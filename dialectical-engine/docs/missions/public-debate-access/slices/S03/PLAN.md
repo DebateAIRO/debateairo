@@ -85,13 +85,45 @@ the file could already satisfy it before proposing a test amendment.**
    shareable via the `?tab=` URL, satisfying the packet's "consider
    deep-linking and shareability" instruction without a second page file
    to keep in sync.
-2. **Tab control markup:** `role="tablist"` wrapping two `<Link
-   role="tab" aria-selected={...}>` elements — anchor tags are natively
-   keyboard-operable (satisfies R2's "reachable by... keyboard" with zero
-   custom key-handling code), and `aria-selected` exposes the selected
-   state (R2's other clause) without a client component or JS state.
+2. **Tab control markup (REV-05, B2, round 1, `t_57891ca5`/`t_a9d1deeb` —
+   REVERSED, was `role="tablist"`/`role="tab"`/`aria-selected`):** plain
+   `<Link>` navigation elements, no ARIA tab role at all.
+   `aria-current={tab === "yours" ? "page" : undefined}` (and the mirror
+   for `"public"`) exposes the selected state instead of `aria-selected`.
+   **Why the reversal:** the original choice took the ARIA tab role's
+   CONTRACT — which promises a screen-reader user arrow-key navigation
+   between an in-page panel set, a single Tab-stop for the whole group,
+   and `aria-controls` linking each tab to its panel — while deliberately
+   declining the role's BEHAVIOR, on the argued grounds that anchors are
+   natively keyboard-reachable "without custom key-handling code." That
+   argument defends generic Tab-key reachability, not the tab widget's own
+   behavioral promise, and is exactly the failure [Using ARIA Rule
+   1](https://www.w3.org/TR/using-aria/#rule1) names — *"No ARIA is better
+   than Bad ARIA"* — measured against the [WAI-ARIA APG Tabs
+   pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), which requires
+   tabpanels, `aria-controls`, and arrow-key roving tabindex, none of which
+   this markup had or should have. No citation was found that defends
+   `role="tab"` without the pattern's behavior — Option 3 (defend as-is) is
+   ruled out for lack of one, not chosen and rebutted.
+   **Why the real tab pattern (tabpanels/`aria-controls`/roving tabindex)
+   is also rejected, not just the naked role:** decision 1's own rationale
+   for putting tab state in `?tab=` is that these are genuine
+   navigations — separate, shareable, deep-linkable URLs that cause a real
+   page load, not a client-side panel switch. That is the opposite of the
+   tab pattern's model (one view, in-page panels, one logical widget).
+   Building tabpanels and roving-tabindex management over two full-page
+   navigations would be a false pattern-match — correct-looking ARIA
+   describing behavior the page does not and, per decision 1, should not
+   have — and would additionally require converting a server component to
+   a client component to own the roving-tabindex state, undoing decision
+   1's "zero client component" rationale for no SPEC-mandated benefit.
+   `aria-current="page"` is the W3C-standard mechanism for "this link
+   represents the current item in a set of navigation links" — real
+   navigation semantics, not borrowed widget semantics — and satisfies
+   SPEC R2's explicit "`aria-pressed`, `aria-selected`, **or equivalent tab
+   semantics**" latitude without a new SPEC version.
    Label text: "Your Debates" / "Public Debates" (Title Case, picking one
-   spelling per SPEC R1's explicit latitude).
+   spelling per SPEC R1's explicit latitude) — unchanged by this reversal.
 3. **Default selection (R6):** logged-out → `public`; logged-in →
    `yours`. Matches the SPEC's own suggested seed. An explicit `?tab=`
    value always wins over the default, for both login states.
@@ -102,20 +134,160 @@ the file could already satisfy it before proposing a test amendment.**
    R5's language, so it is not part of what switches. Only the list
    section below it (today's two stacked `<h2>` blocks) becomes the
    single tab-switched region.
-5. **Your Debates tab, logged out:** shows no list at all (relies on the
-   existing banner above, which already carries the sign-in/create-account
-   CTA) rather than inventing new empty-state markup — satisfies R3
-   ("shows the existing sign-in / create-account path... rather than
-   inventing a global anonymous private list") with zero new markup.
+5. **Your Debates tab, logged out (REV-05, N1, round 1, `t_57891ca5`/
+   `t_a9d1deeb` — REVISED, was "shows no list at all, relies on the
+   existing banner above"):** the original text is now the failure mode,
+   not the answer. The existing sign-in banner (`page.tsx:53-63`) is
+   unconditional on `token === null` and sits ABOVE the tab body,
+   unchanged regardless of which tab is selected — decision 4 explicitly
+   excludes it from being "a list surface" and "part of what switches."
+   That exclusion is correct for decision 4's own purpose (deciding what
+   does NOT re-render per tab), but this decision then reused that same
+   excluded element as if it were the Your-Debates tab's own answer to
+   SPEC R3 ("the Your Debates **surface** shows the existing sign-in /
+   create-account path") — an element decision 4 declares is not part of
+   any tab's surface cannot also be decision 5's proof that the
+   Your-Debates surface satisfies R3. Measured against V's Done criterion 2
+   in its own words, *"clicking either will show the user their debates/the
+   public debates"*: an anonymous visitor who clicks "Your Debates" gets a
+   click that visibly changes nothing — the banner was already on screen,
+   unconditional, before the click. REV-05 finding N1 caught this directly.
+   **This is a HOW defect, not a SCOPE question for V.** SPEC R3 already
+   settles WHAT an anonymous visitor is entitled to see under Your
+   Debates — explicitly "the existing sign-in / create-account path (or
+   equivalent) rather than... a global anonymous private list" — so
+   raising that as a V DECISIONS row would re-litigate an already-settled
+   SPEC clause (`heartbeat-architecture` §1: "settled choices are
+   settled"). What was not settled, and was simply under-executed, is
+   whether the Your-Debates tab's OWN content area has to visibly say so.
+   **Fix: S03-C2-3 below** adds one line of in-panel text inside that
+   tab's own body when logged out, satisfying the SPEC acceptance sketch's
+   explicit alternative "(or empty+CTA)" literally — empty of a list, with
+   a CTA now living inside the panel that switched, not merely inherited
+   from an element decision 4 already excluded from switching.
 
 ## Clusters
 
 | Cluster | Steps | ONE verification command | File surface |
 |---|---|---|---|
-| S03-C1 | S03-C1-1..5 (**REWORK ROUND 1, N5, `t_6f28d98d`**: added C1-4/C1-5 for keyboard accessibility) | `node -e "const s=require('fs').readFileSync('apps/ui/app/page.tsx','utf8'); const need=['role=\"tablist\"','role=\"tab\"','aria-selected','Your Debates','Public Debates']; const missing=need.filter(n=>!s.includes(n)); if(missing.length){console.error('MISSING',missing);process.exit(1)} console.log('OK')" && pnpm exec vitest run tests/unit/pda-s03-keyboard-accessibility.test.ts` | `apps/ui/app/page.tsx`, new `tests/unit/pda-s03-keyboard-accessibility.test.ts` |
-| S03-C2 | S03-C2-1..2 | `curl -sk 'https://localhost:3000/?tab=yours' \| grep -c "Sign in to start\|Your debate workspace"` (own live probe pattern; worker re-runs against a running dev server, both logged-in and logged-out session states) | `apps/ui/app/page.tsx` |
-| S03-C3 | S03-C3-1..3 (**SCOPE-BOUNDARY thread, round 1, Finding 2, `t_5560836d`**: added C3-3, the negative/absence probe S03-CODE's review correctly said was missing) | `curl -sk 'https://localhost:3000/?tab=public' \| grep -c "/public/debate/"` (positive; see S03-C3-3 for the negative counterpart) | `apps/ui/app/page.tsx` |
+| S03-C1 | S03-C1-1..5 (**REWORK ROUND 1, N5, `t_6f28d98d`**: added C1-4/C1-5 for keyboard accessibility) | `node -e "const s=require('fs').readFileSync('apps/ui/app/page.tsx','utf8'); const need=['aria-current','Your Debates','Public Debates']; const forbidden=['role=\"tablist\"','role=\"tab\"','aria-selected']; const missing=need.filter(n=>!s.includes(n)); const present=forbidden.filter(n=>s.includes(n)); if(missing.length||present.length){console.error('MISSING',missing,'FORBIDDEN-PRESENT',present);process.exit(1)} console.log('OK')" && pnpm exec vitest run tests/unit/pda-s03-keyboard-accessibility.test.ts` (**RATIFIED, item 3, `t_7539734e`: S03-CODE's Row 7 in-place correction of the escaped `\|\|`, which this same seat's CLASS-FIX round had already identified as broken and deliberately left untouched pending exactly this — verified independently: extracted and run against both an empty string and the coding seat's finished worktree, no syntax error, correct OK/exit-0 result. REV-05, B2, round 1, `t_57891ca5`/`t_a9d1deeb` — command REVISED**: `need` swapped from the old ARIA-tab markers to `aria-current`; a new `forbidden` arm fails the check if `role="tablist"`/`role="tab"`/`aria-selected` are still present, so a fix that adds `aria-current` alongside the old markup instead of replacing it does not pass — see the note below the table) | `apps/ui/app/page.tsx`, `tests/unit/pda-s03-keyboard-accessibility.test.ts` |
+| S03-C2 | S03-C2-1..3 (**REV-05, N1, round 1, `t_57891ca5`/`t_a9d1deeb`**: added C2-3, the in-panel logged-out CTA) | **run block `S03-C2-live` below** (own live probe pattern; worker re-runs against a running dev server, both logged-in and logged-out session states) — **CLASS-FIX ROUND 1 (`t_7539734e`): moved out of this table cell, see the note below the table** | `apps/ui/app/page.tsx` |
+| S03-C3 | S03-C3-1..3 (**SCOPE-BOUNDARY thread, round 1, Finding 2, `t_5560836d`**: added C3-3, the negative/absence probe S03-CODE's review correctly said was missing) | **run block `S03-C3-live` below** (positive; see S03-C3-3 for the negative counterpart) — **CLASS-FIX ROUND 1 (`t_7539734e`): moved out of this table cell, see the note below the table** | `apps/ui/app/page.tsx` |
 | S03-C4 | S03-C4-1..2 | `grep -c "logged-out.*Public Debates\|logged-in.*Your Debates" docs/missions/public-debate-access/slices/S03/DECISIONS.md` | `docs/missions/public-debate-access/slices/S03/DECISIONS.md` (documentation only) |
+
+```sh
+# S03-C2-live (own live probe pattern; worker re-runs against a running dev server,
+# both logged-in and logged-out session states). The shell pipe between curl and
+# grep is REAL (fenced blocks need no markdown escaping); the `\|` INSIDE the grep
+# pattern stays escaped on purpose — that one is grep BRE alternation syntax, not a
+# markdown artifact, and removing it changes the match from "any of three strings"
+# to "this one literal string containing pipe characters" (own re-verification
+# below caught exactly this when a first draft of this block wrongly unescaped it).
+curl -sk 'https://localhost:3000/?tab=yours' | grep -c "Sign in to start\|Your debate workspace\|tabEmptyHint"
+
+# S03-C3-live (positive; see S03-C3-3 for the negative counterpart) — single
+# pattern, no internal alternation, nothing to escape either way.
+curl -sk 'https://localhost:3000/?tab=public' | grep -c "/public/debate/"
+```
+
+**CLASS-FIX, ROUND 1 (`t_7539734e`): the fifth variant came back, in my own
+REV-05/B2 fix, and the round-4 "class fix" (cap waived by V, Row 6) did
+NOT close the class — it closed three instances.** What happened: REV-05's
+B2 fix added the S03-C1 cluster command's first compound condition,
+written `if(missing.length\|\|present.length)` — a **markdown-escaped
+pipe inside a raw JavaScript operator**, sitting in a table cell. Run
+literally (extracted, not read): `node` throws `Expression expected`
+before evaluating anything. Both the broken and correct forms exit `1`
+today (one from the syntax error, one because `aria-current` genuinely
+isn't in the code yet) — indistinguishable now, but `S03-C1` is a
+FEATURE-ASSERTION that must go GREEN once B2 lands, and the escaped form
+never can, because a syntax error does not depend on the state of the
+code. That specific instance was left for the coding seat to correct in
+place (Row 7 authority, provisional on ratification) and was **not
+touched by that round** — `.worktrees/s03-code` was not read or written
+then. **RATIFIED this round (item 3, `t_7539734e`, FOUR-ITEMS bundle):**
+the seat's in-place correction (`\|\|` → `||`, nothing else changed on
+that line) is now applied to the cell above — verified independently by
+extracting and running it against the coding seat's finished worktree
+(no syntax error, `OK`, exit 0) before ratifying, not accepted on the
+ticket's word.
+
+**Why round 4's fix didn't hold, concretely.** Round 4 found three sites
+with this shape (S01-C1/C2/C3's `vitest -t` presence arms) and extracted
+all three into labeled fenced blocks, closing those instances. But the
+FIX removed occurrences, not the **generating condition**: a markdown
+table cell cannot carry a raw `|` at all, so ANY command written directly
+into a table cell that needs a literal pipe character — for ANY reason,
+in ANY language — must be escaped to survive the table, and that escape
+is silently wrong or fatal depending on what actually reads the raw
+source text. Round 4 checked the ONE known variant (`vitest -t`'s JS
+regex, where `\|` parses fine but means "escaped literal pipe," a silent
+wrong-match) and confirmed S02/S03/S04 had no occurrence of THAT variant.
+It did not ask the more general question: does this file have ANY table
+cell containing a raw pipe, regardless of what interprets it? It did not,
+and this round's own sweep (below) found the general case still live —
+in S03, in a table cell one row below the one just "closed," and in S01,
+in a table cell in the exact same table three rows just fixed.
+**A fix that only removes existing occurrences of a known shape is not a
+class fix; a class fix removes the condition that generates the shape.**
+
+**What actually closes the class: stop putting executable commands in
+table cells, full stop — not "unless the pipe happens to be
+alternation-safe."** The two `curl | grep` commands above (S03-C2,
+S03-C3) are moved into the `S03-C2-live`/`S03-C3-live` fenced blocks
+just added, with real unescaped pipes, exactly as S01 already did for
+its three `vitest -t` presence arms. The table cells now hold a label,
+never executable text. **`S03-C1` is deliberately left as the one
+exception this round** (coding-seat-owned edit in progress) — flagged
+here as a known follow-up: once that pipe correction is ratified, S03-C1
+should ALSO move into a labeled fenced block, or the table will carry
+exactly one bare command again and the class will have one surviving
+foothold.
+
+**Why this is a stronger rule than "escape correctly": the escape is
+invisible in rendered markdown.** A stranger reading the rendered PLAN.md
+sees a clean `||` or a clean `| grep` — GitHub, most editors, and any
+markdown viewer render `\|` as a single `|` character, indistinguishable
+from an unescaped one at a glance. The defect is only visible by reading
+the RAW source bytes or by extracting and running the command — which is
+exactly why this survived a full round of review, a peer-review diamond,
+and this seat's own "run every command" sweep in round 4 (that sweep ran
+the commands that existed then; it could not have run a command not yet
+written). No amount of "read the PLAN more carefully" fixes this — the
+document format itself hides the defect from a reader. Removing table
+cells as a place executable text can live removes the hiding place, not
+just this round's instances of it.
+
+**Sweep, this round — confirmed by EXTRACTING and RUNNING every command
+matching this shape in all four PLANs, not by reading:**
+
+| Site | Shape | Extracted, run literally | Verdict |
+|---|---|---|---|
+| S03-C1 (line 173 pre-fix) | `\|\|` inside `node -e` | `node` throws `SyntaxError: Expression expected` | **BROKEN** — was the coding seat's fix in progress at the time; **RATIFIED this round (item 3, `t_7539734e`)** — see the corrected cell above and the ratification note below the class-fix section |
+| S03-C2 (line 174 pre-fix) | `curl ... \| grep ...` | full HTML body dumped to stdout, grep never runs, `-c` count never produced | **BROKEN** — fixed this round (`S03-C2-live` block) |
+| S03-C3 (line 175 pre-fix) | `curl ... \| grep ...` | same failure as S03-C2 | **BROKEN** — fixed this round (`S03-C3-live` block) |
+| S03-C2/C3 category-note rows (below) | same `curl ... \| grep ...`, quoted a second time as illustrative evidence | same failure | **BROKEN** — fixed this round, repointed at the same blocks |
+| S03-C4 | `grep -c "...\|..."` (grep-internal alternation only, no shell pipe) | ran clean, alternation matched both branches | safe — confirmed, not touched |
+| S01-C4 (`S01/PLAN.md:437`) | `printf ... \| grep ... \| tail ...` (three escaped shell pipes) | extracted and run exactly as written: `printf`'s extra arguments get recycled into the format string, `grep`/`tail` never run as separate processes, `guard` comes back wrong (`guard=1`, a FALSE FAIL, on a case that is a genuine pass) | **BROKEN — proven, in scope (any PLAN the sweep proves broken); fixed this round in `S01/PLAN.md`** |
+| S01-C1/C2/C3 presence-arm blocks | already extracted to fenced blocks in round 4 | ran clean with real `\|` | safe, unaffected |
+| S01 lines 924/1099/1188/1193/1461/1479/1562/1674/1787/2248 | `grep`-internal `\|` (inline code spans, not table cells) or historical prose quoting the OLD escaped form for illustration | ran clean where live; historical text is not executed | safe — confirmed, not touched |
+| S02 lines 126/147/664/778/828 | `grep`-internal `\|` (table cells and inline spans) | ran clean, alternation matched as intended | safe — confirmed, not touched |
+| S04 lines 210/411 | `grep`-internal `\|` (inline spans, one with `\(...\)` groups) | ran clean, alternation and grouping both matched as intended | safe — confirmed, not touched |
+
+**Conclusion: two PLANs needed a fix this round — S03 (this file, three
+sites plus the coding seat's in-progress fourth) and S01 (one site,
+`S01-C4`, fixed in `S01/PLAN.md` this round under this same ticket, since
+the sweep proved it broken and this PLAN's own scope covers "any PLAN
+whose command your sweep proves is broken").** S02 and S04 are clean —
+every occurrence of `\|` in both files is grep-internal alternation,
+confirmed safe by running it, not assumed from the pattern looking
+familiar.
+
+`t_b81ee2b2` (small, factual): the `S03-C1` pre-fix RED evidence row
+below described the OLD command (5 ARIA markers required-and-missing)
+after the command itself had already been revised to the new
+`need`/`forbidden` shape — documenting a run that could no longer happen.
+Corrected in place, re-run against base commit, result recorded below.
 
 **REWORK ROUND 4 (PLAN-03, blocking, `t_71699495`): every command above RUN,
 not just edited.** S03 used `--reporter=basic` twice (in S03-C1's compound
@@ -131,9 +303,9 @@ cases), a plain grep/node-script with its own honest exit code, or a live
 
 | Cluster | Category | Observed pre-fix result |
 |---|---|---|
-| S03-C1 | FEATURE-ASSERTION | **RED, genuinely:** the `node -e` structural check reports all 5 required markers (`role="tablist"`, `role="tab"`, `aria-selected`, `Your Debates`, `Public Debates`) MISSING, exit 1 — short-circuits before the `&&`'d vitest call. |
-| S03-C2 | REGRESSION-BASELINE | **GREEN today, for a baseline reason, not a built-feature reason:** `curl -sk 'https://localhost:3000/?tab=yours' \| grep -c "Sign in to start\|Your debate workspace"` → `1` — today's page ignores the (not-yet-implemented) `?tab=` param entirely and unconditionally shows one of the two banner strings; the count must stay ≥1 once C2-1's gating exists. |
-| S03-C3 | REGRESSION-BASELINE | **GREEN today, same reason as S03-C2:** `curl -sk 'https://localhost:3000/?tab=public' \| grep -c "/public/debate/"` → `1` — the published list is shown unconditionally today. |
+| S03-C1 | FEATURE-ASSERTION | **RED, genuinely — row REVISED (`t_b81ee2b2`): the row previously here described the pre-REV-05 command (5 required markers, all MISSING) which the B2 fix supersedes; that run can no longer happen.** Current `need`/`forbidden` check, run 2026-08-29 against base commit: `MISSING ['aria-current','Your Debates','Public Debates'] FORBIDDEN-PRESENT []`, exit 1 — short-circuits before the `&&`'d vitest call. |
+| S03-C2 | REGRESSION-BASELINE | **GREEN today, for a baseline reason, not a built-feature reason (CLASS-FIX ROUND 1, `t_7539734e`: re-run via the `S03-C2-live` block, this cell no longer embeds the command):** `S03-C2-live` → `1` — today's page ignores the (not-yet-implemented) `?tab=` param entirely and unconditionally shows one of the two banner strings; the count must stay ≥1 once C2-1's gating exists. |
+| S03-C3 | REGRESSION-BASELINE | **GREEN today, same reason as S03-C2 (CLASS-FIX ROUND 1, `t_7539734e`: re-run via the `S03-C3-live` block):** `S03-C3-live` → `1` — the published list is shown unconditionally today. |
 | S03-C4 | VERIFICATION-ONLY | **GREEN, correctly:** `grep -c "logged-out.*Public Debates\|logged-in.*Your Debates" docs/missions/public-debate-access/slices/S03/DECISIONS.md` → `2` — the default-selection decision is already durably recorded (Architecture decision §3 above). |
 
 **ACCEPTANCE-COMMAND THREAD, ROUND 2 (PLAN-04, blocking, `t_eade6007`):
@@ -144,6 +316,36 @@ script (`&&`-chained to vitest, not piped through grep), plain `grep -c`/
 output into a second process whose exit status silently replaces the
 first's. Re-run 2026-08-29: the `node -e` structural check still reports
 all 5 markers MISSING, exit 1 — unaffected by this round's fix.
+
+**REV-05 FINDINGS, ROUND 1 (`t_57891ca5`/`t_a9d1deeb`): B2 and N1, both
+Architecture's own design, not the coder's.** A blind Grok lens reviewed
+S03's already-implemented code and returned REWORK. Two of its three
+findings are recorded here (the third, B1, is the coding seat's, being
+reworked live in `.worktrees/s03-code` — not this PLAN's concern).
+
+- **B2 (blocking):** `role="tablist"`/`role="tab"`/`aria-selected` on
+  `next/link` navigation elements, with no tabpanel, no `aria-controls`,
+  no arrow-key behavior, is Bad ARIA per Using ARIA Rule 1 — see
+  Architecture decision 2 above (revised in place) for the full argument
+  and citations. **Pinned in two places, both now addressed:** the
+  `S03-C1` cluster's `node -e` check (table above, revised) and
+  `tests/unit/pda-s03-keyboard-accessibility.test.ts` (NOT revised here —
+  out of this round's bounds, a coding-seat file; **coordination note**:
+  that test currently asserts `role="tab"`, per the brief, and will need a
+  follow-up edit, on its own ticket, once this markup change is coded —
+  until then the `S03-C1` cluster's compound acceptance command stays
+  correctly RED after B2's fix lands and before that follow-up lands, not
+  falsely green; this is an intentional, disclosed sequencing dependency,
+  not a defect).
+- **N1:** an anonymous visitor clicking "Your Debates" saw neither list,
+  with the click producing no visible change — see Architecture decision 5
+  above (revised in place) and new step S03-C2-3 below for the ruling (a
+  HOW defect, not a V scope question) and the fix.
+
+Both fixes are markup/PLAN changes only, described here for the coding
+seat to implement on separate future tickets — no product code or test
+file was written or touched by Architecture this round, and
+`.worktrees/s03-code` was not read or written.
 
 ## SPEC trace — R1 Both controls present
 
@@ -181,7 +383,7 @@ case.
 **Failure it MISSES:** does not catch `token` itself being wrong (that
 logic predates this PLAN, at `page.tsx:15`, untouched here).
 
-### S03-C1-2 — Replace the two `<h2>` headings with a `role="tablist"` pair
+### S03-C1-2 — Replace the two `<h2>` headings with a plain-link pair (REV-05, B2, round 1, `t_57891ca5`/`t_a9d1deeb` — REVISED, was a `role="tablist"` pair)
 
 **Cluster:** S03-C1
 **File surface:** `apps/ui/app/page.tsx:80-89` and `:97-104` (the two
@@ -190,18 +392,16 @@ logic predates this PLAN, at `page.tsx:15`, untouched here).
 <span className="count">...</span></div>` blocks with a single shared
 block above the (now-conditional) list body:
 ```tsx
-<div className="sectionHead" role="tablist" aria-label="Debate library">
+<div className="sectionHead" aria-label="Debate library">
   <Link
-    role="tab"
-    aria-selected={tab === "yours"}
+    aria-current={tab === "yours" ? "page" : undefined}
     href="/?tab=yours"
     className={tab === "yours" ? "tab tabActive" : "tab"}
   >
     Your Debates
   </Link>
   <Link
-    role="tab"
-    aria-selected={tab === "public"}
+    aria-current={tab === "public" ? "page" : undefined}
     href="/?tab=public"
     className={tab === "public" ? "tab tabActive" : "tab"}
   >
@@ -216,18 +416,31 @@ block above the (now-conditional) list body:
 ```
 The count `<span>` logic is a straight port of the two existing count
 expressions (`page.tsx:82-87` and `:99-103`), unchanged in substance,
-merged behind the `tab` conditional rather than duplicated.
+merged behind the `tab` conditional rather than duplicated. No
+`role="tablist"`, `role="tab"`, or `aria-selected` anywhere — removed
+entirely, not merely supplemented, per Architecture decision 2's reversal.
 **Acceptance test:** `grep -c '<h2>Your debates</h2>\|<h2>Published debates</h2>' apps/ui/app/page.tsx`
-returns `0` (both old headings gone) AND `grep -c 'role="tab"'
-apps/ui/app/page.tsx` returns `2`.
-**Category (REWORK ROUND 4, PLAN-03, `t_71699495`): FEATURE-ASSERTION —
-observed pre-fix RED, correctly.** Run 2026-08-29: first grep → `2`
-(both old headings present, wants `0`); second grep (`role="tab"`) →
-`0` (wants `2`). Both halves of this two-part check are genuinely RED.
+returns `0` (both old headings gone) AND `grep -c 'aria-current='
+apps/ui/app/page.tsx` returns `2` AND `grep -c 'role="tab"'
+apps/ui/app/page.tsx` returns `0` (proves the old Bad-ARIA markup was
+actually removed, not left alongside the new attribute — the same
+exclusive-provenance failure shape this mission has hit before: a PASS
+that a `need`-only check without a `forbidden` arm cannot distinguish from
+"added the new thing without removing the old one").
+**Category (REV-05, B2, round 1, `t_57891ca5`/`t_a9d1deeb` — markers
+revised; category unchanged): FEATURE-ASSERTION — observed pre-fix RED,
+correctly.** Run 2026-08-29 against `apps/ui/app/page.tsx` at base commit:
+first grep (old headings) → `2` (wants `0`); second grep (`aria-current=`)
+→ `0` (wants `2`); third grep (`role="tab"`) → `0` (wants `0`, already
+correct — the markup never existed at base commit, so this arm is
+currently vacuously satisfied and only becomes a live check once the
+now-superseded `role="tab"` markup that REV-05 flagged is removed again).
 **Failure it CATCHES:** SPEC's Intent ("Replace passive... headings with
 selectable... controls") not actually being followed — a plan that adds
 new buttons ALONGSIDE the old headings (satisfying R1's letter while
-contradicting its Intent) is caught by the first grep returning nonzero.
+contradicting its Intent) is caught by the first grep returning nonzero;
+Bad-ARIA regression (adding `role="tab"` back, or adding `aria-current`
+without removing it) is caught by the third grep returning nonzero.
 **Failure it MISSES:** does not catch the controls being present but
 UNREACHABLE (e.g. `visibility: hidden` in CSS) — a visual/CSS regression
 outside a source-text grep's reach; S03-C1-3's live probe is the closer
@@ -270,27 +483,45 @@ NOT (routed to QA below, not silently dropped).
 ### S03-C1-4 — Mechanical test: the tab controls are natively focusable elements, not JS-only pseudo-controls
 
 **Cluster:** S03-C1
-**File surface:** new `tests/unit/pda-s03-keyboard-accessibility.test.ts`
-(source-text based, following the `v2ui-pages.test.ts` convention already
-established for this slice, since `page.tsx` is a server component with
-no DOM-render path — see this PLAN's "MEASURED ground truth" section)
-**Change:** Write a test that reads `apps/ui/app/page.tsx`'s source text
-and asserts, for BOTH tab elements: (1) the element is a `<Link` (which
-Next.js compiles to a real `<a href>`, per Next's own documented behavior
-— not a `<div>`/`<span>` with an `onClick`, which would NOT be
-keyboard-focusable without a manually-added `tabIndex={0}` and manual
-`onKeyDown` Enter/Space handling); (2) it carries a real, non-empty
-`href="/?tab=..."` (an anchor with no `href` is NOT in the native tab
-order — this is the single most common way a "looks like a link" element
-silently fails keyboard access); (3) neither `tabIndex={-1}` nor
-`disabled` appears anywhere on the same element (either would remove it
-from the tab order or block activation). This is a STRONGER guarantee
-than a simulated keypress would be for this specific case: a native
-`<a href>` with none of these three defects is GUARANTEED by the HTML
-platform, not by this app's own JS, to be Tab-reachable and
-Enter-activatable — there is no app-level keyboard-handling LOGIC here to
-regression-test, because S03's design (decision 2, tabs-on-`/` via plain
-navigation) deliberately introduces none.
+**File surface:** `tests/unit/pda-s03-keyboard-accessibility.test.ts`
+(**STALE-RECORD FIX, item 2, `t_63f6e7e6` — third instance of this
+disease after the stale "Row 4, still OPEN" text and the stale S04
+checklist items 3/3b: this description previously said "source-text
+based, following the `v2ui-pages.test.ts` convention... no DOM-render
+path," which stopped being true when B1's rework replaced it. Corrected
+below from the file as it now stands, not from memory of what it was
+authored to be.**) Actually renders: calls the real `HomePage` function
+(mocking only `@/lib/serverApi`'s `createServerContractClient` and
+`next/headers`), pipes the result through `react-dom/server`'s
+`renderToStaticMarkup`, and parses that markup with `jsdom` into a real
+`Document` — a genuine DOM, not a source-text pattern match.
+**Change:** none this round (test file, not this PLAN's to edit — see
+scope). For the record, what it now asserts, per the two tab links,
+across both `tab=yours` and `tab=public` renders (`it.each`): tag name is
+literally `A` (a real anchor, not a `<div onClick>`); `href` matches the
+exact expected destination; `tabIndex === 0` (native tab order); no
+`disabled` attribute and `aria-disabled` is not `"true"`; `role` is
+**not** `"tab"` and `role` on the wrapping nav element is **not**
+`"tablist"`, and `aria-selected` is **absent** (B2's reversal, asserted
+as a negative — the exact markup this mission's REV-05 round removed
+must stay removed); `aria-current` is `"page"` on the selected link and
+`null`/absent on the other (B2's replacement, asserted as the positive);
+an accessible name (via `aria-label`, `aria-labelledby` resolution, or
+text content) equals the expected label; and a `knownConcealmentBarrier`
+walk up the ancestor chain confirms no `hidden`/`aria-hidden="true"`/
+`inert`/`display:none`/`visibility:hidden|collapse`/
+`content-visibility:hidden` conceals the link (an enumerated, disclosed-
+as-non-exhaustive check, not a full accessibility-tree computation — JSDOM
+has none). A second `it()` covers N1's `tabEmptyHint` fix: rendering
+`tab=yours` logged-out shows a `<p class="tabEmptyHint">` with the exact
+sign-in copy immediately after the nav element, and rendering `tab=public`
+shows no such element at all. This is STILL a stronger guarantee than a
+simulated keypress for the native-anchor properties (tag/href/tabIndex/
+disabled are HTML-platform guarantees once true, not app-JS behavior to
+regress) but is now ALSO a real, if JSDOM-limited, DOM-render check for
+the ARIA-role and concealment properties that a source-text match could
+never have covered — the file surface changed shape after B1's rework;
+this description now matches the file, not the file's first draft.
 **Acceptance test:** `pnpm exec vitest run tests/unit/pda-s03-keyboard-accessibility.test.ts`
 exits 0.
 **Category (REWORK ROUND 4, PLAN-03, `t_71699495`): FEATURE-ASSERTION —
@@ -298,16 +529,32 @@ observed pre-fix RED, correctly.** Run 2026-08-29: exit 1, `No test files
 found, exiting with code 1` — single-file target, the file does not exist
 yet; no vacuous-pass risk (this is the same genuine-RED shape as S01's
 single-missing-file steps, not S01's multi-file vacuous-pass defect).
-**Failure it CATCHES:** the actual historical failure mode this class of
+**Failure it CATCHES (STALE-RECORD FIX, item 2, `t_63f6e7e6` — extended,
+not just corrected, since the real test catches more than the old
+description claimed):** the actual historical failure mode this class of
 bug takes — a developer reaching for a `<div role="tab" onClick={...}>`
 instead of a real `<Link>` (visually identical, silently NOT
 keyboard-operable), or an `href` that's empty/missing because the `tab`
 variable was interpolated wrong, or a stray `tabIndex={-1}` copied from
-an unrelated pattern elsewhere in the codebase.
-**Failure it MISSES:** does not catch a CSS `pointer-events`/`visibility`
-rule that hides a technically-focusable element from sighted keyboard
-users (focus lands somewhere invisible) — a real gap, honestly left to
-QA, not claimed as covered here.
+an unrelated pattern elsewhere in the codebase. Now ALSO catches: B2's
+own regression class — `role="tab"`/`role="tablist"`/`aria-selected`
+reappearing (asserted absent, not merely unmentioned) — and `aria-current`
+being wrong or missing on the selected link; and N1's regression class —
+the `tabEmptyHint` sign-in pointer disappearing from the logged-out
+Your-Debates render, or leaking into the Public-Debates render where it
+must be absent.
+**Failure it MISSES (corrected, same round):** a CSS `pointer-events: none`
+rule that leaves an element visible and "focusable" by this test's own
+checks but unclickable by a pointing device — still not checked, and
+still honestly left to QA. **No longer accurate as previously written**:
+the old text claimed visibility-based concealment (`display`/`visibility`)
+was also missed; `knownConcealmentBarrier`'s computed-style walk now
+checks `display:none`, `visibility:hidden`/`collapse`, and
+`content-visibility:hidden` up the whole ancestor chain, so that part of
+the old claim is stale, not merely imprecise — it describes a gap that
+closed. Real screen-reader announcement quality and real browser
+focus-ring visibility remain S03-C1-5's QA-routed gaps, unaffected by
+this test's upgrade.
 
 ### S03-C1-5 — Route to QA: what this PLAN does not and cannot mechanically verify
 
@@ -316,13 +563,17 @@ QA, not claimed as covered here.
 **Change:** none — **this step exists so the boundary is explicit rather
 than silently assumed**, per the brief's own either/or instruction.
 Three things S03-C1-4's structural test does NOT and cannot prove, named
-so QA picks them up rather than nobody: (1) that a real screen reader
-announces "Your Debates, tab, 1 of 2, selected" (or equivalent) in a way
-that is actually COMPREHENSIBLE, not just technically ARIA-compliant —
-`role="tab"` outside a screen-reader-recognized `role="tablist"` container
-can announce oddly in some assistive tech, and only a real AT (assistive
-technology) session proves the experience is good, not merely present;
-(2) that visible focus styling (an outline/ring on `:focus-visible`)
+so QA picks them up rather than nobody: (1) **(REV-05, B2, round 1,
+`t_57891ca5`/`t_a9d1deeb` — revised: the markup this item describes
+changed from a naked `role="tab"` to `aria-current="page"`, which lowers
+but does not zero this risk)** that a real screen reader announces the
+current-page state for `aria-current="page"` in a way that is actually
+COMPREHENSIBLE in the specific AT/browser combination QA uses —
+`aria-current` is a well-supported, standard attribute with a much more
+predictable announcement than the previous round's naked `role="tab"`
+outside a `role="tablist"` container, so residual risk here is lower, but
+verifying an actual AT session's experience is still QA's job, not a
+source-text test's; (2) that visible focus styling (an outline/ring on `:focus-visible`)
 exists and is legible — this PLAN adds no CSS and inherits whatever
 `.tab`/`.tabActive` classes resolve to, UNVERIFIED by this seat; (3) that
 Tab ORDER relative to the rest of the page (composer, sign-in banner) is
@@ -409,6 +660,42 @@ programmatically for this probe was not itself executed by Architecture
 (out of bounds: "you write no product code and run no product tests" —
 this is a worker-time verification step, described precisely enough to
 run, not run here).
+
+### S03-C2-3 — In-panel sign-in pointer for the Your-Debates tab, logged out (REV-05, N1, round 1, `t_57891ca5`/`t_a9d1deeb`)
+
+**Cluster:** S03-C2
+**File surface:** `apps/ui/app/page.tsx` (same block as S03-C2-1)
+**Change:** extend S03-C2-1's conditional with an explicit `else if`
+branch for the logged-out case, so the Your-Debates tab's own content area
+is never blank when selected:
+```tsx
+{sessionConfirmed && tab === "yours" ? (
+  <div className="recentList"><DebatesBuffer debates={debates} /></div>
+) : tab === "yours" ? (
+  <p className="tabEmptyHint">Sign in or create an account above to see your debates.</p>
+) : null}
+```
+This does NOT invent a global anonymous private list (still forbidden by
+SPEC R3) — it is one line of text pointing at the sign-in banner that
+already exists above (`page.tsx:53-63`, decision 4, unchanged), rendered
+INSIDE the tab body that actually switched, rather than relying on an
+element decision 4 already declared is not part of any tab's surface.
+Satisfies the SPEC acceptance sketch's explicit "(or empty+CTA)"
+alternative literally.
+**Acceptance test:** `grep -c 'tabEmptyHint' apps/ui/app/page.tsx` returns
+`≥1`.
+**Category (REV-05, N1, round 1, `t_57891ca5`/`t_a9d1deeb`):
+FEATURE-ASSERTION — observed pre-fix RED, correctly.** Run 2026-08-29:
+`grep -c 'tabEmptyHint' apps/ui/app/page.tsx` → `0` — the string does not
+exist in today's page.
+**Failure it CATCHES:** the exact defect REV-05's N1 found — an anonymous
+visitor's click on "Your Debates" producing no visible change to the
+panel that switched (the sign-in banner, unconditional and already
+visible above, does not count as content of the tab that just activated).
+**Failure it MISSES:** does not catch the hint text being present but
+poorly worded or not actually near enough to the banner's own CTA link to
+read as connected to it — a copy/UX-polish judgment, not a structural one;
+left to QA the same way S03-C1-5 leaves comparable polish questions there.
 
 ## SPEC trace — R4 Public Debates shows published debates
 
@@ -650,3 +937,14 @@ design explicitly avoids needing to touch — see standing-test analysis
 above) plus a new QA verdict file. **S03 has no file-surface collision
 with any other slice and no hard dependency on S01 or S02 — it can be
 implemented and merged independently, in parallel.**
+
+**FOUR-ITEMS bundle, item 1 (`t_5d2a4e79`), cross-check confirmed, not
+re-derived:** the same standing test's line 159 (`home` contains
+"Published debates," the exact heading S03 replaces with tabs) was
+already re-verified by the Router against S03's finished worktree — 5/5
+passed, the string survives twice in S03's own `page.tsx` (per the "what
+I nearly got wrong" note and the standing-test analysis above). Disjoint
+write surfaces held for S03 on this axis; the round's actual finding
+(disjoint writes don't imply independent effects) landed on S02's write
+to a DIFFERENT block of the same file (lines 168-174), not on anything
+S03 touches. No S03/PLAN.md change follows from item 1 beyond this note.

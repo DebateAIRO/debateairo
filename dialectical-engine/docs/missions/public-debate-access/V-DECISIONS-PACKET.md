@@ -200,3 +200,114 @@ owner may author a fix to `PLAN.md`.** Its bounds, so it does not become general
 **Standing consequence:** where a rework cap and a demonstrably-wrong instruction collide, V would
 rather the seat with the evidence fix it and disclose than have the fleet either encode a known
 fiction or spend a round on a one-line factual correction.
+
+---
+
+## Row 8 — S03's live probes cannot observe the code under test; the dev stack is single-instance and hardcoded to :3000 (DECIDE)
+
+**Raised by:** the S03-CODE seat, as a BLOCKER, at its own exit 2026-08-29 22:08. It refused to
+report the probe as passing and refused to touch the shared server. That was the correct call and
+it is why this row exists rather than a false green.
+
+**MEASURED, not inferred:**
+
+- `apps/ui/app/page.tsx` — S03's implementation — is complete in `.worktrees/s03-code` and locally
+  green: `tsc --noEmit` exit 0; the new accessibility test `1 passed/1`; `git diff --check` clean.
+- The seat **mutation-tested its own assertion**, which is the part that makes this trustworthy:
+  mutating `Link` → `div` produced a genuine `1 failed/1`, and a neighbour-styling mutant stayed
+  passing. The test discriminates, and it is specific rather than over-broad.
+- S03-C3-3's acceptance is a LIVE probe:
+  `curl -sk 'https://localhost:3000/?tab=yours' | grep -c "/public/debate/"`.
+- `https://localhost:3000` is served by PID 43352, whose cwd is the **main checkout**
+  (`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`), NOT the seat's worktree.
+  **The probe therefore observes a tree that does not contain the change it is verifying.**
+- The dev stack cannot be run twice: `apps/runner/src/dev-auth-stack.ts:122` calls
+  `isPublicPortOccupied()` and throws `DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED` when 3000 is taken,
+  and the origin is a hardcoded **type-level literal** `"https://localhost:3000"` (lines 62, 163).
+  There is no port env knob — I looked for one.
+
+**Why the fleet cannot resolve this itself.** Making the port configurable is a product change in
+`apps/runner/**`: outside S03's file surface, outside this mission's scope, and not authorable by
+the Router. Freeing :3000 means stopping a server shared with other in-flight missions, which
+collides with your standing instruction not to disturb another mission's work.
+
+**This is the same defect shape as the acceptance-command family, one level up.** Variant 1 was a
+command that could not observe its own change because the path was gitignored. This is a command
+that cannot observe its own change because it is pointed at a different *runtime*. The assertion
+is fine; the thing it looks at is the wrong world.
+
+**Options:**
+
+1. **Defer the live probes to the QA loop** *(Router's recommendation)*. S03-CODE hands off with
+   the implementation, the passing test, and the mutation evidence, and the probe recorded
+   UNVERIFIED-BY-RUNTIME with its exact command — the identical treatment S03-C3-3 direction 2
+   already has. QA owns Manual QA runs under the spine and must answer the runtime question anyway
+   for direction 2, so this consolidates one problem instead of solving it twice. Costs nothing now.
+2. **Authorize a coordinated server swap**: stop PID 43352, serve the worktree on :3000, run both
+   probes, restore. Verifies the real thing today. Risk: it disturbs whatever else depends on that
+   server, and the observability mission has in-flight work.
+3. **Authorize a small product change** making the dev-stack port configurable. Cleanest long-term
+   and unblocks every future worktree probe in this repo, but it is scope expansion mid-mission and
+   needs its own slice and review.
+
+**Nothing is blocked on this today** — S02 is running, and S03's remaining work does not depend on
+the answer. It becomes blocking when QA starts.
+
+---
+
+## Row 8 — CLOSED 2026-08-29 by V — live probes deferred to QA
+
+**V's ruling: DEFER THE LIVE PROBES TO THE QA LOOP.** Option 1 of the three offered.
+
+The shared dev server on `:3000` is **not** to be stopped, swapped, or reconfigured, and the
+dev-stack port is **not** to be made configurable as part of this mission. S03-CODE hands off with
+its implementation, its passing accessibility test and its mutation evidence, and S03-C3-3 stands
+recorded **UNVERIFIED-BY-RUNTIME** with the exact command and the PID/cwd evidence — the identical
+treatment direction 2 already carried as UNVERIFIED-BY-ARCHITECTURE.
+
+**Consequence for QA:** QA now inherits BOTH directions of S03-C3-3 plus S03-C1-3, and it must
+answer the runtime question to discharge any of them. It cannot discharge them from the shared
+main-checkout runtime — that runtime does not contain the change. QA must say what it did about
+that before reporting a verdict on those steps; an unqualified PASS on a probe run against
+`:3000` would be the same defect this row exists to record.
+
+**Compliance verified at the seat's exit:** S03-CODE-R2 recorded exactly this and confirmed *"the
+server was not stopped, restarted, or reconfigured"* and *"no runner modification"*.
+
+---
+
+## Row 9 — CLOSED 2026-08-30 by V — the contract's lone `.passthrough()` becomes `.strict()`
+
+**V's ruling: MAKE IT `.strict()` — FAIL LOUDLY.** Chosen over silent stripping and over deferral.
+
+**The finding.** `packages/contract/src/index.ts:434`, inside `NodeSchema` (line 424), which
+`PublicDebateSchema` reaches via `answer.nodes`:
+
+    stranger_restatement: z.object({ check_status: CheckStatusSchema }).passthrough(),
+
+The **only** `.passthrough()` in the contract. `PublicDebateSchema` is `.strict()` at both levels and
+every sibling object is `.strict()`. Router reproduction
+(`.hermes/reports/public-debate-access/probes/passthrough-probe.mts`):
+
+    parse_success: true
+    keys_that_survived: ["check_status","SMUGGLED_OWNER_SECRET"]
+    SMUGGLED_VALUE: ledger:abc-123
+    VERDICT_SIGNAL: PASSTHROUGH_LEAKS_UNKNOWN_KEYS
+
+An owner-shaped value survives validation into the parsed public envelope, which
+`buildPublicAnswerExport` spreads wholesale into a downloadable file for anonymous readers.
+
+**No live leak today** — `apps/api/src/publications.ts:53` explicitly constructs
+`{ check_status: … }` and discards the rest; REV-06's own export probe returned
+`secret_hits_in_export: []`. The hole is that the **contract does not enforce what it appears to**:
+S01's whole discipline is enumerate-every-field-and-classify-it, and this is the one place an
+unenumerated field is accepted *by design*.
+
+**Why `.strict()` is low-risk as well as loud:** the sole producer already emits only
+`check_status`, so `.strict()` cannot reject any data the system currently produces. It fails only
+if a producer starts emitting something new — which is precisely the event that must not be silent.
+
+**Consequences:** this reopens **committed** S01 (`packages/contract` is S01's surface). It needs a
+new PLAN step with a real RED-before-GREEN acceptance — a test that an unknown key under
+`stranger_restatement` is REJECTED, which must fail before the change and pass after. The Router
+may not author that step.

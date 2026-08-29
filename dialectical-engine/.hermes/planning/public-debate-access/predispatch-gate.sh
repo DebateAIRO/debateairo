@@ -43,6 +43,35 @@ if [ -f "$WTPLAN" ]; then
   else say FAIL "worktree PLAN DIFFERS from the one being validated ($(wc -l < "$PLAN" | tr -d ' ') vs $(wc -l < "$WTPLAN" | tr -d ' ') lines) — sync it before dispatch"; FAIL=1; fi
 else say FAIL "no PLAN at the seat's path: $WTPLAN"; FAIL=1; fi
 
+echo "== 2c. which STANDING tests READ this slice's write surface =="
+# Surface-disjointness answers "will two seats collide", NOT "will this seat break something that
+# watches it". S02 wrote only files it owned and still broke s8-publication-contract.test.ts:170.
+# Full paths, no cap, explicit count — a truncated list here would be the third silent cap.
+SURF=$(grep -E '^\*\*File surface' "$PLAN" | grep -oE '`(packages|apps|tests|tools)/[A-Za-z0-9_./\[\]*-]+`' | tr -d '`' | sort -u)
+tot=0
+# NOTE: zsh does NOT word-split an unquoted parameter, so `for f in $SURF` iterates ONCE with the
+# whole list as a single value — and `grep -F` then reads the embedded newlines as MULTIPLE patterns,
+# producing plausible output with wrong per-file attribution. Caught by testing this check against a
+# slice whose answer was already known. Iterate line by line instead.
+printf '%s\n' "$SURF" | while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  case "$f" in *"*"*) continue ;; esac
+  hits=$( cd "$WT" && grep -rlF --include='*.test.ts' --include='*.test.tsx' "$f" tests/ 2>/dev/null | sort )
+  n=$(printf '%s' "$hits" | grep -c . )
+  if [ "${n:-0}" -gt 0 ]; then
+    tot=$((tot+n))
+    say WATCH "$f -> $n standing test(s):"
+    printf '%s\n' "$hits" | sed 's/^/           /'
+  fi
+done
+say OK "$tot standing-test dependencies found, ALL listed (no cap) — RUN THEM before handoff"
+# HONEST SCOPE, because a coverage line that overstates its reach is this file's most repeated bug:
+# this check sees ONLY paths declared on '**File surface**' lines, and ONLY exact-path references in
+# test sources. A test that reads a file by BASENAME, by a path built at runtime, or a surface the
+# PLAN mentions elsewhere (e.g. in a Single-writer check) is NOT covered. Known live example:
+# pol01-policy.test.ts reads DebatePageClient.tsx, which S02 modifies, and this check does not see it.
+say NOTE "SCOPE: exact-path refs from '**File surface**' lines only — basename/runtime refs NOT covered"
+
 echo "== 3. dependency resolution from the SEAT'S cwd, not the main tree =="
 ( cd "$WT" && perl -e 'alarm 300; exec @ARGV' npx tsc --noEmit ) >/tmp/pdg-tsc.txt 2>&1
 if [ -s /tmp/pdg-tsc.txt ]; then
@@ -86,6 +115,15 @@ say NOTE "$VERIF verification-only steps (Change: none) are legitimately pre-fix
 rm -f /tmp/pdg-broken /tmp/pdg-stolen
 ALL=$(grep -oE 'Acceptance test:\*\* `[^`]+`' "$PLAN" | sed 's/^.*`\(.*\)`$/\1/' | sort -u)
 TOT=$(printf '%s\n' "$ALL" | grep -c .)
+# COVERAGE HONESTY: a step whose acceptance is PROSE yields no command, so it silently
+# never enters ALL — and the "running N of N" line below then reads as full coverage of a
+# set that quietly excluded it. Same silent-cap class this gate exists to catch. Name them.
+DECL=$(grep -cE 'Acceptance test:\*\*' "$PLAN")
+WITHCMD=$(grep -cE 'Acceptance test:\*\* `[^`]+`' "$PLAN")
+if [ "$DECL" -gt "$WITHCMD" ]; then
+  say WARN "COVERAGE HOLE: $((DECL-WITHCMD)) of $DECL 'Acceptance test:' steps state PROSE, not a runnable command — this gate CANNOT check them:"
+  grep -nE 'Acceptance test:\*\*' "$PLAN" | grep -vE 'Acceptance test:\*\* `' | cut -c1-110 | sed 's/^/         /' | head -8
+fi
 CAP=${PDG_CAP:-40}
 [ "$TOT" -gt "$CAP" ] && say WARN "COVERAGE BOUNDED: running $CAP of $TOT acceptance commands — $((TOT-CAP)) NOT checked (raise PDG_CAP)"
 say NOTE "$TOT distinct acceptance commands found; running $(( TOT < CAP ? TOT : CAP ))"
@@ -134,6 +172,30 @@ printf '%s\n' "$ALL" | head -"$CAP" | while read -r cmd; do
             : > /tmp/pdg-stolen ;;
         esac ;;
     esac ;;
+  esac
+  # VARIANT 7 (found by this gate's own output, 2026-08-29): the extracted string is not a
+  # COMMAND at all. A PLAN may backtick the FILE an assertion lives in ("`foo.test.tsx` renders
+  # ...") in the same position where another step backticks a runnable command. Executing a bare
+  # path yields "no such file or directory", nonzero — which this gate then reported as
+  # "pre-fix RED (ran, and failed — discriminates)". It never ran and discriminates nothing, and
+  # because a .tsx file is never executable it would report RED in EVERY state of the code,
+  # including a correct implementation. Worse than variant 1: permanently, silently uninformative.
+  case "$cmd" in
+    *'='*|*'$('*|*'&&'*|*'|'*|*';'*) : ;;   # compound/shell syntax — first token test does not apply
+    *)
+      first=${cmd%% *}
+      if ! command -v "$first" >/dev/null 2>&1; then
+        say UNRUNNABLE "NOT a command — a backticked FILE REFERENCE the extractor mistook for one: ${cmd:0:58}"
+        printf '         it fails identically in every state of the code; it verifies NOTHING\n'
+        printf '         run the cluster command from the Clusters table instead\n'
+        # NOT blocking, deliberately. This gate CANNOT distinguish its own extraction artifact
+        # (a PLAN legitimately backticks the FILE an assertion lives in) from a genuinely
+        # unrunnable acceptance. Failing closed here would condemn every well-formed PLAN.
+        # It is loud and named instead, and the Router must run that cluster's real command by
+        # hand and record the result. Silence was the bug; blocking is not the fix.
+        printf '         NON-BLOCKING: gate cannot tell artifact from defect — RUN THE CLUSTER COMMAND BY HAND\n'
+        continue
+      fi ;;
   esac
   case "$cmd" in
     *"git diff"*generated*) say FAIL "targets a gitignored path — can never observe its change: ${cmd:0:60}";;

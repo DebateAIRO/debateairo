@@ -403,3 +403,183 @@ dependency closure, "which tests are affected by this change". Any rule whose pr
 its own conclusion has this shape. Also note the process lesson: the rule itself was written down
 correctly and still failed, because its APPLICATION PROCEDURE was never stated. An unstated
 procedure is not a safeguard.
+
+---
+
+## VARIANT 7 of the acceptance-command family: the "command" is not a command
+Found 2026-08-29, in the PRE-DISPATCH GATE ITSELF — the instrument built to catch the other six.
+The gate extracted acceptance commands with `grep -oE 'Acceptance test:\*\* `[^`]+`'`. That
+assumes every backticked string in that position is runnable. It is not. A PLAN legitimately uses
+the same position two ways:
+  **Acceptance test:** `pnpm exec vitest run tests/unit/x.test.ts`     <- a command
+  **Acceptance test:** `tests/render/y.test.tsx` renders the drawer... <- the FILE the assertion lives in
+Four of nine extracted "commands" for S02 were bare `.test.tsx` paths. The gate ran each through
+`zsh -lc`, got `no such file or directory` (nonzero), and printed:
+    RED  pre-fix RED (ran, and failed — discriminates)
+It never ran and it discriminates nothing.
+**This is strictly worse than variant 1.** A gitignored path could at least turn green for the
+wrong reason. A `.tsx` file is never executable, so this reports RED in EVERY state of the code —
+including a perfectly correct implementation. It would have gone on "confirming" the four most
+important feature-assertion clusters were properly RED, and then masked a genuinely broken build
+later, because its answer never changes.
+**Rule: before trusting a nonzero exit as evidence, confirm the thing you ran was a COMMAND.**
+First token resolvable via `command -v`, unless the string carries shell syntax (`=`, `$(`, `&&`,
+`|`, `;`) in which case the test does not apply. Generalises: any harness that harvests commands
+out of prose must verify it harvested a command. "It exited nonzero" and "it ran" are different claims.
+
+## The coverage number that describes only what it could see
+Same gate, same day, found by patching it. It printed:
+    NOTE  9 distinct acceptance commands found; running 9
+"9 of 9" reads as total coverage. The PLAN has **22** `Acceptance test:` steps. Ten of them state
+their acceptance in PROSE ("the new test file passes, AND additionally asserts a pinned count of
+..."), so they produced no command, never entered the set, and were never counted as missing.
+The denominator was silently redefined to the subset the tool could parse.
+**Rule: a coverage count must be stated against the count of things that EXIST, not the count of
+things the tool managed to extract.** Report `N of M`, and NAME the M−N it could not handle. Same
+family as the `head -10` silent cap recorded earlier in this file: both are tools describing their
+own reach while sounding like they describe the work.
+
+## Do not let the gate condemn the well-formed input (recurrence #2)
+When variant-7 detection was added it initially set the BLOCKING flag. That would have failed
+closed on every correctly-written PLAN, because a PLAN backticking the file an assertion lives in
+is not a defect. But the gate genuinely CANNOT distinguish its own extraction artifact from a real
+unrunnable acceptance. Resolution: make it **loud and named, non-blocking**, and say explicitly
+that it cannot tell the difference and the cluster command must be run by hand.
+**Silence was the bug. Blocking is not automatically the fix.** A check that cannot discriminate
+should say so, not vote.
+
+---
+
+## Blindness is a property of the COMMIT, not of what you copied
+Found 2026-08-29 by REV-05, **filed against the Router, and disclosed rather than exploited.**
+Building a blind lens: worktree cut at `4138f72`, then only the two files under review copied in.
+The author's self-report was deliberately not copied. But `S03-CODE-codex.md` had been **committed
+at `4138f72`** as part of the mission-record commit, so an 8KB copy of the author's reasoning was
+sitting in the lens tree from the moment it was created. Not copying a file does not withhold it.
+**And the blindness check I ran PASSED.** It was:
+    git status --porcelain | grep -q 'agent-reports'   # → no match → "OK: no self-report in lens"
+A committed, unmodified file is *clean* in `git status`. The check asked **"was it modified?"**
+when the question was **"does it exist?"** — it returned the right-looking answer for a reason
+entirely unrelated to the property it claimed to verify. Same family as everything else in this
+file, now in the review setup rather than in an acceptance command.
+**Rule: verify blindness by PRESENCE, not by diff status** — `test -e` / `git ls-tree` the path in
+the lens, and prefer cutting the lens from a commit that predates the artifact, or deleting the
+artifact from the lens after creation. Generalises: any "X is absent" guarantee must be checked
+with an existence test, never with a change-detection test. `git status` answers a question about
+*change*; absence is a question about *state*.
+
+---
+
+## The escaped pipe is CONSUMER-DEPENDENT — the same escape is correct in one place and fatal in another
+Measured 2026-08-29, sweeping all four PLANs after variant 5 reappeared (variant 9). This is the
+class rule that two earlier rounds missed, and it is **not** "never escape pipes":
+
+| Consumer | `\|` means | Verdict |
+|---|---|---|
+| `grep` **BRE** (its default) | **alternation** | **CORRECT** — measured: escaped matched 2 lines, bare `\|` matched 0 |
+| `vitest -t` (a **JS regex**) | a literal pipe | **BROKEN** — matches nothing (variant 5) |
+| `node -e` (**JS source**) | `\|\|` → `Expression expected` | **BROKEN** — SyntaxError (variant 9) |
+| a **shell pipeline** | an escaped literal argument | **BROKEN, AND SILENT** — no pipeline is built at all |
+
+**A blanket unescape breaks five currently-correct `grep` commands. A blanket "leave them" leaves
+three broken ones.** Any fix must ask what consumes the string.
+
+### The worst instance: the mission's own "safe" idiom was permanently red
+S01's cluster acceptance — the capture-first pattern this mission adopted *because* it was safe —
+has its shell pipes escaped in the PLAN. The shell then passes `|`, `grep`, `-E` and the pattern to
+`printf` as plain arguments and builds no pipeline. Measured on both arms:
+
+    passing summary → escaped guard=1 ; correct guard=0
+    failing summary → escaped guard=1 ; correct guard=1
+
+The escaped guard is **permanently 1** — the trailing `! printf … | grep -q 'failed'` term is always
+false, so the summary is never examined. The cluster ends `[ "$vt" -eq 0 ] && [ "$guard" -eq 0 ]`,
+so the acceptance can never pass in any state of the code. **Variant 7's signature delivered through
+variant 5's mechanism, inside the pattern adopted to prevent exactly this.**
+
+### The generating condition, which is the actual thing to fix
+A raw `|` breaks a markdown table cell. So every command stored in a table cell is under pressure to
+escape, and **the escape is invisible in rendered markdown** — a reader sees `||` and a correct
+pipeline. Only *extraction and execution* reveals it. Hence: do not store executable commands in
+table cells (use labelled fenced blocks, as S01's clusters were later moved to), and make the gate
+extract-and-run rather than eyeball. Removing the existing occurrences was never a class fix,
+because it left the pressure that generates them untouched.
+
+## Fixing one instance of a leak is not fixing the leak
+Immediate recurrence of the blindness trap above, same day, in the fix for it. The remedy applied
+to the round-2 lens deleted the ONE file named in the finding — the author's self-report. Eleven
+agent-reports were tracked at the lens's base commit, so ten others (Architecture's full reasoning,
+three prior reviewers' findings, another coder's self-report) stayed readable for the first minutes
+of the re-review.
+**A leak is a CLASS — every artifact of that kind at that path — not the instance that was
+reported.** Sanitize by glob at lens creation and verify by existence; then state, in the receipt,
+that the window existed and ask the lens whether it read anything, because from outside you cannot
+tell. Same lesson as "fix the CLASS not the instance," here applied to a review-setup guarantee
+rather than to code.
+
+---
+
+## Disjoint WRITE surfaces do not imply independent EFFECTS
+Found 2026-08-29 when S02's coding seat blocked for the third time. All four PLANs verified their
+write surfaces were mutually disjoint, and that verification was **correct** — the Router re-checked
+it when a suspected S02/S03 collision turned out to be a false alarm. S02 then wrote *only* files it
+owns and still broke `tests/architecture/s8-publication-contract.test.ts:170`, which asserts a string
+lives in a file S02 legitimately refactored. **Nobody owned that assertion**: S04 owns lines 120–138,
+S03's PLAN says its design avoids the 140–175 block.
+**The missing question: which STANDING tests READ the files each slice WRITES?** Surface-disjointness
+answers "will two seats collide," not "will one seat break something that watches it." Those are
+different questions and only the first was asked.
+Router sweep of every standing test reading the S02/S03 surfaces (full paths, no cap): S02's only
+breakage is `s8-publication-contract`; `dr184-judged-standing` 6/6, `pol01-policy` 8/8,
+`v2ui-pages` 42/42, `s10-erasure-ui` 3/3, `v2ui-export` 5/5 all pass. S03 is clean across all five
+including `s8-publication-contract` 5/5.
+
+## The silent cap, a THIRD time, in the tool built to find silent caps
+Building the diagnostic above, the Router wrote `... | head -4` and matched on **basenames**. The
+result omitted `s8-publication-contract.test.ts` — *the very test whose breakage motivated the
+diagnostic*. The output looked like a complete answer.
+Two compounding errors, both previously recorded in this file: a truncating cap presented as a
+result, and a **loose matcher** (`page.tsx` as a basename) that produces noise while missing the
+precise hit. Re-run with full paths and explicit counts, the answer was both smaller and correct.
+**Rule: a diagnostic must report `N of N` with N measured, and match on the identifier that is
+actually unique.** If the tool cannot show everything, it must say how much it hid. Third recurrence
+of this exact shape — `head -10` in the gate, "9 of 9" coverage, now `head -4` here — which is itself
+the evidence that naming a trap once does not prevent it.
+
+## Checking half a loop is not checking the loop
+Architecture's own admission when ruling the "standing tests that read this slice's writes" class,
+2026-08-29, and it is the sharpest statement of the gap: **`S02/PLAN.md had already done half this
+check and stopped at the wrong half of a two-element loop.`**
+
+The standing assertion was `for (const page of [applicationPublic, webPublic])`. The PLAN's boundary
+analysis considered the `web/` target — which S02 never touches, so it concluded "unaffected" — and
+did not carry the same question to `applicationPublic`, which S02 refactors. The conclusion drawn
+from one iteration was recorded as a conclusion about the loop.
+
+**Rule: when a check iterates, check EVERY target it iterates, not the one that looks relevant.**
+A loop's safety is the conjunction over its targets; establishing it for one member proves nothing
+about the others, and "the other one is out of scope" is precisely the reasoning that hides the
+in-scope one. Generalises to parameterised tests, `describe.each`, matrix CI jobs, and any
+fixture list — the shape is "we verified the case we were thinking about."
+
+## The escaped pipe does not just return the wrong answer — it performs a DIFFERENT OPERATION
+Physical evidence found in the main tree 2026-08-30: an untracked 131-byte file literally named
+`Sign in to start\|Your debate workspace\|tabEmptyHint`, containing
+`# Netscape HTTP Cookie File ... generated by libcurl!`.
+
+Its origin is S03's probe:
+
+    curl -sk 'https://localhost:3000/?tab=yours' | grep -c "Sign in to start\|Your debate workspace\|tabEmptyHint"
+
+With the shell pipe escaped as `\|`, no pipeline is built, so `curl` receives `|`, `grep`, `-c`, and
+the pattern as its own arguments — and **`-c <file>` is curl's COOKIE-JAR flag.** curl therefore
+wrote a cookie jar named after the grep pattern, `grep` never ran, and the "count" was never taken.
+The command exited 0.
+
+**This is the sharpest available statement of why exit codes are not evidence.** Earlier entries
+recorded that an escaped pipe yields a wrong `guard` value. It is worse than that: the surviving
+arguments are re-interpreted by the *first* command, which can silently take a completely different
+action — write a file, set an option, change a target. A defect that only *fails* is a good defect;
+this one succeeded at something nobody asked for.
+Corollary for janitors: an unexplained file with a bizarre name is not noise. It is a receipt for a
+command that ran differently than it read.

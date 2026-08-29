@@ -1,12 +1,12 @@
-SKILLS LOADED: heartbeat-protocol, heartbeat-worker, superpowers:using-superpowers, superpowers:test-driven-development, superpowers:verification-before-completion, superpowers:executing-plans, superpowers:using-git-worktrees, superpowers:systematic-debugging
+SKILLS LOADED: heartbeat-protocol, heartbeat-worker, superpowers:using-superpowers, superpowers:receiving-code-review, superpowers:systematic-debugging, superpowers:test-driven-development, superpowers:verification-before-completion
 
 # S03-CODE Codex case file
 
-**Status:** BLOCKED before implementation on 2026-08-29. No product or test file was modified.
+**Status:** REWORK READY FOR REVIEW on 2026-08-29 under ticket `t_fc0f5e85`; rework round 2 of 3 is complete, with one round remaining. B1, B2, and N1 still stand; B3 and N2 are addressed in the addendum below.
 
 ## Executive finding
 
-The dispatch combines a universal rule—every PLAN step must show feature-specific RED before GREEN—with acceptance steps that are intentionally already satisfied before S03. That makes literal execution impossible. The same packet also requires a repository-wide typecheck that cannot pass in the assigned worktree because its shared dependency layout resolves workspace packages through the main checkout and omits package-local pnpm links.
+Two dispatch defects correctly stopped earlier attempts: the original PLAN conflated feature assertions with already-green baselines, and the original worktree lacked an isolated pnpm dependency layout. Both were repaired before implementation. The first implementation's product behavior was sound, but its accessibility test made a source-text oracle stand in for rendered behavior. Rework ticket `t_b065763f` replaces that oracle with a real `HomePage` render and proves the repaired assertion against hostile rendering and destination mutants. The separate port-3000 limitation remains environmental and is still recorded honestly.
 
 ## Findings, cause, and price
 
@@ -72,3 +72,107 @@ The dispatch combines a universal rule—every PLAN step must show feature-speci
 Add one automated pre-dispatch gate that reads the packet and PLAN, verifies every absolute path and allowed output, compares board workspace metadata, checks dependency resolution from the assigned cwd, executes every acceptance command on the base commit, and rejects any feature assertion whose expected pre-fix state is GREEN. Emit that machine-generated matrix into the packet. This would have caught all three external blockers before consuming a coding seat.
 
 The prompt should also separate three concepts currently overloaded as “acceptance”: regression baseline, pre-fix RED assertion, and post-fix verification. Each row needs an explicit category and expected result before and after implementation. With that distinction, the coding seat can execute mechanically in one pass instead of interpreting contradictions.
+
+## Resume addendum — implementation complete locally, live evidence blocked
+
+The first two blockers were genuinely repaired: PLAN now categorizes feature assertions versus baselines and adds the negative C3-3 probe; the fresh worktree has a real pnpm installation and clean typecheck. The implementation and its planned test were therefore written under valid RED-first evidence.
+
+### 5. A shared long-lived server is not worktree acceptance evidence
+
+**Cause:** The live commands name one global URL, `https://localhost:3000`, but the listener is owned by a dev stack whose cwd is the main checkout. The coding seat edits an isolated worktree. The pre-dispatch gate confirmed the commands' pre-fix behavior but did not attest that the runtime would serve the seat's artifact after edits.
+
+**Evidence:** At 2026-08-29T22:05:40+03:00, port 3000 listener PID 43352 had cwd `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`. After the worktree implementation, the exact commands still returned the main checkout's pre-fix values: labels `0/0`, and the negative `?tab=yours` public-link probe `1` instead of `0`.
+
+**Price:** One coding pass reached finished local implementation but could not enter three-run live verification; one human coordination decision is required. No rework round was consumed, and no shared process or main-tree product file was changed.
+
+**Upgrade:** Give every coding worktree a distinct attested runtime origin in its packet, or coordinate exclusive ownership of the canonical port for the verification window. The gate must record the listener PID and cwd both before RED and before GREEN. A command at the right URL is still wrong-target evidence when the process behind that URL serves another checkout.
+
+### What I nearly got wrong on resume
+
+- I nearly treated the unchanged live RED as an implementation failure. Process cwd proved the server had never observed the diff.
+- I considered an alternate-port UI launch. That would be useful diagnostic evidence but would silently substitute for the PLAN's exact command, so I stopped.
+- I did not stop the shared stack or copy the page into main. Either would cross lane/runtime authority merely to manufacture GREEN.
+
+### Resume dead ends and packet ambiguity
+
+- Hot reload cannot bridge checkouts: a Next process watches the cwd it started from.
+- The committed goal packet still names the retired `prog-b-s03` absolute path while the direct dispatch names `s03-code`. Direct instruction resolved execution, but the artifact remains factually stale.
+- `hermes kanban claim` still resolves the ticket's generic scratch workspace, not the dispatched worktree. The CLAIM comment must continue to carry the actual path.
+
+### Local evidence preserved before the runtime block
+
+- Feature RED: missing C1 structure and labels, missing C2/C3 gates, and C3-3 public-link count `1` where `0` is required.
+- Assertion RED: the new accessibility test failed `1/1` because neither native tab link existed.
+- Local GREEN: accessibility test `1 passed/1`; repository typecheck exit 0; structural check `OK`.
+- Refutation: replacing the Your Debates `Link` with `div` failed `1/1`; changing only its styling class passed `1/1`; both mutants were restored.
+
+## Final resolution and verification receipt
+
+- Superseding ticket `t_23b9245c` was created ready with the corrected `s03-code` worktree and claimed by this seat. The original `t_895ef432` remains superseded.
+- S03-C1 cluster runs: three GREEN runs, each structural `OK` plus accessibility `1 passed/1`; worst run GREEN.
+- S03-C2 regression-baseline cluster runs: `1`, `1`, `1`; worst run GREEN. These responses come from the shared main-checkout runtime and prove only that the pre-existing banner baseline remains available there.
+- S03-C3 regression-baseline cluster runs: `1`, `1`, `1`; worst run GREEN. These responses likewise prove only the shared runtime's public-link baseline.
+- S03-C4 verification-only cluster runs: `2`, `2`, `2`; worst run GREEN. Manual cross-check confirms `token !== null ? "yours" : "public"` matches logged-out → Public Debates and logged-in → Your Debates.
+- Repository typecheck exited 0. The standing publication-contract suite passed `5/5`. `git diff --check` was clean before handoff.
+- C1-3 is `UNVERIFIED-BY-RUNTIME`: the exact anonymous label probes still return `0/0` because PID 43352 serves `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`, not this worktree.
+- C3-3 direction 1 is `UNVERIFIED-BY-RUNTIME`: `curl -sk 'https://localhost:3000/?tab=yours' | grep -c '/public/debate/'` returns `1` from that same wrong-target runtime; it is not a verdict on this patch. The server was not stopped, restarted, or reconfigured.
+- C2-2 and C3-3 direction 2 remain `UNVERIFIED-BY-ARCHITECTURE` for QA with a real signed-in cookie, exactly as the PLAN records.
+- Mutation sensitivity/specificity evidence is deliberate: the `Link` → `div` mutant produced a real `1 failed/1`, while the neighboring styling-class mutant correctly remained `1 passed/1`. Both were reverted and the intended test returned `1 passed/1` after each restoration.
+
+## Rework round 1 — B1 source-text oracle replaced
+
+**Cause:** The first test read `page.tsx`, regex-selected `<Link>` source blocks, and used substring checks. Its PASS was produced by text existing in the file, so it could not distinguish rendered controls from dead JSX or distinguish a real destination from decoy attribute text.
+
+**Price:** One blind-review rework round and roughly one additional verification cycle. The earlier `Link` → `div` mutation was a useful sample but not proof of the whole reachability property.
+
+**Required reproduction before repair:** wrapping both links in `{false ? (...) : <span>Tabs disabled</span>}` left the old test GREEN at `1 passed/1`; changing both real destinations to `/` while adding decoy attributes containing the expected `href="/?tab=..."` text also stayed GREEN at `1 passed/1`. Both mutants were restored, and `git status --porcelain` was printed after each restoration.
+
+**Remedy:** The test now calls the real async `HomePage`, uses the existing `next/headers` test boundary plus a focused public-contract-client mock, renders with `renderToStaticMarkup`, parses the result with JSDOM, and inspects rendered DOM properties. For both `tab=yours` and `tab=public`, it requires two rendered native navigation anchors, exact accessible names and real `href` attributes, `tabIndex === 0`, enabled state, no borrowed tab ARIA, and `aria-current="page"` only on the selected destination.
+
+**RED → GREEN:** With the revised assertion held against the false-ternary mutant, both cases failed `2/2` at rendered tab count `0` (expected `2`). Restoring the intended page returned `2 passed/2`.
+
+**Class sweep:** The final-form test rejects the false-ternary mutant (`2 failed/2`), wrong real href plus decoy text (`2 failed/2`), `Link` → `div`, reversed selection, `tabIndex={-1}`, native `disabled`, `aria-disabled="true"`, and both `aria-label`/`aria-labelledby` accessible-name overrides. The neighboring active-class rename remains GREEN at `2 passed/2`. Every mutant was restored; no mutant token remains in `page.tsx`.
+
+**Dead ends / near miss:** The first real-render attempt errored with `useRouter is not a function` because the global request stub created a signed-in session and therefore mounted `LibraryComposer`. That was setup failure, not counted as RED. A test-local anonymous `next/headers` boundary removed the unrelated composer while preserving the requirement that both controls render for anonymous visitors. Root typecheck then exposed that the PLAN-pinned `.test.ts` filename cannot statically import TSX or UI-local render declarations under the root compiler; typed `vi.importActual` boundaries keep the real runtime modules without changing the filename, packages, or compiler configuration.
+
+**Final receipt:** Exact S03-C1 cluster command ran three times on the final tree; every run returned structural `OK` and `2 passed/2`, so the worst run is GREEN. Fresh repository typecheck exited `0`; the standing publication-contract suite passed `5/5`; `git diff --check` exited `0`.
+
+**Historical routing note:** B2 (ARIA tabs-pattern design) and N1 (anonymous Your Debates empty-list design) were correctly left to Architecture during B1. Architecture then ruled both and V routed their coding follow-up back to this same session; the addendum below records that separate, uncharged realignment.
+
+**Upgrade:** Accessibility assertions must consume rendered output whenever the claim contains “present,” “reachable,” or a real destination. Mutation matrices should include dead-branch and decoy-text cases before a source-oriented oracle is accepted; a single caught syntax mutation is sensitivity evidence for that mutation only.
+
+## Architecture-parallel B2/N1 realignment — not charged as a second coding rework round
+
+**Cause and price:** Architecture's B2/N1 rulings landed while B1 was being repaired. B2 replaced invalid ARIA-tab semantics with ordinary navigation links carrying `aria-current="page"`; N1 required an anonymous Your-Debates hint inside the switched content area. The parallel dispatch caused one additional coding/verification cycle, but V explicitly left the coding rework count at 1 of 3.
+
+**ARCH-N1 reproduction before correction:** The updated S03-C1 PLAN command contained `if(missing.length\|\|present.length)` inside JavaScript. Run verbatim before edits, Node exited 1 with `Expression expected` / `SyntaxError: Invalid or unexpected token`; Vitest never ran. The unescaped control also exited 1, but by actually evaluating the page and reporting `MISSING [ 'aria-current' ] FORBIDDEN-PRESENT [ 'role="tablist"', 'role="tab"', 'aria-selected' ]`. Evidence was posted to `t_7539734e`; under V Row 7, only those two markdown-escape backslashes were removed provisionally. Architecture ratification remains required.
+
+**RED → GREEN:** The realigned render suite failed 3/3 before the product edit: both mode cases found the forbidden container role, and logged-out Your Debates had no in-panel hint. After the minimal page edit, the suite passed 3/3. The corrected compound C1 command reached its source guard and the rendered tests.
+
+**Class refutation:** The final test rejects dead JSX (`false` ternary: 2 failed/3), real `href="/"` plus decoy destination attributes (2 failed/3), both links always carrying `aria-current="page"` (2 failed/3), reintroduced `role="tablist"` (2 failed/3), reintroduced link `role="tab"` (2 failed/3), reintroduced `aria-selected` (2 failed/3), and moving the anonymous hint to the Public branch (1 failed/3). The neighboring selected-class rename stayed 3 passed/3. Every mutant was restored with `git status --porcelain` read back; no mutant token remains.
+
+**Three-run receipt:** S03-C1 ran three times at `OK` plus 3 passed/3; worst GREEN. S03-C2's local feature step returned `tabEmptyHint=1` three times, and the same rendered C1 suite exercises its location/copy. S03-C4 returned `2` three times. Typecheck exited 0; publication architecture passed 5/5; `git diff --check` exited 0. Source acceptances read: old headings 0, `aria-current=` 2, `role="tab"` 0, `published.items.map` 1.
+
+**Runtime limitation preserved honestly:** Port 3000 is still PID 43352 with cwd `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`, not this worktree. Across three runs, the C2 live baseline returned 1 while the new `tabEmptyHint` marker returned 0; therefore it cannot be credited as product evidence for this patch. C3 public/default positives returned 1, while the exact C3-3 negative probe `curl -sk 'https://localhost:3000/?tab=yours' | grep -c '/public/debate/'` returned 1 all three times from the wrong tree. C2/C3 live directions remain `UNVERIFIED-BY-RUNTIME`; the signed-in direction remains `UNVERIFIED-BY-ARCHITECTURE` for QA, exactly as previously routed. PID 43352 was not stopped, restarted, or reconfigured.
+
+**One acceptance distinction worth preserving:** S03-C2's cluster curl is still a REGRESSION-BASELINE: it can return 1 from the unconditional `Sign in to start` text even when `tabEmptyHint` is absent. It is not credited as proof of C2-3. The discriminating evidence is the step's local `tabEmptyHint` assertion plus the real-render test, which was observed RED before GREEN.
+
+**File ownership:** This seat changed `apps/ui/app/page.tsx`, `tests/unit/pda-s03-keyboard-accessibility.test.ts`, this report, its main-tree receipt, and the single authorized factual `||` correction in S03 PLAN. The already-dirty Architecture/Orchestrator changes in `DECISIONS.md`, the rest of `PLAN.md`, and `PROGRESS.md` were not authored or altered by this seat.
+
+**Late Architecture readback:** Comment `t_7539734e` created_at `1788034635` independently generalized the command defect to “no executable command in a table cell” and repaired C2/C3 in Architecture's main-tree artifact. It explicitly left this worktree's C1 instance to the coding seat pending ratification. Those later Architecture-owned changes were not synced or copied by this seat; the artifact split is disclosed instead of silently crossing lanes.
+
+## Rework round 2 — B3 rendered-but-concealed controls and N2 role precision
+
+**Cause:** The B1 repair upgraded the oracle from source text to a rendered DOM, but it still equated “two anchors exist” with “two controls are exposed.” JSDOM does not compute a browser accessibility tree: its `HTMLElement.prototype.checkVisibility` is absent, and its synthetic `focus()` can set `activeElement` to anchors hidden by `hidden` or `display:none`. No installed repository dependency provides `isInaccessible`, Axe, Playwright, or another accessibility-tree exposure oracle. A machine-installed Chrome exists, but making a unit test depend on undeclared host software would not be a repository-owned oracle.
+
+**Reproduce first:** Before modifying the test, adding `hidden` to both rendered tab links left the suite byte-identical to baseline at 3 passed/3. Restoring the page also returned 3 passed/3. Separately, adding the legitimate `role="navigation"` to the wrapper made the old N2 assertion fail 2/3 with the misleading message “must not claim tablist semantics,” proving it rejected every role rather than only `tablist`.
+
+**Remedy and honest boundary:** The render test now walks each anchor and its ancestors and rejects an enumerated set of known concealment barriers: `hidden`, `aria-hidden="true"`, `inert`, computed `display:none`, `visibility:hidden|collapse`, and `content-visibility:hidden`. This is explicitly a blacklist, not a claim of full reachability or accessibility-tree equivalence. The PLAN's S03-C1-4 `Failure it MISSES` field now names the residual gaps exactly: app/external stylesheet-only concealment, off-screen/clipped/zero-size/occluded layout, opacity/transparency, pointer blocking, closed-details/popover and future unmodelled exclusion mechanisms, and browser/AT-specific accessibility-tree behaviour. N3's Architecture-owned stale source-text description was not edited. N2 now forbids only wrapper `role="tablist"` and link `role="tab"`; a neighbor with `role="navigation"`/`role="link"` passes 3/3.
+
+**RED → GREEN:** With the repaired oracle, the original `hidden` mutant failed 2/3 with `known concealment barrier: hidden`; restoration returned 3/3. The other required B3 mutants each failed 2/3: `aria-hidden="true"` on both links, `inert` on `.sectionHead`, and inline `display:none` on both links. Additional `visibility:hidden` and `content-visibility:hidden` ancestor mutants also failed 2/3. Every restoration returned 3/3 with a status readback.
+
+**Sensitivity and specificity sweep:** Both original B1 mutants remain rejected: the false-ternary/dead-JSX mutant failed 2/3 at rendered-link count zero, and real `href="/"` plus decoy destination attributes failed 2/3 on the actual href. A cosmetic selected-class rename remained GREEN at 3 passed/3. All mutants were restored; no temporary mutant is part of the handoff.
+
+**Price:** One coding rework round and an explicit residual QA boundary. No product behavior change was needed for B3 or N2; the permanent code change is confined to the rendered test, plus this required PLAN failure-boundary receipt and the paired case-file receipts.
+
+**Final verification receipt:** The exact S03-C1 compound acceptance ran three times on the restored final tree; every run returned structural `OK` and 3 passed/3, so the worst run is GREEN. `pnpm run typecheck` exited 0. The standing publication-contract suite passed 5/5. `git diff --check` exited 0. The worktree and main-tree case-file receipts are byte-identical. Ticket comments were read through created_at `1788035502` immediately before this final receipt; no intervening instruction was present.

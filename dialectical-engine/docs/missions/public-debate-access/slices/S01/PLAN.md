@@ -400,6 +400,19 @@ sum=$(printf '%s' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
 printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
   && ! printf '%s' "$sum" | grep -q 'failed'; guard=$?
 [ "$vt" -eq 0 ] && [ "$guard" -eq 0 ]
+
+# S01-C4-verify (CLASS-FIX ROUND 1, `t_7539734e`, public-debate-access: this block
+# was previously a table cell with `\|` in place of every one of these three shell
+# pipes — extracted and run literally as written, it never actually pipes: printf's
+# extra arguments get recycled into the "%s" format string instead of reaching a
+# second process, so grep/tail never run, and `guard` comes back wrong. No
+# grep-internal alternation appears in this one's two patterns, so unescaping is
+# unconditionally correct here — nothing to weigh against BRE `\|` semantics.)
+out=$(pnpm exec vitest run tests/unit/s8-publication.test.ts -t "legacy" 2>&1); vt=$?
+sum=$(printf '%s' "$out" | grep -E '^[[:space:]]*Tests[[:space:]]+' | tail -1)
+printf '%s' "$sum" | grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' \
+  && ! printf '%s' "$sum" | grep -q 'failed'; guard=$?
+[ "$vt" -eq 0 ] && [ "$guard" -eq 0 ]
 ```
 
 Run against the coder's finished worktree, own observed results (2026-08-29):
@@ -408,7 +421,18 @@ S01-C1-presence: exit 0, Test Files 2 passed (2), Tests  4 passed | 20 skipped (
 S01-C2-presence: vt=0 guard=0, Tests  5 passed | 16 skipped (21)
 S01-C3-presence: vt=0 guard=0, Tests  2 passed | 23 skipped (25)
 ```
-All three now GREEN for the right reason — every one of the matched titles is a real,
+Run against the MAIN tree (not the worktree — S01-C4 is a regression/legacy check,
+not a presence arm gated on the coder's new work), own observed results, CLASS-FIX
+ROUND 1 (2026-08-29): **escaped form, run exactly as it appeared in the table cell
+before this round:** `printf` receives `"$out"`, `|`, `grep`, `-E`, ... as five
+literal arguments (the backslash makes bash treat `|` as ordinary text, not the
+pipe operator), so `grep`/`tail` never execute as separate processes and `$sum`
+comes back as garbage; `vt=0 guard=1` — a **false FAIL** on a case that is a
+genuine pass. **`S01-C4-verify` block above, unescaped, same tree, same moment:**
+`vt=0 guard=0`, `Tests  1 passed | 24 skipped (25)` — correct, and matches the
+regression-baseline category this row already claims (see line ~465's corrected
+evidence below).
+All three presence arms remain GREEN for the right reason — every one of the matched titles is a real,
 distinct new test, not a contrivance (S01-C2 alone accounts for 5 of the 8 new tests named
 in its step list; S01-C3 for 2 of its 4).
 
@@ -431,10 +455,10 @@ not break the acceptance.
 
 | Cluster | Steps | ONE verification command | File surface |
 |---|---|---|---|
-| S01-C1 | S01-C1-1..5 | `test -f tests/unit/pda-s01-envelope-schema.test.ts && pnpm exec vitest run tests/unit/pda-s01-envelope-schema.test.ts tests/unit/s8-publication.test.ts` — presence arm: **run block `S01-C1-presence` above** (see step 5 for the exact final command once test names are fixed by the worker) | `packages/contract/src/index.ts`, `tests/unit/pda-s01-envelope-schema.test.ts` |
+| S01-C1 | S01-C1-1..6 (**V RULING, DECISIONS Row 9, `t_a00a162e`**: added C1-6, `.strict()` on `NodeSchema.stranger_restatement`) | `test -f tests/unit/pda-s01-envelope-schema.test.ts && pnpm exec vitest run tests/unit/pda-s01-envelope-schema.test.ts tests/unit/s8-publication.test.ts tests/unit/contract.test.ts` — presence arm: **run block `S01-C1-presence` above** (see step 5 for the exact final command once test names are fixed by the worker) | `packages/contract/src/index.ts`, `tests/unit/pda-s01-envelope-schema.test.ts`, `tests/unit/contract.test.ts` |
 | S01-C2 | S01-C2-0, S01-C2-0B, S01-C2-1..8 (**REWORK ROUND 2, B2, `t_9322ae7b`**: added C2-7/C2-8, one residual test per open-ended bag) | whole-file regression run **plus a presence arm** (**ROUND 3, Finding 2, `t_f910328a`**, pattern fixed **ROUND 4, `t_e1208546`** — see note below the table): `pnpm exec vitest run tests/unit/s8-publication.test.ts` (regression) `&&` **run block `S01-C2-presence` above** (presence — at least one named new test must have run and passed) | `apps/api/src/publications.ts`, `tests/unit/s8-publication.test.ts` |
 | S01-C3 | S01-C3-1..4 (**REWORK ROUND 1, self-caught while re-checking every cluster's step count against N2's pattern**: corrected from "1..3" — S01-C3-4, "confirm no new anonymous route," was always in this cluster's body, undercounted in round 0's table) | whole-file regression run **plus a presence arm** (same fix as S01-C2): `pnpm exec vitest run tests/unit/s8-publication.test.ts tests/unit/s8-publication-http.test.ts` (regression) `&&` **run block `S01-C3-presence` above** (presence) | `tests/unit/s8-publication.test.ts`, `tests/unit/s8-publication-http.test.ts` (read-only regression, no production-code edit expected) |
-| S01-C4 | S01-C4-1..2 | `out=$(pnpm exec vitest run tests/unit/s8-publication.test.ts -t "legacy" 2>&1); vt=$?; sum=$(printf '%s' "$out" \| grep -E '^[[:space:]]*Tests[[:space:]]+' \| tail -1); printf '%s' "$sum" \| grep -qE '^[[:space:]]*Tests[[:space:]]+[1-9][0-9]* passed' && ! printf '%s' "$sum" \| grep -q 'failed'; guard=$?; [ "$vt" -eq 0 ] && [ "$guard" -eq 0 ]` | `tests/unit/s8-publication.test.ts` (read-only regression + 1 new test, no production-code edit beyond C1/C2) |
+| S01-C4 | S01-C4-1..2 | **run block `S01-C4-verify` above** (**CLASS-FIX ROUND 1, `t_7539734e`: moved out of this table cell — the previous inline form used `\|` for three real shell pipes, which is BROKEN when extracted and run literally; see the class-fix note above the S01-C1..C3 blocks and this mission's `S03/PLAN.md` for the sibling instances and the general argument**) | `tests/unit/s8-publication.test.ts` (read-only regression + 1 new test, no production-code edit beyond C1/C2) |
 
 **Cluster command categories and their OBSERVED pre-fix results (run
 2026-08-29, main tree; S01-C1's substance is COMPLETE per the coding seat —
@@ -462,7 +486,7 @@ mechanism, an existing one applied at the cluster level where it was previously 
 `test -f <path> &&` guard from S01-C1-5 was the other option the brief named; not used here
 because S01-C2/C3's gap is TEST ABSENCE within an existing file, not FILE absence — `test -f`
 cannot see inside a file, and a filtered vitest run already does, exactly.
-| S01-C4 | FEATURE-ASSERTION | **RED, correctly, on the round-3 ANCHORED capture-then-check idiom.** Re-run 2026-08-29 (main tree, still pre-S01-CODE — the coding seat's work lives in a worktree the Router syncs, not touched by this thread): `vt=0`, `guard=1`, summary `Tests  13 skipped (13)` — compound false, RED, correctly. Same observable result as round 2's unanchored version on THIS input (this file's other test titles don't happen to contain the polluting substring), but round 2's version was still structurally vulnerable to a title that did — see the Clusters section's round-3 note for the reproduced, Router-independently-confirmed bug and the verified 7-case matrix. |
+| S01-C4 | FEATURE-ASSERTION | **RED, correctly, on the round-3 ANCHORED capture-then-check idiom.** Re-run 2026-08-29 (main tree, still pre-S01-CODE — the coding seat's work lives in a worktree the Router syncs, not touched by this thread): `vt=0`, `guard=1`, summary `Tests  13 skipped (13)` — compound false, RED, correctly. Same observable result as round 2's unanchored version on THIS input (this file's other test titles don't happen to contain the polluting substring), but round 2's version was still structurally vulnerable to a title that did — see the Clusters section's round-3 note for the reproduced, Router-independently-confirmed bug and the verified 7-case matrix. **Superseded by drift, not by this round's fix (CLASS-FIX ROUND 1, `t_7539734e`): this row's `13 skipped (13)` reflects the main tree AS IT STOOD AT ROUND 3** — the file has since grown to 25 tests across later rounds, including a passing "legacy" test. The `S01-C4-verify` block's fresh run above (`vt=0 guard=0`, `1 passed \| 24 skipped (25)`) is TODAY's correct result on the SAME command, unescaped — the difference from this row is codebase growth across rounds, not a reversal of this row's own claim, and is unrelated to the escaped-pipe defect this round actually fixes (this row never had one). |
 
 **Note on the cluster table's "ONE verification command" for S01-C1:** the
 worker names the new test file's `it()` blocks and finalizes the exact
@@ -742,6 +766,165 @@ later run — the three-run law's whole purpose.
 wrong in a way that happens to assert something true by accident (a
 tautological assertion) — that class of defect needs Grok's mutant-class
 review, not a rerun.
+
+### S01-C1-6 — `NodeSchema.stranger_restatement` becomes `.strict()`, per V's ruling (DECISIONS Row 9, `t_a00a162e`)
+
+**V has ruled; this step implements the ruling, it does not re-argue it.**
+DECISIONS Row 9: the contract's lone `.passthrough()` becomes `.strict()`,
+chosen deliberately over silent stripping and over deferral.
+
+**The finding, reproduced myself before writing this step, not taken on
+the Router's word:** `packages/contract/src/index.ts:434`, inside
+`NodeSchema` (424), reached by `PublicDebateSchema` through `answer.nodes`:
+```ts
+stranger_restatement: z.object({ check_status: CheckStatusSchema }).passthrough(),
+```
+It is the only `.passthrough()` in the contract; everything else on the
+anonymous path is `.strict()`. Ran the Router's committed probe
+(`.hermes/reports/public-debate-access/probes/passthrough-probe.mts`)
+myself, 2026-08-29: `parse_success: true`,
+`keys_that_survived: ["check_status","SMUGGLED_OWNER_SECRET"]`,
+`SMUGGLED_VALUE: ledger:abc-123` — confirmed, reproduces exactly as
+reported. That parsed envelope is what `apps/ui/lib/v3/publicAnswerExport.ts`'s
+`buildPublicAnswerExport` (S02-C3-3) spreads wholesale into a downloadable
+file for anonymous readers.
+
+**Cluster:** S01-C1
+**File surface:** `packages/contract/src/index.ts:434` (the ONE token,
+`.passthrough()` → `.strict()`, nothing else on this line or schema
+changes), `tests/unit/contract.test.ts` (new assertions, existing file —
+first claim by this mission; not previously in any slice's surface, no
+collision).
+**Change:** `.passthrough()` → `.strict()` on line 434's `z.object(...)`
+call. No other line in `packages/contract/src/index.ts` changes.
+
+**1. RED-before-GREEN acceptance, verified by RUNNING both ways, not by
+reasoning.** `tests/unit/contract.test.ts:113-171` already has a proven-
+valid `node` fixture (satisfies `NodeSchema.parse` today, per its own
+existing assertions at lines 145-170) — reused rather than built from
+scratch, since the Router's own probe took three attempts to reach a
+valid fixture (`way_of_knowing` enum, `LabeledNumberSchema.value`/`kind`/
+`producer`/`source`/`provenance_ref`/`replay_handle` — ALL six fields
+required, `.strict()`, not just the three the brief named — and
+`relevant_as_of`) and an invalid fixture fails for the wrong reason,
+proving nothing: this mission's signature defect. New assertion, added to
+the existing `it("admits recorded per-node maker lineage...")` block
+(same fixture already in scope, no new `describe`/`it` needed):
+```ts
+expect(() => NodeSchema.parse({
+  ...node,
+  stranger_restatement: { ...node.stranger_restatement, SMUGGLED_OWNER_SECRET: "ledger:abc-123" }
+})).toThrow();
+```
+**Verified myself, both ways, by running — not by reasoning:**
+- **RED, against the CURRENT contract** (own script, `pnpm exec tsx`,
+  imported the real `NodeSchema` read-only, deleted after, `git status
+  --porcelain` confirmed clean before and after): the exact assertion
+  above does NOT throw today — `NodeSchema.safeParse` on the smuggled
+  object returns `success: true`, `stranger_restatement.SMUGGLED_OWNER_SECRET`
+  present with value `"ledger:abc-123"`. The written assertion genuinely
+  fails against today's contract, for the right reason (the passthrough
+  leak, not a fixture bug) — confirmed by ALSO checking the base fixture
+  (no smuggled key) parses successfully, so the failure is specific to
+  the added key, not a defect in the reused fixture.
+- **GREEN, against the ONE-LINE change** (own script, reconstructed
+  `NodeSchema` verbatim field-for-field from the real source with every
+  sub-schema — `WayOfKnowingSchema`, `LabeledNumberSchema`,
+  `MakerLineageSchema`, `NodeReviewSchema`, `ConditionMarkSchema`,
+  `AbstentionSchema`, `StalenessStateSchema`, `CheckStatusSchema` — all
+  imported live from the real package, changing ONLY the one line under
+  test to `.strict()`): the base fixture still parses (no regression on
+  the valid case), and the smuggled object is rejected —
+  `{"code":"unrecognized_keys","keys":["SMUGGLED_OWNER_SECRET"],"path":["stranger_restatement"],"message":"Unrecognized key: \"SMUGGLED_OWNER_SECRET\""}`.
+  Reconstructing the full schema (not just the inner `stranger_restatement`
+  sub-object in isolation) confirms the surrounding 16 other required
+  fields don't interfere with or mask the one-line change's effect.
+- Did not edit the tracked `packages/contract/src/index.ts` to produce
+  the GREEN run — that would be product code, out of this round's scope.
+  The reconstruction is a scratch-only script, deleted after use,
+  `git status --porcelain` confirmed clean before and after; the coding
+  seat runs the REAL one-line edit and the REAL test on its own ticket.
+**Acceptance test:** `pnpm exec vitest run tests/unit/contract.test.ts`
+exits 0 (regression: the file's existing 9+ assertions, including the
+7 pre-existing `NodeSchema.parse`/`.toThrow()` calls at lines 145-170,
+must still pass) AND the new `SMUGGLED_OWNER_SECRET` assertion above
+specifically throws (feature: this is the new, previously-impossible
+rejection).
+**Category (V RULING, DECISIONS Row 9, `t_a00a162e`):** FEATURE-ASSERTION — own reproduction, 2026-08-29: RED
+against the current contract (assertion does not throw, as shown above);
+GREEN required once the one-line change lands (shown reachable above via
+the reconstructed schema, not assumed).
+
+**2. Blast-radius answer, measured, not assumed.** Which callers actually
+invoke `NodeSchema.parse`/`.safeParse`/`AnswerSchema.parse` (the only
+schemas embedding `NodeSchema`, `packages/contract/src/index.ts:475,498`)
+— own grep across `packages/`, `apps/`, `tests/`, real source only,
+build artifacts under `.next*` excluded:
+- `apps/api/src/index.ts:932` — `NodeSchema.parse(node)`, single-node GET
+  route. `node` originates from `packages/serve/src/index.ts:2198`'s
+  query projection, which constructs `stranger_restatement: { check_status:
+  row.check_status }` — own read, exactly one key. Unaffected.
+- `apps/api/src/index.ts:899,993` — `AnswerSchema.parse(answer)`, same
+  producer (`packages/serve/src/index.ts`), same single-key construction
+  (there is only one construction site for this object in that file).
+  Unaffected.
+- `apps/api/src/publications.ts:53` — the public-projection function
+  (this mission's own S01-C2 work) constructs `stranger_restatement: {
+  check_status: node.stranger_restatement.check_status }` on its OUTPUT,
+  explicit single-key projection, own read. Unaffected — and this is the
+  object that then gets `PublicDebateSchema.parse`d, so the anonymous
+  path was already implicitly safe by construction even before this
+  step; `.strict()` makes that safety a schema-enforced INVARIANT instead
+  of an implementation habit, which is the entire point of V's ruling.
+- **Checked and RULED OUT, explicitly, because it looks risky and isn't:**
+  `tests/unit/s8-publication.test.ts:124-128`'s fixture sets
+  `stranger_restatement: { check_status: "PASS", secret_extra:
+  "LEAK-ME-RESTATEMENT", owner_note: "do-not-publish" }` — extra keys,
+  typed as `Answer` at its call site (`publicationHarness().publish(answer)`,
+  `answer: Answer` per `PostgresPublicationApplication.publish`'s own
+  signature). Traced whether this ever reaches `NodeSchema.parse`/
+  `AnswerSchema.parse`: own read of `apps/api/src/publications.ts`'s
+  `publish` method — its ONLY `.parse()` calls are `PublicDebateSchema.parse`
+  on the freshly-projected OUTPUT (lines 229, 388); the INPUT `Answer` is
+  never schema-validated, only read field-by-field (duck-typed by
+  design). The extra keys are inert JS properties on an object TypeScript
+  accepts because it's passed via an intermediate `const`, not a literal
+  (bypassing TS's excess-property check) — and since nothing ever calls
+  `.parse()` on that object, `.strict()` has zero runtime interaction
+  with it. **Confirmed by reasoning about the code path AND by the
+  RED-run above using the real fixture from `tests/unit/contract.test.ts`
+  instead** — the two fixtures are different objects; this one was
+  checked by tracing, not by re-running it, since re-running the whole
+  publish pipeline is a heavier, unnecessary proof for a question the
+  source trace already answers unambiguously (no `.parse()` call exists
+  on the input, full stop).
+- No other real-source call site invokes `NodeSchema`/`AnswerSchema`'s
+  `.parse()`/`.safeParse()` — confirmed by grep across every non-build-
+  artifact `.ts`/`.tsx` file in `packages/`, `apps/ui`, `apps/api/src`,
+  `tests/`.
+**The number V asked for: zero.** No existing caller, producer, or test
+currently passes an extra key through anything that actually validates
+against `NodeSchema`/`AnswerSchema`. `.strict()` turns a silent widening
+into a hard failure, and V accepted that trade-off knowingly — but
+nothing in this codebase exercises the trade-off today. This is a
+measured zero, not an assumed one: every `.parse()`/`.safeParse()` call
+site was found and individually traced to its producer.
+
+**Failure it CATCHES:** the exact defect this step exists to close — an
+unknown key surviving `NodeSchema` validation into a parsed public
+envelope, from which `buildPublicAnswerExport` (S02-C3-3) spreads the
+ENTIRE `answer` object, forbidden-key exclusions and all, into a
+downloadable file. `.strict()` makes this structurally impossible at the
+schema layer, not merely absent from today's two producers by
+convention — a THIRD future producer of `Node`-shaped data that carelessly
+spreads extra fields into `stranger_restatement` now fails LOUDLY at
+parse time instead of silently shipping.
+**Failure it MISSES:** does not catch an owner-only secret smuggled under
+a DIFFERENT, already-declared field name (e.g. reusing `check_status`
+itself for a non-enum value that happens to coerce, or a leak through a
+field this schema already declares and therefore already accepts) — that
+is a field-CONTENT problem, not a schema-SHAPE problem, and `.strict()`
+only closes the shape-widening class this finding is about.
 
 ## SPEC trace — R2 Public-safe honesty fields; identity carriers absent
 

@@ -1,5 +1,254 @@
 # ARCH-01 self-report — public-debate-access — Claude, 2026-08-29
 
+## `.strict()` STEP, addendum (filed same day, ticket `t_a00a162e`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**What this round actually required.** V ruled; my job was execution, not argument — a
+different posture than most rounds this mission, where I was usually the one weighing options.
+The discipline here was staying inside that posture: author the step correctly, don't relitigate,
+don't add scope V didn't ask for.
+
+**The RED-before-GREEN verification was the most mechanically careful thing I did this round.**
+I could not touch product code, so "verify GREEN by running it" required reconstructing
+`NodeSchema` field-for-field in a scratch script, importing every real sub-schema live rather than
+guessing at their shapes, changing only the one line under test. This is more work than asserting
+"Zod's `.strict()` obviously rejects unknown keys," but the brief's own framing — three attempts to
+build a valid fixture, an invalid fixture proving nothing — is exactly this mission's recurring
+lesson, and I had no standing to exempt myself from it just because the underlying mechanism
+(schema strictness) is well-understood in the abstract. Reused an ALREADY-proven-valid fixture from
+`tests/unit/contract.test.ts` rather than building one from scratch, specifically to avoid
+reproducing the "three attempts" cost the brief warned about.
+
+**The blast-radius measurement surfaced one near-miss worth naming.** `tests/unit/s8-publication.
+test.ts`'s fixture with `secret_extra`/`owner_note` under `stranger_restatement` LOOKS exactly like
+something `.strict()` would break — extra keys, typed as `Answer`. It doesn't, because
+`publish()`'s input is duck-typed and never schema-validated; only its freshly-projected output is.
+I traced this to source rather than pattern-matching on "has extra keys therefore breaks," which
+is the same discipline this mission has demanded of every acceptance-command fix this session — a
+fixture or a caller LOOKING risky is not evidence; tracing what actually calls `.parse()` is.
+
+**A third near-repeat of the bold-marker mistake, caught inline again.** Wrote `**Category:**`
+instead of `**Category (...):**` on the new step, same slip as the FOUR-ITEMS round's S02-C1-6 and
+an earlier round's S01/S02 breaks — caught immediately by running the exact balance check before
+calling the step done, not after. Recording this a third time because the pattern itself is now
+data: the mistake keeps happening at the exact same moment (writing a new step's Category line
+fast, then fixing it fast) rather than stopping. The reflex to check is solid; the reflex to get it
+right the first time is not, and three instances is enough to say so plainly rather than treat each
+one as isolated.
+
+**What I did not do.** Did not touch any product file — the scratch verification scripts (both the
+RED probe re-run and the GREEN reconstruction) were copied into the repo root temporarily, run, and
+deleted, `git status --porcelain` confirmed clean before and after each. Did not touch
+`.worktrees/s02-code` (read-only checks only, confirmed via its own `git status --porcelain` showing
+only the coding seat's own pre-existing changes, none of mine). Did not re-litigate V's ruling —
+the brief was explicit that the decision is made, and nothing in this round's writeup treats it as
+open.
+
+## FOUR-ITEMS BUNDLE, addendum (filed same day, tickets `t_5d2a4e79`/`t_63f6e7e6`/`t_7539734e`/`t_899df0d3`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**Item 1, the one that matters.** S02's correct refactor broke a standing assertion in a file no
+slice owns. Ruled the instance by MERGING two of the brief's three offered options rather than
+picking one: narrowly widened S02's write surface to exactly the one loop the refactor actually
+affects (`s8-publication-contract.test.ts:168-174`, not the whole file — S04 keeps its read-only
+relationship to lines 120-138 untouched), and specified the concrete fix (concatenate the split
+composition's two files for the `apps/ui` iteration only). Rejecting the refactor was considered
+and ruled out on the merits, not by default: the assertion was using file-location as an incidental
+proxy for "the disclosure renders somewhere," and that proxy broke, not the actual requirement.
+Verified the fix would work by SIMULATING it against the real worktree files before writing it
+down — all five checks pass against the concatenated content, including the bonus: the same fix
+extends forbidden-string coverage to the new client component, which the old single-file check
+never scanned at all.
+
+**The class ruling is the one I take most seriously.** "Disjoint write surfaces don't imply
+independent effects" is a genuinely new axis of failure this mission hadn't named before, and I
+answered it concretely: a required addition to every slice's Single-writer check — grep the
+standing test suite for references to each write-surface file, and for every hit, check EVERY
+target a `for` loop iterates, not just the one that seems relevant. I did not present this as
+someone else's oversight. My own S02/PLAN.md had already performed HALF of this exact check for
+this exact test block, before this round, and drew a true conclusion (`web/`'s iteration is
+unaffected) that answered a narrower question than the one that mattered (does ANY iteration
+break), then stopped. A partial check that looks complete is arguably worse than no check, because
+it reads as diligence rather than as the gap it is.
+
+**A near-miss, self-caught.** Writing S02-C1-6's Category line, I dropped the parenthetical
+citation format (`**Category:**` instead of `**Category (...):**`) that this file's balance
+invariant depends on — caught immediately by re-running the exact balance check rather than
+assuming the edit was clean, the same reflex noted in an earlier round's self-report. Worth
+recording again: this is now the third time this specific mechanical slip has happened across this
+mission (twice fully landed and caught after the fact, this time caught inline) — the reflex is
+holding, but the underlying habit (writing the bold-marker line fast, before checking its exact
+required shape) has not gone away just because the catch has gotten faster.
+
+**Items 3 and 4, ratified, not rubber-stamped.** Both corrections were exactly what they claimed
+to be, but I did not take either on the ticket's word: re-ran t_7539734e's corrected command against
+the coding seat's actual finished worktree (clean OK/exit-0, not just "no syntax error in the
+abstract"), and re-read both `PublicDebatePageClient.tsx` and `PublicHonestyDrawer.tsx` for
+t_899df0d3 to confirm the corrected oracle's `role="dialog"` element genuinely exists, genuinely
+gates on the same state the trigger button sets, and genuinely discriminates the failure mode the
+original oracle couldn't see. Applied t_7539734e's ratified fix to the live PLAN.md by hand, since
+the coding seat's worktree copy had been synced before my own CLASS-FIX round and a wholesale merge
+would have clobbered that round's work — a small but real reminder that "ratify a worker's in-place
+correction" sometimes means re-deriving the edit against a moving base, not applying their diff.
+
+**What I did not do.** Did not touch either worktree beyond read-only inspection (`git status
+--porcelain` clean before and after in both). Did not write or edit any product file or test file —
+S02-C1-6 describes the exact new test body but leaves it for the coding seat's own future ticket.
+Did not extend the new standing-test-blast-radius check to S01 or S04's own write surfaces this
+round — that is the Router's ticket to open, per the brief's own instruction, not mine to
+pre-empt.
+
+## CLASS-FIX ROUND 1 (the fifth variant came back), addendum (filed same day, tickets `t_7539734e`/`t_b81ee2b2`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**The finding, plainly.** V waived the rework cap in Row 6 specifically to close a CLASS, and I
+reported that round closed. It wasn't. My very next round (REV-05/B2, same file even) introduced
+a fresh instance of the identical generating condition — a markdown-escaped pipe surviving into a
+raw JS operator, inside a table cell — because I fixed the INSTANCES round 4 found and never
+removed the CONDITION that produces them. That is as direct a counter-example to my own claim of
+closure as this mission has produced: not a new defect shape discovered by adversarial review, but
+the SAME shape, recurring in my own next round's own output, in the same file, one table over.
+
+**Why the round-4 fix looked complete and wasn't.** I checked S02/S03/S04 for the ONE variant I'd
+just found (`vitest -t`'s JS regex) and reported them clean. That check was real, not fabricated —
+but it answered a narrower question than the one that mattered. "Does this specific known shape
+exist elsewhere" is not the same question as "can this file's authoring mechanism produce this
+shape again," and I reported the narrow answer as if it settled the broad one. The sweep this
+round found the broad question's answer was no: `S01-C4`, sitting in the SAME table as the three
+sites I fixed in round 4, one row below them, had the same generating condition (a raw pipe forced
+into a table cell) wearing a different interpreter (a shell pipe, not a JS regex) — proven broken
+by extraction and execution, not assumed. I had never run it; round 4's own "run every command"
+sweep ran what existed then, correctly, and could not have caught a command's NEXT edit.
+
+**A mistake inside this round's own fix, self-caught.** Drafting the replacement for `S03-C2`'s
+`curl | grep` command, I initially unescaped BOTH pipes — the real shell connector AND the
+grep-internal alternation — producing `grep -c "Sign in to start|Your debate workspace|tabEmptyHint"`.
+That is wrong: unescaped, BRE `|` is a literal character, not alternation, and the command silently
+stopped matching (confirmed: it returned `0` against a live server response that plainly contained
+one of the three target strings). I caught this only because I ran the corrected block before
+writing it down as fixed, not because I reasoned it out first. This is the same lesson the whole
+mission keeps teaching from different angles: "unescape the pipe" is not one operation, it is a
+per-site judgment call about what each specific pipe means to its specific interpreter, and getting
+it wrong is exactly as easy in the fix as it was in the original defect.
+
+**What actually closes the class, argued and applied, not just proposed.** No executable command
+lives in a table cell — full stop, not "unless the escape happens to be safe for this command's
+language." `S03-C2`/`S03-C3` moved to labelled fenced blocks this round; `S01-C4` likewise, in
+`S01/PLAN.md`, since the sweep proved it broken and this PLAN's own scope covers that. `S03-C1` was
+deliberately left untouched — the coding seat owns that exact cell right now, fixing the instance
+REV-05 found, under Row 7 authority pending my ratification — and I recorded a follow-up: it should
+also move to a fenced block once ratified, or the table keeps exactly one bare command and the
+class keeps one foothold.
+
+**What I did not do.** Did not touch `.worktrees/s03-code`, any product file, or any test file. Did
+not re-fix S03-C1's own pipe (the coding seat's, in progress). Did not extend the fenced-block
+restructuring to S02 or S04 — their sweep came back clean (every `\|` in both is grep-internal
+alternation, confirmed by running it, not read), and the round's scope authorizes touching a PLAN
+only where the sweep PROVES it broken.
+
+**Balance, checked:** S03 stayed 13/13, S01 stayed 20/20 — this round changed command SHAPE, not
+step COUNT, so neither should have moved, and I verified rather than assumed that.
+
+## REV-05 FINDINGS, ROUND 1 (B2, N1), addendum (filed same day, tickets `t_57891ca5`/`t_a9d1deeb`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**What this round actually was.** Two findings from a blind lens against S03's already-shipped
+code, both against my OWN Architecture decisions, not a coder's fidelity to them — a different
+flavor of self-correction than most rounds this mission: the coding seat "implemented exactly
+what it was told" (the Router's own words), so there was no implementation bug to find, only a
+design decision to re-examine under adversarial pressure it hadn't faced before.
+
+**B2, plainly.** I wrote `role="tablist"`/`role="tab"`/`aria-selected` onto plain navigation
+links, defended it with an argument about generic keyboard reachability, and never checked that
+argument against the ARIA tab role's actual behavioral contract (tabpanels, `aria-controls`,
+arrow-key roving tabindex). That is the same shape of mistake as every prior round's defect in
+this mission — a signal (here, an ARIA role) asserting something (full tab-widget behavior) that
+nothing behind it actually provides — now surfacing in a THIRD distinct technical domain beyond
+test-filtering and field-redaction/line-numbering: markup semantics. The exclusive-provenance
+invariant holds here too, restated for accessibility: an ARIA role's PASS (a screen reader
+announcing "tab") must trace to actual behavior matching that announcement, or the role is a
+false claim, and Rule 1 says a false claim is worse than no claim. Fixed by dropping the role
+entirely for `aria-current`, which claims only what the markup actually does. I found no citation
+defending the original choice, so I did not manufacture one — Option 3 is recorded as ruled out
+for lack of evidence, not argued down.
+
+**N1, plainly.** I wrote decision 4 (the banner is not part of any tab's switched surface) and
+decision 5 (the banner satisfies R3 for the Your Debates tab) in the same document, and did not
+notice they contradict each other until REV-05's matrix forced the click-by-click accounting.
+That is a cheaper category of miss than B2 — an internal consistency check I could have run on my
+own prose without any external review — and I should have run it before handoff the first time.
+Fixed with one new step, S03-C2-3, rather than re-opening the SPEC: SPEC R3's carve-out for
+logged-out visitors was already correct and is not what REV-05 found wrong.
+
+**What I did not do.** Did not touch `.worktrees/s03-code`, `tests/unit/pda-s03-keyboard-
+accessibility.test.ts`, or any product file — both fixes are PLAN.md prose describing markup for
+the coding seat to implement on separate future tickets, per the brief's own instruction and this
+round's scope. Did not open a V DECISIONS row for N1, having concluded (and argued in
+DECISIONS.md) that it is a HOW question already answerable within Architecture's own authority,
+not a WHAT question SPEC R3 left open.
+
+**Balance and scope, checked:** `S03/PLAN.md` acceptance/category markers moved from 12/12 to
+13/13 (one new step, S03-C2-3) — checked mechanically, not assumed, given this exact bold-marker
+convention has bitten me twice before in this mission. `git status --porcelain` clean on all
+product/test paths and `.worktrees/s03-code` before this handoff.
+
+## S02-C5 CORRECTION ROUND, addendum (filed same day)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**This is the sixth or seventh instance of the mission's core defect
+family, now in a slice I had not touched before today (S02), which is
+itself informative: the family is not specific to S01's redaction logic
+or to vitest's regex semantics — it recurs anywhere an acceptance command
+is written without first asking "what OTHER state of the world could
+produce this exact signal." A directory scan for forbidden strings is a
+different mechanism from a `-t` filter or a line-numbered `sed`, and it
+carried the same shape of defect anyway.**
+
+**What I did right this round, worth keeping:** I did not implement the
+coding seat's proposed fix. The brief was explicit that the category
+decision was mine, and the seat's proposal (assert-then-scan) was a
+reasonable ENGINEERING answer to "how do I make this catch the bug" but
+not an authorized answer to "what KIND of claim should this step make."
+Before writing anything, I checked whether the seat's own justification
+for its proposal held — it didn't fully; the citation naming which OTHER
+steps already guaranteed the artifact's existence (`C2-4/C2-5/C5-2`) was
+wrong, and I would have propagated that error forward if I had trusted it
+and moved straight to picking a shape. Reading `C2-4`/`C2-5`/`C5-2`
+myself, then finding the REAL guarantee lives in `C1`'s own render test
+(and confirming it's genuinely RED today by running it against the
+parked worktree, not assuming), is what let me argue the category
+decision from evidence rather than from the ticket's framing.
+
+**A concrete self-correction this round, small but the same shape as last
+round's:** I again wrote `**Acceptance test (guarded, ...):**` with the
+annotation inside the bold marker, and again broke S02's own 22/22
+balance invariant — caught immediately this time, by habit rather than
+by surprise, since I ran the balance check as a matter of course before
+considering the edit finished, exactly per last round's own
+recommendation to myself. Recording this not because it is new
+information but because it is evidence the recommendation actually
+changed my behavior, not just my prose — the same mistake happened
+again, but the DETECTION was now reflexive rather than discovered.
+
+**The class sweep (S01/S03/S04) was a genuine, bounded piece of work,
+not a formality:** confirming that S02-C5-1 is the ONLY member of this
+specific shape (recursive directory scan anchored to a root rather than
+an artifact) required checking not just for the same LITERAL pattern
+(`grep -r`) elsewhere, but for a structurally similar risk in every OTHER
+grep-based acceptance in three other PLAN files — including verifying,
+empirically, that `grep -c` on a missing single file behaves differently
+(no stdout output at all) than on an existing file with zero matches
+(prints `0`), which is WHY the mission's other single-file `grep -c`
+checks were never at risk of this same conflation even though I had
+never explicitly reasoned about it before this round. A "clean" report
+needed that positive check, not just an absence of matches to the
+original defect's literal grep pattern.
+
 ## REDACTION-CORRECTNESS thread, ROUND 3 OF 3 — FINAL, addendum (filed same day)
 
 **SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.

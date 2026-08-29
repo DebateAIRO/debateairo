@@ -119,11 +119,11 @@ runtime `undefined.map` crash inside `synthesisFromAnswer` the first time
 
 | Cluster | Steps | ONE verification command | File surface |
 |---|---|---|---|
-| S02-C1 | S02-C1-1..5 (**REWORK ROUND 1, N2, `t_bc19eccb`**: corrected from "1..3" — steps 4 and 5 exist in this cluster's own step bodies, under the R2/R9 trace headings below; the cluster ID, not the SPEC trace section, is what determines membership) | `pnpm exec vitest run tests/render/pda-s02-public-page.test.tsx` | `apps/ui/app/public/debate/[id]/page.tsx`, new `PublicDebatePageClient.tsx` |
+| S02-C1 | S02-C1-1..6 (**REWORK ROUND 1, N2, `t_bc19eccb`**: corrected from "1..3" — steps 4 and 5 exist in this cluster's own step bodies, under the R2/R9 trace headings below; the cluster ID, not the SPEC trace section, is what determines membership. **BLOCKING, item 1, `t_5d2a4e79`**: added C1-6, the widened standing-test fix, this round) | `pnpm exec vitest run tests/render/pda-s02-public-page.test.tsx && pnpm exec vitest run tests/architecture/s8-publication-contract.test.ts` | `apps/ui/app/public/debate/[id]/page.tsx`, new `PublicDebatePageClient.tsx`, `tests/architecture/s8-publication-contract.test.ts` (lines 168-174 only, widened this round) |
 | S02-C2 | S02-C2-1..6 | `pnpm run typecheck && pnpm exec vitest run tests/render/pda-s02-public-tree.test.tsx` | `apps/ui/lib/v3/adapter.ts`, `apps/ui/components/DebateThread.tsx`, `DebateSplit.tsx`, `DebateCanvas.tsx`, `NodeDetailDrawer.tsx`, `PublicDebatePageClient.tsx` |
 | S02-C3 | S02-C3-1..5 | `pnpm exec vitest run tests/render/pda-s02-honesty-export.test.tsx` | new `PublicHonestyDrawer.tsx`, new `apps/ui/lib/v3/publicAnswerExport.ts`, `apps/ui/components/PublicAnswerDisclosure.tsx` |
 | S02-C4 | S02-C4-1..2 | `pnpm exec vitest run tests/render/pda-s02-scoring-chrome.test.tsx` | `apps/ui/app/debate/[id]/DebatePageClient.tsx` (export only), `PublicDebatePageClient.tsx` |
-| S02-C5 | S02-C5-1..2 | `grep -rn "PublicationControl\|regenerateNode\|unlinkMemory\|recordInvestigation\|ChallengePopover\|InvestigationDrawer" apps/ui/app/public/debate/` | `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx` |
+| S02-C5 | S02-C5-1..2 | (**S02-C5 CORRECTION ROUND, `t_d33dd7d6`: guarded, see S02-C5-1 for the full argument**) `test -d "apps/ui/app/public/debate/[id]" && { grep -rn "PublicationControl\|regenerateNode\|unlinkMemory\|recordInvestigation\|ChallengePopover\|InvestigationDrawer" apps/ui/app/public/debate/; [ "$?" -eq 1 ]; }` | `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx` |
 | S02-C6 (**REWORK ROUND 1, N1, `t_575435c7`**, new) | S02-C6-1..2 | `pnpm exec vitest run tests/unit/pda-s02-affordance-drift.test.ts` | new `tests/unit/pda-s02-affordance-drift.test.ts` (read-only regression against `DebatePageClient.tsx` and `AnswerHonestyDrawer.tsx`, no production-code edit) |
 
 **REWORK ROUND 4 (PLAN-03, blocking, `t_71699495`): every command above RUN,
@@ -144,7 +144,7 @@ running each one (2026-08-29):
 | S02-C2 | FEATURE-ASSERTION | **RED, genuinely:** `pnpm run typecheck && pnpm exec vitest run tests/render/pda-s02-public-tree.test.tsx` → exit 1 (typecheck passes today since no S02 code exists to break it; the `&&` proceeds to vitest, which fails the same way as S02-C1 — single missing file, no filter). |
 | S02-C3 | FEATURE-ASSERTION | **RED, genuinely:** same "No test files found" shape, exit 1. |
 | S02-C4 | FEATURE-ASSERTION | **RED, genuinely:** same shape, exit 1. |
-| S02-C5 | VERIFICATION-ONLY (Change: none on its constituent step) | **GREEN, correctly, and must stay GREEN:** `grep -rn "PublicationControl\|regenerateNode\|unlinkMemory\|recordInvestigation\|ChallengePopover\|InvestigationDrawer" apps/ui/app/public/debate/` → no output, exit 1 (grep convention: 1 = no match = the desired state). Not vacuous: this directory exists today (`page.tsx` only) and genuinely contains none of the forbidden imports; the check will keep discriminating once `PublicDebatePageClient.tsx` is added, since a real accidental import would produce real grep output. |
+| S02-C5 | VERIFICATION-ONLY (Change: none on its constituent step; category CONFIRMED, not merely retained — see S02-C5-1's own argument, `t_d33dd7d6`) | **GREEN, correctly, and must stay GREEN — GUARDED as of the correction round, see S02-C5-1:** `test -d "apps/ui/app/public/debate/[id]" && { grep -rn "PublicationControl\|regenerateNode\|unlinkMemory\|recordInvestigation\|ChallengePopover\|InvestigationDrawer" apps/ui/app/public/debate/; [ "$?" -eq 1 ]; }` → own re-run 2026-08-29: `test -d` succeeds (own confirmation: `find apps/ui/app/public/debate -type f` → exactly `[id]/page.tsx`, `PublicDebatePageClient.tsx` genuinely absent), grep prints no output, `$?` exactly `1` → compound exit `0`, PASS. **Not vacuous IN COMBINATION WITH S02-C1's own cluster verification** — own run against the S02 coding seat's parked worktree (`.worktrees/s02-code`, read-only): `pnpm exec vitest run tests/render/pda-s02-public-page.test.tsx` → `No test files found, exiting with code 1`, real exit `1` — the render test that will import `PublicDebatePageClient.tsx` has not been authored yet either, and C1's own command is correctly RED for that reason today, not silently passing. S02-C5-1 on its own only proves "no forbidden string appears in whatever currently exists under this root," which is honestly narrower than "the mandated component is clean," and this row now says so rather than implying otherwise — the two checks' PASS conditions are independent, and only their CONJUNCTION (both GREEN) means what the cluster's overall claim implies. |
 | S02-C6 | FEATURE-ASSERTION | **RED, genuinely:** same "No test files found" shape, exit 1. |
 
 **ACCEPTANCE-COMMAND THREAD, ROUND 2 (PLAN-04, blocking, `t_eade6007`):
@@ -541,7 +541,28 @@ close control.
 **Acceptance test:** `tests/render/pda-s02-honesty-export.test.tsx`
 (additional `it()`) renders `PublicDebatePageClient` with a fixture,
 simulates a click on the honesty-labeled button, and asserts the
-drawer's `reversal_point` text becomes visible in the DOM.
+`role="dialog"` / `aria-label="Public answer honesty"` element exists and
+contains the drawer's `reversal_point` text. **RATIFIED (item 4,
+`t_899df0d3`, FOUR-ITEMS bundle): S02-CODE's Row 7 in-place correction,
+disclosed and provisional, now ratified.** The prior document-wide text
+oracle (`toContain`-style, no element scoping) could be satisfied by
+S02-C1-4's own required base-page reversal section — own verification,
+this round, of `PublicDebatePageClient.tsx:177`:
+`<section className="card"><h2>What could reverse this answer?</h2><p>{debate.answer.reversal_point}</p></section>`
+renders unconditionally on the base page, independent of `honestyOpen` —
+so the old oracle would pass whether or not this step's own trigger ever
+opened the drawer, an exclusivity gap of the same shape this mission has
+found repeatedly elsewhere (a PASS not tracing exclusively to the fact it
+claims). Own verification that the corrected, dialog-scoped oracle is
+actually satisfiable by real product code, not merely plausible-sounding:
+`PublicHonestyDrawer.tsx:15` — `<aside className="drawer scroll"
+role="dialog" aria-modal aria-label="Public answer honesty">` — and this
+element is mounted only when `honestyOpen` is true
+(`PublicDebatePageClient.tsx:242`), so scoping the assertion to it
+restores genuine discrimination between "the trigger opened the drawer"
+and "the base page already said this." Preserves this step's product
+behavior, scope, cluster, and FEATURE-ASSERTION category — only the
+oracle's element-scoping changed, not what the step builds or claims.
 **Category (REWORK ROUND 4, PLAN-03, `t_71699495`): FEATURE-ASSERTION —
 same file/command as S02-C3-1 above (see Clusters section, S02-C3);
 observed pre-fix RED there.**
@@ -718,27 +739,105 @@ need updating at that time regardless.
 
 ### S02-C5-1 — Grep-verified absence of every forbidden control's import
 
+**S02-C5 CORRECTION ROUND (`t_d33dd7d6`): two defects, measured by the
+S02-CODE seat with hostile controls and re-verified by this seat before
+any change.** (a) The old acceptance text read "any nonzero exit as
+PASS" — but `grep -r` on a clean, existing directory returns `rc=1` while
+`grep -r` on a MISSING scan root returns `rc=2` (own reproduction:
+`grep -rn ... apps/ui/app/public/debate/` from this repo's root → `rc=1`;
+the identical command run from `/tmp`, where the relative path does not
+resolve → `ugrep: warning: ... No such file or directory`, `rc=2`) — both
+nonzero, both read as PASS under the old wording, so a renamed or
+vanished scan root would have silently passed. (b) The command **already
+passes at base commit** while `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx` —
+the file this step exists to police, and the ONLY file that could carry a
+forbidden import here — **does not exist**: own reproduction, `find
+apps/ui/app/public/debate -type f` → exactly `[id]/page.tsx`, no
+`PublicDebatePageClient.tsx` anywhere; grep → no output, `rc=1` → PASS.
+**A component landing in any other filename or location under this root
+would be silently accepted and never scanned — the scan is anchored to a
+ROOT, not to the ARTIFACT the step's own file surface names.**
+
+**The category question, decided here, not implemented from the coding
+seat's proposal.** The seat correctly stopped rather than fix (b) itself:
+the obvious remedy — assert `PublicDebatePageClient.tsx` exists, then
+scan it — makes this step RED until S02 lands, converting it from
+VERIFICATION-ONLY to FEATURE-ASSERTION, a category change Row 7
+explicitly withholds from a worker's own authority. **Decision: S02-C5-1
+STAYS VERIFICATION-ONLY.** Argued, not asserted: this step's own
+"Change: none" premise rests on the claim that SOME OTHER step already
+establishes `PublicDebatePageClient.tsx`'s existence as a real
+FEATURE-ASSERTION — own check of that claim, since the original text
+cited "C2-4/C2-5/C5-2" and none of the three actually do (`S02-C2-4`/`C2-5`
+make an existing prop optional on OTHER, already-existing components;
+`S02-C5-2` greps `page.tsx` for a cookie read, not `PublicDebatePageClient.tsx`
+at all). The citation was WRONG, but the underlying claim is TRUE at a
+different address: `S02-C1`'s own cluster verification,
+`pnpm exec vitest run tests/render/pda-s02-public-page.test.tsx`, is a
+real render test that will import `PublicDebatePageClient.tsx` directly —
+own run against the S02 coding seat's parked worktree confirms this
+command is CORRECTLY RED today (`No test files found, exiting with code
+1`, real exit `1` — the test itself is not yet authored either, which is
+its own honest RED, not a false GREEN). **Converting S02-C5-1 to
+FEATURE-ASSERTION would DUPLICATE a claim S02-C1 already owns and is
+already correctly gating** — two steps independently asserting the same
+artifact's existence is a traceability defect of its own (unclear which
+one is authoritative if they ever disagree), not an improvement. The
+fix that belongs to THIS step is narrower: make its own MECHANISM (the
+scan) fail honestly when its ROOT is missing or wrong, and say plainly,
+in this step's own text, that its PASS is conditional on S02-C1's
+existence-check also being green — not silently imply a stronger claim
+than a directory scan can prove.
 **Cluster:** S02-C5
 **File surface:** `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx`,
 `apps/ui/app/public/debate/[id]/page.tsx`
-**Change:** none (verification-only step; C2-4/C2-5/C5-2 already ensure
-this by construction — this step is the explicit, standalone proof).
-**Acceptance test:** `grep -rn "PublicationControl\|regenerateNode\|unlinkMemory\|recordInvestigation\|ChallengePopover\|InvestigationDrawer" apps/ui/app/public/debate/`
-returns no output (exit 1).
-**Category (REWORK ROUND 4, PLAN-03, `t_71699495`): VERIFICATION-ONLY —
-observed pre-fix GREEN, correctly (same result as this cluster's own
-command; see Clusters section, S02-C5).**
+**Change:** none (verification-only step, CONFIRMED as such above — its
+narrower, honest claim is "no forbidden import string appears anywhere
+under this route today," which is independent of, and does not
+duplicate, S02-C1's own claim that `PublicDebatePageClient.tsx` exists
+and renders correctly).
+**Acceptance test:** (**guarded, `t_d33dd7d6`**) `test -d "apps/ui/app/public/debate/[id]" && { grep -rn "PublicationControl\|regenerateNode\|unlinkMemory\|recordInvestigation\|ChallengePopover\|InvestigationDrawer" apps/ui/app/public/debate/; [ "$?" -eq 1 ]; }`
+exits `0` (compound: the scan root must exist AND grep's own exit code
+must be EXACTLY `1`, not merely nonzero — POSIX grep semantics
+distinguish "no match" (`1`) from "error, e.g. missing path" (`2`)
+reliably; the old defect was in the PLAN's stated pass CONDITION, not in
+grep's own ability to discriminate). Own verification of all three
+world-states, this repo, before writing this line: directory present +
+clean → compound exit `0` (PASS); directory missing (simulated from
+`/tmp`) → compound exit `1` (FAIL, closes defect (a)); directory present
++ a forbidden import injected into a copy → compound exit `1` (FAIL,
+unchanged behavior for the case this step already caught).
+**Category (REWORK ROUND 4, PLAN-03, `t_71699495`; RE-ARGUED AND CONFIRMED,
+S02-C5 CORRECTION ROUND, `t_d33dd7d6`): VERIFICATION-ONLY — observed
+pre-fix GREEN, correctly, and observed GREEN again post-guard, for the
+right reason this time.** Own re-run 2026-08-29: compound exit `0`
+(`test -d` succeeds, grep prints no output, `$?` exactly `1`) — matches
+the pre-guard result exactly on TODAY's real state, confirming the guard
+changes what the command can DETECT without changing today's verdict on
+a directory that is, in fact, clean of the six forbidden strings.
 **Failure it CATCHES:** literally every control SPEC R7 names
 (delete/unpublish/replay-generation lives inside `PublicationControl`;
 challenge/investigation-recording lives inside `ChallengePopover`/
 `InvestigationDrawer`/`recordInvestigation`; memory-unlink is
 `unlinkMemory`) being imported anywhere under the public route — a single
-grep, matching the cluster table's ONE-command requirement exactly.
+guarded grep, matching the cluster table's ONE-command requirement
+exactly. As of this round, also catches the scan root itself vanishing
+or being renamed (own reproduction above) — previously silent, since
+"any nonzero" swallowed the difference between "clean" and "gone."
 **Failure it MISSES:** does not catch a mutation control reintroduced
 under an alias import (`import { unlinkMemory as detachMemory }`) — a
 determined evasion of this literal grep; Grok's review is expected to
 probe exactly this, per packet §5's "expect it to probe for a step it
-cannot mechanically verify" — flagged here rather than hidden.
+cannot mechanically verify" — flagged here rather than hidden. **Does
+not, on its own, catch `PublicDebatePageClient.tsx` never being created
+at all** — a directory that stays forever empty of the mandated file
+would still pass this grep cleanly and honestly (there is genuinely no
+forbidden import in a file that doesn't exist), which is why this step's
+PASS is not sufficient proof of R7 alone: `S02-C1`'s own cluster
+verification is what proves the artifact exists, and a reviewer checking
+this cluster's overall claim must read BOTH commands, not this one in
+isolation — stated here explicitly rather than left for a reviewer to
+assume.
 
 ### S02-C5-2 — Regression: signed-in non-owner sees the identical public component tree
 
@@ -791,6 +890,86 @@ file-split refactor.
 **Failure it MISSES:** nothing beyond C3-5's own coverage of the new
 legacy-specific sentence — this step only re-confirms the PRE-EXISTING
 sentence survives.
+
+### S02-C1-6 — Widen the standing cross-composition test's `apps/ui` half to read both split files (BLOCKING, item 1, `t_5d2a4e79`)
+
+**Cluster:** S02-C1
+**File surface:** `tests/architecture/s8-publication-contract.test.ts`,
+**lines 168-174 ONLY** — the single `for (const page of [applicationPublic,
+webPublic])` loop and its body. **This is a deliberately narrow, one-time
+widening of S02's write surface, granted by Architecture this round, not
+a standing expansion.** It does NOT include lines 120-138 (S04's own
+regression-review ground truth, still read-only for every slice including
+S02) or any other line of this file. No other slice's PLAN needs updating
+for this grant: S04's own text already says it "reads (does not write)"
+this file; S03's boundary claim concerns the disjoint 140-175 block as a
+whole and is unaffected by a change scoped to one loop inside it (S03
+never reads or runs the `apps/ui` half of this specific assertion either).
+**Why this instance, not the other two options:** rejecting S02-C1's
+refactor (keeping `PublicAnswerDisclosure` inline in `page.tsx`) was
+considered and rejected — the refactor is the correct one (parity with
+the owner-side pattern, a clean server/client split), and the assertion
+this breaks was never actually checking "does the disclosure live in
+page.tsx" as a real requirement — it was checking "does the public
+composition render the disclosure somewhere," using file-location as an
+incidental proxy that stopped holding once the composition split into two
+files. Freezing product code to satisfy a proxy is backwards.
+**Change:** the loop body's `apps/ui` iteration widens to cover both
+files the composition now spans; `web/`'s iteration is untouched (S02
+never touches `web/`, confirmed unaffected — this PLAN's own boundary
+section already established that for the OLD assertion, and concatenation
+changes nothing about `web/`'s single-file check):
+```ts
+const applicationPublicClient = await read("apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx");
+for (const page of [applicationPublic + applicationPublicClient, webPublic]) {
+  expect(page).toContain("readPublicDebate(id)");
+  expect(page).toContain("PublicAnswerDisclosure");
+  for (const forbidden of ["readInspection", "readLedgerDigest", "readEvents", "memory_disclosure"]) {
+    expect(page).not.toContain(forbidden);
+  }
+}
+```
+This also closes a second, smaller gap noticed while fixing the first:
+the forbidden-string checks (`readInspection`/`readLedgerDigest`/
+`readEvents`/`memory_disclosure`) previously covered only `page.tsx` for
+the `apps/ui` side — `PublicDebatePageClient.tsx`, the new file that now
+does most of the actual rendering, was invisible to this regression guard
+entirely. Concatenation extends the SAME forbidden-string coverage to it
+for free, not as a separate step, since it is the same loop body checking
+the same `page` variable.
+**Acceptance test:** `pnpm exec vitest run tests/architecture/s8-publication-contract.test.ts`
+exits 0, run three times, against the coding seat's finished worktree.
+**Category (BLOCKING, item 1, `t_5d2a4e79`):** REGRESSION-BASELINE for the pre-existing three assertions
+(`readPublicDebate(id)`/forbidden-strings on `page.tsx`'s own content,
+already true and unaffected) composed with FEATURE-ASSERTION for the
+`PublicAnswerDisclosure` clause specifically (RED against the coding
+seat's worktree before this fix — own reproduction, 2026-08-29, in the
+S02 worktree: `1 failed | 4 passed (5)`, the exact failure the brief
+reported; GREEN required after S02-C1-6 lands). **Own verification this
+round that the fix, once applied, would actually pass — simulated the
+full new assertion body against the real worktree files (read-only, no
+writes, `git status --porcelain` confirmed clean before and after):**
+concatenating `page.tsx` + `PublicDebatePageClient.tsx` from
+`.worktrees/s02-code`, all five checks that would run against the
+concatenated string pass — `readPublicDebate(id)`: present;
+`PublicAnswerDisclosure`: present; all four forbidden strings
+(`readInspection`/`readLedgerDigest`/`readEvents`/`memory_disclosure`):
+absent. Not a plausible-sounding fix — an executed one, against the
+actual files this step's acceptance will run against.
+**Failure it CATCHES:** the exact defect this round exists to fix — a
+refactor that moves a required affordance out of the file a stale,
+single-file oracle reads, either by the mechanism observed here (a
+legitimate split) or by a regression that DROPS the affordance entirely
+(concatenation only helps if the string is present SOMEWHERE in the
+composition — an implementation that deletes `PublicAnswerDisclosure`
+from both files still fails this check, which is the actual invariant
+the test was always meant to protect).
+**Failure it MISSES:** does not catch the disclosure being present in
+SOURCE TEXT but not actually RENDERED on the composed page (e.g., dead
+code, or conditionally mounted in a way that never fires) — S02-C1-5
+above is the step that pins RENDERED presence via
+`tests/render/pda-s02-public-page.test.tsx`; this step only restores the
+architecture-level source-text guard to its pre-refactor strength.
 
 ## SPEC trace — anti-drift for the parallel component tree (REWORK ROUND 1, N1, `t_575435c7`)
 
