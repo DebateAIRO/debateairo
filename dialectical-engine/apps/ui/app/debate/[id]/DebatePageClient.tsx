@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import {
   COOKIE_SESSION_MARKER,
   contractClient,
@@ -23,7 +23,7 @@ import {
   contractNodesById,
   liveDebateDetail
 } from "@/lib/v3/adapter";
-import { buildAnswerExport } from "@/lib/v3/answerExport";
+import { buildAnswerExport, type AnswerExport } from "@/lib/v3/answerExport";
 import { projectCanvasCensus } from "@/lib/v3/census";
 import {
   measureDebateHeaderCollapse,
@@ -337,7 +337,12 @@ export default function DebatePageClient({
   initialDebate,
   initialAnswer = null,
   initialError = null,
-  initialPending = false
+  initialPending = false,
+  publicMode = false,
+  publicNodesById = null,
+  publicExport = null,
+  renderPublicHonesty = null,
+  publicHeader = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -349,6 +354,19 @@ export default function DebatePageClient({
   // client polling/stream below retries. Only a definitive failure sets
   // initialError, which is the sole seed of the fatal `error && !debate` gate.
   initialPending?: boolean;
+  /**
+   * Public read-only mode. A published debate is the same workspace seen by a
+   * stranger: identical chrome, identical views, identical panels — minus every
+   * affordance that needs an owner session. One component, so the public page
+   * can never drift away from the private one.
+   */
+  publicMode?: boolean;
+  /** Public projections, supplied by the caller because the public envelope is not an Answer. */
+  publicNodesById?: ReturnType<typeof contractNodesById> | null;
+  publicExport?: AnswerExport | null;
+  renderPublicHonesty?: ((close: () => void) => ReactNode) | null;
+  /** Publication-only chrome: byline, published date, disclosure, answer cards. */
+  publicHeader?: ReactNode;
 }) {
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
@@ -469,9 +487,10 @@ export default function DebatePageClient({
     : false;
 
   useEffect(() => {
+    if (publicMode) return;
     if (privateDeletionStatus!==null) return;
     refresh();
-  }, [privateDeletionStatus,refresh]);
+  }, [publicMode,privateDeletionStatus,refresh]);
 
   useEffect(() => {
     setScoringState({ status: "idle", data: null, error: null });
@@ -508,6 +527,7 @@ export default function DebatePageClient({
   useEffect(() => {
     if (privateDeletionStatus!==null) return;
     let active = true;
+    if (publicMode) return;
     setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
     getDebateAdaptiveDepthDryRun(id)
       .then((payload) => {
@@ -528,6 +548,7 @@ export default function DebatePageClient({
   }, [id,privateDeletionStatus]);
 
   useEffect(() => {
+    if (publicMode) return;
     let active = true;
     async function validateCookieSession() {
       try {
@@ -552,6 +573,7 @@ export default function DebatePageClient({
   // translator; while no settled answer exists, the tree the stream described
   // is materialized into the SAME debate state the V2 views already render.
   useEffect(() => {
+    if (publicMode) return;
     if (privateDeletionStatus!==null) return;
     const runRef = answerRef.current?.run_ref ?? id;
 
@@ -730,10 +752,17 @@ export default function DebatePageClient({
   // the top bar and the honesty drawer so the label can never outrun the
   // payload.
   const answerExport = useMemo(
-    () => buildAnswerExport({ answer, ledgerDigest, ledgerError, live }),
-    [answer, ledgerDigest, ledgerError, live]
+    () => publicMode
+      ? (publicExport ?? { available: false, reason: "ANSWER_UNAVAILABLE", message: "Export is not available for this debate." } as const)
+      : buildAnswerExport({ answer, ledgerDigest, ledgerError, live }),
+    [publicMode, publicExport, answer, ledgerDigest, ledgerError, live]
   );
-  const v3NodeById = useMemo(() => (answer === null ? null : contractNodesById(answer)), [answer]);
+  const v3NodeById = useMemo(
+    () => publicMode ? publicNodesById : (answer === null ? null : contractNodesById(answer)),
+    [publicMode, publicNodesById, answer]
+  );
+  // The honesty surface exists in both modes; only its contents differ.
+  const honestyAvailable = publicMode ? renderPublicHonesty !== null : answer !== null;
   const canvasCensus = useMemo(() => answer === null ? null : projectCanvasCensus(answer), [answer]);
   const synthesisRaw = synthesisDraft?.raw || "";
   const strongestPro =
@@ -847,6 +876,10 @@ export default function DebatePageClient({
     };
 
     measureHeaderFit();
+    // Same guard CanvasViewport already applies: environments without
+    // ResizeObserver still get the one-shot measurement above, they just do
+    // not get live re-measurement.
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measureHeaderFit);
     return observeDebateHeaderFit({
       observer,
@@ -949,11 +982,20 @@ export default function DebatePageClient({
   }
 
   function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
+    if (publicMode) return;
     const rect = anchor.getBoundingClientRect();
     setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
   }
 
+  // Thread, Split and Canvas each render a Challenge affordance only when they
+  // are handed a handler. Withholding it is what makes the public view
+  // read-only — a no-op handler would still paint a dead button.
+  const challengeProps = publicMode
+    ? {}
+    : { onChallengeNode: (node: DebateNode, anchor: HTMLElement) => openChallenge(node, anchor) };
+
   function onProseSelect(node: DebateNode, _event: MouseEvent) {
+    if (publicMode) return;
     const selection = window.getSelection();
     const text = selection?.toString().trim();
     if (!text || text.length < 4) return;
@@ -1108,17 +1150,17 @@ export default function DebatePageClient({
             <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
               <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
             </Link>
-            {hasTree ? (
+            {hasTree && !publicMode ? (
               <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
                 <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
               </button>
             ) : null}
-            {hasArtifacts ? (
+            {hasArtifacts && !publicMode ? (
               <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
                 <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
               </button>
             ) : null}
-            {answer ? (
+            {honestyAvailable ? (
               <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
                 <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
               </button>
@@ -1129,7 +1171,7 @@ export default function DebatePageClient({
               </a>
             ) : null}
             <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
-            <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>
+            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
           </div>
           <details className="debateOverflow">
             <summary className="iconBtn" role="button" aria-label="More debate actions" title="More debate actions">
@@ -1139,17 +1181,17 @@ export default function DebatePageClient({
               <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
                 <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
               </Link>
-              {hasTree ? (
+              {hasTree && !publicMode ? (
                 <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
                   <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
                 </button>
               ) : null}
-              {hasArtifacts ? (
+              {hasArtifacts && !publicMode ? (
                 <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
                   <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
                 </button>
               ) : null}
-              {answer ? (
+              {honestyAvailable ? (
                 <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
                   <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
                 </button>
@@ -1160,11 +1202,13 @@ export default function DebatePageClient({
                 </a>
               ) : null}
               <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
-              <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>
+              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
             </div>
           </details>
         </div>
       </header>
+
+      {publicMode && publicHeader ? publicHeader : null}
 
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
       {process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
@@ -1274,7 +1318,7 @@ export default function DebatePageClient({
                   setSelectedNodeId(nodeId);
                   setDetailNodeId(nodeId);
                 }}
-                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                {...challengeProps}
                 onToggleExpand={toggleExpand}
                 onToggleCollapse={toggleCollapse}
                 onProseSelect={onProseSelect}
@@ -1290,7 +1334,7 @@ export default function DebatePageClient({
                   setSelectedNodeId(nodeId);
                   setDetailNodeId(nodeId);
                 }}
-                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                {...challengeProps}
                 onToggleExpand={toggleExpand}
                 onProseSelect={onProseSelect}
               />
@@ -1321,7 +1365,7 @@ export default function DebatePageClient({
                   setSelectedNodeId(nodeId);
                   setDetailNodeId(nodeId);
                 }}
-                onChallengeNode={(node, anchor) => openChallenge(node, anchor)}
+                {...challengeProps}
                 onToggleExpand={toggleExpand}
                 onProseSelect={onProseSelect}
               />
@@ -1369,9 +1413,11 @@ export default function DebatePageClient({
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}
           currentUserFeedback={currentUserFeedbackByNodeId.get(detailNode.id)}
           lifecycleDecision={lifecycleDecisionByNodeId.get(detailNode.id)}
-          token={actionToken}
+          token={publicMode ? null : actionToken}
           onClose={() => setDetailNodeId(null)}
-          onChallenge={(anchor, text) => openChallenge(detailNode, anchor, text)}
+          {...(publicMode
+            ? {}
+            : { onChallenge: (anchor: HTMLElement, text: string) => openChallenge(detailNode, anchor, text) })}
           onFocusRecommendationNode={focusRecommendationNode}
           canFocusRecommendationNode={canFocusRecommendationNode}
           onQueued={() => {
@@ -1421,7 +1467,9 @@ export default function DebatePageClient({
         <DebateWorkspaceDrawer debate={debate} singleShot={singleShotResult} onClose={() => setWorkspaceOpen(false)} />
       ) : null}
 
-      {honestyOpen && answer ? (
+      {honestyOpen && publicMode ? renderPublicHonesty?.(() => setHonestyOpen(false)) : null}
+
+      {honestyOpen && !publicMode && answer ? (
         <AnswerHonestyDrawer
           answer={answer}
           live={live}
@@ -1451,7 +1499,7 @@ export default function DebatePageClient({
         />
       ) : null}
 
-      {debate ? <PublicationControl
+      {debate && !publicMode ? <PublicationControl
         runId={answer?.run_ref ?? id}
         onPrivateDeletion={purgePrivateDebate}
       /> : null}
@@ -1459,10 +1507,14 @@ export default function DebatePageClient({
 
       {toast ? <Toast message={toast} /> : null}
 
-      {/* S5: the only browser credential is the server-set HttpOnly cookie. */}
-      <div className="tokenDock">
-        <span className="btn" aria-live="polite">{actionToken ? "🔓 Signed in" : "Session required"}</span>
-      </div>
+      {/* S5: the only browser credential is the server-set HttpOnly cookie.
+          A public reader is not missing a session — they need none — so the
+          dock states an owner-mode fact and stays out of the public page. */}
+      {publicMode ? null : (
+        <div className="tokenDock">
+          <span className="btn" aria-live="polite">{actionToken ? "🔓 Signed in" : "Session required"}</span>
+        </div>
+      )}
     </div>
   );
 }

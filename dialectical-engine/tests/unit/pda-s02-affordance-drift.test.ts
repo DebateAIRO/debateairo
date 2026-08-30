@@ -48,9 +48,17 @@ describe("S02 owner/public affordance drift pins", () => {
     expect(occurrences(topBar, 'aria-label="Settings"')).toBe(2);
     // READ/STRUCTURAL — owner overflow itself contains the duplicated responsive actions.
     expect(occurrences(topBar, 'aria-label="More debate actions"')).toBe(1);
-    // MUTATION — challenge callbacks stay owner-only and are omitted by the public parent.
-    expect(occurrences(ownerPage, "onChallengeNode={(node, anchor)")).toBe(3);
-    expect(occurrences(ownerPage, "onChallenge={(anchor, text)")).toBe(1);
+    // MUTATION — challenge callbacks stay owner-only. The owner and public routes
+    // are now one component, so the split is no longer "which page renders the
+    // prop" but "does publicMode withhold it". Both handler surfaces are pinned:
+    // the three tree call sites share one spread that is empty in publicMode, and
+    // the node drawer's onChallenge is spread conditionally. Withholding — not a
+    // no-op handler — is what removes the trigger, because every consumer gates
+    // its affordance on the callback being present (behaviourally pinned in
+    // tests/render/pda-s02-public-tree.test.tsx).
+    expect(occurrences(ownerPage, "{...challengeProps}")).toBe(3);
+    expect(occurrences(ownerPage, "const challengeProps = publicMode\n    ? {}\n    : { onChallengeNode:")).toBe(1);
+    expect(occurrences(ownerPage, "{...(publicMode\n            ? {}\n            : { onChallenge:")).toBe(1);
     // MUTATION — publication, unpublish and private-delete controls stay owner-only.
     expect(occurrences(ownerPage, "<PublicationControl")).toBe(1);
 
