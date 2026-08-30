@@ -131,12 +131,21 @@ export default async function HomePage({
               {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
               {published.items.map((debate) => (
                 <article className="debateCard" key={debate.public_ref}>
-                  <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
-                  <p>
-                    By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
-                    {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
-                  </p>
-                  <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
+                  <div className="debateCardBody">
+                    <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
+                    <p>
+                      By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
+                      {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
+                    </p>
+                    <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
+                  </div>
+                  <Link
+                    className="tab"
+                    style={{ flexShrink: 0 }}
+                    href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}
+                  >
+                    Open the full debate →
+                  </Link>
                 </article>
               ))}
             </div>

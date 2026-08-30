@@ -1006,6 +1006,7 @@ a:focus-visible {
   background: transparent;
   color: var(--text-3);
   text-decoration: none;
+  white-space: nowrap;
 }
 .tab[aria-current="page"] {
   background: var(--surface);
