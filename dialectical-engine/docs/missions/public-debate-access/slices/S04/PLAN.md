@@ -31,20 +31,20 @@ does not pre-empt the verdict.
   test asserts anything about identity-shaped fields inside a `NodeSchema`
   or `EdgeSchema` instance. This is the actual NEW exposure surface S04
   exists to review; S04-C1 below is net-new work, not a regression check.
-- `packages/contract/src/index.ts:443-462` (own read, cited in S01's
-  PLAN too) — `NodeSchema` fields with plausible identity-adjacency:
-  `maker_lineage: {transport: string, provider_ref: string}` (which AI
-  provider/model served this node — not a human identity, but `provider_ref`'s
-  exact string value is UNVERIFIED by this seat: could be a bare model
-  name like `"anthropic/claude"` or could be an account-scoped API
-  routing key, depending on how the runner populates it). `provenance_ref`
-  (both `NodeSchema` and `EdgeSchema`) — an internal pointer whose target
-  shape is UNVERIFIED by this seat (could be an opaque UUID pointing to
-  internal storage, safe to expose, or could resolve to something
-  sensitive if dereferenced by a future feature).
+- `packages/contract/src/index.ts` (`NodeSchema`/`EdgeSchema`) and S01's
+  S01-C2-0B field table — the value-provenance classification is SETTLED,
+  not open for this seat to re-derive: the four reachable
+  `provenance_ref` variants are REDACTED, while `MakerLineageSchema.*`
+  (including `.provider_ref`) and the `AbstentionSchema.register_*` fields
+  are COPIED (VERIFIED) from static deployment/policy-register producers.
+  S04-C4's remaining sample-read is a QA implementation check against that
+  classification, not a new classification decision. The current live-data
+  gap is explicit: the sole published debate is a legacy publication without
+  `tree_included`, so none of these node/edge values has yet been observed on
+  the anonymous live path.
 - `apps/api/src/index.ts:728` (own read) — `ResourceIdSchema.safeParse(request.params.id)`
   already gates the `{id}` path param before any lookup; unaffected by S01/S02.
-- `apps/api/src/publications.ts:320-321` (own read) — `readPublicDebate`'s
+- `apps/api/src/publications.ts:399-400` (own read) — `readPublicDebate`'s
   catch block returns bare `null`, never a caught error's `.message` —
   already non-leaky by construction; S01 adds no new catch/throw sites.
 
@@ -61,9 +61,11 @@ does not pre-empt the verdict.
 not just edited.** S04 used `--reporter=basic` 7 times (all stripped). Own
 reproduction of the underlying bug, as elsewhere: `npx vitest run
 tests/unit/s8-publication.test.ts --reporter=basic` → `Startup Error:
-Failed to load custom Reporter from basic`, exit 1. **No vacuous-pass
-defect found in any S04 command**: S04-C1's cluster command and its `-t
-"fixture"` variant (S04-C1-2) both target a SINGLE nonexistent file, which
+Failed to load custom Reporter from basic`, exit 1. **No command-execution
+vacuous pass was found in these S04 invocations**: S04-C1's cluster command
+and its original `-t "fixture"` variant (S04-C1-2; replaced after its test
+subject was found vacuous in S04-CODE rework round 1) both targeted a SINGLE
+nonexistent file, which
 fails cleanly (`No test files found`, exit 1 — the genuine-RED shape, not
 the multi-file-argument vacuous-GREEN shape S01 had); S04-C2/C3 are
 single-file, no-filter regression runs against files that exist today.
@@ -116,20 +118,22 @@ hypothetical `session_hint` field) — that class of risk is exactly what
 S04-C4's human/QA verdict exists to judge; a name-matching test cannot
 substitute for it.
 
-### S04-C1-2 — Fixture-level test: a real widened `PublicDebate` object contains no top-level OR node-level forbidden key
+### S04-C1-2 — Product-path test: publish erases forbidden keys carried inside node `disagreement`
 
 **Cluster:** S04-C1
 **File surface:** `tests/unit/pda-s04-node-carrier-audit.test.ts` (same
 file, second `it()`)
-**Change:** Build a fixture `PublicDebate` with ≥2 nodes and ≥1 edge
-(reuse S01-C2-2's test fixture pattern if the worker implements S01 first;
-otherwise construct fresh), `JSON.stringify` it, and assert the resulting
-string does not contain any of the ten forbidden key names as a
-substring — a cheap, deterministic, whole-object sweep independent of
-`PublicDebateSchema.parse`'s own `.strict()` enforcement (this test is a
-second, independent line of defense, not a re-test of `.strict()` itself).
-**Acceptance test:** `pnpm exec vitest run tests/unit/pda-s04-node-carrier-audit.test.ts -t "fixture"`
-exits 0.
+**Change:** Build an owner-side `Answer` with ≥2 nodes and ≥1 edge, place
+all ten forbidden key names plus distinct marker values inside every
+fixture node's open `disagreement` record, and call the real
+`PostgresPublicationApplication.publish` method. Stub only its repository
+and cipher boundaries, capture the `PublicDebate` passed to encryption,
+and assert the real `redactNodeForPublic` projection sets every projected
+node's `disagreement` to `null` and removes every planted key and value.
+This is a targeted product-path guard for the open-record projection; it
+is not a claim that an independent whole-envelope scanner exists.
+**Acceptance test:** `pnpm exec vitest run tests/unit/pda-s04-node-carrier-audit.test.ts -t "real publish projection removes forbidden keys smuggled through node disagreement"`
+exits 0 with that named test executed.
 **Category (REWORK ROUND 4, PLAN-03, `t_71699495`): FEATURE-ASSERTION —
 observed pre-fix RED, correctly, without needing a `grep -qE` suffix.**
 Run 2026-08-29: exit 1, `No test files found, exiting with code 1` — this
@@ -138,22 +142,18 @@ existence before it ever applies the `-t` filter; the vacuous-pass defect
 S01 found (a `-t` filter matching zero tests inside a file that DOES
 exist, or a missing file silently dropped from a multi-file argument list)
 does not apply here — there is only one argument and it is absent.
-**Failure it CATCHES:** a forbidden key smuggled in under a DIFFERENT
-schema path that `.strict()` doesn't reach (e.g. inside `z.record()` or
-`z.unknown()` — `NodeSchema.disagreement: z.record(z.string(),
-z.unknown())` at `packages/contract/src/index.ts` is exactly this shape:
-an open-ended record whose VALUES are not schema-validated at all).
-**FLAGGED, not silently passed over:** `disagreement` is a genuine review
-target for S04-C4 — its value type is `z.unknown()`, meaning nothing stops
-arbitrary content (including, hypothetically, identity-shaped strings)
-from being stored there today, for OWNER data; whether it is safe to
-expose that unvalidated bag to anonymous readers via the widened `nodes`
-array is a real, undecided question this PLAN surfaces but does not
-resolve — see S04-C4-2.
-**Failure it MISSES:** a `z.unknown()` field's actual RUNTIME content
-(this test only proves the SCHEMA doesn't structurally forbid it — it
-cannot prove no live data happens to contain something sensitive inside
-`disagreement`, since that field's shape is untyped by design).
+**Failure it CATCHES:** a projection regression that copies
+`NodeSchema.disagreement: z.record(z.string(), z.unknown()).nullable()`
+instead of nulling it. That regression lets arbitrary keys and values
+cross the anonymous boundary while `PublicDebateSchema.parse` still
+accepts the result; the test's deliberate `disagreement:
+node.disagreement` product mutant makes this named test RED.
+**Failure it MISSES:** identity carried only in a VALUE under an allowed,
+copied field name (for example `maker_lineage.provider_ref: "owner:..."`).
+The neighboring value mutant stays GREEN by design. S01-C2-0B's settled
+producer-trace table supplies the classification for those copied fields,
+and S04-C4's tree-bearing anonymous sample remains QA's implementation
+check; C1 alone does not close R1.
 
 ### S04-C1-3 — Confirm `author_pseudonym` remains the only human-facing publisher label
 
@@ -236,7 +236,7 @@ exits 0.
 **Category (REWORK ROUND 4, PLAN-03, `t_71699495`): REGRESSION-BASELINE —
 covered by cluster S04-C3's own verification command (see Clusters
 section); observed pre-fix GREEN there (4/4 passed).**
-**Failure it CATCHES:** S01's `readPublicDebate` catch-block (`publications.ts:320-321`,
+**Failure it CATCHES:** S01's `readPublicDebate` catch-block (`publications.ts:399-400`,
 already `catch { return null }`, no message forwarded) regressing to leak
 a caught error's `.message` into the 404 body — this mission's PLANs make
 no edit to that catch block's body, only to what it parses, so this is a
@@ -298,8 +298,8 @@ the review MECHANICALLY RUNNABLE, not to pre-empt its answer.
 not new code)
 **Change:** none — this PLAN step names the exact inputs S04-C4-2's
 verdict depends on, so QA does not have to re-derive them:
-1. The full `NodeSchema`/`EdgeSchema` field list (S01 PLAN's own MEASURED
-   citation, `packages/contract/src/index.ts:443-476`).
+1. The full `NodeSchema`/`EdgeSchema` field list (current bodies at
+   `packages/contract/src/index.ts:424-442` and `:445-457`).
 2 (**RESOLVED, round 2, B2 `t_9322ae7b` — not open, listed for QA's
    positive record**). `NodeSchema.disagreement: z.record(z.string(),
    z.unknown())` — an untyped bag QA does NOT need to sample, because it
@@ -316,23 +316,30 @@ verdict depends on, so QA does not have to re-derive them:
    node-carrier audit confirms no real `disagreement` content reaches a
    published debate, but the open QUESTION this checklist item originally
    posed is closed.
-3. `maker_lineage.provider_ref` and `provenance_ref` (both node- and
-   edge-level) — this seat's own UNVERIFIED flag on whether these values,
-   in practice, are opaque-safe strings or could resolve to something
-   sensitive; QA resolves this by reading actual sample values, not by
-   re-reading the schema (the schema only declares `z.string().min(1)`,
-   it says nothing about the value's semantic safety).
-3b. `node.abstention.register_row_key` / `register_version` /
-   `register_source_ref` (`AbstentionSchema`, `packages/contract/src/index.ts:385-387`)
-   — flows through on any node whose `abstention` is non-null (S01 copies
-   `nodes` wholesale, per-node). S01 deliberately did NOT redact these
-   (only `ledger_unknown_ref`, a sibling field on the SAME schema — see
-   S01/DECISIONS.md and S01/PLAN.md's S01-C2-0), on the theory they
-   reference the model DEPLOYMENT REGISTER, not the ledger, and are the
-   same operational-provenance category as `maker_lineage`/`provenance_ref`
-   above rather than an identity/audit-trail handle. **QA should treat
-   this as the SAME open question as item 3, not a settled exclusion** —
-   this seat's reasoning for not redacting it is recorded, not proven.
+3 (**CLASSIFICATION RESOLVED upstream; QA implementation sample remains**).
+   Follow S01/PLAN.md's S01-C2-0B value-provenance rule and field table:
+   `NodeSchema.provenance_ref`, `EdgeSchema.provenance_ref`,
+   `LabeledNumberSchema.provenance_ref` (all three reachable sites), and
+   `NodeReviewSchema.provenance_ref` are REDACTED; `MakerLineageSchema.*`
+   (including `.provider_ref`) is COPIED (VERIFIED) after producer traces
+   to static per-deployment provider-slot identifiers. QA reads ACTUAL
+   values from a tree-bearing published sample only to verify the shipped
+   anonymous projection matches that settled classification; it does not
+   re-open or repeat S01's producer trace. The current database's sole
+   publication is legacy and lacks `tree_included`, so it cannot satisfy
+   this live sample check; QA must record that product-truth gap rather than
+   infer the widened path from the legacy response.
+3b (**CLASSIFICATION RESOLVED upstream; QA implementation sample remains**).
+   Follow the same S01-C2-0B table for
+   `node.abstention.register_row_key` / `register_version` /
+   `register_source_ref`: all three are COPIED (VERIFIED) policy/deployment-
+   register citations, while the sibling `ledger_unknown_ref` is REDACTED.
+   QA's sample-read checks that a tree-bearing anonymous publication matches
+   those settled dispositions in practice; it does not re-derive whether
+   the register fields are safe from schema names or a new producer trace.
+   The legacy-only live database means this check is not yet observable
+   end-to-end and remains QA's product-truth evidence gap, not this coding
+   seat's verdict.
 3c (**RESOLVED, round 2 — not open, listed for QA's positive record**).
    `node.locator` and `node.defeater_refs` — round 1 left both UNVERIFIED
    ("presumed intra-tree" / "could not verify"). The rework brief for B2
@@ -370,7 +377,9 @@ verdict depends on, so QA does not have to re-derive them:
    S04 anonymous-exposure checklist") so QA's R5 audit has a positive
    record of what was already closed, not just what remains open** — QA
    may still spot-check this in S04-C1 (the node-carrier audit test), but
-   it is not an open question the way items 3/3b/3c/3d are.
+   it is not a new classification question. Items 3/3b retain only QA's
+   implementation sample check against S01's settled table; items 3c/3d
+   are resolved outright.
 4. `claim` (node) and any composed prose fields — the plain free-text
    content V's brief explicitly wants public ("you can see... the
    arguments"), which is the field SPEC R5 exists to adjudicate: can a
@@ -388,7 +397,8 @@ is the actual acceptance gate for R5.
 not mechanically runnable — self-checked by re-reading this PLAN's own
 checklist rather than left undeclared.** Confirmed 2026-08-29: the
 checklist (items 1-4 above, including 2/3c/3d marked RESOLVED and 3/3b
-marked open) is present in this file, above this line — GREEN, trivially,
+pointing to S01's settled classification plus QA's implementation sample)
+is present in this file, above this line — GREEN, trivially,
 since this step's "test" is the checklist's own existence in a document
 this seat is actively editing.
 **Failure it CATCHES:** QA re-deriving the same field inventory
