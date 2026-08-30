@@ -1,0 +1,22 @@
+Dialectical Engine
+dezbatere.ro
+Library
+Account
++ New debate
+⚙
+A reasoning instrument
+What should we debate?
+Post a claim. Several different AI models argue it out against each other in a structured tree — so you can see how the strongest case for and against actually holds up.
+Sign in to start a debate and save it to your account.
+Log in
+Create account
+Your Debates
+Public Debates
+1 total
+QA full flow: Municipal budgets should be published as open data.
+By
+coral-willow-dea2f6
+·
+SUPPORTED
+· CAPPED
+Published debates may be indexed by search engines. Copies may persist after unpublishing.

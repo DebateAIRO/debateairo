@@ -1,0 +1,187 @@
+{
+  "styles": {
+    "tabs": [
+      {
+        "text": "Your Debates",
+        "ariaCurrent": null,
+        "className": "tab",
+        "color": "oklch(0.27 0.012 70)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderBottom": "0px none oklch(0.27 0.012 70)",
+        "fontWeight": "400",
+        "outline": "oklch(0.27 0.012 70) none 3px",
+        "textDecoration": "none"
+      },
+      {
+        "text": "Public Debates",
+        "ariaCurrent": "page",
+        "className": "tab tabActive",
+        "color": "oklch(0.27 0.012 70)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderBottom": "0px none oklch(0.27 0.012 70)",
+        "fontWeight": "400",
+        "outline": "oklch(0.27 0.012 70) none 3px",
+        "textDecoration": "none"
+      }
+    ],
+    "focused": {
+      "outline": "oklch(0.6 0.04 70) solid 2px",
+      "outlineOffset": "2px",
+      "boxShadow": "none",
+      "borderColor": "oklch(0.27 0.012 70)"
+    },
+    "hasFocusVisibleRule": true
+  },
+  "order": [
+    {
+      "tag": "A",
+      "className": "brand",
+      "text": "Dialectical Engine — home",
+      "ariaCurrent": null,
+      "href": "/"
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Account",
+      "ariaCurrent": null,
+      "href": "/login"
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "+ New debate",
+      "ariaCurrent": null,
+      "href": "/new"
+    },
+    {
+      "tag": "A",
+      "className": "iconBtn",
+      "text": "Settings",
+      "ariaCurrent": null,
+      "href": "/settings"
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Log in",
+      "ariaCurrent": null,
+      "href": "/login"
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "Create account",
+      "ariaCurrent": null,
+      "href": "/sign-up"
+    },
+    {
+      "tag": "A",
+      "className": "tab",
+      "text": "Your Debates",
+      "ariaCurrent": null,
+      "href": "/?tab=yours"
+    },
+    {
+      "tag": "A",
+      "className": "tab tabActive",
+      "text": "Public Debates",
+      "ariaCurrent": "page",
+      "href": "/?tab=public"
+    },
+    {
+      "tag": "A",
+      "className": "",
+      "text": "QA full flow: Municipal budgets should be published as open data.",
+      "ariaCurrent": null,
+      "href": "/public/debate/d89b38a4-f188-4840-94bd-a2dece92f275"
+    },
+    {
+      "tag": "NEXTJS-PORTAL",
+      "className": "",
+      "text": "",
+      "ariaCurrent": null,
+      "href": null
+    },
+    {
+      "tag": "BODY",
+      "className": "",
+      "text": "Dialectical Enginedezbatere.roLibraryAccount+ New debate⚙A reasoning instrumentW",
+      "ariaCurrent": null,
+      "href": null
+    },
+    {
+      "tag": "A",
+      "className": "brand",
+      "text": "Dialectical Engine — home",
+      "ariaCurrent": null,
+      "href": "/"
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Account",
+      "ariaCurrent": null,
+      "href": "/login"
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "+ New debate",
+      "ariaCurrent": null,
+      "href": "/new"
+    },
+    {
+      "tag": "A",
+      "className": "iconBtn",
+      "text": "Settings",
+      "ariaCurrent": null,
+      "href": "/settings"
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Log in",
+      "ariaCurrent": null,
+      "href": "/login"
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "Create account",
+      "ariaCurrent": null,
+      "href": "/sign-up"
+    },
+    {
+      "tag": "A",
+      "className": "tab",
+      "text": "Your Debates",
+      "ariaCurrent": null,
+      "href": "/?tab=yours"
+    },
+    {
+      "tag": "A",
+      "className": "tab tabActive",
+      "text": "Public Debates",
+      "ariaCurrent": "page",
+      "href": "/?tab=public"
+    },
+    {
+      "tag": "A",
+      "className": "",
+      "text": "QA full flow: Municipal budgets should be published as open data.",
+      "ariaCurrent": null,
+      "href": "/public/debate/d89b38a4-f188-4840-94bd-a2dece92f275"
+    }
+  ],
+  "focusedTab": {
+    "text": "Your Debates",
+    "ariaCurrent": null,
+    "outline": "oklch(0.6 0.04 70) solid 2px",
+    "outlineColor": "oklch(0.6 0.04 70)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "outlineOffset": "2px",
+    "boxShadow": "none"
+  }
+}

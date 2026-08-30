@@ -1,0 +1,318 @@
+{
+  "focusables": [
+    {
+      "idx": 0,
+      "tag": "A",
+      "type": null,
+      "className": "brand",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": "Dialectical Engine — home",
+      "tabIndex": 0,
+      "text": "Dialectical Engine — home",
+      "rect": {
+        "x": 22,
+        "y": 15,
+        "w": 142.96875,
+        "h": 29
+      }
+    },
+    {
+      "idx": 1,
+      "tag": "A",
+      "type": null,
+      "className": "btn",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "Account",
+      "rect": {
+        "x": 1041.15625,
+        "y": 14.5,
+        "w": 70.453125,
+        "h": 30
+      }
+    },
+    {
+      "idx": 2,
+      "tag": "A",
+      "type": null,
+      "className": "btn btnDark",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "+ New debate",
+      "rect": {
+        "x": 1119.609375,
+        "y": 14.5,
+        "w": 98.390625,
+        "h": 30
+      }
+    },
+    {
+      "idx": 3,
+      "tag": "A",
+      "type": null,
+      "className": "iconBtn",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": "Settings",
+      "tabIndex": 0,
+      "text": "Settings",
+      "rect": {
+        "x": 1226,
+        "y": 13.5,
+        "w": 32,
+        "h": 32
+      }
+    },
+    {
+      "idx": 4,
+      "tag": "A",
+      "type": null,
+      "className": "btn",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "Log in",
+      "rect": {
+        "x": 242,
+        "y": 320.578125,
+        "w": 60.390625,
+        "h": 30
+      }
+    },
+    {
+      "idx": 5,
+      "tag": "A",
+      "type": null,
+      "className": "btn btnDark",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "Create account",
+      "rect": {
+        "x": 312.390625,
+        "y": 320.578125,
+        "w": 106.65625,
+        "h": 30
+      }
+    },
+    {
+      "idx": 6,
+      "tag": "A",
+      "type": null,
+      "className": "tab",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "Your Debates",
+      "rect": {
+        "x": 228,
+        "y": 407.578125,
+        "w": 86.828125,
+        "h": 18
+      }
+    },
+    {
+      "idx": 7,
+      "tag": "A",
+      "type": null,
+      "className": "tab tabActive",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "Public Debates",
+      "rect": {
+        "x": 621.296875,
+        "y": 407.578125,
+        "w": 96.421875,
+        "h": 18
+      }
+    },
+    {
+      "idx": 8,
+      "tag": "A",
+      "type": null,
+      "className": "",
+      "id": "",
+      "name": null,
+      "placeholder": null,
+      "ariaLabel": null,
+      "tabIndex": 0,
+      "text": "QA full flow: Municipal budgets should be published as open ",
+      "rect": {
+        "x": 248,
+        "y": 485.578125,
+        "w": 237.125,
+        "h": 36
+      }
+    }
+  ],
+  "order": [
+    {
+      "tag": "A",
+      "className": "brand",
+      "text": "Dialectical Engine — home",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Account",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "+ New debate",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "iconBtn",
+      "text": "Settings",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Log in",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "Create account",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "tab",
+      "text": "Your Debates",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "tab tabActive",
+      "text": "Public Debates",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "",
+      "text": "QA full flow: Municipal budgets should be published as open ",
+      "placeholder": null
+    },
+    {
+      "tag": "NEXTJS-PORTAL",
+      "className": "",
+      "text": "",
+      "placeholder": null
+    },
+    {
+      "tag": "BODY",
+      "className": "",
+      "text": "Dialectical Enginedezbatere.roLibraryAccount+ New debate⚙A r",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "brand",
+      "text": "Dialectical Engine — home",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Account",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "+ New debate",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "iconBtn",
+      "text": "Settings",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Log in",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "Create account",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "tab",
+      "text": "Your Debates",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "tab tabActive",
+      "text": "Public Debates",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "",
+      "text": "QA full flow: Municipal budgets should be published as open ",
+      "placeholder": null
+    },
+    {
+      "tag": "NEXTJS-PORTAL",
+      "className": "",
+      "text": "",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "brand",
+      "text": "Dialectical Engine — home",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn",
+      "text": "Account",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "btn btnDark",
+      "text": "+ New debate",
+      "placeholder": null
+    },
+    {
+      "tag": "A",
+      "className": "iconBtn",
+      "text": "Settings",
+      "placeholder": null
+    }
+  ]
+}

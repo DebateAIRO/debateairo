@@ -1,0 +1,82 @@
+{
+  "after": {
+    "url": "https://localhost:3000/?tab=yours",
+    "hint": true,
+    "publicLinks": 0,
+    "yoursCurrent": true,
+    "bodySnippet": "Dialectical Engine\ndezbatere.ro\nLibrary\nAccount\n+ New debate\n⚙\nA REASONING INSTRUMENT\nWhat should we debate?\n\nPost a claim. Several different AI models argue it out against each other in a structured tree — so you can see how the strongest case for and against actually holds up.\n\nSign in to start a debate and save it to your account.\n\nLog in\nCreate account\nYour Debates\nPublic Debates\n0 shown\n\nSign in or create an account above to see your debates."
+  },
+  "deep": {
+    "title": "QA full flow: Municipal budgets should be published as open data.",
+    "mutation": [
+      {
+        "s": "Challenge",
+        "n": 0
+      },
+      {
+        "s": "Unpublish",
+        "n": 0
+      },
+      {
+        "s": "PublicationControl",
+        "n": 0
+      },
+      {
+        "s": "Regenerate",
+        "n": 0
+      }
+    ],
+    "honesty": true,
+    "export": true,
+    "treeSection": false,
+    "legacyNote": true,
+    "viewButtons": [
+      {
+        "s": "Thread",
+        "present": false
+      },
+      {
+        "s": "Split",
+        "present": false
+      },
+      {
+        "s": "Tree",
+        "present": false
+      },
+      {
+        "s": "Map",
+        "present": false
+      }
+    ]
+  },
+  "honesty": {
+    "open": true,
+    "text": "Dialectical Engine\ndezbatere.ro\nAccount\n+ New debate\n⚙\n← Published debates\n\nPUBLIC DEBATE · BY CORAL-WILLOW-DEA2F6\n\nQA full flow: Municipal budgets should be published as open data.\n\nPublished 8/27/2026.\n\nSCORING\ni\nHonesty\nExport\n\nPublished debates may be indexed by search engines. Copies may persist after unpublishing.\n\nAnswer status: DOWNGRADED\n\nThis publication predates argument-tree publishing; only the answer summary is available.\n\nEvidence as of 8/27/2026, 5:19:04 PM.\n\nSUPPORTED\n\nConfidence: CAPPED\n\nThe available reasoning supports a provisional, qualified answer.\n\nTest the key assumptions with independent evidence before treating the conclusion as settled.\n\nWhat could reverse this answer?\n\nThe conclusion could change if stronger contrary evidence appears.\n\nPUBLISHED SNAPSHOT\nAnswer honesty\nx\nAnswer state\n\nTerminal state: DOWNGRADED\n\nEvidence as of 8/27/2026, 5:19:04 PM.\n\nVerdict\n\nSUPPORTED\n\nConfidence: CAPPED\n\nWhat could reverse this\n\nThe conclusion could change if stronger contrary evidence appears.\n\nNot in this snapshot\n\nRisk tier: not included in this public snapshot.\n\nCost envelope: not included in this public snapshot.\n\nMemory disclosure: not applicable to public snapshots.\n\nExecution ledger digest: not included in this public snapshot — see Export for what is included.\n\nAuthorized inspection: owner-only, not available on the public page.",
+    "ownerHits": [
+      {
+        "s": "REDACTED_OWNER_ONLY",
+        "n": 0
+      },
+      {
+        "s": "replay_handle",
+        "n": 0
+      },
+      {
+        "s": "provenance_ref",
+        "n": 0
+      },
+      {
+        "s": "owner_ref",
+        "n": 0
+      },
+      {
+        "s": "user_id",
+        "n": 0
+      },
+      {
+        "s": "ledger:",
+        "n": 0
+      }
+    ]
+  }
+}
