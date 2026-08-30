@@ -4,8 +4,21 @@
     {
       "name": "ui",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui && NEXT_DIST_DIR=.next-dev pnpm dev"],
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui && NEXT_DIST_DIR=.next-dev pnpm dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "dev-stack",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine && pnpm run dev:auth:up"
+      ],
+      "port": 3000,
+      "url": "https://localhost:3000"
     }
   ]
 }
