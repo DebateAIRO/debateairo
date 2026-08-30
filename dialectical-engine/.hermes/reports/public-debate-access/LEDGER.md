@@ -439,3 +439,45 @@ disk**, so there is no positive evidence in either direction.
 
 V ruled: **V restarts it; the Router stays off it.** Row 8 made that server V's, and "I probably
 didn't break it" is not a basis for starting a TLS-and-database stack the Router did not set up.
+
+## SKILLS LOADED compliance — measured, closing `t_79d8e6d0`
+
+Three separate lenses (REV-06, REV-08, REV-09) reported the author's `SKILLS LOADED` declaration as
+**unverifiable**, each for the same structural reason: blinding a lens deletes the author's
+self-report, so the lens cannot check the very thing it is asked to check. That is a real property of
+the method, and no lens can resolve it. **The Router can**, from the logs and the board — so it did.
+
+**Method:** every seat log ≥400 bytes, plus the board comments for seats whose CLI posts to the ticket
+rather than to stdout.
+
+**Result over 74 substantive seat logs: 52 declared in the log, 22 did not.** Of those 22:
+
+- **16 are ARCH (Claude) seats that declared on the BOARD instead.** Verified, not assumed —
+  `t_f864a84b` carries 9 `SKILLS LOADED` occurrences, including timestamped declarations at 12:58,
+  13:16, 13:42, 14:23, 15:00 on 2026-08-29. The ledger's earlier claim that Claude seats post to the
+  board was correct and is now evidenced rather than asserted.
+- **6 predate the gate entirely** — `REQ-01`, `REQ-01-rework1`, `REV-00`, `REV-01`, `REV-01-confirm`,
+  `ARCH-01`, all launched between 10:53 and 11:52 on 2026-08-29, before any packet carried the
+  requirement (the first observed declaration anywhere is 12:58).
+
+**Zero genuine violations.** The gate held everywhere it was in force.
+
+## Router defect, found while doing that measurement — version skew, against my own §5
+
+The spine commit introducing the gate, `28f7bc2`, landed at **20:49** on 2026-08-29. Seats were being
+dispatched with the requirement, and complying with it, from **12:58** — roughly **eight hours
+earlier**.
+
+My own orchestrator contract §5 says: *"Fail closed on skew: if the rule set you are dispatching is
+newer than the installed skill or the repo spine, the dispatch does not go out — amend the spine
+first, in the same commit. A seat charged with a rule it cannot discover from the repo is your
+defect."*
+
+For eight hours I charged seats with a rule that existed only in my packets. Every seat complied, so
+nothing broke — but compliance was luck, not discoverability: a seat that had gone looking for the
+rule in the repo would not have found it, and would have been right to say so. **The rule worked
+because seats obey packets, which is precisely the reliance §5 exists to forbid.**
+
+Worth pairing with the standing lesson already recorded here — *gates work, reminders do not*. This
+one was a gate in the packet and a reminder in the repo, and the gap between the two was invisible
+until someone counted.
