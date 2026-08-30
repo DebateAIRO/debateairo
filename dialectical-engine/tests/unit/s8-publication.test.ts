@@ -5,7 +5,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PublicDebateSchema, type Answer } from "@debateai/contract";
+import { PublicDebateSchema, type Answer, type Node } from "@debateai/contract";
 import type { Pool } from "pg";
 import {
   FilePublicationKeyStore,
@@ -125,7 +125,7 @@ function answerWithTree(): Answer {
         check_status: "PASS",
         secret_extra: "LEAK-ME-RESTATEMENT",
         owner_note: "do-not-publish"
-      },
+      } as Node["stranger_restatement"],
       defeater_refs: [],
       defeater_exhaustion_marked: true,
       disagreement: {

@@ -431,7 +431,7 @@ export const NodeSchema = z.object({
   maker_lineage: MakerLineageSchema.nullable(),
   review: NodeReviewSchema.nullable(),
   locator: z.string().nullable(),
-  stranger_restatement: z.object({ check_status: CheckStatusSchema }).passthrough(),
+  stranger_restatement: z.object({ check_status: CheckStatusSchema }).strict(),
   defeater_refs: z.array(z.string().min(1)),
   defeater_exhaustion_marked: z.boolean(),
   disagreement: z.record(z.string(), z.unknown()).nullable(),

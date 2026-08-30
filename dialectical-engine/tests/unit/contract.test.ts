@@ -168,6 +168,27 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
     expect(() => NodeSchema.parse({ ...node, review: { outcome: "concurs" } })).toThrow();
     const { review: _review, ...withoutReviewAbsence } = node;
     expect(() => NodeSchema.parse(withoutReviewAbsence)).toThrow();
+    const nodeWithSmuggledStrangerRestatementKey = {
+      ...node,
+      stranger_restatement: {
+        ...node.stranger_restatement,
+        SMUGGLED_OWNER_SECRET: "ledger:abc-123"
+      }
+    };
+    expect(() => NodeSchema.parse(nodeWithSmuggledStrangerRestatementKey)).toThrow();
+    const smuggledParseResult = NodeSchema.safeParse(nodeWithSmuggledStrangerRestatementKey);
+    expect(smuggledParseResult.success).toBe(false);
+    if (!smuggledParseResult.success) {
+      expect(smuggledParseResult.error.issues).toContainEqual(expect.objectContaining({
+        code: "unrecognized_keys",
+        keys: ["SMUGGLED_OWNER_SECRET"],
+        path: ["stranger_restatement"]
+      }));
+    }
+    expect(NodeSchema.parse({
+      ...node,
+      stranger_restatement: { check_status: "FAIL" }
+    }).stranger_restatement).toEqual({ check_status: "FAIL" });
   });
 
   it("FX-SRV-14/15 makes typed segments and honesty projections non-optional", () => {
