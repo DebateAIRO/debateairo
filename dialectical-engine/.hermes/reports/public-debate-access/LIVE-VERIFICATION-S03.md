@@ -53,3 +53,31 @@ ARIA Rule 1 against is genuinely gone from the served HTML, not merely from the 
    anonymous direction; the signed-in direction is QA's.
 3. **"public debates can be accessed just the same as the user's own debates"** — **partially**:
    reachable and readable, but not yet at parity. Awaiting S02.
+
+---
+
+## End-to-end anonymous journey — run 2026-08-30, no session cookie
+
+Nobody had done this. Not a fixture, not a render test — the real app, a real published debate.
+
+1. `GET /?tab=public` → yields `/public/debate/d89b38a4-f188-4840-94bd-a2dece92f275`
+2. `GET` that path with **no session** → **46,243 bytes** returned
+
+**What the anonymous reader receives:** the question, `Public debate · by <pseudonym>`, verdict
+**SUPPORTED**, and the reversal point with real content — *"The conclusion could change if stronger
+contrary evidence appears."* Badges and Residual objections do not render, and that is **correct,
+not a defect**: both are conditional on `.length > 0` and this debate has neither.
+
+**Mutation controls — all absent, verified live:**
+`PublicationControl`, `Challenge`, `Regenerate`, `Unpublish`, `recordInvestigation` — **0 each.**
+
+**Owner-only markers — all absent, verified live:**
+`REDACTED_OWNER_ONLY`, `replay_handle`, `cost_envelope`, `ledger:`, `provenance_ref` — **0 each.**
+
+**Why this matters more than the unit evidence.** S01's two blocking leaks were invisible to
+fixtures because *a fixture that cannot fail against production pins nothing.* This is the first
+time the read-only-and-no-leaks property has been checked against **production data through the
+real serving path**, rather than against a constructed envelope. It holds.
+
+**What it does NOT establish:** parity. This is the pre-S02 detail page — no argument tree, no
+honesty drawer, no export. Criterion 3 is *accessible*, not yet *"just the same"*.

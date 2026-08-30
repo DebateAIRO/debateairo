@@ -114,3 +114,93 @@ Declarations found in `S01-CODE-codex.log`, `S01-CODE-resume-codex.log`, `S03-CO
 The Claude and Grok seats post their declaration to the BOARD rather than to the log, so log
 absence is not evidence of non-compliance for those — verify at the ticket, and remember the
 standing rule: a skill PATH proves nothing, only the skill BODY reaching the seat does.
+
+## Seat exit — ARCH-01-strictfix (2026-08-30 02:13, ticket `t_cc34ba78`)
+
+**Charge:** rule on the refutation of ARCH's own blast-radius-zero claim for the `.strict()` change.
+Not charged to any rework cap — this was a Router-raised refutation of a closed step, not seat rework.
+
+**Delivered.** `REWORK READY FOR REVIEW`. Reproduced the `TS2353` itself before ruling (§2.5 honoured
+by the seat that had to be corrected). Marked the wrong S01-C1-6 bullet **REFUTED in place rather
+than silently rewriting it**. Split the claim into two measured numbers — runtime blast radius still
+zero, compile-time blast radius exactly one. Applied the S02-C1-6 precedent (narrow surface widening
+over freezing correct product code) and explained the mechanism difference: no cross-slice grant is
+needed because S01 already owns the file. Specified the fix as a cast to `Node["stranger_restatement"]`.
+Stated plainly that none of this was a defect in the coding seat's work. Balance 21/21, no product,
+test, or worktree writes.
+
+**The lesson it recorded against itself, and it is the valuable part:** the blast-radius sweep asked
+*"does anything PARSE an extra key at runtime"* and never asked *"does anything CONSTRUCT one."* A
+zod schema drives both a validator and a `z.infer` type; `.strict()` narrows both; only one consumer
+of that dual effect was checked. This is **"checking half a loop is not checking the loop" one
+abstraction level up** — the same seat's own earlier lesson, recurring in a new dimension. A
+blast-radius method that examines only runtime will miss this class every time.
+
+**Router verification before acting on the ruling** (not review — a factual check, since acting on a
+wrong ruling costs a seat cycle): the harness at `tests/unit/s8-publication.test.ts:265` calls the
+real `application.publish`, which maps every node through `redactNodeForPublic`
+(`apps/api/src/publications.ts:244`) **before** `PublicDebateSchema.parse` (line 229), and re-parses
+after decrypt at line 280. The extra keys are stripped by the redactor and never reach the strict
+parse. **The test passing today is itself the proof that the redactor strips them.** So the runtime
+is genuinely unaffected, and `.strict()` is strictly better: a redactor regression now throws at the
+schema boundary instead of passing the key through. Ruling confirmed sound; fix dispatched.
+
+**One trap the Router measured and handed to the fix seat:** TypeScript reports only the FIRST excess
+property in an object literal. `secret_extra` (line 126) is reported; `owner_note` (line 127) is also
+excess and currently hidden behind it. A fix addressing only the reported error is not finished — and
+the *lazy* fix, deleting both keys, would make `tsc` pass while destroying the only property the test
+exists to prove. Forbidden explicitly in the packet.
+
+## Seat exit — S01-STRICT-fix (2026-08-30 02:20, ticket `t_cc34ba78`, rework round 1/3)
+
+**Delivered.** `REWORK READY FOR REVIEW`. Reproduced the exact `TS2353` before editing, as instructed.
+Applied precisely the ruled fix: imported `Node`, cast the whole `stranger_restatement` literal to
+`Node["stranger_restatement"]`. **Preserved `secret_extra`, `owner_note`, and every assertion
+unchanged** — it did not take the fast route of deleting the keys, which is the fix that would have
+made `tsc` pass while destroying the only property the test exists to prove. Three runs: `tsc` exit 0,
+31/31, leak guards passing on every run. No product-code change.
+
+**Router verification, re-derived rather than inherited.** Diff is 2 insertions / 2 deletions across
+one file. Leak markers still present (5 occurrences). `tsc --noEmit` exit 0. Anchored idiom on
+`tests/unit/s8-publication.test.ts`: vitest exit 0, `Tests 25 passed (25)`, guard exit 0, **zero
+skipped**. And the check that a green suite does not supply — confirmed by name that the specific
+tests execute: *"publishes the tree without leaking owner-only fields"*, *"projects
+stranger_restatement to its public check_status only"*, *"nulls disagreement instead of publishing its
+open record"*, plus four `provenance_ref` redaction tests. All ✓.
+
+## Seat exit — S04-CODE (2026-08-30 02:25, tickets `t_76050188`, `t_5d00506b`)
+
+**Delivered.** `READY FOR PEER REVIEW`. New `tests/unit/pda-s04-node-carrier-audit.test.ts` (142
+lines). Corrected S04's stale checklist items 3/3b in place under Row 7, evidence filed on the ticket.
+C1 2/2, C2 5/5, C3 4/4, combined 11/11, three runs each; typecheck exit 0. **Ran refutation mutants
+and reported that neighbouring non-catches behaved correctly** — it tested that its own tests
+discriminate, unprompted.
+
+**Independent corroboration, which is the point of not telling it what the Router had found:** it
+reached the same conclusion about the live-evidence gap on its own — *"the only live publication lacks
+`tree_included`, so the anonymous argument-tree path still lacks live product-truth evidence."*
+
+**It also corrected the Router.** The Router had read S04's checklist items 3/3b **while this seat was
+concurrently fixing their staleness**, and wrote an alarm into the QA packet and ticket `t_3e217eab`
+claiming `maker_lineage.provider_ref` might be an account-scoped API key. It is not. `S01/PLAN.md`'s
+S01-C2-0B field table already classified it **COPIED (VERIFIED)** with a producer trace to a static
+per-deployment provider-slot id — literal values read: `"development:codex-cli"`,
+`"development:claude-cli"` — and classified `abstention.register_row_key` / `register_version` /
+`register_source_ref` **COPIED (VERIFIED)** as policy-register citations, structurally identical to
+already-public `BandCeilingSchema` fields. Both rows say "no longer open" in as many words. QA-01.md
+and the ticket are corrected; the correction is disclosed in both rather than quietly swapped.
+
+**The lesson, and it is a new one: reading a document that is actively being repaired and treating its
+text as current state.** The staleness was not hidden — a ticket existed for it, a seat was dispatched
+against it, and the Router dispatched that seat. Knowing a document is stale is not the same as
+remembering it while reading.
+
+## Router hazard, self-disclosed — mutating a running seat's worktree
+
+To test whether the `.strict()` change would break S04's new test, the Router applied `sed` directly to
+`packages/contract/src/index.ts` **inside `.worktrees/s04-code` while the S04 seat was actively
+running in it**, then restored it seconds later. The file was one S04 does not write, and S04's output
+shows no sign of disturbance — but this could have corrupted a live seat's work or its verification
+runs, and "it happened to be fine" is not a defence. **The correct move, used for the runtime half of
+the same check, was to copy S04's test file into the idle `s01-strict` worktree and run it there.**
+Recorded so the next Router does the second thing first.

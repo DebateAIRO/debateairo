@@ -876,39 +876,133 @@ build artifacts under `.next*` excluded:
   path was already implicitly safe by construction even before this
   step; `.strict()` makes that safety a schema-enforced INVARIANT instead
   of an implementation habit, which is the entire point of V's ruling.
-- **Checked and RULED OUT, explicitly, because it looks risky and isn't:**
-  `tests/unit/s8-publication.test.ts:124-128`'s fixture sets
-  `stranger_restatement: { check_status: "PASS", secret_extra:
-  "LEAK-ME-RESTATEMENT", owner_note: "do-not-publish" }` — extra keys,
-  typed as `Answer` at its call site (`publicationHarness().publish(answer)`,
-  `answer: Answer` per `PostgresPublicationApplication.publish`'s own
-  signature). Traced whether this ever reaches `NodeSchema.parse`/
-  `AnswerSchema.parse`: own read of `apps/api/src/publications.ts`'s
-  `publish` method — its ONLY `.parse()` calls are `PublicDebateSchema.parse`
-  on the freshly-projected OUTPUT (lines 229, 388); the INPUT `Answer` is
-  never schema-validated, only read field-by-field (duck-typed by
-  design). The extra keys are inert JS properties on an object TypeScript
-  accepts because it's passed via an intermediate `const`, not a literal
-  (bypassing TS's excess-property check) — and since nothing ever calls
-  `.parse()` on that object, `.strict()` has zero runtime interaction
-  with it. **Confirmed by reasoning about the code path AND by the
-  RED-run above using the real fixture from `tests/unit/contract.test.ts`
-  instead** — the two fixtures are different objects; this one was
-  checked by tracing, not by re-running it, since re-running the whole
-  publish pipeline is a heavier, unnecessary proof for a question the
-  source trace already answers unambiguously (no `.parse()` call exists
-  on the input, full stop).
+- **REFUTED, `t_cc34ba78` — the bullet below was WRONG, correcting in
+  place, not silently rewriting it:** `tests/unit/s8-publication.test.ts:124-128`'s
+  fixture sets `stranger_restatement: { check_status: "PASS", secret_extra:
+  "LEAK-ME-RESTATEMENT", owner_note: "do-not-publish" }`. This bullet
+  originally claimed the extra keys were "inert JS properties TypeScript
+  accepts because [the object is] passed via an intermediate `const`, not
+  a literal" and concluded `.strict()` "has zero runtime interaction with
+  it." **That reasoning checked the wrong half of the change.** It
+  correctly traced whether the object is later PARSED at runtime (no —
+  `publish()`'s only `.parse()` calls are on its freshly-projected
+  OUTPUT, never this INPUT) but never checked whether the object is
+  CONSTRUCTED under a type that `.strict()` also narrows. It is: the
+  fixture is built and returned inside `function answerWithTree(): Answer`
+  — a fresh object literal under a direct return-type annotation, exactly
+  where TypeScript's excess-property check applies, regardless of
+  whether anything ever calls `.parse()` on the result at runtime.
+  `z.object(...).strict()` narrows the INFERRED TYPESCRIPT TYPE (via
+  `z.infer`) as well as the runtime parse — only the runtime half was
+  checked here. **Measured, independently, not accepted on the ticket's
+  word:** `npx tsc --noEmit` in `.worktrees/s01-strict` exits `1` with
+  exactly one error: `tests/unit/s8-publication.test.ts(126,9): error
+  TS2353: Object literal may only specify known properties, and
+  'secret_extra' does not exist in type '{ check_status: "FAIL" |
+  "NOT_SAMPLED" | "PASS"; }'.` Own reproduction, same worktree, same
+  result, before writing this correction.
 - No other real-source call site invokes `NodeSchema`/`AnswerSchema`'s
   `.parse()`/`.safeParse()` — confirmed by grep across every non-build-
   artifact `.ts`/`.tsx` file in `packages/`, `apps/ui`, `apps/api/src`,
-  `tests/`.
-**The number V asked for: zero.** No existing caller, producer, or test
-currently passes an extra key through anything that actually validates
-against `NodeSchema`/`AnswerSchema`. `.strict()` turns a silent widening
-into a hard failure, and V accepted that trade-off knowingly — but
-nothing in this codebase exercises the trade-off today. This is a
-measured zero, not an assumed one: every `.parse()`/`.safeParse()` call
-site was found and individually traced to its producer.
+  `tests/`. This half of the original sweep stands, unrefuted — the
+  correction above is about a construction site, not a parse site.
+**The number V asked for, corrected: two separate numbers, not one.**
+RUNTIME blast radius (does anything that PARSES via `NodeSchema`/
+`AnswerSchema` currently pass an extra key): still zero, unaffected by
+this correction. COMPILE-TIME blast radius (does anything CONSTRUCT an
+`Answer`/`Node`-typed object literal with an extra key under
+`stranger_restatement`): **exactly one** —
+`tests/unit/s8-publication.test.ts:124-128`, measured by `tsc`, not
+assumed. A blast-radius method that only runs the runtime half of this
+check will miss this class every time `.strict()` (or any schema
+narrowing) is applied to a type that ALSO flows into a `z.infer`-derived
+TypeScript type used elsewhere — checking half of what a schema change
+touches is not checking the change, the same shape as this mission's own
+"checking half a `for` loop is not checking the loop" lesson, one
+abstraction level up.
+
+**The irony, recorded because it is the useful part, not a footnote:**
+this exact fixture exists to PROVE a leak-shaped key does not escape to
+an anonymous reader — that is the entire purpose of the
+`secret_extra`/`owner_note` keys and the test at line 1054
+("projects `stranger_restatement` to its public `check_status` only")
+that consumes them. It could only ever have been WRITTEN in the first
+place because the schema permitted the extra key at construction time —
+the exact hole V's ruling closes. The guard depended on the vulnerability
+it guarded against; closing the vulnerability necessarily breaks the
+guard's own construction, not because the guard was wrong, but because
+its INPUT could no longer be expressed as a plain literal once the type
+it was borrowing room from tightened.
+
+**Ruling: same shape as S02-C1-6 (a correct change breaking a standing
+assertion), same conclusion (fix the assertion/fixture, do not freeze or
+revert correct product code) — precedent applied, mechanism differs.**
+S02-C1-6 needed a cross-slice SURFACE grant because the broken assertion
+lived in `tests/architecture/s8-publication-contract.test.ts`, a file S02
+did not own. Here, the broken fixture lives in
+`tests/unit/s8-publication.test.ts`, a file S01 already owns and already
+edits extensively (S01-C2/C3/C4's own file surface, and this same
+S01-C1-6 step's widened cluster command) — there is no cross-slice
+boundary to cross, so applying the precedent requires zero additional
+surface-widening, only specifying the fixture fix within a step already
+authorized to touch this file. Rejecting the `.strict()` change (the
+S02-C1-6 precedent's "reject the refactor" option) is ruled out for the
+same reason it was ruled out there: V has ruled, and the change is
+correct — the assertion is what needs to adapt to newly-correct product
+code, not the other way around.
+
+**The fix — restructure the fixture so it still proves what it was
+written to prove, without depending on a schema hole that no longer
+exists.** The test's RUNTIME behavior must not change: the projection
+function under test still needs a REAL extra key at runtime to prove it
+strips one. Only the COMPILE-TIME view needs to change. Construct the
+invalid input through a cast, not a literal — verified by running `tsc`
+both ways, not by reasoning:
+```ts
+stranger_restatement: {
+  check_status: "PASS",
+  secret_extra: "LEAK-ME-RESTATEMENT",
+  owner_note: "do-not-publish"
+} as Node["stranger_restatement"],
+```
+(`type Node` added to the existing `import { PublicDebateSchema, type
+Answer } from "@debateai/contract"` line — `Node` is already exported
+from `packages/contract/src/index.ts:443` as `export type Node =
+z.infer<typeof NodeSchema>`, no new export needed.) **Own verification,
+both ways, against the real `.strict()`'d contract in
+`.worktrees/s01-strict`, scratch file written to the main repo root
+(NOT the worktree), run, deleted, `git status --porcelain` confirmed
+clean before and after in both the main tree and the worktree:**
+without the cast, `tsc --noEmit` reproduces the exact TS2353 error above
+(control, confirms the reproduction is faithful); with the cast, `tsc
+--noEmit` exits `0`, no errors, anywhere in the file. Runtime check on
+the SAME cast object, same script: `Object.keys(node.stranger_restatement)`
+→ exactly `["check_status","secret_extra","owner_note"]` —
+**the cast does not strip the properties at runtime**, only changes
+TypeScript's static view of the literal, so the test at line 1054 needs
+NO change at all: it still receives a real three-key object at runtime
+and still proves `publications.ts`'s projection drops the two extra
+keys. `as Node["stranger_restatement"]` (a direct assertion, not
+`as unknown as ...`) suffices because the literal is a structural
+SUPERSET of the target type — verified with an isolated minimal
+reproduction before applying it to the real fixture, since `as` and
+direct-literal-assignment have different excess-property rules in
+TypeScript and that difference is exactly what this fix depends on.
+**This is a test-file edit; the coding seat applies it on its own
+ticket, not here.**
+
+**Not a defect in the coding seat's own work, said plainly so credit
+lands where it belongs:** the S01-STRICT seat's RED was RED for the
+right reason (`unrecognized_keys` naming `SMUGGLED_OWNER_SECRET` at
+`stranger_restatement`), GREEN was 6/6, a `check_status: "FAIL"` fixture
+was still correctly accepted (proving `.strict()` didn't over-narrow the
+enum itself), three runs were 34/34, and the seat correctly separated a
+PRE-EXISTING failure at `tests/unit/s8-publication-database.test.ts:1712`
+that reproduces identically with `.passthrough()` still in place — not
+caused by this change. **It reported the breakage instead of working
+around it, which is exactly what Row 7 and this mission's own standing
+law both require.** The defect this correction fixes is in my own
+blast-radius METHOD, not in anything the seat did.
 
 **Failure it CATCHES:** the exact defect this step exists to close — an
 unknown key surviving `NodeSchema` validation into a parsed public

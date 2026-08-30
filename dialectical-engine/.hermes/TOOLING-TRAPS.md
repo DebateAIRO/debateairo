@@ -583,3 +583,86 @@ action — write a file, set an option, change a target. A defect that only *fai
 this one succeeded at something nobody asked for.
 Corollary for janitors: an unexplained file with a bizarre name is not noise. It is a receipt for a
 command that ran differently than it read.
+
+## The error count that under-reports: TypeScript stops at the FIRST excess property
+
+**Measured on this repo, 2026-08-30, not inferred.**
+
+`tests/unit/s8-publication.test.ts` constructs a `stranger_restatement` object literal carrying **two**
+properties the type does not declare:
+
+```ts
+stranger_restatement: {
+  check_status: "PASS",
+  secret_extra: "LEAK-ME-RESTATEMENT",   // line 126
+  owner_note:   "do-not-publish"         // line 127
+},
+```
+
+After `NodeSchema.stranger_restatement` was changed from `.passthrough()` to `.strict()`,
+`npx tsc --noEmit` exited 1 and printed **exactly one error**:
+
+```
+tests/unit/s8-publication.test.ts(126,9): error TS2353: Object literal may only specify
+known properties, and 'secret_extra' does not exist in type '{ check_status: ... }'.
+```
+
+`owner_note` is equally excess and equally broken. It is not reported, because TypeScript's excess
+property check reports the first offending key per object literal and stops.
+
+**Why this belongs here.** The whole mission has been governed by counting: *how many errors, how many
+findings, how many tests*. This is the compiler doing the same thing three of our own instruments did
+— the `| head -4` cap, the coverage number that described only what it could see, the scan root not
+tied to its artifact. **An error count is a count of REPORTS, never a count of PROBLEMS.** A seat told
+"make the one error go away" will fix line 126, re-run, and meet a *new* error it was never warned
+about — and if it is near its rework cap, that surprise costs a round.
+
+**The rule:** when a type-level change breaks a literal, never brief a seat on the reported error
+count. Brief it on the *shape* of the breakage and tell it to expect more of the same kind behind the
+first one. Fix the whole literal, then re-run to discover what was hidden — a clean second run is the
+evidence, not the first run's count.
+
+**The trap under the trap, and it is worse.** The fix that satisfies `tsc` fastest here is to delete
+`secret_extra` and `owner_note`. That turns the error count to zero and **silently destroys the only
+property the test exists to prove** — that a leak-shaped key never reaches an anonymous reader. It
+would be variant 11 of the acceptance-defect family: a check that now returns the right answer for a
+reason unrelated to the property it claims. When a type change breaks a *deliberately invalid*
+fixture, the fixture is usually the point; widen the construction (a cast), never narrow the fixture.
+
+## Reading a document that is actively being repaired
+
+**Happened to the Router, 2026-08-30, and it published a false alarm before it was caught.**
+
+The Router needed to know which node fields reach an anonymous reader. It read `S04/PLAN.md`'s
+checklist items 3 and 3b, which flagged `maker_lineage.provider_ref` and
+`abstention.register_row_key`/`register_version`/`register_source_ref` as **UNVERIFIED**, with
+`provider_ref` possibly being "an account-scoped API routing key." It wrote that into the QA packet as
+the sharpest open risk in the mission, and filed a ticket saying so.
+
+None of it was true any more. `S01/PLAN.md`'s S01-C2-0B field table had already classified both as
+**COPIED (VERIFIED)** with real producer traces — `provider_ref` resolved to a static per-deployment
+provider slot with literal values `"development:codex-cli"` and `"development:claude-cli"`, and the
+register fields to a versioned policy table structurally identical to already-public fields. Both rows
+end with the words "no longer open."
+
+**The part that makes this a trap rather than ordinary carelessness:** the Router *knew* the checklist
+was stale. A ticket existed for it (`t_5d00506b`, "S04's checklist items 3/3b are stale now that the
+classification is settled upstream"). The Router had *dispatched the seat to fix it*, and that seat
+was editing the file at the moment the Router was reading it. The staleness was not hidden, not
+subtle, and not forgotten — it was on the Router's own work list.
+
+**Knowing a document is stale is not the same as remembering it while reading.** The knowledge and the
+read happened in different tasks, and nothing connected them.
+
+**The rule:** before quoting a planning document as current state, check whether an open ticket
+targets that document — and if a seat is running against it right now, read the seat's output instead,
+or wait. A file under active repair is not evidence; it is a work in progress that happens to be
+readable.
+
+**Cheap mechanical form:** `grep` the open ticket list for the file path you are about to cite. If it
+appears, the file is a hypothesis, not a fact.
+
+**Related, and the reason this one stung:** the mission's standing lesson is *"a fixture that cannot
+fail against production pins nothing."* Its sibling is this — **a document that is mid-correction
+cannot support a claim, and citing it launders a stale assertion into a fresh one.** The alarm reached
+a QA packet and a ticket before the seat's own output refuted it.

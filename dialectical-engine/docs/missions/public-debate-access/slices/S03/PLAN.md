@@ -543,18 +543,17 @@ being wrong or missing on the selected link; and N1's regression class —
 the `tabEmptyHint` sign-in pointer disappearing from the logged-out
 Your-Debates render, or leaking into the Public-Debates render where it
 must be absent.
-**Failure it MISSES (corrected, same round):** a CSS `pointer-events: none`
-rule that leaves an element visible and "focusable" by this test's own
-checks but unclickable by a pointing device — still not checked, and
-still honestly left to QA. **No longer accurate as previously written**:
-the old text claimed visibility-based concealment (`display`/`visibility`)
-was also missed; `knownConcealmentBarrier`'s computed-style walk now
-checks `display:none`, `visibility:hidden`/`collapse`, and
-`content-visibility:hidden` up the whole ancestor chain, so that part of
-the old claim is stale, not merely imprecise — it describes a gap that
-closed. Real screen-reader announcement quality and real browser
-focus-ring visibility remain S03-C1-5's QA-routed gaps, unaffected by
-this test's upgrade.
+**Failure it MISSES (B3, coding rework round 2):** this test uses an
+enumerated JSDOM blacklist, not a browser accessibility-tree oracle. It
+catches self/ancestor `hidden`, `aria-hidden="true"`, `inert`, and computed
+`display: none`, `visibility: hidden | collapse`, and
+`content-visibility: hidden`. It does **not** catch concealment supplied
+only by app/external stylesheet class rules (the static render does not
+load app CSS); off-screen positioning, clipping, zero-size or occluded
+layout; opacity/transparency; pointer blocking; closed-details/popover or
+future/unmodelled exclusion mechanisms; or browser/AT-specific
+accessibility-tree behaviour. Those gaps remain QA/browser evidence and
+are not claimed as reachability proof here.
 
 ### S03-C1-5 — Route to QA: what this PLAN does not and cannot mechanically verify
 

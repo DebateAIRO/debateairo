@@ -1,0 +1,25 @@
+# S01-STRICT Codex self-report
+
+- Seat: S01-STRICT, first-pass implementation of S01-C1-6 plus Architecture-directed rework; round 1 of 3.
+- Outcome: changed `NodeSchema.stranger_restatement` from `.passthrough()` to `.strict()`, added contract assertions, and localized the intentionally-invalid publication fixture behind one type-only cast.
+- Root cause closed: the nested schema was the contract's lone open key set, so Zod preserved arbitrary fields in parsed `Node` values.
+- RED evidence: the focused contract run executed six tests and failed only because the smuggled-key parse did not throw; the five surrounding tests passed.
+- GREEN evidence: the same file passed 6/6 after the one-token production change.
+- Refutation evidence: the rejection issue is `unrecognized_keys`, names `SMUGGLED_OWNER_SECRET`, and points to `stranger_restatement`.
+- Neighbor control: `{ check_status: "FAIL" }` remains valid, so the test does not reject a declared key with another legal enum value.
+- Cluster evidence: the authored S01-C1 command passed 34/34 in each of three runs; worst run was GREEN.
+- Blast-radius finding: the packet's measured-zero claim is false at compile time even though its runtime trace is correct.
+- First-pass exact break: `pnpm run typecheck` failed at `tests/unit/s8-publication.test.ts:126`; `secret_extra` was no longer assignable to the strict inferred `Node` type.
+- First-pass attribution: that publication fixture was initially outside this seat's file contract, so it was reported and left untouched until Architecture widened S01's surface in `t_cc34ba78`.
+- Separate pre-existing failure: the broad publication run was 68/69 because the database test at line 1712 supplies no `nodes`/`edges` and fails in `publish()`'s `.map()` calls.
+- Baseline proof: that database test fails identically with the contract temporarily restored to `.passthrough()`, so `.strict()` did not cause it.
+- Price: blast-radius attribution cost two embedded-PostgreSQL starts and about 17 seconds of test wall time; it prevented a false claim that strictness broke the database behavior.
+- Near miss: relying only on Vitest would have repeated Architecture's “zero” conclusion because Vitest transpiles the fixture without the repository typecheck.
+- Dead end avoided: no fresh `Node` fixture was built; the proven-valid fixture prevented enum/required-field failures from masquerading as the intended RED.
+- Packet clarity: the code/test surface and required mutant were precise; “blast radius zero” should have distinguished runtime parse calls from inferred-TypeScript consumers.
+- Harness improvement: make `pnpm run typecheck` part of blast-radius acceptance whenever a Zod schema change alters an exported inferred type.
+- Rework RED: `npx tsc --noEmit` produced exactly one diagnostic, TS2353 at line 126 for `secret_extra`; `owner_note` was the hidden second excess key.
+- Rework fix: cast the whole fixture object to `Node["stranger_restatement"]`; both leak-shaped keys and every redaction assertion remain byte-for-byte present.
+- Rework GREEN: typecheck exited 0 in all three verification runs; the combined publication/contract run passed 31/31 each time.
+- Discrimination evidence: anchored output confirmed the HANDLE_MARKERS, stranger-restatement leak, and disagreement leak tests all executed and passed in every run.
+- Rework price: one two-line test-file change (type import plus cast), one compiler RED run, and three approximately 2.5-second verification runs.

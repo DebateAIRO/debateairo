@@ -1,0 +1,21 @@
+ARCHITECTURE HAS RULED on the breakage you reported. Ticket t_cc34ba78 is closed in your favour: your RED was red for the right reason, your GREEN was 6/6, and you were correct to REPORT the typecheck breakage instead of working around it. Architecture's blast-radius-zero claim was refuted, not your work. It has recorded why it missed this: it checked only RUNTIME parse behaviour and never COMPILE-TIME inference, and making a zod object strict narrows the inferred TypeScript type as well as the runtime parse.
+
+YOUR TASK: make the one remaining typecheck error go away WITHOUT destroying what the test proves.
+
+REPRODUCE FIRST. Before you touch anything, run npx tsc --noEmit in your worktree and confirm you see EXACTLY ONE error: tests/unit/s8-publication.test.ts line 126 column 9, TS2353, secret_extra does not exist in type. Paste it in your handoff. If you see anything else, STOP and report.
+
+THE RULING. Architecture applies the S02-C1-6 precedent - narrow surface widening over freezing correct product code - and specifies the fix as a precise cast on the stranger_restatement object literal to the type Node stranger_restatement, so the fixture can still construct the invalid shape. No cross-slice grant is needed because S01 already owns this file. The contract change stays as it is. The redaction test itself needs no assertion change.
+
+WHAT YOU MUST NOT DO, and this is the whole point. DO NOT delete secret_extra. DO NOT delete owner_note. DO NOT soften any assertion. Those keys are the entire reason the test exists: it proves a leak-shaped key does not reach an anonymous reader. Deleting them makes tsc pass and silently destroys the property, which would be exactly the defect family this mission has now catalogued ten times - a check that returns the right answer for a reason unrelated to the property it claims. If your fix makes the test unable to fail when the redactor regresses, it is the wrong fix.
+
+A TRAP THE ROUTER MEASURED FOR YOU. TypeScript reports only the FIRST excess property in an object literal. Line 126 secret_extra is reported; line 127 owner_note is ALSO excess and is currently hidden behind it. A cast applied to the whole stranger_restatement object covers both. A fix that only addresses secret_extra will surface owner_note as a new error - if that happens you have not finished.
+
+WHY THE RUNTIME IS GENUINELY UNAFFECTED, verified independently by the Router so you do not have to re-derive it: your fixture is an engine-side Answer. The harness at line 265 calls application.publish, which at apps/api/src/publications.ts line 244 maps every node through redactNodeForPublic BEFORE PublicDebateSchema.parse at line 229. The extra keys are stripped by the redactor and never reach the strict parse. The test passes today, which is itself the proof that the redactor strips them. Under strict the behaviour is strictly better: if the redactor ever regresses, the parse now throws at the schema boundary instead of quietly passing the key through.
+
+VERIFY. npx tsc --noEmit must exit 0. Then run the full s8-publication unit file and confirm the leak assertions still execute and still pass - specifically the ones asserting the serialized output does not contain LEAK-ME-RESTATEMENT and does not contain LEAK-ME-DISAGREEMENT, and the HANDLE_MARKERS loop. Use the anchored idiom, not a bare pipe to grep. Three-run law, worst run is the verdict. Also confirm your own contract.test.ts RED-turned-GREEN still passes.
+
+KNOWN PRE-EXISTING, NOT YOURS: s8-publication-database.test.ts line 1712 fails identically with passthrough and with strict. You already established that. Do not chase it.
+
+SCOPE: tests/unit/s8-publication.test.ts, plus the contract and contract.test.ts changes you already have. No product code. No other test files. No worktrees. SPECs FROZEN. No push, no merge, no commit.
+
+Rework rounds max 3. If the acceptance cannot discriminate, BLOCK and say so - four seats have done that on this mission and all four were right. Update your self-report at .hermes/reports/public-debate-access/agent-reports/S01-STRICT-codex.md. Handoff opens with SKILLS LOADED, then REWORK READY FOR REVIEW.

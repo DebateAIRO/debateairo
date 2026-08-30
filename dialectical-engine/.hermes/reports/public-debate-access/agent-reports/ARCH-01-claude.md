@@ -1,5 +1,88 @@
 # ARCH-01 self-report — public-debate-access — Claude, 2026-08-29
 
+## BLAST-RADIUS REFUTED, addendum (filed same day, ticket `t_cc34ba78`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**The mistake, plainly, in my own words, not the brief's.** I wrote "measured zero" and I meant it —
+I did grep every real call site and trace every producer, and none of that work was fabricated or
+lazy. But I asked the grep one question (who parses this at runtime) when the change I was
+measuring the blast radius OF has two effects, not one: `.strict()` narrows a runtime parser AND a
+compile-time inferred type, because they're the same Zod schema producing both. I checked the
+runtime half thoroughly and never asked whether the compile-time half had its own, completely
+separate set of consumers — fixtures, in this case, which never call `.parse()` at all and were
+therefore invisible to every grep I ran. A "measured, not assumed" claim that only measures half of
+the actual mechanism is not more honest than an assumption; it's an assumption with better
+production values.
+
+**Why this one stings more than most of this mission's other misses.** Most of this mission's
+"checking half of X" defects (the for-loop finding, the escaped-pipe class) were about SYNTACTIC or
+MECHANICAL incompleteness — reading half a diff, running half a command. This one is about not
+having the right MENTAL MODEL of what `.strict()` actually does. I know, and have always known,
+that Zod schemas produce both a validator and an inferred type from the same declaration — this
+isn't a fact I was missing. I just didn't apply it at the moment the blast-radius question was
+actually being asked, because "does this break anything" defaulted, in my head, to "does this break
+at RUNTIME" without my ever noticing that substitution happened. That is a more concerning failure
+mode than a missed grep pattern, because there's no obvious mechanical fix for "apply the fact you
+already know" the way there is for "run the loop over every element."
+
+**The verification for the fix itself tried to hold to a higher bar than the mistake did.** I didn't
+just assert the cast would compile — I wrote an isolated minimal reproduction of the excess-property
+rule first (does `as` bypass it, checked against a toy type, confirmed yes), THEN applied the same
+pattern to a full reproduction of the real fixture against the REAL `.strict()`'d contract in the
+seat's own worktree, ran both the broken and fixed forms, and separately confirmed the runtime
+object still carries all three keys after the cast (so the leak-prevention test itself needs no
+change). Three separate empirical checks for one two-line fix, because the whole point of this
+round is that reasoning about type-checker behavior from memory is exactly what failed the first
+time.
+
+**What I did not do.** Did not touch the s01-strict worktree — the tsc verification ran from a
+scratch file written to and deleted from the main repo root, importing the worktree's contract
+source read-only; `git status --porcelain` confirmed clean in both trees before and after. Did not
+edit `tests/unit/s8-publication.test.ts` — specified the exact cast and import addition for the
+coding seat's own ticket. Did not treat this as a defect in the coding seat's work anywhere in the
+writeup — its RED/GREEN/three-run results and its separation of the pre-existing database-test
+failure were all correct, and said so explicitly rather than leaving it to be inferred.
+
+## PLAN RECONCILIATION, addendum (filed same day, tickets `t_d40a86f1`/`t_ddee6473`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**What made this round different.** Every prior round this mission, divergence was something I
+found by comparing a claim against evidence. This round, the divergence was between two versions
+of MY OWN FILE — one I had been actively editing for five rounds, one I had never looked at because
+nothing told me it existed. Diffing my own document against a stranger's copy of it, not knowing in
+advance which parts were mine, is a different kind of check than anything else this mission has
+asked for, and it is worth naming as its own category rather than folding it into "another stale-
+record fix."
+
+**The actual mechanics of a correct 2-way reconciliation without a saved base.** With no dispatch-
+time snapshot preserved, I could not run a real three-way merge — I had to look at each diff hunk
+and decide, from memory of my own five prior rounds' work, which side was "newer" for that specific
+paragraph. That worked here because I could name the round that produced almost every remaining
+hunk (CLASS-FIX, STALE-RECORD FIX, FOUR-ITEMS bundle) — but I want to be honest that this is a
+fragile method. A reconciler without my specific memory of this mission's last six rounds would
+have had to guess, or would have needed to read every DECISIONS.md entry chronologically to
+reconstruct the same picture I already had loaded. That fragility is the actual argument for the
+standing check I recommended, not just an abstract "process improvement" — I personally got lucky
+that the diff landed on a session that still remembered writing every piece of it.
+
+**Verification discipline held here specifically because the cost of skipping it was so visible.**
+The brief itself said "verify by grepping, not by assuming the edit worked" — and I did the byte-
+identical diff check on the carried-over B3 block specifically because "close enough" on a
+blind-lens-validated, already-reviewed paragraph is not actually close enough; a single dropped
+word in the miss-list would have been a worse outcome than not attempting the merge at all, since
+it would look correct while quietly weakening exactly the claim B3 exists to bound honestly.
+
+**What I did not do.** Did not touch either worktree — read-only inspection only, confirmed via
+each worktree's own `git status --porcelain` before treating their content as ground truth. Did not
+edit the test file for `t_ddee6473` — specified the corrected PROPERTY comment text in DECISIONS.md
+for the Router to route, per the brief's own instruction that the test file is a coder surface. Did
+not comment on or investigate the unrelated S02 product-file changes visible in the main working
+tree's `git status` during this round's scope checks — clearly a separate, concurrent process (S03's
+own `page.tsx` shows zero pending changes, confirming S03 itself is cleanly merged) and squarely
+outside this round's S03-only scope.
+
 ## `.strict()` STEP, addendum (filed same day, ticket `t_a00a162e`)
 
 **SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.

@@ -1,0 +1,26 @@
+BLIND REVIEW RETURNED REWORK on your node-carrier audit. Rework round 1 of 3. The reviewer never saw your reasoning and you have not seen its report - here are its findings, reproduced faithfully, including the evidence it ran.
+
+B1 BLOCKING - YOUR SECOND TEST IS VACUOUS. The test at tests/unit/pda-s04-node-carrier-audit.test.ts lines 99-141 hand-builds a clean tree (disagreement null, already-redacted literals), JSON.stringify's it, and asserts that no forbidden KEY-NAME substring appears. It never calls redactNodeForPublic, never calls publish, never makes an HTTP request. It asserts that a fixture you wrote does not contain keys you did not put in it.
+
+The reviewer PROVED this rather than asserting it: it added owner_ref to NodeSchema. Your FIRST test went RED. Your SECOND test STAYED GREEN. It ran the suite three times and confirmed both tests execute and neither is skipped. Its own strongest counter, stated fairly: the assertion CAN go red if someone plants asker_id in the fixture - but the shipped subject never does, so it does not guard the product.
+
+This is variant eleven of the family you already know: a check that returns the right answer for a reason unrelated to the property it claims. Reproduce the reviewer's mutant yourself FIRST, before you change anything, and confirm you see what it saw. If you cannot reproduce it, say so and stop - do not fix what you cannot see.
+
+WHAT THE FIX MUST ACHIEVE. The test must observe the PRODUCT, not a fixture. It must run a node that carries identity through the real redaction path - redactNodeForPublic and/or the publish path - and assert the identity does not survive. If you cannot reach that path from a unit test, say so plainly and say what the test CAN honestly claim, then narrow its name and its PROPERTY comment to exactly that. A narrower honest test beats a broad vacuous one. Do NOT keep a broad title over a narrow check.
+
+B2 BLOCKING - THE PLAN OVERCLAIMS WHAT S04-C1-2 COVERS. Your PLAN says S04-C1-2 is a second independent line of defense and claims it catches z.record smuggling. Your shipped fixture hard-codes disagreement: null, so that catch is never exercised. Either exercise it or withdraw the claim. Note this is not a small point: an independent second reviewer, looking at the contract from a completely different angle, found that disagreement is z.record(z.string(), z.unknown()).nullable() at packages/contract/src/index.ts line 437 and demonstrated that a projection regression there leaks arbitrary keys into the anonymous envelope with the schema accepting it. Two lenses reached the same gap from opposite directions. Treat it as real.
+
+N1 NON-BLOCKING, and understand it before you fix B1, because it shapes the fix. A key-name blacklist cannot catch identity carried in a VALUE. The reviewer demonstrated that identity placed under provider_ref as the value "owner:..." keeps your fixture test green. Whatever you build must not let a later reader believe a green S04-C1 closes R1 by itself.
+
+N2 NON-BLOCKING - TWO STALE CITATIONS IN YOUR PLAN, both independently confirmed by the Router:
+- You cite apps/api/src/publications.ts:320-321 as readPublicDebate's catch returning null. Lines 320-321 are actually "await this.reconcileKeyCleanup();" and the unpublish call. The real catch-returning-null is at lines 399-400.
+- You cite packages/contract/src/index.ts:443-476 as the Node/Edge field list. Line 443 is "export type Node = z.infer<typeof NodeSchema>;". The NodeSchema body is 424-442.
+Correct both to what the files actually say, read from the files as they stand right now, not from memory.
+
+WHAT THE REVIEWER CONFIRMED IS GOOD, so you do not churn it: your FIRST test is a real schema-name guard and it discriminates - the reviewer's mutant turned it red. collectObjectKeys genuinely recurses through objects, arrays, nullable and optional wrappers, unions including the edge ZodDiscriminatedUnion, and record value schemas; it verified this rather than assuming it. And your edited checklist items 3 and 3b are FACTUALLY ALIGNED with publications.ts and S01-C2-0B - that Row 7 correction stands and was independently confirmed. Do not revisit any of that.
+
+VERIFY. Reproduce-first on B1. Then three runs, worst run is the verdict, using the anchored idiom rather than a bare pipe to grep. Confirm by NAME that the tests you care about actually executed - a green suite where your test was skipped is a false pass. Prove your new or repaired test DISCRIMINATES by mutation, the same way the reviewer disproved your old one, and show the mutant going red in your handoff.
+
+SCOPE: tests/unit/pda-s04-node-carrier-audit.test.ts and docs/missions/public-debate-access/slices/S04/PLAN.md. No product code. No contract change - the disagreement schema is S01's surface and is being routed separately. SPECs FROZEN. No push, no merge, no commit.
+
+Update your self-report. Handoff opens with SKILLS LOADED, then REWORK READY FOR REVIEW.

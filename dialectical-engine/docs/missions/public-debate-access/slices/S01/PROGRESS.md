@@ -68,3 +68,24 @@ the ticket and the orchestrator folds it in.
 - Fixing a trap for the NEXT seat rather than only for the one that hit it: REV-03 could not run the publication tests because `generate:contract` had never been run in its lens. Every subsequent worktree now gets install **and** generate, verified by `test -f client.ts` before dispatch.
 - **Asking for a constructed counterexample found the blocking defect twice running.** REV-03 found the unanchored guard; REV-04 found this leak. The reviewer predicted its own counterfactual: *"a plan-table-only lens likely PASSes and misses B1."* A review that reads the redaction table passes; a review that tries to defeat the redaction does not.
 - Architecture volunteering a near-miss in its own self-report: its first instinct on `provider_ref` was still a NAME-based guess before it traced the producer — the same error the round existed to fix, caught one step before it shipped.
+
+## 2026-08-30 — `.strict()` reopening, ruled and in fix
+
+- **V ruled** the sole `.passthrough()` in the contract (`packages/contract/src/index.ts:434`,
+  `NodeSchema.stranger_restatement`) becomes `.strict()` — "fail loudly", chosen over silent
+  stripping and over deferral. This reopens committed S01.
+- **S01-STRICT** made the one-token change and reported that it breaks `npx tsc --noEmit`:
+  one `TS2353` at `tests/unit/s8-publication.test.ts:126`. It reported rather than worked around,
+  which is what it was told to do. Its RED (`unrecognized_keys` naming the smuggled key), GREEN 6/6,
+  and three-run 34/34 all stand.
+- **Architecture's blast-radius-zero claim for C1-6 is REFUTED** (`t_cc34ba78`, now ruled). ARCH
+  marked the bullet REFUTED in place, split the claim into runtime-zero / compile-time-one, and
+  recorded that it checked runtime parse behaviour but never compile-time inference.
+- **Ruling applied:** S02-C1-6 precedent — widen the construction with a cast to
+  `Node["stranger_restatement"]`; do not freeze correct product code, do not weaken the fixture.
+- **In flight:** `S01-STRICT-fix` seat applying the cast. Merge is blocked until
+  `npx tsc --noEmit` exits 0 **and** the leak assertions still execute and pass.
+- **Note for whoever reads this next:** the fixture's extra keys are not debris. They are the test.
+  It proves a leak-shaped key does not reach an anonymous reader, and it could only ever have been
+  written because the schema permitted the extra key — the guard depended on the hole it guards.
+  `owner_note` (line 127) is a second excess key hidden behind the reported one.
