@@ -1,5 +1,58 @@
 # ARCH-01 self-report — public-debate-access — Claude, 2026-08-29
 
+## DISAGREEMENT SCHEMA-SPLIT DESIGN, addendum (filed same day, ticket `t_83df0d9c`)
+
+**SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.
+
+**Applying the previous round's lesson forward, not just citing it.** The brief said plainly that
+this round exists to test whether the compile-time lesson from `t_cc34ba78` actually changed how I
+work, not just what I write in a DECISIONS entry. I ran a genuine both-halves blast-radius sweep
+before proposing anything — 15 runtime call sites and 13 compile-time type-position sites, every
+one traced to its actual content, not categorized by how risky its name sounded. The one file that
+looked highest-risk by pattern (`s8-publication-http.test.ts:41`, a direct `: PublicDebate` literal)
+turned out to be safe only because I read it field-by-field and found it omits `nodes` entirely —
+exactly the kind of thing "looks risky" pattern-matching would have either wrongly flagged or,
+worse, wrongly cleared without checking.
+
+**The design choice that mattered most: derive, don't duplicate.** Choosing `.omit().extend()` over
+a hand-written `PublicNodeSchema` was not a stylistic preference — it's the direct reason this
+round's compile-time blast radius came back at zero instead of one. Tightening the SHARED schema
+(what Row 9 did, correctly, for `stranger_restatement`) put both the owner and public inferred types
+through the same narrowing, and one owner-side fixture broke as a result. This design deliberately
+leaves `NodeSchema`/`Node` completely untouched and introduces a new derived schema instead — I want
+to be honest that this isn't a deeper insight so much as noticing that THIS field's redaction is
+call-site-conditional (owner side genuinely needs the wide shape) in a way `stranger_restatement`
+never was, and picking the mechanism that matches that difference.
+
+**The narrow-vs-wide ruling was the part I spent the most time on, and I want to record why.** It
+would have been easy to rule wide by default — "close the whole class while I'm here" is this
+mission's own repeated lesson, and ruling narrow risks reading as the same mistake again. I did not
+rule narrow to avoid work; I ruled narrow because investigating the wide option surfaced a REAL
+asymmetry (`LabeledNumberSchema`'s conditional `redactSource` flag, shared with `EdgeSchema`) that a
+wide split would have to resolve non-trivially, and because `disagreement`'s unbounded-record type is
+a genuinely different KIND of exposure than the five bounded-string sentinel fields, not merely a
+smaller version of the same risk. I tried to make that argument checkable rather than asserted — the
+DECISIONS entry names the specific schemas a wide version would need and the specific asymmetry it
+would have to encode, so a reviewer can judge whether that argument holds without taking my word for
+it.
+
+**A near-miss in my own step, caught by the balance check, worth naming precisely.** I wrote the
+entire acceptance-test specification in prose without ever using the literal `**Acceptance test:**`
+marker this file's balance invariant depends on — not a formatting slip like the `Category:` vs
+`Category (...):` mistake from earlier rounds, but a genuinely MISSING marker, invisible until the
+mechanical grep count caught it (22 Category lines against 21 Acceptance lines). This is a different
+failure shape than the prior near-misses: those were "wrote the right marker, wrong format"; this was
+"described the acceptance thoroughly enough that I forgot to actually mark it as one." Fixed
+immediately by inserting the proper marker at the exact sentence that already stated the command.
+
+**What I did not do.** Wrote no product code — `packages/contract/src/index.ts` and
+`apps/api/src/publications.ts` are specified precisely enough for the coding seat to implement
+without further judgment calls, not edited here. Verified the `.omit().extend()` mechanism and its
+exact rejection/acceptance behavior with a scratch script against the real Zod 4.4.3 in this repo,
+deleted after, `git status --porcelain` clean before and after. Disclosed the wide option's real cost
+to V explicitly, per the brief's own instruction, rather than either silently picking narrow or
+silently gold-plating to wide without flagging the tradeoff.
+
 ## BLAST-RADIUS REFUTED, addendum (filed same day, ticket `t_cc34ba78`)
 
 **SKILLS LOADED this round:** `heartbeat-protocol`, `heartbeat-architecture`.

@@ -204,3 +204,104 @@ shows no sign of disturbance — but this could have corrupted a live seat's wor
 runs, and "it happened to be fine" is not a defence. **The correct move, used for the runtime half of
 the same check, was to copy S04's test file into the idle `s01-strict` worktree and run it there.**
 Recorded so the next Router does the second thing first.
+
+## Seat exit — S04-CODE rework 1 (2026-08-30 09:05, `t_76050188` / REV-08 B1,B2,N1,N2)
+
+**Delivered.** `REWORK READY FOR REVIEW`, round 1 of 3. Reproduced B1 before touching anything, as
+instructed. **Replaced the vacuous fixture test outright** rather than patching it: the new
+`S04-C1-2` imports `PostgresPublicationApplication` and publishes through the real product path,
+smuggling all ten forbidden key names plus distinct marker values into a node's open `disagreement`
+record, then asserting none survive. Narrowed the `S04-C1-2` PLAN claim to describe what the test
+actually exercises. Corrected both stale citations. 11/11 combined, three runs, typecheck 0.
+
+**The part that shows the seat understood the finding rather than just clearing it:** it re-ran the
+lens's *value-carrier* mutant (`provider_ref: "owner:..."`), confirmed it **still leaves the test
+GREEN**, and reported that as an acknowledged bound on the claim instead of hiding it or pretending
+the new test closes it. A seat clearing a blocking finding had every incentive to stay quiet about a
+neighbouring hole; it did the opposite.
+
+**Router verification, re-derived not inherited.** Confirmed the import reaches the real product
+(`apps/api/src/publications.js`, `application.publish` at line 213). Anchored idiom: vitest exit 0,
+`Tests 2 passed (2)`, guard 0, zero skipped, both tests confirmed executing **by name**. Then the
+decisive check the whole finding turns on — **applied the mutant myself**: `publications.ts:56`
+`disagreement: null` → `disagreement: node.disagreement` gave `Tests 1 failed | 1 passed`, exit 1;
+restored gave `2 passed`; worktree left clean. **The repaired test genuinely discriminates.**
+Citations re-resolved by reading: `publications.ts:399-400` is the real `catch { return null; }`, and
+`contract/index.ts:424` is `export const NodeSchema = z.object({`.
+
+## Closed alongside — `t_ddee6473`, and why it matters more than its size
+
+A one-comment fix, filed 2026-08-29, with Architecture having already authored the exact replacement
+text. It was **routed to a coding seat that never picked it up**, and it sat open for a day looking
+identical to work in progress. Found during the board reconciliation, applied verbatim, verified
+(3/3, tsc 0, `exposes` count 0), committed as `a322803`.
+
+**This is the small, concrete instance of the failure the whole reconciliation exposed:** the mission
+had a standing rule that *"routed elsewhere in a packet is not a route"*, recorded after an earlier
+loss — and then lost a finding to exactly that, in the same mission, while the rule was in force.
+Writing a remedy down and naming its owner is not the same as the remedy happening. Nothing checked.
+
+## Seat exit — REV-08 re-review (2026-08-30 09:12, `t_fec6b69a`) — PASS
+
+Returned to the **same session** via `grok --continue` (grok keys sessions by working directory), per
+the same-terminal rework law. It opened by stating it would not take the author's account on trust,
+and did not.
+
+**All four findings CLOSED, each re-probed rather than accepted.** It confirmed the publish path
+genuinely reaches `redactNodeForPublic` before encrypt, then ran the author's own RED mutant **plus
+two the author never mentioned** — a skip-redact mutant and a partial bag `{panel:"kept"}` — both
+RED. Three runs, both tests executing, no skips. On N1 it re-ran the value-carrier probe itself,
+confirmed `provider_ref: "owner:…"` still survives, and accepted the *acknowledgement* as adequate
+because it appears in both the test comment and the PLAN's Failure-it-MISSES — it checked the
+acknowledgement's placement, not just its existence.
+
+**And then it kept going.** Having cleared the blocking finding it was sent to re-check, it went
+looking for a mutant that would leave the repaired test **green** — and found one. The test plants
+forbidden keys only into `nodes[0]`, so a partial regression that redacts the first node and misses
+the rest is invisible to it. Confirmed by planting the same payload on `nodes[1]` in a scratch copy
+under that mutant, which went RED. Filed as `t_b29234fe`; rework round 2 dispatched.
+
+**This is the behaviour that catches the family.** Stopping at the red mutant the author supplied
+would have ended in a clean PASS with a real hole intact. The finding only exists because the lens
+asked the harder question — *what mutant leaves this green?* — after it had already earned the right
+to stop.
+
+## Router hazard, self-disclosed — I destroyed a lens receipt with my own sanitizer
+
+Refreshing the `rev-08` lens for re-review, I ran `rm -rf .../agent-reports` to keep it blind. That
+directory contained **the lens's own first-pass self-report**. The lens hit the deletion mid-run —
+its log reads *"Report file was wiped by sanitization; rewriting it"* — and reconstructed it.
+
+**The ledger already carried a standing warning about exactly this** ("Blind-lens receipt hazard":
+review self-reports live inside the lens, janitor cleanup destroys them, two were stranded earlier in
+this mission and had to be rescued). I wrote that warning and then walked into it.
+
+Recovered by luck, not design: the substance survived in the log, and the lens rebuilt the artifact
+unprompted. **The rule is now mechanical, not advisory: rescue receipts BEFORE sanitizing, never
+after.** All 18 self-reports are now held in the main tree rather than in worktrees that any cleanup
+can delete.
+
+## Merge precondition for S04 — recorded BEFORE the merge, not discovered after
+
+S04's seat has worked the whole time in a worktree based at `f8b9d5f`. Since then `dev` gained
+`f59618a`, which changes `packages/contract/src/index.ts` — the file S04's test imports `NodeSchema`
+and `type Node` from, and whose `PublicDebateSchema` its product-path test publishes through.
+
+**S04's test was written and verified against the NON-strict contract.** Its three-run GREEN proves
+nothing about the tree it will actually land in. This is the mission's own recorded law —
+*disjoint WRITE surfaces do not imply independent EFFECTS; ask which standing tests READ the files
+each slice WRITES* — and S04 reads exactly the file the strict change wrote.
+
+**Precondition, to be satisfied in the MAIN tree before any S04 commit:**
+1. `pnpm run generate:contract`, then `npx tsc --noEmit` exit 0.
+2. `tests/unit/pda-s04-node-carrier-audit.test.ts` green under the anchored idiom, both tests
+   confirmed executing **by name**, zero skipped.
+3. The discrimination re-proved *against the strict contract*: mutate `publications.ts:56` to
+   `disagreement: node.disagreement` and confirm RED; restore and confirm GREEN. A test that passes
+   in the worktree and stops discriminating in the merged tree is the same defect wearing a
+   different hat.
+4. Architecture suite compared against the known baseline of 7 failed / 263 passed — identical
+   failures, not merely an identical count.
+
+An earlier merge in this mission was saved from destroying reviewed work only by a manual diff run
+seconds beforehand. This note exists so the check is a precondition rather than luck.

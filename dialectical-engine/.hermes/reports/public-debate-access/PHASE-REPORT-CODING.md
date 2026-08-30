@@ -1,76 +1,81 @@
-# Phase report — CODING loop · mission `public-debate-access` · 2026-08-29
+# Phase report — CODING loop (public-debate-access)
 
-Written at the coding-loop gate. Nothing here is a verdict; verdicts are Hermes's and merges are
-V's. Every number below was measured, and where it could not be, that is said rather than estimated.
+**Closed 2026-08-30.** All four slices merged to `dev`. Nothing pushed, per standing law.
 
-## Slice status
+## What shipped
 
-| Slice | What it delivers | State |
+| Slice | What it does | Commit |
 |---|---|---|
-| **S01** | Public envelope carries the redacted argument tree | **COMMITTED** on `dev` at `4138f72` (4 commits). Unpushed, unmerged. Two real anonymous-data leaks found and closed by blind review. |
-| **S02** | Public debate DETAIL page — read parity, no mutation affordance | Implementation in flight. All 8 declared files modified, 3 new components, 4 new render tests. One correct block already spent and resolved. |
-| **S03** | Your Debates / Public Debates tabs on the library page | Implemented and locally green; 2 blocking review findings, both now addressed or in flight. |
-| **S04** | Publication-contract audit + QA verdict inputs | **Blocked on S02**, correctly — its C2-1 verifies state "after S01/S02 land". Ticket `t_76050188`. |
-| **QA-01** | Final QA loop | Not started. Packet authored and ready (`packets/QA-01.md`). |
+| **S01** | Publishes a redacted argument tree to anonymous readers — the envelope, the publish path, and the value-provenance redactor | `56f46ab` |
+| **S03** | Selectable `Your Debates` / `Public Debates` on the library page | `f1168c6` |
+| **S02** | Anonymous public debate detail page at read parity with the owner view | `f8b9d5f` |
+| **Row 9** | `NodeSchema.stranger_restatement` `.passthrough()` → `.strict()` | `f59618a` |
+| **S04** | Publication-contract audit: schema-name guard + real product-path redaction test | `e879f87` |
+| — | An overclaiming test comment, filed 2026-08-29 and never applied | `a322803` |
 
-## The mission's signature finding: one defect family, now **nine** variants
+## Against V's Done criteria
 
-Every one is the same shape — **a check that returns the right answer for a reason unrelated to the
-property it claims.** Each was found by a different seat, and each cost real time until the class
-was named:
+1. **Both buttons present and accessible.** Present and verified in served markup after merge.
+   "Accessible" was split honestly: the *mechanical* half is tested (real `<a href>` anchors, natively
+   focusable, `aria-current="page"` correct, `aria-selected` absent — proved by rendering the real
+   `HomePage` through `renderToStaticMarkup` and parsing with jsdom). The half no test can reach —
+   real screen-reader announcement, visible focus styling, tab order against the rest of the page —
+   is **routed to QA and open**, not claimed.
+2. **Each shows the right list.** Verified live after merge: `"Public Debates"` 0→1, `?tab=yours`
+   public links 1→0, `?tab=public` 0→1. The logged-in mirror (`?tab=public` must not show the user's
+   own debates) needs a session and is **QA's, still open**.
+3. **Public debates accessible like the owner's.** Anonymous end-to-end journey verified against
+   production data: 46,243 bytes, zero mutation controls, zero owner-only markers. **But the argument
+   tree path has never been observed live** — see the gap below.
 
-1. Gitignored path — the command could never observe its own change.
-2. `--reporter=basic` — removed in vitest 4.1.10; the run crashed before starting.
-3. Live `| grep -q` — crashed the run *and* stole its exit status.
-4. Unanchored guard — matched a *skipped test's title* instead of the summary.
-5. Markdown-escaped `\|` in a `-t` filter — a literal pipe in a JS regex, matching nothing.
-6. Absolute line ranges — observes the wrong place, and goes **silent** when the assertion is negative.
-7. A backticked **file reference** executed as a command — fails identically in every state of the code.
-8. A scan root not tied to the artifact it polices — passed while the mandated file did not exist.
-9. **Variant 5 again**, inside the fix for finding B2 — escaped pipes in a `node -e` compound condition.
+## The one gap that matters, stated plainly
 
-**Variants 7 and 9 are the load-bearing lessons.** Variant 7 lived in the Router's own pre-dispatch
-gate: it reported four feature-assertion clusters as verified-RED when it had executed nothing. It
-was *worse* than variant 1, because a `.tsx` path is never executable, so it would have reported RED
-in every state of the code forever — including a correct implementation. Variant 9 matters because
-V waived the rework cap (Row 6) *specifically* to close variant 5's class, and the class came back
-the first time a new `||` was written. **A fix that only removes existing occurrences was never a
-class fix.** Architecture is answering that now.
+`redactNodeForPublic` is the control that stands between an anonymous reader and owner-only data. It
+has **never executed against a node the engine produced.** The only publication in the database
+predates `56f46ab`, so it carries no tree, and S02 correctly suppresses all tree UI when
+`tree_included !== true` — the absent tree is right, not broken.
 
-Two further instances were in *review setup* rather than in acceptance commands: a coverage count
-that reported "9 of 9" against a PLAN with 22 acceptance steps (ten stated in prose, silently
-excluded), and a blindness check that grepped `git status` — which says nothing about a committed,
-unmodified file — and so verified *"was it modified"* when the question was *"does it exist."*
+Every input that redactor has ever seen was authored by someone who already knew what it strips.
+That is the mission's own recorded law: *a fixture that cannot fail against production pins nothing.*
+V has ruled that V publishes a fresh debate and QA verifies it.
 
-## What worked, and should propagate
+## How the work actually went
 
-- **Asking a reviewer to CONSTRUCT a counterexample rather than to "review."** Three for three: both
-  S01 data leaks and REV-05's B1 were found this way, and REV-04 predicted a plan-table-only lens
-  would have missed its finding entirely.
-- **Mutation-testing an assertion in both directions** — S03's seat proved its test was *sensitive*
-  (a real mutant fails) and *specific* (a neighbouring styling mutant still passes). That is the
-  only evidence offered all mission that a green test means anything.
-- **Blocking instead of complying.** S01's seat blocked 7 times, was right 7 times, and consumed
-  zero rework rounds. S02's seat blocked once, was right, and found more than the Router had.
-- **Reproducing a finding before routing it.** Several reports have been wrong; several have been
-  righter than expected. Both are only discoverable by re-running them.
+Every slice was blind-reviewed and **every slice came back with something real.** The reviews were not
+a formality:
 
-## Defects charged to the Router, disclosed
+- **REV-04** found two anonymous-data leaks in S01. Both closed; the redaction rule became recursive
+  and iterated to a fixed point.
+- **REV-05** found `role="tab"` on navigation links was Bad ARIA, and that the PLAN had *mandated* it.
+  Architecture dropped the tab ARIA for `aria-current="page"`.
+- **REV-06** found S02's oracle asserted a node *existed* rather than that it was *reachable*.
+- **REV-07** found the `.strict()` change safe **and** found its sibling — `disagreement` is still an
+  open bag — by mutating the projection and watching the schema accept a leak.
+- **REV-08** found S04's second test vacuous, proved it (adding `owner_ref` turned test 1 red and left
+  test 2 green), and then — after clearing that blocking finding — went looking for a mutant that
+  would leave the *repaired* test green, and found one.
 
-1. A dispatch packet that **contradicted itself** — granting Row 7 authority in one paragraph and
-   forbidding the C5 change in another. Cost one seat cycle. Retracted in the resume packet.
-2. **Variant 7 in the pre-dispatch gate** (above), plus the silent coverage count.
-3. **A broken blindness guarantee** — the author's self-report was committed at the lens's base
-   commit, so withholding the copy withheld nothing. Disclosed by the lens, not exploited.
-4. **Dispatching S03's B1 rework and Architecture's B2 ruling in parallel** as though independent.
-   The ruling changed the markup the seat's new test asserts. The follow-up round is explicitly
-   **not** charged against that seat's rework cap.
+That last move is the single most valuable behaviour observed this mission: **after a mutant turns a
+test red, ask what mutant leaves it green.** Stopping at the author-supplied red mutant would have
+produced a clean PASS with a real hole intact.
 
-## Open for V
+## Defects found in the harness itself
 
-- **Row 8 — CLOSED.** Live probes deferred to QA. Consequence recorded: QA inherits three
-  unverified acceptances and must state which runtime it observed, at which commit, before
-  reporting any verdict on them.
-- **Nothing is pushed and nothing is merged.** S01 sits on `dev`, 4 commits ahead of origin.
-- The **dev-branch triage** (7 pre-existing failures, unrelated to this mission) was delivered and
-  is awaiting a go-ahead. Nothing has been fixed.
+Eleven variants of one shape — *a check that returns the right answer for a reason unrelated to the
+property it claims* — catalogued in `.hermes/TOOLING-TRAPS.md`. Several were in the Router's own
+instruments: a gate that executed a backticked filename and reported it as verified RED; a coverage
+number that described only what it could see; a `| head -4` cap that hid the very file motivating the
+diagnostic; a blindness check that grepped `git status` and so answered "was it modified" when the
+question was "does it exist".
+
+Three Router defects are recorded in the ledger with their consequences: a self-contradicting packet
+that cost a seat cycle; a QA packet that dropped **every** item Architecture had routed to it; and a
+sanitizer that deleted a blind lens's own self-report mid-run.
+
+## Open at phase close
+
+- **QA loop** (`t_cb2dd94d`) — running; the tree check blocked on V's publication.
+- **`t_3e217eab`** — the redactor's first run against real data.
+- **`t_83df0d9c`** — V ruled *fix it now, split the schema*; Architecture is designing it.
+- **`t_79d8e6d0`** — blinding a lens makes the author's `SKILLS LOADED` unverifiable. Structural.
+- **`t_373a9132`** — addressed to a Hermes seat that was never on this roster.

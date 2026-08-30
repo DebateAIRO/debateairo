@@ -455,7 +455,7 @@ not break the acceptance.
 
 | Cluster | Steps | ONE verification command | File surface |
 |---|---|---|---|
-| S01-C1 | S01-C1-1..6 (**V RULING, DECISIONS Row 9, `t_a00a162e`**: added C1-6, `.strict()` on `NodeSchema.stranger_restatement`) | `test -f tests/unit/pda-s01-envelope-schema.test.ts && pnpm exec vitest run tests/unit/pda-s01-envelope-schema.test.ts tests/unit/s8-publication.test.ts tests/unit/contract.test.ts` — presence arm: **run block `S01-C1-presence` above** (see step 5 for the exact final command once test names are fixed by the worker) | `packages/contract/src/index.ts`, `tests/unit/pda-s01-envelope-schema.test.ts`, `tests/unit/contract.test.ts` |
+| S01-C1 | S01-C1-1..7 (**V RULING, DECISIONS Row 9, `t_a00a162e`**: added C1-6, `.strict()` on `NodeSchema.stranger_restatement`; **V RULING, `t_83df0d9c`**: added C1-7, `PublicNodeSchema` split for `disagreement`) | `test -f tests/unit/pda-s01-envelope-schema.test.ts && pnpm exec vitest run tests/unit/pda-s01-envelope-schema.test.ts tests/unit/s8-publication.test.ts tests/unit/contract.test.ts` — presence arm: **run block `S01-C1-presence` above** (see step 5 for the exact final command once test names are fixed by the worker) | `packages/contract/src/index.ts`, `apps/api/src/publications.ts`, `tests/unit/pda-s01-envelope-schema.test.ts`, `tests/unit/contract.test.ts` |
 | S01-C2 | S01-C2-0, S01-C2-0B, S01-C2-1..8 (**REWORK ROUND 2, B2, `t_9322ae7b`**: added C2-7/C2-8, one residual test per open-ended bag) | whole-file regression run **plus a presence arm** (**ROUND 3, Finding 2, `t_f910328a`**, pattern fixed **ROUND 4, `t_e1208546`** — see note below the table): `pnpm exec vitest run tests/unit/s8-publication.test.ts` (regression) `&&` **run block `S01-C2-presence` above** (presence — at least one named new test must have run and passed) | `apps/api/src/publications.ts`, `tests/unit/s8-publication.test.ts` |
 | S01-C3 | S01-C3-1..4 (**REWORK ROUND 1, self-caught while re-checking every cluster's step count against N2's pattern**: corrected from "1..3" — S01-C3-4, "confirm no new anonymous route," was always in this cluster's body, undercounted in round 0's table) | whole-file regression run **plus a presence arm** (same fix as S01-C2): `pnpm exec vitest run tests/unit/s8-publication.test.ts tests/unit/s8-publication-http.test.ts` (regression) `&&` **run block `S01-C3-presence` above** (presence) | `tests/unit/s8-publication.test.ts`, `tests/unit/s8-publication-http.test.ts` (read-only regression, no production-code edit expected) |
 | S01-C4 | S01-C4-1..2 | **run block `S01-C4-verify` above** (**CLASS-FIX ROUND 1, `t_7539734e`: moved out of this table cell — the previous inline form used `\|` for three real shell pipes, which is BROKEN when extracted and run literally; see the class-fix note above the S01-C1..C3 blocks and this mission's `S03/PLAN.md` for the sibling instances and the general argument**) | `tests/unit/s8-publication.test.ts` (read-only regression + 1 new test, no production-code edit beyond C1/C2) |
@@ -1019,6 +1019,286 @@ itself for a non-enum value that happens to coerce, or a leak through a
 field this schema already declares and therefore already accepts) — that
 is a field-CONTENT problem, not a schema-SHAPE problem, and `.strict()`
 only closes the shape-widening class this finding is about.
+
+### S01-C1-7 — Split `NodeSchema` so the public path enforces `disagreement: null` at the boundary, per V's ruling (`t_83df0d9c`)
+
+**V has ruled; this step designs the fix, it does not re-argue it.** Two
+independent blind lenses, from opposite angles, found the same hole:
+`packages/contract/src/index.ts:437` declares `disagreement:
+z.record(z.string(), z.unknown()).nullable()` inside `NodeSchema` — a
+mutant that copies `disagreement` through instead of nulling it is
+ACCEPTED by the schema, contrasted directly against `stranger_restatement`
+after Row 9, where the identical class of mutant is a `ZodError`. No live
+leak exists — `apps/api/src/publications.ts:56` sets `disagreement: null`
+unconditionally, and S04's merged product-path test fails on three
+regression shapes if that line regresses — but the field is guarded by
+product code and a test, not by the contract, which is exactly what V
+ruled must change.
+
+**The premise, verified myself, not taken from the ticket:** `NodeSchema`
+is used at two sites — `packages/contract/src/index.ts:475`
+(`PublicDebateSchema.answer.nodes`) and `:498`
+(`AnswerSchema.nodes`, the owner side). Own read of
+`packages/serve/src/index.ts:2059,2201`: the owner-side query projection
+types `disagreement: Readonly<Record<string, unknown>> | null` and
+populates it from `judgement.disagreement` (a real, non-null JSONB
+column value when a disagreement was actually recorded) — `disagreement:
+row.disagreement`. The owner's own view of a debate genuinely needs a
+non-null disagreement record; tightening `NodeSchema` in place, the way
+Row 9 tightened `stranger_restatement`, would break that. **This is why
+it is a split and not a one-token change** — confirmed, not assumed.
+
+**Cluster:** S01-C1
+**File surface:** `packages/contract/src/index.ts` (new schema/type,
+one line changed at `PublicDebateSchema.answer.nodes`),
+`apps/api/src/publications.ts` (one return-type annotation) —
+**both already S01's own surface** (S01-C1 owns the contract; S01-C2
+owns the publish path), no cross-slice grant needed.
+
+**1. The shape of the split.** `NodeSchema.omit({ disagreement: true
+}).extend({ disagreement: z.null() })`, not a hand-written separate
+schema and not a branded variant. Verified working, both runtime and
+compile-time, against the real Zod 4.4.3 in this repo (scratch script,
+main repo root, deleted after, `git status --porcelain` clean before and
+after):
+```ts
+export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
+  disagreement: z.null()
+});
+export type PublicNode = z.infer<typeof PublicNodeSchema>;
+```
+Own confirmed results: the owner-side `NodeSchema` still accepts a
+non-null `disagreement` (`true`, unaffected); `PublicNodeSchema` rejects
+one (`false`) with `{"expected":"null","code":"invalid_type","path":
+["disagreement"],"message":"Invalid input: expected null, received
+object"}`; `PublicNodeSchema` still accepts `disagreement: null`
+(`true`); `PublicNodeSchema` still requires every other `NodeSchema`
+field exactly as before (tested by omitting one, correctly rejected).
+**Why `.omit().extend()` over a hand-written separate schema:** every
+OTHER field stays derived from one source of truth — if `NodeSchema`
+ever gains a new field for the owner side, `PublicNodeSchema`
+automatically inherits it (typed, required) rather than silently missing
+it, which is exactly the parallel-drift failure this mission already
+paid for once (S02's parallel-component-tree anti-drift cluster, S02-C6,
+recorded because a hand-duplicated structure can go out of sync with no
+compiler signal). **Why not a branded variant:** `.brand()` is a
+compile-time-only device — it does not change what the RUNTIME parser
+accepts, and the actual defect here is that the runtime parser accepts
+too much. Branding would rename the type without closing the hole.
+**`PublicDebateSchema.answer.nodes` (line 475) changes from
+`z.array(NodeSchema).optional()` to `z.array(PublicNodeSchema).optional()`
+— the only edit to an existing schema.** `AnswerSchema.nodes` (line
+~498, owner side) is untouched.
+**What happens to `export type Node` (line 443) and its consumers:**
+**nothing.** `NodeSchema` itself is not modified — `PublicNodeSchema` is
+a NEW schema derived FROM it, not a replacement of it. `Node` continues
+to mean exactly what it means today (`disagreement: Record<string,
+unknown> | null`), and every existing importer of `type Node`
+(`packages/contract/src/client.ts`, `packages/serve/src/index.ts`,
+`apps/api/src/index.ts`, `apps/api/src/publications.ts`,
+`tests/unit/pda-s04-node-carrier-audit.test.ts`,
+`tests/unit/s8-publication.test.ts` — own grep, confirmed below) keeps
+compiling unchanged. This is the structural reason this split's blast
+radius is small where Row 9's `.strict()` change was not: Row 9 tightened
+a field INSIDE the one schema both paths share; this step introduces a
+second schema instead of tightening the shared one.
+**`redactNodeForPublic`'s return type, recommended change (product code,
+for the coding seat):** `apps/api/src/publications.ts:33`,
+`function redactNodeForPublic(node: Node): Node` becomes
+`function redactNodeForPublic(node: Node): PublicNode`. This is a SECOND,
+independent enforcement layer beyond the runtime schema: if a future
+edit reverts line 56 from `disagreement: null` to `disagreement:
+node.disagreement` (the exact mutant the blind lens applied), the
+function body now fails to COMPILE — `Record<string, unknown> | null` is
+not assignable to `null` — catching the regression before it ever reaches
+`PublicDebateSchema.parse()` at runtime. Own grep, one caller only
+(`apps/api/src/publications.ts:244`, `input.answer.nodes.map(redactNodeForPublic)`,
+consistent across every worktree checked), so this return-type change is
+fully contained.
+
+**2. Narrow vs wide — ruled explicitly, narrow, with the boundary
+named.** `redactNodeForPublic` also forces a fixed sentinel
+(`"REDACTED_OWNER_ONLY"`) at `provenance_ref` (node-level, `base_score`,
+`final_strength`, `review`) and at `abstention.ledger_unknown_ref` —
+none of these are schema-enforced either. Own trace of EVERY call:
+within `redactNodeForPublic` specifically (not `redactEdgeForPublic`,
+which is a different function with its own conditional `redactSource`
+flag, out of scope here), every one of these sentinel substitutions is
+UNCONDITIONAL — no branch, no exception, every node, every time. A wide
+split would express them too: `z.literal("REDACTED_OWNER_ONLY")` in
+place of `z.string().min(1)` at each site. **Ruled narrow, this round —
+`disagreement` only.** Reason, not a default: `disagreement`'s type is
+`z.record(z.string(), z.unknown())` — an UNBOUNDED, ARBITRARY-SHAPED
+record that can hold any nested object graph with no structural
+constraint at all, which is exactly why the blind lens's mutant produced
+a schema-valid leak of a full smuggled object rather than a
+type-mismatch. The sentinel-string fields are, in every case, typed as
+`z.string().min(1)` — a mutant that skips their redaction still produces
+a STRING (the wrong one, a real leak of that one value, a real bug) but
+one bounded in shape by the existing type; it cannot smuggle an
+arbitrary object graph the way an unconstrained record can. This is a
+difference in KIND of exposure, not merely degree, and it is why
+`disagreement` was the field two independent lenses converged on and not
+one of the others. **What remains unexpressed, said plainly:** the
+`provenance_ref`/`replay_handle`/`ledger_unknown_ref` sentinel
+invariants stay enforced by `redactNodeForPublic` and its own test
+coverage only, not by the schema. Widening to cover them would also
+require deriving public variants of `LabeledNumberSchema`,
+`NodeReviewSchema`, and `AbstentionSchema` — and `LabeledNumberSchema`
+is SHARED with `EdgeSchema.strength.number`, where `redactEdgeForPublic`
+calls `redactLabeledNumber(..., { redactSource: false })` — a genuinely
+different, conditional redaction rule for the SAME shared schema. A
+public `LabeledNumberSchema` variant would have to either encode that
+node/edge asymmetry (real added complexity, a second variant or a
+parameterized one) or leave `source` unconstrained (weakening the wide
+case's own completeness claim). This is real, non-trivial follow-on
+work, not a rubber stamp on "leave it" — named explicitly as a
+recommended follow-up ticket, not silently dropped, and flagged for V:
+the SAME class of gap (schema silent where product code redacts) exists
+at these five additional sites, lower severity than `disagreement`
+(bounded string leaks, not arbitrary object leaks) but real.
+
+**3. Blast radius, both halves, counted, not estimated.** Runtime
+(`PublicDebateSchema`/`PublicNodeSchema` `.parse()`/`.safeParse()` call
+sites) and compile-time (constructors/consumers of `type Node`/`type
+PublicDebate`), per the `t_cc34ba78` lesson applied deliberately this
+time:
+- **Runtime — every `PublicDebateSchema.parse`/`.safeParse` call site
+  found by grep (15 total, product and test) traced to its data
+  origin:** three product sites
+  (`apps/api/src/publications.ts:229,388`, `apps/api/src/index.ts:735`)
+  either construct nodes via the real (always-nulling) `redactNodeForPublic`
+  or re-parse an already-published, already-redacted stored snapshot.
+  Twelve test sites: five construct no `nodes` array at all
+  (`.optional()`, omitting it is valid — `tests/unit/s8-publication-ui.test.tsx`,
+  `tests/render/pda-s02-public-page.test.tsx`,
+  `tests/render/pda-s02-scoring-chrome.test.tsx`, the `legacyDebate`
+  fixture in `tests/render/pda-s02-public-tree.test.tsx:290`, and
+  `publicDebate()`/`s8-publication-http.test.ts:41`'s direct `:
+  PublicDebate` literal); one constructs `nodes: []`
+  (`tests/render/pda-s02-honesty-export.test.tsx`); the rest construct
+  `disagreement: null` directly or route through the real
+  `redactNodeForPublic`/`publicationHarness` pipeline
+  (`tests/unit/pda-s04-node-carrier-audit.test.ts`,
+  `tests/unit/s8-publication.test.ts`, `tests/unit/contract.test.ts`,
+  `tests/unit/s14-ui.test.ts`, `tests/unit/dr174-resilience.test.ts`,
+  `tests/render/pda-s02-public-tree.test.tsx`'s main fixture,
+  `tests/support/v2uiFixtures.ts`). **Runtime blast radius: zero.**
+- **Compile-time — every file importing `type Node` (7) or referencing
+  `PublicDebate` in a type position (6) found by grep and individually
+  checked, not assumed safe by category:** the 7 `type Node` importers
+  are unaffected because `NodeSchema`/`Node` are unmodified (see above).
+  Of the 6 `PublicDebate` type-position sites, four are UI components
+  RECEIVING the type as a read-only parameter (`PublicDebatePageClient`,
+  `PublicHonestyDrawer`, `PublicAnswerDisclosure`,
+  `buildPublicAnswerExport`) — a consumer receiving a narrower type is
+  never a compile break, only a producer constructing one can be. The
+  other two — `tests/unit/pda-s04-node-carrier-audit.test.ts:190`'s
+  `const projectedDebates: PublicDebate[] = []` (populated via `.push()`
+  from `.parse()`'s own return value, not a hand-built literal) and
+  `tests/unit/s8-publication-http.test.ts:41`'s direct `const
+  publicDebate: PublicDebate = {...}` literal (the one genuinely
+  highest-risk site, checked field-by-field: its `answer` object has no
+  `nodes` key at all) — are both confirmed safe by reading their actual
+  content, not by pattern-matching on "this looks like the risky shape."
+  **Compile-time blast radius: zero.** No test fixture, in either half,
+  needs any change — unlike Row 9's `.strict()` change, which needed
+  exactly one cast. The difference is structural (this design never
+  narrows the shared `NodeSchema`/`Node`), not luck, and is stated as
+  such rather than presented as a coincidence.
+- **Files that DO need to change — both already S01's own surface, both
+  named above, nothing else:** `packages/contract/src/index.ts` (new
+  schema/type, one line changed) and `apps/api/src/publications.ts` (one
+  return-type annotation). Zero test files, zero fixture files.
+
+**4. What proves it.** New test, `tests/unit/contract.test.ts` (already
+this mission's home for direct schema-level negative-key tests, per
+`t_a00a162e`'s `stranger_restatement` test) — **the property under test
+is exactly V's ruling's own words: a non-null `disagreement` in a PUBLIC
+envelope is REJECTED, not silently dropped** — tested at the
+`PublicDebateSchema` boundary itself, not merely at the derived
+`PublicNodeSchema` helper, since the boundary is what V's ruling names:
+```ts
+const smuggledDisagreementDebate = {
+  public_ref: "11111111-1111-4111-8111-111111111111",
+  author_pseudonym: "p", question: "q",
+  published_at: "2026-08-24T00:00:00.000Z",
+  answer: {
+    terminal: "SERVED", verdict: "SUPPORTED", verdict_available: true,
+    confidence_band: "moderate",
+    summary_segments: [{ text: "s" }], badges: [], residual_objections: [],
+    reversal_point: "r", as_of: "2026-08-24T00:00:00.000Z",
+    nodes: [{ ...validPublicNode, disagreement: { internal_note: "LEAK-ME" } }]
+  }
+};
+expect(PublicDebateSchema.safeParse(smuggledDisagreementDebate).success).toBe(false);
+expect(PublicDebateSchema.safeParse({
+  ...smuggledDisagreementDebate,
+  answer: { ...smuggledDisagreementDebate.answer, nodes: [{ ...validPublicNode, disagreement: null }] }
+}).success).toBe(true);
+```
+(`validPublicNode`: any node fixture satisfying every OTHER `NodeSchema`
+field — the existing `node` fixture at `tests/unit/contract.test.ts:114-143`,
+minus its `secret_extra` cast concern which is irrelevant here, is a
+ready-made base.) **No table-cell command — this mission's standing law
+— the cluster's ONE verification command stays a plain single-file
+target, no pipe, nothing to escape.**
+**Acceptance test:** `pnpm exec vitest run tests/unit/contract.test.ts`
+exits 0, including the two new assertions above.
+**The mutant that must turn this RED, named explicitly so the
+acceptance can be checked for discrimination, not just existence:** an
+implementation that skips wiring `PublicNodeSchema` into
+`PublicDebateSchema.answer.nodes` — i.e., leaves line 475 as `z.array(NodeSchema)`
+— is the mutant that reproduces the ORIGINAL finding exactly; under that
+mutant the first assertion above flips from `false` to `true` and the
+test goes RED. A second, real-world mutant this design also catches
+differently: reverting `redactNodeForPublic`'s line 56
+(`disagreement: null` → `disagreement: node.disagreement`) is caught at
+COMPILE TIME if the return-type change is applied (`Node` is not
+assignable to `PublicNode`), and — independently, if the return-type
+change were somehow skipped — at RUNTIME by this same test's schema, and
+separately by the already-existing S04 product-path test
+(`pda-s04-node-carrier-audit.test.ts`), which the brief confirms already
+fails on this exact shape. Three independent layers for the real-world
+mutant, one schema-level layer (this step's own) for the pure
+schema-omission mutant that started this ticket.
+**Category (V RULING, `t_83df0d9c`): FEATURE-ASSERTION — own verification
+this round, before writing this step down, not after:** `PublicNodeSchema`
+does not exist in the tracked contract today, so
+`pnpm exec vitest run tests/unit/contract.test.ts` with this test added
+would fail to even import/compile — a genuine, unambiguous RED (a
+missing export, not a vacuous pass), matching this mission's own
+established RED-shape vocabulary (same class as a missing test file,
+not a filter/escaping defect). GREEN is reachable: verified via the
+scratch `.omit().extend()` script above, run against the real Zod 4.4.3
+in this repo, producing the exact rejection/acceptance results the test
+asserts.
+**Failure it CATCHES:** the exact defect this step exists to close — a
+`disagreement` value surviving `PublicDebateSchema`/`PublicNodeSchema`
+validation into a parsed public envelope, independent of whether the
+PROJECTION code (`redactNodeForPublic`) is itself correct — this is the
+"fail loudly at the boundary" property Row 9 already established for
+`stranger_restatement`, now also true for `disagreement`.
+**Failure it MISSES:** the five sentinel-string fields named in item 2
+above (`provenance_ref` ×4 sites, `replay_handle` ×2,
+`ledger_unknown_ref`) remain unenforced by the schema — a mutant that
+skips redacting one of THOSE still passes this step's own test and every
+other schema-level test in this file, since none of them assert those
+fields' exact values; they remain guarded by `redactNodeForPublic`'s
+product code and its own test coverage only, named as a recommended
+follow-up, not claimed as closed here.
+
+**Cost disclosed to V, as instructed if the HOW has one worth knowing
+before it is paid:** this design's cost is genuinely small — two files,
+zero test-fixture edits, a `.omit().extend()` one-liner plus one
+return-type annotation — BECAUSE it deliberately does not widen beyond
+`disagreement`. The wider fix (closing all six redaction guarantees at
+the schema layer) is real, valuable, and NOT free: it requires new public
+variants of three more shared schemas and a decision about how to encode
+`LabeledNumberSchema`'s node/edge `redactSource` asymmetry. If V wants
+that closed now rather than as a follow-up, the cost is a materially
+larger step than this one, not a token change — worth knowing before
+committing to it, not after.
 
 ## SPEC trace — R2 Public-safe honesty fields; identity carriers absent
 

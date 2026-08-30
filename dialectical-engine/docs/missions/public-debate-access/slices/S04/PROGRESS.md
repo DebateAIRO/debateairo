@@ -27,3 +27,28 @@ the ticket and the orchestrator folds it in.
 
 - Naming the anonymous-exposure review as its own slice rather than a checklist item on S01 — the widened envelope is new public surface and deserves an independent verdict.
 - Naming anonymous-exposure review as its own slice: V packet Row 4 emerged precisely because someone was looking at exposure as a first-class question.
+
+## 2026-08-30 — audit built, reviewed, reworked
+
+- **S04-CODE delivered** the node-carrier audit (`tests/unit/pda-s04-node-carrier-audit.test.ts`) and
+  corrected checklist items 3/3b in place under Row 7. 11/11, three runs, typecheck 0, with
+  refutation mutants run unprompted.
+- **REV-08 (Grok blind lens) returned REWORK.** Test 1 was a real schema-name guard that
+  discriminates. **Test 2 was vacuous** — it hand-built a clean fixture and asserted it did not
+  contain keys the author never put in it. The lens proved it: adding `owner_ref` to `NodeSchema`
+  turned test 1 red and left test 2 **green**.
+- **Rework round 1 replaced test 2 outright** with a product-path test that publishes through the
+  real `PostgresPublicationApplication`, smuggling all ten forbidden key names into a node's
+  `disagreement` record and asserting none survive.
+- **Router re-derived the discrimination rather than inheriting it:** mutating
+  `publications.ts:56` to `disagreement: node.disagreement` gives 1 failed / 1 passed; restoring
+  gives 2 passed. The test genuinely fails when the product regresses.
+- **Honest bound, reported by the seat itself and kept:** the value-carrier mutant
+  (`provider_ref: "owner:..."`) still leaves the test green. A key-name blacklist cannot catch
+  identity carried in a value. A green `S04-C1` does **not** close R1 on its own.
+- **Independent corroboration across two lenses:** REV-07, reviewing an unrelated change with no
+  sight of REV-08, found `disagreement` is `z.record(z.string(), z.unknown())` at
+  `packages/contract/src/index.ts:437` and demonstrated the schema accepts arbitrary keys when the
+  projection regresses. Routed to V as `t_83df0d9c` — not S04's to fix.
+- **Open:** re-review in flight; C4/R5 verdict remains QA's, and the anonymous HTTP tree path is
+  still unobserved live because the sole publication is legacy.
