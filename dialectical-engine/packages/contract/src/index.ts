@@ -442,6 +442,11 @@ export const NodeSchema = z.object({
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
+export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
+  disagreement: z.null()
+});
+export type PublicNode = z.infer<typeof PublicNodeSchema>;
+
 export const EdgeSchema = z.object({
   edge_id: z.string().min(1),
   from_node_ref: z.string().min(1),
@@ -472,7 +477,7 @@ export const PublicDebateSchema = z.object({
     residual_objections: z.array(z.string()),
     reversal_point: z.string().min(1),
     as_of: z.iso.datetime(),
-    nodes: z.array(NodeSchema).optional(),
+    nodes: z.array(PublicNodeSchema).optional(),
     edges: z.array(EdgeSchema).optional(),
     tree_included: z.boolean().optional()
   }).strict()

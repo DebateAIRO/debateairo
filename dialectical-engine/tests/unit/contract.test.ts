@@ -4,6 +4,7 @@ import {
   AskAcceptedSchema,
   SessionSchema,
   NodeSchema,
+  PublicDebateSchema,
   AnswerSchema,
   InspectionSchema,
   NumberSlotSchema,
@@ -11,6 +12,39 @@ import {
   TierSourceSchema,
   contractInventory
 } from "@debateai/contract";
+
+function validNodeFixture() {
+  return {
+    node_id: "node:test-lineage",
+    claim: "A test-layer claim",
+    way_of_knowing: "REASONING",
+    base_score: {
+      value: 0.7, kind: "test-layer", source: "test-layer", producer: "test-layer",
+      provenance_ref: "number:test-base", replay_handle: "replay:test-base"
+    },
+    final_strength: {
+      value: 0.6, kind: "test-layer", source: "test-layer", producer: "test-layer",
+      provenance_ref: "number:test-final", replay_handle: "replay:test-final"
+    },
+    provenance_ref: "artifact:test-lineage",
+    maker_lineage: {
+      maker: "maker:test-layer",
+      model_id: "model:test-layer",
+      transport: "provider-kind:test-layer",
+      provider_ref: "provider:test-layer"
+    },
+    review: null,
+    locator: null,
+    stranger_restatement: { check_status: "PASS" },
+    defeater_refs: [],
+    defeater_exhaustion_marked: false,
+    disagreement: null,
+    condition_marks: [],
+    abstention: null,
+    staleness_state: "FRESH",
+    relevant_as_of: "2026-08-12T00:00:00.000Z"
+  };
+}
 
 describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
   it("declares POST /v1/asks and the Answer/Node reads before the facade", () => {
@@ -111,36 +145,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
   });
 
   it("admits recorded per-node maker lineage and requires typed null when it is absent", () => {
-    const node = {
-      node_id: "node:test-lineage",
-      claim: "A test-layer claim",
-      way_of_knowing: "REASONING",
-      base_score: {
-        value: 0.7, kind: "test-layer", source: "test-layer", producer: "test-layer",
-        provenance_ref: "number:test-base", replay_handle: "replay:test-base"
-      },
-      final_strength: {
-        value: 0.6, kind: "test-layer", source: "test-layer", producer: "test-layer",
-        provenance_ref: "number:test-final", replay_handle: "replay:test-final"
-      },
-      provenance_ref: "artifact:test-lineage",
-      maker_lineage: {
-        maker: "maker:test-layer",
-        model_id: "model:test-layer",
-        transport: "provider-kind:test-layer",
-        provider_ref: "provider:test-layer"
-      },
-      review: null,
-      locator: null,
-      stranger_restatement: { check_status: "PASS" },
-      defeater_refs: [],
-      defeater_exhaustion_marked: false,
-      disagreement: null,
-      condition_marks: [],
-      abstention: null,
-      staleness_state: "FRESH",
-      relevant_as_of: "2026-08-12T00:00:00.000Z"
-    };
+    const node = validNodeFixture();
 
     expect(NodeSchema.parse(node).maker_lineage).toEqual(node.maker_lineage);
     expect(NodeSchema.parse({ ...node, maker_lineage: null }).maker_lineage).toBeNull();
@@ -189,6 +194,49 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       ...node,
       stranger_restatement: { check_status: "FAIL" }
     }).stranger_restatement).toEqual({ check_status: "FAIL" });
+  });
+
+  it("keeps owner disagreement while rejecting it at the public envelope boundary", () => {
+    const ownerDisagreement = { internal_note: "LEAK-ME" };
+    const ownerParseResult = NodeSchema.safeParse({
+      ...validNodeFixture(),
+      disagreement: ownerDisagreement
+    });
+    expect(ownerParseResult.success).toBe(true);
+    if (ownerParseResult.success) {
+      expect(ownerParseResult.data.disagreement).toEqual(ownerDisagreement);
+    }
+
+    const publicDebateWithDisagreement = (disagreement: unknown) => ({
+      public_ref: "11111111-1111-4111-8111-111111111111",
+      author_pseudonym: "p",
+      question: "q",
+      published_at: "2026-08-24T00:00:00.000Z",
+      answer: {
+        terminal: "SERVED",
+        verdict: "SUPPORTED",
+        verdict_available: true,
+        confidence_band: "moderate",
+        summary_segments: [{ text: "s" }],
+        badges: [],
+        residual_objections: [],
+        reversal_point: "r",
+        as_of: "2026-08-24T00:00:00.000Z",
+        nodes: [{ ...validNodeFixture(), disagreement }]
+      }
+    });
+    for (const [label, disagreement] of [
+      ["existing keyed object", ownerDisagreement],
+      ["empty object", {}],
+      ["unrelated key", { secret_panel_note: "STILL-LEAKS" }],
+      ["nested object", { nested: { secret_panel_note: "STILL-LEAKS" } }]
+    ] as const) {
+      const publicParseResult = PublicDebateSchema.safeParse(
+        publicDebateWithDisagreement(disagreement)
+      );
+      expect.soft(publicParseResult.success, label).toBe(false);
+    }
+    expect(PublicDebateSchema.safeParse(publicDebateWithDisagreement(null)).success).toBe(true);
   });
 
   it("FX-SRV-14/15 makes typed segments and honesty projections non-optional", () => {

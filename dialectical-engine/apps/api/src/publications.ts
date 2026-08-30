@@ -4,7 +4,8 @@ import {
   type Answer,
   type Edge,
   type Node,
-  type PublicDebate
+  type PublicDebate,
+  type PublicNode
 } from "@debateai/contract";
 import {
   hashVerificationToken,
@@ -30,7 +31,7 @@ function redactLabeledNumber(
   };
 }
 
-function redactNodeForPublic(node: Node): Node {
+function redactNodeForPublic(node: Node): PublicNode {
   return {
     node_id: node.node_id,
     claim: node.claim,
