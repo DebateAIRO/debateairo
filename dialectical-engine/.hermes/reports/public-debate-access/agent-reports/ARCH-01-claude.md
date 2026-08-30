@@ -1405,3 +1405,117 @@ prior to this handoff), `t_5c7a1e7f` (parent/requirements, read in full),
 existed at read time). No sibling-ticket disclosure needed: no ticket
 outside this contract's set (`t_f864a84b`, `t_5c7a1e7f`, `t_2a279210`) was
 read.
+
+---
+
+# Self-report addendum — S05, ticket `t_e8c6c083` (2026-08-30)
+
+**SKILLS LOADED: heartbeat-architecture, heartbeat-requirements.** Both, in
+direct response to the ticket's explicit dual-authorship exception for a
+brand-new slice with no prior Requirements dispatch (SPEC normally frozen
+and never Architecture-edited; this round is the named exception).
+
+## What this round was
+
+V ruled, from two screenshots, that "Done" for this mission looks
+different from what shipped: a full owner-fidelity tree/map/split/canvas
+view on the public route, reached via an explicit button, "same UI as if
+published by the user." Five items to rule on, verbatim in the ticket:
+what the button means, fidelity gaps, whether the census numbers can be
+truthfully computed publicly, the owner-only-affordance invariant
+(specifically QA-N2's Regenerate-button concern), and scope discipline.
+Deliverable: SPEC.md + PLAN.md (+ DECISIONS.md, PROGRESS.md skeleton) for
+a new slice S05.
+
+## What I found, and why it changes the shape of the answer
+
+The investigation was almost entirely read-only (no product code touched,
+per Architecture's bound) and produced one dominant, load-bearing fact:
+**the owner-fidelity canvas V described in Screenshot 1 already exists,
+verbatim, on the public route.** Not "similar" — the literal same
+component files. `PublicDebatePageClient.tsx` imports `DebateCanvas`,
+which imports `CanvasViewport` (the file that turned out to hold the
+entire zoom cluster — Zoom in, Zoom out, Fit, 1:1, live `%` readout — none
+of which I initially found because it lives one component layer below
+where I first grepped). The public page's default view state is
+literally `useState<DebateView>("tree")`. The only reason V has only ever
+seen the flat verdict-only fallback is that the sole existing publication
+predates the commit that introduced tree data into publications at all —
+a data-availability accident, not an unbuilt feature.
+
+That fact reframes all five items:
+- **Item 1** rules to reading (a): the button is a discoverability
+  addition to an existing page, not a new screen. I checked this against
+  V's own words before ruling, not just the code — "the verdict and
+  debate state can be kept for now" reads, in context, as an approving
+  description of the CURRENT top-of-page section, asking for something
+  ADDED below it. That textual reading and the structural evidence agree,
+  which is the strongest form of confirmation available here short of an
+  actual tree-bearing publication rendering (which does not yet exist to
+  look at — I said so plainly rather than pretending certainty I didn't
+  have, then specified exactly what a real render would additionally
+  confirm: visual density parity with Screenshot 1, and that the
+  corrected census header reads truthfully).
+- **Item 2** (fidelity) resolved into three buckets by direct comparison
+  of both files, not assumption: identical-and-shared (canvas/map/split/
+  thread/zoom/set-aside-checkbox — no work needed), genuinely-missing-
+  but-envelope-blocked (SynthesisPanel, needs `debate.synthesis.*` which
+  doesn't exist publicly), and correctly-already-suppressed
+  (Challenge, real generation history — verified by reading
+  `NodeDetailDrawer.tsx` in full, not trusting the brief's line numbers).
+- **Item 3** confirmed decisively by re-reading `PublicDebateSchema`'s
+  complete, `.strict()`-enforced field list: no `condition_mark_records`,
+  no substitute possible even per-node. Ruled: omit the three counts,
+  never render zero.
+- **Item 4**: QA-N2 is real as an *untested precondition*, not a live
+  defect — the Regenerate button is unconditionally disabled on BOTH
+  routes today (a `V3_MISSING_CAPABILITIES` stub, not an ownership gate),
+  and the actual owner-only affordances are already correctly prop-gated.
+  I designed a test (S05-C3-1, category VERIFICATION-ONLY, expected to
+  pass on first run) rather than a code change, and said so explicitly —
+  this is one of the "already done, needs proving" cases the ticket gave
+  explicit permission to name plainly.
+- **Item 5**: both routed-envelope gaps (`condition_mark_records`,
+  `debate.synthesis.*`) named precisely enough that a future
+  contract-touching slice does not have to re-derive this investigation,
+  with a mechanical `git diff --quiet` check proving this slice's own
+  diff never touches the contract or publish-path files.
+
+## What I nearly missed, and how it was caught
+
+My first pass at locating V's "zoom controls (+, -, Fit, 1:1, 37%)"
+grepped `DebateCanvas.tsx` directly for literal strings like "Fit"/"zoom"/
+"1:1" and found nothing — I recorded this as "unconfirmed, remains open"
+rather than concluding the controls didn't exist. The correct next step
+(broadening the search to the whole `apps/ui` tree rather than one file)
+surfaced `CanvasViewport.tsx` as a separate component `DebateCanvas`
+delegates to. Recorded here because the near-miss itself is the lesson:
+absence of a hit in one file is evidence about that file, not about the
+feature — the fix was widening the search surface, not concluding "not
+built" from a negative grep in the wrong place.
+
+## Balance-invariant discipline applied
+
+Per the two near-misses in the immediately prior round (`t_83df0d9c`), I
+ran the `**Acceptance test:**` / `**Category` / `**Failure it CATCHES:**` /
+`**Failure it MISSES:**` count check on S05/PLAN.md before handoff: 11 =
+11 = 11 = 11 across 11 numbered steps. Also checked the full R1–R6 trace
+was textually present in PLAN.md (found R4 and R6 missing an explicit
+citation on first pass — both were substantively covered by S05-C3-1 and
+S05-C4-1 respectively, just not cited by name — added one sentence to
+each step closing the citation gap rather than treating it as
+substantively uncovered).
+
+## Scope held
+
+No product code written or edited. No product test run. Files touched:
+`docs/missions/public-debate-access/slices/S05/{SPEC,PLAN,DECISIONS,
+PROGRESS}.md` (PROGRESS.md left as an empty heading skeleton, orchestrator-
+write-only per its own header) and this self-report. `packages/contract/
+src/index.ts` and `apps/api/src/publications.ts` were read, not edited —
+confirmed via `git diff --quiet` on both before handoff.
+
+## Comments read through
+
+`t_e8c6c083` (own ticket, read in full, no prior comments — this is the
+first response). No sibling ticket outside this contract's set was read.
