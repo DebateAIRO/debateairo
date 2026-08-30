@@ -1,8 +1,8 @@
-SKILLS LOADED: heartbeat-protocol, heartbeat-worker, superpowers:using-superpowers, superpowers:receiving-code-review, superpowers:systematic-debugging, superpowers:test-driven-development, superpowers:verification-before-completion
+SKILLS LOADED: heartbeat-protocol, heartbeat-worker, superpowers:receiving-code-review, superpowers:systematic-debugging, superpowers:test-driven-development, superpowers:verification-before-completion
 
 # S03-CODE Codex case file
 
-**Status:** REWORK READY FOR REVIEW on 2026-08-29 under ticket `t_fc0f5e85`; rework round 2 of 3 is complete, with one round remaining. B1, B2, and N1 still stand; B3 and N2 are addressed in the addendum below.
+**Status:** READY FOR PEER REVIEW on 2026-08-30 under new QA-defect ticket `t_880241fd`. The visual selected-state defect is addressed without changing S03 product logic or page markup.
 
 ## Executive finding
 
@@ -176,3 +176,23 @@ The first two blockers were genuinely repaired: PLAN now categorizes feature ass
 **Price:** One coding rework round and an explicit residual QA boundary. No product behavior change was needed for B3 or N2; the permanent code change is confined to the rendered test, plus this required PLAN failure-boundary receipt and the paired case-file receipts.
 
 **Final verification receipt:** The exact S03-C1 compound acceptance ran three times on the restored final tree; every run returned structural `OK` and 3 passed/3, so the worst run is GREEN. `pnpm run typecheck` exited 0. The standing publication-contract suite passed 5/5. `git diff --check` exited 0. The worktree and main-tree case-file receipts are byte-identical. Ticket comments were read through created_at `1788035502` immediately before this final receipt; no intervening instruction was present.
+
+## QA-N1 new work — sighted selected-state affordance
+
+**Cause and price:** The earlier accessibility work proved DOM presence, native-link keyboard semantics, ARIA current state, and enumerated non-concealment. It never asserted that active and inactive controls compute to visually different styles. S03-C1-5 explicitly inherited `.tab`/`.tabActive` styling without establishing that either class existed, so “not hidden” was incorrectly allowed to stand in for “distinguishable.” QA found the user-visible gap after mission integration. The price was one new first-pass QA ticket and about fifteen minutes of coding-seat investigation/repair; no rework round has been consumed on this ticket.
+
+**Reproduction:** On clean `7bfe662`, every repository CSS/SCSS/Sass file contained zero `.tab` or `tabActive` selectors, while `page.tsx` contained `tabActive` twice. The live response at `/?tab=public` served `class="tab"` and `class="tab tabActive"` with `aria-current="page"`; the served `layout.css` contained zero matching rules. PID 43352 served the main checkout, also at `7bfe662`, so this was valid base-code evidence rather than the earlier wrong-runtime condition.
+
+**RED → GREEN:** The new test renders the real async `HomePage`, injects the real `globals.css` into its JSDOM document, and compares computed styles. Before CSS, both selected-state cases failed: 2 failed/3 passed, with the navigation still `space-between`, no group gap, plain-link font/padding/radius, and identical active/inactive background, foreground, and shadow. The CSS change made the suite 5 passed/5.
+
+**Remedy and sighted result:** The two links are now adjacent, bordered 12px/600-weight rounded controls with 5px × 12px padding; the count remains at the far edge of the existing section header. The inactive control is transparent and muted. The `aria-current="page"` control uses the surface background, ink foreground, and a raised `0 1px 3px` shadow. The distinction is not colour-only: background fill and shadow geometry supplement foreground colour. The existing `a:focus-visible` rule remains effective because `.tab` does not override outline; the final computed probe returned `outline: 2px solid var(--focus)`, `outline-offset: 2px`, and `:focus-visible = true`.
+
+**Why page.tsx stayed untouched:** Its existing `aria-current="page"` is the semantic state CSS needs. Styling `.tab[aria-current="page"]` keeps visual and assistive state on one source of truth; adding product logic or relying on the redundant `tabActive` class would weaken that invariant.
+
+**Refutation sweep:** A wrong `aria-current` selector failed 2/5; removing the base `.tab` selector failed 2/5; breaking the scoped group selector failed 2/5; retaining colour changes while setting the selected shadow to `none` failed 2/5, proving colour-only is rejected. Changing the group gap from 4px to 5px stayed 5/5, so the test does not pin cosmetic spacing. Every mutant was restored.
+
+**Near miss / dead end:** The first colour-only mutation matched the pre-existing `.segment` shadow instead of the new tab shadow because the declaration text was duplicated; its GREEN result was irrelevant and discarded. A later generic restore matched an earlier `.metaLine` gap instead of the mutant. Final diff inspection caught both before handoff; selector-context patches restored the neighbor and the complete three-run verification was restarted. This cost one extra probe and one full final cluster rerun. The durable lesson is that `apply_patch` context must name the selector when mutating duplicated CSS declarations; porcelain alone shows dirt, not whether the right hunk was restored.
+
+**Dispatch findings:** The corrected worktree preflight was clean and at `7bfe662`. The ticket still carries a stale `[claude-opus]` title, null assignee, scratch/no-path metadata, and no typed state/file contract comment, despite the model law and direct V instruction assigning implementation to Codex. The original S03 goal packet also names retired ticket/worktree paths. Direct V scope made this run unambiguous, but the board/packet metadata should be repaired before it is reused as an automated dispatch source.
+
+**Final verification:** The restored final visual-state cluster ran three times at 5 passed/5; worst run GREEN. `pnpm run typecheck` exited 0. The standing publication-contract suite passed 5/5. Live post-fix serving is intentionally not claimed: PID 43352 serves the main checkout and cannot observe this uncommitted worktree diff; the real rendered-HomePage computed-style test is the discriminating local proof, with browser/integration visual confirmation left to peer/QA after integration.

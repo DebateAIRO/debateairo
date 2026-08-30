@@ -305,3 +305,137 @@ each slice WRITES* — and S04 reads exactly the file the strict change wrote.
 
 An earlier merge in this mission was saved from destroying reviewed work only by a manual diff run
 seconds beforehand. This note exists so the check is a precondition rather than luck.
+
+## Seat exit — S01-SPLIT round 1 (2026-08-30 09:56) — BLOCKED, correctly, on a Router defect
+
+Ran two minutes and returned `CODEX BLOCKED: required upstream artifact missing`. `S01-C1-7` was
+absent from its worktree because Architecture's 280-line design sat **uncommitted in the main tree**
+while the Router moved the seat's worktree to `e879f87`, a commit predating the edit.
+
+**The seat's closing line is the valuable part:** *"I will not reconstruct Architecture's
+specification from the dispatch summary."* The packet did summarise the design accurately enough that
+a more accommodating seat could have built from it — and produced something plausible, unreviewable
+against the real spec, and subtly different from what was actually ruled. That failure would have
+been silent. This one cost two minutes and named its own cause.
+
+**Fixed structurally, not by copying a file at the seat:** Architecture's design committed as
+`7bfe662`, worktree moved to that commit, spec confirmed byte-identical between worktree and main
+before re-dispatch. The seat now obtains its specification by checkout.
+
+**Recurrence of SYNC-01's class** (`t_d40a86f1`), whose recommendations — sync-time snapshots and a
+pre-merge diff gate — were recorded and never built. Different instance, same cause: **a worktree's
+planning documents and the main tree's are related by nothing.** Recorded in TOOLING-TRAPS.md.
+
+## Seat exit — S01-SPLIT round 2 (2026-08-30 10:11) — implemented, and it corrected the Router twice
+
+Delivered the split `NodeSchema.omit({disagreement:true}).extend({disagreement:z.null()})` exactly as
+S01-C1-7 specified. Reproduced the hole before editing —
+`{"accepted":true,"preserved_disagreement":{"internal_note":"LEAK-ME"}}` — then TDD RED, then GREEN.
+The required mutant (rewiring public nodes back to `NodeSchema`) turned it RED. A **product** mutant
+copying `node.disagreement` through failed at **compile time** with `TS2322`, which is a stronger
+guarantee than the runtime rejection that was asked for. 34/34 across three runs, `tsc` exit 0.
+
+**It reported three corrections to its own packet rather than quietly conforming:**
+
+1. **17 runtime parser sites, not the 15 Architecture stated** — all traced, all safe.
+2. **The "13 compile-time sites" figure was not reproducible** as a consistent file count. It said so
+   instead of manufacturing agreement.
+3. **The architecture baseline the Router gave it — 7 failed / 263 passed — was wrong.** It measured
+   6 failed / 264 passed, three runs each side, same five failing files.
+
+**That third correction was the valuable one, and it exposed a defect in the Router's method rather
+than in anyone's code.** Both numbers were correct: the Router measured in the main tree, which
+contains `.worktrees/`; the seat measured inside a worktree, which contains no nested worktrees. The
+standing test `s9-dev-token-retirement-contract.test.ts` walks into `.worktrees/` — **a directory
+`git check-ignore` confirms is ignored** — so its offender count is a function of how many worktrees
+happen to exist. This mission created and destroyed a dozen.
+
+The Router's merge gate compared main-tree runs to main-tree runs, so its conclusions held by
+internal consistency. But the gate's wording — *"identical failing files, not merely an identical
+count"* — sounded rigorous while **anchoring on a number nobody had checked was stable.** Filed as
+`t_5fef39e6`; recorded in TOOLING-TRAPS.md as "the baseline that moves when you look at it."
+
+**A seat disagreeing with the Router was the only thing that surfaced it.** Had it deferred to the
+number it was given, the defect would still be invisible.
+
+## Seat exit — REV-09 (2026-08-30 10:22) — PASS on the split
+
+Verified by running: the boundary **rejects** with `invalid_type expected null` rather than silently
+dropping; anonymous `readPublicDebate` fails closed on parse errors; reverting the split turns the new
+test red; `.catch(null)` and preprocess-to-null mutants also turn it red; the owner path still admits
+disagreement objects and S04's audit still strips them; 21 files touch the symbols, root `tsc` clean,
+`PublicNode → Node` assignability holds.
+
+**N1, and the distinction is worth keeping: the test is NARROW, not VACUOUS.** Those are different
+defects and only the second was ruled out. The lens planted a mutant that keeps the test green while
+still admitting `{ secret_panel_note: "STILL-LEAKS" }` — the rejection arm pins one fixture while the
+title claims a universal property. **Third instance this mission of the same shape** (REV-08's N4 on
+`nodes[0]`, the original B1 vacuity, now this), found by three different probes. Dispatched rather
+than deferred, because this mission has already lost one "non-blocking, fix later" item for a day.
+
+**N2 corroborates Architecture rather than contradicting it.** The lens enumerated the five sibling
+redactions still enforced only in product code — and named **exactly the set** Architecture had
+already listed when ruling the split narrow, with no sight of that ruling. The residual is bounded and
+honestly accounted, not an oversight. Routed to V as `t_dbddfc61`.
+
+## Seat exit — S03-TABCSS round 2 (2026-08-30 10:32, `t_880241fd`)
+
+**Round 1 was killed by the Router after 41 seconds**, having written nothing: a `git checkout` had
+printed `Aborting` and left the worktree at a commit from hours earlier with 89 staged files, and the
+Router dispatched against it without reading the output. Before resetting, the Router checked whether
+those staged files held anything unmerged — `git diff --name-only <commit>` returned **zero** — so the
+reset was provably safe rather than hopefully safe. Recorded in TOOLING-TRAPS.md.
+
+**Round 2 delivered, and improved on the brief.** The packet suggested keying the styling off the
+`.tabActive` class; the seat keyed it off `[aria-current="page"]` instead — the state already in the
+markup. That is better than what was specified: **the visual state and the accessibility state are now
+one source of truth and cannot drift apart.** Styling follows the app's own
+`.segment button[aria-pressed="true"]` precedent, distinguishing the selected tab by background,
+foreground colour **and** shadow, so it does not fail WCAG 1.4.1 as a colour-only cue.
+
+Proved by **computed style**, not source text — `getComputedStyle` on both tabs, asserting they differ
+per channel. TDD RED 2 failed / 3 passed, GREEN 5/5, three runs. Router re-derived it: removing the
+active rule gives 2 failed / 3 passed, restoring gives 5/5.
+
+## Seat exit — S01-N1 (2026-08-30 10:33, `t_65236b16`)
+
+Reproduced the finding before fixing it: the pre-existing test stayed GREEN while a selective mutant
+still leaked `{"secret_panel_note":"STILL-LEAKS"}`. The rejection arm now covers four shapes and that
+mutant is RED with `unrelated key: expected true to be false`. Split-reversion, `.catch(null)` and
+preprocess-to-null mutants all still RED. 34/34, three runs, `tsc` 0.
+
+**The judgement call worth keeping:** it wrote an assertion pinning zod's internal `invalid_union`
+error type, found that it failed *before reaching the leak*, and **removed it** — so the test
+discriminates behaviour rather than schema spelling. A test that asserts how a library phrases its
+error is coupled to the library, not to the property; it would have gone red on a zod upgrade that
+changed nothing about safety.
+
+## Router defect — a vacuous mutant check, caught by its own missing evidence
+
+Verifying the merged split, the Router ran `sed -i '' '56s/disagreement: null,/.../'` to plant a
+product mutant, and `tsc` reported **no error**. The apparent conclusion — that the compile-time guard
+did not work — was wrong. The merge had shifted `disagreement: null` from line 56 to **57**, so `sed`
+matched nothing and **no mutant was ever applied.** The check proved nothing and would have read as a
+clean pass had the expected error not been conspicuously absent.
+
+This is **variant 6 of the mission's own catalogue — an acceptance pinned to an absolute line number,
+silent when the line moves** — committed by the Router while verifying a fix for the same family of
+defect. Re-run keyed on a unique pattern with an assertion that exactly one match exists, it produced
+`TS2322: Type 'Record<string, unknown> | null' is not assignable to type 'null'`.
+
+**What saved it was expecting a specific outcome.** A check that only asked "did anything go wrong"
+would have passed. One that asked "does the error I predict actually appear" failed loudly.
+
+## Dev stack down — cause not established, disclosed rather than assumed
+
+Both `:3000` and `:8790` closed. Alive and serving at 09:42; QA-01 ran its full anonymous probe suite
+against it 09:43–09:53; found dead at 10:33.
+
+**The Router cannot prove it did not cause this.** At ~10:16 it killed a misdispatched seat with
+`pkill -f 'launch-S03-TABCSS.sh'`, `pkill -f 'codex.*s03-code'`, and two PIDs by number — none of
+which should match a Next.js dev process, and the PIDs were 41-second-old codex children. It also ran
+`pnpm install` in three worktrees, which touches the shared pnpm store. **No dev-stack logs exist on
+disk**, so there is no positive evidence in either direction.
+
+V ruled: **V restarts it; the Router stays off it.** Row 8 made that server V's, and "I probably
+didn't break it" is not a basis for starting a TLS-and-database stack the Router did not set up.

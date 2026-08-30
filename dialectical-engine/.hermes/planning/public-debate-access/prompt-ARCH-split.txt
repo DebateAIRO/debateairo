@@ -1,0 +1,25 @@
+NEW DESIGN THREAD, not rework. Ticket t_83df0d9c. V has ruled and you are designing the fix, not deciding whether to make it.
+
+THE FINDING, and it was DEMONSTRATED rather than argued. packages/contract/src/index.ts line 437 declares disagreement as z.record(z.string(), z.unknown()).nullable() inside NodeSchema. A blind lens mutated the projection so disagreement is copied through instead of nulled, and the schema ACCEPTED it - the published JSON contained the planted marker. Contrast the same mutant against stranger_restatement after V's Row 9 change: ZodError, unrecognized_keys, rejected at the boundary. A second, independent lens reviewing entirely different work and with no sight of the first reached the same gap from the opposite direction. Two lenses, opposite angles, one hole.
+
+There is no live leak: apps/api/src/publications.ts line 56 sets disagreement: null unconditionally, and S04's merged product-path test now fails on three separate regression shapes - pass-through, skip-redact, and a partial regression that only clears the first node. So the field is guarded by product code and by a test. It is NOT guarded by the contract, which is exactly the thing V ruled must change.
+
+V'S RULING, verbatim in effect: fix it now, split the schema. V chose this over deferring it, over leaving it documented and test-guarded, and over merely constraining the field's shape without a split. V's reasoning is Row 9's reasoning: fail loudly at the boundary.
+
+WHY IT IS A SPLIT AND NOT A ONE-TOKEN CHANGE, measured by the Router before routing this to you: NodeSchema is used in TWO places - packages/contract/src/index.ts:475, inside PublicDebateSchema's answer.nodes, and :498, the owner-side AnswerSchema's nodes. The owner side genuinely populates disagreement from the database (packages/serve/src/index.ts:2201, disagreement: row.disagreement, typed Record<string, unknown> | null). Tightening the field in place would break the owner's own view. Verify this yourself rather than taking it from me - it is the premise the whole design rests on.
+
+WHAT YOU MUST DECIDE.
+
+1. THE SHAPE OF THE SPLIT. A separate PublicNodeSchema? NodeSchema.omit/extend? A branded variant? State the mechanism and why, including what happens to the exported type Node at :443 and to every consumer that imports it.
+
+2. AND THE REAL QUESTION, WHICH IS HOW FAR THE SPLIT GOES. redactNodeForPublic already enforces a contract the schema does not express: provenance_ref is forced to REDACTED_OWNER_ONLY at four sites, stranger_restatement is rebuilt as check_status only, disagreement is nulled, ledger_unknown_ref is redacted, while maker_lineage and the abstention register fields are copied verbatim. If you are introducing a public node type at all, there is an argument that it should express ALL of what the redactor guarantees, not just the one field that was caught. There is an equally real argument that this is scope growth on a mission whose Done criteria are already met, and that a narrow split is the honest minimum. RULE ON THIS EXPLICITLY. If you go narrow, say plainly what remains unexpressed and why that is acceptable. If you go wide, justify each field you add and be honest about the blast radius.
+
+3. BLAST RADIUS, AT BOTH RUNTIME AND COMPILE TIME. This is the lesson from your own t_cc34ba78, so it should not need saying: you claimed blast radius zero for the Row 9 change by asking whether anything PARSES an extra key at runtime, and never asked whether anything CONSTRUCTS one, which is the compile-time half. A zod schema drives a validator AND a z.infer type. Measure both. Name every file that must change, and say which are product, which are tests, and which are fixtures. Do not estimate - go and count.
+
+4. WHAT PROVES IT. Specify the acceptance so a coding seat can execute it. The property is that a non-null disagreement in a PUBLIC envelope is REJECTED, not silently dropped. State how a test demonstrates that, and state the mutant that must turn it RED. Remember this mission's standing law: no executable command inside a table cell, ever, and an acceptance that cannot discriminate is a defect, not a formality.
+
+DO NOT WRITE PRODUCT CODE. You are designing. Output goes to S01's PLAN.md and DECISIONS.md - this is S01's surface since S01 owns the contract and the publish path. SPECs remain FROZEN; this changes no requirement, it makes the contract enforce one that already exists.
+
+If you conclude the split cannot be done safely, or that some part of it must be deferred, say so plainly with evidence - four seats on this mission have reported "this cannot be verified" and all four were right. V ruled on the WHAT; you own the HOW, including telling V if the how has a cost V would want to know about before it is paid.
+
+Handoff opens with SKILLS LOADED. Return control at READY FOR REVIEW or a genuine blocker.

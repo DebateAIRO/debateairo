@@ -1,0 +1,42 @@
+NEW WORK on your slice. Ticket t_880241fd. Your worktree has been moved to 7bfe662; confirm it is clean before you start.
+
+QA FOUND A REAL DEFECT IN S03 AND IT IS AGAINST V'S DONE CRITERION 1. The Router confirmed it independently three ways before sending this to you.
+
+THE FINDING. apps/ui/app/page.tsx lines 95 and 102 apply className "tab tabActive" and "tab". NOTHING DEFINES THOSE CLASSES. Measured:
+- grep across every .css/.scss/.sass in the repo excluding node_modules: ZERO matches for tabActive or .tab
+- the live server at https://localhost:3000/?tab=public serves class="tab tabActive" and class="tab"
+- the served bundle /_next/static/css/app/layout.css contains ZERO tabActive rules
+
+CONSEQUENCE: the two tabs render as visually identical, unstyled text links. A SIGHTED user cannot tell which section is selected, and they do not look like controls at all.
+
+V's criterion 1 is that the buttons are "present, AND accessible". Assistive technology is served correctly - aria-current="page" is present and right, and that was verified repeatedly. A sighted user is not served at all.
+
+WHY THIS SURVIVED, because it should inform how you fix it. The accessibility work on this slice ran for multiple rework rounds and a blocking blind-review finding, and every round was about ARIA SEMANTICS - role="tab" versus aria-current, whether Bad ARIA is worse than no ARIA, what a screen reader announces. The mechanical test asserts aria-current is correct. The concealment check walks computed styles to prove the links are not HIDDEN. Nobody asked whether the ACTIVE STATE IS VISUALLY DISTINGUISHABLE. Not hidden is not the same as distinguishable. Every check passed for a reason unrelated to what a sighted person experiences.
+
+REPRODUCE FIRST. Confirm for yourself that no CSS defines .tab or .tabActive, and confirm what the live server serves. Do not fix what you have not seen.
+
+THE FIX, and match the app's existing design language rather than inventing one. There is already a precedent for exactly this pattern in apps/ui/app/globals.css:
+
+  .segment button { border: none; cursor: pointer; font-family: var(--font-sans);
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px;
+    background: transparent; color: var(--text-3); }
+  .segment button[aria-pressed="true"] { background: var(--surface); color: var(--ink);
+    box-shadow: 0 1px 3px oklch(0.4 0.02 70 / 0.18); }
+
+Note what that precedent does: it distinguishes the selected control by BACKGROUND and COLOUR and SHADOW - several channels at once, not colour alone. Do the same. A colour-only distinction fails WCAG 1.4.1 and would be a defect of the same kind as the one you are fixing: technically present, useless to some users.
+
+The tabs are anchors carrying aria-current="page", not buttons with aria-pressed, so your selector differs from the precedent's. Use the state that is actually in the markup. Read page.tsx and see what is really there before choosing a selector - do not assume from this brief.
+
+They sit inside .sectionHead, which is a flex row with a baseline alignment and a bottom border. Make sure what you add works in that context and does not disturb the heading beside it.
+
+Also style the plain .tab so the pair reads as a control group rather than as body-text links, and keep the existing a:focus-visible outline working - QA verified focus styling functions today and it must still function afterwards.
+
+PROVE IT. This is CSS, so a source-text assertion is weak evidence. Do better:
+1. Assert in a test that the served or computed styling actually DIFFERS between the active and inactive tab. A test that merely asserts a rule exists in a file is the same class of defect as the one you are fixing.
+2. State plainly in your handoff what a sighted user now sees, and which channels carry the distinction.
+3. Confirm the distinction is NOT colour-only.
+4. Re-run tests/unit/pda-s03-keyboard-accessibility.test.ts - it walks computed styles for concealment barriers and your change touches exactly that surface. It must still pass, and you must say so.
+
+SCOPE: apps/ui/app/globals.css, and a test to prove the property. Touch page.tsx only if the markup genuinely cannot express the state - and if you conclude that, say why rather than changing it silently. SPECs FROZEN. No product logic changes. No push, no merge, no commit.
+
+Rework rounds max 3. Update your self-report. Handoff opens with SKILLS LOADED, then READY FOR PEER REVIEW.

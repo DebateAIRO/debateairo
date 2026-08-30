@@ -1,0 +1,25 @@
+REWORK RETURNED for your re-review. You are the same seat that reviewed this work and returned REWORK with B1 and B2 blocking. The author has responded. Your job is to decide whether your findings are actually closed.
+
+WHAT THE AUTHOR SAYS IT DID:
+- Replaced the vacuous fixture test entirely with a test that publishes through the real product path, then asserts the forbidden keys do not survive.
+- Reproduced your B1 exactly before changing anything, then proved the repaired test goes RED under the mutant "disagreement: node.disagreement" and GREEN after restoring.
+- Confirmed that your N1 value-carrier mutant, provider_ref set to "owner:...", still leaves the test GREEN - it reports this as an acknowledged bound on what the test claims, not as something fixed.
+- Narrowed the S04-C1-2 PLAN claim to describe the product-path test rather than the z.record smuggling catch it never exercised.
+- Corrected both stale citations you found.
+- Three runs, worst verdict: C1 2/2, C2 5/5, C3 4/4, combined 11/11, typecheck exit 0.
+
+DO NOT TAKE ANY OF THAT ON TRUST. It is the author's account of its own work, which is exactly the class of claim you were elected to test.
+
+WHAT TO DECIDE, per finding:
+1. B1 - is the vacuity actually gone? The test now imports the real publication application. Ask whether it exercises the redaction path for the property it claims, or whether it has merely moved the fixture one layer inward. Run your own mutant. Then ask the sharper question: are there OTHER ways the property could break that this test still would not catch? Your original B1 was proven by a mutant that left the test green - try to find another one.
+2. B2 - is the PLAN claim now honest about what the test exercises? Read the revised S04-C1-2 text against what the test actually does, not against what it says it does.
+3. N1 - the author says it is acknowledging your value-carrier gap rather than closing it. Is the acknowledgement adequate and in the right place, or does a reader still come away believing a green S04-C1 closes R1?
+4. N2 - re-check both corrected citations resolve to what is now claimed.
+
+NEW CONTEXT YOU DID NOT HAVE, and it is relevant to B2. An independent second lens, reviewing a completely different change with no sight of your report, found that packages/contract/src/index.ts line 437 declares disagreement as z.record(z.string(), z.unknown()).nullable() and DEMONSTRATED that mutating the projection makes the schema accept arbitrary keys into the anonymous envelope. Two lenses reached the same gap from opposite directions. That schema question is being routed to the human for a ruling and is NOT this author's to fix - do not require it here. Mentioned only so you can judge whether the narrowed C1-2 claim is now correctly scoped against a hole that genuinely still exists at the schema level.
+
+ALSO NOTE, so you are not surprised: the contract's stranger_restatement field was changed from .passthrough() to .strict() and merged since your first pass. That is a different slice's work, already reviewed and passed by another lens. It is not under your review.
+
+BOUNDS unchanged. Read-only. No commits, no pushes, no merges, no product edits. Scratch copies and mutants are expected - clean them up. UNVERIFIED remains a respected answer.
+
+OUTPUT: open with SKILLS LOADED. For each of B1, B2, N1, N2 state CLOSED or STILL OPEN with the evidence you ran. Then an overall verdict: PASS or REWORK. If PASS, say plainly what the test now establishes and what it still does not, in one paragraph a stranger could act on. Update your self-report. Return control at READY FOR ROUTER.

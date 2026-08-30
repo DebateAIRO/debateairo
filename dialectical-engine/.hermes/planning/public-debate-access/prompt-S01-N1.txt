@@ -1,0 +1,23 @@
+BLIND REVIEW PASSED YOUR SPLIT. Verdict PASS, safe to merge for the disagreement hole. The lens verified, by running rather than reading: the boundary REJECTS with invalid_type expected null rather than silently dropping; reverting the split turns your test red; strip-style mutants (.catch(null), preprocess-to-null) also turn it red, so your test is NOT vacuous; the owner path still admits disagreement objects and S04's audit still publishes and strips them; 21 files touch these symbols and root tsc is clean; PublicNode-to-Node assignability holds.
+
+It also confirmed your three packet corrections were right - the runtime site count, the unreproducible compile-time file count, and the stale architecture baseline. That last one turned out to be a real defect in a standing test, which is now its own ticket. You were right to report the discrepancy instead of adopting the Router's number. Do that every time.
+
+ONE NON-BLOCKING FINDING TO CLOSE. Ticket t_65236b16. Rework round 1 of 3, and it is small.
+
+YOUR TEST IS NARROW, NOT VACUOUS - and those are different defects. tests/unit/contract.test.ts:199, "keeps owner disagreement while rejecting it at the public envelope boundary", checks rejection with exactly ONE fixture (ownerDisagreement, line 225) and acceptance of null (line 233). So it pins "this particular object is rejected", while its title and the change's whole purpose claim something universal: "a non-null disagreement is rejected at the public boundary".
+
+The lens PROVED the gap rather than asserting it. It planted a mutant that keeps your test GREEN while still admitting { secret_panel_note: "STILL-LEAKS" } through the public envelope. Your test cannot tell that mutant from the correct code.
+
+REPRODUCE FIRST. Construct a schema mutant that your CURRENT test passes while a non-null disagreement still gets through. Paste the evidence. If you cannot build one, say so and stop - the finding would be wrong and you should say that plainly rather than changing a test to satisfy a claim you could not reproduce.
+
+THE FIX. Make the rejection arm pin null-ONLY rather than not-this-one-fixture. At minimum assert rejection for an empty object {}, an object with a key unrelated to your existing fixture, and a nested object. Consider whether a small table of shapes reads better than three separate assertions - your judgement, but the property must be the universal one.
+
+THEN PROVE IT DISCRIMINATES against the finding itself: re-plant the mutant that previously stayed green and show it now turns RED. That is the acceptance for this ticket. Also re-run the mutants that already worked - reverting the split, .catch(null), and preprocess-to-null - and confirm they are all still RED. A fix that closes this gap while quietly breaking an existing catch is a net loss.
+
+DO NOT EXPAND SCOPE. The five sibling redactions the lens named - provenance_ref at its four sites, labeled-number source/provenance/replay, abstention.ledger_unknown_ref - are a KNOWN, DELIBERATE residual. Architecture ruled the split narrow and named them; the lens independently enumerated the same set and agreed the accounting is complete. They are routed to V as t_dbddfc61. Do not touch them. Do not add PublicNodeSchema to contractInventory.resources either - that is t_153e553f and it should be decided together with the sibling question.
+
+VERIFY. Three runs, worst run is the verdict, anchored idiom. Confirm by NAME that the tests executed with no skips. npx tsc --noEmit exit 0. Run tests/unit/contract.test.ts, tests/unit/s8-publication.test.ts and tests/unit/pda-s04-node-carrier-audit.test.ts.
+
+On the architecture suite: compare by identical FAILING FILES, never by count, and know that s9-dev-token-retirement-contract.test.ts fails for an unrelated reason - it walks into gitignored .worktrees directories, so its offender count varies with how many worktrees exist on this machine. Ignore it; do not treat it as a regression and do not try to fix it.
+
+SCOPE: tests/unit/contract.test.ts only. The contract and publications.ts changes are already reviewed and PASSED - do not touch them. SPECs FROZEN. No push, no merge, no commit. Update your self-report. Handoff opens with SKILLS LOADED, then REWORK READY FOR REVIEW.

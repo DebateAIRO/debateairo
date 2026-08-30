@@ -666,3 +666,128 @@ appears, the file is a hypothesis, not a fact.
 fail against production pins nothing."* Its sibling is this — **a document that is mid-correction
 cannot support a claim, and citing it launders a stale assertion into a fresh one.** The alarm reached
 a QA packet and a ticket before the seat's own output refuted it.
+
+## Dispatching a seat against a spec that exists only in your own working tree
+
+**Router defect, 2026-08-30. The seat caught it; nothing mechanical did.**
+
+Architecture designed a schema split and wrote it into `docs/.../S01/PLAN.md` as step `S01-C1-7`.
+The Router then moved the coding seat's worktree to commit `e879f87` and dispatched it to implement
+that step. The seat came back in two minutes:
+
+```
+CODEX BLOCKED: required upstream artifact missing.
+S01 PLAN ends at S01-C1-6; S01-C1-7 and t_83df0d9c are absent.
+Repository-wide and all-ref searches found no authored step.
+Please land or provide the complete S01-C1-7 plan step. I will not
+reconstruct Architecture's specification from the dispatch summary.
+```
+
+**Architecture's edit was uncommitted.** It ran in the main tree; the worktree was checked out at a
+commit that predated the edit by minutes. The 280 lines of specification existed on exactly one
+filesystem path, and it was not the one the seat could see.
+
+**Why this is a trap and not simple carelessness.** The dispatch packet *summarised* the design
+accurately — the shape of the split, the file surface, the mutant. A more accommodating seat would
+have implemented from the summary and produced something plausible, unreviewable against the real
+spec, and subtly different from what Architecture actually ruled. **The failure would have been
+invisible.** It surfaced only because the seat refused to work from a second-hand description.
+
+**This is SYNC-01's class again.** That finding — a PLAN diverging in both directions between main
+and a worktree, caught by a manual diff seconds before a merge that would have destroyed reviewed
+work — produced a recommendation for sync-time snapshots and a pre-merge diff gate. Neither was
+built. The recurrence is not the same *instance* (that was divergence after copying; this is absence
+from never copying) but it is the same *cause*: **a worktree's planning documents and the main
+tree's are related by nothing.** No mechanism keeps them in step and no gate notices.
+
+**The rule, and it is structural rather than procedural:** a seat must obtain its specification **by
+checkout, from a commit** — never by a file the Router copies in, and never by prose in the dispatch
+packet. Commit the design first, move the worktree to that commit, then verify the spec file is
+byte-identical between worktree and main before dispatching. If the design is too provisional to
+commit, it is too provisional to implement.
+
+**Corollary worth keeping:** *"I will not reconstruct the specification from the dispatch summary"*
+is correct seat behaviour and should be praised, not smoothed over. A seat that helpfully fills the
+gap converts a loud, cheap, two-minute failure into a silent one that survives review.
+
+## The baseline that moves when you look at it
+
+**Measured 2026-08-30. Found by a coding seat contradicting the Router, not by the Router.**
+
+The Router had been gating merges on: *"architecture suite must show 7 failed / 263 passed, identical
+failing files — not merely an identical count."* Careful-sounding, and it caught nothing, because the
+baseline itself was an artifact.
+
+A coding seat measured **6 failed / 264 passed**, three runs each side, and **reported the
+discrepancy instead of adopting the Router's number.** Both measurements were correct. The Router
+measured in the main tree, which contains `.worktrees/`. The seat measured inside a worktree, which
+does not contain nested worktrees.
+
+`tests/architecture/s9-dev-token-retirement-contract.test.ts` walks into `.worktrees/` — **a directory
+`git check-ignore` confirms is ignored** — and counts every file there as an offender. Its failure
+count therefore rises and falls with how many worktrees happen to exist on the machine at that
+moment. This mission created and destroyed a dozen. **The number was a function of the Router's own
+tooling, not of the code under test.**
+
+(It also counts 37 *tracked* files under `docs/missions/2026-08-06-v3-programming/` — historical
+handoffs from a previous mission. The test's own name is *"removes the header from every
+**non-historical** source"*, so it has the concept and simply fails to apply it to mission docs. The
+product code is genuinely clean: `git grep` finds the retired header in no non-doc source.)
+
+**Two distinct lessons, and the second is the one that generalises.**
+
+*First:* a scan root that walks gitignored directories polices whatever happens to be lying around —
+variant 8 of the family, recurring in a standing test rather than a mission instrument.
+
+*Second, and worse:* **"compare against the baseline" is only as sound as the baseline's own
+stability, and nothing was checking that.** The Router's gate compared main-tree runs to main-tree
+runs, so its conclusions held by luck of internal consistency — but it was anchoring on a number that
+changed whenever a worktree was created. A baseline captured once and quoted thereafter is a
+**stale-record defect wearing the costume of rigour.**
+
+**The rule:** before gating on a baseline, establish that it is *reproducible* — same value from two
+different working directories, or two runs with unrelated state changed in between. If it moves,
+you have measured your environment, not the code. And when a seat contradicts your number, **check
+before correcting it**: on this mission the seat was right, and the disagreement was the only thing
+that surfaced the defect.
+
+## `git checkout` said "Aborting" and I never read it
+
+**Router defect, 2026-08-30, twenty minutes after recording the sibling lesson.**
+
+Preparing a seat, the Router ran `git checkout -q --detach <commit>` in a worktree, then immediately
+dispatched against it. The checkout had printed **`Aborting`** — it refused because leftover *staged*
+files would have been overwritten — and left the worktree at a commit from hours earlier with 89
+dirty entries. The seat launched against a stale, dirty tree.
+
+**Why it slipped through, and it is not "I forgot to check".** The word `Aborting` appeared in the
+output. The Router had piped the command through `tail -1` inside a larger script whose *other* lines
+printed reassuring facts — the HEAD it went on to print was read from the same broken worktree, so it
+faithfully reported the stale commit as though it were the intended one. **The verification and the
+failure were reading the same corrupted source.** A line saying `HEAD: 4138f72` looks like evidence
+until you notice nobody compared it to the commit that was requested.
+
+**The general shape, which is this mission's whole subject:** `git checkout`, `git stash pop`,
+`cp`, `sed -i` and friends fail *quietly enough* that a script wrapping them keeps going, and any
+"verification" that reads state afterwards without comparing it to the *intended* state will
+cheerfully confirm the failure. **Asserting a fact is not the same as asserting the fact you meant.**
+
+**The rule:** after any command that moves a tree — checkout, reset, stash pop, clean — assert the
+post-condition **against the value you asked for**, not merely that some value exists:
+
+```
+git checkout --detach "$WANT" || exit 1
+[ "$(git rev-parse HEAD)" = "$(git rev-parse "$WANT")" ] || { echo "FATAL: not at $WANT"; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "FATAL: tree dirty"; exit 1; }
+```
+
+**And the part that is easy to skip once you are annoyed with yourself:** before resetting the dirty
+tree, the Router first checked whether those 89 staged files contained anything not already merged —
+`git diff --name-only <commit>` returned **zero**. Only then was the reset performed. Standing law
+here is *do not discard another mission's in-flight work*; "it looked like leftovers" is not the same
+as knowing it was, and the check costs one command.
+
+**Related:** the sibling trap recorded minutes earlier — *dispatching a seat against a spec that
+exists only in your own working tree* — was about the specification. This is the same failure applied
+to the **tree**: verify that the setup you performed actually took effect, not merely that you issued
+it.

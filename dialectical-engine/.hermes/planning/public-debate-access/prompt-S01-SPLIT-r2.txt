@@ -1,0 +1,23 @@
+YOUR BLOCKER WAS CORRECT AND IT WAS THE ROUTER'S FAULT. S01-C1-7 genuinely did not exist where you looked. Architecture had written it into the MAIN tree and left it uncommitted; the Router then moved your worktree to e879f87, a commit that predates the edit. You were dispatched against a specification that did not exist in your checkout.
+
+Refusing to reconstruct Architecture's specification from the dispatch summary was exactly right. Do that again any time it happens.
+
+FIXED, and fixed structurally rather than by copying a file at you: Architecture's design is now COMMITTED as 7bfe662, and your worktree has been moved to that commit. You obtain the spec by checkout, not by a point-in-time copy - which is the divergence class this mission recorded as SYNC-01, where a PLAN diverged in both directions between main and a worktree and was caught by a manual diff seconds before a merge that would have destroyed reviewed work.
+
+Verify for yourself before you trust any of that:
+- git rev-parse --short HEAD should be 7bfe662
+- git status --porcelain should be empty
+- S01-C1-7 should be present in docs/missions/public-debate-access/slices/S01/PLAN.md
+The Router also confirmed that file is byte-identical to the main tree's copy. Re-derive it if you want to; you have been right once already today.
+
+Now proceed with the original task, unchanged. Read S01-C1-7 IN FULL first - it is a complete specification with the shape of the split, the file surface, the blast-radius measurement, and the exact acceptance and mutant. Everything in your previous instructions still stands:
+
+REPRODUCE FIRST. Before changing anything, demonstrate the CURRENT hole - show that a public envelope carrying a non-null disagreement is ACCEPTED by PublicDebateSchema today. Paste it. If you cannot make the current schema accept it, STOP and report, because the premise would be wrong.
+
+The property is that a non-null disagreement in a PUBLIC envelope is REJECTED, not silently dropped. Rejected and dropped are different outcomes and only one is what V ruled for - your test must tell them apart. Run the mutant S01-C1-7 names and show it RED. Then confirm the OWNER side still accepts a non-null disagreement, as a test, not an assurance - that is the half a careless split breaks.
+
+BLAST RADIUS at BOTH runtime and compile time; re-run Architecture's 15 runtime and 13 compile-time sites yourself rather than inheriting them. npx tsc --noEmit must exit 0. This is the direct lesson of t_cc34ba78 on this very file.
+
+Three runs, worst run is the verdict, anchored idiom. Confirm by NAME that your tests executed. Run tests/unit/s8-publication.test.ts, tests/unit/contract.test.ts and tests/unit/pda-s04-node-carrier-audit.test.ts - all three touch this schema. Run tests/architecture and compare to the baseline of 7 failed / 263 passed by identical FAILING FILES, not by count.
+
+SCOPE unchanged: packages/contract/src/index.ts, apps/api/src/publications.ts, and the tests needed to prove the property. SPECs FROZEN. No push, no merge, no commit. Handoff opens with SKILLS LOADED, then READY FOR PEER REVIEW.
