@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 type HomePageModule = {
@@ -30,6 +32,8 @@ const expectedTabs = [
   { label: "Your Debates", href: "/?tab=yours" },
   { label: "Public Debates", href: "/?tab=public" }
 ] as const;
+
+const globalStyles = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
 
 function accessibleName(element: Element, document: Document): string {
   const labelledBy = element.getAttribute("aria-labelledby")?.trim();
@@ -69,6 +73,12 @@ async function renderHomePage(selected: "yours" | "public"): Promise<Document> {
   ]);
   const page = await HomePage({ searchParams: Promise.resolve({ tab: selected }) });
   return new JSDOM(renderToStaticMarkup(page)).window.document;
+}
+
+function applyGlobalStyles(document: Document): void {
+  const style = document.createElement("style");
+  style.textContent = globalStyles;
+  document.head.append(style);
 }
 
 describe("public debate navigation keyboard accessibility", () => {
@@ -123,4 +133,45 @@ describe("public debate navigation keyboard accessibility", () => {
     const publicDocument = await renderHomePage("public");
     expect(publicDocument.querySelector(".tabEmptyHint"), "hint is exclusive to Your Debates").toBeNull();
   });
+
+  it.each(["yours", "public"] as const)(
+    "computes a grouped control treatment and a non-colour-only current state for tab=%s",
+    async (selected) => {
+      // PROPERTY: the real HomePage markup plus the real global stylesheet makes
+      // both links read as one control group and distinguishes aria-current=page
+      // through background, foreground, and shadow rather than colour alone.
+      const document = await renderHomePage(selected);
+      applyGlobalStyles(document);
+
+      const navigation = document.querySelector<HTMLElement>('.sectionHead[aria-label="Debate library"]');
+      const active = navigation?.querySelector<HTMLElement>('a[aria-current="page"]');
+      const inactive = [...(navigation?.querySelectorAll<HTMLElement>("a") ?? [])].find(
+        (link) => link !== active
+      );
+      const count = navigation?.querySelector<HTMLElement>(".count");
+
+      expect(navigation, "debate navigation").not.toBeNull();
+      expect(active, "current link").not.toBeNull();
+      expect(inactive, "inactive link").not.toBeUndefined();
+      expect(count, "debate count").not.toBeNull();
+
+      const view = document.defaultView!;
+      const navigationStyle = view.getComputedStyle(navigation!);
+      const activeStyle = view.getComputedStyle(active!);
+      const inactiveStyle = view.getComputedStyle(inactive!);
+      const countStyle = view.getComputedStyle(count!);
+
+      expect.soft(navigationStyle.justifyContent, "tabs stay grouped").toBe("flex-start");
+      expect.soft(navigationStyle.gap, "group spacing").not.toBe("");
+      expect.soft(countStyle.marginLeft, "count remains at the far edge").toBe("auto");
+      expect.soft(inactiveStyle.fontWeight, "inactive link control weight").toBe("600");
+      expect.soft(inactiveStyle.padding, "inactive link control padding").not.toBe("0");
+      expect.soft(inactiveStyle.borderRadius, "inactive link control shape").not.toBe("");
+      expect.soft(activeStyle.background, "current-state background").not.toBe(inactiveStyle.background);
+      expect.soft(activeStyle.color, "current-state foreground").not.toBe(inactiveStyle.color);
+      expect.soft(activeStyle.boxShadow, "current-state non-colour channel").not.toBe(inactiveStyle.boxShadow);
+      expect.soft(activeStyle.boxShadow, "current-state shadow exists").not.toBe("");
+      expect.soft(activeStyle.boxShadow, "current-state shadow is enabled").not.toBe("none");
+    }
+  );
 });
