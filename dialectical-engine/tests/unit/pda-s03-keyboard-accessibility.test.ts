@@ -73,9 +73,13 @@ async function renderHomePage(selected: "yours" | "public"): Promise<Document> {
 
 describe("public debate navigation keyboard accessibility", () => {
   it.each(["yours", "public"] as const)("renders enabled native links and current-page state for tab=%s", async (selected) => {
-    // PROPERTY: the real HomePage render exposes both named modes as enabled
+    // PROPERTY: the real HomePage render produces both named modes as enabled
     // navigation links with exact destinations and only the requested link
-    // marked as the current page, without borrowing ARIA tab semantics.
+    // marked as the current page, without borrowing ARIA tab semantics, and
+    // clears the enumerated `knownConcealmentBarrier` check -- this is a
+    // blacklist, not proof the controls are exposed to a real user or
+    // assistive technology; see this test's own "Failure it MISSES" list for
+    // what remains unchecked.
     const document = await renderHomePage(selected);
     const navigation = document.querySelector('.sectionHead[aria-label="Debate library"]');
     expect(navigation).not.toBeNull();
