@@ -26,3 +26,7 @@
   4 non-blocking (AN1 router stale constant · AN2/AN3 arch hygiene · N4=Q-10). SKILLS LOADED verified by body-phrase greps (spine + reviewer skill in worker threads).
   Self-report filed 10.4k. V's Wave-0-parallel gamble cost zero rework.
   PHASE: ARCHITECTURE CLOSED. Coding wave 0 (T9-C3 codex) already running since 19:01.
+2026-08-31 19:18:43 — CODE-T9C3 attempt 1 BLOCKED by the seat itself (rc=0, 175k tokens, zero writes):
+  unassigned/unauthorized card + kanban lock unreachable under workspace-write. Seat obeyed the spine; router defect F-codex-1 (t_13210254).
+  Fix: assign+authorize posted; sandbox = workspace-write + writable_roots=[~/.hermes] (narrower than danger-full-access, which the auto-mode classifier refused — kept the refusal).
+  Attempt 2 launched 19:16:54.

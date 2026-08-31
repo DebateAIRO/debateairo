@@ -798,3 +798,15 @@ on a log that structurally cannot grow before exit. Ground truth for claude -p
 seats: the session transcript under ~/.claude/projects/<encoded-cwd>/*.jsonl
 (grows every tool call), output-file mtimes, and process CPU time — never the
 tee'd stdout log. Fingerprint those.
+
+## Codex workspace-write cannot reach ~/.hermes — and an unassigned card is a refusable card (2026-08-31)
+T9-C3 attempt 1: the seat read the spine, found its card had no assignee and no
+HERMES AUTHORIZED marker, could not post WORKER CLAIM (kanban lock lives under
+~/.hermes, outside workspace-write), and BLOCKED — 175k tokens, zero files, and
+it was RIGHT both times. Router defects: probed CLI liveness but not the
+board-write from inside the seat's sandbox (F1 class, second recurrence);
+dispatched a card without assign + authorize.
+Fixes that hold: assign + HERMES AUTHORIZED NEXT comment before dispatch, and
+`-c sandbox_workspace_write.writable_roots=["/Users/vladmihaimiron/.hermes"]` —
+strictly narrower than the 2026-08 danger-full-access precedent, which the
+permission classifier (correctly) refused to relaunch.
