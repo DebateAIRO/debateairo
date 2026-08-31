@@ -30,3 +30,8 @@
   unassigned/unauthorized card + kanban lock unreachable under workspace-write. Seat obeyed the spine; router defect F-codex-1 (t_13210254).
   Fix: assign+authorize posted; sandbox = workspace-write + writable_roots=[~/.hermes] (narrower than danger-full-access, which the auto-mode classifier refused — kept the refusal).
   Attempt 2 launched 19:16:54.
+2026-08-31 20:43:20 — CODE-T9C3 attempt 3 EXIT rc=0 in 46 min: READY FOR PEER REVIEW, commit 55b18ee.
+  RED 6/11 -> GREEN 11/11 worst-of-three; typecheck 0; both sweeps 0. Five self-run mutants incl. specificity probe.
+  Router mechanical gate re-ran acceptance (11/11) + typecheck (0) before commit. File contract exact.
+  Attempts 1-2 blocked correctly (router defect, then ARCH oracle defect) — both on the record.
+  -> Opus 5 code review dispatching against 55b18ee.
