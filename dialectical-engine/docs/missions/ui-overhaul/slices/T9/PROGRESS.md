@@ -34,3 +34,28 @@ REQUIREMENTS DRAFTED — awaiting review
   21:58 (ADR-001 range-pair contract + ADR-006 cwd pin); RW2 packet pre-drafted with
   AM3-FILL placeholder; then codex resume epoch=4, then REV3.
 - Corrected on the record: REV2's restated anonymous-landing hole was already closed by AM2/D.
+
+## 2026-09-01 — Wave 1: T9-C1 shipped (commit 3aefb2d), blind review running
+- Attempt 1 preflight-blocked CORRECTLY (verify-command survivability, 4th AF-1-class defect)
+  -> ARCH-01-AM5 rewrote all 32 rows under the ownership law (pin ownership follows subject
+  ownership; nothing reordered; 5 orphan pins fixed; absence-pin rule; s8 + mount constraints).
+  Grok reviewed the AM2-AM5 series: PASS — AMENDMENT SERIES SOUND.
+- Round 1 (resumed session, 28 min): all four rows RED->GREEN (5f/54p -> 59/59 worst-of-3);
+  pda-s03 migrated per adjudication (5 cases before/after, library assertions byte-preserved
+  against session render); DOM order asserted; 12 mutants incl. MOVE/REMOVE/REFORMAT triples
+  on both boundary properties, SHA-restored; render suite 18->19 files (83 tests); canonical
+  gate 0-new; oracle 0.
+- Orchestrator gate re-ran everything + LIVE dev-server proof: cookieless GET / returns the
+  hero headline + data-mode-toggle in initial HTML (HTTP 200).
+- Fresh Opus blind review dispatched 00:11 against 3aefb2d (REDs reproduced from 3aefb2d^,
+  own mutants incl. one against the migration). On PASS -> T3-C1 (serialized on page.tsx).
+
+## 2026-09-01 01:00 — T9-C1 CLOSED: PASS — MERGED-READY
+- REV round 1 REWORK (B1: document-wide pin dies at T3-C1's TopBar mount — reviewer M9,
+  forward-dated) -> RW1 (f017e12, scoped pins, class swept, N5 corrected) + AM6 in parallel
+  (d10b403: premise fixed, two-toggles adjudicated -> T3-C1-4, convention published,
+  fail-loud gate). REV2: PASS — reviewer's own M9/M5/M8 all RED, discriminator proven,
+  neighbor control clean; two non-blocking findings routed INTO T3-C1 (t_3c8f699b scope
+  one-liner, t_5d0c892a real-render premise pin).
+- T9 slice state: C3 done, C1 done; C2 (chrome labels/CTAs/return path) and C4 (content)
+  and C5 (residual migration bind) remain — C2 is Wave 2.
