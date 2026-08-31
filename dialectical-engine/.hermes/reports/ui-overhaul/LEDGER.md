@@ -15,3 +15,9 @@
   F1/F2 class fixes CONFIRMED by the reviewer: board write first try; target immutable.
   F3-F13 + orchestrator tickets closed on the board with per-finding receipts.
   Micro-round 2 dispatched to resumed grok session for N1-N4; ARCH gate holds until they land.
+2026-08-31 18:38:57 — ARCH-01 (opus5, session bb69b040) EXIT rc=0 after 40 min. Commit f75b7e1.
+  12 arch files + 8 PLAN fills + 41 DECISIONS rows; SPEC freeze intact (empty diff).
+  SKILLS LOADED verified by body-phrase grep. Self-report filed (17k).
+  Blocking: 12/78 pins test web/ (ticketed to REQ). 12 V questions ticketed with defaults.
+  Stagnation false-alarm root-caused: claude -p buffers stdout; watchdog v2 fingerprints transcript+files.
+  -> ARCH-01-REV (grok) dispatching against f75b7e1.
