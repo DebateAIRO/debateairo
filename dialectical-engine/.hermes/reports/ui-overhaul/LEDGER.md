@@ -35,3 +35,13 @@
   Router mechanical gate re-ran acceptance (11/11) + typecheck (0) before commit. File contract exact.
   Attempts 1-2 blocked correctly (router defect, then ARCH oracle defect) — both on the record.
   -> Opus 5 code review dispatching against 55b18ee.
+
+## Receipt — CODE-T9C3-REV (Opus 5 blind review of Wave 0)
+- exit: 2026-08-31 20:58:00 rc=0 | session 8795a3eb-440d-4a53-a377-c88407921083 (claude -p, resumable)
+- verdict: REWORK round 1/3 — B1 blocking (ModeToggle JSX.Element, TS2503 under @types/react 19.2.18; root tsconfig excludes apps/ui so the packet gate never compiled it), N1-N3 green structural mutants (guard position / stale 199-line exclusion / suppressHydrationWarning), N4-N7 packet+process defects charged to orchestrator, +1 AF-1-class coverage hole (no pin for mode control on ANONYMOUS landing, SPEC T9 R3).
+- confirmed: acceptance 11/11 x3, render suite 78/78, both ADR-001 oracles 0, token fidelity 89x2+24 exact via independent parser, all 69 legacy names preserved, RED reproduced byte-for-byte, ADR-002 conformance char-for-char, worker skills floor MET.
+- reviewer self-refuted its own would-be blocker (SVG var() in presentation attributes — verified working in Chrome 152) instead of filing it. Probe cost 2 min; a false filing would have cost a rework round.
+- SKILLS LOADED verified by body-grep in transcript: "phantom findings" x2, "1% chance" x2, "worst run" x7, "Evidence before claims" x1 — no fabrication.
+- tree at exit: clean of all mutants (only pre-existing PDA-lane web/ dirt + authorized self-report). Self-report filed: agent-reports/CODE-T9C3-REV-claude.md.
+- tokens (basis: transcript usage sums): output 122,834; fresh input 411,969; cache reads 18,262,597.
+- N7 practice fix adopted by orchestrator effective now: orchestrator/planning artifacts commit SEPARATELY from product commits.
