@@ -51,8 +51,10 @@ export function TopBar() {
   const pathname = usePathname();
   const recoveryAcknowledgementPending = useRecoveryAcknowledgementPending();
 
-  // The debate view renders its own contextual chrome.
-  if (pathname?.startsWith("/debate/")) return null;
+  // The debate view renders its own contextual chrome — and a published debate
+  // is that same view, so the public route suppresses this bar for the same
+  // reason the private one does.
+  if (pathname?.startsWith("/debate/") || pathname?.startsWith("/public/debate/")) return null;
 
   if (pathname !== null && AUTH_PATHS.has(pathname)) {
     return (

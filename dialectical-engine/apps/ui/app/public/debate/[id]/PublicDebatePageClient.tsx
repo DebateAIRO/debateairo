@@ -62,12 +62,19 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
     };
   }, [debate]);
 
-  // Everything a publication carries that a private run does not: who published
-  // it, when, what the snapshot withholds, and the answer itself.
+  // Everything a publication carries that a private run does not. The answer
+  // state, verdict, confidence and reversal point are already in the Honesty
+  // drawer, so repeating them above the workspace was pure duplication. The
+  // rest — pseudonym, published date, badges, residual objections and the
+  // indexing disclosure — has no other public home, so it collapses behind one
+  // summary line rather than being dropped. A closed <details> keeps its
+  // children in the DOM, so nothing stops being reachable or assertable.
   const publicHeader = (
-    <>
-      <p className="eyebrow" style={{ marginTop: 30 }}>Public debate · by {debate.author_pseudonym}</p>
-      <p>Published {new Date(debate.published_at).toLocaleDateString()}.</p>
+    <details className="publicationDetails">
+      <summary>
+        Public debate · by {debate.author_pseudonym} · published{" "}
+        {new Date(debate.published_at).toLocaleDateString()}
+      </summary>
       <section className="card">
         <PublicAnswerDisclosure answer={debate.answer} />
         <h2>{debate.answer.verdict ?? "Verdict unavailable"}</h2>
@@ -84,7 +91,7 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
         </section>
       ) : null}
       <section className="card"><h2>What could reverse this answer?</h2><p>{debate.answer.reversal_point}</p></section>
-    </>
+    </details>
   );
 
   return (
