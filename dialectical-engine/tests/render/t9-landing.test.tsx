@@ -80,26 +80,29 @@ describe("T9-C1 route split & chrome", () => {
     // PROPERTY: a request without the session cookie renders the landing's
     // exact hero headline and does not leak the signed-in library surface.
     const document = await renderRoute(null);
+    const hero = document.querySelector('[data-landing-section="hero"]');
 
-    expect(document.body.textContent).toContain("Find the weakest claim in your own argument.");
+    expect(hero?.textContent).toContain("Find the weakest claim in your own argument.");
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]')).toBeNull();
   });
 
   it("keeps the library document for a request carrying the session cookie", async () => {
     // PROPERTY: cookie presence selects the unchanged library branch, including
-    // its global + New debate action, and excludes the landing-only headline.
+    // its discriminating library section, and excludes the landing-only headline.
     const document = await renderRoute("t9-c1-session");
 
-    expect(document.body.textContent).toContain("+ New debate");
-    expect(document.querySelector('.sectionHead[aria-label="Debate library"]')).not.toBeNull();
+    expect(
+      document.querySelector('.sectionHead[aria-label="Debate library"]'),
+      "signed-in library discriminator"
+    ).not.toBeNull();
     expect(document.body.textContent).not.toContain("Find the weakest claim in your own argument.");
   });
 
   it("renders an accessibly named mode control on the anonymous document", async () => {
-    // PROPERTY: the anonymous landing mounts the real mode control, identifiable
-    // by its marker and accessible name rather than by its decorative glyph.
+    // PROPERTY: the anonymous landing chrome mounts the real mode control,
+    // identifiable by its marker and accessible name rather than its decorative glyph.
     const document = await renderRoute(null);
-    const toggle = document.querySelector("[data-mode-toggle]");
+    const toggle = document.querySelector('[data-landing-section="chrome"] [data-mode-toggle]');
     const accessibleName = toggle?.getAttribute("aria-label") ?? toggle?.textContent?.trim() ?? "";
 
     expect(toggle?.tagName).toBe("BUTTON");

@@ -144,11 +144,12 @@ describe("public debate navigation keyboard accessibility", () => {
     // PROPERTY: anonymous `/` removes the library navigation and hint, renders
     // the exact landing hero, and exposes the mode button to keyboard users.
     const document = await renderHomePage("yours", null);
+    const hero = document.querySelector('[data-landing-section="hero"]');
     const toggle = document.querySelector("[data-mode-toggle]");
 
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]') === null).toBe(true);
     expect(document.querySelector(".tabEmptyHint") === null).toBe(true);
-    expect(document.body.textContent).toContain("Find the weakest claim in your own argument.");
+    expect(hero?.textContent).toContain("Find the weakest claim in your own argument.");
     expect(toggle?.tagName, "mode control native element").toBe("BUTTON");
     expect((toggle as HTMLButtonElement | null)?.tabIndex, "mode control keyboard tab order").toBe(0);
     expect(toggle?.hasAttribute("disabled"), "mode control native disabled state").toBe(false);
