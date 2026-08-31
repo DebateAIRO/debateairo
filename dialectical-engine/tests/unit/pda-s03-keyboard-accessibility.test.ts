@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type HomePageModule = {
   default: (props: { searchParams: Promise<{ tab?: string }> }) => Promise<unknown>;
@@ -15,17 +15,30 @@ type JSDOMModule = {
 };
 
 const serverMocks = vi.hoisted(() => ({
-  readPublicDebates: vi.fn(async () => ({ items: [], total: 0 }))
+  sessionCookie: "pda-s03-render-test" as string | null,
+  readPublicDebates: vi.fn(async () => ({ items: [], total: 0 })),
+  listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 }))
 }));
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ readPublicDebates: serverMocks.readPublicDebates })
+  createServerContractClient: () => ({ readPublicDebates: serverMocks.readPublicDebates }),
+  listDebatesPageServer: serverMocks.listDebatesPageServer
 }));
 
 vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: () => undefined }),
+  cookies: async () => ({
+    get: (name: string) =>
+      name === "__Host-debateai-session" && serverMocks.sessionCookie !== null
+        ? { value: serverMocks.sessionCookie }
+        : undefined
+  }),
   headers: async () => new Headers({ "user-agent": "pda-s03-render-test" })
+}));
+
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../render/stubs/next-navigation.js")>()),
+  useRouter: () => ({ push: vi.fn() })
 }));
 
 const expectedTabs = [
@@ -65,7 +78,11 @@ function knownConcealmentBarrier(element: Element): string | null {
   return null;
 }
 
-async function renderHomePage(selected: "yours" | "public"): Promise<Document> {
+async function renderHomePage(
+  selected: "yours" | "public",
+  sessionCookie: string | null = "pda-s03-render-test"
+): Promise<Document> {
+  serverMocks.sessionCookie = sessionCookie;
   const [{ default: HomePage }, { renderToStaticMarkup }, { JSDOM }] = await Promise.all([
     vi.importActual<HomePageModule>("../../apps/ui/app/page.js"),
     vi.importActual<StaticRendererModule>("react-dom/server"),
@@ -82,6 +99,12 @@ function applyGlobalStyles(document: Document): void {
 }
 
 describe("public debate navigation keyboard accessibility", () => {
+  beforeEach(() => {
+    serverMocks.sessionCookie = "pda-s03-render-test";
+    serverMocks.readPublicDebates.mockClear();
+    serverMocks.listDebatesPageServer.mockClear();
+  });
+
   it.each(["yours", "public"] as const)("renders enabled native links and current-page state for tab=%s", async (selected) => {
     // PROPERTY: the real HomePage render produces both named modes as enabled
     // navigation links with exact destinations and only the requested link
@@ -117,21 +140,23 @@ describe("public debate navigation keyboard accessibility", () => {
     }
   });
 
-  it("renders the logged-out Your Debates sign-in pointer inside the switched content area", async () => {
-    // PROPERTY: selecting Your Debates without a session visibly replaces the
-    // public list area with the exact account-path hint owned by that mode.
-    const yoursDocument = await renderHomePage("yours");
-    const navigation = yoursDocument.querySelector('.sectionHead[aria-label="Debate library"]');
-    const hint = navigation?.nextElementSibling;
+  it("renders the anonymous landing without library controls and keeps its mode control keyboard-reachable", async () => {
+    // PROPERTY: anonymous `/` removes the library navigation and hint, renders
+    // the exact landing hero, and exposes the mode button to keyboard users.
+    const document = await renderHomePage("yours", null);
+    const toggle = document.querySelector("[data-mode-toggle]");
 
-    expect(hint?.tagName, "in-panel hint element").toBe("P");
-    expect(hint?.classList.contains("tabEmptyHint"), "in-panel hint class").toBe(true);
-    expect(hint?.textContent?.trim(), "in-panel hint copy").toBe(
-      "Sign in or create an account above to see your debates."
+    expect(document.querySelector('.sectionHead[aria-label="Debate library"]') === null).toBe(true);
+    expect(document.querySelector(".tabEmptyHint") === null).toBe(true);
+    expect(document.body.textContent).toContain("Find the weakest claim in your own argument.");
+    expect(toggle?.tagName, "mode control native element").toBe("BUTTON");
+    expect((toggle as HTMLButtonElement | null)?.tabIndex, "mode control keyboard tab order").toBe(0);
+    expect(toggle?.hasAttribute("disabled"), "mode control native disabled state").toBe(false);
+    expect(toggle?.getAttribute("aria-disabled"), "mode control ARIA disabled state").not.toBe("true");
+    expect(accessibleName(toggle!, document), "mode control accessible name").toMatch(
+      /Switch to (Chamber|Terracotta) mode/
     );
-
-    const publicDocument = await renderHomePage("public");
-    expect(publicDocument.querySelector(".tabEmptyHint"), "hint is exclusive to Your Debates").toBeNull();
+    expect(knownConcealmentBarrier(toggle!), "mode control known concealment barrier").toBeNull();
   });
 
   it.each(["yours", "public"] as const)(
