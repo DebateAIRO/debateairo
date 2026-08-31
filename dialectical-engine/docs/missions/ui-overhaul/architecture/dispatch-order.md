@@ -16,6 +16,28 @@
 other cluster's `forbidden` set names the `:root` and `html[data-mode="chamber"]`
 blocks explicitly.
 
+### Acceptance defaults — every cluster, in addition to the command in its row
+
+**COMPILE GATE (added 2026-08-31, AM2/C).** Every cluster that writes any file
+under `apps/ui/` also runs the workspace compile gate at **0-new**. That is every
+cluster below except the pure test-migration ones that write only under `tests/`
+(T9-C5, T1-C4, T3-C4, T4-C4, T5-C3, T6-C4, T7-C4, T8-C4):
+
+```sh
+pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
+  | grep -E 'error TS' \
+  | grep -v -e 'app/debate/\[id\]/DebatePageClient\.tsx(1488,11): error TS2322' \
+          -e 'app/layout\.tsx(3,8): error TS2882' \
+  | tee /dev/stderr \
+  | wc -l          # required: 0
+```
+
+`pnpm run typecheck` is **NOT** this gate and must never be cited as one for
+`apps/ui` work: root `tsconfig.json` excludes `apps/ui` and `web`, so it exits 0
+without opening a single file this mission writes. That blindness is how a
+non-compiling `ModeToggle.tsx` passed every named gate in Wave 0. Full law, the
+two baselined errors and their evidence: `ADR-006` §"Compile-gate law".
+
 ## Wave 0 — the foundation. One seat. Everything else is gated on it.
 
 | # | Cluster | Writes | Verify |
@@ -45,8 +67,37 @@ evaluate and a mode toggle that flips nothing.
 
 | # | Cluster | Writes | Verify |
 |---|---|---|---|
-| 2 | **T9-C1** — anonymous `/` vs signed-in `/` | `apps/ui/app/page.tsx` · `apps/ui/components/landing/LandingPage.tsx` · `tests/render/t9-landing.test.tsx` | `pnpm exec vitest run tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/architecture/s8-publication-contract.test.ts` |
+| 2 | **T9-C1** — anonymous `/` vs signed-in `/` **+ mode control on the anonymous landing** | `apps/ui/app/page.tsx` · `apps/ui/components/landing/LandingPage.tsx` · `apps/ui/components/landing/LandingChrome.tsx` (the `ModeToggle` mount only) · `tests/render/t9-landing.test.tsx` | `pnpm exec vitest run tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/architecture/s8-publication-contract.test.ts` |
 | 3 | **T3-C1** — signed-in library chrome + ☾ mount in `TopBar` | `apps/ui/components/TopBar.tsx` · `apps/ui/app/page.tsx` (library half) · `apps/ui/components/LibraryComposer.tsx` · `tests/render/t3-library.test.tsx` | `pnpm exec vitest run tests/render/t3-library.test.tsx tests/render/auth-flow-integration.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts` |
+
+#### T9-C1 additional acceptance — CH1, the anonymous-landing mode control (added 2026-08-31, AM2/D)
+
+SPEC T9 **R3** requires the mode control on the **anonymous landing**. Nothing in
+the plan pinned it there: T9-C3 proves `ModeToggle` in isolation (both mounts are
+outside its contract), T3-C1-3 pins it on the **signed-in library**, and T9-C1's
+existing rows assert only the hero headline and the route split. The control
+could therefore have been absent from the one surface R3 actually names, with
+every cluster green. Same uncovered-acceptance class as AF-1; found by the Wave-0
+blind review (`t_4ccac5c4`, "coverage hole, flagged not resolved").
+
+SPEC and PLAN are frozen, so the pin lives here in the cluster contract, which is
+the dispatch source of truth.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T9-C1-3** | R3 | The anonymous landing renders the mode control | In `tests/render/t9-landing.test.tsx` (owned by T9-C1): render the anonymous `/` document — the same no-session render as T9-C1-1 — and assert the markup contains an element carrying `data-mode-toggle` whose accessible name matches `/Switch to (Chamber\|Terracotta) mode/`. Asserting the `☾` glyph alone = RED (the glyph is decoration, the label is the contract). Asserting that `ModeToggle` is merely imported = RED — the assertion is on the RENDERED anonymous-landing output |
+
+**V QA line (human-runnable, for the manual acceptance):**
+
+> Open `/` in a private window, logged out. **Expect:** the mode control is
+> visible in the landing chrome. Click it. **Expect:** the landing switches
+> between Terracotta and Chamber, and `<html>` carries `data-mode="chamber"`
+> after the first click. Reload the page. **Expect:** the chosen mode persists
+> and there is no flash of the other mode before paint.
+
+`LandingChrome.tsx` is created by T9-C2 for its chrome copy, but **T9-C1 owns the
+`ModeToggle` mount inside it**, so the pin and the thing it pins land in the same
+cluster. A pin whose subject is created by a later cluster is not a pin.
 
 T9-C1 and T3-C1 both write `apps/ui/app/page.tsx` — **they are serialised**,
 T9-C1 first. T9-C1 adds the early return; T3-C1 edits the body below it. This is
@@ -155,11 +206,15 @@ T8-C4. Split it the same way as `t9-landing`: T7-C4 owns the sign-in
 As the LAST cluster in this order, `T8-C4` additionally runs the **MISSION-FINAL
 ORACLE** from `ADR-001` §(c) — the repo-wide sweep — and it must return `0`:
 
-```
+```sh
+# Boundary found BY SYNTAX at run time. Never a literal line number.
+BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
+             apps/ui/app/globals.css)
+[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   apps/ui/app apps/ui/lib apps/ui/components \
-  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
   | wc -l
 ```
 

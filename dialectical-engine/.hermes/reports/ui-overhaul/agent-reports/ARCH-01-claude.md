@@ -328,3 +328,73 @@ footer that a reviewer can check with one `grep -c`) and AN3 (ADR-005 cited 26
 measured contrast rows against 16 published; the complete table of **34 rows,
 0 failures** is now published in `token-inventory.md`, and ADR-005 cites it
 rather than keeping a second count).
+
+---
+
+## AMENDMENT 2 (2026-08-31) — my contract shipped a type that does not compile, and the gate that should have caught it did not exist
+
+The Wave-0 blind review (`t_4ccac5c4`, 20:57) returned REWORK on one blocking
+finding, and **the blocking finding is mine**. `ADR-002` published
+`export function ModeToggle(): JSX.Element;` with no `JSX` import. React 19
+removed the global `JSX` namespace; installed `@types/react` is 19.2.18; the
+line is `error TS2503`. The worker implemented my contract character for
+character and shipped a file that does not compile, with `ignoreBuildErrors:
+false` making `next build` red on the same line. **The worker is not at fault
+and the ADR is the defect** — that is the reviewer's phrasing and it is correct.
+
+**PRICE: one rework round on Wave 0, the foundation every other cluster
+inherits.** Cheap only because a blind lens ran a compiler the mission's own
+gates never ran.
+
+**The deeper failure is not the type — it is that I published a type expression
+I never compiled.** Everything else in this report is about measuring numbers
+before publishing them; a type signature is a claim of exactly the same kind,
+and I exempted it without noticing. The standing rule is now in `ADR-002`: any
+type expression an ADR publishes as a contract must have been compiled under the
+workspace tsconfig before publication. Before amending, I compiled all three
+candidate forms against the installed types in an isolated probe — and first
+confirmed the probe FAILED on the broken form, because a green probe that cannot
+go red proves nothing.
+
+**AM2/C is the finding I would put in front of V.** The packets mandated
+`pnpm run typecheck` and called it "repo-wide". Root `tsconfig.json` excludes
+`apps/ui` and `web`. **The mission's only compile gate could not open a single
+file the mission writes**, and it exited 0 the whole time. That is worse than
+having no gate: a gate that cannot fail stops anyone from looking. `ADR-006` now
+carries a compile-gate law — every gate NAMES its tsconfig, every `apps/ui`
+cluster runs the workspace compile at 0-new, and the baseline is a list of exact
+error lines rather than a count, because a count silently absorbs a new error the
+moment an old one is fixed.
+
+**And the baseline itself repeated the AF-1 defect, one level down.** The packet
+told me to baseline exactly one pre-existing error; the reviewer recorded
+`layout.tsx CLEAN`. The tree emits **three** `error TS` lines. The third —
+`layout.tsx(3,8) TS2882`, a side-effect `import "./globals.css"` for which
+`next/types/global.d.ts` declares `*.module.css` but not plain `*.css` — is
+pre-existing and structural (byte-identical at `55b18ee^`, same line in `web/`).
+Baselining only the packet's single error would have produced a gate stuck at 1
+forever: **an unsatisfiable acceptance, for the third time in three amendments,
+inside the amendment written to stop unsatisfiable acceptances.** I baselined
+both, published the evidence, and routed the one-line permanent fix rather than
+taking new product scope.
+
+**What I nearly got wrong, again a measurement artifact.** Reproducing the
+reviewer's M2 mutant, both the old and new oracles appeared to catch it — which
+would have made the N2 finding wrong and the amendment unnecessary. The cause
+was mine: I ran `rg` against a single file, and `rg` omits the path prefix in
+that mode, so a filter keyed on `globals.css:NNN:` matched nothing. Re-run with
+the real repo path shape, the reviewer is exactly right and the old window was
+blind. **A filter that keys on a path must be exercised with a path** — the
+harness's own shape, not a convenient stand-in. One tool call from filing "the
+reviewer is mistaken" against a correct finding.
+
+**The through-line across all three amendments, stated once.** AF-1: a count I
+did not enumerate. AM1's near-miss: a matcher tightened until the count looked
+clean. AM2: a type I did not compile, and a boundary encoded as a round number
+85 lines stale. Every one is the same act — **publishing an artifact whose
+correctness I asserted instead of executed.** The remedy that would have caught
+all four is one line: *anything an ARCH document publishes as executable — a
+command, a count, a type, a boundary — must be run, at its real scope, in the
+same edit that publishes it, and its output pasted in.* Every command in this
+amendment was verified that way, including the fail-loud guard, which I tested
+on a deliberately renamed token block to confirm it actually fires.

@@ -70,9 +70,18 @@ already present — no change to those props.
 
 ```tsx
 "use client";
+import type { JSX } from "react";
+
 export type Mode = "terracotta" | "chamber";
 export function ModeToggle(): JSX.Element;
 ```
+
+**The `import type { JSX } from "react"` line is part of the contract, not
+boilerplate.** React 19 removed the GLOBAL `JSX` namespace; it lives at
+`React.JSX` and is re-exported from `react`. Installed here: `@types/react`
+**19.2.18**. Without that import, `JSX.Element` is `error TS2503: Cannot find
+namespace 'JSX'` — see the changelog below, where this ADR's own earlier text
+caused exactly that failure.
 
 - Renders a single `<button type="button" className="modeToggle"
   data-mode-toggle aria-pressed={mode === "chamber"}>` whose label is
@@ -133,5 +142,55 @@ its inventory value. It **catches**: a Chamber block that was never written; a
 Chamber block written under the wrong selector; a token declared in one block
 and not the other. It does **not** catch: a component that hard-codes a colour
 and therefore ignores both blocks — that is the separate concern of ADR-001's
-120-literal sweep, and the two acceptances must both exist because neither
-implies the other.
+colour-literal sweep (three scoped oracles since AM1), and the two acceptances
+must both exist because neither implies the other.
+
+---
+
+## Changelog
+
+### 2026-08-31 — AM2/A: the published contract did not compile (trigger: `t_4ccac5c4`, blind review of Wave 0, verdict 20:57)
+
+**What was wrong.** This ADR published the contract line
+
+```
+export function ModeToggle(): JSX.Element;
+```
+
+with no `JSX` import. The Wave-0 worker implemented it faithfully, character for
+character. The result does not compile:
+
+```
+$ pnpm exec tsc --noEmit -p apps/ui/tsconfig.json
+apps/ui/components/ModeToggle.tsx(7,31): error TS2503: Cannot find namespace 'JSX'.
+```
+
+`@types/react` 19.2.18 is installed, and **React 19 removed the global `JSX`
+namespace** (it moved under `React.JSX`). `apps/ui/next.config.mjs` sets
+`typescript.ignoreBuildErrors: false`, so `next build` is red on the same line.
+The finding is filed against BOTH the code and this ADR; **the ADR is the source
+of the wrong type** and the worker is not at fault.
+
+**Why no gate caught it** — see `ADR-006` §"Compile-gate law". The root
+`tsconfig.json` excludes `apps/ui`, so the mission's `pnpm run typecheck` never
+opened the file.
+
+**The fix, and why this form over the alternatives.** All three candidates were
+compiled against the installed 19.2.18 types before this ADR was amended, in an
+isolated probe that was first shown to FAIL on the broken form (`TS2503`) so a
+green result would mean something:
+
+| Form | Compiles on 19.2.18 | Chosen? |
+|---|---|---|
+| `import type { JSX } from "react"` + `(): JSX.Element` | yes | **YES** |
+| `import * as React` + `(): React.JSX.Element` | yes | no — adds a namespace import to a component that needs no other React namespace member |
+| no return annotation, `export function ModeToggle() {` | yes | no — infers correctly, but this ADR publishes a *contract* that other clusters quote; an inferred type is not quotable |
+
+The chosen form is also the one that survives a downgrade: `@types/react`
+18.3+ exports the same `JSX` namespace from `react`, so the line is correct on
+both major versions, whereas the bare global was only ever correct on 18.
+
+**Standing rule this produces.** Any type expression this or any other ADR
+publishes as a contract MUST have been compiled under the workspace tsconfig
+before publication. A contract that does not compile is not a contract; it is a
+defect with authority, and it propagates to every seat that obeys it.

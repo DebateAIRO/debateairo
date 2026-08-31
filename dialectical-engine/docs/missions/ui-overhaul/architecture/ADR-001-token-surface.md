@@ -70,11 +70,15 @@ can be an oracle.
 
 ### The oracle pattern (corrected)
 
-```
+```sh
+# Boundary found BY SYNTAX at run time. Never a literal line number.
+BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
+             apps/ui/app/globals.css)
+[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   <SCOPE> \
-  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:'
+  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)'
 ```
 
 Three corrections to the original pattern, each with its reason:
@@ -104,10 +108,14 @@ clean is how the real defects leave the list.
 
 Re-measured by ARCH-01 on 2026-08-31 with the corrected oracle at repo scope:
 
-```
-$ rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
+```sh
+# Boundary found BY SYNTAX at run time. Never a literal line number.
+BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
+             apps/ui/app/globals.css)
+[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
+rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
     --glob '!*.disabled' --glob '!*.svg' apps/ui/app apps/ui/lib apps/ui/components \
-  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
   | cut -d: -f1 | sort | uniq -c | sort -rn
  111 apps/ui/app/globals.css
   12 apps/ui/lib/scrutiny.ts
@@ -135,19 +143,25 @@ twice.
 
 Scope is **T9-C3's write surface only**, the four product files it owns:
 
-```
+```sh
+# Boundary found BY SYNTAX at run time. Never a literal line number.
+BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
+             apps/ui/app/globals.css)
+[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   apps/ui/app/globals.css apps/ui/app/layout.tsx \
   apps/ui/components/ModeToggle.tsx apps/ui/lib/debatePresentation.ts \
-  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
   | wc -l
 ```
 
 **Baseline 113** (`globals.css` 111 + `debatePresentation.ts` 2;
 `layout.tsx` 0, `ModeToggle.tsx` does not exist yet).
-**Required after T9-C3: 0.** The `globals.css` lines 1–199 exclusion is kept —
-that is the token region itself, where literals are the point.
+**Required after T9-C3: 0.** The `globals.css` exemption covers the token region
+itself — where literals ARE the point — and nothing beyond it. Since AM2 that
+region is located by SYNTAX at run time (the `BOUNDARY` preamble above), never
+by a line number.
 
 This is satisfiable without touching one file T9-C3 does not own.
 
@@ -184,11 +198,15 @@ finding for ticketing: T1-C2's write surface grows by six files
 
 The repo-wide sweep survives, unchanged in scope, as the **mission-final** check:
 
-```
+```sh
+# Boundary found BY SYNTAX at run time. Never a literal line number.
+BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
+             apps/ui/app/globals.css)
+[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   apps/ui/app apps/ui/lib apps/ui/components \
-  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
   | wc -l          # required: 0
 ```
 
@@ -208,3 +226,82 @@ question a seat can act on. The mission-final oracle answers *"is the product
 clean"* — the only question V cares about. Neither implies the other, and the
 original single-oracle design collapsed them, which is precisely why it became
 unsatisfiable for the one seat that had to run it first.
+
+---
+
+## The mirrored guard in `tests/unit/t9-mode-tokens.test.ts` (contract, not code)
+
+The acceptance mirrors this oracle so the sweep is enforced by the test suite and
+not only by a human running a command. **Its exclusion must be derived the same
+way.** The contract the rework worker implements:
+
+```ts
+/** Last line of globals.css inside the token blocks (1-indexed, inclusive). */
+function tokenBlockBoundary(css: string): number {
+  const lines = css.split("\n");
+  const start = lines.findIndex((l) => /^html\[data-mode="chamber"\]\s*\{/.test(l));
+  if (start === -1) throw new Error("chamber token block not found in globals.css");
+  const end = lines.findIndex((l, i) => i > start && /^\}/.test(l));
+  if (end === -1) throw new Error("chamber token block is not closed");
+  return end + 1;
+}
+```
+
+The per-line skip becomes
+`if (path === globalsPath && lineNumber <= tokenBlockBoundary(css)) continue;`
+— replacing the current `index < 199`.
+
+**No fixed line number may remain anywhere** — not in this ADR, not in the shell
+oracle, not in the test. And the helper `throw`s rather than falling back: a
+boundary the guard cannot find is a broken guard, and a broken guard must stop
+the run rather than quietly pass everything or nothing.
+
+---
+
+## Changelog
+
+### 2026-08-31 — AM2/B: the exclusion window was 85 lines wider than the region it protected (trigger: `t_4ccac5c4`, Wave-0 blind review, mutant M2)
+
+**What was wrong.** This ADR's oracle and its mirror in
+`tests/unit/t9-mode-tokens.test.ts:460` both excluded `globals.css` **lines
+1–199** — a round number chosen while the token blocks were still hypothetical.
+Measured after Wave 0 landed:
+
+```
+$ grep -n '^:root\|^html\[data-mode="chamber"\]\|^}' apps/ui/app/globals.css | head -4
+5::root {
+72:}
+74:html[data-mode="chamber"] {
+114:}
+```
+
+The token blocks **end at line 114**. Lines 115–199 — which contain real product
+CSS, e.g. `* { box-sizing: border-box; }` at 116 — were exempt from the
+colour-literal law for no reason but the round number.
+
+**The mutant, and my reproduction.** M2 inserted
+`.appShell { background: #FF00FF; }` at line 150:
+
+| Filter | Residual | M2 caught? |
+|---|---|---|
+| OLD (lines 1–199) | 0 | **no** — a magenta, mode-inert app-shell background ships fully green |
+| NEW (syntax-bound, boundary 114) | 1 | **yes** |
+
+*Method note, because it nearly fooled me:* my first reproduction ran `rg`
+against a single file, and `rg` omits the path prefix in that mode — so the
+`globals\.css:NNN:` filter matched nothing and BOTH oracles appeared to catch
+M2. The finding looked wrong for one tool call. Re-run with the real repo path
+shape, the reviewer is exactly right. **The test was the artifact, not the
+finding** — and a filter that keys on a path must be exercised with a path.
+
+**Cost of the fix: zero.** The WAVE-0 ORACLE against the real tree with the
+tightened boundary still returns **0**: Wave 0 had already tokenised every line
+in 115–199. The window was latent, not live — but it was open, on the one file
+every cluster inherits.
+
+**The class, not the instance.** The defect is not "199 was the wrong number" —
+it is *a structural boundary encoded as a positional constant*. That exact shape
+is already recorded in `.hermes/TOOLING-TRAPS.md` as *"an acceptance pinned to
+ABSOLUTE LINE NUMBERS"*. So the remedy is not a better number; it is removing the
+number. Every consumer now computes the boundary from syntax at run time and
+fails loudly if it cannot find it.
