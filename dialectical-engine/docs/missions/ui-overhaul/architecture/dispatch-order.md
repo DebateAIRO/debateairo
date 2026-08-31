@@ -67,8 +67,31 @@ evaluate and a mode toggle that flips nothing.
 
 | # | Cluster | Writes | Verify |
 |---|---|---|---|
-| 2 | **T9-C1** — anonymous `/` vs signed-in `/` **+ mode control on the anonymous landing** | `apps/ui/app/page.tsx` · `apps/ui/components/landing/LandingPage.tsx` · `apps/ui/components/landing/LandingChrome.tsx` (the `ModeToggle` mount only) · `tests/render/t9-landing.test.tsx` | `pnpm exec vitest run tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/architecture/s8-publication-contract.test.ts` |
+| 2 | **T9-C1** — anonymous `/` vs signed-in `/` **+ mode control on the anonymous landing** | `apps/ui/app/page.tsx` · `apps/ui/components/landing/LandingPage.tsx` · `apps/ui/components/landing/LandingChrome.tsx` (the `ModeToggle` mount only) · `apps/ui/components/landing/LandingHero.tsx` · `LandingSample.tsx` · `LandingMethod.tsx` · `LandingPricing.tsx` (**empty stubs only — content is T9-C4's**; see the stub rule below) · `tests/render/t9-landing.test.tsx` | `pnpm exec vitest run tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/architecture/s8-publication-contract.test.ts` |
 | 3 | **T3-C1** — signed-in library chrome + ☾ mount in `TopBar` | `apps/ui/components/TopBar.tsx` · `apps/ui/app/page.tsx` (library half) · `apps/ui/components/LibraryComposer.tsx` · `tests/render/t3-library.test.tsx` | `pnpm exec vitest run tests/render/t3-library.test.tsx tests/render/auth-flow-integration.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts` |
+
+#### T9-C1 stub rule (added 2026-08-31, AM4)
+
+`LandingPage.tsx` composes five children. T9's PLAN HOW rules: *"C1 ships it with
+the five children as empty stubs; C2 and C4 fill them."* A contract-obedient C1
+therefore **must create all five files**, or `LandingPage`'s imports do not
+resolve, the ADR-006 compile gate goes red on module-not-found, and the seat
+correctly refuses to proceed.
+
+- `LandingChrome.tsx` — created by C1, which also mounts `<ModeToggle />` in it
+  (AM2/D). Its chrome copy is **T9-C2's** (row 4).
+- `LandingHero.tsx`, `LandingSample.tsx`, `LandingMethod.tsx`,
+  `LandingPricing.tsx` — created by C1 as **empty stubs**. Their content is
+  **T9-C4's** (row 5).
+
+**One exception, forced by C1's own acceptance:** the hero stub is not empty. It
+must render the exact string `Find the weakest claim in your own argument.`,
+because `T9-C1-1` asserts that headline on the no-session `/` render. A literally
+empty `LandingHero` makes T9-C1's own acceptance unsatisfiable — the AF-1 shape
+again, one file down.
+
+Everything else in the four stubs is T9-C4's to write. C1 adding copy beyond the
+headline is a contract violation in the other direction, and row 5 owns it.
 
 #### T9-C1 additional acceptance — CH1, the anonymous-landing mode control (added 2026-08-31, AM2/D)
 
@@ -207,14 +230,19 @@ As the LAST cluster in this order, `T8-C4` additionally runs the **MISSION-FINAL
 ORACLE** from `ADR-001` §(c) — the repo-wide sweep — and it must return `0`:
 
 ```sh
-# Boundary found BY SYNTAX at run time. Never a literal line number.
-BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
-             apps/ui/app/globals.css)
-[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
+# The token region is TWO intervals. Both found BY SYNTAX at run time.
+RANGES=$(awk '
+  /^:root[[:space:]]*\{/                       {s1=NR; f=1; next}
+  f==1 && /^\}/                                {e1=NR; f=0; next}
+  /^html\[data-mode="chamber"\][[:space:]]*\{/ {s2=NR; g=1; next}
+  g==1 && /^\}/                                {e2=NR; g=0; next}
+  END { if (s1 && e1 && s2 && e2) printf "%d,%d,%d,%d", s1, e1, s2, e2 }
+' apps/ui/app/globals.css)
+[ -n "$RANGES" ] || { echo "FAIL: globals.css token blocks not found or unclosed"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   apps/ui/app apps/ui/lib apps/ui/components \
-  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
+  | awk -v r="$RANGES" -F: 'BEGIN{split(r,a,",")} !($1 ~ /globals\.css$/ && (($2+0>=a[1] && $2+0<=a[2]) || ($2+0>=a[3] && $2+0<=a[4])))' \
   | wc -l
 ```
 
@@ -231,3 +259,70 @@ Green-green-red is RED, and re-running until green is falsification under R5.
 `vitest.config.ts` sets `fileParallelism: false`, so runs are already
 deterministic in ordering; a flake here is a real flake, not a scheduling
 artefact.
+
+---
+
+## Changelog
+
+### 2026-08-31 — AM4: T9-C1's write surface omitted the four landing stubs it is required to create (trigger: orchestrator pre-dispatch validation, ticket `t_40a227bb`)
+
+**What was wrong.** Row 2 listed `page.tsx`, `LandingPage.tsx`,
+`LandingChrome.tsx` and the test file — but not `LandingHero.tsx`,
+`LandingSample.tsx`, `LandingMethod.tsx` or `LandingPricing.tsx`, which T9's PLAN
+HOW requires C1 to create as stubs. A contract-obedient C1 could not create them,
+`LandingPage`'s imports would not resolve, and the compile gate would go red on
+module-not-found. AF-1 class: a write surface that contradicts the acceptance it
+has to satisfy — **caught pre-dispatch this time, before the seat burned a
+preflight block on it.**
+
+**Cross-check, run in this edit:**
+
+| Source | Says |
+|---|---|
+| `slices/T9/PLAN.md:64` (HOW) | *"C1 ships it with the five children as empty stubs; C2 and C4 fill them."* |
+| `dispatch-order.md` row 4 (T9-C2) | writes `LandingChrome.tsx` — the chrome copy |
+| `dispatch-order.md` row 5 (T9-C4) | writes `LandingHero/Sample/Method/Pricing` — the content |
+| `dispatch-order.md` row 2 (T9-C1), **before** | listed neither the four stubs nor any creation duty |
+| `dispatch-order.md` row 2, **after** | lists all four, annotated *empty stubs only — content is T9-C4's* |
+
+No contradiction remains: C1 **creates** five files, C2 fills chrome, C4 fills
+the other four. The hero-stub exception is stated in the stub rule above.
+
+**Rest of row 2, re-checked against PLAN in the same edit as charged:**
+
+- Verification command — matches T9-C1's PLAN HOW command exactly. ✓
+- Serialisation note (`T9-C1` before `T3-C1` on `app/page.tsx`) — matches. ✓
+- `tests/render/t9-landing.test.tsx` created by C1 with three empty `describe`
+  blocks — present in row 2 and in rows 4 and 5. ✓
+- The AM2/C compile gate applies to row 2 (it writes under `apps/ui/`) and is an
+  acceptance default, not a per-row entry. ✓
+
+**Class sweep — every `**Create**` target in every PLAN vs its OWN creating
+cluster's dispatch row.** 32 rows parsed, 19 targets checked, **0 genuine
+mismatches** (two apparent hits were a regex over-reach on
+`slices/T9/PLAN.md:75`, which names `tests/render/stubs/next-headers.ts` and
+`vitest.config.ts` as *existing* infrastructure — "already wired" — not as
+creation targets).
+
+**Why the sweep would not have found this one, which is the transferable
+lesson.** The four stubs are invisible to a `**Create**`-marker sweep because
+T9's PLAN expresses the obligation in **prose** — *"ships it with the five
+children as empty stubs"* — not as a `**Create**` line with backticked paths. A
+machine-checkable contract that depends on a human noticing a sentence is not
+machine-checkable. Creation duties should be stated in the marked form the sweep
+can see.
+
+### 2026-08-31 — AM4 (beyond charge): the mission-final oracle still carried the AM2 prefix filter
+
+Flagged as an open residual at the end of AM3 and left unfixed there because
+`dispatch-order.md` was outside AM3's allowed writes. It is inside AM4's, and
+leaving a known-blind gate in a file being edited is not defensible, so it is
+closed here and declared rather than done quietly.
+
+The mission-final oracle (cluster #32, `T8-C4`) now uses the **range-pair**
+membership filter from `ADR-001` §(a) — the same one the per-cluster oracles
+already use. Before this edit it used AM2's one-sided `$2+0 <= b`, which REV2
+proved blind to mutants M4 (gap between the token blocks), M5 (above `:root`) and
+M6 (chamber block legally relocated to EOF, which exempts the entire stylesheet).
+`1 of 1` occurrence replaced; `grep -rn '\$2+0 <= b' docs/missions/ui-overhaul/`
+now returns nothing.

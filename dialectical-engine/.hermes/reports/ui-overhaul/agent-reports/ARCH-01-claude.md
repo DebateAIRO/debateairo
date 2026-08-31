@@ -468,3 +468,57 @@ crossing a file contract is the heavier violation. Exactly one line, exact
 replacement text published in ADR-001 §(a), surfaced in the handoff for the
 orchestrator to apply or ticket. `1 of 1` occurrence, measured
 (`grep -rn '\$2+0 <= b' docs/missions/ui-overhaul/`).
+
+---
+
+## AMENDMENT 4 (2026-08-31) — the first one caught before it cost anyone a block
+
+Row 2 of `dispatch-order.md` listed T9-C1's writes as `page.tsx`,
+`LandingPage.tsx`, `LandingChrome.tsx` and the test file. T9's PLAN HOW rules
+that C1 "ships it with the five children as empty stubs; C2 and C4 fill them" —
+so C1 must also create `LandingHero`, `LandingSample`, `LandingMethod` and
+`LandingPricing`. A contract-obedient C1 could not, `LandingPage`'s imports would
+not resolve, the ADR-006 compile gate would go red on module-not-found, and the
+seat would have blocked. **AF-1 class, fifth appearance: a write surface that
+contradicts the acceptance it must satisfy.**
+
+**What is different this time is who found it and when.** AF-1 cost a coder
+preflight cycle. B1 cost a rework round. B2 cost a second one. This one was
+caught by orchestrator pre-dispatch validation, before the seat was launched —
+the cheapest square on the board. The class has not stopped recurring, but the
+detection has moved three stages earlier, and that is the trend worth reporting.
+
+**One exception I had to state explicitly.** The hero stub cannot actually be
+empty: `T9-C1-1` asserts the exact headline `Find the weakest claim in your own
+argument.` on the no-session render, so an empty `LandingHero` makes C1's own
+acceptance unsatisfiable — the same defect shape, one file down, created by the
+fix itself. The stub rule names it.
+
+**The class sweep, and why it would not have caught this.** I checked every
+`**Create**` target in all eight PLANs against the row of the cluster its PLAN
+says creates it: 32 rows parsed, 19 targets, **0 genuine mismatches** (two
+apparent hits were my regex over-reaching into a sentence that names
+`next-headers.ts` and `vitest.config.ts` as *existing* infrastructure). The four
+landing stubs are invisible to that sweep because T9's PLAN states the obligation
+in **prose** rather than as a `**Create**` line with backticked paths. **A
+contract that a machine can only check when a human happens to phrase it in the
+marked form is not a machine-checkable contract.** That is the transferable
+finding: creation duties must be written in the form the sweep can see, and my
+PLANs mix the two freely.
+
+**Beyond the charge, declared not done quietly.** `dispatch-order.md:217` still
+carried AM2's one-sided prefix filter in the mission-final oracle — the residual
+I reported at the end of AM3 and could not fix there, because the file was
+outside AM3's allowed writes. It is inside AM4's. Leaving a gate I know to be
+blind to M4/M5/M6 in a file I am editing is not defensible, so I closed it and
+said so in the changelog rather than folding it in silently. `1 of 1` occurrence;
+`grep -rn '\$2+0 <= b' docs/missions/ui-overhaul/` now returns only the changelog
+prose describing the old form. Corrected mission-final oracle re-run: residual
+**43**, matching `ADR-001` §(b)'s ownership table exactly.
+
+**Widening scope is a decision, not a convenience.** I took it because the
+residual was already reported, already ticketed in substance, and its replacement
+text was already published and verified — and because the alternative was
+shipping AM4 with a known-blind gate in the very file AM4 edits. If the
+orchestrator would rather that had waited for its own charge, the correction is
+one revert and I would not argue.
