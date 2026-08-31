@@ -1,0 +1,287 @@
+# SELF-REPORT — ARCH-01 (Claude Opus 5), ui-overhaul architecture seat
+
+> treat it like a murder case. I want to get a nice report on what can be done
+> better. What we must upgrade. what repeatedly costed us tokens. how we can
+> make the coding more efficient. How can we turn this into a one prompt machine
+> even better.
+
+**Seat:** ARCH-01, ticket `t_09a09884`, board `ui-overhaul`. One round, no
+rework. Wrote 8 `PLAN.md`, 8 `DECISIONS.md`, 12 files under
+`docs/missions/ui-overhaul/architecture/`, this report. Zero SPEC edits, zero
+product code, zero git commands, zero sub-delegation.
+
+---
+
+## 1. THE BODY — the defect that would have killed this mission
+
+**12 of the 78 "render pins" the SPECs name test an application this mission
+does not ship.**
+
+`tests/render/web-auth-login.test.tsx`, `web-auth-sign-up.test.tsx` and
+`web-auth-enrollment.test.tsx` import from `web/`, not `apps/ui`. Measured:
+
+```
+web-auth-enrollment.test.tsx   apps/ui:0  web:4
+web-auth-login.test.tsx        apps/ui:0  web:2
+web-auth-sign-up.test.tsx      apps/ui:0  web:1
+```
+
+T7's and T8's frozen SPEC acceptance sections name these files as the ones to
+update. A Codex seat following that instruction would have:
+
+1. added `WELCOME BACK` to `web-auth-login.test.tsx` — **genuine RED**;
+2. edited `web/components/LoginFlow.tsx` to make it pass — **genuine GREEN**;
+3. filed textbook RED→GREEN evidence;
+4. shipped a mission where the suite is green, the report is honest, and the
+   product a user opens is **unchanged**.
+
+Every gate in the spine would have passed. Independent review would have passed
+— a reviewer checking "did the test go red then green" gets yes. The
+product-truth gate is the only thing that catches it, at C8, after eight slices
+of work built on the same false floor.
+
+**CAUSE:** the repo has two Next applications (`apps/ui` = `dialectical-engine-v2ui`,
+the serving tree; `web` = `dialectical-engine-web`) with parallel `page.tsx`,
+`login`, `settings`, `LoginFlow`, `TopBar`. `INSTRUCTIONS.md` correctly pins
+`apps/ui`. But nothing in the requirements chain checked **which tree each named
+pin file actually imports**, because the SPECs name test files by their
+human-readable topic ("web-auth sign-up tests") and the topic is identical in
+both trees. The name `web-auth-*` even reads as a description of the auth
+domain, not as a path prefix.
+
+**PRICE IF IT HAD SHIPPED:** two slices (T7, T8) rebuilt from scratch, plus the
+credibility cost of a mission whose evidence chain was formally perfect and
+substantively empty. Conservatively 2 full rework rounds across 8 clusters.
+
+**PRICE TO FIND IT:** about four minutes, once I asked the right question. The
+right question was not "which files do the SPECs name" but **"which tree does
+each named file import"** — one `grep -c` per file.
+
+**THE UPGRADE:** in a repo with more than one application tree, every
+requirements artifact that names a test file must record the **import target**
+beside the path, and intake must run a one-line check that every named pin
+resolves into the serving tree. Cost: one command. It would also have caught
+this at REQ time instead of ARCH time.
+
+---
+
+## 2. WHAT I NEARLY GOT WRONG — three, all the same shape
+
+### 2a. A loose matcher that under-reported by 12 files
+
+I swept for standing tests that read `apps/ui` **as source text** with
+`grep -c "readFileSync"`. Answer: **5 files**. I wrote it into the architecture
+doc. Then, reading `tests/architecture/s8-publication-contract.test.ts` for an
+unrelated reason, I saw `import { readFile } from "node:fs/promises"`.
+
+The real answer is **17 of 44**. I had understated the most fragile surface in
+the mission by 240%.
+
+`readFile` vs `readFileSync` is exactly the "loose matcher" trap already recorded
+in `.hermes/TOOLING-TRAPS.md` — *"match on the identifier that is actually
+unique"*. I had read that file. I still did it. **Reading a trap does not
+prevent it**, which is the single most useful thing I learned this round, and
+the file itself already says so.
+
+**THE UPGRADE:** a sweep should be expressed as a **regex over the concept**
+(`\breadFile(Sync)?\(`), never a literal over one spelling — and the sweep should
+be re-run and its count re-quoted at the moment it is written into the artifact,
+not remembered from ten tool calls earlier.
+
+### 2b. A self-review that printed "clean" without running
+
+My placeholder/identifier self-review used
+`F="a/*.md b/*.md"; grep -n PATTERN $F`. zsh passed the whole string as one
+literal filename. ugrep printed a *warning* to stderr and exited non-zero, my
+`|| echo "  clean"` fired, and I got:
+
+```
+=== 1. placeholder scan ===
+  clean
+```
+
+**A self-review that cannot fail is not a self-review.** This is TOOLING-TRAPS'
+*"'Ran and failed' is not the same as 'ran'"* in a new costume, and it is the
+second time in one session I reproduced a trap I had read.
+
+**THE UPGRADE:** any check whose failure mode is "prints clean" must first print
+`N` — the number of files it actually opened. My corrected run opens with
+`files under review: 28`. If that line reads `0`, the "clean" below it is a lie
+and you can see it.
+
+### 2c. Nearly designing around a limitation that does not exist
+
+I probed jsdom, found `getComputedStyle(el).background` returns the literal
+`"var(--bg)"` and `.backgroundColor` returns transparent, and concluded that
+token verification needed a static CSS parser — a whole new mechanism, written
+from scratch, for eight slices to share.
+
+Then I probed one level further:
+`getComputedStyle(documentElement).getPropertyValue("--bg")` returns `#F9F6F1`,
+and setting `data-mode="chamber"` re-cascades it **live**. jsdom honours
+attribute-selector cascade for custom properties perfectly. And
+`tests/unit/pda-s03-keyboard-accessibility.test.ts` was **already** injecting the
+real `globals.css` into jsdom and reading computed style — the pattern shipped
+months ago.
+
+I was one probe away from writing a bespoke CSS parser that the repo did not
+need. **PRICE AVOIDED:** a new test-infrastructure module, its review, and the
+maintenance of a second way to read the same stylesheet.
+
+**THE UPGRADE:** when a probe says "the tool cannot do X", probe the adjacent
+capability before designing around the gap — and grep the repo for anyone
+already doing X. The answer here was in a file I had already opened.
+
+---
+
+## 3. DEAD ENDS — recorded so nobody re-derives them
+
+1. **`apps/ui/app/tokens.css` imported from `globals.css`.** The obvious shape.
+   Fatal: jsdom does not follow `@import`, and a standing test injects
+   `globals.css` **by path**. A separate token file is invisible to that test and
+   to every token test built on it — the values read as empty and the assertions
+   pass vacuously. This is precisely the "orphan `tokens.css` = RED" failure the
+   T9 SPEC warns about, arriving through the harness rather than the browser.
+   Tokens go at the top of `globals.css`. (ADR-001)
+2. **Asserting resolved colours via `getComputedStyle(el).backgroundColor`.**
+   Returns `rgba(0, 0, 0, 0)` for any `var()`-valued property in this repo's
+   jsdom. Such an assertion can only pass by accident. Use
+   `getPropertyValue('--token')` on the document element. (ADR-006)
+3. **"Gold is reserved for reasoning & verdict" read as mode-independent.** The
+   design's own `accentsFor(dk)` gives reasoning `#3D5A80` (slate blue) in
+   Terracotta and gold only in Chamber. The closing note describes Chamber. A
+   coder who reads only the note paints light-mode REASONING chips gold.
+4. **Trusting the mission compass's palette.** `INSTRUCTIONS.md` lists cream
+   `#E7E2D8` / `#f0eee6` and ink `#111111`. The first two are the *design
+   document's own page and stage chrome*; the third does not occur as a colour
+   anywhere in the rendered export. The real palette is a 16-key token function
+   on line 388 of the original bundle.
+
+---
+
+## 4. WHAT REPEATEDLY COST TOKENS
+
+| Cost | Amount | Cause | Fix |
+|---|---|---|---|
+| Reading the spine | 2006 lines, ~4 large reads | `debateai-heartbeat-protocol.md` is the mandated first read and is 106 KB. Perhaps 15% of it was actionable for an architecture seat: §7 feedback edges, §10 caps, the TDD/DDD laws, v3.3.0 items 11–16. The rest is router and verifier law I cannot act on. | The skill split already exists and works — `heartbeat-architecture` is 87 lines and was worth every one. The **spine** should carry a per-role index at the top: "ARCHITECTURE: read §5.5, §7, §10, §11, v3.3.0 items 11–16." The role contract routes to a skill; nothing routes *within* the spine. |
+| The design bundle | 1.28 MB, one line | `design-document-original.html` is a single 1.28 MB line. Reading it was impossible; I found the entire token system with `awk 'NR==388' \| tr '\\' '\n' \| grep -nE "const tokensFor"` — about 300 bytes of output that settled the whole token deliverable. | **The token map should have been extracted at REQ time.** A 16-key colour function is requirements-grade information; leaving every downstream seat to re-mine a 1.28 MB minified line is a cost multiplier. Ship `design-tokens.json` beside the design document. |
+| `cd` drift in Bash | 4 failed calls, ~2 min | The Bash tool persists working directory across calls. I `cd`-ed into the design directory and the next three relative-path calls failed, one of them silently writing a file to the wrong directory before I caught it. | Never `cd`. Use absolute paths, or `cd <abs> && …` in one statement with the whole body inside the `&&` chain. |
+| Re-deriving what shipped | moderate | I spent real effort designing card anatomy, connectors, view toggles and set-aside behaviour before discovering `Thread`/`Split`/`Tree`/`Map`, `Show set-aside paths`, `↻ Regenerate`, `ROLE_PALETTES` → `var(--pro-line)`, and a 69-token `:root` block all already ship. | **Read the target files before reading the design.** I did it in the other order. An "already true, do not rebuild" inventory belongs at the top of every re-skin mission's compass. |
+
+**The single biggest saving I found:** `apps/ui/app/globals.css` already has a
+semantic token layer — 69 custom properties, 521 `var()` consumers, 120 literals.
+The overhaul is a **redefinition** of that layer plus one dark-mode block, not a
+new design system. That one fact turns "restyle 8 screens" into "rewrite ~100
+lines of CSS variables, then fix 120 literals", and it is why the
+test-migration column has **zero REPLACE** entries.
+
+---
+
+## 5. WHERE THE PACKET WAS UNCLEAR — exactly
+
+1. **"tests/render/** (72 tests, 18 files)".** Measured: **78 tests**, 18 files
+   (`vitest list tests/render/`). A stale constant. It cost nothing because I
+   measured it, but a seat that quoted it into an acceptance would have shipped
+   an unmeetable count.
+2. **"the per-cluster verification command confirmed runnable" (§2.8) vs
+   `heartbeat-architecture` §4 "you run no product tests".** Direct tension. I
+   resolved it by using `vitest list` (enumerates without executing test bodies)
+   and `command -v` — which proves the command resolves and the paths exist
+   without running product tests. **The packet should say which form of
+   "confirmed" it wants.** I have marked every command's *colour* as UNVERIFIED
+   on purpose; that is the worker's RED-before-GREEN evidence, not mine.
+3. **The planning-graph gate is unreachable from my contract.**
+   `heartbeat-architecture` §2 requires a mission graph at
+   `.hermes/reports/<mission>/mission-graph.svg`, and spine v3.2.0 item 5 makes
+   V's yes on that image **gate programming**. My §3 `allowed` list contains
+   `.hermes/reports/ui-overhaul/agent-reports/ARCH-01-claude.md` and nothing else
+   under `.hermes/reports/`. I did not write it — crossing a file contract to
+   satisfy a skill is still crossing a file contract. **`dispatch-order.md`
+   contains the whole graph in table form** (32 clusters, 6 waves, per-lane write
+   surfaces, merge order); rendering it as SVG needs one line added to some
+   seat's `allowed`. Flagging rather than silently skipping, per §2.7.
+4. **Superpowers' `brainstorming` HARD-GATE vs the One-Prompt Machine law.**
+   `brainstorming` forbids any implementation action until "your human partner
+   has approved". The spine forbids an architecture node from addressing V
+   outside the design-question surface, and the packet authorizes me to write.
+   I read the peer-review diamond as the approval gate and proceeded, routing
+   the genuinely V-owned choices to `open-questions.md` with defaults. **This
+   collision will recur for every seat that loads `brainstorming`**, and the
+   protocol should say so once instead of each seat re-adjudicating it.
+
+---
+
+## 6. HOW TO MAKE THE CODING MORE EFFICIENT
+
+1. **Freeze class names and `data-*` attributes at ARCH time, in writing.** This
+   single rule is why 32 of the 44 standing test files need no edit (12 RETARGET,
+   32 KEEP, 0 REPLACE). A re-skin that
+   renames classes converts every standing assertion into rework, and the seat
+   doing the renaming is never the seat that pays.
+2. **Make the verification mechanism part of the plan, not the coder's problem.**
+   `tests/support/tokenContract.ts` and `tests/support/contrast.ts` are written
+   ONCE, by the foundation cluster, with signatures fixed in an ADR. Eight slices
+   consume them. Without that, eight seats each invent a way to assert "the mode
+   toggle works", and six of those ways will be `getComputedStyle().background`,
+   which cannot work here.
+3. **Ask "which standing tests READ what this cluster WRITES" for every cluster.**
+   Write-surface disjointness answers "will two seats collide". It does not
+   answer "will one seat break something that watches it". Those are different
+   questions and TOOLING-TRAPS already records a mission losing a round to the
+   second one. Every command in `dispatch-order.md` carries its slice's
+   regression set for exactly this reason.
+4. **One writer for the token file, first, alone.** 32 clusters against a
+   4080-line stylesheet with two seats editing `:root` is the one collision this
+   mission cannot absorb.
+5. **Name the serial chains explicitly.** Four clusters write
+   `LoginFlow.tsx`; three write `app/page.tsx`; two each write
+   `DebateCanvas.tsx` and `NodeDetailDrawer.tsx`. Each is ordered with a stated
+   reason. A dispatch order that only lists waves silently invites parallel edits
+   to the same hunk.
+
+---
+
+## 7. THE ONE-PROMPT MACHINE — five upgrades, cheapest first
+
+1. **Intake asserts that every named test file resolves into the serving tree.**
+   One command. Would have caught §1 at REQ time, one loop earlier, at a
+   fraction of the cost. *This is the highest-value item in this report.*
+2. **Every counted claim in a packet carries its command.** "72 tests, 18 files"
+   should read "78 tests, 18 files (`vitest list tests/render/`, 2026-08-31)".
+   A number with a command attached is re-derivable and ages loudly; a bare
+   number ages silently and gets quoted into an acceptance.
+3. **Every sweep reports `N of N` with N measured *at write time*.** Not
+   remembered from earlier in the session. Both of my near-misses (§2a, §2b)
+   were counts that were stale or never computed, and both printed a
+   confident-looking number.
+4. **Requirements ships machine-readable design facts.** A `design-tokens.json`
+   extracted once at REQ time replaces N seats independently mining a 1.28 MB
+   minified line, and removes the class of error where the compass paraphrases a
+   palette (§3.4) and every downstream seat inherits the paraphrase.
+5. **Add a per-role index to the spine.** The skill split fixed the role
+   *contracts*; the 2006-line spine is still read whole by every seat. Ten lines
+   at the top mapping role → sections would cut the mandatory read by most of
+   its length without removing a single rule.
+
+---
+
+## 8. WHAT WENT WELL — so it is repeated
+
+- **The three-file read order gate worked.** Reading the architecture contract
+  before touching anything is why `PLAN.md` has no line cap in my output, why
+  every DECISIONS row names who ruled, and why I did not edit a frozen SPEC when
+  I found four things wrong with them.
+- **`heartbeat-architecture` §3 (refute your own plan) changed the output.**
+  Writing "and one mutant it would NOT catch" for every cluster forced me to
+  admit the contrast cluster does not cover `--muted` on `--con-bg`, and that
+  `T1-C3-1` asserts `before ≠ after` rather than a direction. Both are now
+  stated boundaries instead of assumptions a reviewer would have to find.
+- **Superpowers' `writing-plans` "no placeholders" rule** is why every HOW block
+  carries real signatures and real commands rather than "ARCH finalizes". The
+  count of `ARCH finalizes` placeholders remaining across 8 PLANs is 0.
+- **Measuring before pinning.** I computed contrast for all 26 token/surface
+  pairs *before* choosing 4.5:1 and 3.0:1. Five Terracotta accents fail the
+  design's raw hex, one of them (gold on shell, 2.94:1) below even the non-text
+  floor. Had I pinned the number first and measured later, I would have written
+  an acceptance the design cannot meet and discovered it in round 2, in a
+  reviewer's finding, against a coder who did nothing wrong.

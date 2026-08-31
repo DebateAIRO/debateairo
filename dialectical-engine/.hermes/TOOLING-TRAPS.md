@@ -791,3 +791,10 @@ as knowing it was, and the check costs one command.
 exists only in your own working tree* — was about the specification. This is the same failure applied
 to the **tree**: verify that the setup you performed actually took effect, not merely that you issued
 it.
+
+## claude -p buffers stdout — a silent tee log is NOT a hang (2026-08-31)
+Same class as `hermes --yolo -z`. The ARCH-01 stagnation alarm fired at 20 min
+on a log that structurally cannot grow before exit. Ground truth for claude -p
+seats: the session transcript under ~/.claude/projects/<encoded-cwd>/*.jsonl
+(grows every tool call), output-file mtimes, and process CPU time — never the
+tee'd stdout log. Fingerprint those.
