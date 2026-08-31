@@ -6,3 +6,7 @@
   self-report: agent-reports/REQ-01-grok.md (filed before FULLY DONE ack)
   open questions: 3 → V-DECISIONS (vocab, anonymous CTA, placeholders), 1 → ARCH (T3b composition)
   tokens: not yet collected (grok usage file — collect at closure)
+2026-08-31 17:24:05 — REQ-01-R1 (grok resumed 01a0580a) EXIT rc=0. 416 ins/25 files, commit bc9f301.
+  V rulings folded: app vocab everywhere · CTA->auth->New debate · static placeholders.
+  Freeze discipline HELD (exit verified before commit — F2 class fix working).
+  -> dispatching round-2 verification to Opus 5 against bc9f301.
