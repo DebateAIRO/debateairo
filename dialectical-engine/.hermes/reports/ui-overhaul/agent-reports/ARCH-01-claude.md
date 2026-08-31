@@ -398,3 +398,73 @@ command, a count, a type, a boundary — must be run, at its real scope, in the
 same edit that publishes it, and its output pasted in.* Every command in this
 amendment was verified that way, including the fail-loud guard, which I tested
 on a deliberately renamed token block to confirm it actually fires.
+
+---
+
+## AMENDMENT 3 (2026-08-31) — I fixed where the number came from and left what the number MEANT
+
+REV2 (`t_4ccac5c4`, 21:55) confirmed all four round-1 fixes and then found that
+**my AM2 remedy kept the wrong shape**. AM2 replaced a literal `199` with a
+syntax-derived boundary — genuinely better, and it closed M2 — but the
+comparison stayed one-sided: `lineNumber <= boundary`. The token region is not a
+prefix. It is **two intervals**, `:root` 5–72 and chamber 74–114, with the
+banner above, the gap between, and 4000 lines below all outside it. AM2's own
+changelog states the property correctly — *"covers the token region itself and
+nothing beyond it"* — and then implements something weaker. **I wrote the right
+sentence and the wrong predicate, in the same edit.**
+
+Three live mutants survived: M4 (literal in the gap at line 73), M5 (literal
+above `:root` at line 4), and **M6 — the chamber block relocated to EOF**, which
+is a semantically legal refactor because `ADR-002` itself records that
+`html[data-mode="chamber"]` beats `:root` on specificity regardless of source
+order. Under my prefix filter that one move computes a boundary of 4121 and
+**exempts the entire stylesheet from the colour-literal law, silently**, on the
+one file all 32 clusters consume and the one file with a single authorised writer
+all mission — so no later seat could have repaired it. M6 is the sharpest finding
+anyone has produced against my work in this mission, and it is sharp precisely
+because it attacks the *shape* rather than the value.
+
+**The lesson is the spine's own corollary, and I had already quoted it.** AM1's
+DECISIONS row says *"choose the remedy by the SHAPE, not by your confidence about
+the content."* In AM2 I applied it to the **source** of the number — literal vs
+syntax — and never asked what the predicate meant. Fixing where a number comes
+from is not the same act as fixing what it denotes. That distinction is now the
+AM3/A changelog's closing paragraph, because it is the one I keep failing:
+across AF-1, AM2 and AM3 the through-line has moved from *"I asserted instead of
+executed"* to something narrower and worse — **I execute the check I thought of,
+and the defect lives in the check I did not think of.** Running M2 proved the
+boundary; nobody ran a line above `:root`, because the mutant I was handed did
+not go there. A refutation table that only contains mutants someone else supplied
+is not a refutation table.
+
+**What I did differently this round.** I built all four fixtures (clean, M4, M5,
+M6) before writing a word, ran **both** published artifacts against them — the
+shell filter and the TypeScript helper contract, executed as real code, not
+quoted — reproduced the reviewer's table exactly, and additionally exercised both
+fail-loud paths on known-bad input (`:root` renamed → guard fires and helper
+throws; chamber unclosed → same). Then re-ran the wave-0 and mission-final
+oracles on the real tree to confirm the shape change moves no number (0 and 43,
+unchanged). Fixtures were scratch-only under `/tmp` and are removed.
+
+**AM3/B, and a correction I owe the reviewer.** AM2/C recorded that the reviewer's
+round-0 note "layout.tsx CLEAN" was wrong. It was not careless — **this repo has
+two TypeScript compilers**, root pinned at 7.0.2 and `apps/ui` at 5.9.3, and
+`pnpm exec` resolves whichever is nearest the cwd. From inside `apps/ui` the
+TS2882 does not exist; from the root it does. Same tsconfig, same tree, different
+answer. Under its compiler the reviewer was right, and it found and published
+this itself, against its own earlier verdict. So AM2's law — *name the tsconfig*
+— was necessary and **not sufficient**: on this repo the tsconfig does not
+determine the answer, and the gate must also pin the invocation directory. The
+canonical directory is now in the published command as
+`cd "$(git rev-parse --show-toplevel)"`, with the measured divergence and the
+differing error-path shapes recorded. The TS2882 baseline is confirmed
+load-bearing: dropping the clause returns 1, not 0.
+
+**One residual I could not close, reported rather than crossed.**
+`dispatch-order.md:217` still carries the AM2 prefix filter in the mission-final
+oracle, so that gate keeps the M4/M5/M6 blindness. AM3 §1 says to fix the filter
+"anywhere else it is quoted", but §3 Bounds lists only ADR-001 and ADR-006, and
+crossing a file contract is the heavier violation. Exactly one line, exact
+replacement text published in ADR-001 §(a), surfaced in the handoff for the
+orchestrator to apply or ticket. `1 of 1` occurrence, measured
+(`grep -rn '\$2+0 <= b' docs/missions/ui-overhaul/`).

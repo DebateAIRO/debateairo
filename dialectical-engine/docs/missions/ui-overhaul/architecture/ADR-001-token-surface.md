@@ -71,14 +71,20 @@ can be an oracle.
 ### The oracle pattern (corrected)
 
 ```sh
-# Boundary found BY SYNTAX at run time. Never a literal line number.
-BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
-             apps/ui/app/globals.css)
-[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
+# The token region is TWO intervals. Both found BY SYNTAX at run time; fail loud if
+# either is missing or unclosed. Never a literal line number, never a prefix.
+RANGES=$(awk '
+  /^:root[[:space:]]*\{/                       {s1=NR; f=1; next}
+  f==1 && /^\}/                                {e1=NR; f=0; next}
+  /^html\[data-mode="chamber"\][[:space:]]*\{/ {s2=NR; g=1; next}
+  g==1 && /^\}/                                {e2=NR; g=0; next}
+  END { if (s1 && e1 && s2 && e2) printf "%d,%d,%d,%d", s1, e1, s2, e2 }
+' apps/ui/app/globals.css)
+[ -n "$RANGES" ] || { echo "FAIL: globals.css token blocks not found or unclosed"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   <SCOPE> \
-  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)'
+  | awk -v r="$RANGES" -F: 'BEGIN{split(r,a,",")} !($1 ~ /globals\.css$/ && (($2+0>=a[1] && $2+0<=a[2]) || ($2+0>=a[3] && $2+0<=a[4])))'
 ```
 
 Three corrections to the original pattern, each with its reason:
@@ -109,13 +115,19 @@ clean is how the real defects leave the list.
 Re-measured by ARCH-01 on 2026-08-31 with the corrected oracle at repo scope:
 
 ```sh
-# Boundary found BY SYNTAX at run time. Never a literal line number.
-BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
-             apps/ui/app/globals.css)
-[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
+# The token region is TWO intervals. Both found BY SYNTAX at run time; fail loud if
+# either is missing or unclosed. Never a literal line number, never a prefix.
+RANGES=$(awk '
+  /^:root[[:space:]]*\{/                       {s1=NR; f=1; next}
+  f==1 && /^\}/                                {e1=NR; f=0; next}
+  /^html\[data-mode="chamber"\][[:space:]]*\{/ {s2=NR; g=1; next}
+  g==1 && /^\}/                                {e2=NR; g=0; next}
+  END { if (s1 && e1 && s2 && e2) printf "%d,%d,%d,%d", s1, e1, s2, e2 }
+' apps/ui/app/globals.css)
+[ -n "$RANGES" ] || { echo "FAIL: globals.css token blocks not found or unclosed"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
     --glob '!*.disabled' --glob '!*.svg' apps/ui/app apps/ui/lib apps/ui/components \
-  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
+  | awk -v r="$RANGES" -F: 'BEGIN{split(r,a,",")} !($1 ~ /globals\.css$/ && (($2+0>=a[1] && $2+0<=a[2]) || ($2+0>=a[3] && $2+0<=a[4])))' \
   | cut -d: -f1 | sort | uniq -c | sort -rn
  111 apps/ui/app/globals.css
   12 apps/ui/lib/scrutiny.ts
@@ -144,24 +156,30 @@ twice.
 Scope is **T9-C3's write surface only**, the four product files it owns:
 
 ```sh
-# Boundary found BY SYNTAX at run time. Never a literal line number.
-BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
-             apps/ui/app/globals.css)
-[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
+# The token region is TWO intervals. Both found BY SYNTAX at run time; fail loud if
+# either is missing or unclosed. Never a literal line number, never a prefix.
+RANGES=$(awk '
+  /^:root[[:space:]]*\{/                       {s1=NR; f=1; next}
+  f==1 && /^\}/                                {e1=NR; f=0; next}
+  /^html\[data-mode="chamber"\][[:space:]]*\{/ {s2=NR; g=1; next}
+  g==1 && /^\}/                                {e2=NR; g=0; next}
+  END { if (s1 && e1 && s2 && e2) printf "%d,%d,%d,%d", s1, e1, s2, e2 }
+' apps/ui/app/globals.css)
+[ -n "$RANGES" ] || { echo "FAIL: globals.css token blocks not found or unclosed"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   apps/ui/app/globals.css apps/ui/app/layout.tsx \
   apps/ui/components/ModeToggle.tsx apps/ui/lib/debatePresentation.ts \
-  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
+  | awk -v r="$RANGES" -F: 'BEGIN{split(r,a,",")} !($1 ~ /globals\.css$/ && (($2+0>=a[1] && $2+0<=a[2]) || ($2+0>=a[3] && $2+0<=a[4])))' \
   | wc -l
 ```
 
 **Baseline 113** (`globals.css` 111 + `debatePresentation.ts` 2;
 `layout.tsx` 0, `ModeToggle.tsx` does not exist yet).
 **Required after T9-C3: 0.** The `globals.css` exemption covers the token region
-itself — where literals ARE the point — and nothing beyond it. Since AM2 that
-region is located by SYNTAX at run time (the `BOUNDARY` preamble above), never
-by a line number.
+itself — where literals ARE the point — and nothing beyond it. Since AM3 that
+region is expressed as **membership in one of two syntax-derived intervals**,
+never a line number and never a prefix.
 
 This is satisfiable without touching one file T9-C3 does not own.
 
@@ -199,14 +217,20 @@ finding for ticketing: T1-C2's write surface grows by six files
 The repo-wide sweep survives, unchanged in scope, as the **mission-final** check:
 
 ```sh
-# Boundary found BY SYNTAX at run time. Never a literal line number.
-BOUNDARY=$(awk '/^html\[data-mode="chamber"\][[:space:]]*\{/{f=1;next} f&&/^\}/{print NR;exit}' \
-             apps/ui/app/globals.css)
-[ -n "$BOUNDARY" ] || { echo "FAIL: chamber token block not found in globals.css"; exit 2; }
+# The token region is TWO intervals. Both found BY SYNTAX at run time; fail loud if
+# either is missing or unclosed. Never a literal line number, never a prefix.
+RANGES=$(awk '
+  /^:root[[:space:]]*\{/                       {s1=NR; f=1; next}
+  f==1 && /^\}/                                {e1=NR; f=0; next}
+  /^html\[data-mode="chamber"\][[:space:]]*\{/ {s2=NR; g=1; next}
+  g==1 && /^\}/                                {e2=NR; g=0; next}
+  END { if (s1 && e1 && s2 && e2) printf "%d,%d,%d,%d", s1, e1, s2, e2 }
+' apps/ui/app/globals.css)
+[ -n "$RANGES" ] || { echo "FAIL: globals.css token blocks not found or unclosed"; exit 2; }
 rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
   --glob '!*.disabled' --glob '!*.svg' \
   apps/ui/app apps/ui/lib apps/ui/components \
-  | awk -v b="$BOUNDARY" -F: '!($1 ~ /globals\.css$/ && $2+0 <= b)' \
+  | awk -v r="$RANGES" -F: 'BEGIN{split(r,a,",")} !($1 ~ /globals\.css$/ && (($2+0>=a[1] && $2+0<=a[2]) || ($2+0>=a[3] && $2+0<=a[4])))' \
   | wc -l          # required: 0
 ```
 
@@ -232,29 +256,48 @@ unsatisfiable for the one seat that had to run it first.
 ## The mirrored guard in `tests/unit/t9-mode-tokens.test.ts` (contract, not code)
 
 The acceptance mirrors this oracle so the sweep is enforced by the test suite and
-not only by a human running a command. **Its exclusion must be derived the same
-way.** The contract the rework worker implements:
+not only by a human running a command. **Its exemption must have the same SHAPE**
+— two intervals, not a prefix. The contract the rework worker implements:
 
 ```ts
-/** Last line of globals.css inside the token blocks (1-indexed, inclusive). */
-function tokenBlockBoundary(css: string): number {
+/** A 1-indexed, inclusive line interval. */
+export type LineRange = readonly [start: number, end: number];
+
+/**
+ * The two token-block intervals in globals.css, located by syntax.
+ * Throws if either block is absent or unclosed — a boundary the guard cannot
+ * find is a broken guard, and a broken guard must stop the run.
+ */
+function tokenBlockRanges(css: string): readonly LineRange[] {
   const lines = css.split("\n");
-  const start = lines.findIndex((l) => /^html\[data-mode="chamber"\]\s*\{/.test(l));
-  if (start === -1) throw new Error("chamber token block not found in globals.css");
-  const end = lines.findIndex((l, i) => i > start && /^\}/.test(l));
-  if (end === -1) throw new Error("chamber token block is not closed");
-  return end + 1;
+  const find = (re: RegExp, label: string): LineRange => {
+    const start = lines.findIndex((l) => re.test(l));
+    if (start === -1) throw new Error(`${label} token block not found in globals.css`);
+    const end = lines.findIndex((l, i) => i > start && /^\}/.test(l));
+    if (end === -1) throw new Error(`${label} token block is not closed`);
+    return [start + 1, end + 1];
+  };
+  return [
+    find(/^:root\s*\{/, ":root"),
+    find(/^html\[data-mode="chamber"\]\s*\{/, "chamber")
+  ];
 }
+
+const isInsideTokenBlocks = (n: number, ranges: readonly LineRange[]): boolean =>
+  ranges.some(([start, end]) => n >= start && n <= end);
 ```
 
 The per-line skip becomes
-`if (path === globalsPath && lineNumber <= tokenBlockBoundary(css)) continue;`
-— replacing the current `index < 199`.
 
-**No fixed line number may remain anywhere** — not in this ADR, not in the shell
-oracle, not in the test. And the helper `throw`s rather than falling back: a
-boundary the guard cannot find is a broken guard, and a broken guard must stop
-the run rather than quietly pass everything or nothing.
+```ts
+if (path === globalsPath && isInsideTokenBlocks(lineNumber, ranges)) continue;
+```
+
+replacing AM2's `lineNumber <= tokenBlockBoundary(css)`.
+
+**Neither a fixed line number NOR a prefix comparison may remain anywhere** — not
+in this ADR, not in the shell oracle, not in the test. The two are different
+defects: AM2 fixed where the number came from, AM3 fixes what the number means.
 
 ---
 
@@ -305,3 +348,73 @@ is already recorded in `.hermes/TOOLING-TRAPS.md` as *"an acceptance pinned to
 ABSOLUTE LINE NUMBERS"*. So the remedy is not a better number; it is removing the
 number. Every consumer now computes the boundary from syntax at run time and
 fails loudly if it cannot find it.
+
+### 2026-08-31 — AM3/A: the AM2 remedy fixed the boundary's SOURCE but kept a one-sided PREFIX (trigger: `t_4ccac5c4` REV2 verdict 21:55, finding B2; ticket `t_6cd3cba0`)
+
+**What was still wrong.** AM2 replaced a literal `199` with a syntax-derived
+boundary. That closed M2 and was a real improvement — but the SHAPE never
+changed: `lineNumber <= boundary` exempts **everything from line 1 to the end of
+the last token block**. The token region is not a prefix. It is **two
+intervals** — `:root` at 5–72 and `html[data-mode="chamber"]` at 74–114 — with
+the banner above, the gap between, and the whole stylesheet below all outside
+it. This ADR had already stated the property correctly in its own words
+("covers the token region itself … and nothing beyond it") and then implemented
+something weaker.
+
+**Three live members of the surviving class, all GREEN under the AM2 filter:**
+
+| Mutant | Where the literal sits | AM2 (prefix) | AM3 (ranges) |
+|---|---|---|---|
+| M4 | line 73, the **gap between** the two blocks | 0 — missed | **1 — caught** |
+| M5 | line 4, **above `:root`** in the comment banner | 0 — missed | **1 — caught** |
+| M6 | line 150, with the **chamber block relocated to EOF** | 0 — missed | **1 — caught** |
+
+**M6 is why this was blocking rather than an N.** Moving the Chamber block to the
+bottom of `globals.css` is a semantically legal refactor — `ADR-002` itself
+records that `html[data-mode="chamber"]` (0,1,1) beats `:root` (0,1,0)
+*regardless of source order*, so nothing else in the suite objects. Under the
+prefix filter that single move computes a boundary of 4121 and **exempts the
+entire 4119-line stylesheet from the colour-literal law, silently** — on the one
+file all 32 clusters consume, and the one file with a single authorised writer
+for the whole mission, so no later seat could repair it.
+
+**Verification of the published artifacts, run at real scope on scratch fixtures
+(`/tmp`, zero repo writes, fixtures removed afterwards):**
+
+```
+FIXTURE  RANGES (published finder)   AM2-bound   AM3 hits   AM2 hits
+clean    [(5,72),(74,114)]           114         0          0
+m4       [(5,72),(75,115)]           115         1          0
+m5       [(6,73),(75,115)]           115         1          0
+m6       [(5,72),(4081,4121)]        4121        1          0
+```
+
+The same four fixtures through the **published TypeScript helper**, executed:
+
+```
+clean   ranges=[[5,72],[74,114]]    hits=0
+m4      ranges=[[5,72],[75,115]]    hits=1
+m5      ranges=[[6,73],[75,115]]    hits=1
+m6      ranges=[[5,72],[4081,4121]] hits=1
+```
+
+Fail-loud paths exercised on known-BAD input, both consumers:
+
+```
+:root renamed        -> shell guard fires (exit 2) ; helper THROWS ":root token block not found in globals.css"
+chamber left unclosed -> shell guard fires (exit 2) ; helper THROWS "chamber token block is not closed"
+real globals.css      -> RANGES = 5,72,74,114 (guard correctly does NOT fire)
+```
+
+*(My M6 fixture yields `(4081,4121)` where the reviewer recorded `(4082,4122)`
+— a one-line difference in how each of us rebuilt the fixture. Immaterial: both
+exempt the entire stylesheet, which is the finding.)*
+
+**The class, one level up.** AM2's changelog said the defect was "a structural
+boundary encoded as a positional constant" and fixed the constant. That
+diagnosis was incomplete: the deeper defect was **a two-interval region encoded
+as a one-sided comparison**. Fixing where a number comes from is not the same as
+fixing what the number means — and the spine's own corollary names this exactly:
+*choose the remedy by the SHAPE, not by your confidence about the source.* I had
+that corollary in front of me, quoted it in AM1, and still applied it to the
+source rather than the shape.

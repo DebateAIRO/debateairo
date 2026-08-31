@@ -136,6 +136,10 @@ looking.
    acceptance cell. `pnpm run typecheck` is a real gate for `packages/**`,
    `apps/api`, `apps/runner`, `tools/**` and `tests/**` — and for nothing under
    `apps/ui` or `web`.
+1b. **Every acceptance compile gate ALSO NAMES THE INVOCATION DIRECTORY**
+   (added AM3/B). On this repo the tsconfig does not determine the answer —
+   see §"Two compilers" below. **The repo root is canonical** for the 0-new
+   gate. A gate that names only its tsconfig is under-specified here.
 2. **Every cluster that writes any file under `apps/ui/` additionally runs the
    workspace compile gate**, enforced at **0-new** against the named baseline
    below. This applies to all 32 clusters except the four pure test-migration
@@ -143,9 +147,11 @@ looking.
 3. **The baseline is a named, dated list of exact error lines** — never a count.
    A count silently absorbs a new error the moment an old one is fixed.
 
-### The 0-new command (quote verbatim in packets)
+### The 0-new command (quote verbatim in packets) — **run from the repo root**
 
 ```sh
+cd "$(git rev-parse --show-toplevel)"      # CANONICAL. From apps/ui this resolves a
+                                           # DIFFERENT compiler and a different answer.
 pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
   | grep -E 'error TS' \
   | grep -v -e 'app/debate/\[id\]/DebatePageClient\.tsx(1488,11): error TS2322' \
@@ -204,3 +210,59 @@ itself (which also runs bundling and route collection); or a type error in
 `web/`, which no gate in this mission opens at all. `web/` is out of contract
 (`open-questions.md` Q-02) and its compile status is deliberately not this
 mission's claim.
+
+### Two compilers (added 2026-08-31, AM3/B — trigger: `t_4ccac5c4` REV2 finding N9)
+
+**This repository contains two TypeScript compilers, and `pnpm exec` resolves
+whichever is nearest the working directory.** Measured 2026-08-31:
+
+```
+$ pnpm exec tsc --version                       # from the repo root
+Version 7.0.2
+$ (cd apps/ui && pnpm exec tsc --version)       # from the workspace
+Version 5.9.3
+```
+
+Declared: root `package.json` pins `typescript: 7.0.2`; `apps/ui/package.json`
+pins `typescript: ^5.6.0`, resolved to 5.9.3.
+
+**Same tsconfig, same tree, different compiler, different answer:**
+
+```
+$ pnpm exec tsc --noEmit -p apps/ui/tsconfig.json | grep -c 'error TS'          # root, TS 7.0.2
+2      # apps/ui/app/debate/[id]/DebatePageClient.tsx(1488,11) TS2322
+       # apps/ui/app/layout.tsx(3,8)                            TS2882
+
+$ (cd apps/ui && pnpm exec tsc --noEmit -p tsconfig.json | grep -c 'error TS')  # workspace, TS 5.9.3
+1      # app/debate/[id]/DebatePageClient.tsx(1488,11) TS2322
+```
+
+TypeScript 7 reports the unresolved side-effect import of `./globals.css` as
+**TS2882** by default; 5.9.3 does not report it at all, and under
+`--noUncheckedSideEffectImports` reports it as **TS2307** — a third code for the
+same condition.
+
+Note the **error paths differ too**: `apps/ui/app/…` from the root,
+`app/…` from the workspace. The published filter clauses are substring matches
+that survive both shapes, but any future clause anchored with `^` would not.
+
+**Consequences that are now law:**
+
+- The **TS2882 baseline clause is load-bearing under the canonical compiler.**
+  Dropping it makes the 0-new gate return **1**, not 0 — verified. It is not a
+  phantom.
+- A seat that runs `pnpm --filter ui typecheck` — the workspace's own script, and
+  the natural thing to reach for — gets a **different compiler and a different
+  baseline** than this gate. That is not an alternative way to run the gate; it
+  is a different gate.
+- **This is why "name the tsconfig" was necessary but not sufficient.** AM2 fixed
+  the gate that could not open the file. AM3 fixes the gate that opens the file
+  with a compiler nobody named.
+
+**Correcting the record, and crediting it.** AM2/C recorded that the Wave-0
+reviewer's round-0 note "layout.tsx CLEAN" was wrong. It was not carelessness:
+the reviewer ran from inside `apps/ui`, where TS 5.9.3 genuinely reports nothing
+for that line. Under its compiler the observation was correct. The reviewer found
+and published this itself, against its own earlier verdict. The dual-compiler
+split is recorded in `.hermes/TOOLING-TRAPS.md` by the orchestrator; this ADR
+references it and does not restate it.
