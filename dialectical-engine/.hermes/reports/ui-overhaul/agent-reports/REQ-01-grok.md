@@ -22,3 +22,8 @@
 17. **Murder-case upgrades for one-prompt machine:** (a) design export → auto checklist of labeled strings/controls per artboard against SPEC inventory; (b) CI grep forbidding bare `| Assert` PLAN cells and missing `Cluster verification command`; (c) freeze artifact at READY FOR PEER REVIEW (F2) so reviewers never race writers; (d) packets must load brainstorming skill path explicitly (F5 floor).
 18. **Efficiency:** V rulings in the rework packet saved a second OQ cycle — keep rulings in the same packet as findings. F11 missing `4 TOTAL`/`Read ▾`/`Details ▾` was a checklist miss, not ambiguity.
 19. **Write discipline:** finished all SPEC/PLAN/DECISIONS/self-report writes before the final board comment (F2 freeze).
+
+## Round 2 micro (N1–N4)
+
+20. **Class-sweep residue:** F4g/F11 “named instances fixed, class not swept” cost a second micro-round — upgrade the requirements floor to grep shapes (`when fixture has`, unbound sibling paragraphs) before READY, not only the cited lines.
+21. **N1–N4 landed exactly:** T9-C4-3 OR→AND + V-manual hero meta; T1/T5 Required fixtures + T3 erratum; T9 SPEC v3 METHOD bodies (03 graph, no bench) + T9-C4-4; T8 R1 dead conditional struck via DECISIONS erratum.

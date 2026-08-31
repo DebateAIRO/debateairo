@@ -10,3 +10,4 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | Missing design controls `4 TOTAL`, `Details ▾`, `Read ▾`? | Added to inventory/copy/R3/R6/acceptance (F11). | Design TURN 3. | Requirements (Grok REQ-01-R1)
 - 2026-08-31 | SPEC version? | Bumped to v2 (F10 class). | Spine re-version. | Requirements (Grok REQ-01-R1)
 - 2026-08-31 | Mode toggle on library/public? | Yes — design shows ☾. | Design. | Requirements (Grok REQ-01)
+- 2026-08-31 | ERRATUM — V-manual step 3 “(when tree exists)” skippable? | Struck; rewritten as required fixture with strongest pro/con cases (N2 micro-round 2). Not a scope re-open. | Round-2 review N2. | Requirements (Grok REQ-01-R2)

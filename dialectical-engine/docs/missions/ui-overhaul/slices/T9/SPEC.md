@@ -1,6 +1,6 @@
 # SPEC — T9 Landing page
 
-**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1.
+**Version:** v3 (2026-08-31) · **Status:** FROZEN at v3. Supersedes v2.
 Scope change = new SPEC version, ratified by V.
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 9 in
@@ -55,7 +55,11 @@ are stub anchors only.
 - Method intro: `Four steps, then you do it again tomorrow.`
 - Method arena line: `The arena is built for repetition, not for a performance you prepare for once.`
 - Method steps 01–04 titles: `Models argue` · `They review each other` · `You challenge` · `Verdict with receipts`
-- Method step-03 body uses app framing: focused rebuttal spawned where you pointed (no `bench`)
+- Method step bodies (binding):
+  - 01: `Five frontier models build the tree — pro, con, and the reasoning that binds them.`
+  - 02: `Every claim is cross-reviewed by a rival model: agree or dispute, on the record.`
+  - 03: `Flag any sentence; the graph spawns a focused rebuttal where you pointed.` (app-vocab translation of design `bench` → `the graph`; no `bench`)
+  - 04: `Scores, condition marks, and replay handles — every number traces to its source.`
 - Closing: `Your argument is only as strong as its weakest claim.`
 - Pricing CTA line: `Take one debate. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering.`
 - Pricing strip: `First [PLACEHOLDER] debates free, then [PLACEHOLDER] per month. Cancel whenever.` (static glyphs this mission — V 2026-08-31)
@@ -136,7 +140,8 @@ pins stay under T3). **Which exact pin files = ARCH.**
 
 1. Open `/` logged out. **Expect:** landing with `DebateAI`,
    Method/Transcripts/Pricing, `Start a debate`, hero headline
-   `Find the weakest claim in your own argument.`, method steps 01–04, pricing
+   `Find the weakest claim in your own argument.`, hero meta
+   `[PLACEHOLDER] debates argued this week`, method steps 01–04, pricing
    strip containing literal `[PLACEHOLDER]`.
 2. Click the mode toggle. **Expect:** document mode marker flips between
    Terracotta and Chamber; text/surface pairs meet the contrast threshold ARCH

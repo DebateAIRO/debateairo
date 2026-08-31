@@ -19,7 +19,7 @@ Same as T9/PLAN.md.
 | Step | SPEC | WHAT | Acceptance |
 |---|---|---|---|
 | T5-C1-1 | R1 | Details/open control opens drawer for a node | Click `Details ▸` (or ARCH open control); assert drawer/dialog present |
-| T5-C1-2 | R2 | Score labels present when fixture has scores | Assert `BASE SCORE` and `FINAL STRENGTH` present |
+| T5-C1-2 | R2 | Score labels present | Required fixture: node with scores; assert `BASE SCORE` and `FINAL STRENGTH` present |
 | T5-C1-3 | R3 | Review verdict line when fixture has cross-review | Required fixture with cross-review; assert `REVIEW AGREED BY:` or `REVIEW DISPUTED BY:` plus model line |
 | T5-C1-4 | R3 | No fabricated review line without cross-review | Required fixture without cross-review; assert those labels absent |
 | T5-C1-5 | R4 | Replay/Restatement/Defeaters/Judge disagreement labels | Assert `REPLAY`, `RESTATEMENT`, `DEFEATERS`, `JUDGE DISAGREEMENT` present |

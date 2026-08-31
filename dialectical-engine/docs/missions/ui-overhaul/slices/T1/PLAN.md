@@ -45,7 +45,7 @@ one verification command per cluster; no bare `Assert`).
 | Step | SPEC | WHAT | Acceptance |
 |---|---|---|---|
 | T1-C3-1 | R5 | `Show set-aside paths` toggles visibility on a set-aside fixture | Required fixture: debate with ≥1 set-aside path; assert visible path/card count changes after toggle |
-| T1-C3-2 | R6 | Synthesis/verdict strip labels present when fixture has synthesis | Assert `↑ STRONGEST PRO` or `VERDICT` (or SPEC binding synthesis labels) present |
+| T1-C3-2 | R6 | Synthesis/verdict strip labels present | Required fixture: debate with synthesis/verdict data; assert `↑ STRONGEST PRO` or `VERDICT` (or SPEC binding synthesis labels) present |
 | T1-C3-3 | R8 | publicMode canvas locks Regenerate mutate path | Assert `↻ Regenerate` absent or disabled on publicMode mount; contrast threshold ARCH pins met |
 
 **Cluster verification command (ARCH finalizes):** three runs of T1 set-aside/synthesis/publicMode tests; worst run is verdict.

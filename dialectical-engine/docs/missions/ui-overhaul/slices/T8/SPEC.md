@@ -47,9 +47,8 @@ recovery security policy.
 
 ### R1 — Sign-up shell matches TURN 8 regions
 
-T8-S1 renders the listed regions and binding strings (or V-approved synonyms
-only if V closes a vocabulary OPEN QUESTION globally — until then use design
-copy on this auth marketing-adjacent shell).
+T8-S1 renders the listed regions and binding strings (including
+`Put a claim on the graph.`).
 
 ### R2 — Field validation affordances
 

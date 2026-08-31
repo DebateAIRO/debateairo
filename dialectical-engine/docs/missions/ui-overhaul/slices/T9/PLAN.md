@@ -8,7 +8,7 @@
 signed-in `/` stays library; stub nav; mode toggle; static placeholders;
 anonymous `Start a debate` → auth → New debate.
 
-**Spec:** `docs/missions/ui-overhaul/slices/T9/SPEC.md` v2
+**Spec:** `docs/missions/ui-overhaul/slices/T9/SPEC.md` v3
 
 **Status:** REQUIREMENTS CLUSTERS DRAFTED — Architecture fills HOW / file
 surfaces / exact acceptance commands.
@@ -71,8 +71,8 @@ vs library route tests; worst run is verdict.
 |---|---|---|---|
 | T9-C4-1 | R7 | Method steps include titles `Models argue`, `They review each other`, `You challenge`, `Verdict with receipts` | Assert all four strings on anonymous `/` |
 | T9-C4-2 | R6 | Sample block shows full R6 anatomy on ≥1 card | Assert in landing sample region: stance or type chip (`PRO`/`CON`/`REASONING`), `BASE`, `FINAL`, a model attribution line (e.g. contains `·`), and `REVIEW AGREED BY:` or `REVIEW DISPUTED BY:` — BASE/FINAL alone = RED |
-| T9-C4-3 | R8 | Placeholder slots remain static `[PLACEHOLDER]` glyphs this mission | Assert `[PLACEHOLDER] debates argued this week` OR pricing strip still contains literal `[PLACEHOLDER]`; live numeric counter without V DECISIONS closure = RED |
-| T9-C4-4 | R7/copy | Binding marketing paragraphs present (translated) | Assert hero body substring `softest point in your reasoning` AND closing `weakest claim` AND `Four steps, then you do it again tomorrow.` |
+| T9-C4-3 | R8 | Placeholder slots remain static `[PLACEHOLDER]` glyphs this mission | Assert `[PLACEHOLDER] debates argued this week` AND pricing strip contains literal `[PLACEHOLDER]`; either missing or a live numeric counter without V DECISIONS closure = RED |
+| T9-C4-4 | R7/copy | Binding marketing paragraphs + METHOD step bodies present (translated) | Assert hero body substring `softest point in your reasoning` AND closing `weakest claim` AND `Four steps, then you do it again tomorrow.` AND method bodies `Five frontier models build the tree — pro, con, and the reasoning that binds them.` AND `Every claim is cross-reviewed by a rival model: agree or dispute, on the record.` AND `Flag any sentence; the graph spawns a focused rebuttal where you pointed.` AND `Scores, condition marks, and replay handles — every number traces to its source.` |
 
 **Cluster verification command (ARCH finalizes):** three runs of T9 method/sample/placeholder tests; worst run is verdict.
 

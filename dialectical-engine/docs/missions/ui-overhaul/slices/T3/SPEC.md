@@ -135,10 +135,10 @@ Terracotta ↔ Chamber on library and public surfaces.
    `Your debates` then `Public debates`. **Expect:** visible row set or
    empty-state string differs between selectors (identical hardcoded
    “No debates yet” under both = fail).
-3. Open a published public debate URL logged out. **Expect:** public locked
-   banner; verdict/status with `Details ▾`; strongest pro/con with `Read ▾`
-   (when tree exists); view toggles work; Challenge locked; no owner
-   settings/delete.
+3. Open a published public debate URL logged out on a required fixture whose
+   tree has strongest pro and con cases. **Expect:** public locked banner;
+   verdict/status with `Details ▾`; strongest pro/con with `Read ▾`; view
+   toggles work; Challenge locked; no owner settings/delete.
 4. Click Unlock actions. **Expect:** sign-in (or documented auth) path; after
    auth, behavior matches ARCH-documented unlock rule.
 
