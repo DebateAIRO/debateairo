@@ -1,5 +1,6 @@
 "use client";
 
+import type { JSX } from "react";
 import { useEffect, useState } from "react";
 
 export type Mode = "terracotta" | "chamber";

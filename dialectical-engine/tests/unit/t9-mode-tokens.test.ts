@@ -295,6 +295,16 @@ function canonicalCssValue(value: string): string {
     .trim();
 }
 
+/** Last line of globals.css inside the token blocks (1-indexed, inclusive). */
+function tokenBlockBoundary(css: string): number {
+  const lines = css.split("\n");
+  const start = lines.findIndex((l) => /^html\[data-mode="chamber"\]\s*\{/.test(l));
+  if (start === -1) throw new Error("chamber token block not found in globals.css");
+  const end = lines.findIndex((l, i) => i > start && /^\}/.test(l));
+  if (end === -1) throw new Error("chamber token block is not closed");
+  return end + 1;
+}
+
 describe("T9-C3 token contract", () => {
   it("declares the complete inventory and the same mode-bearing key set in both modes", async () => {
     // PROPERTY: every inventory key is declared exactly once in its owning block,
@@ -445,6 +455,34 @@ describe("T9-C3 mode control and document guard", () => {
     expect(toggleSource, "head script remains storage's single reader").not.toContain("localStorage.getItem");
   });
 
+  it("keeps the pre-paint storage guard inside head and before body", () => {
+    // PROPERTY: the storage reader executes from the document head, never after
+    // application children where the first Terracotta paint could already occur.
+    const source = readFileSync(layoutPath, "utf8");
+    const headStart = source.indexOf("<head");
+    const guardStart = source.indexOf("dangerouslySetInnerHTML");
+    const headEnd = source.indexOf("</head>");
+    const bodyStart = source.indexOf("<body");
+
+    expect(headStart, "head opening exists").toBeGreaterThanOrEqual(0);
+    expect(guardStart, "guard follows head opening").toBeGreaterThan(headStart);
+    expect(guardStart, "guard is inside head").toBeLessThan(headEnd);
+    expect(headEnd, "head closes before body opens").toBeLessThan(bodyStart);
+  });
+
+  it("keeps hydration-warning suppression on both document root elements", () => {
+    // PROPERTY: the server html/body tolerate the head guard's pre-hydration
+    // data-mode mutation instead of reporting a mismatch for returning readers.
+    const source = readFileSync(layoutPath, "utf8");
+
+    expect(source, "html suppresses the expected data-mode mismatch").toMatch(
+      /<html\b[^>]*\bsuppressHydrationWarning(?:\s|>)/
+    );
+    expect(source, "body retains its hydration suppression").toMatch(
+      /<body\b[^>]*\bsuppressHydrationWarning(?:\s|>)/
+    );
+  });
+
   it("leaves no mode-inert colour literal in the four Wave-0 product files", () => {
     // PROPERTY: outside globals.css's declared token region, every owned product
     // colour is a custom-property reference and can therefore respond to mode.
@@ -455,11 +493,13 @@ describe("T9-C3 mode control and document guard", () => {
         hits.push(`${path}:missing`);
         continue;
       }
-      const lines = readFileSync(path, "utf8").split("\n");
-      lines.forEach((line, index) => {
-        if (path === globalsPath && index < 199) return;
-        if (patterns.test(line)) hits.push(`${path}:${index + 1}:${line.trim()}`);
-      });
+      const css = readFileSync(path, "utf8");
+      const lines = css.split("\n");
+      for (const [index, line] of lines.entries()) {
+        const lineNumber = index + 1;
+        if (path === globalsPath && lineNumber <= tokenBlockBoundary(css)) continue;
+        if (patterns.test(line)) hits.push(`${path}:${lineNumber}:${line.trim()}`);
+      }
     }
     expect(hits).toEqual([]);
   });
