@@ -86,7 +86,7 @@ export function TopBar() {
         <Link className="btn btnDark" href="/new">
           + New debate
         </Link>
-        <span className="btn" aria-label="Signed-in asker">ASKER</span>
+        <span className="roleChip" title="Asker role placeholder">ASKER</span>
         <ModeToggle />
         <Link className="iconBtn" href="/settings" aria-label="Settings" title="Settings">
           ⚙

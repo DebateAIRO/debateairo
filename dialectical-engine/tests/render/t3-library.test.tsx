@@ -52,8 +52,8 @@ vi.mock("next/navigation", async (importOriginal) => ({
 
 const globalStyles = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
 
-async function renderSignedInRoute(): Promise<Document> {
-  routeMocks.sessionCookie = "t3-c1-session";
+async function renderRoute(sessionCookie: string | null): Promise<Document> {
+  routeMocks.sessionCookie = sessionCookie;
   setPathname("/");
   const [{ default: HomePage }, { TopBar }, { renderToStaticMarkup }, { JSDOM }] = await Promise.all([
     vi.importActual<HomePageModule>("../../apps/ui/app/page.js"),
@@ -68,7 +68,15 @@ async function renderSignedInRoute(): Promise<Document> {
       {page}
     </div>
   );
-  return new JSDOM(html).window.document;
+  const document = new JSDOM(html).window.document;
+  const style = document.createElement("style");
+  style.textContent = globalStyles;
+  document.head.append(style);
+  return document;
+}
+
+async function renderSignedInRoute(): Promise<Document> {
+  return renderRoute("t3-c1-session");
 }
 
 async function syntheticShell(hasLanding: boolean): Promise<Document> {
@@ -109,10 +117,19 @@ describe("chrome", () => {
     const rendered = await renderSignedInRoute();
     const topBar = rendered.querySelector(".topBar");
     const library = rendered.querySelector('.sectionHead[aria-label="Debate library"]');
+    const askerPlaceholder = [...(topBar?.querySelectorAll("span") ?? [])].find(
+      (element) => element.textContent === "ASKER"
+    );
 
     expect(topBar?.textContent).toContain("Library");
     expect(topBar?.textContent).toContain("+ New debate");
-    expect(topBar?.textContent).toContain("ASKER");
+    // Placeholder pending V's Q-13 identity chip (t_afb67c94): this is an
+    // honest, non-interactive role label and makes no signed-in-state claim.
+    expect(askerPlaceholder, "ASKER role placeholder").not.toBeNull();
+    expect(askerPlaceholder?.classList.contains("roleChip")).toBe(true);
+    expect(askerPlaceholder?.classList.contains("btn")).toBe(false);
+    expect(askerPlaceholder?.getAttribute("title")).toBe("Asker role placeholder");
+    expect(askerPlaceholder?.hasAttribute("aria-label")).toBe(false);
     expect(library?.textContent?.includes("Your Debates") || topBar?.textContent?.includes("+ New debate")).toBe(true);
     expect(rendered.body.textContent).not.toContain("Find the weakest claim in your own argument.");
   });
@@ -145,6 +162,24 @@ describe("chrome", () => {
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("mounts an enabled mode toggle in the auth TopBar", async () => {
+    // PROPERTY (T3-C1-5): auth routes expose the authTopBar branch's own
+    // accessibly named mode control, and the control is never disabled.
+    setPathname("/login");
+    const { TopBar } = await vi.importActual<TopBarModule>("../../apps/ui/components/TopBar.js");
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<TopBar />));
+
+    const toggle = document.querySelector<HTMLButtonElement>(".authTopBar [data-mode-toggle]");
+    const accessibleName = toggle?.getAttribute("aria-label") ?? toggle?.textContent?.trim() ?? "";
+
+    expect(toggle, "authTopBar mode toggle").not.toBeNull();
+    expect(accessibleName).toMatch(/Switch to (Chamber|Terracotta) mode/);
+    expect(toggle?.hasAttribute("aria-disabled")).toBe(false);
+  });
+
   it("suppresses the global TopBar when the landing is the document", async () => {
     // PROPERTY: a landing marker anywhere inside appShell suppresses its direct
     // global TopBar child before paint.
@@ -161,6 +196,39 @@ describe("chrome", () => {
     const topBar = rendered.querySelector<HTMLElement>(".topBar");
 
     expect(rendered.defaultView!.getComputedStyle(topBar!).display).not.toBe("none");
+  });
+
+  it("suppresses the TopBar in the real anonymous landing document", async () => {
+    // PROPERTY (T3-C1-4 P1): the real anonymous `/` branch emits all five
+    // landing markers and suppresses the real global TopBar with display:none.
+    const rendered = await renderRoute(null);
+    const topBar = rendered.querySelector<HTMLElement>(".topBar");
+
+    expect(rendered.querySelectorAll("[data-landing-section]")).toHaveLength(5);
+    expect(topBar, "real anonymous TopBar").not.toBeNull();
+    expect(rendered.defaultView!.getComputedStyle(topBar!).display).toBe("none");
+  });
+
+  it("keeps the TopBar mode toggle visible in the real signed-in document", async () => {
+    // PROPERTY (T3-C1-4 P2): the same real route harness keeps signed-in
+    // global chrome and its accessibly named mode control visible.
+    const rendered = await renderRoute("t3-c1-session");
+    const topBar = rendered.querySelector<HTMLElement>(".topBar");
+    const toggle = topBar?.querySelector<HTMLElement>("[data-mode-toggle]") ?? null;
+    const accessibleName = toggle?.getAttribute("aria-label") ?? toggle?.textContent?.trim() ?? "";
+
+    expect(rendered.defaultView!.getComputedStyle(topBar!).display).toBe("flex");
+    expect(toggle, "real signed-in TopBar mode toggle").not.toBeNull();
+    expect(accessibleName).toMatch(/Switch to (Chamber|Terracotta) mode/);
+    expect(rendered.defaultView!.getComputedStyle(toggle!).display).not.toBe("none");
+  });
+
+  it("keeps the real layout TopBar as a direct appShell child", () => {
+    // PROPERTY (T3-C1-4 P3): layout.tsx preserves the direct-child shape on
+    // which the anonymous suppression selector depends.
+    const layoutSource = readFileSync(resolve(process.cwd(), "apps/ui/app/layout.tsx"), "utf8");
+
+    expect(layoutSource).toMatch(/<div className="appShell">\s*<TopBar \/>/);
   });
 
   it("pins the real signed-in render to zero landing markers", async () => {
