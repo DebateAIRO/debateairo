@@ -522,3 +522,139 @@ text was already published and verified — and because the alternative was
 shipping AM4 with a known-blind gate in the very file AM4 edits. If the
 orchestrator would rather that had waited for its own charge, the correction is
 one revert and I would not argue.
+
+---
+
+# AM5 — verify survivability (ticket `t_707a9ac6`)
+
+**Charge.** The fresh T9-C1 codex seat preflight-blocked: row 2's verify command
+required `tests/unit/pda-s03-keyboard-accessibility.test.ts`, which row 2's own
+mandated route split necessarily breaks. Sweep the class over all 32 clusters,
+fix every DEFECT row, reconcile the ADR-002 / T9-DECISIONS mount drift.
+
+## The block was correct, and my dispatch graph caused it
+
+`SELECT * FROM` the seat's position: SPEC T9 R1 mandates the split; the pin was
+not in T9-C1's write surface; the designated migration owner (T9-C5) was four
+rows later. There is no execution of T9-C1's charge that ends green. The seat
+burned a preflight and wrote nothing, which is the correct outcome and the
+second time a coder has caught an ARCH acceptance defect before touching code
+(AF-1 was the first).
+
+**My cause, stated plainly.** I built the dispatch order along one axis —
+*write-surface disjointness* — and verified it along that axis (AM4's sweep
+checked create-targets). A verify command is a second surface: it names files a
+cluster must make green, and a cluster's own charge can make them red. I never
+crossed the two. Four amendments, four instances of the same shape: **an
+acceptance a contract-obedient seat cannot satisfy.**
+
+## What I found beyond the reported instance
+
+The charge said "fix every DEFECT row, not just T9-C1's". The sweep found five
+things the reported instance did not show:
+
+1. **Five RETARGET pins had no writer in any of the 32 rows** — `pol01-policy`,
+   `pda-s02-affordance-drift`, `v2ui-pages`, `s8-publication-contract`,
+   `auth-front-door-parity`. If any went red, no cluster was legally permitted
+   to fix it. That is the general form of T9-C1's block; T9-C1 was the instance
+   that happened to be dispatched first.
+2. **`pda-s03` breaks a SECOND time at T3-C2 (#14)**, which recases the library
+   selectors to `Your debates` / `Public debates` — with the migration owner at
+   #6, eight rows *before* the break. Moving T9-C5 earlier (the packet's
+   suggested lever) makes this row worse, not better.
+3. **22 of 32 clusters under-ran their slice regression set**, which
+   `test-migration.md` declares mandatory in its own words. That under-run is
+   how a break stays invisible for eleven rows.
+4. **Two absence-clause traps no ordering can fix.** `pol01-policy.test.ts:92`
+   forbids `localStorage` in `DebatePageClient.tsx` — which is ADR-002's second
+   mode-toggle mount. `auth-front-door-parity.test.ts:80` forbids it in
+   `LoginFlow.tsx`/`SignUpFlow.tsx` — which T9-C2 rewrites for the return path.
+   Both break by *adding* code, so every possible cluster order contains the
+   break. The fix is a constraint on how the mount is written, not a position.
+5. **T5-C3's write surface held a KEEP file** (`prov01-honesty-drawer.test.tsx`).
+   A migration cluster holding a KEEP pin makes "edit the test that caught it"
+   the cheapest exit from a real regression. Corrected.
+
+## The resolution, and why not the obvious one
+
+The packet offered two levers: re-order T9-C5 earlier, or strip `pda-s03` from
+intermediate commands. I took neither.
+
+Re-ordering fixes one row and breaks others — it cannot fix finding 2 (the break
+is *after* every position C5 could take and *before* the only other T9 cluster),
+and it cannot touch finding 4 at all. Stripping the pin from intermediate
+commands buys green by deleting coverage in exactly the window where the code is
+changing.
+
+What I shipped instead: **pin ownership follows subject ownership.** The cluster
+that rewrites a product file owns every standing pin that reads it. The law then
+holds by construction at every position, because the last breaker before any
+consumer is itself a legal migrator. Nothing is reordered; all 32 positions and
+every dependency rationale in the file survive, because the defect was
+ownership, not sequence.
+
+Two pins deliberately gain no writer: `pol01-policy` and
+`auth-front-door-parity` assert *absence*, so their red is a product bug and
+editing them would delete the security property they exist to hold.
+
+## Method, including where it was wrong first
+
+- Parsed all 32 rows mechanically. Built a test→product read-map. **The first
+  read-map under-reported**: it matched literal `apps/ui/…` strings, and
+  `v2ui-pages.test.ts` reads through a `source(relativePath)` helper, so it
+  showed 0 of its 9 real subjects. Re-done by suffix + `@/`-alias join. Then
+  `app/page.tsx` was removed from that file by hand — its only match is
+  `duplicateWebSource("app/page.tsx")` at line 270, which reads `web/`. Same
+  loose-matcher failure as AM1, caught the same way: by diffing match sets.
+- **Adjudicated every candidate against what the pin actually asserts.** File
+  overlap generates candidates; it does not decide. The raw join produced a
+  closure in which nearly every cluster could write nearly every pin — an
+  absurd result that would have destroyed single-writer discipline. Four
+  (breaker, pin) pairs are adjudicated NOT-A-BREAK and **published with their
+  evidence and the constraint that keeps each true**, because an unpublished
+  exemption is a hole.
+- **A false alarm I nearly filed.** Mid-sweep, `vitest list` appeared to return
+  zero tests for multi-path invocations — I was one step from reporting a
+  false-green trap in every verify command in the mission. It was a shell
+  artefact (an empty variable in one probe, stdin consumed by a subshell in
+  another). Re-run through `subprocess` with explicit paths: all five files
+  collected, all 30 standing paths collected, 172 test names. **No such trap
+  exists.** Recorded because I would have published it.
+- Re-ran the invariant checker against the **published file** (parsed back out
+  of the markdown, not from my working data): 32 rows, 4 exemptions,
+  **0 violations**.
+
+## Packet error, reported not absorbed
+
+Constraint 2 says *"Session cases are unaffected."* There are **no session
+cases**. `pda-s03` has one module-level `next/headers` mock returning
+`get: () => undefined`, so all **5 of 5** cases render anonymous `/` and all
+five assert `.sectionHead[aria-label="Debate library"]` / `.tabEmptyHint`. A
+seat following the packet would migrate half a file and leave the rest red —
+the same defect one layer down.
+
+The migration is therefore a **mock change, not an assertion rewrite**, for four
+of the five: after the split the library lives on the signed-in `/`, whose
+markup T9-C1 does not touch, so the assertions hold verbatim against a
+session-cookie render. The fifth (`.tabEmptyHint`) is the only one whose subject
+the SPEC genuinely deletes, and it is re-pointed to the route-split property.
+Exact mock, and the pin-list bounded by what exists at position #2, are in
+`dispatch-order.md`.
+
+## What this amendment still would not catch
+
+The sweep is a static join. A pin that reaches a product file through a runtime
+import chain (test → component A → component B) is invisible to it.
+`ui02d-model-identity.test.tsx` asserts across seven components and is KEEP only
+because ADR-006 freezes their class names — if a cluster renames a frozen class,
+the sweep says OK and the suite goes red. That is ADR-006's job, not this law's,
+and both must hold. I am stating the gap rather than claiming the sweep is a
+proof of safety.
+
+## Writes
+
+`dispatch-order.md` (all 32 rows + the law, exemptions, constraints, T9-C1
+migration section, one stale-prose correction, changelog with the full sweep
+table) · `ADR-002-mode-mechanism.md` (mount enumeration two→three, absence-clause
+constraints, changelog) · `slices/T9/DECISIONS.md` (5 appended rows + new tally;
+no existing row rewritten) · this report · board comment on `t_707a9ac6`.

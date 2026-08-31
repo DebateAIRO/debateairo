@@ -97,12 +97,20 @@ caused exactly that failure.
 
 ### Where it mounts — the complete enumeration
 
-Exactly **two** mount points cover all eight slices. This is the whole list; a
-seat that adds a third has found a route the map missed and must say so.
+**AMENDED 2026-08-31 (AM5). The number is THREE, not two.** This section used to
+say two and to list anonymous `/` under `TopBar`. That was written before
+`ADR-003`'s route split existed in dispatch form: after the split, anonymous `/`
+renders `LandingPage`, which does **not** render `TopBar`, so the row below that
+claimed to cover *"`/` (T9 anonymous)"* covered nothing. AM2/D already put the
+mount in `LandingChrome` and pinned it with `T9-C1-3`; this table had not caught
+up, and `slices/T9/DECISIONS.md` inherited the stale description from it.
+
+A seat that finds a **fourth** has found a route the map missed and must say so.
 
 | Mount | File | Covers |
 |---|---|---|
-| Global chrome | `apps/ui/components/TopBar.tsx` — in `topBarActions`, and in the `authTopBar` branch | `/` (T9 anonymous, T3 signed-in), `/new` (T4), `/settings` (T6), `/admin/workers` (T7 fleet), `/login` `/sign-up` `/verify-email` `/enroll-mfa` (T7, T8) |
+| Anonymous landing | `apps/ui/components/landing/LandingChrome.tsx` — created and mounted by **T9-C1** (dispatch row 2), whose chrome copy is T9-C2's | `/` **logged out only** (T9 R3) |
+| Global chrome | `apps/ui/components/TopBar.tsx` — in `topBarActions`, and in the `authTopBar` branch | `/` **signed in only** (T3), `/new` (T4), `/settings` (T6), `/admin/workers` (T7 fleet), `/login` `/sign-up` `/verify-email` `/enroll-mfa` (T7, T8) |
 | Debate chrome | `apps/ui/app/debate/[id]/DebatePageClient.tsx` — inside `<div className="debateTopControlRow">`, as a **sibling of** the `{hasTree ? …}` conditional, never inside it | `/debate/[id]` (T1, T5 drawer) and `/public/debate/[id]` (T3 3b, T5 public) |
 
 The "sibling of, never inside" is load-bearing: the `segment` view group is
@@ -113,8 +121,30 @@ debate that may still be generating. Anchor on the class name
 cluster in T1/T3/T5 edits it.
 
 `TopBar` returns `null` for `/debate/*` and `/public/debate/*`
-(`TopBar.tsx:57`), which is precisely why the debate chrome needs its own
-mount and why two is the exact number.
+(`TopBar.tsx:57`), which is why the debate chrome needs its own mount. The
+anonymous landing needs its own for the mirror-image reason: it never renders
+`TopBar` at all. Three is the exact number, and each of the three is pinned by
+a different cluster's acceptance — `T9-C1-3` (landing), `T3-C1-3` (signed-in
+library), and T1's debate-chrome row.
+
+### Two absence-clause pins constrain HOW the mount is written (AM5)
+
+The persistence mechanism is `localStorage`, and two standing tests forbid that
+identifier in files this ADR tells clusters to edit. Both are quoted with their
+constraints in `dispatch-order.md` §"Two negative-clause traps"; the rule for
+this ADR is one sentence:
+
+> **Every mount is `<ModeToggle />` and nothing else.** All storage access lives
+> inside `apps/ui/components/ModeToggle.tsx`. No mount site may read or write
+> `localStorage` inline.
+
+`tests/unit/pol01-policy.test.ts:92` asserts
+`not.toMatch(/…|localStorage/)` over `DebatePageClient.tsx` — this ADR's debate
+chrome mount. `tests/architecture/auth-front-door-parity.test.ts:80` asserts the
+same over `LoginFlow.tsx` and `SignUpFlow.tsx`, which is why the auth screens
+take their toggle from the `TopBar` row above and never grow one of their own.
+Neither test may be edited to accommodate a mount: they are the security
+properties the mount must not break.
 
 The drawer (T5) does not mount its own toggle: `NodeDetailDrawer` renders
 inside the debate document, so the debate-chrome toggle already switches it.
@@ -194,3 +224,26 @@ both major versions, whereas the bare global was only ever correct on 18.
 publishes as a contract MUST have been compiled under the workspace tsconfig
 before publication. A contract that does not compile is not a contract; it is a
 defect with authority, and it propagates to every seat that obeys it.
+
+### 2026-08-31 — AM5/A: the mount enumeration still described the pre-split landing (trigger: T9-C1 codex seat, secondary finding on `t_4487f9b1`, 23:07)
+
+**What was wrong.** The table said *"Exactly two mount points"* and listed
+anonymous `/` under the `TopBar` row. `ADR-003` splits `/` so that the logged-out
+document renders `LandingPage`, and `LandingPage` does not render `TopBar`. The
+row therefore claimed coverage of a surface it could not reach — and SPEC T9 R3
+names that exact surface. AM2/D had already added the `LandingChrome` mount and
+pinned it (`T9-C1-3`); this table was the stale half of the same fix, and
+`slices/T9/DECISIONS.md` was written from it.
+
+**Fixed:** three rows, each with a cluster that pins it. The count sentence now
+says three, and the two-is-exact argument is replaced with the reason each of
+the three exists.
+
+**Second half of the same amendment.** The sweep in `dispatch-order.md` §AM5
+found that this ADR's `localStorage` persistence collides with two standing
+absence-clause pins covering `DebatePageClient.tsx`, `LoginFlow.tsx` and
+`SignUpFlow.tsx` — files this ADR sends clusters into. The constraint is stated
+above rather than left to be discovered by whichever seat goes red first. Note
+what this was NOT fixed by: no reordering of clusters helps, because the break
+is caused by *adding* code, not by *changing* copy, and every order contains the
+addition.
