@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 916" font-family="Helvetica,Arial,sans-serif">
+<rect width="1180" height="916" fill="#F7F4EC"/>
+<text x="24" y="46" font-size="21" font-weight="bold" fill="#29261F">ui-overhaul — mission graph (32 Codex clusters · 6 waves)</text>
+<text x="24" y="68" font-size="12" fill="#6b6459">REQ frozen 561da88 (Grok → Opus5 ×2 rounds) → ARCH f75b7e1 (Opus5 → Grok review RUNNING) → CODE Codex (rev Opus5) → QA V · one writer per file · verify = worst of 3 runs</text>
+<rect x="24" y="94" width="1132" height="102" rx="10" fill="white" stroke="#C15F3C" stroke-width="2"/>
+<text x="38" y="116" font-size="13" font-weight="bold" fill="#C15F3C">Wave 0 — foundation (serial gate)</text>
+<rect x="38" y="128" width="214" height="52" rx="7" fill="#C15F3C" fill-opacity="0.12" stroke="#C15F3C"/>
+<text x="48" y="148" font-size="13" font-weight="bold" fill="#29261F">T9-C3</text>
+<text x="48" y="166" font-size="10.5" fill="#4b453c">tokens · fonts · mode</text>
+<rect x="24" y="212" width="1132" height="102" rx="10" fill="white" stroke="#A8823E" stroke-width="2"/>
+<text x="38" y="234" font-size="13" font-weight="bold" fill="#A8823E">Wave 1 — chrome & route split (serialised: shared page.tsx)</text>
+<rect x="38" y="246" width="214" height="52" rx="7" fill="#A8823E" fill-opacity="0.12" stroke="#A8823E"/>
+<text x="48" y="266" font-size="13" font-weight="bold" fill="#29261F">T9-C1</text>
+<text x="48" y="284" font-size="10.5" fill="#4b453c">anon / vs signed-in /</text>
+<rect x="266" y="246" width="214" height="52" rx="7" fill="#A8823E" fill-opacity="0.12" stroke="#A8823E"/>
+<text x="276" y="266" font-size="13" font-weight="bold" fill="#29261F">T3-C1</text>
+<text x="276" y="284" font-size="10.5" fill="#4b453c">library chrome + ☾ mount</text>
+<line x1="590.0" y1="196" x2="590.0" y2="212" stroke="#29261F" stroke-width="2" marker-end="url(#a)"/>
+<rect x="24" y="330" width="1132" height="102" rx="10" fill="white" stroke="#3F7466" stroke-width="2"/>
+<text x="38" y="352" font-size="13" font-weight="bold" fill="#3F7466">Wave 2 — landing body (parallel)</text>
+<rect x="38" y="364" width="214" height="52" rx="7" fill="#3F7466" fill-opacity="0.12" stroke="#3F7466"/>
+<text x="48" y="384" font-size="13" font-weight="bold" fill="#29261F">T9-C2</text>
+<text x="48" y="402" font-size="10.5" fill="#4b453c">chrome · CTAs · return path</text>
+<rect x="266" y="364" width="214" height="52" rx="7" fill="#3F7466" fill-opacity="0.12" stroke="#3F7466"/>
+<text x="276" y="384" font-size="13" font-weight="bold" fill="#29261F">T9-C4</text>
+<text x="276" y="402" font-size="10.5" fill="#4b453c">method · sample · pricing</text>
+<rect x="494" y="364" width="214" height="52" rx="7" fill="#3F7466" fill-opacity="0.12" stroke="#3F7466"/>
+<text x="504" y="384" font-size="13" font-weight="bold" fill="#29261F">T9-C5</text>
+<text x="504" y="402" font-size="10.5" fill="#4b453c">T9 pin migration</text>
+<line x1="590.0" y1="314" x2="590.0" y2="330" stroke="#29261F" stroke-width="2" marker-end="url(#a)"/>
+<rect x="24" y="448" width="1132" height="102" rx="10" fill="white" stroke="#3D5A80" stroke-width="2"/>
+<text x="38" y="470" font-size="13" font-weight="bold" fill="#3D5A80">Wave 3 — debate surfaces</text>
+<rect x="38" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="48" y="502" font-size="13" font-weight="bold" fill="#29261F">T1-C1</text>
+<text x="48" y="520" font-size="10.5" fill="#4b453c">debate chrome + views</text>
+<rect x="266" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="276" y="502" font-size="13" font-weight="bold" fill="#29261F">T1-C2</text>
+<text x="276" y="520" font-size="10.5" fill="#4b453c">card anatomy</text>
+<rect x="494" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="504" y="502" font-size="13" font-weight="bold" fill="#29261F">T1-C3</text>
+<text x="504" y="520" font-size="10.5" fill="#4b453c">set-aside · synthesis · publicMode</text>
+<rect x="722" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="732" y="502" font-size="13" font-weight="bold" fill="#29261F">T1-C4</text>
+<text x="732" y="520" font-size="10.5" fill="#4b453c">T1 pin migration</text>
+<rect x="950" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="960" y="502" font-size="13" font-weight="bold" fill="#29261F">T5-C1</text>
+<text x="960" y="520" font-size="10.5" fill="#4b453c">drawer core</text>
+<rect x="1178" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="1188" y="502" font-size="13" font-weight="bold" fill="#29261F">T5-C2</text>
+<text x="1188" y="520" font-size="10.5" fill="#4b453c">drawer actions + mode</text>
+<rect x="1406" y="482" width="214" height="52" rx="7" fill="#3D5A80" fill-opacity="0.12" stroke="#3D5A80"/>
+<text x="1416" y="502" font-size="13" font-weight="bold" fill="#29261F">T5-C3</text>
+<text x="1416" y="520" font-size="10.5" fill="#4b453c">T5 pin migration</text>
+<line x1="590.0" y1="432" x2="590.0" y2="448" stroke="#29261F" stroke-width="2" marker-end="url(#a)"/>
+<rect x="24" y="566" width="1132" height="102" rx="10" fill="white" stroke="#6B5CA5" stroke-width="2"/>
+<text x="38" y="588" font-size="13" font-weight="bold" fill="#6B5CA5">Wave 4 — library lists & public 3b</text>
+<rect x="38" y="600" width="214" height="52" rx="7" fill="#6B5CA5" fill-opacity="0.12" stroke="#6B5CA5"/>
+<text x="48" y="620" font-size="13" font-weight="bold" fill="#29261F">T3-C2</text>
+<text x="48" y="638" font-size="10.5" fill="#4b453c">Your/Public selectors</text>
+<rect x="266" y="600" width="214" height="52" rx="7" fill="#6B5CA5" fill-opacity="0.12" stroke="#6B5CA5"/>
+<text x="276" y="620" font-size="13" font-weight="bold" fill="#29261F">T3-C3</text>
+<text x="276" y="638" font-size="10.5" fill="#4b453c">3b verdict-first + locks</text>
+<rect x="494" y="600" width="214" height="52" rx="7" fill="#6B5CA5" fill-opacity="0.12" stroke="#6B5CA5"/>
+<text x="504" y="620" font-size="13" font-weight="bold" fill="#29261F">T3-C4</text>
+<text x="504" y="638" font-size="10.5" fill="#4b453c">T3 pin migration</text>
+<line x1="590.0" y1="550" x2="590.0" y2="566" stroke="#29261F" stroke-width="2" marker-end="url(#a)"/>
+<rect x="24" y="684" width="1132" height="102" rx="10" fill="white" stroke="#8C4A5E" stroke-width="2"/>
+<text x="38" y="706" font-size="13" font-weight="bold" fill="#8C4A5E">Wave 5 — forms & auth (parallel)</text>
+<rect x="38" y="718" width="214" height="52" rx="7" fill="#8C4A5E" fill-opacity="0.12" stroke="#8C4A5E"/>
+<text x="48" y="738" font-size="13" font-weight="bold" fill="#29261F">T4-C1..C4</text>
+<text x="48" y="756" font-size="10.5" fill="#4b453c">new debate ×4</text>
+<rect x="266" y="718" width="214" height="52" rx="7" fill="#8C4A5E" fill-opacity="0.12" stroke="#8C4A5E"/>
+<text x="276" y="738" font-size="13" font-weight="bold" fill="#29261F">T6-C1..C4</text>
+<text x="276" y="756" font-size="10.5" fill="#4b453c">settings ×4</text>
+<rect x="494" y="718" width="214" height="52" rx="7" fill="#8C4A5E" fill-opacity="0.12" stroke="#8C4A5E"/>
+<text x="504" y="738" font-size="13" font-weight="bold" fill="#29261F">T7-C1..C4</text>
+<text x="504" y="756" font-size="10.5" fill="#4b453c">sign-in · 2FA · fleet ×4</text>
+<rect x="722" y="718" width="214" height="52" rx="7" fill="#8C4A5E" fill-opacity="0.12" stroke="#8C4A5E"/>
+<text x="732" y="738" font-size="13" font-weight="bold" fill="#29261F">T8-C1..C4</text>
+<text x="732" y="756" font-size="10.5" fill="#4b453c">sign-up · MFA · recovery ×4</text>
+<line x1="590.0" y1="668" x2="590.0" y2="684" stroke="#29261F" stroke-width="2" marker-end="url(#a)"/>
+<text x="24" y="810" font-size="12" fill="#6b6459">Serial chains inside waves: LoginFlow.tsx (T9-C2→T7-C1→T7-C2→T8-C3) · page.tsx (T9-C1→T3-C1→T3-C2) · DebateCanvas.tsx (T1-C2→T1-C3) · NodeDetailDrawer.tsx (T5-C1→T5-C2)</text>
+<text x="24" y="830" font-size="12" fill="#6b6459">Every cluster bundles its slice regression set — 44 files read apps/ui, 12 legacy web/ pins excluded by ARCH ruling (Q-03). globals.css writer: T9-C3 only.</text>
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#29261F"/></marker></defs>
+</svg>
