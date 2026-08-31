@@ -46,7 +46,9 @@ handoff includes the RED evidence (the failing run's tail) and the GREEN runs.
 ## 4. Acceptance (the verdict is the WORST of three runs)
 pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts tests/unit/pda-s03-keyboard-accessibility.test.ts
 Run it three times; all three must pass; paste the worst run's summary line.
-ALSO: the ADR-001 sweep command output showing residual count 0.
+ALSO: ADR-001's WAVE-0 ORACLE (the sweep scoped to your four product files,
+amended 2026-08-31 after your own preflight block — baseline 113) showing
+residual count 0. The global sweep is NOT yours; it belongs to T8-C4.
 ALSO: pnpm run typecheck must exit 0 (repo-wide).
 
 ## 5. Self-report (verbatim law) — BEFORE your final comment, write

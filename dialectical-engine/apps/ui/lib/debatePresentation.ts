@@ -38,7 +38,7 @@ export const ROLE_PALETTES: Record<Exclude<Role, "root">, RolePalette> = {
     text: "var(--text-3)",
     bg: "var(--surface-sunken)",
     border: "var(--line-strong)",
-    line: "oklch(0.78 0.01 80)",
+    line: "var(--line-strong)",
     arrow: "◆",
     label: "Lens"
   }
@@ -265,7 +265,7 @@ export function layoutTree(
     connectors.push({
       id: p.id,
       d: `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`,
-      color: p.state === "empty" || p.state === "abandoned" ? "oklch(0.82 0.006 80)" : pal.line,
+      color: p.state === "empty" || p.state === "abandoned" ? "var(--line-strong)" : pal.line,
       width: p.state === "empty" || p.state === "abandoned" ? 1.5 : 2,
       dash: p.state === "empty" || p.state === "abandoned" ? "4 5" : "none",
       opacity: streaming ? 0.45 : p.state === "abandoned" ? 0.5 : 0.9

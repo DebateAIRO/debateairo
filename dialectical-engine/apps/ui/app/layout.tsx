@@ -1,26 +1,26 @@
-import { Source_Serif_4, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { TopBar } from "@/components/TopBar";
 import "./globals.css";
 
-const serif = Source_Serif_4({
+const display = Fraunces({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  axes: ["SOFT", "WONK", "opsz"],
   style: ["normal", "italic"],
-  variable: "--font-serif",
+  variable: "--font-fraunces",
   display: "swap"
 });
 
-const sans = Hanken_Grotesk({
+const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-sans",
+  style: ["normal", "italic"],
+  variable: "--font-jakarta",
   display: "swap"
 });
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-mono",
+  variable: "--font-mono-src",
   display: "swap"
 });
 
@@ -31,7 +31,16 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var m=localStorage.getItem('debateai.mode');" +
+              "if(m==='chamber'||m==='terracotta')document.documentElement.dataset.mode=m;}catch(e){}"
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <div className="appShell">
           <TopBar />
