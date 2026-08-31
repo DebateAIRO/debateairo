@@ -1,6 +1,7 @@
 # SPEC — T1 Debate view — tree canvas
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1
+(pre-handoff pin-bind + REVIEW line amendments recorded in DECISIONS).
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 1 (1a Approved).
 
@@ -77,8 +78,8 @@ treatments.
 
 ### R8 — publicMode compatibility
 
-When mounted with publicMode, canvas remains readable; regenerate/challenge
-mutate paths locked per T3/T5.
+When mounted with publicMode, canvas text/surface pairs meet the contrast
+threshold ARCH pins; regenerate/challenge mutate paths locked per T3/T5.
 
 ### R9 — Render pins move to NEW UI
 
@@ -101,17 +102,22 @@ mission’s passing bar.
    confirm whether tree cards require reviewer verdict on-face or only in
    Details (T5). Requirements proposes **Details carries full reviewer line;
    tree card may show compact verdict mark if already present in app**.
-2. **Vocab:** keep `claims` in `32 claims / depth 4` meta (propose yes) vs
-   design `joints` — V-DECISION shared.
+2. ~~Vocab~~ — **CLOSED** V 2026-08-31: app vocabulary everywhere; keep
+   `claims` in `32 claims / depth 4` meta (see T9/DECISIONS mapping).
 
 ## Acceptance — V manual (browser)
 
-1. Open an owner debate with a tree. **Expect:** four view toggles; mode
-   toggle; cards with BASE/FINAL; Details opens T5; Regenerate visible.
-2. Toggle Show set-aside paths. **Expect:** visible path set changes.
-3. Confirm stance tab/connector color differs across PRO vs CON cards.
-4. Open same debate via public URL logged out. **Expect:** canvas readable;
-   Regenerate not actionable.
+1. Open an owner debate with a tree. **Expect:** four view toggles
+   (`Thread`/`Split`/`Tree`/`Map`); mode toggle; cards with `BASE`/`FINAL`;
+   `Details ▸` opens T5; `↻ Regenerate` visible.
+2. On a debate fixture that has ≥1 set-aside path (required precondition —
+   do not run on a tree with zero set-aside paths): toggle `Show set-aside
+   paths`. **Expect:** count of visible path/card nodes changes (before ≠
+   after).
+3. Confirm stance tab/connector color token/class differs across PRO vs CON
+   cards.
+4. Open same debate via public URL logged out. **Expect:** canvas meets
+   contrast threshold ARCH pins; `↻ Regenerate` not actionable.
 
 ## Acceptance — automated
 

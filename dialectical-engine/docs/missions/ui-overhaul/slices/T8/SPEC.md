@@ -1,6 +1,7 @@
 # SPEC — T8 Sign up, MFA enrolment & recovery
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1
+(vocab translation + OQ closure in DECISIONS).
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 8.
 
@@ -15,7 +16,7 @@ recovery security policy.
 
 | ID | Screen | Notes |
 |---|---|---|
-| T8-S1 | Create account | Wordmark `Dialectical Engine`; `CREATE AN ACCOUNT`; `Put a claim to the bench.`; email + Verify email; recovery email; password with live checks; age affirmation; `Create account`; link `Already have one? Log in` |
+| T8-S1 | Create account | Wordmark `Dialectical Engine`; `CREATE AN ACCOUNT`; `Put a claim on the graph.`; email + Verify email; recovery email; password with live checks; age affirmation; `Create account`; link `Already have one? Log in` |
 | T8-S2 | Mandatory MFA — step 1 Verify mailed link | `MANDATORY MFA` / `Protect your account`; step 1 done state when verified |
 | T8-S3 | Mandatory MFA — step 2 Authenticator | QR + setup key (shown once); six-digit code; `Verify and create recovery codes` |
 | T8-S4 | Mandatory MFA — step 3 Recovery codes | Ten one-time codes; Print; Replace with a new set; confirm-by-typing one code; `Activate account` |
@@ -35,7 +36,7 @@ recovery security policy.
 
 ## Copy (binding)
 
-- `CREATE AN ACCOUNT` · `Put a claim to the bench.`
+- `CREATE AN ACCOUNT` · `Put a claim on the graph.` (translated from design `bench` per V 2026-08-31)
 - `Email verification and authenticator enrolment are required before your account can be used.`
 - Password rules: at least eight characters; one capital; one number; one special character
 - Age: `I affirm that I am at least 18 years old.`
@@ -90,22 +91,21 @@ must move to NEW UI. **Which pins = ARCH.**
 - Phone SMS MFA.
 - Redesigning security policy (sessions, cookies) — visual/copy shell only
   unless a bug blocks the shell.
-- Resolving global `bench` vocabulary — see mission OPEN QUESTION on T9
-  (applies to `Put a claim to the bench.`).
+- Inventing SMS MFA or weakening mandatory authenticator/recovery policy.
 
 ## OPEN QUESTIONS
 
-1. **Vocabulary (V-DECISION):** `Put a claim to the bench.` / `DebateAIRO` in
-   MFA step 2 vs product name `DebateAI` / `Dialectical Engine` on the same
-   flow — ship design strings verbatim? Route with T9 vocab question.
-2. **Wordmark inconsistency inside TURN 8 (ARCH):** design shows `Dialectical
-   Engine` on sign-up and `DebateAIRO` in MFA step 2 copy — confirm intentional
-   product-string split vs unify under ARCH token/copy map.
+1. ~~Vocabulary `bench`~~ — **CLOSED** V 2026-08-31: binding CTA is
+   `Put a claim on the graph.` (see T9/DECISIONS mapping).
+2. **Wordmark inconsistency inside TURN 8 (ARCH proposes, V ratifies):** design
+   shows `Dialectical Engine` on sign-up and `DebateAIRO` in MFA step 2 copy —
+   confirm intentional product-string split vs unify under ARCH token/copy map.
 
 ## Acceptance — V manual (browser)
 
-1. Open sign-up logged out. **Expect:** `CREATE AN ACCOUNT`, email/recovery/
-   password/age regions, mode toggle.
+1. Open sign-up logged out. **Expect:** `CREATE AN ACCOUNT`,
+   `Put a claim on the graph.`, email/recovery/password/age regions, mode
+   toggle.
 2. Enter matching recovery email = primary. **Expect:** differ-rule failure
    marker.
 3. Complete create → MFA. **Expect:** steps 1–3 visible; cannot skip to

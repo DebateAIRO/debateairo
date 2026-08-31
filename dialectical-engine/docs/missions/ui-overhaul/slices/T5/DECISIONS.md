@@ -7,3 +7,7 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | Drawer field order vs design? | OPEN QUESTION → ARCH records chosen order. | Possible a11y/layout constraint. | Requirements (Grok REQ-01)
 - 2026-08-31 | Completeness gap: TURN 5 `REVIEW AGREED BY:` omitted from SPEC? | Amended SPEC/PLAN same day before peer PASS: inventory T5-S5, binding copy, R3, V-manual steps, PLAN T5-C1-3/4. Not a scope expansion — design artboard already bound it (design-document-text.txt:302–304). | Skeptic criterion 2. | Requirements (Grok REQ-01) rework
 - 2026-08-31 | Completeness gap: T5 R8 lacked explicit `tests/render/**` bind? | Amended to R9 with same `tests/render/**` … move to NEW UI (ARCH names pins) wording as sibling slices. | Skeptic criterion 3. | Requirements (Grok REQ-01) rework
+- 2026-08-31 | SPEC version after pre-handoff amendments? | Bumped to v2 FROZEN (F10). | Spine re-version. | Requirements (Grok REQ-01-R1)
+- 2026-08-31 | Vocab joint vs claim in drawer? | **CLOSED** — claim/node (V 2026-08-31). | V ruling. | V
+- 2026-08-31 | “Readable” / “if available” acceptance? | Contrast threshold ARCH pins; no-cross-review step requires fixture (F4g/F7). | Peer findings. | Requirements (Grok REQ-01-R1)
+- 2026-08-31 | Mode toggle on drawer? | Yes — participates in Terracotta↔Chamber. | Design + F13. | Requirements (Grok REQ-01-R1)

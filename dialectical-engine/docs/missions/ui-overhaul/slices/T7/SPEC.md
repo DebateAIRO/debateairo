@@ -1,6 +1,7 @@
 # SPEC — T7 Sign in, two-step & fleet
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1
+(vocab closure + F4g fixture acceptance in DECISIONS).
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 7.
 
@@ -77,8 +78,9 @@ askers.
 
 ## OPEN QUESTIONS
 
-1. **`Back to the graph.` vocabulary (V-DECISION):** same rounds/debates/
-   graph language tension as T9 — ship verbatim?
+1. ~~`Back to the graph.` vocabulary~~ — **CLOSED** V 2026-08-31: app
+   vocabulary / graph framing — ship `Back to the graph.` verbatim (see
+   T9/DECISIONS mapping: bench→graph).
 2. **Fleet route ownership (ARCH):** confirm whether TURN 7 fleet artboard
    maps to `admin/workers` only, a settings deep-link, or a dedicated stub
    route — without inventing privileged APIs.
@@ -89,9 +91,12 @@ askers.
    toggle.
 2. Submit valid credentials. **Expect:** two-step screen with 6-digit entry and
    `Use a recovery code`.
-3. Use back link. **Expect:** return to sign in.
-4. As ordinary asker, open fleet/operator stub if linked. **Expect:**
-   unavailable copy; no fake worker list.
+3. Use `← Back to sign in`. **Expect:** return to sign in (`WELCOME BACK`).
+4. On a build that exposes an ordinary-asker fleet/operator entry (required
+   fixture — ARCH names the route; do not skip): open it as ordinary asker.
+   **Expect:** unavailable copy containing `Deployment state is unavailable in
+   the ordinary asker interface` (or the SPEC binding fleet string); no worker
+   rows fabricated.
 5. Complete authenticator continue. **Expect:** reach an authenticated product
    surface (library or prior deep link).
 

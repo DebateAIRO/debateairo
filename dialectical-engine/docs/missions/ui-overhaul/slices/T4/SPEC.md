@@ -1,6 +1,6 @@
 # SPEC — T4 New debate
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1.
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 4.
 
@@ -82,12 +82,14 @@ pins for the replaced form must not remain as the mission’s passing bar.
 
 - Inventing new V3 contract fields for V2 options.
 - Making role overrides user-editable.
-- Anonymous create (T9 OPEN QUESTION).
+- Anonymous create-without-auth on this form. (Aligned with closed T9 CTA
+  ruling V 2026-08-31: anonymous visitors reach New debate only after
+  sign-in/sign-up via landing `Start a debate` return path.)
 
 ## OPEN QUESTIONS
 
-1. **CTA label `Start run` vs library `Start debate` (ARCH/V-DECISION):** design
-   uses both across turns — unify or keep per-screen strings?
+1. **CTA label `Start run` vs library `Start debate` (ARCH proposes, V ratifies):**
+   design uses both across turns — unify or keep per-screen strings?
 2. **Options panel visibility (ARCH):** keep visible-but-not-sent vs hide V2
    controls entirely — design shows them with not-sent note; SPEC prefers
    **show with not-sent note** unless V says hide.

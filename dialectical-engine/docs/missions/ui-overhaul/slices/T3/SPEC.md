@@ -1,6 +1,6 @@
 # SPEC — T3 Library & public debate view
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1.
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 3 (3a Library, 3b Public).
 
@@ -22,7 +22,7 @@ lock, not a mandate to invent a second unrelated page architecture.
 |---|---|---|
 | T3-S1 | Chrome | `Dialectical Engine` / `dezbatere.ro` / `Library` / `+ New debate` / asker chip / mode / settings |
 | T3-S2 | Composer hero | `A REASONING INSTRUMENT`; prompt `What should we debate?`; body; input `Type a debatable claim or question…`; `Models argue · you judge`; `Start debate →` |
-| T3-S3 | Lists | Tabs/sections `Your debates` and `Public debates`; rows with title, relative time, model count, status (`Complete` / `Generating`), open affordance |
+| T3-S3 | Lists | Tabs/sections `Your debates` and `Public debates`; `4 TOTAL` count chip on the list chrome; rows with title, relative time, model count, status (`Complete` / `Generating`), open affordance |
 | T3-S4 | Mode + tokens | Terracotta ↔ Chamber |
 
 ### 3b Public debate view
@@ -30,8 +30,8 @@ lock, not a mandate to invent a second unrelated page architecture.
 | ID | Region | Notes |
 |---|---|---|
 | T3-S5 | Public header | Title; `🔒 Public view · actions locked`; view toggles Thread/Split/Tree/Map; mode |
-| T3-S6 | Verdict first | Status chip (e.g. `CONTESTED`); thresholds line; verdict paragraph; caveat when present; metric line (dialectical support / verification / judge coverage / convergence) |
-| T3-S7 | Strongest cases | `THE CASE FOR` / `THE CASE AGAINST` with strongest surviving argument cards; scores; model lines |
+| T3-S6 | Verdict first | Status chip (e.g. `CONTESTED`); thresholds line; `Details ▾` disclosure on the verdict block; verdict paragraph; caveat when present; metric line (dialectical support / verification / judge coverage / convergence) |
+| T3-S7 | Strongest cases | `THE CASE FOR` / `THE CASE AGAINST` with strongest surviving argument cards; scores; model lines; per-card `Read ▾` |
 | T3-S8 | Locked actions | Challenge controls locked; banner `🔒 Viewing publicly — sign in to challenge, regenerate, or flag claims.`; `Unlock actions` |
 | T3-S9 | Mode + tokens | Terracotta ↔ Chamber |
 
@@ -49,9 +49,9 @@ lock, not a mandate to invent a second unrelated page architecture.
 ## Copy (binding excerpts)
 
 - Library: `A REASONING INSTRUMENT`; `What should we debate?`; `Start debate →`;
-  `Your debates`; `Public debates`
-- Public: `Public view · actions locked`; locked Challenge; public viewing banner;
-  `Unlock actions`
+  `Your debates`; `Public debates`; `4 TOTAL`
+- Public: `Public view · actions locked`; verdict `Details ▾`; per-card `Read ▾`;
+  locked Challenge; public viewing banner; `Unlock actions`
 
 ## Requirements
 
@@ -67,7 +67,10 @@ existing auth rules).
 ### R3 — Your / Public lists
 
 Both list selectors exist; each shows the corresponding debate rows with title,
-time, model count, status.
+time, model count, status. List chrome includes the `4 TOTAL` count chip from
+design. Selecting `Your debates` vs `Public debates` must change which debate
+set is shown (or distinct empty-state copy) — not the same hardcoded list under
+both labels.
 
 ### R4 — Bezel card language
 
@@ -83,7 +86,8 @@ Public debate URL continues to render the shared workspace in `publicMode`
 ### R6 — Verdict-first public reading (3b)
 
 Public view presents verdict/status block before or above the strongest-case
-pair as in TURN 3b (ordering measurable in DOM/reading order).
+pair as in TURN 3b (ordering measurable in DOM/reading order). Verdict block
+exposes `Details ▾`. Strongest-case cards expose `Read ▾`.
 
 ### R7 — Actions locked for public readers
 
@@ -103,7 +107,9 @@ Terracotta ↔ Chamber on library and public surfaces.
 
 - Implementing Method/Transcripts/Pricing pages.
 - Changing publication envelope schema (prior mission).
-- Giving anonymous users create-debate without auth (see T9 OPEN QUESTION).
+- Anonymous create-without-auth on this surface. (Aligned with closed T9 CTA
+  ruling V 2026-08-31: anonymous `Start a debate` goes through sign-in/sign-up
+  with return to New debate — not draft-create here.)
 
 ## OPEN QUESTIONS
 
@@ -114,20 +120,25 @@ Terracotta ↔ Chamber on library and public surfaces.
    verdict-first layout conflicts with existing view toggles (Thread/Split/
    Tree/Map), ARCH proposes the layout composition — must not drop
    `publicMode` shared workspace without V scope change.
-2. **Vocabulary (V-DECISION):** `debates` in library vs design `rounds` on
-   landing — keep product term `debates` on T3?
+2. ~~Vocabulary~~ — **CLOSED** V 2026-08-31: app vocabulary everywhere (`debates`
+   / `claims`); see T9/DECISIONS mapping table.
 3. **`Unlock actions` destination (ARCH):** sign-in return URL to the same
    public debate vs owner route — document choice.
 
 ## Acceptance — V manual (browser)
 
-1. Sign in → `/`. **Expect:** Library chrome, composer, Your/Public lists, mode
-   toggle — not T9 hero.
-2. Open Your debates and Public debates. **Expect:** each selector shows its
-   list (or empty state), no crash.
+1. Sign in → `/`. **Expect:** Library chrome, composer, `Your debates` /
+   `Public debates`, `4 TOTAL` chip, mode toggle — not T9 hero
+   `Find the weakest claim in your own argument.`
+2. With a fixture where Your and Public membership differ (at least one debate
+   in Your that is absent from Public, or distinct empty-state copy): open
+   `Your debates` then `Public debates`. **Expect:** visible row set or
+   empty-state string differs between selectors (identical hardcoded
+   “No debates yet” under both = fail).
 3. Open a published public debate URL logged out. **Expect:** public locked
-   banner; verdict/status visible; strongest pro/con (when tree exists); view
-   toggles work; Challenge locked; no owner settings/delete.
+   banner; verdict/status with `Details ▾`; strongest pro/con with `Read ▾`
+   (when tree exists); view toggles work; Challenge locked; no owner
+   settings/delete.
 4. Click Unlock actions. **Expect:** sign-in (or documented auth) path; after
    auth, behavior matches ARCH-documented unlock rule.
 

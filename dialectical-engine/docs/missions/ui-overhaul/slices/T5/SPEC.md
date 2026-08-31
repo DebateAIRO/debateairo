@@ -1,6 +1,7 @@
 # SPEC — T5 Node detail drawer
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1
+(pre-handoff `REVIEW AGREED BY:` + `tests/render/**` amendments in DECISIONS).
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 5.
 
@@ -109,21 +110,24 @@ remain as the mission’s passing bar.
 1. **Field order vs design (ARCH):** if current drawer order differs from TURN 5
    vertical order, match design order unless accessibility requires otherwise —
    ARCH records the chosen order.
-2. **Shared vocab:** `claim`/`node` product terms vs design `joint` — keep
-   product terms inside drawer (propose); V-DECISION shared with T9.
+2. ~~Shared vocab~~ — **CLOSED** V 2026-08-31: app vocabulary everywhere;
+   `claim`/`node` product terms inside drawer (see T9/DECISIONS mapping).
 
 ## Acceptance — V manual (browser)
 
-1. Open a debate → open a node Details on a node that has a cross-review.
-   **Expect:** drawer with way of knowing, `REVIEW AGREED BY:` or
-   `REVIEW DISPUTED BY:` plus reviewer model line, base/final, replay,
-   restatement, defeaters, disagreement, condition marks, history.
-2. Open a node with no cross-review (if available). **Expect:** no fabricated
-   `REVIEW AGREED BY:` / `REVIEW DISPUTED BY:` line.
-3. As owner, confirm Challenge and Regenerate visible. **Expect:** present.
+1. Open a debate → open a node Details on a node that has a cross-review
+   (required fixture). **Expect:** drawer with way of knowing,
+   `REVIEW AGREED BY:` or `REVIEW DISPUTED BY:` plus reviewer model line,
+   `BASE SCORE`/`FINAL STRENGTH`, `REPLAY`, restatement, defeaters,
+   disagreement, condition marks, history.
+2. On a required fixture node with no cross-review: open Details. **Expect:**
+   no fabricated `REVIEW AGREED BY:` / `REVIEW DISPUTED BY:` line.
+3. As owner, confirm `⚐ Challenge` and `↻ Regenerate` visible. **Expect:**
+   present.
 4. As public reader on publicMode debate, open node. **Expect:** read fields
    (including review line when present); Challenge/Regenerate locked or absent.
-5. Toggle mode. **Expect:** drawer remains readable in both modes.
+5. Toggle mode. **Expect:** drawer text/surface pairs meet the contrast
+   threshold ARCH pins in both modes.
 
 ## Acceptance — automated
 

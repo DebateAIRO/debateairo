@@ -1,6 +1,7 @@
 # SPEC — T6 Settings — identity & account
 
-**Version:** v1 (2026-08-31) · **Status:** FROZEN at creation.
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1
+(F9 owner sequence + vocab closure in DECISIONS).
 
 **Mission:** `ui-overhaul` · **Design source:** TURN 6.
 
@@ -84,10 +85,11 @@ Terracotta ↔ Chamber on settings.
 
 ## OPEN QUESTIONS
 
-1. **Site label `dezbatere.ro` (V-DECISION / ARCH):** design chrome shows it
-   beside Dialectical Engine — confirm production host string vs generic
+1. **Site label `dezbatere.ro` (ARCH proposes, V ratifies):** design chrome shows
+   it beside Dialectical Engine — confirm production host string vs generic
    wordmark for all deployments.
-2. **Vocabulary:** none unique beyond shared mission vocab question.
+2. ~~Vocabulary~~ — **CLOSED** V 2026-08-31: app vocabulary everywhere; see
+   T9/DECISIONS mapping.
 
 ## Acceptance — V manual (browser)
 
