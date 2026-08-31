@@ -40,7 +40,7 @@ export function LibraryComposer() {
           onKeyDown={(event) => {
             if (event.key === "Enter") start();
           }}
-          placeholder="e.g. Remote work should be the default for knowledge workers."
+          placeholder="Type a debatable claim or question…"
           aria-label="Debate claim"
         />
         <button
@@ -49,12 +49,10 @@ export function LibraryComposer() {
           onClick={start}
           disabled={!ready || busy}
         >
-          {busy ? "Starting" : "Start"} <span aria-hidden>→</span>
+          {busy ? "Starting…" : "Start debate"} <span aria-hidden>→</span>
         </button>
       </div>
-      <button type="button" className="advancedLink" onClick={() => router.push("/new")}>
-        ⚙ Advanced options — depth, branching, model roles
-      </button>
+      <p className="muted">Models argue · you judge</p>
       {error ? (
         <div className="error" style={{ marginTop: 12 }}>
           {error}

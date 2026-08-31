@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ModeToggle } from "@/components/ModeToggle";
 import { useRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 
 const SCREEN_TITLES: Record<string, string> = {
@@ -60,6 +61,7 @@ export function TopBar() {
     return (
       <header className="authTopBar">
         <BrandMark homeNavigationAvailable={!recoveryAcknowledgementPending} />
+        <ModeToggle />
       </header>
     );
   }
@@ -84,6 +86,8 @@ export function TopBar() {
         <Link className="btn btnDark" href="/new">
           + New debate
         </Link>
+        <span className="btn" aria-label="Signed-in asker">ASKER</span>
+        <ModeToggle />
         <Link className="iconBtn" href="/settings" aria-label="Settings" title="Settings">
           ⚙
         </Link>

@@ -52,7 +52,7 @@ export default async function HomePage({
   return (
     <div className="screen scroll">
       <div className="screenInner wide">
-        <div className="eyebrow">A reasoning instrument</div>
+        <div className="eyebrow">A REASONING INSTRUMENT</div>
         <h1 className="display lg" style={{ marginTop: 14 }}>
           What should we debate?
         </h1>

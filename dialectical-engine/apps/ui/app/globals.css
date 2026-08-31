@@ -214,6 +214,10 @@ select {
   width: 100%;
 }
 
+/* `/` serves two different specified chromes (ADR-002 §"The `/` chrome adjudication").
+   When the landing is the document, the layout's global bar must not render above it. */
+.appShell:has([data-landing-section]) > .topBar { display: none; }
+
 .topBar {
   display: flex;
   align-items: center;

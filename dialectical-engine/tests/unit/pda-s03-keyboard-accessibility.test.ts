@@ -145,7 +145,7 @@ describe("public debate navigation keyboard accessibility", () => {
     // the exact landing hero, and exposes the mode button to keyboard users.
     const document = await renderHomePage("yours", null);
     const hero = document.querySelector('[data-landing-section="hero"]');
-    const toggle = document.querySelector("[data-mode-toggle]");
+    const toggle = document.querySelector('[data-landing-section="chrome"] [data-mode-toggle]');
 
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]') === null).toBe(true);
     expect(document.querySelector(".tabEmptyHint") === null).toBe(true);
