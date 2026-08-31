@@ -147,11 +147,27 @@ looking.
 3. **The baseline is a named, dated list of exact error lines** — never a count.
    A count silently absorbs a new error the moment an old one is fixed.
 
-### The 0-new command (quote verbatim in packets) — **run from the repo root**
+### The 0-new command (quote verbatim in packets) — **run from anywhere at or below the pnpm workspace root**
+
+> **CORRECTED 2026-09-01 (AM6/N2).** The previous first line was
+> `cd "$(git rev-parse --show-toplevel)"`, annotated *"CANONICAL"*. It was not
+> canonical; it was broken, and broken in the worst available direction — see
+> the changelog entry below for the measured false green. This block no longer
+> depends on the git root at all.
 
 ```sh
-cd "$(git rev-parse --show-toplevel)"      # CANONICAL. From apps/ui this resolves a
-                                           # DIFFERENT compiler and a different answer.
+# 1. Locate the pnpm WORKSPACE root. It is NOT the git repo root: this repository's
+#    toplevel is DebateAIRO/, and its child dialectical-engine/ is what holds package.json.
+start=$PWD; root=$PWD
+while [ "$root" != "/" ] && [ ! -f "$root/apps/ui/tsconfig.json" ]; do root=$(dirname "$root"); done
+[ -f "$root/apps/ui/tsconfig.json" ] || { echo "GATE FAIL: no pnpm workspace root at or above $start (looked for apps/ui/tsconfig.json)"; exit 2; }
+cd "$root" || exit 2
+[ -f apps/ui/tsconfig.json ] || { echo "GATE FAIL: apps/ui/tsconfig.json not found in $PWD"; exit 2; }
+
+# 2. Prove a compiler actually RUNS here before trusting a count of zero.
+pnpm exec tsc --version >/dev/null 2>&1 || { echo "GATE FAIL: 'pnpm exec tsc' does not run in $PWD"; exit 2; }
+
+# 3. The gate.
 pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
   | grep -E 'error TS' \
   | grep -v -e 'app/debate/\[id\]/DebatePageClient\.tsx(1488,11): error TS2322' \
@@ -160,9 +176,54 @@ pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
   | wc -l          # required: 0
 ```
 
+**Why an upward walk and not a hard-coded path.** The walk preserves the only
+thing the old line got right — the dual-compiler pin from AM3/N9. Run from
+`apps/ui`, the walk climbs to the workspace root, so the gate always resolves
+the ROOT compiler. Measured in this edit:
+
+```
+from workspace root:                       Version 7.0.2
+from apps/ui, with NO walk (the old trap): Version 5.9.3
+```
+
+**Why step 2 exists.** Step 1 catches the wrong *directory*. Step 2 catches the
+wrong *toolchain* — any state where `pnpm exec` cannot start a compiler. Without
+it, every failure mode of the runner still reaches `grep -E 'error TS'`, matches
+nothing, and prints the required `0`. **The filter that makes this gate readable
+is the same filter that hides a harness failure**, so the harness has to be
+proven separately. That is the general lesson, not a detail of this one command.
+
 `tee /dev/stderr` is deliberate: when the gate fails, the failing lines must be
 in the log, not just a number. A gate that prints only `1` sends the next seat
 back to re-run it.
+
+**Runs, this edit, four directories:**
+
+```
+=== cwd: /Users/vladmihaimiron/Documents/DebateAIRO            (git toplevel — the OLD block's target)
+GATE FAIL: no pnpm workspace root at or above /Users/vladmihaimiron/Documents/DebateAIRO (looked for apps/ui/tsconfig.json)
+    rc=2
+=== cwd: /tmp                                                  (outside the repo entirely)
+GATE FAIL: no pnpm workspace root at or above /tmp (looked for apps/ui/tsconfig.json)
+    rc=2
+=== cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine
+       0
+    rc=0
+=== cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/apps/ui
+       0
+    rc=0
+```
+
+**Discrimination proof — a gate that only ever prints 0 proves nothing.** The
+same pipeline with the baseline filter removed, from the workspace root:
+
+```
+$ pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 | grep -E 'error TS' | wc -l
+       2
+```
+
+Two lines in, two filtered, residual 0. The compiler ran and produced output;
+the zero is a result, not an absence.
 
 ### The baseline — TWO pre-existing errors, not one
 
@@ -186,6 +247,15 @@ Measured 2026-08-31 by ARCH-01 on the tree at `55b18ee`:
 > $ pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 | grep -c 'error TS'
 > 3
 > ```
+>
+> **RE-MEASURED 2026-09-01 (AM6) on the tree at `3aefb2d`: the count is now 2,
+> and the drop is explained, not shrugged at.** The third line at `55b18ee` was
+> `components/ModeToggle.tsx(7,31): error TS2503` — the AM2/A defect this ADR's
+> own changelog records. `git ls-tree 55b18ee apps/ui/components/` confirms
+> `ModeToggle.tsx` existed on that tree, and `git log` shows it repaired at
+> `94c3bcf` (*"T9-C3 rework round 1 — React19 JSX contract"*). Both dated
+> measurements are correct for their date; the baseline filter's two patterns
+> are unchanged and residual is 0 either way, so no gate moves.
 
 **Why error 2 is structural, not environmental.** `next/types/global.d.ts` in
 next 15.5.23 declares `*.module.css`, `*.module.sass` and `*.module.scss` — but
@@ -266,3 +336,63 @@ for that line. Under its compiler the observation was correct. The reviewer foun
 and published this itself, against its own earlier verdict. The dual-compiler
 split is recorded in `.hermes/TOOLING-TRAPS.md` by the orchestrator; this ADR
 references it and does not restate it.
+
+
+---
+
+## Changelog
+
+### 2026-09-01 — AM6/N2: the published 0-new gate was broken run verbatim, and it failed by printing the required answer (trigger: T9-C1 blind review, `t_4487f9b1` verdict 00:26, finding N2)
+
+**What was wrong.** The block opened with
+`cd "$(git rev-parse --show-toplevel)"`, which I annotated **CANONICAL**. This
+repository's git toplevel is `DebateAIRO/` — the **parent** of the pnpm
+workspace. There is no `package.json` and no `apps/` there. Measured:
+
+```
+$ cd "$(git rev-parse --show-toplevel)" && pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1
+[ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE] No package found in this workspace
+```
+
+That message is on stderr, the block merges stderr into the pipe with `2>&1`,
+and `grep -E 'error TS'` does not match it. So the full published block, run
+verbatim from a seat's normal cwd, does this:
+
+```
+$ sh ./published-block.sh          # cwd = the workspace root
+       0
+  block rc=0
+```
+
+**`0` is the required value.** A seat quoting the gate verbatim, in good faith,
+gets a pass having compiled nothing. Thirty clusters still have to run it.
+
+**Why this is worse than an ordinary bug.** A gate that errors is a nuisance; a
+gate that reports success while doing nothing is an *anti-gate* — it converts
+every downstream cluster's compile evidence into a fabrication that nobody
+committed. It is the exact class recorded in `.hermes/TOOLING-TRAPS.md`
+(2026-08-29), which I wrote a compile-gate law for in AM2 and then instantiated
+wrongly. AM2's law said *name the invocation directory*; I named one, and never
+ran the command from it.
+
+**Why no one caught it for four amendments.** Everyone — including me, including
+the Wave-0 reviewer, including the T9-C1 worker — ran the *pipeline* from the
+project root, where it works, rather than the *block*, whose first line moves
+you somewhere else first. The reviewer's own prediction says so: *"I expect
+ADR-006's broken `cd` went unnoticed, because everyone runs the gate from the
+project root where it works, and nobody runs the published command verbatim."*
+That prediction is the finding. **Publishing a command is claiming you ran it as
+published**, and for this block I had not.
+
+**Fixed** with an upward walk to the directory that actually holds
+`apps/ui/tsconfig.json`, a fail-loud guard (`exit 2`), and a compiler-liveness
+probe, all shown running from four directories above — two that must fail and
+two that must pass — plus a discrimination proof that the zero is a result and
+not an absence.
+
+**Standing rule this produces, and it generalises past this gate.** *Any command
+this or any other ARCH document publishes must be executed **as published, from
+a directory a seat would plausibly be in**, before it is published.* Running the
+idea of the command is not running the command. Where a gate's output is a
+count, the run must also show the count moving — a gate only ever observed
+printing its pass value has not been shown to be a gate.

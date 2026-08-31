@@ -97,20 +97,28 @@ caused exactly that failure.
 
 ### Where it mounts — the complete enumeration
 
-**AMENDED 2026-08-31 (AM5). The number is THREE, not two.** This section used to
-say two and to list anonymous `/` under `TopBar`. That was written before
-`ADR-003`'s route split existed in dispatch form: after the split, anonymous `/`
-renders `LandingPage`, which does **not** render `TopBar`, so the row below that
-claimed to cover *"`/` (T9 anonymous)"* covered nothing. AM2/D already put the
-mount in `LandingChrome` and pinned it with `T9-C1-3`; this table had not caught
-up, and `slices/T9/DECISIONS.md` inherited the stale description from it.
+**AMENDED 2026-08-31 (AM5): the number is THREE, not two — correct conclusion.**
+**RE-AMENDED 2026-09-01 (AM6/N1): the REASON given for it was false.**
+
+AM5 wrote that anonymous `/` *"renders `LandingPage`, which does **not** render
+`TopBar`."* That is wrong. `apps/ui/app/layout.tsx:44` renders `<TopBar />`
+inside `.appShell` on **every** route, above `{children}`, and `TopBar` returns
+`null` for `/debate/*` and `/public/debate/*` only (`TopBar.tsx:57`). The route
+split changes what `{children}` is; it does not remove the bar above it.
+
+The count of three survives — but only because of the **suppression rule below**,
+which this amendment introduces. Until that rule lands, the anonymous landing
+carries two headers and, after T3-C1, two mode controls. Found by the T9-C1
+blind review (`t_4487f9b1`, N1 + the B1 root cause), which was invited by the
+line beneath this table and answered the mirror case: not a missing mount, but a
+listed mount whose *covers* column was wrong.
 
 A seat that finds a **fourth** has found a route the map missed and must say so.
 
 | Mount | File | Covers |
 |---|---|---|
 | Anonymous landing | `apps/ui/components/landing/LandingChrome.tsx` — created and mounted by **T9-C1** (dispatch row 2), whose chrome copy is T9-C2's | `/` **logged out only** (T9 R3) |
-| Global chrome | `apps/ui/components/TopBar.tsx` — in `topBarActions`, and in the `authTopBar` branch | `/` **signed in only** (T3), `/new` (T4), `/settings` (T6), `/admin/workers` (T7 fleet), `/login` `/sign-up` `/verify-email` `/enroll-mfa` (T7, T8) |
+| Global chrome | `apps/ui/components/TopBar.tsx` — in `topBarActions`, and in the `authTopBar` branch | `/` **signed in only** (T3) — true only once T3-C1 lands the suppression rule below; `TopBar` renders on anonymous `/` at HEAD · `/new` (T4), `/settings` (T6), `/admin/workers` (T7 fleet), `/login` `/sign-up` `/verify-email` `/enroll-mfa` (T7, T8) |
 | Debate chrome | `apps/ui/app/debate/[id]/DebatePageClient.tsx` — inside `<div className="debateTopControlRow">`, as a **sibling of** the `{hasTree ? …}` conditional, never inside it | `/debate/[id]` (T1, T5 drawer) and `/public/debate/[id]` (T3 3b, T5 public) |
 
 The "sibling of, never inside" is load-bearing: the `segment` view group is
@@ -122,10 +130,97 @@ cluster in T1/T3/T5 edits it.
 
 `TopBar` returns `null` for `/debate/*` and `/public/debate/*`
 (`TopBar.tsx:57`), which is why the debate chrome needs its own mount. The
-anonymous landing needs its own for the mirror-image reason: it never renders
-`TopBar` at all. Three is the exact number, and each of the three is pinned by
-a different cluster's acceptance — `T9-C1-3` (landing), `T3-C1-3` (signed-in
-library), and T1's debate-chrome row.
+anonymous landing needs its own for a different reason, stated correctly this
+time: `TopBar` **does** render there, and must be suppressed. Three is the exact
+number, and each of the three is pinned by a different cluster's acceptance —
+`T9-C1-3` (landing), `T3-C1-3` (signed-in library), and T1's debate-chrome row.
+
+### The `/` chrome adjudication (AM6/N1) — one route, two specified chromes
+
+`/` is the only path in the product that serves two entirely different
+**specified** chromes:
+
+| | Specified chrome | Wordmark | Actions |
+|---|---|---|---|
+| anonymous `/` | SPEC T9 **T9-S1** | `DebateAI` | `Method` · `Transcripts` · `Pricing` · `Start a debate` · ☾ |
+| signed-in `/` | SPEC T3 **T3-S1** | `Dialectical Engine` / `dezbatere.ro` | `Library` · `+ New debate` · asker chip · ☾ · settings |
+
+Today both would render, stacked. That is not "one extra toggle"; it is a second
+header with a **different product name** on the screen whose SPEC names the
+first one, plus `+ New debate` and `⚙ Settings` — affordances a logged-out
+visitor cannot use, competing with T9 R5's `Start a debate` return-path CTA,
+which is the one thing that screen is supposed to make people click.
+
+**DECISION: on anonymous `/`, `TopBar` does not render. The landing's own chrome
+is the only chrome, and `LandingChrome`'s ☾ is the only mode control.**
+
+Three grounds, in the order they bind:
+
+1. **Design.** The TURN 9 artboard (`design-document-text.txt`, "9e Original —
+   Terracotta · Chamber, *the pre-decision Editorial Luxury landing, full page*")
+   opens with `DebateAI / Method / Transcripts / Pricing / Start a round →`.
+   There is no application bar above it. The artboard is the full page.
+2. **SPEC T9 States 1**, verbatim: *"Anonymous `/`: landing (T9-S1…S6) **is the
+   document**."* A second chrome the landing does not own is not part of that
+   document.
+3. **T3-S1 is not dropped, it is scoped.** The signed-in library keeps `TopBar`
+   exactly as it is — `SCREEN_TITLES["/"] = "Library"` already produces T3-S1's
+   title, and `BrandMark` already produces its wordmark and domain. T3-C1's
+   contracted ☾-in-`topBarActions` mount stands unchanged.
+
+The two rejected alternatives, and why:
+
+- **Suppress the landing's toggle instead.** Refused: T9-S1 names the toggle as
+  part of the landing chrome and T9 R3 requires it *on the landing*, so this
+  deletes a SPEC requirement to preserve an unspecified bar. It also leaves both
+  headers on screen, fixing the symptom the review reported and not the defect
+  it found.
+- **Accept both.** Refused on ground 1: two wordmarks, one of which is the wrong
+  product name for that screen.
+
+### How the suppression is implemented — and the cost, stated
+
+`TopBar` is a client component; the session cookie is `__Host-`-prefixed and
+HttpOnly, so **`TopBar` cannot know whether the visitor is signed in**, and
+`layout.tsx` (a server component, which can read the cookie) cannot know the
+pathname. Neither mount point has both halves of the predicate. The one place
+that has both is the CSS, because the server has already decided which document
+it rendered:
+
+```css
+/* `/` serves two different specified chromes (ADR-002 §"The `/` chrome
+   adjudication"). When the landing is the document, the layout's global bar
+   must not render above it. */
+.appShell:has([data-landing-section]) > .topBar { display: none; }
+```
+
+- No session logic in any component, no new cookie, and no flash: the rule
+  applies at first paint, so the bar is never painted and then removed.
+- `display: none` removes the bar from the accessibility tree and the tab order,
+  not just from view — suppression, not concealment.
+- It keys on `[data-landing-section]`, the harness convention published in
+  `dispatch-order.md` §"Landing query convention (AM6)". **That attribute is
+  therefore load-bearing product markup, not test scaffolding**, and a seat that
+  drops it silently restores the duplicate header.
+
+**Owner: T3-C1 (dispatch row 3)**, whose write surface gains
+`apps/ui/app/globals.css` for this one rule with the token blocks forbidden as
+for every non-T9-C3 cluster. T3-C1 is the cluster that makes the defect visible
+(it adds the second toggle) and the first cluster after HEAD that can legally
+take a CSS write; T9-C1's rework is scoped and adding to it mid-flight is the
+skew the orchestrator sequenced this amendment to avoid.
+
+**The honest cost, twice over.** First: between HEAD (`3aefb2d`) and row 3 the
+anonymous landing ships with a duplicate header. That window is two clusters
+wide, it is a visual defect and not a correctness or security one, and it is
+named here rather than discovered. Second: `display: none` leaves `TopBar`'s
+markup in the anonymous HTML — three dead `<Link>`s to `/login`, `/new` and
+`/settings`. The structurally clean fix is for the layout to stop mounting
+chrome the route owns, which means moving `<TopBar />` into each route and
+re-laying-out `.topBar` (it is `flex: 0 0 60px` as a direct child of
+`.appShell`, so it cannot simply move inside `{children}`). That touches every
+route and `globals.css`'s layout rules; it is a refactor, not a cluster, and it
+is **routed as an open question rather than absorbed**.
 
 ### Two absence-clause pins constrain HOW the mount is written (AM5)
 
@@ -247,3 +342,32 @@ above rather than left to be discovered by whichever seat goes red first. Note
 what this was NOT fixed by: no reordering of clusters helps, because the break
 is caused by *adding* code, not by *changing* copy, and every order contains the
 addition.
+
+
+### 2026-09-01 — AM6/N1: the "does not render TopBar" premise was false, and it hid a product defect (trigger: T9-C1 blind review, `t_4487f9b1` verdict 00:26, finding N1 and the B1 root cause)
+
+**What was wrong.** AM5's amendment note and `slices/T9/DECISIONS.md:45` both
+asserted that logged-out `/` *"does not render `TopBar`"*. `layout.tsx:44`
+renders it on every route; `TopBar` nulls only for `/debate/*` and
+`/public/debate/*`. I corrected this table's *conclusion* in AM5 (three mounts,
+not two) using a *reason* I had not checked, and the reason is the thing later
+work leans on.
+
+**What the false premise cost.** It is the root cause of the review's blocking
+finding B1: `T9-C1-3`'s pin queried the whole anonymous document for
+`[data-mode-toggle]`, which is sound only if nothing else on that document
+mounts one. From dispatch row 3 onward `TopBar` does. The reviewer proved it by
+simulating T3-C1's contracted mount and deleting T9-C1's own — `5 passed (5)`,
+all green, with the SPEC T9 R3 control absent from the surface R3 names. The pin
+AM2/D added *specifically* to stop that outcome had stopped discriminating.
+
+**The transferable lesson, and it is not "check your facts".** AM2/A produced the
+rule *a type expression must be compiled before it is published*. The same rule
+generalises and I had not generalised it: **a claim about runtime composition
+must be read out of the composing file before it is published.** One `sed -n` on
+`layout.tsx` would have settled it. I asserted it from the shape of the route
+split instead, and three documents inherited it.
+
+**Fixed here:** the premise, the mount table's `Covers` column, the `/` chrome
+adjudication and its suppression rule, with the implementation cost stated
+rather than smoothed over.

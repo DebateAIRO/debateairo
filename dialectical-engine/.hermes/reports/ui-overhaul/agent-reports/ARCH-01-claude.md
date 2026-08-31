@@ -658,3 +658,165 @@ migration section, one stale-prose correction, changelog with the full sweep
 table) · `ADR-002-mode-mechanism.md` (mount enumeration two→three, absence-clause
 constraints, changelog) · `slices/T9/DECISIONS.md` (5 appended rows + new tally;
 no existing row rewritten) · this report · board comment on `t_707a9ac6`.
+
+---
+
+# AM6 — the false premise, the two chromes, the convention, the anti-gate (ticket `t_a2312f3f`)
+
+Four charges from the T9-C1 blind review. Two of them are my errors, and both
+are the same error wearing different clothes.
+
+## The one mistake, stated once
+
+**I published two claims in the voice of a measurement without taking the
+measurement.**
+
+- AM5: *"the logged-out `/` renders `LandingPage`, which does not render
+  `TopBar`."* `layout.tsx:44` renders `<TopBar />` on every route. One `sed -n`
+  would have settled it. I derived it from the shape of the route split.
+- AM2: I wrote the compile-gate law *"name the invocation directory"*, named
+  `cd "$(git rev-parse --show-toplevel)"`, annotated it **CANONICAL**, and never
+  ran the block from there. It resolves to the parent of the pnpm workspace.
+
+AM2/A's own rule was *a type expression must be compiled before it is
+published*. I never generalised it. It generalises: **a claim about runtime
+composition must be read out of the composing file; a command must be run as
+published, from a directory a seat would plausibly be in.**
+
+## Charge 4 first, because it is the worst
+
+The published gate does not fail loudly. It prints the **required** value:
+
+```
+$ sh ./published-block.sh          # cwd = the workspace root
+       0
+  block rc=0
+```
+
+`pnpm` errors to stderr, `2>&1` folds it into the pipe, `grep -E 'error TS'`
+does not match it, `wc -l` says `0`. A seat quoting the gate verbatim, in good
+faith, gets a pass having compiled nothing — and 30 clusters still had to run
+it. **A gate that errors is a nuisance; a gate that reports success while doing
+nothing converts every downstream cluster's compile evidence into a fabrication
+nobody committed.**
+
+The mechanism generalises past this command and that is the part worth keeping:
+*the filter that makes a gate readable is the same filter that hides a harness
+failure*, so the harness has to be proven separately. Hence step 2, the
+`tsc --version` liveness probe, which no charge asked for.
+
+Fixed in **both** copies — `ADR-006` and the `dispatch-order.md` acceptance
+default, which had no directory discipline at all and fails the same way. Run
+from four directories (two must fail with `exit 2`, two must pass), plus a
+discrimination proof that the zero is a result and not an absence: the same
+pipeline without the baseline filter prints `2`.
+
+While re-measuring I found the baseline had moved 3 → 2 since `55b18ee`. I did
+not shrug at it: the missing third line was
+`ModeToggle.tsx(7,31): error TS2503` — AM2/A's own defect — repaired at
+`94c3bcf`. Both dated measurements are correct for their date.
+
+## Charge 1 → charge 2: the premise hid a product defect
+
+The premise is not just wrong, it is *load-bearing*. It is the root cause of the
+review's blocking B1: `T9-C1-3` — the pin AM2/D added **specifically** so the
+mode control could not go missing from the one surface T9 R3 names — queried the
+whole anonymous document. From row 3 `TopBar` supplies a second one. The
+reviewer simulated T3-C1's contracted mount, deleted T9-C1's own, and got
+`5 passed (5)`.
+
+And beneath that, the thing no charge asked about and no cluster owned: after
+T3-C1 the anonymous landing ships **two headers with two different product
+names**. The packet frames this as "two mode controls". It is not. It is
+`Dialectical Engine` / `dezbatere.ro` / `+ New debate` / `⚙ Settings` sitting on
+the screen whose SPEC (T9-S1) specifies `DebateAI` / `Method` / `Transcripts` /
+`Pricing` — with app affordances a logged-out visitor cannot use, competing with
+the one CTA (T9 R5) that screen exists to make people click.
+
+**Decision: `TopBar` does not render on anonymous `/`.** Grounded, in binding
+order: the TURN 9 artboard is *"the full page"* and has no application bar; SPEC
+T9 States 1 says the landing *"is the document"*; T3-S1 is not dropped but
+scoped, and `SCREEN_TITLES["/"] = "Library"` already produces it for the
+signed-in half.
+
+I rejected the two alternatives the packet offered. Suppressing the *landing's*
+toggle deletes a SPEC requirement to preserve an unspecified bar, and fixes the
+symptom reported rather than the defect found. Accepting both ships two
+wordmarks, one of them wrong for that screen.
+
+**Mechanism, and I checked the constraint before choosing.** `TopBar` is a
+client component and the session cookie is `__Host-`-prefixed HttpOnly, so it
+cannot know the session; `layout.tsx` is a server component that can read the
+cookie but cannot know the pathname. Neither mount point holds both halves of
+the predicate. I costed the structural alternative — move `<TopBar />` into each
+route — and rejected it: `.topBar` is `flex: 0 0 60px` as a **direct child** of
+`.appShell`, so it cannot simply move inside `{children}` without re-laying-out
+the shell. That is a refactor, not a cluster. So: one CSS rule,
+`.appShell:has([data-landing-section]) > .topBar { display: none }`, owned by
+T3-C1, with `globals.css`'s single-writer law broken **declaredly** and bounded
+three ways.
+
+**I verified the acceptance is runnable before publishing it.** jsdom 30.0.1
+supports `:has()` and propagates it through `getComputedStyle`:
+
+```
+landing present      | display = "none" | querySelector(:has) = matched
+signed-in library    | display = "flex" | querySelector(:has) = no match
+```
+
+Had it not, the cell would have needed a different shape, and publishing it
+unmeasured would have handed T3-C1 an acceptance it could not satisfy — AF-1 a
+fifth time, by me, in the amendment fixing the fourth.
+
+**Two costs I am naming rather than smoothing.** Between HEAD and row 3 the
+landing ships the duplicate header — two clusters wide, visual only. And
+`display: none` leaves three dead `<Link>`s in the anonymous HTML. The clean fix
+is the refactor above; it is routed in the board comment, not absorbed, and not
+filed in `open-questions.md` because that file is outside AM6's writes.
+
+## Charge 3: a convention, because the harness is shared
+
+`[data-landing-section]` scoping for presence; document-wide for absence —
+absence over a superset is the stronger claim, so scoping it would weaken it.
+An attribute rather than a class because classes are style surface and this
+mission is a re-skin. T9-C2 and T9-C4 inherit the same harness and would
+otherwise each rediscover the same defect.
+
+The convention turned out to be load-bearing twice: charge 2's suppression rule
+selects on the same attribute. **So it is product markup, not test
+scaffolding** — a seat that drops it does not merely weaken a pin, it silently
+restores the duplicate header. I wrote that down because "it's only for tests"
+is exactly the reasoning that would remove it.
+
+## Verification
+
+- Compile gate: four directories, two `exit 2`, two `0`; compiler identity
+  `7.0.2` from the workspace root vs `5.9.3` from `apps/ui` without the walk —
+  the dual-compiler pin from AM3/N9 is preserved by the walk, not lost with the
+  bad `cd`.
+- `:has()` in jsdom 30.0.1: both branches probed.
+- AM5 verify-survivability invariant re-run after **every** AM6 edit, parsed back
+  out of the published markdown: 32 rows, 5 exemptions, **0 violations**. The
+  fifth exemption is caused by AM6 itself (T3-C1 became `globals.css`'s second
+  writer, which `v2ui-pages.test.ts` reads) and is published with its constraint
+  rather than left to be discovered.
+
+## What I did not verify
+
+No browser run: the two-header defect and its suppression are argued from the
+artboard, the SPEC, `layout.tsx` and the CSS, not from a rendered page. I did
+not read `apps/ui/components/landing/` or `tests/` as stable — a codex rework
+seat is live in both — so the convention is specified against what those files
+must contain, not against what they contain right now. If that rework lands
+without `data-landing-section`, `T3-C1-4` blocks. That is the correct behaviour
+and it is stated in the cell.
+
+## Writes
+
+`ADR-002-mode-mechanism.md` (premise, mount-table `Covers`, the `/` chrome
+adjudication + suppression rule, changelog) · `ADR-006-ui-test-contract.md` (the
+0-new block, re-measured baseline, new changelog) · `dispatch-order.md` (gate
+copy, landing query convention, T3-C1 row + `T3-C1-4`, second-writer
+declaration, fifth exemption, changelog) · `slices/T9/DECISIONS.md` (4 appended
+rows + new tally; nothing rewritten) · this report · board comment on
+`t_a2312f3f`.

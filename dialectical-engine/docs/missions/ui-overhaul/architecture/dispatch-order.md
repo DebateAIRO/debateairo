@@ -12,9 +12,17 @@
   Every command bundles the slice's regression set from `test-migration.md`,
   because surface-disjointness does not imply effect-disjointness.
 
-`globals.css` has exactly ONE writer for the whole mission: **T9-C3**. Every
-other cluster's `forbidden` set names the `:root` and `html[data-mode="chamber"]`
-blocks explicitly.
+`globals.css` has exactly **TWO** writers for the whole mission: **T9-C3** (the
+token blocks, the fonts, and its ADR-001 literal sweep) and — added 2026-09-01,
+AM6/charge 2 — **T3-C1**, for the single `/` chrome suppression rule in
+`T3-C1-4` and nothing else. Every other cluster's `forbidden` set names the
+`:root` and `html[data-mode="chamber"]` blocks explicitly, and so does T3-C1's.
+
+The second writer is declared rather than quietly permitted because
+single-writer-per-file is a mission law and this is an exception to it. It is
+bounded three ways: one named rule, a cell that fails if a second rule appears
+in the diff, and the token blocks still forbidden. The rule contains no colour
+literal, so neither the wave-0 nor the mission-final ADR-001 oracle changes.
 
 ### Acceptance defaults — every cluster, in addition to the command in its row
 
@@ -24,6 +32,18 @@ cluster below except the pure test-migration ones that write only under `tests/`
 (T9-C5, T1-C4, T3-C4, T4-C4, T5-C3, T6-C4, T7-C4, T8-C4):
 
 ```sh
+# 1. Locate the pnpm WORKSPACE root. It is NOT the git repo root: this repository's
+#    toplevel is DebateAIRO/, and its child dialectical-engine/ is what holds package.json.
+start=$PWD; root=$PWD
+while [ "$root" != "/" ] && [ ! -f "$root/apps/ui/tsconfig.json" ]; do root=$(dirname "$root"); done
+[ -f "$root/apps/ui/tsconfig.json" ] || { echo "GATE FAIL: no pnpm workspace root at or above $start (looked for apps/ui/tsconfig.json)"; exit 2; }
+cd "$root" || exit 2
+[ -f apps/ui/tsconfig.json ] || { echo "GATE FAIL: apps/ui/tsconfig.json not found in $PWD"; exit 2; }
+
+# 2. Prove a compiler actually RUNS here before trusting a count of zero.
+pnpm exec tsc --version >/dev/null 2>&1 || { echo "GATE FAIL: 'pnpm exec tsc' does not run in $PWD"; exit 2; }
+
+# 3. The gate.
 pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
   | grep -E 'error TS' \
   | grep -v -e 'app/debate/\[id\]/DebatePageClient\.tsx(1488,11): error TS2322' \
@@ -31,6 +51,15 @@ pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
   | tee /dev/stderr \
   | wc -l          # required: 0
 ```
+
+> **CORRECTED 2026-09-01 (AM6/N2).** Steps 1 and 2 are new. The previous block
+> was the bare step-3 pipeline with no directory discipline at all, so run from
+> anywhere without a `package.json` it prints the required `0` having compiled
+> nothing — `pnpm`'s failure goes to stderr, `2>&1` merges it into the pipe, and
+> `grep -E 'error TS'` does not match it. The ADR-006 copy was worse still: it
+> opened by `cd`-ing to the git toplevel, which IS such a directory. Both are
+> fixed; `ADR-006` §"The 0-new command" carries the four-directory run and the
+> discrimination proof.
 
 `pnpm run typecheck` is **NOT** this gate and must never be cited as one for
 `apps/ui` work: root `tsconfig.json` excludes `apps/ui` and `web`, so it exits 0
@@ -91,11 +120,12 @@ RETARGET pin that genuinely reads `NodeDetailDrawer.tsx`, the file T5 rewrites.
 `prov01` stays in every T5 command as an unedited regression guard, which is
 what a KEEP file is for.
 
-### The four adjudicated exemptions — published, because an unpublished exemption is a hole
+### The five adjudicated exemptions — published, because an unpublished exemption is a hole
 
 A cluster writing a file a pin reads is a **candidate** breaker, not a breaker.
-Four (breaker, pin) pairs were adjudicated NOT-A-BREAK against what the pin
-actually asserts; they account for all eight cells the raw checker reports.
+Five (breaker, pin) pairs were adjudicated NOT-A-BREAK against what the pin
+actually asserts; they account for every cell the raw checker reports (eight at
+AM5, twelve once AM6 made T3-C1 the second `globals.css` writer).
 Each one is a constraint on the cluster, and if the constraint is violated the
 exemption is void and the pin is red with no owner — so they are listed, not
 assumed.
@@ -105,11 +135,13 @@ assumed.
 | #1 T9-C3 `globals.css` → `pda-s03` | computed `justify-content`, `gap`, `margin-left`, `font-weight`, `padding`, `border-radius`, `background`, `color`, `box-shadow` on `.sectionHead` / `.tab` / `.tabActive` / `.count` (lines 164–174) | jsdom does not resolve `var()`, so a token *value* cannot reach any of these reads; T9-C3's charge is the two token blocks and the font wiring | the `ADR-001` literal→var substitution is **declaration-preserving**: it changes values, never which selectors or declarations exist |
 | #1 T9-C3 `globals.css` → `v2ui-pages` | `v2ui-pages.test.ts:579` pins the literal text `border: 1px solid var(--line-strong); … background: var(--surface-sunken); … color: var(--muted);`, plus `@media` and `[data-actions-collapsed]` rules (lines 349–352, 546) | all three custom-property NAMES survive — `ADR-001`: *"existing names are redefined; new names are added beside them"* (`token-inventory` rows for `--surface-sunken`, `--muted`, `--line-strong`) | T9-C3 may not RENAME an existing token, only redefine it |
 | #2 T9-C1 `app/page.tsx` → `s8-publication-contract` | `readPublicDebates(50, 0)`, `Published debates…`, and the source slice `published.items.map` → `</article>` | an early return adds a branch above the library body; the pinned text stays in the file | the split moves no JSX out of `app/page.tsx` (stated in full above) |
+| #3 T3-C1 `globals.css` → `v2ui-pages` (added AM6) | `v2ui-pages.test.ts` reads `globals.css` only for `@media` blocks, `[data-actions-collapsed]` and `[data-maker-absence]` (lines 349–352, 546, 579) | T3-C1 adds ONE rule, `.appShell:has([data-landing-section]) > .topBar`, and modifies none — it cannot intersect any pinned selector | `T3-C1-4` fails if the `globals.css` diff contains more than that one added rule; the token blocks stay forbidden |
 | #3 T3-C1 `TopBar.tsx` → `auth-flow-integration` | `.authTopBar a[href="/"]` not null (lines 171, 200) and `.authTopBar [aria-disabled="true"]` **null** in the pre-auth state (line 201) | `ModeToggle` renders `aria-pressed`, not `aria-disabled`, and does not touch the brand link | the ☾ control must never carry `aria-disabled`; the `authTopBar` brand link keeps `href="/"` |
 
-Re-running the invariant checker over this file reports exactly the eight cells
-these four pairs generate and nothing else; with the exemption list applied it
-reports **0**. A reviewer who
+Re-running the invariant checker over this file reports exactly the cells these
+five pairs generate and nothing else; with the exemption list applied it reports
+**0**. Re-run after every AM6 edit, against the published markdown rather than
+any working copy. A reviewer who
 disagrees with an exemption has a one-line diff to make, which is the point of
 writing them down.
 
@@ -184,7 +216,7 @@ evaluate and a mode toggle that flips nothing.
 | # | Cluster | Writes | Verify |
 |---|---|---|---|
 | 2 | **T9-C1** — anonymous `/` vs signed-in `/` **+ mode control on the anonymous landing** | `apps/ui/app/page.tsx` · `apps/ui/components/landing/LandingPage.tsx` · `apps/ui/components/landing/LandingChrome.tsx` (the `ModeToggle` mount only) · `apps/ui/components/landing/LandingHero.tsx` · `LandingSample.tsx` · `LandingMethod.tsx` · `LandingPricing.tsx` (**empty stubs only — content is T9-C4's**; see the stub rule below) · `tests/render/t9-landing.test.tsx` · `tests/unit/pda-s03-keyboard-accessibility.test.ts` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
-| 3 | **T3-C1** — signed-in library chrome + ☾ mount in `TopBar` | `apps/ui/components/TopBar.tsx` · `apps/ui/app/page.tsx` (library half) · `apps/ui/components/LibraryComposer.tsx` · `tests/render/t3-library.test.tsx` · `tests/unit/pda-s03-keyboard-accessibility.test.ts` · `tests/architecture/s8-publication-contract.test.ts` | `pnpm exec vitest run tests/architecture/s8-publication-contract.test.ts tests/render/auth-flow-integration.test.tsx tests/render/bug03-home-buffer.test.tsx tests/render/pda-s02-honesty-export.test.tsx tests/render/pda-s02-public-page.test.tsx tests/render/pda-s02-public-tree.test.tsx tests/render/pda-s02-scoring-chrome.test.tsx tests/render/t3-library.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/s8-publication-ui.test.tsx` |
+| 3 | **T3-C1** — signed-in library chrome + ☾ mount in `TopBar` **+ the `/` chrome suppression rule** | `apps/ui/app/globals.css` (**the ONE rule in T3-C1-4 only** — `:root` and `html[data-mode="chamber"]` remain forbidden, as for every non-T9-C3 cluster) · `apps/ui/components/TopBar.tsx` · `apps/ui/app/page.tsx` (library half) · `apps/ui/components/LibraryComposer.tsx` · `tests/render/t3-library.test.tsx` · `tests/unit/pda-s03-keyboard-accessibility.test.ts` · `tests/architecture/s8-publication-contract.test.ts` | `pnpm exec vitest run tests/architecture/s8-publication-contract.test.ts tests/render/auth-flow-integration.test.tsx tests/render/bug03-home-buffer.test.tsx tests/render/pda-s02-honesty-export.test.tsx tests/render/pda-s02-public-page.test.tsx tests/render/pda-s02-public-tree.test.tsx tests/render/pda-s02-scoring-chrome.test.tsx tests/render/t3-library.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/s8-publication-ui.test.tsx tests/unit/t9-mode-tokens.test.ts tests/unit/v2ui-pages.test.ts` |
 
 #### T9-C1 stub rule (added 2026-08-31, AM4)
 
@@ -243,6 +275,52 @@ later cluster is not a pin.
 > is created by T9-C2 for its chrome copy"*, which contradicted the AM4 stub rule
 > eleven lines above it and row 2's own write surface. Same AF-1 class, prose
 > instance.
+
+### Landing query convention (AM6/charge 3) — T9-C1, T9-C2, T9-C4 all inherit this
+
+`apps/ui/app/layout.tsx:44` renders `<TopBar />` on every route, above
+`{children}`. Every landing acceptance therefore runs against a document that
+contains **the landing plus the application bar**, and an unscoped
+`document.querySelector` cannot tell which one it found. That is not a
+hypothesis: the T9-C1 review proved it by simulating T3-C1's contracted `TopBar`
+☾ mount and deleting T9-C1's own — `t9-landing.test.tsx` stayed `5 passed (5)`
+with SPEC T9 R3's control absent from the landing.
+
+**The convention, in three lines:**
+
+1. **Every landing region carries `data-landing-section="<name>"`** on its root
+   element. The five names are exactly the five children of `LandingPage`:
+   `chrome` · `hero` · `sample` · `method` · `pricing`.
+2. **Presence assertions scope to the owning subtree.**
+   `document.querySelector('[data-landing-section="chrome"] [data-mode-toggle]')`,
+   never `document.querySelector('[data-mode-toggle]')`. Same for the hero
+   headline (`[data-landing-section="hero"]`), the CTAs, the method steps and
+   the pricing strip.
+3. **Absence assertions stay document-wide.** `.sectionHead` and `.tabEmptyHint`
+   must be absent from the *whole* anonymous document, not from a subtree.
+   Absence over a superset is a strictly stronger claim; scoping it would weaken
+   it. This is the one case where the unscoped query is the correct one.
+
+**Why an attribute and not a class.** Classes are style surface and get renamed
+by re-skins — this whole mission is a re-skin. `data-landing-section` is
+assertion surface with no style meaning, so nothing in T9-C2's or T9-C4's charge
+has a reason to touch it. ADR-006 freezes class names for the same reason in
+the opposite direction; this is the complementary tool.
+
+**It is also product markup, not test scaffolding.** The `/` chrome suppression
+rule (ADR-002 §"How the suppression is implemented") selects on
+`.appShell:has([data-landing-section])`. A seat that drops the attribute does
+not merely weaken a pin — it silently restores the duplicate header on the
+anonymous landing. Stated here because "it's only for tests" is exactly the
+reasoning that would remove it.
+
+**Scope of the retrofit.** T9-C1 (row 2) introduces the attributes as part of
+its B1 rework; T9-C2 (row 4) and T9-C4 (row 5) inherit them and add no new
+unscoped landing query. The review's own class sweep lists the members: the
+`[data-mode-toggle]` existence check (blocking, B1), the `+ New debate`
+signed-in assertion (vacuous today — only `TopBar.tsx:85` emits that string, on
+every route), and the hero headline read via `document.body.textContent`. All
+three take the same one-line remedy.
 
 #### T9-C1's `pda-s03` migration — what it may pin at position #2 (AM5)
 
@@ -317,6 +395,38 @@ Case count in = 5, case count out ≥ 5, per guard rail 2.
 Without #14 in that list the pin would have gone red at T3-C2 with its migration
 scheduled two rows *earlier* — a second instance of the same defect, found only
 because the sweep was run over all 32 rows rather than around T9-C1.
+
+#### T3-C1 additional acceptance — T3-C1-4, the `/` chrome suppression (AM6/charge 2)
+
+**This cell is what gated T3-C1's dispatch.** The adjudication, its three
+grounds and the two rejected alternatives are in `ADR-002` §"The `/` chrome
+adjudication"; the decision is: **on anonymous `/`, `TopBar` does not render.**
+T3-C1 is the cluster that makes the defect visible — it adds the second ☾ — and
+it is the first cluster after HEAD that can legally take a `globals.css` write.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T3-C1-4** | T9 R3 + T9 States 1 (`"the landing IS the document"`), T3 R1 | The layout's global bar is suppressed when the landing is the document, and present when the library is | In `tests/render/t3-library.test.tsx` (owned by T3-C1), using ADR-006's stylesheet-injection pattern: build a document containing `.appShell > header.topBar` plus a `[data-landing-section]` element, inject `globals.css`, assert `getComputedStyle(topBar).display === "none"`. Then build the same document with the library markup and **no** `[data-landing-section]`, and assert `display !== "none"`. **Both halves are required** — the first alone is satisfied by a rule that hides the bar everywhere, which would take T3-S1's chrome off the signed-in library |
+
+**Verified in this edit that the acceptance is runnable — the rule resolves in
+the mission's own harness.** jsdom **30.0.1** supports `:has()` and propagates it
+through `getComputedStyle`:
+
+```
+landing present      | getComputedStyle.display = "none" | querySelector(:has) = matched
+signed-in library    | getComputedStyle.display = "flex" | querySelector(:has) = no match
+```
+
+That probe is why this cell is written as a computed-style assertion rather than
+a source-text one. Had jsdom not supported `:has()`, the acceptance would have
+had to change shape, and publishing it unmeasured would have handed T3-C1 an
+acceptance it could not satisfy — the AF-1 defect, a fifth time.
+
+**What T3-C1 must NOT do here.** Not touch the token blocks. Not add a second
+rule. Not suppress `.authTopBar` (the auth routes keep their bar; `T7`/`T8` pins
+in `auth-flow-integration.test.tsx` assert `.authTopBar a[href="/"]`). Not
+change `TopBar.tsx`'s null-return list — the suppression is CSS precisely
+because `TopBar` cannot know the session and `layout.tsx` cannot know the path.
 
 T9-C1 and T3-C1 both write `apps/ui/app/page.tsx` — **they are serialised**,
 T9-C1 first. T9-C1 adds the early return; T3-C1 edits the body below it. This is
@@ -628,3 +738,51 @@ and is KEEP only because `ADR-006` freezes their class names. If a cluster
 renames a frozen class the sweep says OK and the suite goes red. That is
 `ADR-006`'s job, not this law's, and the two must both hold.
 
+
+### 2026-09-01 — AM6: the `/` chrome adjudication, the landing query convention, and a compile gate that passed by doing nothing (trigger: T9-C1 blind review, `t_4487f9b1` verdict 00:26 — B1 root cause, N1, N2)
+
+**The premise underneath three documents was false.** `ADR-002` and
+`slices/T9/DECISIONS.md:45` both said logged-out `/` *"does not render
+`TopBar`"*. `apps/ui/app/layout.tsx:44` renders it on every route;
+`TopBar.tsx:57` nulls only `/debate/*` and `/public/debate/*`. I wrote that
+premise in AM5 to justify a conclusion that happened to be right, without
+reading the file that decides it.
+
+**Its two consequences, both found by the review and neither predicted by me:**
+
+| | |
+|---|---|
+| **B1 (blocking)** | `T9-C1-3` — the pin AM2/D added *specifically* so the mode control could not go missing from the one surface T9 R3 names — queried the whole anonymous document. From row 3 onward `TopBar` supplies a second `[data-mode-toggle]`. The reviewer simulated T3-C1's mount, deleted T9-C1's, and got `5 passed (5)`. The pin had stopped discriminating |
+| **N1 (product)** | Nothing in the plan noticed that anonymous `/` would ship **two headers with two different product names** — `DebateAI` (T9-S1) above/below `Dialectical Engine` (T3-S1) — plus `+ New debate` and `⚙ Settings`, which a logged-out visitor cannot use |
+
+**Adjudicated (charge 2): `TopBar` does not render on anonymous `/`.** Grounds,
+alternatives and the implementation cost are in `ADR-002` §"The `/` chrome
+adjudication"; the cell is `T3-C1-4` above; `globals.css` gains its declared
+second writer. The decision is grounded in the TURN 9 artboard (which shows no
+application bar) and SPEC T9 States 1 (*"the landing IS the document"*), not in
+taste.
+
+**Published (charge 3): the landing query convention.** `[data-landing-section]`
+scoping for presence assertions, document-wide for absence assertions. The
+review's class sweep listed three members and one non-member; the remedy is a
+convention rather than three patches, because T9-C2 and T9-C4 inherit the same
+harness and would otherwise each rediscover it.
+
+**Fixed (charge 4): the compile gate.** Both copies. `ADR-006` carries the
+four-directory run and the discrimination proof; the copy in this file's
+acceptance defaults had no directory discipline at all and printed the required
+`0` from anywhere without a `package.json`. Thirty clusters still have to run it.
+
+**What I got wrong, in one line each.** AM5: asserted a rendering fact from the
+shape of a route split instead of reading `layout.tsx`. AM2: wrote the law *"name
+the invocation directory"*, named one, and never ran the block from it. Both are
+the same failure — **publishing a claim in the voice of a measurement without
+taking the measurement** — and both were caught by seats downstream of me rather
+than by any gate I wrote.
+
+**Verification re-run after every edit in this amendment**, against the published
+markdown rather than a working copy: 32 rows, 5 exemptions, **0 violations** of
+the AM5 verify-survivability law. The fifth exemption is new here and is a
+consequence of AM6 itself: T3-C1's `globals.css` write is read by
+`v2ui-pages.test.ts`, and the single added rule cannot intersect any selector it
+pins.
