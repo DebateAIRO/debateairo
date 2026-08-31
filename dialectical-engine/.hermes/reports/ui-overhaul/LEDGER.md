@@ -59,3 +59,25 @@
 - orchestrator mechanical gate re-ran: acceptance 13/13, gate 0, oracle 0, no fixed 199 in test. SKILLS body-verified in codex rollout ("worst run" x17, TDD phrases x4, "1% chance" x1).
 - tooling: tee /dev/stderr blocked in codex sandbox (promoted to TOOLING-TRAPS); rg absent from codex PATH (already recorded) — worker used documented fallbacks and said so.
 - product commit (worker net diff only, N7 practice): see git log; tokens (codex footer basis): tokens used
+
+## Receipt — CODE-T9C3-REV2 (Opus 5 re-review, round 2 verdict)
+- exit: 2026-08-31 21:55:37 rc=0 | session 8795a3eb resumed (9 min) | verdict: REWORK round 2 of 3, 1 blocking (B2)
+- ALL FOUR round-1 findings CONFIRMED FIXED (M1/M2/M3 re-applied and RED; M3b class-sweep also RED; 2 of 3 neighbor controls independently re-run GREEN; tree discipline exact; "best-disciplined rework I have reviewed in this mission").
+- B2: exclusion is syntax-BOUND but still a one-sided PREFIX; the token region is TWO intervals ((5,72),(74,114)). Live green mutants: M4 literal in the inter-block gap, M5 literal above :root, M6 chamber block legally relocated to EOF -> boundary 4122 -> ENTIRE stylesheet exempt while the file has ONE authorized writer all mission. Remedy (range-pair membership) verified OUT-OF-TREE by the reviewer before being required. ADR-001 again the source; worker again not at fault.
+- N9: TWO TypeScript compilers in the repo (root 7.0.2 / apps/ui 5.9.3, nearest-cwd resolution) — the reviewer's own round-0 "layout.tsx CLEAN" was wrong because of it, admitted in the verdict. ADR-006 law extended: gates pin the invocation directory. TS2882 baseline confirmed load-bearing (dropping it -> gate returns 1). Promoted to TOOLING-TRAPS.
+- Reviewer offered a fair-counter re-tier of B2 to N; the orchestrator holds no verdict authority and does not re-tier — REWORK round 2 stands as issued.
+- STALE RESTATEMENT corrected on the board: the anonymous-landing hole was closed by AM2/D (dispatch-order T9-C1-3) before this review; the reviewer's packet did not route it to dispatch-order. Not a new finding.
+- skills: same floor set, same session — bodies already verified this session (cumulative transcript). Tree byte-clean at verdict.
+- tokens (transcript delta basis, computed): output 86,635; fresh input 542,710 this round.
+
+## Receipt — ARCH-01-AM3 (resumed ARCH seat, micro-amendment 3)
+- exit: 2026-08-31 22:03:29 rc=0 | session bb69b040 (5 min) | ticket t_6cd3cba0
+- ADR-001 exclusion -> RANGE-PAIR MEMBERSHIP in both consumers (4 preambles + 4 filters in-file; tokenBlockRanges()+isInsideTokenBlocks() published contract); ADR-006 gates pin invocation directory (canonical: repo root via git rev-parse; dual-compiler section measured 7.0.2 vs 5.9.3, error-path spelling difference recorded, TS2882 baseline reconfirmed load-bearing; amended gate run verbatim = 0).
+- verification tables pasted for BOTH consumers on clean/M4/M5/M6 fixtures (AM3 hits 0/1/1/1 vs AM2 0/0/0/0), fail-loud proven on TWO known-BAD inputs, real-tree oracles unchanged (wave-0=0, mission-final=43). Fixture off-by-one vs reviewer's m6 named and shown immaterial.
+- seat's opening line owns the defect cleanly: "AM2 fixed where the boundary came FROM and left what it MEANT." Also filed a record correction crediting the reviewer: its round-0 "layout.tsx CLEAN" was compiler-relative truth, not carelessness.
+- orchestrator verification: bounds clean; prefix residue in ADR-001 = changelog narration only (296, 356); independent re-run RANGES=5,72,74,114, wave-0 residual 0. Committed as ARCH-docs-only commit.
+
+## Receipt — CODE-T9C3-RW2 (codex rework round 2 of 3)
+- exit: 2026-08-31 22:35:03 rc=0 | session 01a058b3 resumed (29 min) | epoch=4
+- F-B2 closed: range-pair membership implemented from AM3 verbatim; M4/M5/M6 reproduced GREEN-under-prefix then RED-under-ranges with exact planted-line hits (73 / 4 / 150 incl. the true relocated-chamber fixture), M2 retained RED, both neighbors GREEN, everything reverted. globals.css zero-net proven by byte-identical SHA-256 (git denied by packet law — good substitution, promote as pattern). 13/13 worst-of-three; RANGES=5,72,74,114 hits=0; canonical-root gate 0 (compiler 7.0.2 named); render 78/78.
+- orchestrator mechanical gate re-ran all of it: acceptance 13/13, gate 0, residue 0, isInsideTokenBlocks present, SHA f0d29024 confirmed. Product commit: test file alone.

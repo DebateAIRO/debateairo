@@ -44,3 +44,19 @@
 - The direct Superpowers skill bodies were readable even though they were absent from this turn's invokable skill catalog; the adapter's markdown fallback prevented a false skills-floor shortfall.
 - One-prompt upgrade: compile every published TS/TSX contract under the owning workspace tsconfig during ADR authoring, and require move/remove mutants whenever an acceptance says “inside”, “before”, “after”, or “on this element”.
 - The tooling-trap appendix is again outside the rework allowlist, so the new `/dev/stderr` behavior is recorded here for Hermes to promote rather than written across the contract.
+
+## RW2 — range shape, not boundary provenance
+
+- Root cause: AM2 changed where the endpoint came from but kept the prefix shape; a two-interval region cannot be represented by `line <= lastEnd`.
+- Price: one additional review round, four old-guard GREEN reproductions, five range-guard RED runs, two neighbor runs, and repeated byte-for-byte restores of the 4,119-line stylesheet; the extra M6 pair reconciled the packet's “old position” shorthand with the reviewer's exact line-150 record.
+- M4 and M5 proved both holes around the token blocks were live: literals at the inter-block gap and banner stayed 13/13 GREEN before AM3, then failed at exact lines 73 and 4.
+- M6 was the decisive class member: moving Chamber to EOF is legal CSS, yet the prefix guard expanded to nearly the whole stylesheet; the exact line-150 replay stayed 13/13 GREEN before AM3 and became 1 failed / 12 passed after it.
+- The retained M2 probe failed at exact line 150 under the new logic, so fixing the two holes did not reopen the original below-region defect.
+- The non-colour declaration below the blocks and benign comment between them each stayed GREEN, showing the guard responds to colour debt rather than harmless boundary movement.
+- I nearly installed the new helper after reproducing only M4; doing so would have left M5/M6 without the required proof that the *current* acceptance was green, so all three old-guard runs were completed first.
+- The dead end is now explicit: no better endpoint or later syntax-derived boundary can repair a prefix guard; membership must preserve both starts and both ends.
+- The verbatim AM3 helper produces real-tree ranges `5,72,74,114`, and an independent four-file scan reports `hits=0`.
+- Transient CSS discipline was checked by SHA-256 after every mutation family; the final `globals.css` hash equals the pre-RW2 hash `f0d290245b3d385fcef478c81c31b6c6aa7ccf4cb3fbe557cfdf6aa4cb78b631`.
+- Root-canonical TypeScript remains a distinct gate: compiler 7.0.2 reports only the two named baselines and zero filtered errors; running from `apps/ui` would answer a different question.
+- One-prompt upgrade: generate the shell oracle and Vitest guard from one executable range-membership fixture, with banner/gap/relocation hostile cases run when an ADR changes.
+- Packet quality was high: it named the exact property, three reviewer mutants, two specificity controls, cwd-sensitive compile gate, restore law, and the only intended net test-file change.
