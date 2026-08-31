@@ -256,7 +256,22 @@ the dispatch source of truth.
 
 | Row | SPEC | WHAT | Acceptance |
 |---|---|---|---|
-| **T9-C1-3** | R3 | The anonymous landing renders the mode control | In `tests/render/t9-landing.test.tsx` (owned by T9-C1): render the anonymous `/` document — the same no-session render as T9-C1-1 — and assert the markup contains an element carrying `data-mode-toggle` whose accessible name matches `/Switch to (Chamber\|Terracotta) mode/`. Asserting the `☾` glyph alone = RED (the glyph is decoration, the label is the contract). Asserting that `ModeToggle` is merely imported = RED — the assertion is on the RENDERED anonymous-landing output |
+| **T9-C1-3** | R3 | The anonymous landing renders the mode control | In `tests/render/t9-landing.test.tsx` (owned by T9-C1): render the anonymous `/` document — the same no-session render as T9-C1-1 — and assert that `document.querySelector('[data-landing-section="chrome"] [data-mode-toggle]')` is non-null and its accessible name matches `/Switch to (Chamber\|Terracotta) mode/`. **The subtree scope is part of the acceptance, not a style preference** (see §"Landing query convention"): `layout.tsx:44` renders `TopBar` into the same document, and from dispatch row 3 `TopBar` mounts a `[data-mode-toggle]` of its own, so an unscoped query passes with the landing's control deleted. Asserting the `☾` glyph alone = RED (the glyph is decoration, the label is the contract). Asserting that `ModeToggle` is merely imported = RED — the assertion is on the RENDERED anonymous-landing output |
+
+> **AMENDED 2026-09-01 (AM7, found by this amendment's own cell audit — not
+> charged).** This cell read *"assert the markup contains an element carrying
+> `data-mode-toggle`"*, unscoped. That is precisely the query the T9-C1 review
+> filed as blocking B1 and proved green with the landing's control deleted. The
+> **test file** was fixed in T9-C1's rework and AM6 published the general
+> convention, but **the cell itself was never amended** — and the cell is what a
+> rework packet quotes verbatim, so the defect was one packet away from being
+> reissued. Fixed here to match the convention it should always have matched.
+>
+> The audit that found it exists because AM7's changelog was about to claim
+> *"every remaining cell has been read against the real-artifact rule"*. Running
+> the claim instead of writing it turned up the counter-example in the same
+> file — which is the AM6/AM7 lesson applied to my own prose rather than to
+> someone else's code.
 
 **V QA line (human-runnable, for the manual acceptance):**
 
@@ -406,21 +421,123 @@ it is the first cluster after HEAD that can legally take a `globals.css` write.
 
 | Row | SPEC | WHAT | Acceptance |
 |---|---|---|---|
-| **T3-C1-4** | T9 R3 + T9 States 1 (`"the landing IS the document"`), T3 R1 | The layout's global bar is suppressed when the landing is the document, and present when the library is | In `tests/render/t3-library.test.tsx` (owned by T3-C1), using ADR-006's stylesheet-injection pattern: build a document containing `.appShell > header.topBar` plus a `[data-landing-section]` element, inject `globals.css`, assert `getComputedStyle(topBar).display === "none"`. Then build the same document with the library markup and **no** `[data-landing-section]`, and assert `display !== "none"`. **Both halves are required** — the first alone is satisfied by a rule that hides the bar everywhere, which would take T3-S1's chrome off the signed-in library |
+| **T3-C1-4** | T9 R3 + T9 States 1 (`"the landing IS the document"`), T3 R1 | The layout's global bar is suppressed when the landing is the document, and present when the library is — **proved on the real documents the product emits, not on a document the test writes** | In `tests/render/t3-library.test.tsx` (owned by T3-C1), all three parts REQUIRED. **P1 — real anonymous `/`** (the existing route helper with `sessionCookie = null`) rendered into JSDOM with `globals.css` injected: `[data-landing-section]` markers = **5**; `.topBar` present; `getComputedStyle(.topBar).display === "none"`. **P2 — real signed-in `/`** in the same harness: `getComputedStyle(.topBar).display === "flex"`; `.topBar [data-mode-toggle]` non-null with accessible name matching `/Switch to (Chamber\|Terracotta) mode/`; its computed `display !== "none"`. **P3 — shape**: `apps/ui/app/layout.tsx` matches `/<div className="appShell">\s*<TopBar \/>/`. The synthetic hand-built documents MAY remain as fast unit-level guards; they are not the acceptance
 
-**Verified in this edit that the acceptance is runnable — the rule resolves in
-the mission's own harness.** jsdom **30.0.1** supports `:has()` and propagates it
-through `getComputedStyle`:
+> **REWRITTEN 2026-09-01 (AM7, blocking finding B2 on `t_9d3f1f2d`).** The cell
+> previously read: *"build a document containing `.appShell > header.topBar`
+> plus a `[data-landing-section]` element"*. That prescribed a **synthetic**
+> document, so the selector was only ever validated against shapes the test
+> hand-writes — and `apps/ui/app/layout.tsx`, the file that actually emits
+> `.appShell > <TopBar />`, was read by no test in the render suite. The worker
+> obeyed the cell to the letter and added a real-render arm on top; the defect
+> is mine. Measured by the reviewer:
+>
+> ```
+> M6  TopBar nested one div deeper in layout.tsx
+>     row-3 command (12 files)          -> 12 passed / 92 passed   NOT CAUGHT
+>     widest usable net (22 files)      -> 22 passed / 102 passed  NOT CAUGHT
+> ```
+>
+> Under M6 the `:has() > .topBar` child combinator stops matching and **the
+> whole AM6 two-toggles adjudication silently reverts** — two headers, two
+> wordmarks, two ☾ on anonymous `/` — with every acceptance in the mission
+> green. The P1/P2/P3 form above is the reviewer's, adopted **verbatim**; they
+> built it and it passed first try.
+
+**Why the trio and not a fourth part.** Each part closes a mutant the others
+miss, which is why none of them is redundant:
+
+| Mutant | P1 | P2 | P3 |
+|---|---|---|---|
+| suppression rule deleted | RED | — | — |
+| selector broadened to `.appShell > .topBar` (hides the bar everywhere) | — | RED | — |
+| `display:none` → `visibility:hidden` (concealment, not suppression) | RED | — | — |
+| `[data-landing-section]` dropped from the landing roots | RED (markers ≠ 5) | — | — |
+| ☾ removed from `topBarActions` | — | RED | — |
+| **M6 — `TopBar` nested deeper in `layout.tsx`** | — | — | **RED** |
+| **M9 — `.appShell` renamed in `layout.tsx`** | — | — | **RED** |
+
+**Re-derived independently in this edit** — the reviewer's regex against the real
+file and against both structural mutants, before adopting it:
 
 ```
-landing present      | getComputedStyle.display = "none" | querySelector(:has) = matched
-signed-in library    | getComputedStyle.display = "flex" | querySelector(:has) = no match
+P3 regex vs SHIPPED layout.tsx     : MATCH
+P3 regex vs M6 (TopBar nested)     : NO MATCH  <- RED, catches M6
+P3 regex vs M9 (.appShell renamed) : NO MATCH  <- RED, catches M9
 ```
 
-That probe is why this cell is written as a computed-style assertion rather than
-a source-text one. Had jsdom not supported `:has()`, the acceptance would have
-had to change shape, and publishing it unmeasured would have handed T3-C1 an
-acceptance it could not satisfy — the AF-1 defect, a fifth time.
+and P1's marker count is contractual, not incidental — the five names published
+in §"Landing query convention" each occur exactly once in product source:
+
+```
+$ grep -rho 'data-landing-section="[a-z]*"' apps/ui/components/landing/ | sort | uniq -c
+   1 data-landing-section="chrome"     1 data-landing-section="hero"
+   1 data-landing-section="method"     1 data-landing-section="pricing"
+   1 data-landing-section="sample"
+```
+
+P2's `display !== "none"` resolves against `.modeToggle { display: inline-flex }`
+(`globals.css:377`), and the suppression rule is the single occurrence at
+`globals.css:219` — exemption #3's one-rule bound still holds.
+
+jsdom **30.0.1** supports `:has()` and propagates it through `getComputedStyle`,
+which is what makes a computed-style assertion legal here at all; that probe was
+run at AM6 and is unchanged. What it did **not** establish, and what B2 is, is
+*which document you run it against*.
+
+**One residual, named rather than left to be found.** P3 pins that `<TopBar />`
+sits directly inside `<div className="appShell">`. It does **not** pin that
+`{children}` also sits inside it. Measured here:
+
+```
+P3 regex vs M-children (children hoisted OUT of .appShell): MATCH  <- not caught
+```
+
+Hoisting `{children}` out of `.appShell` would stop `:has()` from matching and
+restore the duplicate header with P1/P2/P3 unable to see it — P1 renders its own
+composition, so it would still pass. It is far less plausible than M6 (it breaks
+the flex-column shell that lays the whole app out) and **no cluster in the 32
+rows writes `layout.tsx`**, so there is no owner to route it to. It is therefore
+a **V closure line**, stated here and repeated in the handoff, not a silent
+extension of the reviewer's verified form.
+
+#### T3-C1 additional acceptance — T3-C1-5, the `authTopBar` ☾ mount (AM7/charge 2, from B1)
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T3-C1-5** | T8 R7 (`"Mode toggle on auth shell"`), T7 R1 | The `authTopBar` branch's ☾ mount — the second of `TopBar.tsx`'s two code sites — is pinned by the only cluster that writes the file | In the `chrome` describe of `tests/render/t3-library.test.tsx`: `setPathname("/login")`, render `<TopBar />`, assert `.authTopBar [data-mode-toggle]` is non-null, that its accessible name matches `/Switch to (Chamber\|Terracotta) mode/`, and that it carries **no** `aria-disabled` (dispatch exemption #3's standing constraint). Prove it RED by deleting that mount alone, leaving `topBarActions` intact |
+
+**Why this cannot be deferred, measured rather than argued.** The reviewer
+deleted the `authTopBar` mount alone and ran the canonical 12-path row-3
+command: `12 files passed / 92 tests passed`. Not caught. A mount required by
+T9's PLAN HOW (*"in `topBarActions` AND in the `authTopBar` branch"*) and by
+`ADR-002`'s table for `/login`, `/sign-up`, `/verify-email` and `/enroll-mfa`
+could be absent with T3-C1 fully green, leaving SPEC T8 R7 unsatisfied and
+invisible.
+
+`awk` over the Writes column of all 32 rows: **T3-C1 is the only row that writes
+`apps/ui/components/TopBar.tsx`.** `T7-C1-2` (row 25) and `T8-C4-1` (row 32) do
+assert the control, but neither owns the file, and both are 22+ rows away — so
+"later" here means "by a seat with no write access to the subject". That is the
+AM5 verify-survivability law read from the other side: a pin whose subject no
+later cluster may touch has exactly one legal owner, and it is this one.
+
+#### One recorded fact about T3's eyebrow copy (AM7/charge 3, from N5)
+
+`.eyebrow` already carries `text-transform: uppercase` (`globals.css:512`), so
+T3-C1's change of `A reasoning instrument` → `A REASONING INSTRUMENT`
+(`apps/ui/app/page.tsx:55`) has **zero rendered effect**. It is a source-text
+change that satisfies SPEC T3's binding-copy list literally, and it is correct
+as charged.
+
+The consequence worth recording: the ALL-CAPS is now in the **DOM**, which is
+what assistive technology receives, where before the capitalisation was purely
+presentational. Screen readers may spell out or re-pitch literal caps. This is
+noted so no later seat "fixes" the redundancy by reverting the source string
+(which breaks the binding-copy pin) or by deleting the CSS rule (which changes
+every other `.eyebrow` in the product). **Neither is a defect and neither
+should be touched**; if the AT rendering is ever judged a problem, it is a
+copy/vocabulary question for REQ, not a cluster edit.
 
 **What T3-C1 must NOT do here.** Not touch the token blocks. Not add a second
 rule. Not suppress `.authTopBar` (the auth routes keep their bar; `T7`/`T8` pins
@@ -786,3 +903,56 @@ the AM5 verify-survivability law. The fifth exemption is new here and is a
 consequence of AM6 itself: T3-C1's `globals.css` write is read by
 `v2ui-pages.test.ts`, and the single added rule cannot intersect any selector it
 pins.
+
+### 2026-09-01 — AM7: the third cell defect, and it is one act repeated (trigger: T3-C1 blind review, `t_9d3f1f2d` verdict 02:04 — B1, B2, N5, N6)
+
+**B2 — `T3-C1-4` prescribed a synthetic artifact.** The cell said *"build a
+document containing `.appShell > header.topBar` plus a `[data-landing-section]`
+element"*. The worker obeyed it exactly. The result validated the selector only
+against documents the test hand-writes, while `apps/ui/app/layout.tsx` — the
+file that actually emits that shape — was read by no test in the render suite.
+Measured: nesting `TopBar` one `<div>` deeper in `layout.tsx` left `12 files /
+92 tests` and the widest usable net `22 files / 102 tests` fully green, with the
+entire AM6 two-toggles adjudication silently reverted. Rewritten above to the
+reviewer's verified P1/P2/P3 real-render trio, **adopted verbatim**; I re-derived
+P3 against the shipped file and both structural mutants before adopting, and
+found no defect in it. The one thing it does not cover — `{children}` hoisted out
+of `.appShell` — is named in the cell and routed as a V closure line, not
+smuggled in as an edit to their form.
+
+**B1 — `T3-C1-5` added.** `ADR-002`'s mount table collapses two `TopBar` code
+sites into one row, and my pin-coverage claim counted rows. The `authTopBar` ☾
+mount was shipped and pinned by nothing, and T3-C1 is the only row of 32 that
+writes the file.
+
+**N5, N6 — recorded and re-measured.** `.eyebrow` already uppercases, so T3's
+copy change is source-text-only but now puts literal caps in the DOM where AT
+reads them; recorded so nobody "fixes" it in either direction. The suppressed
+bar's cost is four dead links, a duplicate toggle and the chip — measured, not
+estimated, and the earlier estimate had erred toward flattering the decision.
+
+**The pattern, stated because it is now three.** AM2 published a type contract
+that did not compile. AM3 published an exclusion of the wrong shape. AM6
+published a gate that had never been run as published. AM7's two are the same
+act again: prescribing a **synthetic artifact where only the real one proves the
+property**, and claiming coverage from a count I never took. The corrective is
+not "be more careful" — it is a rule with a test: **an acceptance must name the
+real artifact the property lives in, and if a cell can be satisfied by a
+document the test itself authored, it is not an acceptance.** So every cell in this file was
+audited against that rule in this edit — all three of them, enumerated by
+`grep`, not from memory:
+
+| Cell | Real artifact? | Verdict |
+|---|---|---|
+| `T9-C1-3` | yes — the rendered anonymous `/` | but its **query was still unscoped**, i.e. the exact form its own review blocked. **Amended here** (see the note under the cell). Not charged; found by running the audit instead of asserting it |
+| `T3-C1-4` | now yes — P1/P2/P3 | the subject of this amendment |
+| `T3-C1-5` | yes — the real `authTopBar` branch of the real `TopBar` | clean; the property lives in the component being rendered |
+
+One of three was still defective. That is the honest result, and it is why the
+audit was run rather than claimed: the sentence I had drafted said all cells
+were clean.
+
+**Verification re-run in this edit**, against the published markdown: the AM5
+verify-survivability invariant holds at 32 rows / 5 exemptions / 0 violations —
+AM7 changed no Writes or Verify column, and the check is re-run rather than
+assumed.

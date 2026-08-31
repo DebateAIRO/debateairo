@@ -820,3 +820,138 @@ copy, landing query convention, T3-C1 row + `T3-C1-4`, second-writer
 declaration, fifth exemption, changelog) · `slices/T9/DECISIONS.md` (4 appended
 rows + new tally; nothing rewritten) · this report · board comment on
 `t_a2312f3f`.
+
+---
+
+# AM7 — the third cell defect, and one my own audit found (ticket `t_03525886`)
+
+## The pattern the packet names, and it is right
+
+AM2 published a type contract that did not compile. AM3 published an exclusion
+of the wrong shape. AM6 published a gate never run as published. AM7's B2 is the
+same act again: **`T3-C1-4` prescribed a synthetic artifact where only the real
+one proves the property.**
+
+The cell said *"build a document containing `.appShell > header.topBar` plus a
+`[data-landing-section]` element"*. The worker obeyed it to the letter — and
+correctly added a real-render arm on top, which is more than the cell asked. The
+result: the selector was validated only against documents the test hand-writes,
+and `apps/ui/app/layout.tsx`, the file that actually emits that shape, was read
+by no test in the render suite. The reviewer measured the cost:
+
+```
+M6  TopBar nested one div deeper in layout.tsx
+    row-3 command (12 files)     -> 12 passed / 92 passed   NOT CAUGHT
+    widest usable net (22 files) -> 22 passed / 102 passed  NOT CAUGHT
+```
+
+Under M6 the whole AM6 two-toggles adjudication silently reverts — two headers,
+two wordmarks, two ☾ on anonymous `/` — with every acceptance in the mission
+green. I wrote that adjudication three hours earlier and then wrote a cell that
+could not defend it.
+
+## Adoption, with the check the packet asked for
+
+The packet's default is adopt-verbatim unless defective, and post before
+amending. I checked for defects and found none, so P1/P2/P3 are adopted
+**verbatim**. What I ran before adopting, rather than trusting the `[PASSED]`
+markers:
+
+```
+P3 regex vs SHIPPED layout.tsx     : MATCH
+P3 regex vs M6 (TopBar nested)     : NO MATCH  <- RED, catches M6
+P3 regex vs M9 (.appShell renamed) : NO MATCH  <- RED, catches M9
+```
+
+plus P1's `= 5` is contractual, not incidental (`grep` shows each of the five
+published section names occurring exactly once in product source), and P2's
+`display !== "none"` resolves against `.modeToggle { display: inline-flex }`
+(`globals.css:377`).
+
+**One residual, which I did not silently fold in.** P3 pins that `<TopBar />`
+sits directly inside `<div className="appShell">`; it does not pin that
+`{children}` does too. Measured: hoisting `{children}` out of `.appShell` leaves
+P3 MATCHing while `:has()` stops matching and the duplicate header returns. It
+is far less plausible than M6 — it breaks the flex shell that lays out the whole
+app — and **no cluster in the 32 rows writes `layout.tsx`**, so there is no owner
+to route it to. Adding a fourth part would have been amending a form the packet
+told me to adopt verbatim, so it is recorded in the cell and routed as a V
+closure line instead.
+
+## B1, and why "later" was not available
+
+`ADR-002`'s mount table has three rows; I claimed *"each of the three is pinned
+by a different cluster's acceptance"*. **Three mounts, four code sites** — the
+Global-chrome row is `topBarActions` *and* the `authTopBar` branch, and only the
+first was pinned. I counted rows in a table I wrote instead of code sites in the
+file it describes.
+
+The reason it could not be deferred is a count, not an argument: `awk` over the
+Writes column of all 32 rows shows **T3-C1 is the only cluster that writes
+`TopBar.tsx`**. `T7-C1-2` and `T8-C4-1` assert the control but own neither the
+file nor the fix, 22+ rows away. That is the AM5 verify-survivability law read
+from the other side — a pin whose subject no later cluster may touch has exactly
+one legal owner. Published as `T3-C1-5`, with the ADR table rebuilt at code-site
+granularity so the collapse cannot happen again.
+
+## What the audit found, which no charge asked for
+
+Writing the changelog, I drafted the sentence *"every remaining cell in this
+file has been read against that rule"*. Given AM6 and AM7 are both about
+claiming a measurement I had not taken, I ran it instead of writing it —
+`grep` for every `T*-C*-N` cell, three of them, read one by one.
+
+**`T9-C1-3` was still defective.** Its text still reads *"assert the markup
+contains an element carrying `data-mode-toggle`"* — unscoped: precisely the
+query the T9-C1 review filed as blocking B1 and proved green with the landing's
+control deleted. The **test file** was fixed in that rework and AM6 published
+the general convention, but nobody amended **the cell**, and the cell is what a
+rework packet quotes verbatim. It was one packet away from being reissued.
+
+Fixed, and the changelog now carries the audit as a three-row table with the
+real result — one of three was defective — rather than the clean sentence I had
+drafted.
+
+## Charges 3 and 4
+
+N5: `.eyebrow` already carries `text-transform: uppercase` (`globals.css:512`),
+so T3-C1's `A reasoning instrument` → `A REASONING INSTRUMENT` has zero rendered
+effect but puts literal caps in the DOM, which is what AT receives. Recorded
+with both wrong "fixes" named — reverting the source breaks the binding-copy
+pin, deleting the CSS rule changes every other `.eyebrow`.
+
+N6: the stated cost of the suppressed bar was *"three dead `<Link>`s"*. Measured:
+**four** (I omitted `BrandMark`'s own `/`), plus a second `[data-mode-toggle]`,
+plus the `ASKER` chip. All inside `display: none`, hence out of the a11y tree and
+tab order, so the conclusion holds — but the estimate erred toward making my own
+decision look cheaper, which is the one direction an estimate must not err in.
+Replaced with the count, not nudged.
+
+## Verification
+
+- P3 regex re-derived against the shipped file and two structural mutants.
+- Landing markers `= 5`, one per published name; suppression rule a single
+  occurrence at `globals.css:219` (exemption #3's bound intact).
+- `.modeToggle { display: inline-flex }` confirms P2's non-`none` assertion.
+- N5 and N6 re-measured at source (`globals.css:512`; `TopBar.tsx:18/83/85/89/91`).
+- AM5 verify-survivability invariant re-run against the published markdown after
+  every edit: **32 rows, 5 exemptions, 0 violations**. AM7 touched no Writes or
+  Verify column; the check was re-run rather than assumed.
+
+## What I did not verify
+
+I did not re-run P1/P2 end to end. They require a test file inside `tests/`, which
+is outside AM7's writes, so I checked their *inputs* — the marker count, the
+`.modeToggle` display, the CSS rule, the regex — and relied on the reviewer's
+measured `[PASSED]` for the assembled cases. Stated plainly rather than implied:
+the trio's three parts are individually cross-checked here; the assembled run is
+the reviewer's evidence, not mine. No browser either — `:has()` support in the
+product's target browsers remains assumed, as the reviewer also flagged.
+
+## Writes
+
+`architecture/dispatch-order.md` (`T3-C1-4` rewritten to P1/P2/P3, `T3-C1-5`
+added, `T9-C1-3` amended, N5 note, changelog with the cell audit) ·
+`architecture/ADR-002-mode-mechanism.md` (pin-coverage table at code-site
+granularity, measured cost, changelog) · this report · board comment on
+`t_03525886`.

@@ -131,9 +131,36 @@ cluster in T1/T3/T5 edits it.
 `TopBar` returns `null` for `/debate/*` and `/public/debate/*`
 (`TopBar.tsx:57`), which is why the debate chrome needs its own mount. The
 anonymous landing needs its own for a different reason, stated correctly this
-time: `TopBar` **does** render there, and must be suppressed. Three is the exact
-number, and each of the three is pinned by a different cluster's acceptance —
-`T9-C1-3` (landing), `T3-C1-3` (signed-in library), and T1's debate-chrome row.
+time: `TopBar` **does** render there, and must be suppressed.
+
+> **CORRECTED 2026-09-01 (AM7/charge 2, from blocking finding B1 on
+> `t_9d3f1f2d`).** This paragraph used to end: *"Three is the exact number, and
+> each of the three is pinned by a different cluster's acceptance — `T9-C1-3`
+> (landing), `T3-C1-3` (signed-in library), and T1's debate-chrome row."*
+> **False, because the table has three MOUNTS but four CODE SITES.** The
+> Global-chrome row is two of them — `topBarActions` **and** the `authTopBar`
+> branch — and only `topBarActions` was pinned. The reviewer deleted the
+> `authTopBar` mount alone and the canonical row-3 command returned
+> `12 files passed / 92 tests passed`: not caught. SPEC T8 R7 (*"Mode toggle on
+> auth shell"*) could therefore be unsatisfied and invisible. Counted over the
+> Writes column of all 32 rows, **T3-C1 is the only cluster that writes
+> `TopBar.tsx`**, so no later cluster could have closed it — `T7-C1-2` (row 25)
+> and `T8-C4-1` (row 32) assert the control but own neither the file nor the
+> fix. Same class as the `T9-C1-3` defect a round was already paid for: I wrote
+> a mount enumeration and then claimed pin coverage over it without counting the
+> code sites the enumeration collapses.
+
+**Pin coverage, corrected and counted — three mounts, four code sites:**
+
+| # | Mount | Code site | Pinned by |
+|---|---|---|---|
+| 1 | Anonymous landing | `LandingChrome.tsx` | `T9-C1-3`, scoped to `[data-landing-section="chrome"]` |
+| 2 | Global chrome | `TopBar.tsx` → `topBarActions` | `T3-C1-3` |
+| 3 | Global chrome | `TopBar.tsx` → `authTopBar` branch | **`T3-C1-5`** — added by the AM7 rework: `setPathname("/login")`, render `<TopBar />`, assert `.authTopBar [data-mode-toggle]` is non-null with accessible name matching `/Switch to (Chamber\|Terracotta) mode/` and carrying no `aria-disabled` (exemption #3's constraint) |
+| 4 | Debate chrome | `DebatePageClient.tsx` → `debateTopControlRow` | T1's debate-chrome row |
+
+Both `TopBar` code sites are pinned by **T3-C1**, not by different clusters —
+they have to be, because T3-C1 is that file's only writer in the whole order.
 
 ### The `/` chrome adjudication (AM6/N1) — one route, two specified chromes
 
@@ -213,9 +240,28 @@ skew the orchestrator sequenced this amendment to avoid.
 **The honest cost, twice over.** First: between HEAD (`3aefb2d`) and row 3 the
 anonymous landing ships with a duplicate header. That window is two clusters
 wide, it is a visual defect and not a correctness or security one, and it is
-named here rather than discovered. Second: `display: none` leaves `TopBar`'s
-markup in the anonymous HTML — three dead `<Link>`s to `/login`, `/new` and
-`/settings`. The structurally clean fix is for the layout to stop mounting
+named here rather than discovered, and **it is now closed** — T3-C1 landed at
+`af50e34`.
+
+Second: `display: none` leaves `TopBar`'s markup in the anonymous HTML.
+**MEASURED 2026-09-01 (AM7/charge 4, from N6) on the real anonymous document at
+`af50e34`, replacing this ADR's earlier estimate of "three dead `<Link>`s":**
+
+| Suppressed but present in the anonymous HTML | Source |
+|---|---|
+| **4** dead links — `/` (BrandMark's home link, `TopBar.tsx:18`), `/login`, `/new`, `/settings` | the `topBar` branch |
+| a **second** `[data-mode-toggle]` — the first is `LandingChrome`'s | T3-C1's `topBarActions` mount |
+| the `ASKER` chip text | `TopBar.tsx:89` |
+
+The estimate was wrong in the direction that flatters the decision — it
+undercounted the links by one and omitted both the duplicate toggle and the chip
+— so it is replaced by the count rather than nudged. **All of it sits inside
+`display: none`**, which removes it from the accessibility tree and the tab
+order: no duplicate control is reachable, nothing is announced, nothing is
+tabbable, so there is no live defect. That is precisely why AM6 specified
+suppression and not `visibility: hidden`, and the reviewer's M7 mutant confirms
+the distinction is genuinely protected (`display:none` → `visibility:hidden`
+goes RED). The structurally clean fix is for the layout to stop mounting
 chrome the route owns, which means moving `<TopBar />` into each route and
 re-laying-out `.topBar` (it is `flex: 0 0 60px` as a direct child of
 `.appShell`, so it cannot simply move inside `{children}`). That touches every
@@ -371,3 +417,34 @@ split instead, and three documents inherited it.
 **Fixed here:** the premise, the mount table's `Covers` column, the `/` chrome
 adjudication and its suppression rule, with the implementation cost stated
 rather than smoothed over.
+### 2026-09-01 — AM7: a pin-coverage claim that counted mounts instead of code sites (trigger: T3-C1 blind review, `t_9d3f1f2d` verdict 02:04, B1 and N6)
+
+**What was wrong (charge 2).** This ADR's mount table has three rows and I wrote
+that *"each of the three is pinned by a different cluster's acceptance"*. The
+Global-chrome row is **two code sites**, `topBarActions` and the `authTopBar`
+branch, and only the first was pinned. Deleting the `authTopBar` mount alone
+left the canonical row-3 command at `12 files / 92 tests` green, with SPEC T8 R7
+unsatisfied and nothing anywhere to say so.
+
+**Why it mattered more than the count suggests.** `T3-C1` is the only row of 32
+that writes `TopBar.tsx`. A gap here is not "close it later" — it is "close it by
+a seat with no write access to the subject". Corrected above into a
+four-row, code-site-level table, with `T3-C1-5` published in `dispatch-order.md`
+so the rework packet has a cell to quote.
+
+**What was wrong (charge 4).** §"the honest cost" estimated *"three dead
+`<Link>`s"*. Measured on the real anonymous document: **four** links (I forgot
+`BrandMark`'s own `/`), plus a second `[data-mode-toggle]`, plus the `ASKER`
+chip. Every item is inside `display: none` and therefore out of the a11y tree
+and tab order, so the conclusion is unchanged — but the estimate erred toward
+making my own decision look cheaper than it is, which is the direction an
+estimate must never err in. Replaced with the count.
+
+**The pattern across AM5 → AM7, since this is now three.** AM5: asserted a
+rendering fact without reading `layout.tsx`. AM6: published a compile gate
+without running it as published. AM7: published pin coverage without counting
+the code sites, and a cost without counting the affordances. All three are one
+act — **stating a number or a fact in the voice of a measurement without taking
+the measurement** — and all three were caught downstream. The ADR-006 rule now
+reads for facts and counts as well as commands: if it is published as measured,
+it must have been measured, and the measurement pasted.
