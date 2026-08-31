@@ -160,3 +160,32 @@
 - PACKET DEFECT #8 (orchestrator): my section 4 said 10 paths; canonical row 3 has 12 (AM6 widened it). Seat ran the 12-path superset and DECLARED at CLAIM — correct behavior; validator rule (quote commands from the file at write time, re-grep after any amendment) reinforced.
 - routed findings closed in-round: pda-s03:147 scoped (harness renders HomePage only, still pins the landing mount); s8 untouched, SHA pinned.
 - orchestrator gate re-ran: 12-path command 12/92, compile 0-new, suppression rule occurrences=1, 0 literals added, render 20/89, skills bodies present in rollout.
+
+## Receipt — CODE-T3C1-REV (fresh Opus 5 blind seat, round 1 verdict)
+- exit: 2026-09-01 02:04:57 rc=0 (27 min) | VERDICT: REWORK round 1/3 — B1+B2, both additive test cases in worker-owned files; every contracted cell/gate/copy string CONFIRMED; frozen-target discipline held (verified receipts-only HEAD movement touched nothing under apps/ or tests/).
+- B1: the authTopBar mount is pinned by NOTHING (M1b: delete it -> 92/92 green); awk census over 32 rows proves T3-C1 is the ONLY TopBar.tsx writer; ADR-002's "each of the three is pinned" is false for the second code site. Same class as T9-C1's B1.
+- B2: T3-C1-4 validates hand-built DOM only; nothing pins layout.tsx's .appShell > TopBar shape (M6 wrap-in-div -> 92/92 AND 22-file net green; jsdom reality probe shows the duplicate header restored). ROOT CAUSE IS THE CELL (ARCH cell defect #3: AM2 contract, AM3 shape, AM6 cell). Reviewer BUILT the remedy and it passed first try: P1 real-anon (markers=5, topBar display none), P2 real-signed-in (display flex, toggle reachable, closes the reachability question), P3 layout shape regex.
+- N1 confirms PD8 independently (remedy: generate commands from the row at packet-build time). N2: ASKER chip — worker's safety call CONFIRMED right (zero pseudonym occurrences); three issues (inert .btn span, unreliable aria-label asserting state TopBar cannot know, ASKER not SPEC binding copy but now pinned); real identity chip owned by NO row -> V question. N3: Account->/login inside signed-in chrome, pre-existing, only T3-C1 can remove -> V question. N4: Q-04 transiently violated by pre-existing /new Start debate — T4 must fix the FORM not the library. N5: ALL-CAPS now in DOM (AT-visible) — ARCH line. N6: ADR-002's stated suppression cost is FOUR dead links + toggle + ASKER, not three — update.
+- Routing: SERIALIZED this time (AM7 amends the cell to the reviewer's verified form FIRST, then the rework implements it) — the parallel shortcut is only lawful when the fix cannot contradict the amendment.
+
+## Receipt — ARCH-01-AM7 (resumed ARCH seat)
+- exit: 2026-09-01 02:17:07 rc=0 | session bb69b040 (7 min) | ticket t_03525886 | ARCH-docs commit above
+- adopted the reviewer's cell form VERBATIM only after re-deriving its markers (P3 vs shipped/M6/M9; P1's marker count proven contractual by grep; P2 display resolution; exemption bound) — did not trust [PASSED]. Published T3-C1-5 so the rework has a cell to quote. Named ONE residual in the adopted form without folding it in ({children} hoisted out of .appShell -> P3 blind; NO cluster writes layout.tsx) — routed to V closure.
+- BEYOND-CHARGE AUDIT (ran the sentence instead of writing it): 1 of 3 real-artifact cells still defective — T9-C1-3's CELL remained unscoped after its test was fixed and its convention published; one packet away from reissue. Amended.
+- Root cause series owned across AM5/AM6/AM7 as ONE ACT: "stating a number or a fact in the voice of a measurement without taking the measurement." Corrective published AS A RULE WITH A TEST: an acceptance must name the real artifact the property lives in; a cell satisfiable by a test-authored document is not an acceptance.
+- honest gaps stated: P1/P2 not re-run end-to-end (outside AM7 writes — inputs cross-checked, reviewer's measurements relied on, said so); :has() in real target browsers still assumed (V QA line).
+- orchestrator verification: bounds exact; AM5 invariant re-run claim noted; commit is ARCH-docs-only.
+
+## Receipt — CODE-T3C1-RW1 (codex rework round 1)
+- exit: 2026-09-01 02:35:01 rc=0 | session 01a059da resumed (13 min) | epoch=9 | commit af2d590
+- F-B1: M1b reproduced green (92/92 with the mount deleted) -> T3-C1-5 case -> RED -> restored, SHA both directions. F-B2: M6 reproduced green -> AM7 trio implemented (P1 5-markers/none, P2 flex/reachable, P3 shape regex) -> M6 RED via P3 -> layout byte-restored (SHA c9961a20 confirmed by orchestrator). F-N2: one-line honest roleChip with title, pin marked pending Q-13; three refutations + neighbor green; forward AND backward SHA proofs on the single line.
+- tests 92 -> 96; render 20/93; canonical gate 0-new (raw=2 baselines exactly); oracle 0; suppression occurrences 1; no other product net change.
+- orchestrator gate re-ran: 12-path 96/96, raw error count 2, layout SHA match. Re-review dispatched to the same reviewer session (6cf246a8) at 02:38.
+
+## Receipt — CODE-T3C1-REV2 — T3-C1 CLOSED, WAVE 1 COMPLETE
+- exit: 2026-09-01 02:47:11 rc=0 | session 6cf246a8 (9 min) | VERDICT: PASS — T3-C1 MERGED-READY (commits af50e34 + af2d590; ARCH d10b403/fadb3d7)
+- both blockers re-falsified with the SAME mutations that found them (M1b: round-1 92/92 -> round-2 1f/95p; M6: round-1 green on 22 files -> round-2 RED via P3), trio verified character-for-character vs the AM7 cell, N2 mechanics verified directly (.roleChip reuse credited "better than the remedy I proposed"; honesty-regression refutation re-run), placeholder pin correctly names Q-13 at the assertion.
+- NEW PROBE REFUTED BY MUTATION: hypothesized AM5 survivability hole from the trio's widened read-set; simulated T9-C4's legitimate future charge -> the break surfaces at the causing cluster's OWN command (t9-landing pins the marker list document-wide). "Cheaper to mutate than to reason about" — recorded so no later lens re-derives it.
+- hygiene beyond charge: shuffle x3 + repeat on the new cases (no order-dependence); four-directory gate re-proof; baseline-filter discrimination proof (raw=2).
+- honest bounds for V QA: jsdom is not a rendering engine — :has() in target browsers, anonymous first paint, and chrome composition (chip + moon + gear crowding) are V's browser lines. P3 pins source text; its one blind shape is V's closure line t_ec4d5b5f.
+- WAVE 1 COMPLETE: both faces of / replaced. Cost: T9-C1 (1 preflight block + 1 round + 1 rework + 2 reviews) + T3-C1 (1 round + 1 rework + 2 reviews) + AM4-AM7.
