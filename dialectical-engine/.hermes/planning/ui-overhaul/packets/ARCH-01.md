@@ -11,7 +11,7 @@ invent structure.
 3. /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-architecture/SKILL.md
 Your handoff comment OPENS with `SKILLS LOADED: <files actually read>`.
 
-## 1. Inputs (frozen at commit __FROZEN_SHA__)
+## 1. Inputs (frozen at commit 561da88)
 - docs/missions/ui-overhaul/INSTRUCTIONS.md + slices/{T1,T3,T4,T5,T6,T7,T8,T9}/
   (SPECs are FROZEN — you may not edit SPEC.md; a spec defect is a board
   comment routed back, not an edit)
