@@ -12,3 +12,4 @@
 10. **Left open on purpose:** vocab, anonymous CTA, placeholders, T3b composition, `dezbatere.ro` — routed, not picked.
 11. **Write surface:** `docs/missions/ui-overhaul/**` + this report + kanban comment only; no apps/ edits, no git commit. Pre-existing dirty `web/.../page.tsx` is not this seat’s.
 12. **Reviewer ask:** any PLAN step that needs judgement to mark done/not-done is still too soft — file it.
+13. **Skeptic rework:** T5 omitted design `REVIEW AGREED BY:` and lacked explicit `tests/render/**` bind — fixed; swept same pin-bind class onto T1/T4. Cost: one rework round that a design-string checklist against each artboard would have prevented.

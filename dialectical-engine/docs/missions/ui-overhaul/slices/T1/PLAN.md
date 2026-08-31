@@ -49,5 +49,5 @@ Same as T9/PLAN.md.
 
 | Step | SPEC | WHAT | Acceptance |
 |---|---|---|---|
-| T1-C4-1 | R9 | ARCH names canvas/debate pins (incl. `ui02e-debate-canvas`) | Named list |
+| T1-C4-1 | R9 | ARCH names the `tests/render/**` files that pinned OLD canvas/debate chrome (incl. `ui02e-debate-canvas`) | Named list under `tests/render/**` |
 | T1-C4-2 | R9 | Named tests pass (three runs) | Vitest three-run |

@@ -71,10 +71,12 @@ Start run and Cancel exist; Ctrl/Cmd-Enter starts when valid.
 
 Terracotta ↔ Chamber on new-debate.
 
-### R7 — Render pins move
+### R7 — Render pins move to NEW UI
 
-`tests/render/ux01-new-debate-form.test.tsx` (and any sibling pins) move to
-NEW UI (**ARCH confirms full pin list**).
+Existing `tests/render/**` pins that assert OLD new-debate form copy or chrome
+for this surface must move to the NEW UI (**which exact pin files = ARCH** —
+examples include `ux01-new-debate-form.test.tsx` and siblings). OLD-UI-exact
+pins for the replaced form must not remain as the mission’s passing bar.
 
 ## NON-goals
 

@@ -80,10 +80,13 @@ treatments.
 When mounted with publicMode, canvas remains readable; regenerate/challenge
 mutate paths locked per T3/T5.
 
-### R9 — Render pins move
+### R9 — Render pins move to NEW UI
 
-`tests/render/ui02e-debate-canvas.test.tsx`, load/scoring debate pins, etc.
-move to NEW UI (**ARCH names full pin list**).
+Existing `tests/render/**` pins that assert OLD debate-canvas / tree chrome for
+this surface must move to the NEW UI (**which exact pin files = ARCH** —
+examples include `ui02e-debate-canvas.test.tsx` and related load/scoring debate
+pins). OLD-UI-exact pins for the replaced canvas must not remain as the
+mission’s passing bar.
 
 ## NON-goals
 

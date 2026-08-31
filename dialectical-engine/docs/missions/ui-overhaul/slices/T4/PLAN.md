@@ -46,5 +46,5 @@ Same as T9/PLAN.md.
 
 | Step | SPEC | WHAT | Acceptance |
 |---|---|---|---|
-| T4-C4-1 | R7 | ARCH names new-debate pins (incl. `ux01-new-debate-form`) | Named list |
+| T4-C4-1 | R7 | ARCH names the `tests/render/**` files that pinned OLD new-debate chrome (incl. `ux01-new-debate-form`) | Named list under `tests/render/**` |
 | T4-C4-2 | R7 | Named tests pass (three runs) | Vitest three-run |
