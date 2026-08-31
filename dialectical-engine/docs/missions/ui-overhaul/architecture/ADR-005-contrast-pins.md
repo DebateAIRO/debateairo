@@ -28,9 +28,16 @@ in every single row measured.
 ## Measured result — the design passes, after two derived values
 
 Computed 2026-08-31 over the values in `token-inventory.md` using the WCAG
-relative-luminance formula. **18 text rows and 8 non-text rows, 0 failures.**
+relative-luminance formula. **34 rows (17 tokens × 2 modes), 0 failures.**
 Terracotta is the binding mode; Chamber clears every floor by a margin (its
 worst row is `--muted` at 5.32).
+
+The full row-by-row evidence — every token, both modes, worst surface, ratio —
+is published in `token-inventory.md` §"Contrast measurements". This ADR states
+the floors and cites that table; it deliberately does not keep a second count of
+its own. *(Amended 2026-08-31 per AN3: an earlier revision said "18 text rows
+and 8 non-text rows" while the inventory published 16 token-rows — two units for
+one measurement, with three measured tokens never published at all.)*
 
 Five tokens do **not** meet their floor at the design's raw hex and are shipped
 as derived variants. This is recorded, not hidden:

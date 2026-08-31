@@ -16,3 +16,6 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | May the library tab selectors become buttons or client state? | No. They stay native `<a href="/?tab=…">` with `tabIndex` 0, `aria-current="page"`, and no `role="tab"`/`aria-selected`/`role="tablist"`. | `tests/unit/pda-s03-keyboard-accessibility.test.ts` asserts every one of those deliberately, from a prior mission. T3 changes label case and the count chip only. | ARCH-01
 - 2026-08-31 | Do the existing `publicationDetails` contents survive 3b? | Yes — pseudonym, badges, residual objections and reversal point are kept and moved below the strongest-case pair. | The design gives them no position; dropping them removes their only public home. | ARCH-01
 - 2026-08-31 | Library row card language? | `data-bezel="shell"` / `="core"` on the row wrapper and body, sharing the T1 card vocabulary. | Shared token+attribute vocabulary is what stops library rows and canvas cards drifting visually without coupling their components. | ARCH-01
+
+---
+**Tally (2026-08-31, ARCH-01 AM1):** 14 rows — 9 pre-ARCH (REQ-01) + 5 appended by ARCH-01 at handoff; 0 at AM1.

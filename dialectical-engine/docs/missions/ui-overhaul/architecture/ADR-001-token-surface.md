@@ -46,37 +46,165 @@ seats editing the token blocks concurrently is the one collision this mission
 cannot absorb. `dispatch-order.md` sequences T9-C3 alone, first, with every
 other cluster gated behind it.
 
-## The 120 hard-coded colour literals
+## The colour-literal sweep — THREE oracles, not one (AMENDED 2026-08-31, AF-1)
 
-`globals.css` contains 521 `var(--…)` references and **120 colour literals
-outside `:root`** (`oklch()`, `#hex`, `rgb()`/`rgba()`). Measured 2026-08-31:
+### The defect this replaces
 
-```
-sed -n '101,4080p' apps/ui/app/globals.css | grep -oE 'oklch\([^)]*\)|#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)' | wc -l   # 120
-sed -n '101,4080p' apps/ui/app/globals.css | grep -oE 'var\(--[a-z0-9-]+' | wc -l                                    # 521
-```
+The original version of this section specified ONE repo-wide sweep over
+`apps/ui/{app,lib,components}` and required T9-C3 to drive it to residual 0. It
+also asserted that only **two** class members lived outside `globals.css`.
 
-Those 120 are the **class**, not a list of instances: every one of them is a
-colour that will not respond to the mode switch and will therefore be wrong in
-Chamber. They are swept as a single step in T9-C3 (`T9-C3-4`), each replaced by
-a token or, where no token fits, promoted to a new token declared in both
-blocks. The acceptance is the count going to zero, not a spot check — a residual
-literal is a Chamber bug that only appears in dark mode, i.e. exactly the kind
-that ships.
+**Both were wrong, and the wave-0 coder caught it at preflight before writing a
+line** (`t_4ccac5c4`, CODEX BLOCKED 2026-08-31 19:25). The repo-wide oracle
+matches 45 literals outside `globals.css`, spread across files owned by *later*
+clusters. Requiring T9-C3 to reach 0 against it made the acceptance satisfiable
+only by violating one-writer-per-file — an unsatisfiable acceptance, which is
+strictly worse than no acceptance because it reports RED in every state of the
+code including a correct one.
 
-Two further members of the same class live outside `globals.css` and are swept
-in the same cluster:
+The cause was mine and it is the exact failure this repo already has a name for:
+I identified the CLASS correctly ("every colour literal that cannot respond to
+the mode switch") and then published an instance count I had not enumerated.
+Naming a class and enumerating it are different acts, and only the second one
+can be an oracle.
 
-- `apps/ui/lib/debatePresentation.ts:268` — `"oklch(0.82 0.006 80)"`, the
-  connector colour for `empty`/`abandoned` paths. Becomes `var(--line-strong)`.
-- `apps/ui/components/DebateCanvas.tsx:320` — inline `color: "var(--text-2)"`
-  is already a token; no change. Named here so the sweep is checkable as
-  `N of N` rather than "spot-checked".
-
-Sweep command, to be run and quoted verbatim by the T9-C3 worker:
+### The oracle pattern (corrected)
 
 ```
-rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e 'rgba?\(' \
-  apps/ui/app/globals.css apps/ui/lib apps/ui/components apps/ui/app \
+rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
+  --glob '!*.disabled' --glob '!*.svg' \
+  <SCOPE> \
   | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:'
 ```
+
+Three corrections to the original pattern, each with its reason:
+
+1. **`\brgba?\(` not `rgba?\(`.** Without the word boundary it matches `rgb(`
+   inside the identifier `oklchToLinearSrgb(` — 2 false positives in
+   `apps/ui/lib/scoreBandTokens.test.mjs.disabled`.
+2. **`--glob '!*.disabled'`.** A `.mjs.disabled` file is neither executed nor
+   bundled; a literal there cannot reach a user.
+3. **`--glob '!*.svg'`.** `apps/ui/app/icon.svg` carries `#111111` and `#f8f6f1`
+   as a favicon's fills. An SVG referenced as a file cannot read CSS custom
+   properties from `globals.css`, and favicons do not follow mode. Requiring it
+   to reach 0 would be a second unsatisfiable acceptance.
+   *(Aside worth recording: this file is the ONLY occurrence of `#111111` in the
+   repo, which is almost certainly where the mission compass's "ink `#111111`"
+   came from — see `open-questions.md` Q-10. It is a favicon fill, not a text
+   colour.)*
+
+`oklch\(` is deliberately left BROAD. A first tightening attempt used
+`oklch\(\s*[0-9.]` and silently dropped three REAL members —
+`DebateMap.tsx:58-60`, which build colours as template literals
+`` `oklch(${(0.6 + light).toFixed(3)} 0.12 162)` ``. Those are hard-coded
+colours that will be wrong in Chamber. A matcher tightened until the count looks
+clean is how the real defects leave the list.
+
+### Measured baseline — 156 matches, `12 of 12` files, every member owned
+
+Re-measured by ARCH-01 on 2026-08-31 with the corrected oracle at repo scope:
+
+```
+$ rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
+    --glob '!*.disabled' --glob '!*.svg' apps/ui/app apps/ui/lib apps/ui/components \
+  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | cut -d: -f1 | sort | uniq -c | sort -rn
+ 111 apps/ui/app/globals.css
+  12 apps/ui/lib/scrutiny.ts
+  11 apps/ui/components/DebateMap.tsx
+   6 apps/ui/components/GuideModal.tsx
+   6 apps/ui/app/debate/[id]/DebatePageClient.tsx
+   2 apps/ui/lib/debatePresentation.ts
+   2 apps/ui/components/DebateSplit.tsx
+   2 apps/ui/components/DebateCanvas.tsx
+   1 apps/ui/components/SynthesisPanel.tsx
+   1 apps/ui/components/ModelPresentation.tsx
+   1 apps/ui/components/DebateThread.tsx
+   1 apps/ui/components/DebateOutline.tsx
+                                              TOTAL 156
+```
+
+The coder measured **47 across 12 files** under the ORIGINAL (loose) oracle. That
+count was correct for that oracle. The corrected oracle gives **45 across 10
+files** outside `globals.css`; the 2-file / 4-match difference is exactly the
+`icon.svg` and `.disabled` exclusions above. Both numbers are right; they answer
+different questions, and this paragraph exists so nobody has to reconcile them
+twice.
+
+### (a) WAVE-0 ORACLE — T9-C3's acceptance
+
+Scope is **T9-C3's write surface only**, the four product files it owns:
+
+```
+rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
+  --glob '!*.disabled' --glob '!*.svg' \
+  apps/ui/app/globals.css apps/ui/app/layout.tsx \
+  apps/ui/components/ModeToggle.tsx apps/ui/lib/debatePresentation.ts \
+  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | wc -l
+```
+
+**Baseline 113** (`globals.css` 111 + `debatePresentation.ts` 2;
+`layout.tsx` 0, `ModeToggle.tsx` does not exist yet).
+**Required after T9-C3: 0.** The `globals.css` lines 1–199 exclusion is kept —
+that is the token region itself, where literals are the point.
+
+This is satisfiable without touching one file T9-C3 does not own.
+
+### (b) PER-CLUSTER ORACLE — every remaining member has exactly one owner
+
+Each re-skin cluster inherits the same command **scoped to its own write
+surface**, and must reach **0 after its work**. The 45 non-wave-0 residuals,
+grouped by owning cluster — `10 of 10` files, `45 of 45` matches:
+
+| Owner | File | Matches | Why this owner |
+|---|---|---|---|
+| **T1-C1** | `apps/ui/app/debate/[id]/DebatePageClient.tsx` | 6 | already T1-C1's write surface |
+| **T1-C1** | `apps/ui/components/GuideModal.tsx` | 6 | imported by `DebatePageClient.tsx` only |
+| **T1-C2** | `apps/ui/components/DebateMap.tsx` | 11 | a view mode; renders the cards T1-C2 owns |
+| **T1-C2** | `apps/ui/lib/scrutiny.ts` | 12 | scrutiny-tier colour map consumed by `DebateCanvas`, `DebateSplit`, `DebateThread`, `DebatePageClient`, `ChallengePopover`, `InvestigationDrawer` — the same shape as `ROLE_PALETTES` |
+| **T1-C2** | `apps/ui/components/DebateCanvas.tsx` | 2 | already T1-C2's write surface |
+| **T1-C2** | `apps/ui/components/DebateSplit.tsx` | 2 | a view mode |
+| **T1-C2** | `apps/ui/components/DebateThread.tsx` | 1 | a view mode |
+| **T1-C2** | `apps/ui/components/DebateOutline.tsx` | 1 | a view mode. NOTE: no app importer found — test-referenced only (`ui02d-model-identity`). Flagged for the orphan audit; NOT deleted here |
+| **T1-C2** | `apps/ui/components/ModelPresentation.tsx` | 1 | the model identity line inside every card |
+| **T1-C3** | `apps/ui/components/SynthesisPanel.tsx` | 1 | already T1-C3's write surface |
+
+Subtotals: **T1-C1 = 12 · T1-C2 = 30 · T1-C3 = 1 · total 43** in files already
+or newly assigned, plus **T9-C3 = 113**. `113 + 43 = 156`. Every match has
+exactly one owner and no file has two.
+
+**Every non-wave-0 residual falls inside T1.** The literal debt is entirely in
+the debate-canvas slice — no other slice inherits any of it. That is a real
+finding for ticketing: T1-C2's write surface grows by six files
+(`DebateMap`, `DebateSplit`, `DebateThread`, `DebateOutline`,
+`ModelPresentation`, `scrutiny.ts`), which `dispatch-order.md` now reflects.
+
+### (c) MISSION-FINAL ORACLE — the original global sweep, owned and dated
+
+The repo-wide sweep survives, unchanged in scope, as the **mission-final** check:
+
+```
+rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
+  --glob '!*.disabled' --glob '!*.svg' \
+  apps/ui/app apps/ui/lib apps/ui/components \
+  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | wc -l          # required: 0
+```
+
+**Owner: `T8-C4`**, cluster #32 and the last in `dispatch-order.md`. This is a
+verification-only duty — T8-C4 writes no product code for it. If the number is
+non-zero at that point, the residual belongs to whichever cluster owns the file
+per table (b), and the finding is routed there rather than absorbed by T8-C4.
+
+It is ALSO repeated as a **QA line for V** at the closure gate, because a
+per-cluster green tells you each seat cleaned its own surface, and only the
+global sweep tells you the union is actually clean.
+
+### Why keep all three
+
+The per-cluster oracle answers *"did this seat clean what it owns"* — the only
+question a seat can act on. The mission-final oracle answers *"is the product
+clean"* — the only question V cares about. Neither implies the other, and the
+original single-oracle design collapsed them, which is precisely why it became
+unsatisfiable for the one seat that had to run it first.

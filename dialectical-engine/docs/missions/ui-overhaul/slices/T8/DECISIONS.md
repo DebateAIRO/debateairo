@@ -14,3 +14,6 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | What mechanism implements T8-C3-2 "product routes blocked until acknowledge"? | The already-shipped one: `setRecoveryAcknowledgementPending` in `apps/ui/lib/authNavigationGuard.ts`, read by `TopBar` through `useRecoveryAcknowledgementPending()`, which renders `BrandMark` with `aria-disabled="true"` instead of a `<Link>`. T8 re-skins it. | Inventing a second gate would leave two sources of truth for the same block. The assertion is the `aria-disabled` → `<Link>` transition, a real state change. | ARCH-01
 - 2026-08-31 | Recovery-email differ rule comparison? | Case-insensitive and trimmed. | A differ rule that a trailing space or a capital defeats is not a rule. | ARCH-01
 - 2026-08-31 | Does T8 mount its own mode toggle? | No — `/sign-up`, `/verify-email` and `/enroll-mfa` are all in `TopBar`'s `AUTH_PATHS`, so the `authTopBar` toggle from T3-C1 is already present. | ADR-002. | ARCH-01
+
+---
+**Tally (2026-08-31, ARCH-01 AM1):** 12 rows — 6 pre-ARCH (REQ-01) + 6 appended by ARCH-01 at handoff; 0 at AM1.

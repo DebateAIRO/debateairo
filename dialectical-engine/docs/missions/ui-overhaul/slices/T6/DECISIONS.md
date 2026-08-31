@@ -12,3 +12,6 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | Current-vs-other session distinction? | `aria-current="true"` plus a text label, never colour alone. | The distinction has to survive Chamber and a colour-blind reader; a colour-only state fails both. | ARCH-01
 - 2026-08-31 | Which files carry T6's pin migration? | `tests/render/s5-session-controls.test.tsx` (RETARGET), plus KEEP guards `s9-legacy-claim-controls`, `s10-erasure-ui`, `s10-erasure-ui-render`, `s9-dev-token-retirement-contract`. | `s5-session-controls` and `s9-legacy-claim-controls` reference BOTH `apps/ui` and `web/`; only their `apps/ui` assertions move. `s9-dev-token-retirement-contract` reads `settings/page.tsx` as source, so it is in every T6 command. | ARCH-01
 - 2026-08-31 | Do the existing security strings change? | No — `Active sessions`, `Current session`, `Fresh authentication complete` are kept verbatim; design columns are added around them. | They are pinned by a standing test and T6's NON-goals put the security model out of contract. | ARCH-01
+
+---
+**Tally (2026-08-31, ARCH-01 AM1):** 10 rows — 5 pre-ARCH (REQ-01) + 5 appended by ARCH-01 at handoff; 0 at AM1.

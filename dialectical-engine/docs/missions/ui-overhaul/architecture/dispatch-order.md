@@ -22,10 +22,20 @@ blocks explicitly.
 |---|---|---|---|
 | 1 | **T9-C3** — tokens, fonts, mode mechanism | `apps/ui/app/globals.css` · `apps/ui/app/layout.tsx` · `apps/ui/components/ModeToggle.tsx` · `apps/ui/lib/debatePresentation.ts` · `tests/support/contrast.ts` · `tests/support/tokenContract.ts` · `tests/unit/t9-mode-tokens.test.ts` | `pnpm exec vitest run tests/unit/t9-mode-tokens.test.ts tests/unit/pda-s03-keyboard-accessibility.test.ts` |
 
-T9-C3 also carries ADR-001's **120-literal sweep** and the two out-of-file
-members (`debatePresentation.ts:268`, checked in `DebateCanvas.tsx`). Its
-acceptance is the residual count reaching **0**, quoted verbatim from the sweep
-command in ADR-001 — not a spot check.
+T9-C3 also carries ADR-001's colour-literal sweep — **scoped to its own four
+product files**, not repo-wide. Baseline **113** (`globals.css` 111 +
+`debatePresentation.ts` 2; `layout.tsx` 0; `ModeToggle.tsx` new). Its acceptance
+is that the **WAVE-0 ORACLE** in `ADR-001` §(a) reaches residual **0**, with the
+command's output quoted verbatim — not a spot check, and not the repo-wide
+sweep.
+
+> **AMENDED 2026-08-31 (AF-1).** The original row demanded the REPO-WIDE sweep
+> reach 0. That was unsatisfiable: 45 further literals live in files owned by
+> later clusters, so T9-C3 could only have reached 0 by violating
+> one-writer-per-file. Caught by the wave-0 coder at preflight, before any edit
+> (`t_4ccac5c4`). The remaining 45 are enumerated and owned in `ADR-001` §(b);
+> the repo-wide sweep survives as the **mission-final** oracle, owned by
+> cluster #32 (`T8-C4`) and repeated as a QA line for V.
 
 Nothing in waves 1–5 starts before T9-C3 is Hermes-approved. A slice that
 re-skins against tokens that do not exist yet produces a diff no reviewer can
@@ -61,8 +71,8 @@ clusters own one block each and never edit the same hunk.
 
 | # | Cluster | Writes | Verify |
 |---|---|---|---|
-| 7 | **T1-C1** — debate chrome, view toggles, ☾ mount | `apps/ui/app/debate/[id]/DebatePageClient.tsx` · `tests/render/t1-canvas.test.tsx` | `pnpm exec vitest run tests/render/t1-canvas.test.tsx tests/render/load01-debate-page.test.tsx tests/render/bug02-debate-effects.test.tsx tests/unit/pol01-policy.test.ts tests/unit/pda-s02-affordance-drift.test.ts` |
-| 8 | **T1-C2** — card anatomy, stance tab, connectors | `apps/ui/components/DebateCanvas.tsx` · `apps/ui/components/DebateTree.tsx` · `apps/ui/lib/debatePresentation.ts` · `tests/render/t1-canvas.test.tsx` | `pnpm exec vitest run tests/render/t1-canvas.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pol01-policy.test.ts` |
+| 7 | **T1-C1** — debate chrome, view toggles, ☾ mount | `apps/ui/app/debate/[id]/DebatePageClient.tsx` · `apps/ui/components/GuideModal.tsx` · `tests/render/t1-canvas.test.tsx` | `pnpm exec vitest run tests/render/t1-canvas.test.tsx tests/render/load01-debate-page.test.tsx tests/render/bug02-debate-effects.test.tsx tests/unit/pol01-policy.test.ts tests/unit/pda-s02-affordance-drift.test.ts` |
+| 8 | **T1-C2** — card anatomy, stance tab, connectors | `apps/ui/components/DebateCanvas.tsx` · `DebateTree.tsx` · `DebateMap.tsx` · `DebateSplit.tsx` · `DebateThread.tsx` · `DebateOutline.tsx` · `ModelPresentation.tsx` · `apps/ui/lib/debatePresentation.ts` · `apps/ui/lib/scrutiny.ts` · `tests/render/t1-canvas.test.tsx` | `pnpm exec vitest run tests/render/t1-canvas.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pol01-policy.test.ts` |
 | 9 | **T1-C3** — set-aside, synthesis, publicMode | `apps/ui/components/DebateCanvas.tsx` · `apps/ui/components/SynthesisPanel.tsx` · `tests/render/t1-canvas.test.tsx` | `pnpm exec vitest run tests/render/t1-canvas.test.tsx tests/render/pda-s02-public-tree.test.tsx` |
 | 10 | **T1-C4** — render-pin migration for T1 | `tests/render/ui02e-debate-canvas.test.tsx` | `pnpm exec vitest run tests/render/ui02e-debate-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/render/bug02-debate-effects.test.tsx tests/render/load01-debate-page.test.tsx tests/unit/pol01-policy.test.ts tests/unit/pda-s02-affordance-drift.test.ts` |
 | 11 | **T5-C1** — drawer open + core sections | `apps/ui/components/NodeDetailDrawer.tsx` · `tests/render/t5-drawer.test.tsx` | `pnpm exec vitest run tests/render/t5-drawer.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pol01-policy.test.ts` |
@@ -72,6 +82,17 @@ clusters own one block each and never edit the same hunk.
 T1-C2 and T1-C3 both write `DebateCanvas.tsx`; T5-C1 and T5-C2 both write
 `NodeDetailDrawer.tsx`. **Serialised in the order shown** — same file, same
 hunks, and the spine's single-writer rule is per file, not per cluster.
+
+> **WRITE SURFACES WIDENED 2026-08-31 (AF-1).** T1-C1 gains `GuideModal.tsx`;
+> T1-C2 gains `DebateMap.tsx`, `DebateSplit.tsx`, `DebateThread.tsx`,
+> `DebateOutline.tsx`, `ModelPresentation.tsx` and `lib/scrutiny.ts`. These six
+> files carry 28 of the 45 non-wave-0 colour literals and previously belonged to
+> **no cluster at all** — the second half of the AF-1 defect. Ownership is
+> evidence-based, not assigned by theme: each was traced to its importer
+> (`rg -l '/(components|lib)/<name>"' apps/ui`). **All 45 non-wave-0 residuals
+> fall inside T1**; no other slice inherits any. `ADR-001` §(b) has the full
+> `10 of 10` table. `DebateOutline.tsx` has no app importer — test-referenced
+> only; flagged for the orphan audit, not deleted here.
 
 ## Wave 4 — library lists and public 3b
 
@@ -103,7 +124,7 @@ T1-C3 (publicMode locks are shared with the canvas). Wave 4 runs after wave 3.
 | 29 | **T8-C1** — sign-up shell + validation | `apps/ui/components/SignUpFlow.tsx` · `tests/render/t8-signup.test.tsx` | `pnpm exec vitest run tests/render/t8-signup.test.tsx tests/render/auth-flow-integration.test.tsx tests/architecture/auth-front-door-parity.test.ts` |
 | 30 | **T8-C2** — three-step MFA + activate gate | `apps/ui/app/enroll-mfa/page.tsx` · `tests/render/t8-signup.test.tsx` | `pnpm exec vitest run tests/render/t8-signup.test.tsx tests/architecture/s4-mfa-contract.test.ts tests/unit/mfa-ui.test.ts tests/render/web-auth-enrollment.test.tsx` |
 | 31 | **T8-C3** — recovery replacement gate | `apps/ui/components/LoginFlow.tsx` · `apps/ui/lib/authNavigationGuard.ts` · `tests/render/t8-signup.test.tsx` | `pnpm exec vitest run tests/render/t8-signup.test.tsx tests/render/auth-flow-integration.test.tsx` |
-| 32 | **T8-C4** — mode on auth shell + render-pin migration for T8 | `tests/render/auth-flow-integration.test.tsx` | `pnpm exec vitest run tests/render/auth-flow-integration.test.tsx tests/render/web-auth-sign-up.test.tsx tests/render/web-auth-enrollment.test.tsx tests/architecture/s4-mfa-contract.test.ts tests/architecture/auth-front-door-parity.test.ts tests/unit/mfa-ui.test.ts` |
+| 32 | **T8-C4** — mode on auth shell + render-pin migration for T8 + **MISSION-FINAL colour-literal sweep** | `tests/render/auth-flow-integration.test.tsx` | `pnpm exec vitest run tests/render/auth-flow-integration.test.tsx tests/render/web-auth-sign-up.test.tsx tests/render/web-auth-enrollment.test.tsx tests/architecture/s4-mfa-contract.test.ts tests/architecture/auth-front-door-parity.test.ts tests/unit/mfa-ui.test.ts` |
 
 ### The `LoginFlow.tsx` contention — read this before dispatching wave 5
 
@@ -128,6 +149,25 @@ T8-C4. Split it the same way as `t9-landing`: T7-C4 owns the sign-in
 3. **Landing body** — the only fully greenfield work; parallel because it shares no file with the product.
 4. **Debate before public** — `PublicDebatePageClient` renders `DebatePageClient`; restyling the parent after the child means restyling twice.
 5. **Forms and auth last** — they are the least coupled to the token/chrome work and the most coupled to security tests, so they get the most stable base to land on.
+
+## Mission-final colour-literal sweep (AF-1, owner: cluster #32 `T8-C4`)
+
+As the LAST cluster in this order, `T8-C4` additionally runs the **MISSION-FINAL
+ORACLE** from `ADR-001` §(c) — the repo-wide sweep — and it must return `0`:
+
+```
+rg -n --no-heading -e 'oklch\(' -e '#[0-9a-fA-F]{6}\b' -e '\brgba?\(' \
+  --glob '!*.disabled' --glob '!*.svg' \
+  apps/ui/app apps/ui/lib apps/ui/components \
+  | grep -v -E 'globals\.css:[1-9][0-9]?:|globals\.css:1[0-9][0-9]:' \
+  | wc -l
+```
+
+This is **verification-only**: T8-C4 writes no product code for it. A non-zero
+result is routed to whichever cluster owns the file per `ADR-001` §(b) — never
+absorbed by T8-C4, which owns none of those surfaces. The same command is a
+**QA line for V** at the closure gate: per-cluster greens prove each seat cleaned
+its own surface; only this one proves the union is clean.
 
 ## Three-run law
 

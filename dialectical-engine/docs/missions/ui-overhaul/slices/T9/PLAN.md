@@ -158,6 +158,13 @@ pnpm exec vitest run tests/unit/t9-return-path.test.ts tests/render/t9-landing.t
 
 **HOW (ARCH) — this is Wave 0. Every other cluster in every slice is gated on it.**
 
+> **AMENDED 2026-08-31 (AF-1).** `T9-C3-4` originally required the REPO-WIDE
+> colour-literal sweep to reach 0. That was unsatisfiable — 45 further literals
+> sit in files owned by later clusters, so this cluster could only have complied
+> by violating one-writer-per-file. The wave-0 coder caught it at preflight
+> before writing a line (`t_4ccac5c4`). The step below is now scoped to this
+> cluster's own write surface; the repo-wide sweep moved to cluster #32.
+
 - **Modify** `apps/ui/app/globals.css`: write `:root { … }` (Terracotta) and
   `html[data-mode="chamber"] { … }` (Chamber) at the top of the file, both
   declaring the same key set, with the exact values in
@@ -179,8 +186,10 @@ pnpm exec vitest run tests/unit/t9-return-path.test.ts tests/render/t9-landing.t
   `☀ Terracotta` in Chamber. Reads initial state from
   `document.documentElement.dataset.mode`, never from `localStorage` — the head
   script is storage's single reader, so the two cannot disagree.
-- **Modify** `apps/ui/lib/debatePresentation.ts:268` — the hard-coded
-  `"oklch(0.82 0.006 80)"` connector colour becomes `var(--line-strong)`.
+- **Modify** `apps/ui/lib/debatePresentation.ts` — its 2 colour literals,
+  including the `"oklch(0.82 0.006 80)"` connector colour for
+  `empty`/`abandoned` paths, become tokens (`var(--line-strong)`). Anchor on the
+  string, not the line number.
 - **Create** `tests/support/contrast.ts` and `tests/support/tokenContract.ts` —
   signatures in `ADR-005` and `ADR-006`. `tokenContract` loads the real
   `globals.css` into jsdom, exactly as
@@ -203,7 +212,7 @@ already wrote as "computed style **or** data-token"; the WHAT is unchanged.
 
 | Step | SPEC | WHAT | Acceptance |
 |---|---|---|---|
-| T9-C3-4 | R3 | No colour literal survives outside the two token blocks | Run the sweep command in `ADR-001` and quote its output verbatim; assert the residual count is `0`. A non-zero count is a colour that cannot respond to the mode switch, i.e. a Chamber bug that only appears in dark mode |
+| T9-C3-4 | R3 | No colour literal survives in T9-C3's OWN four product files | Run the **WAVE-0 ORACLE** in `ADR-001` §(a) — scoped to `apps/ui/app/globals.css`, `apps/ui/app/layout.tsx`, `apps/ui/components/ModeToggle.tsx`, `apps/ui/lib/debatePresentation.ts` — and quote its output verbatim; baseline is **113**, required after is **`0`**. A residual is a colour that cannot respond to the mode switch, i.e. a Chamber bug that only appears in dark mode. **Do NOT run the repo-wide sweep here** — 45 further literals live in files this cluster may not write; they are owned per `ADR-001` §(b) and checked by the mission-final oracle at cluster #32 |
 | T9-C3-5 | R3 | Every text token clears 4.5:1 and every meaning-bearing non-text token clears 3.0:1, against all four surface tokens, in both modes | Read each token with `getPropertyValue` off the real stylesheet, compute `contrastRatio`, assert the worst pair per token meets its floor. Values and floors in `ADR-005`; a test that hard-codes the palette and checks it against itself = RED |
 | T9-C3-6 | R3 | Both blocks declare the same mode-bearing key set | Assert `declaredTokenNames()` and `chamberTokenNames()` agree on the mode-bearing subset. A token in one block only is the defect that produces exactly one wrong colour in dark mode |
 

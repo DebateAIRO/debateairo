@@ -16,3 +16,6 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | How is "no fabricated review line" made un-gameable? | Assert BOTH `data-node-review="absent"` AND the two binding labels being absent. | Two independent signals, so a coder cannot satisfy the step by deleting the attribute. | ARCH-01
 - 2026-08-31 | Does the drawer mount its own mode toggle? | No — it renders inside the debate document, so T1-C1's chrome toggle already switches it. A second toggle is a finding. | Two toggles on one document can disagree. R8 is satisfied by the drawer's tokens responding, which is what T5-C2-4 measures. ADR-002. | ARCH-01
 - 2026-08-31 | Which colour tokens for agree/dispute in the drawer? | `var(--agree-text)` / `var(--dispute-text)`, the text-role tokens, not the raw accents. | The design's raw `agree` `#3E7A4E` measures 4.25:1 on `shell`, below the 4.5 text floor. ADR-005. | ARCH-01
+
+---
+**Tally (2026-08-31, ARCH-01 AM1):** 14 rows — 9 pre-ARCH (REQ-01) + 5 appended by ARCH-01 at handoff; 0 at AM1.

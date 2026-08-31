@@ -228,6 +228,70 @@ test can compute on the declared value (`ADR-006`).
 | `--shadow-drawer` | `-22px 0 54px -22px rgba(41,38,31,.32)` | `-26px 0 62px -26px rgba(0,0,0,.9)` | `shadowBig`, rotated to the drawer's edge |
 | `--shadow-chrome` | `0 20px 46px -22px rgba(26,22,19,.26)` | `0 24px 52px -24px rgba(0,0,0,.85)` | NEW — the floating nav pill (`rendered:270`) |
 
+## Contrast measurements — the complete published set (AN3, 2026-08-31)
+
+`ADR-005` pins the floors; this is the **full evidence table** behind them.
+Every token that carries a floor, in **both** modes, with the worst surface it
+is measured against and the resulting ratio. **34 rows, 0 failures.**
+
+Earlier revisions of `ADR-005` cited "26 measured rows" while this file
+published 16 token-rows — two different units (per-token-per-mode vs
+per-token), and three tokens (`--text-strong`, `--text-3`, `--muted-2`) were
+measured but never published. Both are fixed here: **34 = 17 tokens × 2 modes**
+is the single authoritative count, and `ADR-005` now cites this table rather
+than a number of its own.
+
+Surface set (the denominators): `--bg`, `--surface`, `--surface-2`,
+`--surface-sunken`. The worst of the four is the verdict. In every one of the 34
+rows the worst surface is `--surface-sunken` (`shell`).
+
+#### Text tokens — floor 4.5:1
+| Token | Mode | Value | Worst surface | Ratio | Verdict |
+|---|---|---|---|---|---|
+| `--text` | Terracotta | `#29261F` | `--surface-sunken` | **12.51** | PASS |
+| `--text` | Chamber | `#F2EAD9` | `--surface-sunken` | **13.97** | PASS |
+| `--text-strong` | Terracotta | `#1A1613` | `--surface-sunken` | **14.90** | PASS |
+| `--text-strong` | Chamber | `#FFFFFF` | `--surface-sunken` | **16.72** | PASS |
+| `--text-2` | Terracotta | `#555147` | `--surface-sunken` | **6.56** | PASS |
+| `--text-2` | Chamber | `#B5A88F` | `--surface-sunken` | **7.13** | PASS |
+| `--text-3` | Terracotta | `#6E675C` | `--surface-sunken` | **4.63** | PASS |
+| `--text-3` | Chamber | `#9C907A` | `--surface-sunken` | **5.32** | PASS |
+| `--muted` | Terracotta | `#6E675C` | `--surface-sunken` | **4.63** | PASS |
+| `--muted` | Chamber | `#9C907A` | `--surface-sunken` | **5.32** | PASS |
+| `--muted-2` | Terracotta | `#6E675C` | `--surface-sunken` | **4.63** | PASS |
+| `--muted-2` | Chamber | `#9C907A` | `--surface-sunken` | **5.32** | PASS |
+| `--pro-text` | Terracotta | `#3F7365` | `--surface-sunken` | **4.52** | PASS |
+| `--pro-text` | Chamber | `#6E9E96` | `--surface-sunken` | **5.57** | PASS |
+| `--con-text` | Terracotta | `#A55133` | `--surface-sunken` | **4.55** | PASS |
+| `--con-text` | Chamber | `#C8834F` | `--surface-sunken` | **5.43** | PASS |
+| `--gold-text` | Terracotta | `#826530` | `--surface-sunken` | **4.52** | PASS |
+| `--gold-text` | Chamber | `#C8A055` | `--surface-sunken` | **6.86** | PASS |
+| `--agree-text` | Terracotta | `#3C754B` | `--surface-sunken` | **4.53** | PASS |
+| `--agree-text` | Chamber | `#86B58D` | `--surface-sunken` | **7.17** | PASS |
+| `--dispute-text` | Terracotta | `#B0432F` | `--surface-sunken` | **4.72** | PASS |
+| `--dispute-text` | Chamber | `#D67F65` | `--surface-sunken` | **5.64** | PASS |
+| `--reasoning-text` | Terracotta | `#3D5A80` | `--surface-sunken` | **5.85** | PASS |
+| `--reasoning-text` | Chamber | `#C8A055` | `--surface-sunken` | **6.86** | PASS |
+
+#### Meaning-bearing non-text tokens — floor 3.0:1
+| Token | Mode | Value | Worst surface | Ratio | Verdict |
+|---|---|---|---|---|---|
+| `--pro-line` | Terracotta | `#3F7466` | `--surface-sunken` | **4.46** | PASS |
+| `--pro-line` | Chamber | `#6E9E96` | `--surface-sunken` | **5.57** | PASS |
+| `--con-line` | Terracotta | `#C15F3C` | `--surface-sunken` | **3.50** | PASS |
+| `--con-line` | Chamber | `#C8834F` | `--surface-sunken` | **5.43** | PASS |
+| `--gold-line` | Terracotta | `#A5803D` | `--surface-sunken` | **3.02** | PASS |
+| `--gold-line` | Chamber | `#C8A055` | `--surface-sunken` | **6.86** | PASS |
+| `--reasoning-line` | Terracotta | `#3D5A80` | `--surface-sunken` | **5.85** | PASS |
+| `--reasoning-line` | Chamber | `#C8A055` | `--surface-sunken` | **6.86** | PASS |
+| `--focus` | Terracotta | `#C15F3C` | `--surface-sunken` | **3.50** | PASS |
+| `--focus` | Chamber | `#C8834F` | `--surface-sunken` | **5.43** | PASS |
+
+**34 rows · 0 failures.** Terracotta is the binding mode throughout; Chamber's
+weakest row is `--muted` at 5.32. Reproduce with the `contrastRatio` helper in
+`tests/support/contrast.ts` (`ADR-005`), reading the values off the real
+stylesheet via `getPropertyValue` rather than transcribing them.
+
 ## Type scale
 
 The artboards are fixed 1280px compositions; the product is responsive. Sizes

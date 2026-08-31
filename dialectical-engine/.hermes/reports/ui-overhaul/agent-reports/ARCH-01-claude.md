@@ -285,3 +285,46 @@ test-migration column has **zero REPLACE** entries.
   floor. Had I pinned the number first and measured later, I would have written
   an acceptance the design cannot meet and discovered it in round 2, in a
   reviewer's finding, against a coder who did nothing wrong.
+
+---
+
+## AMENDMENT 1 (2026-08-31) — the wave-0 coder found a real defect in my ADR-001, and it was the same failure I had already written up twice
+
+`ADR-001` shipped ONE repo-wide colour-literal sweep and made "residual 0" T9-C3's
+acceptance, on the asserted premise that only **two** class members lived outside
+`globals.css`. Both halves were wrong. The wave-0 Codex seat blocked at preflight,
+**before writing a line**, with a grouped `47 across 12 files` count and the exact
+right diagnosis: those files belong to later clusters, so the acceptance was
+satisfiable only by violating one-writer-per-file. An acceptance that reports RED
+in every state of the code — including a correct implementation — is worse than no
+acceptance, and I had written that sentence myself, about someone else's gate,
+in §2 of this report. **PRICE: one coder preflight cycle, one micro-amendment
+round, zero code written against a wrong target — the cheapest possible place to
+pay it, entirely because the seat validated its contract before its first edit
+rather than after.** Re-measuring myself confirmed the coder exactly (156 repo-wide
+/ 113 wave-0 / 43 later-cluster after two false-positive classes are excluded), and
+turned up a **second** defect it had not been asked to find: six of those files —
+`DebateMap`, `DebateSplit`, `DebateThread`, `DebateOutline`, `ModelPresentation`,
+`lib/scrutiny.ts`, carrying 28 literals — belonged to **no cluster at all** in my
+dispatch order. My component map covered every *designed* surface and silently
+skipped the components that only inherit tokens. **THE CAUSE, and it is the same
+one as §2a and §2b: I named the class correctly and published an instance count I
+had not enumerated.** Three times in one mission — `readFileSync` vs `readFile`, a
+self-review that printed "clean" without running, and now this — all the identical
+shape: a confident number that was never measured at the moment it was written.
+While re-measuring I nearly committed the fourth: my first tightened regex
+(`oklch\(\s*[0-9.]`) dropped three REAL members, the `oklch(${…})` template
+literals in `DebateMap.tsx:58-60`, because I tightened until the count looked
+clean instead of reading what fell out — the diff between the two match sets is
+the only reason I caught it. **THE UPGRADE, and it is now the one thing I would
+put above everything in §7: an oracle is not a specification, it is a
+measurement, and it must be RUN — at its real scope, with its output diffed
+against the previous run — in the same edit that publishes its number. A count
+written from memory is a claim; a count written from a command that just ran is
+evidence. Everything else in this report is downstream of that distinction.**
+Filed alongside: AN2 (my handoff said 41 DECISIONS rows; the true figure is 47,
+Grok's count was right and mine was wrong — all eight files now carry a tally
+footer that a reviewer can check with one `grep -c`) and AN3 (ADR-005 cited 26
+measured contrast rows against 16 published; the complete table of **34 rows,
+0 failures** is now published in `token-inventory.md`, and ADR-005 cites it
+rather than keeping a second count).

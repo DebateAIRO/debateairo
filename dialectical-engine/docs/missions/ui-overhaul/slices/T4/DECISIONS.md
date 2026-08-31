@@ -14,3 +14,6 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | How is "V2 options not sent" made un-gameable? | Every V2 control carries `data-v2-only="true"`; T4-C3-2 collects those field names, sets non-default values, submits, and asserts the V3 payload key set contains none of them. | A test that asserts only the not-sent SENTENCE is green while the values ship. The attribute is the machine-readable list so it cannot drift from the prose. | ARCH-01
 - 2026-08-31 | Is `class="optionsToggle"` renamed? | No — frozen. `tests/render/ux01-new-debate-form.test.tsx` pins it together with `aria-expanded`. | Class names are a frozen contract for the whole mission. ADR-006. | ARCH-01
 - 2026-08-31 | Which files carry T4's pin migration? | `tests/render/ux01-new-debate-form.test.tsx` and `tests/unit/v2ui-pages.test.ts` (618 lines of page-SOURCE wiring guards over `new/page.tsx`). | `v2ui-pages` is outside `tests/render/**` but reads the file T4 writes, so it is named under R7's "ARCH names pins" delegation and carried in every T4 command. | ARCH-01
+
+---
+**Tally (2026-08-31, ARCH-01 AM1):** 12 rows — 7 pre-ARCH (REQ-01) + 5 appended by ARCH-01 at handoff; 0 at AM1.

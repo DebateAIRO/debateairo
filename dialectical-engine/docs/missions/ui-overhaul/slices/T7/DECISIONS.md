@@ -13,3 +13,6 @@ Format: `YYYY-MM-DD | question | choice | reason | ruled by`
 - 2026-08-31 | Does `AuthShell` need new markup for T7-S1? | No — it already takes `eyebrow`/`title`/`description` and renders `.authEyebrow`/`.authHeadline`/`.authLede`. The three text regions are prop values. | Re-skin plus copy, not structure. | ARCH-01
 - 2026-08-31 | `LoginFlow.tsx` write order across the mission? | T9-C2 (return path) → T7-C1 (shell copy) → T7-C2 (two-step copy) → T8-C3 (recovery gate), strictly serial. | Four clusters write this one file — the mission's worst single-writer hazard. The behaviour change goes first so three copy diffs are not rebased around it, which is where a `next` parameter quietly gets dropped. | ARCH-01
 - 2026-08-31 | How is fleet honesty asserted without a browser? | Rendered markup contains zero worker rows, AND a source assertion that `admin/workers/page.tsx` contains no `fetch(`, no `contractClient`, and no `use client`. | "No fabricated rows" and "no privileged request issued" are two different claims and need two different assertions. | ARCH-01
+
+---
+**Tally (2026-08-31, ARCH-01 AM1):** 11 rows — 6 pre-ARCH (REQ-01) + 5 appended by ARCH-01 at handoff; 0 at AM1.
