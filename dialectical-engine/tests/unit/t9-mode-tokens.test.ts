@@ -295,15 +295,31 @@ function canonicalCssValue(value: string): string {
     .trim();
 }
 
-/** Last line of globals.css inside the token blocks (1-indexed, inclusive). */
-function tokenBlockBoundary(css: string): number {
+/** A 1-indexed, inclusive line interval. */
+export type LineRange = readonly [start: number, end: number];
+
+/**
+ * The two token-block intervals in globals.css, located by syntax.
+ * Throws if either block is absent or unclosed — a boundary the guard cannot
+ * find is a broken guard, and a broken guard must stop the run.
+ */
+function tokenBlockRanges(css: string): readonly LineRange[] {
   const lines = css.split("\n");
-  const start = lines.findIndex((l) => /^html\[data-mode="chamber"\]\s*\{/.test(l));
-  if (start === -1) throw new Error("chamber token block not found in globals.css");
-  const end = lines.findIndex((l, i) => i > start && /^\}/.test(l));
-  if (end === -1) throw new Error("chamber token block is not closed");
-  return end + 1;
+  const find = (re: RegExp, label: string): LineRange => {
+    const start = lines.findIndex((l) => re.test(l));
+    if (start === -1) throw new Error(`${label} token block not found in globals.css`);
+    const end = lines.findIndex((l, i) => i > start && /^\}/.test(l));
+    if (end === -1) throw new Error(`${label} token block is not closed`);
+    return [start + 1, end + 1];
+  };
+  return [
+    find(/^:root\s*\{/, ":root"),
+    find(/^html\[data-mode="chamber"\]\s*\{/, "chamber")
+  ];
 }
+
+const isInsideTokenBlocks = (n: number, ranges: readonly LineRange[]): boolean =>
+  ranges.some(([start, end]) => n >= start && n <= end);
 
 describe("T9-C3 token contract", () => {
   it("declares the complete inventory and the same mode-bearing key set in both modes", async () => {
@@ -494,10 +510,11 @@ describe("T9-C3 mode control and document guard", () => {
         continue;
       }
       const css = readFileSync(path, "utf8");
+      const ranges = path === globalsPath ? tokenBlockRanges(css) : [];
       const lines = css.split("\n");
       for (const [index, line] of lines.entries()) {
         const lineNumber = index + 1;
-        if (path === globalsPath && lineNumber <= tokenBlockBoundary(css)) continue;
+        if (path === globalsPath && isInsideTokenBlocks(lineNumber, ranges)) continue;
         if (patterns.test(line)) hits.push(`${path}:${lineNumber}:${line.trim()}`);
       }
     }
