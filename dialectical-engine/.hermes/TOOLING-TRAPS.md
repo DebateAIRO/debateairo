@@ -810,3 +810,5 @@ Fixes that hold: assign + HERMES AUTHORIZED NEXT comment before dispatch, and
 `-c sandbox_workspace_write.writable_roots=["/Users/vladmihaimiron/.hermes"]` —
 strictly narrower than the 2026-08 danger-full-access precedent, which the
 permission classifier (correctly) refused to relaunch.
+
+- **`tee /dev/stderr` is blocked inside codex workspace-write sandboxes** ("Operation not permitted") even though the pipeline's final count still emits — a packet that quotes ADR-006's 0-new gate verbatim will print the scary tee error while the number stays correct. Workers should run the capture-first variant (redirect to a file, grep the file) and say so; reviewers must not read the tee error as a gate failure. (Found by CODE-T9C3-RW1, 2026-08-31; the gate's verbatim form stays canonical for non-sandboxed seats because /dev/stderr visibility is deliberate.)

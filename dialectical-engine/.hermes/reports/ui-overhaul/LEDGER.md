@@ -45,3 +45,17 @@
 - tree at exit: clean of all mutants (only pre-existing PDA-lane web/ dirt + authorized self-report). Self-report filed: agent-reports/CODE-T9C3-REV-claude.md.
 - tokens (basis: transcript usage sums): output 122,834; fresh input 411,969; cache reads 18,262,597.
 - N7 practice fix adopted by orchestrator effective now: orchestrator/planning artifacts commit SEPARATELY from product commits.
+
+## Receipt — ARCH-01-AM2 (resumed ARCH seat, micro-amendment 2)
+- exit: 2026-08-31 21:19:03 rc=0 | session bb69b040 (9 min) | ticket t_c34a0214
+- delivered all four charges, every published constant EXECUTED before publication: A) ADR-002 contract = import type { JSX } from "react" (three candidate forms compiled against @types/react 19.2.18, probe validated on known-BAD first); B) ADR-001 exclusion syntax-bound via awk + fail-loud guard, published tokenBlockBoundary() mirror for the test, M2 reproduced old-miss/new-catch, boundary=114; C) ADR-006+dispatch-order compile-gate law, 0-new with dated two-error baseline — found a THIRD pre-existing error the packet missed (app/layout.tsx(3,8) TS2882, plain-CSS module decl) and baselined it with evidence instead of shipping an unsatisfiable gate (AF-1 class averted a third time); routed the css.d.ts fix as new scope (ticket t_4e59ee34); D) dispatch-order T9-C1-3 row pins the ANONYMOUS-landing mode control + V QA line; ModeToggle mount moved into T9-C1's write surface (LandingChrome.tsx).
+- seat's stated root cause across AF-1/AM1/AM2: "publishing an artifact whose correctness I ASSERTED instead of EXECUTED" — rule adopted into its ADR practice: run-at-real-scope-in-the-same-edit, output pasted.
+- orchestrator mechanical verification (21:2x): write bounds clean; no fixed-line exclusion residue in architecture/; gate re-run = exactly 1 = B1; syntax-bound wave-0 oracle re-run = 0 at BOUNDARY=114. Committed d600046 (ARCH docs alone, N7 practice).
+- tokens: claude -p resume; session-cumulative basis (shared with ARCH-01/AM1) — per-seat split not separable; noted per reporting law.
+
+## Receipt — CODE-T9C3-RW1 (codex rework round 1 of 3)
+- exit: 2026-08-31 21:41:25 rc=0 | session 01a058b3 resumed (18 min) | ticket t_4ccac5c4 | epoch=3
+- all four fixes with reproduce-first evidence AND neighbor-mutant specificity controls (a move/remove mutant proves each assertion catches; an adjacent benign change proves it does not over-fire). Tests 11 -> 13. Worst-of-three 13/13; render 78/78; 0-new gate 0; syntax-bound oracle 0; root typecheck 0; no git commands; layout.tsx/globals.css zero net change.
+- orchestrator mechanical gate re-ran: acceptance 13/13, gate 0, oracle 0, no fixed 199 in test. SKILLS body-verified in codex rollout ("worst run" x17, TDD phrases x4, "1% chance" x1).
+- tooling: tee /dev/stderr blocked in codex sandbox (promoted to TOOLING-TRAPS); rg absent from codex PATH (already recorded) — worker used documented fallbacks and said so.
+- product commit (worker net diff only, N7 practice): see git log; tokens (codex footer basis): tokens used
