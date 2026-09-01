@@ -8,7 +8,7 @@ import {
   type PromptPacket,
   type ProviderGateway
 } from "@debateai/providers";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
@@ -554,6 +554,55 @@ export interface RecordReducedJudgementInput extends RecordJudgementInput {
   readonly disagreement: Readonly<Record<string, unknown>>;
 }
 
+/** A node review whose content is encrypted and ready for ONE INSERT. */
+export interface PreparedNodeReview {
+  readonly nodeReviewId: string;
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly authorRawArtifactRef: string;
+  readonly reviewRawArtifactRef: string;
+  readonly outcome: ReviewOutcome;
+  readonly reasons: string;
+  readonly contentCiphertext: string | null;
+  readonly contentAttestation: Buffer | null;
+}
+
+/**
+ * T5 r3 — the review INSERT, scoped to a CALLER'S transaction.
+ *
+ * `ledger.node_review` is append-only, refuses UPDATE and DELETE, and carries
+ * `UNIQUE (node_id)`; `readUnreviewedNodes` filters reviewed nodes out. So a
+ * review that commits alone is irreversible AND removes the node from every
+ * future work set. If the bearings that came back on the same call are written
+ * in a later transaction and that transaction fails, the measurement is lost
+ * permanently — no retry and no catch-up can reach it. The composition root
+ * therefore runs this INSERT and those magnitudes in one transaction, which is
+ * why this is exported client-scoped.
+ */
+export async function insertPreparedNodeReview(
+  client: PoolClient,
+  prepared: PreparedNodeReview
+): Promise<string> {
+  const result = await client.query<{ node_review_id: string }>(
+    `INSERT INTO ledger.node_review (
+      node_review_id, run_id, node_id, author_raw_artifact_ref,
+      review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext,content_attestation
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING node_review_id`,
+    [prepared.nodeReviewId, prepared.runId, prepared.nodeId, prepared.authorRawArtifactRef,
+      prepared.reviewRawArtifactRef, prepared.outcome, prepared.reasons,
+      await allocateSequence(client), prepared.contentCiphertext, prepared.contentAttestation]
+  );
+  return result.rows[0]!.node_review_id;
+}
+
+/** The producer-grading bulkhead surfaces as a typed error, not a raw message. */
+export function translateNodeReviewFailure(error: unknown): unknown {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.startsWith("PRODUCER_GRADING_FORBIDDEN:")
+    ? new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message)
+    : error;
+}
+
 export interface UnreviewedNode {
   readonly nodeId: string;
   readonly statement: string;
@@ -620,34 +669,37 @@ export class JudgementRepository {
     });
   }
 
+  /**
+   * T5 r3 — prepare, then insert, so the composition root can put the INSERT in
+   * the SAME transaction as the edge magnitudes the same review returned. The
+   * encryption still happens before the transaction opens, exactly as it did.
+   */
+  async prepareNodeReview(input: RecordNodeReviewInput): Promise<PreparedNodeReview> {
+    const nodeReviewId = randomUUID();
+    const content = await encryptAttestedContentForRun(
+      this.pool, input.runId, "ledger.node_review", nodeReviewId,
+      { reasons: input.reasons }
+    );
+    return Object.freeze({
+      nodeReviewId,
+      runId: input.runId,
+      nodeId: input.nodeId,
+      authorRawArtifactRef: input.authorRawArtifactRef,
+      reviewRawArtifactRef: input.reviewRawArtifactRef,
+      outcome: input.outcome,
+      reasons: JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
+      contentCiphertext: content === null ? null : JSON.stringify(content.envelope),
+      contentAttestation: content?.attestation ?? null
+    });
+  }
+
   async recordNodeReview(input: RecordNodeReviewInput): Promise<string> {
     return withRunContentLease(this.pool, [input.runId], async () => {
-      const nodeReviewId = randomUUID();
-      const content = await encryptAttestedContentForRun(
-        this.pool, input.runId, "ledger.node_review", nodeReviewId,
-        { reasons: input.reasons }
-      );
+      const prepared = await this.prepareNodeReview(input);
       try {
-        return await withWriteTransaction(this.pool, async (client) => {
-          const result = await client.query<{ node_review_id: string }>(
-            `INSERT INTO ledger.node_review (
-              node_review_id, run_id, node_id, author_raw_artifact_ref,
-              review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext,content_attestation
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING node_review_id`,
-            [nodeReviewId, input.runId, input.nodeId, input.authorRawArtifactRef,
-              input.reviewRawArtifactRef, input.outcome,
-              JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
-              await allocateSequence(client),
-              content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
-          );
-          return result.rows[0]!.node_review_id;
-        });
+        return await withWriteTransaction(this.pool, (client) => insertPreparedNodeReview(client, prepared));
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.startsWith("PRODUCER_GRADING_FORBIDDEN:")) {
-          throw new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message);
-        }
-        throw error;
+        throw translateNodeReviewFailure(error);
       }
     });
   }

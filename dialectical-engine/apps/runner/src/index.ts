@@ -6,6 +6,7 @@ import {
   RunRepository,
   assertNoOpenWriteTransaction,
   withRunContentLease,
+  withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember
 } from "@debateai/db";
@@ -14,10 +15,12 @@ import {
   assertClaimCoversCall,
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
-import { GraphRepository } from "@debateai/graph";
+import { GraphRepository, recordEdgeMeasurementsOnClient } from "@debateai/graph";
 import {
   Judge,
   JudgementRepository,
+  insertPreparedNodeReview,
+  translateNodeReviewFailure,
   applyCorrelatedErrorDiscount,
   applyDeclaredDisagreement,
   bindWayOfKnowingDowngrade,
@@ -431,6 +434,60 @@ export type ReviewCatchUpRefusal =
   | "CATCH_UP_WOULD_DOWNGRADE"
   | "CATCH_UP_NUMBER_WOULD_MOVE";
 
+/**
+ * T5 r3 (codex r2 B1) — the review and the bearings that ONE call returned are
+ * committed as a single fact, or not at all.
+ *
+ * `ledger.node_review` is append-only, node-unique, and
+ * `JudgementRepository.readUnreviewedNodes` filters reviewed nodes out of all
+ * future work. A review that commits on its own is therefore IRREVERSIBLE and
+ * UNREPAIRABLE: if the magnitude write then fails, the edge stays UNKNOWN, a
+ * retry cannot re-review the node (UNIQUE), and catch-up can no longer see it.
+ * The bearing the model already produced — and that was already paid for — is
+ * lost for the life of the run.
+ *
+ * Neither package may import the other (the declared architecture edges give
+ * `judgement` and `graph` no dependency on each other), so the atomic
+ * composition belongs here, at the composition root that already owns both.
+ * Both production review sites — the in-run reviewer and the catch-up lane —
+ * go through this function; there is no other way to persist a review.
+ */
+export async function recordReviewWithMeasurements(pool: Pool, input: {
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly authorRawArtifactRef: string;
+  readonly reviewRawArtifactRef: string;
+  readonly outcome: "agree" | "dispute" | "cannot-assess";
+  readonly reasons: readonly string[];
+  readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
+}): Promise<string> {
+  const judgements = new JudgementRepository(pool);
+  return withRunContentLease(pool, [input.runId], async () => {
+    // Encryption happens before the transaction opens, exactly as it did when
+    // the review was written alone.
+    const prepared = await judgements.prepareNodeReview({
+      runId: input.runId,
+      nodeId: input.nodeId,
+      authorRawArtifactRef: input.authorRawArtifactRef,
+      reviewRawArtifactRef: input.reviewRawArtifactRef,
+      outcome: input.outcome,
+      reasons: input.reasons
+    });
+    try {
+      return await withWriteTransaction(pool, async (client) => {
+        // The same run lock `withGraphWrite` takes, so a concurrent graph write
+        // cannot interleave between the two halves of this one fact.
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [input.runId]);
+        const nodeReviewId = await insertPreparedNodeReview(client, prepared);
+        await recordEdgeMeasurementsOnClient(client, input.runId, input.measurements);
+        return nodeReviewId;
+      });
+    } catch (error) {
+      throw translateNodeReviewFailure(error);
+    }
+  });
+}
+
 export interface ReviewCatchUpNode {
   readonly nodeId: string;
   readonly statement: string;
@@ -467,11 +524,17 @@ export interface ReviewCatchUpReviewer {
     readonly contractHash: string;
     readonly bound: CallBound;
     /**
-     * T5 / S3-1. The catch-up lane re-reviews nodes whose edges were already
-     * minted and, where the in-run review landed, already measured — so it
-     * offers NO edges for measurement and re-measures nothing. Passing the
-     * empty list explicitly is what keeps that a stated decision rather than
-     * an omission (finding F-T5-2).
+     * T5 / S3-1. Every edge the reviewed node still owns UNMEASURED, offered
+     * for measurement on this one visit. A catch-up review is a real reviewer
+     * visit and measures what it can.
+     *
+     * This list is empty ONLY when the node genuinely has nothing left to
+     * measure — an already-MEASURED edge is excluded by the reader, because
+     * 0052's one-way ratchet would refuse a second write. Declaring an
+     * edge-owning node to have no edges is a FALSE statement, not a missing
+     * measurement; that was finding F-T5-2 and it is outlawed, not documented.
+     * A reviewer that looks and cannot say returns a null bearing instead,
+     * which leaves the edge honestly UNKNOWN.
      */
     readonly edges: readonly {
       readonly edgeId: string;
@@ -509,19 +572,21 @@ export interface ReviewCatchUpDependencies {
   readUnreviewedNodes(runId: string): Promise<readonly ReviewCatchUpNode[]>;
   readDisclosedNodeIds(answerId: string, answerVersion: number): Promise<readonly string[]>;
   readLatestReviewerMaker(runId: string, authorMaker: string): Promise<string | null>;
-  recordNodeReview(input: {
+  /**
+   * T5 / S3-1 + codex r2 B1 — the review and the bearings that same call
+   * returned are persisted together or not at all. There is deliberately no
+   * way to record one without the other: a lone review is irreversible and
+   * removes the node from every future work set.
+   */
+  recordReviewWithMeasurements(input: {
     readonly runId: string;
     readonly nodeId: string;
     readonly authorRawArtifactRef: string;
     readonly reviewRawArtifactRef: string;
     readonly outcome: "agree" | "dispute" | "cannot-assess";
     readonly reasons: readonly string[];
-  }): Promise<string>;
-  /** T5 / S3-1 — writes the magnitudes the review call already returned. */
-  recordEdgeMeasurements(input: {
-    readonly runId: string;
     readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
-  }): Promise<void>;
+  }): Promise<string>;
   countRunModelAttempts(runId: string): Promise<number>;
   readPinnedMaximumAttempts(runId: string): Promise<number>;
   prepareVersion(input: {
@@ -632,25 +697,17 @@ export async function runReviewCatchUp(input: {
       })
     });
     if (outcome.kind === "HALTED") continue;
-    await input.dependencies.recordNodeReview({
+    await input.dependencies.recordReviewWithMeasurements({
       runId: input.runId,
       nodeId: node.nodeId,
       authorRawArtifactRef: node.authorRawArtifactRef,
       reviewRawArtifactRef: outcome.value.provenanceRef,
       outcome: outcome.value.outcome,
-      reasons: outcome.value.reasons
+      reasons: outcome.value.reasons,
+      // The magnitudes came back on the review call above; a cannot-assess
+      // bearing is null and leaves its edge honestly UNKNOWN.
+      measurements: outcome.value.edgeMeasurements
     });
-    // T5 / S3-1: the magnitudes came back on the review call above. Writing
-    // them here spends nothing — a measurement-only call site would be exactly
-    // the extra call the ruling forbids. A cannot-assess bearing is null and
-    // leaves its edge UNKNOWN, which is the honest record of a reviewer that
-    // looked and could not say.
-    if (outcome.value.edgeMeasurements.length > 0) {
-      await input.dependencies.recordEdgeMeasurements({
-        runId: input.runId,
-        measurements: outcome.value.edgeMeasurements
-      });
-    }
     reviewed += 1;
   }
   if (reviewed === 0) {
@@ -737,10 +794,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
     readDisclosedNodeIds: (answerId, answerVersion) =>
       serve.readReviewCatchUpDisclosedNodeIds(answerId, answerVersion),
     readLatestReviewerMaker: (runId, maker) => judgements.readLatestReviewerMaker(runId, maker),
-    recordNodeReview: (record) => judgements.recordNodeReview(record),
-    recordEdgeMeasurements: async ({ runId, measurements }) => {
-      await graph.withGraphWrite(runId, (writer) => writer.recordEdgeMeasurements({ runId, measurements }));
-    },
+    recordReviewWithMeasurements: (record) => recordReviewWithMeasurements(input.pool, record),
     countRunModelAttempts: (runId) => budget.countRunModelAttempts(runId),
     readPinnedMaximumAttempts: async (runId) => (await budget.readPinnedBasis(runId)).maxModelAttempts,
     prepareVersion: async ({ runId, answerId, fromVersion }) => {
@@ -2230,23 +2284,19 @@ export class WalkingSkeletonRunner {
             continue;
           }
           const review = reviewAttempt.value;
-          await this.#judgements.recordNodeReview({
+          // T5 / S3-1 + codex r2 B1: the review and the magnitudes it already
+          // returned are ONE fact, committed in ONE transaction. Writing the
+          // review alone is irreversible and would remove this node from every
+          // future work set, stranding the bearing beyond any repair.
+          await recordReviewWithMeasurements(this.pool, {
             runId: run.runId,
             nodeId: authoredNode.nodeId,
             authorRawArtifactRef: authoredNode.provenanceRef,
             reviewRawArtifactRef: review.provenanceRef,
             outcome: review.outcome,
-            reasons: review.reasons
+            reasons: review.reasons,
+            measurements: review.edgeMeasurements
           });
-          // T5 / S3-1: the magnitudes the review already returned are written
-          // here — no second call site exists, so the model-call ledger shows
-          // one entry per reviewed node and nothing else.
-          if (review.edgeMeasurements.length > 0) {
-            await this.#graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
-              runId: run.runId,
-              measurements: review.edgeMeasurements
-            }));
-          }
         } catch (error) {
           if (error instanceof TypedDomainError && [
             "RUN_COST_ENVELOPE_EXHAUSTED",

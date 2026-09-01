@@ -38,11 +38,10 @@ function dependencies(overrides: Partial<ReviewCatchUpDependencies> = {}): Revie
         observed: input
       }))
     }]),
-    recordEdgeMeasurements: vi.fn(async () => undefined),
+    recordReviewWithMeasurements: vi.fn(async () => "review:1"),
     readUnreviewedNodes: vi.fn(async () => [node]),
     readDisclosedNodeIds: vi.fn(async () => [node.nodeId]),
     readLatestReviewerMaker: vi.fn(async () => null),
-    recordNodeReview: vi.fn(async () => "review:1"),
     countRunModelAttempts: vi.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(4),
     readPinnedMaximumAttempts: vi.fn(async () => 10),
     prepareVersion: vi.fn(async () => ({
@@ -80,12 +79,12 @@ describe("T5 · catch-up reviews measure the edges they can still measure (S3-1)
     }));
   });
 
-  it("persists what that ONE call measured, without a measurement-only call", async () => {
-    const recordEdgeMeasurements = vi.fn(async () => undefined);
+  it("persists the review and what that ONE call measured as a single fact", async () => {
+    const recordReviewWithMeasurements = vi.fn(async () => "review:1");
     const deps = dependencies({
       readUnreviewedNodes: vi.fn(async () => [edgeOwningNode]),
       readDisclosedNodeIds: vi.fn(async () => [edgeOwningNode.nodeId]),
-      recordEdgeMeasurements
+      recordReviewWithMeasurements
     });
     await runReviewCatchUp({
       runId: "run:1", answerId: "answer:1", fromVersion: 1,
@@ -99,16 +98,20 @@ describe("T5 · catch-up reviews measure the edges they can still measure (S3-1)
     });
     const reviewer = (await (deps.probePinnedPanel as ReturnType<typeof vi.fn>).mock.results[0]!.value)[0]!;
 
-    expect(recordEdgeMeasurements).toHaveBeenCalledWith({
+    // codex r2 B1: ONE call carries both facts — there is no way to persist the
+    // review without the bearings it returned.
+    expect(recordReviewWithMeasurements).toHaveBeenCalledWith(expect.objectContaining({
       runId: "run:1",
+      nodeId: "node:edge-owner",
       measurements: [{ edgeId: "edge:1", bearing: 0.5 }]
-    });
+    }));
+    expect(recordReviewWithMeasurements).toHaveBeenCalledTimes(1);
     expect(reviewer.review).toHaveBeenCalledTimes(1);
   });
 
-  it("writes nothing when the node has no unmeasured edge left to offer", async () => {
-    const recordEdgeMeasurements = vi.fn(async () => undefined);
-    const deps = dependencies({ recordEdgeMeasurements });
+  it("records an empty measurement set when the node has no unmeasured edge left", async () => {
+    const recordReviewWithMeasurements = vi.fn(async () => "review:1");
+    const deps = dependencies({ recordReviewWithMeasurements });
     await runReviewCatchUp({
       runId: "run:1", answerId: "answer:1", fromVersion: 1,
       workItemId: "work:original", questionLine: "Question?",
@@ -122,7 +125,10 @@ describe("T5 · catch-up reviews measure the edges they can still measure (S3-1)
 
     // `node` sources no unmeasured edge — an already-measured edge is never
     // re-offered, because the one-way ratchet would refuse the second write.
-    expect(recordEdgeMeasurements).not.toHaveBeenCalled();
+    // The review still lands, carrying an empty measurement set.
+    expect(recordReviewWithMeasurements).toHaveBeenCalledWith(expect.objectContaining({
+      measurements: []
+    }));
   });
 });
 

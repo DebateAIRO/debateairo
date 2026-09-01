@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
-import { Judge } from "@debateai/judgement";
+import { JudgementRepository, Judge } from "@debateai/judgement";
+import { recordReviewWithMeasurements } from "@debateai/runner";
 import { LedgerRepository } from "@debateai/ledger";
 import { evaluate } from "@debateai/propagation";
 import type { ProviderGateway } from "@debateai/providers";
@@ -110,7 +112,7 @@ interface ConstructedRun {
   readonly runId: string;
   readonly rootId: string;
   readonly rootTau: number;
-  readonly reviewed: readonly { readonly nodeId: string; readonly edgeId: string; readonly tau: number }[];
+  readonly reviewed: readonly { readonly nodeId: string; readonly edgeId: string; readonly tau: number; readonly authorRef: string | null }[];
 }
 
 /**
@@ -120,7 +122,7 @@ interface ConstructedRun {
  */
 async function constructRun(label: string, taus: {
   readonly root: number; readonly attacker: number; readonly supporter: number; readonly unassessable: number;
-}): Promise<ConstructedRun> {
+}, options: { readonly bindAuthorArtifacts?: boolean } = {}): Promise<ConstructedRun> {
   const runId = await createRun(label);
   const graph = new GraphRepository(database.pool);
   const ledger = new LedgerRepository(database.pool);
@@ -141,6 +143,10 @@ async function constructRun(label: string, taus: {
     `, [runId, nodeId, artifactId, tau, `artifact:${artifactId}`, `judgement:${randomUUID()}`]);
   };
 
+  const authorRefs = new Map<number, string>();
+  if (options.bindAuthorArtifacts === true) {
+    for (const ordinal of [1, 2, 3]) authorRefs.set(ordinal, await artifact(runId, "house-a"));
+  }
   const built = await graph.withGraphWrite(runId, async (writer) => {
     const base = {
       runId, claimType: "unknown" as const, generationStatus: "complete" as const,
@@ -154,7 +160,11 @@ async function constructRun(label: string, taus: {
     const child = async (statement: string, childKind: "support" | "defeater", ordinal: number): Promise<string> =>
       writer.addNode({
         ...base, statementText: statement, parentNodeId: rootId,
-        childKind, siblingOrdinal: ordinal, provenanceRef: null
+        childKind, siblingOrdinal: ordinal,
+        // core.node is append-only, so the review lineage the trigger checks has
+        // to be bound at creation. Opt-in: a non-null provenance_ref gives the
+        // arrow a clusterKey, which the propagation fixtures must not acquire.
+        provenanceRef: options.bindAuthorArtifacts === true ? authorRefs.get(ordinal)! : null
       });
     const attackerId = await child("The proposal rests on an unmeasured premise.", "defeater", 1);
     const supporterId = await child("The proposal is carried by its record.", "support", 2);
@@ -176,9 +186,9 @@ async function constructRun(label: string, taus: {
     return Object.freeze({
       runId, rootId, rootTau: taus.root,
       reviewed: Object.freeze([
-        Object.freeze({ nodeId: attackerId, edgeId: attackEdgeId, tau: taus.attacker }),
-        Object.freeze({ nodeId: supporterId, edgeId: supportEdgeId, tau: taus.supporter }),
-        Object.freeze({ nodeId: unassessableId, edgeId: unassessableEdgeId, tau: taus.unassessable })
+        Object.freeze({ nodeId: attackerId, edgeId: attackEdgeId, tau: taus.attacker, authorRef: authorRefs.get(1) ?? null }),
+        Object.freeze({ nodeId: supporterId, edgeId: supportEdgeId, tau: taus.supporter, authorRef: authorRefs.get(2) ?? null }),
+        Object.freeze({ nodeId: unassessableId, edgeId: unassessableEdgeId, tau: taus.unassessable, authorRef: authorRefs.get(3) ?? null })
       ])
     });
   });
@@ -186,6 +196,18 @@ async function constructRun(label: string, taus: {
   await recordTau(built.rootId, taus.root);
   for (const node of built.reviewed) await recordTau(node.nodeId, node.tau);
   return built;
+}
+
+/** A raw artifact attributable to one maker, for the review lineage trigger. */
+async function artifact(runId: string, maker: string): Promise<string> {
+  const artifactId = randomUUID();
+  await new LedgerRepository(database.pool).appendRawArtifact({
+    artifactId, attemptId: randomUUID(), runId, providerRef: `provider:${maker}`,
+    provider: "test-layer", model: `model:${maker}`, maker, modelVersion: `model:${maker}`,
+    rawText: "{}", metadata: {}, parseStatus: "PARSED",
+    inputHash: "a".repeat(64), contractHash: "b".repeat(64), contentHash: "c".repeat(64)
+  });
+  return artifactId;
 }
 
 /** Bearings by review order: attacker 0.5, supporter 0.25, unassessable cannot-assess. */
@@ -296,6 +318,183 @@ describe("T5 · the reviewer's magnitudes reach the post-run graph (S3-1)", () =
     expect(new Set(calls.rows.map((row) => row.call_site_key))).toEqual(
       new Set(run.reviewed.map((node) => `JUDGE:review:${node.nodeId}`))
     );
+  });
+});
+
+/**
+ * T5 r3 / codex r2 B1 — the review and the bearings it returned are ONE fact.
+ *
+ * `ledger.node_review` is append-only, carries `UNIQUE (node_id)`, and
+ * `readUnreviewedNodes` filters on `review.node_id IS NULL`. So a review that
+ * commits on its own is IRREVERSIBLE and REMOVES the node from all future work:
+ * if the magnitude write then fails, the edge stays UNKNOWN and nothing —
+ * neither a retry nor catch-up — can ever repair it. The bearing the model
+ * already produced and was already paid for is lost permanently.
+ *
+ * The failure is injected without mocks, using the ratchet the schema already
+ * enforces: measure the edge first, then compose a review whose bearing targets
+ * that now-MEASURED edge. The second write refuses, exactly as codex's scenario
+ * describes ("E no longer satisfies magnitude_status='UNKNOWN'").
+ */
+describe("DEMO (codex r2 B1) — the OLD two-transaction shape strands a half-write", () => {
+  it("records the review, loses the bearing, and removes the node from all future work", async () => {
+    const run = await constructRun(
+      "t05-old-shape-strands", { root: 0.5, attacker: 0.5, supporter: 0.5, unassessable: 0.5 },
+      { bindAuthorArtifacts: true }
+    );
+    const node = run.reviewed[0]!;
+    const judgements = new JudgementRepository(database.pool);
+    const graph = new GraphRepository(database.pool);
+    const reviewerRef = await artifact(run.runId, "house-b");
+
+    // Burn the edge's one lawful transition so the SECOND write will refuse.
+    await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
+      runId: run.runId, measurements: [{ edgeId: node.edgeId, bearing: 0.25 }]
+    }));
+
+    // THE OLD SHAPE, exactly as r2 shipped it: two awaited writes, two transactions.
+    await judgements.recordNodeReview({
+      runId: run.runId, nodeId: node.nodeId,
+      authorRawArtifactRef: node.authorRef!, reviewRawArtifactRef: reviewerRef,
+      outcome: "agree", reasons: ["The bearing this review returned is about to be lost."]
+    });
+    let second: unknown = null;
+    try {
+      await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
+        runId: run.runId, measurements: [{ edgeId: node.edgeId, bearing: 0.75 }]
+      }));
+    } catch (error) { second = error; }
+
+    const reviews = await database.pool.query("SELECT 1 FROM ledger.node_review WHERE node_id=$1", [node.nodeId]);
+    const edge = await database.pool.query<{ strength: number; magnitude_status: string }>(
+      "SELECT strength, magnitude_status FROM core.edge WHERE edge_id=$1", [node.edgeId]);
+    const unreviewed = await judgements.readUnreviewedNodes(run.runId);
+    console.info("[B1 DEMO] second write threw:", (second as { code?: string } | null)?.code);
+    console.info("[B1 DEMO] review rows for node:", reviews.rowCount);
+    console.info("[B1 DEMO] edge after:", JSON.stringify(edge.rows[0]));
+    console.info("[B1 DEMO] node still selectable by catch-up:",
+      unreviewed.some((candidate) => candidate.nodeId === node.nodeId));
+
+    // The stranded half-state, asserted so the demo cannot pass by accident.
+    expect(reviews.rowCount).toBe(1);                                   // review committed
+    expect(edge.rows[0]!.magnitude_status).toBe("MEASURED");
+    expect(Number(edge.rows[0]!.strength)).toBe(0.25);                  // the 0.75 bearing is GONE
+    expect(unreviewed.some((c) => c.nodeId === node.nodeId)).toBe(false); // catch-up is blind
+    await expect(judgements.recordNodeReview({
+      runId: run.runId, nodeId: node.nodeId,
+      authorRawArtifactRef: node.authorRef!, reviewRawArtifactRef: reviewerRef,
+      outcome: "agree", reasons: ["A second review cannot exist."]
+    })).rejects.toThrow();                                              // UNIQUE(node_id): unrepairable
+  });
+
+  it("is why no production site may write a review on its own", async () => {
+    // The primitives above still exist as a repository API, but the runner —
+    // the only place that persists a review — must never compose them
+    // sequentially again. This is the regression pin for that.
+    const runner = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    expect(runner).not.toMatch(/\brecordNodeReview\(/);
+    expect(runner).toMatch(/recordReviewWithMeasurements\(/);
+  });
+});
+
+describe("T5 · a review and its bearings commit atomically or not at all", () => {
+  const reviewedRun = async (label: string): Promise<{
+    readonly run: ConstructedRun; readonly authorRef: string; readonly reviewerRef: string;
+  }> => {
+    const run = await constructRun(
+      label, { root: 0.5, attacker: 0.5, supporter: 0.5, unassessable: 0.5 }, { bindAuthorArtifacts: true }
+    );
+    return { run, authorRef: run.reviewed[0]!.authorRef!, reviewerRef: await artifact(run.runId, "house-b") };
+  };
+
+  it("leaves NEITHER fact behind when the magnitude write refuses", async () => {
+    const { run, authorRef, reviewerRef } = await reviewedRun("t05-atomic-refusal");
+    const node = run.reviewed[0]!;
+    const judgements = new JudgementRepository(database.pool);
+    const graph = new GraphRepository(database.pool);
+
+    // Burn the edge's one lawful transition, so the measurement below refuses.
+    await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
+      runId: run.runId, measurements: [{ edgeId: node.edgeId, bearing: 0.25 }]
+    }));
+
+    await expect(recordReviewWithMeasurements(database.pool, {
+      runId: run.runId,
+      nodeId: node.nodeId,
+      authorRawArtifactRef: authorRef,
+      reviewRawArtifactRef: reviewerRef,
+      outcome: "agree",
+      reasons: ["Scripted review whose magnitude cannot land."],
+      measurements: [{ edgeId: node.edgeId, bearing: 0.75 }]
+    })).rejects.toThrowError(expect.objectContaining({ code: "EDGE_MEASUREMENT_REFUSED" }));
+
+    // The review must NOT have survived on its own: an orphan review row is
+    // unrepairable, because the table refuses UPDATE, DELETE and a second INSERT.
+    const reviews = await database.pool.query(
+      "SELECT 1 FROM ledger.node_review WHERE node_id=$1", [node.nodeId]
+    );
+    expect(reviews.rowCount).toBe(0);
+
+    // And the node is still selectable, so a retry or catch-up can repair it.
+    const unreviewed = await judgements.readUnreviewedNodes(run.runId);
+    expect(unreviewed.map((candidate) => candidate.nodeId)).toContain(node.nodeId);
+
+    // The edge keeps the magnitude it lawfully had; nothing was half-written.
+    const edge = await database.pool.query<{ strength: number; magnitude_status: string }>(
+      "SELECT strength, magnitude_status FROM core.edge WHERE edge_id=$1", [node.edgeId]
+    );
+    expect(edge.rows[0]).toEqual({ strength: 0.25, magnitude_status: "MEASURED" });
+  });
+
+  it("lands BOTH facts on success, and the repaired retry then succeeds", async () => {
+    const { run, authorRef, reviewerRef } = await reviewedRun("t05-atomic-success");
+    const node = run.reviewed[0]!;
+    const judgements = new JudgementRepository(database.pool);
+
+    await expect(recordReviewWithMeasurements(database.pool, {
+      runId: run.runId,
+      nodeId: node.nodeId,
+      authorRawArtifactRef: authorRef,
+      reviewRawArtifactRef: reviewerRef,
+      outcome: "agree",
+      reasons: ["Both facts land together."],
+      measurements: [{ edgeId: node.edgeId, bearing: 0.75 }]
+    })).resolves.toBeDefined();
+
+    const edge = await database.pool.query<{ strength: number; magnitude_status: string; strength_source: string }>(
+      "SELECT strength, magnitude_status, strength_source FROM core.edge WHERE edge_id=$1", [node.edgeId]
+    );
+    expect(edge.rows[0]).toEqual({ strength: 0.75, magnitude_status: "MEASURED", strength_source: "REVIEWER" });
+    const reviews = await database.pool.query(
+      "SELECT 1 FROM ledger.node_review WHERE node_id=$1", [node.nodeId]
+    );
+    expect(reviews.rowCount).toBe(1);
+    const unreviewed = await judgements.readUnreviewedNodes(run.runId);
+    expect(unreviewed.map((candidate) => candidate.nodeId)).not.toContain(node.nodeId);
+  });
+
+  it("a cannot-assess review lands alone, leaving its edge honestly UNKNOWN", async () => {
+    const { run, authorRef, reviewerRef } = await reviewedRun("t05-atomic-cannot-assess");
+    const node = run.reviewed[0]!;
+
+    await recordReviewWithMeasurements(database.pool, {
+      runId: run.runId,
+      nodeId: node.nodeId,
+      authorRawArtifactRef: authorRef,
+      reviewRawArtifactRef: reviewerRef,
+      outcome: "cannot-assess",
+      reasons: ["Looked, and could not say."],
+      measurements: [{ edgeId: node.edgeId, bearing: null }]
+    });
+
+    const edge = await database.pool.query<{ magnitude_status: string }>(
+      "SELECT magnitude_status FROM core.edge WHERE edge_id=$1", [node.edgeId]
+    );
+    expect(edge.rows[0]!.magnitude_status).toBe("UNKNOWN");
+    const reviews = await database.pool.query(
+      "SELECT 1 FROM ledger.node_review WHERE node_id=$1", [node.nodeId]
+    );
+    expect(reviews.rowCount).toBe(1);
   });
 });
 

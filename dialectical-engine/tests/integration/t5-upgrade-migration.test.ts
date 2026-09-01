@@ -78,12 +78,22 @@ async function applyThrough(target: TestDatabase, through: string): Promise<void
   }
 }
 
-/** Applies ONE migration in its own transaction, so a refusal rolls back whole. */
+/**
+ * Applies ONE migration the way the production migrator does
+ * (`packages/db/src/index.ts`): the SQL and its schema-ledger row land in the
+ * SAME transaction, so a refusal rolls back both. Executing only the SQL would
+ * make the "0052 is absent from the ledger" assertion vacuous — it would pass
+ * even on success, because nothing would ever have inserted the name.
+ */
 async function applyOne(target: TestDatabase, name: string): Promise<void> {
   const client = await target.pool.connect();
   try {
     await client.query("BEGIN");
     await client.query(await readFile(new URL(name, MIGRATIONS), "utf8"));
+    await client.query(
+      "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
+      [name]
+    );
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -91,6 +101,14 @@ async function applyOne(target: TestDatabase, name: string): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+/** Whether the schema ledger records a migration as applied. */
+async function ledgerRecords(target: TestDatabase, name: string): Promise<boolean> {
+  const result = await target.pool.query(
+    "SELECT 1 FROM public.debateai_schema_migration WHERE name=$1", [name]
+  );
+  return result.rowCount === 1;
 }
 
 async function seedRun(target: TestDatabase, label: string): Promise<string> {
@@ -189,6 +207,7 @@ describe("T5 · 0052 upgrade from a 0051-shaped database", () => {
     expect(after.rows[0]).toEqual({
       strength: null, magnitude_status: "UNKNOWN", strength_source: "REVIEWER"
     });
+    expect(await ledgerRecords(target, RENAME)).toBe(true);
   }, 240_000);
 
   it("arm (a) leaves the replacement stamp constraint VALIDATED, not merely promised", async () => {
@@ -226,18 +245,22 @@ describe("T5 · 0052 upgrade from a 0051-shaped database", () => {
     expect(after.rows[0]).toEqual({
       strength: 0.75, magnitude_status: "MEASURED", strength_source: RETIRED_STAMP
     });
-    const applied = await target.pool.query<{ name: string }>(
-      "SELECT name FROM public.debateai_schema_migration WHERE name=$1", [RENAME]
-    );
-    expect(applied.rowCount).toBe(0);
+    // Discriminating only because `applyOne` DOES insert the ledger row on
+    // success (asserted in arm (a)): the row's absence here is a rollback, not
+    // an artefact of a helper that never wrote it.
+    expect(await ledgerRecords(target, RENAME)).toBe(false);
   }, 240_000);
 
-  it("arm (b) becomes applicable once the operator has ruled on the offending row", async () => {
+  it("arm (b) converges once the operator withdraws the unattributable measurement", async () => {
     const { target, edgeId } = await seedEdgeOfShape("MEASURED", 0.75);
     await expect(applyOne(target, RENAME)).rejects.toThrow();
 
-    // The operator's disposition, whatever it is, has to reach the row itself;
-    // here it is the narrowest one that preserves the recorded number.
+    // The operator's disposition has to reach the row itself. The one
+    // demonstrated here WITHDRAWS the legacy measurement — it returns the edge
+    // to UNKNOWN/NULL, discarding the recorded 0.75 — because relabelling the
+    // number to REVIEWER would launder provenance the retired stamp never had.
+    // It is one lawful disposition, not the only one; a deployment that wants
+    // to keep the number must re-derive it from a real reviewer visit.
     await target.pool.query("ALTER TABLE core.edge DISABLE TRIGGER reject_mutation");
     await target.pool.query(
       "UPDATE core.edge SET strength=NULL, magnitude_status='UNKNOWN' WHERE edge_id=$1", [edgeId]
@@ -249,5 +272,6 @@ describe("T5 · 0052 upgrade from a 0051-shaped database", () => {
       "SELECT strength_source FROM core.edge WHERE edge_id=$1", [edgeId]
     );
     expect(after.rows[0]!.strength_source).toBe("REVIEWER");
+    expect(await ledgerRecords(target, RENAME)).toBe(true);
   }, 240_000);
 });
