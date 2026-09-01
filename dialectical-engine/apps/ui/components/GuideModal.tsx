@@ -3,27 +3,27 @@
 const GUIDE_ITEMS = [
   {
     icon: "⚡",
-    iconBg: "oklch(0.95 0.04 78)",
+    iconBg: "var(--gold-bg)",
     title: "Live generation",
     body: "The skeleton appears first, then each model writes its claim in with a cursor while the bar tracks progress."
   },
   {
     icon: "●",
-    iconBg: "oklch(0.95 0.03 165)",
-    iconColor: "oklch(0.58 0.13 255)",
+    iconBg: "var(--pro-bg)",
+    iconColor: "var(--reasoning)",
     title: "Who said what, and which side",
     body: "Every claim names the model that wrote it (colored dot). Pro supports its parent claim; Con opposes it."
   },
   {
     icon: "⚐",
-    iconBg: "oklch(0.95 0.04 78)",
-    iconColor: "oklch(0.45 0.06 55)",
+    iconBg: "var(--gold-bg)",
+    iconColor: "var(--gold-text)",
     title: "Challenge a flaw anywhere",
     body: "Click Challenge on a claim — or select any sentence inside an argument — to send focused scrutiny at that exact spot."
   },
   {
     icon: "↻",
-    iconBg: "oklch(0.94 0.01 75)",
+    iconBg: "var(--surface-sunken)",
     title: "Compare, switch, export",
     body: "Open any claim for its generation history and compare versions. Toggle Tree / Outline, and Export for Markdown."
   }

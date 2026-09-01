@@ -66,6 +66,7 @@ import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { ChallengePopover } from "@/components/ChallengePopover";
 import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
+import { ModeToggle } from "@/components/ModeToggle";
 import { Toast } from "@/components/Toast";
 import {
   PublicationControl,type PrivateDeletionStatus
@@ -1132,6 +1133,7 @@ export default function DebatePageClient({
               </button>
             </div>
           ) : null}
+          <ModeToggle />
           <ScoringErrorBoundary>
             <div className="topSwitch">
               <span>Scoring</span>
@@ -1860,9 +1862,9 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
         gap: 6,
         width: 220,
         padding: "8px 10px",
-        border: "1px solid oklch(0.88 0.03 75)",
+        border: "1px solid var(--line-strong)",
         borderRadius: 6,
-        background: item.expansion_hint === "expand" ? "oklch(0.97 0.03 118)" : "oklch(0.98 0.01 75)"
+        background: item.expansion_hint === "expand" ? "var(--score-strength-bg)" : "var(--surface-2)"
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -1876,7 +1878,7 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
           height: 5,
           overflow: "hidden",
           borderRadius: 4,
-          background: "oklch(0.9 0.01 75)"
+          background: "var(--surface-sunken)"
         }}
       >
         <div
@@ -1886,10 +1888,10 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
             borderRadius: 4,
             background:
               item.pressure === "high"
-                ? "oklch(0.62 0.15 32)"
+                ? "var(--dispute)"
                 : item.pressure === "medium"
-                  ? "oklch(0.66 0.12 80)"
-                  : "oklch(0.62 0.09 165)"
+                  ? "var(--gold)"
+                  : "var(--agree)"
           }}
         />
       </div>
