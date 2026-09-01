@@ -1,9 +1,9 @@
 import type { Pool } from "pg";
-import { agg, σ, product } from "@debateai/published-arithmetic";
+import { agg, σ } from "@debateai/published-arithmetic";
 
 export const REPLAY_ISOLATION_PROOF = Object.freeze({
   workspaceImports: Object.freeze(["@debateai/published-arithmetic"] as const),
-  sharedSymbols: Object.freeze(["agg", "σ", "product"] as const),
+  sharedSymbols: Object.freeze(["agg", "σ"] as const),
   localArithmeticSymbols: Object.freeze([] as const)
 });
 
@@ -82,7 +82,7 @@ function recomputeFrozenRow(row: FrozenReplayRow): number {
     throw new TypeError("REPLAY_SHAPE_NOT_IMPLEMENTED");
   }
   // The symbols stay live imports so the isolation receipt and export pin cover the entire licensed surface.
-  void [σ, product];
+  void [σ];
   return agg([Number(row.base_strengths[0])]);
 }
 

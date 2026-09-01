@@ -380,8 +380,6 @@ export const nodeStrengthRecord = ledger.table("node_strength_record", {
   operatorLevel: text("operator_level"),
   positionLabel: text("position_label"),
   liftMarker: jsonb("lift_marker").notNull(),
-  rivalOperator: text("rival_operator"),
-  rivalStrength: doublePrecision("rival_strength"),
   reducedJudgementRef: uuid("reduced_judgement_ref")
     .references(() => reducedJudgement.reducedJudgementId)
 });

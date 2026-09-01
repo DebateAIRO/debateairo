@@ -7,8 +7,3 @@ export function σ(tau: number, aggregateAttack: number, aggregateSupport: numbe
     ? tau - tau * (aggregateAttack - aggregateSupport)
     : tau + (1 - tau) * (aggregateSupport - aggregateAttack);
 }
-
-export function product(values: readonly number[]): number {
-  if (values.length === 0) throw new TypeError("strict-and has no identity element");
-  return values.reduce((product, value) => product * value);
-}

@@ -78,16 +78,16 @@ export async function auditArchitecture(): Promise<{
   const replaySource = await readFile(join(root, "apps/replay/src/index.ts"), "utf8");
   const replayImport = replaySource.match(/import\s*\{([^}]+)\}\s*from\s*["']@debateai\/published-arithmetic["']/)?.[1]
     ?.split(",").map((name) => name.trim()).sort();
-  if (JSON.stringify(replayImport) !== JSON.stringify(["agg", "product", "σ"].sort())) {
-    violations.push("apps/replay must import exactly agg, σ, product from published-arithmetic");
+  if (JSON.stringify(replayImport) !== JSON.stringify(["agg", "σ"].sort())) {
+    violations.push("apps/replay must import exactly agg, σ from published-arithmetic");
   }
   const arithmeticSource = await readFile(join(root, "packages/published-arithmetic/src/index.ts"), "utf8");
   const arithmeticExports = [...arithmeticSource.matchAll(/export function\s+([^\s(]+)/g)].map((match) => match[1]).sort();
-  if (JSON.stringify(arithmeticExports) !== JSON.stringify(["agg", "product", "σ"].sort())) {
-    violations.push("published-arithmetic must export exactly agg, σ, product");
+  if (JSON.stringify(arithmeticExports) !== JSON.stringify(["agg", "σ"].sort())) {
+    violations.push("published-arithmetic must export exactly agg, σ");
   }
   const replayWithoutImport = replaySource.replace(/import[^;]+;/g, "");
-  if (/(?:function|const|let|class)\s+(?:agg|σ|product)\b/.test(replayWithoutImport)) {
+  if (/(?:function|const|let|class)\s+(?:agg|σ)\b/.test(replayWithoutImport)) {
     violations.push("apps/replay declares a local arithmetic symbol");
   }
   return { edgeRowsChecked: rows.length, violations };

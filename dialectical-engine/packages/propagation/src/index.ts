@@ -10,7 +10,7 @@ import {
   type ScoringOperator,
   type StrengthSource
 } from "@debateai/kernel";
-import { agg, product, σ } from "@debateai/published-arithmetic";
+import { agg, σ } from "@debateai/published-arithmetic";
 
 export type { OperatorSupplyingLevel, ScoringOperator } from "@debateai/kernel";
 
@@ -99,13 +99,10 @@ export interface NodeStrengthRecord {
   readonly operatorLevel: OperatorSupplyingLevel | null;
   readonly positionLabel: string | null;
   readonly liftMarker: readonly LiftRecord[];
-  readonly rivalOperator: ScoringOperator | null;
-  readonly rivalStrength: number | null;
 }
 
 export interface PropagationOutcome {
   readonly strengths: readonly NodeStrengthRecord[];
-  readonly withheld: readonly { readonly nodeId: string; readonly reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED" }[];
   readonly unjudgedNodeIds: readonly string[];
   readonly arrowOrder: readonly string[];
   readonly transmissionReductions: readonly TransmissionReduction[];
@@ -129,34 +126,20 @@ export interface SensitivityRecord {
 
 interface ScoringStrategy {
   readonly id: ScoringOperator;
-  readonly requiresEverySupportConjunct: boolean;
   aggregateSupport(values: readonly number[]): number;
 }
 
 const ACCUMULATE_STRATEGY: ScoringStrategy = Object.freeze({
   id: "accumulate",
-  requiresEverySupportConjunct: false,
   aggregateSupport: agg
 });
 
-const STRICT_AND_STRATEGY: ScoringStrategy = Object.freeze({
-  id: "strict-and",
-  requiresEverySupportConjunct: true,
-  aggregateSupport: (values: readonly number[]) => values.length === 0 ? agg(values) : product(values)
-});
-
+// S5-2 (goal 119-128): `accumulate` is THE operator. The kernel vocabulary is a
+// one-member closed set, so this switch is a single arm plus the exhaustive
+// guard, which fails the build loudly if that set ever grows again.
 function scoringStrategy(operator: ScoringOperator): ScoringStrategy {
   switch (operator) {
     case "accumulate": return ACCUMULATE_STRATEGY;
-    case "strict-and": return STRICT_AND_STRATEGY;
-    default: return exhaustive(operator);
-  }
-}
-
-function rivalOperator(operator: ScoringOperator): ScoringOperator {
-  switch (operator) {
-    case "accumulate": return "strict-and";
-    case "strict-and": return "accumulate";
     default: return exhaustive(operator);
   }
 }
@@ -321,7 +304,6 @@ function applyLifts(snapshot: EvaluationSnapshot): {
 
 interface ComputedGraph {
   readonly values: ReadonlyMap<string, number>;
-  readonly withheld: ReadonlySet<string>;
   readonly clusterRecords: readonly ClusterCollapseRecord[];
   readonly survivingArrows: readonly EffectiveArrow[];
 }
@@ -330,7 +312,6 @@ function computeGraph(input: {
   readonly snapshot: EvaluationSnapshot;
   readonly arrows: readonly EffectiveArrow[];
   readonly reductions: readonly TransmissionReduction[];
-  readonly rival: boolean;
 }): ComputedGraph {
   const nodes = new Map(input.snapshot.nodes.map((node) => [node.nodeId, node]));
   const recordedOrderIndex = new Map(
@@ -352,13 +333,11 @@ function computeGraph(input: {
   }
   const resolutions = new Map(input.snapshot.operatorResolutions.map((resolution) => [resolution.parentNodeId, resolution]));
   const values = new Map<string, number>();
-  const withheld = new Set<string>();
   const visiting = new Set<string>();
   const clusterRecords = new Map<string, ClusterCollapseRecord>();
   const survivingArrows = new Map<string, EffectiveArrow>();
   const valueOf = (nodeId: string): number | null => {
     if (values.has(nodeId)) return values.get(nodeId)!;
-    if (withheld.has(nodeId)) return null;
     const node = nodes.get(nodeId)!;
     if (node.baseStrength === null || node.abstained === true) return null;
     if (visiting.has(nodeId)) throw new TypedDomainError("GRAPH_CYCLE_DETECTED", "A cycle reached scoring");
@@ -368,14 +347,10 @@ function computeGraph(input: {
     if (nodeArrows.length > 0 && resolution === undefined) {
       throw new TypedDomainError("OPERATOR_RESOLUTION_MISSING", `No register-backed operator resolved for ${nodeId}`);
     }
-    const selected = resolution?.operator;
-    const operator = input.rival && selected !== undefined
-      ? rivalOperator(selected)
-      : selected;
+    const operator = resolution?.operator;
     const strategy = operator === undefined ? undefined : scoringStrategy(operator);
     const support: number[] = [];
     const attack: number[] = [];
-    let missingStrictConjunct = false;
     const groups = new Map<string, EffectiveArrow[]>();
     const selectedGroups: {
       readonly arrow: EffectiveArrow;
@@ -433,7 +408,6 @@ function computeGraph(input: {
     for (const selectedGroup of selectedGroups) {
       const { arrow, sourceValue, contribution } = selectedGroup;
       if (sourceValue === null || arrow.strength === null || arrow.magnitudeStatus === "UNKNOWN") {
-        if (strategy?.requiresEverySupportConjunct === true && arrow.polarity === "support") missingStrictConjunct = true;
         continue;
       }
       if (arrow.polarity === "support") {
@@ -441,11 +415,6 @@ function computeGraph(input: {
       } else {
         attack.push(contribution!);
       }
-    }
-    if (strategy?.requiresEverySupportConjunct === true && missingStrictConjunct) {
-      visiting.delete(nodeId);
-      withheld.add(nodeId);
-      return null;
     }
     const aggregateSupport = strategy?.aggregateSupport(support) ?? agg(support);
     const result = σ(node.baseStrength, agg(attack), aggregateSupport);
@@ -457,7 +426,6 @@ function computeGraph(input: {
   for (const node of input.snapshot.nodes) valueOf(node.nodeId);
   return Object.freeze({
     values,
-    withheld,
     clusterRecords: Object.freeze([...clusterRecords.values()]),
     survivingArrows: Object.freeze([...survivingArrows.values()])
   });
@@ -534,8 +502,7 @@ function evaluateInternal(snapshot: EvaluationSnapshot, includeSensitivity: bool
   assertSnapshot(snapshot);
   const transmissionReductions = deriveTransmissionReductions(snapshot);
   const lifted = applyLifts(snapshot);
-  const primary = computeGraph({ snapshot, arrows: lifted.arrows, reductions: transmissionReductions, rival: false });
-  const rival = computeGraph({ snapshot, arrows: lifted.arrows, reductions: transmissionReductions, rival: true });
+  const primary = computeGraph({ snapshot, arrows: lifted.arrows, reductions: transmissionReductions });
   const resolutions = new Map(snapshot.operatorResolutions.map((resolution) => [resolution.parentNodeId, resolution]));
   const incoming = new Map<string, EffectiveArrow[]>();
   for (const arrow of primary.survivingArrows) {
@@ -555,7 +522,6 @@ function evaluateInternal(snapshot: EvaluationSnapshot, includeSensitivity: bool
     const strength = primary.values.get(node.nodeId);
     if (strength === undefined) return [];
     const resolution = resolutions.get(node.nodeId);
-    const rivalStrength = resolution === undefined ? null : rival.values.get(node.nodeId) ?? null;
     const nodeArrows = incoming.get(node.nodeId) ?? [];
     return [Object.freeze({
       nodeId: node.nodeId,
@@ -569,26 +535,14 @@ function evaluateInternal(snapshot: EvaluationSnapshot, includeSensitivity: bool
       operatorUsed: resolution?.operator ?? null,
       operatorLevel: resolution?.suppliedBy ?? null,
       positionLabel: node.positionLabel ?? null,
-      liftMarker: Object.freeze(markers.get(node.nodeId) ?? []),
-      // The ledger owns this as an all-or-nothing pair. A strict-and rival can
-      // be withheld by an honestly UNKNOWN support magnitude; recording only
-      // its operator would claim a rival result that does not exist.
-      rivalOperator: rivalStrength === null ? null : rivalOperator(resolution!.operator),
-      rivalStrength
+      liftMarker: Object.freeze(markers.get(node.nodeId) ?? [])
     })];
   });
-  const withheld = snapshot.nodes
-    .filter((node) => primary.withheld.has(node.nodeId))
-    .map((node) => Object.freeze({
-      nodeId: node.nodeId,
-      reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED" as const
-    }));
   const unjudgedNodeIds = snapshot.nodes
     .filter((node) => node.baseStrength === null || node.abstained === true)
     .map((node) => node.nodeId);
   const partial = {
     strengths: Object.freeze(strengths),
-    withheld: Object.freeze(withheld),
     unjudgedNodeIds: Object.freeze(unjudgedNodeIds),
     arrowOrder: Object.freeze([...snapshot.arrowOrder]),
     transmissionReductions,

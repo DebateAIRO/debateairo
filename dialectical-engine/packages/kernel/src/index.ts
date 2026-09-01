@@ -185,7 +185,7 @@ export const STRENGTH_SOURCES = [
 ] as const;
 export type StrengthSource = typeof STRENGTH_SOURCES[number];
 
-export const SCORING_OPERATORS = ["accumulate", "strict-and"] as const;
+export const SCORING_OPERATORS = ["accumulate"] as const;
 export type ScoringOperator = typeof SCORING_OPERATORS[number];
 
 export const OPERATOR_SUPPLYING_LEVELS = ["parent", "run", "deployment"] as const;
