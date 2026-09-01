@@ -608,6 +608,55 @@ to T9-C2 — was not taken: it would split the hero across two clusters, since
 T9-C4 must still write the hero body copy (`T9-C4-4`), and one file with two
 writers in the same wave is the hazard the wave structure exists to avoid.
 
+#### T9-C2 addendum — N3 ratified, T9-C2-6 and T9-C2-7 (AM9)
+
+T9-C2 PASSED and merged at `6aa9f35`. These three items come from its review
+(`t_3c187757`, 03:41) and all touch files T9-C2 already owns, so they belong to
+the **open T9-C2 addendum round** (the N1 pin session), not to a new cluster and
+not to a later slice.
+
+**N3 — RATIFIED, not dropped.** `LandingChrome` ships `Log in` → `/login` and
+`Sign up` → `/sign-up`, and `t9-landing.test.tsx` now pins both hrefs. `T9-S1`
+does not enumerate them, so the reviewer correctly routed *"un-ratified copy is
+now contractual"* to ARCH. They stay, on one ground that is mine to own:
+
+> **AM6 removed the only labelled sign-in affordance the anonymous landing had.**
+> Before AM6, `TopBar` rendered `Account` → `/login` on `/`. AM6 suppressed
+> `TopBar` on the anonymous landing. Dropping these two links would leave a
+> returning reader with no labelled way to sign in — their only path would be
+> the `Start a debate` CTA, which is the wrong label for someone who wants their
+> library. That regression would be authored by my own amendment, and ratifying
+> is how it is repaired without a new round.
+
+The artboard does not show them (`9e` opens `DebateAI / Method / Transcripts /
+Pricing / Start a round →`), and the artboard is a marketing comp, not an auth
+inventory — but that is why this is a **ratification with a V-visible DECISIONS
+row**, not a silent acceptance. Row 4's chrome inventory is therefore: wordmark ·
+`Method` · `Transcripts` · `Pricing` · `Log in` · `Sign up` · `Start a debate` ·
+☾ — the T9-S1 list **plus** the two ratified auth links.
+
+**One residual this ratification exposes, routed not absorbed:** the product now
+says `Sign up` (landing), `Create one` (`LoginFlow.tsx:115`) and `Create account`
+(`SignUpFlow.tsx:105`, and T8-S1's binding copy) for the same action. Three
+strings, one action. `Log in` is already app vocabulary (`SignUpFlow.tsx:68`,
+T8's binding `Already have one? Log in`), so only the sign-up label diverges.
+Copy is REQ/V's, not a cluster edit and not mine to unify — filed for V with the
+Q-04 distinctness family.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T9-C2-6** (new) | R5 · ADR-004 §Decision | The login→sign-up leg forwards `next`, so R5's sign-up branch keeps its return path | In `tests/render/t9-landing.test.tsx` (T9-C2's block): render `LoginFlow` at `/login?next=%2Fnew` and assert the `Create one` link's `href` is `/sign-up?next=%2Fnew` — not the bare `/sign-up` shipped at `LoginFlow.tsx:115`. **And** pin the round trip end to end: from `/login?next=%2Fnew`, `Create one` → `Already have one? Log in` returns an href whose decoded `next` is still `/new`. A mutant that drops the parameter on either leg must be RED. Do **not** add a second validation site — the forwarding legs are transport, `safeReturnPath` is the gate (ADR-004 §Wiring, AM9 note) |
+| **T9-C2-7** (new) | R5 · ADR-004 §"The validator" | The public-debate kind admits only real refs | In `tests/unit/t9-return-path.test.ts` (T9-C2's file), extend the hostile-input table: `safeReturnPath('/public/debate/..')` and `safeReturnPath('/public/debate/.')` each return exactly `/#start-a-debate`; and an accept-case — `safeReturnPath('/public/debate/3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012')` returns that path unchanged. The accept-case is required: it is what will go RED if `public_ref` ever stops being a UUID, which is the signal ADR-004's changelog names |
+
+**Supersedes `slices/T9/PLAN.md:116`**, which quotes the old permissive regex
+`[A-Za-z0-9._~-]{1,128}` verbatim. PLAN stays frozen; the dispatch cell is
+dispatch truth (AM7/AM8 practice). Measured accept/reject table for old vs new
+kind: `ADR-004` §Changelog, AM9/charge 3.
+
+**Real-artifact check (AM7 rule) on the two new cells.** `T9-C2-6` renders the
+real `LoginFlow` and reads the real link's `href`; `T9-C2-7` calls the real
+`safeReturnPath`. Neither can be satisfied by a document the test authored.
+
 T9-C2 and T9-C4 both touch `tests/render/t9-landing.test.tsx`. Split it by
 `describe` block at creation — T9-C1 creates the file with three empty
 `describe`s (`route split`, `chrome and CTAs`, `body content`) so the three

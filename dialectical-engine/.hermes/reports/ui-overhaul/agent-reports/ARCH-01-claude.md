@@ -1030,3 +1030,137 @@ against a render. Stated rather than implied.
 
 `architecture/dispatch-order.md` (the three cells, their rationale, changelog) ·
 this report · board comment on `t_cf92a3e1`.
+
+---
+
+# AM9 — three calls from the T9-C2 review (ticket `t_6c169645`)
+
+T9-C2 PASSED. Three findings were mine alone. One of them made me depart from
+the packet's framing, and one traces to my own AM6 decision.
+
+## N3 — ratified, and the ground is my own regression
+
+`LandingChrome` ships `Log in` and `Sign up`; `T9-S1` enumerates neither. The
+reviewer routed it correctly as un-ratified copy that had become contractual.
+
+I ratified, on a ground the packet did not name and that I had to go looking
+for: **AM6 removed the only labelled sign-in affordance the anonymous landing
+had.** `TopBar` used to render `Account` → `/login` on `/`; I suppressed it.
+Dropping these two links would leave a returning reader with no labelled way to
+sign in — only `Start a debate`, which is the wrong label for someone who wants
+their library. That regression would have been authored by my own amendment, so
+ratifying repairs it without a new round.
+
+The artboard does not show them. That is exactly why this is a ratification with
+a V-visible DECISIONS row rather than a silent acceptance — the artboard is a
+marketing comp, not an auth inventory, but "the comp doesn't show it" is a real
+objection and V should see it stated.
+
+**Residual the ratification exposed, routed not absorbed:** the product now says
+`Sign up`, `Create one` and `Create account` for one action. `Log in` is already
+app vocabulary, so only the sign-up label diverges. Copy is REQ/V's — me picking
+one of the three would be the same un-ratified-copy defect I was closing.
+
+## N4 — I did not do what the charge said, and here is why
+
+The charge: *"Amend the ADR so ONE half is normative."* That framing does not
+survive the measurement. §Decision and §Wiring do not contradict each other —
+**they name two different links and each omitted the other's**:
+
+- §Decision: `LoginFlow`'s `Create one` → `/sign-up?next=…`
+- §Wiring: `SignUpFlow`'s `Already have one? Log in` → `/login?next=…`
+
+Both legs are needed for the round trip to preserve `next`. Making one normative
+and dropping the other keeps the loss in one direction. So **both are
+normative**, and I said so rather than obeying the framing.
+
+Measured, by reading both files:
+
+```
+SignUpFlow.tsx:18-22,68   forwards        <- the §Wiring leg, shipped
+LoginFlow.tsx:115         <Link href="/sign-up">Create one</Link>   <- the §Decision leg, never built
+
+/login?next=%2Fnew -> "Create one" -> /sign-up (next DROPPED)
+                   -> "Already have one? Log in" -> /login (nothing to forward)
+                   -> post-auth safeReturnPath(null) = "/#start-a-debate", not "/new"
+```
+
+Contract propagation, not a worker defect — no cell ever named the clause. Cell
+`T9-C2-6` carries the fix, and pins the **round trip**, not just the one link,
+because pinning one leg is how this got here.
+
+MFA boundary restated and unchanged: `next` still does not cross enrolment
+(T8 R3); both legs sit strictly before that gate. I also wrote down that
+`SignUpFlow` forwards the raw value unvalidated **and that this is correct** —
+the legs are transport, `safeReturnPath` is the gate — so that the fix does not
+grow a second validation site.
+
+## N6 — tightened, on purpose grounds not security grounds
+
+The declared kind `[A-Za-z0-9._~-]{1,128}` accepts `.` and `..`. The reviewer is
+right that this is not a security escape: same-origin, and per the declared-kind
+law it is my call, not a worker's.
+
+I tightened it, and not because it is dangerous. Because the clause four lines
+above says *"returning the reader to **the same public debate they were
+reading**"*, and:
+
+```
+/public/debate/..   ->  /public/
+/public/debate/.    ->  /public/debate/
+```
+
+Neither is a debate. A validator accepting values that defeat its own clause is
+not implementing the clause. And `..` in a security-touching validator is the
+shape that becomes a real finding the first time someone composes it elsewhere.
+
+**The old kind was invented; the new one is measured.**
+`packages/contract/src/index.ts:249,253,466` declare `public_ref: z.uuid()`, so
+the value space was known and I had used a permissive character class instead.
+Ten cases run before publishing — every real ref accepted, all five dot/tilde/
+slug survivors rejected. Narrowing can only reduce what is accepted, so the
+reviewer's 29,992-input fuzz result survives by construction.
+
+**The cost, stated rather than buried:** this couples ADR-004 to the contract's
+ref type. If `public_ref` becomes a slug, the return path breaks fail-closed and
+visibly, and `T9-C2-7`'s **required accept-case** is the alarm. That is why the
+cell demands an accept-case and not just two rejects — a rejection-only table
+would let the coupling fail silently.
+
+## Owning round, and no surface moves
+
+All three land in the **open T9-C2 addendum session** (the N1 pin round). Checked
+rather than assumed: every file `T9-C2-6` and `T9-C2-7` need —
+`LoginFlow.tsx`, `lib/returnPath.ts`, `t9-return-path.test.ts`,
+`t9-landing.test.tsx` — is already in row 4's write surface. **No write surface
+changes.**
+
+## Verification
+
+- Both auth cross-links read at source; the round-trip loss traced link by link.
+- Old vs new kind run over 10 cases including the two N6 survivors, a real UUID,
+  and the browser normalisation of both survivors.
+- `public_ref: z.uuid()` confirmed at three contract sites.
+- AM5 verify-survivability invariant re-run on the published markdown:
+  **32 rows, 5 exemptions, 0 violations**.
+- AM7 real-artifact rule applied to both new cells: `T9-C2-6` renders the real
+  `LoginFlow` and reads the real href; `T9-C2-7` calls the real `safeReturnPath`.
+
+## What I did not verify
+
+I did not run the tightened regex inside the product — `returnPath.ts` is a
+shipped file I may not write, so the change is specified in the cell, not
+applied, and my probe ran the two regexes standalone in node rather than through
+`safeReturnPath`'s full rule chain. Steps 1–3 of that chain are unaffected by a
+narrowing of step 4, but I am stating the boundary rather than implying I
+exercised the shipped function. No browser: real-URL handling remains V's line,
+as the reviewer also flagged.
+
+## Writes
+
+`architecture/ADR-004-auth-return-path.md` (§Decision both legs, §Wiring the
+missing leg + the AM9 reconciliation note, the tightened kind, changelog) ·
+`architecture/dispatch-order.md` (N3 ratification into row 4's inventory,
+`T9-C2-6`, `T9-C2-7`, the PLAN:116 supersession) · `slices/T9/DECISIONS.md`
+(4 appended rows + new tally; nothing rewritten) · this report · board comment
+on `t_6c169645`.
