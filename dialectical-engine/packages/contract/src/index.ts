@@ -510,6 +510,10 @@ export const AnswerSchema = z.object({
     call_site_key: z.string().min(1).nullable().default(null),
     planned_leg_count: z.number().int().nonnegative().nullable().default(null),
     terminal_transport_outcome: z.enum(["TIMED_OUT", "FAILED"]).nullable().default(null),
+    // T6 / S4-2 / J14: the second route into class H/D. A review that came back
+    // `cannot-assess` reached its reviewer, so it has no transport outcome; the
+    // reason it leaves the node unjudged is the outcome itself.
+    review_outcome: z.enum(["agree", "dispute", "cannot-assess"]).nullable().default(null),
     hidden_strength: z.number().min(0).max(1).nullable().default(null),
     hidden_score_threshold: z.number().min(0).max(1).nullable().default(null),
     hidden_score_threshold_source_ref: z.string().min(1).nullable().default(null),
@@ -517,20 +521,26 @@ export const AnswerSchema = z.object({
     judged_basis_count: z.number().int().positive().nullable().default(null),
     affected_node_ids: z.array(z.string().min(1)).default([])
   }).strict().superRefine((record, context) => {
+    // T6/J14: EXACTLY ONE reason. A transport outcome (the review never landed)
+    // or a review outcome (it landed and could not judge) — never both, never
+    // neither. Stated as an XOR so the transport route keeps the requirement it
+    // has always had instead of the second route weakening it into optional.
+    const namesOneUnjudgedReason = (record.terminal_transport_outcome === null)
+      !== (record.review_outcome === null);
     if (record.mark === "HIDDEN-UNJUDGEABLE" && (
-      record.call_site_key === null || record.terminal_transport_outcome === null
+      record.call_site_key === null || !namesOneUnjudgedReason
       || record.excluded_from_served_number !== true || record.affected_node_ids.length === 0
-    )) context.addIssue({ code: "custom", message: "Class H requires transport provenance and affected hidden nodes" });
+    )) context.addIssue({ code: "custom", message: "Class H requires a call site, exactly one unjudged reason, and affected hidden nodes" });
     if (record.mark === "HIDDEN-LOW-SCORE" && (
       record.hidden_strength === null || record.hidden_score_threshold === null
       || record.hidden_score_threshold_source_ref === null
       || record.excluded_from_served_number !== false || record.affected_node_ids.length === 0
     )) context.addIssue({ code: "custom", message: "Class L requires threshold provenance, presentation-only status, and affected hidden nodes" });
     if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
-      record.call_site_key === null || record.terminal_transport_outcome === null
+      record.call_site_key === null || !namesOneUnjudgedReason
       || record.excluded_from_served_number !== false
       || record.judged_basis_count === null || record.affected_node_ids.length === 0
-    )) context.addIssue({ code: "custom", message: "Class D requires failed-review provenance and a positive judged basis" });
+    )) context.addIssue({ code: "custom", message: "Class D requires unjudged-review provenance and a positive judged basis" });
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
       record.call_site_key === null || record.planned_leg_count === null
       || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0

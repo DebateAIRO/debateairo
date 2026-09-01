@@ -817,6 +817,12 @@ export interface ConditionMarkRecord {
   readonly callSiteKey?: string | null;
   readonly plannedLegCount?: number | null;
   readonly terminalTransportOutcome?: "TIMED_OUT" | "FAILED" | null;
+  /**
+   * T6 / S4-2 / J14 — the second route into class H/D: the review LANDED and
+   * said it could not judge. Exactly one of this and `terminalTransportOutcome`
+   * is set on a class-H or class-D record.
+   */
+  readonly reviewOutcome?: "agree" | "dispute" | "cannot-assess" | null;
   readonly hiddenStrength?: number | null;
   readonly hiddenScoreThreshold?: number | null;
   readonly hiddenScoreThresholdSourceRef?: string | null;
@@ -856,11 +862,17 @@ export function assertRequiredConditionMarkRecords(
     );
   }
   for (const record of records) {
+    // T6/J14: EXACTLY ONE unjudged reason — a transport outcome (the review
+    // never landed) XOR a review outcome (it landed and could not judge).
+    // Written as an XOR so the transport route keeps its existing requirement
+    // rather than the second route turning it into an optional field.
+    const namesOneUnjudgedReason = (record.terminalTransportOutcome == null)
+      !== (record.reviewOutcome == null);
     if (record.mark === "HIDDEN-UNJUDGEABLE" && (
-      record.callSiteKey == null || record.terminalTransportOutcome == null
+      record.callSiteKey == null || !namesOneUnjudgedReason
       || record.excludedFromServedNumber !== true
     )) {
-      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class H requires call site, transport outcome, and served-number exclusion");
+      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class H requires call site, exactly one unjudged reason, and served-number exclusion");
     }
     if (record.mark === "HIDDEN-LOW-SCORE" && (
       record.hiddenStrength == null || record.hiddenScoreThreshold == null
@@ -869,14 +881,14 @@ export function assertRequiredConditionMarkRecords(
       throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class L requires strength, threshold provenance, and presentation-only status");
     }
     if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
-      record.callSiteKey == null || record.terminalTransportOutcome == null
+      record.callSiteKey == null || !namesOneUnjudgedReason
       || record.excludedFromServedNumber !== false
       || record.judgedBasisCount == null || !Number.isInteger(record.judgedBasisCount)
       || record.judgedBasisCount < 1
     )) {
       throw new TypedDomainError(
         "DERIVED_STANDING_RECORD_INVALID",
-        "Class D requires failed-review provenance, presentation inclusion, and a positive judged basis count"
+        "Class D requires unjudged-review provenance, presentation inclusion, and a positive judged basis count"
       );
     }
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
@@ -1164,10 +1176,10 @@ export class ServeRepository {
         const mark = await client.query<{ condition_mark_id: string }>(
           `INSERT INTO serve.condition_mark (
              answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule,
-             call_site_key, planned_leg_count, terminal_transport_outcome, hidden_strength,
+             call_site_key, planned_leg_count, terminal_transport_outcome, review_outcome, hidden_strength,
              hidden_score_threshold, hidden_score_threshold_source_ref, excluded_from_served_number,
              judged_basis_count, at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
            RETURNING condition_mark_id`,
           [
             answer.rows[0]!.answer_id,
@@ -1181,6 +1193,7 @@ export class ServeRepository {
             record.callSiteKey ?? null,
             record.plannedLegCount ?? null,
             record.terminalTransportOutcome ?? null,
+            record.reviewOutcome ?? null,
             record.hiddenStrength ?? null,
             record.hiddenScoreThreshold ?? null,
             record.hiddenScoreThresholdSourceRef ?? null,
@@ -1545,6 +1558,7 @@ export class ServeRepository {
       call_site_key: string | null;
       planned_leg_count: number | null;
       terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
+      review_outcome: "agree" | "dispute" | "cannot-assess" | null;
       hidden_strength: number | null;
       hidden_score_threshold: number | null;
       hidden_score_threshold_source_ref: string | null;
@@ -1553,7 +1567,7 @@ export class ServeRepository {
       affected_node_ids: string[];
     }>(
       `SELECT mark, scope, subject_ref, reason, lift_path, served_root_rule,
-              call_site_key, planned_leg_count, terminal_transport_outcome,
+              call_site_key, planned_leg_count, terminal_transport_outcome, review_outcome,
               hidden_strength, hidden_score_threshold, hidden_score_threshold_source_ref,
               excluded_from_served_number, judged_basis_count,
               ARRAY(SELECT link.node_id::text FROM serve.condition_mark_node AS link
@@ -1621,6 +1635,7 @@ export class ServeRepository {
         call_site_key: record.call_site_key,
         planned_leg_count: record.planned_leg_count,
         terminal_transport_outcome: record.terminal_transport_outcome,
+        review_outcome: record.review_outcome,
         hidden_strength: record.hidden_strength === null ? null : Number(record.hidden_strength),
         hidden_score_threshold: record.hidden_score_threshold === null ? null : Number(record.hidden_score_threshold),
         hidden_score_threshold_source_ref: record.hidden_score_threshold_source_ref,

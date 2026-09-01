@@ -27,6 +27,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   createPostgresProviderGateway,
+  createPostgresReviewCatchUpDependencies,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
@@ -2416,6 +2417,175 @@ describe("apps/runner — legal command lifecycle", () => {
       await secondary.stop();
       await primary.stop();
     }
+  });
+
+  /**
+   * T6 r2 / J14 — the SECOND route into hidden-unjudgeable gets its disclosure.
+   *
+   * This is T33's fixture with one byte-level change: the review that T33 kills
+   * with transport failures (`{status:503}` twice) instead comes back as an
+   * honest `cannot-assess`. The reviewer was reached, answered, and said it
+   * could not judge. Under T6's outcome filter that node has no judged basis
+   * and lands in exactly the same class — but the class-H record schema demands
+   * a transport outcome that truthfully does not exist here, so before J14 the
+   * node left the served graph with NO record and NO mark: a silent skip, which
+   * goal 26 forbids.
+   *
+   * The two assertions are the two halves of the consequence: the answer
+   * discloses the route (naming the review outcome instead of a transport
+   * outcome), and the review-catch-up lane can still READ that disclosure —
+   * `transportFields` threw CATCH_UP_DISCLOSURE_MISMATCH for any hidden node
+   * whose record was missing, so the silent route did not merely under-disclose,
+   * it stopped the catch-up lane on every run containing one.
+   */
+  const runCannotAssessClassHScenario = async () => {
+    const composition = JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "The judged position survives.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+    ] });
+    const primary = await startProviderDouble([
+      judgementDouble("Primary unassessable-frame position 1"),
+      reviewDouble("agree", "Primary review 1"),
+      judgementDouble("Primary unassessable-frame position 2"),
+      judgementDouble("Primary unassessable-frame position 3"),
+      reviewDouble("cannot-assess", "Primary cannot assess position 2"),
+      reviewDouble("agree", "Primary review 3"),
+      judgementDouble("Primary unassessable-frame position 4"),
+      reviewDouble("agree", "Primary review 4"),
+      composition,
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    const secondary = await startProviderDouble([
+      judgementDouble("Secondary unassessable-frame position 1"),
+      reviewDouble("agree", "Secondary review 1"),
+      judgementDouble("Secondary unassessable-frame position 2"),
+      judgementDouble("Secondary unassessable-frame position 3"),
+      reviewDouble("agree", "Secondary review 2"),
+      reviewDouble("agree", "Secondary review 3"),
+      judgementDouble("Secondary unassessable-frame position 4"),
+      reviewDouble("agree", "Secondary review 4")
+    ]);
+    try {
+      const question = `t06-cannot-assess-class-h-${randomUUID()}`;
+      const runId = await createRun(question, 40, 2, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t06-cannot-assess-class-h:${runId}`
+      });
+      const runRepository = new RunRepository(database.pool);
+      const scoringOperator = { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" } as const;
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...settings,
+        claimMs: 1_204_000,
+        runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
+        hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+        holdRecorder: {
+          countCooldownHolds: (candidateRunId) => runRepository.countCooldownHolds(candidateRunId),
+          record: (event: HoldProgressEvent) => runRepository.recordRunLifecycleEvent({
+            runId: event.runId,
+            kind: event.kind,
+            value: {
+              state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+              hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+              transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+            }
+          }),
+          wait: async () => undefined
+        },
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        },
+        scoringOperator
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The run really did take the honest-cannot-assess route, not a transport
+      // death: exactly one stored review says so, and no review call was lost.
+      const outcomes = await database.pool.query<{ outcome: string; count: string }>(
+        "SELECT outcome, count(*)::text AS count FROM ledger.node_review WHERE run_id=$1 GROUP BY outcome ORDER BY outcome",
+        [runId]
+      );
+      expect(outcomes.rows).toEqual([
+        { outcome: "agree", count: "7" },
+        { outcome: "cannot-assess", count: "1" }
+      ]);
+
+      return {
+        runId,
+        settings,
+        scoringOperator,
+        answer: await new ServeRepository(database.pool)
+          .readAnswerProjection(result.answerId, `asker:${question}`)
+      };
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  };
+
+  it("T6/J14 discloses the cannot-assess hidden route with the review outcome in place of a transport outcome", async () => {
+    const scenario = await runCannotAssessClassHScenario();
+
+    // The mark is raised and its typed record names the REAL reason — the
+    // review outcome — where the transport route names a transport outcome.
+    // Neither route may name both, and neither may name none.
+    expect(scenario.answer?.condition_marks).toContain("HIDDEN-UNJUDGEABLE");
+    const hiddenRecord = scenario.answer?.condition_mark_records.find(
+      (candidate) => candidate.mark === "HIDDEN-UNJUDGEABLE"
+    );
+    expect(hiddenRecord).toMatchObject({
+      call_site_key: expect.stringMatching(/^JUDGE:review:/),
+      terminal_transport_outcome: null,
+      review_outcome: "cannot-assess",
+      excluded_from_served_number: true
+    });
+    const hiddenNodeId = hiddenRecord?.affected_node_ids[0];
+    if (hiddenNodeId === undefined) throw new Error("TEST_EXPECTED_HIDDEN_NODE");
+    expect(scenario.answer?.nodes.find((node) => node.node_id === hiddenNodeId)).toMatchObject({
+      final_strength: null,
+      condition_marks: expect.arrayContaining(["HIDDEN-UNJUDGEABLE"])
+    });
+  });
+
+  /**
+   * The consequence T6 r1 could only READ, executed. `prepareVersion` rebuilds
+   * every class-H/class-D record from the PREVIOUS answer's records, and a
+   * hidden node with no record there is a typed loud stop. So the silent route
+   * did not merely under-disclose: it stopped the review-catch-up lane on every
+   * run that contained a cannot-assess review, including runs where catch-up
+   * had no work to do at all.
+   */
+  it("T6/J14 the review-catch-up lane reads the cannot-assess disclosure instead of stopping on it", async () => {
+    const scenario = await runCannotAssessClassHScenario();
+    const source = await new ServeRepository(database.pool).readReviewCatchUpSource(scenario.runId);
+    const dependencies = createPostgresReviewCatchUpDependencies({
+      pool: database.pool,
+      reviewers: [],
+      scoringOperator: scenario.scoringOperator,
+      propagationContractHash: scenario.settings.propagationContractHash,
+      propagationNumberKind: scenario.settings.propagationNumberKind,
+      propagationProducer: scenario.settings.propagationProducer,
+      judgementSelectionRule: { ...scenario.settings.judgementPolicy!.selectionRule },
+      compositionBudget: scenario.settings.servePolicy!.compositionBudgets.low
+    });
+
+    const candidate = await dependencies.prepareVersion({
+      runId: scenario.runId, answerId: source.answerId, fromVersion: source.answerVersion
+    });
+    // The set-aside node is still set aside — catch-up cannot repair it
+    // (`UNIQUE (node_id)` refuses a second review) — but the lane now READS
+    // that state instead of stopping on it.
+    expect(candidate.stillSetAside).toBeGreaterThan(0);
   });
 
   it("DR-184 C-5 serves a class-D root when its own review dies but judged arguments remain", async () => {

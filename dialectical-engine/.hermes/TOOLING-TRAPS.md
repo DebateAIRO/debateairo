@@ -122,3 +122,11 @@ Every entry below was paid for at least once. Do not pay for it again.
   It is what settled T6's `staleness_state ARCHIVED_REVIVED` failure as pre-existing in
   one run instead of an argument. Note the repo-relative path inside a worktree still
   carries the `dialectical-engine/` prefix even when your cwd IS `dialectical-engine`. (T6 r1)
+- **CORRECTION to the index-free base revert above (T6 r1) — it is only safe on COMMITTED
+  work.** `git checkout -- <path>` restores from the INDEX, so if the file you overwrote with
+  `git show <sha>:<path> > <path>` held UNCOMMITTED edits, the "restore" silently replaces
+  them with the last committed version and `git status --porcelain` then looks *clean*, which
+  reads as success. T6 r2 lost three product files this way while running the D16 base pair
+  mid-change; only a content grep (`grep -c review_outcome`) caught it, not git. COMMIT (or
+  `git stash`) BEFORE any base-pair revert, and verify the restore by grepping for a token
+  your change introduced — never by `git status` alone. (T6 r2)
