@@ -150,6 +150,7 @@ export type Connector = {
   width: number;
   dash: string;
   opacity: number;
+  stance: "pro" | "con" | "pov";
 };
 
 export type CanvasLayout = {
@@ -268,7 +269,8 @@ export function layoutTree(
       color: p.state === "empty" || p.state === "abandoned" ? "var(--line-strong)" : pal.line,
       width: p.state === "empty" || p.state === "abandoned" ? 1.5 : 2,
       dash: p.state === "empty" || p.state === "abandoned" ? "4 5" : "none",
-      opacity: streaming ? 0.45 : p.state === "abandoned" ? 0.5 : 0.9
+      opacity: streaming ? 0.45 : p.state === "abandoned" ? 0.5 : 0.9,
+      stance: role === "pro" || role === "con" ? role : "pov"
     });
   });
 

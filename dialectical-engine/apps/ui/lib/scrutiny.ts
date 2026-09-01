@@ -15,27 +15,27 @@ export type ScrutinyStatus = {
 export const SCRUTINY_STATUS: Record<string, ScrutinyStatus> = {
   working: {
     label: "Investigating",
-    color: "oklch(0.68 0.12 75)",
-    bg: "oklch(0.95 0.05 78)",
-    text: "oklch(0.5 0.08 65)"
+    color: "var(--reasoning-line)",
+    bg: "var(--reasoning-bg)",
+    text: "var(--reasoning-text)"
   },
   contested: {
     label: "Contested",
-    color: "oklch(0.7 0.13 70)",
-    bg: "oklch(0.95 0.06 78)",
-    text: "oklch(0.5 0.09 60)"
+    color: "var(--gold-line)",
+    bg: "var(--gold-bg)",
+    text: "var(--gold-text)"
   },
   strengthened: {
     label: "Strengthened",
-    color: "oklch(0.58 0.1 165)",
-    bg: "oklch(0.95 0.03 165)",
-    text: "oklch(0.43 0.07 165)"
+    color: "var(--agree-border)",
+    bg: "var(--agree-bg)",
+    text: "var(--agree-text)"
   },
   refuted: {
     label: "Refuted",
-    color: "oklch(0.56 0.1 45)",
-    bg: "oklch(0.95 0.03 50)",
-    text: "oklch(0.5 0.1 45)"
+    color: "var(--dispute-border)",
+    bg: "var(--dispute-bg)",
+    text: "var(--dispute-text)"
   }
 };
 

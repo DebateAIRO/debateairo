@@ -3,7 +3,15 @@ import { makerIdentityLabel } from "@/lib/makerIdentity";
 import { modelMeta } from "@/lib/models";
 
 export function modelColor(identity: string): string {
-  const palette = ["#1f6f8b", "#7a4d1d", "#6f5d9a", "#168050", "#b43c37", "#8062b5", "#2f6f5f"];
+  const palette = [
+    "var(--m-gemini)",
+    "var(--m-gpt)",
+    "var(--m-claude)",
+    "var(--m-qwen)",
+    "var(--con-line)",
+    "var(--reasoning-line)",
+    "var(--pro-line)"
+  ];
   let hash = 0;
   for (const char of identity) hash = (hash + char.charCodeAt(0)) % palette.length;
   return palette[hash];

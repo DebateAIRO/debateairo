@@ -51,13 +51,12 @@ function arcPath(rInner: number, rOuter: number, a0: number, a1: number): string
   return `M ${x0o} ${y0o} A ${rOuter} ${rOuter} 0 ${large} 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${rInner} ${rInner} 0 ${large} 0 ${x0i} ${y0i} Z`;
 }
 
-function fillFor(node: DebateNode, depth: number): string {
-  if (renderStateOf(node) === "empty") return "oklch(0.9 0.004 80)";
-  const light = (depth - 1) * 0.05;
+function fillFor(node: DebateNode): string {
+  if (renderStateOf(node) === "empty") return "var(--surface-sunken)";
   const role = roleOf(node);
-  if (role === "pro") return `oklch(${(0.6 + light).toFixed(3)} 0.12 162)`;
-  if (role === "con") return `oklch(${(0.6 + light).toFixed(3)} 0.135 42)`;
-  return `oklch(${(0.66 + light).toFixed(3)} 0.03 65)`;
+  if (role === "pro") return "var(--pro-line)";
+  if (role === "con") return "var(--con-line)";
+  return "var(--reasoning-line)";
 }
 
 export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
@@ -74,7 +73,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
         id: node.id,
         node,
         d: arcPath(innerR(depth), innerR(depth) + ringW, a0, a1),
-        fill: fillFor(node, depth),
+        fill: fillFor(node),
         depth
       });
     }
@@ -101,11 +100,11 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
       <div className="mapInner">
         <div className="mapLegend">
           <span className="mapLegendItem">
-            <span className="mapLegendSwatch" style={{ background: "oklch(0.6 0.12 162)" }} />
+            <span className="mapLegendSwatch" style={{ background: "var(--pro-line)" }} />
             Supports
           </span>
           <span className="mapLegendItem">
-            <span className="mapLegendSwatch" style={{ background: "oklch(0.6 0.135 42)" }} />
+            <span className="mapLegendSwatch" style={{ background: "var(--con-line)" }} />
             Opposes
           </span>
           <span className="mapLegendHint">Ring = depth · width = debate below it</span>
@@ -118,7 +117,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
                 key={arc.id}
                 d={arc.d}
                 fill={arc.fill}
-                stroke="oklch(0.99 0.004 85)"
+                stroke="var(--core)"
                 strokeWidth={2}
                 opacity={hoverId && hoverId !== arc.id ? 0.55 : 1}
                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
@@ -132,8 +131,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
               cx={CX}
               cy={CY}
               r={HUB_R}
-              fill="oklch(0.62 0.11 255)"
-              stroke="oklch(0.22 0.012 70)"
+              fill="var(--reasoning-line)"
+              stroke="var(--text-strong)"
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
               onClick={() => {
@@ -143,8 +142,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             >
               <title>{root.claim}</title>
             </circle>
-            <circle cx={CX} cy={CY} r={9} fill="none" stroke="oklch(0.99 0.004 85)" strokeWidth={2.5} />
-            <circle cx={CX} cy={CY} r={2.4} fill="oklch(0.99 0.004 85)" />
+            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--core)" strokeWidth={2.5} />
+            <circle cx={CX} cy={CY} r={2.4} fill="var(--core)" />
           </svg>
         </div>
 

@@ -132,7 +132,7 @@ function ThreadRowCard({
   const cardStyle: CSSProperties = scrutiny
     ? { background: "var(--surface)", borderColor: scrutiny.color, borderLeftColor: pal.line }
     : empty
-      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)", borderLeftColor: "oklch(0.82 0.006 80)" }
+      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)", borderLeftColor: "var(--line-2)" }
       : { background: "var(--surface)", borderColor: pal.border, borderLeftColor: pal.line };
 
   const canOpen = state === "done";

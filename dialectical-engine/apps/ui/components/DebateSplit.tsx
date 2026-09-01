@@ -162,7 +162,7 @@ export function DebateSplit({
               <div
                 className="splitMeterBar"
                 style={{
-                  background: `linear-gradient(90deg, oklch(0.62 0.09 168) 0%, oklch(0.62 0.09 168) ${leanPct}%, oklch(0.72 0.1 55) ${leanPct}%, oklch(0.72 0.1 55) 100%)`
+                  background: `linear-gradient(90deg, var(--pro-line) 0%, var(--pro-line) ${leanPct}%, var(--con-line) ${leanPct}%, var(--con-line) 100%)`
                 }}
               />
               <div className="splitMeterSide left">
@@ -283,7 +283,7 @@ function SplitCard({
   const cardStyle: CSSProperties = scrutiny
     ? { background: "var(--surface)", borderColor: scrutiny.color, borderLeftColor: pal.line }
     : empty
-      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)", borderLeftColor: "oklch(0.82 0.006 80)" }
+      ? { background: "var(--surface-sunken)", borderColor: "var(--line-2)", borderLeftColor: "var(--line-2)" }
       : { background: "var(--surface)", borderColor: pal.border, borderLeftColor: pal.line };
 
   return (
