@@ -559,6 +559,55 @@ it imports `TopBar`.
 | 5 | **T9-C4** — method ledger, sample cards, placeholders | `apps/ui/components/landing/LandingHero.tsx` · `LandingSample.tsx` · `LandingMethod.tsx` · `LandingPricing.tsx` · `tests/render/t9-landing.test.tsx` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
 | 6 | **T9-C5** — render-pin migration bind for T9 | `tests/unit/pda-s03-keyboard-accessibility.test.ts` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
 
+#### The R5 CTA sites — T9-C2-2 narrowed, T9-C4-5 and T9-C4-6 added (AM8)
+
+**Why this exists.** SPEC T9 splits the CTAs by region and my cells did not
+follow the split. `T9-S1` (chrome) names **one** CTA — *"primary CTA `Start a
+debate`"*. `T9-S2` (hero) names **the pair** — *"CTAs `Start a debate` and `Read
+a scored transcript`"*. `R5` names **three** sites for the primary:
+*"`Start a debate` (hero + chrome + method close)"*. PLAN's `T9-C2-2` predates
+the AM6 convention and reads *"Assert both strings on anonymous `/`"* — an
+unscoped, whole-document assertion. Under the AM6 scoped-presence rule it cannot
+be satisfied by T9-C2's charge: `Read a scored transcript` ships only in the
+hero, and `LandingHero.tsx` is **T9-C4's** file (row 5). The fresh T9-C2 seat
+preflight-blocked on exactly this in six minutes, correctly, with zero edits
+(`t_3c187757`, 02:57).
+
+**PLAN stays frozen; these cells are dispatch truth** and supersede PLAN's
+`T9-C2-2` wording — the same practice AM7 used for `T9-C1-3`. A spec or plan
+defect is a routed comment, not an edit.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T9-C2-2** (narrowed, supersedes PLAN:94) | R5 · T9-S1 | The **chrome** primary CTA is present | In `tests/render/t9-landing.test.tsx`, `chrome and CTAs` describe (T9-C2's block): on the **real anonymous `/` render**, assert `document.querySelector('[data-landing-section="chrome"]')` contains the exact string `Start a debate`. Scope is part of the acceptance (§"Landing query convention"). **`Read a scored transcript` is NOT asserted here** — it does not ship in the chrome, and asserting it would force T9-C2 to write a file it does not own. The CTA's auth-entry href stays `T9-C2-4`'s cell |
+| **T9-C4-5** (new) | R5 · T9-S2 | The **hero** CTA pair is present, and the hero primary is not a dead link | In `tests/render/t9-landing.test.tsx`, `body content` describe (T9-C4's block): on the **real anonymous `/` render**, assert `document.querySelector('[data-landing-section="hero"]')` contains **both** exact strings `Start a debate` **and** `Read a scored transcript`. **And** assert the hero's `Start a debate` carries the same ADR-004 auth-entry contract as the chrome CTA — an `href` of `/login?next=%2Fnew` (ADR-004 §"Landing CTA"), not `#` and not a bare `/login`. A mutant that renders the label with `href="#"` must be RED |
+| **T9-C4-6** (new, beyond charge — see below) | R5 · T9-S4 | The **method-close** tertiary CTA is present | In the same describe: on the real anonymous `/` render, assert `document.querySelector('[data-landing-section="method"]')` contains the exact string `Start a debate`, with the same `/login?next=%2Fnew` auth-entry contract |
+
+**`T9-C4-6` is beyond the charge and is declared, not slipped in.** The charge
+was two cells. Checking R5's site list rather than assuming it — *"`Start a
+debate` (hero + chrome + **method close**)"*, and `T9-S4`'s *"plus closing lines
+and tertiary `Start a debate`"* — showed the third site is pinned by **nothing**:
+
+```
+$ grep -n 'T9-C[0-9]-[0-9]' docs/missions/ui-overhaul/slices/T9/PLAN.md | grep -c 'Start a debate'
+2          # T9-C2-2 (whole-document, now narrowed to chrome) and T9-C2-4 (the href) — neither reaches the method close
+```
+
+Narrowing `T9-C2-2` to the chrome subtree would have **created** that hole
+rather than merely leaving it: the old unscoped assertion at least matched the
+string wherever it lived. Publishing the narrowing without `T9-C4-6` would have
+been this mission's fourth unpinned-site defect, authored by the amendment
+fixing the third. `LandingMethod.tsx` is already in row 5's write surface, so
+T9-C4 is the legal owner and no surface changes.
+
+**No write surface moves in this amendment.** Row 4 keeps `LandingChrome.tsx`;
+row 5 keeps `LandingHero.tsx`, `LandingSample.tsx`, `LandingMethod.tsx`,
+`LandingPricing.tsx`. Both clusters already own `tests/render/t9-landing.test.tsx`
+in their own `describe` block. The seat's option (a) — moving `LandingHero.tsx`
+to T9-C2 — was not taken: it would split the hero across two clusters, since
+T9-C4 must still write the hero body copy (`T9-C4-4`), and one file with two
+writers in the same wave is the hazard the wave structure exists to avoid.
+
 T9-C2 and T9-C4 both touch `tests/render/t9-landing.test.tsx`. Split it by
 `describe` block at creation — T9-C1 creates the file with three empty
 `describe`s (`route split`, `chrome and CTAs`, `body content`) so the three
@@ -955,4 +1004,45 @@ were clean.
 **Verification re-run in this edit**, against the published markdown: the AM5
 verify-survivability invariant holds at 32 rows / 5 exemptions / 0 violations —
 AM7 changed no Writes or Verify column, and the check is re-run rather than
+assumed.
+
+### 2026-09-01 — AM8: a cell that predated my own convention, and the third CTA site nobody pinned (trigger: fresh T9-C2 seat preflight block, `t_3c187757` 02:57)
+
+**What was wrong.** PLAN's `T9-C2-2` reads *"Assert both strings on anonymous
+`/`"* — written before AM6 published the scoped-presence convention. Under that
+convention the cell is unsatisfiable by T9-C2's charge: SPEC puts
+`Read a scored transcript` only in `T9-S2` (the hero), and `LandingHero.tsx`
+belongs to T9-C4 at row 5. The seat blocked in six minutes with zero edits and
+proposed both lawful repairs. It was right on every point, including which of
+the two to prefer.
+
+**Adopted: the seat's option (b).** `T9-C2-2` narrowed to the chrome primary
+CTA; the S2 hero pair transferred to a new `T9-C4-5` carrying the ADR-004
+auth-entry contract so T9-C4 cannot ship a live-looking dead CTA. Option (a) —
+moving `LandingHero.tsx` into T9-C2 — was rejected because T9-C4 must still
+write the hero body copy for `T9-C4-4`, so option (a) puts two writers on one
+file inside one wave, which is the hazard the wave structure exists to remove.
+**No write surface moves in this amendment.**
+
+**Beyond charge, and declared: `T9-C4-6`.** R5 names three sites — *"`Start a
+debate` (hero + chrome + method close)"* — and `T9-S4` names the third
+explicitly. Grepping PLAN's cells rather than trusting the charge's framing
+showed only two mention the string, and neither reaches the method close. So the
+third site was pinned by nothing, and **narrowing `T9-C2-2` would have created
+that hole rather than merely inheriting it** — the old unscoped assertion at
+least matched the string wherever it lived. Publishing the narrowing alone would
+have made this amendment the author of the mission's fourth unpinned-site
+defect, in the file already open to fix the third. `LandingMethod.tsx` is
+already row 5's, so the fix costs a cell and no surface.
+
+**Real-artifact audit, re-run over all six published cells** (AM7's rule: a cell
+satisfiable by a document the test itself authored is not an acceptance). Six of
+six now name a real render — `T9-C1-3`, `T3-C1-4` (P1/P2/P3), `T3-C1-5`, and the
+three above. The AM6 convention section is untouched; note that it already lists
+*"the CTAs"* among the things to scope, so the narrowing is the convention being
+applied, not extended.
+
+**Verification, re-run on the published markdown after this edit:** the AM5
+verify-survivability invariant holds at **32 rows, 5 exemptions, 0 violations**.
+AM8 changed no Writes and no Verify column, and the check was re-run rather than
 assumed.

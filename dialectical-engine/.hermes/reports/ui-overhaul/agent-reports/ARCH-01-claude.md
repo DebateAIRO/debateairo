@@ -955,3 +955,78 @@ added, `T9-C1-3` amended, N5 note, changelog with the cell audit) ·
 `architecture/ADR-002-mode-mechanism.md` (pin-coverage table at code-site
 granularity, measured cost, changelog) · this report · board comment on
 `t_03525886`.
+
+---
+
+# AM8 — a cell that predated my own convention (ticket `t_cf92a3e1`)
+
+## The block
+
+PLAN's `T9-C2-2` says *"Assert both strings on anonymous `/`"*. AM6 then
+published the scoped-presence convention. The two cannot both hold for T9-C2:
+SPEC puts `Read a scored transcript` only in `T9-S2`, the hero, and
+`LandingHero.tsx` is T9-C4's file at row 5. The seat blocked in six minutes,
+zero edits, and proposed both lawful repairs — correct on every point including
+which one to prefer.
+
+This is not a new class for me; it is the AM7 class one file over. AM7's
+`T9-C1-3` was a cell the review had already invalidated and nobody amended.
+`T9-C2-2` is a cell my own AM6 convention invalidated and I did not sweep for.
+**When I publish a convention, every cell written before it is a candidate
+defect, and the sweep is my job, not the next seat's preflight.**
+
+## Adopted option (b), with the rejection reasoned
+
+Option (a) — move `LandingHero.tsx` into T9-C2 — is lawful but wrong: T9-C4 must
+still write the hero body copy for `T9-C4-4`, so (a) puts two writers on one file
+inside one wave, which is exactly what the wave structure removes. Option (b)
+narrows `T9-C2-2` to the chrome and transfers the pair to a new `T9-C4-5`.
+**No write surface moves.**
+
+`T9-C4-5` carries the ADR-004 auth-entry contract (`/login?next=%2Fnew`), not
+just the two labels, because a cell that asserts only strings lets a seat ship a
+hero CTA that looks live and goes nowhere — the packet asked for this and it is
+right.
+
+## Beyond charge: the third CTA site
+
+The charge was two cells. R5 names three sites — *"`Start a debate` (hero +
+chrome + **method close**)"* — and `T9-S4` names the third explicitly. I grepped
+PLAN's cells instead of trusting the framing:
+
+```
+$ grep -n 'T9-C[0-9]-[0-9]' docs/missions/ui-overhaul/slices/T9/PLAN.md | grep -c 'Start a debate'
+2          # T9-C2-2 (whole-document, now narrowed) and T9-C2-4 (the href) — neither reaches the method close
+```
+
+The method-close CTA is pinned by nothing. And the charge's own narrowing would
+have **created** that hole rather than inherited it: the old unscoped assertion
+at least matched the string wherever it lived, so shipping the narrowing alone
+makes this amendment the author of the mission's fourth unpinned-site defect —
+in the file already open to fix the third. `LandingMethod.tsx` is already row
+5's, so `T9-C4-6` costs a cell and no surface. Declared as beyond charge in the
+row and the changelog rather than folded in quietly.
+
+## Verification
+
+- AM6 convention section confirmed untouched, and it already lists *"the CTAs"*
+  among the things to scope — so the narrowing applies the convention rather
+  than extending it.
+- Real-artifact audit (AM7's rule) re-run over **all six** published cells: six
+  of six name a real render.
+- AM5 verify-survivability invariant re-run on the published markdown:
+  **32 rows, 5 exemptions, 0 violations**. AM8 changed no Writes and no Verify
+  column; re-run rather than assumed.
+
+## What I did not verify
+
+Nothing was executed against product code — `apps/ui/lib/returnPath.ts` does not
+exist yet (T9-C2 creates it at row 4), and neither landing CTA ships yet, so
+`T9-C4-5`'s and `T9-C4-6`'s href contracts are checked against ADR-004's
+published form (§"Landing CTA", `/login?next=%2Fnew`) and against SPEC, not
+against a render. Stated rather than implied.
+
+## Writes
+
+`architecture/dispatch-order.md` (the three cells, their rationale, changelog) ·
+this report · board comment on `t_cf92a3e1`.
