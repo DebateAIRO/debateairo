@@ -153,5 +153,6 @@ describe("Turn 5 reference drawer", () => {
       "Under-explored"
     ]);
     expect(pills.map((pill) => pill.dataset.mark)).toEqual(["agree", "dispute", "gold"]);
+    expect(new Set(pills.map((pill) => pill.dataset.mark))).toHaveLength(3);
   });
 });

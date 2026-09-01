@@ -854,3 +854,9 @@ that inspection reached `localStorage` and replaced the useful mismatch with a
 `SecurityError`. Assert scalar evidence from that document (counts, text, attributes, or
 booleans) so a failure remains printable. This is a reporting-harness failure, not proof
 that application code accessed browser storage.
+
+## Vitest may rewrite `import.meta.url` to a non-file module URL
+Found by CODE-T5C1 (2026-09-01): a jsdom dump test passed a URL derived from
+`import.meta.url` to `mkdirSync` and failed with `ERR_INVALID_URL_SCHEME` before writing
+the artifact. For repo-local throwaway artifacts, resolve the authorized destination from
+the test command's pinned `process.cwd()` with `node:path`; this cost one failed dump run.
