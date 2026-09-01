@@ -6,14 +6,14 @@ import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
-
-const HOME_PATH = "/#start-a-debate";
+import { safeReturnPath } from "@/lib/returnPath";
 
 type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
 type VerificationMethod = "authenticator" | "recovery";
 
 function navigateHome(): void {
-  window.location.assign(HOME_PATH);
+  const next = new URLSearchParams(window.location.search).get("next");
+  window.location.assign(safeReturnPath(next));
 }
 
 export function LoginFlow({

@@ -58,6 +58,7 @@ async function click(label: string): Promise<void> {
 describe("rendered auth flow integration", () => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    window.history.replaceState({}, "", "/");
     setPathname("/");
     const container = document.createElement("div");
     document.body.append(container);
@@ -260,6 +261,56 @@ describe("rendered auth flow integration", () => {
     field("code").value = "123456";
     await submit();
     expect(onAuthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the validated default return path at login completion time", async () => {
+    window.history.replaceState({}, "", "/login?next=%2Fsettings");
+    const client = {
+      beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge" }),
+      completeLogin: vi.fn().mockResolvedValue({
+        status: "authenticated" as const,
+        csrf_token: "c".repeat(43),
+        session: SESSION
+      })
+    };
+    await act(async () => root!.render(<LoginFlow client={client} />));
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+
+    const assign = vi.fn();
+    const completionWindow = Object.create(window) as Window;
+    Object.defineProperty(completionWindow, "location", {
+      configurable: true,
+      value: { search: "?next=%2Fnew", assign }
+    });
+    vi.stubGlobal("window", completionWindow);
+    field("code").value = "123456";
+    await submit();
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith("/new");
+  });
+
+  it("forwards sign-up next to login only when the parameter is present", async () => {
+    window.history.replaceState({}, "", "/sign-up?next=%2Fnew");
+    await act(async () => root!.render(
+      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+    ));
+    await settle();
+
+    expect(document.querySelector('.authFooter a')?.getAttribute("href"))
+      .toBe("/login?next=%2Fnew");
+  });
+
+  it("keeps the sign-up login link query-free when next is absent", async () => {
+    window.history.replaceState({}, "", "/sign-up");
+    await act(async () => root!.render(
+      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+    ));
+    await settle();
+
+    expect(document.querySelector('.authFooter a')?.getAttribute("href")).toBe("/login");
   });
 
   it("renders the non-enumerating registration state and resends only to the submitted email", async () => {

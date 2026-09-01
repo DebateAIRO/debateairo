@@ -143,6 +143,67 @@ describe("T9-C1 route split & chrome", () => {
   });
 });
 
-describe.todo("T9-C2 chrome labels & CTAs", () => {});
+describe("T9-C2 chrome labels & CTAs", () => {
+  it("renders the wordmark and exact navigation labels inside landing chrome", async () => {
+    // PROPERTY: C2-owned labels are found only through the chrome subtree, so
+    // content in later T9 sections cannot accidentally satisfy this contract.
+    const document = await renderRoute(null);
+    const chrome = document.querySelector('[data-landing-section="chrome"]');
+    expect(chrome).not.toBeNull();
+
+    const expectedLinks = [
+      ["Method", "#method"],
+      ["Transcripts", "#transcripts"],
+      ["Pricing", "#pricing"],
+      ["Log in", "/login"],
+      ["Sign up", "/sign-up"]
+    ] as const;
+
+    for (const [label, href] of expectedLinks) {
+      const link = [...chrome!.querySelectorAll("a")]
+        .find((candidate) => candidate.textContent?.trim() === label);
+      expect(link, `missing chrome link ${label}`).toBeDefined();
+      expect(link?.getAttribute("href")).toBe(href);
+    }
+
+    const wordmark = [...chrome!.querySelectorAll<HTMLAnchorElement>("a")]
+      .find((candidate) => candidate.textContent?.trim() === "DebateAI");
+    expect(wordmark).toBeDefined();
+    expect(wordmark?.style.fontFamily).toBe("var(--font-display)");
+  });
+
+  it("renders the chrome primary CTA with the exact safe return target", async () => {
+    // PROPERTY: the AM8-narrowed C2 CTA is asserted inside chrome only; hero
+    // CTAs remain T9-C4's contract.
+    const document = await renderRoute(null);
+    const chrome = document.querySelector('[data-landing-section="chrome"]');
+    const primary = [...chrome!.querySelectorAll("a")]
+      .find((candidate) => candidate.textContent?.trim() === "Start a debate");
+
+    expect(primary).toBeDefined();
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).not.toBe("#");
+    expect(primary?.getAttribute("href")).not.toBe("/new");
+  });
+
+  it("keeps every stub navigation link safe to click", async () => {
+    // PROPERTY: all three stub anchors can be activated on the real anonymous
+    // document without replacing the page with an uncaught error surface.
+    const document = await renderRoute(null);
+    const chrome = document.querySelector('[data-landing-section="chrome"]');
+    const errorEvents: ErrorEvent[] = [];
+    document.defaultView?.addEventListener("error", (event) => errorEvents.push(event));
+
+    for (const href of ["#method", "#transcripts", "#pricing"]) {
+      const link = chrome!.querySelector<HTMLAnchorElement>(`a[href="${href}"]`);
+      expect(link, `missing stub ${href}`).not.toBeNull();
+      expect(() => link!.click()).not.toThrow();
+      expect(chrome!.textContent).toContain("DebateAI");
+      expect(document.querySelector("[data-nextjs-error-boundary]")).toBeNull();
+    }
+
+    expect(errorEvents).toEqual([]);
+  });
+});
 
 describe.todo("T9-C4 landing content", () => {});

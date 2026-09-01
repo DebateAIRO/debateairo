@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type { ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { contractClient } from "@/lib/api";
@@ -15,6 +15,12 @@ export function SignUpFlow({
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginHref, setLoginHref] = useState("/login");
+
+  useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next !== null) setLoginHref(`/login?next=${encodeURIComponent(next)}`);
+  }, []);
 
   async function submitRegistration(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -59,7 +65,7 @@ export function SignUpFlow({
       eyebrow="Create an account"
       title="Put a claim to the bench."
       description="Email verification and authenticator enrolment are required before your account can be used."
-      footer={<p>Already have one? <Link href="/login">Log in</Link></p>}
+      footer={<p>Already have one? <Link href={loginHref}>Log in</Link></p>}
     >
       {error ? <div className="authAlert" role="alert">{error}</div> : null}
 
