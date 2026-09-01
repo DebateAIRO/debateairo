@@ -109,24 +109,62 @@ describe("T4 / S2-3 — RAN is not a way of knowing the judge may claim", () => 
 });
 
 describe("T4 / S2-3 — a downgraded way of knowing is disclosed, never absorbed", () => {
-  it("records WAY-OF-KNOWING-DOWNGRADED naming the node and the claimed value when LOOKED_UP has no locator", async () => {
+  it("reports the claimed and resolved values, and cannot name a node it has not seen", async () => {
     const judge = new Judge(fixtureProvider(artifact("LOOKED_UP", null), capture()));
 
-    const result = await judge.judge(judgeInput("node:downgrade-subject"));
+    // `work:42` is what the runner really passes as subjectItemId — a WORK ITEM,
+    // not a node. The judge-layer downgrade must not launder it into a node
+    // reference (codex T4-r1 B2).
+    const result = await judge.judge(judgeInput("work:42"));
 
     expect(result.wayOfKnowing).toBe("REASONING");
     expect(result.locator).toBeNull();
     expect(result.wayOfKnowingDowngrade).toEqual({
+      claimedWayOfKnowing: "LOOKED_UP",
+      resolvedWayOfKnowing: "REASONING"
+    });
+    expect(JSON.stringify(result.wayOfKnowingDowngrade)).not.toContain("work:42");
+  });
+
+  it("binds the disclosure to the node id the graph minted, and refuses to record one without it", async () => {
+    const judgement = await import("@debateai/judgement");
+    const judge = new Judge(fixtureProvider(artifact("LOOKED_UP", null), capture()));
+    const downgrade = (await judge.judge(judgeInput("work:42"))).wayOfKnowingDowngrade;
+
+    const bound = judgement.bindWayOfKnowingDowngrade(downgrade!, "d3f1c0de-0000-4000-8000-00000000ab01");
+
+    expect(bound).toEqual({
       mark: "WAY-OF-KNOWING-DOWNGRADED",
       scope: "node",
-      subjectRef: "node:downgrade-subject",
+      subjectRef: "d3f1c0de-0000-4000-8000-00000000ab01",
       claimedWayOfKnowing: "LOOKED_UP",
       resolvedWayOfKnowing: "REASONING",
       reason: expect.any(String)
     });
     // "naming node + claimed value" — the human-readable limb carries both too.
-    expect(result.wayOfKnowingDowngrade!.reason).toContain("node:downgrade-subject");
-    expect(result.wayOfKnowingDowngrade!.reason).toContain("LOOKED_UP");
+    expect(bound.reason).toContain("d3f1c0de-0000-4000-8000-00000000ab01");
+    expect(bound.reason).toContain("LOOKED_UP");
+    expect(Object.isFrozen(bound)).toBe(true);
+
+    expect(() => judgement.bindWayOfKnowingDowngrade(downgrade!, "   ")).toThrowError(
+      expect.objectContaining({ code: "WAY_OF_KNOWING_DOWNGRADE_NODE_UNRESOLVED" })
+    );
+  });
+
+  it("mints the mark in the ONE canonical vocabulary, so a served answer can carry it", async () => {
+    const [judgement, kernel, contract] = await Promise.all([
+      import("@debateai/judgement"),
+      import("@debateai/kernel"),
+      import("@debateai/contract")
+    ]);
+
+    expect(kernel.CONDITION_MARKS).toContain(judgement.WAY_OF_KNOWING_DOWNGRADED);
+    expect(contract.ConditionMarkSchema.parse("WAY-OF-KNOWING-DOWNGRADED")).toBe("WAY-OF-KNOWING-DOWNGRADED");
+    // The DR-176 tail is read positionally elsewhere; the new member must not
+    // have been appended to the end of the vocabulary.
+    expect(kernel.CONDITION_MARKS.slice(-4)).toEqual([
+      "HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
+    ]);
   });
 
   it("emits no record when a locator-pinned LOOKED_UP survives normalization unchanged", async () => {

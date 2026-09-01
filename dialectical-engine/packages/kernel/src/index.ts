@@ -90,6 +90,12 @@ export const CONDITION_MARKS = [
   "NON-COMPARABLE",
   "NOT_SAMPLED",
   "OFF-SUBJECT-DOWNGRADE",
+  // S2-3 (goal-v4 T4): the judge claimed a way of knowing normalization could
+  // not keep — a locator-less LOOKED_UP. The node is served as REASONING and
+  // the override is disclosed rather than absorbed. Deliberately placed here,
+  // beside the other downgrade disclosure, and NOT appended: the DR-176 tail
+  // of this vocabulary is read positionally by `CONDITION_MARKS.slice(-4)`.
+  "WAY-OF-KNOWING-DOWNGRADED",
   "AMENDED-SEARCH",
   "MISSING-NUMBER",
   // DR-139(4), TERM-01: a battery row ACTIVE at run completion whose owed

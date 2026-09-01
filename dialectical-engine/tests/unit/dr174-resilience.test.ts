@@ -197,7 +197,7 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   });
 
   it("T32 mints exactly H/L/N and enforces typed required records without pretending class N is revealable", () => {
-    expect(CONDITION_MARKS).toHaveLength(28);
+    expect(CONDITION_MARKS).toHaveLength(29);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

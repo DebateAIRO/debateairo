@@ -170,6 +170,18 @@ function judgementDouble(statement: string, fidelity = 0.72): string {
   });
 }
 
+/**
+ * S2-3 / T4: a judge artifact that CLAIMS a lookup it cannot pin. Normalization
+ * must resolve it to REASONING and disclose the downgrade.
+ */
+function unpinnedLookupJudgementDouble(statement: string): string {
+  return JSON.stringify({
+    ...JSON.parse(judgementDouble(statement)),
+    way_of_knowing: "LOOKED_UP",
+    locator: null
+  });
+}
+
 function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
   return JSON.stringify({ outcome, reasons: [reason] });
 }
@@ -2543,6 +2555,53 @@ describe("apps/runner — legal command lifecycle", () => {
     expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
       mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
     }));
+  });
+
+  it("S2-3 T4 projects WAY-OF-KNOWING-DOWNGRADED on the real node when a judge claims a lookup it cannot pin", async () => {
+    const downgraded = "Primary T4 position claiming a lookup it cannot pin";
+    const scenario = await executeResil01Scenario({
+      label: "t4-way-of-knowing-downgraded",
+      primary: [
+        unpinnedLookupJudgementDouble(downgraded),
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary T4 position ${index + 2}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T4 review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T4 position ${index + 1}`)),
+        { status: 503 }, { status: 503 },
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("dispute", `Secondary T4 review ${index + 2}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    // The node id comes from the REAL producer — the persisted, served graph —
+    // never from a node-shaped literal handed in by the test (codex T4-r1 B2).
+    expect(scenario.answer?.nodes.map((node) => node.claim)).toContain(downgraded);
+    const producedNode = scenario.answer?.nodes.find((node) => node.claim === downgraded);
+    expect(producedNode?.way_of_knowing).toBe("REASONING");
+    expect(producedNode?.locator).toBeNull();
+
+    // Projected on the affected NODE, which is what makes the mark visible.
+    expect(producedNode?.condition_marks).toContain("WAY-OF-KNOWING-DOWNGRADED");
+    expect(scenario.answer?.condition_marks).toContain("WAY-OF-KNOWING-DOWNGRADED");
+
+    const record = scenario.answer?.condition_mark_records
+      .find((candidate) => candidate.mark === "WAY-OF-KNOWING-DOWNGRADED");
+    expect(record).toMatchObject({ scope: "node", subject_ref: producedNode?.node_id });
+    // "naming node + claimed value" — the node is the subject_ref above, the
+    // claimed value survives in the persisted reason.
+    expect(record?.reason).toContain("LOOKED_UP");
+
+    // A node that claimed nothing it could not keep carries no such mark.
+    const honest = scenario.answer?.nodes.find((node) => node.claim === "Primary T4 position 2");
+    expect(honest).toBeDefined();
+    expect(honest?.condition_marks).not.toContain("WAY-OF-KNOWING-DOWNGRADED");
   });
 
   it("preserves the database producer-grading refusal instead of laundering it", async () => {

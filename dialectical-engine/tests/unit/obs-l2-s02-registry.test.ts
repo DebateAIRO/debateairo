@@ -412,7 +412,7 @@ describe("S02 severity and unordered condition marks", () => {
     expect(new Set(Object.keys(CONDITION_MARK_SEVERITY))).toEqual(
       new Set(CONDITION_MARKS),
     );
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(28);
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(29);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );
