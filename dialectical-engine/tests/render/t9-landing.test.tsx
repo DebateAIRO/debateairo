@@ -206,4 +206,126 @@ describe("T9-C2 chrome labels & CTAs", () => {
   });
 });
 
-describe.todo("T9-C4 landing content", () => {});
+describe("T9-C4 landing content", () => {
+  it("renders the numbered method titles inside the method ledger", async () => {
+    // PROPERTY: the real anonymous method subtree owns all four numbered
+    // method steps, so matching copy elsewhere cannot satisfy the ledger.
+    const document = await renderRoute(null);
+    const method = document.querySelector('[data-landing-section="method"]');
+    const steps = [...(method?.querySelectorAll("li") ?? [])];
+    const expectedSteps = [
+      ["01", "Models argue"],
+      ["02", "They review each other"],
+      ["03", "You challenge"],
+      ["04", "Verdict with receipts"]
+    ] as const;
+
+    expect(method).not.toBeNull();
+    expect(steps).toHaveLength(expectedSteps.length);
+    expectedSteps.forEach(([number, title], index) => {
+      expect(steps[index]?.textContent).toContain(number);
+      expect(steps[index]?.textContent).toContain(title);
+    });
+  });
+
+  it("renders complete static sample-card anatomy inside the sample block", async () => {
+    // PROPERTY: a sample card is a double-bezel, stance-marked card carrying
+    // type, two scores, model attribution, and a recorded review disposition.
+    const document = await renderRoute(null);
+    const sample = document.querySelector('[data-landing-section="sample"]');
+
+    expect(sample).not.toBeNull();
+    expect(sample?.textContent).toContain("ONE DEBATE, FOUR TURNS");
+    expect(sample?.textContent).toContain("The pressure lands on the claim, not the wording.");
+    for (const stance of ["pro", "con", "reasoning"] as const) {
+      expect(sample?.querySelector(`[data-bezel="shell"][data-stance="${stance}"]`)).not.toBeNull();
+    }
+
+    const card = sample?.querySelector('[data-bezel="shell"][data-stance]');
+    const cardText = card?.textContent ?? "";
+    expect(card?.querySelector('[data-bezel="core"]')).not.toBeNull();
+    expect(cardText).toMatch(/PRO|CON|REASONING/);
+    expect(cardText).toContain("BASE");
+    expect(cardText).toContain("FINAL");
+    expect(cardText).toMatch(/\S+\s+·\s+\S+/);
+    expect(cardText).toMatch(/REVIEW (?:AGREED|DISPUTED) BY:/);
+  });
+
+  it("keeps the hero and pricing placeholders literal", async () => {
+    // PROPERTY: this mission renders the two V-closed placeholder strings,
+    // never a live debate counter or a real price substituted in either region.
+    const document = await renderRoute(null);
+    const hero = document.querySelector('[data-landing-section="hero"]');
+    const pricing = document.querySelector('[data-landing-section="pricing"]');
+
+    expect(hero?.textContent).toContain("[PLACEHOLDER] debates argued this week");
+    expect(pricing?.textContent).toContain(
+      "First [PLACEHOLDER] debates free, then [PLACEHOLDER] per month. Cancel whenever."
+    );
+  });
+
+  it("renders every binding landing paragraph verbatim in its owning subtree", async () => {
+    // PROPERTY: V-approved landing prose survives verbatim and remains in the
+    // region that owns it rather than being paraphrased or copied across regions.
+    const document = await renderRoute(null);
+    const hero = document.querySelector('[data-landing-section="hero"]');
+    const sample = document.querySelector('[data-landing-section="sample"]');
+    const method = document.querySelector('[data-landing-section="method"]');
+    const pricing = document.querySelector('[data-landing-section="pricing"]');
+
+    expect(hero?.textContent).toContain(
+      "You argue. An opponent trained to locate the softest point in your reasoning presses on it until the claim holds or gives. Every turn is scored on evidence and on whether you actually answered the question — never on how well it was phrased."
+    );
+    expect(sample?.textContent).toContain(
+      "The debate ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the claim you conceded."
+    );
+    expect(method?.textContent).toContain("Four steps, then you do it again tomorrow.");
+    expect(method?.textContent).toContain(
+      "The arena is built for repetition, not for a performance you prepare for once."
+    );
+    expect(method?.textContent).toContain(
+      "Five frontier models build the tree — pro, con, and the reasoning that binds them."
+    );
+    expect(method?.textContent).toContain(
+      "Every claim is cross-reviewed by a rival model: agree or dispute, on the record."
+    );
+    expect(method?.textContent).toContain(
+      "Flag any sentence; the graph spawns a focused rebuttal where you pointed."
+    );
+    expect(method?.textContent).toContain(
+      "Scores, condition marks, and replay handles — every number traces to its source."
+    );
+    expect(method?.textContent).toContain("Your argument is only as strong as its weakest claim.");
+    expect(pricing?.textContent).toContain(
+      "Take one debate. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering."
+    );
+  });
+
+  it("renders both hero CTAs and sends the primary through the safe auth entry", async () => {
+    // PROPERTY: the hero owns both CTA labels and its primary enters auth with
+    // the exact encoded /new return path rather than a dead or unsafe target.
+    const document = await renderRoute(null);
+    const hero = document.querySelector('[data-landing-section="hero"]');
+    const links = [...(hero?.querySelectorAll("a") ?? [])];
+    const primary = links.find((link) => link.textContent?.trim() === "Start a debate");
+    const secondary = links.find(
+      (link) => link.textContent?.trim() === "Read a scored transcript"
+    );
+
+    expect(primary).toBeDefined();
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(secondary).toBeDefined();
+  });
+
+  it("renders the method-close CTA with the safe auth entry", async () => {
+    // PROPERTY: the tertiary Start action belongs to the method subtree and
+    // uses the same encoded /new auth-entry contract as the other primaries.
+    const document = await renderRoute(null);
+    const method = document.querySelector('[data-landing-section="method"]');
+    const primary = [...(method?.querySelectorAll("a") ?? [])]
+      .find((link) => link.textContent?.trim() === "Start a debate");
+
+    expect(primary).toBeDefined();
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+  });
+});
