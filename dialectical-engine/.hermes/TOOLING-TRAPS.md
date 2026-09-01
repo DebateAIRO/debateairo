@@ -38,3 +38,22 @@ Every entry below was paid for at least once. Do not pay for it again.
 - `stderr` byte counts are **not tree pins**: every probe carries its own error-token
   length, so three lenses measured three different values and all were correct. The
   durable property is paired-arm byte identity, never an absolute count. (S05)
+- perl `s{...}{...}` **mangles a JSX replacement containing braces** (`rows={3}`): it dies
+  with "Missing right curly" on stderr, leaves the file UNTOUCHED, and the mutant run then
+  reads as a clean GREEN — i.e. "my test failed to catch the mutant" when the mutant was
+  never applied. Two of six mutants were silently void this way. Use python3 (or any
+  literal-string writer) for JSX mutants, assert the anchor was found, and **print
+  `git diff --stat` of the applied mutant before believing any mutant verdict.** (T2)
+- Root `pnpm run typecheck` is **blind to the legacy UI**: tsconfig.json:20 excludes `web`
+  and `apps/ui`, and its include list carries `tests/**/*.ts` but **not** `.tsx`. A web/
+  edit and a new `.test.tsx` are typechecked by NOTHING at repo level, so a green root
+  typecheck is not evidence for either. Gate web/ with `tsc --noEmit -p web/tsconfig.json`
+  — which carries 1 pre-existing error (TS2882, `globals.css` side-effect import in
+  web/app/layout.tsx) because Next's `.next/types` shim is not generated. (T2)
+- The vitest `@` alias resolves to **apps/ui** (vitest.config.ts:8) for EVERY test, so a
+  `web/` component's `@/lib/api` import loads apps/ui's module under test, not web's. Mock
+  the specifier or you are asserting against the wrong app's client. (T2)
+- Concurrent lane worktrees each running the full suite **serialize on this host**: with
+  three `vitest run` processes live (lane-t2, lane-t4, primary), `pnpm test` took 2984s vs
+  T0's 515s — 5.8x. Budget suite wall-clock by counting concurrent lanes before promising
+  a three-run cluster on the FULL suite, and never read a slow run as a hang. (T2)
