@@ -3,7 +3,7 @@
 const GUIDE_ITEMS = [
   {
     icon: "⚡",
-    iconBg: "var(--gold-bg)",
+    iconBg: "var(--gen-bg)",
     title: "Live generation",
     body: "The skeleton appears first, then each model writes its claim in with a cursor while the bar tracks progress."
   },
@@ -16,8 +16,8 @@ const GUIDE_ITEMS = [
   },
   {
     icon: "⚐",
-    iconBg: "var(--gold-bg)",
-    iconColor: "var(--gold-text)",
+    iconBg: "var(--score-uncertainty-bg)",
+    iconColor: "var(--score-uncertainty-text)",
     title: "Challenge a flaw anywhere",
     body: "Click Challenge on a claim — or select any sentence inside an argument — to send focused scrutiny at that exact spot."
   },

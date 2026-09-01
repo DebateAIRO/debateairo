@@ -1890,7 +1890,7 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
               item.pressure === "high"
                 ? "var(--dispute)"
                 : item.pressure === "medium"
-                  ? "var(--gold)"
+                  ? "var(--gen-dot)"
                   : "var(--agree)"
           }}
         />
