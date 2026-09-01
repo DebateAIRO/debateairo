@@ -2556,35 +2556,132 @@ describe("apps/runner — legal command lifecycle", () => {
       condition_marks: expect.arrayContaining(["HIDDEN-UNJUDGEABLE"])
     });
 
-    // The XOR is enforced by the DATABASE, not only by the writer: exactly one
-    // reason is storable. A row naming BOTH would let a cannot-assess node be
-    // dressed as a transport death (the fabrication this design exists to make
-    // unspellable); a row naming NEITHER is the silent skip J14 repealed. Probed
-    // against the real constraint and rolled back, the way the class-D count
-    // constraint is probed above.
     const answerId = scenario.answer?.answer_id;
     const answerVersion = scenario.answer?.answer_version;
     if (answerId === undefined || answerVersion === undefined) throw new Error("TEST_EXPECTED_ANSWER");
+
+    // T6 r3 / J14 ADDENDUM (2) — the stored row's PROVENANCE is the review row
+    // itself. The writer did not take the caller's word for which review it
+    // meant: it looked the node's own `cannot-assess` review up in the ledger,
+    // and the answer row carries that `node_review_id` under a composite
+    // foreign key. So the disclosure cannot drift from the fact it reports.
+    const reviews = await database.pool.query<{ node_review_id: string; node_id: string; outcome: string }>(
+      `SELECT node_review_id::text, node_id::text, outcome FROM ledger.node_review
+        WHERE run_id=$1 ORDER BY outcome, at_seq`,
+      [scenario.runId]
+    );
+    const unassessedReview = reviews.rows.find((row) => row.outcome === "cannot-assess")!;
+    const agreedReview = reviews.rows.find((row) => row.outcome === "agree")!;
+    expect(unassessedReview.node_id).toBe(hiddenNodeId);
+    const storedHidden = await database.pool.query<{
+      review_ref: string | null; review_node_ref: string | null; terminal_transport_outcome: string | null;
+    }>(
+      `SELECT review_ref::text AS review_ref, review_node_ref::text AS review_node_ref,
+              terminal_transport_outcome
+         FROM serve.condition_mark
+        WHERE answer_id=$1 AND answer_version=$2 AND mark='HIDDEN-UNJUDGEABLE'`,
+      [answerId, answerVersion]
+    );
+    expect(storedHidden.rows).toEqual([{
+      review_ref: unassessedReview.node_review_id,
+      review_node_ref: hiddenNodeId,
+      terminal_transport_outcome: null
+    }]);
+
+    // What the DATABASE itself refuses, probed against the real constraints in
+    // a rolled-back transaction and named one by one — a probe that only shows
+    // "something threw" cannot tell a vocabulary rule from a foreign key.
+    //
+    // The one shape the DDL still ACCEPTS is called out rather than blessed:
+    // a transport reason on a node whose review landed is cross-table truth,
+    // which no CHECK can express and which J14's addendum (3) explicitly
+    // declines to mandate a trigger for. That row is refused by the atomic
+    // writer guard instead — proved in `t06-review-teeth-database.test.ts`.
     const ddlClient = await database.pool.connect();
-    const probe = (transport: string, review: string) => ddlClient.query(
+    const probe = (input: {
+      readonly transport?: "TIMED_OUT" | "FAILED";
+      readonly review?: string;
+      readonly reviewRef?: string;
+      readonly reviewNodeRef?: string;
+      readonly subject?: string;
+    }) => ddlClient.query(
       `INSERT INTO serve.condition_mark (
          answer_id, answer_version, mark, scope, subject_ref, reason,
          call_site_key, terminal_transport_outcome, review_outcome,
-         excluded_from_served_number, at_seq
-       ) VALUES ($1,$3,'HIDDEN-UNJUDGEABLE','node',$2,'ddl-probe',
-         'JUDGE:review:test',${transport},${review},true,ledger.allocate_sequence())`,
-      [answerId, hiddenNodeId, answerVersion]
+         review_ref, review_node_ref, excluded_from_served_number, at_seq
+       ) VALUES ($1,$2,'HIDDEN-UNJUDGEABLE','node',$3,'ddl-probe',
+         'JUDGE:review:test',$4,$5,$6::uuid,$7::uuid,true,ledger.allocate_sequence())`,
+      [answerId, answerVersion, input.subject ?? hiddenNodeId,
+        input.transport ?? null, input.review ?? null,
+        input.reviewRef ?? null, input.reviewNodeRef ?? null]
     );
+    const rolledBack = async (name: string, run: () => Promise<unknown>) => {
+      await ddlClient.query(`SAVEPOINT ${name}`);
+      await run();
+      await ddlClient.query(`ROLLBACK TO SAVEPOINT ${name}`);
+    };
     try {
       await ddlClient.query("BEGIN");
-      await expect(probe("'FAILED'", "NULL")).resolves.toBeDefined();
-      await ddlClient.query("SAVEPOINT both_reasons");
-      await expect(probe("'FAILED'", "'cannot-assess'")).rejects.toThrow();
-      await ddlClient.query("ROLLBACK TO SAVEPOINT both_reasons");
-      await ddlClient.query("SAVEPOINT no_reason");
-      await expect(probe("NULL", "NULL")).rejects.toThrow();
-      await ddlClient.query("ROLLBACK TO SAVEPOINT no_reason");
-      await expect(probe("NULL", "'cannot-assess'")).resolves.toBeDefined();
+      // ACCEPTED by DDL, refused by the writer: the transport arm for a node
+      // whose review landed. Named as the DDL's honest limit, not as a
+      // correct row.
+      await rolledBack("transport_arm_ddl_limit", async () => {
+        await expect(probe({ transport: "FAILED" })).resolves.toBeDefined();
+      });
+      // ACCEPTED, and true: the review arm naming this node's own review row.
+      await rolledBack("review_arm_true", async () => {
+        await expect(probe({
+          review: "cannot-assess",
+          reviewRef: unassessedReview.node_review_id,
+          reviewNodeRef: hiddenNodeId
+        })).resolves.toBeDefined();
+      });
+      // Cardinality (r2's rule, kept): never both, never neither.
+      await rolledBack("both_reasons", async () => {
+        await expect(probe({
+          transport: "FAILED",
+          review: "cannot-assess",
+          reviewRef: unassessedReview.node_review_id,
+          reviewNodeRef: hiddenNodeId
+        })).rejects.toThrow(/condition_mark_unjudged_reason_check/);
+      });
+      await rolledBack("no_reason", async () => {
+        await expect(probe({})).rejects.toThrow(/condition_mark_unjudged_reason_check/);
+      });
+      // J14 addendum (1) at the SQL layer: `agree` and `dispute` both SEED
+      // judged standing, so the review arm admits neither.
+      for (const [name, outcome] of [["agree_arm", "agree"], ["dispute_arm", "dispute"]] as const) {
+        await rolledBack(name, async () => {
+          await expect(probe({
+            review: outcome,
+            reviewRef: agreedReview.node_review_id,
+            reviewNodeRef: agreedReview.node_id,
+            subject: agreedReview.node_id
+          })).rejects.toThrow(/condition_mark_review_outcome_check/);
+        });
+      }
+      // J14 addendum (2) at the SQL layer: the review arm without provenance,
+      // with provenance for the WRONG node, and with provenance for a review
+      // that reached a judgement — codex's LIE 1 made unspellable.
+      await rolledBack("review_arm_no_ref", async () => {
+        await expect(probe({ review: "cannot-assess" }))
+          .rejects.toThrow(/condition_mark_review_provenance_check/);
+      });
+      await rolledBack("review_arm_other_subject", async () => {
+        await expect(probe({
+          review: "cannot-assess",
+          reviewRef: unassessedReview.node_review_id,
+          reviewNodeRef: agreedReview.node_id
+        })).rejects.toThrow(/condition_mark_review_subject_check/);
+      });
+      await rolledBack("review_arm_judged_row", async () => {
+        await expect(probe({
+          review: "cannot-assess",
+          reviewRef: agreedReview.node_review_id,
+          reviewNodeRef: agreedReview.node_id,
+          subject: agreedReview.node_id
+        })).rejects.toThrow(/condition_mark_review_row_fk/);
+      });
     } finally {
       await ddlClient.query("ROLLBACK");
       ddlClient.release();
@@ -2620,6 +2717,114 @@ describe("apps/runner — legal command lifecycle", () => {
     // (`UNIQUE (node_id)` refuses a second review) — but the lane now READS
     // that state instead of stopping on it.
     expect(candidate.stillSetAside).toBeGreaterThan(0);
+  });
+
+  /**
+   * T6 r3 / codex r1 N1 — the class-D twin gets its own PRODUCTION arm.
+   *
+   * r2 proved the cannot-assess route at the production seam for class H only,
+   * and proved class D for cannot-assess only at the standing projection. So a
+   * mutant that filtered review-outcome disclosures out of `classDReviewRecords`
+   * left every J14 production assertion green while restoring, for class D,
+   * exactly the silence F-T6-4 says was fixed.
+   *
+   * This is DR-184 C-5's own fixture with one change: the review that C-5 kills
+   * with two transport failures instead comes back as an honest
+   * `cannot-assess`. The node keeps its judged arguments, so it still SERVES —
+   * it is included in the served number, unlike the class-H route — and the
+   * record must name the review outcome, carry the ledger review row, count a
+   * positive judged basis, and stay readable by the catch-up lane.
+   */
+  it("T6/J14 discloses the cannot-assess class-D route, served and counted, with the review outcome as its reason", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "t06-cannot-assess-class-d",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary D position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary D review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary D position ${index + 1}`)),
+        reviewDouble("cannot-assess", "Secondary D cannot assess review 1"),
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("dispute", `Secondary D review ${index + 2}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    // The run really took the honest cannot-assess route: one stored review
+    // says so, and no review call was lost to transport.
+    const outcomes = await database.pool.query<{ outcome: string; count: string }>(
+      `SELECT outcome, count(*)::text AS count FROM ledger.node_review
+        WHERE run_id=$1 GROUP BY outcome ORDER BY outcome`,
+      [scenario.runId]
+    );
+    expect(outcomes.rows.find((row) => row.outcome === "cannot-assess")).toEqual({
+      outcome: "cannot-assess", count: "1"
+    });
+
+    // The class-D record names the REVIEW outcome, not a transport outcome,
+    // and keeps class D's own presentation contract: a positive judged basis
+    // and INCLUSION in the served number.
+    expect(scenario.answer?.condition_marks).toContain("DERIVED-STANDING-UNREVIEWED");
+    const derivedRecords = (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "DERIVED-STANDING-UNREVIEWED");
+    const unassessedDerived = derivedRecords.find((record) => record.review_outcome !== null);
+    expect(unassessedDerived).toMatchObject({
+      call_site_key: expect.stringMatching(/^JUDGE:review:/),
+      terminal_transport_outcome: null,
+      review_outcome: "cannot-assess",
+      excluded_from_served_number: false
+    });
+    expect(unassessedDerived?.judged_basis_count ?? 0).toBeGreaterThan(0);
+    const derivedNodeId = unassessedDerived?.subject_ref;
+    if (derivedNodeId === undefined) throw new Error("TEST_EXPECTED_DERIVED_NODE");
+
+    // The disclosure is bound to the ledger row it reports, and the node it
+    // reports on is the node whose review actually came back cannot-assess.
+    const unassessedReview = await database.pool.query<{ node_review_id: string; node_id: string }>(
+      `SELECT node_review_id::text, node_id::text FROM ledger.node_review
+        WHERE run_id=$1 AND outcome='cannot-assess'`,
+      [scenario.runId]
+    );
+    expect(unassessedReview.rows[0]?.node_id).toBe(derivedNodeId);
+    const storedDerived = await database.pool.query<{ review_ref: string; review_node_ref: string }>(
+      `SELECT review_ref::text AS review_ref, review_node_ref::text AS review_node_ref
+         FROM serve.condition_mark
+        WHERE answer_id=$1 AND answer_version=$2
+          AND mark='DERIVED-STANDING-UNREVIEWED' AND review_outcome='cannot-assess'`,
+      [scenario.answer?.answer_id, scenario.answer?.answer_version]
+    );
+    expect(storedDerived.rows).toEqual([{
+      review_ref: unassessedReview.rows[0]!.node_review_id,
+      review_node_ref: derivedNodeId
+    }]);
+
+    // Class D SERVES — that is the whole difference from class H. The node
+    // still carries a final strength and is not excluded from the number.
+    expect(scenario.answer?.nodes.find((node) => node.node_id === derivedNodeId)?.final_strength)
+      .not.toBeNull();
+
+    // ... and the catch-up lane reads the disclosure instead of stopping on it.
+    const source = await new ServeRepository(database.pool).readReviewCatchUpSource(scenario.runId);
+    const settings = runnerSettings();
+    const dependencies = createPostgresReviewCatchUpDependencies({
+      pool: database.pool,
+      reviewers: [],
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      propagationContractHash: settings.propagationContractHash,
+      propagationNumberKind: settings.propagationNumberKind,
+      propagationProducer: settings.propagationProducer,
+      judgementSelectionRule: { ...settings.judgementPolicy!.selectionRule },
+      compositionBudget: settings.servePolicy!.compositionBudgets.low
+    });
+    await expect(dependencies.prepareVersion({
+      runId: scenario.runId, answerId: source.answerId, fromVersion: source.answerVersion
+    })).resolves.toBeDefined();
   });
 
   it("DR-184 C-5 serves a class-D root when its own review dies but judged arguments remain", async () => {

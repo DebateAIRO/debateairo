@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
@@ -818,11 +818,18 @@ export interface ConditionMarkRecord {
   readonly plannedLegCount?: number | null;
   readonly terminalTransportOutcome?: "TIMED_OUT" | "FAILED" | null;
   /**
-   * T6 / S4-2 / J14 — the second route into class H/D: the review LANDED and
-   * said it could not judge. Exactly one of this and `terminalTransportOutcome`
-   * is set on a class-H or class-D record.
+   * T6 / S4-2 / J14 (+ ADDENDUM) — the second route into class H/D: the review
+   * LANDED and said it could not judge. Exactly one of this and
+   * `terminalTransportOutcome` is set on a class-H or class-D record.
+   *
+   * `cannot-assess` is the ONLY value this arm can take. `agree` and `dispute`
+   * both SEED judged standing, so neither can ever be the reason a node is
+   * unjudged; admitting them made the disclosure a writable lie (codex r1 B1).
+   * The provenance for this arm is not supplied by the caller — it is looked up
+   * in the ledger by `resolveTrueUnjudgedReasons` and written under a composite
+   * foreign key, so the record cannot name a review it does not have.
    */
-  readonly reviewOutcome?: "agree" | "dispute" | "cannot-assess" | null;
+  readonly reviewOutcome?: "cannot-assess" | null;
   readonly hiddenStrength?: number | null;
   readonly hiddenScoreThreshold?: number | null;
   readonly hiddenScoreThresholdSourceRef?: string | null;
@@ -866,8 +873,14 @@ export function assertRequiredConditionMarkRecords(
     // never landed) XOR a review outcome (it landed and could not judge).
     // Written as an XOR so the transport route keeps its existing requirement
     // rather than the second route turning it into an optional field.
+    //
+    // J14 ADDENDUM (1): and the review arm admits only `cannot-assess`. The
+    // type already says so; this restates it as a runtime rule because the
+    // record also arrives from untyped edges (a projected answer, a stored
+    // row), and a reason that reached a judgement is not a reason at all.
     const namesOneUnjudgedReason = (record.terminalTransportOutcome == null)
-      !== (record.reviewOutcome == null);
+      !== (record.reviewOutcome == null)
+      && (record.reviewOutcome == null || record.reviewOutcome === "cannot-assess");
     if (record.mark === "HIDDEN-UNJUDGEABLE" && (
       record.callSiteKey == null || !namesOneUnjudgedReason
       || record.excludedFromServedNumber !== true
@@ -897,6 +910,93 @@ export function assertRequiredConditionMarkRecords(
       throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class N requires call site, planned leg count, and transport outcome");
     }
   }
+}
+
+/**
+ * The provenance a class-H/class-D row carries for the reason it names. Null on
+ * the transport arm, where the truth being reported is the ABSENCE of a review.
+ */
+export interface UnjudgedReasonProvenance {
+  readonly reviewRef: string | null;
+  readonly reviewNodeRef: string | null;
+}
+
+/**
+ * T6 / S4-2 / J14 ADDENDUM — the disclosure reason must be TRUE, not merely
+ * singular (codex r1 B1).
+ *
+ * `assertRequiredConditionMarkRecords` binds CARDINALITY: a class-H/class-D
+ * record names exactly one reason, and the review arm names `cannot-assess`.
+ * Neither that guard nor any CHECK constraint can see whether the reason is a
+ * FACT, because the fact lives in another table. Two lies survived r2:
+ *
+ *   1. the review arm claiming `cannot-assess` for a node whose review said
+ *      something else — or that has no review at all; and
+ *   2. the transport arm claiming "the review never landed" for a node whose
+ *      review is sitting in `ledger.node_review` (r2's own DDL probe asserted
+ *      that row was ACCEPTED).
+ *
+ * This is the guard that closes both, by consulting the ledger. The caller does
+ * not get to say WHICH review row it means: for the review arm the row is
+ * looked up by `(runId, subjectRef)` — `ledger.node_review` is `UNIQUE
+ * (node_id)`, so that is a function — and the resolved `node_review_id` is what
+ * `ServeRepository.persist` stores, under a composite foreign key. A
+ * mis-binding is therefore not merely refused, it is unspellable.
+ *
+ * Run inside the writer's OWN transaction, so the check and the insert cannot
+ * be separated by a concurrent review write. J14's addendum (3) accepts this
+ * atomic-writer guard, rather than a database trigger, as the floor for the
+ * transport arm's cross-table negative.
+ *
+ * Marks outside class H/D carry no unjudged reason and are passed through
+ * untouched — a HIDDEN-LOW-SCORE row names a threshold, not a review, and its
+ * subject may perfectly well have a landed review.
+ */
+export async function resolveTrueUnjudgedReasons(
+  source: Pool | PoolClient,
+  runId: string,
+  records: readonly ConditionMarkRecord[]
+): Promise<readonly UnjudgedReasonProvenance[]> {
+  const carriesUnjudgedReason = (record: ConditionMarkRecord): boolean =>
+    record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED";
+  const subjects = [...new Set(records.filter(carriesUnjudgedReason).map((record) => record.subjectRef))];
+  const landed = new Map<string, { readonly nodeReviewId: string; readonly outcome: string }>();
+  if (subjects.length > 0) {
+    const rows = await source.query<{ node_review_id: string; node_id: string; outcome: string }>(
+      `SELECT node_review_id::text AS node_review_id, node_id::text AS node_id, outcome
+         FROM ledger.node_review
+        WHERE run_id = $1 AND node_id::text = ANY($2::text[])`,
+      [runId, subjects]
+    );
+    for (const row of rows.rows) {
+      landed.set(row.node_id, { nodeReviewId: row.node_review_id, outcome: row.outcome });
+    }
+  }
+  return Object.freeze(records.map((record): UnjudgedReasonProvenance => {
+    if (!carriesUnjudgedReason(record)) return Object.freeze({ reviewRef: null, reviewNodeRef: null });
+    const review = landed.get(record.subjectRef);
+    if (record.reviewOutcome != null) {
+      // The arm says "the review landed and could not judge". The ledger must
+      // hold that node's own review, and it must say exactly that.
+      if (review === undefined || review.outcome !== record.reviewOutcome) {
+        throw new TypedDomainError(
+          "CONDITION_MARK_REVIEW_REASON_UNTRUE",
+          `${record.mark} names review outcome ${record.reviewOutcome} for ${record.subjectRef}, `
+          + `but the run's ledger holds ${review === undefined ? "no review" : review.outcome}`
+        );
+      }
+      return Object.freeze({ reviewRef: review.nodeReviewId, reviewNodeRef: record.subjectRef });
+    }
+    if (record.terminalTransportOutcome != null && review !== undefined) {
+      // The arm says "the review never landed". It did.
+      throw new TypedDomainError(
+        "CONDITION_MARK_TRANSPORT_REASON_UNTRUE",
+        `${record.mark} names transport outcome ${record.terminalTransportOutcome} for ${record.subjectRef}, `
+        + `but that node's review landed with outcome ${review.outcome}`
+      );
+    }
+    return Object.freeze({ reviewRef: null, reviewNodeRef: null });
+  }));
 }
 
 export class ServeRepository {
@@ -1172,14 +1272,22 @@ export class ServeRepository {
             : JSON.stringify(input.result.projections.memoryDisclosure)
         ]
       );
-      for (const record of conditionMarkRecords) {
+      // T6 / J14 ADDENDUM — the reason each class-H/class-D record names is
+      // checked against the ledger HERE, inside the write transaction, so a
+      // concurrent review cannot land between the check and the insert. The
+      // review arm's provenance is RESOLVED rather than accepted: what goes
+      // into `review_ref` is the row the ledger actually holds.
+      const unjudgedProvenance = await resolveTrueUnjudgedReasons(client, input.runId, conditionMarkRecords);
+      for (const [recordIndex, record] of conditionMarkRecords.entries()) {
+        const provenance = unjudgedProvenance[recordIndex]!;
         const mark = await client.query<{ condition_mark_id: string }>(
           `INSERT INTO serve.condition_mark (
              answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule,
-             call_site_key, planned_leg_count, terminal_transport_outcome, review_outcome, hidden_strength,
+             call_site_key, planned_leg_count, terminal_transport_outcome, review_outcome,
+             review_ref, review_node_ref, hidden_strength,
              hidden_score_threshold, hidden_score_threshold_source_ref, excluded_from_served_number,
              judged_basis_count, at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
            RETURNING condition_mark_id`,
           [
             answer.rows[0]!.answer_id,
@@ -1194,6 +1302,8 @@ export class ServeRepository {
             record.plannedLegCount ?? null,
             record.terminalTransportOutcome ?? null,
             record.reviewOutcome ?? null,
+            provenance.reviewRef,
+            provenance.reviewNodeRef,
             record.hiddenStrength ?? null,
             record.hiddenScoreThreshold ?? null,
             record.hiddenScoreThresholdSourceRef ?? null,
@@ -1558,7 +1668,10 @@ export class ServeRepository {
       call_site_key: string | null;
       planned_leg_count: number | null;
       terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
-      review_outcome: "agree" | "dispute" | "cannot-assess" | null;
+      // T6 / J14 ADDENDUM (1): narrowed at the READ because the column is
+      // narrowed at the WRITE — `condition_mark_review_outcome_check` admits
+      // only `cannot-assess` in this arm, VALID over the existing rows.
+      review_outcome: "cannot-assess" | null;
       hidden_strength: number | null;
       hidden_score_threshold: number | null;
       hidden_score_threshold_source_ref: string | null;
@@ -2048,7 +2161,10 @@ export class ServeRepository {
       model_version: string | null;
       provider: string | null;
       provider_ref: string | null;
-      review_outcome: "agree" | "dispute" | "cannot-assess" | null;
+      // T6 / J14 ADDENDUM (1): narrowed at the READ because the column is
+      // narrowed at the WRITE — `condition_mark_review_outcome_check` admits
+      // only `cannot-assess` in this arm, VALID over the existing rows.
+      review_outcome: "cannot-assess" | null;
       review_reasons: string[] | null;
       node_review_id: string | null;
       review_content_ciphertext: CryptoEnvelope | null;

@@ -5,7 +5,7 @@ import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
 import { projectJudgedStanding } from "@debateai/runner";
-import { assertUnjudgedReasonsAreTrue, type ConditionMarkRecord } from "@debateai/serve";
+import { resolveTrueUnjudgedReasons, type ConditionMarkRecord } from "@debateai/serve";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -228,9 +228,10 @@ describe("T6 · cannot-assess stops seeding the judged-standing basis (S4-2)", (
 /**
  * T6 r3 / J14 ADDENDUM — the disclosure reason must be TRUE, not merely singular.
  *
- * The r2 XOR bound CARDINALITY: exactly one of `terminal_transport_outcome` and
- * `review_outcome` is set. Codex proved that leaves two writable lies, because
- * nothing tied the selected branch to the actual `ledger.node_review` row:
+ * r2's XOR bound CARDINALITY: exactly one of `terminal_transport_outcome` and
+ * `review_outcome` is set on a class-H/class-D row. Codex proved that leaves
+ * two writable lies, because nothing tied the selected branch to the actual
+ * `ledger.node_review` row:
  *
  *   1. the review arm accepted `agree` / `dispute`, though BOTH seed judged
  *      standing and neither can be a reason a node is unjudged; and
@@ -238,12 +239,18 @@ describe("T6 · cannot-assess stops seeding the judged-standing basis (S4-2)", (
  *      whose review demonstrably HAD landed — r2's own DDL probe asserted that
  *      row was accepted, which is the fabrication the design claims to outlaw.
  *
- * `assertUnjudgedReasonsAreTrue` is the cross-table guard that closes both. It
- * runs at BOTH ends: the writer (`ServeRepository.persist`) refuses to seal a
- * false reason, and the review-catch-up reader refuses to propagate one it
- * finds. Cross-table truth is not expressible in a CHECK constraint, and J14's
- * addendum explicitly does not mandate a trigger, so this guard plus these
- * negative probes are the floor.
+ * `resolveTrueUnjudgedReasons` is the cross-table guard that closes both. The
+ * caller ASSERTS a reason; the guard checks that assertion against the ledger
+ * and RESOLVES the provenance the row will carry — for the review arm, the
+ * `node_review_id` of that node's own cannot-assess review, which then rides
+ * into `serve.condition_mark` under a composite foreign key. Nothing the caller
+ * says about which review row it means is trusted: the row is looked up, so a
+ * mis-binding is not merely refused, it is unspellable.
+ *
+ * The transport arm's cross-table truth is NOT expressible in a CHECK
+ * constraint and J14's addendum explicitly declines to mandate a trigger for
+ * it, so this guard — invoked inside `ServeRepository.persist`'s own write
+ * transaction — plus these negative probes are the accepted floor.
  */
 describe("T6 r3 · the unjudged reason is truth-bound, not just single (J14 addendum)", () => {
   const record = (over: Partial<ConditionMarkRecord> & { readonly subjectRef: string }): ConditionMarkRecord => ({
@@ -257,7 +264,6 @@ describe("T6 r3 · the unjudged reason is truth-bound, not just single (J14 adde
     plannedLegCount: null,
     terminalTransportOutcome: null,
     reviewOutcome: null,
-    reviewRef: null,
     hiddenStrength: null,
     hiddenScoreThreshold: null,
     hiddenScoreThresholdSourceRef: null,
@@ -265,81 +271,88 @@ describe("T6 r3 · the unjudged reason is truth-bound, not just single (J14 adde
     judgedBasisCount: null,
     ...over
   });
+  /** Class D differs only in presentation; the reason rules are identical. */
+  const derived = {
+    mark: "DERIVED-STANDING-UNREVIEWED",
+    excludedFromServedNumber: false,
+    judgedBasisCount: 1
+  } as const satisfies Partial<ConditionMarkRecord>;
 
-  it("accepts a review arm that names the node's OWN cannot-assess review, and refuses every falsehood", async () => {
-    const run = await seedRun("t06-truth", [
+  it("resolves the review arm to the node's OWN cannot-assess review row", async () => {
+    const run = await seedRun("t06-truth-review", [
       { key: "unassessed", outcome: "cannot-assess" },
+      { key: "agreed", outcome: "agree" }
+    ]);
+    const subjectRef = run.ids.get("unassessed")!;
+    await expect(resolveTrueUnjudgedReasons(database.pool, run.runId, [
+      record({ subjectRef, reviewOutcome: "cannot-assess" })
+    ])).resolves.toEqual([{
+      reviewRef: run.reviewIds.get("unassessed")!,
+      reviewNodeRef: subjectRef
+    }]);
+    // The class-D twin resolves through the same lookup.
+    await expect(resolveTrueUnjudgedReasons(database.pool, run.runId, [
+      record({ subjectRef, ...derived, reviewOutcome: "cannot-assess" })
+    ])).resolves.toEqual([{
+      reviewRef: run.reviewIds.get("unassessed")!,
+      reviewNodeRef: subjectRef
+    }]);
+  });
+
+  it("refuses the review arm on a node whose review REACHED a judgement, or has no review at all", async () => {
+    const run = await seedRun("t06-truth-judged", [
       { key: "agreed", outcome: "agree" },
       { key: "disputed", outcome: "dispute" },
       { key: "unreviewed", outcome: null }
     ]);
-    const nodeOf = (key: string) => run.ids.get(key)!;
-    const reviewOf = (key: string) => run.reviewIds.get(key)!;
     const check = (candidate: ConditionMarkRecord) =>
-      assertUnjudgedReasonsAreTrue(database.pool, run.runId, [candidate]);
+      resolveTrueUnjudgedReasons(database.pool, run.runId, [candidate]);
+    for (const key of ["agreed", "disputed", "unreviewed"]) {
+      await expect(check(record({
+        subjectRef: run.ids.get(key)!, reviewOutcome: "cannot-assess"
+      }))).rejects.toMatchObject({ code: "CONDITION_MARK_REVIEW_REASON_UNTRUE" });
+      await expect(check(record({
+        subjectRef: run.ids.get(key)!, ...derived, reviewOutcome: "cannot-assess"
+      }))).rejects.toMatchObject({ code: "CONDITION_MARK_REVIEW_REASON_UNTRUE" });
+    }
+  });
 
-    // TRUE: the node's own review, and it really did come back cannot-assess.
-    await expect(check(record({
-      subjectRef: nodeOf("unassessed"),
-      reviewOutcome: "cannot-assess",
-      reviewRef: reviewOf("unassessed")
-    }))).resolves.toBeUndefined();
-
-    // LIE 1 — the review arm pointed at a review that REACHED a judgement.
-    // `agree` and `dispute` both seed judged standing, so neither can ever be
-    // the reason a node is unjudged.
-    await expect(check(record({
-      subjectRef: nodeOf("agreed"),
-      reviewOutcome: "cannot-assess",
-      reviewRef: reviewOf("agreed")
-    }))).rejects.toMatchObject({ code: "CONDITION_MARK_REVIEW_REASON_UNTRUE" });
-    await expect(check(record({
-      subjectRef: nodeOf("disputed"),
-      reviewOutcome: "cannot-assess",
-      reviewRef: reviewOf("disputed")
-    }))).rejects.toMatchObject({ code: "CONDITION_MARK_REVIEW_REASON_UNTRUE" });
-
-    // LIE 2 — a real cannot-assess review, but ANOTHER node's. The FK is
-    // satisfied and the CHECK is satisfied; only subject identity catches it.
-    await expect(check(record({
-      subjectRef: nodeOf("agreed"),
-      reviewOutcome: "cannot-assess",
-      reviewRef: reviewOf("unassessed")
-    }))).rejects.toMatchObject({ code: "CONDITION_MARK_REVIEW_REASON_UNTRUE" });
-
-    // LIE 3 — the fabrication r2's own probe affirmed: "the review never
-    // landed" claimed for a node whose review is sitting in the ledger.
-    await expect(check(record({
-      subjectRef: nodeOf("unassessed"),
-      terminalTransportOutcome: "FAILED"
-    }))).rejects.toMatchObject({ code: "CONDITION_MARK_TRANSPORT_REASON_UNTRUE" });
-    await expect(check(record({
-      subjectRef: nodeOf("agreed"),
-      terminalTransportOutcome: "TIMED_OUT"
-    }))).rejects.toMatchObject({ code: "CONDITION_MARK_TRANSPORT_REASON_UNTRUE" });
-
+  it("refuses the transport arm for a node whose review LANDED — the fabrication r2's own probe affirmed", async () => {
+    const run = await seedRun("t06-truth-transport", [
+      { key: "unassessed", outcome: "cannot-assess" },
+      { key: "agreed", outcome: "agree" },
+      { key: "unreviewed", outcome: null }
+    ]);
+    const check = (candidate: ConditionMarkRecord) =>
+      resolveTrueUnjudgedReasons(database.pool, run.runId, [candidate]);
+    for (const key of ["unassessed", "agreed"]) {
+      await expect(check(record({
+        subjectRef: run.ids.get(key)!, terminalTransportOutcome: "FAILED"
+      }))).rejects.toMatchObject({ code: "CONDITION_MARK_TRANSPORT_REASON_UNTRUE" });
+      await expect(check(record({
+        subjectRef: run.ids.get(key)!, ...derived, terminalTransportOutcome: "TIMED_OUT"
+      }))).rejects.toMatchObject({ code: "CONDITION_MARK_TRANSPORT_REASON_UNTRUE" });
+    }
     // TRUE: the transport arm for a node that genuinely has no review row.
     await expect(check(record({
-      subjectRef: nodeOf("unreviewed"),
-      terminalTransportOutcome: "FAILED"
-    }))).resolves.toBeUndefined();
+      subjectRef: run.ids.get("unreviewed")!, terminalTransportOutcome: "FAILED"
+    }))).resolves.toEqual([{ reviewRef: null, reviewNodeRef: null }]);
+  });
 
-    // The class-D twin is bound by the same guard, on the same two arms.
-    const derived = { mark: "DERIVED-STANDING-UNREVIEWED" as const, excludedFromServedNumber: false, judgedBasisCount: 1 };
-    await expect(check(record({
-      subjectRef: nodeOf("unassessed"), ...derived,
-      reviewOutcome: "cannot-assess", reviewRef: reviewOf("unassessed")
-    }))).resolves.toBeUndefined();
-    await expect(check(record({
-      subjectRef: nodeOf("agreed"), ...derived, terminalTransportOutcome: "FAILED"
-    }))).rejects.toMatchObject({ code: "CONDITION_MARK_TRANSPORT_REASON_UNTRUE" });
+  it("scopes the ledger lookup to the run — another run's cannot-assess review proves nothing here", async () => {
+    const elsewhere = await seedRun("t06-truth-other-run", [{ key: "unassessed", outcome: "cannot-assess" }]);
+    const here = await seedRun("t06-truth-this-run", [{ key: "unreviewed", outcome: null }]);
+    await expect(resolveTrueUnjudgedReasons(database.pool, here.runId, [
+      record({ subjectRef: elsewhere.ids.get("unassessed")!, reviewOutcome: "cannot-assess" })
+    ])).rejects.toMatchObject({ code: "CONDITION_MARK_REVIEW_REASON_UNTRUE" });
   });
 
   it("leaves marks that carry no unjudged reason alone", async () => {
     const run = await seedRun("t06-truth-passthrough", [{ key: "agreed", outcome: "agree" }]);
     // A class-L record names a threshold, not a review; the guard must not
-    // invent an obligation for marks outside class H/D.
-    await expect(assertUnjudgedReasonsAreTrue(database.pool, run.runId, [record({
+    // invent an obligation for marks outside class H/D, and must not refuse a
+    // subject that happens to carry a landed review.
+    await expect(resolveTrueUnjudgedReasons(database.pool, run.runId, [record({
       mark: "HIDDEN-LOW-SCORE",
       subjectRef: run.ids.get("agreed")!,
       callSiteKey: null,
@@ -347,6 +360,6 @@ describe("T6 r3 · the unjudged reason is truth-bound, not just single (J14 adde
       hiddenStrength: 0.1,
       hiddenScoreThreshold: 0.35,
       hiddenScoreThresholdSourceRef: "test-layer"
-    })])).resolves.toBeUndefined();
+    })])).resolves.toEqual([{ reviewRef: null, reviewNodeRef: null }]);
   });
 });

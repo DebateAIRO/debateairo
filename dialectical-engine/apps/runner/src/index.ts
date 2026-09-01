@@ -434,6 +434,53 @@ export type ReviewCatchUpRefusal =
   | "CATCH_UP_WOULD_DOWNGRADE"
   | "CATCH_UP_NUMBER_WOULD_MOVE";
 
+/** The previous answer's class-H/class-D row, as the catch-up lane reads it. */
+export interface StoredUnjudgedDisclosure {
+  readonly call_site_key: string | null;
+  readonly terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
+  /** Deliberately widened: this value arrives from a stored row, not from a literal. */
+  readonly review_outcome: string | null;
+}
+
+/**
+ * T6 / S4-2 / J14 (+ ADDENDUM) — the catch-up lane's read of the previous
+ * answer's disclosure, and its refusal to propagate a malformed one.
+ *
+ * `prepareVersion` rebuilds every class-H/class-D record from the PREVIOUS
+ * answer's records, so whatever shape it finds there it will write again. Two
+ * lawful shapes exist: a transport outcome (the review never landed) or the
+ * review outcome `cannot-assess` (it landed and could not judge). Anything
+ * else — both at once, neither, a review arm naming an outcome that REACHED a
+ * judgement, a record with no call site, or no record at all for a node the
+ * standing projection set aside — is a typed loud stop.
+ *
+ * `agree` and `dispute` are refused here as well as at the contract, the writer
+ * and the SQL layers (J14 addendum 1). The rule is restated at this layer
+ * rather than assumed from the others because this is the one layer that reads
+ * a row written by an EARLIER version of the schema, and the whole point of the
+ * catch-up lane is that it runs long after the answer it rebuilds.
+ */
+export function assertUnjudgedDisclosureShape(
+  nodeId: string,
+  stored: StoredUnjudgedDisclosure | undefined
+): {
+  readonly callSiteKey: string;
+  readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED" | null;
+  readonly reviewOutcome: "cannot-assess" | null;
+} {
+  const namesOneTrueReason = stored !== undefined
+    && (stored.terminal_transport_outcome === null) !== (stored.review_outcome === null)
+    && (stored.review_outcome === null || stored.review_outcome === "cannot-assess");
+  if (stored === undefined || stored.call_site_key === null || !namesOneTrueReason) {
+    throw new TypedDomainError("CATCH_UP_DISCLOSURE_MISMATCH", nodeId);
+  }
+  return Object.freeze({
+    callSiteKey: stored.call_site_key,
+    terminalTransportOutcome: stored.terminal_transport_outcome,
+    reviewOutcome: stored.review_outcome === null ? null : "cannot-assess" as const
+  });
+}
+
 /**
  * T5 r3 (codex r2 B1) — the review and the bearings that ONE call returned are
  * committed as a single fact, or not at all.
@@ -858,19 +905,8 @@ export function createPostgresReviewCatchUpDependencies(input: {
        * is still a typed loud stop — so is a hidden node with no record at all,
        * which is what every run carrying a cannot-assess review used to be.
        */
-      const disclosureFields = (nodeId: string) => {
-        const old = oldReviewRecords.get(nodeId);
-        const namesOneReason = old !== undefined
-          && (old.terminal_transport_outcome === null) !== (old.review_outcome === null);
-        if (old === undefined || old.call_site_key === null || !namesOneReason) {
-          throw new TypedDomainError("CATCH_UP_DISCLOSURE_MISMATCH", nodeId);
-        }
-        return {
-          callSiteKey: old.call_site_key,
-          terminalTransportOutcome: old.terminal_transport_outcome,
-          reviewOutcome: old.review_outcome
-        } as const;
-      };
+      const disclosureFields = (nodeId: string) =>
+        assertUnjudgedDisclosureShape(nodeId, oldReviewRecords.get(nodeId));
       // The sentence follows the ROUTE, never the version being written: a
       // cannot-assess node must not be told its transport was exhausted, and
       // its lift is not a retry — `UNIQUE (node_id)` refuses a second review.
