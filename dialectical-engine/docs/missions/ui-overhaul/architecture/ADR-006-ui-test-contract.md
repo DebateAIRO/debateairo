@@ -438,3 +438,62 @@ So the gate now fails loudly in three separate ways — wrong directory, dead
 toolchain, and baseline drift — and its `0` still means "compiled, and nothing
 new". Both copies were corrected: this ADR and `dispatch-order.md`'s acceptance
 defaults.
+
+### 2026-09-01 — AM13/N10: nothing type-checks `tests/**/*.tsx`, and the obvious fix is the wrong one (trigger: CODE-T1C2-REV2, `t_bef5e6da`)
+
+**RULING: WIRE IT — but into the `apps/ui` project, not the root one.** The
+charge's default reading (add `tests/**/*.tsx` to the root `include`) is refused
+on a measurement, and the reason is the whole finding.
+
+**The hole, structurally.** Root `tsconfig.json` includes `tests/**/*.ts` and
+**excludes** `apps/ui`. `apps/ui/tsconfig.json` includes `**/*.ts` and
+`**/*.tsx` — but its globs are relative to `apps/ui/`, so repo-root `tests/`
+is outside it entirely. **23 `.tsx` test files are compiled by no project**, and
+a planted type error in one passes both published gates. AM12a's stated safety
+net for the contract-bound fixture type — *"goes red at compile time"* — is
+therefore not wired for `.tsx` call sites. The binding is still right
+(`AnswerSchema.parse` catches drift at runtime); the **net was illusory**, and I
+wrote that sentence.
+
+**Why the root include is the wrong home — baseline sweep, run first as charged:**
+
+| Project context | Diagnostics | Character |
+|---|---|---|
+| **root** `tsconfig.json` + `tests/**/*.tsx` | **325** | 172 are `TS2307 Cannot find module` for `react`, `react-dom/client`, `next/link`, `@/lib/*` — artefacts of a project that excludes `apps/ui` and has no `@/` mapping, no React types, no JSX setting |
+| **`apps/ui`** `tsconfig.json` + `tests/**/*.tsx` | **12** | real diagnostics |
+
+The render tests import `apps/ui` components; they belong to the project that
+knows how to resolve them. Adding them to the root include would produce a
+325-line wall of module-resolution noise, and the seat that had to baseline it
+would baseline the noise — re-creating AM3/N9's dual-compiler defect from the
+other end.
+
+**The baseline to carry, measured (12 diagnostics), classified rather than
+dumped:**
+
+| Class | Count | Disposition |
+|---|---|---|
+| `DebatePageClient.tsx(<line>,11) TS2322` | 1 | already baselined above — the PDA-owned `AnswerExport` union |
+| `TS2724 '"next/navigation.js"' has no exported member 'setPathname'` in `auth-flow-integration`, `t3-library`, `web-auth-login` | 3 | **not a defect — fix by config.** `vitest.config.ts` aliases `next/navigation` to `tests/render/stubs/next-navigation.ts`, where `setPathname` exists; `tsc` has no such alias. The gate's tsconfig must mirror vitest's aliases via `paths`, or these three are false reds |
+| `TS7016` — no declaration file for `jsdom` (`s10-erasure-ui-render`) | 1 | dependency: add `@types/jsdom`, or baseline it |
+| genuine strictness findings — `ux01-new-debate-form` (TS2322 ×2, TS18046 ×3), `s10-erasure-ui-render` TS2322, `s5-session-controls` TS2769 | 7 | **fix or baseline individually, each with a stated reason.** These are real |
+
+**The gate this becomes — per this ADR's own gate law (name the config, the
+gate, and the invocation directory):**
+
+- **Config:** a new `tsconfig.tests.json` at the workspace root that `extends`
+  `apps/ui/tsconfig.json`, sets `include: ["../../tests/**/*.tsx"]` (or an
+  equivalent rooted glob), and mirrors `vitest.config.ts`'s aliases in `paths`
+  so the harness stubs resolve the way they resolve at run time.
+- **Which gate:** it joins the existing **0-new compile gate** as a second
+  `-p` invocation, under the same fail-loud guards (workspace-root walk,
+  `pnpm exec tsc --version` liveness) and the same line-agnostic, count-pinned
+  baseline discipline. One gate, two projects — not a second gate a seat can
+  forget.
+- **Invocation directory:** the pnpm workspace root, resolved by the upward walk
+  already published above. Unchanged.
+
+**Owner: routed row R-4.** The tsconfig is a config file and this amendment
+writes none — ARCH names the gate, a worker wires it. It is **systemic, not
+T1-C2's**: every render-test pin in the mission has been unchecked, so it does
+not belong to whichever cluster happened to surface it.

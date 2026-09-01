@@ -476,3 +476,67 @@ should treat it as absent rather than as evidence.
 **Measured live residual at this amendment, with both guards satisfied:** `1`,
 in `apps/ui/components/SynthesisPanel.tsx` — owned by **T1-C3 (row 9)**, which
 writes that file, so it is on-track and not a residual without an owner.
+
+## 2026-09-01 — AM13/N11: `--surface-sunken` is `--shell`, and the state bezel is invisible (trigger: CODE-T1C2-REV2, `t_109c2c42`)
+
+**Measured on the shipped stylesheet:**
+
+```
+--shell           Terracotta #EFE9E0   Chamber #221D17
+--surface-sunken  Terracotta #EFE9E0   Chamber #221D17
+IDENTICAL in both modes: True
+```
+
+So a state card (empty / abandoned / failed) paints its core the same bytes as
+the shell around it: the double bezel T1 R2 requires survives only on healthy
+cards, and the cards a reader most needs to tell apart are the ones that lose
+it. This is the sharpest instance of the names-vs-values through-line this
+mission keeps hitting — swapping `sunken → shell` changes **zero pixels** and
+still flips a pin, because the pin reads the name.
+
+**This is LIVE, not hypothetical.** T1-C2's rework landed (`0cf36149`), and the
+state fill is shipped: `DebateCanvas.tsx:311` and `:376` both set
+`background: "var(--surface-sunken)"`. So on the current tree, empty / abandoned
+/ failed cards already render a single flat surface in both modes. The routed row
+below is a fix for a defect a reader can see today, not a precaution.
+
+**RULING: MINT a state-surface token. Re-valuing `--surface-sunken` is REFUSED,
+and the cost is the reason.**
+
+| Option | Cost, measured | Verdict |
+|---|---|---|
+| **Re-value `--surface-sunken`** | it is the worst-case surface in **all 34 rows** of the published contrast table (`token-inventory` §"the worst surface is `--surface-sunken`"; 37 occurrences in that file). Changing its value **invalidates every row** and requires a full re-measurement plus a wave-0 reopen | **REFUSED** |
+| **Mint `--surface-state` (+ `-2` if a second depth is needed)** | **zero ADR-001 residual** — new declarations live inside the `:root` / `html[data-mode="chamber"]` blocks, which the range-pair oracle exempts by construction. The 34-row table is untouched. Cost is two values and one new contrast obligation | **RULED** |
+| **Ratify the flat look** | free | **REFUSED** — T1 R2 requires the double bezel on tree/canvas cards, and state cards are tree/canvas cards. Ratifying would make the affordance conditional on a card being healthy, which inverts who needs it |
+
+**A correction to the finding as filed, made in the reviewer's favour.** The
+ticket says *"the reviewer measured EVERY in-contract token — none distinct from
+`--shell` in both modes."* Widening the search past the contract, **83 tokens
+are distinct from `--shell` in both modes**, ~30 of them surface-family. The
+reviewer's statement is true of the in-contract set they were bounded to; it is
+not true of the palette, and a later reader must not conclude the palette is
+exhausted. **Reuse was still rejected on semantics, not scarcity:**
+`--surface-2` is the nearest candidate and it reads *raised* in Terracotta
+(`#F4F0E8`, lighter than `--shell`) while reading *sunken* in Chamber
+(`#171310`, darker). A token whose depth reverses between modes is worse than a
+flat one.
+
+**Constraints the minted token must satisfy — the implementing row measures
+these; this ADR does not publish an unmeasured colour:**
+
+1. Distinct from `--shell` **and** from `--core` in **both** modes.
+2. Reads **recessed in both modes** — same direction relative to `--core` in
+   Terracotta and Chamber. This is the constraint that rejected `--surface-2`.
+3. Every text token that lands on a state card meets **ADR-005**'s floors
+   against it (4.5:1 text, 3.0:1 meaning-bearing non-text), measured and
+   published as new rows — the existing 34 are **not** re-derived, because
+   `--surface-sunken` is untouched.
+4. Declared in **both** token blocks, so the mode-parity pin in
+   `t9-mode-tokens.test.ts` stays total.
+
+**Owner: routed row R-5.** `globals.css` has exactly two writers — T9-C3
+(wave 0, closed) and T3-C1 (row 3, one named rule only) — so neither can take a
+new token. R-5 is a **token addendum**: it mints the token in both blocks,
+publishes its contrast rows, and re-points the state-card rule. It is **not**
+folded into the live T1-C2 rework: that seat writes `DebateCanvas`/`scrutiny`,
+not the token blocks, and mid-rework token edits are how wave-0 discipline dies.

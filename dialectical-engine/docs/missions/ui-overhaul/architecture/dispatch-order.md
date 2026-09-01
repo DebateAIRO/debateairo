@@ -1669,3 +1669,54 @@ and bumping it to 21 would fix the instance and keep the class.
 published markdown — **32 rows, 5 exemptions, 0 violations**. No Writes or Verify
 column moved; the two gate blocks changed only inside the acceptance-defaults
 text, and row 8 was not touched.
+
+### 2026-09-01 — AM13: two rulings, two routed rows (anchors `t_bef5e6da`, `t_109c2c42`)
+
+| # | Item | Ruling | Measurement |
+|---|---|---|---|
+| N10 | nothing type-checks `tests/**/*.tsx` | **WIRE IT → routed row R-4**, into the **`apps/ui`** project, **not** the root include | 23 `.tsx` test files compiled by no project. Root context: **325** diagnostics, 172 of them module-resolution noise. `apps/ui` context: **12**, real |
+| N11 | `--surface-sunken` ≡ `--shell` in both modes | **MINT a state-surface token → routed row R-5.** Re-value REFUSED; ratify-flat REFUSED | identical bytes both modes (`#EFE9E0` / `#221D17`); `--surface-sunken` is the worst-case surface in **all 34** published contrast rows |
+
+#### R-4 — wire `tests/**/*.tsx` into the 0-new gate (owner: a worker; systemic, not T1-C2's)
+
+Full ruling, baseline table and gate wiring: `ADR-006` §AM13/N10. The short form:
+
+- The obvious fix — adding `tests/**/*.tsx` to the **root** `include` — is
+  **refused on measurement**: the root project excludes `apps/ui`, so the render
+  tests' own imports produce 172 `TS2307`s. A seat baselining that would baseline
+  noise, re-creating AM3/N9's dual-compiler defect from the other end.
+- New `tsconfig.tests.json` extends `apps/ui/tsconfig.json`, mirrors
+  `vitest.config.ts`'s aliases in `paths` (three of the twelve diagnostics are
+  `setPathname` false-reds that the alias cures), and joins the **existing**
+  0-new gate as a second `-p` — one gate, two projects, same fail-loud guards and
+  the same line-agnostic count-pinned baseline discipline.
+- Baseline to carry: **1** known product error, **3** alias false-reds to cure by
+  config, **1** missing `@types/jsdom`, **7** genuine strictness findings to fix
+  or individually baseline with a reason.
+- **This amendment writes no config.** ARCH names the gate; a worker wires it.
+
+**Why it is not routed to a T1 cluster:** every render-test pin in the mission
+has been unchecked since the mission began. It belongs to whoever owns the
+harness, not to the cluster that happened to surface it.
+
+#### R-5 — mint a state-surface token (owner: a token addendum)
+
+Full ruling and the four constraints: `ADR-001` §AM13/N11. The short form:
+
+- Re-valuing `--surface-sunken` would invalidate **all 34** published contrast
+  rows, since it is the worst-case surface in every one of them. Minting costs
+  **zero ADR-001 residual** — new declarations sit inside the token blocks the
+  range-pair oracle exempts by construction — and leaves the table untouched.
+- Reuse of an existing token was measured and rejected on **semantics, not
+  scarcity**: 83 tokens are distinct from `--shell` in both modes, and the
+  nearest surface-family candidate (`--surface-2`) reverses depth between modes.
+- `globals.css`'s two writers are T9-C3 (wave 0, closed) and T3-C1 (one named
+  rule), so neither can take a new token — hence a dedicated addendum.
+- **Not folded into the live T1-C2 rework.** That seat writes `DebateCanvas` and
+  `scrutiny`, not the token blocks; mid-rework token edits are how wave-0
+  discipline dies.
+
+**Verification for this amendment:** AM5 ownership invariant re-run on the
+published markdown — **32 rows, 5 exemptions, 0 violations**. **No row moved:**
+both rulings are routed rows, and neither writes a dispatch Writes or Verify
+column. Row 8 and every T1-C2 cell untouched, as in AM12b.
