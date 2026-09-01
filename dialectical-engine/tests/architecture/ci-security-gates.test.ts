@@ -17,4 +17,8 @@ describe("CI security gates (F-03)", () => {
     expect(db).toContain('package-ecosystem: "npm"'); expect(db).toContain('directory: "/dialectical-engine"');
     expect(db).toContain('package-ecosystem: "github-actions"'); expect(db.match(/interval: "weekly"/g)?.length).toBe(2);
   });
+  it("ships SECURITY.md with a disclosure route", () => {
+    expect(existsSync(resolve(gitRoot, "SECURITY.md"))).toBe(true);
+    expect(read("SECURITY.md")).toContain("Report a vulnerability");
+  });
 });
