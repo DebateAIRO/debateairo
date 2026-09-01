@@ -130,3 +130,26 @@ Every entry below was paid for at least once. Do not pay for it again.
   mid-change; only a content grep (`grep -c review_outcome`) caught it, not git. COMMIT (or
   `git stash`) BEFORE any base-pair revert, and verify the restore by grepping for a token
   your change introduced — never by `git status` alone. (T6 r2)
+- **One vitest FILE = one embedded Postgres = ONE monotonic `ledger.allocate_sequence()`
+  counter shared by every test in it.** A fixture that hard-codes an `at_seq` /
+  `created_at_seq` literal is therefore a LANDMINE with a fuse: it detonates the moment
+  the file's own allocations climb to that number, and it detonates in *other people's*
+  tests, at setup, with `duplicate key value violates unique constraint
+  "run_created_at_seq_key"`. `database.test.ts` carried literals at 10001/10002/10005 with
+  only a few hundred allocations of headroom; adding ONE production scenario tripped it and
+  took out 23 unrelated tests, all failing in 1–2 ms. The symptom points at your change and
+  the cause is a decade-old constant. Diagnose by reading the DETAIL line (`Key
+  (created_at_seq)=(10001) already exists` — a suspiciously round number is the tell) and
+  `grep -oE "'s00',[0-9]+\)"`, then bisect PRODUCT vs TEST by running the file with the
+  previous round's test file against the new product code. (T6 r3)
+- **Base-pair classification: `git checkout --detach <base>` inside the lane worktree is
+  the safe form**, once the tree is committed and clean — run the gates, then `git checkout
+  <branch>`. It moves the whole tree coherently, so nothing half-reverted can compile-fail
+  in a way you then misread as a finding, and it cannot silently eat uncommitted work the
+  way the per-file `git show <sha>:<path> > <path>` form can. Verify the return by grepping
+  a token your change introduced, not by `git status`. (T6 r3)
+- **A parameterised INSERT built from string fragments must reference EVERY `$n` you bind.**
+  Postgres rejects the round trip with `bind message supplies 6 parameters, but prepared
+  statement "" requires 3` — which reads like a driver bug, not like a probe that varies its
+  own SQL. Pass the varying values as parameters (`$4,$5,$6`) and let them be NULL, instead
+  of interpolating `NULL` / `'literal'` into the statement text. (T6 r3)
