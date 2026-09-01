@@ -291,6 +291,37 @@ describe("D10 Grok relay binary resolution", () => {
     }
   });
 
+  // r2 regression arms (codex r1 B1) — see claude-relay.test.ts for the rule.
+  it("selects the test command seam when the override is blank, instead of throwing the override's code", async () => {
+    const previous = process.env.ACCEPTANCE_GROK_BINARY;
+    process.env.ACCEPTANCE_GROK_BINARY = "  ";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("grok-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_GROK_BINARY;
+      else process.env.ACCEPTANCE_GROK_BINARY = previous;
+    }
+  });
+
+  it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_GROK_COMMAND_FORBIDDEN when the override is blank", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_GROK_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_GROK_BINARY = "  ";
+    try {
+      await expect(startGrokRelay({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      })).rejects.toThrow("TEST_ONLY_GROK_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_GROK_BINARY;
+      else process.env.ACCEPTANCE_GROK_BINARY = previous;
+    }
+  });
+
   it("spawns the binary named by ACCEPTANCE_GROK_BINARY rather than the compiled-in default", async () => {
     const binary = await hostBinary("grok", fakeCli);
     const previous = process.env.ACCEPTANCE_GROK_BINARY;

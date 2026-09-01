@@ -176,7 +176,7 @@ export interface ClaudeRelayHandle extends CliRelayHandle {
  */
 export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<ClaudeRelayHandle> {
   const command = resolveTestGuardedCommand(
-    { binary: resolveClaudeBinary(), prefixArguments: [] },
+    () => ({ binary: resolveClaudeBinary(), prefixArguments: [] }),
     options.testOnlyCommand,
     "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
   );

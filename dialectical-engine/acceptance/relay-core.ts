@@ -96,8 +96,17 @@ export function renderPromptTranscript(messages: readonly {
   });
 }
 
+/**
+ * The default may be supplied LAZILY. A default that reads configuration can
+ * fail on its own account (see resolveConfiguredBinary), and eager evaluation
+ * of such a default would let a configuration error pre-empt this guard's own
+ * typed-loud codes — selecting or rejecting the test seam must not depend on
+ * whether an unrelated environment key happens to be well formed. This
+ * function therefore stays the sole authority for both, and only reaches for
+ * the default once no test seam is in play.
+ */
 export function resolveTestGuardedCommand(
-  defaultCommand: CommandSpec,
+  defaultCommand: CommandSpec | (() => CommandSpec),
   testOnlyCommand: CommandSpec | undefined,
   forbiddenCode: string
 ): CommandSpec {
@@ -107,7 +116,7 @@ export function resolveTestGuardedCommand(
     }
     return testOnlyCommand;
   }
-  return defaultCommand;
+  return typeof defaultCommand === "function" ? defaultCommand() : defaultCommand;
 }
 
 /**

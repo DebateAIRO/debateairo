@@ -122,7 +122,7 @@ export interface GrokRelayHandle extends CliRelayHandle {
 
 export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRelayHandle> {
   const command = resolveTestGuardedCommand(
-    { binary: resolveGrokBinary(), prefixArguments: [] },
+    () => ({ binary: resolveGrokBinary(), prefixArguments: [] }),
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );

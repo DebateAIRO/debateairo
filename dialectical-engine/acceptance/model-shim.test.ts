@@ -285,4 +285,37 @@ describe("D10 Codex shim binary resolution", () => {
       else process.env.ACCEPTANCE_CODEX_BINARY = previous;
     }
   });
+
+  // r2 regression arms (codex r1 B1) — see claude-relay.test.ts for the rule.
+  // Both arms keep testOnlyCommand supplied, so the codex default is never
+  // reached and no live provider call is possible.
+  it("selects the test command seam when the override is blank, instead of throwing the override's code", async () => {
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.ACCEPTANCE_CODEX_BINARY = "  ";
+    try {
+      const shim = await start();
+      expect(shim.model).toBe("gpt-5.6-sol");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
+  });
+
+  it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_CODEX_COMMAND_FORBIDDEN when the override is blank", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_CODEX_BINARY = "  ";
+    try {
+      await expect(startModelShim({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      })).rejects.toThrow("TEST_ONLY_CODEX_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
+  });
 });

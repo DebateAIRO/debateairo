@@ -175,7 +175,7 @@ export const codexAdapter: CliRelayAdapter = createCodexAdapter(defaultCodexSess
 
 export async function startModelShim(options: ModelShimOptions): Promise<ModelShimHandle> {
   const command = resolveTestGuardedCommand(
-    { binary: resolveCodexBinary(), prefixArguments: [] },
+    () => ({ binary: resolveCodexBinary(), prefixArguments: [] }),
     options.testOnlyCommand,
     "TEST_ONLY_CODEX_COMMAND_FORBIDDEN"
   );
