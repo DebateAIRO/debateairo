@@ -126,3 +126,19 @@ Every entry below was paid for at least once. Do not pay for it again.
   loop's `activeExpansionRound` is a per-root index, not a global round counter. It is safe
   for its existing job (triggering reviews) and wrong for anything that must happen "once per
   round". Read the PRODUCER's loop nesting before attaching to the consumer. (T7 r1)
+- `buildMultiMakerExpansionPlan(depth, effectiveMakerCount)` takes **DEPTH FIRST**
+  (apps/runner/src/index.ts:1183-1186). Both arguments are small positive integers, so
+  the reversed call builds a perfectly legal plan for a DIFFERENT shape and every
+  assertion about it is quietly about the wrong tree — only the symmetric `(2,2)` case
+  is safe from the confusion. Symptom: a generalisation loop over `(M, depth)` pairs
+  fails on the shapes you did not hand-check. Print `legs.length` and the distinct
+  `rootIndex` set before asserting. (t07 r3; two false RED failures + one diagnostic run)
+- zsh does **no word splitting on a plain scalar**, so `Z="a.ts b.ts"; vitest run $Z`
+  passes ONE argument and vitest answers `No test files found, exiting with code 1` —
+  instantly, three runs in a row, looking exactly like a broken zone. Use an array:
+  `Z=(a.ts b.ts); vitest run "${Z[@]}"`. (t07 r3; the generic form of this trap was
+  already recorded and it still cost a cluster round — the fix is the ARRAY, write it down)
+- A mutant harness that restores with `git checkout HEAD -- <file>` **destroys
+  uncommitted implementation work**, because HEAD is whatever you inherited. COMMIT the
+  GREEN state before the first mutant, then mutate against your own commit. (t07 r3;
+  caught before it fired, one harness rewrite)
