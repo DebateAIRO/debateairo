@@ -215,7 +215,9 @@ describe("P4-13 approved adversarial relay corpus", () => {
           rawArtifactRef: `artifact:${request.callSiteKey}`,
           ledgerEntryRef: `ledger:${request.callSiteKey}`,
           content: request.callSiteKey === "corpus:review"
-            ? JSON.stringify({ outcome: "cannot-assess", reasons: ["Local corpus fixture."] })
+            // T5/S3-1: the review artifact carries one bearing per offered edge.
+            // This probe offers none, so it measures none and says so.
+            ? JSON.stringify({ outcome: "cannot-assess", reasons: ["Local corpus fixture."], edge_bearings: [] })
             : validJudgeArtifact,
           provider: "openai-compatible-http",
           model: "p4-local-corpus-model",
@@ -244,6 +246,10 @@ describe("P4-13 approved adversarial relay corpus", () => {
       statement: content,
       providerRef: "corpus:provider",
       contractHash: "corpus:contract",
+      // T5/S3-1: this corpus probe reviews a bare statement that sources no
+      // graph edge, so it offers none and measures none. Empty here is the
+      // true state, not a stand-in for one.
+      edges: [],
       bound: { maxAttempts: 1, tokenCeiling: 2_048, deadlineMs: 5_000 }
     });
 
@@ -268,7 +274,13 @@ describe("P4-13 approved adversarial relay corpus", () => {
       fields: [
         { name: "question_line", content },
         { name: "author_maker", content },
-        { name: "statement", content }
+        { name: "statement", content },
+        // T5/S3-1: the edges a review is asked to measure are model-authored
+        // material too, so they are fenced in the SAME versioned untrusted-data
+        // envelope rather than concatenated into the instruction text. DELIM-01
+        // now guards that field as well; this probe offers no edges, so the
+        // fenced content is the empty list it actually sent.
+        { name: "edges_sourced_by_this_node", content: "[]" }
       ]
     });
   });
