@@ -1,0 +1,7 @@
+#!/bin/bash
+cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine || exit 1
+PACKET="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/ui-overhaul/packets/ARCH-01-AM16.md"
+LOG="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/ui-overhaul/logs/ARCH-01-AM16.log"
+echo "[launch] $(date '+%F %T') ARCH-01-AM16 resume bb69b040" | tee "$LOG"
+claude --resume bb69b040-288f-4ab3-9fad-a192a6f8663f -p "ARCH-01-AM16 (ticket t_3aa71df3): three charges while three coding fleets run in their own worktrees — rows 9/11/14 are FROZEN. (1) N13: the tier retoken was validated against one neighbour of six pairs and collided with another; re-run distinctness as a full pairwise matrix in both modes and route the fix. (2) N7: rule whether to pull R-2's role oracle forward as its own parallel slice-fleet (V's worktree law makes it cheap) or accept the debt with a mandated disclosure sentence — re-skin regressions are measured undetectable, twice. (3) Write next-wave fidelity cells for T4/T6/T7/T8, and amend the fidelity law itself with the measured capability split (codex cannot run the browser half: sandbox denies loopback listen, no Playwright — the Opus review seat measures worker-emitted DOM dumps) plus the worktree precondition (install AND generate:contract). Full charge: \$PACKET — read it fully first." --model claude-opus-5 --permission-mode bypassPermissions 2>&1 | tee -a "$LOG"
+echo "[exit] $(date '+%F %T') rc=$?" | tee -a "$LOG"

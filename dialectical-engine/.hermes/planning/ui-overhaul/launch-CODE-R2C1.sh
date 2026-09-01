@@ -1,0 +1,6 @@
+#!/bin/bash
+cd /Users/vladmihaimiron/Documents/DebateAIRO-worktrees/slice-r2/dialectical-engine || exit 1
+LOG="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/ui-overhaul/logs/CODE-R2C1.log"
+echo "[launch] $(date '+%F %T') CODE-R2C1 (codex) in $(pwd)" | tee "$LOG"
+/Applications/ChatGPT.app/Contents/Resources/codex exec -c model='"gpt-5.6-sol"' -c sandbox_mode='"workspace-write"' -c 'sandbox_workspace_write.writable_roots=["/Users/vladmihaimiron/.hermes"]' "You are CODE-R2C1, a FRESH codex coding seat, mission ui-overhaul, board ui-overhaul, ticket t_0b95c2d9, authority_epoch=36, HERMES AUTHORIZED and assigned (read both back). Row 36 in the slice/r2 worktree: build the role-token oracle — ONE new test file, no product edits. Derive the expected map from the DESIGN and token ROLES, never from current source (an oracle read off the source ratifies wrong roles instead of detecting them). Bar: mutants M10, ME, MF, MH each RED, plus a role-correct neighbour control staying GREEN. Packet (inside your own tree): .hermes/planning/ui-overhaul/packets/CODE-R2C1.md — read it fully and execute exactly." < /dev/null 2>&1 | tee -a "$LOG"
+echo "[exit] $(date '+%F %T') rc=$?" | tee -a "$LOG"

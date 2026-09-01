@@ -1,0 +1,6 @@
+#!/bin/bash
+cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine || exit 1
+LOG="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/ui-overhaul/logs/CODE-T1C1-ADD.log"
+echo "[launch] $(date '+%F %T') CODE-T1C1-ADD resume 01a05afd" | tee "$LOG"
+/Applications/ChatGPT.app/Contents/Resources/codex exec resume -c model='"gpt-5.6-sol"' -c sandbox_mode='"workspace-write"' -c 'sandbox_workspace_write.writable_roots=["/Users/vladmihaimiron/.hermes"]' 01a05afd-70e0-7962-9f49-dcb42ed172a5 "T1-C1 addendum, ticket t_81095178, authority_epoch=28, HERMES AUTHORIZED (marker on the ticket — read it back first): routed row R-3, quoted verbatim in dispatch-order item 4b — retoken DebatePageClient's four --gold bindings to --gen-*/--score-uncertainty-* (they are byte-identical in both modes; the defect is coupling, not appearance). Acceptance: before/after resolved-value table proving ZERO pixel change, scoped oracle stays 0, row-7 8-file command 3x, typecheck 0. No test-file writes. Apply-patch only, SHA pairs, freeze-law handoff on t_81095178. Parallel lanes touch scrutiny/DebateMap/docs — not yours." < /dev/null 2>&1 | tee -a "$LOG"
+echo "[exit] $(date '+%F %T') rc=$?" | tee -a "$LOG"

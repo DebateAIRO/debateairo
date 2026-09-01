@@ -158,3 +158,97 @@ $ git status --porcelain -- dialectical-engine/apps dialectical-engine/tests
 ```
 
 All three match the worker's declared apply-patch ledger exactly.
+
+---
+
+# ADDENDUM — re-verdict round on `t_81095178` / commit `af0db9af` (R-3), epoch=30
+
+Same reviewer session (`8745277b`). Charge: verify MY OWN N1 finding's fix — the four gold
+bindings retokened, worker claiming zero pixel change on 8/8 comparisons. **Verdict: PASS —
+R-3 RESOLVED**, 3 non-blocking findings (N7-N9).
+
+## The one thing worth recording from this round
+
+**I reviewed the fix to my own finding, and the interesting result was not the fix — it was that
+the worker's evidence was right by luck of two premises nobody checked.**
+
+The handoff's table is headed *"Resolved-value proof … pixel delta"* and its method is
+`getComputedStyle(documentElement).getPropertyValue` under jsdom. Measured by me:
+
+```
+terra   --gen-bg on <html>  : "#F3ECE0"          <- jsdom DOES return declared custom properties
+chamber --gen-bg on <html>  : "#342A1B"          <- and mode-switches them correctly
+element backgroundColor     : "rgba(0, 0, 0, 0)" <- jsdom does NOT substitute var()
+```
+
+So the harness compares **declared token values**, never a rendered pixel. It would print `8 ZERO`
+even if a binding site were broken, because it never renders the site. The conclusion is
+nevertheless correct — but only because of two facts the handoff neither states nor checks:
+
+1. none of the four sites carries a `var()` fallback (`var(--x, #fff)` would break the identity), and
+2. none of the seven tokens is redefined anywhere outside `globals.css`'s two token blocks
+   (a scoped override would make the root comparison irrelevant at the element).
+
+I verified both, then re-ran the entire table in a **real engine** (WebKit, 533 rules loaded), which
+substitutes `var()` for real: 8 comparisons, 0 changed, resolved RGB matching the declared hex
+exactly. **And I proved the harness could report DIFF** — swapping one probe to `--con-bg` gave
+`rgb(246,232,224)` vs `rgb(243,236,224)`, and an undeclared token resolved to `rgba(0,0,0,0)`.
+Without that discrimination step, "8 × ZERO" is indistinguishable from a stylesheet that never
+loaded — the ADR-006 false-green shape, one level up.
+
+**The upgrade:** the mission now has a standing evidence template for zero-pixel proofs, and it is
+mislabelled. Either rename it *declared-value comparison* and state the two premises as part of the
+proof, or resolve in an engine that substitutes. A jsdom "pixel delta" is not a pixel delta, and the
+next seat will copy this table.
+
+## What I nearly got wrong, again, and in the same direction as last round
+
+I nearly opened a fresh semantics argument about whether `--gen-dot` is the right role for a
+*pressure* level (it is a "generating" status token, and a pressure level is not generation). Then I
+enumerated every mode-bearing token equal to `--gold` in **both** modes:
+
+```
+--gold      (#A8823E / #C8A055)  -> identical in both modes: --gen-dot        -> non-gold options: --gen-dot ONLY
+--gold-bg   (#F3ECE0 / #342A1B)  -> --gen-bg, --score-uncertainty-bg
+--gold-text (#826530 / #C8A055)  -> --gen-text, --score-uncertainty-text
+```
+
+**The choice was forced.** Under the zero-pixel constraint that ARCH's own item 4b imposes,
+`--gen-dot` was the only legal target for `--gold`. Arguing role there would have been arguing
+against a constraint I helped create. *The general lesson for a reviewer reviewing its own finding's
+fix: check whether the remedy space had more than one member before critiquing which member was
+chosen.* Last round I nearly over-tiered by not computing values; this round I nearly over-tiered by
+not computing the option set. Same failure, one level up.
+
+## Class check, done because a finding is a sample of a class
+
+My N1 named four bindings in two files. I swept **all twelve** T1 product files for any `--gold*`
+binding: **zero**, across `DebatePageClient`, `GuideModal`, `DebateCanvas`, `DebateTree`,
+`DebateMap`, `DebateSplit`, `DebateThread`, `DebateOutline`, `ModelPresentation`,
+`debatePresentation.ts`, `scrutiny.ts`, `SynthesisPanel`. The sibling R-1 row (`d13cbd1c`, "contested
+off gold") closed T1-C2's half. The class is closed on the landed surface, and the legitimate gold
+uses are still ahead of us (T1-C3's verdict treatment, which PLAN correctly specifies as
+`--gold-text`).
+
+## The finding that should outlive this ticket
+
+**Reverting the fix is invisible to every gate.** Mutant: `--gen-bg` → `--gold-bg` in `GuideModal`.
+Scoped oracle **0**; row-7 command **8/8, 89 passed, 1 todo**; full render suite **21/21, 119 passed,
+1 todo**. Nothing fires. R-3's acceptance never asked for a pin, so this is not a worker miss — but
+it is the **second** time this session I have measured the same blindness (last round's M10 swapped
+tokens freely with everything green), and the mission has 20+ re-skin clusters left. A rule that is
+enforced only by whichever reviewer happens to look is not enforced. Filed as N7 to ARCH.
+
+## Cost note for the one-prompt machine
+
+The expensive event on this ticket was not the work — the retoken is four tokens — it was the
+**cross-lane blocker**: the worker sat in `waiting_dependency` from 09:00 to 09:31 because row-7 run 1
+was RED at a `DebateMap` hub-ring pin owned by an explicitly parallel lane. The worker did the right
+thing (rolled its own two files back to their pre-addendum SHAs, reproduced the identical failure,
+proved non-causality, restored, and blocked rather than guessed). **The router's dispatch said the
+lanes were parallel because their WRITE surfaces were disjoint — but they shared a VERIFY command.**
+That is the `VERIFY-SURVIVABILITY LAW` question asked of write surfaces only, and it is the same
+half-a-loop error TOOLING-TRAPS already records under *"Checking half a loop is not checking the
+loop"*. **Two lanes are parallel only if their verify commands are also disjoint, or if one of them
+is allowed to be red on the other's file.** Thirty-one minutes of a seat's wall clock, and it will
+recur on every remaining wave that runs two clusters at once.
