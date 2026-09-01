@@ -18,11 +18,13 @@ import { GraphRepository } from "@debateai/graph";
 import {
   Judge,
   JudgementRepository,
+  bindWayOfKnowingDowngrade,
   createUnmeasuredDisagreement,
   reduceAssessment,
   selectReducedJudgement,
   type CompositionMapRegisterRow,
-  type JudgementSelectionRule
+  type JudgementSelectionRule,
+  type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
 import {
@@ -1580,6 +1582,12 @@ export class WalkingSkeletonRunner {
       maker: primaryMaker.maker
     })]]);
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
+    // S2-3 / J5: way-of-knowing downgrades are bound to the node the graph
+    // minted, never to the work item the judge was called with (codex T4-r1 B2).
+    const wayOfKnowingDowngrades: WayOfKnowingDowngradeRecord[] = [];
+    if (judged.wayOfKnowingDowngrade !== null) {
+      wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(judged.wayOfKnowingDowngrade, nodeId));
+    }
     const hiddenReviewRecords: Array<{
       readonly nodeId: string;
       readonly record: HaltedExpansionRecord;
@@ -1694,6 +1702,9 @@ export class WalkingSkeletonRunner {
           }
           return created;
         });
+        if (childJudged.wayOfKnowingDowngrade !== null) {
+          wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
+        }
         const childReducedJudgementId = await this.#judgements.recordReduced({
           runId: run.runId,
           nodeId: childNodeId,
@@ -2077,7 +2088,9 @@ export class WalkingSkeletonRunner {
       ...(classHReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
       ...(classDReviewRecords.length > 0 ? ["DERIVED-STANDING-UNREVIEWED" as const] : []),
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
-      ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : [])
+      ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : []),
+      // S2-3 / J5: the honesty mark is only visible if it reaches the answer.
+      ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : [])
     ]);
     const factBundle: FactBundle = buildFactBundle({
       facts: Object.freeze([servedRoot.statement]),
@@ -2196,6 +2209,25 @@ export class WalkingSkeletonRunner {
         callSiteKey: record.callSiteKey,
         plannedLegCount: record.plannedLegCount,
         terminalTransportOutcome: record.terminalTransportOutcome,
+        hiddenStrength: null,
+        hiddenScoreThreshold: null,
+        hiddenScoreThresholdSourceRef: null,
+        excludedFromServedNumber: null
+      })),
+      // S2-3 / J5: one typed record per downgraded node, projected onto that
+      // node through `affectedNodeIds` so the disclosure is visible where the
+      // override happened — not only on the answer.
+      ...wayOfKnowingDowngrades.map((record): ConditionMarkRecord => Object.freeze({
+        mark: "WAY-OF-KNOWING-DOWNGRADED",
+        scope: "node",
+        subjectRef: record.subjectRef,
+        reason: record.reason,
+        liftPath: "Re-ask with a source the judge can pin, or read the node as reasoning",
+        servedRootRule: null,
+        affectedNodeIds: Object.freeze([record.subjectRef]),
+        callSiteKey: null,
+        plannedLegCount: null,
+        terminalTransportOutcome: null,
         hiddenStrength: null,
         hiddenScoreThreshold: null,
         hiddenScoreThresholdSourceRef: null,

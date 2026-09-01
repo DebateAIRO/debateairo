@@ -38,6 +38,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "NON-COMPARABLE": return "Results are not compute-matched";
     case "NOT_SAMPLED": return "Not sampled";
     case "OFF-SUBJECT-DOWNGRADE": return "Off-subject evidence downgraded";
+    case "WAY-OF-KNOWING-DOWNGRADED": return "Claimed lookup had no locator";
     case "AMENDED-SEARCH": return "Search amended during run";
     case "MISSING-NUMBER": return "Number removed after replay failure";
     case "OWED-CHECK-UNEXECUTED": return "Owed check not executed at completion";

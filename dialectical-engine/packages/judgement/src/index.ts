@@ -23,9 +23,75 @@ import {
 
 export * from "./s04.js";
 
+/**
+ * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. Nothing in the
+ * engine could ever execute anything on the judge's behalf, so the label was
+ * unreachable and its only real use was to dress a guess as a measurement.
+ * This constant is the ONE source both change sites read — the strict artifact
+ * schema below and the declared prompt schema in `Judge.judge` — so the two can
+ * no longer drift apart the way they had.
+ */
+export const JUDGE_WAYS_OF_KNOWING = ["LOOKED_UP", "REASONING"] as const;
+export type JudgeClaimedWayOfKnowing = typeof JUDGE_WAYS_OF_KNOWING[number];
+
+const JUDGE_WAY_OF_KNOWING_UNION = JUDGE_WAYS_OF_KNOWING.map((way) => `"${way}"`).join(" | ");
+
+/**
+ * S2-3: the honesty mark that discloses a downgraded way-of-knowing claim.
+ * Emitted by normalization, never by a caller.
+ */
+export const WAY_OF_KNOWING_DOWNGRADED = "WAY-OF-KNOWING-DOWNGRADED" as const;
+
+/**
+ * S2-3: what the JUDGE layer knows about a downgrade. Deliberately carries no
+ * subject: at judge time the graph node does not exist yet, and the judge is
+ * called with a WORK-ITEM id. A type that cannot hold a node id cannot name the
+ * wrong one (codex T4-r1 B2).
+ */
+export interface WayOfKnowingDowngrade {
+  readonly claimedWayOfKnowing: JudgeClaimedWayOfKnowing;
+  readonly resolvedWayOfKnowing: WayOfKnowing;
+}
+
+/**
+ * S2-3: the persistable condition-mark record. `subjectRef` is a REAL node id,
+ * so this can only be built by the caller that created the node — see
+ * `bindWayOfKnowingDowngrade`.
+ */
+export interface WayOfKnowingDowngradeRecord extends WayOfKnowingDowngrade {
+  readonly mark: typeof WAY_OF_KNOWING_DOWNGRADED;
+  readonly scope: "node";
+  readonly subjectRef: string;
+  readonly reason: string;
+}
+
+/**
+ * S2-3: bind a judge-time downgrade to the node the graph actually minted.
+ * Call it only after `addNode` has returned an id.
+ */
+export function bindWayOfKnowingDowngrade(
+  downgrade: WayOfKnowingDowngrade,
+  nodeId: string
+): WayOfKnowingDowngradeRecord {
+  if (nodeId.trim() === "") {
+    throw new TypedDomainError(
+      "WAY_OF_KNOWING_DOWNGRADE_NODE_UNRESOLVED",
+      "A way-of-knowing downgrade cannot be recorded without the node it concerns"
+    );
+  }
+  return Object.freeze({
+    mark: WAY_OF_KNOWING_DOWNGRADED,
+    scope: "node",
+    subjectRef: nodeId,
+    claimedWayOfKnowing: downgrade.claimedWayOfKnowing,
+    resolvedWayOfKnowing: downgrade.resolvedWayOfKnowing,
+    reason: `Node ${nodeId} claimed way of knowing ${downgrade.claimedWayOfKnowing}; normalization resolved ${downgrade.resolvedWayOfKnowing}. A LOOKED_UP claim keeps its label only when it carries a resolving locator.`
+  });
+}
+
 const judgeArtifactSchema = z.object({
   statement: z.string().trim().min(1),
-  way_of_knowing: z.enum(["LOOKED_UP", "RAN", "REASONING"]),
+  way_of_knowing: z.enum(JUDGE_WAYS_OF_KNOWING),
   locator: z.string().trim().min(1).nullable(),
   restatement_text: z.string().trim().min(1),
   restatement_status: z.enum(["PASS", "FAIL", "NOT_SAMPLED"]),
@@ -84,6 +150,13 @@ export interface JudgedNode {
   readonly statement: string;
   readonly wayOfKnowing: WayOfKnowing;
   readonly locator: string | null;
+  /**
+   * S2-3: non-null exactly when normalization resolved a way of knowing the
+   * judge did not claim. `null` means the claim survived untouched — the
+   * absence is itself an assertion, not a missing field. The caller binds it to
+   * the real node id with `bindWayOfKnowingDowngrade` before persisting.
+   */
+  readonly wayOfKnowingDowngrade: WayOfKnowingDowngrade | null;
   readonly restatementText: string;
   readonly restatementStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
   readonly provenanceRef: string;
@@ -127,7 +200,7 @@ export class Judge {
           content: `Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:
 {
   "statement": non-empty string,
-  "way_of_knowing": "LOOKED_UP" | "RAN" | "REASONING",
+  "way_of_knowing": ${JUDGE_WAY_OF_KNOWING_UNION},
   "locator": non-empty string | null,
   "restatement_text": non-empty string,
   "restatement_status": "PASS" | "FAIL" | "NOT_SAMPLED",
@@ -189,11 +262,20 @@ Never invent evidence, citations, or sources. Score relevance against the questi
     } catch (error) {
       throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", error instanceof Error ? error.message : String(error));
     }
-    const pinnedLookup = parsed.value.way_of_knowing === "LOOKED_UP" && parsed.value.locator !== null;
+    const claimedWayOfKnowing = parsed.value.way_of_knowing;
+    const pinnedLookup = claimedWayOfKnowing === "LOOKED_UP" && parsed.value.locator !== null;
+    const resolvedWayOfKnowing: WayOfKnowing = pinnedLookup ? "LOOKED_UP" : "REASONING";
     return {
       statement: parsed.value.statement,
-      wayOfKnowing: pinnedLookup ? "LOOKED_UP" : "REASONING",
+      wayOfKnowing: resolvedWayOfKnowing,
       locator: pinnedLookup ? parsed.value.locator : null,
+      // S2-3: normalization never absorbs a claim it overrode. The condition is
+      // derived from the PROPERTY — resolved differs from claimed — not from
+      // the one case that satisfies it today. The NODE is bound by the caller
+      // once the graph has minted it (`bindWayOfKnowingDowngrade`).
+      wayOfKnowingDowngrade: resolvedWayOfKnowing === claimedWayOfKnowing
+        ? null
+        : Object.freeze({ claimedWayOfKnowing, resolvedWayOfKnowing }),
       restatementText: parsed.value.restatement_text,
       restatementStatus: parsed.value.restatement_status,
       provenanceRef: response.rawArtifactRef,

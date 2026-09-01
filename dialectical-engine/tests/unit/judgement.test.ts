@@ -48,7 +48,8 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
   it("declares the complete strict artifact schema so a provider can return ruled judge JSON", async () => {
     const requiredSchemaFragments = [
       '"statement": non-empty string',
-      '"way_of_knowing": "LOOKED_UP" | "RAN" | "REASONING"',
+      // S2-3 (goal-v4 T4): RAN left the declared schema with the strict parser.
+      '"way_of_knowing": "LOOKED_UP" | "REASONING"',
       '"locator": non-empty string | null',
       '"restatement_text": non-empty string',
       '"restatement_status": "PASS" | "FAIL" | "NOT_SAMPLED"',
