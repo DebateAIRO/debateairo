@@ -802,12 +802,148 @@ clusters own one block each and never edit the same hunk.
 | # | Cluster | Writes | Verify |
 |---|---|---|---|
 | 7 | **T1-C1** — debate chrome, view toggles, ☾ mount | `apps/ui/app/debate/[id]/DebatePageClient.tsx` · `apps/ui/components/GuideModal.tsx` · `tests/render/t1-canvas.test.tsx` · `tests/unit/pda-s02-affordance-drift.test.ts` · `tests/unit/v2ui-pages.test.ts` | `pnpm exec vitest run tests/render/bug02-debate-effects.test.tsx tests/render/load01-debate-page.test.tsx tests/render/t1-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/v2ui-pages.test.ts` |
-| 8 | **T1-C2** — card anatomy, stance tab, connectors | `apps/ui/components/DebateCanvas.tsx` · `DebateTree.tsx` · `DebateMap.tsx` · `DebateSplit.tsx` · `DebateThread.tsx` · `DebateOutline.tsx` · `ModelPresentation.tsx` · `apps/ui/lib/debatePresentation.ts` · `apps/ui/lib/scrutiny.ts` · `tests/render/t1-canvas.test.tsx` · `tests/render/ui02e-debate-canvas.test.tsx` · `tests/unit/v2ui-pages.test.ts` | `pnpm exec vitest run tests/render/bug02-debate-effects.test.tsx tests/render/load01-debate-page.test.tsx tests/render/t1-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/v2ui-pages.test.ts` |
+| 8 | **T1-C2** — card anatomy, stance tab, connectors | `apps/ui/components/DebateCanvas.tsx` · `DebateTree.tsx` · `DebateMap.tsx` · `DebateSplit.tsx` · `DebateThread.tsx` · `DebateOutline.tsx` · `ModelPresentation.tsx` · `apps/ui/lib/debatePresentation.ts` · `apps/ui/lib/scrutiny.ts` · `tests/render/t1-canvas.test.tsx` · `tests/render/ui02e-debate-canvas.test.tsx` · `tests/unit/v2ui-pages.test.ts` · `tests/support/v2uiFixtures.ts` (**the review-helper type only** — AM12a/T1-C2-5) | `pnpm exec vitest run tests/render/bug02-debate-effects.test.tsx tests/render/load01-debate-page.test.tsx tests/render/prov01-honesty-drawer.test.tsx tests/render/t1-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/v2ui-data-layer.test.ts tests/unit/v2ui-export.test.ts tests/unit/v2ui-ownership.test.ts tests/unit/v2ui-pages.test.ts` |
 | 9 | **T1-C3** — set-aside, synthesis, publicMode | `apps/ui/components/DebateCanvas.tsx` · `apps/ui/components/SynthesisPanel.tsx` · `tests/render/t1-canvas.test.tsx` · `tests/render/ui02e-debate-canvas.test.tsx` · `tests/unit/v2ui-pages.test.ts` | `pnpm exec vitest run tests/render/bug02-debate-effects.test.tsx tests/render/load01-debate-page.test.tsx tests/render/pda-s02-public-tree.test.tsx tests/render/t1-canvas.test.tsx tests/render/ui02d-model-identity.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/v2ui-pages.test.ts` |
 | 10 | **T1-C4** — render-pin migration for T1 | `tests/render/ui02e-debate-canvas.test.tsx` · `tests/unit/pda-s02-affordance-drift.test.ts` | `pnpm exec vitest run tests/render/bug02-debate-effects.test.tsx tests/render/load01-debate-page.test.tsx tests/render/ui02d-model-identity.test.tsx tests/render/ui02e-debate-canvas.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts` |
 | 11 | **T5-C1** — drawer open + core sections | `apps/ui/components/NodeDetailDrawer.tsx` · `tests/render/t5-drawer.test.tsx` · `tests/unit/v2ui-pages.test.ts` | `pnpm exec vitest run tests/render/pda-s02-public-tree.test.tsx tests/render/prov01-honesty-drawer.test.tsx tests/render/t5-drawer.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/v2ui-pages.test.ts` |
 | 12 | **T5-C2** — actions, history, mode | `apps/ui/components/NodeDetailDrawer.tsx` · `tests/render/t5-drawer.test.tsx` · `tests/unit/v2ui-pages.test.ts` | `pnpm exec vitest run tests/render/pda-s02-public-tree.test.tsx tests/render/prov01-honesty-drawer.test.tsx tests/render/t5-drawer.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/t9-mode-tokens.test.ts tests/unit/v2ui-pages.test.ts` |
 | 13 | **T5-C3** — render-pin migration for T5 | `tests/unit/v2ui-pages.test.ts` (T5 slice-close residual only — see the note below) | `pnpm exec vitest run tests/render/pda-s02-public-tree.test.tsx tests/render/prov01-honesty-drawer.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pda-s02-affordance-drift.test.ts tests/unit/pol01-policy.test.ts tests/unit/v2ui-pages.test.ts` |
+
+#### T1-C2 rework cells — T1-C2-5 and T1-C2-6 (AM12a)
+
+Both come from the T1-C2 RW1 review and both are **cell defects, not worker
+defects**: the worker implemented what row 8 and PLAN HOW enumerate. PLAN stays
+frozen; these dispatch cells are dispatch truth and supersede the enumerations
+named below (AM7/AM8/AM10 practice).
+
+**B2 — the review-mark enumeration is not a partition.** The contract union is
+`agree | dispute | cannot-assess` (`packages/contract/src/index.ts:417`,
+`NodeReviewSchema`); the enumeration says `agreed | disputed | absent`. The
+shipped ternary (`DebateCanvas.tsx:251-255`) maps two and lets the third fall
+into the `else`. Probe run in this amendment over the **full** union rather than
+over the fixtures:
+
+```
+review state                       data-node-review (shipped)   data-review (shipped)  data-review (amended)
+completed: agree                   agree                        agreed                 agreed
+completed: dispute                 dispute                      disputed               disputed
+completed: cannot-assess           cannot-assess                absent                 unassessed
+no review at all                   absent                       absent                 absent
+
+shipped data-review distinct values: agreed | disputed | absent  -> 4 states collapse to 3
+```
+
+**A completed `cannot-assess` review and no review at all render identically.**
+Those are different facts: a `cannot-assess` review is a *recorded finding* with
+`reasons`, `provenance_ref` and `reviewer_lineage` (all required by
+`NodeReviewSchema`), while `absent` means the review never happened. Folding a
+recorded honest "I could not assess this" into "nothing here" is the same class
+this repo pins against elsewhere — `Not exposed by scoring API` rather than a
+fabricated zero, and T7's `no worker state is fabricated`. **So the fold is
+refused and the mapping goes total.**
+
+The sibling attribute on the same element already carries the value —
+`data-node-review={v3Review?.outcome ?? "absent"}` (`DebateCanvas.tsx:445`) is
+total today — so this costs one ternary arm, not a new data path.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T1-C2-5** (new, supersedes the `agreed\|disputed\|absent` enumeration in row 8 and PLAN T1-C2 HOW) | R3 · contract `NodeReviewSchema` | `data-review` is a **total** function of the review state — four states, four values, no collision | In `tests/render/t1-canvas.test.tsx` (T1-C2's file): render a canvas whose fixtures carry, on four different nodes, each of `agree`, `dispute`, `cannot-assess`, and **no review**, and assert `data-review` is `agreed`, `disputed`, `unassessed`, `absent` respectively. **The `cannot-assess` row is the one that must go RED against the shipped ternary** — prove it. Also assert the four values are pairwise distinct, so a future fold cannot pass. The dot colour MAY remain `--muted` for both `unassessed` and `absent`: the dot is `aria-hidden="true"` decoration and the distinction lives in the attribute, so no new colour token is required and none is authorised here |
+
+**Fixture-type widening — RULED, and it is why no RED existed.**
+`tests/support/v2uiFixtures.ts:18` types the helper
+`(outcome: "agree" \| "dispute", …)`, a hand-written copy of two thirds of the
+contract union, so `cannot-assess` was **unconstructible** in any fixture. The
+type is widened — and **not by hand-copying the third member**. It binds to the
+contract:
+
+```ts
+import type { NodeReview } from "@debateai/contract";   // exported: index.ts:422
+const review = (outcome: NodeReview["outcome"], reviewer: string) => ({ … });
+```
+
+This is AM11/N9's rule applied one layer down: **an alarm that restates the
+contract cannot detect the contract moving.** A hand-widened
+`"agree" | "dispute" | "cannot-assess"` would be correct today and silently stale
+the next time the union changes; `NodeReview["outcome"]` goes red at compile time
+instead. `tests/support/` is inside T1-C2's write surface for this mission's
+support files, and the ADR-006 compile gate is the thing that will catch a
+regression here.
+
+**N4 — four stances, three line tokens: RULED, root gets its own binding.**
+Measured: `Role = "root" | "pro" | "con" | "pov"` (`debatePresentation.ts:8`),
+`stance = role === "pov" ? "reasoning" : role` (`DebateCanvas.tsx:232`), so
+`data-stance ∈ {root, pro, con, reasoning}` — PLAN's four are right. But
+`stanceLine` has three arms with a catch-all `else`, so **root paints
+`--reasoning-line`**, and that line is the `background` of `nodeStanceTab`
+(`DebateCanvas.tsx:347`), which every card renders — the root included.
+
+**Ratifying `root = reasoning` is refused, on SPEC evidence:**
+
+| Source | Says |
+|---|---|
+| `T1-S3` | *"Root claim card \| ROOT CLAIM + question text; claims/depth meta"* — no stance, no type chip, no model line |
+| `T1-S4` | *"Argument cards \| Stance tab color; type (**REASONING / PRO / CON**)"* — the stance-tab colour belongs to argument cards, whose types are exactly three |
+| design `:495-499` | the ROOT CLAIM card carries `32 claims / depth 4` and nothing else; the `◆ REASONING` at `:500` opens the next card |
+| `DebateCanvas.tsx:231` | the code already special-cases root once — `pal = role === "root" ? null : …` |
+
+Painting the root reasoning-blue asserts a card type the SPEC's own inventory
+does not give it. The collapse is an accident of a catch-all `else`, not a
+decision.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T1-C2-6** (new, supersedes PLAN T1-C2 HOW's three-token list at `PLAN.md:97`) | R2 · R4 · T1-S3/S4 | Every one of the four `data-stance` values has an **explicit** line binding; root reads as structural, not as an argument type | `stanceLine` becomes exhaustive over the four stances with **no catch-all**: `pro → var(--pro-line)`, `con → var(--con-line)`, `reasoning → var(--reasoning-line)`, `root → var(--line-strong)`. In `tests/render/t1-canvas.test.tsx`, assert the root card's `nodeStanceTab` background resolves to `var(--line-strong)` and **differs from** the reasoning card's. Prove RED against the shipped catch-all |
+
+**Why `--line-strong`, and the costs measured.** It is an **existing wave-0
+token**, declared in both blocks (`globals.css:13` Terracotta
+`rgba(41,38,31,.20)`, `:81` Chamber `rgba(242,234,217,.18)`), so the **ADR-001
+cost is zero** — no new colour literal enters any file and neither the wave-0 nor
+the mission-final oracle moves. It is a neutral hairline, which is exactly the
+reading T1-S3 wants: structural, not a stance.
+
+**It is deliberately NOT added to `ADR-005`'s 3:1 non-text list.** That list
+(`--pro-line`, `--con-line`, `--gold-line`, `--reasoning-line`, `--focus`) covers
+marks that *carry* meaning. The root tab carries the **absence** of stance; the
+meaning is carried by the `ROOT CLAIM` label as text, and nothing is lost if the
+tab is barely visible. Stated so no later seat "fixes" its contrast and
+re-introduces a stance colour on a card that has no stance.
+
+**Rejected alternative, recorded:** suppressing the tab element entirely for the
+root. Semantically cleanest, but it deletes the `nodeStanceTab[data-stance]`
+carrier that `T1-C2-1` and `T1-C2-6` both query, and a missing element and a
+neutral element are not equally easy to assert. Colour binding is the smaller,
+lower-risk change and answers the charge as asked.
+
+**Row 8's write surface DOES change, and this is the correction that matters.**
+My first draft of this section asserted *"no write-surface change ... 
+`tests/support/v2uiFixtures.ts` is support scaffolding for the same cluster"*.
+**That was false and I checked it before publishing it.** Measured:
+
+```
+$ grep -n 'v2uiFixtures' dispatch-order.md          # rows listing it as a write: NONE
+$ grep -rln 'v2uiFixtures' tests/
+tests/unit/v2ui-data-layer.test.ts   tests/unit/v2ui-ownership.test.ts
+tests/unit/v2ui-export.test.ts       tests/render/ui02e-debate-canvas.test.tsx
+tests/render/load01-debate-page.test.tsx  tests/render/prov01-honesty-drawer.test.tsx
+tests/render/t1-canvas.test.tsx      tests/render/bug02-debate-effects.test.tsx
+```
+
+The file was owned by **no row in 32** and is read by **eight tests**. Shipping
+`T1-C2-5` on the earlier claim would have handed T1-C2 an acceptance requiring a
+write outside its contract — the AF-1 class, authored by me, inside the
+amendment fixing two other cell defects. So:
+
+- `tests/support/v2uiFixtures.ts` is added to row 8's write surface, **scoped to
+  the review-helper type** and nothing else.
+- Row 8's verify gains the four importers it did not already run —
+  `v2ui-data-layer`, `v2ui-ownership`, `v2ui-export`, `prov01-honesty-drawer` —
+  per guard rail 3 (*if you write it, you run it*). The other four importers
+  (`ui02e`, `load01`, `bug02`, `t1-canvas`) were already in row 8's command.
+- The change is **type-widening on a parameter**, so it is additive: every
+  existing call site passing `"agree"` or `"dispute"` still compiles, and no
+  fixture VALUE changes. That is why eight readers can be touched safely, and it
+  is the reason the ADR-006 compile gate is the right net for it.
 
 T1-C2 and T1-C3 both write `DebateCanvas.tsx`; T5-C1 and T5-C2 both write
 `NodeDetailDrawer.tsx`. **Serialised in the order shown** — same file, same
@@ -1337,3 +1473,48 @@ cell describes, is there a row for the other side?*
 invariant holds at **32 rows, 5 exemptions, 0 violations**. AM11 changed no
 Writes and no Verify column — both amended cells live inside row 4's existing
 write surface — and the check was re-run rather than assumed.
+
+### 2026-09-01 — AM12a: an enumeration that was not a partition, and a ternary with a catch-all (trigger: T1-C2 RW1 review, ticket `t_33f1eb6a` — B2 and N4)
+
+Both blockers are **cell defects**. The worker implemented row 8 and PLAN HOW as
+written; the enumerations were wrong.
+
+**B2.** `agreed | disputed | absent` is not a partition of
+`agree | dispute | cannot-assess`. Probed over the full union rather than over
+the fixtures: a **completed** `cannot-assess` review and **no review at all**
+both render `data-review="absent"`. Those are different facts — `cannot-assess`
+carries required `reasons`, `provenance_ref` and `reviewer_lineage` — and folding
+a recorded honest "could not assess" into "nothing here" is the failure this
+repo pins against elsewhere (`Not exposed by scoring API`, `no worker state is
+fabricated`). Mapping made total; the fold refused.
+
+The fixture gap is the interesting half: the helper was typed
+`"agree" | "dispute"` by hand, so the third member was **unconstructible** and no
+RED could exist. Ruled — widen, but bind to the contract
+(`NodeReview["outcome"]`), not by hand-copying the third member.
+**AM11/N9's rule one layer down: a copy of the contract cannot detect the
+contract moving.**
+
+**N4.** `Role` has four members and `stanceLine` has three arms plus a catch-all,
+so the root card paints `--reasoning-line` on a tab every card renders. Ratifying
+`root = reasoning` was refused on SPEC evidence — `T1-S3` gives the root card no
+stance, no type chip and no model line, while `T1-S4` scopes stance-tab colour to
+argument cards typed `REASONING / PRO / CON`. Root binds to `--line-strong`, an
+existing wave-0 token in both blocks, so the **ADR-001 cost is zero** and no new
+colour literal enters any file. Deliberately **not** added to `ADR-005`'s 3:1
+non-text list, with the reason stated in the cell so nobody "fixes" it later.
+
+**What this amendment got wrong before publishing, and caught.** The section
+first claimed *"no write-surface change"* for both cells. `grep` says
+`tests/support/v2uiFixtures.ts` is owned by **no row in 32** and read by **eight
+tests**. Publishing that claim would have handed T1-C2 an acceptance requiring a
+write outside its contract — AF-1, authored by me, inside the amendment fixing
+two other cell defects. Row 8 now carries the file scoped to the review-helper
+type, and its verify gains the four importers it did not already run. **The
+check that caught it is the one AM11 named:** the cell describes a file, so ask
+who owns the file — not whether it feels like part of the cluster.
+
+**Verification, re-run on the published markdown:** AM5 ownership invariant
+**32 rows, 5 exemptions, 0 violations** — re-run after the row-8 surface change,
+not assumed, because this amendment is the first in a while that actually moved
+a Writes column.
