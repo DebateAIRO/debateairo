@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
-import { ProviderContentUnacceptedError, type CallBound, type PromptPacket, type ProviderGateway } from "@debateai/providers";
+import {
+  ProviderCallFailedError,
+  ProviderContentUnacceptedError,
+  type CallBound,
+  type PromptPacket,
+  type ProviderGateway
+} from "@debateai/providers";
 import type { Pool } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
@@ -13,6 +19,7 @@ import {
   withWriteTransaction
 } from "@debateai/db";
 import {
+  PanelMemberFailure,
   classifyClaimText,
   judgeAssessmentSchema,
   parseStructuredArtifact,
@@ -177,6 +184,21 @@ export interface NodeReviewInput {
   readonly providerRef: string;
   readonly contractHash: string;
   readonly bound: CallBound;
+}
+
+/**
+ * S2-2 / T3: what one panel member is asked. Structurally the review call's
+ * inputs, because a member assesses the same node material — but the ANSWER is
+ * a scored assessment, not a review outcome, and the two calls stay separate
+ * (S4-1).
+ */
+export type PanelAssessmentInput = NodeReviewInput;
+
+export interface PanelAssessment {
+  readonly judgementRef: string;
+  readonly assessment: JudgeAssessment;
+  readonly providerLedgerRef: string;
+  readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
 }
 
 export interface ReviewedNode {
@@ -345,6 +367,83 @@ Never invent evidence, citations, or sources. Score relevance against the questi
       outcome: parsed.value.outcome,
       reasons: Object.freeze([...parsed.value.reasons]),
       provenanceRef: response.rawArtifactRef,
+      providerLedgerRef: response.ledgerEntryRef,
+      parseStrategy: parsed.strategy
+    });
+  }
+
+  /**
+   * S2-2 / T3 — one PANEL member's assessment of a node ANOTHER maker authored.
+   *
+   * This is deliberately NOT `review` (S4-1): the review call asks for a typed
+   * agree/dispute OUTCOME on the node and belongs to the edge-measurement lane;
+   * a panel member is asked for the same scored assessment the author produced
+   * about itself, so the two are commensurable and `measureDispersion` compares
+   * like with like. The member never restates or re-authors the statement.
+   *
+   * Every failure is raised as a typed `PanelMemberFailure` so `runJudgePanel`
+   * records WHICH way the member fell over instead of collapsing the panel.
+   */
+  async assess(input: PanelAssessmentInput): Promise<PanelAssessment> {
+    const packet: PromptPacket = {
+      messages: [
+        {
+          role: "system",
+          content: `Assess an existing debate node authored by another maker. Do not restate, rewrite or re-author the statement; assess the statement exactly as supplied. Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:\n{\n  "steelman": { "summary": non-empty string, "fidelity": number [0,1] },\n  "critic": { "summary": non-empty string, "counterargumentStrength": number [0,1], "basis": "REAL_ATTACK" | "PLAUSIBLE_COUNTER" },\n  "evidence": { "quality": number [0,1], "relevance": number [0,1] },\n  "context": { "fit": number [0,1], "ambiguityFlags": non-empty string[] },\n  "fallacy": { "severity": number [0,1], "fatalFlags": [{ "type": non-empty string, "severity": number [0,1], "description": non-empty string }] }\n}\nNever invent evidence, citations, or sources. Score relevance against the question asked. Use REAL_ATTACK only for a supplied attack; otherwise use PLAUSIBLE_COUNTER and say so. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
+        },
+        {
+          role: "user",
+          content: renderUntrustedPromptFields([
+            { name: "question_line", content: input.questionLine },
+            { name: "author_maker", content: input.authorMaker },
+            { name: "statement", content: input.statement }
+          ])
+        }
+      ]
+    };
+    let response;
+    try {
+      response = await this.provider.call({
+        runId: input.runId,
+        subjectItemId: input.subjectItemId,
+        callSiteKey: input.callSiteKey,
+        role: "JUDGE",
+        lane: "served",
+        bound: input.bound,
+        contractHash: input.contractHash,
+        providerRef: input.providerRef,
+        packet,
+        buildRepairPacket: ({ parseError }) => buildContentRepairPacket(packet, parseError),
+        classifyContent: (content) => {
+          const outcome = parseStructuredArtifact(content, judgeAssessmentSchema);
+          if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
+          return {
+            parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
+            parseError: outcome.message
+          };
+        }
+      });
+    } catch (error) {
+      if (error instanceof ProviderContentUnacceptedError) {
+        throw new PanelMemberFailure(
+          error.lastParseStatus === "PARSE_FAILED" ? "PARSE_FAILURE" : "SCHEMA_FAILURE",
+          error.lastParseError
+        );
+      }
+      if (error instanceof ProviderCallFailedError) {
+        throw new PanelMemberFailure(
+          error.lastOutcome === "TIMED_OUT" ? "TIMEOUT" : "PROVIDER_ERROR",
+          `${error.code}:${error.lastOutcome}`
+        );
+      }
+      throw new PanelMemberFailure("PROVIDER_ERROR", error instanceof Error ? error.message : String(error));
+    }
+    const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema);
+    if (parsed.kind === "PARSE_FAILURE") throw new PanelMemberFailure("PARSE_FAILURE", parsed.message);
+    if (parsed.kind === "SCHEMA_FAILURE") throw new PanelMemberFailure("SCHEMA_FAILURE", parsed.message);
+    return Object.freeze({
+      judgementRef: response.rawArtifactRef,
+      assessment: Object.freeze(parsed.value),
       providerLedgerRef: response.ledgerEntryRef,
       parseStrategy: parsed.strategy
     });

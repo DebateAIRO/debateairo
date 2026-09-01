@@ -103,10 +103,6 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
     expect(report.neverCalled).toEqual(expect.arrayContaining([
       expect.objectContaining({ package: "packages/kernel.exhaustive" }),
       expect.objectContaining({ package: "packages/graph.constructEdge" }),
-      expect.objectContaining({ package: "packages/judgement.runJudgePanel" }),
-      expect.objectContaining({ package: "packages/judgement.measureDispersion" }),
-      expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount" }),
-      expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement" }),
       expect.objectContaining({ package: "packages/judgement.createTypedNonAnswer" }),
       expect.objectContaining({ package: "packages/battery/decision.decideSplitClassification" }),
       expect.objectContaining({ package: "packages/ledger.LedgerRepository.recordDecision" }),
@@ -116,11 +112,14 @@ describe("FX-ORPH-02 / FX-ORPH-03 / FX-ORPH-06 — reports are wired", () => {
       expect.objectContaining({ package: "packages/battery/decision.resolveRegeneration" }),
       expect.objectContaining({ package: "packages/battery/decision.selectRivalCarver" })
     ]));
+    // T3 / S2-2: the four panel surfaces are production-reachable now that the
+    // runner's per-node judgement path calls them. Attachment is DERIVED from
+    // reachability, so these rows flip only when the wiring is really there.
     expect(report.s04Surface).toEqual([
-      expect.objectContaining({ package: "packages/judgement.runJudgePanel", attachment: "UNATTACHED" }),
-      expect.objectContaining({ package: "packages/judgement.measureDispersion", attachment: "UNATTACHED" }),
-      expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount", attachment: "UNATTACHED" }),
-      expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement", attachment: "UNATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.runJudgePanel", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.measureDispersion", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.applyCorrelatedErrorDiscount", attachment: "ATTACHED" }),
+      expect.objectContaining({ package: "packages/judgement.applyDeclaredDisagreement", attachment: "ATTACHED" }),
       expect.objectContaining({ package: "packages/judgement.createTypedNonAnswer", attachment: "UNATTACHED" }),
       expect.objectContaining({ package: "packages/judgement.resolveClaimType", attachment: "ATTACHED" })
     ]);

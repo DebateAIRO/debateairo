@@ -57,3 +57,56 @@ Every entry below was paid for at least once. Do not pay for it again.
   three `vitest run` processes live (lane-t2, lane-t4, primary), `pnpm test` took 2984s vs
   T0's 515s — 5.8x. Budget suite wall-clock by counting concurrent lanes before promising
   a three-run cluster on the FULL suite, and never read a slow run as a hang. (T2)
+- An acceptance **provider double that classifies a request on a QUOTED fragment of the
+  rendered prompt never matches**: the packet is JSON-encoded onto the wire, so
+  `"statement": non-empty string` arrives as `\"statement\": non-empty string`.
+  `acceptance/ceremony.test.ts` carries exactly this dead check and survives only because
+  its fixed FIFO falls back to popping index 0 — i.e. **a FIFO queue masks a broken
+  classifier**. Key on escape-safe fragments (`restatement_text`, `served_number_refs`,
+  `conforms,findings`) and make the double **refuse to guess**: record the unclassified
+  body and answer 500, or a fixture gap surfaces as a bogus production error
+  (`JUDGE_SCHEMA_FAILURE`) and a RED that proves nothing. (T3)
+- **Adding one provider call site is a repo-wide event.** Before wiring a new model call,
+  grep `call_site_key LIKE` across `migrations/*.sql` AND tests: expansion legs are
+  enumerated by pattern (`JUDGE:%:root%:r1:p%` in acceptance/ceremony.test.ts:511,
+  `JUDGE:%:root%:r%` in tests/integration/database.test.ts:1824), so a new call that reuses
+  the `JUDGE:` prefix is silently counted as an authoring leg. Give a new call class its
+  own namespace (`PANEL:`) rather than editing the assertions. Also check fixed-queue
+  provider doubles and the sealed envelope basis. (T3)
+- `tools/orphan-audit`'s **`neverCalled` list is hand-declared with no cross-check against
+  `reachableCallables`** — wiring a listed surface makes the entry a silent lie, and no
+  test fails. (`s04Surface`/`s05Surface` are safe: their attachment is derived.) After
+  attaching any surface, edit `neverCalled` by hand. (T3)
+- In `tests/integration/database.test.ts` a runner fixture is one of TWO species and the
+  choice is not a continuum: it either **terminates on its envelope** (pin a tight
+  `maxModelAttempts`; script only judgements + reviews; the serve gate takes the
+  envelope-terminal path with zero composer calls) or it **serves** (generous ceiling;
+  you MUST script compose + two conformance + R9 on the PRIMARY maker's double). A
+  ceiling between the two fails as an unscripted-composer schema error or a hard
+  `RUN_COST_ENVELOPE_EXHAUSTED` throw, and neither message names the real cause. Decide
+  the species before choosing the number. (T3 r2)
+- A provider double that pops `index 0` when a RECOGNISED request class has no scripted
+  response of its own class serves a wrong-class answer (a review body to a judge call),
+  which surfaces as a bogus production schema failure. Refuse by name for recognised
+  classes; keep FIFO only for genuinely untyped requests such as health probes. Fixing
+  the guess in `ceremony.test.ts` and `database.test.ts` left all their fixtures green,
+  so the fallback was masking, not load-bearing. (T3 r2)
+- Adding a member to a CLOSED VOCABULARY has a fixed shape in this repo, and skipping any
+  step ships a FACSIMILE — a string that looks like a canonical value but is rejected by
+  the parser that is supposed to disclose it. The full chain: `packages/kernel`
+  CONDITION_MARKS (**insert MID-LIST** — the DR-176 tail is read positionally by
+  `CONDITION_MARKS.slice(-4)` in `tests/unit/t4-way-of-knowing.test.ts`,
+  `tests/unit/dr174-resilience.test.ts` and the runner's required-record gate) →
+  `packages/contract` `z.enum(CONDITION_MARKS)` (automatic, but PROVE it with
+  `ConditionMarkSchema.parse`) → the `ConditionMarkRecord.mark` union in
+  `packages/serve/src/index.ts` (NOT automatic) → a runner projection that actually emits
+  it → the deliberately-exhaustive UI switches `apps/ui/lib/v3/labels.ts` and
+  `web/lib/v3Presentation.ts` (these fail typecheck by design — one forced line each) →
+  `pnpm run generate:contract` → both D16 surface gates. Write the two-line admission
+  test (`CONDITION_MARKS` contains it; the schema parses it) FIRST: a behavioural test
+  that asserts against your own untyped JSON will pass while the mark is still a
+  facsimile. (T3 r3)
+- A scope claim like "my diff does not touch packages/kernel, so D16 does not gate" is a
+  DERIVED fact with an expiry — it silently becomes false when a later round edits the
+  kernel. Re-run the gate greps immediately before freezing a report, never once at the
+  start. (T3 r3)

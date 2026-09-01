@@ -25,6 +25,8 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "DEGRADED-DIVERSITY": return "Model diversity degraded";
     case "SINGLE-LINEAGE": return "Single model lineage";
     case "CRITIQUE-UNAVAILABLE": return "Independent critique unavailable";
+    case "PANEL-PARTIAL": return "Some judges could not assess this point";
+    case "PANEL-DEGRADED-SINGLE-VOICE": return "Only the author's own assessment survived";
     case "AMBIGUOUS_ATTRIBUTION": return "Attribution ambiguous";
     case "STALE": return "Stale";
     case "UNDER-REVIEW": return "Under review";

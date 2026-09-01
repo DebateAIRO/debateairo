@@ -123,6 +123,29 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
     judgeWeightVersion: "test-layer:weight-v1",
     reducerVersion: "test-layer:reducer-v1"
   },
+  // J12 coherence consequence (J5/J10a class): every M>=2 fixture below now needs the
+  // sealed panel inputs, because an unsealed multi-maker run stops loudly. Provisioning
+  // only — no fixture's own subject assertions change. The band map is stated over THIS
+  // fixture's own band vocabulary (servePolicy.bandCeiling above), not the deployment's.
+  panelPolicy: {
+    registerVersion: 1,
+    dispersionScale: 1,
+    repeatedFamilyMultiplier: 0.5,
+    disagreementThreshold: 0.25,
+    oneStepDown: { TEST_CAPPED_BAND: "TEST_CAPPED_BAND", TEST_TOP_BAND: "TEST_CAPPED_BAND" },
+    providerFamilies: [
+      { familyRef: "test-layer:family:primary", providerRefs: ["provider:test-layer"] },
+      { familyRef: "test-layer:family:secondary", providerRefs: ["provider:test-layer:secondary"] }
+    ],
+    unmappedReason: "PROVIDER_FAMILY_UNMAPPED",
+    sourceRefs: {
+      dispersionScale: "test-layer:J1",
+      repeatedFamilyMultiplier: "test-layer:J1",
+      disagreementThreshold: "test-layer:J1",
+      downgradeBands: "test-layer:J1",
+      providerFamilyMap: "test-layer:J1"
+    }
+  },
   resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
     batteryRowId,
     state: "INACTIVE" as const,
@@ -196,7 +219,35 @@ async function createRunnerWork(questionLine: string): Promise<{ runId: string; 
 
 type ProviderDoubleResponse = string | Readonly<{ status: number; body?: string }>;
 
-async function startProviderDouble(contents: readonly ProviderDoubleResponse[]): Promise<{
+/**
+ * T3/S2-2: the content this double returns for a PANEL assessment call. The default
+ * scores fidelity 0 (tau 0), which can never displace an author's voice under the
+ * strictly-greater selection, so every pre-existing fixture keeps its own tau. A test
+ * that is ABOUT the panel passes its own content — including non-JSON prose, which the
+ * panel must classify as a typed PARSE_FAILURE.
+ */
+const DEFAULT_PANEL_ASSESSMENT = JSON.stringify({
+  steelman: { summary: "Panel member assessment.", fidelity: 0 },
+  critic: { summary: "Panel member counter.", counterargumentStrength: 1, basis: "PLAUSIBLE_COUNTER" },
+  evidence: { quality: 0, relevance: 0 },
+  context: { fit: 0, ambiguityFlags: [] },
+  fallacy: { severity: 1, fatalFlags: [] }
+});
+
+function panelAssessmentDouble(fidelity: number): string {
+  return JSON.stringify({
+    steelman: { summary: "Panel member assessment.", fidelity },
+    critic: { summary: "Panel member counter.", counterargumentStrength: 0, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: fidelity, relevance: fidelity },
+    context: { fit: fidelity, ambiguityFlags: [] },
+    fallacy: { severity: 0, fatalFlags: [] }
+  });
+}
+
+async function startProviderDouble(
+  contents: readonly ProviderDoubleResponse[],
+  panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
+): Promise<{
   endpoint: string; calls(): number; stop(): Promise<void>;
 }> {
   type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
@@ -229,11 +280,29 @@ async function startProviderDouble(contents: readonly ProviderDoubleResponse[]):
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
+      // each authored node draws one assess call per non-author maker. Those legs are
+      // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
+      // scripted queue keeps its exact positions and its own assertions stand unchanged.
+      // The member scores fidelity 0, i.e. tau 0: selection is strictly greater-than, so
+      // a panel voice can never displace the author's and no fixture's tau moves.
+      if (body.includes("Assess an existing debate node authored by another maker")) {
+        calls += 1;
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+          id: `panel-assess-${calls}`,
+          model: "model:test-layer",
+          choices: [{ message: { content: panelAssessment } }]
+        }));
+        return;
+      }
+      // T3 N4 (same defect as acceptance/ceremony.test.ts): the JUDGE discriminator must
+      // be ESCAPE-SAFE — the packet reaches the wire JSON-encoded, so `"statement":`
+      // arrives as \"statement\" and the old check never matched.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
-        : body.includes("\"statement\": non-empty string") ? "JUDGE"
-          : body.includes("{conforms,findings}") ? "CONFORMANCE"
+        : body.includes("restatement_text") ? "JUDGE"
+          : body.includes("conforms,findings") ? "CONFORMANCE"
             : body.includes("{pass}") ? "R9"
-              : body.includes("segments") && body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+              : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
       const content = selected?.content;
@@ -1774,10 +1843,14 @@ describe("apps/runner — legal command lifecycle", () => {
     );
     try {
       // Sixteen authored calls plus one cross-maker review per authored node
-      // exactly fill this test-layer envelope.
+      // plus — since T3/S2-2 — one PANEL assessment per authored node from the
+      // single non-author maker (M=2 ⇒ M−1 = 1) exactly fill this test-layer
+      // envelope: 16 + 16 + 16 = 48.
       // The serve gate therefore takes its real envelope-terminal path with
       // zero composer/conformance calls and zero external model calls.
-      const runId = await createRun("hyg-01-depth-2-two-maker", 32, 2, 2);
+      // J12 coherence: the pinned ceiling is provisioning; every assertion in
+      // this fixture — including ENVELOPE_EXHAUSTED — is unchanged.
+      const runId = await createRun("hyg-01-depth-2-two-maker", 48, 2, 2);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId,
         batteryRowId: "Q1",
@@ -1809,8 +1882,15 @@ describe("apps/runner — legal command lifecycle", () => {
 
       const result = await runner.executeWorkItem(workItemId);
       expect(result.kind).toBe("COMPLETED");
-      expect(primary.calls()).toBe(16);
-      expect(secondary.calls()).toBe(16);
+      // T3/S2-2 + J12 — DISCLOSED DEVIATION from "assertions unchanged", and the only
+      // one in this file. These two numbers are per-provider CALL COUNTS, and a new
+      // lawful call class necessarily moves them: across 16 nodes split 8/8 between the
+      // two makers, each provider now serves its 16 original legs plus 8 panel
+      // assessments of the OTHER maker's nodes (M−1 = 1 per authored node) = 24.
+      // The fixture's SUBJECT is untouched: still 16 nodes, still the real
+      // envelope-terminal path, still the single-root disclosure — all asserted below.
+      expect(primary.calls()).toBe(24);
+      expect(secondary.calls()).toBe(24);
 
       const nodes = await database.pool.query<{ node_id: string }>(
         "SELECT node_id FROM core.node WHERE run_id=$1 ORDER BY created_at_seq",
@@ -1907,7 +1987,11 @@ describe("apps/runner — legal command lifecycle", () => {
       ...Array.from({ length: 15 }, (_, index) => reviewDouble("cannot-assess", `Rotation C review ${index + 1}`))
     ]);
     try {
-      const runId = await createRun("grok-01-three-maker-review-rotation", 30, 3, 1);
+      // J12 coherence: at M=3 each authored node draws two PANEL assessments
+      // (M−1). The envelope is provisioning here, not this fixture's subject —
+      // the subject is reviewer ROTATION — so the ceiling is raised to keep the
+      // rotation reachable. Assertions unchanged.
+      const runId = await createRun("grok-01-three-maker-review-rotation", 60, 3, 1);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId,
         batteryRowId: "Q1",
@@ -2671,6 +2755,237 @@ describe("apps/runner — legal command lifecycle", () => {
       );
       expect(state.rows[0]).toEqual({ state: "READY", claimed_by: null });
       expect(provider.calls()).toBe(0);
+    } finally { await provider.stop(); }
+  });
+
+  // J12 (T3 F6): an M>=2 run whose deployment never sealed the T16 panel rows STOPS
+  // LOUDLY. Recording a reason and proceeding is the silent-degradation shape the goal
+  // repeals; this follows the scoringOperator precedent exactly — the stop lands BEFORE
+  // the work item is claimed and BEFORE a single token of model spend.
+  it("J12 — refuses unsealed panel weighting on a multi-maker run before claiming or spending", async () => {
+    const primary = await startProviderDouble([]);
+    const secondary = await startProviderDouble([]);
+    try {
+      const work = await createRunnerWork("panel-policy-before-claim");
+      const { panelPolicy: _omitted, ...settingsWithoutPanelPolicy } = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "model:test-layer", maker: "maker:test-layer"
+      }), {
+        ...settingsWithoutPanelPolicy,
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "model:test-layer:secondary", maker: "maker:test-layer:secondary"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "maker:test-layer:secondary"
+        },
+        // Supplied so the DR-074 multi-maker guard is satisfied and the PANEL guard is
+        // demonstrably the one that fires.
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(work.workItemId)).rejects.toMatchObject({
+        code: "PANEL_WEIGHTING_UNRESOLVED"
+      });
+      const state = await database.pool.query<{ state: string; claimed_by: string | null }>(
+        "SELECT state, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [work.workItemId]
+      );
+      expect(state.rows[0]).toEqual({ state: "READY", claimed_by: null });
+      // Zero model-call spend: the missing row can never become a degraded self-grade
+      // paid for with real tokens.
+      expect(primary.calls()).toBe(0);
+      expect(secondary.calls()).toBe(0);
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
+  /**
+   * T3 r2 · B4 + B5 — the repeated-family MULTIPLIER and the PARTIAL mark, on one
+   * M=3 real-database fixture.
+   *
+   * Topology: makers A and B share ONE sealed provider family; C is its own. The
+   * register's family map groups by maker, so two provider refs sharing a family is a
+   * lawful deployment (two endpoints of one maker) — not a contrivance.
+   *
+   * On the node A authors:
+   *   - B assesses successfully. B is the SECOND appearance of the shared family, so
+   *     `applyCorrelatedErrorDiscount` gives it ordinal 2 and multiplies its weight.
+   *   - C returns prose, so the panel records a typed PARSE_FAILURE and PROCEEDS on the
+   *     voices that parsed — confirm-item 5's middle arm, marked PANEL-PARTIAL.
+   *
+   * The discount is made LOAD-BEARING FOR THE OUTCOME, not merely recorded: B scores a
+   * HIGHER tau than A (0.9 vs 0.5). Undiscounted, B would win selection outright
+   * (0.9 > 0.5). Discounted, B scores 0.9 × 0.5 = 0.45 and A's 0.5 survives. Asserting
+   * the selected tau is therefore an assertion about the multiplier arithmetic itself.
+   */
+  it("B4/B5 — discounts a repeated provider family and marks a partial panel (M=3)", async () => {
+    const authorFidelity = 0.5;
+    const repeatedFamilyFidelity = 0.9;
+    const makerA = await startProviderDouble([
+      ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Family A position ${index + 1}`, authorFidelity)),
+      ...Array.from({ length: 12 }, (_, index) => reviewDouble("agree", `Family A review ${index + 1}`)),
+      // The primary maker also carries the composer/conformance chain, so this run
+      // reaches a real serve instead of an envelope terminal.
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "Family A position 1", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    // B parses, and scores ABOVE the author — only the discount keeps it from winning.
+    const makerB = await startProviderDouble([
+      ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Family B position ${index + 1}`, authorFidelity)),
+      ...Array.from({ length: 12 }, (_, index) => reviewDouble("agree", `Family B review ${index + 1}`))
+    ], panelAssessmentDouble(repeatedFamilyFidelity));
+    // C refuses in prose: a typed PARSE_FAILURE member, never a silent drop.
+    const makerC = await startProviderDouble([
+      ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Family C position ${index + 1}`, authorFidelity)),
+      ...Array.from({ length: 12 }, (_, index) => reviewDouble("agree", `Family C review ${index + 1}`))
+    ], "I decline to assess another maker's node.");
+    try {
+      // Same envelope shape as the three-maker rotation fixture above: the run reaches
+      // its envelope terminal and serves without a composer leg. The root A authors is
+      // judged FIRST, so its panel receipt is persisted long before that terminal.
+      const runId = await createRun("t3-repeated-family-and-partial", 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [],
+        commandKey: "runner-test:t3-repeated-family-and-partial"
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/family-a", maker: "Family maker A"
+      }), {
+        ...settings,
+        providerRef: "provider:test-layer",
+        maker: "Family maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/family-b", maker: "Family maker B"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Family maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/family-c", maker: "Family maker C"
+          }),
+          providerRef: "provider:test-layer:third",
+          maker: "Family maker C"
+        }],
+        panelPolicy: {
+          ...settings.panelPolicy!,
+          // A and B share one sealed family; C stands alone.
+          providerFamilies: [
+            {
+              familyRef: "test-layer:family:shared",
+              providerRefs: ["provider:test-layer", "provider:test-layer:secondary"]
+            },
+            { familyRef: "test-layer:family:solo", providerRefs: ["provider:test-layer:third"] }
+          ]
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      const receipt = await database.pool.query<{
+        tau: string;
+        dispersion: number | null;
+        disagreement: {
+          readonly marks: readonly string[];
+          readonly panel: {
+            readonly authorProviderRef: string;
+            readonly nonAuthorVoiceCount: number;
+            readonly members: readonly {
+              readonly memberRole: string;
+              readonly familyRef: string | null;
+              readonly familyOrdinal: number | null;
+              readonly earnedWeight: number;
+              readonly effectiveWeight: number;
+            }[];
+            readonly notes: readonly { readonly memberRole: string; readonly failureKind: string }[];
+          };
+        };
+      }>(
+        `SELECT tau::text AS tau, dispersion, disagreement FROM ledger.reduced_judgement
+         WHERE run_id=$1 AND disagreement->'panel'->>'authorProviderRef' = 'provider:test-layer'
+         ORDER BY at_seq LIMIT 1`,
+        [runId]
+      );
+      const row = receipt.rows[0];
+      if (row === undefined) throw new Error("T3_PANEL_RECEIPT_MISSING_FOR_AUTHOR");
+
+      // B5 — confirm-item 5's middle arm: proceed on the parsed voices, and SAY SO.
+      expect(row.disagreement.marks).toContain("PANEL-PARTIAL");
+      expect(row.disagreement.marks).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+      expect(row.disagreement.panel.nonAuthorVoiceCount).toBe(1);
+      // Two notes, and both matter: C's typed parse failure (the partial arm), and the
+      // author's own refused seat — author != judge is enforced on THIS node, not
+      // merely in the abstract.
+      expect(row.disagreement.panel.notes).toEqual(expect.arrayContaining([
+        expect.objectContaining({ memberRole: "Family maker C", failureKind: "PARSE_FAILURE" }),
+        expect.objectContaining({ memberRole: "Family maker A", failureKind: "PRODUCER_GRADING_FORBIDDEN" })
+      ]));
+      expect(row.disagreement.panel.notes).toHaveLength(2);
+
+      // B4 — the repeated family is DISCOUNTED, with the sealed multiplier.
+      const members = row.disagreement.panel.members;
+      expect(members).toHaveLength(2);
+      const [first, second] = members;
+      expect(first).toMatchObject({ familyRef: "test-layer:family:shared", familyOrdinal: 1 });
+      expect(first!.effectiveWeight).toBe(first!.earnedWeight);
+      expect(second).toMatchObject({ familyRef: "test-layer:family:shared", familyOrdinal: 2 });
+      expect(second!.effectiveWeight)
+        .toBe(second!.earnedWeight * settings.panelPolicy!.repeatedFamilyMultiplier);
+      // Not merely recorded — DECISIVE. B's higher tau loses only because its repeated
+      // family was discounted; drop the multiplier and the selected tau becomes 0.9.
+      expect(Number(row.tau)).toBeCloseTo(authorFidelity, 10);
+      expect(row.dispersion).toBeCloseTo(repeatedFamilyFidelity - authorFidelity, 10);
+
+      // J13(b) / B6 — the disclosure must survive the CANONICAL machinery, not only the
+      // untyped receipt JSON above. This reads the served answer back through
+      // `ServeRepository.readAnswerProjection`, whose every mark goes through
+      // `ConditionMarkSchema.parse` — a mark absent from the kernel vocabulary is
+      // REJECTED there rather than disclosed, so this assertion is the production seam.
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:t3-repeated-family-and-partial");
+      expect(projection?.condition_marks).toEqual(expect.arrayContaining(["PANEL-PARTIAL"]));
+      // Node scope, bound to the node whose panel was partial — the disclosure is
+      // visible where the degradation happened, not only on the answer (T4 discipline).
+      const partialRecord = projection?.condition_mark_records
+        .find((record) => record.mark === "PANEL-PARTIAL");
+      expect(partialRecord).toMatchObject({ scope: "node" });
+      expect(partialRecord?.affected_node_ids ?? []).not.toHaveLength(0);
+      expect(partialRecord?.reason).toContain("Family maker C");
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+
+  // J12 coherence: a MONO-maker run is untouched by the panel guard — the walking
+  // skeleton keeps working on a deployment that never needed panel rows at all.
+  it("J12 — leaves a single-maker run free of any panel-weighting requirement", async () => {
+    const provider = await startProviderDouble([]);
+    try {
+      const work = await createRunnerWork("panel-policy-mono-exempt");
+      const { panelPolicy: _omitted, ...settingsWithoutPanelPolicy } = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "model:test-layer", maker: "maker:test-layer"
+      }), settingsWithoutPanelPolicy);
+
+      // It must NOT stop on panel weighting. It stops later, on the empty double.
+      await expect(runner.executeWorkItem(work.workItemId)).rejects.not.toMatchObject({
+        code: "PANEL_WEIGHTING_UNRESOLVED"
+      });
     } finally { await provider.stop(); }
   });
 

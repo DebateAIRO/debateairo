@@ -18,11 +18,18 @@ import { GraphRepository } from "@debateai/graph";
 import {
   Judge,
   JudgementRepository,
+  applyCorrelatedErrorDiscount,
+  applyDeclaredDisagreement,
   bindWayOfKnowingDowngrade,
   createUnmeasuredDisagreement,
+  measureDispersion,
   reduceAssessment,
+  runJudgePanel,
   selectReducedJudgement,
+  type ClaimType,
   type CompositionMapRegisterRow,
+  type JudgeAssessment,
+  type JudgeFamily,
   type JudgementSelectionRule,
   type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
@@ -113,6 +120,47 @@ export interface RunnerCritiqueSettings {
   readonly provider: ProviderGateway;
   readonly providerRef: string;
   readonly maker: string;
+}
+
+/**
+ * S2-2 / T3 — the sealed T16 panel inputs as the runner consumes them. Every
+ * member is READ from a register row by the deployment's boot; the runner binds
+ * identifiers only and never restates a value (T16 consumer discipline).
+ */
+export interface RunnerPanelPolicy {
+  readonly registerVersion: number;
+  readonly dispersionScale: number;
+  readonly repeatedFamilyMultiplier: number;
+  readonly disagreementThreshold: number;
+  /** The sealed band vocabulary's one-step-down map, total over the band order. */
+  readonly oneStepDown: Readonly<Record<string, string>>;
+  readonly providerFamilies: readonly {
+    readonly familyRef: string;
+    readonly providerRefs: readonly string[];
+  }[];
+  /** The sealed reason an unmapped provider carries; UNKNOWN is discount-exempt. */
+  readonly unmappedReason: string;
+  readonly sourceRefs: Readonly<Record<string, string>>;
+}
+
+/**
+ * confirm-item 5: the visible marks a degraded panel leaves on the node's
+ * receipt. A partial panel PROCEEDS with the voices that parsed and says so;
+ * a panel whose every non-author member failed is never allowed to look like a
+ * clean self-grade.
+ */
+export const PANEL_PARTIAL_MARK = "PANEL-PARTIAL" as const;
+export const PANEL_DEGRADED_SINGLE_VOICE_MARK = "PANEL-DEGRADED-SINGLE-VOICE" as const;
+/** J13(b): both are canonical `CONDITION_MARKS` members, not runner-local strings. */
+export type PanelDegradationMark =
+  | typeof PANEL_PARTIAL_MARK
+  | typeof PANEL_DEGRADED_SINGLE_VOICE_MARK;
+
+/** One node's panel degradation, bound to the node id the graph minted. */
+interface PanelDegradationRecord {
+  readonly subjectRef: string;
+  readonly mark: PanelDegradationMark;
+  readonly reason: string;
 }
 
 export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
@@ -820,6 +868,14 @@ export interface WalkingSkeletonSettings {
     readonly judgeWeightVersion: string;
     readonly reducerVersion: string;
   };
+  /**
+   * S2-2 / T3: the sealed T16 panel inputs, READ from the register by the
+   * deployment's boot (`readPanelWeightingControls` + `readVerdictLabelControls`)
+   * and handed here whole. The runner never carries any of these values as a
+   * code constant — a missing family is the register reader's loud failure, not
+   * a default invented here.
+   */
+  readonly panelPolicy?: RunnerPanelPolicy;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1268,6 +1324,17 @@ export class WalkingSkeletonRunner {
         "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
       );
     }
+    if (this.#configuredMakers.length > 1 && this.settings.panelPolicy === undefined) {
+      // S2-2 × J12: a multi-maker deployment that never sealed the T16 panel rows STOPS
+      // LOUDLY, here — before the work item is claimed and before a single model call.
+      // Recording a reason and grading the node on its author's own voice is the
+      // silent-degradation shape the goal repeals; the Global DoD's "missing rows fail
+      // loudly" and the scoringOperator precedent directly above both govern.
+      throw new TypedDomainError(
+        "PANEL_WEIGHTING_UNRESOLVED",
+        "J12: a multi-maker run requires the sealed T16 panel-weighting rows (dispersion scale, repeated-family multiplier, downgrade bands, provider-family map) and the sealed disagreement threshold; they are read from the register and never invented"
+      );
+    }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
     const claimed = workItemId === undefined
       ? await this.#work.claimNext(claimInput)
@@ -1422,6 +1489,253 @@ export class WalkingSkeletonRunner {
     }
     const effectiveMakerCount = configuredMakers.length;
     const primaryMaker = configuredMakers[0]!;
+    const panelPolicy = this.settings.panelPolicy;
+    // S2-2 / J13(b): one record per node whose panel degraded, bound to the node the
+    // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
+    // here because BOTH judgement producers (root and child) append to it.
+    const panelDegradations: PanelDegradationRecord[] = [];
+
+    /**
+     * S2-2 / T3 — the judge panel for ONE authored node.
+     *
+     * Every OTHER healthy maker assesses the node; the author's own assessment
+     * is one member. The author is handed to `runJudgePanel` as a member too,
+     * so the FX-HR-H6 producer bulkhead is exercised by the code that owns it
+     * and leaves a recorded note, rather than being pre-filtered away here.
+     *
+     * S4-1: this is node-local and is NOT the cross-maker review call — the
+     * review leg (edge measurement) stays exactly where it was.
+     *
+     * Panel legs live in their OWN `PANEL:` call-site namespace. They are not
+     * authoring legs and must never be counted as one: the expansion-leg
+     * enumerations key off `JUDGE:%:root%`, so a panel call that borrowed the
+     * `JUDGE:` prefix would silently join that set.
+     */
+    const runNodePanel = async (input: {
+      readonly authorMaker: string;
+      readonly authorProviderRef: string;
+      readonly authorJudgementRef: string;
+      readonly authorAssessment: JudgeAssessment;
+      readonly authorTau: number;
+      readonly claimType: ClaimType;
+      readonly statement: string;
+      readonly callSiteKey: string;
+      readonly questionLine: string;
+    }): Promise<{
+      readonly selectedJudgementRef: string;
+      readonly tau: number;
+      readonly selectionScore: number;
+      readonly rule: JudgementSelectionRule;
+      readonly dispersion: number | null;
+      readonly panelContractHashes: readonly string[];
+      readonly disagreement: Readonly<Record<string, unknown>>;
+      /**
+       * J13(b): the canonical degradation marks this node earned, returned TYPED so the
+       * caller can bind them to the node the graph mints. Reading them back out of the
+       * untyped receipt JSON would be the facsimile pattern this mint exists to end.
+       */
+      readonly marks: readonly PanelDegradationMark[];
+      readonly panelFailureReason: string | null;
+    }> => {
+      const judgeContractHash = this.settings.judgeContractHash;
+      const authorOnlySelection = (): {
+        readonly selectedJudgementRef: string;
+        readonly tau: number;
+        readonly selectionScore: number;
+        readonly rule: JudgementSelectionRule;
+      } => {
+        const selected = selectReducedJudgement([{
+          judgementRef: input.authorJudgementRef,
+          tau: input.authorTau,
+          effectiveWeight: judgementPolicy.earnedWeight
+        }], judgementPolicy.selectionRule);
+        if (selected.kind !== "SELECTED") {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
+        }
+        return {
+          selectedJudgementRef: selected.selectedJudgementRef,
+          tau: selected.tau,
+          selectionScore: selected.selectionScore,
+          rule: selected.rule
+        };
+      };
+
+      // S2-2: the walking-skeleton literal is reachable at M=1 ONLY.
+      if (effectiveMakerCount <= 1) {
+        return Object.freeze({
+          ...authorOnlySelection(),
+          dispersion: null,
+          panelContractHashes: Object.freeze([judgeContractHash]),
+          disagreement: createUnmeasuredDisagreement(),
+          marks: Object.freeze([]),
+          panelFailureReason: null
+        });
+      }
+      if (panelPolicy === undefined) {
+        // Unreachable: the M>=2 loud stop above rejects this deployment before the
+        // work item is claimed. Kept as a typed defence so the missing-row condition
+        // can never re-acquire a degraded, proceeding shape (J12).
+        throw new TypedDomainError(
+          "PANEL_WEIGHTING_UNRESOLVED",
+          "J12: a multi-maker run reached the panel without the sealed T16 panel-weighting rows"
+        );
+      }
+
+      const panel = await runJudgePanel({
+        artifactProducerRef: input.authorProviderRef,
+        primary: {
+          judgementRef: input.authorJudgementRef,
+          assessment: input.authorAssessment,
+          memberRole: input.authorMaker
+        },
+        members: configuredMakers.map((member) => ({
+          memberRole: member.maker,
+          actorRef: member.providerRef,
+          contractHash: judgeContractHash,
+          judge: async () => {
+            const assessed = await member.judge.assess({
+              runId: run.runId,
+              subjectItemId: claimed.workItemId,
+              callSiteKey: `${input.callSiteKey}:${member.providerRef}`,
+              questionLine: input.questionLine,
+              statement: input.statement,
+              authorMaker: input.authorMaker,
+              providerRef: member.providerRef,
+              contractHash: judgeContractHash,
+              bound: this.settings.judgeBound
+            });
+            return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+          }
+        }))
+      });
+
+      // Each member's assessment is reduced through the SAME ratified
+      // composition as the author's, so the taus are commensurable.
+      const reducedMembers = panel.judgements.flatMap((entry) => {
+        const reducedMember = reduceAssessment({
+          claimType: input.claimType,
+          assessment: entry.assessment,
+          compositionRow,
+          reducerVersion: judgementPolicy.reducerVersion
+        });
+        return reducedMember.kind === "REDUCED"
+          ? [{ ...entry, tau: reducedMember.tau }]
+          : [];
+      });
+      if (reducedMembers.length === 0) {
+        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
+      }
+
+      const dispersion = measureDispersion(
+        reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
+        {
+          scale: panelPolicy.dispersionScale,
+          rowKey: "dispersionScale",
+          registerVersion: panelPolicy.registerVersion,
+          sourceRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason
+        }
+      );
+
+      const familyOf = (memberRole: string): JudgeFamily => {
+        const member = configuredMakers.find((candidate) => candidate.maker === memberRole);
+        const entry = member === undefined
+          ? undefined
+          : panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(member.providerRef));
+        return entry === undefined
+          ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
+          : { kind: "KNOWN", familyRef: entry.familyRef };
+      };
+      const weighted = applyCorrelatedErrorDiscount(
+        reducedMembers.map((entry) => ({
+          memberRole: entry.memberRole,
+          earnedWeight: judgementPolicy.earnedWeight,
+          family: familyOf(entry.memberRole)
+        })),
+        {
+          repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
+          rowKey: "repeatedFamilyMultiplier",
+          registerVersion: panelPolicy.registerVersion,
+          sourceRef: panelPolicy.sourceRefs.repeatedFamilyMultiplier ?? panelPolicy.unmappedReason
+        }
+      );
+      const selection = selectReducedJudgement(
+        reducedMembers.map((entry, index) => ({
+          judgementRef: entry.judgementRef,
+          tau: entry.tau,
+          effectiveWeight: weighted[index]!.effectiveWeight
+        })),
+        judgementPolicy.selectionRule
+      );
+      if (selection.kind !== "SELECTED") {
+        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
+      }
+
+      // confirm-item 5. The author is always judgement[0]; every other entry is
+      // a non-author voice that actually parsed.
+      const nonAuthorVoices = reducedMembers.length - 1;
+      const memberFailures = panel.notes.filter((note) => note.kind === "MEMBER_FAILED");
+      const marks: PanelDegradationMark[] = [];
+      if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
+      else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
+      // The reason names WHICH members fell over and how — a disclosure that says only
+      // "partial" tells a reader nothing they can act on.
+      const panelFailureReason = memberFailures.length === 0
+        ? null
+        : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
+
+      const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
+      const steppedDownBand = candidateBand === null
+        ? null
+        : panelPolicy.oneStepDown[candidateBand] ?? null;
+      // A single surviving voice steps the band down one place in the sealed
+      // vocabulary; a measured spread at or above the sealed threshold fires
+      // the declared disagreement. Either way the downgrade is DECLARED, never
+      // computed from a value this file carries.
+      const disagreementFires = nonAuthorVoices === 0
+        || (dispersion.kind === "MEASURED" && dispersion.value >= panelPolicy.disagreementThreshold);
+      const declared = applyDeclaredDisagreement({
+        fires: disagreementFires && candidateBand !== null && steppedDownBand !== null,
+        predicateRef: panelPolicy.sourceRefs.disagreementThreshold ?? panelPolicy.unmappedReason,
+        observationRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason,
+        certaintyBand: candidateBand,
+        downgradedBand: steppedDownBand
+      });
+
+      return Object.freeze({
+        marks: Object.freeze([...marks]),
+        panelFailureReason,
+        selectedJudgementRef: selection.selectedJudgementRef,
+        tau: selection.tau,
+        selectionScore: selection.selectionScore,
+        rule: selection.rule,
+        dispersion: dispersion.kind === "MEASURED" ? dispersion.value : null,
+        panelContractHashes: Object.freeze(reducedMembers.map(() => judgeContractHash)),
+        disagreement: Object.freeze({
+          ...declared,
+          marks: Object.freeze(marks),
+          dispersionAbsentReason: dispersion.kind === "ABSENT" ? dispersion.reason : null,
+          panel: Object.freeze({
+            authorMaker: input.authorMaker,
+            authorProviderRef: input.authorProviderRef,
+            voiceCount: reducedMembers.length,
+            nonAuthorVoiceCount: nonAuthorVoices,
+            members: Object.freeze(weighted.map((entry) => Object.freeze({
+              memberRole: entry.memberRole,
+              familyRef: entry.family.kind === "KNOWN" ? entry.family.familyRef : null,
+              familyOrdinal: entry.familyOrdinal,
+              earnedWeight: judgementPolicy.earnedWeight,
+              effectiveWeight: entry.effectiveWeight
+            }))),
+            notes: Object.freeze(panel.notes.map((note) => Object.freeze({
+              memberRole: note.memberRole,
+              kind: note.kind,
+              failureKind: note.failureKind,
+              reason: note.reason
+            })))
+          })
+        })
+      });
+    };
 
     const completable = await this.#ledger.findSuccessfulCommandArtifact({
       runId: run.runId,
@@ -1505,14 +1819,17 @@ export class WalkingSkeletonRunner {
     if (reduced.kind !== "REDUCED") {
       throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${reduced.claimType}`);
     }
-    const selection = selectReducedJudgement([{
-      judgementRef: judged.provenanceRef,
-      tau: reduced.tau,
-      effectiveWeight: judgementPolicy.earnedWeight
-    }], judgementPolicy.selectionRule);
-    if (selection.kind !== "SELECTED") {
-      throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
-    }
+    const selection = await runNodePanel({
+      authorMaker: primaryMaker.maker,
+      authorProviderRef: primaryMaker.providerRef,
+      authorJudgementRef: judged.provenanceRef,
+      authorAssessment: judged.assessment,
+      authorTau: reduced.tau,
+      claimType: judged.normalizedClaim.claimType,
+      statement: judged.statement,
+      callSiteKey: "PANEL:root",
+      questionLine: run.questionLine
+    });
     const nodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
       const created = await writer.addNode({
         runId: run.runId,
@@ -1536,6 +1853,13 @@ export class WalkingSkeletonRunner {
       });
       return created;
     });
+    for (const mark of selection.marks) {
+      panelDegradations.push(Object.freeze({
+        subjectRef: nodeId,
+        mark,
+        reason: selection.panelFailureReason ?? "Every non-author panel member failed"
+      }));
+    }
     const reducedJudgementId = await this.#judgements.recordReduced({
       runId: run.runId,
       nodeId,
@@ -1552,9 +1876,9 @@ export class WalkingSkeletonRunner {
       reducerVersion: reduced.reducerVersion,
       judgeWeightVersion: judgementPolicy.judgeWeightVersion,
       selectedJudgementRef: selection.selectedJudgementRef,
-      dispersion: null,
-      panelContractHashes: [this.settings.judgeContractHash],
-      disagreement: createUnmeasuredDisagreement()
+      dispersion: selection.dispersion,
+      panelContractHashes: selection.panelContractHashes,
+      disagreement: selection.disagreement
     });
 
     interface AuthoredDebateNode {
@@ -1655,14 +1979,17 @@ export class WalkingSkeletonRunner {
         if (childReduced.kind !== "REDUCED") {
           throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
         }
-        const childSelection = selectReducedJudgement([{
-          judgementRef: childJudged.provenanceRef,
-          tau: childReduced.tau,
-          effectiveWeight: judgementPolicy.earnedWeight
-        }], judgementPolicy.selectionRule);
-        if (childSelection.kind !== "SELECTED") {
-          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", `The ${input.role} produced no selectable judgement`);
-        }
+        const childSelection = await runNodePanel({
+          authorMaker: selectedMaker.maker,
+          authorProviderRef: selectedMaker.providerRef,
+          authorJudgementRef: childJudged.provenanceRef,
+          authorAssessment: childJudged.assessment,
+          authorTau: childReduced.tau,
+          claimType: childJudged.normalizedClaim.claimType,
+          statement: childJudged.statement,
+          callSiteKey: `PANEL:${input.callSiteKey}`,
+          questionLine: input.questionLine
+        });
         const childNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
             runId: run.runId,
@@ -1705,6 +2032,13 @@ export class WalkingSkeletonRunner {
         if (childJudged.wayOfKnowingDowngrade !== null) {
           wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
         }
+        for (const mark of childSelection.marks) {
+          panelDegradations.push(Object.freeze({
+            subjectRef: childNodeId,
+            mark,
+            reason: childSelection.panelFailureReason ?? "Every non-author panel member failed"
+          }));
+        }
         const childReducedJudgementId = await this.#judgements.recordReduced({
           runId: run.runId,
           nodeId: childNodeId,
@@ -1721,9 +2055,9 @@ export class WalkingSkeletonRunner {
           reducerVersion: childReduced.reducerVersion,
           judgeWeightVersion: judgementPolicy.judgeWeightVersion,
           selectedJudgementRef: childSelection.selectedJudgementRef,
-          dispersion: null,
-          panelContractHashes: [this.settings.judgeContractHash],
-          disagreement: createUnmeasuredDisagreement()
+          dispersion: childSelection.dispersion,
+          panelContractHashes: childSelection.panelContractHashes,
+          disagreement: childSelection.disagreement
         });
       return { kind: "AUTHORED", value: Object.freeze({
           nodeId: childNodeId,
@@ -2090,7 +2424,10 @@ export class WalkingSkeletonRunner {
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
       ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : []),
       // S2-3 / J5: the honesty mark is only visible if it reaches the answer.
-      ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : [])
+      ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : []),
+      // S2-2 / J13(b): same rule for the panel degradations — a mark recorded only on
+      // the node's receipt is not disclosed to the reader of the answer.
+      ...new Set(panelDegradations.map((record) => record.mark))
     ]);
     const factBundle: FactBundle = buildFactBundle({
       facts: Object.freeze([servedRoot.statement]),
@@ -2217,6 +2554,26 @@ export class WalkingSkeletonRunner {
       // S2-3 / J5: one typed record per downgraded node, projected onto that
       // node through `affectedNodeIds` so the disclosure is visible where the
       // override happened — not only on the answer.
+      // S2-2 / J13(b): one typed record per degraded panel, projected onto the node
+      // whose panel degraded so the disclosure is visible where it happened.
+      ...panelDegradations.map((record): ConditionMarkRecord => Object.freeze({
+        mark: record.mark,
+        scope: "node" as const,
+        subjectRef: record.subjectRef,
+        reason: record.reason,
+        liftPath: record.mark === PANEL_DEGRADED_SINGLE_VOICE_MARK
+          ? "Re-ask when another healthy maker can assess this node"
+          : "Re-ask to collect the assessments the failed panel members owed",
+        servedRootRule: null,
+        affectedNodeIds: Object.freeze([record.subjectRef]),
+        callSiteKey: null,
+        plannedLegCount: null,
+        terminalTransportOutcome: null,
+        hiddenStrength: null,
+        hiddenScoreThreshold: null,
+        hiddenScoreThresholdSourceRef: null,
+        excludedFromServedNumber: null
+      })),
       ...wayOfKnowingDowngrades.map((record): ConditionMarkRecord => Object.freeze({
         mark: "WAY-OF-KNOWING-DOWNGRADED",
         scope: "node",

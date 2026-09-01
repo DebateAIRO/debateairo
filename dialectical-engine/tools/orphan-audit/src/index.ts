@@ -605,10 +605,10 @@ export async function auditOrphans(): Promise<{
     neverCalled: [
       { package: "packages/kernel.exhaustive", reason: "closed-switch fall-through carrier is present; the S00 runtime path has no switch" },
       { package: "packages/graph.constructEdge", reason: "S02 exposes the pure construction seam, but its current callers are test fixtures; the first production caller belongs to a later graph-construction slice" },
-      { package: "packages/judgement.runJudgePanel", reason: "S04 proves the P15 panel bulkhead in the pure surface; the current production shell is honestly single-judge until panel routing is composed" },
-      { package: "packages/judgement.measureDispersion", reason: "S04 proves typed dispersion at two judgements; the current single-judge production shell persists null" },
-      { package: "packages/judgement.applyCorrelatedErrorDiscount", reason: "S04 proves first-appearance family discounting; production attachment waits for multi-member routing" },
-      { package: "packages/judgement.applyDeclaredDisagreement", reason: "S04 proves declared disagreement decisions in the pure surface; the single-judge production shell records truthful NOT_MEASURED instead" },
+      // T3 / S2-2: runJudgePanel, measureDispersion, applyCorrelatedErrorDiscount
+      // and applyDeclaredDisagreement left this list when the runner's judgement
+      // path was wired to the panel. They are production-reachable now, and the
+      // s04Surface rows below derive that attachment from reachability.
       { package: "packages/judgement.createTypedNonAnswer", reason: "S04 enforces spec section 12.3 at the pure seam; ignorance-ledger production attachment belongs to the serving shell" },
       { package: "packages/serve.projectProvenance", reason: "DR-081 layer projection is pure and test-covered; the S14 enriched provenance read owns its production attachment once V supplies the flip row" },
       { package: "packages/battery/decision.decideSplitClassification", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
@@ -635,10 +635,10 @@ export async function auditOrphans(): Promise<{
       { package: "tools/acceptance-bundle", reason: "S00 scaffolds its read edges; S15 owns invocation" }
     ],
     s04Surface: deriveSurfaceRows([
-      { package: "packages/judgement.runJudgePanel", evidence: "pure P15 bulkhead only; production runner is honestly single-judge" },
-      { package: "packages/judgement.measureDispersion", evidence: "pure >=2-judgement measurement only; production single-judge path persists null" },
-      { package: "packages/judgement.applyCorrelatedErrorDiscount", evidence: "pure multi-member family grouping only; no production panel routing exists" },
-      { package: "packages/judgement.applyDeclaredDisagreement", evidence: "two-way declared predicate evaluation is pure-only; production single-judge path truthfully records NOT_MEASURED" },
+      { package: "packages/judgement.runJudgePanel", evidence: "T3/S2-2: the runner's per-node panel routes every other healthy maker through the P15 producer bulkhead" },
+      { package: "packages/judgement.measureDispersion", evidence: "T3/S2-2: the runner measures panel dispersion per node and persists it on the reduced judgement" },
+      { package: "packages/judgement.applyCorrelatedErrorDiscount", evidence: "T3/S2-2: the runner discounts repeated provider families before the panel's selection arithmetic" },
+      { package: "packages/judgement.applyDeclaredDisagreement", evidence: "T3/S2-2: the runner declares the disagreement decision against the sealed threshold and records the band downgrade" },
       { package: "packages/judgement.createTypedNonAnswer", evidence: "pure spec section 12.3 enforcement only; serving-shell attachment remains later work" },
       { package: "packages/judgement.resolveClaimType", evidence: "Judge.judge calls the shared resolver for code-first then bounded model classification" }
     ], reachableCallables),
