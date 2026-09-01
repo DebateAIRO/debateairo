@@ -230,11 +230,21 @@ function CanvasCard({
   const { node, state, role } = placed;
   const pal = role === "root" ? null : ROLE_PALETTES[role];
   const stance = role === "pov" ? "reasoning" : role;
-  const stanceLine = stance === "pro"
-    ? "var(--pro-line)"
-    : stance === "con"
-      ? "var(--con-line)"
-      : "var(--reasoning-line)";
+  let stanceLine: string;
+  switch (stance) {
+    case "pro":
+      stanceLine = "var(--pro-line)";
+      break;
+    case "con":
+      stanceLine = "var(--con-line)";
+      break;
+    case "reasoning":
+      stanceLine = "var(--reasoning-line)";
+      break;
+    case "root":
+      stanceLine = "var(--line-strong)";
+      break;
+  }
   const generation = node.active_generation;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
   const setAside = isSetAsidePath(node);
@@ -252,7 +262,9 @@ function CanvasCard({
     ? "agreed"
     : v3Review?.outcome === "dispute"
       ? "disputed"
-      : "absent";
+      : v3Review?.outcome === "cannot-assess"
+        ? "unassessed"
+        : "absent";
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -296,7 +308,7 @@ function CanvasCard({
         }
       : state === "empty" || state === "abandoned" || state === "failed"
         ? {
-            background: "var(--core)",
+            background: "var(--surface-sunken)",
             borderRadius: "var(--r-card)",
             position: "relative",
             borderColor: "var(--line-2)"
@@ -449,6 +461,10 @@ function CanvasCard({
                       className="nodeReviewDot"
                       aria-hidden="true"
                       style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 6,
+                        borderRadius: "var(--r-dot)",
                         background: compactReview === "agreed"
                           ? "var(--agree-text)"
                           : compactReview === "disputed"

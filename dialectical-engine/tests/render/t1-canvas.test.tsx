@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Answer, RunEvent } from "@debateai/contract";
 import { debateDetailFromAnswer, debateDetailFromRunProjection } from "../../apps/ui/lib/v3/adapter.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import { DebateCanvas } from "../../apps/ui/components/DebateCanvas.js";
+import { DebateMap } from "../../apps/ui/components/DebateMap.js";
+import { ModelMetaLine } from "../../apps/ui/components/ModelPresentation.js";
+import type { DebateNode } from "../../apps/ui/lib/types.js";
 
 const mocks = vi.hoisted(() => ({
   getDebateBundle: vi.fn(),
@@ -83,6 +87,15 @@ async function mountDebate(initialAnswer: Answer | null): Promise<HTMLElement> {
       />
     );
   });
+  await settleEffects();
+  return container;
+}
+
+async function mountElement(element: ReactNode): Promise<HTMLElement> {
+  const container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(element));
   await settleEffects();
   return container;
 }
@@ -201,6 +214,78 @@ describe("card anatomy", () => {
     };
   }
 
+  function answerWithEveryReviewState(): Answer {
+    const base = answerWithProAndCon();
+    const position = base.nodes.find((node) => node.node_id === "node:position")!;
+    const attack = base.edges[0]!;
+    const unassessed = {
+      ...position,
+      node_id: "node:unassessed",
+      claim: "The cannot-assess review state under test.",
+      provenance_ref: "prov:node:unassessed",
+      review: {
+        ...position.review!,
+        outcome: "cannot-assess" as const,
+        reasons: ["The reviewer recorded that this claim could not be assessed."]
+      },
+      defeater_refs: []
+    };
+    const unreviewed = {
+      ...position,
+      node_id: "node:unreviewed",
+      claim: "The absent review state under test.",
+      provenance_ref: "prov:node:unreviewed",
+      review: null,
+      defeater_refs: []
+    };
+    return buildFairShapedAnswer({
+      nodes: [...base.nodes, unassessed, unreviewed],
+      edges: [
+        ...base.edges,
+        {
+          ...attack,
+          edge_id: "edge:support:unassessed",
+          from_node_ref: unassessed.node_id,
+          relation: "support",
+          provenance_ref: "prov:edge:support:unassessed"
+        },
+        {
+          ...attack,
+          edge_id: "edge:support:unreviewed",
+          from_node_ref: unreviewed.node_id,
+          relation: "support",
+          provenance_ref: "prov:edge:support:unreviewed"
+        }
+      ]
+    });
+  }
+
+  function canvasTreeWithRenderStates(): DebateNode {
+    const projected = debateDetailFromAnswer(answerWithProAndCon()).tree!;
+    const seed = projected.children.find((node) => node.id === "node:position")!;
+    const card = (id: string, status: string, claim: string): DebateNode => ({
+      ...seed,
+      id,
+      parent_id: projected.id,
+      node_type: "PRO",
+      status,
+      claim,
+      active_generation_id: null,
+      active_generation: null,
+      maker: null,
+      children: []
+    });
+    return {
+      ...projected,
+      children: [
+        card("node:healthy", "complete", "A healthy completed argument."),
+        card("node:empty", "complete", ""),
+        card("node:abandoned", "abandoned", "An abandoned argument."),
+        card("node:failed", "failed", "A failed argument.")
+      ]
+    };
+  }
+
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -249,6 +334,7 @@ describe("card anatomy", () => {
       expect(shell?.style.background).toBe("var(--shell)");
       expect(shell?.style.borderRadius).toBe("var(--r-card)");
       expect(shell?.style.boxShadow).toBe("var(--shadow-card)");
+      expect(shell?.style.padding).toBe("4px");
       expect(core, `${stance} core`).not.toBeNull();
       expect(core?.style.background).toBe("var(--core)");
       expect(core?.style.borderRadius).toBe("var(--r-card)");
@@ -267,6 +353,13 @@ describe("card anatomy", () => {
     expect(reasoningTab, "reasoning stance tab").not.toBeNull();
     expect(reasoningTab?.style.background).toBe("var(--reasoning-line)");
     expect(reasoningTab?.style.background).not.toBe("var(--gold)");
+
+    const rootTab = container.querySelector<HTMLElement>(
+      '[data-bezel="shell"][data-stance="root"] .nodeStanceTab[data-stance="root"]'
+    );
+    expect(rootTab, "root stance tab").not.toBeNull();
+    expect(rootTab?.style.background).toBe("var(--line-strong)");
+    expect(rootTab?.style.background).not.toBe(reasoningTab?.style.background);
   });
 
   it("keeps BASE, FINAL, and an accessible Details control on one card", async () => {
@@ -284,8 +377,106 @@ describe("card anatomy", () => {
     expect(details?.querySelector('[aria-hidden="true"]')?.textContent).toBe("▸");
     const review = card!.querySelector<HTMLElement>('[data-review="agreed"]');
     expect(review, "compact agreed review mark").not.toBeNull();
-    expect(review?.querySelector<HTMLElement>(".nodeReviewDot")?.style.background)
-      .toBe("var(--agree-text)");
+    const reviewDot = review?.querySelector<HTMLElement>(".nodeReviewDot");
+    expect(reviewDot?.style.background).toBe("var(--agree-text)");
+    // jsdom has no layout, so this pins the non-zero inline sizing mechanism;
+    // rendered-size proof remains V browser QA on t_187bbd93.
+    expect(reviewDot?.style.display).toBe("inline-block");
+    expect(Number.parseFloat(reviewDot?.style.width ?? "0")).toBeGreaterThan(0);
+    expect(Number.parseFloat(reviewDot?.style.height ?? "0")).toBeGreaterThan(0);
+    expect(reviewDot?.style.borderRadius).toBe("var(--r-dot)");
+  });
+
+  it("maps all completed review outcomes and absence to four distinct compact states", async () => {
+    // PROPERTY (T1-C2-5): data-review is a total, collision-free rendering of
+    // agree, dispute, cannot-assess, and no review.
+    const container = await mountDebate(answerWithEveryReviewState());
+    const expected = [
+      ["node:position", "agree", "agreed"],
+      ["node:defeater", "dispute", "disputed"],
+      ["node:unassessed", "cannot-assess", "unassessed"],
+      ["node:unreviewed", "absent", "absent"]
+    ] as const;
+    const rendered: string[] = [];
+
+    for (const [nodeId, raw, compact] of expected) {
+      const mark = container.querySelector<HTMLElement>(
+        `[data-node-id="${nodeId}"] .nodeReviewBadges`
+      );
+      expect(mark, `${nodeId} review mark`).not.toBeNull();
+      expect(mark?.dataset.nodeReview).toBe(raw);
+      expect(mark?.dataset.review).toBe(compact);
+      rendered.push(mark!.dataset.review!);
+    }
+
+    expect(new Set(rendered).size).toBe(4);
+  });
+
+  it("binds rendered maker dots to maker-owned model tokens only", async () => {
+    // PROPERTY (B3): a recorded maker selects its own --m-* identity token;
+    // makers without a dedicated token share only the honest default.
+    const expected = [
+      ["Anthropic", "var(--m-claude)"],
+      ["OpenAI", "var(--m-gpt)"],
+      ["Google", "var(--m-gemini)"],
+      ["xAI", "var(--m-grok)"],
+      ["Alibaba", "var(--m-qwen)"],
+      ["Meta", "var(--m-default)"],
+      ["Mistral", "var(--m-default)"],
+      ["Unknown House", "var(--m-default)"]
+    ] as const;
+    const container = await mountElement(
+      <div>
+        {expected.map(([maker]) => (
+          <ModelMetaLine key={maker} maker={maker} modelId={`model:${maker}`} />
+        ))}
+      </div>
+    );
+    const rendered = expected.map(([maker, token]) => {
+      const dot = container.querySelector<HTMLElement>(`[data-maker="${maker}"] .modelDot`);
+      const renderedToken = dot?.style.getPropertyValue("--dot");
+      expect(renderedToken, maker).toBe(token);
+      return renderedToken;
+    });
+
+    expect(new Set(rendered).size).toBe(6);
+    expect(rendered.every((token) => token?.startsWith("var(--m-"))).toBe(true);
+  });
+
+  it("keeps empty, abandoned, and failed cores sunken from a healthy core", async () => {
+    // PROPERTY (N5): non-healthy card states retain the state surface inside
+    // the core bezel instead of collapsing onto a healthy card's --core fill.
+    const tree = canvasTreeWithRenderStates();
+    const container = await mountElement(
+      <DebateCanvas
+        root={tree}
+        expanded={new Set()}
+        selectedNodeId={null}
+        meta={{ claims: 4, depth: 1, judged: 0, derivedStanding: 0, setAside: 0 }}
+        onOpenNode={() => {}}
+        onToggleExpand={() => {}}
+      />
+    );
+    const coreFill = (nodeId: string) => container.querySelector<HTMLElement>(
+      `[data-node-id="${nodeId}"] > [data-bezel="core"]`
+    )?.style.background;
+
+    expect(coreFill("node:healthy")).toBe("var(--core)");
+    for (const nodeId of ["node:empty", "node:abandoned", "node:failed"]) {
+      expect(coreFill(nodeId), nodeId).toBe("var(--surface-sunken)");
+      expect(coreFill(nodeId), nodeId).not.toBe(coreFill("node:healthy"));
+    }
+  });
+
+  it("uses a structural line token for the DebateMap hub ring", async () => {
+    // PROPERTY (N6): the decorative map hub ring uses a line-role token, not
+    // pure strong text colour in Chamber mode.
+    const container = await mountElement(
+      <DebateMap root={canvasTreeWithRenderStates()} onOpenSplit={() => {}} />
+    );
+    const hub = container.querySelector<SVGCircleElement>('circle[r="44"]');
+
+    expect(hub?.getAttribute("stroke")).toBe("var(--line-strong)");
   });
 
   it("keeps Regenerate on the owner canvas argument card", async () => {

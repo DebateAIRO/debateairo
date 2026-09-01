@@ -3,18 +3,20 @@ import { makerIdentityLabel } from "@/lib/makerIdentity";
 import { modelMeta } from "@/lib/models";
 
 export function modelColor(identity: string): string {
-  const palette = [
-    "var(--m-gemini)",
-    "var(--m-gpt)",
-    "var(--m-claude)",
-    "var(--m-qwen)",
-    "var(--con-line)",
-    "var(--reasoning-line)",
-    "var(--pro-line)"
-  ];
-  let hash = 0;
-  for (const char of identity) hash = (hash + char.charCodeAt(0)) % palette.length;
-  return palette[hash];
+  switch (identity.trim().toLowerCase()) {
+    case "anthropic":
+      return "var(--m-claude)";
+    case "openai":
+      return "var(--m-gpt)";
+    case "google":
+      return "var(--m-gemini)";
+    case "xai":
+      return "var(--m-grok)";
+    case "alibaba":
+      return "var(--m-qwen)";
+    default:
+      return "var(--m-default)";
+  }
 }
 
 export function modelColorStyle(identity: string): CSSProperties {
