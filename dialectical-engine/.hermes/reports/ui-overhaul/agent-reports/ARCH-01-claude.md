@@ -1258,3 +1258,111 @@ here. Stated rather than implied.
 
 `architecture/dispatch-order.md` (amended `T9-C4-4`, the Q-16 standing note, the
 class sweep, changelog) · this report · board comment on `t_bb3b97ff`.
+
+---
+
+# AM11 — two half-pins, one measured departure (ticket `t_1784225a`)
+
+The re-verify came back **ADDENDA SOUND**: AM9's narrowing held under a
+17,553-input side-by-side fuzz with 0 new accepts, and 2,266 contract-valid refs
+with 0 rejected. Four findings, all mine, none blocking.
+
+## N8 — I departed from the reproduction METHOD, and got a better fact for it
+
+The charge told me to reproduce M17 by mutating `LoginFlow.tsx`. **I did not
+mutate it.** Two lanes were live in this tree (`CODE-T9C4-N1` on
+`t9-landing.test.tsx`, `CODE-T9C5` on `pda-s03`). Planting a deliberate defect
+in a shared product file while other seats run gates against it can fail their
+rounds with my mutant — a cross-lane harm that is not mine to risk, and the
+packet's own bounds forbid product writes in the same breath as the charge asks
+for one.
+
+Instead I enumerated the whole test corpus for pins on the `Create one` href and
+modelled M17's logic against them. That is not a weaker substitute — it produced
+a fact the mutant cannot:
+
+```
+tests/render/t9-landing.test.tsx:229   href === "/sign-up?next=%2Fnew"   <- the ONLY Create-one pin
+tests/render/auth-flow-integration.test.tsx:306
+      "keeps the sign-up login link query-free when next is absent"  -> "/login"
+```
+
+**`SignUpFlow`'s absent case is pinned. `LoginFlow`'s is not.** The two legs of
+one round trip have different coverage, and the uncovered leg is the one **AM9
+added**. There was a correct model of the pin sitting one file away when I wrote
+the cell. The mutant proves M17 is green; the enumeration proves I had an example
+and did not use it.
+
+## N9 — intent adopted, form departed, on a measurement
+
+The remedy was `z.uuid().safeParse(<fixture>).success === true`. That assertion
+exercises **zod**, not the contract, so it cannot fail on the drift it exists to
+catch. Simulated against `public_ref` drifting to a slug schema:
+
+```
+REVIEWER: z.uuid().safeParse(fixture).success        today true   drifted true    <- never alarms
+ADOPTED : <Schema>.shape.public_ref.safeParse(fx)    today true   drifted false   <- RED
+```
+
+The alarm now binds to `PublicDebateSummarySchema.shape.public_ref`
+(`packages/contract/src/index.ts:252`, exported; zod v4 exposes `.shape`;
+`pol01-policy.test.ts` already imports `@debateai/contract`, so resolution is
+proven in this suite). Intent adopted whole; only the binding target moved.
+
+## N10 — adopted, and the open question closed rather than parked
+
+Measured with the repo's own zod 4.4.3: the kind accepts things `z.uuid()`
+rejects (bad version/variant nibbles), and `z.uuid()` accepts **nothing** the
+kind rejects. The second half is the one that matters — the superset runs in the
+harmless direction, so no real ref can ever be rejected.
+
+I also answered the tightening question instead of leaving it open: not charged,
+because it buys nothing that fails closed today, because a hand-written RFC-4122
+regex would drift against the library **in the direction that rejects real
+refs**, and because the divergence already has an alarm in `T9-C2-7`. Noting
+that zod 4.4.3 admits nil and max UUIDs — an accept-set that has moved across
+majors — is what turned that from a preference into a reason.
+
+## N11 — recorded, not retitled
+
+Grepped `dispatch-order.md` and every ADR for the *"overlong public debate ref"*
+row: zero ARCH occurrences, so there was nothing to retitle. I wrote that down
+rather than saying nothing, because silence would let the addendum seat assume
+ARCH had handled the in-file rename, and let a later reader assume ARCH prose
+was updated.
+
+## The pattern, named once
+
+AM9 wrote both these cells and both were **half-pins**: `T9-C2-6` pinned the
+present branch and not its complement; `T9-C2-7` pinned the regex and not the
+schema it stands for. This is neither the AM10 permutation class nor the AM7
+synthetic class. It is **pinning the branch you were thinking about and not the
+branch beside it**, and one check catches both: *for every conditional the cell
+describes, is there a row for the other side?*
+
+## Verification
+
+- Corpus enumeration for `Create one` pins; M17 modelled against present and
+  absent cases.
+- N9 departure demonstrated against a simulated schema drift, not argued.
+- N10 relation measured with the repo's zod across 9 cases, both directions.
+- N11 grep over `dispatch-order` + all ADRs: 0 hits.
+- AM5 invariant re-run on the published markdown: **32 rows, 5 exemptions,
+  0 violations**; both amended cells stay inside row 4's existing write surface.
+- `git status --porcelain -- apps tests` **empty** — no product or test file
+  touched, and the live lanes' surfaces are exactly as I found them.
+
+## What I did not verify
+
+I did not execute the mutant, so "M17 is green under the current suite" is the
+reviewer's measurement, not mine; what I verified independently is the stronger
+underlying claim — that no test in the corpus pins the absent case. And I did not
+run the two new assertions, since both test files are outside AM11's writes; the
+schema-agreement form was proven reachable and drift-sensitive in isolation, not
+inside vitest.
+
+## Writes
+
+`architecture/dispatch-order.md` (`T9-C2-6` and `T9-C2-7` amended, AM11 rationale
+section, changelog) · `architecture/ADR-004-auth-return-path.md` (the superset
+paragraph) · this report · board comment on `t_1784225a`.
