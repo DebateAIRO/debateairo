@@ -113,9 +113,23 @@ describe("T8 — strict-and and the rival-operator pathway are gone from shipped
   });
 
   it("P4: published-arithmetic exports exactly agg and σ — strict-and's `product` is gone", async () => {
+    // Ground truth is the MODULE'S OWN KEYS, not a source pattern: an oracle
+    // that greps only `export function` passes a module that re-adds the
+    // repealed symbol as `export const product = ...` or as a re-export.
+    const module_ = await import("../../packages/published-arithmetic/src/index.js");
+    expect(Object.keys(module_).sort()).toEqual(["agg", "σ"].sort());
+
+    // Second, independent reading of the same property over the source text, so
+    // an export form that is declared but not reachable at runtime still fails.
     const source = await readFile(join(root, "packages/published-arithmetic/src/index.ts"), "utf8");
-    const exported = [...source.matchAll(/export function\s+([^\s(]+)/g)].map((match) => match[1]).sort();
-    expect(exported).toEqual(["agg", "σ"].sort());
+    const declared = [
+      ...source.matchAll(/export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([^\s(=:;{]+)/g)
+    ].map((match) => match[1]);
+    const reExported = [...source.matchAll(/export\s*\{([^}]*)\}/g)]
+      .flatMap((match) => match[1]!.split(","))
+      .map((name) => name.split(/\s+as\s+/u).at(-1)!.trim())
+      .filter((name) => name.length > 0);
+    expect([...declared, ...reExported].sort()).toEqual(["agg", "σ"].sort());
   });
 
   it("P5: the receipt schema is migrated — history names it, exactly one forward file retires it", async () => {
