@@ -62,7 +62,7 @@ The Phase 2–7 **product programmes** already tracked in `docs/missions/2026-08
 
 | ID | Sev | Surface | Finding (evidence) | Disposition |
 |---|---|---|---|---|
-| F-01 | **HIGH** | Repo / history | A live PostgreSQL data directory with plaintext debate content (`DebateAI-V3/acceptance/.pgdata-backup-2026-08-11/**`, `.pgdata-debate-091b7663-…/**`) was committed in `7ba6bed0` (2026-08-11) and removed in `56b256ce` (2026-08-12). It is still reachable from `origin/dev` and every `lane/*`/`obs-lane-*` branch (not from `origin/main`). The repository is **PUBLIC**. The root `.gitignore` documents the incident ("1731 files / 72 MB … pushed to a PUBLIC repo"). | §6 **Q1** → B11 runbook; execution needs V's explicit go (history rewrite is destructive to 17 worktrees). |
+| F-01 | INFO (was HIGH; **R1**) | Repo / history | A live PostgreSQL data directory with plaintext debate content (`DebateAI-V3/acceptance/.pgdata-backup-2026-08-11/**`, `.pgdata-debate-091b7663-…/**`) was committed in `7ba6bed0` (2026-08-11) and removed in `56b256ce` (2026-08-12). It is still reachable from `origin/dev` and every `lane/*`/`obs-lane-*` branch (not from `origin/main`). The repository is **PUBLIC**. The root `.gitignore` documents the incident ("1731 files / 72 MB … pushed to a PUBLIC repo"). | **R1 (V, 2026-09-02): the data are FAKE test debates by V and a colleague — nothing to protect.** Repo stays public, no history rewrite, B11 dropped. Hygiene only (B2; the catch-all `.pgdata*` ignore rules already prevent recurrence). Real debates will live on a separate VPS → Phase C. |
 | F-02 | **HIGH** | Supply chain | `pnpm audit`: 4 high, 3 moderate, 1 low. `postcss` ≤8.5.22 (4 advisories: XSS via unescaped `</style>`, arbitrary `.map` read ×3) pinned to `8.4.31` by `next@15.5.23`; `sharp` <0.35.0 (libvips CVE-2026-33327/33328/35590/35591) via `next`; `nanoid` <3.3.18 via `postcss`; `esbuild@0.18.20` via `drizzle-kit>@esbuild-kit`; `esbuild@0.27.7` via `tsx`. Latest `next@15` is `15.5.25` (allows `sharp ^0.35.4`); `next@16.3.4` ships `postcss 8.5.23`. Saved: `scratchpad/pnpm-audit.json`. | **B1** |
 | F-03 | **MEDIUM** | Assurance | No `.github/` at all (only GitHub's dynamic dependency-graph workflow). No CI test gate, no secret scanning, no dependency-audit gate, no Dependabot config, no `SECURITY.md`, no CodeQL — on a public repo. IMPLEMENTATION-STATUS Phase 7 lists this as ✗. | **B7, B8** |
 | F-04 | **MEDIUM** | Dev stack exposure | `compose.dev.yaml`: `hatchet-lite` publishes `8888:8888` and `7077:7077` and `vllm` publishes `8000:8000` on **all interfaces** with `SERVER_AUTH_COOKIE_INSECURE=true`, `SERVER_GRPC_INSECURE=true`, and no vLLM auth. Only `postgres` is bound to `127.0.0.1:55432`. | **B3** |
@@ -334,7 +334,7 @@ describe("compose.dev.yaml publishes only on loopback (F-04)", () => {
 - [ ] **Step 4: GREEN**; also run `pnpm exec vitest run tests/architecture/dev-compose-postgres.test.ts tests/architecture/dev-auth-data-plane.test.ts` (they pin compose facts).
 - [ ] **Step 5: Commit** `fix(dev-stack): bind hatchet-lite and vllm to 127.0.0.1 (F-04)`.
 
-### Task B4: Dev custody root override + cloud-sync refusal (F-05) — *gated on §6 Q4*
+### Task B4: Dev custody root override + cloud-sync refusal (F-05) — **APPROVED under R4** (custody moves out of the synced tree; source stays synced; README gets a "moving to a new machine" section: regenerate dev keys, never copy custody)
 **Files:**
 - Create: `dialectical-engine/deploy/dev-auth/custody-root.mjs`, `custody-root.d.mts`
 - Modify: `apps/runner/src/dev-secret-files.ts:188-190`, `dev-hatchet-token.ts:202-203`, `dev-api-environment.ts:325-326`, `dev-api-process.ts:64,161`, `dev-auth-data-plane.ts:373`, `dev-database-principals-cli.ts:7`, `deploy/dev-auth/tls-front-door.mjs:321`, `deploy/dev-auth/create-local-certificate.mjs:23`, `deploy/dev-auth/README.md`
@@ -590,7 +590,7 @@ We follow coordinated disclosure: a fix, then a public advisory citing the repor
 ```
 Step 3: GREEN, commit `docs(security): add SECURITY.md disclosure policy (F-03)`. Then (orchestrator, with V's go from §6 Q1/Q2) enable **private vulnerability reporting**, **secret scanning + push protection**, and **Dependabot alerts** via `gh api -X PATCH repos/DebateAIRO/debateairo` / `gh api -X PUT repos/DebateAIRO/debateairo/private-vulnerability-reporting` — these are account-setting changes and are executed only after V says yes.
 
-### Task B9: Nonce-based CSP for the UI (F-08) — *gated on §6 Q4 and L3 feasibility*
+### Task B9: Nonce-based CSP for the UI (F-08) — **APPROVED under R4**, still gated on L3 feasibility
 **Files:** Create `apps/ui/middleware.ts`; Modify `apps/ui/app/layout.tsx:32-43` (read nonce via `headers()`), `apps/ui/next.config.mjs` (drop the static CSP header when middleware owns it; keep every other header), `tests/integration/s5-ui-security-smoke.mjs:22-25`, `apps/ui/scripts/next-config-csp.test.mjs`.
 - [ ] Step 1: RED — change the smoke assertion to `assert.match(csp, /script-src 'self' 'nonce-[A-Za-z0-9+/=]{22,}' 'strict-dynamic'/)` and `assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/)`; run `node tests/integration/s5-ui-security-smoke.mjs` (needs a production build; see the file's own spawn logic).
 - [ ] Step 2: Implement
@@ -628,7 +628,7 @@ In `next.config.mjs` remove only the `Content-Security-Policy` entry from `heade
 ### Task B10: Admission limits for `POST /v1/asks` and anonymous public reads (F-07) — *minted after L1*
 L1 reports whether any per-user spend/admission control exists. If none: reuse the `MfaVerificationLimiter` shape (`apps/api/src/mfa.ts:51-95`, windowed count + temporary block, fail-closed) as a new `AdmissionLimiter` keyed by `ownerRef` for asks and by normalized source IP for `/v1/public/*`; policy values live in a **new versioned register row** `admissionPolicy` in `packages/register/src/session-policy.ts` (proposed: asks `20 / 60 min / user`, public reads `120 / 15 min / source`; both refuse with `429 {error:"ADMISSION_RATE_LIMITED"}` and an audit row via the existing refusal-aggregate pattern). The exact numbers are put to V in `V-DECISIONS-PACKET.md`; the mechanism and the RED test (`tests/unit/api-admission-limits.test.ts`, 21st ask → 429) are not contingent.
 
-### Task B11: History remediation runbook (F-01) — *gated on §6 Q1*
+### Task B11: History remediation runbook (F-01) — **DROPPED by R1 (2026-09-02): the leaked trees are fake test data; no rewrite, repo stays public.** Kept below only as the procedure to use if a real leak ever happens.
 **Files:** Create `docs/missions/2026-09-01-security-hardening/HISTORY-REWRITE-RUNBOOK.md`. No code. Content (to be executed only on V's explicit go, after the algorithm-live-loop mission has merged and every `.worktrees/lane-*` is removed):
 1. `gh repo edit DebateAIRO/debateairo --visibility private` (immediate blast-radius cut; reversible).
 2. Inventory: `git rev-list --objects --all | grep -E '\.pgdata' | wc -l`, total bytes via `git cat-file --batch-check`.
@@ -652,9 +652,165 @@ Appended by the orchestrator after A.8, one section per `FIX-NOW` finding, same 
 
 ---
 
-## 6. Open questions for V (answered before Phase B starts)
+## 6. Open questions for V — **answered 2026-09-02, rulings in §7**
 
 - **Q1 — F-01, public repo with leaked database history.** Recommended: make the repository **private now** (reversible, immediate), rewrite history **after** the live algorithm mission lands (17 worktrees would otherwise need re-creation), then reconsider going public. Alternatives: rewrite now; leave history and only go private; accept as-is.
 - **Q2 — Deployment horizon and scope.** Is the product local-only on your Mac for the foreseeable future, or is a hosted deployment planned? Local-only keeps the loopback assumptions and prioritises custody (B4) and dev-stack binding (B3); hosted pulls forward SCRAM/HBA/TLS, backups and break-glass (currently Phase 3 ✗) into this mission. And: stay with "defects + hygiene + CI" (recommended, §1.4) or include the Phase 2–7 programmes?
 - **Q3 — Timing versus the live algorithm mission.** Recommended: audit now (read-only), fixes now in separate worktrees, full suites only on a quiet host. Alternatives: audit now / fixes after the mission lands; everything now regardless of host load.
 - **Q4 — Two behaviour changes.** (a) B4 makes `pnpm dev:auth:up` **refuse** to run with custody under OneDrive until `DEBATEAI_DEV_CUSTODY_ROOT` points outside the synced tree (recommended; the alternative is a warning, which is not fail-closed). (b) B9 replaces `'unsafe-inline'` scripts with a per-request nonce (recommended if L3 confirms feasibility on Next 15.5; the fallback is to move the one inline script to a static file and keep the current CSP).
+
+
+---
+
+## 7. Rulings (V, 2026-09-02) and amendments
+
+- **R1 (Q1 — leaked `.pgdata` trees).** They hold **fake test debates** authored by V and a colleague; nothing to protect. Repository stays **public**; **no history rewrite**; F-01 re-graded INFO; B11 dropped. The real debates will live on a separate VPS once deployed → they are the asset Phase C protects.
+- **R2 (Q2 — deployment).** **A hosted VPS deployment is planned.** Phase C (below) is added to this mission: production configuration floors in code, an explicit reverse-proxy trust rule for the UI edge, and a VPS deployment baseline (config, systemd, Postgres SCRAM/TLS, encrypted off-host backups, restore drill). The Phase 2–7 product programmes stay out of scope.
+- **R3 (Q3 — timing).** Fix now under the quiet-host rule. The live-loop orchestrator (session "Dialectical engine goal implementation") runs a **one-heavy-suite-at-a-time** law on this host: message it before any full `pnpm test` or repo-wide `pnpm run typecheck`; focused files anytime. Never write under `.worktrees/lane-*`, `.worktrees/integration`, or `dialectical-engine/.hermes/reports/2026-09-01-*/`. `TOOLING-TRAPS.md` is append-only; announce appends.
+- **R4 (Q4 — behaviour changes).** V wants the *source* synced between two Macs (a new machine is being set up) and will move things out of OneDrive if it causes an issue. Therefore B4 ships **both** the override (`DEBATEAI_DEV_CUSTODY_ROOT`) and the fail-closed cloud-sync refusal, with an error message that names the variable and a suggested path (`~/.debateai/dev-auth`) so the repo itself can stay synced while keys never sync. `deploy/dev-auth/README.md` gains "Moving to a new machine": run `pnpm dev:auth:generate-secrets` + principals + register on the new host; never copy custody. **Nonce CSP (B9) approved** subject to L3's feasibility verdict.
+
+### Merge coordination (R3)
+The security branch is off `b5a6b6eb`; the live mission is off `1c9578a` with 95 diverged files on UI/web/serve/kernel/runner. Surfaces this branch touches: `apps/api/src/index.ts` (constructor, error handler, auth-route options), `apps/ui/{middleware.ts,app/layout.tsx,next.config.mjs,server.mjs,trusted-client-ip.mjs}`, `tests/integration/s5-ui-security-smoke.mjs`, `apps/runner/src/dev-*.ts` (custody resolver), `deploy/**`, `compose.dev.yaml`, `package.json` + `pnpm-lock.yaml` (overrides, next bump), `apps/ui/package.json`, `.github/**`, `.gitignore`, `SECURITY.md`, new `tests/architecture/*.test.ts`, `packages/register/src/runtime-environment.ts` (C1), this docs directory. V decides merge order; the orchestrator of the live mission records a closure "dev-sync" step.
+
+---
+
+## 8. Phase C — hosted deployment baseline (added under R2)
+
+### Task C1: Production configuration floors (code)
+**Files:** Modify `packages/register/src/runtime-environment.ts` (`validateApiEnvironment`, `loadRunnerEnvironment`); Test `tests/unit/production-environment-floors.test.ts` (find the existing tests that call `parseApiEnvironment` with `grep -rl parseApiEnvironment tests` and copy their fixture builder).
+
+**Interfaces:** Produces `assertProductionFloors(environment: { NODE_ENV?: string; [key: string]: unknown }): void` (exported for the runner path) throwing `TypeError` with messages `DATABASE_URL_TLS_REQUIRED:<KEY>`, `HATCHET_TLS_REQUIRED`, `API_HOST_MUST_BE_LOOPBACK`. Applied only when `NODE_ENV === "production"`.
+
+- [ ] **Step 1: Failing test**
+```ts
+// tests/unit/production-environment-floors.test.ts
+import { describe, expect, it } from "vitest";
+import { parseApiEnvironment } from "@debateai/register";
+import { validApiEnvironmentFixture } from "../support/apiEnvironmentFixture.js"; // build it from the existing parseApiEnvironment tests if absent
+
+const production = (overrides: Record<string, string | undefined>) =>
+  parseApiEnvironment({ ...validApiEnvironmentFixture(), NODE_ENV: "production", ...overrides });
+
+describe("production configuration floors (R2)", () => {
+  it("accepts loopback database hosts without TLS", () => {
+    expect(() => production({ DATABASE_URL: "postgresql://api:pw@127.0.0.1:5432/debateai?sslmode=disable" })).not.toThrow();
+  });
+  it("refuses a remote database URL without sslmode=verify-full", () => {
+    expect(() => production({ DATABASE_URL: "postgresql://api:pw@db.internal:5432/debateai?sslmode=require" }))
+      .toThrow("DATABASE_URL_TLS_REQUIRED:DATABASE_URL");
+    expect(() => production({ ERASURE_DATABASE_URL: "postgresql://erasure:pw@10.0.0.5:5432/debateai" }))
+      .toThrow("DATABASE_URL_TLS_REQUIRED:ERASURE_DATABASE_URL");
+  });
+  it("refuses HATCHET_TLS_STRATEGY=none against a non-loopback Hatchet", () => {
+    expect(() => production({ HATCHET_TLS_STRATEGY: "none", HATCHET_HOST_PORT: "hatchet.internal:7077" })).toThrow("HATCHET_TLS_REQUIRED");
+    expect(() => production({ HATCHET_TLS_STRATEGY: "none", HATCHET_HOST_PORT: "127.0.0.1:7077" })).not.toThrow();
+  });
+  it("refuses a public API bind (the edge proxy is the only public listener)", () => {
+    expect(() => production({ API_HOST: "0.0.0.0" })).toThrow("API_HOST_MUST_BE_LOOPBACK");
+  });
+  it("applies none of this outside production", () => {
+    expect(() => parseApiEnvironment({ ...validApiEnvironmentFixture(), NODE_ENV: "development", API_HOST: "0.0.0.0" })).not.toThrow();
+  });
+});
+```
+- [ ] **Step 2: RED.**
+- [ ] **Step 3: Implement** (in `runtime-environment.ts`, above `validateApiEnvironment`)
+```ts
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
+function isLoopbackHost(host: string): boolean { return LOOPBACK_HOSTS.has(host.toLowerCase()); }
+function databaseUrlNeedsTls(url: string): boolean {
+  const parsed = new URL(url);
+  return !isLoopbackHost(parsed.hostname) && parsed.searchParams.get("sslmode") !== "verify-full";
+}
+export function assertProductionFloors(environment: Readonly<Record<string, unknown>>): void {
+  if (environment.NODE_ENV !== "production") return;
+  for (const key of Object.keys(environment).filter((name) => name.endsWith("_DATABASE_URL") || name === "DATABASE_URL")) {
+    const value = environment[key];
+    if (typeof value === "string" && databaseUrlNeedsTls(value)) throw new TypeError(`DATABASE_URL_TLS_REQUIRED:${key}`);
+  }
+  const hatchetHost = typeof environment.HATCHET_HOST_PORT === "string" ? environment.HATCHET_HOST_PORT.replace(/:\d+$/, "") : "";
+  if (environment.HATCHET_TLS_STRATEGY === "none" && !isLoopbackHost(hatchetHost)) throw new TypeError("HATCHET_TLS_REQUIRED");
+  if (typeof environment.API_HOST === "string" && !isLoopbackHost(environment.API_HOST)) throw new TypeError("API_HOST_MUST_BE_LOOPBACK");
+}
+```
+Call `assertProductionFloors(environment)` as the first statement of `validateApiEnvironment` and before `return environment` in `loadRunnerEnvironment` (the runner has no `API_HOST`; the DB/Hatchet floors apply).
+- [ ] **Step 4: GREEN**; run every test that references `parseApiEnvironment`/`loadRunnerEnvironment` (`grep -rl 'parseApiEnvironment\|loadRunnerEnvironment\|loadApiEnvironment' tests`), `pnpm run typecheck` (coordinated window).
+- [ ] **Step 5: Commit** `feat(register): production floors — remote DB TLS, Hatchet TLS, loopback API bind (R2)`.
+
+### Task C2: Explicit reverse-proxy trust for the UI edge (code)
+Why: on the VPS a TLS-terminating reverse proxy (Caddy/nginx) sits in front of `server.mjs`. Today `hardenIncomingProxyHeaders` discards every forwarded header, so **every client would be seen as 127.0.0.1**: all per-source rate limits collapse into one bucket and the audit source-IP becomes meaningless. Trust must be explicit and exact, never guessed.
+
+**Files:** Modify `apps/ui/trusted-client-ip.mjs`, `apps/ui/trusted-client-ip.d.mts`, `apps/ui/server.mjs`; Test `apps/ui/lib/trustedClientIp.test.mjs` (node:test, register it in `apps/ui/scripts/node-test-manifest.json`).
+
+**Interfaces:** `parseTrustedProxies(text: string | undefined): readonly string[]` (exact IPv4/IPv6 literals, comma-separated; refuses CIDRs, hostnames, whitespace-only garbage with `DIALECTICAL_UI_TRUSTED_PROXIES_INVALID`); `hardenIncomingProxyHeaders(headers, remoteAddress, trustedProxies = [])`. Env: `DIALECTICAL_UI_TRUSTED_PROXIES` (default empty = current behaviour).
+
+- [ ] **Step 1: Failing test**
+```js
+// apps/ui/lib/trustedClientIp.test.mjs
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { hardenIncomingProxyHeaders, parseTrustedProxies, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
+
+test("untrusted remote: every forwarded header is dropped and the socket address wins", () => {
+  const headers = { "x-forwarded-for": "203.0.113.9", forwarded: "for=203.0.113.9", host: "localhost" };
+  hardenIncomingProxyHeaders(headers, "127.0.0.1", ["10.0.0.2"]);
+  assert.equal(headers["x-forwarded-for"], undefined);
+  assert.equal(headers[TRUSTED_CLIENT_IP_HEADER], "127.0.0.1");
+});
+test("trusted remote: the LAST x-forwarded-for hop becomes the client ip", () => {
+  const headers = { "x-forwarded-for": "198.51.100.7, 203.0.113.9" };
+  hardenIncomingProxyHeaders(headers, "10.0.0.2", ["10.0.0.2"]);
+  assert.equal(headers[TRUSTED_CLIENT_IP_HEADER], "203.0.113.9");
+  assert.equal(headers["x-forwarded-for"], undefined);
+});
+test("trusted remote with a malformed hop falls back to the socket address", () => {
+  const headers = { "x-forwarded-for": "not-an-ip" };
+  hardenIncomingProxyHeaders(headers, "10.0.0.2", ["10.0.0.2"]);
+  assert.equal(headers[TRUSTED_CLIENT_IP_HEADER], "10.0.0.2");
+});
+test("parseTrustedProxies accepts exact literals only", () => {
+  assert.deepEqual(parseTrustedProxies("10.0.0.2, ::1"), ["10.0.0.2", "::1"]);
+  assert.deepEqual(parseTrustedProxies(undefined), []);
+  for (const bad of ["10.0.0.0/8", "proxy.internal", "10.0.0.2;::1"]) assert.throws(() => parseTrustedProxies(bad), /DIALECTICAL_UI_TRUSTED_PROXIES_INVALID/);
+});
+```
+- [ ] **Step 2: RED** (`node --test apps/ui/lib/trustedClientIp.test.mjs`).
+- [ ] **Step 3: Implement**
+```js
+// trusted-client-ip.mjs additions
+export function parseTrustedProxies(text) {
+  if (text === undefined || text.trim() === "") return Object.freeze([]);
+  const entries = text.split(",").map((entry) => entry.trim());
+  const normalized = entries.map((entry) => normalizeClientIp(entry));
+  if (normalized.some((entry) => entry === null)) throw new Error("DIALECTICAL_UI_TRUSTED_PROXIES_INVALID");
+  return Object.freeze(normalized);
+}
+export function hardenIncomingProxyHeaders(headers, remoteAddress, trustedProxies = []) {
+  const forwardedFor = headers["x-forwarded-for"];
+  for (const name of Object.keys(headers)) { /* unchanged stripping loop */ }
+  const socketIp = normalizeClientIp(remoteAddress);
+  let clientIp = socketIp;
+  if (socketIp !== null && trustedProxies.includes(socketIp) && typeof forwardedFor === "string" && forwardedFor.length <= 512) {
+    const hops = forwardedFor.split(",").map((hop) => hop.trim());
+    const lastHop = normalizeClientIp(hops[hops.length - 1]);
+    if (lastHop !== null) clientIp = lastHop;
+  }
+  if (clientIp !== null) headers[TRUSTED_CLIENT_IP_HEADER] = clientIp;
+}
+```
+`server.mjs`: `const trustedProxies = parseTrustedProxies(process.env.DIALECTICAL_UI_TRUSTED_PROXIES);` at boot (throws → process refuses to start), passed to both `hardenIncomingProxyHeaders` calls. Update the `.d.mts` signatures. The API side (`TRUSTED_UI_PROXY_NETWORKS`) stays loopback: Next remains the only hop to the API.
+- [ ] **Step 4: GREEN**; run `pnpm --filter dialectical-engine-v2ui test`; `node apps/ui/lib/sessionProxy.test.mjs`.
+- [ ] **Step 5: Commit** `feat(ui-edge): explicit trusted reverse-proxy list for client ip (R2)`.
+
+### Task C3: VPS deployment baseline (config, units, Postgres, backups, runbook)
+**Files (create):** `deploy/vps/README.md`, `deploy/vps/Caddyfile`, `deploy/vps/compose.prod.yaml`, `deploy/postgres/pg_hba.conf.template`, `deploy/postgres/hardening.sql`, `deploy/vps/systemd/debateai-api.service`, `deploy/vps/systemd/debateai-ui.service`, `deploy/vps/systemd/debateai-runner.service`, `deploy/vps/backup.sh`, `deploy/vps/restore-drill.sh`; Test `tests/architecture/vps-deployment-baseline.test.ts`.
+
+Floors the test pins (each is a `toContain` on the named file):
+- `Caddyfile`: `header_up X-Forwarded-For`, `Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"`, `request_body { max_size 1MB }`, `reverse_proxy 127.0.0.1:3001`, no `:80` plaintext site except the automatic redirect.
+- `compose.prod.yaml`: every `ports:` entry starts with `127.0.0.1:`; postgres `command:` contains `-c ssl=on`, `-c password_encryption=scram-sha-256`, `-c log_connections=on`, `-c log_disconnections=on`; `POSTGRES_PASSWORD_FILE` (never inline); `hatchet-lite` has **no** `SERVER_AUTH_COOKIE_INSECURE`/`SERVER_GRPC_INSECURE`; `vllm` absent (model access is via authenticated CLIs per DR-179) or loopback + `--api-key`.
+- `pg_hba.conf.template`: only `scram-sha-256` and `hostssl` lines for non-local, `reject` catch-all last.
+- `hardening.sql`: `REVOKE CREATE ON SCHEMA public FROM PUBLIC;`, `ALTER DATABASE debateai SET statement_timeout`, per-role `SET search_path`.
+- systemd units: `User=debateai`, `NoNewPrivileges=true`, `ProtectSystem=strict`, `PrivateTmp=true`, `ReadWritePaths=` (custody + data only), `EnvironmentFile=/etc/debateai/<svc>.env` (0600 root:debateai), `Environment=NODE_ENV=production`, `Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1` for the UI unit.
+- `backup.sh`: `pg_dump --format=custom` piped to `age -r` (public key in `/etc/debateai/backup.age.pub`), `set -euo pipefail`, off-host copy (`rclone copy` or `scp`), retention pruning, receipt line `BACKUP_OK <sha256> <bytes>`; `restore-drill.sh`: restores into `debateai_drill`, runs `SELECT count(*)` on `core.runs` and the audit chain check, prints `RESTORE_DRILL_OK`, drops the drill DB.
+- `README.md`: firewall (`ufw allow 22,80,443; ufw default deny incoming`), unattended-upgrades, secrets custody at `/etc/debateai` 0600, key generation with the existing `dev:auth:generate-secrets`-equivalent production commands, principal provisioning via `pnpm db:provision-principals`, quarterly restore drill, log retention, break-glass = deliberately absent (Phase 2), the exact boot order.
+- [ ] Step 1 RED (test asserts existence + floors), Step 2 author the files, Step 3 GREEN, Step 4 `shellcheck` both scripts if installed (record), Step 5 commit `feat(deploy): VPS baseline — Caddy, hardened compose/postgres, systemd, encrypted backups, restore drill (R2)`.
