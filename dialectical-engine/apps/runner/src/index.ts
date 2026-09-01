@@ -451,6 +451,18 @@ export interface ReviewCatchUpReviewer {
     readonly providerRef: string;
     readonly contractHash: string;
     readonly bound: CallBound;
+    /**
+     * T5 / S3-1. The catch-up lane re-reviews nodes whose edges were already
+     * minted and, where the in-run review landed, already measured — so it
+     * offers NO edges for measurement and re-measures nothing. Passing the
+     * empty list explicitly is what keeps that a stated decision rather than
+     * an omission (finding F-T5-2).
+     */
+    readonly edges: readonly {
+      readonly edgeId: string;
+      readonly targetStatement: string;
+      readonly polarity: "support" | "attack";
+    }[];
   }): Promise<{
     readonly outcome: "agree" | "dispute" | "cannot-assess";
     readonly reasons: readonly string[];
@@ -588,7 +600,8 @@ export async function runReviewCatchUp(input: {
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
         contractHash: input.judgeContractHash,
-        bound: { ...input.judgeBound, maxAttempts }
+        bound: { ...input.judgeBound, maxAttempts },
+        edges: []
       })
     });
     if (outcome.kind === "HALTED") continue;
@@ -1892,9 +1905,20 @@ export class WalkingSkeletonRunner {
       readonly reversalPoint: string;
       readonly authorIndex: number;
       readonly maker: string;
+      /**
+       * T5 / S3-1: every edge this node sources, carried to the node's ONE
+       * review call so the reviewer measures them all on the visit it was
+       * already making. A root sources none.
+       */
+      readonly sourcedEdges: readonly {
+        readonly edgeId: string;
+        readonly targetStatement: string;
+        readonly polarity: "support" | "attack";
+      }[];
     }
     const authoredNodes = new Map<number, AuthoredDebateNode>([[0, Object.freeze({
       nodeId,
+      sourcedEdges: Object.freeze([]),
       statement: judged.statement,
       provenanceRef: judged.provenanceRef,
       reducedJudgementId,
@@ -1929,6 +1953,7 @@ export class WalkingSkeletonRunner {
       readonly explorationDecision: "continue" | "deepen" | "challenge";
       readonly edges: readonly {
         readonly targetNodeId: string;
+        readonly targetStatement: string;
         readonly polarity: "support" | "attack";
       }[];
     }): Promise<
@@ -1990,7 +2015,7 @@ export class WalkingSkeletonRunner {
           callSiteKey: `PANEL:${input.callSiteKey}`,
           questionLine: input.questionLine
         });
-        const childNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
+        const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
             runId: run.runId,
             statementText: childJudged.statement,
@@ -2011,8 +2036,9 @@ export class WalkingSkeletonRunner {
             text: childJudged.restatementText,
             checkStatus: childJudged.restatementStatus
           });
+          const minted: { readonly edgeId: string; readonly targetStatement: string; readonly polarity: "support" | "attack" }[] = [];
           for (const edge of input.edges) {
-            await writer.addEdge({
+            const edgeId = await writer.addEdge({
               runId: run.runId,
               sourceNodeId: created,
               targetKind: "NODE",
@@ -2023,11 +2049,13 @@ export class WalkingSkeletonRunner {
               kind: edge.polarity === "attack" ? "rebutting" : null,
               strength: null,
               magnitudeStatus: "UNKNOWN",
-              strengthSource: "EVIDENCE_VERIFIER",
+              // T5 / S3-1: the stamp names the role that will measure this edge.
+              strengthSource: "REVIEWER",
               provenanceRef: childJudged.provenanceRef
             });
+            minted.push({ edgeId, targetStatement: edge.targetStatement, polarity: edge.polarity });
           }
-          return created;
+          return { created, minted: Object.freeze(minted) };
         });
         if (childJudged.wayOfKnowingDowngrade !== null) {
           wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
@@ -2061,6 +2089,7 @@ export class WalkingSkeletonRunner {
         });
       return { kind: "AUTHORED", value: Object.freeze({
           nodeId: childNodeId,
+          sourcedEdges: childSourcedEdges,
           statement: childJudged.statement,
           provenanceRef: childJudged.provenanceRef,
           reducedJudgementId: childReducedJudgementId,
@@ -2150,7 +2179,9 @@ export class WalkingSkeletonRunner {
               authorMaker: authoredNode.maker,
               providerRef: reviewer.providerRef,
               contractHash: this.settings.judgeContractHash,
-              bound: { ...this.settings.judgeBound, maxAttempts }
+              bound: { ...this.settings.judgeBound, maxAttempts },
+              // S3-1: this ONE call measures every edge the node sources.
+              edges: authoredNode.sourcedEdges
             })
           });
           if (reviewAttempt.kind === "HALTED") {
@@ -2166,6 +2197,15 @@ export class WalkingSkeletonRunner {
             outcome: review.outcome,
             reasons: review.reasons
           });
+          // T5 / S3-1: the magnitudes the review already returned are written
+          // here — no second call site exists, so the model-call ledger shows
+          // one entry per reviewed node and nothing else.
+          if (review.edgeMeasurements.length > 0) {
+            await this.#graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
+              runId: run.runId,
+              measurements: review.edgeMeasurements
+            }));
+          }
         } catch (error) {
           if (error instanceof TypedDomainError && [
             "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -2230,7 +2270,7 @@ export class WalkingSkeletonRunner {
         siblingOrdinal: leg.polarity === "support" ? 1 : 2,
         plannedLegCount: plannedSubtreeIndices.length,
         explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
-        edges: [{ targetNodeId: parent.nodeId, polarity: leg.polarity }]
+        edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
       });
       if (authored.kind === "HALTED") {
         const indices = plannedSubtreeIndices;
@@ -2272,8 +2312,8 @@ export class WalkingSkeletonRunner {
         plannedLegCount: 1,
         explorationDecision: "challenge",
         edges: [
-          { targetNodeId: authorRoot.nodeId, polarity: "support" },
-          { targetNodeId: targetRoot.nodeId, polarity: "attack" }
+          { targetNodeId: authorRoot.nodeId, targetStatement: authorRoot.statement, polarity: "support" },
+          { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
         ]
       });
       if (authored.kind === "HALTED") {

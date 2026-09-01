@@ -107,12 +107,29 @@ const judgeArtifactSchema = z.object({
   ...judgeAssessmentSchema.shape
 }).strict();
 
-const nodeReviewArtifactSchema = z.object({
-  outcome: z.enum(REVIEW_OUTCOMES),
-  reasons: z.array(z.string().trim().min(1)).min(1)
-}).strict();
+/**
+ * T5 / S3-1 — the review artifact carries the edge measurements.
+ *
+ * `edge_bearings` is positional and its length is pinned to the number of edges
+ * the caller supplied, so ONE call is structurally obliged to measure ALL of
+ * the reviewed node's edges: a short array is a schema failure, not a partial
+ * result that a second call could top up. `null` is the per-edge
+ * cannot-assess, which leaves that edge UNKNOWN.
+ */
+function nodeReviewArtifactSchema(edgeCount: number) {
+  return z.object({
+    outcome: z.enum(REVIEW_OUTCOMES),
+    reasons: z.array(z.string().trim().min(1)).min(1),
+    edge_bearings: z.array(z.union([z.number().min(0).max(1), z.null()]))
+      .length(edgeCount)
+  }).strict();
+}
 
-type UntrustedPromptFieldName = "question_line" | "author_maker" | "statement";
+type UntrustedPromptFieldName =
+  | "question_line"
+  | "author_maker"
+  | "statement"
+  | "edges_sourced_by_this_node";
 
 function renderUntrustedPromptFields(
   fields: readonly { readonly name: UntrustedPromptFieldName; readonly content: string }[]
@@ -174,7 +191,7 @@ export interface JudgedNode {
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
 }
 
-export interface NodeReviewInput {
+export interface JudgeSubjectInput {
   readonly runId: string | null;
   readonly subjectItemId: string;
   readonly callSiteKey: string;
@@ -186,13 +203,30 @@ export interface NodeReviewInput {
   readonly bound: CallBound;
 }
 
+/** One edge sourced by the node under review, offered for measurement (S3-1). */
+export interface ReviewedEdgeSubject {
+  readonly edgeId: string;
+  readonly targetStatement: string;
+  readonly polarity: "support" | "attack";
+}
+
+export interface NodeReviewInput extends JudgeSubjectInput {
+  /**
+   * Every edge this node sources. REQUIRED, never optional: an absent list and
+   * an empty list must not look alike, or a caller that forgets to pass its
+   * edges silently reproduces the all-UNKNOWN skeleton T5 repeals.
+   */
+  readonly edges: readonly ReviewedEdgeSubject[];
+}
+
 /**
  * S2-2 / T3: what one panel member is asked. Structurally the review call's
- * inputs, because a member assesses the same node material — but the ANSWER is
- * a scored assessment, not a review outcome, and the two calls stay separate
- * (S4-1).
+ * SUBJECT inputs, because a member assesses the same node material — but the
+ * ANSWER is a scored assessment, not a review outcome, and the two calls stay
+ * separate (S4-1). It carries no edges: measurement is the reviewer's seat,
+ * and the panel never sees an edge.
  */
-export type PanelAssessmentInput = NodeReviewInput;
+export type PanelAssessmentInput = JudgeSubjectInput;
 
 export interface PanelAssessment {
   readonly judgementRef: string;
@@ -201,12 +235,20 @@ export interface PanelAssessment {
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
 }
 
+/** One edge's measured bearing, or `null` where the reviewer cannot assess it. */
+export interface ReviewedEdgeMeasurement {
+  readonly edgeId: string;
+  readonly bearing: number | null;
+}
+
 export interface ReviewedNode {
   readonly outcome: ReviewOutcome;
   readonly reasons: readonly string[];
   readonly provenanceRef: string;
   readonly providerLedgerRef: string;
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
+  /** One entry per supplied edge, in the order supplied (S3-1). */
+  readonly edgeMeasurements: readonly ReviewedEdgeMeasurement[];
 }
 
 export class Judge {
@@ -315,19 +357,35 @@ Never invent evidence, citations, or sources. Score relevance against the questi
     };
   }
 
+  /**
+   * S3-1 / S4-1 — the cross-maker review, which now ALSO measures every edge
+   * the reviewed node sources. The measurement rides this existing visit: it
+   * is the relational, never-the-author examination (argument against target),
+   * so it is the impartial seat, and bundling it here costs zero extra calls.
+   * Panel judging stays a separate call (`assess`).
+   */
   async review(input: NodeReviewInput): Promise<ReviewedNode> {
+    const schema = nodeReviewArtifactSchema(input.edges.length);
     const packet: PromptPacket = {
       messages: [
         {
           role: "system",
-          content: `Review an existing debate node authored by a different maker. Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...]\n}\nUse cannot-assess when the supplied material does not support an honest judgement. Never invent evidence, citations, or sources. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
+          content: `Review an existing debate node authored by a different maker. Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...],\n  "edge_bearings": [number in [0,1] or null, ...]\n}\nUse cannot-assess when the supplied material does not support an honest judgement. edge_bearings measures how strongly the statement bears on each target listed in edges_sourced_by_this_node, in the SAME ORDER, one entry per edge and exactly ${String(input.edges.length)} entries. Use 0 for no bearing, 1 for a decisive bearing, and null when the supplied material does not support an honest measurement of that edge. Never invent evidence, citations, or sources. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
         },
         {
           role: "user",
           content: renderUntrustedPromptFields([
             { name: "question_line", content: input.questionLine },
             { name: "author_maker", content: input.authorMaker },
-            { name: "statement", content: input.statement }
+            { name: "statement", content: input.statement },
+            {
+              name: "edges_sourced_by_this_node",
+              content: JSON.stringify(input.edges.map((edge, ordinal) => ({
+                ordinal,
+                relation: edge.polarity,
+                target_statement: edge.targetStatement
+              })))
+            }
           ])
         }
       ]
@@ -346,7 +404,7 @@ Never invent evidence, citations, or sources. Score relevance against the questi
         packet,
         buildRepairPacket: ({ parseError }) => buildContentRepairPacket(packet, parseError),
         classifyContent: (content) => {
-          const outcome = parseStructuredArtifact(content, nodeReviewArtifactSchema);
+          const outcome = parseStructuredArtifact(content, schema);
           if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
           return {
             parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
@@ -360,15 +418,28 @@ Never invent evidence, citations, or sources. Score relevance against the questi
       }
       throw error;
     }
-    const parsed = parseStructuredArtifact(response.content, nodeReviewArtifactSchema);
+    const parsed = parseStructuredArtifact(response.content, schema);
     if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("NODE_REVIEW_PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", parsed.message);
+    const bearings = parsed.value.edge_bearings;
     return Object.freeze({
       outcome: parsed.value.outcome,
       reasons: Object.freeze([...parsed.value.reasons]),
       provenanceRef: response.rawArtifactRef,
       providerLedgerRef: response.ledgerEntryRef,
-      parseStrategy: parsed.strategy
+      parseStrategy: parsed.strategy,
+      // The schema pinned the length; the guard makes a drop LOUD rather than
+      // letting a missing entry pass as a cannot-assess.
+      edgeMeasurements: Object.freeze(input.edges.map((edge, ordinal) => {
+        const bearing = bearings[ordinal];
+        if (bearing === undefined) {
+          throw new TypedDomainError(
+            "NODE_REVIEW_SCHEMA_FAILURE",
+            `edge_bearings has no bearing for edge ordinal ${String(ordinal)}`
+          );
+        }
+        return Object.freeze({ edgeId: edge.edgeId, bearing });
+      }))
     });
   }
 

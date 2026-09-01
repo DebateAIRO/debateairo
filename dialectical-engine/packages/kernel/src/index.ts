@@ -192,8 +192,15 @@ export type EdgeKind = typeof EDGE_KINDS[number];
 export const MAGNITUDE_STATUSES = ["MEASURED", "UNKNOWN"] as const;
 export type MagnitudeStatus = typeof MAGNITUDE_STATUSES[number];
 
+/**
+ * T5 / S3-1 — the stamp names the role that actually measures. `REVIEWER`
+ * replaces the retired `EVIDENCE_VERIFIER`, which named a role that never
+ * took a measurement: every edge it stamped carried a NULL strength.
+ * Migration 0052 renames the stamp on the stored rows and narrows the column
+ * domain, so no read path can hand back a value this vocabulary refuses.
+ */
 export const STRENGTH_SOURCES = [
-  "EVIDENCE_VERIFIER",
+  "REVIEWER",
   "CLUSTER_COLLAPSE",
   "UNDERCUT_TRANSMISSION"
 ] as const;
