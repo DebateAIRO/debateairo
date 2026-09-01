@@ -819,3 +819,9 @@ permission classifier (correctly) refused to relaunch.
 Found by CODE-T9C4-N1 (2026-09-01): a zsh `for path in ...` loop overwrites the special
 $path array (mirror of $PATH), making commands appear missing for the rest of the shell.
 Use any other variable name in zsh loops (`p`, `f`, `file`).
+
+## Vitest may rewrite `import.meta.url` to a non-file module URL
+Found by CODE-T5C1 (2026-09-01): a jsdom dump test passed a URL derived from
+`import.meta.url` to `mkdirSync` and failed with `ERR_INVALID_URL_SCHEME` before writing
+the artifact. For repo-local throwaway artifacts, resolve the authorized destination from
+the test command's pinned `process.cwd()` with `node:path`; this cost one failed dump run.
