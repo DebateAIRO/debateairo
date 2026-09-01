@@ -4,15 +4,18 @@ import type { Pool, PoolClient } from "pg";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   AUTH_POLICY_REGISTER_ROWS,
+  ENGINE_BAND_ORDER,
   MFA_POLICY_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
+  buildAlgorithmRegisterRows,
   loadBootstrapRegister,
   persistBootstrapRegister,
-  type BootstrapRegister
+  type BootstrapRegister,
+  type ProviderFamilyEntry
 } from "@debateai/register";
-import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import type { DevelopmentConfiguredProvider, DevelopmentProviderPanel } from "./dev-provider-panel.js";
 
 export type DevelopmentDeploymentRegisterRow = Readonly<{
   rowKey: string;
@@ -24,6 +27,9 @@ export const DEVELOPMENT_SOURCE_REF =
   "DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05" as const;
 export const DEVELOPMENT_RUNNER_SOURCE_REF =
   "DEV-12D-development-runner-policy.md#sealed-v2" as const;
+/** T16 · dev provenance for every sealed algorithm row (goal-v4 lines 80-96). */
+export const DEVELOPMENT_ALGORITHM_SOURCE_REF =
+  "DEV-T16-algorithm-register.md#goal-v4:80-96" as const;
 export const DEVELOPMENT_ORGAN_COST_BOUNDS = Object.freeze({
   kind: "ACCEPTANCE_ORGAN_COST_BOUNDS" as const,
   organs: Object.freeze({
@@ -83,6 +89,55 @@ export function buildDevelopmentDeploymentRegisterRows(
     }),
     ...DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS
   ]);
+}
+
+/**
+ * T16 · the provider→family map, read off the deployment's OWN configured
+ * provider set so the family names are exactly what the relay layer calls its
+ * makers (DECISIONS J1). First-appearance order is preserved.
+ */
+export function deriveProviderFamilies(
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
+): readonly ProviderFamilyEntry[] {
+  const byMaker = new Map<string, string[]>();
+  for (const provider of configuredProviders) {
+    const providerRefs = byMaker.get(provider.maker);
+    if (providerRefs === undefined) byMaker.set(provider.maker, [provider.providerRef]);
+    else providerRefs.push(provider.providerRef);
+  }
+  if (byMaker.size === 0) throw new TypeError("DEV_ALGORITHM_REGISTER_FAMILY_MAP_UNRESOLVED");
+  return Object.freeze([...byMaker].map(([familyRef, providerRefs]) =>
+    Object.freeze({ familyRef, providerRefs: Object.freeze([...providerRefs]) })
+  ));
+}
+
+/**
+ * T16 · dev-provisional synthesizer and evaluator identities: the first two
+ * configured providers of DIFFERENT makers. Identical refs stay lawful
+ * (goal 84-85) but the register reader warns at startup; this deployment
+ * seeds two different ones, so the warning must not fire here.
+ */
+export function deriveSynthesisRoleRefs(
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
+): Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string }> {
+  const families = deriveProviderFamilies(configuredProviders);
+  if (families.length < 2) throw new TypeError("DEV_ALGORITHM_REGISTER_ROLE_REFS_UNRESOLVED");
+  return Object.freeze({
+    synthesizerRoleRef: families[0]!.providerRefs[0]!,
+    evaluatorRoleRef: families[1]!.providerRefs[0]!
+  });
+}
+
+export function buildDevelopmentAlgorithmRegisterRows(
+  providerPanel: DevelopmentProviderPanel
+): readonly DevelopmentDeploymentRegisterRow[] {
+  const roles = deriveSynthesisRoleRefs(providerPanel.configuredProviders);
+  return Object.freeze(buildAlgorithmRegisterRows({
+    deploymentSourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF,
+    synthesizerRoleRef: roles.synthesizerRoleRef,
+    evaluatorRoleRef: roles.evaluatorRoleRef,
+    providerFamilies: deriveProviderFamilies(providerPanel.configuredProviders)
+  }).map((row) => Object.freeze(row)));
 }
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
@@ -154,7 +209,7 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
     {
       rowKey: "wayOfKnowingCeiling",
       value: Object.freeze({
-        bandOrder: Object.freeze(["CAPPED", "FULL"]),
+        bandOrder: ENGINE_BAND_ORDER,
         ceilingLabels: Object.freeze(["DEFAULT_CEILING", "REASONING_CEILING"]),
         defaultCeiling: Object.freeze({
           label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band"
@@ -235,7 +290,8 @@ function developmentRows(
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
-    ...buildDevelopmentDeploymentRegisterRows(providerPanel)
+    ...buildDevelopmentDeploymentRegisterRows(providerPanel),
+    ...buildDevelopmentAlgorithmRegisterRows(providerPanel)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
@@ -271,6 +327,9 @@ async function insertAndSeal(
      VALUES ($1,$2,true)`,
     [registerVersion, rows.length]
   );
+  // T16 · the migration-declared manifest fails the seal loudly, naming the
+  // family and row key, if any mandatory row was not supplied.
+  await client.query("SELECT register.assert_required_rows($1)", [registerVersion]);
   if (await readExactState(client, registerVersion, rows) !== "EXACT") {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DRIFT");
   }

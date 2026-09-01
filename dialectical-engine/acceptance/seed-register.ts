@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
-import { loadBootstrapRegister } from "@debateai/register";
+import {
+  ENGINE_BAND_ORDER,
+  buildAlgorithmRegisterRows,
+  loadBootstrapRegister,
+  type ProviderFamilyEntry
+} from "@debateai/register";
 
 export const ACCEPTANCE_REGISTER_VERSION = 1 as const;
 export const ACCEPTANCE_REGISTER_SOURCE_REF = "acceptance:DR-133:V-approved" as const;
@@ -21,6 +26,40 @@ export const ACCEPTANCE_PROVIDER_SET_SOURCE_REF = "acceptance:DR-177:V-approved"
  * it through the SHIPPED resolveScoringOperator chain (P8) and records the
  * supplying level on the propagation receipt. */
 export const ACCEPTANCE_SCORING_OPERATOR_SOURCE_REF = "acceptance:DR-144:V-approved" as const;
+/** T16 (goal-v4 80-96): ceremony provenance for the sealed algorithm rows. */
+export const ACCEPTANCE_ALGORITHM_SOURCE_REF = "acceptance:T16-algorithm-register" as const;
+
+/** GROK-01 (DR-177) roster — the single source for the configured provider set
+ * row AND for T16's provider→family map, so the two can never disagree. */
+export const ACCEPTANCE_CONFIGURED_PROVIDERS = Object.freeze([
+  Object.freeze({ providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http" as const, maker: "OpenAI" }),
+  Object.freeze({ providerRef: "acceptance:claude-cli", adapterKind: "openai-compatible-http" as const, maker: "Anthropic" }),
+  Object.freeze({ providerRef: "acceptance:grok-cli", adapterKind: "openai-compatible-http" as const, maker: "xAI" })
+]);
+
+function acceptanceProviderFamilies(): readonly ProviderFamilyEntry[] {
+  const byMaker = new Map<string, string[]>();
+  for (const provider of ACCEPTANCE_CONFIGURED_PROVIDERS) {
+    const refs = byMaker.get(provider.maker);
+    if (refs === undefined) byMaker.set(provider.maker, [provider.providerRef]);
+    else refs.push(provider.providerRef);
+  }
+  return Object.freeze([...byMaker].map(([familyRef, providerRefs]) =>
+    Object.freeze({ familyRef, providerRefs: Object.freeze([...providerRefs]) })
+  ));
+}
+
+/** T16 · the ceremony's copy of every sealed algorithm row. Same ruled values as
+ * the dev deployment register; ceremony provenance and ceremony role identities. */
+export function buildAcceptanceAlgorithmRegisterRows(): readonly AcceptanceRegisterRow[] {
+  const families = acceptanceProviderFamilies();
+  return buildAlgorithmRegisterRows({
+    deploymentSourceRef: ACCEPTANCE_ALGORITHM_SOURCE_REF,
+    synthesizerRoleRef: families[0]!.providerRefs[0]!,
+    evaluatorRoleRef: families[1]!.providerRefs[0]!,
+    providerFamilies: families
+  });
+}
 
 export interface AcceptanceRegisterRow {
   readonly rowKey: string;
@@ -145,7 +184,7 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
     {
       rowKey: "wayOfKnowingCeiling",
       value: {
-        bandOrder: ["CAPPED", "FULL"],
+        bandOrder: [...ENGINE_BAND_ORDER],
         ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING"],
         defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
         cuts: [{
@@ -239,22 +278,15 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
       value: {
         kind: "CONFIGURED_PROVIDER_SET",
         requiredDistinctMakers: 1,
-        providers: [{
-          providerRef: "acceptance:codex-cli",
-          adapterKind: "openai-compatible-http",
-          maker: "OpenAI"
-        }, {
-          providerRef: "acceptance:claude-cli",
-          adapterKind: "openai-compatible-http",
-          maker: "Anthropic"
-        }, {
-          providerRef: "acceptance:grok-cli",
-          adapterKind: "openai-compatible-http",
-          maker: "xAI"
-        }]
+        providers: ACCEPTANCE_CONFIGURED_PROVIDERS.map((provider) => ({
+          providerRef: provider.providerRef,
+          adapterKind: provider.adapterKind,
+          maker: provider.maker
+        }))
       },
       sourceRef: ACCEPTANCE_PROVIDER_SET_SOURCE_REF
-    }
+    },
+    ...buildAcceptanceAlgorithmRegisterRows()
   ];
   return Object.freeze(
     [...ruledRows, ...await computeContractHashes()].map((row) => Object.freeze(row))
