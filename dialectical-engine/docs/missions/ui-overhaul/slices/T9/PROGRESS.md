@@ -59,3 +59,23 @@ REQUIREMENTS DRAFTED — awaiting review
   one-liner, t_5d0c892a real-render premise pin).
 - T9 slice state: C3 done, C1 done; C2 (chrome labels/CTAs/return path) and C4 (content)
   and C5 (residual migration bind) remain — C2 is Wave 2.
+
+## 2026-09-01 04:55 — T9-C2 CLOSED, T9-C4 CLOSED; slice-finish round dispatching
+- T9-C2: PASS — MERGED-READY at 6aa9f35 (REV round 1, 7 N-findings 0 blocking), then two
+  addenda in the same worker session (ec7c857: M8/M9 rows; f61d68bc: AM9's uuid-kind
+  narrowing + round-trip cell + accept-case alarm) re-verified by the SAME reviewer:
+  ADDENDA SOUND — subset-proof by 17,553-input side-by-side fuzz (0 new accepts), 2,266
+  contract-valid refs 0 rejected. Four fail-closed N-findings ticketed same day
+  (t_00a05b8e N8, t_b8a08133 N9, t_aa149484 N10, t_89478959 N11) + qualifier-clause
+  packet practice adopted (t_51bb54fe).
+- T9-C4: PASS — MERGED-READY at 174735a (copy verbatim under V's mapping, placeholders
+  static). One finding: M3 body-swap survives (pairing unpinned) -> AM10 (d22fb2bc)
+  amended T9-C4-4 to positional [number, title, body] tuples; worker addendum pending.
+- Now dispatching in parallel (no shared surfaces): ARCH-01-AM11 (N8 cell row, N9
+  schema-agreement adoption, N10 ADR-004 note, N11 naming — session bb69b040),
+  CODE-T9C4-N1 (AM10 tuples, session 01a05a71), CODE-T9C5 (fresh codex, slice-close
+  bind: pda-s03 audit vs final T9 surface + three-run; 4-file command pre-verified
+  green 54/54 at dispatch).
+- After AM11: CODE-T9C2-N3 (session 01a05a3c) implements N8/N9/N11 rows. Then re-verdicts
+  ride the SAME reviewer sessions; T9-C5 gets a fresh Opus review. That closes T9 except
+  the V queue (Q-13..Q-16, closure lines, browser QA).
