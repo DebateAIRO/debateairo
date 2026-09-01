@@ -436,6 +436,21 @@ export interface ReviewCatchUpNode {
   readonly statement: string;
   readonly authorMaker: string;
   readonly authorRawArtifactRef: string;
+  /**
+   * T5 / S3-1 — the edges this node sources that are still UNMEASURED.
+   *
+   * A catch-up review is a real reviewer visit, so it measures what it can. The
+   * list is empty only when the node genuinely has nothing left to measure;
+   * declaring an edge-owning node to have none would be a false statement, not
+   * a missing measurement. Already-MEASURED edges are excluded at the reader:
+   * the one-way ratchet in 0052 refuses a second write, so re-offering them
+   * would ask the reviewer for a number nothing could record.
+   */
+  readonly sourcedEdges: readonly {
+    readonly edgeId: string;
+    readonly targetStatement: string;
+    readonly polarity: "support" | "attack";
+  }[];
 }
 
 export interface ReviewCatchUpReviewer {
@@ -467,6 +482,11 @@ export interface ReviewCatchUpReviewer {
     readonly outcome: "agree" | "dispute" | "cannot-assess";
     readonly reasons: readonly string[];
     readonly provenanceRef: string;
+    /** One entry per offered edge — the same ONE call, no extra spend (S3-1). */
+    readonly edgeMeasurements: readonly {
+      readonly edgeId: string;
+      readonly bearing: number | null;
+    }[];
   }>;
 }
 
@@ -497,6 +517,11 @@ export interface ReviewCatchUpDependencies {
     readonly outcome: "agree" | "dispute" | "cannot-assess";
     readonly reasons: readonly string[];
   }): Promise<string>;
+  /** T5 / S3-1 — writes the magnitudes the review call already returned. */
+  recordEdgeMeasurements(input: {
+    readonly runId: string;
+    readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
+  }): Promise<void>;
   countRunModelAttempts(runId: string): Promise<number>;
   readPinnedMaximumAttempts(runId: string): Promise<number>;
   prepareVersion(input: {
@@ -601,7 +626,9 @@ export async function runReviewCatchUp(input: {
         providerRef: reviewer.providerRef,
         contractHash: input.judgeContractHash,
         bound: { ...input.judgeBound, maxAttempts },
-        edges: []
+        // T5 / S3-1: a catch-up review is a real reviewer visit. It measures
+        // the edges this node still owns unmeasured — never a false empty list.
+        edges: node.sourcedEdges
       })
     });
     if (outcome.kind === "HALTED") continue;
@@ -613,6 +640,17 @@ export async function runReviewCatchUp(input: {
       outcome: outcome.value.outcome,
       reasons: outcome.value.reasons
     });
+    // T5 / S3-1: the magnitudes came back on the review call above. Writing
+    // them here spends nothing — a measurement-only call site would be exactly
+    // the extra call the ruling forbids. A cannot-assess bearing is null and
+    // leaves its edge UNKNOWN, which is the honest record of a reviewer that
+    // looked and could not say.
+    if (outcome.value.edgeMeasurements.length > 0) {
+      await input.dependencies.recordEdgeMeasurements({
+        runId: input.runId,
+        measurements: outcome.value.edgeMeasurements
+      });
+    }
     reviewed += 1;
   }
   if (reviewed === 0) {
@@ -700,6 +738,9 @@ export function createPostgresReviewCatchUpDependencies(input: {
       serve.readReviewCatchUpDisclosedNodeIds(answerId, answerVersion),
     readLatestReviewerMaker: (runId, maker) => judgements.readLatestReviewerMaker(runId, maker),
     recordNodeReview: (record) => judgements.recordNodeReview(record),
+    recordEdgeMeasurements: async ({ runId, measurements }) => {
+      await graph.withGraphWrite(runId, (writer) => writer.recordEdgeMeasurements({ runId, measurements }));
+    },
     countRunModelAttempts: (runId) => budget.countRunModelAttempts(runId),
     readPinnedMaximumAttempts: async (runId) => (await budget.readPinnedBasis(runId)).maxModelAttempts,
     prepareVersion: async ({ runId, answerId, fromVersion }) => {

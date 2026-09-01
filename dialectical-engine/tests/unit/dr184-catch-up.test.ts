@@ -8,7 +8,19 @@ const node = Object.freeze({
   nodeId: "node:1",
   statement: "A claim",
   authorMaker: "maker:a",
-  authorRawArtifactRef: "artifact:author"
+  authorRawArtifactRef: "artifact:author",
+  sourcedEdges: Object.freeze([])
+});
+
+/** T5/S3-1: a catch-up node that still owns an unmeasured edge. */
+const edgeOwningNode = Object.freeze({
+  nodeId: "node:edge-owner",
+  statement: "A claim that attacks its parent",
+  authorMaker: "maker:a",
+  authorRawArtifactRef: "artifact:author",
+  sourcedEdges: Object.freeze([
+    Object.freeze({ edgeId: "edge:1", targetStatement: "The parent position", polarity: "attack" as const })
+  ])
 });
 
 function dependencies(overrides: Partial<ReviewCatchUpDependencies> = {}): ReviewCatchUpDependencies {
@@ -16,13 +28,17 @@ function dependencies(overrides: Partial<ReviewCatchUpDependencies> = {}): Revie
     withContentLease: async (_runId,use) => use(),
     probePinnedPanel: vi.fn(async () => [{
       maker: "maker:b", providerRef: "provider:b",
-      review: vi.fn(async (input) => ({
+      review: vi.fn(async (input: { readonly edges: readonly { readonly edgeId: string }[] }) => ({
         outcome: "agree" as const, reasons: ["reviewed"],
         provenanceRef: "artifact:review", providerLedgerRef: "ledger:review",
         parseStrategy: "RAW" as const,
+        // The double answers the call it was actually given: one bearing per
+        // offered edge, never a blanket empty array.
+        edgeMeasurements: input.edges.map((edge) => ({ edgeId: edge.edgeId, bearing: 0.5 })),
         observed: input
       }))
     }]),
+    recordEdgeMeasurements: vi.fn(async () => undefined),
     readUnreviewedNodes: vi.fn(async () => [node]),
     readDisclosedNodeIds: vi.fn(async () => [node.nodeId]),
     readLatestReviewerMaker: vi.fn(async () => null),
@@ -38,6 +54,77 @@ function dependencies(overrides: Partial<ReviewCatchUpDependencies> = {}): Revie
     ...overrides
   };
 }
+
+describe("T5 · catch-up reviews measure the edges they can still measure (S3-1)", () => {
+  it("offers the node's own unmeasured edges instead of declaring it has none", async () => {
+    const deps = dependencies({
+      readUnreviewedNodes: vi.fn(async () => [edgeOwningNode]),
+      readDisclosedNodeIds: vi.fn(async () => [edgeOwningNode.nodeId])
+    });
+    await runReviewCatchUp({
+      runId: "run:1", answerId: "answer:1", fromVersion: 1,
+      workItemId: "work:original", questionLine: "Question?",
+      invocationId: "catch:1", pinnedPanel: [{ maker: "maker:b", providerRef: "provider:b" }],
+      judgeBound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 1_000 },
+      judgeContractHash: "contract:judge",
+      runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 0 },
+      hold: { countCooldownHolds: async () => 2, record: async () => undefined, wait: async () => undefined },
+      dependencies: deps
+    });
+    const reviewer = (await (deps.probePinnedPanel as ReturnType<typeof vi.fn>).mock.results[0]!.value)[0]!;
+
+    // A node that sources an edge must not be described to the reviewer as
+    // sourcing none: that is a false declaration, not a missing measurement.
+    expect(reviewer.review).toHaveBeenCalledWith(expect.objectContaining({
+      edges: [{ edgeId: "edge:1", targetStatement: "The parent position", polarity: "attack" }]
+    }));
+  });
+
+  it("persists what that ONE call measured, without a measurement-only call", async () => {
+    const recordEdgeMeasurements = vi.fn(async () => undefined);
+    const deps = dependencies({
+      readUnreviewedNodes: vi.fn(async () => [edgeOwningNode]),
+      readDisclosedNodeIds: vi.fn(async () => [edgeOwningNode.nodeId]),
+      recordEdgeMeasurements
+    });
+    await runReviewCatchUp({
+      runId: "run:1", answerId: "answer:1", fromVersion: 1,
+      workItemId: "work:original", questionLine: "Question?",
+      invocationId: "catch:1", pinnedPanel: [{ maker: "maker:b", providerRef: "provider:b" }],
+      judgeBound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 1_000 },
+      judgeContractHash: "contract:judge",
+      runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 0 },
+      hold: { countCooldownHolds: async () => 2, record: async () => undefined, wait: async () => undefined },
+      dependencies: deps
+    });
+    const reviewer = (await (deps.probePinnedPanel as ReturnType<typeof vi.fn>).mock.results[0]!.value)[0]!;
+
+    expect(recordEdgeMeasurements).toHaveBeenCalledWith({
+      runId: "run:1",
+      measurements: [{ edgeId: "edge:1", bearing: 0.5 }]
+    });
+    expect(reviewer.review).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing when the node has no unmeasured edge left to offer", async () => {
+    const recordEdgeMeasurements = vi.fn(async () => undefined);
+    const deps = dependencies({ recordEdgeMeasurements });
+    await runReviewCatchUp({
+      runId: "run:1", answerId: "answer:1", fromVersion: 1,
+      workItemId: "work:original", questionLine: "Question?",
+      invocationId: "catch:1", pinnedPanel: [{ maker: "maker:b", providerRef: "provider:b" }],
+      judgeBound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 1_000 },
+      judgeContractHash: "contract:judge",
+      runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 0 },
+      hold: { countCooldownHolds: async () => 2, record: async () => undefined, wait: async () => undefined },
+      dependencies: deps
+    });
+
+    // `node` sources no unmeasured edge — an already-measured edge is never
+    // re-offered, because the one-way ratchet would refuse the second write.
+    expect(recordEdgeMeasurements).not.toHaveBeenCalled();
+  });
+});
 
 describe("DR-184 catch-up", () => {
   it("C-2 uses a fresh invocation-scoped key while retaining the original work item and ruled bound", async () => {

@@ -559,6 +559,18 @@ export interface UnreviewedNode {
   readonly statement: string;
   readonly authorMaker: string;
   readonly authorRawArtifactRef: string;
+  /**
+   * T5 / S3-1 — the edges this node sources that are still UNMEASURED, so a
+   * catch-up review can measure them on its own single visit. MEASURED edges
+   * are excluded here rather than at the call site: 0052's one-way ratchet
+   * refuses a second write, so offering one would ask for a number that
+   * nothing could record.
+   */
+  readonly sourcedEdges: readonly {
+    readonly edgeId: string;
+    readonly targetStatement: string;
+    readonly polarity: "support" | "attack";
+  }[];
 }
 
 export class JudgementRepository {
@@ -689,6 +701,40 @@ export class JudgementRepository {
        ORDER BY node.created_at_seq, node.node_id`,
       [runId]
     );
+      // T5 / S3-1: the still-unmeasured edges each of those nodes sources, with
+      // the target's own statement so the reviewer can judge the relation.
+      const edgeResult = await this.pool.query<{
+        edge_id: string;
+        source_node_id: string;
+        polarity: "support" | "attack";
+        target_node_id: string;
+        target_claim_text: string;
+        target_content_ciphertext: CryptoEnvelope | null;
+      }>(
+        `SELECT edge.edge_id::text, edge.source_node_id::text, edge.polarity,
+                edge.target_node_id::text, target.claim_text AS target_claim_text,
+                target.content_ciphertext AS target_content_ciphertext
+           FROM core.edge AS edge
+           JOIN core.node AS target
+             ON target.run_id=edge.run_id AND target.node_id=edge.target_node_id
+          WHERE edge.run_id=$1 AND edge.target_kind='NODE'
+            AND edge.magnitude_status='UNKNOWN'
+            AND edge.source_node_id = ANY($2::uuid[])
+          ORDER BY edge.created_at_seq`,
+        [runId, result.rows.map((row) => row.node_id)]
+      );
+      const edgesBySource = new Map<string, {
+        readonly edgeId: string; readonly targetStatement: string; readonly polarity: "support" | "attack";
+      }[]>();
+      for (const edge of edgeResult.rows) {
+        const target = await decryptContentForRun<{ claimText: string }>(
+          this.pool, runId, "core.node", edge.target_node_id, edge.target_content_ciphertext,
+          { claimText: edge.target_claim_text }
+        );
+        const bucket = edgesBySource.get(edge.source_node_id) ?? [];
+        bucket.push({ edgeId: edge.edge_id, targetStatement: target.claimText, polarity: edge.polarity });
+        edgesBySource.set(edge.source_node_id, bucket);
+      }
       return Object.freeze(await Promise.all(result.rows.map(async (row) => {
         const content = await decryptContentForRun<{ claimText: string }>(
           this.pool, runId, "core.node", row.node_id, row.content_ciphertext,
@@ -698,7 +744,8 @@ export class JudgementRepository {
           nodeId: row.node_id,
           statement: content.claimText,
           authorMaker: row.maker,
-          authorRawArtifactRef: row.raw_artifact_id
+          authorRawArtifactRef: row.raw_artifact_id,
+          sourcedEdges: Object.freeze(edgesBySource.get(row.node_id) ?? [])
         });
       })));
     });

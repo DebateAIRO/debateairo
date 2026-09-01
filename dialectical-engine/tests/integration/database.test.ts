@@ -34,6 +34,7 @@ import {
   type WalkingSkeletonSettings
 } from "@debateai/runner";
 import { evaluate } from "@debateai/propagation";
+import { agg, σ } from "@debateai/published-arithmetic";
 import { ServeRepository, type ConditionMarkRecord } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -205,8 +206,71 @@ function unpinnedLookupJudgementDouble(statement: string): string {
   });
 }
 
-function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
-  return JSON.stringify({ outcome, reasons: [reason] });
+/**
+ * T5 / S3-1 — the review artifact now also carries one bearing per edge the
+ * reviewed node sources, and the count is pinned to the edges the CALL actually
+ * offered. A scripted string cannot know that count, so a fixture declares a
+ * POLICY here and `startProviderDouble` turns it into an array whose cardinality
+ * and per-edge polarity come from the real request.
+ *
+ * The default is `cannot-assess`: this double does not assess bearings, and it
+ * says so in the goal's own vocabulary rather than claiming to have measured
+ * zero edges. Those edges stay UNKNOWN, contribute nothing to propagation, and
+ * every fixture below keeps the numbers it had before T5. A fixture that wants
+ * the graph to go numerically live passes explicit per-polarity bearings.
+ */
+type ReviewBearingPolicy = "cannot-assess" | { readonly support: number; readonly attack: number };
+
+function reviewDouble(
+  outcome: "agree" | "dispute" | "cannot-assess",
+  reason: string,
+  bearings: ReviewBearingPolicy = "cannot-assess"
+): string {
+  return JSON.stringify({ outcome, reasons: [reason], edge_bearings: { __policy: bearings } });
+}
+
+interface RequestedReviewEdge {
+  readonly ordinal: number;
+  readonly relation: "support" | "attack";
+  readonly target_statement: string;
+}
+
+/** The edges THIS review call offered, read off the wire, never assumed. */
+function requestedReviewEdges(body: string): readonly RequestedReviewEdge[] {
+  let request: { messages?: readonly { role: string; content: string }[] };
+  try {
+    request = JSON.parse(body) as typeof request;
+  } catch {
+    return [];
+  }
+  for (const message of request.messages ?? []) {
+    if (message.role !== "user") continue;
+    try {
+      const envelope = JSON.parse(message.content) as {
+        fields?: readonly { name: string; content: string }[];
+      };
+      const field = (envelope.fields ?? []).find((entry) => entry.name === "edges_sourced_by_this_node");
+      if (field !== undefined) return JSON.parse(field.content) as readonly RequestedReviewEdge[];
+    } catch { /* a non-envelope user message is not the one carrying the edges */ }
+  }
+  return [];
+}
+
+function withRequestDerivedBearings(content: string, edges: readonly RequestedReviewEdge[]): string {
+  let value: { edge_bearings?: { __policy?: ReviewBearingPolicy } | unknown };
+  try {
+    value = JSON.parse(content) as typeof value;
+  } catch {
+    return content;
+  }
+  const declared = value.edge_bearings as { __policy?: ReviewBearingPolicy } | undefined;
+  const policy = declared?.__policy;
+  // A fixture that scripted a literal array means it; only a policy is expanded.
+  if (policy === undefined) return content;
+  return JSON.stringify({
+    ...value,
+    edge_bearings: edges.map((edge) => policy === "cannot-assess" ? null : policy[edge.relation])
+  });
 }
 
 async function createRunnerWork(questionLine: string): Promise<{ runId: string; workItemId: string }> {
@@ -305,7 +369,11 @@ async function startProviderDouble(
               : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
-      const content = selected?.content;
+      // T5/S3-1: a review response must measure exactly the edges THIS call
+      // offered, so the declared policy is resolved against the live request.
+      const content = selected !== undefined && requestKind === "REVIEW" && typeof selected.content === "string"
+        ? withRequestDerivedBearings(selected.content, requestedReviewEdges(body))
+        : selected?.content;
       calls += 1;
       if (content === undefined) {
         response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "unexpected test call" }));
@@ -2403,6 +2471,116 @@ describe("apps/runner — legal command lifecycle", () => {
     expect(scenario.answer?.condition_mark_records.filter(
       (record) => record.mark === "DERIVED-STANDING-UNREVIEWED"
     ).length).toBeGreaterThanOrEqual(2);
+  });
+
+  /**
+   * T5 / S3-1 — the PRODUCTION seam, not a hand-composed chain.
+   *
+   * This drives the real `WalkingSkeletonRunner` through
+   * `executeResil01Scenario`, with doubles only at the provider boundary. It
+   * therefore pins the two production wires a component-level test cannot see:
+   * `edges: authoredNode.sourcedEdges` on the review call, and the runner's
+   * `recordEdgeMeasurements` writeback. Removing either turns this RED.
+   *
+   * Every node is scored at fidelity 0.5, so every tau is 0.5 and the σ oracle
+   * below is the same arithmetic as the constructed run in
+   * `t05-measured-edges-database.test.ts` — 0.5 attack bearing and 0.25 support
+   * bearing over tau-0.5 leaves, i.e. σ(0.5, 0.25, 0.125) = 0.4375 for a root
+   * carrying one measured attack and one measured support from leaves.
+   */
+  it("T5 the production runner writes the reviewer's magnitudes and the graph goes numerically live", async () => {
+    const bearings = { support: 0.25, attack: 0.5 } as const;
+    const scenario = await executeResil01Scenario({
+      label: "t05-production-seam",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T5 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T5 review ${index + 1}`, bearings)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T5 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Secondary T5 review ${index + 1}`, bearings))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    // (1) The post-run graph holds MEASURED magnitudes, stamped REVIEWER, and
+    //     each one is the bearing scripted for THAT edge's own polarity — the
+    //     transport carried the real relation, not a uniform label.
+    const measured = await database.pool.query<{
+      polarity: "support" | "attack"; strength: number; strength_source: string;
+    }>(
+      `SELECT polarity, strength, strength_source FROM core.edge
+        WHERE run_id=$1 AND magnitude_status='MEASURED' ORDER BY created_at_seq`,
+      [scenario.runId]
+    );
+    expect(measured.rowCount).toBeGreaterThan(0);
+    for (const row of measured.rows) {
+      expect(row.strength_source).toBe("REVIEWER");
+      expect(Number(row.strength)).toBe(bearings[row.polarity]);
+    }
+    expect(new Set(measured.rows.map((row) => row.polarity))).toEqual(new Set(["support", "attack"]));
+
+    // (2) The ledger: one model call per reviewed node, no measurement-only site.
+    const reviewCalls = await database.pool.query<{ call_site_key: string; attempts: string }>(
+      `SELECT call_site_key, count(*)::text AS attempts FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key LIKE 'JUDGE:review:%'
+        GROUP BY call_site_key`,
+      [scenario.runId]
+    );
+    expect(reviewCalls.rowCount).toBeGreaterThan(0);
+    expect(reviewCalls.rows.every((row) => Number(row.attempts) === 1)).toBe(true);
+    const anyMeasurementSite = await database.pool.query(
+      `SELECT 1 FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind='MODEL_CALL'
+          AND (call_site_key ILIKE '%measur%' OR call_site_key ILIKE '%bearing%'
+               OR call_site_key ILIKE '%magnitude%')`,
+      [scenario.runId]
+    );
+    expect(anyMeasurementSite.rowCount).toBe(0);
+
+    // (3) FINAL ≠ τ through the production graph, checked against an oracle
+    //     computed from the run's OWN taus and bearings with the published
+    //     arithmetic — never against propagation's own answer.
+    const targetNodeIds = [...new Set(scenario.snapshot.arrows
+      .filter((arrow) => arrow.targetKind === "NODE")
+      .map((arrow) => arrow.targetNodeId!))];
+    const propagated = evaluate({
+      ...scenario.snapshot,
+      operatorResolutions: targetNodeIds.map((parentNodeId) => ({
+        parentNodeId, operator: "accumulate" as const, suppliedBy: "deployment" as const
+      }))
+    });
+    const strengthOf = (nodeId: string): number =>
+      propagated.strengths.find((record) => record.nodeId === nodeId)!.strength;
+    const tauOf = (nodeId: string): number =>
+      scenario.snapshot.nodes.find((candidate) => candidate.nodeId === nodeId)!.baseStrength!;
+
+    // A parent all of whose measured incoming arrows come from LEAVES: its
+    // children's values are their own taus, so σ can be recomputed by hand.
+    const sourcesOf = (nodeId: string) => scenario.snapshot.arrows
+      .filter((arrow) => arrow.targetKind === "NODE" && arrow.targetNodeId === nodeId);
+    const isLeaf = (nodeId: string): boolean => sourcesOf(nodeId).length === 0;
+    const subject = targetNodeIds.find((nodeId) =>
+      sourcesOf(nodeId).some((arrow) => arrow.magnitudeStatus === "MEASURED")
+      && sourcesOf(nodeId).every((arrow) => isLeaf(arrow.sourceNodeId)));
+    if (subject === undefined) throw new Error("TEST_EXPECTED_A_MEASURED_LEAF_PARENT");
+
+    const contributions = (polarity: "support" | "attack"): number[] => sourcesOf(subject)
+      .filter((arrow) => arrow.polarity === polarity && arrow.magnitudeStatus === "MEASURED")
+      .map((arrow) => arrow.strength! * tauOf(arrow.sourceNodeId));
+    const attack = agg(contributions("attack"));
+    const support = agg(contributions("support"));
+    const oracle = σ(tauOf(subject), attack, support);
+
+    expect(strengthOf(subject)).toBeCloseTo(oracle, 12);
+    // The headline: the tree moved the number off tau.
+    expect(strengthOf(subject)).not.toBe(tauOf(subject));
   });
 
   it("RESIL-01 rev2 R2 keeps a healthy tau-0.30 graph servable and makes class L presentation-only", async () => {
