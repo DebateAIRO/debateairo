@@ -22,6 +22,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "SKIPPED-BY-BUDGET": return "Enrichment skipped by budget";
     case "ENVELOPE_EXHAUSTED": return "Run envelope exhausted";
     case "LEVERAGE_UNRESOLVED": return "Leverage unresolved";
+    case "BRANCH-FROZEN-LOW-LEVERAGE": return "Branch not expanded: it could not move the answer";
     case "DEGRADED-DIVERSITY": return "Model diversity degraded";
     case "SINGLE-LINEAGE": return "Single model lineage";
     case "CRITIQUE-UNAVAILABLE": return "Independent critique unavailable";

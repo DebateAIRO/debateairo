@@ -148,6 +148,20 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       providerFamilyMap: "test-layer:J1"
     }
   },
+  // T7 coherence consequence (same J12 class as panelPolicy directly above): a
+  // multi-maker run needs the sealed adaptive-stopping rows or it stops loudly.
+  // Provisioning only. δ and ε are set WIDE OF the fixtures' arithmetic so no
+  // existing fixture's expansion is truncated by this addition; the stopping
+  // rule's own numbers are pinned in tests/unit/t07-adaptive-stopping.test.ts.
+  stoppingPolicy: {
+    registerVersion: 1,
+    delta: 0,
+    epsilon: 0,
+    sourceRefs: {
+      globalStopDelta: "test-layer:T7",
+      branchFreezeEpsilon: "test-layer:T7"
+    }
+  },
   resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
     batteryRowId,
     state: "INACTIVE" as const,

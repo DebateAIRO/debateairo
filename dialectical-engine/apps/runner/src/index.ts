@@ -36,13 +36,14 @@ import {
   type JudgementSelectionRule,
   type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
-import { LedgerRepository } from "@debateai/ledger";
+import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
 import {
   ENGINE_BRANCHING_FACTOR,
   ENGINE_COMPOSITION_SEGMENT_CAP,
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
-  resolveScoringOperator
+  resolveScoringOperator,
+  type AdaptiveStoppingControls
 } from "@debateai/register";
 import {
   BudgetRepository,
@@ -50,7 +51,16 @@ import {
   parseCostEnvelopeBasis,
   type BudgetPressureDecision
 } from "@debateai/budget";
-import { evaluate, type EvaluationSnapshot } from "@debateai/propagation";
+import {
+  decideBranchFreezes,
+  decideRoundContinuation,
+  evaluate,
+  type BranchFreezeDecision,
+  type EvaluationSnapshot,
+  type NodeStrengthRecord,
+  type PropagationOutcome,
+  type RoundContinuationDecision
+} from "@debateai/propagation";
 import {
   ValuationRepository,
   buildValueOverlay,
@@ -984,6 +994,13 @@ export interface WalkingSkeletonSettings {
    * a default invented here.
    */
   readonly panelPolicy?: RunnerPanelPolicy;
+  /**
+   * S3-2/S5-1 / T7: the sealed T16 adaptive-stopping rows (δ, ε), READ from the
+   * register by the deployment's boot (`readAdaptiveStoppingControls`) and
+   * handed here whole, exactly as `panelPolicy` is. The runner carries neither
+   * value as a code constant and invents neither.
+   */
+  readonly stoppingPolicy?: AdaptiveStoppingControls;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1236,6 +1253,146 @@ export function buildUnservedMakerPositionRecord(
 }
 
 /**
+ * T7 / S3-2 · adaptive stopping — the branch-freeze disclosure.
+ *
+ * A canonical `CONDITION_MARKS` member, not a runner-local string: the kernel
+ * mints it beside `LEVERAGE_UNRESOLVED`, mid-list, so the DR-176 tail that
+ * `CONDITION_MARKS.slice(-4)` reads positionally is untouched.
+ */
+export const BRANCH_FROZEN_LOW_LEVERAGE_MARK = "BRANCH-FROZEN-LOW-LEVERAGE" as const;
+
+/**
+ * The typed record a frozen branch leaves behind. It names the branch, the
+ * ROOT-SCOPED leverage that froze it (mission ruling J3), the ε it was measured
+ * against, and WHERE that ε came from — a sealed T16 register row, never a code
+ * constant. Without the source ref the disclosure could not be audited against
+ * the register version the run actually read.
+ */
+export function buildBranchFrozenRecord(input: {
+  readonly carryingNodeId: string;
+  readonly leverage: number;
+  readonly epsilon: number;
+  readonly epsilonSourceRef: string;
+  readonly rootNodeIds: readonly string[];
+  readonly frozenSubtreeNodeIds: readonly string[];
+}): ConditionMarkRecord {
+  if (input.epsilonSourceRef.trim() === "") {
+    throw new TypedDomainError(
+      "BRANCH_FREEZE_EPSILON_PROVENANCE_MISSING",
+      `The freeze of ${input.carryingNodeId} cannot be disclosed without the sealed epsilon row it used`
+    );
+  }
+  return Object.freeze({
+    mark: BRANCH_FROZEN_LOW_LEVERAGE_MARK,
+    scope: "node",
+    subjectRef: input.carryingNodeId,
+    reason: `Adaptive stopping froze branch ${input.carryingNodeId}: its root-scoped leverage `
+      + `${input.leverage} over roots ${input.rootNodeIds.join(", ")} is strictly below the sealed `
+      + `branch-freeze epsilon ${input.epsilon} (${input.epsilonSourceRef}); nothing was expanded beneath it`,
+    liftPath: "Lower the sealed branch-freeze epsilon, or judge material that gives this branch root leverage",
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([...input.frozenSubtreeNodeIds])
+  });
+}
+
+export interface AdaptiveStoppingRoundInput {
+  readonly runId: string;
+  readonly attemptId: string;
+  /** Expansion rounds finished so far. 0 means the round-1 floor is in force. */
+  readonly completedRounds: number;
+  readonly depthCeiling: number;
+  /** J3: propagation has no root notion, so the runner supplies the root ids. */
+  readonly rootNodeIds: readonly string[];
+  readonly branchCarryingNodeIds: readonly string[];
+  readonly previousStrengths: readonly NodeStrengthRecord[] | null;
+  readonly snapshot: EvaluationSnapshot;
+  /** δ and ε as read from T16's sealed rows — never a constant in this file. */
+  readonly controls: AdaptiveStoppingControls;
+  readonly propagationContractHash: string;
+  readonly propagationProducer: string;
+}
+
+export interface AdaptiveStoppingRoundDependencies {
+  readonly appendLedger: (entry: AppendLedgerInput) => Promise<unknown>;
+}
+
+export interface AdaptiveStoppingRoundOutcome {
+  readonly propagation: PropagationOutcome;
+  readonly continuation: RoundContinuationDecision;
+  readonly freezes: readonly BranchFreezeDecision[];
+  readonly frozenCarryingNodeIds: readonly string[];
+  readonly conditionMarkRecords: readonly ConditionMarkRecord[];
+}
+
+/**
+ * T7 · one round boundary of the debate loop.
+ *
+ * PURE CODE by construction: it evaluates the snapshot it was handed and
+ * decides. It reaches no provider and appends exactly one PROPAGATION ledger
+ * row per round — the DoD's "zero model calls" is a property of this function's
+ * dependency surface, which contains no model client at all, and the ledger row
+ * is what lets an auditor prove it after the fact.
+ *
+ * The ε freeze is only consulted once round 1 has completed: `resolveLeverage`
+ * refuses to answer before then, which is the round-1 floor at the leverage
+ * door as well as at the loop's.
+ */
+export async function runAdaptiveStoppingRound(
+  input: AdaptiveStoppingRoundInput,
+  dependencies: AdaptiveStoppingRoundDependencies
+): Promise<AdaptiveStoppingRoundOutcome> {
+  const startedAt = new Date();
+  const propagation = evaluate(input.snapshot);
+  const continuation = decideRoundContinuation({
+    completedRounds: input.completedRounds,
+    depthCeiling: input.depthCeiling,
+    rootNodeIds: input.rootNodeIds,
+    previousStrengths: input.previousStrengths,
+    currentStrengths: propagation.strengths,
+    delta: input.controls.delta
+  });
+  const freezes = input.completedRounds < 1 || input.branchCarryingNodeIds.length === 0
+    ? Object.freeze([])
+    : decideBranchFreezes({
+      completedRounds: input.completedRounds,
+      sensitivityRecords: propagation.sensitivityRecords,
+      branchCarryingNodeIds: input.branchCarryingNodeIds,
+      rootNodeIds: input.rootNodeIds,
+      epsilon: input.controls.epsilon
+    });
+  const frozen = freezes.filter((decision) => decision.verdict === "FROZEN");
+  const epsilonSourceRef = input.controls.sourceRefs.branchFreezeEpsilon ?? "";
+  await dependencies.appendLedger({
+    runId: input.runId,
+    attemptId: input.attemptId,
+    actionKind: "PROPAGATION",
+    callSiteKey: `STOPPING:round:${input.completedRounds}`,
+    subjectItemId: input.rootNodeIds[0]!,
+    stanceAtAction: "UNASSIGNED",
+    outcome: "OK",
+    actorRef: input.propagationProducer,
+    inputHash: hash(input.snapshot),
+    contractHash: input.propagationContractHash,
+    startedAt,
+    finishedAt: new Date()
+  });
+  return Object.freeze({
+    propagation,
+    continuation,
+    freezes,
+    frozenCarryingNodeIds: Object.freeze(frozen.map((decision) => decision.carryingNodeId)),
+    conditionMarkRecords: Object.freeze(frozen.map((decision) => buildBranchFrozenRecord({
+      carryingNodeId: decision.carryingNodeId,
+      leverage: decision.leverage,
+      epsilon: input.controls.epsilon,
+      epsilonSourceRef,
+      rootNodeIds: input.rootNodeIds,
+      frozenSubtreeNodeIds: [decision.carryingNodeId]
+    })))
+  });
+}
+
+/**
  * DR-159 B2-A applies the two-segment cap to composer/conformance output.
  * The memory disclosure is a separately validated typed-renderer projection:
  * persist it for honesty, but never smuggle it into the conformance spend set.
@@ -1386,6 +1543,51 @@ export class WalkingSkeletonRunner {
     });
   }
 
+  /**
+   * P8 × DR-074: an arrow-bearing graph propagates only under the ruled
+   * deployment scoringOperator row, resolved through the SHIPPED chain with the
+   * supplying level RECORDED on the receipt. Unruled ⇒ typed loud stop.
+   *
+   * T7 lifted this out of the end-of-run path so the per-round stopping
+   * propagation reads the graph through the SAME door; two doors would let the
+   * rounds and the served answer disagree about what the graph is.
+   */
+  async #resolveOperatorResolvedSnapshot(runId: string): Promise<{
+    readonly materialised: EvaluationSnapshot;
+    readonly snapshot: EvaluationSnapshot;
+  }> {
+    const materialised = await this.#graph.materialiseSnapshot(runId);
+    const arrowTargetNodeIds = [...new Set(materialised.arrows.flatMap((arrow) =>
+      arrow.targetKind === "NODE" && arrow.targetNodeId !== null ? [arrow.targetNodeId] : []
+    ))];
+    if (arrowTargetNodeIds.length === 0) {
+      return Object.freeze({ materialised, snapshot: materialised });
+    }
+    const scoringRegisterRow = this.settings.scoringOperator;
+    if (scoringRegisterRow === undefined) {
+      throw new TypedDomainError(
+        "SCORING_OPERATOR_UNRESOLVED",
+        "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
+      );
+    }
+    const resolvedOperator = resolveScoringOperator({
+      parent: {},
+      run: {},
+      deployment: { scoringOperator: scoringRegisterRow.deploymentRowValue }
+    });
+    return Object.freeze({
+      materialised,
+      snapshot: Object.freeze({
+        ...materialised,
+        operatorResolutions: Object.freeze(arrowTargetNodeIds.map((parentNodeId) => Object.freeze({
+          parentNodeId,
+          operator: resolvedOperator.value,
+          suppliedBy: resolvedOperator.suppliedBy
+        })))
+      })
+    });
+  }
+
   private async execute(workItemId?: string): Promise<RunnerExecutionResult> {
     const longestDeadline = Math.max(
       this.settings.judgeBound.deadlineMs,
@@ -1441,6 +1643,16 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError(
         "PANEL_WEIGHTING_UNRESOLVED",
         "J12: a multi-maker run requires the sealed T16 panel-weighting rows (dispersion scale, repeated-family multiplier, downgrade bands, provider-family map) and the sealed disagreement threshold; they are read from the register and never invented"
+      );
+    }
+    if (this.#configuredMakers.length > 1 && this.settings.stoppingPolicy === undefined) {
+      // S3-2/S5-1 × J12, same shape and same place: a multi-maker run is the only
+      // run that expands, and expansion is what δ and ε govern. Running the
+      // ceiling with the stopping rule quietly absent — or with a δ/ε invented
+      // here — is the silent-degradation shape the mission repeals.
+      throw new TypedDomainError(
+        "ADAPTIVE_STOPPING_UNRESOLVED",
+        "J12: a multi-maker run requires the sealed T16 adaptive-stopping rows (globalStopDelta, branchFreezeEpsilon); they are read from the register and never invented"
       );
     }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
@@ -2325,13 +2537,82 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...indices]);
     };
+    // T7 / S3-2 + S5-1 — adaptive stopping state carried across round boundaries.
+    const frozenIndices = new Set<number>();
+    const branchFrozenRecords: ConditionMarkRecord[] = [];
+    let previousRoundStrengths: readonly NodeStrengthRecord[] | null = null;
+    let stoppedByAdaptiveRule = false;
+    /**
+     * One round boundary: propagate (PURE CODE — no provider is reachable from
+     * here), then apply the global δ stop and the ε branch freeze. Returns true
+     * when the debate should stop expanding.
+     */
+    const closeExpansionRound = async (completedRounds: number): Promise<boolean> => {
+      const stoppingPolicy = this.settings.stoppingPolicy;
+      if (stoppingPolicy === undefined) return false;
+      const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
+      const roundStanding = projectJudgedStanding(
+        roundSnapshot,
+        await this.#judgements.readReviewedNodeIds(run.runId)
+      );
+      const scoredNodeIds = new Set(roundStanding.snapshot.nodes.map((node) => node.nodeId));
+      const rootNodeIds = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
+        .flatMap((root) => root !== undefined && scoredNodeIds.has(root.nodeId) ? [root.nodeId] : []);
+      if (rootNodeIds.length === 0) {
+        // No maker root survived into this round's standing, so root movement is
+        // unmeasurable. Continuing to the ASK-time ceiling is the pre-T7
+        // behaviour and never truncates a debate on absent evidence; inventing a
+        // stop here would end a run on a number nobody measured.
+        return false;
+      }
+      // The branches that would expand next are the nodes this round authored.
+      const branchCarryingNodeIds = expansionPlan
+        .filter((candidate) => candidate.round === completedRounds
+          && !haltedIndices.has(candidate.childIndex)
+          && !frozenIndices.has(candidate.childIndex))
+        .flatMap((candidate) => {
+          const authored = authoredNodes.get(candidate.childIndex);
+          return authored !== undefined && scoredNodeIds.has(authored.nodeId)
+            ? [{ index: candidate.childIndex, nodeId: authored.nodeId }]
+            : [];
+        });
+      const boundary = await runAdaptiveStoppingRound({
+        runId: run.runId,
+        attemptId: runnerAttemptId,
+        completedRounds,
+        depthCeiling: expansionDepth,
+        rootNodeIds,
+        branchCarryingNodeIds: branchCarryingNodeIds.map((branch) => branch.nodeId),
+        previousStrengths: previousRoundStrengths,
+        snapshot: roundStanding.snapshot,
+        controls: stoppingPolicy,
+        propagationContractHash: this.settings.propagationContractHash,
+        propagationProducer: this.settings.propagationProducer
+      }, { appendLedger: (entry) => this.#ledger.append(entry) });
+      previousRoundStrengths = boundary.propagation.strengths;
+      const frozenNodeIds = new Set(boundary.frozenCarryingNodeIds);
+      for (const branch of branchCarryingNodeIds) {
+        if (!frozenNodeIds.has(branch.nodeId)) continue;
+        for (const index of subtreeIndices(branch.index)) frozenIndices.add(index);
+      }
+      for (const record of boundary.conditionMarkRecords) branchFrozenRecords.push(record);
+      return boundary.continuation.kind === "STOP";
+    };
+    // Round 0: the reviewed maker roots, before a single expansion round. This
+    // is the baseline the round-1 δ comparison is taken against, and the
+    // round-1 floor is what makes it a baseline rather than a stop — at
+    // completedRounds 0 the rule CONTINUES unconditionally and freezes nothing.
+    if (expansionPlan.length > 0) await closeExpansionRound(0);
     let activeExpansionRound = expansionPlan[0]?.round ?? null;
     for (const leg of expansionPlan) {
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
+        stoppedByAdaptiveRule = await closeExpansionRound(activeExpansionRound);
         activeExpansionRound = leg.round;
+        if (stoppedByAdaptiveRule) break;
       }
       if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)) continue;
+      if (frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)) continue;
       const parent = authoredNodes.get(leg.parentIndex);
       if (parent === undefined) {
         throw new TypedDomainError("DEBATE_EXPANSION_PARENT_MISSING", `Node index ${leg.parentIndex}`);
@@ -2421,36 +2702,9 @@ export class WalkingSkeletonRunner {
       .map(([, authored]) => authored);
     const authoredMakerPositions = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
-    const materialised = await this.#graph.materialiseSnapshot(run.runId);
-    // P8 × DR-074: an arrow-bearing graph propagates only under the ruled
-    // deployment scoringOperator row, resolved through the SHIPPED chain with
-    // the supplying level RECORDED on the receipt. Unruled ⇒ typed loud stop.
-    const arrowTargetNodeIds = [...new Set(materialised.arrows.flatMap((arrow) =>
-      arrow.targetKind === "NODE" && arrow.targetNodeId !== null ? [arrow.targetNodeId] : []
-    ))];
-    let snapshot: EvaluationSnapshot = materialised;
-    if (arrowTargetNodeIds.length > 0) {
-      const scoringRegisterRow = this.settings.scoringOperator;
-      if (scoringRegisterRow === undefined) {
-        throw new TypedDomainError(
-          "SCORING_OPERATOR_UNRESOLVED",
-          "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
-        );
-      }
-      const resolvedOperator = resolveScoringOperator({
-        parent: {},
-        run: {},
-        deployment: { scoringOperator: scoringRegisterRow.deploymentRowValue }
-      });
-      snapshot = Object.freeze({
-        ...materialised,
-        operatorResolutions: Object.freeze(arrowTargetNodeIds.map((parentNodeId) => Object.freeze({
-          parentNodeId,
-          operator: resolvedOperator.value,
-          suppliedBy: resolvedOperator.suppliedBy
-        })))
-      });
-    }
+    const { materialised, snapshot: operatorResolvedSnapshot } =
+      await this.#resolveOperatorResolvedSnapshot(run.runId);
+    let snapshot: EvaluationSnapshot = operatorResolvedSnapshot;
     const reviewedNodeIds = effectiveMakerCount <= 1
       ? materialised.nodes.map((node) => node.nodeId)
       : await this.#judgements.readReviewedNodeIds(run.runId);
@@ -2554,6 +2808,9 @@ export class WalkingSkeletonRunner {
       ...(classDReviewRecords.length > 0 ? ["DERIVED-STANDING-UNREVIEWED" as const] : []),
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
       ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : []),
+      // T7 / S3-2: a branch the stopping rule froze is a skip, and the Scope law
+      // requires every skip to be visible in the ANSWER, not only in a receipt.
+      ...(branchFrozenRecords.length > 0 ? [BRANCH_FROZEN_LOW_LEVERAGE_MARK] : []),
       // S2-3 / J5: the honesty mark is only visible if it reaches the answer.
       ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : []),
       // S2-2 / J13(b): same rule for the panel degradations — a mark recorded only on
@@ -2608,6 +2865,9 @@ export class WalkingSkeletonRunner {
       : [buildUnservedMakerPositionRecord(authoredMakerPositions, servedRoot)];
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
+      // T7 / S3-2: one typed record per frozen branch, minted at the round
+      // boundary that froze it and carried whole to the answer.
+      ...branchFrozenRecords,
       ...(absentAtClaim.length === 0 || effectiveMakerCount === 1 ? [] : [Object.freeze({
         mark: "CRITIQUE-UNAVAILABLE" as const,
         scope: "answer" as const,

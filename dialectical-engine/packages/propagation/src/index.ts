@@ -588,12 +588,214 @@ export function evaluate(snapshot: EvaluationSnapshot): PropagationOutcome {
   return evaluateInternal(snapshot, true);
 }
 
+export interface RootScopedLeverage {
+  readonly kind: "LEVERAGE_RESOLVED";
+  /** The branch's subtree-root node — the node whose removal was simulated. */
+  readonly carryingNodeId: string;
+  readonly leverage: number;
+  /** The root scope the maximum was restricted to, recorded for audit. */
+  readonly rootNodeIds: readonly string[];
+}
+
+/**
+ * T7 / S3-2 · mission ruling J3 — LEVERAGE IS ROOT-SCOPED (reading (b)).
+ *
+ * The freeze quantity for a branch is the ROOT-RESTRICTED maximum |Δstrength|
+ * taken over the recorded per-node fragility rows of the branch's subtree-root
+ * sensitivity record. Propagation has no root notion, so the CALLER (the
+ * runner) supplies the root ids. The recorded all-nodes `leverage` field on
+ * `SensitivityRecord` stays recorded and is deliberately left UNCONSUMED here:
+ * a branch that cannot move any root cannot change the served answer, which is
+ * what the goal's own rationale sentence reasons about.
+ *
+ * A fragility row with a `null` difference contributes nothing. That is the
+ * same rule the goal states for UNKNOWN edges — an unmeasured influence cannot
+ * unfreeze a branch — applied to the one other way a difference can be absent.
+ */
 export function resolveLeverage(input: {
+  /** The round-1 floor at the leverage door: K=1 must complete first. */
   readonly completedRounds: number;
   readonly carryingNodeId: string;
-}): { readonly kind: "LEVERAGE_UNRESOLVED"; readonly carryingNodeId: string } {
-  if (input.completedRounds < 1) {
-    throw new TypedDomainError("LEVERAGE_ROUND_INCOMPLETE", "K=1 must complete before leverage can be unresolved");
+  readonly sensitivityRecords: readonly SensitivityRecord[];
+  readonly rootNodeIds: readonly string[];
+}): RootScopedLeverage {
+  if (!Number.isInteger(input.completedRounds) || input.completedRounds < 1) {
+    throw new TypedDomainError("LEVERAGE_ROUND_INCOMPLETE", "K=1 must complete before leverage can be resolved");
   }
-  return Object.freeze({ kind: "LEVERAGE_UNRESOLVED", carryingNodeId: input.carryingNodeId });
+  if (input.rootNodeIds.length === 0) {
+    // An empty root scope would read every branch as leverage 0 and freeze the
+    // whole debate in silence. J3 puts the root ids on the caller, so their
+    // absence is the caller's defect and it stops loudly.
+    throw new TypedDomainError(
+      "LEVERAGE_ROOT_SCOPE_EMPTY",
+      "J3 restricts the freeze quantity to caller-supplied roots; none were supplied"
+    );
+  }
+  const record = input.sensitivityRecords.find((candidate) => candidate.removedNodeId === input.carryingNodeId);
+  if (record === undefined) {
+    throw new TypedDomainError(
+      "LEVERAGE_SUBTREE_ROOT_UNRECORDED",
+      `No sensitivity record exists for subtree root ${input.carryingNodeId}`
+    );
+  }
+  const rootScope = new Set(input.rootNodeIds);
+  const leverage = record.fragility.reduce(
+    (maximum, row) => rootScope.has(row.nodeId) ? Math.max(maximum, row.difference ?? 0) : maximum,
+    0
+  );
+  return Object.freeze({
+    kind: "LEVERAGE_RESOLVED",
+    carryingNodeId: input.carryingNodeId,
+    leverage,
+    rootNodeIds: Object.freeze([...input.rootNodeIds])
+  });
+}
+
+export type BranchFreezeVerdict = "FROZEN" | "CONTINUES";
+
+export interface BranchFreezeDecision {
+  readonly carryingNodeId: string;
+  readonly leverage: number;
+  readonly verdict: BranchFreezeVerdict;
+}
+
+/**
+ * T7 · branch freeze: leverage < ε ⇒ no expansion beneath the branch.
+ *
+ * STRICTLY less than. Equality at ε CONTINUES — a branch that moves a root by
+ * exactly the threshold is still moving the answer, and the goal's own DoD
+ * makes that case one of its four required examples.
+ */
+export function decideBranchFreezes(input: {
+  readonly completedRounds: number;
+  readonly sensitivityRecords: readonly SensitivityRecord[];
+  readonly branchCarryingNodeIds: readonly string[];
+  readonly rootNodeIds: readonly string[];
+  readonly epsilon: number;
+}): readonly BranchFreezeDecision[] {
+  assertUnitInterval(input.epsilon, "branch freeze epsilon");
+  return Object.freeze(input.branchCarryingNodeIds.map((carryingNodeId) => {
+    const { leverage } = resolveLeverage({
+      completedRounds: input.completedRounds,
+      carryingNodeId,
+      sensitivityRecords: input.sensitivityRecords,
+      rootNodeIds: input.rootNodeIds
+    });
+    return Object.freeze({
+      carryingNodeId,
+      leverage,
+      // STRICT: equality at ε continues.
+      verdict: leverage < input.epsilon ? "FROZEN" : "CONTINUES"
+    } as BranchFreezeDecision);
+  }));
+}
+
+export type RoundContinuationReason =
+  | "ROUND_1_FLOOR"
+  | "DEPTH_CEILING"
+  | "GLOBAL_DELTA_CONVERGED"
+  | "ROOT_MOVED";
+
+export interface RoundContinuationDecision {
+  readonly kind: "CONTINUE" | "STOP";
+  readonly reason: RoundContinuationReason;
+  /** null only when no previous round exists to compare against. */
+  readonly maxRootMovement: number | null;
+  readonly movedRootNodeIds: readonly string[];
+}
+
+/**
+ * T7 · the round loop's three gates, in the order the goal states them.
+ *
+ * 1. ROUND-1 FLOOR — round 1 always runs; movement is not consulted before it.
+ * 2. DEPTH CEILING — the ASK-time depth is a ceiling no convergence can raise.
+ * 3. GLOBAL δ STOP — stop once no root moved more than δ against the previous
+ *    round. The DoD requires this to be reachable BEFORE the ceiling.
+ */
+export function decideRoundContinuation(input: {
+  readonly completedRounds: number;
+  readonly depthCeiling: number;
+  readonly rootNodeIds: readonly string[];
+  readonly previousStrengths: readonly NodeStrengthRecord[] | null;
+  readonly currentStrengths: readonly NodeStrengthRecord[];
+  readonly delta: number;
+}): RoundContinuationDecision {
+  assertUnitInterval(input.delta, "global stop delta");
+  if (!Number.isInteger(input.completedRounds) || input.completedRounds < 0) {
+    throw new TypedDomainError("STOPPING_ROUND_COUNT_INVALID", "Completed rounds must be a non-negative integer");
+  }
+  if (!Number.isInteger(input.depthCeiling) || input.depthCeiling < 1) {
+    throw new TypedDomainError("STOPPING_DEPTH_CEILING_INVALID", "The depth ceiling must be a positive integer");
+  }
+  if (input.rootNodeIds.length === 0) {
+    throw new TypedDomainError("STOPPING_ROOT_SCOPE_EMPTY", "The global stop is measured on roots; none were supplied");
+  }
+  const movement = input.previousStrengths === null
+    ? null
+    : rootMovement(input.rootNodeIds, input.previousStrengths, input.currentStrengths);
+  if (input.completedRounds < 1) {
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "ROUND_1_FLOOR",
+      maxRootMovement: movement === null ? null : movement.maximum,
+      movedRootNodeIds: Object.freeze([])
+    });
+  }
+  if (movement === null) {
+    throw new TypedDomainError(
+      "STOPPING_PREVIOUS_ROUND_MISSING",
+      "The global δ stop compares against the previous round, which was not supplied"
+    );
+  }
+  if (input.completedRounds >= input.depthCeiling) {
+    return Object.freeze({
+      kind: "STOP",
+      reason: "DEPTH_CEILING",
+      maxRootMovement: movement.maximum,
+      movedRootNodeIds: movement.moved(input.delta)
+    });
+  }
+  const moved = movement.moved(input.delta);
+  return Object.freeze(moved.length === 0
+    ? {
+        kind: "STOP",
+        reason: "GLOBAL_DELTA_CONVERGED",
+        maxRootMovement: movement.maximum,
+        movedRootNodeIds: Object.freeze([])
+      }
+    : {
+        kind: "CONTINUE",
+        reason: "ROOT_MOVED",
+        maxRootMovement: movement.maximum,
+        movedRootNodeIds: moved
+      });
+}
+
+function rootMovement(
+  rootNodeIds: readonly string[],
+  previousStrengths: readonly NodeStrengthRecord[],
+  currentStrengths: readonly NodeStrengthRecord[]
+): { readonly maximum: number; moved(delta: number): readonly string[] } {
+  const before = new Map(previousStrengths.map((record) => [record.nodeId, record.strength]));
+  const after = new Map(currentStrengths.map((record) => [record.nodeId, record.strength]));
+  const perRoot = rootNodeIds.map((nodeId) => {
+    const from = before.get(nodeId);
+    const to = after.get(nodeId);
+    if (from === undefined || to === undefined) {
+      // A root the engine failed to score in one of the two rounds cannot be
+      // declared unmoved. Guessing here would let the debate stop on a root
+      // nobody measured, so it is a typed loud stop.
+      throw new TypedDomainError(
+        "STOPPING_ROOT_STRENGTH_UNRESOLVED",
+        `Root ${nodeId} has no strength in ${from === undefined ? "the previous" : "the current"} round`
+      );
+    }
+    return { nodeId, movement: Math.abs(to - from) };
+  });
+  return {
+    maximum: perRoot.reduce((maximum, row) => Math.max(maximum, row.movement), 0),
+    moved: (delta: number) => Object.freeze(perRoot
+      .filter((row) => row.movement > delta)
+      .map((row) => row.nodeId))
+  };
 }

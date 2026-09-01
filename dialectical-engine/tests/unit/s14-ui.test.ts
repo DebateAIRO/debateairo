@@ -115,7 +115,8 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
   it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
     // J13(b) 29 -> 31: PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE joined the
     // vocabulary. Both renderers below are asserted to label them non-empty.
-    expect(CONDITION_MARKS).toHaveLength(31);
+    // T7 31 -> 32: BRANCH-FROZEN-LOW-LEVERAGE joined the vocabulary mid-list.
+    expect(CONDITION_MARKS).toHaveLength(32);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");

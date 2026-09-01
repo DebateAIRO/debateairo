@@ -394,9 +394,24 @@ describe("S03 ruled graph behavior", () => {
   });
 
   it("FX-C52-09 names the carrying piece after K=1", () => {
-    expect(resolveLeverage({ completedRounds: 1, carryingNodeId: "node:carrying" })).toEqual({
-      kind: "LEVERAGE_UNRESOLVED",
-      carryingNodeId: "node:carrying"
+    // T7 / mission ruling J3: the stub that answered LEVERAGE_UNRESOLVED is
+    // implemented — it now RESOLVES the root-scoped leverage of the named
+    // carrying node. The K=1 floor it always guarded is unchanged; the exact
+    // root-scoping arithmetic is pinned in tests/unit/t07-adaptive-stopping.test.ts.
+    const outcome = evaluate(snapshot([
+      node("root", 0.5), node("node:carrying", 0.5)
+    ], [arrow("carry-root", "node:carrying", "root", "support", { strength: 0.5 })], [resolution("root")]));
+
+    expect(resolveLeverage({
+      completedRounds: 1,
+      carryingNodeId: "node:carrying",
+      sensitivityRecords: outcome.sensitivityRecords,
+      rootNodeIds: ["root"]
+    })).toEqual({
+      kind: "LEVERAGE_RESOLVED",
+      carryingNodeId: "node:carrying",
+      leverage: 0.125,
+      rootNodeIds: ["root"]
     });
   });
 
