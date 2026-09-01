@@ -60,7 +60,10 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
     ]);
     expect(migration).toContain("ask_contract");
     expect(api).toContain("steering_annotations: ask.steering_annotations");
-    expect(askForm).toContain("logged verbatim");
+    // S1-2 / T2 retired the legacy steering placebo: the asker-facing "logged verbatim"
+    // annotation control is gone from the form. W16's substance is unchanged and is
+    // pinned by the `api` assertion above — the API still persists steering verbatim.
+    expect(askForm).not.toContain("logged verbatim");
     expect(askPage).toContain('dynamic = "force-dynamic"');
     expect(askPage).toContain("deriveMachineAskAsOf()");
     expect(serverDefaults).toContain('import "server-only"');
