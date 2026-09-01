@@ -1313,6 +1313,17 @@ export class WalkingSkeletonRunner {
         "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
       );
     }
+    if (this.#configuredMakers.length > 1 && this.settings.panelPolicy === undefined) {
+      // S2-2 × J12: a multi-maker deployment that never sealed the T16 panel rows STOPS
+      // LOUDLY, here — before the work item is claimed and before a single model call.
+      // Recording a reason and grading the node on its author's own voice is the
+      // silent-degradation shape the goal repeals; the Global DoD's "missing rows fail
+      // loudly" and the scoringOperator precedent directly above both govern.
+      throw new TypedDomainError(
+        "PANEL_WEIGHTING_UNRESOLVED",
+        "J12: a multi-maker run requires the sealed T16 panel-weighting rows (dispersion scale, repeated-family multiplier, downgrade bands, provider-family map) and the sealed disagreement threshold; they are read from the register and never invented"
+      );
+    }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
     const claimed = workItemId === undefined
       ? await this.#work.claimNext(claimInput)
@@ -1537,21 +1548,13 @@ export class WalkingSkeletonRunner {
         });
       }
       if (panelPolicy === undefined) {
-        // A multi-maker run whose deployment never sealed the T16 panel rows.
-        // NOT the M=1 skeleton literal and NOT a silent self-grade: the receipt
-        // names the missing configuration as the reason no panel was measured.
-        return Object.freeze({
-          ...authorOnlySelection(),
-          dispersion: null,
-          panelContractHashes: Object.freeze([judgeContractHash]),
-          disagreement: Object.freeze({
-            kind: "NOT_MEASURED",
-            reason: "PANEL_WEIGHTING_UNCONFIGURED",
-            marks: Object.freeze([PANEL_DEGRADED_SINGLE_VOICE_MARK]),
-            certaintyEffect: "UNCHANGED",
-            abstention: false
-          })
-        });
+        // Unreachable: the M>=2 loud stop above rejects this deployment before the
+        // work item is claimed. Kept as a typed defence so the missing-row condition
+        // can never re-acquire a degraded, proceeding shape (J12).
+        throw new TypedDomainError(
+          "PANEL_WEIGHTING_UNRESOLVED",
+          "J12: a multi-maker run reached the panel without the sealed T16 panel-weighting rows"
+        );
       }
 
       const panel = await runJudgePanel({

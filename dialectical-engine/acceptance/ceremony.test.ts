@@ -65,14 +65,28 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
         }));
         return;
       }
+      // T3 N4: the JUDGE discriminator must be ESCAPE-SAFE. The rendered packet reaches
+      // the wire JSON-encoded, so a quoted fragment like `"statement": non-empty string`
+      // arrives as \"statement\" and never matches — the old check was dead, and only
+      // the FIFO fallback below hid it.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
-        : body.includes("\"statement\": non-empty string") ? "JUDGE"
-          : body.includes("{conforms,findings}") ? "CONFORMANCE"
+        : body.includes("restatement_text") ? "JUDGE"
+          : body.includes("conforms,findings") ? "CONFORMANCE"
             : body.includes("{pass}") ? "R9"
-              : body.includes("segments") && body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+              : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
-      const content = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
       calls += 1;
+      // T3 N4: never GUESS ACROSS CLASSES. A recognised request with no scripted
+      // response of its own class refuses by name instead of serving whatever sits at
+      // the head of the queue — a wrong-class answer surfaces as a bogus production
+      // schema failure and costs a debugging round. Untyped requests (health probes)
+      // keep honest FIFO order.
+      if (requestKind !== "GENERAL" && matching < 0) {
+        response.writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ error: "PROVIDER_DOUBLE_UNSCRIPTED_CLASS", requestKind }));
+        return;
+      }
+      const content = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
       if (content === undefined) {
         response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "UNEXPECTED_TEST_CALL" }));
         return;
