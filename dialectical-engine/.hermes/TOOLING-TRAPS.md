@@ -110,3 +110,19 @@ Every entry below was paid for at least once. Do not pay for it again.
   DERIVED fact with an expiry — it silently becomes false when a later round edits the
   kernel. Re-run the gate greps immediately before freezing a report, never once at the
   start. (T3 r3)
+- `git stash push -u` is NOT a time machine once your work is COMMITTED: it stashes only the
+  uncommitted delta, so a "base classification" run done after a checkpoint commit still runs
+  YOUR tip and will happily tell you your own regression is pre-existing. Use
+  `git checkout <base-sha>` (detached), and make every base-classification command print
+  `git rev-parse HEAD` in its own output so the log proves which tree was tested. (T7 r1)
+- Under `zsh`, `grep -rn "x" --include=*.ts .` dies with `no matches found` before grep ever
+  runs — the shell expands `--include=*.ts`. Quote it: `--include='*.ts'`. (T7 r1)
+- A vitest spy declared `vi.fn(async () => undefined)` has no parameter type, so
+  `spy.mock.calls.map(([entry]) => entry.someField)` fails `tsc` with TS2493/TS2352 even
+  though the test runs. Declare the parameter on the mock:
+  `vi.fn(async (_entry: { readonly actionKind: string }) => undefined)`. (T7 r1)
+- `buildMultiMakerExpansionPlan` (`apps/runner/src/index.ts`) emits legs ROOT-MAJOR —
+  `rootIndex` OUTER, `round` INNER — so `leg.round` RESETS at every root and the consumption
+  loop's `activeExpansionRound` is a per-root index, not a global round counter. It is safe
+  for its existing job (triggering reviews) and wrong for anything that must happen "once per
+  round". Read the PRODUCER's loop nesting before attaching to the consumer. (T7 r1)
