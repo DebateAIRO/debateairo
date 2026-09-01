@@ -1217,6 +1217,41 @@ describe("T7 / codex B1 — the authoritative root scope is built from the MAKER
     })).toEqual({ expectedRootCount: 3, rootNodeIds: ["root:A", "root:B", "root:C"] });
   });
 
+  it("refuses a scope that claims MORE roots than the run has makers", () => {
+    // Mutant MN2 removed this guard and the whole suite stayed green: a
+    // defensive line nothing exercises is product code nobody has read.
+    expect(() => decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 1,
+      previousStrengths: evaluate(roundTwo).strengths,
+      currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
+      delta: 0.01
+    })).toThrowError(expect.objectContaining({ code: "STOPPING_ROOT_SCOPE_OVERFULL" }));
+
+    expect(() => decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 1.5,
+      previousStrengths: evaluate(roundTwo).strengths,
+      currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
+      delta: 0.01
+    })).toThrowError(expect.objectContaining({ code: "STOPPING_EXPECTED_ROOT_COUNT_INVALID" }));
+  });
+
+  it("refuses to build a scope for a run with no makers", async () => {
+    const runner = await import("@debateai/runner");
+
+    expect(() => runner.selectAuthoritativeRootScope({
+      effectiveMakerCount: 0,
+      authoredRootNodeIdByMakerIndex: new Map()
+    })).toThrowError(expect.objectContaining({ code: "STOPPING_ROOT_SCOPE_MAKER_COUNT_INVALID" }));
+  });
+
   it("keeps the expected count at the maker count when a maker root is absent", async () => {
     const runner = await import("@debateai/runner");
 
