@@ -110,3 +110,15 @@ Every entry below was paid for at least once. Do not pay for it again.
   DERIVED fact with an expiry — it silently becomes false when a later round edits the
   kernel. Re-run the gate greps immediately before freezing a report, never once at the
   start. (T3 r3)
+- **zsh does NOT word-split an unquoted variable.** `ZONE="a.test.ts b.test.ts"; npx vitest
+  run $ZONE` passes the whole string as ONE filter; vitest answers `No test files found,
+  exiting with code 1` — which reads like a broken glob, not like a shell difference, and
+  the run looks superficially normal (exit 1, no failures). Pass the paths as literal
+  arguments, or use `${=ZONE}`. Cost: one wasted zone run. (T6 r1)
+- **Reverting source WITHOUT touching the index**, for the paired base↔HEAD classification
+  the fleet keeps needing: `git show <sha>:<repo-relative-path> > <path>`, run, then
+  `git checkout -- <path>`. Unlike `git checkout <sha> -- <path>` (already recorded above)
+  this stages nothing, so `git status --porcelain` after the restore is genuinely empty.
+  It is what settled T6's `staleness_state ARCHIVED_REVIVED` failure as pre-existing in
+  one run instead of an argument. Note the repo-relative path inside a worktree still
+  carries the `dialectical-engine/` prefix even when your cwd IS `dialectical-engine`. (T6 r1)
