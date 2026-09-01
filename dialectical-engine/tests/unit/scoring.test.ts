@@ -34,7 +34,7 @@ const arrow = (
   kind: polarity === "attack" ? "rebutting" : null,
   strength: 1,
   magnitudeStatus: "MEASURED",
-  strengthSource: "EVIDENCE_VERIFIER",
+  strengthSource: "REVIEWER",
   ...rest
 });
 

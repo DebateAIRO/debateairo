@@ -156,10 +156,10 @@ describe("S14 / W10 — first-class graph edges", () => {
     const base = {
       edgeId: "edge:test", sourceNodeId: "node:child", sourceChildKind: "support",
       targetKind: "NODE" as const, targetRef: "node:parent", polarity: "support" as const,
-      strengthSource: "EVIDENCE_VERIFIER", provenanceRef: "provenance:edge"
+      strengthSource: "REVIEWER", provenanceRef: "provenance:edge"
     };
     expect(projectServeEdge({ ...base, magnitudeStatus: "MEASURED", strength: 0.6 }).strength).toMatchObject({
-      status: "PRESENT", number: { value: 0.6, source: "EVIDENCE_VERIFIER", replay_handle: "provenance:edge" }
+      status: "PRESENT", number: { value: 0.6, source: "REVIEWER", replay_handle: "provenance:edge" }
     });
     expect(projectServeEdge({ ...base, magnitudeStatus: "UNKNOWN", strength: null }).strength).toEqual({
       status: "UNKNOWN", reason: "NO_JUDGEMENT_OR_MAGNITUDE"

@@ -50,7 +50,13 @@ describe("XREV-01 cross-maker node review", () => {
     const call = vi.fn(async () => ({
       rawArtifactRef: "artifact:review",
       ledgerEntryRef: "ledger:review",
-      content: JSON.stringify({ outcome: "dispute", reasons: ["The conclusion outruns the supplied premise."] }),
+      // T5/S3-1: the review artifact always carries edge_bearings — a node that
+      // sources no edges measures none, and says so rather than omitting the key.
+      content: JSON.stringify({
+        outcome: "dispute",
+        reasons: ["The conclusion outruns the supplied premise."],
+        edge_bearings: []
+      }),
       provider: "test",
       model: "model-b",
       maker: "house-b",
@@ -67,7 +73,8 @@ describe("XREV-01 cross-maker node review", () => {
       authorMaker: "house-a",
       providerRef: "provider:b",
       contractHash: "b".repeat(64),
-      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 }
+      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
+      edges: []
     })).resolves.toMatchObject({
       outcome: "dispute",
       reasons: ["The conclusion outruns the supplied premise."],

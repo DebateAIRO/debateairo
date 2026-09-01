@@ -8,7 +8,7 @@ import {
   type PromptPacket,
   type ProviderGateway
 } from "@debateai/providers";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
@@ -107,12 +107,29 @@ const judgeArtifactSchema = z.object({
   ...judgeAssessmentSchema.shape
 }).strict();
 
-const nodeReviewArtifactSchema = z.object({
-  outcome: z.enum(REVIEW_OUTCOMES),
-  reasons: z.array(z.string().trim().min(1)).min(1)
-}).strict();
+/**
+ * T5 / S3-1 — the review artifact carries the edge measurements.
+ *
+ * `edge_bearings` is positional and its length is pinned to the number of edges
+ * the caller supplied, so ONE call is structurally obliged to measure ALL of
+ * the reviewed node's edges: a short array is a schema failure, not a partial
+ * result that a second call could top up. `null` is the per-edge
+ * cannot-assess, which leaves that edge UNKNOWN.
+ */
+function nodeReviewArtifactSchema(edgeCount: number) {
+  return z.object({
+    outcome: z.enum(REVIEW_OUTCOMES),
+    reasons: z.array(z.string().trim().min(1)).min(1),
+    edge_bearings: z.array(z.union([z.number().min(0).max(1), z.null()]))
+      .length(edgeCount)
+  }).strict();
+}
 
-type UntrustedPromptFieldName = "question_line" | "author_maker" | "statement";
+type UntrustedPromptFieldName =
+  | "question_line"
+  | "author_maker"
+  | "statement"
+  | "edges_sourced_by_this_node";
 
 function renderUntrustedPromptFields(
   fields: readonly { readonly name: UntrustedPromptFieldName; readonly content: string }[]
@@ -174,7 +191,7 @@ export interface JudgedNode {
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
 }
 
-export interface NodeReviewInput {
+export interface JudgeSubjectInput {
   readonly runId: string | null;
   readonly subjectItemId: string;
   readonly callSiteKey: string;
@@ -186,13 +203,30 @@ export interface NodeReviewInput {
   readonly bound: CallBound;
 }
 
+/** One edge sourced by the node under review, offered for measurement (S3-1). */
+export interface ReviewedEdgeSubject {
+  readonly edgeId: string;
+  readonly targetStatement: string;
+  readonly polarity: "support" | "attack";
+}
+
+export interface NodeReviewInput extends JudgeSubjectInput {
+  /**
+   * Every edge this node sources. REQUIRED, never optional: an absent list and
+   * an empty list must not look alike, or a caller that forgets to pass its
+   * edges silently reproduces the all-UNKNOWN skeleton T5 repeals.
+   */
+  readonly edges: readonly ReviewedEdgeSubject[];
+}
+
 /**
  * S2-2 / T3: what one panel member is asked. Structurally the review call's
- * inputs, because a member assesses the same node material — but the ANSWER is
- * a scored assessment, not a review outcome, and the two calls stay separate
- * (S4-1).
+ * SUBJECT inputs, because a member assesses the same node material — but the
+ * ANSWER is a scored assessment, not a review outcome, and the two calls stay
+ * separate (S4-1). It carries no edges: measurement is the reviewer's seat,
+ * and the panel never sees an edge.
  */
-export type PanelAssessmentInput = NodeReviewInput;
+export type PanelAssessmentInput = JudgeSubjectInput;
 
 export interface PanelAssessment {
   readonly judgementRef: string;
@@ -201,12 +235,20 @@ export interface PanelAssessment {
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
 }
 
+/** One edge's measured bearing, or `null` where the reviewer cannot assess it. */
+export interface ReviewedEdgeMeasurement {
+  readonly edgeId: string;
+  readonly bearing: number | null;
+}
+
 export interface ReviewedNode {
   readonly outcome: ReviewOutcome;
   readonly reasons: readonly string[];
   readonly provenanceRef: string;
   readonly providerLedgerRef: string;
   readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
+  /** One entry per supplied edge, in the order supplied (S3-1). */
+  readonly edgeMeasurements: readonly ReviewedEdgeMeasurement[];
 }
 
 export class Judge {
@@ -315,19 +357,35 @@ Never invent evidence, citations, or sources. Score relevance against the questi
     };
   }
 
+  /**
+   * S3-1 / S4-1 — the cross-maker review, which now ALSO measures every edge
+   * the reviewed node sources. The measurement rides this existing visit: it
+   * is the relational, never-the-author examination (argument against target),
+   * so it is the impartial seat, and bundling it here costs zero extra calls.
+   * Panel judging stays a separate call (`assess`).
+   */
   async review(input: NodeReviewInput): Promise<ReviewedNode> {
+    const schema = nodeReviewArtifactSchema(input.edges.length);
     const packet: PromptPacket = {
       messages: [
         {
           role: "system",
-          content: `Review an existing debate node authored by a different maker. Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...]\n}\nUse cannot-assess when the supplied material does not support an honest judgement. Never invent evidence, citations, or sources. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
+          content: `Review an existing debate node authored by a different maker. Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...],\n  "edge_bearings": [number in [0,1] or null, ...]\n}\nUse cannot-assess when the supplied material does not support an honest judgement. edge_bearings measures how strongly the statement bears on each target listed in edges_sourced_by_this_node, in the SAME ORDER, one entry per edge and exactly ${String(input.edges.length)} entries. Use 0 for no bearing, 1 for a decisive bearing, and null when the supplied material does not support an honest measurement of that edge. Never invent evidence, citations, or sources. ${UNTRUSTED_PROMPT_FIELDS_INSTRUCTION}`
         },
         {
           role: "user",
           content: renderUntrustedPromptFields([
             { name: "question_line", content: input.questionLine },
             { name: "author_maker", content: input.authorMaker },
-            { name: "statement", content: input.statement }
+            { name: "statement", content: input.statement },
+            {
+              name: "edges_sourced_by_this_node",
+              content: JSON.stringify(input.edges.map((edge, ordinal) => ({
+                ordinal,
+                relation: edge.polarity,
+                target_statement: edge.targetStatement
+              })))
+            }
           ])
         }
       ]
@@ -346,7 +404,7 @@ Never invent evidence, citations, or sources. Score relevance against the questi
         packet,
         buildRepairPacket: ({ parseError }) => buildContentRepairPacket(packet, parseError),
         classifyContent: (content) => {
-          const outcome = parseStructuredArtifact(content, nodeReviewArtifactSchema);
+          const outcome = parseStructuredArtifact(content, schema);
           if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
           return {
             parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
@@ -360,15 +418,28 @@ Never invent evidence, citations, or sources. Score relevance against the questi
       }
       throw error;
     }
-    const parsed = parseStructuredArtifact(response.content, nodeReviewArtifactSchema);
+    const parsed = parseStructuredArtifact(response.content, schema);
     if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("NODE_REVIEW_PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", parsed.message);
+    const bearings = parsed.value.edge_bearings;
     return Object.freeze({
       outcome: parsed.value.outcome,
       reasons: Object.freeze([...parsed.value.reasons]),
       provenanceRef: response.rawArtifactRef,
       providerLedgerRef: response.ledgerEntryRef,
-      parseStrategy: parsed.strategy
+      parseStrategy: parsed.strategy,
+      // The schema pinned the length; the guard makes a drop LOUD rather than
+      // letting a missing entry pass as a cannot-assess.
+      edgeMeasurements: Object.freeze(input.edges.map((edge, ordinal) => {
+        const bearing = bearings[ordinal];
+        if (bearing === undefined) {
+          throw new TypedDomainError(
+            "NODE_REVIEW_SCHEMA_FAILURE",
+            `edge_bearings has no bearing for edge ordinal ${String(ordinal)}`
+          );
+        }
+        return Object.freeze({ edgeId: edge.edgeId, bearing });
+      }))
     });
   }
 
@@ -483,11 +554,72 @@ export interface RecordReducedJudgementInput extends RecordJudgementInput {
   readonly disagreement: Readonly<Record<string, unknown>>;
 }
 
+/** A node review whose content is encrypted and ready for ONE INSERT. */
+export interface PreparedNodeReview {
+  readonly nodeReviewId: string;
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly authorRawArtifactRef: string;
+  readonly reviewRawArtifactRef: string;
+  readonly outcome: ReviewOutcome;
+  readonly reasons: string;
+  readonly contentCiphertext: string | null;
+  readonly contentAttestation: Buffer | null;
+}
+
+/**
+ * T5 r3 — the review INSERT, scoped to a CALLER'S transaction.
+ *
+ * `ledger.node_review` is append-only, refuses UPDATE and DELETE, and carries
+ * `UNIQUE (node_id)`; `readUnreviewedNodes` filters reviewed nodes out. So a
+ * review that commits alone is irreversible AND removes the node from every
+ * future work set. If the bearings that came back on the same call are written
+ * in a later transaction and that transaction fails, the measurement is lost
+ * permanently — no retry and no catch-up can reach it. The composition root
+ * therefore runs this INSERT and those magnitudes in one transaction, which is
+ * why this is exported client-scoped.
+ */
+export async function insertPreparedNodeReview(
+  client: PoolClient,
+  prepared: PreparedNodeReview
+): Promise<string> {
+  const result = await client.query<{ node_review_id: string }>(
+    `INSERT INTO ledger.node_review (
+      node_review_id, run_id, node_id, author_raw_artifact_ref,
+      review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext,content_attestation
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING node_review_id`,
+    [prepared.nodeReviewId, prepared.runId, prepared.nodeId, prepared.authorRawArtifactRef,
+      prepared.reviewRawArtifactRef, prepared.outcome, prepared.reasons,
+      await allocateSequence(client), prepared.contentCiphertext, prepared.contentAttestation]
+  );
+  return result.rows[0]!.node_review_id;
+}
+
+/** The producer-grading bulkhead surfaces as a typed error, not a raw message. */
+export function translateNodeReviewFailure(error: unknown): unknown {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.startsWith("PRODUCER_GRADING_FORBIDDEN:")
+    ? new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message)
+    : error;
+}
+
 export interface UnreviewedNode {
   readonly nodeId: string;
   readonly statement: string;
   readonly authorMaker: string;
   readonly authorRawArtifactRef: string;
+  /**
+   * T5 / S3-1 — the edges this node sources that are still UNMEASURED, so a
+   * catch-up review can measure them on its own single visit. MEASURED edges
+   * are excluded here rather than at the call site: 0052's one-way ratchet
+   * refuses a second write, so offering one would ask for a number that
+   * nothing could record.
+   */
+  readonly sourcedEdges: readonly {
+    readonly edgeId: string;
+    readonly targetStatement: string;
+    readonly polarity: "support" | "attack";
+  }[];
 }
 
 export class JudgementRepository {
@@ -537,35 +669,35 @@ export class JudgementRepository {
     });
   }
 
-  async recordNodeReview(input: RecordNodeReviewInput): Promise<string> {
-    return withRunContentLease(this.pool, [input.runId], async () => {
-      const nodeReviewId = randomUUID();
-      const content = await encryptAttestedContentForRun(
-        this.pool, input.runId, "ledger.node_review", nodeReviewId,
-        { reasons: input.reasons }
-      );
-      try {
-        return await withWriteTransaction(this.pool, async (client) => {
-          const result = await client.query<{ node_review_id: string }>(
-            `INSERT INTO ledger.node_review (
-              node_review_id, run_id, node_id, author_raw_artifact_ref,
-              review_raw_artifact_ref, outcome, reasons, at_seq, content_ciphertext,content_attestation
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10) RETURNING node_review_id`,
-            [nodeReviewId, input.runId, input.nodeId, input.authorRawArtifactRef,
-              input.reviewRawArtifactRef, input.outcome,
-              JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
-              await allocateSequence(client),
-              content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null]
-          );
-          return result.rows[0]!.node_review_id;
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.startsWith("PRODUCER_GRADING_FORBIDDEN:")) {
-          throw new TypedDomainError("PRODUCER_GRADING_FORBIDDEN", message);
-        }
-        throw error;
-      }
+  /**
+   * T5 r4 — there is deliberately NO self-transacting review writer on this
+   * repository. A review that commits on its own is irreversible
+   * (`ledger.node_review` is append-only and node-unique) and removes the node
+   * from every future work set, so a later failure to write the bearings that
+   * same review returned strands them beyond any repair.
+   *
+   * Every caller therefore prepares here — encryption still happens before any
+   * transaction opens — and inserts through `insertPreparedNodeReview` on a
+   * transaction the CALLER owns, so the review and its magnitudes can be one
+   * commit. The composition root's `recordReviewWithMeasurements` is the only
+   * path that does this for a node's own edges.
+   */
+  async prepareNodeReview(input: RecordNodeReviewInput): Promise<PreparedNodeReview> {
+    const nodeReviewId = randomUUID();
+    const content = await encryptAttestedContentForRun(
+      this.pool, input.runId, "ledger.node_review", nodeReviewId,
+      { reasons: input.reasons }
+    );
+    return Object.freeze({
+      nodeReviewId,
+      runId: input.runId,
+      nodeId: input.nodeId,
+      authorRawArtifactRef: input.authorRawArtifactRef,
+      reviewRawArtifactRef: input.reviewRawArtifactRef,
+      outcome: input.outcome,
+      reasons: JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
+      contentCiphertext: content === null ? null : JSON.stringify(content.envelope),
+      contentAttestation: content?.attestation ?? null
     });
   }
 
@@ -618,6 +750,40 @@ export class JudgementRepository {
        ORDER BY node.created_at_seq, node.node_id`,
       [runId]
     );
+      // T5 / S3-1: the still-unmeasured edges each of those nodes sources, with
+      // the target's own statement so the reviewer can judge the relation.
+      const edgeResult = await this.pool.query<{
+        edge_id: string;
+        source_node_id: string;
+        polarity: "support" | "attack";
+        target_node_id: string;
+        target_claim_text: string;
+        target_content_ciphertext: CryptoEnvelope | null;
+      }>(
+        `SELECT edge.edge_id::text, edge.source_node_id::text, edge.polarity,
+                edge.target_node_id::text, target.claim_text AS target_claim_text,
+                target.content_ciphertext AS target_content_ciphertext
+           FROM core.edge AS edge
+           JOIN core.node AS target
+             ON target.run_id=edge.run_id AND target.node_id=edge.target_node_id
+          WHERE edge.run_id=$1 AND edge.target_kind='NODE'
+            AND edge.magnitude_status='UNKNOWN'
+            AND edge.source_node_id = ANY($2::uuid[])
+          ORDER BY edge.created_at_seq`,
+        [runId, result.rows.map((row) => row.node_id)]
+      );
+      const edgesBySource = new Map<string, {
+        readonly edgeId: string; readonly targetStatement: string; readonly polarity: "support" | "attack";
+      }[]>();
+      for (const edge of edgeResult.rows) {
+        const target = await decryptContentForRun<{ claimText: string }>(
+          this.pool, runId, "core.node", edge.target_node_id, edge.target_content_ciphertext,
+          { claimText: edge.target_claim_text }
+        );
+        const bucket = edgesBySource.get(edge.source_node_id) ?? [];
+        bucket.push({ edgeId: edge.edge_id, targetStatement: target.claimText, polarity: edge.polarity });
+        edgesBySource.set(edge.source_node_id, bucket);
+      }
       return Object.freeze(await Promise.all(result.rows.map(async (row) => {
         const content = await decryptContentForRun<{ claimText: string }>(
           this.pool, runId, "core.node", row.node_id, row.content_ciphertext,
@@ -627,7 +793,8 @@ export class JudgementRepository {
           nodeId: row.node_id,
           statement: content.claimText,
           authorMaker: row.maker,
-          authorRawArtifactRef: row.raw_artifact_id
+          authorRawArtifactRef: row.raw_artifact_id,
+          sourcedEdges: Object.freeze(edgesBySource.get(row.node_id) ?? [])
         });
       })));
     });

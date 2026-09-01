@@ -126,9 +126,9 @@ const fullSnapshot: EvaluationSnapshot = {
     { nodeId: "sibling", baseStrength: 0.4, parentNodeId: "root" }
   ],
   arrows: [
-    { arrowId: "a:hidden", sourceNodeId: "hidden", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" },
-    { arrowId: "a:hidden-child", sourceNodeId: "hidden-child", targetKind: "NODE", targetNodeId: "hidden", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" },
-    { arrowId: "a:sibling", sourceNodeId: "sibling", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" }
+    { arrowId: "a:hidden", sourceNodeId: "hidden", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" },
+    { arrowId: "a:hidden-child", sourceNodeId: "hidden-child", targetKind: "NODE", targetNodeId: "hidden", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" },
+    { arrowId: "a:sibling", sourceNodeId: "sibling", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" }
   ],
   arrowOrder: ["a:hidden-child", "a:hidden", "a:sibling"],
   operatorResolutions: [{ parentNodeId: "root", operator: "accumulate", suppliedBy: "deployment" }],

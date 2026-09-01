@@ -6,6 +6,7 @@ import {
   RunRepository,
   assertNoOpenWriteTransaction,
   withRunContentLease,
+  withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember
 } from "@debateai/db";
@@ -14,10 +15,12 @@ import {
   assertClaimCoversCall,
   type TerminalCompletionDeclaration
 } from "@debateai/battery";
-import { GraphRepository } from "@debateai/graph";
+import { GraphRepository, recordEdgeMeasurementsOnClient } from "@debateai/graph";
 import {
   Judge,
   JudgementRepository,
+  insertPreparedNodeReview,
+  translateNodeReviewFailure,
   applyCorrelatedErrorDiscount,
   applyDeclaredDisagreement,
   bindWayOfKnowingDowngrade,
@@ -431,11 +434,80 @@ export type ReviewCatchUpRefusal =
   | "CATCH_UP_WOULD_DOWNGRADE"
   | "CATCH_UP_NUMBER_WOULD_MOVE";
 
+/**
+ * T5 r3 (codex r2 B1) — the review and the bearings that ONE call returned are
+ * committed as a single fact, or not at all.
+ *
+ * `ledger.node_review` is append-only, node-unique, and
+ * `JudgementRepository.readUnreviewedNodes` filters reviewed nodes out of all
+ * future work. A review that commits on its own is therefore IRREVERSIBLE and
+ * UNREPAIRABLE: if the magnitude write then fails, the edge stays UNKNOWN, a
+ * retry cannot re-review the node (UNIQUE), and catch-up can no longer see it.
+ * The bearing the model already produced — and that was already paid for — is
+ * lost for the life of the run.
+ *
+ * Neither package may import the other (the declared architecture edges give
+ * `judgement` and `graph` no dependency on each other), so the atomic
+ * composition belongs here, at the composition root that already owns both.
+ * Both production review sites — the in-run reviewer and the catch-up lane —
+ * go through this function; there is no other way to persist a review.
+ */
+export async function recordReviewWithMeasurements(pool: Pool, input: {
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly authorRawArtifactRef: string;
+  readonly reviewRawArtifactRef: string;
+  readonly outcome: "agree" | "dispute" | "cannot-assess";
+  readonly reasons: readonly string[];
+  readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
+}): Promise<string> {
+  const judgements = new JudgementRepository(pool);
+  return withRunContentLease(pool, [input.runId], async () => {
+    // Encryption happens before the transaction opens, exactly as it did when
+    // the review was written alone.
+    const prepared = await judgements.prepareNodeReview({
+      runId: input.runId,
+      nodeId: input.nodeId,
+      authorRawArtifactRef: input.authorRawArtifactRef,
+      reviewRawArtifactRef: input.reviewRawArtifactRef,
+      outcome: input.outcome,
+      reasons: input.reasons
+    });
+    try {
+      return await withWriteTransaction(pool, async (client) => {
+        // The same run lock `withGraphWrite` takes, so a concurrent graph write
+        // cannot interleave between the two halves of this one fact.
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [input.runId]);
+        const nodeReviewId = await insertPreparedNodeReview(client, prepared);
+        await recordEdgeMeasurementsOnClient(client, input.runId, input.measurements);
+        return nodeReviewId;
+      });
+    } catch (error) {
+      throw translateNodeReviewFailure(error);
+    }
+  });
+}
+
 export interface ReviewCatchUpNode {
   readonly nodeId: string;
   readonly statement: string;
   readonly authorMaker: string;
   readonly authorRawArtifactRef: string;
+  /**
+   * T5 / S3-1 — the edges this node sources that are still UNMEASURED.
+   *
+   * A catch-up review is a real reviewer visit, so it measures what it can. The
+   * list is empty only when the node genuinely has nothing left to measure;
+   * declaring an edge-owning node to have none would be a false statement, not
+   * a missing measurement. Already-MEASURED edges are excluded at the reader:
+   * the one-way ratchet in 0052 refuses a second write, so re-offering them
+   * would ask the reviewer for a number nothing could record.
+   */
+  readonly sourcedEdges: readonly {
+    readonly edgeId: string;
+    readonly targetStatement: string;
+    readonly polarity: "support" | "attack";
+  }[];
 }
 
 export interface ReviewCatchUpReviewer {
@@ -451,10 +523,33 @@ export interface ReviewCatchUpReviewer {
     readonly providerRef: string;
     readonly contractHash: string;
     readonly bound: CallBound;
+    /**
+     * T5 / S3-1. Every edge the reviewed node still owns UNMEASURED, offered
+     * for measurement on this one visit. A catch-up review is a real reviewer
+     * visit and measures what it can.
+     *
+     * This list is empty ONLY when the node genuinely has nothing left to
+     * measure — an already-MEASURED edge is excluded by the reader, because
+     * 0052's one-way ratchet would refuse a second write. Declaring an
+     * edge-owning node to have no edges is a FALSE statement, not a missing
+     * measurement; that was finding F-T5-2 and it is outlawed, not documented.
+     * A reviewer that looks and cannot say returns a null bearing instead,
+     * which leaves the edge honestly UNKNOWN.
+     */
+    readonly edges: readonly {
+      readonly edgeId: string;
+      readonly targetStatement: string;
+      readonly polarity: "support" | "attack";
+    }[];
   }): Promise<{
     readonly outcome: "agree" | "dispute" | "cannot-assess";
     readonly reasons: readonly string[];
     readonly provenanceRef: string;
+    /** One entry per offered edge — the same ONE call, no extra spend (S3-1). */
+    readonly edgeMeasurements: readonly {
+      readonly edgeId: string;
+      readonly bearing: number | null;
+    }[];
   }>;
 }
 
@@ -477,13 +572,20 @@ export interface ReviewCatchUpDependencies {
   readUnreviewedNodes(runId: string): Promise<readonly ReviewCatchUpNode[]>;
   readDisclosedNodeIds(answerId: string, answerVersion: number): Promise<readonly string[]>;
   readLatestReviewerMaker(runId: string, authorMaker: string): Promise<string | null>;
-  recordNodeReview(input: {
+  /**
+   * T5 / S3-1 + codex r2 B1 — the review and the bearings that same call
+   * returned are persisted together or not at all. There is deliberately no
+   * way to record one without the other: a lone review is irreversible and
+   * removes the node from every future work set.
+   */
+  recordReviewWithMeasurements(input: {
     readonly runId: string;
     readonly nodeId: string;
     readonly authorRawArtifactRef: string;
     readonly reviewRawArtifactRef: string;
     readonly outcome: "agree" | "dispute" | "cannot-assess";
     readonly reasons: readonly string[];
+    readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
   }): Promise<string>;
   countRunModelAttempts(runId: string): Promise<number>;
   readPinnedMaximumAttempts(runId: string): Promise<number>;
@@ -588,17 +690,23 @@ export async function runReviewCatchUp(input: {
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
         contractHash: input.judgeContractHash,
-        bound: { ...input.judgeBound, maxAttempts }
+        bound: { ...input.judgeBound, maxAttempts },
+        // T5 / S3-1: a catch-up review is a real reviewer visit. It measures
+        // the edges this node still owns unmeasured — never a false empty list.
+        edges: node.sourcedEdges
       })
     });
     if (outcome.kind === "HALTED") continue;
-    await input.dependencies.recordNodeReview({
+    await input.dependencies.recordReviewWithMeasurements({
       runId: input.runId,
       nodeId: node.nodeId,
       authorRawArtifactRef: node.authorRawArtifactRef,
       reviewRawArtifactRef: outcome.value.provenanceRef,
       outcome: outcome.value.outcome,
-      reasons: outcome.value.reasons
+      reasons: outcome.value.reasons,
+      // The magnitudes came back on the review call above; a cannot-assess
+      // bearing is null and leaves its edge honestly UNKNOWN.
+      measurements: outcome.value.edgeMeasurements
     });
     reviewed += 1;
   }
@@ -686,7 +794,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
     readDisclosedNodeIds: (answerId, answerVersion) =>
       serve.readReviewCatchUpDisclosedNodeIds(answerId, answerVersion),
     readLatestReviewerMaker: (runId, maker) => judgements.readLatestReviewerMaker(runId, maker),
-    recordNodeReview: (record) => judgements.recordNodeReview(record),
+    recordReviewWithMeasurements: (record) => recordReviewWithMeasurements(input.pool, record),
     countRunModelAttempts: (runId) => budget.countRunModelAttempts(runId),
     readPinnedMaximumAttempts: async (runId) => (await budget.readPinnedBasis(runId)).maxModelAttempts,
     prepareVersion: async ({ runId, answerId, fromVersion }) => {
@@ -1892,9 +2000,20 @@ export class WalkingSkeletonRunner {
       readonly reversalPoint: string;
       readonly authorIndex: number;
       readonly maker: string;
+      /**
+       * T5 / S3-1: every edge this node sources, carried to the node's ONE
+       * review call so the reviewer measures them all on the visit it was
+       * already making. A root sources none.
+       */
+      readonly sourcedEdges: readonly {
+        readonly edgeId: string;
+        readonly targetStatement: string;
+        readonly polarity: "support" | "attack";
+      }[];
     }
     const authoredNodes = new Map<number, AuthoredDebateNode>([[0, Object.freeze({
       nodeId,
+      sourcedEdges: Object.freeze([]),
       statement: judged.statement,
       provenanceRef: judged.provenanceRef,
       reducedJudgementId,
@@ -1929,6 +2048,7 @@ export class WalkingSkeletonRunner {
       readonly explorationDecision: "continue" | "deepen" | "challenge";
       readonly edges: readonly {
         readonly targetNodeId: string;
+        readonly targetStatement: string;
         readonly polarity: "support" | "attack";
       }[];
     }): Promise<
@@ -1990,7 +2110,7 @@ export class WalkingSkeletonRunner {
           callSiteKey: `PANEL:${input.callSiteKey}`,
           questionLine: input.questionLine
         });
-        const childNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
+        const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
             runId: run.runId,
             statementText: childJudged.statement,
@@ -2011,8 +2131,9 @@ export class WalkingSkeletonRunner {
             text: childJudged.restatementText,
             checkStatus: childJudged.restatementStatus
           });
+          const minted: { readonly edgeId: string; readonly targetStatement: string; readonly polarity: "support" | "attack" }[] = [];
           for (const edge of input.edges) {
-            await writer.addEdge({
+            const edgeId = await writer.addEdge({
               runId: run.runId,
               sourceNodeId: created,
               targetKind: "NODE",
@@ -2023,11 +2144,13 @@ export class WalkingSkeletonRunner {
               kind: edge.polarity === "attack" ? "rebutting" : null,
               strength: null,
               magnitudeStatus: "UNKNOWN",
-              strengthSource: "EVIDENCE_VERIFIER",
+              // T5 / S3-1: the stamp names the role that will measure this edge.
+              strengthSource: "REVIEWER",
               provenanceRef: childJudged.provenanceRef
             });
+            minted.push({ edgeId, targetStatement: edge.targetStatement, polarity: edge.polarity });
           }
-          return created;
+          return { created, minted: Object.freeze(minted) };
         });
         if (childJudged.wayOfKnowingDowngrade !== null) {
           wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
@@ -2061,6 +2184,7 @@ export class WalkingSkeletonRunner {
         });
       return { kind: "AUTHORED", value: Object.freeze({
           nodeId: childNodeId,
+          sourcedEdges: childSourcedEdges,
           statement: childJudged.statement,
           provenanceRef: childJudged.provenanceRef,
           reducedJudgementId: childReducedJudgementId,
@@ -2150,7 +2274,9 @@ export class WalkingSkeletonRunner {
               authorMaker: authoredNode.maker,
               providerRef: reviewer.providerRef,
               contractHash: this.settings.judgeContractHash,
-              bound: { ...this.settings.judgeBound, maxAttempts }
+              bound: { ...this.settings.judgeBound, maxAttempts },
+              // S3-1: this ONE call measures every edge the node sources.
+              edges: authoredNode.sourcedEdges
             })
           });
           if (reviewAttempt.kind === "HALTED") {
@@ -2158,13 +2284,18 @@ export class WalkingSkeletonRunner {
             continue;
           }
           const review = reviewAttempt.value;
-          await this.#judgements.recordNodeReview({
+          // T5 / S3-1 + codex r2 B1: the review and the magnitudes it already
+          // returned are ONE fact, committed in ONE transaction. Writing the
+          // review alone is irreversible and would remove this node from every
+          // future work set, stranding the bearing beyond any repair.
+          await recordReviewWithMeasurements(this.pool, {
             runId: run.runId,
             nodeId: authoredNode.nodeId,
             authorRawArtifactRef: authoredNode.provenanceRef,
             reviewRawArtifactRef: review.provenanceRef,
             outcome: review.outcome,
-            reasons: review.reasons
+            reasons: review.reasons,
+            measurements: review.edgeMeasurements
           });
         } catch (error) {
           if (error instanceof TypedDomainError && [
@@ -2230,7 +2361,7 @@ export class WalkingSkeletonRunner {
         siblingOrdinal: leg.polarity === "support" ? 1 : 2,
         plannedLegCount: plannedSubtreeIndices.length,
         explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
-        edges: [{ targetNodeId: parent.nodeId, polarity: leg.polarity }]
+        edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
       });
       if (authored.kind === "HALTED") {
         const indices = plannedSubtreeIndices;
@@ -2272,8 +2403,8 @@ export class WalkingSkeletonRunner {
         plannedLegCount: 1,
         explorationDecision: "challenge",
         edges: [
-          { targetNodeId: authorRoot.nodeId, polarity: "support" },
-          { targetNodeId: targetRoot.nodeId, polarity: "attack" }
+          { targetNodeId: authorRoot.nodeId, targetStatement: authorRoot.statement, polarity: "support" },
+          { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
         ]
       });
       if (authored.kind === "HALTED") {

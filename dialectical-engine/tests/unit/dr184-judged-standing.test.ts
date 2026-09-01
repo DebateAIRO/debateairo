@@ -17,8 +17,8 @@ const snapshot: EvaluationSnapshot = {
     { nodeId: "hidden-child", baseStrength: 0.3, parentNodeId: "hidden" }
   ],
   arrows: [
-    { arrowId: "attack-b", sourceNodeId: "attacker", targetKind: "NODE", targetNodeId: "root-b", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" },
-    { arrowId: "hidden-support", sourceNodeId: "hidden-child", targetKind: "NODE", targetNodeId: "hidden", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" }
+    { arrowId: "attack-b", sourceNodeId: "attacker", targetKind: "NODE", targetNodeId: "root-b", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" },
+    { arrowId: "hidden-support", sourceNodeId: "hidden-child", targetKind: "NODE", targetNodeId: "hidden", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" }
   ],
   arrowOrder: ["attack-b", "hidden-support"],
   operatorResolutions: [
@@ -82,8 +82,19 @@ describe("DR-184 judged-standing projection mutation ledger", () => {
   });
 });
 
-describe("DR-184 future-number sentinel", () => {
-  it("T13/C-9 fails when any shipped writer emits a measured edge", async () => {
+/**
+ * T5 (goal 144-159) — the DR-184 future-number sentinel is REPEALED.
+ *
+ * The sentinel pinned the walking-skeleton constraint that no shipped writer
+ * may emit a measured edge, so every arrow in the graph stayed UNKNOWN and the
+ * tree could move no number. S3-1 supersedes it: the cross-maker reviewer
+ * measures each argument's bearing on its target during its existing review
+ * visit. The sentinel is replaced here by its INVERSION — the same scan, now
+ * asserting that a shipped writer DOES emit MEASURED, and that the writer sits
+ * on the graph package's measured-update path rather than anywhere convenient.
+ */
+describe("T5 measured-edge repeal (supersedes the DR-184 future-number sentinel; S3-1)", () => {
+  it("requires a shipped writer to emit a measured edge", async () => {
     const sourceFiles = async (directory: string): Promise<readonly string[]> => {
       const entries = await readdir(directory, { withFileTypes: true });
       return (await Promise.all(entries.map(async (entry) => {
@@ -95,13 +106,14 @@ describe("DR-184 future-number sentinel", () => {
     const files = (await Promise.all(["apps", "packages", "acceptance"].map(sourceFiles))).flat();
     const measuredWriter = /magnitudeStatus\s*:\s*["']MEASURED["']/;
     const knownTypeDeclaration = /^\s*readonly\s+magnitudeStatus\s*:\s*["']MEASURED["']\s*\|\s*["']UNKNOWN["']\s*;\s*$/;
-    const offenders = (await Promise.all(files.map(async (file) => {
+    const writers = (await Promise.all(files.map(async (file) => {
       const lines = (await readFile(file, "utf8")).split("\n");
       return lines.flatMap((line, index) => measuredWriter.test(line) && !knownTypeDeclaration.test(line)
         ? [`${file}:${index + 1}:${line.trim()}`]
         : []);
     }))).flat();
-    expect(offenders).toEqual([]);
+    expect(writers).not.toEqual([]);
+    expect(writers.map((writer) => writer.split(":")[0])).toContain("packages/graph/src/index.ts");
   });
 
   it("T15 keeps veil state node-local so a low-score descendant is not hidden by inheritance", async () => {
