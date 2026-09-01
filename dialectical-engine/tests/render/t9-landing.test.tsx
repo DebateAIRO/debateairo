@@ -210,6 +210,31 @@ describe("T9-C2 chrome labels & CTAs", () => {
     expect(errorEvents).toEqual([]);
   });
 
+  it("keeps Create one query-free when next is absent", async () => {
+    // PROPERTY: the real LoginFlow transports next only when it exists, so the
+    // absent branch stays the exact bare sign-up route rather than adding ?next=.
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    window.history.replaceState({}, "", "/login");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(
+        <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
+      ));
+      const createOne = [...container.querySelectorAll("a")]
+        .find((link) => link.textContent?.trim() === "Create one");
+
+      expect(createOne?.getAttribute("href")).toBe("/sign-up");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      window.history.replaceState({}, "", "/");
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("preserves next through the login and sign-up round trip", async () => {
     // PROPERTY: both real pre-MFA cross-links transport the same raw next value,
     // so the sign-up branch returns to login with decoded next still equal to /new.

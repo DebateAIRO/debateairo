@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { PublicDebateSummarySchema } from "@debateai/contract";
 import {
   DEFAULT_RETURN_PATH,
   RETURN_PATH_ALLOW_LIST,
   safeReturnPath
 } from "../../apps/ui/lib/returnPath.js";
+
+const ACCEPTED_PUBLIC_REF = "3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012";
 
 describe("T9 return-path validation", () => {
   it.each(RETURN_PATH_ALLOW_LIST)("accepts allow-listed path %s", (path) => {
@@ -17,9 +20,15 @@ describe("T9 return-path validation", () => {
   });
 
   it("accepts a UUID public debate path", () => {
-    const path = "/public/debate/3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012";
+    const path = `/public/debate/${ACCEPTED_PUBLIC_REF}`;
 
     expect(safeReturnPath(path)).toBe(path);
+  });
+
+  it("keeps the accepted public ref aligned with the contract schema", () => {
+    expect(
+      PublicDebateSummarySchema.shape.public_ref.safeParse(ACCEPTED_PUBLIC_REF).success
+    ).toBe(true);
   });
 
   it.each([
@@ -42,7 +51,7 @@ describe("T9 return-path validation", () => {
     ["missing public debate ref", "/public/debate/"],
     ["public debate dot-dot ref", "/public/debate/.."],
     ["public debate dot ref", "/public/debate/."],
-    ["overlong public debate ref", `/public/debate/${"a".repeat(129)}`],
+    ["129-char non-uuid ref rejected on shape", `/public/debate/${"a".repeat(129)}`],
     ["null", null],
     ["undefined", undefined],
     ["empty", ""]
