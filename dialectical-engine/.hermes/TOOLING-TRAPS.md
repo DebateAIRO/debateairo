@@ -77,3 +77,17 @@ Every entry below was paid for at least once. Do not pay for it again.
   `reachableCallables`** — wiring a listed surface makes the entry a silent lie, and no
   test fails. (`s04Surface`/`s05Surface` are safe: their attachment is derived.) After
   attaching any surface, edit `neverCalled` by hand. (T3)
+- In `tests/integration/database.test.ts` a runner fixture is one of TWO species and the
+  choice is not a continuum: it either **terminates on its envelope** (pin a tight
+  `maxModelAttempts`; script only judgements + reviews; the serve gate takes the
+  envelope-terminal path with zero composer calls) or it **serves** (generous ceiling;
+  you MUST script compose + two conformance + R9 on the PRIMARY maker's double). A
+  ceiling between the two fails as an unscripted-composer schema error or a hard
+  `RUN_COST_ENVELOPE_EXHAUSTED` throw, and neither message names the real cause. Decide
+  the species before choosing the number. (T3 r2)
+- A provider double that pops `index 0` when a RECOGNISED request class has no scripted
+  response of its own class serves a wrong-class answer (a review body to a judge call),
+  which surfaces as a bogus production schema failure. Refuse by name for recognised
+  classes; keep FIFO only for genuinely untyped requests such as health probes. Fixing
+  the guess in `ceremony.test.ts` and `database.test.ts` left all their fixtures green,
+  so the fallback was masking, not load-bearing. (T3 r2)
