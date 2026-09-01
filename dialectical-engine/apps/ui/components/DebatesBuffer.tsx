@@ -10,8 +10,15 @@ export function DebatesBuffer({ debates }: { readonly debates: readonly DebateSu
   return debates.map((debate) => {
     const complete = isComplete(debate.status);
     return (
-      <Link key={debate.id} className="debateCard" href={`/debate/${debate.id}`}>
-        <div className="debateCardBody">
+      <Link
+        key={debate.id}
+        className="debateCard"
+        href={`/debate/${debate.id}`}
+        data-library-row
+        data-bezel="shell"
+        style={{ background: "var(--shell)", borderColor: "var(--line)", borderRadius: 13 }}
+      >
+        <div className="debateCardBody" data-bezel="core" style={{ background: "var(--core)" }}>
           <div className="debateCardClaim">{debate.topic}</div>
           <div className="debateCardMeta">
             {debate.terminal_reason === null || debate.terminal_reason === undefined
@@ -35,7 +42,13 @@ export function DebatesBuffer({ debates }: { readonly debates: readonly DebateSu
                 key={model}
                 className="modelDot"
                 title={meta.name}
-                style={{ ["--dot" as string]: meta.dot }}
+                style={{
+                  ["--dot" as string]: meta.dot,
+                  borderColor: "var(--core)",
+                  height: 12,
+                  marginLeft: -4,
+                  width: 12
+                }}
               />
             );
           })}

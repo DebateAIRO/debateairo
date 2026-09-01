@@ -819,3 +819,11 @@ permission classifier (correctly) refused to relaunch.
 Found by CODE-T9C4-N1 (2026-09-01): a zsh `for path in ...` loop overwrites the special
 $path array (mirror of $PATH), making commands appear missing for the rest of the shell.
 Use any other variable name in zsh loops (`p`, `f`, `file`).
+
+## Vitest can trip opaque-origin localStorage while formatting failed JSDOM element assertions
+Found by CODE-T3C2 (2026-09-01): a failed equality assertion whose received value was an
+array of JSDOM elements made Vitest's formatter inspect the owning opaque-origin window;
+that inspection reached `localStorage` and replaced the useful mismatch with a
+`SecurityError`. Assert scalar evidence from that document (counts, text, attributes, or
+booleans) so a failure remains printable. This is a reporting-harness failure, not proof
+that application code accessed browser storage.

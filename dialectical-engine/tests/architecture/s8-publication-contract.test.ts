@@ -158,13 +158,18 @@ describe("Accounts S8 publication architecture", () => {
       expect(home).toContain("readPublicDebates(50, 0)");
       expect(home).toContain("Published debates");
       expect(home).toContain("/public/debate/");
-      const publicCard = home.slice(
-        home.indexOf("published.items.map"),
-        home.indexOf("</article>", home.indexOf("published.items.map"))
-      );
-      expect(publicCard).toContain("may be indexed by search engines");
-      expect(publicCard).toContain("Copies may persist after unpublishing");
     }
+    const disclosure =
+      "Published debates may be indexed by search engines. Copies may persist after unpublishing.";
+    const applicationMapStart = applicationHome.indexOf("published.items.map");
+    const applicationCardEnd = applicationHome.indexOf("</article>", applicationMapStart);
+    expect(applicationHome.match(/Published debates may be indexed by search engines/g) ?? []).toHaveLength(1);
+    expect(applicationHome.indexOf(disclosure)).toBeGreaterThan(applicationCardEnd);
+
+    const webMapStart = webHome.indexOf("published.items.map");
+    const webPublicCard = webHome.slice(webMapStart, webHome.indexOf("</article>", webMapStart));
+    expect(webPublicCard).toContain("may be indexed by search engines");
+    expect(webPublicCard).toContain("Copies may persist after unpublishing");
     const applicationPublicClient = await read("apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx");
     for (const page of [applicationPublic + applicationPublicClient, webPublic]) {
       expect(page).toContain("readPublicDebate(id)");

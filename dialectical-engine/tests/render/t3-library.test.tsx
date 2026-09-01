@@ -6,6 +6,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setPathname } from "next/navigation";
+import type { PublicDebateSummary } from "@debateai/contract";
+import type { DebateSummary } from "../../apps/ui/lib/types.js";
 
 type HomePageModule = {
   default: (props: { searchParams: Promise<{ tab?: string }> }) => Promise<ReactNode>;
@@ -25,8 +27,8 @@ type JSDOMModule = {
 
 const routeMocks = vi.hoisted(() => ({
   sessionCookie: "t3-c1-session" as string | null,
-  readPublicDebates: vi.fn(async () => ({ items: [], total: 0 })),
-  listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 }))
+  readPublicDebates: vi.fn(async () => ({ items: [] as PublicDebateSummary[], total: 0 })),
+  listDebatesPageServer: vi.fn(async () => ({ summaries: [] as DebateSummary[], shown: 0, total: 0 }))
 }));
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
@@ -52,7 +54,10 @@ vi.mock("next/navigation", async (importOriginal) => ({
 
 const globalStyles = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
 
-async function renderRoute(sessionCookie: string | null): Promise<Document> {
+async function renderRoute(
+  sessionCookie: string | null,
+  selected: "yours" | "public" = "yours"
+): Promise<Document> {
   routeMocks.sessionCookie = sessionCookie;
   setPathname("/");
   const [{ default: HomePage }, { TopBar }, { renderToStaticMarkup }, { JSDOM }] = await Promise.all([
@@ -61,7 +66,7 @@ async function renderRoute(sessionCookie: string | null): Promise<Document> {
     vi.importActual<StaticRendererModule>("react-dom/server"),
     vi.importActual<JSDOMModule>("jsdom")
   ]);
-  const page = await HomePage({ searchParams: Promise.resolve({ tab: "yours" }) });
+  const page = await HomePage({ searchParams: Promise.resolve({ tab: selected }) });
   const html = renderToStaticMarkup(
     <div className="appShell">
       <TopBar />
@@ -240,4 +245,157 @@ describe("chrome", () => {
   });
 });
 
-describe.todo("lists", () => {});
+describe("lists", () => {
+  const yourDebates = [
+    {
+      id: "debate:yours-1",
+      topic: "Should cities price road congestion?",
+      status: "complete",
+      created_at: "2026-08-31T08:00:00.000Z",
+      completed_at: "2026-08-31T08:10:00.000Z",
+      models: ["gpt-5.6-sol", "claude-opus-5"]
+    },
+    {
+      id: "debate:yours-2",
+      topic: "Can prediction markets improve public policy?",
+      status: "generating",
+      created_at: "2026-08-31T09:00:00.000Z",
+      completed_at: null,
+      models: ["gpt-5.6-sol", "claude-opus-5", "grok-4"]
+    },
+    {
+      id: "debate:yours-3",
+      topic: "Should scientific peer review be open by default?",
+      status: "complete",
+      created_at: "2026-08-31T10:00:00.000Z",
+      completed_at: "2026-08-31T10:10:00.000Z",
+      models: ["gpt-5.6-sol"]
+    },
+    {
+      id: "debate:yours-4",
+      topic: "Does remote work strengthen small cities?",
+      status: "complete",
+      created_at: "2026-08-31T11:00:00.000Z",
+      completed_at: "2026-08-31T11:10:00.000Z",
+      models: ["claude-opus-5", "grok-4"]
+    }
+  ] satisfies DebateSummary[];
+
+  const publicDebates = [
+    {
+      public_ref: "11111111-1111-4111-8111-111111111111",
+      author_pseudonym: "ember-archive",
+      question: "Should public algorithms publish their evaluation sets?",
+      published_at: "2026-08-30T08:00:00.000Z",
+      verdict: "SUPPORTED",
+      confidence_band: "moderate"
+    },
+    {
+      public_ref: "22222222-2222-4222-8222-222222222222",
+      author_pseudonym: "quiet-cedar",
+      question: "Can a city eliminate parking minimums without displacement?",
+      published_at: "2026-08-30T09:00:00.000Z",
+      verdict: "CONTESTED",
+      confidence_band: "mixed"
+    },
+    {
+      public_ref: "33333333-3333-4333-8333-333333333333",
+      author_pseudonym: "north-starling",
+      question: "Should replication grants precede novel research grants?",
+      published_at: "2026-08-30T10:00:00.000Z",
+      verdict: null,
+      confidence_band: null
+    }
+  ] satisfies PublicDebateSummary[];
+
+  const disclosure =
+    "Published debates may be indexed by search engines. Copies may persist after unpublishing.";
+
+  beforeEach(() => {
+    routeMocks.sessionCookie = "t3-c2-session";
+    routeMocks.listDebatesPageServer.mockReset().mockResolvedValue({
+      summaries: yourDebates,
+      shown: yourDebates.length,
+      total: 41
+    });
+    routeMocks.readPublicDebates.mockReset().mockResolvedValue({
+      items: publicDebates,
+      total: 37
+    });
+  });
+
+  function expectLiveCount(document: Document, exact: string): void {
+    const navigation = document.querySelector('.sectionHead[aria-label="Debate library"]');
+    const count = navigation?.querySelector<HTMLElement>(".count");
+    const rows = document.querySelectorAll("[data-library-row]");
+
+    expect(count?.textContent?.trim()).toBe(exact);
+    expect(Number.parseInt(count?.textContent ?? "", 10)).toBe(rows.length);
+  }
+
+  it("renders recased native selectors and a live count for the four Your debates rows", async () => {
+    // PROPERTY (T3-C2-1/T3-C2-4): the Your debates selector uses the
+    // approved casing and its chip is the number of rows actually rendered.
+    const rendered = await renderRoute("t3-c2-session", "yours");
+    const labels = [...rendered.querySelectorAll('.sectionHead[aria-label="Debate library"] a')]
+      .map((link) => link.textContent?.trim());
+
+    expect(labels).toEqual(["Your debates", "Public debates"]);
+    expectLiveCount(rendered, "4 TOTAL");
+  });
+
+  it("renders a live count for the three Public debates rows", async () => {
+    // PROPERTY (T3-C2-4): the Public debates chip follows the rendered public
+    // rows, even when the API's aggregate total is larger than this page.
+    const rendered = await renderRoute("t3-c2-session", "public");
+
+    expectLiveCount(rendered, "3 TOTAL");
+  });
+
+  it("keeps Your and Public membership distinct", async () => {
+    // PROPERTY (T3-C2-2): switching the routed selector changes the rendered
+    // membership instead of showing one hard-coded list under both labels.
+    const yours = await renderRoute("t3-c2-session", "yours");
+    const publicList = await renderRoute("t3-c2-session", "public");
+
+    expect(yours.body.textContent).toContain("Should cities price road congestion?");
+    expect(yours.body.textContent).not.toContain("Should public algorithms publish their evaluation sets?");
+    expect(publicList.body.textContent).toContain("Should public algorithms publish their evaluation sets?");
+    expect(publicList.body.textContent).not.toContain("Should cities price road congestion?");
+  });
+
+  it("renders every library row as a shell/core bezel", async () => {
+    // PROPERTY (T3-C2-3): every row in both routed lists has a shell wrapper
+    // and one direct core body, using the shared T1 bezel vocabulary.
+    for (const selected of ["yours", "public"] as const) {
+      const rendered = await renderRoute("t3-c2-session", selected);
+      const rows = [...rendered.querySelectorAll<HTMLElement>('[data-library-row][data-bezel="shell"]')];
+
+      expect(rows.length).toBe(selected === "yours" ? 4 : 3);
+      for (const row of rows) {
+        const core = row.querySelector<HTMLElement>(':scope > [data-bezel="core"]');
+
+        expect(row.style.background).toBe("var(--shell)");
+        expect(core).not.toBeNull();
+        expect(core?.style.background).toBe("var(--core)");
+        expect(core?.style.background).not.toBe(row.style.background);
+      }
+    }
+  });
+
+  it("renders the public search-indexing disclosure once under the list and never on Yours", async () => {
+    // PROPERTY (T3-C2-4): indexing persistence is a public-list disclosure,
+    // not per-row copy and not content shown on the private list.
+    const yours = await renderRoute("t3-c2-session", "yours");
+    const publicList = await renderRoute("t3-c2-session", "public");
+    const publicMatches = [...publicList.querySelectorAll("p")]
+      .filter((paragraph) => paragraph.textContent?.trim() === disclosure);
+    const yoursMatches = [...yours.querySelectorAll("p")]
+      .filter((paragraph) => paragraph.textContent?.trim() === disclosure);
+
+    expect(publicMatches.length).toBe(1);
+    expect(publicList.querySelector(".recentList")?.nextElementSibling === publicMatches[0]).toBe(true);
+    expect(yoursMatches.length).toBe(0);
+  });
+
+});

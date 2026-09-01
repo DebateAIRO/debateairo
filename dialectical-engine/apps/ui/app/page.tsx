@@ -26,7 +26,6 @@ export default async function HomePage({
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   let debates: DebateSummary[] = [];
-  let total: number | null = null;
   let error: string | null = null;
   let sessionConfirmed = false;
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
@@ -42,7 +41,6 @@ export default async function HomePage({
     try {
       const page = await listDebatesPageServer(token, undefined, userAgent);
       debates = page.summaries;
-      total = page.total;
       sessionConfirmed = true;
     } catch {
       error = "Your signed-in session could not be confirmed. Refresh once, or sign in again.";
@@ -95,26 +93,56 @@ export default async function HomePage({
             aria-current={tab === "yours" ? "page" : undefined}
             href="/?tab=yours"
             className={tab === "yours" ? "tab tabActive" : "tab"}
+            style={tab === "yours"
+              ? {
+                  background: "var(--ink)",
+                  borderColor: "var(--ink)",
+                  borderRadius: "var(--r-pill)",
+                  color: "var(--bg)",
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 700,
+                  padding: "6px 15px"
+                }
+              : {
+                  background: "transparent",
+                  borderColor: "var(--line-strong)",
+                  borderRadius: "var(--r-pill)",
+                  color: "var(--muted)",
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 600,
+                  padding: "6px 15px"
+                }}
           >
-            Your Debates
+            Your debates
           </Link>
           <Link
             aria-current={tab === "public" ? "page" : undefined}
             href="/?tab=public"
             className={tab === "public" ? "tab tabActive" : "tab"}
+            style={tab === "public"
+              ? {
+                  background: "var(--ink)",
+                  borderColor: "var(--ink)",
+                  borderRadius: "var(--r-pill)",
+                  color: "var(--bg)",
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 700,
+                  padding: "6px 15px"
+                }
+              : {
+                  background: "transparent",
+                  borderColor: "var(--line-strong)",
+                  borderRadius: "var(--r-pill)",
+                  color: "var(--muted)",
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 600,
+                  padding: "6px 15px"
+                }}
           >
-            Public Debates
+            Public debates
           </Link>
           <span className="count">
-            {tab === "yours"
-              ? (total === null
-                  ? `${debates.length} shown`
-                  : total > debates.length
-                    ? `${debates.length} shown of ${total} total`
-                    : `${total} total`)
-              : (published.total > published.items.length
-                  ? `${published.items.length} shown of ${published.total} total`
-                  : `${published.total} total`)}
+            {`${tab === "yours" ? debates.length : published.items.length} TOTAL`}
           </span>
         </div>
 
@@ -132,14 +160,28 @@ export default async function HomePage({
             <div className="recentList">
               {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
               {published.items.map((debate) => (
-                <article className="debateCard" key={debate.public_ref}>
-                  <div className="debateCardBody">
-                    <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
-                    <p>
+                <article
+                  className="debateCard"
+                  key={debate.public_ref}
+                  data-library-row
+                  data-bezel="shell"
+                  style={{ background: "var(--shell)", borderColor: "var(--line)", borderRadius: 13 }}
+                >
+                  <div className="debateCardBody" data-bezel="core" style={{ background: "var(--core)" }}>
+                    <Link
+                      className="debateCardClaim"
+                      href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}
+                    >
+                      {debate.question}
+                    </Link>
+                    <p className="debateCardMeta">
                       By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
                       {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
                     </p>
-                    <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
+                  </div>
+                  <div className={`pill ${debate.verdict === "SUPPORTED" ? "pillOk" : "pillGen"}`}>
+                    <span className="dot" />
+                    {debate.verdict ?? "Published"}
                   </div>
                   <Link
                     className="tab"
@@ -151,6 +193,12 @@ export default async function HomePage({
                 </article>
               ))}
             </div>
+            <p
+              className="libraryDisclosure"
+              style={{ color: "var(--muted)", fontSize: 10.5, fontStyle: "italic", marginTop: 12 }}
+            >
+              Published debates may be indexed by search engines. Copies may persist after unpublishing.
+            </p>
           </>
         ) : null}
       </div>
