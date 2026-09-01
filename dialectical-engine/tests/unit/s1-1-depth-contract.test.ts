@@ -10,6 +10,7 @@ import {
   type AskRequest
 } from "@debateai/contract";
 import { resolveExpansionDepth } from "@debateai/runner";
+import { auditArchitecture, auditSourceRules } from "../../tools/orphan-audit/src/index.js";
 import { createDebate } from "../../apps/ui/lib/api.js";
 import { createBrowserContractClient } from "../../web/lib/api.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
@@ -221,31 +222,46 @@ const SKIPPED_DIRECTORIES = new Set(["node_modules", "generated", ".next", "dist
 const SHIPPED_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs"];
 
 /**
- * The goal's negative invariant is literal: "No second literal 5". A duplicate
- * SOURCE is therefore any shipped line that re-fixes the CEILING itself, in any
- * of the three syntaxes the codebase actually uses to express a domain:
+ * BROAD BY CONSTRUCTION, with the one owner named.
  *
- *   VALIDATOR      a schema re-validating the bound   `depth: z.…min(1).max(5)`
- *   COMPARISON     a guard re-comparing against it    `depth <= 5`, `depth > 5`
- *   OPTION_DOMAIN  an enumeration of the whole range  `[1, 2, 3, 4, 5]`
+ * r2 enumerated spellings (`.max(5)`, `depth <= 5`, `[1,2,3,4,5]`) and codex
+ * refuted it: `.lte(5)`, a `superRefine` refinement and the reversed
+ * `5 >= depth` all reintroduced the bound while the oracle stayed green.
+ * Enumerating spellings is unwinnable — the author's imagination is the
+ * coverage limit. So this oracle inverts the burden:
  *
- * Two deliberate exclusions, each reasoned rather than convenient:
- *   · The OWNER's own declaration is not matched, because it names a constant
- *     (`EXPANSION_DEPTH_MAX = 5`) rather than restating the bound in a bound
- *     position. Assignment to a named export IS the single source; the scan is
- *     therefore run over packages/contract too, and passes on its merits.
- *   · A floor-only guard carrying no ceiling literal (`depth < 1`, as at
- *     web/app/new/NewQuestionForm.tsx:18) is NOT a second definition of the 1–5
- *     bound and contains no second literal 5. It is a separate completeness gap,
- *     reported as finding F-T1-4 and owned by T2, not silenced here.
+ *   DEPTH_BOUND_LITERAL  any line mentioning a depth that also carries the
+ *                        literal 5, or a 6 in an exclusive-bound position
+ *   DOMAIN_ENUMERATION   any line spelling the whole domain 1,2,3,4,5
+ *
+ * and then allows exactly ONE line in the whole tree: the owning declaration.
+ * A new spelling does not need a new detector; it needs a new exemption, which
+ * is a visible diff to this list.
+ *
+ * `6` counts only next to a comparison/`lt`/`gte` (an exclusive ceiling), never
+ * as a bare value — otherwise the observability logger's unrelated
+ * `maxDepth: 6` (apps/ui/lib/observability/logger.ts:77) is swept in. A
+ * floor-only guard carrying no ceiling literal (`depth < 1`, as at
+ * web/app/new/NewQuestionForm.tsx:18) still does not match: it is not a second
+ * definition of the 1–5 bound and holds no second literal 5. That remains
+ * finding F-T1-4, owned by T2 — argued, not silenced, and pinned by a negative
+ * control below.
  */
-type DuplicateKind = "VALIDATOR" | "COMPARISON" | "OPTION_DOMAIN";
+type DuplicateKind = "DEPTH_BOUND_LITERAL" | "DOMAIN_ENUMERATION";
 
-const CEILING_DETECTORS: ReadonlyArray<{ readonly kind: DuplicateKind; readonly pattern: RegExp }> = [
-  { kind: "VALIDATOR", pattern: /depth[^\n]{0,80}?\.max\(\s*5\s*\)/i },
-  { kind: "COMPARISON", pattern: /\bdepth\b[^\n]{0,40}?(?:<=?\s*[56]\b|>=?\s*[56]\b)/i },
-  { kind: "OPTION_DOMAIN", pattern: /\[\s*1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\s*\]/ }
-];
+const MENTIONS_A_DEPTH = /depth/i;
+const BARE_FIVE = /(?<![\w.$])5(?![\w.$])/;
+const SIX_AS_EXCLUSIVE_BOUND = /(?:[<>]=?\s*6(?![\w.$])|\.(?:lt|gte)\(\s*6\s*\))/;
+const WHOLE_DOMAIN = /\b1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\b/;
+
+/**
+ * The SINGLE owning declaration, allowed by exact text. Not a path exemption:
+ * a second numeric depth export in this very file is still a violation.
+ */
+const OWNING_DECLARATION = Object.freeze({
+  path: "packages/contract/src/index.ts",
+  text: "export const EXPANSION_DEPTH_MAX = 5;"
+});
 
 interface DuplicateSite {
   readonly kind: DuplicateKind;
@@ -255,9 +271,14 @@ interface DuplicateSite {
 
 /** The oracle, over text — so it can be controlled with planted sources. */
 function duplicateBoundSites(source: string): DuplicateSite[] {
-  return source.split("\n").flatMap((text, index) => CEILING_DETECTORS
-    .filter(({ pattern }) => pattern.test(text))
-    .map(({ kind }) => ({ kind, line: index + 1, text: text.trim() })));
+  return source.split("\n").flatMap((raw, index) => {
+    const text = raw.trim();
+    const kind: DuplicateKind | null =
+      MENTIONS_A_DEPTH.test(raw) && (BARE_FIVE.test(raw) || SIX_AS_EXCLUSIVE_BOUND.test(raw))
+        ? "DEPTH_BOUND_LITERAL"
+        : WHOLE_DOMAIN.test(raw) ? "DOMAIN_ENUMERATION" : null;
+    return kind === null ? [] : [{ kind, line: index + 1, text }];
+  });
 }
 
 function shippedSourceFiles(): string[] {
@@ -274,8 +295,8 @@ function shippedSourceFiles(): string[] {
   return found;
 }
 
-/** Every duplicate SITE in shipped code, addressed `path:line [KIND] text`. */
-function duplicateBoundSitesInShippedCode(): string[] {
+/** Every depth-bound SITE in shipped code, addressed `path:line [KIND] text`. */
+function depthBoundSitesInShippedCode(): string[] {
   return shippedSourceFiles().flatMap((absolute) => {
     const path = relative(REPOSITORY_ROOT, absolute).split(sep).join("/");
     return duplicateBoundSites(readFileSync(absolute, "utf8"))
@@ -283,28 +304,49 @@ function duplicateBoundSitesInShippedCode(): string[] {
   }).sort();
 }
 
+/** The same scan minus the one owning declaration — must be empty. */
+function duplicateBoundSitesInShippedCode(): string[] {
+  return depthBoundSitesInShippedCode().filter(
+    (site) => !site.startsWith(`${OWNING_DECLARATION.path}:`) || !site.endsWith(` ${OWNING_DECLARATION.text}`)
+  );
+}
+
 describe("S1-1 · the depth bound has a single source", () => {
-  // PROPERTY: no shipped file re-fixes the ceiling in ANY syntax. Site-addressed,
-  // not file-addressed, so a second duplicate inside an already-listed file
-  // cannot hide behind the first.
+  // PROPERTY: exactly ONE line in shipped code fixes the ruled ceiling, and it is
+  // the owning declaration. Site-addressed, so a second duplicate inside an
+  // already-listed file cannot hide behind the first.
   it("leaves no duplicate definition of the ruled ceiling anywhere in shipped code", () => {
     expect(duplicateBoundSitesInShippedCode()).toEqual([]);
   });
 
-  // POSITIVE CONTROLS — the oracle detects each syntax class it claims to cover.
-  // Without these, an oracle that silently matched nothing would also be "green".
+  it("keeps the owning declaration as the only depth-bound site in shipped code", () => {
+    expect(depthBoundSitesInShippedCode()).toEqual([
+      `${OWNING_DECLARATION.path}:112 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
+    ]);
+  });
+
+  // POSITIVE CONTROLS — adversarial by design. The first three are the exact
+  // spellings that defeated the r2 oracle (codex r2 B1); the rest cover the
+  // forms already seen in this repo. A control must discriminate the CLASS, not
+  // re-run the one spelling the author happened to write.
   it.each([
-    { kind: "VALIDATOR", planted: "  depth: z.number().int().min(1).max(5)," },
-    { kind: "COMPARISON", planted: "  const ready = depth >= 1 && depth <= 5;" },
-    { kind: "OPTION_DOMAIN", planted: "  {[1, 2, 3, 4, 5].map((value) => value)}" }
-  ])("detects a planted $kind duplicate", ({ kind, planted }) => {
-    expect(duplicateBoundSites(planted).map((site) => site.kind)).toContain(kind as DuplicateKind);
+    { spelling: "zod .lte alias", planted: "  depth: z.number().int().gte(1).lte(5)," },
+    { spelling: "refinement", planted: "  .superRefine((d, c) => { if (d.depth > 5) c.addIssue({}); })" },
+    { spelling: "reversed operands", planted: "  const ready = 1 <= depth && 5 >= depth;" },
+    { spelling: "zod .max", planted: "  depth: z.number().int().min(1).max(5)," },
+    { spelling: "plain comparison", planted: "  const ready = depth >= 1 && depth <= 5;" },
+    { spelling: "exclusive six", planted: "  if (!Number.isInteger(depth) || depth < 6) {" },
+    { spelling: "array option domain", planted: "  {[1, 2, 3, 4, 5].map((value) => value)}" },
+    { spelling: "set option domain", planted: "  const allowed = new Set([1, 2, 3, 4, 5]);" }
+  ])("detects a duplicate written as $spelling", ({ planted }) => {
+    expect(duplicateBoundSites(planted)).not.toEqual([]);
   });
 
   // NEGATIVE CONTROLS — unrelated depth concepts, and a floor-only guard, are
   // not flagged. Each line is real code from this repo.
   it.each([
     "  if (depth >= limits.maxDepth) {",                              // logger recursion depth
+    "      maxDepth: 6,",                                             // logger serialization depth
     "  const depthLimit = boundedDepth(options.causeDepthMax);",      // obs cause depth
     "    topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 },", // a different depth field
     "    if (!Number.isInteger(depth) || depth < 1) {"                // floor-only, no ceiling literal
@@ -318,5 +360,37 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(contractSource).toContain(`export const EXPANSION_DEPTH_MAX = ${EXPANSION_DEPTH_MAX}`);
     const runnerSource = readFileSync(join(REPOSITORY_ROOT, "apps/runner/src/index.ts"), "utf8");
     expect(runnerSource).toMatch(/import\s*\{[^}]*EXPANSION_DEPTH_MAX[^}]*\}\s*from\s*"@debateai\/contract"/);
+  });
+});
+
+/**
+ * J10 reconciliation. The goal ORDERS an exported contract depth constant; the
+ * architecture audit forbids exported numeric literals outside
+ * published-arithmetic, and J6's imports create two new workspace edges. Both
+ * are real law-vs-audit conflicts, and both are settled in the audit — narrowly.
+ */
+describe("S1-1 · the architecture audit recognizes the ruled exports and edges (J10)", () => {
+  // PROPERTY: after J10, this diff contributes NO architecture violation. The
+  // audit is the authority, so the audit is what is asserted.
+  it("reports no T1-owned architecture or source-rule violation", async () => {
+    const [architecture, sourceRules] = await Promise.all([auditArchitecture(), auditSourceRules()]);
+    expect(architecture.violations.filter((line) => line.includes("-> contract"))).toEqual([]);
+    expect(sourceRules.blocking.filter((line) => line.includes("packages/contract/"))).toEqual([]);
+  });
+
+  // PROPERTY: the reconciliation is NARROW. It names two exports in one file —
+  // never a package-wide exemption — so a third numeric export in that very file
+  // still trips the purity law (proved by mutant m8 in the refutation harness).
+  it("exempts exactly the two ruled depth exports, in exactly one file", () => {
+    const auditSource = readFileSync(join(REPOSITORY_ROOT, "tools/orphan-audit/src/index.ts"), "utf8");
+    const exemption = auditSource.slice(
+      auditSource.indexOf("GOAL_RULED_LAW_CARRIERS"),
+      auditSource.indexOf("GOAL_RULED_LAW_CARRIERS") + 400
+    );
+    expect(exemption).toContain("packages/contract/src/index.ts");
+    expect(exemption).toContain("EXPANSION_DEPTH_MIN");
+    expect(exemption).toContain("EXPANSION_DEPTH_MAX");
+    // Narrowness: no directory-prefix or package-wide form.
+    expect(exemption).not.toMatch(/startsWith\(\s*["']packages\/contract/);
   });
 });
