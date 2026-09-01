@@ -302,6 +302,62 @@ pins in the same cell.**
 Step 5's warning is written from the inside: this amendment ran the kit, deleted
 the tracked directory, and restored it.
 
+### AMENDED 2026-09-01 (AM16) — WHO executes each half. The law implied one seat; two seats are required.
+
+**Measured capability split, now standing law.** A codex worker seat **cannot** execute
+the browser half:
+
+- the sandbox denies `listen 127.0.0.1` — `EPERM`, observed **twice** in this mission
+  (`CODE-T1C2-REV-claude.md` §11.2, and again in the worker lane it replaced), and the
+  Playwright MCP blocks `file://`, so there is no path to a rendered page without a
+  loopback socket;
+- this repo has **no Playwright** in any manifest (`grep -rn 'playwright' package.json
+  apps/ui/package.json` → no matches, re-checked this session).
+
+A law that tells such a seat to "run the browser half" is an AF-1 acceptance — one a
+contract-obedient seat cannot satisfy — and this mission has paid for four of those. So
+the halves are split by seat, explicitly:
+
+| half | executed by | how |
+|---|---|---|
+| jsdom / structural | the **worker** (codex or otherwise) | ordinary committed pins in its own cluster verify command |
+| **DOM emission** | the **worker** | a throwaway `it("DUMP")` writes `container.innerHTML` to `.hermes/reports/ui-overhaul/dom-dumps/<cluster>-<surface>.html`, **committed with the cluster**, then the probe is removed and the test file restored by checksum |
+| **browser half** | the **Opus REVIEW seat** | serves the worker's emitted dump plus the real `apps/ui/app/globals.css` on loopback, opens it in Chromium via the Playwright MCP, reads both modes, and quotes the numbers into the review report |
+| **V-QA half** | **V** | on the running app, recorded on the ticket |
+
+**Consequences that must be stated or the split leaks:**
+
+1. **The worker's contract now includes emitting the dump**, and its cluster report must
+   name the dump path. A cluster that ships no dump has not completed its visual cells,
+   and the review seat is BLOCKED rather than obliged to hand-write the fixture — that
+   substitution is what produced the "measured a fixture I invented" failure this law
+   exists to end.
+2. **The dump is emitted from the REAL render**, never hand-written. Hand-writing it
+   reintroduces exactly the gap the fidelity law closes: a seat asserting against markup
+   it authored rather than markup the product produces.
+3. **The review seat may not edit the worker's files** to obtain a dump. If the dump is
+   missing or malformed it is a finding, not a repair.
+4. `.hermes/reports/ui-overhaul/dom-dumps/` is a **report** path, so it is inside every
+   seat's existing report allowance and adds no product write.
+
+### AMENDED 2026-09-01 (AM16) — THE WORKTREE PRECONDITION, both steps
+
+AM15 recorded `generate:contract`. Proven in three trees since, the precondition is **two
+steps, in order**, and a packet that names only the second is as broken as one that names
+neither:
+
+```sh
+pnpm install                    # the worktree has no node_modules of its own
+pnpm run generate:contract      # = tsx packages/contract/src/generate.ts
+```
+
+`packages/contract/package.json` declares one entry point,
+`"exports": "./generated/client.ts"`, and `.gitignore:7` ignores
+`packages/contract/generated/`. **`git worktree add` materialises tracked files only**, so
+the generated client cannot travel with a worktree and no amount of `pnpm install` will
+create it. Every packet dispatched into a slice worktree carries both lines ahead of its
+verify command.
+
 ### Inheritance — this is a pre-dispatch gate, not advice
 
 **T5, the T3 list surfaces, T4, T6, T7 and T8 do not dispatch until every
@@ -2030,6 +2086,300 @@ wave.
 **R-2** (the token-role oracle, row 10) and the **minted state-surface token** (AM13/N11)
 stay exactly where AM12b and AM13 put them. Nothing folds here.
 
+## AM16 charge 1 — N13: tier distinctness as a FULL PAIRWISE MATRIX (`t_41f2950f`)
+
+**The method error is the finding.** AM12b moved `contested` onto `--dispute-*` and
+validated it against **one** neighbour, `working`. Four tiers make **six pairs**. The
+candidate collided with a pair nobody looked at. So the remedy is not a better guess —
+it is that a distinctness claim over `n` tiers is a claim about `n(n-1)/2` pairs, in
+**both** modes, and anything less is an untested claim wearing a measurement's clothes.
+
+Values resolved from the shipped stylesheet by syntax (`:root` and
+`html[data-mode="chamber"]` located by regex, never by line number), tiers read from
+`apps/ui/lib/scrutiny.ts`:
+
+| tier | color | bg | text |
+|---|---|---|---|
+| `working` | `--reasoning-line` | `--reasoning-bg` | `--reasoning-text` |
+| `contested` | `--dispute` | `--dispute-bg` | `--dispute-text` |
+| `strengthened` | `--agree-border` | `--agree-bg` | `--agree-text` |
+| `refuted` | `--dispute-border` | `--dispute-bg` | `--dispute-text` |
+
+### The matrix — ΔE (CIE76, Lab) per channel, all six pairs, both modes
+
+```
+TERRACOTTA                       dE color   dE bg  dE text   verdict
+working / contested                  73.3     7.1     73.3   distinct
+working / strengthened               53.2     5.4     52.0   distinct
+working / refuted                    54.8     7.1     73.3   distinct
+contested / strengthened             70.3     7.8     74.2   distinct
+contested / refuted                  47.6     0.0      0.0   COLLISION
+strengthened / refuted               28.2     7.8     74.2   distinct
+
+CHAMBER                          dE color   dE bg  dE text   verdict
+working / contested                  30.1     6.3     30.1   distinct
+working / strengthened               48.0     8.3     41.4   distinct
+working / refuted                    43.4     6.3     30.1   distinct
+contested / strengthened             52.5    11.3     56.8   distinct
+contested / refuted                  31.4     0.0      0.0   COLLISION
+strengthened / refuted               31.5    11.3     56.8   distinct
+```
+
+**Exactly one collision, the same pair in both modes.** The reviewer's `47.6 / 31.4`
+reproduces on the `color` channel. **The other five pairs are clean** — so the sweep also
+does the job a matrix is for: it bounds the blast radius instead of leaving "what else?"
+open.
+
+**The distinctness rule this matrix applies, stated so it is reusable:** a chip's read is
+its **fill and its label**. `color` is a dot or a hairline border — a secondary mark. So
+a pair is DISTINCT iff `bg` **or** `text` differ by ΔE ≥ 2.3 (the JND); a pair that
+differs only on `color` is a COLLISION regardless of how large that ΔE is. `contested` and
+`refuted` differ on `color` by 47.6 and are otherwise **byte-identical**.
+
+### The candidate sweep — the charge's premise is FALSE, measured
+
+The charge says to "retoken whichever tier the matrix frees". I swept **every complete
+`-bg`/`-text`/`-border` family present in both modes** — eleven of them — as a candidate
+for each collided tier, requiring all six pairs to clear JND in both modes:
+
+```
+candidates for CONTESTED                    candidates for REFUTED
+  PASS  --pro-*      margin dE 17.1           PASS  --pro-*      margin dE 17.1
+  PASS  --con-*      margin dE 11.2           PASS  --con-*      margin dE 11.2
+  FAIL  --agree-*  --dispute-*  --gen-*  --gold-*  --ok-*  --reasoning-*
+        --score-impact-*  --score-strength-*  --score-uncertainty-*     (all 0.0)
+```
+
+**Two of eleven pass, and both are STANCE colours.** `--pro-*` is the pro-stance green and
+`--con-*` the con-stance terracotta; binding either to a scrutiny tier couples the
+scrutiny vocabulary to the stance vocabulary — the exact class of coupling AM12b's ruling
+and routed row R-3 exist to remove. **So the matrix frees nothing. There is no retoken.**
+
+### And the four-tier system has NO design source — measured
+
+```
+in ui_designs/DebateAI Design Document.html (the BINDING ORIGINAL):
+  "Investigating"   0
+  "Contested"       1     <- and NOT as a scrutiny chip: it is the verdict status in the
+                             synthesis rail, rendered in {{ tA.mute }}
+  "Strengthened"    0
+  "Refuted"         0
+```
+
+One of four labels appears, in a different component, in a different colour. **The
+four-tier scrutiny palette is entirely an app invention with no design authority to port.**
+That is why no family fits: the design provides three accent roles (pro / con / reasoning)
+plus gold-for-reasoning-and-verdict, and four tiers were laid over them.
+
+### RULING — differentiate by chip WEIGHT inside `--dispute-*`, mint nothing
+
+Minting a fifth accent would be ARCH inventing a hue for a palette V approved, in the
+same session whose law is *port, do not reinterpret*. The alternative the original does
+support is **fill weight**: solid `accent fill + page-colour label` appears **15 times** in
+the binding original (`--ink` ×12, `--gold` ×3). `refuted` is the terminal escalation of
+`contested`, so it takes the heavier chip:
+
+```
+refuted:  color: var(--dispute)   bg: var(--dispute)   text: var(--bg)
+          (contested is unchanged: the TINTED chip in the same family)
+```
+
+Measured, all six pairs, both modes:
+
+```
+TERRACOTTA  max(dE bg, dE text)          CHAMBER
+  working / contested          73.3        30.1
+  working / strengthened       52.0        41.4
+  working / refuted            74.2        75.9
+  contested / strengthened     74.2        56.8
+  contested / refuted          75.9  <---  69.7   <--- was 0.0
+  strengthened / refuted       74.8        70.0
+WCAG 1.4.3 on the refuted label:  #F9F6F1 on #B0432F = 5.28:1   PASS
+                                  #14110E on #D67F65 = 6.35:1   PASS
+```
+
+`contested / refuted` goes from **0.0 to the LARGEST separation of any pair**, every other
+pair is unchanged or better, both labels clear 4.5:1, and **zero tokens are minted**, so
+ADR-001's contrast table gains no rows.
+
+> **ROUTED ROW R-7 (new, AM16): `refuted` becomes the solid `--dispute` chip.**
+> `apps/ui/lib/scrutiny.ts` is **row 8's** file and rows 9/11/14 are live, so this is a
+> routed row and **not** an edit here. Owner: the same post-close T1-C2 addendum that
+> carries R-1. **Acceptance:** the six-pair matrix above is asserted as a test — not a
+> spot check of one pair — over the four tiers in both modes, so the next candidate
+> cannot repeat AM12b's one-neighbour error. **Fold R-1 and R-7 into one addendum**: both
+> edit the same `SCRUTINY_STATUS` object, and two rounds on one object is waste.
+>
+> **If V prefers a distinct hue** to a weight change, that is a palette decision and it is
+> V's, not ARCH's. This ruling is the cheapest design-consistent fix, not a claim that no
+> better one exists — the measured cost of the alternative is one new accent trio plus its
+> ADR-001 contrast rows in both modes.
+
+---
+
+## AM16 charge 2 — N7: R-2 is PULLED FORWARD as its own slice fleet (`t_50dd84fb`)
+
+**Ruled: (a) — pull it forward, as row 36, in its own worktree, dispatchable immediately.**
+
+The deciding argument is not cost, it is **direction**. R-2's oracle is a `role →
+token-family` map asserted against the rendered surface. If it is written *after* T5, T3,
+T4, T6, T7, T8 and T1-C3 land their re-skins, its map has to be authored against whatever
+those clusters shipped — and the one defect class it exists to catch is *a surface wearing
+the wrong role's colour*. An oracle derived from a surface that already has the defect
+**ratifies it**. Written before, the map is derived from the design and the SPEC, and every
+subsequent cluster is guarded at the moment it writes. The same forty lines are a detector
+in one order and a rubber stamp in the other, and that asymmetry does not appear anywhere
+in a cost comparison.
+
+Option (b)'s disclosure sentence was weighed and rejected on this mission's own evidence:
+a sentence tells a reviewer to look, and re-skin regressions are **measured undetectable by
+every mechanical gate** — reverting a single retoken leaves the scoped oracle at 0, the
+cluster green and the full render suite green, observed twice. Three reviewers' worth of
+evidence in this mission says eyes catch role errors *after* merge (T1-C1 M10; T1-C2
+ME/MF/MH — four green mutants). Mandating a sentence to guard a class that has beaten
+every gate and every reviewer is a control that has already failed.
+
+**Why it is cheap now and was not before.** Under V's vertical-slice law it takes its own
+worktree, so the single-writer rule no longer bites, and — decisively — **it writes exactly
+one NEW file and modifies none.** It cannot collide with the three live fleets by
+construction.
+
+| # | Cluster | Tree | Writes | Verify |
+|---|---|---|---|---|
+| 36 | **R2-C1** — the role→token oracle, pulled forward from row 10 | new worktree `slice/r2` at `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/slice-r2/dialectical-engine` | `tests/architecture/role-token-map.test.ts` (**new file, nothing else**) | `pnpm exec vitest run tests/architecture/role-token-map.test.ts tests/render/t1-canvas.test.tsx tests/unit/v2ui-pages.test.ts` |
+
+**Preconditions in its packet:** `pnpm install` then `pnpm run generate:contract`, per the
+amended law above.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **R2-C1-1** | ADR-001 · role integrity | The role→token-family map is **derived from the design, not from the DOM** | The map is authored from the binding original's `accentsFor(dk) = { pro: t.pro, con: t.con, reasoning: dk ? '#C8A055' : '#3D5A80' }` and its closing rule *"gold is reserved for reasoning & verdict"* — **quoted in a comment at the head of the test with its source line**. A map derived by reading the current rendered output is the ratifier failure this row exists to prevent, and a reviewer checks provenance by that comment |
+| **R2-C1-2** | ADR-001 · role integrity | Repainting a role is RED **regardless of which file did it** | Assert, over the real rendered canvas: every element carrying `data-stance="pro"` resolves its stance colour to the `--pro-*` family, `con` to `--con-*`, `reasoning` to `--reasoning-*`; every review mark resolves to `--agree-*` or `--dispute-*`; and `--gold*` appears **only** on reasoning and verdict surfaces. **RED-proof required, and the four historical mutants are the required cases:** T1-C1's **M10** and T1-C2's **ME / MF / MH** — all four shipped green — must each go RED under this cell. A row that cannot re-catch the four mutants that motivated it is not the row that was ruled |
+| **R2-C1-3** | AM12b item 5 | The DebateMap con-arc distinction is one row of the map, not its own pin | Assert that con arcs and pro arcs in `DebateMap.tsx` resolve to different families; folds item 5's residual in, as AM12b ruled |
+| **R2-C1-4** | ADR-001 · scope | The oracle guards ROLE, not value | It must pass unchanged when a token's *value* changes and fail when a surface's *family* changes. **RED-proof:** edit `--pro` to a different hex and show the row stays GREEN; rebind one pro surface to `--con-line` and show it goes RED. Without both proofs this row is indistinguishable from the contrast oracle it is meant to complement |
+
+**What this does NOT do, said so the row is not oversold.** It cannot see a role that is
+wrong in the SPEC, and it cannot see a surface that carries no role marker at all — an
+element with no `data-stance` is invisible to it. The second is a real hole and it is the
+reason `R2-C1-2` asserts over `data-stance` **coverage** as well as colour: a re-skin that
+drops the attribute would otherwise silently shrink the oracle's domain.
+
+**Row 10 (T1-C4) keeps its migration charge and LOSES R-2**, which is now row 36. That is
+a Writes-column move and it is carried in the AM16 invariant below.
+
+## AM16 charge 3 — next-wave fidelity cells: T4, T6, T7, T8
+
+**All existing cells stay, every one.** `T4-C1-1..3`, `T4-C2-1..3`, `T4-C3-1..2`,
+`T4-C4-1..2` · `T6-C1-1..3`, `T6-C2-1..2`, `T6-C3-1..3`, `T6-C4-1..2` ·
+`T7-C1-1..2`, `T7-C2-1..2`, `T7-C3-1..2`, `T7-C4-1..2` · `T8-C1-1..3`, `T8-C2-1..3`,
+`T8-C3-1..2`, `T8-C4-1..3`. They are content, behaviour and migration cells. The law adds
+halves; it rewrites nothing.
+
+**Every browser half below is executed by the Opus REVIEW seat** against the worker's
+emitted DOM dump, per the capability split amended into the fidelity law above. Each cell
+names its dump path. **Every packet carries `pnpm install` then `pnpm run
+generate:contract`.**
+
+### The APP-SCREEN GRAMMAR — measured once, inherited by all four clusters
+
+The binding original's four app screens (`3a Library`, `4a New debate`, `5a Node detail
+drawer`, `6a Settings`) are **the same page**, instantiated differently. Publishing the
+grammar once means four clusters assert one vocabulary instead of inventing four, and it
+is the fix-the-class rule applied to cells.
+
+| element | binding original (verbatim inline style) | ships as |
+|---|---|---|
+| **app header** | `display:flex; align-items:center; gap:14px; height:58px; padding:0 20px; border-bottom:1px solid {{ tA.hair }}; background:{{ tA.headerBg }}` | `var(--line)`, `var(--header-bg)`; geometry literal |
+| brand mark | `display:grid; place-items:center; width:26px; height:26px; border:1px solid {{ tA.hairStrong }}; border-radius:7px` containing `width:9px; height:9px; transform:rotate(45deg); background:{{ tA.gold }}` | `var(--line-strong)`, `var(--gold)` |
+| brand text | `font-size:12.5px; font-weight:700` (`Dialectical Engine`) over `font-size:9.5px; color:{{ tA.mute }}; letter-spacing:.08em` (`dezbatere.ro`), `line-height:1.15` | `var(--muted)` |
+| page-name divider | `width:1px; height:22px; background:{{ tA.hair }}` then `font-size:12px; font-weight:600; color:{{ tA.mute }}` | `var(--line)`, `var(--muted)` |
+| asker chip | `display:flex; align-items:center; gap:8px; padding:4px 13px 4px 5px; border-radius:999px; border:1px solid {{ goldBorder }}; background:{{ goldBg }}` + a `22px` `border-radius:50%` initial in `background:{{ tA.gold }}; color:{{ tA.page }}; font-size:10.5px; font-weight:800` | `var(--r-pill)`, `var(--gold-border)`, `var(--gold-bg)`, `var(--gold)`, `var(--bg)` |
+| mode button | `display:grid; place-items:center; width:30px; height:30px; border-radius:999px; border:1px solid {{ tA.hairStrong }}; background:{{ tA.shell }}; color:{{ tA.ink }}; font-size:12px` | `var(--r-pill)`, `var(--line-strong)`, `var(--shell)`, `var(--ink)` |
+| **body frame** | `padding:44px 56px 48px` with an inner `max-width:<n>px; margin:0 auto` — `660px` on 4a, `720px` on 6a, `820px` on 3a | literal per screen |
+| **eyebrow** | `font-family:ui-monospace,Menlo,monospace; font-size:9.5px; font-weight:700; letter-spacing:.22em; color:{{ tA.gold }}` | `var(--font-mono)`, **`var(--gold-text)`** — gold's third reserved use |
+| **h1** | `margin:12px 0 0; font-family:Fraunces,serif; font-weight:500; font-size:30px; letter-spacing:-.025em` (`36px` on 3a) | `var(--font-display)` |
+| **lede** | `margin:10px 0 0; font-size:12.5px; line-height:1.6; color:{{ tA.hint }}; max-width:560px; text-wrap:pretty` | `var(--text-2)` |
+| **THE DOUBLE BEZEL** | outer `background:{{ tA.shell }}; border:1px solid {{ tA.hairStrong }}; border-radius:16px; padding:7px; box-shadow:{{ tA.shadow }}` (or `shadowBig`) wrapping inner `background:{{ tA.core }}; border:1px solid {{ tA.hair }}; border-radius:10px` | `var(--shell)` / `var(--line-strong)` / `var(--shadow-card)` (or `--shadow-pop`) over `var(--core)` / `var(--line)` |
+| **key/value table** | rows `display:flex; align-items:baseline; gap:12px; padding:11px 0; border-bottom:1px solid {{ tA.hair }}`; key `flex:0 0 150px; font-family:ui-monospace; font-size:9px; font-weight:700; letter-spacing:.1em; color:{{ tA.mute }}`; value `font-size:12px; font-weight:600` | `var(--line)`, `var(--font-mono)`, `var(--muted)`, `var(--text)`. **`flex:0 0 150px` is the grammar** — the keys form a column, they do not wrap around their values |
+| **segmented control** | track `display:flex; gap:2px; padding:3px; border-radius:999px; border:1px solid {{ tA.hairStrong }}; background:{{ tA.shell }}`; item `padding:4px 12px; border-radius:999px; font-size:10.5px`, **active** `font-weight:700; background:{{ tA.ink }}; color:{{ tA.page }}`, **inactive** `font-weight:600; background:transparent; color:{{ tA.mute }}` | `var(--r-pill)`, `var(--line-strong)`, `var(--shell)`, `var(--ink)`, `var(--bg)`, `var(--muted)` |
+| **auth frame** (7a-c, 8a-c) | `width:540px; border-radius:18px; overflow:hidden; border:1px solid rgba(26,22,19,.14); box-shadow:0 48px 90px -44px rgba(26,22,19,.5)` over inner `padding:52px 56px 56px; background-image:radial-gradient({{ tA.gridDot }} 1px, transparent 1.4px); background-size:22px 22px` | frame border/shadow are mode-invariant literals in the original — declared; **the dot grid is `var(--line-2)`** and is the auth screens' signature |
+
+**Shipped baseline for the grammar, measured:** `apps/ui/app/new/page.tsx`,
+`apps/ui/app/settings/page.tsx` — `eyebrow` 0, bezel markers 0, segmented markers 0,
+key/value markers 0. `AuthShell.tsx` has 3 `eyebrow` hits, `SignUpFlow.tsx` 1. **The
+grammar is essentially unbuilt on all four surfaces**, which is why these are cells and
+not audits.
+
+### T4 (rows 17-20) — new debate
+
+Dump path: `.hermes/reports/ui-overhaul/dom-dumps/T4-C1-new-debate.html`
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T4-C1-4** (new, jsdom) | T4 · fidelity | The composer is a **double bezel**, and the tier controls are **segmented tracks**, not loose buttons | In `tests/render/t4-new-debate.test.tsx`, new describe `T4-C1 fidelity`: assert the claim composer renders an outer element with the bezel class **containing** an inner one (two nested elements, not one), and that each of `Risk tier` and `Composition budget` renders a track element containing **exactly** 3 items with **exactly one** carrying the active marker. Assert the eyebrow `NEW QUESTION` and the `h1` `What should we debate?` are present. **RED-proof:** flatten the bezel to one element; mark two items active |
+| **T4-C1-5** (new, browser — REVIEW seat) | T4 · fidelity | The bezel and the segmented control resolve, both modes | Against the dump: (1) outer bezel `backgroundColor` = `--shell`, inner = `--core`, and **the two differ**; (2) outer `borderRadius` `16px`, inner `10px`; (3) outer `boxShadow` ≠ `none`; (4) the active segment's `backgroundColor` = `--ink` and its `color` = `--bg`; an inactive segment's `backgroundColor` is `rgba(0, 0, 0, 0)`; (5) the eyebrow's `color` = `--gold-text`; (6) all hold in `chamber` |
+| **T4-C1-6** (new, V-QA) | T4 · fidelity | V's judgement | Does `/new` read as one framed question card over a settings ledger, with the tier choices as pill tracks rather than a row of buttons, in both modes? |
+
+### T6 (rows 21-24) — settings
+
+Dump path: `.hermes/reports/ui-overhaul/dom-dumps/T6-C1-settings.html`
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T6-C1-4** (new, jsdom) | T6 · fidelity | Identity renders as the grammar's **key/value table** inside a bezel | In `tests/render/t6-settings.test.tsx`, new describe `T6-C1 fidelity`: assert the identity block is a bezel pair containing exactly three rows, taken **positionally**, keyed `ASKER · SCOPE · IDENTITY MODEL` in that order, each with a non-empty value element. Assert the eyebrow `IDENTITY` and `h1` `Your asker scope`. **RED-proof:** reorder two rows; render a key with no value element |
+| **T6-C1-5** (new, browser — REVIEW seat) | T6 · fidelity | The key column is a **column**, both modes | Against the dump: (1) the three key elements share the same `left` **and** the same `width` (the `flex:0 0 150px` grammar — a wrapped key column is the failure); (2) each key's `color` = `--muted` and its `fontFamily` resolves to the mono stack; (3) values are **not** `--muted` — they resolve to `--text`; (4) the bezel pair's two `backgroundColor`s differ (`--shell` / `--core`); (5) all hold in `chamber` |
+| **T6-C1-6** (new, V-QA) | T6 · fidelity | V's judgement | Does `/settings` open with a gold `IDENTITY` eyebrow over a framed table whose labels line up in one column, and session rows beneath it, in both modes? |
+| **T6-C2-3** (new, jsdom + browser) | T6 · fidelity | Session rows carry a **state dot**, and the dangerous one is not the same colour as the safe one | jsdom: each session row renders a dot element with a state marker. Browser (REVIEW seat, dump `T6-C2-sessions.html`): the current-session dot, the idle dot and the unrecognized-session dot resolve to **three different** colours, matching the original's `okC` / `mute` / `badC` = `--agree` / `--muted` / `--dispute`; holds in both modes |
+
+### T7 (rows 25-28) — auth screens
+
+Dump path: `.hermes/reports/ui-overhaul/dom-dumps/T7-C1-signin.html`
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T7-C1-3** (new, jsdom) | T7 · fidelity | The auth shell is the **dot-grid frame**, and it is shared | In `tests/render/t7-signin.test.tsx`, new describe `T7-C1 fidelity`: assert the sign-in screen renders the `AuthShell` frame element carrying the dot-grid marker, containing the brand row (a `26px` box with a rotated gold diamond) and the `Dialectical Engine` string. Assert the same frame element is what `SignUpFlow` renders — **one shell, asserted from both entry points**, so the shared-shell claim is mechanical rather than assumed |
+| **T7-C1-4** (new, browser — REVIEW seat) | T7 · fidelity | The dot grid, the frame and the mode flip resolve | Against the dump: (1) the inner surface's `backgroundImage` contains `radial-gradient` and its `backgroundSize` is `22px 22px`; (2) the dot colour resolves to `--line-2`; (3) the frame's `borderRadius` is `18px` and its `boxShadow` ≠ `none`; (4) the brand diamond's computed `transform` is a 45° rotation matrix and its `backgroundColor` = `--gold`; (5) all hold in `chamber` — **the dot grid must remain visible in Chamber**, which is the one thing a light-mode-only port breaks |
+| **T7-C1-5** (new, V-QA) | T7 · fidelity | V's judgement | Does signing in present a single narrow card on a dotted field, with the gold diamond mark, that looks like the same product as the debate canvas — in both modes? |
+
+### T8 (rows 29-32) — sign-up, MFA, recovery
+
+Dump paths: `.hermes/reports/ui-overhaul/dom-dumps/T8-C1-signup.html`,
+`T8-C2-mfa.html`, `T8-C3-recovery.html`
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T8-C1-4** (new, jsdom + browser) | T8 · fidelity | Password rules render **per-rule state**, not one blob | jsdom: assert one element per rule, each carrying a pass/fail marker, with the original's four rules present. Browser (REVIEW seat): a passing rule's mark resolves to `--agree` and a failing one to `--dispute` — **two different colours in both modes**. The original's `mkRule` gives `✓`/`✗` with `okC`/`badC`; a single-colour checklist is RED |
+| **T8-C2-4** (new, jsdom + browser) | T8 · fidelity | The MFA digit field is a **row of equal cells** | jsdom: exactly six digit cells. Browser: the six cells share one `top` and one `width`, and adjacent `left` values are evenly spaced to within 1px — a wrapped or ragged code field is the failure this catches and no string assertion can |
+| **T8-C3-3** (new, jsdom + browser) | T8 · fidelity | The recovery code is the **dashed gold box**, distinct from ordinary body text | jsdom: the code renders in a dedicated element carrying the recovery marker. Browser: its `borderStyle` is `dashed`, `borderColor` resolves to `--gold-border`, `backgroundColor` to `--gold-bg`, `fontFamily` to the mono stack, and `textAlign` is `center`. The original: `padding:13px; border-radius:10px; border:1px dashed {{ goldBorder }}; background:{{ goldBg }}; font-family:ui-monospace; font-size:15px; font-weight:700; letter-spacing:.12em; text-align:center` |
+| **T8-C4-4** (new, V-QA) | T8 · fidelity | V's judgement, for the whole auth family | Do sign-up, MFA enrolment and the recovery-code screen read as three steps of one flow — same frame, same dotted field, same gold marks — rather than three pages, in both modes? |
+
+### AM16 invariant
+
+**One Writes-column move: R-2 leaves row 10 and becomes row 36.**
+
+| row | before | after |
+|---|---|---|
+| 10 `T1-C4` | migration charge **+ R-2 role oracle** | migration charge only |
+| **36 `R2-C1`** | — | `tests/architecture/role-token-map.test.ts` (new file), worktree `slice/r2` |
+
+Row 36 **modifies no existing file**, so it cannot collide with rows 9/11/14 running live,
+and the survivability law is satisfied trivially: no cluster at any position writes a
+product file that its new test reads *and* that row 36 also writes.
+
+**Every other new cell writes only a new describe in a test file its cluster already
+owns** — `t4-new-debate.test.tsx` (rows 17-20), `t6-settings.test.tsx` (rows 21-24),
+`t7-signin.test.tsx` (rows 25-28), `t8-signup.test.tsx` (rows 29-32). No verify command
+moves. Guard rail 3 holds; guard rail 2 holds (each cell adds a describe, deletes no case).
+
+**The DOM-dump paths are report paths**, inside every seat's existing report allowance, so
+they add no product or test write to any Writes column.
+
+**NOT VERIFIED HERE, and the reason is the freeze:** rows 17-32 have no worktrees yet, so
+their verify commands were **not** run for this amendment. AM15's law requires
+satisfiability to be measured *in the tree the cluster will use*, and those trees do not
+exist. **The measurement is owed at worktree-creation time, before dispatch, and this
+sentence is the record of the debt** — not an assumption that they are green.
+
 ## Ordering rationale in one line each
 
 1. **T9-C3 first** — nothing can be re-skinned against tokens that do not exist.
@@ -2946,4 +3296,95 @@ because three packets would otherwise each carry the same line. (b) I ran
 `pnpm run generate:contract` in both worktrees. It writes one gitignored generated file
 and is the standard install step, not a product, test or config write; without it the
 satisfiability claim could not be made at all. Declared rather than silent.
+
+### 2026-09-01 — AM16: a distinctness claim is a claim about every pair (anchor `t_3aa71df3`)
+
+Three coding fleets live in their own worktrees on rows 9, 11 and 14; those rows and every
+`T1-C3` / `T5-C1` / `T3-C2` cell were frozen for this amendment. Four charges, all
+delivered, and two of them found their own premise to be wrong.
+
+**N13 — the pairwise matrix, and why the charge's remedy does not exist.** AM12b moved
+`contested` onto `--dispute-*` after validating the candidate against **one** neighbour.
+Four tiers make six pairs; the candidate collided with a pair nobody looked at. Re-run as
+a full matrix in both modes, there is **exactly one collision and it is the same pair in
+both** — `contested / refuted`, byte-identical on `bg` and `text`, differing only on the
+secondary mark (ΔE 47.6 / 31.4, reproducing the reviewer's numbers). The other five pairs
+are clean, which is the second thing a matrix is for: it bounds the blast radius instead
+of leaving *what else?* open.
+
+The charge then said to "retoken whichever tier the matrix frees". **The matrix frees
+nothing.** Sweeping all **eleven** complete `-bg`/`-text`/`-border` families as candidates
+for each collided tier, only **two** clear JND on all six pairs in both modes — `--pro-*`
+and `--con-*` — and both are stance colours, so either would couple the scrutiny
+vocabulary to the stance vocabulary, the exact class routed row R-3 exists to remove.
+The root cause is upstream of the token surface: **the four-tier scrutiny palette has no
+design source at all.** In the binding original, `Investigating`, `Strengthened` and
+`Refuted` appear **zero** times, and `Contested` appears once — as the verdict status in
+the synthesis rail, rendered in `--muted`. Four tiers were laid over a palette that
+provides three accent roles plus gold-for-reasoning-and-verdict.
+
+**Ruled: differentiate by chip WEIGHT, mint nothing.** `refuted` becomes the solid
+`--dispute` chip (`bg: var(--dispute)`, `text: var(--bg)`); `contested` keeps the tinted
+one. Solid *accent fill + page-colour label* is an established idiom in the binding
+original — 15 occurrences — so this is an extension of the design's own vocabulary rather
+than an invention, and the escalation reads correctly: refuted is the terminal form of
+contested. Measured, the collided pair goes from **0.0 to 75.9 / 69.7 — the largest
+separation of any pair** — every other pair is unchanged or better, and both labels clear
+WCAG 1.4.3 (5.28:1 / 6.35:1). Zero tokens minted, so ADR-001 gains no contrast rows.
+Routed as **R-7**, folded into the same post-close T1-C2 addendum as R-1 because both edit
+`SCRUTINY_STATUS` and two rounds on one object is waste. **Its acceptance is the six-pair
+matrix as a test**, so the next candidate cannot repeat the one-neighbour error. A distinct
+hue instead of a weight change is a palette decision and it is V's.
+
+**N7 — R-2 is pulled forward, and the argument is direction, not cost.** R-2's oracle is a
+role→token-family map asserted against the rendered surface. Written *after* the seven
+clusters that land re-skins before row 10, its map must be authored against whatever those
+clusters shipped — and the one defect class it exists to catch is a surface wearing the
+wrong role's colour. **An oracle derived from a surface that already has the defect
+ratifies it.** The same forty lines are a detector in one order and a rubber stamp in the
+other, and that asymmetry appears in no cost comparison. Option (b)'s disclosure sentence
+was rejected on this mission's own evidence: re-skin regressions are measured undetectable
+by every mechanical gate (twice), and three reviewers' worth of evidence says eyes catch
+role errors after merge — four green mutants, M10 and ME/MF/MH. Mandating a sentence to
+guard a class that has beaten every gate *and* every reviewer is a control that has already
+failed. It becomes **row 36**, worktree `slice/r2`, writing exactly **one new file and
+modifying none**, so it cannot collide with the three live fleets by construction. Its
+`R2-C1-2` requires the four historical mutants to go RED — a row that cannot re-catch the
+mutants that motivated it is not the row that was ruled — and `R2-C1-4` requires the
+converse proof, that a token's *value* changing leaves it green, so it is distinguishable
+from the contrast oracle it complements.
+
+**The fidelity law gets the seat split it was missing.** As written it implied one seat
+does both halves. Measured: a codex worker **cannot** execute the browser half — the
+sandbox denies `listen 127.0.0.1` (EPERM, twice observed) and this repo has no Playwright
+in any manifest (re-checked). Telling such a seat to run it is an AF-1 acceptance, and this
+mission has paid for four. The law now splits by seat: the **worker** runs the jsdom half
+and **emits the real rendered DOM** to `.hermes/reports/ui-overhaul/dom-dumps/`; the
+**Opus review seat** serves that dump against the real `globals.css` and reads both modes;
+**V** answers the V-QA half. Three consequences are stated because the split leaks
+otherwise: the dump is part of the worker's contract, it must come from the real render and
+never be hand-written, and a missing dump **blocks** the reviewer rather than obliging it to
+hand-write the fixture — which is precisely the substitution the fidelity law exists to
+end.
+
+**The worktree precondition is two steps, not one.** AM15 recorded `generate:contract`;
+proven in three trees since, a fresh worktree needs `pnpm install` **and**
+`pnpm run generate:contract`, in that order. `git worktree add` materialises tracked files
+only and the generated client is gitignored, so no amount of `install` will produce it.
+
+**Next-wave cells, and the class fix inside them.** T4, T6, T7 and T8 each get their
+browser and V-QA halves — but the four screens in the binding original are **the same page
+instantiated differently**, so rather than four unrelated cell blocks the amendment
+publishes the **app-screen grammar** once (header, brand mark, asker chip, eyebrow, h1,
+lede, the double bezel, the key/value table with its `flex:0 0 150px` key column, the
+segmented control, the auth dot-grid frame) and each cluster asserts its own instantiation
+of it. Fix the class, not the instance, applied to cells. Shipped baseline measured: the
+grammar is essentially unbuilt on all four surfaces.
+
+**What I did NOT verify, stated rather than implied.** Rows 17-32 have no worktrees yet, so
+their verify commands were not run. AM15's own law requires satisfiability to be measured
+in the tree the cluster will use, and those trees do not exist — so **the measurement is
+owed at worktree-creation time and the debt is written into the invariant** rather than
+papered over with an assumption that they are green. This is the same discipline that
+caught two red worktrees last amendment; the honest form of it here is to name the debt.
 
