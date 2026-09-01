@@ -193,5 +193,58 @@ their debate, and `T9-C2-7`'s accept-case goes RED, which is the signal to
 revisit this line. That trade is taken deliberately: a visible break beats a
 silent superset.
 
+### The kind is a strict SUPERSET of the schema — named, and why that is the safe direction (AM11/N10)
+
+The kind above is a hex-and-hyphens grammar. `z.uuid()` additionally enforces
+RFC-4122/9562 version and variant nibbles. So the two do not coincide, and the
+relation was undocumented until now. Measured with the repo's own `zod` (4.4.3):
+
+```
+case                         value                                    AM9 kind regex   z.uuid()
+published T9-C2-7 fixture    3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012     ACCEPT           ACCEPT
+same, uppercase              3F2A1B4C-9D8E-4F70-B1C2-5A6D7E8F9012     ACCEPT           ACCEPT
+nil UUID                     00000000-0000-0000-0000-000000000000     ACCEPT           ACCEPT
+max UUID                     ffffffff-ffff-ffff-ffff-ffffffffffff     ACCEPT           ACCEPT
+v7                           018f3a2b-1c4d-7e8f-9a0b-1c2d3e4f5a6b     ACCEPT           ACCEPT
+bad version nibble (v0)      3f2a1b4c-9d8e-0f70-b1c2-5a6d7e8f9012     ACCEPT           reject
+bad version nibble (vF)      3f2a1b4c-9d8e-ff70-b1c2-5a6d7e8f9012     ACCEPT           reject
+bad variant nibble (c)       3f2a1b4c-9d8e-4f70-c1c2-5a6d7e8f9012     ACCEPT           reject
+
+kind accepts something z.uuid() rejects (strict superset)?  true
+z.uuid() accepts something the kind rejects?                false
+```
+
+**The second line is the one that matters.** The superset runs in the harmless
+direction: **every schema-valid ref passes the kind**, so the validator can never
+reject a real public debate. The reviewer's fuzz found the same thing from the
+other side — 2,266 contract-valid refs, 0 rejected.
+
+**Why this is fail-closed today.** Refs are not attacker-chosen; they are issued
+by the product and are schema-valid at issue time. A string that satisfies the
+kind but not `z.uuid()` therefore corresponds to no debate: the return path
+sends the reader to `/public/debate/<that ref>`, which does not resolve, so the
+outcome is a dead read on a same-origin route — not an escape, not a redirect
+off-origin, and not a leak. The narrow grammar's job is to keep the return path
+inside the public-debate route; the schema's job is to say which refs exist.
+
+**Tightening the regex to full RFC-4122 is NOT charged, deliberately.** Three
+reasons, in order:
+
+1. **It would buy nothing that fails closed today.** The only inputs it newly
+   rejects are refs that already resolve to nothing.
+2. **It would re-couple the ADR to a moving target.** `z.uuid()`'s own accept
+   set has changed across zod majors — 4.4.3 admits nil and max UUIDs, which
+   earlier RFC-4122-strict readings did not. A hand-written RFC-4122 regex here
+   would drift against the library silently, in the direction that **rejects
+   real refs**, which is the one direction that breaks users.
+3. **The divergence already has an alarm.** `T9-C2-7`'s schema-agreement row
+   (AM11/N9) asserts the accepted fixture against the contract's **own** field
+   schema, so a change to `public_ref` goes RED there rather than being absorbed
+   silently here.
+
+If the ref format ever stops being a UUID, the signal is `T9-C2-7` going RED —
+both its accept-case and its schema-agreement row — and that is the moment to
+revisit this grammar, not before.
+
 **Supersedes** `slices/T9/PLAN.md:116`, which quotes the old regex verbatim. PLAN
 stays frozen; the dispatch row carries the correction (AM7/AM8 practice).

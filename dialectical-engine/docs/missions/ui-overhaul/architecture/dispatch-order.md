@@ -720,8 +720,68 @@ Q-04 distinctness family.
 
 | Row | SPEC | WHAT | Acceptance |
 |---|---|---|---|
-| **T9-C2-6** (new) | R5 · ADR-004 §Decision | The login→sign-up leg forwards `next`, so R5's sign-up branch keeps its return path | In `tests/render/t9-landing.test.tsx` (T9-C2's block): render `LoginFlow` at `/login?next=%2Fnew` and assert the `Create one` link's `href` is `/sign-up?next=%2Fnew` — not the bare `/sign-up` shipped at `LoginFlow.tsx:115`. **And** pin the round trip end to end: from `/login?next=%2Fnew`, `Create one` → `Already have one? Log in` returns an href whose decoded `next` is still `/new`. A mutant that drops the parameter on either leg must be RED. Do **not** add a second validation site — the forwarding legs are transport, `safeReturnPath` is the gate (ADR-004 §Wiring, AM9 note) |
-| **T9-C2-7** (new) | R5 · ADR-004 §"The validator" | The public-debate kind admits only real refs | In `tests/unit/t9-return-path.test.ts` (T9-C2's file), extend the hostile-input table: `safeReturnPath('/public/debate/..')` and `safeReturnPath('/public/debate/.')` each return exactly `/#start-a-debate`; and an accept-case — `safeReturnPath('/public/debate/3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012')` returns that path unchanged. The accept-case is required: it is what will go RED if `public_ref` ever stops being a UUID, which is the signal ADR-004's changelog names |
+| **T9-C2-6** (new) | R5 · ADR-004 §Decision | The login→sign-up leg forwards `next`, so R5's sign-up branch keeps its return path | In `tests/render/t9-landing.test.tsx` (T9-C2's block): render `LoginFlow` at `/login?next=%2Fnew` and assert the `Create one` link's `href` is `/sign-up?next=%2Fnew` — not the bare `/sign-up` shipped at `LoginFlow.tsx:115`. **And** pin the round trip end to end: from `/login?next=%2Fnew`, `Create one` → `Already have one? Log in` returns an href whose decoded `next` is still `/new`. A mutant that drops the parameter on either leg must be RED. Do **not** add a second validation site — the forwarding legs are transport, `safeReturnPath` is the gate (ADR-004 §Wiring, AM9 note) **AND the absent complement (AM11/N8):** rendered with NO `next` in the URL, the `Create one` href is exactly `/sign-up` — no query string, not `/sign-up?next=`. Both halves are required; the present case alone is satisfied by a component that appends unconditionally |
+| **T9-C2-7** (new) | R5 · ADR-004 §"The validator" | The public-debate kind admits only real refs | In `tests/unit/t9-return-path.test.ts` (T9-C2's file), extend the hostile-input table: `safeReturnPath('/public/debate/..')` and `safeReturnPath('/public/debate/.')` each return exactly `/#start-a-debate`; and an accept-case — `safeReturnPath('/public/debate/3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012')` returns that path unchanged. The accept-case is required: it is what will go RED if `public_ref` ever stops being a UUID, which is the signal ADR-004's changelog names **AND a schema-agreement row (AM11/N9, DEPARTED from the reviewer's form — see below):** import the contract's own field schema and assert `PublicDebateSummarySchema.shape.public_ref.safeParse('<the same fixture>').success === true`. **Not** `z.uuid().safeParse(fixture)` — that form is constant under the drift it is meant to detect |
+
+#### AM11 — the two complements these cells were missing
+
+**N8 — the absent case had no pin, and a working model sat one file away.**
+`LoginFlow.tsx:31-35` sets `signUpHref` to `/sign-up` and appends `?next=` only
+when the parameter is present. AM9's `T9-C2-6` pinned the present case and the
+round trip; it did not pin the absent case. Enumerated over the whole test
+corpus rather than by mutating a shared tree with two lanes live:
+
+```
+$ grep -rn 'signUpHref|Create one|/sign-up' tests/
+tests/render/t9-landing.test.tsx:229   expect(createOne?.getAttribute("href")).toBe("/sign-up?next=%2Fnew")   <- the ONLY Create-one pin
+```
+
+Modelled against the reviewer's M17 (mutate `LoginFlow` to append
+unconditionally):
+
+```
+rendered at                shipped                    M17 (always append)
+/login?next=%2Fnew         /sign-up?next=%2Fnew       /sign-up?next=%2Fnew
+/login  (no next)          /sign-up                   /sign-up?next=
+
+shipped        T9-C2-6 present-case: GREEN  | absent-case complement: GREEN
+M17 mutant     T9-C2-6 present-case: GREEN  | absent-case complement: RED
+```
+
+**The sharper form of the finding, which the enumeration gives and the mutant
+does not:** `SignUpFlow`'s absent case **is** pinned —
+`auth-flow-integration.test.tsx:306` *"keeps the sign-up login link query-free
+when next is absent"*, asserting `/login`. The two legs of one round trip have
+different coverage, and the uncovered leg is the one **AM9 added**. There was a
+correct model of the pin in the repo, one file away, when I wrote the cell.
+
+**N9 — DEPARTED from the reviewer's remedy, on a measurement.** The remedy was
+three lines asserting `z.uuid().safeParse(<fixture>).success === true`. That
+assertion **cannot fail on the drift it exists to catch**: it exercises `zod`,
+not the contract. Run against a simulated drift of `public_ref` to a slug
+schema:
+
+```
+assertion form                                       contract = z.uuid() (today)  contract drifted to slug
+REVIEWER: z.uuid().safeParse(fixture).success        true                         true
+ADOPTED : <Schema>.shape.public_ref.safeParse(fx)    true                         false   <- RED, alarms
+```
+
+The **intent** is adopted in full — bind the alarm to the schema — and only the
+binding target changes, from `zod`'s `uuid` to the contract's own field.
+`PublicDebateSummarySchema` is exported (`packages/contract/src/index.ts:252`)
+and zod v4 object schemas expose `.shape`, so the field is reachable from a test;
+`tests/unit/pol01-policy.test.ts` already imports `@debateai/contract`, so the
+resolution path is proven in this suite.
+
+**N11 — retitle is the worker's; nothing in ARCH text names the row.** Grepped
+`dispatch-order.md` and every ADR for the `t9-return-path.test.ts` row named
+*"overlong public debate ref"* (`tests/unit/t9-return-path.test.ts:45`): **zero
+ARCH occurrences**, so there is nothing here to retitle. Since AM9's narrowing,
+that input is rejected on non-UUID **shape** before its length is ever reached,
+so the name describes a property the row no longer tests. **The in-file rename
+belongs to the addendum seat**, not to this amendment — recorded so the retitle
+is not read as ARCH-owned, and so nobody assumes ARCH text was updated.
 
 **Supersedes `slices/T9/PLAN.md:116`**, which quotes the old permissive regex
 `[A-Za-z0-9._~-]{1,128}` verbatim. PLAN stays frozen; the dispatch cell is
@@ -1226,3 +1286,54 @@ today; only the pin was weak.
 **Verification re-run on the published markdown:** AM5 verify-survivability
 invariant holds at **32 rows, 5 exemptions, 0 violations**. AM10 changed no
 Writes and no Verify column; re-run rather than assumed.
+
+### 2026-09-01 — AM11: two complements, one departure, and a retitle that is not mine (trigger: CODE-T9C2-REV2 re-verify, `t_1784225a`, ADDENDA SOUND)
+
+The re-verify confirmed AM9's narrowing by measurement — 17,553-input
+side-by-side fuzz, 0 new accepts; 2,266 contract-valid refs, 0 rejected. Four
+N-findings, all fail-closed or cosmetic.
+
+| Charge | Outcome |
+|---|---|
+| **N8** absent-`next` complement | **ADOPTED** into `T9-C2-6` |
+| **N9** schema-agreement alarm | **INTENT ADOPTED, FORM DEPARTED** — the proposed assertion is constant under the drift it targets |
+| **N10** superset paragraph | **ADOPTED** into `ADR-004`, with the tightening question answered rather than left open |
+| **N11** stale row name | **RECORDED, not retitled** — no ARCH text names the row; the rename is the worker's |
+
+**N8 — I departed from the reproduction method, and the substitute is stronger.**
+The charge said to reproduce M17 by mutating `LoginFlow.tsx`. I did not mutate
+it: two parallel lanes were live in this tree
+(`CODE-T9C4-N1` on `t9-landing.test.tsx`, `CODE-T9C5` on `pda-s03`), and putting
+a deliberate defect into a shared product file while other seats run their gates
+against it risks failing their rounds with my mutant. Instead I **enumerated the
+whole test corpus** for pins on the `Create one` href and modelled M17's logic
+against them. That is not a weaker substitute: enumeration proved a fact the
+mutant cannot — `SignUpFlow`'s absent case **is** pinned
+(`auth-flow-integration.test.tsx:306`), so the two legs of one round trip have
+different coverage and **the uncovered leg is the one AM9 added**. A correct
+model of the pin existed one file away when I wrote the cell.
+
+**N9 — the departure, on a measurement.** `z.uuid().safeParse(fixture)` exercises
+`zod`, not the contract; simulated against a drift of `public_ref` to a slug
+schema it stays `true` while a contract-bound assertion goes `false`. The alarm
+now binds to `PublicDebateSummarySchema.shape.public_ref`. Intent adopted whole,
+target corrected.
+
+**N11 — the boundary matters more than the rename.** Nothing in `dispatch-order`
+or any ADR names the *"overlong public debate ref"* row, so there was no ARCH
+text to change. Saying so is the point: a later reader must not assume ARCH
+prose was updated, and the addendum seat must not assume ARCH already handled
+the in-file rename.
+
+**The pattern in AM9→AM11, which is worth naming once.** AM9 wrote both these
+cells and both were half-pins: `T9-C2-6` pinned the present case and not its
+complement; `T9-C2-7` pinned the regex and not the schema it stands for. Neither
+is the AM10 permutation class and neither is the AM7 synthetic class — this one
+is **pinning the branch you were thinking about and not the branch beside it**.
+The check that would have caught both is the same: *for every conditional the
+cell describes, is there a row for the other side?*
+
+**Verification re-run on the published markdown:** AM5 verify-survivability
+invariant holds at **32 rows, 5 exemptions, 0 violations**. AM11 changed no
+Writes and no Verify column — both amended cells live inside row 4's existing
+write surface — and the check was re-run rather than assumed.
