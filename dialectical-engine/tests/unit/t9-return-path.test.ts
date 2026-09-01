@@ -17,6 +17,13 @@ describe("T9 return-path validation", () => {
   });
 
   it.each([
+    ["/new?x=1", "/new?x=1"],
+    ["/public/debate/abc-123?from=share", "/public/debate/abc-123?from=share"]
+  ])("preserves accepted return path %s unchanged", (raw, expected) => {
+    expect(safeReturnPath(raw)).toBe(expected);
+  });
+
+  it.each([
     ["scheme-relative authority", "//evil.example"],
     ["slash then backslash", "/\\evil"],
     ["leading backslash", "\\evil"],
