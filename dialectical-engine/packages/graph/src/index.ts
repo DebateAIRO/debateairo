@@ -410,21 +410,6 @@ export class GraphWriter {
     }
   }
 
-  /**
-   * T5 / S3-1 — the measured-update path, inside this writer's transaction.
-   * Delegates to the exported client-scoped form so the composition root can
-   * run it in the SAME transaction as the review that produced the bearings.
-   */
-  async recordEdgeMeasurements(input: {
-    readonly runId: string;
-    readonly measurements: readonly EdgeMeasurement[];
-  }): Promise<readonly string[]> {
-    if (input.runId !== this.runId) {
-      throw new TypedDomainError("GRAPH_RUN_MISMATCH", "Measurement belongs to another graph");
-    }
-    return recordEdgeMeasurementsOnClient(this.client, this.runId, input.measurements);
-  }
-
   async spawnPendingChild(input: SpawnPendingChildInput): Promise<SpawnedPendingChild> {
     if (input.runId !== this.runId) {
       throw new TypedDomainError("GRAPH_RUN_MISMATCH", "Spawn belongs to another graph");

@@ -5,6 +5,7 @@ import { migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository, Judge } from "@debateai/judgement";
 import { recordReviewWithMeasurements } from "@debateai/runner";
+import { measureEdgesAlone, recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
 import { LedgerRepository } from "@debateai/ledger";
 import { evaluate } from "@debateai/propagation";
 import type { ProviderGateway } from "@debateai/providers";
@@ -239,10 +240,7 @@ async function reviewAndMeasure(run: ConstructedRun): Promise<void> {
       bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
       edges: [{ edgeId: node.edgeId, targetStatement: "The proposal should stand.", polarity: "attack" }]
     });
-    await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
-      runId: run.runId,
-      measurements: reviewed.edgeMeasurements
-    }));
+    await measureEdgesAlone(database.pool, run.runId, reviewed.edgeMeasurements);
   }
 }
 
@@ -348,21 +346,17 @@ describe("DEMO (codex r2 B1) — the OLD two-transaction shape strands a half-wr
     const reviewerRef = await artifact(run.runId, "house-b");
 
     // Burn the edge's one lawful transition so the SECOND write will refuse.
-    await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
-      runId: run.runId, measurements: [{ edgeId: node.edgeId, bearing: 0.25 }]
-    }));
+    await measureEdgesAlone(database.pool, run.runId, [{ edgeId: node.edgeId, bearing: 0.25 }]);
 
     // THE OLD SHAPE, exactly as r2 shipped it: two awaited writes, two transactions.
-    await judgements.recordNodeReview({
+    await recordNodeReviewAlone(database.pool, {
       runId: run.runId, nodeId: node.nodeId,
       authorRawArtifactRef: node.authorRef!, reviewRawArtifactRef: reviewerRef,
       outcome: "agree", reasons: ["The bearing this review returned is about to be lost."]
     });
     let second: unknown = null;
     try {
-      await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
-        runId: run.runId, measurements: [{ edgeId: node.edgeId, bearing: 0.75 }]
-      }));
+      await measureEdgesAlone(database.pool, run.runId, [{ edgeId: node.edgeId, bearing: 0.75 }]);
     } catch (error) { second = error; }
 
     const reviews = await database.pool.query("SELECT 1 FROM ledger.node_review WHERE node_id=$1", [node.nodeId]);
@@ -380,7 +374,7 @@ describe("DEMO (codex r2 B1) — the OLD two-transaction shape strands a half-wr
     expect(edge.rows[0]!.magnitude_status).toBe("MEASURED");
     expect(Number(edge.rows[0]!.strength)).toBe(0.25);                  // the 0.75 bearing is GONE
     expect(unreviewed.some((c) => c.nodeId === node.nodeId)).toBe(false); // catch-up is blind
-    await expect(judgements.recordNodeReview({
+    await expect(recordNodeReviewAlone(database.pool, {
       runId: run.runId, nodeId: node.nodeId,
       authorRawArtifactRef: node.authorRef!, reviewRawArtifactRef: reviewerRef,
       outcome: "agree", reasons: ["A second review cannot exist."]
@@ -388,11 +382,16 @@ describe("DEMO (codex r2 B1) — the OLD two-transaction shape strands a half-wr
   });
 
   it("is why no production site may write a review on its own", async () => {
-    // The primitives above still exist as a repository API, but the runner —
-    // the only place that persists a review — must never compose them
-    // sequentially again. This is the regression pin for that.
+    // ADVISORY ONLY. This reads the runner source and is deliberately NOT the
+    // law: codex r3 showed a regex cannot be one — `recordNodeReview ({...})`
+    // with a space is valid syntax that `/\brecordNodeReview\(/` does not
+    // match, and a `.bind()` alias or computed access evades any token rule.
+    //
+    // THE LAW IS THE COMPILER: `tests/architecture/t05-half-write-seal.test.ts`
+    // type-checks the reviewer's own evasions and asserts they DO NOT COMPILE,
+    // because neither unsafe surface exists any more. This line survives only
+    // as a fast, human-readable signpost to that test.
     const runner = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
-    expect(runner).not.toMatch(/\brecordNodeReview\(/);
     expect(runner).toMatch(/recordReviewWithMeasurements\(/);
   });
 });
@@ -414,9 +413,7 @@ describe("T5 · a review and its bearings commit atomically or not at all", () =
     const graph = new GraphRepository(database.pool);
 
     // Burn the edge's one lawful transition, so the measurement below refuses.
-    await graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
-      runId: run.runId, measurements: [{ edgeId: node.edgeId, bearing: 0.25 }]
-    }));
+    await measureEdgesAlone(database.pool, run.runId, [{ edgeId: node.edgeId, bearing: 0.25 }]);
 
     await expect(recordReviewWithMeasurements(database.pool, {
       runId: run.runId,
@@ -501,12 +498,9 @@ describe("T5 · a review and its bearings commit atomically or not at all", () =
 describe("T5 · the measured-update path refuses loudly rather than losing a measurement", () => {
   it("refuses a second measurement instead of silently updating nothing", async () => {
     const run = await constructRun("t05-loud-refusal", { root: 0.5, attacker: 0.5, supporter: 0.5, unassessable: 0.5 });
-    const graph = new GraphRepository(database.pool);
-    const measure = (): Promise<readonly string[]> => graph.withGraphWrite(run.runId, (writer) =>
-      writer.recordEdgeMeasurements({
-        runId: run.runId,
-        measurements: [{ edgeId: run.reviewed[0]!.edgeId, bearing: 0.5 }]
-      }));
+    const measure = (): Promise<readonly string[]> => measureEdgesAlone(
+      database.pool, run.runId, [{ edgeId: run.reviewed[0]!.edgeId, bearing: 0.5 }]
+    );
 
     await expect(measure()).resolves.toEqual([run.reviewed[0]!.edgeId]);
     // A no-op UPDATE would leave the caller believing a magnitude landed.
@@ -517,11 +511,9 @@ describe("T5 · the measured-update path refuses loudly rather than losing a mea
 
   it("refuses a bearing outside the unit interval before it reaches the column check", async () => {
     const run = await constructRun("t05-bearing-range", { root: 0.5, attacker: 0.5, supporter: 0.5, unassessable: 0.5 });
-    const graph = new GraphRepository(database.pool);
-    await expect(graph.withGraphWrite(run.runId, (writer) => writer.recordEdgeMeasurements({
-      runId: run.runId,
-      measurements: [{ edgeId: run.reviewed[0]!.edgeId, bearing: 1.5 }]
-    }))).rejects.toThrowError(expect.objectContaining({ code: "EDGE_BEARING_OUT_OF_RANGE" }));
+    await expect(measureEdgesAlone(
+      database.pool, run.runId, [{ edgeId: run.reviewed[0]!.edgeId, bearing: 1.5 }]
+    )).rejects.toThrowError(expect.objectContaining({ code: "EDGE_BEARING_OUT_OF_RANGE" }));
   });
 });
 

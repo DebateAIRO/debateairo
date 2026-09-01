@@ -670,9 +670,17 @@ export class JudgementRepository {
   }
 
   /**
-   * T5 r3 — prepare, then insert, so the composition root can put the INSERT in
-   * the SAME transaction as the edge magnitudes the same review returned. The
-   * encryption still happens before the transaction opens, exactly as it did.
+   * T5 r4 — there is deliberately NO self-transacting review writer on this
+   * repository. A review that commits on its own is irreversible
+   * (`ledger.node_review` is append-only and node-unique) and removes the node
+   * from every future work set, so a later failure to write the bearings that
+   * same review returned strands them beyond any repair.
+   *
+   * Every caller therefore prepares here — encryption still happens before any
+   * transaction opens — and inserts through `insertPreparedNodeReview` on a
+   * transaction the CALLER owns, so the review and its magnitudes can be one
+   * commit. The composition root's `recordReviewWithMeasurements` is the only
+   * path that does this for a node's own edges.
    */
   async prepareNodeReview(input: RecordNodeReviewInput): Promise<PreparedNodeReview> {
     const nodeReviewId = randomUUID();
@@ -690,17 +698,6 @@ export class JudgementRepository {
       reasons: JSON.stringify(content === null ? input.reasons : [CONTENT_CIPHERTEXT_SENTINEL]),
       contentCiphertext: content === null ? null : JSON.stringify(content.envelope),
       contentAttestation: content?.attestation ?? null
-    });
-  }
-
-  async recordNodeReview(input: RecordNodeReviewInput): Promise<string> {
-    return withRunContentLease(this.pool, [input.runId], async () => {
-      const prepared = await this.prepareNodeReview(input);
-      try {
-        return await withWriteTransaction(this.pool, (client) => insertPreparedNodeReview(client, prepared));
-      } catch (error) {
-        throw translateNodeReviewFailure(error);
-      }
     });
   }
 

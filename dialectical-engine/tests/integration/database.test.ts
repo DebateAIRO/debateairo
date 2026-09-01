@@ -35,6 +35,7 @@ import {
 } from "@debateai/runner";
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
+import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
 import { ServeRepository, type ConditionMarkRecord } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -2004,7 +2005,7 @@ describe("apps/runner — legal command lifecycle", () => {
         `SELECT node_id, provenance_ref::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq LIMIT 1`,
         [runId]
       );
-      await expect(new JudgementRepository(database.pool).recordNodeReview({
+      await expect(recordNodeReviewAlone(database.pool, {
         runId,
         nodeId: firstNode.rows[0]!.node_id,
         authorRawArtifactRef: firstNode.rows[0]!.provenance_ref,
