@@ -863,6 +863,33 @@ describe("T7 / J15(d) — the stopping consumer is LIVE in the expansion loop", 
     expect(source).toMatch(/await runAdaptiveStoppingRound\(/);
     expect(source).toMatch(/globalRoundCompletions\.get\(legIndex\)/);
   });
+
+  /**
+   * codex B1, the seam itself. This assertion is STRUCTURAL and says so: the
+   * live boundary lives in a closure inside `executeWorkItem`, reachable only
+   * from the embedded-postgres harness, and there every maker root carries
+   * standing — so no behavioural fixture in this repo can tell a narrowed scope
+   * from a whole one. What CAN be pinned is that the call site hands the scope
+   * object's own two fields down untouched. Narrowing either of them is what
+   * codex B1 was, and it is caught here; the `expectedRootCount` gate then makes
+   * the narrowing harmless even if this pin is ever deleted.
+   */
+  it("hands the authoritative scope down UNNARROWED — neither field is filtered at the seam", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile(
+      new URL("../../apps/runner/src/index.ts", import.meta.url),
+      "utf8"
+    );
+
+    const callIndex = source.indexOf("const boundary = await runAdaptiveStoppingRound({");
+    expect(callIndex).toBeGreaterThan(-1);
+    const call = source.slice(callIndex, source.indexOf("}, {", callIndex));
+
+    expect(call).toContain("rootNodeIds: rootScope.rootNodeIds,");
+    expect(call).toContain("expectedRootCount: rootScope.expectedRootCount,");
+    // ...and the scope is built by the function that is blind to standing.
+    expect(source).toMatch(/const rootScope = selectAuthoritativeRootScope\(\{/);
+  });
 });
 
 
