@@ -131,6 +131,41 @@ describe("T3 / S2-2 — the judge panel member call", () => {
   });
 });
 
+/**
+ * J13(b) / B6 — the panel's disclosure marks are CANONICAL vocabulary members.
+ *
+ * A mark that lives only as a runner-local constant written into untyped ledger JSON is
+ * not a disclosure: `ConditionMarkSchema.parse` REJECTS it, so the projection that is
+ * supposed to surface it throws instead. Minted under T4's discipline — mid-list, so the
+ * DR-176 positional tail is preserved.
+ */
+describe("J13(b) — PANEL-PARTIAL and its sibling are minted in the canonical vocabulary", () => {
+  it("admits both panel disclosure marks through the kernel vocabulary and the contract schema", async () => {
+    const [kernel, contract, runner] = await Promise.all([
+      import("@debateai/kernel"),
+      import("@debateai/contract"),
+      import("@debateai/runner")
+    ]);
+
+    // The runner's constants ARE the canonical members — not lookalike strings.
+    expect(kernel.CONDITION_MARKS).toContain(runner.PANEL_PARTIAL_MARK);
+    expect(kernel.CONDITION_MARKS).toContain(runner.PANEL_DEGRADED_SINGLE_VOICE_MARK);
+    expect(contract.ConditionMarkSchema.parse("PANEL-PARTIAL")).toBe("PANEL-PARTIAL");
+    expect(contract.ConditionMarkSchema.parse("PANEL-DEGRADED-SINGLE-VOICE"))
+      .toBe("PANEL-DEGRADED-SINGLE-VOICE");
+  });
+
+  it("keeps the DR-176 positional tail intact — the new members are mid-list, never appended", async () => {
+    const kernel = await import("@debateai/kernel");
+    // Read positionally by `CONDITION_MARKS.slice(-4)` in the runner's required-record
+    // gate and its two test consumers. Appending a member here silently redefines the
+    // DR-176 hidden-material set.
+    expect(kernel.CONDITION_MARKS.slice(-4)).toEqual([
+      "HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
+    ]);
+  });
+});
+
 describe("T3 / S2-2 — author != judge, through the panel the runner calls", () => {
   const primary = {
     judgementRef: "artifact:author",

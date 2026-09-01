@@ -151,6 +151,17 @@ export interface RunnerPanelPolicy {
  */
 export const PANEL_PARTIAL_MARK = "PANEL-PARTIAL" as const;
 export const PANEL_DEGRADED_SINGLE_VOICE_MARK = "PANEL-DEGRADED-SINGLE-VOICE" as const;
+/** J13(b): both are canonical `CONDITION_MARKS` members, not runner-local strings. */
+export type PanelDegradationMark =
+  | typeof PANEL_PARTIAL_MARK
+  | typeof PANEL_DEGRADED_SINGLE_VOICE_MARK;
+
+/** One node's panel degradation, bound to the node id the graph minted. */
+interface PanelDegradationRecord {
+  readonly subjectRef: string;
+  readonly mark: PanelDegradationMark;
+  readonly reason: string;
+}
 
 export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
   authorMaker: string,
@@ -1479,6 +1490,10 @@ export class WalkingSkeletonRunner {
     const effectiveMakerCount = configuredMakers.length;
     const primaryMaker = configuredMakers[0]!;
     const panelPolicy = this.settings.panelPolicy;
+    // S2-2 / J13(b): one record per node whose panel degraded, bound to the node the
+    // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
+    // here because BOTH judgement producers (root and child) append to it.
+    const panelDegradations: PanelDegradationRecord[] = [];
 
     /**
      * S2-2 / T3 — the judge panel for ONE authored node.
@@ -1514,6 +1529,13 @@ export class WalkingSkeletonRunner {
       readonly dispersion: number | null;
       readonly panelContractHashes: readonly string[];
       readonly disagreement: Readonly<Record<string, unknown>>;
+      /**
+       * J13(b): the canonical degradation marks this node earned, returned TYPED so the
+       * caller can bind them to the node the graph mints. Reading them back out of the
+       * untyped receipt JSON would be the facsimile pattern this mint exists to end.
+       */
+      readonly marks: readonly PanelDegradationMark[];
+      readonly panelFailureReason: string | null;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
       const authorOnlySelection = (): {
@@ -1544,7 +1566,9 @@ export class WalkingSkeletonRunner {
           ...authorOnlySelection(),
           dispersion: null,
           panelContractHashes: Object.freeze([judgeContractHash]),
-          disagreement: createUnmeasuredDisagreement()
+          disagreement: createUnmeasuredDisagreement(),
+          marks: Object.freeze([]),
+          panelFailureReason: null
         });
       }
       if (panelPolicy === undefined) {
@@ -1650,9 +1674,14 @@ export class WalkingSkeletonRunner {
       // a non-author voice that actually parsed.
       const nonAuthorVoices = reducedMembers.length - 1;
       const memberFailures = panel.notes.filter((note) => note.kind === "MEMBER_FAILED");
-      const marks: string[] = [];
+      const marks: PanelDegradationMark[] = [];
       if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
       else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
+      // The reason names WHICH members fell over and how — a disclosure that says only
+      // "partial" tells a reader nothing they can act on.
+      const panelFailureReason = memberFailures.length === 0
+        ? null
+        : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -1673,6 +1702,8 @@ export class WalkingSkeletonRunner {
       });
 
       return Object.freeze({
+        marks: Object.freeze([...marks]),
+        panelFailureReason,
         selectedJudgementRef: selection.selectedJudgementRef,
         tau: selection.tau,
         selectionScore: selection.selectionScore,
@@ -1822,6 +1853,13 @@ export class WalkingSkeletonRunner {
       });
       return created;
     });
+    for (const mark of selection.marks) {
+      panelDegradations.push(Object.freeze({
+        subjectRef: nodeId,
+        mark,
+        reason: selection.panelFailureReason ?? "Every non-author panel member failed"
+      }));
+    }
     const reducedJudgementId = await this.#judgements.recordReduced({
       runId: run.runId,
       nodeId,
@@ -1993,6 +2031,13 @@ export class WalkingSkeletonRunner {
         });
         if (childJudged.wayOfKnowingDowngrade !== null) {
           wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
+        }
+        for (const mark of childSelection.marks) {
+          panelDegradations.push(Object.freeze({
+            subjectRef: childNodeId,
+            mark,
+            reason: childSelection.panelFailureReason ?? "Every non-author panel member failed"
+          }));
         }
         const childReducedJudgementId = await this.#judgements.recordReduced({
           runId: run.runId,
@@ -2379,7 +2424,10 @@ export class WalkingSkeletonRunner {
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
       ...(haltedExpansionRecords.length > 0 ? ["UNAUTHORED-BRANCH-HALTED" as const] : []),
       // S2-3 / J5: the honesty mark is only visible if it reaches the answer.
-      ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : [])
+      ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : []),
+      // S2-2 / J13(b): same rule for the panel degradations — a mark recorded only on
+      // the node's receipt is not disclosed to the reader of the answer.
+      ...new Set(panelDegradations.map((record) => record.mark))
     ]);
     const factBundle: FactBundle = buildFactBundle({
       facts: Object.freeze([servedRoot.statement]),
@@ -2506,6 +2554,26 @@ export class WalkingSkeletonRunner {
       // S2-3 / J5: one typed record per downgraded node, projected onto that
       // node through `affectedNodeIds` so the disclosure is visible where the
       // override happened — not only on the answer.
+      // S2-2 / J13(b): one typed record per degraded panel, projected onto the node
+      // whose panel degraded so the disclosure is visible where it happened.
+      ...panelDegradations.map((record): ConditionMarkRecord => Object.freeze({
+        mark: record.mark,
+        scope: "node" as const,
+        subjectRef: record.subjectRef,
+        reason: record.reason,
+        liftPath: record.mark === PANEL_DEGRADED_SINGLE_VOICE_MARK
+          ? "Re-ask when another healthy maker can assess this node"
+          : "Re-ask to collect the assessments the failed panel members owed",
+        servedRootRule: null,
+        affectedNodeIds: Object.freeze([record.subjectRef]),
+        callSiteKey: null,
+        plannedLegCount: null,
+        terminalTransportOutcome: null,
+        hiddenStrength: null,
+        hiddenScoreThreshold: null,
+        hiddenScoreThresholdSourceRef: null,
+        excludedFromServedNumber: null
+      })),
       ...wayOfKnowingDowngrades.map((record): ConditionMarkRecord => Object.freeze({
         mark: "WAY-OF-KNOWING-DOWNGRADED",
         scope: "node",

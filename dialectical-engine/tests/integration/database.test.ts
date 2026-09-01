@@ -2891,7 +2891,9 @@ describe("apps/runner — legal command lifecycle", () => {
         scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
       });
 
-      await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
 
       const receipt = await database.pool.query<{
         tau: string;
@@ -2946,6 +2948,22 @@ describe("apps/runner — legal command lifecycle", () => {
       // family was discounted; drop the multiplier and the selected tau becomes 0.9.
       expect(Number(row.tau)).toBeCloseTo(authorFidelity, 10);
       expect(row.dispersion).toBeCloseTo(repeatedFamilyFidelity - authorFidelity, 10);
+
+      // J13(b) / B6 — the disclosure must survive the CANONICAL machinery, not only the
+      // untyped receipt JSON above. This reads the served answer back through
+      // `ServeRepository.readAnswerProjection`, whose every mark goes through
+      // `ConditionMarkSchema.parse` — a mark absent from the kernel vocabulary is
+      // REJECTED there rather than disclosed, so this assertion is the production seam.
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:t3-repeated-family-and-partial");
+      expect(projection?.condition_marks).toEqual(expect.arrayContaining(["PANEL-PARTIAL"]));
+      // Node scope, bound to the node whose panel was partial — the disclosure is
+      // visible where the degradation happened, not only on the answer (T4 discipline).
+      const partialRecord = projection?.condition_mark_records
+        .find((record) => record.mark === "PANEL-PARTIAL");
+      expect(partialRecord).toMatchObject({ scope: "node" });
+      expect(partialRecord?.affected_node_ids ?? []).not.toHaveLength(0);
+      expect(partialRecord?.reason).toContain("Family maker C");
     } finally {
       await makerC.stop();
       await makerB.stop();

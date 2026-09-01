@@ -75,6 +75,14 @@ export const CONDITION_MARKS = [
   "DEGRADED-DIVERSITY",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
+  // S2-2 (goal-v4 T3) / confirm-item 5, ruling J13(b): the judge panel's two degradation
+  // disclosures. PANEL-PARTIAL — some non-author members failed, the node was reduced on
+  // the voices that parsed. PANEL-DEGRADED-SINGLE-VOICE — every non-author member failed,
+  // so the author's own voice is the only one left and the node's band steps down. Placed
+  // HERE, beside the other panel/lineage degradations and NOT appended: the DR-176 tail
+  // of this vocabulary is read positionally by `CONDITION_MARKS.slice(-4)`.
+  "PANEL-PARTIAL",
+  "PANEL-DEGRADED-SINGLE-VOICE",
   "AMBIGUOUS_ATTRIBUTION",
   "STALE",
   "UNDER-REVIEW",
