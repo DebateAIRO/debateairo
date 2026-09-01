@@ -2555,6 +2555,40 @@ describe("apps/runner — legal command lifecycle", () => {
       final_strength: null,
       condition_marks: expect.arrayContaining(["HIDDEN-UNJUDGEABLE"])
     });
+
+    // The XOR is enforced by the DATABASE, not only by the writer: exactly one
+    // reason is storable. A row naming BOTH would let a cannot-assess node be
+    // dressed as a transport death (the fabrication this design exists to make
+    // unspellable); a row naming NEITHER is the silent skip J14 repealed. Probed
+    // against the real constraint and rolled back, the way the class-D count
+    // constraint is probed above.
+    const answerId = scenario.answer?.answer_id;
+    const answerVersion = scenario.answer?.answer_version;
+    if (answerId === undefined || answerVersion === undefined) throw new Error("TEST_EXPECTED_ANSWER");
+    const ddlClient = await database.pool.connect();
+    const probe = (transport: string, review: string) => ddlClient.query(
+      `INSERT INTO serve.condition_mark (
+         answer_id, answer_version, mark, scope, subject_ref, reason,
+         call_site_key, terminal_transport_outcome, review_outcome,
+         excluded_from_served_number, at_seq
+       ) VALUES ($1,$3,'HIDDEN-UNJUDGEABLE','node',$2,'ddl-probe',
+         'JUDGE:review:test',${transport},${review},true,ledger.allocate_sequence())`,
+      [answerId, hiddenNodeId, answerVersion]
+    );
+    try {
+      await ddlClient.query("BEGIN");
+      await expect(probe("'FAILED'", "NULL")).resolves.toBeDefined();
+      await ddlClient.query("SAVEPOINT both_reasons");
+      await expect(probe("'FAILED'", "'cannot-assess'")).rejects.toThrow();
+      await ddlClient.query("ROLLBACK TO SAVEPOINT both_reasons");
+      await ddlClient.query("SAVEPOINT no_reason");
+      await expect(probe("NULL", "NULL")).rejects.toThrow();
+      await ddlClient.query("ROLLBACK TO SAVEPOINT no_reason");
+      await expect(probe("NULL", "'cannot-assess'")).resolves.toBeDefined();
+    } finally {
+      await ddlClient.query("ROLLBACK");
+      ddlClient.release();
+    }
   });
 
   /**
