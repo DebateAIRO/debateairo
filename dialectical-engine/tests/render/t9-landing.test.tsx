@@ -260,17 +260,34 @@ describe("T9-C4 landing content", () => {
     const method = document.querySelector('[data-landing-section="method"]');
     const steps = [...(method?.querySelectorAll("li") ?? [])];
     const expectedSteps = [
-      ["01", "Models argue"],
-      ["02", "They review each other"],
-      ["03", "You challenge"],
-      ["04", "Verdict with receipts"]
+      [
+        "01",
+        "Models argue",
+        "Five frontier models build the tree — pro, con, and the reasoning that binds them."
+      ],
+      [
+        "02",
+        "They review each other",
+        "Every claim is cross-reviewed by a rival model: agree or dispute, on the record."
+      ],
+      [
+        "03",
+        "You challenge",
+        "Flag any sentence; the graph spawns a focused rebuttal where you pointed."
+      ],
+      [
+        "04",
+        "Verdict with receipts",
+        "Scores, condition marks, and replay handles — every number traces to its source."
+      ]
     ] as const;
 
     expect(method).not.toBeNull();
     expect(steps).toHaveLength(expectedSteps.length);
-    expectedSteps.forEach(([number, title], index) => {
+    expectedSteps.forEach(([number, title, body], index) => {
       expect(steps[index]?.textContent).toContain(number);
       expect(steps[index]?.textContent).toContain(title);
+      expect(steps[index]?.textContent).toContain(body);
     });
   });
 
