@@ -2775,47 +2775,58 @@ export class WalkingSkeletonRunner {
         protectedCoreVerified: servedRoot.restatementStatus === "PASS"
       });
     };
-    // T6 / S4-2 — the review outcome reaches the certainty band.
-    //
-    // A cross-maker review that came back `dispute` is a DECLARED disagreement
-    // about the debate's content, so it fires the same primitive T3's panel
-    // spread fires: the band steps down through the SEALED one-step-down row,
-    // never through arithmetic this file performs. The decision is read after
-    // every review has landed, because that is the first moment the run knows
-    // what the reviewers said.
-    //
-    // The provenance names what actually decided: the sealed downgrade-bands
-    // row is the predicate consulted, and the observation is the node_review
-    // rows themselves. The panel's numeric disagreement threshold plays NO
-    // part on this path, so citing it here would be a false provenance.
-    const candidateBandBeforeReview = effectiveMakerCount === 1
-      ? applySingleLineageBandCap(servePolicy.candidateConfidenceBand, servePolicy.bandCeiling)
-      : servePolicy.candidateConfidenceBand;
-    const disputedNodeIds = await this.#judgements.readDisputedNodeIds(run.runId);
-    // A dispute can only exist where a cross-maker review ran, so panelPolicy
-    // is sealed whenever this fires (a mono-maker run reviews nothing). The
-    // guard states that rather than assuming it.
-    if (disputedNodeIds.length > 0 && panelPolicy === undefined) {
-      throw new TypedDomainError(
-        "PANEL_WEIGHTING_UNRESOLVED",
-        "J12: a disputed cross-maker review requires the sealed downgrade-bands row to declare its certainty downgrade"
-      );
-    }
-    const reviewDisagreementBand = disputedNodeIds.length === 0 || panelPolicy === undefined
-      ? candidateBandBeforeReview
-      : applyDeclaredDisagreement({
-        fires: (panelPolicy.oneStepDown[candidateBandBeforeReview] ?? null) !== null,
+    /**
+     * T6 / S4-2 — the review outcome reaches the certainty band.
+     *
+     * A cross-maker review that came back `dispute` is a DECLARED disagreement
+     * about the debate's content, so it fires the same primitive T3's panel
+     * spread fires: the band steps down through the SEALED one-step-down row,
+     * never through arithmetic this file performs. It is read after every
+     * review has landed, because that is the first moment the run knows what
+     * the reviewers said.
+     *
+     * The provenance names what actually decided: the sealed downgrade-bands
+     * row is the predicate consulted, and the observation is the node_review
+     * rows themselves. The panel's numeric disagreement threshold plays NO
+     * part on this path, so citing it here would be a false provenance.
+     *
+     * Deliberately a function called on the serve-gate path only. The band —
+     * mono-lineage cap included — was already computed nowhere else, and
+     * `applySingleLineageBandCap` can stop loudly; hoisting it would make an
+     * envelope-terminal answer that never needed a band fail for the want of
+     * one, which is a behaviour change this task did not ask for.
+     */
+    const servedCandidateConfidenceBand = async (): Promise<string> => {
+      const capped = effectiveMakerCount === 1
+        ? applySingleLineageBandCap(servePolicy.candidateConfidenceBand, servePolicy.bandCeiling)
+        : servePolicy.candidateConfidenceBand;
+      const disputedNodeIds = await this.#judgements.readDisputedNodeIds(run.runId);
+      if (disputedNodeIds.length === 0) return capped;
+      // A dispute can only exist where a cross-maker review ran, so the panel
+      // rows are sealed whenever this fires (a mono-maker run reviews nothing).
+      // The guard states that rather than assuming it.
+      if (panelPolicy === undefined) {
+        throw new TypedDomainError(
+          "PANEL_WEIGHTING_UNRESOLVED",
+          "J12: a disputed cross-maker review requires the sealed downgrade-bands row to declare its certainty downgrade"
+        );
+      }
+      const steppedDown = panelPolicy.oneStepDown[capped] ?? null;
+      return applyDeclaredDisagreement({
+        fires: steppedDown !== null,
         predicateRef: panelPolicy.sourceRefs.downgradeBands ?? panelPolicy.unmappedReason,
         observationRef: `ledger.node_review:dispute:${disputedNodeIds.join(",")}`,
-        certaintyBand: candidateBandBeforeReview,
-        downgradedBand: panelPolicy.oneStepDown[candidateBandBeforeReview] ?? null
-      }).certaintyBand ?? candidateBandBeforeReview;
+        certaintyBand: capped,
+        downgradedBand: steppedDown
+      }).certaintyBand ?? capped;
+    };
     const initialEnvelopeDecision = await evaluateEnvelope();
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
     if (initialEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
       result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
+      const candidateConfidenceBand = await servedCandidateConfidenceBand();
       try {
         result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
       nodes: servedNodes,
@@ -2825,7 +2836,7 @@ export class WalkingSkeletonRunner {
       strangerSampleRate: run.strangerSampleRate,
       // T6 / S4-2: the mono-lineage cap and, on top of it, the declared
       // downgrade a disputed cross-maker review fires.
-      candidateConfidenceBand: reviewDisagreementBand
+      candidateConfidenceBand
     }, {
       measureCompositionBundle: (facts) => Buffer.byteLength(JSON.stringify(facts), "utf8"),
       compose: async (facts, attempt) => {
