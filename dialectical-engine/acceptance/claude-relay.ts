@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CliRelayFailure,
   invokeCli,
+  resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliRelayAdapter,
@@ -25,6 +26,21 @@ import {
  * exactly one reported lineage must match the requested model family.
  */
 export const CLAUDE_BINARY = "/Users/vladmihaimiron/.local/bin/claude" as const;
+/**
+ * D10 host override for {@link CLAUDE_BINARY}. Unset ⇒ the constant above,
+ * byte-identical to the behavior before this key existed.
+ */
+const CLAUDE_BINARY_ENV_KEY = "ACCEPTANCE_CLAUDE_BINARY" as const;
+const CLAUDE_BINARY_UNRESOLVED = "CLAUDE_CLI_BINARY_UNRESOLVED" as const;
+
+export function resolveClaudeBinary(source: NodeJS.ProcessEnv = process.env): string {
+  return resolveConfiguredBinary(
+    CLAUDE_BINARY,
+    CLAUDE_BINARY_ENV_KEY,
+    CLAUDE_BINARY_UNRESOLVED,
+    source
+  );
+}
 export const ANTHROPIC_MAKER = "Anthropic" as const;
 /**
  * The model ALIAS asked of the CLI. Passing none inherits the CLI's default,
@@ -160,7 +176,7 @@ export interface ClaudeRelayHandle extends CliRelayHandle {
  */
 export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<ClaudeRelayHandle> {
   const command = resolveTestGuardedCommand(
-    { binary: CLAUDE_BINARY, prefixArguments: [] },
+    { binary: resolveClaudeBinary(), prefixArguments: [] },
     options.testOnlyCommand,
     "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
   );

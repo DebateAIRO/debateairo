@@ -5,6 +5,7 @@ import {
   CliRelayFailure,
   invokeCli,
   renderPromptTranscript,
+  resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliRelayAdapter,
@@ -13,6 +14,18 @@ import {
 } from "./relay-core.js";
 
 export const CODEX_BINARY = "/Applications/ChatGPT.app/Contents/Resources/codex" as const;
+/**
+ * D10 host override for {@link CODEX_BINARY}. Unset ⇒ the constant above,
+ * byte-identical to the behavior before this key existed. Unlike the other two
+ * makers this default resolves on developer machines by accident of an
+ * installed app, so it is the one default that must never be reached by a test.
+ */
+const CODEX_BINARY_ENV_KEY = "ACCEPTANCE_CODEX_BINARY" as const;
+const CODEX_BINARY_UNRESOLVED = "CODEX_CLI_BINARY_UNRESOLVED" as const;
+
+export function resolveCodexBinary(source: NodeJS.ProcessEnv = process.env): string {
+  return resolveConfiguredBinary(CODEX_BINARY, CODEX_BINARY_ENV_KEY, CODEX_BINARY_UNRESOLVED, source);
+}
 export const ACCEPTANCE_MAKER = "OpenAI" as const;
 export const CODEX_HANDSHAKE_PROMPT =
   "DR-181 acceptance transport handshake. Reply with the single word: OK" as const;
@@ -162,7 +175,7 @@ export const codexAdapter: CliRelayAdapter = createCodexAdapter(defaultCodexSess
 
 export async function startModelShim(options: ModelShimOptions): Promise<ModelShimHandle> {
   const command = resolveTestGuardedCommand(
-    { binary: CODEX_BINARY, prefixArguments: [] },
+    { binary: resolveCodexBinary(), prefixArguments: [] },
     options.testOnlyCommand,
     "TEST_ONLY_CODEX_COMMAND_FORBIDDEN"
   );

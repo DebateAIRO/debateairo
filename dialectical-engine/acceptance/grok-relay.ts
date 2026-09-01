@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CliRelayFailure,
   invokeCli,
+  resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliRelayAdapter,
@@ -10,6 +11,16 @@ import {
 } from "./relay-core.js";
 
 export const GROK_BINARY = "/Users/vladmihaimiron/.grok/bin/grok" as const;
+/**
+ * D10 host override for {@link GROK_BINARY}. Unset ⇒ the constant above,
+ * byte-identical to the behavior before this key existed.
+ */
+const GROK_BINARY_ENV_KEY = "ACCEPTANCE_GROK_BINARY" as const;
+const GROK_BINARY_UNRESOLVED = "GROK_CLI_BINARY_UNRESOLVED" as const;
+
+export function resolveGrokBinary(source: NodeJS.ProcessEnv = process.env): string {
+  return resolveConfiguredBinary(GROK_BINARY, GROK_BINARY_ENV_KEY, GROK_BINARY_UNRESOLVED, source);
+}
 export const XAI_MAKER = "xAI" as const;
 export const GROK_HANDSHAKE_PROMPT =
   "GROK-01 acceptance transport handshake. Reply with the single word: OK" as const;
@@ -111,7 +122,7 @@ export interface GrokRelayHandle extends CliRelayHandle {
 
 export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRelayHandle> {
   const command = resolveTestGuardedCommand(
-    { binary: GROK_BINARY, prefixArguments: [] },
+    { binary: resolveGrokBinary(), prefixArguments: [] },
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );

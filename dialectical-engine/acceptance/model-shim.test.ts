@@ -3,7 +3,9 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  CODEX_BINARY,
   parseCodexCompletion,
+  resolveCodexBinary,
   startModelShim,
   type ModelShimHandle
 } from "./model-shim.js";
@@ -243,5 +245,44 @@ describe("ACC-01 model shim", () => {
 
     expect(response.status).toBe(504);
     expect(await response.json()).toEqual({ error: "CODEX_CLI_TIMEOUT" });
+  });
+});
+
+/**
+ * There is deliberately NO spawn-level test of the codex DEFAULT command here,
+ * and none may be added. Unlike the Claude and Grok defaults — which point into
+ * an absent `/Users/vladmihaimiron` home and therefore fail with ENOENT — the
+ * compiled-in CODEX_BINARY is a real, installed, executable path on developer
+ * machines. A test that reaches the default command would make a live provider
+ * call. The override is pinned here at the resolver, and its wiring into
+ * startModelShim is the same three lines proven end-to-end for the other two
+ * makers in claude-relay.test.ts and grok-relay.test.ts.
+ */
+describe("D10 Codex shim binary resolution", () => {
+  it("keeps the compiled-in default when ACCEPTANCE_CODEX_BINARY is absent", () => {
+    expect(CODEX_BINARY).toBe("/Applications/ChatGPT.app/Contents/Resources/codex");
+    expect(resolveCodexBinary({})).toBe("/Applications/ChatGPT.app/Contents/Resources/codex");
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_CODEX_BINARY", () => {
+    expect(resolveCodexBinary({ ACCEPTANCE_CODEX_BINARY: "/host/bin/codex" }))
+      .toBe("/host/bin/codex");
+  });
+
+  it("fails loudly with a typed code when ACCEPTANCE_CODEX_BINARY is present but blank", () => {
+    expect(() => resolveCodexBinary({ ACCEPTANCE_CODEX_BINARY: "  " }))
+      .toThrow("CODEX_CLI_BINARY_UNRESOLVED");
+  });
+
+  it("keeps the NODE_ENV=test command seam ahead of the environment override", async () => {
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.ACCEPTANCE_CODEX_BINARY = "/nonexistent/host/codex";
+    try {
+      const shim = await start();
+      expect(shim.model).toBe("gpt-5.6-sol");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
   });
 });

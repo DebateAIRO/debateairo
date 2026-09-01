@@ -110,6 +110,33 @@ export function resolveTestGuardedCommand(
   return defaultCommand;
 }
 
+/**
+ * D10: WHICH executable a maker relay spawns is a HOST fact, not a source
+ * constant. Each maker keeps its compiled-in absolute path as the default, so
+ * an absent key leaves behavior byte-identical to before this seam existed;
+ * an operator points the relay at this host's own CLI through the maker's
+ * ACCEPTANCE_*_BINARY key.
+ *
+ * A key that is PRESENT BUT BLANK is a loud typed configuration failure, never
+ * a silent fall back to the compiled-in path — silently spawning another
+ * machine's home directory is precisely the defect this seam exists to remove.
+ * The throw is a plain Error carrying the maker's code, matching
+ * resolveTestGuardedCommand above; run-acceptance records that message
+ * verbatim as the provider probe's failureCode.
+ */
+export function resolveConfiguredBinary(
+  defaultBinary: string,
+  environmentKey: string,
+  unresolvedCode: string,
+  source: NodeJS.ProcessEnv = process.env
+): string {
+  const configured = source[environmentKey];
+  if (configured === undefined) return defaultBinary;
+  const binary = configured.trim();
+  if (binary === "") throw new Error(unresolvedCode);
+  return binary;
+}
+
 export async function invokeCli(
   command: CommandSpec,
   adapter: CliRelayAdapter,
