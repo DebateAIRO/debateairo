@@ -146,6 +146,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
     case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";
     case "UNAUTHORED-BRANCH-HALTED": return "Expansion stopped here — nothing was written to hide or show";
+    case "LABEL-BASIS-INCOMPLETE": return "Verdict basis incomplete — no rival position or no second judge to compare";
   }
 }
 

@@ -64,6 +64,24 @@ export const ABSTENTION_KINDS = [
 ] as const;
 export type AbstentionKind = typeof ABSTENTION_KINDS[number];
 
+/**
+ * T10 (goal 188-195, rulings S6-1 / S6-3) — the rule that picks the served root.
+ *
+ * DR-161's configuration-order rule is RETIRED — its retired string is named
+ * once, in migrations/0055_t10_served_root_selection.sql, and nowhere else in
+ * shipped source. Configuration order no longer decides the answer;
+ * propagation does. The served root is the one carrying the
+ * maximum propagated strength among the servable maker roots, and an exact tie
+ * is broken by lexicographic node id — deterministic, order-independent, and
+ * CONTESTED under T11's ladder anyway because a tie's margin is zero.
+ *
+ * Minted here, beside the other closed vocabularies, because the same string is
+ * a typed record field (serve), a wire literal (contract) and a DDL CHECK member
+ * (migrations). One declaration; every representation imports it.
+ */
+export const SERVED_ROOT_SELECTION_RULE = "max-propagated-strength-lexicographic-tiebreak" as const;
+export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE;
+
 // Spec §12.3 Home 2 is the sole minting authority. Every wire, UI and DDL
 // representation imports this vocabulary; no sibling package extends it.
 export const CONDITION_MARKS = [
@@ -106,6 +124,15 @@ export const CONDITION_MARKS = [
   "WAY-OF-KNOWING-DOWNGRADED",
   "AMENDED-SEARCH",
   "MISSING-NUMBER",
+  // S6-1 / T11, confirm-item 6: the three-state label was derived without a
+  // complete basis — no runner-up existed to measure a margin against, or the
+  // winning root's panel reported fewer than two parseable judgements, so no
+  // dispersion could be measured. The label is CONTESTED and says why: a solo
+  // voice can never print SUPPORTED, no matter how confident. Placed HERE,
+  // beside the other served-answer honesty disclosures, and NOT appended: the
+  // DR-176 tail of this vocabulary is read positionally by
+  // `CONDITION_MARKS.slice(-4)`.
+  "LABEL-BASIS-INCOMPLETE",
   // DR-139(4), TERM-01: a battery row ACTIVE at run completion whose owed
   // check has no recorded execution — the run settles and the served answer
   // names each such check loudly (one condition-mark record per row).

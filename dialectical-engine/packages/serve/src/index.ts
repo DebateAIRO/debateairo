@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { WayOfKnowing } from "@debateai/kernel";
+import type { ServedRootRule, WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
@@ -659,12 +659,178 @@ export function deriveWorkReadState(input: {
     : { state: input.storedState };
 }
 
-export function deriveHonestVerdict(input: { readonly usableBasis: boolean; readonly reasonRef: string }):
-  | { readonly verdictState: "SUPPORTED"; readonly confidenceBand: null; readonly unavailable: null }
-  | { readonly verdictState: null; readonly confidenceBand: null; readonly unavailable: { readonly reasonRef: string } } {
-  return input.usableBasis
-    ? { verdictState: "SUPPORTED", confidenceBand: null, unavailable: null }
-    : { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef } };
+/**
+ * T11 (goal 196-221) — the three-state verdict label.
+ *
+ * A label input is either MEASURED or ABSENT. ABSENT is a RUNTIME value with a
+ * reason, never NaN and never a silent zero: a single servable root has no
+ * runner-up to measure a margin against, and a panel that produced fewer than
+ * two parseable judgements has no dispersion to compare (s04 `measureDispersion`
+ * returns exactly that shape).
+ */
+export type VerdictLabelQuantity =
+  | { readonly kind: "MEASURED"; readonly value: number }
+  | { readonly kind: "ABSENT"; readonly reason: string };
+
+/**
+ * gamma, the two cuts and the disagreement threshold, as the caller read them
+ * from T16's sealed register rows (`readVerdictLabelControls`). This module
+ * carries NO default for any of them — a label derived from a value this file
+ * invented would be uncalibratable and untunable, which is what the sealed rows
+ * exist to prevent (goal 39-40).
+ */
+export interface VerdictLabelControls {
+  readonly gamma: number;
+  readonly highCut: number;
+  readonly lowCut: number;
+  readonly disagreementThreshold: number;
+}
+
+export interface VerdictLabelBasis {
+  /** The served root's propagated strength. */
+  readonly winner: number;
+  /** The served root's margin over the runner-up root. */
+  readonly margin: VerdictLabelQuantity;
+  /**
+   * The recorded panel dispersion of the WINNING root's reduced judgement
+   * (T3's `dispersion` field), on T16's seeded scale.
+   */
+  readonly disagreement: VerdictLabelQuantity;
+  readonly controls: VerdictLabelControls;
+}
+
+export const LABEL_BASIS_INCOMPLETE_MARK = "LABEL-BASIS-INCOMPLETE" as const;
+
+export type VerdictLabelTrigger =
+  | "BASIS_INCOMPLETE"
+  | "BELOW_LOW_CUT"
+  | "MARGIN_WITHIN_GAMMA"
+  | "DISAGREEMENT_AT_THRESHOLD"
+  | "AT_OR_ABOVE_HIGH_CUT"
+  | "MID_BAND";
+
+export interface VerdictLabelDerivation {
+  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them. */
+  readonly rung: 0 | 1 | 2 | 3 | 4;
+  readonly trigger: VerdictLabelTrigger;
+  /** Which basis limbs were ABSENT; empty unless rung 0 fired. */
+  readonly basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
+  readonly marks: readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];
+}
+
+function assertLabelNumber(value: number, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_INPUT_INVALID",
+      `${label} must be a finite number; an unmeasurable input is ABSENT with a reason, never NaN`
+    );
+  }
+  return value;
+}
+
+/**
+ * The ORDERED, TOTAL, DISJOINT ladder, defined over the runtime domain with
+ * absent inputs included (goal 197-207). Exactly one rung fires at every point:
+ * the FIRST whose guard holds. Nothing here consults the round-3 evaluator
+ * objection — the derivation is acyclic and runs BEFORE synthesis, from the
+ * propagated numbers only (confirm-item 3, default NO).
+ */
+export function deriveVerdictLabel(input: VerdictLabelBasis): VerdictLabelDerivation {
+  const { gamma, highCut, lowCut, disagreementThreshold } = input.controls;
+  for (const [value, label] of [
+    [gamma, "gamma"], [highCut, "the high cut"], [lowCut, "the low cut"],
+    [disagreementThreshold, "the disagreement threshold"]
+  ] as const) assertLabelNumber(value, label);
+  if (!(lowCut < highCut)) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_CONTROLS_INVALID",
+      "The low cut must sit strictly below the high cut"
+    );
+  }
+  const winner = assertLabelNumber(input.winner, "the winning strength");
+  const margin = input.margin;
+  const disagreement = input.disagreement;
+  if (margin.kind === "MEASURED") assertLabelNumber(margin.value, "the margin");
+  if (disagreement.kind === "MEASURED") assertLabelNumber(disagreement.value, "the disagreement");
+
+  // Rung 0 — the basis itself is incomplete.
+  if (margin.kind === "ABSENT" || disagreement.kind === "ABSENT") {
+    return Object.freeze({
+      label: "CONTESTED", rung: 0, trigger: "BASIS_INCOMPLETE",
+      basisAbsence: Object.freeze([
+        ...(margin.kind === "ABSENT" ? ["MARGIN" as const] : []),
+        ...(disagreement.kind === "ABSENT" ? ["DISAGREEMENT" as const] : [])
+      ]),
+      marks: Object.freeze([LABEL_BASIS_INCOMPLETE_MARK])
+    });
+  }
+  const noAbsence = Object.freeze([]) as readonly ("MARGIN" | "DISAGREEMENT")[];
+  const noMarks = Object.freeze([]) as readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];
+
+  // Rung 1 — below the low cut.
+  if (winner < lowCut) {
+    return Object.freeze({
+      label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 2 — a tie-adjacent margin, or a panel that disagreed at the threshold.
+  const marginWithinGamma = margin.value <= gamma;
+  if (marginWithinGamma || disagreement.value >= disagreementThreshold) {
+    return Object.freeze({
+      label: "CONTESTED", rung: 2,
+      trigger: marginWithinGamma ? "MARGIN_WITHIN_GAMMA" : "DISAGREEMENT_AT_THRESHOLD",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 3 — at or above the high cut, with a clear margin and low disagreement.
+  if (winner >= highCut) {
+    return Object.freeze({
+      label: "SUPPORTED", rung: 3, trigger: "AT_OR_ABOVE_HIGH_CUT",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 4 — the mid band: low <= winner < high.
+  return Object.freeze({
+    label: "CONTESTED", rung: 4, trigger: "MID_BAND",
+    basisAbsence: noAbsence, marks: noMarks
+  });
+}
+
+/**
+ * The served answer's verdict projection: exactly one of a label or an
+ * unavailability reason (the contract refuses both and neither). The label
+ * itself is T11's ladder above — never a constant this function chose.
+ */
+export function deriveHonestVerdict(input: {
+  readonly usableBasis: boolean;
+  readonly reasonRef: string;
+  readonly labelBasis: VerdictLabelBasis | null;
+}):
+  | {
+      readonly verdictState: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+      readonly confidenceBand: null;
+      readonly unavailable: null;
+      readonly derivation: VerdictLabelDerivation;
+    }
+  | {
+      readonly verdictState: null;
+      readonly confidenceBand: null;
+      readonly unavailable: { readonly reasonRef: string };
+      readonly derivation: null;
+    } {
+  if (!input.usableBasis) {
+    return { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef }, derivation: null };
+  }
+  if (input.labelBasis === null) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_BASIS_UNRESOLVED",
+      "A servable answer must carry the propagated label basis (winner, margin, disagreement, sealed controls); no label is invented here"
+    );
+  }
+  const derivation = deriveVerdictLabel(input.labelBasis);
+  return { verdictState: derivation.label, confidenceBand: null, unavailable: null, derivation };
 }
 
 export function projectProvenance(input: {
@@ -768,6 +934,13 @@ export interface PersistServeInput {
     readonly replayHandle: string;
     readonly propagationRunId: string;
   } | null;
+  /**
+   * T11: the propagated numbers this answer's three-state label is derived
+   * from, computed BEFORE synthesis. Required whenever the answer will carry a
+   * label (a served number on a SERVED/DOWNGRADED terminal); omitted on the
+   * DR-184 superseding path, which preserves the prior answer's projection.
+   */
+  readonly verdictLabelBasis?: VerdictLabelBasis | null;
   /** DR-184: append a new immutable version of an already-served answer. */
   readonly supersedes?: { readonly answerId: string };
 }
@@ -807,12 +980,12 @@ export interface ConditionMarkRecord {
   // J13(b): PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE are node-scope panel
   // degradation disclosures; the record union must name them or the runner cannot
   // project the mark the kernel now mints.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "LABEL-BASIS-INCOMPLETE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
   readonly liftPath: string | null;
-  readonly servedRootRule: "first-configured-provider" | null;
+  readonly servedRootRule: ServedRootRule | null;
   readonly affectedNodeIds: readonly string[];
   readonly callSiteKey?: string | null;
   readonly plannedLegCount?: number | null;
@@ -835,7 +1008,10 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "HIDDEN-UNJUDGEABLE",
   "DERIVED-STANDING-UNREVIEWED",
   "HIDDEN-LOW-SCORE",
-  "UNAUTHORED-BRANCH-HALTED"
+  "UNAUTHORED-BRANCH-HALTED",
+  // T11: a label derived without a complete basis is disclosed on the answer it
+  // labelled, with a typed record naming which limb of the basis was absent.
+  "LABEL-BASIS-INCOMPLETE"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -1008,11 +1184,27 @@ export class ServeRepository {
       throw new TypedDomainError("CONDITION_MARK_AFFECTED_NODES_REQUIRED", "Every S09 mark must inspect affected nodes");
     }
     return withRunContentLease(this.pool,[input.runId],async () => {
+    // DR-184's superseding path never re-derives: the prior answer's verdict
+    // projection is carried forward below, so it needs no label basis.
     const verdict = deriveHonestVerdict({
-      usableBasis: input.servedNumber !== null
+      usableBasis: input.supersedes === undefined
+        && input.servedNumber !== null
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
-      reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`
+      reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`,
+      labelBasis: input.verdictLabelBasis ?? null
     });
+    // The mark and the label are ONE decision. A derivation that says the basis
+    // was incomplete while the answer's marks stay silent is the facsimile shape
+    // this record exists to prevent, so it stops loudly instead of persisting.
+    if (verdict.derivation !== null) {
+      const declared = input.result.conditionMarks.includes(LABEL_BASIS_INCOMPLETE_MARK);
+      if (declared !== (verdict.derivation.marks.length > 0)) {
+        throw new TypedDomainError(
+          "LABEL_BASIS_DISCLOSURE_MISMATCH",
+          `The derived label basis ${verdict.derivation.marks.length > 0 ? "IS" : "is NOT"} incomplete, but the answer's condition marks say otherwise`
+        );
+      }
+    }
     const factBundleId = randomUUID();
     const factContent = await encryptAttestedContentForRun(
       this.pool, input.runId, "serve.fact_bundle", factBundleId,
@@ -1541,7 +1733,7 @@ export class ServeRepository {
       subject_ref: string;
       reason: string;
       lift_path: string | null;
-      served_root_rule: "first-configured-provider" | null;
+      served_root_rule: ServedRootRule | null;
       call_site_key: string | null;
       planned_leg_count: number | null;
       terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;

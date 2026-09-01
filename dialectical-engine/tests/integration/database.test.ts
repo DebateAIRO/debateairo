@@ -148,6 +148,24 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       providerFamilyMap: "test-layer:J1"
     }
   },
+  // T11 coherence consequence: every served answer now carries a code-derived
+  // three-state label, so every fixture that reaches a served answer needs the
+  // sealed verdict-label family. Provisioning only — no fixture's own subject
+  // assertions change. These are the fixture's controls, not the deployment's.
+  verdictLabelPolicy: {
+    registerVersion: 1,
+    gamma: 0.05,
+    highCut: 0.7,
+    lowCut: 0.35,
+    disagreementThreshold: 0.25,
+    sourceRefs: {
+      verdictMarginGamma: "test-layer:goal-v4:80-96",
+      verdictHighCut: "test-layer:goal-v4:80-96",
+      verdictLowCut: "test-layer:goal-v4:80-96",
+      disagreementThreshold: "test-layer:J1",
+      disagreementQuantity: "test-layer:goal-v4:80-96"
+    }
+  },
   resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
     batteryRowId,
     state: "INACTIVE" as const,
@@ -3864,5 +3882,188 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         { outcome: "OK", parse_status: "PARSED" }
       ]);
     } finally { await provider.stop(); }
+  });
+});
+
+/**
+ * T10 + T11 (goal 188-221; rulings S6-1, S6-3, S7-1 + confirm-items 4/6) — the
+ * PRODUCTION seam, not a hand-composed chain.
+ *
+ * Both cases below drive the real `WalkingSkeletonRunner` with doubles only at
+ * the provider boundary, so they pin the wires a component test cannot see: the
+ * runner's served-root selection, the margin it writes to the propagation
+ * receipt, the label it derives from those numbers before composition, and the
+ * disclosure the served answer carries.
+ */
+describe("T10/T11 · the served root and its label, through the production runner", () => {
+  const servedRunResponses = (statement: string, fidelity: number): readonly string[] => [
+    judgementDouble(statement, fidelity),
+    JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: statement, node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+    ] }),
+    JSON.stringify({ conforms: true, findings: [] }),
+    JSON.stringify({ conforms: true, findings: [] }),
+    JSON.stringify({ pass: true })
+  ];
+
+  /**
+   * confirm-item 6, goal 200-203. A mono-maker run has ONE root, so no margin
+   * exists, and its panel is a single voice, so no dispersion exists. The label
+   * is CONTESTED and the answer SAYS SO — a solo voice can never print
+   * SUPPORTED, however confident the judgement it produced.
+   */
+  it("T11 the mono-maker path serves CONTESTED with the LABEL-BASIS-INCOMPLETE disclosure", async () => {
+    const question = `t11-mono-maker-label-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    // Fidelity 0.95 — the most confident judgement the double can give. If the
+    // ladder consulted confidence instead of BASIS, this would print SUPPORTED.
+    const provider = await startProviderDouble([...servedRunResponses("A solo maker's confident position.", 0.95)]);
+    try {
+      const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      const projection = await new ServeRepository(database.pool).readAnswerProjection(
+        result.answerId, `asker:${question}`
+      );
+      // A served number exists — so a label was really derived, not skipped.
+      expect(projection?.number_slots.some((slot) => slot.status === "PRESENT")).toBe(true);
+      expect(projection?.verdict_state).toBe("CONTESTED");
+      expect(projection?.verdict_unavailable).toBeNull();
+      expect(projection?.condition_marks).toContain("LABEL-BASIS-INCOMPLETE");
+      expect(projection?.condition_mark_records).toContainEqual(expect.objectContaining({
+        mark: "LABEL-BASIS-INCOMPLETE",
+        scope: "answer",
+        served_root_rule: null
+      }));
+      const disclosure = projection?.condition_mark_records
+        .find((record) => record.mark === "LABEL-BASIS-INCOMPLETE");
+      // The disclosure names BOTH absent limbs: one root, one voice.
+      expect(disclosure?.reason).toContain("no runner-up root exists");
+      expect(disclosure?.reason).toContain("fewer than two parseable judgements");
+
+      // The receipt carries the same decision the answer was labelled from.
+      const receipt = await database.pool.query<{ served_root_selection: Record<string, unknown> | null }>(
+        `SELECT propagation.served_root_selection
+           FROM ledger.propagation_run AS propagation
+          WHERE propagation.run_id = $1
+          ORDER BY propagation.at_seq DESC
+          LIMIT 1`,
+        [work.runId]
+      );
+      const selection = receipt.rows[0]?.served_root_selection;
+      expect(selection).toMatchObject({
+        rule: "max-propagated-strength-lexicographic-tiebreak",
+        runnerUp: null,
+        margin: { kind: "ABSENT", reason: "SINGLE_SERVABLE_ROOT" },
+        tiebreak: "NOT_APPLIED",
+        candidateCount: 1,
+        verdictLabel: { label: "CONTESTED", rung: 0, trigger: "BASIS_INCOMPLETE" }
+      });
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * THE T10 RED, at run level. The FIRST configured provider authors the WEAKER
+   * root; the second authors the stronger one. The served number, the served
+   * root's disclosure and the receipt must all name the STRONGER root — under
+   * the retired first-configured-provider rule they would all name the weaker.
+   */
+  it("T10 the production runner serves the stronger root when the first-configured one is weaker", async () => {
+    const weakerFirst = await executeResil01Scenario({
+      label: "t10-reversed-config-order",
+      primary: [
+        // The provider double is CLASS-KEYED, so the first JUDGE entry in each
+        // queue is that maker's ROOT. The FIRST-CONFIGURED maker authors the
+        // WEAKER root: under the retired rule its root would still be served.
+        judgementDouble("The first-configured maker's weaker position.", 0.3),
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary child ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        // The SECOND-configured maker authors the STRONGER root.
+        judgementDouble("The second-configured maker's stronger position.", 0.9),
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Secondary child ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Secondary review ${index + 1}`))
+      ]
+    });
+
+    expect(weakerFirst.error).toBeNull();
+    expect(weakerFirst.result?.kind).toBe("COMPLETED");
+
+    // (1) The run's OWN recorded root strengths — the oracle. Never the
+    //     selection's own claim about itself.
+    const strengths = await database.pool.query<{ node_id: string; strength: string }>(
+      `SELECT strength.node_id, strength.strength::text
+         FROM ledger.node_strength_record AS strength
+         JOIN ledger.propagation_run AS propagation
+           ON propagation.propagation_run_id = strength.propagation_run_id
+        WHERE propagation.run_id = $1`,
+      [weakerFirst.runId]
+    );
+    const rootIds = new Set(weakerFirst.snapshot.nodes
+      .filter((node) => node.parentNodeId === null || node.parentNodeId === undefined)
+      .map((node) => node.nodeId));
+    const rootStrengths = strengths.rows
+      .filter((row) => rootIds.has(row.node_id))
+      .map((row) => ({ nodeId: row.node_id, strength: Number(row.strength) }));
+    expect(rootStrengths.length).toBeGreaterThanOrEqual(2);
+    const strongest = rootStrengths.reduce((best, row) => row.strength > best.strength ? row : best);
+    const runnerUpStrength = rootStrengths
+      .filter((row) => row.nodeId !== strongest.nodeId)
+      .reduce((best, row) => row.strength > best.strength ? row : best).strength;
+    // The fixture really did make the roots differ, so "strongest" is a choice.
+    expect(strongest.strength).toBeGreaterThan(runnerUpStrength);
+
+    // (2) THE RED. The served answer's own disclosure names the STRONGEST root
+    //     as the one that was served, under the live rule. On the baseline this
+    //     names the first-configured (weaker) root and the retired rule.
+    const unserved = weakerFirst.answer?.condition_mark_records
+      .find((record) => record.mark === "UNSERVED-MAKER-POSITION");
+    expect(unserved).toEqual(expect.objectContaining({
+      subject_ref: strongest.nodeId,
+      served_root_rule: "max-propagated-strength-lexicographic-tiebreak"
+    }));
+    // The served NUMBER is the served root's strength, not the first root's.
+    const servedNumberValue = weakerFirst.answer?.number_slots
+      .find((slot) => slot.status === "PRESENT");
+    expect(servedNumberValue).toBeDefined();
+
+    // (3) The receipt carries the same decision and the margin to the runner-up.
+    const receipt = await database.pool.query<{ served_root_selection: {
+      servedNodeId: string;
+      servedStrength: number;
+      runnerUp: { nodeId: string; strength: number } | null;
+      margin: { kind: string; value?: number };
+      rule: string;
+      tiebreak: string;
+    } | null }>(
+      `SELECT propagation.served_root_selection
+         FROM ledger.propagation_run AS propagation
+        WHERE propagation.run_id = $1
+        ORDER BY propagation.at_seq DESC
+        LIMIT 1`,
+      [weakerFirst.runId]
+    );
+    const selection = receipt.rows[0]?.served_root_selection;
+    expect(selection).not.toBeNull();
+    expect(selection).not.toBeUndefined();
+    expect(selection!.rule).toBe("max-propagated-strength-lexicographic-tiebreak");
+    expect(selection!.servedNodeId).toBe(strongest.nodeId);
+    expect(selection!.servedStrength).toBeCloseTo(strongest.strength, 12);
+    expect(selection!.runnerUp).not.toBeNull();
+    expect(selection!.margin.kind).toBe("MEASURED");
+    expect(selection!.margin.value).toBeCloseTo(strongest.strength - runnerUpStrength, 12);
+    expect(selection!.tiebreak).toBe("NOT_APPLIED");
+
+    // (4) Two roots and a two-voice panel: the basis is complete, so the
+    //     incomplete-basis disclosure must NOT ride this answer.
+    expect(weakerFirst.answer?.condition_marks).not.toContain("LABEL-BASIS-INCOMPLETE");
+    expect(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).toContain(weakerFirst.answer?.verdict_state);
   });
 });

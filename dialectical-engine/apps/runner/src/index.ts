@@ -77,6 +77,8 @@ import {
   compositionEvidenceRequired,
   createEnvelopeExhaustedResult,
   deriveBandCeiling,
+  deriveVerdictLabel,
+  LABEL_BASIS_INCOMPLETE_MARK,
   runServeGateChain,
   ServeRepository,
   type BandCeilingRegisterRow,
@@ -85,9 +87,10 @@ import {
   type ConditionMarkRecord,
   type FactBundle,
   type ServeGateResult,
-  type ServeNode
+  type ServeNode,
+  type VerdictLabelBasis
 } from "@debateai/serve";
-import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
+import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
@@ -143,6 +146,19 @@ export interface RunnerPanelPolicy {
   }[];
   /** The sealed reason an unmapped provider carries; UNKNOWN is discount-exempt. */
   readonly unmappedReason: string;
+  readonly sourceRefs: Readonly<Record<string, string>>;
+}
+
+/**
+ * S6-1 / T11 — the sealed T16 verdict-label inputs as the runner consumes them.
+ * Identifiers and provenance only: no member below is ever restated in code.
+ */
+export interface RunnerVerdictLabelPolicy {
+  readonly registerVersion: number;
+  readonly gamma: number;
+  readonly highCut: number;
+  readonly lowCut: number;
+  readonly disagreementThreshold: number;
   readonly sourceRefs: Readonly<Record<string, string>>;
 }
 
@@ -984,6 +1000,14 @@ export interface WalkingSkeletonSettings {
    * a default invented here.
    */
   readonly panelPolicy?: RunnerPanelPolicy;
+  /**
+   * S6-1 / T11: the sealed T16 verdict-label family as the runner consumes it,
+   * READ from the register by the deployment's boot (`readVerdictLabelControls`).
+   * Every served answer carries a code-derived label, so a deployment that never
+   * sealed the family stops loudly at selection time rather than labelling on a
+   * value this file invented.
+   */
+  readonly verdictLabelPolicy?: RunnerVerdictLabelPolicy;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1097,16 +1121,79 @@ export interface CrossRootExchangeLeg {
   readonly targetRootIndex: number;
 }
 
-export const SERVED_ROOT_RULE = "first-configured-provider" as const;
+// The rule string is minted ONCE in the kernel vocabulary (serve records it,
+// contract validates it, the DDL CHECKs it); the runner owns the SELECTOR and
+// re-exports the rule so a reader of the selection finds both together.
+export { SERVED_ROOT_SELECTION_RULE };
 
-/** DR-161: B2-A serves the root authored by the first configured provider. */
-export function selectServedRoot<T>(configuredProviderRoots: readonly T[]): Readonly<{
-  rule: typeof SERVED_ROOT_RULE;
-  root: T;
-}> {
-  const root = configuredProviderRoots[0];
-  if (root === undefined) throw new TypedDomainError("SERVED_ROOT_UNRESOLVED", "No configured provider root exists");
-  return Object.freeze({ rule: SERVED_ROOT_RULE, root });
+/** The margin between the served root and its runner-up, or why there is none. */
+export type ServedRootMargin =
+  | Readonly<{ kind: "MEASURED"; value: number }>
+  | Readonly<{ kind: "ABSENT"; reason: "SINGLE_SERVABLE_ROOT" }>;
+
+export interface ServedRootSelection<T> {
+  readonly rule: ServedRootRule;
+  readonly root: T;
+  readonly servedStrength: number;
+  readonly runnerUp: Readonly<{ nodeId: string; strength: number }> | null;
+  readonly margin: ServedRootMargin;
+  readonly tiebreak: "NOT_APPLIED" | "LEXICOGRAPHIC_NODE_ID";
+}
+
+/**
+ * T10 (goal 188-195; rulings S6-1, S6-3) — PROPAGATION chooses the served root.
+ *
+ * DR-161's configuration-order rule is deleted (its retired string survives
+ * only in migrations/0055_t10_served_root_selection.sql, which retires it):
+ * the served number is the MAXIMUM propagated strength among the servable roots, so reordering the
+ * configured providers cannot change the answer. An exact tie is broken by
+ * lexicographic node id — deterministic and equally order-independent; a tie is
+ * CONTESTED under T11's ladder anyway, because its margin is zero.
+ *
+ * The margin to the RUNNER-UP (the second-highest root under the same total
+ * order, never the next configured one) travels with the selection and is
+ * recorded on the propagation receipt. A single servable root has no runner-up,
+ * so its margin is ABSENT with a reason — T11 rung 0 reads exactly that.
+ *
+ * A servable root with no propagated strength is a typed loud stop, never a
+ * default: serving a number the graph never produced is the failure this
+ * selector exists to make impossible.
+ */
+export function selectServedRootByStrength<T extends { readonly nodeId: string }>(
+  servableRoots: readonly T[],
+  strengths: readonly { readonly nodeId: string; readonly strength: number }[]
+): ServedRootSelection<T> {
+  if (servableRoots.length === 0) {
+    throw new TypedDomainError("SERVED_ROOT_UNRESOLVED", "No servable maker root exists");
+  }
+  const byNodeId = new Map(strengths.map((row) => [row.nodeId, row.strength]));
+  const ranked = servableRoots.map((root) => {
+    const strength = byNodeId.get(root.nodeId);
+    if (strength === undefined || !Number.isFinite(strength)) {
+      throw new TypedDomainError("SERVED_ROOT_STRENGTH_UNRESOLVED", root.nodeId);
+    }
+    return { root, strength };
+  }).sort((left, right) => right.strength - left.strength
+    // Lexicographic on code units, NOT localeCompare: collation is
+    // locale-dependent, and a tiebreak that changes with the host locale is not
+    // the deterministic tiebreak the goal asks for.
+    || (left.root.nodeId < right.root.nodeId ? -1 : left.root.nodeId > right.root.nodeId ? 1 : 0));
+  const winner = ranked[0]!;
+  const runnerUp = ranked[1];
+  return Object.freeze({
+    rule: SERVED_ROOT_SELECTION_RULE,
+    root: winner.root,
+    servedStrength: winner.strength,
+    runnerUp: runnerUp === undefined
+      ? null
+      : Object.freeze({ nodeId: runnerUp.root.nodeId, strength: runnerUp.strength }),
+    margin: runnerUp === undefined
+      ? Object.freeze({ kind: "ABSENT" as const, reason: "SINGLE_SERVABLE_ROOT" as const })
+      : Object.freeze({ kind: "MEASURED" as const, value: winner.strength - runnerUp.strength }),
+    tiebreak: runnerUp !== undefined && runnerUp.strength === winner.strength
+      ? "LEXICOGRAPHIC_NODE_ID"
+      : "NOT_APPLIED"
+  });
 }
 
 /** PANEL-01 rev3: budget records append without erasing prior honesty records. */
@@ -1226,11 +1313,11 @@ export function buildUnservedMakerPositionRecord(
     mark: "UNSERVED-MAKER-POSITION",
     scope: "answer",
     subjectRef: servedRoot.nodeId,
-    reason: `The first post-exclusion configured maker root was served: ${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedDescription} ${unserved.length === 1 ? "remains" : "remain"} graph-visible but unserved`,
+    reason: `The strongest post-exclusion maker root was served: ${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedDescription} ${unserved.length === 1 ? "remains" : "remain"} graph-visible but unserved`,
     liftPath: unserved.length === 1
       ? "Serve the other maker root in a separately ruled answer"
       : "Serve another maker root in a separately ruled answer",
-    servedRootRule: SERVED_ROOT_RULE,
+    servedRootRule: SERVED_ROOT_SELECTION_RULE,
     affectedNodeIds: Object.freeze([servedRoot.nodeId, ...unserved.map((root) => root.nodeId)])
   });
 }
@@ -2001,6 +2088,14 @@ export class WalkingSkeletonRunner {
       readonly authorIndex: number;
       readonly maker: string;
       /**
+       * S6-1 / T11: the panel dispersion recorded on THIS node's reduced
+       * judgement (T3's `dispersion`), carried so the winning root's
+       * disagreement is read from the node that actually earned it. `null` is
+       * s04's ABSENT case — fewer than two parseable judgements — and is a
+       * runtime value the label ladder reads, never a zero it can compare.
+       */
+      readonly panelDispersion: number | null;
+      /**
        * T5 / S3-1: every edge this node sources, carried to the node's ONE
        * review call so the reviewer measures them all on the visit it was
        * already making. A root sources none.
@@ -2021,6 +2116,7 @@ export class WalkingSkeletonRunner {
       locator: judged.locator,
       restatementStatus: judged.restatementStatus,
       reversalPoint: judged.assessment.critic.summary,
+      panelDispersion: selection.dispersion,
       authorIndex: 0,
       maker: primaryMaker.maker
     })]]);
@@ -2192,6 +2288,7 @@ export class WalkingSkeletonRunner {
           locator: childJudged.locator,
           restatementStatus: childJudged.restatementStatus,
           reversalPoint: childJudged.assessment.critic.summary,
+          panelDispersion: childSelection.dispersion,
           authorIndex: input.authorIndex,
           maker: selectedMaker.maker
         }) };
@@ -2472,8 +2569,46 @@ export class WalkingSkeletonRunner {
         "Every authored maker position was excluded after cross-maker review transport exhaustion"
       );
     }
-    const servedRootSelection = selectServedRoot(servableMakerPositions);
+    // T10: propagation picks the served root, configuration order does not.
+    const servedRootSelection = selectServedRootByStrength(servableMakerPositions, propagation.strengths);
     const servedRoot = servedRootSelection.root;
+    // T11: the three-state label is derived HERE — from the propagated numbers
+    // only, before composition and before any synthesis step, so the derivation
+    // stays acyclic (confirm-item 3: the round-3 objection is a mark, never a
+    // label input). The mark it may earn is attached to the served answer's
+    // result below, once the terminal is known.
+    const verdictLabelControls = this.settings.verdictLabelPolicy;
+    if (verdictLabelControls === undefined) {
+      throw new TypedDomainError(
+        "VERDICT_LABEL_CONTROLS_UNRESOLVED",
+        "T11: the served answer's label reads gamma, the two cuts and the disagreement threshold from T16's sealed register rows; a deployment that never sealed them stops loudly rather than labelling on invented values (goal 39-40)"
+      );
+    }
+    const servedRootJudgement = authoredMakerPositions.find((root) => root.nodeId === servedRoot.nodeId);
+    if (servedRootJudgement === undefined) {
+      // Unreachable by construction (the servable set is a subset of the
+      // authored one). Typed rather than optional-chained, so a future
+      // refactor cannot turn "no such node" into "no disagreement".
+      throw new TypedDomainError("SERVED_ROOT_JUDGEMENT_UNRESOLVED", servedRoot.nodeId);
+    }
+    const servedRootDispersion = servedRootJudgement.panelDispersion;
+    const verdictLabelBasis: VerdictLabelBasis = Object.freeze({
+      winner: servedRootSelection.servedStrength,
+      margin: servedRootSelection.margin,
+      // The NAMED quantity: the recorded panel dispersion of the WINNING root's
+      // reduced judgement (T3's `dispersion`), on T16's seeded scale. Fewer than
+      // two parseable judgements is ABSENT with s04's own reason.
+      disagreement: servedRootDispersion === null
+        ? Object.freeze({ kind: "ABSENT" as const, reason: "FEWER_THAN_TWO_PARSEABLE_JUDGEMENTS" })
+        : Object.freeze({ kind: "MEASURED" as const, value: servedRootDispersion }),
+      controls: Object.freeze({
+        gamma: verdictLabelControls.gamma,
+        highCut: verdictLabelControls.highCut,
+        lowCut: verdictLabelControls.lowCut,
+        disagreementThreshold: verdictLabelControls.disagreementThreshold
+      })
+    });
+    const verdictLabel = deriveVerdictLabel(verdictLabelBasis);
     const servedNodes = buildFixedSingleRootServeNodes(
       authoredMakerPositions,
       servedRoot.nodeId
@@ -2489,6 +2624,29 @@ export class WalkingSkeletonRunner {
       operatorResolutions: propagation.operatorResolutions,
       transmissionReductions: propagation.transmissionReductions,
       liftRecords: propagation.liftRecords,
+      // T10: the served-root decision and its MARGIN TO THE RUNNER-UP are
+      // recorded on the propagation receipt — the same record that already
+      // carries the judgement selection rule and the operator supplying level.
+      servedRootSelection: {
+        rule: servedRootSelection.rule,
+        servedNodeId: servedRoot.nodeId,
+        servedStrength: servedRootSelection.servedStrength,
+        runnerUp: servedRootSelection.runnerUp,
+        margin: servedRootSelection.margin,
+        tiebreak: servedRootSelection.tiebreak,
+        candidateCount: servableMakerPositions.length,
+        // T11 reads the same numbers; recording the label beside them makes the
+        // receipt self-checking rather than a pair of records that can drift.
+        verdictLabel: {
+          label: verdictLabel.label,
+          rung: verdictLabel.rung,
+          trigger: verdictLabel.trigger,
+          basisAbsence: verdictLabel.basisAbsence,
+          disagreement: verdictLabelBasis.disagreement,
+          registerVersion: verdictLabelControls.registerVersion,
+          sourceRefs: verdictLabelControls.sourceRefs
+        }
+      },
       judgementSelectionRule: {
         ...selection.rule,
         selectedJudgementRef: selection.selectedJudgementRef,
@@ -2989,6 +3147,38 @@ export class WalkingSkeletonRunner {
         result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, "UNRESOLVED-TYPE-FALLBACK"]) };
       }
     }
+    // T11 / confirm-item 6: an answer whose label was derived without a complete
+    // basis says so ON THE ANSWER. The derivation itself happened before
+    // composition; the disclosure is attached HERE, where the terminal is known,
+    // because only a terminal that carries a served number carries a label —
+    // exactly the pattern the owed-check and type-fallback disclosures use.
+    // The SAME predicate serve uses for a usable verdict basis: a served number
+    // on a SERVED or DOWNGRADED terminal. Anything else projects unavailability
+    // and carries no label, so a basis mark there would name a label nobody was
+    // shown. serve stops loudly if this and its own predicate ever disagree.
+    const answerCarriesLabel = compositionEvidenceRequired(result)
+      && (result.terminal === "SERVED" || result.terminal === "DOWNGRADED");
+    if (answerCarriesLabel && verdictLabel.marks.length > 0) {
+      conditionMarkRecords = Object.freeze([
+        ...conditionMarkRecords,
+        Object.freeze({
+          mark: LABEL_BASIS_INCOMPLETE_MARK,
+          scope: "answer",
+          subjectRef: servedRoot.nodeId,
+          reason: `The three-state label was derived without ${verdictLabel.basisAbsence.map((limb) => limb === "MARGIN"
+            ? "a margin (no runner-up root exists to measure one against)"
+            : "a disagreement measure (the winning root's panel returned fewer than two parseable judgements)").join(" and without ")}; the label is CONTESTED because a basis this thin can never print SUPPORTED`,
+          liftPath: verdictLabel.basisAbsence.includes("MARGIN")
+            ? "Run a second maker so a rival root exists to measure a margin against"
+            : "Restore a second parseable panel judgement on the served root",
+          servedRootRule: null,
+          affectedNodeIds: [servedRoot.nodeId]
+        } satisfies ConditionMarkRecord)
+      ]);
+      if (!result.conditionMarks.includes(LABEL_BASIS_INCOMPLETE_MARK)) {
+        result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, LABEL_BASIS_INCOMPLETE_MARK]) };
+      }
+    }
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
@@ -3009,7 +3199,12 @@ export class WalkingSkeletonRunner {
         producer: this.settings.propagationProducer,
         replayHandle,
         propagationRunId
-      } : null
+      } : null,
+      // T11: the propagated numbers the label is derived from. serve re-derives
+      // from these — the derivation is pure, so the runner's disclosure decision
+      // above and the persisted label cannot disagree, and serve stops loudly if
+      // they ever do.
+      verdictLabelBasis: answerCarriesLabel ? verdictLabelBasis : null
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",

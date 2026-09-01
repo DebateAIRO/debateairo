@@ -197,9 +197,9 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   });
 
   it("T32 mints exactly H/L/N and enforces typed required records without pretending class N is revealable", () => {
-    // J13(b) 29 -> 31: the two panel disclosure marks were minted MID-LIST, so the
-    // DR-176 positional tail this test depends on is unchanged (asserted below).
-    expect(CONDITION_MARKS).toHaveLength(31);
+    // J13(b) 29 -> 31, then T11 31 -> 32: every new mark was minted MID-LIST, so
+    // the DR-176 positional tail this test depends on is unchanged (asserted below).
+    expect(CONDITION_MARKS).toHaveLength(32);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

@@ -333,6 +333,9 @@ export const propagationRun = ledger.table("propagation_run", {
   judgementSelectionRuleKey: text("judgement_selection_rule_key"),
   judgementSelectionRuleRegisterVersion: bigint("judgement_selection_rule_register_version", { mode: "number" }),
   judgementSelectionRuleSourceRef: text("judgement_selection_rule_source_ref"),
+  // T10: the served-root decision and its margin to the runner-up. NULL on the
+  // DR-184 catch-up path, which re-propagates without re-selecting a root.
+  servedRootSelection: jsonb("served_root_selection"),
   atSeq: bigint("at_seq", { mode: "number" }).notNull()
 });
 

@@ -525,6 +525,17 @@ export async function createAcceptanceRuntime(input: {
       unmappedReason: panelWeighting.unmappedReason,
       sourceRefs: { ...verdictLabels.sourceRefs, ...panelWeighting.sourceRefs }
     },
+    // S6-1 / T11: the sealed verdict-label family, READ from the same seeded
+    // register. gamma, the two cuts and the disagreement threshold reach the
+    // label ladder as identifiers; no value is restated here.
+    verdictLabelPolicy: {
+      registerVersion: verdictLabels.registerVersion,
+      gamma: verdictLabels.gamma,
+      highCut: verdictLabels.highCut,
+      lowCut: verdictLabels.lowCut,
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      sourceRefs: verdictLabels.sourceRefs
+    },
     // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
     // leg for M=2 compatibility. Every further configured maker is carried by
     // additionalMakers; each artifact persists its maker/provider lineage.
