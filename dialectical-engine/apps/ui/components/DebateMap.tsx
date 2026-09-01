@@ -132,7 +132,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
               cy={CY}
               r={HUB_R}
               fill="var(--reasoning-line)"
-              stroke="var(--line-strong)"
+              stroke="var(--core)"
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
               onClick={() => {

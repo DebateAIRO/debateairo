@@ -476,7 +476,7 @@ describe("card anatomy", () => {
     );
     const hub = container.querySelector<SVGCircleElement>('circle[r="44"]');
 
-    expect(hub?.getAttribute("stroke")).toBe("var(--line-strong)");
+    expect(hub?.getAttribute("stroke")).toBe("var(--core)");
   });
 
   it("keeps Regenerate on the owner canvas argument card", async () => {

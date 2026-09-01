@@ -21,9 +21,9 @@ export const SCRUTINY_STATUS: Record<string, ScrutinyStatus> = {
   },
   contested: {
     label: "Contested",
-    color: "var(--gold-line)",
-    bg: "var(--gold-bg)",
-    text: "var(--gold-text)"
+    color: "var(--dispute)",
+    bg: "var(--dispute-bg)",
+    text: "var(--dispute-text)"
   },
   strengthened: {
     label: "Strengthened",
