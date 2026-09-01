@@ -156,14 +156,26 @@ const claudeAdapter: CliRelayAdapter = {
   //   "user"          -> normal answer, exactly one reported model, $0.032
   //   "project,local" -> `Not logged in` again
   // The CLI's login is carried by the USER source and by nothing else, so
-  // "user" is both necessary and sufficient — the narrowest value that lets an
-  // authenticated CLI see its own keychain login. Project and local settings
-  // stay excluded, which is where repository-specific CLAUDE.md, hooks,
-  // permissions and MCP wiring would otherwise enter a relayed call.
+  // "user" is the narrowest SOURCE LIST that lets an authenticated CLI see its
+  // own keychain login. Project and local settings stay excluded.
+  //
+  // --safe-mode carries the isolation that "" used to provide, without the
+  // auth cost. Loading the user source alone would also load user MEMORY: with
+  // `--setting-sources user` the model answered YES to "do your instructions
+  // include user-level memory loaded from a CLAUDE.md file?" (probe-05, 5423
+  // context tokens); adding --safe-mode it answered NO (probe-06, 2717 tokens)
+  // and still authenticated with exactly one reported model. The installed
+  // binary sets CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 for this flag and its
+  // customization-disable map carries `claudeMd:true, hooks:true, plugins:true`.
+  //
+  // Both are needed: --setting-sources user narrows WHICH SCOPES load,
+  // --safe-mode disables the CUSTOMIZATIONS within them. Neither alone is
+  // sufficient — dropping either is caught by a test.
   buildArguments: (prompt) => [
     "-p", prompt,
     "--output-format", "json",
     "--setting-sources", CLAUDE_SETTING_SOURCES,
+    "--safe-mode",
     "--strict-mcp-config",
     "--no-session-persistence",
     "--tools", "",

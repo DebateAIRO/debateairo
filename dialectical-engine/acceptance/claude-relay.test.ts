@@ -216,7 +216,9 @@ describe("FAIR-02 Claude Code CLI relay", () => {
         "-p", relayed.prompt,
         "--output-format", "json",
         // D18: "user", not "" — "" severed the CLI's keychain login.
+        // --safe-mode restores the isolation "" provided, without the auth cost.
         "--setting-sources", "user",
+        "--safe-mode",
         "--strict-mcp-config",
         "--no-session-persistence",
         "--tools", "",
@@ -501,5 +503,26 @@ describe("F26 ceremony preflight parity", () => {
     });
 
     expect(preflight.handshake.model).toBe("claude-fake-cli-model");
+  });
+});
+
+describe("D18 r2 — CLI customizations excluded from relayed calls", () => {
+  it("passes --safe-mode so user memory, hooks and plugins cannot enter a relayed call", async () => {
+    // Measured on claude 2.1.247 (logs/trel2/probe-05, probe-06), identical
+    // prompt, only --safe-mode differing:
+    //   --setting-sources user              -> model answers YES (user CLAUDE.md in context), 5423 ctx tokens
+    //   --setting-sources user --safe-mode  -> model answers NO,                              2717 ctx tokens
+    // Both authenticate (is_error false, exactly one reported model), so the
+    // isolation is free of any auth cost.
+    const relay = await start();
+    const response = await postCompletion(relay, "Customizations disabled.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+
+    expect(relayed.argumentList).toContain("--safe-mode");
   });
 });
