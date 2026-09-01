@@ -10,6 +10,7 @@ import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
+import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -86,7 +87,12 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
           .end(JSON.stringify({ error: "PROVIDER_DOUBLE_UNSCRIPTED_CLASS", requestKind }));
         return;
       }
-      const content = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
+      const scripted = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
+      // T5/S3-1: a review response must measure exactly the edges THIS call
+      // offered, so the declared policy is resolved against the live request.
+      const content = scripted !== undefined && requestKind === "REVIEW"
+        ? withRequestDerivedBearings(scripted, body)
+        : scripted;
       if (content === undefined) {
         response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "UNEXPECTED_TEST_CALL" }));
         return;
@@ -128,8 +134,23 @@ function judgementDouble(statement: string): string {
   });
 }
 
-function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
-  return JSON.stringify({ outcome, reasons: [reason] });
+/**
+ * T5/S3-1: the review artifact now also carries one bearing per edge the
+ * reviewed node sources, and the count is pinned to the edges the CALL offered
+ * — which a scripted string cannot know. The fixture declares a POLICY and the
+ * double above expands it against the real request.
+ *
+ * The default is `cannot-assess`: this double does not assess bearings and says
+ * so in the goal's own vocabulary rather than claiming to have measured zero
+ * edges. Those edges stay UNKNOWN and contribute nothing, so the ceremony's
+ * numbers are exactly what they were before T5 landed.
+ */
+function reviewDouble(
+  outcome: "agree" | "dispute" | "cannot-assess",
+  reason: string,
+  bearings: ReviewBearingPolicy = "cannot-assess"
+): string {
+  return JSON.stringify({ outcome, reasons: [reason], edge_bearings: { __policy: bearings } });
 }
 
 /** T3 / S2-2: one panel member's assessment of a node another maker authored. */
