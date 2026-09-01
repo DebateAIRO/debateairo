@@ -2,22 +2,16 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  buildApi as buildApiBase,
-  type AskApplication,
-  type RunCreationSettings
-} from "@debateai/api";
+import { buildApi as buildApiBase, type AskApplication } from "@debateai/api";
 import {
   AskRequestSchema,
   EXPANSION_DEPTH_MAX,
   EXPANSION_DEPTH_MIN,
-  createContractClient,
   type AskRequest
 } from "@debateai/contract";
 import { resolveExpansionDepth } from "@debateai/runner";
 import { createDebate } from "../../apps/ui/lib/api.js";
 import { createBrowserContractClient } from "../../web/lib/api.js";
-import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -54,26 +48,11 @@ function fixtureApplication(): AskApplication {
   };
 }
 
-function admissionSettings(): RunCreationSettings {
-  return {
-    strangerSampleRate: 0,
-    registerVersion: 1,
-    batteryVersion: "battery:test",
-    settlementWatchHandle: "watch:test",
-    resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
-    resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
-    resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
-      effectiveRiskTier, tierSource, tierProvenanceRef
-    })
-  };
-}
-
-function buildAskApi() {
+function buildAskApi(application: AskApplication = fixtureApplication()) {
   return buildApiBase({
-    application: fixtureApplication(),
+    application,
     sessions: testSessionApplication([IDENTITY]),
-    allowedOrigin: TEST_APP_ORIGIN,
-    runCreation: admissionSettings()
+    allowedOrigin: TEST_APP_ORIGIN
   });
 }
 
@@ -100,12 +79,9 @@ describe("S1-1 · depth enforced at the contract door", () => {
   // ask ever reaches the application.
   it("refuses depth 9 at POST /v1/asks with the parseRequest 400 envelope", async () => {
     let submitted = 0;
-    const application = fixtureApplication();
-    const api = buildApiBase({
-      application: { ...application, submit: async () => { submitted += 1; return { run_ref: RUN_ID, status: "QUEUED" as const }; } },
-      sessions: testSessionApplication([IDENTITY]),
-      allowedOrigin: TEST_APP_ORIGIN,
-      runCreation: admissionSettings()
+    const api = buildAskApi({
+      ...fixtureApplication(),
+      submit: async () => { submitted += 1; return { run_ref: RUN_ID, status: "QUEUED" as const }; }
     });
     try {
       const response = await api.inject({
