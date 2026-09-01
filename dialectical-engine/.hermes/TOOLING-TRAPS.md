@@ -840,3 +840,9 @@ space-separated string) ran ONCE with the whole string as `f` under zsh, so ever
 failed, the fingerprint never changed, and it reported STAGNATION while all four lanes
 were actively writing. bash word-splits here; zsh does not. Use an explicit list or a
 real array (`LANES=(a b c)` + `"${LANES[@]}"`) in any polling loop.
+
+- **Vitest jsdom can expose `import.meta.url` with an HTTP scheme.** CODE-T1C3 used
+  `fileURLToPath(new URL(..., import.meta.url))` in a jsdom render test and got
+  `TypeError: The URL must be of scheme file` before the feature assertion ran. Cost:
+  one broken RED run and one correction pass. When the acceptance command is explicitly
+  pinned to the worktree root, resolve source fixtures from `process.cwd()` instead.

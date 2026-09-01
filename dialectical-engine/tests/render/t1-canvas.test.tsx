@@ -543,6 +543,40 @@ describe("card anatomy", () => {
 });
 
 describe("set-aside and synthesis", () => {
+  it("changes the visible set-aside card count when the toggle changes", async () => {
+    const projected = debateDetailFromAnswer(answer).tree!;
+    const seed = projected.children[0]!;
+    const setAside: DebateNode = {
+      ...seed,
+      id: "node:set-aside",
+      parent_id: projected.id,
+      claim: "The set-aside path under test.",
+      path_status: "abandoned",
+      stopping_status: "abandoned",
+      children: []
+    };
+    const container = await mountElement(
+      <DebateCanvas
+        root={{ ...projected, children: [...projected.children, setAside] }}
+        expanded={new Set()}
+        selectedNodeId={null}
+        meta={{ claims: 3, depth: 1, judged: 2, derivedStanding: 2, setAside: 1 }}
+        onOpenNode={() => {}}
+        onChallengeNode={() => {}}
+        onToggleExpand={() => {}}
+      />
+    );
+    const toggle = container.querySelector<HTMLInputElement>(
+      '.canvasStickyToggle input[type="checkbox"]'
+    );
+    const countVisibleSetAside = () => container.querySelectorAll('[data-set-aside="true"]').length;
+    const before = countVisibleSetAside();
+
+    expect(toggle, "set-aside toggle").not.toBeNull();
+    await act(async () => toggle!.click());
+    expect(countVisibleSetAside()).not.toBe(before);
+  });
+
   it("uses the reference synthesis labels and semantic lean tokens", async () => {
     const container = await mountElement(
       <SynthesisPanel
