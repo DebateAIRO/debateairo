@@ -91,3 +91,22 @@ Every entry below was paid for at least once. Do not pay for it again.
   classes; keep FIFO only for genuinely untyped requests such as health probes. Fixing
   the guess in `ceremony.test.ts` and `database.test.ts` left all their fixtures green,
   so the fallback was masking, not load-bearing. (T3 r2)
+- Adding a member to a CLOSED VOCABULARY has a fixed shape in this repo, and skipping any
+  step ships a FACSIMILE — a string that looks like a canonical value but is rejected by
+  the parser that is supposed to disclose it. The full chain: `packages/kernel`
+  CONDITION_MARKS (**insert MID-LIST** — the DR-176 tail is read positionally by
+  `CONDITION_MARKS.slice(-4)` in `tests/unit/t4-way-of-knowing.test.ts`,
+  `tests/unit/dr174-resilience.test.ts` and the runner's required-record gate) →
+  `packages/contract` `z.enum(CONDITION_MARKS)` (automatic, but PROVE it with
+  `ConditionMarkSchema.parse`) → the `ConditionMarkRecord.mark` union in
+  `packages/serve/src/index.ts` (NOT automatic) → a runner projection that actually emits
+  it → the deliberately-exhaustive UI switches `apps/ui/lib/v3/labels.ts` and
+  `web/lib/v3Presentation.ts` (these fail typecheck by design — one forced line each) →
+  `pnpm run generate:contract` → both D16 surface gates. Write the two-line admission
+  test (`CONDITION_MARKS` contains it; the schema parses it) FIRST: a behavioural test
+  that asserts against your own untyped JSON will pass while the mark is still a
+  facsimile. (T3 r3)
+- A scope claim like "my diff does not touch packages/kernel, so D16 does not gate" is a
+  DERIVED fact with an expiry — it silently becomes false when a later round edits the
+  kernel. Re-run the gate greps immediately before freezing a report, never once at the
+  start. (T3 r3)
