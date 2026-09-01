@@ -819,3 +819,17 @@ permission classifier (correctly) refused to relaunch.
 Found by CODE-T9C4-N1 (2026-09-01): a zsh `for path in ...` loop overwrites the special
 $path array (mirror of $PATH), making commands appear missing for the rest of the shell.
 Use any other variable name in zsh loops (`p`, `f`, `file`).
+
+## codex sandbox: pnpm exec tsx -e fails with listen EPERM
+Found by CODE-T1C2 (2026-09-01): `pnpm exec tsx -e '<expr>'` attempts an IPC listen the
+sandbox denies. Workaround (established T9-C2): `node --import tsx -e` or write the
+expression to a scratch file and run it.
+
+## codex workspace-write blocks real loopback HTTP fixtures
+Found by CODE-T1C2-RW1 (2026-09-01): the amended row-8 gate adds
+`tests/unit/v2ui-ownership.test.ts`, whose `beforeAll` must bind a real HTTP server to
+`127.0.0.1`. In the Codex workspace-write sandbox it crashes before assertions with
+`EPERM listen 127.0.0.1`; an isolated test run and a minimal Node `createServer` positive
+control reproduce it. Do not count this as a product RED or replace the socket with a mock:
+run this gate in Hermes/non-sandboxed verification, or dispatch the worker in an environment
+whose approved permissions allow loopback listeners.
