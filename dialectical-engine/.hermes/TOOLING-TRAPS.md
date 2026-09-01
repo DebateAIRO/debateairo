@@ -57,3 +57,23 @@ Every entry below was paid for at least once. Do not pay for it again.
   three `vitest run` processes live (lane-t2, lane-t4, primary), `pnpm test` took 2984s vs
   T0's 515s — 5.8x. Budget suite wall-clock by counting concurrent lanes before promising
   a three-run cluster on the FULL suite, and never read a slow run as a hang. (T2)
+- An acceptance **provider double that classifies a request on a QUOTED fragment of the
+  rendered prompt never matches**: the packet is JSON-encoded onto the wire, so
+  `"statement": non-empty string` arrives as `\"statement\": non-empty string`.
+  `acceptance/ceremony.test.ts` carries exactly this dead check and survives only because
+  its fixed FIFO falls back to popping index 0 — i.e. **a FIFO queue masks a broken
+  classifier**. Key on escape-safe fragments (`restatement_text`, `served_number_refs`,
+  `conforms,findings`) and make the double **refuse to guess**: record the unclassified
+  body and answer 500, or a fixture gap surfaces as a bogus production error
+  (`JUDGE_SCHEMA_FAILURE`) and a RED that proves nothing. (T3)
+- **Adding one provider call site is a repo-wide event.** Before wiring a new model call,
+  grep `call_site_key LIKE` across `migrations/*.sql` AND tests: expansion legs are
+  enumerated by pattern (`JUDGE:%:root%:r1:p%` in acceptance/ceremony.test.ts:511,
+  `JUDGE:%:root%:r%` in tests/integration/database.test.ts:1824), so a new call that reuses
+  the `JUDGE:` prefix is silently counted as an authoring leg. Give a new call class its
+  own namespace (`PANEL:`) rather than editing the assertions. Also check fixed-queue
+  provider doubles and the sealed envelope basis. (T3)
+- `tools/orphan-audit`'s **`neverCalled` list is hand-declared with no cross-check against
+  `reachableCallables`** — wiring a listed surface makes the entry a silent lie, and no
+  test fails. (`s04Surface`/`s05Surface` are safe: their attachment is derived.) After
+  attaching any surface, edit `neverCalled` by hand. (T3)
