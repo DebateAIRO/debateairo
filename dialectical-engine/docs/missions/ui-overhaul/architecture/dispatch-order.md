@@ -127,6 +127,58 @@ RETARGET pin that genuinely reads `NodeDetailDrawer.tsx`, the file T5 rewrites.
 `prov01` stays in every T5 command as an unedited regression guard, which is
 what a KEEP file is for.
 
+### The PRESERVING-WRITE clause (added 2026-09-01, AM14)
+
+The law above transfers pin ownership to whoever **rewrites** a product file,
+because a rewrite can move the anchors a pin reads. AM14's fidelity rows write
+`globals.css` (owned by row 1) and `LandingChrome.tsx` / `LandingSample.tsx`
+(rows 2/4/5) without rewriting anything a pin can see, and the mechanical rule
+would hand a *styling* worker edit rights over the token contract and over
+`pda-s03-keyboard-accessibility.test.ts`. That is guard rail 1 inverted, and it
+is worse than the hole it closes. So:
+
+> **A PRESERVING write does not transfer pin ownership.** A cluster's write on
+> file `P` is PRESERVING when its charge forbids removing anything a pin can
+> see:
+>
+> - **stylesheet form** — the diff over `P` has **zero removed lines** and
+>   **exactly one hunk**, appended at end of file under a named banner comment;
+> - **component form** — the post-edit render's set of `data-*` attributes,
+>   `href` values, `aria-*` values and text nodes is a **superset** of the
+>   pre-edit set.
+>
+> Both shapes are checkable and the cell must publish the check. Pins reading
+> `P` then enter the preserving cluster's verify command as **KEEP-class
+> guards**: a RED is fixed in the product — by removing or correcting the
+> appended rules — and **never** in the pin.
+
+The clause is narrow on purpose. It does not apply to a cluster that renames,
+re-nests, deletes or re-strings; those are rewrites and the original rule
+stands. It applies to the one shape that provably cannot break a reader:
+**addition**.
+
+The checkable form of the stylesheet clause, runnable as written from the pnpm
+workspace root:
+
+```sh
+# 1. purely additive: no removed lines
+git diff --unified=0 -- apps/ui/app/globals.css | grep -cE '^-[^-]'   # required: 0
+# 2. one contiguous block, not scattered edits
+git diff --unified=0 -- apps/ui/app/globals.css | grep -cE '^@@'      # required: 1
+# 3. the block is present, under its banner
+grep -c 'FID-1 LANDING CHROME' apps/ui/app/globals.css                # required: 1
+```
+
+Zero deletions + one hunk + the banner present is *strictly appended*, which is
+the whole content of the claim.
+
+**Run, not asserted.** On the tree at `259de07d` all three print `0 / 0 / 0`
+(nothing appended yet). Appending a banner and one rule and re-running prints
+**`0 / 1 / 1`** — the gate discriminates. `grep -c` exits **1** when the count
+is zero, so this block must not be run under `set -e`, and a wrapper must read
+the printed count rather than the exit status. Probe reverted; `git status
+--porcelain apps/ui/app/globals.css` empty afterwards.
+
 ### The five adjudicated exemptions — published, because an unpublished exemption is a hole
 
 A cluster writing a file a pin reads is a **candidate** breaker, not a breaker.
@@ -192,6 +244,76 @@ publication warning pins (`may be indexed by search engines`,
 `Copies may persist after unpublishing`) with it — a privacy-warning regression
 disguised as a refactor. T9-C1's row does not list s8 as a write for exactly
 this reason: at #2 the pin must still pass unedited.
+
+## FIDELITY LAW (added 2026-09-01, AM14 — gates every remaining visual cell)
+
+**Every VISUAL cell names two halves, explicitly. A cell that names neither is
+not a visual cell and must not be dispatched.**
+
+**(a) The machine-checkable half.** Assertions that go RED when the surface
+stops looking like the design. A string-or-attribute assertion is *not* this
+half — that is precisely what let the landing chrome ship as three stacked
+lines with every gate green. jsdom cannot supply this half: it does not resolve
+`var()`, does not lay out, and reports every geometry as `0`. So this half is
+executed in a **real browser**, by the procedure named below, and its output is
+quoted into the cluster report.
+
+**(b) The V-QA half.** The judgement V makes by looking, written as a question
+with a subject so it can be answered yes/no and recorded — not "looks right".
+
+### Why (a) is a procedure and not a committed vitest case
+
+Measured, not assumed:
+
+```sh
+$ grep -rn 'playwright' package.json apps/ui/package.json
+                        # no matches — Playwright is in no manifest in this repo
+```
+
+and two further constraints already paid for in this mission: the Playwright
+MCP **blocks `file://`**, so a fixture needs a loopback HTTP server; and a
+worker sandbox has already been observed to fail `listen EPERM` on loopback,
+which silently converts a real-HTTP contract test into a blocked gate
+(`CODE-T1C2-REV-claude.md` §11.2, now in `TOOLING-TRAPS`). A committed browser
+test would therefore be a gate that is green on one machine, blocked on
+another, and absent from CI. **Half (a) is a seat procedure with a published
+output; the residue that jsdom genuinely can see — class presence, attribute
+cascade, `:has()`, structural order, text content — is committed as ordinary
+pins in the same cell.**
+
+### THE DOM-DUMP BROWSER KIT — named once, so no cell re-invents it
+
+1. Render the real component tree in jsdom, **in the real test file**, via a
+   throwaway `it("DUMP")` that writes `container.innerHTML` to `/tmp`.
+2. Serve that file **plus the real `apps/ui/app/globals.css`** on loopback.
+3. Open it in Chromium through the Playwright MCP; set
+   `document.documentElement.dataset.mode` to `terracotta` and then `chamber`,
+   reading **both**.
+4. Read `getComputedStyle` and `getBoundingClientRect` for the values the cell
+   names. Geometry claims come from rects; colour and elevation claims come
+   from computed style.
+5. **Tear down**: restore the test file by checksum, and delete any
+   `.playwright-mcp/` output the MCP wrote into the CWD **before** the tree
+   check. Note that a `.playwright-mcp/` directory may already be **tracked** at
+   the git root from an earlier mission — `rm -rf` it and you have deleted
+   committed files. Check `git status --porcelain .playwright-mcp` after
+   cleanup; if it shows deletions, `git checkout -- .playwright-mcp`.
+
+Step 5's warning is written from the inside: this amendment ran the kit, deleted
+the tracked directory, and restored it.
+
+### Inheritance — this is a pre-dispatch gate, not advice
+
+**T5, the T3 list surfaces, T4, T6, T7 and T8 do not dispatch until every
+visual cell in them carries both halves.** The router checks this at
+pre-dispatch, the way it checks the write surface. A cell whose acceptance is
+only `toContain("...")` over a subtree is, after AM14, an incomplete cell —
+the same status a missing verify command has.
+
+**What "visual" means here**, so nobody argues the boundary: a cell is visual if
+its SPEC row describes appearance, layout, or composition — anything a reader
+sees rather than reads. A cell about a route, a href, a schema, or a string's
+presence is not visual and inherits nothing.
 
 ## Wave 0 — the foundation. One seat. Everything else is gated on it.
 
@@ -1015,6 +1137,486 @@ where a `next` parameter quietly gets dropped.
 T8-C4. Split it the same way as `t9-landing`: T7-C4 owns the sign-in
 `describe`s, T8-C4 owns the sign-up/enrolment `describe`s.
 
+## Wave 6 — fidelity (added 2026-09-01, AM14). Rows 33-35.
+
+**Position is a dependency bound, not a schedule.** These rows carry positions
+33-35 so the survivability law reads correctly over them: every cluster that
+writes their files — #1 (`globals.css`), #2, #4, #5 (the landing components) —
+sits before them. All four are **merged today**, so rows 33 and 34 are
+**unblocked and dispatchable now**, ahead of waves 3-5. Nothing later in the
+order writes `LandingChrome.tsx`, `LandingSample.tsx` or `globals.css`, so
+nothing can overwrite them afterwards.
+
+| # | Cluster | Writes | Verify |
+|---|---|---|---|
+| 33 | **FID-1** — the landing chrome bar, ported | `apps/ui/components/landing/LandingChrome.tsx` (PRESERVING — component form) · `apps/ui/app/globals.css` (**PRESERVING — stylesheet form; appended block only, banner `FID-1 LANDING CHROME`; see the enumeration below**) · `tests/render/t9-landing.test.tsx` (**new describe `FID-1 chrome fidelity` only**) | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/t9-mode-tokens.test.ts tests/unit/v2ui-pages.test.ts` |
+| 34 | **FID-2** — the sample cards, full anatomy + the generic `ModelPill` | `apps/ui/components/landing/LandingSample.tsx` (PRESERVING — component form) · `apps/ui/components/ModelPill.tsx` (**new file**) · `tests/render/t9-landing.test.tsx` (**new describe `FID-2 sample fidelity` only**) | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/render/t9-landing.test.tsx tests/render/ui02d-model-identity.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
+| 35 | **FID-3** — the fidelity sweep (review-class; **no product writes**) | `.hermes/reports/ui-overhaul/agent-reports/FID-03-<model>.md` only | not a vitest row — the sweep's output *is* its verify; see the FID-3 spec below |
+
+**Row 33's three `globals.css` readers are KEEP-class guards**, under the
+PRESERVING-WRITE clause. Which tests those are was **measured, not assumed** —
+the AM5 lesson, and it cost a file:
+
+```
+$ for f in <row 33's verify set>; do grep -c 'globals.css' $f; done
+t9-mode-tokens.test.ts   4        <- reads it
+v2ui-pages.test.ts       2        <- reads it
+pda-s03-....test.ts      1        <- reads it, and reads the chrome's attributes
+auth-front-door-parity   0
+s8-publication-contract  0
+t9-landing.test.tsx      0        <- reads the components, via the page render
+t1-canvas.test.tsx       0        <- reads NOTHING of FID-1's; REMOVED from the row
+```
+
+`t1-canvas.test.tsx` was in my first draft of row 33 on the assumption that the
+canvas render pin loads the stylesheet. It does not — jsdom does not resolve
+`var()`, which is why the T1-C2 reviewer needed a browser at all. A test that
+cannot observe the change cannot guard it, so it is out; leaving it in would
+have been theatre with a 4-second price. Row 34 carries
+`ui02d-model-identity.test.tsx` on a real read (`ModelPresentation` = 1) — it is
+the standing pin on model identity and `ModelPill` must not disturb it.
+
+For all three guards: if one goes RED, the appended rules are wrong and FID-1
+fixes **them**. FID-1 may not edit any of the three.
+
+**`ModelPresentation.tsx` is NOT in row 34's write surface.** It belongs to row
+8 (`T1-C2`), which is live (`CODE-T1C2-ADD2`). See the ModelPill decision below.
+
+### Why FID-1 and FID-2 exist: the two halves, measured before the cells were written
+
+Both halves below were taken with the DOM-DUMP BROWSER KIT against the
+**shipped** markup and the **real** `globals.css`, Chromium via the Playwright
+MCP on loopback, before a line of this section was drafted. They are the RED
+baseline the cells must move.
+
+**The chrome bar (shipped, `LandingChrome.tsx` at `259de07d`):**
+
+```
+header[data-landing-section=chrome]  display: block        <- not a flex row
+  child 1  <a> wordmark              top 198  h 19         display: inline
+  child 2  <nav>                     top 216  h 19  w 1200 display: block
+  child 3  <div> actions             top 235  h 34  w 1200 display: block
+  header backgroundColor  rgba(0, 0, 0, 0)   border-radius 0px   box-shadow none
+```
+
+Three children on three different lines. No background, no radius, no shadow.
+The component carries **zero** `className` attributes and `globals.css` carries
+**zero** rules that select it — `grep -nE 'landing|data-landing-section'
+apps/ui/app/globals.css` returns exactly one line, the AM6 suppression rule at
+`globals.css:219`, which only *hides* the app `.topBar`. Nothing styles the bar
+because nothing was ever asked to.
+
+**The same bar with the ported rules** (fixture built from the values quoted in
+`FID-1-1` below, both modes):
+
+```
+                  terracotta                         chamber
+bar height        62px                               62px
+bar width         730px                              730px
+children          3, vertical centres 65 / 65 / 65   identical
+max centre delta  0.0px from the bar centre          0.0px
+background        rgba(251, 249, 244, 0.8)           rgba(20, 17, 14, 0.7)
+border-radius     16px                               16px
+box-shadow        rgba(26,22,19,.26) 0 20px 46px -22px   rgba(0,0,0,.85) 0 24px 52px -24px
+backdrop-filter   blur(18px) saturate(1.5)           blur(18px) saturate(1.5)
+CTA background    rgb(41, 38, 31)                    rgb(242, 234, 217)
+arrow radius      9px                                9px
+```
+
+`62px` and `0.0px` are the numbers `FID-1-2` pins. They are measured, not
+chosen.
+
+**What was checked and found FALSE, recorded because I would have published
+it.** I had drafted a finding that `LandingSample.tsx`'s use of
+`className="nodeWrap"` breaks the sample grid, because `globals.css:1944` sets
+`.nodeWrap { position: absolute; }` with no offsets and the cards sit in a
+`display:grid`. In the browser the grid lays out correctly — 2 columns, 552px
+each, height 90px — because `LandingSample.tsx:114` passes an inline
+`position: "relative"` that outranks the class. The finding was wrong and is not
+in any cell. What survives is smaller and true: **the landing depends on an
+inline override of a canvas-graph class**, and `data-bezel` — the shared bezel
+vocabulary `component-map.md` §32 names — has **zero** rules in `globals.css`
+(`grep -n 'data-bezel' apps/ui/app/globals.css` returns nothing), so
+`data-bezel="shell" | "core"` on the sample cards is currently decoration bound
+to nothing.
+
+### PORTING SOURCE HIERARCHY — binding, derived, and the landing gap
+
+V ruled the hierarchy directly on `t_5864f48f` at 09:28, mid-amendment. It is
+stated here once and every FID cell inherits it. **On any discrepancy, the
+authority column wins.**
+
+| tier | file | covers | status |
+|---|---|---|---|
+| **BINDING ORIGINAL** | `/Users/vladmihaimiron/Documents/DebateAIRO/ui_designs/DebateAI Design Document.html` (1,285,323 B) | the **twelve app screens** — `1a Debate canvas`, `3a Library`, `3b Public debate view`, `4a New debate`, `5a Node detail drawer`, `6a Settings`, `7a`-`7c`, `8a`-`8c` | authority |
+| **BINDING for the landing** | `docs/missions/ui-overhaul/design/design-document-rendered.html` (206,757 B, **tracked in this repo**) | the landing, **fully resolved** — no `{{ }}` left, every value computed | authority |
+| derived convenience | `.hermes/planning/ui-overhaul/design-source.html` | the twelve app screens, template form | convenience |
+| derived convenience | `.hermes/planning/ui-overhaul/design-artboard.html` | the landing, template form | convenience |
+
+**The binding original does not contain the landing.** Measured, because V's
+ruling makes it matter:
+
+```
+$ # in "DebateAI Design Document.html"
+data-screen-label      12      <- the twelve app screens, and only those
+"Practice, not performance"     0
+"Start a round"                 0
+"Read a scored transcript"      0
+"backdrop-filter"               0
+```
+
+`docs/missions/ui-overhaul/design/design-document-original.html` is the same
+file by size (1,285,323 B) and scores 0 on the same five markers. The landing
+appears **only** in `design-document-rendered.html`, which is repo-tracked and
+carries it *resolved* — which makes it a better porting source than any template
+form, since the values are already computed. **OPEN FOR V (Q-17):** if a
+separate binding original exists for the landing turn, it supersedes the
+rendered document and every value below is re-checked against it. Until then the
+rendered document is the landing's authority and this row is the record of the
+gap.
+
+**The derived copy was verified rather than trusted**, on exactly the values
+this amendment quotes — counts in the original and in the derived copy, side by
+side:
+
+```
+4 / 4    position:absolute; top:0; left:20px; width:52px; height:4px; border-radius:0 0 5px 5px;
+7 / 7    position:absolute; top:0; left:15px; width:44px; height:4px; border-radius:0 0 5px 5px;
+11 / 11  padding:3px 10px 3px 7px; border-radius:999px;
+2 / 2    Anthropic · Claude · claude-opus-5
+2 / 2    OpenAI · GPT · gpt-5.6-sol
+1 / 1    Google · Gemini · gemini-3-ultra
+1 / 1    gold is reserved for reasoning
+```
+
+Seven of seven identical. The convenience copy is safe to read; the original
+still wins on any discrepancy.
+
+**Every landing value in the FID-1 and FID-2 tables below was then re-verified
+against the resolved document**, and it confirms the port exactly — including
+`font-weight: 480` on the hero `h1` (the `terracotta` variant, resolved),
+`border-radius: 16px` on the nav bar, `box-shadow: rgba(26,22,19,0.26) 0px 20px
+46px -22px` (byte-identical to `--shadow-chrome`), CTA `rgb(41,38,31)` on
+`rgb(249,246,241)` (exactly `--ink` on `--bg`), the maker dot `rgb(180,85,45)`
+(exactly `--m-gpt`), and the stance triple `rgb(61,90,128)` / `.09` / `.26`
+(exactly `--reasoning` and its tint pair). One value in my first draft was
+**wrong and is corrected below**: the card core resolves to `rgb(249,246,241)`
+= `var(--bg)`, not `var(--core)`.
+
+**No design file in any tier contains a single CSS class.** The template forms
+render through `{{ t.* }}` / `{{ tA.* }}` inline styles; the resolved form has
+inline styles and `data-dc-tpl` indices. `design.css` (511KB) is Google Fonts
+`@font-face` blocks and base64 payloads with not one component rule. **This is
+load-bearing for FID-1's cell**: "port the CSS" cannot mean "copy the class
+names", because there are none anywhere. The port *introduces* a class
+vocabulary and binds it to the values below. A cell asserting "the classes
+exist" without saying which would be unsatisfiable.
+
+### The variant is `terracotta`, and it is already in the tokens
+
+`design-artboard.html`'s renderer carries eleven variants. The mission ships
+`terracotta`, which the shipped token surface confirms rather than merely
+claims:
+
+| artboard `terracotta` | value | shipped token | value | verdict |
+|---|---|---|---|---|
+| `dispWeight` | `480` | `--fw-display` | `480` | identical |
+| `rBtn` | `12px` | `--r-btn` | `12px` | identical |
+| `navR` | `16px` | `--r-panel` | `16px` | identical |
+| `rChip` | `999px` | `--r-pill` | `999px` | identical |
+| `navShadow` (light) | `0 20px 46px -22px rgba(26,22,19,.26)` | `--shadow-chrome` | `0 20px 46px -22px rgba(26,22,19,.26)` | byte-identical |
+| `mDots.claude/gpt/gemini` | `#8A63C9` / `#B4552D` / `#3D6FB4` | `--m-claude/-gpt/-gemini` | `#8A63C9` / `#B4552D` / `#3D6FB4` | byte-identical |
+| `tint(accent, .09)` / `.26` | the chip recipe | `--{pro,con,reasoning}-bg` / `-border` | the ported pairs | role-identical |
+
+**Wave 0 ported the palette completely and the composition not at all.** That
+one sentence is the whole defect, and it is why **FID-1 and FID-2 mint zero new
+tokens**: everything they need already resolves in both modes. No mint means no
+new ADR-001 contrast rows and no re-opening of the token surface.
+
+**Geometry ports as literals, and that is legal.** ADR-001's sweep is a
+**colour**-literal sweep — `oklch\(`, `#RRGGBB`, `rgba?\(`. `border-radius: 9px`
+and `padding: 9px 9px 9px 26px` match none of those patterns. The belief that
+every number must become a token is the "uncharged translation" failure named in
+this amendment's changelog entry; it is not the law. **Colours tokenize;
+geometry, spacing, radii and composition port as written.**
+
+### FID-1 — the landing chrome bar
+
+**SPEC.** `T9-S1`. `slices/T9/SPEC.md` is FROZEN; these cells are dispatch truth
+and supersede its chrome wording, the practice AM7 and AM10 used.
+
+**Ported values.** Authority is the resolved landing in
+`design-document-rendered.html`; the template form in `design-artboard.html` is
+quoted where it names the variable, and every value below was checked against
+the resolved document.  With the token each colour becomes: The three-column form exists so a worker
+never has to decide anything:
+
+| element | design (verbatim inline style) | ships as |
+|---|---|---|
+| outer | `position:absolute; top:34px; left:0; right:0; display:flex; justify-content:center; z-index:60` | same, literal |
+| bar | `display:flex; align-items:center; gap:34px; padding:9px 9px 9px 26px; border-radius:{{ t.navR }}; background:{{ t.glass }}; border:1px solid {{ t.hair }}; box-shadow:{{ t.navShadow }}; backdrop-filter:blur(18px) saturate(150%)` | geometry literal; `navR` -> `var(--r-panel)` (16px, identical); `glass` -> `var(--header-bg)`; `hair` -> `var(--line)`; `navShadow` -> `var(--shadow-chrome)` (byte-identical). Keep the `-webkit-backdrop-filter` twin |
+| wordmark | `font-family:Fraunces,serif; font-weight:600; font-size:19px; letter-spacing:-.02em; font-variation-settings:'SOFT' 0,'WONK' 1` | `var(--font-display)`, `var(--fvs-display)`, rest literal, `color: var(--text)` |
+| nav group | `display:flex; align-items:center; gap:28px; font-size:13.5px; font-weight:500; color:{{ t.mute }}` | `mute` -> `var(--muted)`, rest literal |
+| CTA | `display:flex; align-items:center; gap:10px; padding:8px 8px 8px 20px; border-radius:{{ t.rBtn }}; background:{{ t.btnBg }}; color:{{ t.btnText }}; font-size:13.5px; font-weight:600; transition:transform .5s cubic-bezier(.34,1.56,.64,1)`, hover `transform:scale(1.04)` | `rBtn` -> `var(--r-btn)` (12px, identical); `btnBg` = the renderer's `ink` -> `var(--ink)`; `btnText` = the renderer's `canvas` -> `var(--bg)` |
+| CTA arrow | `display:grid; place-items:center; width:26px; height:26px; border-radius:{{ t.rArrow }}; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.26); font-size:12px; line-height:1`, content `&#8594;` | `rArrow` -> literal `9px` (terracotta; no token exists and none is minted). The two whites are the renderer's *page colour at low alpha*, and the renderer flips them to `rgba(0,0,0,.14)` / `.22` in dark — so they ship as `color-mix(in srgb, var(--bg) 14%, transparent)` and `color-mix(in srgb, var(--bg) 26%, transparent)`, which reproduces the mode flip from one declaration. `color-mix` is already an established idiom here (5 uses in `globals.css`) |
+
+**The design's bar holds four items; ours holds seven.** The nav pill in the
+artboard is `[wordmark] [3 nav links] [1 CTA]`. The shipped chrome must also
+carry `Log in`, `Sign up` (both ratified in AM9) and the `ModeToggle` (ADR-002).
+**The composition rule, so this is not re-decided per worker:** the extra items
+join the right-hand actions group as nav-weight items — same `13.5px / 500 /
+var(--muted)` as the nav links, `gap:16px` — and the group ends with the **one**
+`var(--ink)` CTA. There is exactly one filled button in the bar. The
+`ModeToggle` keeps its existing `.modeToggle` class and its
+`data-mode-toggle` attribute untouched; `pda-s03` reads that attribute.
+
+**The `globals.css` write, enumerated.** Append-only, under the banner
+`/* FID-1 LANDING CHROME */`, and these seven selectors and no others:
+
+```
+.landingChrome            .landingChromeBar      .landingWordmark
+.landingNav               .landingChromeActions  .landingCta
+.landingCtaArrow
+```
+
+Plus, inside the same block, `.landingNav a:hover, .landingChromeActions a:hover
+{ opacity: .72; }` — the artboard's only hover rule for links, ported verbatim
+from its `<style>` block. Nothing else. The PRESERVING-WRITE gate above is
+FID-1's acceptance for this file, and the ADR-001 §(a) wave-0 oracle must still
+print **`0`** afterwards (it prints `0` on `259de07d`; re-measured for this
+amendment).
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **FID-1-1** | T9-S1 · fidelity | The chrome's class vocabulary exists and is bound | In `tests/render/t9-landing.test.tsx`, new describe `FID-1 chrome fidelity`: on the **real anonymous `/` render**, assert `[data-landing-section="chrome"]` carries class `landingChrome` and contains, in document order, `.landingChromeBar > .landingWordmark`, `.landingChromeBar > .landingNav`, `.landingChromeBar > .landingChromeActions`, and exactly **one** `.landingCta` containing one `.landingCtaArrow`. **And** assert against `apps/ui/app/globals.css` read as text that each of the seven selectors above appears at least once — jsdom cannot resolve the values, but it can prove the rules are not missing, which is the failure that actually happened. **RED-proof required:** delete any one of the seven rules and show this cell fails |
+| **FID-1-2** (browser half) | T9-S1 · fidelity | The bar is **one horizontal row** with the ported skin, in **both** modes | **DOM-DUMP BROWSER KIT**, output quoted in the cluster report, for `terracotta` **and** `chamber`: (1) every direct child of `.landingChromeBar` has a vertical centre within **1.0px** of the bar's own vertical centre — measured **0.0px** on the ported fixture, so 1.0px is slack, not a target; (2) the bar's height is **≤ 72px** — measured **62px**; (3) `getComputedStyle(bar).backgroundColor` is **not** `rgba(0, 0, 0, 0)`; (4) `borderTopLeftRadius` is `16px`; (5) `boxShadow` is not `none`; (6) the CTA's `backgroundColor` **differs between the two modes** (measured `rgb(41,38,31)` -> `rgb(242,234,217)`), which is the one assertion that catches a bar styled for Terracotta only. The shipped RED baseline for all six is recorded above |
+| **FID-1-3** (V-QA half) | T9-S1 · fidelity | V's judgement, named | Does the anonymous `/` open with a single floating bar — wordmark left, links beside it, one filled `Start a debate` at the right — that reads as designed in **both** modes? Answered by V on the running app, recorded on the ticket. Not a test |
+| **FID-1-4** | T9-S1 · contract | The restyle removes nothing a pin can see | PRESERVING-WRITE, component form: assert the post-edit chrome still exposes `[data-landing-section="chrome"]`, `[data-mode-toggle]`, and the four hrefs `/`, `/login`, `/sign-up`, `/login?next=%2Fnew` — the ADR-004 auth-entry contract and `T9-C2-2` / `T9-C2-4` / `pda-s03` all read these. The three stylesheet-form gate lines are run and their `0 / 1 / 1` output pasted |
+
+### FID-2 — the sample cards, full anatomy
+
+**SPEC.** `T9-S3`. Same supersession note.
+
+**The gap, stated once.** The shipped `LandingSample.tsx` renders **three**
+cards, each carrying a role badge, a BASE and a FINAL badge, and two lines of
+placeholder text (`Model 01 · PRO`, `REVIEW AGREED BY: Model 03`). The design
+renders **four**, each carrying a glyphed stance chip, a gold BASE pill, a
+stance-tinted FINAL pill, an author model pill, **the claim prose**, a rule, a
+verdict-tinted review chip, a reviewer model pill, and a turn counter — as a
+rotated, overlapping deck. The claim prose is the card's content and it is
+entirely absent today.
+
+**The four cards, verbatim from `design-artboard.html`'s `renderVals()`.** These
+strings ship as written — see DECISIONS row (a). None of the four contains
+`round` or `joint`, so the mission's ratified `round`->`debate` /
+`joint`->`claim` substitutions do not apply to any of them; checked, not
+assumed.
+
+| # | stance | glyph | BASE | FINAL | turn | author | reviewer | review | claim (verbatim) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | REASONING | `◆` | 94 | 94 | `01` | `OpenAI · GPT · gpt-5.6-sol` | `Anthropic · Claude · claude-opus-5` | AGREED | Remote-first companies should generally use location-independent salary bands for engineers performing equivalent work, while allowing transparent adjustments for legally required costs, scarce skills, and role scope. |
+| 2 | PRO | `↑` | 95 | 95 | `02` | `Anthropic · Claude · claude-opus-5` | `OpenAI · GPT · gpt-5.6-sol` | DISPUTED | Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker's postal code: two engineers at the same level producing comparable value contribute equally to the firm's output. |
+| 3 | CON | `↓` | 85 | 85 | `03` | `Anthropic · Claude · claude-opus-5` | `OpenAI · GPT · gpt-5.6-sol` | AGREED | Remote-first companies should generally set engineering pay against the local labor market an employee can actually access — geo-tiered bands with transparent, published multipliers — because wages are priced against a worker's realistic alternatives, not against a global abstraction. |
+| 4 | CON | `↓` | 72 | 68 | `04` | `Google · Gemini · gemini-3-ultra` | `OpenAI · GPT · gpt-5.6-sol` | AGREED | A single global rate anchors to the lowest defensible number: when payroll cannot flex by market, firms quietly lower the level everywhere or slow hiring in expensive markets. |
+
+The apostrophes in cards 2 and 3 are U+2019, as in the source. Card 4 is the
+only one whose FINAL differs from its BASE (`72 -> 68`); that asymmetry is the
+point of showing four cards and must survive.
+
+**The resolution above the deck**, also verbatim: `Should remote-first companies
+pay engineers the same salary regardless of where they live?` The shipped code
+repeats the section headline there instead, which is why the sample reads as a
+placeholder. The design's legend row beneath it — three `9px` swatches at
+`border-radius:2px` in `--pro` / `--con` / `--reasoning`, labelled `Pro`, `Con`,
+`Reasoning` — ports with it.
+
+**Ported values.** Same authority: the resolved landing, with the template
+form quoted where it names the variable. Every row below was checked against
+`design-document-rendered.html`:
+
+| element | design (verbatim) | ships as |
+|---|---|---|
+| deck | `max-width:880px; margin:0 auto; padding:40px 0` | literal |
+| card i | `z-index:{1,2,3,4}; margin-top:{0,-54,-48,-50}px; transform:rotate({-1.7,1.3,-1.1,1.6}deg) translateX({-26,20,-14,24}px); transform-origin:{left,right,left,right} center; transition:transform .72s cubic-bezier(.34,1.56,.64,1), box-shadow .72s cubic-bezier(.34,1.56,.64,1); will-change:transform`, hover `rotate(0deg) translateX(0px) translateY(-14px) scale(1.022)` | literal, per card, in that order |
+| shell | `background:{{ t.raised }}; border:1px solid {{ c.shell }}; border-radius:{{ t.rShell }}(=20px); padding:11px; box-shadow:{{ t.cardShadow }}(=`0 30px 62px -30px rgba(41,38,31,.24), 0 8px 20px -12px rgba(41,38,31,.12)`)` | `raised` -> `var(--shell)`; `c.shell` = `tint(accent,.30)` -> `var(--{stance}-border)`; radius literal `20px`; **shadow -> `var(--shadow-pop)`** (`0 30px 60px -26px rgba(41,38,31,.32)`) — see the note below |
+| core | resolved: `background: rgb(249,246,241); border: 1px solid rgba(26,22,19,0.09); border-radius: 13px; padding: 34px 38px 30px; position:relative; overflow:hidden; box-shadow: rgba(255,255,255,0.85) 0 1px 0 inset, rgba(255,255,255,0.4) 0 0 0 1px inset` | **`var(--bg)`, not `var(--core)`** — the landing card's core is the page colour and the shell is the raised bezel (`rgb(239,233,224)` = `--shell`); `hair` -> `var(--line)`; **radius -> `var(--r-card)` (14px; 1px from the design's 13px)**; inset -> `inset 0 1px 0 color-mix(in srgb, var(--core) 85%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--core) 40%, transparent)`, which reproduces the renderer's light `.85`/`.4` and its dark counterpart from one declaration |
+| stance tab | **see `FID-2-2`** — the artboard and the app screens disagree, and the app screens win | |
+| stance chip | `padding:5px 12px; border-radius:{{ t.rChip }}(=999px); background:tint(accent,.09); border:1.5px solid tint(accent,.26); color:accent; font-family:'Plus Jakarta Sans'; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase`, content `{{ c.arrow }} {{ c.role }}` | `var(--r-pill)`, `var(--{stance}-bg)`, `var(--{stance}-border)`, `var(--{stance}-text)`, `var(--font-sans)`; content `↑ PRO` / `↓ CON` / `◆ REASONING` |
+| BASE pill | `padding:4px 11px; border-radius:999px; border:1px solid tint(gold,.45); background:tint(gold,.1); color:gold; font-size:10.5px; font-weight:700`, content `BASE {n}%` | `var(--gold-border)`, `var(--gold-bg)`, `var(--gold-text)`. Gold is in reservation here: BASE is a score band, and `--gold-*` is already the score-uncertainty family |
+| FINAL pill | same box, `border:1px solid {{ c.chipBorder }}; background:{{ c.chipBg }}; color:{{ c.chipText }}`, content `FINAL {n}%` | the **stance** triple, not gold — this is why BASE and FINAL are visually distinct and the shipped pair is not |
+| author pill | `display:inline-flex; align-items:center; gap:7px; padding:4px 12px 4px 9px; border-radius:999px; background:tint(aDot,.12); border:1px solid tint(aDot,.42); font-size:12px; font-weight:700; color:{{ t.ink }}` + dot `width:8px; height:8px; border-radius:50%; background:{{ c.aDot }}` | `<ModelPill size="md" tone="maker">` — `var(--m-{key}-bg)`, `var(--m-{key}-border)`, `var(--m-{key})`, `var(--r-dot)`, `var(--text)` |
+| claim | `margin:0; font-family:Fraunces,serif; font-weight:400; font-size:19px; line-height:1.5; letter-spacing:-.012em; text-wrap:pretty; color:{{ t.ink }}` | `var(--font-display)`, `var(--text)`, rest literal |
+| rule row | `display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:24px; padding-top:18px; border-top:1px solid {{ t.hair }}` | `var(--line)`, rest literal |
+| review chip | `padding:5px 11px; border-radius:999px; border:1px solid tint(rc,.4); background:tint(rc,.08); color:rc; font-size:10px; font-weight:700; letter-spacing:.06em`, content `REVIEW {{ AGREED\|DISPUTED }} BY:` | `rc` = the renderer's `agreeC`/`disputeC` -> `var(--agree-*)` / `var(--dispute-*)`, whose shipped values are `#3E7A4E` / `#B0432F` — the renderer's exact light pair |
+| reviewer pill | same box as the author pill but `background:{{ t.raised }}; border:1px solid {{ t.hairStrong }}; font-size:11.5px`, dot adds `box-shadow:0 0 0 2.5px tint(rDot,.22)` | `<ModelPill size="sm" tone="neutral" halo>` — `var(--shell)`, `var(--line-strong)`, halo `0 0 0 2.5px var(--m-{key}-border)` (the shipped border token is the `.42` tint against the design's `.22`; the delta is declared, and no token is minted for it) |
+| turn | `font-family:Fraunces,serif; font-size:13px; color:{{ t.mute }}; letter-spacing:.04em`, content `Turn {{ c.turn }}` | `var(--font-display)`, `var(--muted)`; content `Turn 01` .. `Turn 04` |
+
+**Two declared deltas, so neither looks like an oversight.** (1) The deck shadow
+ships as `var(--shadow-pop)` rather than the artboard's literal, because the
+literal would be a *second* card-elevation value with no token and no Chamber
+counterpart; `--shadow-pop` is the ported deep-elevation role and is already
+mode-aware. Numerically `0 30px 60px -26px .32` against `0 30px 62px -30px .24`
+— 2px of blur, 4px of spread, and .08 of alpha. (2) The core radius ships as
+`var(--r-card)` (14px) against the design's 13px, for the same reason: one
+card-radius token, not two. Neither delta is visible at a glance; both are
+recorded so V can overrule either in one line.
+
+**Everything `T9-C4` already pins stays.** The section's eyebrow
+(`ONE DEBATE, FOUR TURNS`), its `h2`, and the after-deck close line (`The debate
+ends here. Nothing is declared won. You get the transcript, the two marks per
+turn, and the claim you conceded.`) are SPEC-fixed copy carrying the ratified
+`round`->`debate` and `joint`->`claim` substitutions, and `T9-C4-4` pins them.
+FID-2 does not touch them. **The port is anatomy, not copy** — except the card
+claims and the resolution, which have no SPEC copy because they were never
+carried across at all.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **FID-2-1** | T9-S3 · fidelity | All four cards ship, with every anatomical part, paired to the right card | In `tests/render/t9-landing.test.tsx`, new describe `FID-2 sample fidelity`: on the **real anonymous `/` render**, select the sample subtree per the AM6 convention, take its cards **positionally** (`cards[i]`, the `T9-C4-4` lesson — never subtree containment), assert `cards.length === 4`, and for each `i` assert **all nine** of that row's values from the table above appear **within `cards[i]`**: stance chip text `↑ PRO`\|`↓ CON`\|`◆ REASONING`, `BASE {n}%`, `FINAL {n}%`, the author label, the review chip text, the reviewer label, `Turn {nn}`, and the **claim string in full**. **RED-proof required:** swap the claims of cards 2 and 3, leaving both inside the sample subtree, and show the cell fails |
+| **FID-2-2** | T9-S3 · fidelity | The stance tab is the **app** tab, positioned, not the landing's flush rule — a DECLARED DEPARTURE from the landing authority | The two authorities disagree, and this is the amendment's only place where the landing document is knowingly not followed. Resolved landing (`design-document-rendered.html`): `position: absolute; top: 0px; left: 0px; width: 64px; height: 3px; background: rgb(61,90,128)` — **no radius**. Binding original (app screens): `top:0; left:20px; width:52px; height:4px; border-radius:0 0 5px 5px` (root card) and `left:15px; width:44px; height:4px` (argument card). **The app form wins** — the design document's own closing note ratifies *"the Field Notes stance tab (the small colored line at the top of each card)"* as the approved direction, wave 0 minted `--r-tab: 0 0 5px 5px` for exactly it, and the landing sample is a preview of the canvas card, so a landing-only tab shape would be a third vocabulary. **V can overrule this in one line** — it is the one place the landing document is not followed, and it is flagged rather than absorbed. Ships as `position:absolute; top:0; left:20px; width:52px; height:4px; border-radius: var(--r-tab); background: var(--{stance}-line)`, replacing the shipped `margin:-14px 0 14px` block form. Assert in jsdom that each card's tab carries `data-stance` matching its card and is a descendant of the card's core |
+| **FID-2-3** (browser half) | T9-S3 · fidelity | The deck is a deck, the chips are tinted, and both hold in **both** modes | **DOM-DUMP BROWSER KIT**, both modes, output quoted: (1) the four card `transform` matrices are pairwise distinct and **none** is `none` — the rotation/offset deck is real; (2) consecutive cards **overlap vertically**: `cards[i+1].top < cards[i].bottom` for `i = 0,1,2`; (3) each stance chip's `backgroundColor` is **not** `rgba(0, 0, 0, 0)` and its `color` differs from the card core's `backgroundColor` — the tint shipped; (4) the BASE pill's `backgroundColor` **differs from** the FINAL pill's on the same card, all four cards; (5) the three distinct maker dots resolve to three **different** colours; (6) every one of (1)-(5) holds after flipping `data-mode` to `chamber` |
+| **FID-2-4** (V-QA half) | T9-S3 · fidelity | V's judgement, named | Does the sample section read as four overlapping cards of a real debate — glyphed stance, two scores, who argued it, the argument itself, who reviewed it and how, and which turn — rather than a grid of empty chips? Answered by V on the running app, recorded on the ticket |
+| **FID-2-5** | T9-S3 · contract | The rewrite removes nothing a pin can see | PRESERVING-WRITE, component form: `[data-landing-section="sample"]`, `id="transcripts"`, the section's `aria-labelledby` target, the eyebrow, the `h2` and the after-deck close line survive byte-identical — `T9-C4-4` and `T9-C1`'s section pins read them. Publish the pre/post attribute-and-text superset check |
+
+### The generic `ModelPill` (V's ruling 1)
+
+**One component, one model-identity vocabulary, both surfaces.** The design
+already proves the generalization rather than merely suggesting it: the landing
+author pill and the canvas author pill are the **same box** in both files —
+`inline-flex`, an `8px` `50%` dot, `999px` radius, `tint(dot,.12)` fill,
+`tint(dot,.42)` border, `font-weight:700` — differing in exactly three numbers
+(`gap` 7 vs 6, `padding` `4px 12px 4px 9px` vs `3px 10px 3px 7px`, `font-size`
+12 vs 10). That is a `size` prop, not two components.
+
+**The label seam already ships and already produces V's exact strings.** Run,
+not asserted — a throwaway probe against `apps/ui/lib/makerIdentity.ts`:
+
+```
+makerIdentityLabel({maker:"OpenAI",    modelId:"gpt-5.6-sol"})    -> {"text":"OpenAI · GPT · gpt-5.6-sol","absence":false}
+makerIdentityLabel({maker:"Anthropic", modelId:"claude-opus-5"})  -> {"text":"Anthropic · Claude · claude-opus-5","absence":false}
+makerIdentityLabel({maker:"Google",    modelId:"gemini-3-ultra"}) -> {"text":"Google · Gemini · gemini-3-ultra","absence":false}
+```
+
+Byte-identical to the three labels V named. So `ModelPill` **must not** build
+its own label: it calls `makerIdentityLabel` for the text and `modelKey` for the
+`--m-*` family, and inherits `ModelBadge`'s absence contract unchanged
+(`House unavailable`, no dot, the same `title` and `aria-label`). That is what
+"no third vocabulary" means concretely.
+
+```
+ModelPill(props: {
+  modelId: string | null;
+  maker?: string | null;
+  size?: "sm" | "md";      // md = landing author (12px), sm = reviewer (11.5px)
+  tone?: "maker" | "neutral";  // maker = --m-{key}-bg/-border; neutral = --shell/--line-strong
+  halo?: boolean;          // dot box-shadow 0 0 0 2.5px var(--m-{key}-border)
+  className?: string;
+})
+```
+
+**It lives in a NEW file, `apps/ui/components/ModelPill.tsx`, and the canvas
+adoption is deferred — declared, not forgotten.** `ModelPresentation.tsx` is in
+row 8's write surface and row 8 is **live** (`CODE-T1C2-ADD2`). Editing it now
+would drop a product change into a running rework, the exact hazard AM12b's hard
+constraint exists to prevent. `ModelPill.tsx` *imports* `modelColor` from
+`ModelPresentation.tsx` — a read, which costs the live lane nothing.
+
+> **ROUTED ROW R-6 (new, AM14): re-express `ModelBadge` and `ModelMetaLine` over
+> `ModelPill`.** Owner: row 8 (`T1-C2`), as a post-close addendum, after
+> `CODE-T1C2-ADD2` lands. Acceptance: `ui02d-model-identity.test.tsx` stays
+> green with **zero** edits — it is the standing pin on exactly this contract,
+> and a drop-in replacement is defined by it not moving. Until R-6 lands, the
+> single component exists and the canvas has not yet been switched to it; that
+> is the honest state and it is written here so nobody reports V's ruling as
+> fully delivered.
+
+### FID-3 — the fidelity sweep (row 35, review-class)
+
+**Purpose: V never finds gap #3.** FID-1 and FID-2 close the two V found. The
+sweep is what finds the rest before V does.
+
+**What it reads.** Every shipped surface, paired to its design source:
+
+| shipped surface | authority | screen |
+|---|---|---|
+| `/` anonymous (chrome, hero, sample, method, pricing) | `docs/missions/ui-overhaul/design/design-document-rendered.html` | the whole landing, resolved |
+| `/debate/[id]` canvas | `ui_designs/DebateAI Design Document.html` (binding) | `1a Debate canvas — Atelier` |
+| `/` signed-in library, `/public/debate/[id]` | binding original | `3a Library`, `3b Public debate view` |
+| `/new` | binding original | `4a New debate` |
+| node detail drawer | binding original | `5a Node detail drawer` |
+| `/settings` | binding original | `6a Settings` |
+| `/login`, `/verify-email`, fleet | binding original | `7a`, `7b`, `7c` |
+| `/sign-up`, `/enroll-mfa`, recovery code | binding original | `8a`, `8b`, `8c` |
+
+**How it renders.** The DOM-DUMP BROWSER KIT, once per surface, **both modes**.
+The design side needs no renderer: the authority files are read as text and
+their inline styles are the specification — the sweep compares the shipped computed
+style against the quoted inline value, element for element.
+
+**The output form — a per-element gap table, one row per divergence:**
+
+| surface | mode | element | design value (file + verbatim inline style) | shipped computed value | class |
+|---|---|---|---|---|---|
+
+`class` is one of **ABSENT** (the design element does not exist in the shipped
+tree at all — the class that produced both of V's findings), **UNBOUND** (it
+exists but nothing styles it: transparent background, `0px` radius, `none`
+shadow, default `display`), **DRIFTED** (styled, but the value differs),
+**DECLARED** (differs, and a dispatch cell already says why — the two FID-2
+deltas above are the first two entries).
+
+**Every ABSENT and every UNBOUND row is a finding.** DRIFTED rows are findings
+unless a cell declares them. A sweep that reports zero rows without listing the
+surfaces it rendered is not a sweep; the report must name all twelve.
+
+**It runs after rows 33 and 34 land**, and its findings route as new FID rows,
+not as edits by the sweeping seat. FID-3 writes no product file and no test —
+its write surface is its report.
+
+### FID-4 — one line in the FID worker's contract
+
+Every FID-row packet carries this line: **turn Next's dev indicators off** —
+`devIndicators: false` in `next.config.*` — before any browser measurement or V
+review. The dev badge overlays the bottom-left corner of every screenshot and
+sits in the way of exactly the chrome and card geometry these rows measure. It
+is a **worker** edit inside its own packet's declared config write, not an ARCH
+write, and not part of any acceptance.
+
+### AM5 invariant, re-run for rows 33-35
+
+Three write surfaces moved, so the survivability law is re-checked rather than
+declared intact.
+
+| row | file written | shape | last prior writer | pins that read it | resolution |
+|---|---|---|---|---|---|
+| 33 | `apps/ui/app/globals.css` | PRESERVING (stylesheet) | #1 `T9-C3` | `t9-mode-tokens` (4), `v2ui-pages` (2), `pda-s03` (1) | KEEP-class guards in row 33's verify; ownership stays with #1 |
+| 33 | `LandingChrome.tsx` | PRESERVING (component) | #4 `T9-C2` | `t9-landing` (via page render), `pda-s03` (chrome attributes) | `t9-landing` in row 33's write surface, new describe; `pda-s03` a KEEP guard, protected by `FID-1-4` |
+| 33 | `tests/render/t9-landing.test.tsx` | new describe only | #5 `T9-C4` | itself | the T9-C1/C2/C4 disjoint-describe pattern, extended |
+| 34 | `LandingSample.tsx` | PRESERVING (component) | #5 `T9-C4` | `t9-landing` (via page render) | in row 34's write surface, new describe; `T9-C4-4`'s copy pins protected by `FID-2-5` |
+| 34 | `ModelPill.tsx` | **new file** | none | none | nothing to survive |
+| 34 | `tests/render/t9-landing.test.tsx` | new describe only | row 33 | itself | serialised after row 33, disjoint describe |
+| 35 | report only | n/a | n/a | n/a | review-class; no product write |
+
+**Both verify commands were run on the tree at `259de07d`, before any FID work
+exists**, which is the preflight the AM5 law was written to force:
+
+```
+row 33  6 files   78 passed                 exit 0
+row 34  6 files   77 passed                 exit 0
+```
+
+They are green today, so neither row is dispatched into a command it cannot make
+green. (Run with `CODE-T1C2-ADD2`'s uncommitted edits present on
+`scrutiny.ts` / `DebateMap.tsx` / `t1-canvas.test.tsx` — none of those files is
+in either command after the correction above.)
+
+**Guard rail 3 holds**: both rows write `t9-landing.test.tsx` and both run it.
+**Guard rail 2 holds**: neither row deletes a case; both add a describe, and the
+`vitest list | wc -l` before/after evidence is required in the cluster reports.
+**Guard rail 1 is superseded for these rows by the PRESERVING-WRITE clause**,
+which is narrower than the ownership transfer it replaces: FID-1 and FID-2 get
+*no* edit rights over any pin they do not already own.
+
 ## Ordering rationale in one line each
 
 1. **T9-C3 first** — nothing can be re-skinned against tokens that do not exist.
@@ -1720,3 +2322,124 @@ Full ruling and the four constraints: `ADR-001` §AM13/N11. The short form:
 published markdown — **32 rows, 5 exemptions, 0 violations**. **No row moved:**
 both rulings are routed rows, and neither writes a dispatch Writes or Verify
 column. Row 8 and every T1-C2 cell untouched, as in AM12b.
+
+### 2026-09-01 — AM14: the design was compressed away, twice, with every gate green (trigger: V's review of the live landing, ticket `t_5864f48f`)
+
+V opened the running landing and found two things. The chrome bar had shipped
+**unstyled** — `LandingChrome.tsx` carries zero `className` attributes and
+`globals.css` carries zero rules that select it, so the browser renders an
+`<a>`, a `<nav>` and a `<div>` as three stacked lines at tops 198 / 216 / 235,
+transparent, square-cornered, shadowless. The sample cards had shipped as a
+token checklist: three cards where the design has four, with no claim prose, no
+glyphs, no tinted pills, no model pills, no turn counters and no deck. Every
+cluster was green. Every review passed. Nothing was broken in the sense any gate
+could see.
+
+**Where it went wrong — the two-step compression.**
+
+*Step one: design -> SPEC.* The design is a rendered artefact: 159KB of inline
+styles carrying exact geometry, exact composition, and real content. The SPEC
+row that survives it is `T9-S3`, a checklist of the parts a card has. A
+checklist of parts is a **set**; the design is a **composition**. Everything
+that lives in the relations between the parts — the rotation, the overlap, the
+tint, the pairing of a claim to its author — falls out at this step, silently,
+because a checklist has no place to put it.
+
+*Step two: SPEC -> cell.* I then wrote acceptance cells against the SPEC, not
+against the design, and the cells assert strings and attributes because jsdom
+is what runs them. `toContain("BASE")` is satisfied by a badge with no
+background on a card with no prose. The cell was faithful to the SPEC; the SPEC
+had already lost the design; and the cell's greenness was then read — by me, by
+the workers, by the reviewers — as evidence the surface was right.
+
+The shape of it, counted rather than characterized — `tests/render/t9-landing.test.tsx`,
+the landing's entire standing pin:
+
+```
+expect(...)              63
+toContain(...)           23
+getComputedStyle(...)     0
+getBoundingClientRect()   0
+```
+
+**Sixty-three assertions about the landing, and not one of them looks at how it
+renders.** That is the defect in one table, and the cells that produced it are
+mine.
+
+**Four contributing causes, each of which I own a part of.**
+
+1. **The vocabulary law had a chilling effect on porting.** The mission
+   correctly ratified `round` -> `debate` and `joint` -> `claim`. Workers
+   generalized that into *"design copy is not ours to ship"* and dropped the
+   card claim prose entirely rather than carry it across. Nobody ever ruled
+   that. The rule is narrow — it substitutes two terms — and I never said so,
+   so it read as a licence to paraphrase everything. AM14's DECISIONS row (a)
+   states the boundary explicitly.
+2. **The token law turned copying into uncharged translation.** ADR-001's sweep
+   forbids **colour** literals. It says nothing about `padding: 9px 9px 9px
+   26px`. But a worker reading "no literals" in a hurry sees every number as a
+   thing needing a token that does not exist, and the cheapest exit is to
+   approximate with something responsive-looking instead — which is how the
+   design's `padding:130px 96px 190px` on the exchange section became
+   `clamp(56px, 9vw, 112px) clamp(24px, 7vw, 96px)`
+   (`LandingSample.tsx:41`), and the composition dissolves a value at a time. AM14's Wave 6 section states the boundary in one
+   line: **colours tokenize; geometry, spacing, radii and composition port as
+   written.** Measured cost of not having said it earlier: wave 0 ported the
+   palette **byte-identically** — `--fw-display` 480, `--r-panel` 16px,
+   `--shadow-chrome`, `--m-claude/-gpt/-gemini` all match the design renderer
+   exactly — and the composition **not at all**. The tokens were never the
+   problem. Nothing consumed them.
+3. **jsdom blindness, which I knew about and did not act on.** jsdom does not
+   resolve `var()`, does not lay out, and reports every geometry as `0`. I
+   wrote that sentence in ADR-006 before wave 0 and then kept authoring visual
+   acceptance in jsdom anyway, because it was the tool the suite already had.
+   The T1-C2 reviewer had to build a loopback browser fixture by hand to see a
+   `0 × 0` element, wrote *"promote this into the reviewer kit"* in their
+   report, and I read that report and did not promote it. It is promoted now,
+   as the DOM-DUMP BROWSER KIT, and it is the machine-checkable half of every
+   visual cell from here on.
+4. **F11 was raised at intake and never routed. That is an orchestrator
+   defect and it is named here.** REQ-01 (`t_16d44323`) filed F11 —
+   *"design elements in no SPEC"* — before any code existed. It predicted this
+   exact outcome. It was not routed to ARCH, not turned into a row, and not
+   carried into any packet. A finding that names the class of a future failure
+   and then sits unrouted costs more than never finding it, because the mission
+   spends its confidence on the fact that someone looked. The router owns that
+   miss. I own the sixty-three assertions.
+
+**What actually changes.** Not "be more careful". Two structural things: the
+**FIDELITY LAW** — every visual cell names a real-browser half and a V-QA half,
+enforced at pre-dispatch, inherited by T5, T3-lists, T4, T6, T7, T8 — and
+**FID-3**, a sweep that diffs every shipped surface against its design source in
+a browser and classifies each divergence ABSENT / UNBOUND / DRIFTED / DECLARED.
+The first two gaps were found by V. The rest should not be.
+
+**Beyond charge, declared.** Three things this amendment did that the packet did
+not ask for. (a) V's 09:28 source-hierarchy correction arrived
+mid-amendment and is applied: the binding original is
+`ui_designs/DebateAI Design Document.html`, and the derived copy was **verified
+against it** on all seven values quoted here rather than trusted. Doing that
+surfaced a gap the correction does not cover — **the binding original contains
+no landing at all** (12 screen labels, zero landing markers), so the landing's
+authority is `docs/missions/ui-overhaul/design/design-document-rendered.html`,
+repo-tracked and fully resolved. Filed as **Q-17** for V. Re-verifying every
+landing value against the resolved document also caught one of my own: the card
+core is `var(--bg)`, not `var(--core)`.
+(b) The **PRESERVING-WRITE clause** was added to the verify-survivability law,
+because the mechanical rule would have handed a styling worker edit rights over
+the token contract and over `pda-s03-keyboard-accessibility.test.ts`; the clause
+is checkable and its gate was run against a real probe (`0 / 1 / 1`) before
+publication. (c) **Routed row R-6** — the canvas adoption of `ModelPill` — is
+deferred rather than done, because `ModelPresentation.tsx` sits in the live
+`CODE-T1C2-ADD2` lane; V's "one generic pill" is therefore **structurally**
+delivered and **not yet** adopted on the canvas, which is written into the
+section so nobody reports it as complete.
+
+**One claim was checked and found false before it could be published.** I had
+drafted a finding that `LandingSample.tsx`'s reuse of `.nodeWrap`
+(`globals.css:1944`, `position: absolute`) collapses the sample grid. Rendered
+in Chromium, the grid is fine — an inline `position: "relative"` at
+`LandingSample.tsx:114` outranks the class. The finding is in no cell. What
+survives is true and smaller: the landing depends on an inline override of a
+canvas-graph class, and `data-bezel` — the shared bezel vocabulary
+`component-map.md` names — has **zero** rules in `globals.css`.
