@@ -16,3 +16,15 @@ minimumReleaseAgeExclude:
   - '@types/node@26.2.0'
   - '@types/pg@8.21.0'
   - tsx@4.23.11
+
+# F-02 (2026-09-01 security hardening, task B1): dependency floors for the advisories
+# reachable through next (postcss, sharp, nanoid) and any transitive esbuild (0.24.3 was never
+# published, so the <0.24.3 range is lifted straight to 0.28.1, the version tsx already uses).
+# pnpm 11 no longer reads package.json "pnpm.overrides"; pnpm-workspace.yaml is their home.
+# Enforced by tests/architecture/dependency-floors.test.ts.
+overrides:
+  'postcss@<8.5.23': '8.5.23'
+  'sharp@<0.35.4': '0.35.4'
+  'nanoid@<3.3.18': '3.3.18'
+  'esbuild@<0.24.3': '0.28.1'
+  'esbuild@>=0.27.3 <0.28.1': '0.28.1'
