@@ -11,6 +11,7 @@ import {
   SESSION_POLICY_REGISTER_ROW,
   buildAlgorithmRegisterRows,
   loadBootstrapRegister,
+  warnOnIdenticalSynthesisRoleRefs,
   persistBootstrapRegister,
   type BootstrapRegister,
   type ProviderFamilyEntry
@@ -45,7 +46,16 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
   max_cooldown_holds_per_run: 2,
   applies_to: "TRANSPORT_EXHAUSTION" as const
 });
-export const DEVELOPMENT_REGISTER_VERSION = 4 as const;
+/**
+ * T16 · version 4 is HISTORICAL and sealed: it exists in every dev database
+ * created before this lane and must never be re-opened to receive rows. The
+ * fifteen algorithm rows land in a NEWLY MINTED version 5, which becomes the
+ * current dev register. Every launch pin derives from this constant — the
+ * `REGISTER_VERSION=<n>` fixtures below are generated, never hand-written, so
+ * a future bump can never silently disarm them.
+ */
+export const DEVELOPMENT_REGISTER_VERSION = 5 as const;
+export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 4 as const;
 
 const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
   Object.freeze({
@@ -112,10 +122,10 @@ export function deriveProviderFamilies(
 }
 
 /**
- * T16 · dev-provisional synthesizer and evaluator identities: the first two
- * configured providers of DIFFERENT makers. Identical refs stay lawful
- * (goal 84-85) but the register reader warns at startup; this deployment
- * seeds two different ones, so the warning must not fire here.
+ * T16 · dev-provisional synthesizer and evaluator identities (ruling J8): the
+ * first two configured providers of DIFFERENT makers. Identical refs stay
+ * lawful (goal 84-85) but the seeding entrypoint warns once (ruling J7); this
+ * default seeds two different ones, so the warning must not fire by default.
  */
 export function deriveSynthesisRoleRefs(
   configuredProviders: readonly DevelopmentConfiguredProvider[]
@@ -128,14 +138,45 @@ export function deriveSynthesisRoleRefs(
   });
 }
 
+export type DevelopmentSynthesisRoleRefs = Readonly<{
+  synthesizerRoleRef: string;
+  evaluatorRoleRef: string;
+}>;
+
+/**
+ * Goal 84-85 PERMITS identical synthesizer and evaluator refs (and requires a
+ * warning when they are). An operator therefore needs a way to configure them;
+ * without one the permitted case is unreachable and its warning is dead code.
+ * Each override must name a CONFIGURED provider identity — an unknown ref
+ * fails loudly rather than sealing a role nothing can serve.
+ */
+export function resolveDevelopmentSynthesisRoleRefs(
+  providerPanel: DevelopmentProviderPanel,
+  source: Readonly<Record<string, string | undefined>> = {}
+): DevelopmentSynthesisRoleRefs {
+  const derived = deriveSynthesisRoleRefs(providerPanel.configuredProviders);
+  const configured = new Set(providerPanel.configuredProviders.map((provider) => provider.providerRef));
+  const resolve = (override: string | undefined, fallback: string): string => {
+    if (override === undefined || override.trim() === "") return fallback;
+    if (!configured.has(override)) {
+      throw new TypeError(`DEV_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED:${override}`);
+    }
+    return override;
+  };
+  return Object.freeze({
+    synthesizerRoleRef: resolve(source.DEBATEAI_DEV_SYNTHESIZER_ROLE_REF, derived.synthesizerRoleRef),
+    evaluatorRoleRef: resolve(source.DEBATEAI_DEV_EVALUATOR_ROLE_REF, derived.evaluatorRoleRef)
+  });
+}
+
 export function buildDevelopmentAlgorithmRegisterRows(
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders)
 ): readonly DevelopmentDeploymentRegisterRow[] {
-  const roles = deriveSynthesisRoleRefs(providerPanel.configuredProviders);
   return Object.freeze(buildAlgorithmRegisterRows({
     deploymentSourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF,
-    synthesizerRoleRef: roles.synthesizerRoleRef,
-    evaluatorRoleRef: roles.evaluatorRoleRef,
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
     providerFamilies: deriveProviderFamilies(providerPanel.configuredProviders)
   }).map((row) => Object.freeze(row)));
 }
@@ -254,6 +295,8 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
 type SeedDevelopmentDeploymentRegisterInput = Readonly<{
   adminPool: Pool;
   providerPanel: DevelopmentProviderPanel;
+  /** Defaults to the two-different-makers derivation; the CLI supplies operator overrides. */
+  roleRefs?: DevelopmentSynthesisRoleRefs;
 }>;
 
 export type DevelopmentDeploymentRegisterReceipt = Readonly<{
@@ -274,7 +317,8 @@ function canonicalJson(value: unknown): string {
 
 function developmentRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs
 ): readonly DevelopmentDeploymentRegisterRow[] {
   const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
     Object.freeze({
@@ -291,7 +335,7 @@ function developmentRows(
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
-    ...buildDevelopmentAlgorithmRegisterRows(providerPanel)
+    ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
@@ -301,9 +345,13 @@ function developmentRows(
 
 async function expectedRunnerRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs
 ): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  const rows = [...developmentRows(bootstrap, providerPanel), ...await buildDevelopmentRunnerRegisterRows()];
+  const rows = [
+    ...developmentRows(bootstrap, providerPanel, roleRefs),
+    ...await buildDevelopmentRunnerRegisterRows()
+  ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_RUNNER_REGISTER_DEFINITION_INVALID");
   }
@@ -422,6 +470,15 @@ export async function seedDevelopmentDeploymentRegister(
   input: SeedDevelopmentDeploymentRegisterInput
 ): Promise<DevelopmentDeploymentRegisterReceipt> {
   const bootstrap = await loadBootstrapRegister();
+  const roleRefs = input.roleRefs
+    ?? deriveSynthesisRoleRefs(input.providerPanel.configuredProviders);
+  // Ruling J7: the seeding entrypoint IS T16's startup surface. Emitted before
+  // any database work so the CLI warns even when the register is already sealed.
+  warnOnIdenticalSynthesisRoleRefs({
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    deploymentRef: DEVELOPMENT_ALGORITHM_SOURCE_REF
+  });
   const authorityClient = await input.adminPool.connect();
   try {
     await assertAdmin(authorityClient);
@@ -429,7 +486,7 @@ export async function seedDevelopmentDeploymentRegister(
     authorityClient.release();
   }
   await persistOrAcceptSealedHistoricalBootstrap(input.adminPool, bootstrap);
-  const rows = await expectedRunnerRows(bootstrap, input.providerPanel);
+  const rows = await expectedRunnerRows(bootstrap, input.providerPanel, roleRefs);
   const registerVersion = DEVELOPMENT_REGISTER_VERSION;
   if (registerVersion <= bootstrap.registerVersion) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_VERSION_INVALID");

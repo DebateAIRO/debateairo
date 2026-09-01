@@ -9,7 +9,7 @@ import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
-import { seedAcceptanceRegister } from "./seed-register.js";
+import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -216,11 +216,13 @@ describe("ACC-01 dry-run ceremony", () => {
   it("seeds idempotently, submits through the real API root, settles, and reads through the same token", async () => {
     const firstSeed = await seedAcceptanceRegister(database.pool);
     const countBefore = await database.pool.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=1"
+      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=$1",
+      [ACCEPTANCE_REGISTER_VERSION]
     );
     const secondSeed = await seedAcceptanceRegister(database.pool);
     const countAfter = await database.pool.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=1"
+      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=$1",
+      [ACCEPTANCE_REGISTER_VERSION]
     );
     expect(secondSeed).toEqual(firstSeed);
     expect(countAfter.rows[0]?.count).toBe(countBefore.rows[0]?.count);
@@ -229,7 +231,8 @@ describe("ACC-01 dry-run ceremony", () => {
     // with the ruling's own provenance (idempotent across the double seed).
     const scoringRow = await database.pool.query<{ value: string; source_ref: string }>(
       `SELECT value_json #>> '{}' AS value, source_ref FROM register.register_row
-       WHERE register_version=1 AND row_key='scoringOperator'`
+       WHERE register_version=$1 AND row_key='scoringOperator'`,
+      [ACCEPTANCE_REGISTER_VERSION]
     );
     expect(scoringRow.rows).toEqual([{ value: "accumulate", source_ref: "acceptance:DR-144:V-approved" }]);
 

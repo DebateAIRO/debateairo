@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseApiEnvironment } from "@debateai/register";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "./dev-api-environment.js";
+import { DEVELOPMENT_REGISTER_VERSION } from "./dev-deployment-register.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets
@@ -177,7 +178,7 @@ function validateExactEnvironment(
       ["API_HOST", LOCAL_API_HOST],
       ["API_PORT", String(LOCAL_API_PORT)],
       ["STRANGER_SAMPLE_RATE", "0"],
-      ["REGISTER_VERSION", "4"],
+      ["REGISTER_VERSION", String(DEVELOPMENT_REGISTER_VERSION)],
       ["BATTERY_VERSION", "dev-auth-v1"],
       ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
       ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],

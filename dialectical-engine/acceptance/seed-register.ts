@@ -5,10 +5,17 @@ import {
   ENGINE_BAND_ORDER,
   buildAlgorithmRegisterRows,
   loadBootstrapRegister,
+  warnOnIdenticalSynthesisRoleRefs,
   type ProviderFamilyEntry
 } from "@debateai/register";
 
-export const ACCEPTANCE_REGISTER_VERSION = 1 as const;
+/**
+ * T16 · version 1 is HISTORICAL and sealed in every ceremony database created
+ * before this lane; it is never re-opened. The fifteen algorithm rows land in a
+ * NEWLY MINTED version 2, which becomes the current ceremony register.
+ */
+export const ACCEPTANCE_REGISTER_VERSION = 2 as const;
+export const ACCEPTANCE_HISTORICAL_REGISTER_VERSION = 1 as const;
 export const ACCEPTANCE_REGISTER_SOURCE_REF = "acceptance:DR-133:V-approved" as const;
 export const ACCEPTANCE_CONVERGENCE_SOURCE_REF = "acceptance:DR-136:V-approved" as const;
 export const ACCEPTANCE_DISCOVERY_SOURCE_REF = "acceptance:DR-182:V-approved" as const;
@@ -49,15 +56,43 @@ function acceptanceProviderFamilies(): readonly ProviderFamilyEntry[] {
   ));
 }
 
+/**
+ * T16 · the ceremony's synthesizer/evaluator identities (ruling J8): the first
+ * two configured providers of DIFFERENT makers. Goal 84-85 permits identical
+ * refs, so an operator override exists; an override naming an unconfigured
+ * provider fails loudly rather than sealing a role nothing can serve.
+ */
+export function resolveAcceptanceSynthesisRoleRefs(
+  source: NodeJS.ProcessEnv = process.env
+): Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string }> {
+  const families = acceptanceProviderFamilies();
+  const configured = new Set<string>(
+    ACCEPTANCE_CONFIGURED_PROVIDERS.map((provider) => provider.providerRef)
+  );
+  const resolve = (override: string | undefined, fallback: string): string => {
+    if (override === undefined || override.trim() === "") return fallback;
+    if (!configured.has(override)) {
+      throw new TypeError(`ACCEPTANCE_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED:${override}`);
+    }
+    return override;
+  };
+  return Object.freeze({
+    synthesizerRoleRef: resolve(source.ACCEPTANCE_SYNTHESIZER_ROLE_REF, families[0]!.providerRefs[0]!),
+    evaluatorRoleRef: resolve(source.ACCEPTANCE_EVALUATOR_ROLE_REF, families[1]!.providerRefs[0]!)
+  });
+}
+
 /** T16 · the ceremony's copy of every sealed algorithm row. Same ruled values as
  * the dev deployment register; ceremony provenance and ceremony role identities. */
-export function buildAcceptanceAlgorithmRegisterRows(): readonly AcceptanceRegisterRow[] {
-  const families = acceptanceProviderFamilies();
+export function buildAcceptanceAlgorithmRegisterRows(
+  roleRefs: Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string }>
+    = resolveAcceptanceSynthesisRoleRefs()
+): readonly AcceptanceRegisterRow[] {
   return buildAlgorithmRegisterRows({
     deploymentSourceRef: ACCEPTANCE_ALGORITHM_SOURCE_REF,
-    synthesizerRoleRef: families[0]!.providerRefs[0]!,
-    evaluatorRoleRef: families[1]!.providerRefs[0]!,
-    providerFamilies: families
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    providerFamilies: acceptanceProviderFamilies()
   });
 }
 
@@ -305,6 +340,13 @@ function canonicalJson(value: unknown): string {
 }
 
 export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly rowCount: number }> {
+  // Ruling J7: the ceremony's seeding path is a T16 startup surface.
+  const roleRefs = resolveAcceptanceSynthesisRoleRefs();
+  warnOnIdenticalSynthesisRoleRefs({
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    deploymentRef: ACCEPTANCE_ALGORITHM_SOURCE_REF
+  });
   const [bootstrap, acceptanceRows] = await Promise.all([
     loadBootstrapRegister(),
     buildAcceptanceRegisterRows()
@@ -332,6 +374,9 @@ export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly row
        ON CONFLICT (register_version) DO NOTHING`,
       [ACCEPTANCE_REGISTER_VERSION, rows.length]
     );
+    // T16 · the migration-declared manifest fails the seal loudly, naming the
+    // family and row key, if any mandatory row was not supplied.
+    await client.query("SELECT register.assert_required_rows($1)", [ACCEPTANCE_REGISTER_VERSION]);
     const persisted = await client.query<{ row_key: string; value_json: unknown; source_ref: string }>(
       `SELECT row_key, value_json, source_ref FROM register.register_row
        WHERE register_version=$1 AND row_key=ANY($2::text[]) ORDER BY row_key`,

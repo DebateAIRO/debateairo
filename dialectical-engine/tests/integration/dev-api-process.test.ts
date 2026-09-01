@@ -9,6 +9,7 @@ import {
   type DevelopmentApiProcessOperations
 } from "../../apps/runner/src/dev-api-process.js";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
+import { DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 const roots: string[] = [];
@@ -37,7 +38,7 @@ function environment(root: string): Readonly<Record<string, string>> {
     API_HOST: "127.0.0.1",
     API_PORT: "8790",
     STRANGER_SAMPLE_RATE: "0",
-    REGISTER_VERSION: "4",
+    REGISTER_VERSION: String(DEVELOPMENT_REGISTER_VERSION),
     BATTERY_VERSION: "dev-auth-v1",
     SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,

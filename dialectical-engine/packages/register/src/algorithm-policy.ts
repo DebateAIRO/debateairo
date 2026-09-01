@@ -71,6 +71,13 @@ export const ALGORITHM_REGISTER_ROW_KEYS = Object.freeze(
 /** Ruling provenance appended to each row's deployment source ref. */
 export const T16_GOAL_RULING_REF = "goal-v4-2026-09-01:80-96" as const;
 export const T16_JUDGE_RULING_REF = "algorithm-live-loop-DECISIONS.md#J1" as const;
+/**
+ * J1 rules EXACTLY five values and never mentions the role identities; ruling
+ * J8 chose them. A sealed row must name the ruling that actually chose its
+ * value — a false ref is audit poison (mission DECISIONS J8).
+ */
+export const T16_ROLE_RULING_REF =
+  "algorithm-live-loop-DECISIONS.md#J8+configured-provider-set-derivation" as const;
 export const T16_BAND_VOCABULARY_REF =
   "algorithm-live-loop-DECISIONS.md#J1+packages/register/src/engine-shape.ts#ENGINE_BAND_ORDER" as const;
 export const T16_FAMILY_MAP_REF =
@@ -118,6 +125,27 @@ export function buildOneStepDownBands(
   return Object.freeze(Object.fromEntries(bandOrder.map((band, index) =>
     [band, index === 0 ? bandOrder[0]! : bandOrder[index - 1]!]
   )));
+}
+
+/**
+ * Ruling J7: the SEEDING ENTRYPOINTS are T16's honest startup surface, because
+ * at T16 time no consumer boot reads the role rows (T9 wires that later). Both
+ * seeders call this on their real process path, so an operator who configures
+ * identical refs — which stays LAWFUL under goal 91-93 — is told once, at the
+ * moment the identity is sealed. Returns whether the warning fired.
+ */
+export function warnOnIdenticalSynthesisRoleRefs(input: {
+  readonly synthesizerRoleRef: string;
+  readonly evaluatorRoleRef: string;
+  readonly deploymentRef: string;
+}): boolean {
+  if (input.synthesizerRoleRef !== input.evaluatorRoleRef) return false;
+  console.warn(
+    `${SYNTHESIS_ROLE_REFS_IDENTICAL_WARNING}: ${input.deploymentRef} seals the synthesizer and `
+    + `evaluator role refs as the same configured provider identity "${input.synthesizerRoleRef}"; `
+    + `the evaluator will grade a candidate written by its own provider identity`
+  );
+  return true;
 }
 
 /**
@@ -171,12 +199,12 @@ export function buildAlgorithmRegisterRows(
     {
       rowKey: "synthesizerRoleRef",
       value: { kind: "SYNTHESIZER_ROLE_REF", providerRef: synthesizerRoleRef, provisional: true },
-      sourceRef: ref(T16_JUDGE_RULING_REF)
+      sourceRef: ref(T16_ROLE_RULING_REF)
     },
     {
       rowKey: "evaluatorRoleRef",
       value: { kind: "EVALUATOR_ROLE_REF", providerRef: evaluatorRoleRef, provisional: true },
-      sourceRef: ref(T16_JUDGE_RULING_REF)
+      sourceRef: ref(T16_ROLE_RULING_REF)
     },
     {
       rowKey: "evaluatorLoopMaxRounds",
