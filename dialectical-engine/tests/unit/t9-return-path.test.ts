@@ -11,14 +11,23 @@ describe("T9 return-path validation", () => {
   });
 
   it("accepts a bounded public debate path", () => {
-    const path = "/public/debate/debate_ref-1.2~reader";
+    const path = "/public/debate/7f6c5b4a-3210-4fed-8cba-9876543210ab";
+
+    expect(safeReturnPath(path)).toBe(path);
+  });
+
+  it("accepts a UUID public debate path", () => {
+    const path = "/public/debate/3f2a1b4c-9d8e-4f70-b1c2-5a6d7e8f9012";
 
     expect(safeReturnPath(path)).toBe(path);
   });
 
   it.each([
     ["/new?x=1", "/new?x=1"],
-    ["/public/debate/abc-123?from=share", "/public/debate/abc-123?from=share"]
+    [
+      "/public/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?from=share",
+      "/public/debate/a1b2c3d4-e5f6-4789-abcd-0123456789ef?from=share"
+    ]
   ])("preserves accepted return path %s unchanged", (raw, expected) => {
     expect(safeReturnPath(raw)).toBe(expected);
   });
@@ -31,6 +40,8 @@ describe("T9 return-path validation", () => {
     ["allow-list prefix", "/newx"],
     ["path traversal", "/new/../settings"],
     ["missing public debate ref", "/public/debate/"],
+    ["public debate dot-dot ref", "/public/debate/.."],
+    ["public debate dot ref", "/public/debate/."],
     ["overlong public debate ref", `/public/debate/${"a".repeat(129)}`],
     ["null", null],
     ["undefined", undefined],

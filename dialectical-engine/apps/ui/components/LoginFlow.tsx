@@ -28,8 +28,13 @@ export function LoginFlow({
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("authenticator");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signUpHref, setSignUpHref] = useState("/sign-up");
 
-  useEffect(() => () => setRecoveryAcknowledgementPending(false), []);
+  useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next !== null) setSignUpHref(`/sign-up?next=${encodeURIComponent(next)}`);
+    return () => setRecoveryAcknowledgementPending(false);
+  }, []);
 
   async function submitCredentials(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -112,7 +117,7 @@ export function LoginFlow({
       title={shellCopy.title}
       description={shellCopy.description}
       footer={replacementRecoveryCode === null && !verificationPending ? (
-        <p>No account yet? <Link href="/sign-up">Create one</Link></p>
+        <p>No account yet? <Link href={signUpHref}>Create one</Link></p>
       ) : null}
     >
       {error ? <div className="authAlert" role="alert">{error}</div> : null}

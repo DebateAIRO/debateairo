@@ -1,7 +1,12 @@
+// @vitest-environment jsdom
+
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { ReactNode } from "react";
+import { act, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
+import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 
 type HomePageModule = {
   default: (props: { searchParams: Promise<{ tab?: string }> }) => Promise<ReactNode>;
@@ -203,6 +208,47 @@ describe("T9-C2 chrome labels & CTAs", () => {
     }
 
     expect(errorEvents).toEqual([]);
+  });
+
+  it("preserves next through the login and sign-up round trip", async () => {
+    // PROPERTY: both real pre-MFA cross-links transport the same raw next value,
+    // so the sign-up branch returns to login with decoded next still equal to /new.
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    window.history.replaceState({}, "", "/login?next=%2Fnew");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(
+        <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
+      ));
+      const createOne = [...container.querySelectorAll("a")]
+        .find((link) => link.textContent?.trim() === "Create one");
+
+      expect(createOne?.getAttribute("href")).toBe("/sign-up?next=%2Fnew");
+
+      const signUpUrl = new URL(createOne!.href);
+      window.history.replaceState({}, "", `${signUpUrl.pathname}${signUpUrl.search}`);
+      await act(async () => root.render(
+        <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+      ));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const logIn = [...container.querySelectorAll("a")]
+        .find((link) => link.textContent?.trim() === "Log in");
+      const returnUrl = new URL(logIn!.href);
+
+      expect(returnUrl.pathname).toBe("/login");
+      expect(returnUrl.searchParams.get("next")).toBe("/new");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      window.history.replaceState({}, "", "/");
+      vi.unstubAllGlobals();
+    }
   });
 });
 

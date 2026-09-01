@@ -2,7 +2,7 @@ export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings"] as const;
 
 export const DEFAULT_RETURN_PATH = "/#start-a-debate";
 
-const PUBLIC_DEBATE_PATH = /^\/public\/debate\/[A-Za-z0-9._~-]{1,128}$/;
+const PUBLIC_DEBATE_PATH = /^\/public\/debate\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 export function safeReturnPath(raw: string | null | undefined): string {
   if (typeof raw !== "string" || raw.length === 0) return DEFAULT_RETURN_PATH;
