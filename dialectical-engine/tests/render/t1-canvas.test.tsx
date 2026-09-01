@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +11,7 @@ import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { DebateCanvas } from "../../apps/ui/components/DebateCanvas.js";
 import { DebateMap } from "../../apps/ui/components/DebateMap.js";
 import { ModelMetaLine } from "../../apps/ui/components/ModelPresentation.js";
+import { SynthesisPanel } from "../../apps/ui/components/SynthesisPanel.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
 
 const mocks = vi.hoisted(() => ({
@@ -510,6 +513,124 @@ describe("card anatomy", () => {
   });
 });
 
-describe("set-aside and synthesis", () => {
-  it.todo("reserved for T1-C3");
+describe("T1-C3 synthesis fidelity", () => {
+  function treeWithSetAsidePath(): DebateNode {
+    const projected = debateDetailFromAnswer(answer).tree!;
+    const seed = projected.children[0]!;
+    const setAside: DebateNode = {
+      ...seed,
+      id: "node:set-aside",
+      parent_id: projected.id,
+      claim: "The set-aside path under test.",
+      path_status: "abandoned",
+      stopping_status: "abandoned",
+      children: []
+    };
+
+    return { ...projected, children: [...projected.children, setAside] };
+  }
+
+  function synthesisView() {
+    return (
+      <SynthesisPanel
+        ready
+        pending={false}
+        streaming={false}
+        structured={false}
+        proClaim="The strongest supporting case."
+        conClaim="The strongest opposing case."
+        verdict="The verdict under test."
+        meta="Contested"
+        lean={{ pct: 46, label: "Con 54", source: "dialectical" }}
+      />
+    );
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  });
+
+  afterEach(async () => {
+    if (root) {
+      await act(async () => root!.unmount());
+      root = null;
+    }
+    document.body.replaceChildren();
+    vi.unstubAllGlobals();
+  });
+
+  it("changes the visible set-aside card count when the toggle changes", async () => {
+    // PROPERTY (T1-C3-1): a real set-aside path is excluded and included by
+    // the shipped toggle, so its visible data-set-aside count must change.
+    const container = await mountElement(
+      <DebateCanvas
+        root={treeWithSetAsidePath()}
+        expanded={new Set()}
+        selectedNodeId={null}
+        meta={{ claims: 3, depth: 1, judged: 2, derivedStanding: 2, setAside: 1 }}
+        onOpenNode={() => {}}
+        onChallengeNode={() => {}}
+        onToggleExpand={() => {}}
+      />
+    );
+    const toggle = container.querySelector<HTMLInputElement>(
+      '.canvasStickyToggle input[type="checkbox"]'
+    );
+    const countVisibleSetAside = () => container.querySelectorAll('[data-set-aside="true"]').length;
+    const before = countVisibleSetAside();
+
+    expect(toggle, "set-aside toggle").not.toBeNull();
+    await act(async () => toggle!.click());
+
+    expect(countVisibleSetAside()).not.toBe(before);
+  });
+
+  it("renders the binding synthesis labels and a two-token stance gradient", async () => {
+    // PROPERTY (T1-C3-2/T1-C3-4): the synthesis rail exposes the three
+    // binding uppercase labels and its lean is made only from PRO and CON.
+    const container = await mountElement(synthesisView());
+    const pro = container.querySelector<HTMLElement>(".synthCardLabel.pro");
+    const con = container.querySelector<HTMLElement>(".synthCardLabel.con");
+    const verdict = container.querySelector<HTMLElement>(".synthCardLabel.verdict");
+    const bar = container.querySelector<HTMLElement>(".synthLeanBar");
+    const tokenNames = [...(bar?.style.background ?? "").matchAll(/var\((--[^)]+)\)/g)]
+      .map((match) => match[1]);
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/ui/components/SynthesisPanel.tsx"),
+      "utf8"
+    );
+
+    expect(pro?.textContent).toBe("↑ STRONGEST PRO");
+    expect(con?.textContent).toBe("↓ STRONGEST CON");
+    expect(verdict?.textContent).toBe("VERDICT");
+    expect(source.match(/oklch\(/g) ?? []).toHaveLength(0);
+    expect(new Set(tokenNames)).toEqual(new Set(["--pro", "--con"]));
+  });
+
+  it("renders a genuinely inactive public challenge lock and omits regenerate", async () => {
+    // PROPERTY (T1-C3-3/T1-C3-7): undefined onChallengeNode is public mode;
+    // Challenge stays visible as a semantic lock and Regenerate is absent.
+    const container = await mountElement(
+      <DebateCanvas
+        root={treeWithSetAsidePath()}
+        expanded={new Set()}
+        selectedNodeId={null}
+        meta={{ claims: 3, depth: 1, judged: 2, derivedStanding: 2, setAside: 1 }}
+        onOpenNode={() => {}}
+        onChallengeNode={undefined}
+        onToggleExpand={() => {}}
+      />
+    );
+    const lock = [...container.querySelectorAll<HTMLElement>(".nodeCtrl.challenge")]
+      .find((control) => control.textContent?.includes("Challenge"));
+
+    expect(lock, "public challenge lock").toBeDefined();
+    expect(lock?.textContent).toContain("🔒");
+    expect(lock?.getAttribute("aria-disabled")).toBe("true");
+    expect(lock?.getAttribute("tabindex")).toBe("-1");
+    expect(lock?.onclick).toBeNull();
+    expect(container.textContent).not.toContain("↻ Regenerate");
+  });
+
 });

@@ -819,3 +819,9 @@ permission classifier (correctly) refused to relaunch.
 Found by CODE-T9C4-N1 (2026-09-01): a zsh `for path in ...` loop overwrites the special
 $path array (mirror of $PATH), making commands appear missing for the rest of the shell.
 Use any other variable name in zsh loops (`p`, `f`, `file`).
+
+- **Vitest jsdom can expose `import.meta.url` with an HTTP scheme.** CODE-T1C3 used
+  `fileURLToPath(new URL(..., import.meta.url))` in a jsdom render test and got
+  `TypeError: The URL must be of scheme file` before the feature assertion ran. Cost:
+  one broken RED run and one correction pass. When the acceptance command is explicitly
+  pinned to the worktree root, resolve source fixtures from `process.cwd()` instead.

@@ -531,16 +531,27 @@ function CanvasCard({
                     >
                       ⚐ Challenge
                     </button>
+                  ) : (
+                    <span
+                      className="nodeCtrl challenge"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      style={{ opacity: 0.55 }}
+                    >
+                      🔒 Challenge
+                    </span>
+                  )}
+                  {onChallengeNode ? (
+                    <button
+                      type="button"
+                      className="nodeCtrl"
+                      disabled
+                      aria-disabled="true"
+                      title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                    >
+                      ↻ Regenerate
+                    </button>
                   ) : null}
-                  <button
-                    type="button"
-                    className="nodeCtrl"
-                    disabled
-                    aria-disabled="true"
-                    title={V3_MISSING_CAPABILITIES.nodeRegeneration}
-                  >
-                    ↻ Regenerate
-                  </button>
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
