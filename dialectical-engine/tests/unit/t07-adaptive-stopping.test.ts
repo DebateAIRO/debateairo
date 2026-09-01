@@ -677,6 +677,18 @@ describe("T7 / J15(b) — a δ stop must be NON-VACUOUS", () => {
     expect(countMeasuredEdges(roundTwo)).toBe(1);
     expect(countMeasuredEdges(discriminator)).toBe(2);
 
+    // An edge STAMPED measured but carrying no magnitude is not evidence:
+    // `computeGraph` skips it exactly as it skips an UNKNOWN one, so counting it
+    // would let a graph that moved nothing claim it had something to weigh.
+    const measuredButEmpty = snapshot(
+      [node("root:A", 0.5), node("b1", 0.5)],
+      [support("e:b1->A", "b1", "root:A", null, "MEASURED")],
+      [resolution("root:A")]
+    );
+    expect(countMeasuredEdges(measuredButEmpty)).toBe(0);
+    expect(evaluate(measuredButEmpty).strengths.find((row) => row.nodeId === "root:A")!.strength)
+      .toBe(0.5);
+
     const values = new Map(evaluate(allUnknown).strengths.map((row) => [row.nodeId, row.strength]));
     // Nothing moves anything: every node sits at its own tau.
     expect(values.get("root:A")).toBe(0.5);
