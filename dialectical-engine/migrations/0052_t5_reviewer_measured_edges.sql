@@ -124,16 +124,6 @@ BEGIN
 END;
 $$;
 
--- `0040_account_erasure.sql:6273` swept `REVOKE EXECUTE ON ALL FUNCTIONS IN
--- SCHEMA core FROM PUBLIC` once, at that migration. A function created AFTER
--- that sweep keeps PostgreSQL's default PUBLIC EXECUTE grant, which would put
--- one more core function inside the content-provision role's reach and break
--- its isolation attestation (`assertContentProvisionDatabaseRole` counts the
--- core functions that role may execute and requires EXACTLY the six ruled
--- provision signatures). Every function minted after 0040 must revoke for
--- itself; this is that revoke. (TINT1 root cause 5.)
-REVOKE ALL ON FUNCTION core.reject_edge_mutation_except_measurement() FROM PUBLIC;
-
 DROP TRIGGER IF EXISTS reject_mutation_except_measurement ON core.edge;
 CREATE TRIGGER reject_mutation_except_measurement
   BEFORE UPDATE OR DELETE ON core.edge
