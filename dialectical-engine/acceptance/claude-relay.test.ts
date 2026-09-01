@@ -5,6 +5,7 @@ import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CLAUDE_BINARY,
+  preflightClaudeCli,
   resolveClaudeBinary,
   startClaudeRelay,
   type ClaudeRelayHandle
@@ -214,7 +215,8 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       expect(relayed.argumentList).toEqual([
         "-p", relayed.prompt,
         "--output-format", "json",
-        "--setting-sources", "",
+        // D18: "user", not "" — "" severed the CLI's keychain login.
+        "--setting-sources", "user",
         "--strict-mcp-config",
         "--no-session-persistence",
         "--tools", "",
@@ -412,5 +414,92 @@ describe("D10 Claude relay binary resolution", () => {
       if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
       else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
     }
+  });
+});
+
+/**
+ * Replaces the prompt payload with a placeholder so two argument vectors built
+ * for different prompts can be compared for SHAPE.
+ */
+function argumentShape(argumentList: readonly string[]): readonly string[] {
+  const index = argumentList.indexOf("-p");
+  return index < 0
+    ? argumentList
+    : [...argumentList.slice(0, index + 1), "<prompt>", ...argumentList.slice(index + 2)];
+}
+
+describe("D18 Claude relay keychain-login visibility", () => {
+  it("loads the user setting source so the CLI can see its own keychain login", async () => {
+    // Measured on claude 2.1.247 (logs/trel2/probe-0{2,3,4}): with
+    // `--setting-sources ""` the CLI answers `Not logged in · Please run
+    // /login` (is_error true, zero cost); with `user` it answers normally;
+    // with `project,local` — every source EXCEPT user — it fails again. The
+    // login is carried by the user source and by nothing else.
+    const relay = await start();
+    const response = await postCompletion(relay, "Auth visibility.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    const index = relayed.argumentList.indexOf("--setting-sources");
+
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(relayed.argumentList[index + 1]).toBe("user");
+  });
+
+  it("keeps project and local settings out of the relayed call", async () => {
+    const relay = await start();
+    const response = await postCompletion(relay, "Isolation retained.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    const sources = relayed.argumentList[relayed.argumentList.indexOf("--setting-sources") + 1] ?? "";
+
+    expect(sources.split(",").map((source) => source.trim())).not.toContain("project");
+    expect(sources.split(",").map((source) => source.trim())).not.toContain("local");
+  });
+});
+
+describe("F26 ceremony preflight parity", () => {
+  it("builds the preflight command from the relay's own adapter, so preflight cannot drift", async () => {
+    const preflight = await preflightClaudeCli({
+      timeoutMs: 10_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    const preflightEcho = JSON.parse(preflight.handshake.content) as {
+      argumentList: readonly string[];
+      environment: Readonly<Record<string, string>>;
+    };
+
+    const relay = await start();
+    const response = await postCompletion(relay, "Parity.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayedEcho = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+      environment: Readonly<Record<string, string>>;
+    };
+
+    // The three divergences F26 names, each asserted: same binary, same
+    // argument shape, same child-environment key set.
+    expect(preflight.command.binary).toBe(process.execPath);
+    expect(argumentShape(preflightEcho.argumentList)).toEqual(argumentShape(relayedEcho.argumentList));
+    expect(Object.keys(preflightEcho.environment).sort())
+      .toEqual(Object.keys(relayedEcho.environment).sort());
+  });
+
+  it("reports the CLI-reported model from the preflight handshake, never a guessed literal", async () => {
+    const preflight = await preflightClaudeCli({
+      timeoutMs: 10_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+
+    expect(preflight.handshake.model).toBe("claude-fake-cli-model");
   });
 });

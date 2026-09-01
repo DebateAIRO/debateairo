@@ -521,7 +521,11 @@ describe("P4-13 approved adversarial relay corpus", () => {
     expect(observed.argumentList).toEqual([
       "-p", observed.prompt,
       "--output-format", "json",
-      "--setting-sources", "",
+      // D18: "user", not "" — "" severed the CLI's keychain login. The
+      // security property this case exists for is untouched: the adversarial
+      // `--setting-sources user,project` text stays INSIDE the -p value, which
+      // the index assertion below still proves.
+      "--setting-sources", "user",
       "--strict-mcp-config",
       "--no-session-persistence",
       "--tools", "",
