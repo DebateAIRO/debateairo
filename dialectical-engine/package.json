@@ -9,7 +9,7 @@
     "pnpm": "11.20.0"
   },
   "scripts": {
-    "build": "pnpm run generate:contract && pnpm run typecheck && pnpm --filter dialectical-engine-web build",
+    "build": "pnpm run generate:contract && pnpm run typecheck && pnpm --filter dialectical-engine-v2ui build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:s00": "vitest run tests/unit tests/integration tests/architecture",

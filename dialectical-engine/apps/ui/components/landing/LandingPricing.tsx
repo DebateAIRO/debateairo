@@ -1,57 +1,37 @@
 import type { JSX } from "react";
 
+/* The document's closing CTA: centred, with the pro/rule/con motif above it.
+   The pricing line carries the id the nav points at. */
 export function LandingPricing(): JSX.Element {
   return (
     <section
-      id="pricing"
+      id="start"
       data-landing-section="pricing"
       aria-labelledby="landing-pricing-title"
-      style={{
-        background: "var(--shell)",
-        padding: "clamp(48px, 8vw, 96px) clamp(24px, 7vw, 96px)"
-      }}
+      className="lpSection lpClosing"
     >
-      <p
-        style={{
-          color: "var(--muted)",
-          fontFamily: "var(--font-mono)",
-          fontSize: "var(--t-micro)",
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          margin: "0 0 14px",
-          textTransform: "uppercase"
-        }}
-      >
-        PRICING
-      </p>
-      <h2
-        id="landing-pricing-title"
-        style={{
-          color: "var(--text-strong)",
-          fontFamily: "var(--font-display)",
-          fontSize: "var(--t-display)",
-          fontVariationSettings: "var(--fvs-display)",
-          fontWeight: "var(--fw-display)",
-          lineHeight: 1.08,
-          margin: 0,
-          maxWidth: "22ch"
-        }}
-      >
-        Take one debate. Four turns, about nine minutes, and a transcript that tells you exactly
-        where you stopped answering.
+      <div className="lpMotif" aria-hidden="true">
+        <span className="lpSwatch" data-stance="pro" />
+        <span className="lpMotifRule" />
+        <span className="lpSwatch" data-stance="con" />
+      </div>
+      <h2 id="landing-pricing-title" className="lpDisplay lpClosingTitle">
+        Your argument is only as strong as its weakest joint.
       </h2>
-      <p
-        style={{
-          borderTop: "1px solid var(--line-strong)",
-          color: "var(--text-2)",
-          fontFamily: "var(--font-mono)",
-          fontSize: "var(--t-lede)",
-          lineHeight: 1.55,
-          margin: "clamp(32px, 5vw, 56px) 0 0",
-          paddingTop: "22px"
-        }}
-      >
-        First [PLACEHOLDER] debates free, then [PLACEHOLDER] per month. Cancel whenever.
+      <p className="lpClosingLede">
+        Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where
+        you stopped answering.
+      </p>
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "52px" }}>
+        <a className="lpCta lpCtaClosing" href="/login?next=%2Fnew">
+          Start a round
+          <span className="lpArrow" aria-hidden="true">
+            →
+          </span>
+        </a>
+      </div>
+      <p id="pricing" className="lpPricing">
+        First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever.
       </p>
     </section>
   );

@@ -11,7 +11,6 @@ import type {
 } from "../../apps/api/src/sessions.js";
 import { createContractClient } from "@debateai/contract";
 import { createServerContractClient as createUiServerClient } from "../../apps/ui/lib/serverApi.js";
-import { createServerContractClient as createWebServerClient } from "../../web/lib/serverApi.js";
 import { RETIRED_DEV_HEADER } from "../support/httpSession.js";
 
 const SESSION_TOKEN = "s".repeat(43);
@@ -359,7 +358,7 @@ describe("S5 HTTP session boundary", () => {
     await api.close();
   });
 
-  it("forwards only the incoming browser User-Agent on both cookie-native SSR clients", async () => {
+  it("forwards only the incoming browser User-Agent on the cookie-native SSR client", async () => {
     const originalBase = process.env.DIALECTICAL_API_BASE;
     process.env.DIALECTICAL_API_BASE = "https://api.debateai.test";
     const seen: Headers[] = [];
@@ -371,13 +370,13 @@ describe("S5 HTTP session boundary", () => {
         : Response.json({ error: "SESSION_REQUIRED" }, { status: 401 });
     }) as typeof fetch;
     try {
-      for (const createServerClient of [createUiServerClient, createWebServerClient]) {
+      for (const createServerClient of [createUiServerClient]) {
         await expect(createServerClient(boundFetch, SESSION_TOKEN, "Bound Browser A")
           .readSession()).resolves.toMatchObject({ ownership_provenance: "server_session" });
         await expect(createServerClient(boundFetch, SESSION_TOKEN, "Different Browser B")
           .readSession()).rejects.toMatchObject({ code: "SESSION_REQUIRED" });
       }
-      expect(seen).toHaveLength(4);
+      expect(seen).toHaveLength(2);
       expect(seen[0]!.get("cookie")).toBe(`${SESSION_COOKIE_NAME}=${SESSION_TOKEN}`);
       expect(seen[0]!.get("user-agent")).toBe("Bound Browser A");
       expect([...seen[0]!.keys()].sort()).toEqual(["cookie", "user-agent"]);

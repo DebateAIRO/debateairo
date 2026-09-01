@@ -50,14 +50,14 @@ export function SynthesisPanel(view: SynthesisView) {
               <>
                 <section className="synthCard synthPro">
                   <div className="synthCardHead">
-                    <span className="synthCardLabel pro">↑ Strongest Pro</span>
+                    <span className="synthCardLabel pro">↑ STRONGEST PRO</span>
                   </div>
                   <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.proClaim || "Pending"}</div>
                 </section>
 
                 <section className="synthCard synthCon">
                   <div className="synthCardHead">
-                    <span className="synthCardLabel con">↓ Strongest Con</span>
+                    <span className="synthCardLabel con">↓ STRONGEST CON</span>
                   </div>
                   <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.conClaim || "Pending"}</div>
                 </section>
@@ -66,7 +66,7 @@ export function SynthesisPanel(view: SynthesisView) {
 
             <section className="synthCard synthVerdict">
               <div className="synthCardHead">
-                <span className="synthCardLabel verdict">Verdict</span>
+                <span className="synthCardLabel verdict">VERDICT</span>
                 {view.meta ? <span className="synthVerdictMeta">{view.meta}</span> : null}
               </div>
               <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{verdictBody}</div>
@@ -76,7 +76,7 @@ export function SynthesisPanel(view: SynthesisView) {
                   <div
                     className="synthLeanBar"
                     style={{
-                      background: `linear-gradient(90deg, oklch(0.6 0.08 165) 0%, oklch(0.6 0.08 165) ${view.lean.pct}%, oklch(0.5 0.01 70) ${view.lean.pct}%, oklch(0.65 0.1 50) 100%)`
+                      background: `linear-gradient(90deg, var(--pro) ${view.lean.pct}%, var(--con) ${view.lean.pct}%)`
                     }}
                   />
                   <span className="synthLeanValue">{view.lean.label}</span>

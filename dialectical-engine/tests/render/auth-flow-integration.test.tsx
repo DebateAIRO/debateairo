@@ -299,7 +299,7 @@ describe("rendered auth flow integration", () => {
     ));
     await settle();
 
-    expect(document.querySelector('.authFooter a')?.getAttribute("href"))
+    expect(document.querySelector('.authPanelFooter a')?.getAttribute("href"))
       .toBe("/login?next=%2Fnew");
   });
 
@@ -310,7 +310,7 @@ describe("rendered auth flow integration", () => {
     ));
     await settle();
 
-    expect(document.querySelector('.authFooter a')?.getAttribute("href")).toBe("/login");
+    expect(document.querySelector('.authPanelFooter a')?.getAttribute("href")).toBe("/login");
   });
 
   it("renders the non-enumerating registration state and resends only to the submitted email", async () => {
@@ -333,7 +333,7 @@ describe("rendered auth flow integration", () => {
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
     expect(document.body.textContent).toContain("No account status is revealed here.");
 
-    await click("Resend instructions");
+    await click("Verify email");
     expect(resendVerification).toHaveBeenCalledWith("person@example.test");
     expect(document.body.textContent).toContain(RESEND_MESSAGE);
     expect(document.body.textContent).not.toMatch(/Google|forgot|keep me signed|model API key/i);
@@ -467,7 +467,7 @@ describe("rendered auth flow integration", () => {
     await submit();
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
 
-    await click("Resend instructions");
+    await click("Verify email");
     expect(document.querySelector('[role="alert"]')?.textContent)
       .toBe("Verification instructions could not be resent.");
     expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);

@@ -54,17 +54,15 @@ describe("S9 dev-token retirement architecture contract", () => {
   });
 
   it("exposes a one-shot cookie claim UI and boots acceptance with a real service session", async () => {
-    const [uiControl, webControl, uiSettings, webSettings, acceptance, packageJson,
+    const [uiControl, uiSettings, acceptance, packageJson,
       vitestConfig] = await Promise.all([
       read("apps/ui/components/LegacyRunClaimControls.tsx"),
-      read("web/components/LegacyRunClaimControls.tsx"),
       read("apps/ui/app/settings/page.tsx"),
-      read("web/app/settings/page.tsx"),
       read("acceptance/main.ts"),
       read("package.json"),
       read("vitest.config.ts")
     ]);
-    for (const control of [uiControl, webControl]) {
+    for (const control of [uiControl]) {
       expect(control).toContain("client.claimLegacyRuns(submittedToken)");
       expect(control.indexOf('setLegacyToken("")')).toBeLessThan(
         control.indexOf("client.claimLegacyRuns(submittedToken)")
@@ -72,7 +70,6 @@ describe("S9 dev-token retirement architecture contract", () => {
       expect(control).not.toMatch(/localStorage|sessionStorage|console\./);
     }
     expect(uiSettings).toContain("<LegacyRunClaimControls");
-    expect(webSettings).toContain("<LegacyRunClaimControls");
     expect(acceptance).toContain("new PostgresSessionRepository(");
     expect(acceptance).toContain("acceptanceServiceRequestHeaders");
     expect(acceptance).toContain("serviceCredential");

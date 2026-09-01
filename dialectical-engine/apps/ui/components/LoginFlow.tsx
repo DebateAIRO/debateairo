@@ -11,6 +11,26 @@ import { safeReturnPath } from "@/lib/returnPath";
 type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
 type VerificationMethod = "authenticator" | "recovery";
 
+/* The document shows live validity marks under both auth fields (7a, and 8a
+   with two rules unmet). These are presentation only — the server remains the
+   authority on whether any credential is accepted. */
+const PASSWORD_RULES: readonly { readonly label: string; readonly met: (value: string) => boolean }[] = [
+  { label: "Eight characters", met: (v) => v.length >= 8 },
+  { label: "One capital letter", met: (v) => /[A-Z]/.test(v) },
+  { label: "One number", met: (v) => /[0-9]/.test(v) },
+  { label: "One special character", met: (v) => /[^A-Za-z0-9]/.test(v) }
+];
+
+function emailValidity(value: string): { state: "idle" | "ok" | "bad"; text: string } {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { state: "idle", text: "Use the address this account was verified with." };
+  // Deliberately permissive: the address is checked for shape, not existence.
+  const shaped = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(trimmed);
+  return shaped
+    ? { state: "ok", text: "✓ Valid address" }
+    : { state: "bad", text: "✗ That does not look like an email address" };
+}
+
 function navigateHome(): void {
   const next = new URLSearchParams(window.location.search).get("next");
   window.location.assign(safeReturnPath(next));
@@ -29,6 +49,9 @@ export function LoginFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signUpHref, setSignUpHref] = useState("/sign-up");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -87,6 +110,7 @@ export function LoginFlow({
   }
 
   const verificationPending = challengeToken !== null;
+  const emailState = emailValidity(email);
   const shellCopy = replacementRecoveryCode !== null
     ? {
         eyebrow: "Recovery access",
@@ -124,6 +148,7 @@ export function LoginFlow({
 
       {replacementRecoveryCode !== null ? (
         <section className="authSuccessWarning" role="alert" aria-labelledby="replacement-code-title">
+          <span className="authSuccessAccent" aria-hidden />
           <p className="authNoticeKicker">Signed in securely</p>
           <h2 id="replacement-code-title">Record your replacement recovery code</h2>
           <p>Your used recovery code has been replaced. This is the only time this new code will be shown.</p>
@@ -142,11 +167,52 @@ export function LoginFlow({
         </section>
       ) : challengeToken === null ? (
         <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
-          <div className="authField"><label htmlFor="login-email">Email</label>
-            <input id="login-email" name="email" type="email" autoComplete="username" placeholder="you@institution.edu" required autoFocus disabled={busy} />
+          <div className="authField">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="username"
+              placeholder="you@institution.edu"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              aria-describedby="login-email-validity"
+              required
+              autoFocus
+              disabled={busy}
+            />
+            <p className="authValidity" id="login-email-validity" data-state={emailState.state}>
+              {emailState.text}
+            </p>
           </div>
-          <div className="authField"><label htmlFor="login-password">Password</label>
-            <input id="login-password" name="password" type="password" autoComplete="current-password" required disabled={busy} />
+          <div className="authField">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              aria-describedby="login-password-rules"
+              required
+              disabled={busy}
+            />
+            <ul className="authRules" id="login-password-rules">
+              {PASSWORD_RULES.map((rule) => {
+                const met = rule.met(password);
+                return (
+                  <li
+                    className="authRule"
+                    key={rule.label}
+                    data-met={password.length === 0 ? undefined : String(met)}
+                  >
+                    {password.length === 0 ? "·" : met ? "✓" : "✗"} {rule.label}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
           <button className="authPrimary" type="submit" disabled={busy}>
             {busy ? "Checking…" : "Continue"}
@@ -159,22 +225,58 @@ export function LoginFlow({
             <label htmlFor="login-code">
               {verificationMethod === "authenticator" ? "6-digit authentication code" : "Recovery code"}
             </label>
-            <input
-              className={verificationMethod === "authenticator" ? "authCodeInput" : "authRecoveryInput"}
-              id="login-code"
-              name="code"
-              type="text"
-              autoComplete="one-time-code"
-              inputMode={verificationMethod === "authenticator" ? "numeric" : "text"}
-              pattern={verificationMethod === "authenticator" ? "[0-9]{6}" : undefined}
-              maxLength={verificationMethod === "authenticator" ? 6 : undefined}
-              placeholder={verificationMethod === "authenticator" ? "000000" : "XXXX-XXXX-XXXX-XXXX"}
-              aria-describedby="login-code-hint"
-              spellCheck={false}
-              required
-              autoFocus
-              disabled={busy}
-            />
+            {verificationMethod === "authenticator" ? (
+              /* Six boxes are the document's presentation; the real control is
+                 a single input beneath them, so one-time-code autofill, paste
+                 and assistive tech all keep working. */
+              <div className="authCodeField">
+                <input
+                  className="authCodeCapture"
+                  id="login-code"
+                  name="code"
+                  type="text"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  aria-describedby="login-code-hint"
+                  aria-label="6-digit authentication code"
+                  spellCheck={false}
+                  required
+                  autoFocus
+                  disabled={busy}
+                />
+                <div className="authCodeBoxes" aria-hidden="true">
+                  {[0, 1, 2, 3, 4, 5].map((slot) => (
+                    <span
+                      className="authCodeBox"
+                      key={slot}
+                      data-filled={code.length > slot ? "true" : undefined}
+                      data-next={code.length === slot ? "true" : undefined}
+                    >
+                      {code[slot] ?? ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <input
+                className="authRecoveryInput"
+                id="login-code"
+                name="code"
+                type="text"
+                autoComplete="one-time-code"
+                inputMode="text"
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                aria-describedby="login-code-hint"
+                spellCheck={false}
+                required
+                autoFocus
+                disabled={busy}
+              />
+            )}
             <p className="authFieldHint" id="login-code-hint">
               {verificationMethod === "authenticator"
                 ? "Open Google Authenticator, 1Password, or your preferred authenticator."
@@ -187,6 +289,7 @@ export function LoginFlow({
           <div className="authMfaAlternatives">
             <button className="authTextButton" type="button" disabled={busy} onClick={() => {
               setVerificationMethod((current) => current === "authenticator" ? "recovery" : "authenticator");
+              setCode("");
               setError(null);
             }}>
               {verificationMethod === "authenticator" ? "Use a recovery code" : "Use an authenticator code"}
@@ -194,6 +297,7 @@ export function LoginFlow({
             <button className="authTextButton authBackButton" type="button" disabled={busy} onClick={() => {
               setChallengeToken(null);
               setVerificationMethod("authenticator");
+              setCode("");
               setError(null);
             }}>
               Back to sign in

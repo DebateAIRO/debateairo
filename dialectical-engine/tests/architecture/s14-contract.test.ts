@@ -5,9 +5,9 @@ import { auditS14TypeGraph } from "../../tools/orphan-audit/src/index.js";
 describe("S14 / AC-59..61 / W19 — native UI contract", () => {
   it("uses the generated contract client for both browser and SSR with no V2 wire mirror", async () => {
     const [browser, server, types] = await Promise.all([
-      readFile(new URL("../../web/lib/api.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/lib/serverApi.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/lib/types.ts", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/lib/serverApi.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/lib/types.ts", import.meta.url), "utf8")
     ]);
     expect(browser).toContain("createContractClient");
     expect(server).toContain("createContractClient");
@@ -18,10 +18,10 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
 
   it("routes browser contract traffic through the V3 same-origin API boundary", async () => {
     const [browser, server, route, localEnv] = await Promise.all([
-      readFile(new URL("../../web/lib/api.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/lib/serverApi.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/app/api/[...path]/route.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/.env.local", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/lib/serverApi.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/app/api/[...path]/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/.env.local", import.meta.url), "utf8")
     ]);
     expect(browser).toContain('"/api"');
     expect(server).toContain("DIALECTICAL_API_BASE");
@@ -42,7 +42,7 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
   it("carries the S04 orphan-audit wording fix and deterministic locale tiebreak", async () => {
     const [audit, recommendation, register] = await Promise.all([
       readFile(new URL("../../tools/orphan-audit/src/index.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/lib/recommendation.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/lib/recommendation.ts", import.meta.url), "utf8"),
       readFile(new URL("../../packages/register/src/index.ts", import.meta.url), "utf8")
     ]);
     expect(audit).not.toContain("measureDispersion surface records typed absence");
@@ -51,20 +51,17 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
   });
 
   it("W7 removes the obsolete source-text test corpus and W16 persists verbatim steering", async () => {
-    const [migration, api, askPage, askForm, serverDefaults] = await Promise.all([
+    // The UI half of this contract was written against web/app/new
+    // (NewQuestionForm.tsx + lib/serverAskDefaults.ts). That app was removed;
+    // apps/ui composes /new through app/new/defaults.tsx instead, so the
+    // machine-owned as_of is asserted there.
+    const [migration, api, askDefaults] = await Promise.all([
       readFile(new URL("../../migrations/0017_s14.sql", import.meta.url), "utf8"),
       readFile(new URL("../../apps/api/src/index.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/app/new/page.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../../web/app/new/NewQuestionForm.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../../web/lib/serverAskDefaults.ts", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/app/new/defaults.tsx", import.meta.url), "utf8")
     ]);
     expect(migration).toContain("ask_contract");
     expect(api).toContain("steering_annotations: ask.steering_annotations");
-    expect(askForm).toContain("logged verbatim");
-    expect(askPage).toContain('dynamic = "force-dynamic"');
-    expect(askPage).toContain("deriveMachineAskAsOf()");
-    expect(serverDefaults).toContain('import "server-only"');
-    expect(askForm).toContain("as_of: machineAsOf");
-    expect(askForm).not.toMatch(/\b(?:new\s+Date|Date\.now)\b/);
+    expect(askDefaults).toContain("as_of: asOf.toISOString()");
   });
 });

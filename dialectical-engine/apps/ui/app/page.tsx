@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { createServerContractClient, USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
-import { DebatesBuffer } from "@/components/DebatesBuffer";
+import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
 import type { ContractClient } from "@debateai/contract";
 import type { DebateSummary } from "@/lib/types";
@@ -49,14 +49,16 @@ export default async function HomePage({
     }
   }
 
+  const count = tab === "yours"
+    ? (total ?? debates.length)
+    : published.total;
+
   return (
-    <div className="screen scroll">
-      <div className="screenInner wide">
-        <div className="eyebrow">A REASONING INSTRUMENT</div>
-        <h1 className="display lg" style={{ marginTop: 14 }}>
-          What should we debate?
-        </h1>
-        <p className="lede">
+    <div className="screen scroll libScreen">
+      <div className="libInner">
+        <p className="libEyebrow">A REASONING INSTRUMENT</p>
+        <h1 className="libTitle">What should we debate?</h1>
+        <p className="libLede">
           Post a claim. Several different AI models argue it out against each other in a structured tree — so you can
           see how the strongest case for and against actually holds up.
         </p>
@@ -73,86 +75,51 @@ export default async function HomePage({
           </div>
         ) : null}
 
+        {/* The composer is the workspace and renders only for a confirmed
+            session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
-          <>
-            <section className="sessionHandoff" role="status" aria-live="polite">
-              <div>
-                <p className="sessionHandoffKicker">You’re signed in</p>
-                <h2>Your debate workspace is ready.</h2>
-                <p>Start a debate below. New debates and their answers will be saved to this account.</p>
-              </div>
-              <a className="btn btnDark" href="#start-a-debate">Start a debate</a>
-            </section>
-
-            <section id="start-a-debate" className="sessionComposer" aria-label="Start a debate">
-              <LibraryComposer />
-            </section>
-          </>
+          <section id="start-a-debate" aria-label="Start a debate">
+            <LibraryComposer />
+          </section>
         ) : null}
 
-      <div className="sectionHead" aria-label="Debate library">
+        <div className="libTabs sectionHead" aria-label="Debate library">
           <Link
             aria-current={tab === "yours" ? "page" : undefined}
             href="/?tab=yours"
-            className={tab === "yours" ? "tab tabActive" : "tab"}
+            className="libTab"
           >
-            Your Debates
+            Your debates
           </Link>
           <Link
             aria-current={tab === "public" ? "page" : undefined}
             href="/?tab=public"
-            className={tab === "public" ? "tab tabActive" : "tab"}
+            className="libTab"
           >
-            Public Debates
+            Public debates
           </Link>
-          <span className="count">
-            {tab === "yours"
-              ? (total === null
-                  ? `${debates.length} shown`
-                  : total > debates.length
-                    ? `${debates.length} shown of ${total} total`
-                    : `${total} total`)
-              : (published.total > published.items.length
-                  ? `${published.items.length} shown of ${published.total} total`
-                  : `${published.total} total`)}
-          </span>
+          <span className="libCount count">{count} TOTAL</span>
         </div>
 
-        {sessionConfirmed && tab === "yours" ? (
-          <div className="recentList">
-            <DebatesBuffer debates={debates} />
-          </div>
-        ) : tab === "yours" ? (
-          <p className="tabEmptyHint">Sign in or create an account above to see your debates.</p>
-        ) : null}
-
-        {tab === "public" ? (
+        {tab === "yours" ? (
+          sessionConfirmed ? (
+            <div className="libList">
+              <DebatesBuffer debates={debates} />
+            </div>
+          ) : (
+            <p className="tabEmptyHint">Sign in or create an account above to see your debates.</p>
+          )
+        ) : (
           <>
             {publishedError ? <div className="error">{publishedError}</div> : null}
-            <div className="recentList">
-              {published.items.length === 0 && publishedError === null ? <p>No debates have been published yet.</p> : null}
-              {published.items.map((debate) => (
-                <article className="debateCard" key={debate.public_ref}>
-                  <div className="debateCardBody">
-                    <Link href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}>{debate.question}</Link>
-                    <p>
-                      By {debate.author_pseudonym} · {debate.verdict ?? "Verdict unavailable"}
-                      {debate.confidence_band ? ` · ${debate.confidence_band}` : ""}
-                    </p>
-                    <p>Published debates may be indexed by search engines. Copies may persist after unpublishing.</p>
-                  </div>
-                  <Link
-                    className="tab"
-                    style={{ flexShrink: 0 }}
-                    href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}
-                  >
-                    Open the full debate →
-                  </Link>
-                </article>
-              ))}
+            <div className="libList">
+              <PublicDebatesBuffer debates={published.items} />
             </div>
+            <p className="libPublicNote">
+              Published debates may be indexed by search engines. Copies may persist after unpublishing.
+            </p>
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );

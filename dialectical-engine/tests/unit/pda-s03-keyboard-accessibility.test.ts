@@ -42,8 +42,8 @@ vi.mock("next/navigation", async (importOriginal) => ({
 }));
 
 const expectedTabs = [
-  { label: "Your Debates", href: "/?tab=yours" },
-  { label: "Public Debates", href: "/?tab=public" }
+  { label: "Your debates", href: "/?tab=yours" },
+  { label: "Public debates", href: "/?tab=public" }
 ] as const;
 
 const globalStyles = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
@@ -149,7 +149,7 @@ describe("public debate navigation keyboard accessibility", () => {
 
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]') === null).toBe(true);
     expect(document.querySelector(".tabEmptyHint") === null).toBe(true);
-    expect(hero?.textContent).toContain("Find the weakest claim in your own argument.");
+    expect(hero?.textContent).toContain("Find the weakest joint in your own argument.");
     expect(toggle?.tagName, "mode control native element").toBe("BUTTON");
     expect((toggle as HTMLButtonElement | null)?.tabIndex, "mode control keyboard tab order").toBe(0);
     expect(toggle?.hasAttribute("disabled"), "mode control native disabled state").toBe(false);

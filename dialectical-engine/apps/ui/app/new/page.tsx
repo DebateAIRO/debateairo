@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createDebate, contractClient } from "@/lib/api";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
@@ -24,6 +24,34 @@ const depthModeOptions: Array<{ value: AdaptiveDepthMode; label: string }> = [
   { value: "adaptive", label: "Adaptive" }
 ];
 
+const RISK_TIER_OPTIONS: ReadonlyArray<{ value: RiskTier; label: string }> = [
+  { value: "casual", label: "Casual" },
+  { value: "standard", label: "Standard" },
+  { value: "high-stakes", label: "High stakes" }
+];
+
+const BUDGET_TIER_OPTIONS: ReadonlyArray<{ value: CompositionBudgetTier; label: string }> = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" }
+];
+
+const DEPTH_MIN = 1;
+const DEPTH_MAX = 5;
+
+/* The document draws every text field at its resting height — one line for the
+   question, two for each steering box — so the fields grow with their content
+   instead of scrolling inside a fixed frame. A ref callback rather than a hook,
+   because it also has to run for a topic arriving in the query string. */
+function grow(field: HTMLTextAreaElement | null): void {
+  if (field === null) return;
+  field.style.height = "auto";
+  // scrollHeight covers content and padding; these fields are border-box, so
+  // the border has to be added back or each one settles a border short.
+  const border = field.offsetHeight - field.clientHeight;
+  field.style.height = `${field.scrollHeight + border}px`;
+}
+
 export default function NewDebatePage() {
   return (
     <Suspense fallback={null}>
@@ -43,10 +71,11 @@ function NewDebateForm({ token }: { token: string }) {
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
-  const [roleOverrides, setRoleOverrides] = useState("");
   const [riskTier, setRiskTier] = useState("");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
+  const [steeringPresets, setSteeringPresets] = useState("");
+  const [steeringAnnotations, setSteeringAnnotations] = useState("");
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
@@ -73,7 +102,7 @@ function NewDebateForm({ token }: { token: string }) {
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    depth >= 1 && depth <= 5 &&
+    depth >= DEPTH_MIN && depth <= DEPTH_MAX &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -94,6 +123,8 @@ function NewDebateForm({ token }: { token: string }) {
         decisionScope,
         asOf,
         depth,
+        steeringPresets,
+        steeringAnnotations,
         asOfWasEdited: false,
         riskTierWasEdited
       }, submitTime);
@@ -106,168 +137,158 @@ function NewDebateForm({ token }: { token: string }) {
     }
   }
 
+  // The footer advertises ⌃↵, so the shortcut has to work from inside the
+  // multi-line fields where a bare Enter means "new line".
+  function onKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+    event.preventDefault();
+    void submit(event as unknown as FormEvent);
+  }
+
   return (
-    <div className="screen scroll">
-      <div className="screenInner narrow">
-        <h1 className="display md">What should we debate?</h1>
-        <form onSubmit={submit} style={{ marginTop: 22 }}>
-          {error ? (
-            <div className="error" style={{ marginBottom: 16 }}>
-              {error}
-            </div>
-          ) : null}
+    <div className="screen scroll ndScreen">
+      <div className="ndInner">
+        <p className="ndEyebrow">NEW QUESTION</p>
+        <h1 className="ndTitle">What should we debate?</h1>
+        <form onSubmit={submit} onKeyDown={onKeyDown}>
+          {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
+
           <label className="srOnly" htmlFor="topic">
             Topic
           </label>
-          <textarea
-            id="topic"
-            className="textareaSerif"
-            value={topic}
-            onChange={(event) => setTopic(event.target.value)}
-            placeholder="Type a debatable claim or question…"
-            autoFocus
-            required
-          />
+          <div className="ndTopicBezel">
+            <div className="ndTopicCore">
+              <textarea
+                id="topic"
+                className="ndTopic"
+                ref={grow}
+                rows={1}
+                value={topic}
+                onChange={(event) => {
+                  setTopic(event.target.value);
+                  grow(event.currentTarget);
+                }}
+                placeholder="Type a debatable claim or question…"
+                autoFocus
+                required
+              />
+            </div>
+          </div>
 
-          <div className="optionsPanel" style={{ marginTop: 18 }}>
-            <div className="optionHint" style={{ marginBottom: 4 }}>
+          <div className="ndCard">
+            <p className="ndIntro">
               Choose your risk tier, composition budget tier, and depth, then click Start.
-            </div>
-            <div className="optionRow">
-              <div>
-                <label className="optionLabel" htmlFor="riskTier">
-                  Risk tier
-                </label>
-                <div className="optionHint">How much is riding on the answer</div>
-                <div className="optionHint">Explicit asker selection</div>
-              </div>
-              <div className="optionControl">
-                <select
-                  id="riskTier"
-                  value={riskTier}
+            </p>
+            <SegmentedRow
+              field="riskTier"
+              label="Risk tier"
+              hint="How much is riding on the answer · explicit asker selection"
+              options={RISK_TIER_OPTIONS}
+              value={riskTier}
+              onChange={(value) => {
+                setRiskTier(value);
+                setRiskTierWasEdited(true);
+              }}
+            />
+            <SegmentedRow
+              field="budgetTier"
+              label="Composition budget tier"
+              hint="How much work the composition may spend · provisional default, editable"
+              options={BUDGET_TIER_OPTIONS}
+              value={budgetTier}
+              onChange={(value) => setBudgetTier(value as CompositionBudgetTier)}
+            />
+            <SliderRow
+              id="treeDepth"
+              label="Tree depth"
+              hint="How far the debate expands when cross-maker review is available"
+              min={DEPTH_MIN}
+              max={DEPTH_MAX}
+              value={depth}
+              onChange={setDepth}
+            />
+            <div className="ndRow ndRowSteering">
+              <div className="ndSteerField">
+                <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
+                <div className="ndHint">One per line</div>
+                <textarea
+                  id="steeringPresets"
+                  className="ndSteerInput"
+                  ref={grow}
+                  rows={2}
+                  value={steeringPresets}
                   onChange={(event) => {
-                    setRiskTier(event.target.value);
-                    setRiskTierWasEdited(true);
+                    setSteeringPresets(event.target.value);
+                    grow(event.currentTarget);
                   }}
-                  aria-label="Risk tier"
-                >
-                  <option value="">Choose…</option>
-                  <option value="casual">casual</option>
-                  <option value="standard">standard</option>
-                  <option value="high-stakes">high-stakes</option>
-                </select>
+                  placeholder={"Prefer primary sources\nSurface the strongest counter-case early"}
+                />
+              </div>
+              <div className="ndSteerField">
+                <label className="ndLabel" htmlFor="steeringAnnotations">Steering annotations</label>
+                <div className="ndHint">Free text · logged verbatim, one per line</div>
+                <textarea
+                  id="steeringAnnotations"
+                  className="ndSteerInput"
+                  data-italic="true"
+                  ref={grow}
+                  rows={2}
+                  value={steeringAnnotations}
+                  onChange={(event) => {
+                    setSteeringAnnotations(event.target.value);
+                    grow(event.currentTarget);
+                  }}
+                  placeholder="Add a note the run will carry…"
+                />
               </div>
             </div>
-            <div className="optionRow">
-              <div>
-                <label className="optionLabel" htmlFor="budgetTier">
-                  Composition budget tier
-                </label>
-                <div className="optionHint">How much work the composition may spend</div>
-                <div className="optionHint">Provisional default pending V ruling; editable user-owned value</div>
-              </div>
-              <div className="optionControl">
-                <select
-                  id="budgetTier"
-                  value={budgetTier}
-                  onChange={(event) => setBudgetTier(event.target.value as CompositionBudgetTier)}
-                  aria-label="Composition budget tier"
-                >
-                  <option value="">Choose…</option>
-                  <option value="low">low</option>
-                  <option value="medium">medium</option>
-                  <option value="high">high</option>
-                </select>
-              </div>
-            </div>
-            <div className="optionRow">
-              <div>
-                <label className="optionLabel" htmlFor="treeDepth">Tree depth</label>
-                <div className="optionHint">How far the debate expands when cross-maker review is available</div>
-              </div>
-              <div className="optionControl">
-                <select
-                  id="treeDepth"
-                  value={depth ?? ""}
-                  onChange={(event) => setDepth(Number(event.target.value))}
-                  aria-label="Tree depth"
-                >
-                  {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </div>
-            </div>
+            <p className="ndProvenance">
+              Tier source, provenance, and machine as-of are recorded automatically with the run contract.
+            </p>
           </div>
 
           {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
 
           <button
             type="button"
-            className="optionsToggle"
+            className="ndOptionsToggle"
             aria-expanded={optionsOpen}
             aria-controls={optionsOpen ? "additionalRunOptions" : undefined}
             onClick={() => setOptionsOpen((value) => !value)}
           >
-            Options <span style={{ fontSize: 9 }}>{optionsOpen ? "▲" : "▼"}</span>
+            ⚙ OPTIONS <span className="ndOptionsCaret" aria-hidden>{optionsOpen ? "▲" : "▼"}</span>
+            <span className="ndOptionsRule" aria-hidden />
           </button>
 
-              {optionsOpen ? (
-            <div id="additionalRunOptions" className="optionsPanel">
+          {optionsOpen ? (
+            <div id="additionalRunOptions" className="ndCard ndLegacy">
               {/*
                 DR-115 honesty: the ruled Tree depth control is on the default
                 surface. The legacy V2 knobs below are named as not carried
                 rather than quietly posted into a config the ask builder drops.
               */}
-              <div className="optionHint" style={{ marginBottom: 4 }}>
-                Depth mode, depth of scrutiny, branching width, concurrency, max tokens, and role overrides are V2
+              <p className="ndLegacyNotice">
+                Depth mode, depth of scrutiny, branching width, concurrency, and max tokens are V2
                 controls the V3 run contract has no slot for — they are not sent.
-              </div>
-              <div className="optionRow">
-                <div>
-                  <label className="optionLabel" htmlFor="depthMode">
-                    Depth mode
-                  </label>
-                  <div className="optionHint">Selection strategy</div>
-                </div>
-                <div className="optionControl">
-                  <select
-                    id="depthMode"
-                    value={depthMode}
-                    onChange={(event) => setDepthMode(event.target.value as AdaptiveDepthMode)}
-                    aria-label="Depth mode"
-                  >
-                    {depthModeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="optionRow">
-                <div>
-                  <label className="optionLabel" htmlFor="scrutinyDepth">
-                    Depth of scrutiny
-                  </label>
-                  <div className="optionHint">
-                    {SCRUTINY_DEPTH_OPTIONS.find((option) => option.value === scrutiny)?.hint}
-                  </div>
-                </div>
-                <div className="optionControl">
-                  <select
-                    id="scrutinyDepth"
-                    value={scrutiny}
-                    onChange={(event) => setScrutiny(event.target.value as ScrutinyDepth)}
-                    aria-label="Depth of scrutiny"
-                  >
-                    {SCRUTINY_DEPTH_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              </p>
+              <SelectRow
+                id="depthMode"
+                label="Depth mode"
+                hint="Selection strategy"
+                value={depthMode}
+                onChange={(value) => setDepthMode(value as AdaptiveDepthMode)}
+                options={depthModeOptions}
+              />
+              <SelectRow
+                id="scrutinyDepth"
+                label="Depth of scrutiny"
+                hint={SCRUTINY_DEPTH_OPTIONS.find((option) => option.value === scrutiny)?.hint ?? ""}
+                value={scrutiny}
+                onChange={(value) => setScrutiny(value as ScrutinyDepth)}
+                options={SCRUTINY_DEPTH_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              />
               <SliderRow
+                id="branchingWidth"
                 label="Branching width"
                 hint="Pro + con children per claim"
                 min={1}
@@ -276,6 +297,7 @@ function NewDebateForm({ token }: { token: string }) {
                 onChange={setBranching}
               />
               <SliderRow
+                id="concurrency"
                 label="Concurrency"
                 hint="Models running in parallel"
                 min={1}
@@ -284,6 +306,7 @@ function NewDebateForm({ token }: { token: string }) {
                 onChange={setConcurrency}
               />
               <SliderRow
+                id="maxTokens"
                 label="Max tokens"
                 hint="Per generated argument"
                 min={128}
@@ -292,37 +315,24 @@ function NewDebateForm({ token }: { token: string }) {
                 value={maxTokens}
                 onChange={setMaxTokens}
               />
-              <div className="fieldGroup">
-                <label htmlFor="roleOverrides">Role overrides JSON</label>
-                <textarea
-                  id="roleOverrides"
-                  value={roleOverrides}
-                  onChange={(event) => setRoleOverrides(event.target.value)}
-                  spellCheck={false}
-                  placeholder='{ "proposer": "gpt-5" }'
-                />
-              </div>
-              <div className="optionHint">
-                Model role assignment lives in{" "}
-                <button
-                  type="button"
-                  className="linkBtn"
-                  style={{ padding: 0 }}
-                  onClick={() => router.push("/settings")}
-                >
+              <p className="ndProvenance">
+                Role overrides are not user-editable — model role assignment lives in{" "}
+                <button type="button" className="ndSettingsLink" onClick={() => router.push("/settings")}>
                   Settings →
                 </button>
-              </div>
+              </p>
             </div>
           ) : null}
 
-          <div className="formActions">
-            <button type="submit" className={`startBtn${ready ? " ready" : ""}`} disabled={!ready || submitting}>
-              {submitting ? "Starting" : "Start debate"} <span aria-hidden>→</span>
+          <div className="ndActions">
+            <button type="submit" className="ndStart" disabled={!ready || submitting}>
+              {submitting ? "Starting" : "Start run"} <span aria-hidden>→</span>
             </button>
-            <button type="button" className="btnGhost" onClick={() => router.push("/")}>
+            <button type="button" className="ndCancel" onClick={() => router.push("/")}>
               Cancel
             </button>
+            <span className="ndActionsSpacer" aria-hidden />
+            <span className="ndKeyHint">⌃↵ to start</span>
           </div>
         </form>
       </div>
@@ -330,7 +340,86 @@ function NewDebateForm({ token }: { token: string }) {
   );
 }
 
+/* The document's segmented tier control: one pill per option, the chosen one
+   filled with ink. Radio semantics keep it operable without a pointer. */
+function SegmentedRow({
+  field,
+  label,
+  hint,
+  options,
+  value,
+  onChange
+}: {
+  field: string;
+  label: string;
+  hint: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="ndRow">
+      <div className="ndRowText">
+        <div className="ndLabel" id={`${field}-label`}>{label}</div>
+        <div className="ndHint">{hint}</div>
+      </div>
+      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            id={`${field}-${option.value}`}
+            data-field={field}
+            data-value={option.value}
+            aria-checked={value === option.value}
+            className="ndSegItem"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SelectRow({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+  options
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<{ value: string; label: string }>;
+}) {
+  return (
+    <div className="ndRow">
+      <div className="ndRowText">
+        <label className="ndLabel" htmlFor={id}>{label}</label>
+        <div className="ndHint">{hint}</div>
+      </div>
+      <span className="ndSelect">
+        <span aria-hidden>{options.find((option) => option.value === value)?.label ?? value}</span>
+        <span className="ndSelectCaret" aria-hidden>▼</span>
+        <select id={id} value={value} onChange={(event) => onChange(event.target.value)} aria-label={label}>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </span>
+    </div>
+  );
+}
+
 function SliderRow({
+  id,
   label,
   hint,
   min,
@@ -339,6 +428,7 @@ function SliderRow({
   value,
   onChange
 }: {
+  id: string;
   label: string;
   hint: string;
   min: number;
@@ -347,14 +437,17 @@ function SliderRow({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
-    <div className="optionRow">
-      <div>
-        <div className="optionLabel">{label}</div>
-        <div className="optionHint">{hint}</div>
+    <div className="ndRow ndRowSlider">
+      <div className="ndRowText">
+        <label className="ndLabel" htmlFor={id}>{label}</label>
+        <div className="ndHint">{hint}</div>
       </div>
-      <div className="optionControl">
+      <span className="ndSliderWrap">
         <input
+          id={id}
+          className="ndSlider"
           type="range"
           min={min}
           max={max}
@@ -362,11 +455,10 @@ function SliderRow({
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
           aria-label={label}
+          style={{ "--nd-pct": `${pct}%` } as CSSProperties}
         />
-        <span className="optionValue" style={{ width: step === 1 ? 18 : 44 }}>
-          {value}
-        </span>
-      </div>
+      </span>
+      <span className="ndValue">{value}</span>
     </div>
   );
 }

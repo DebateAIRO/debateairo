@@ -1082,7 +1082,6 @@ export default function DebatePageClient({
     );
   }
 
-  const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = formatScoringConfidenceCopy();
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
@@ -1097,26 +1096,30 @@ export default function DebatePageClient({
       data-actions-collapsed={headerActionsCollapsed ? "true" : "false"}
     >
       {/* ---- top bar ---- */}
-      <header className="debateTopBar" ref={debateHeaderRef}>
+      <header className="debateTopBar" data-debate-reference-chrome ref={debateHeaderRef}>
         <div className="debateTopIdentityRow" ref={debateHeaderIdentityRef}>
           <BrandMark />
+          <span className="debateTopDivider" aria-hidden />
           <div className="debateTopClaim" ref={debateHeaderClaimRef}>
             <span className="debateTopTitle">{debate.topic}</span>
             <span className="debateTopTitle debateTopTitleMeasure" aria-hidden ref={debateHeaderTitleMeasureRef}>
               {debate.topic}
             </span>
-            <span className={`pill ${statusKind}`}>
-              <span className="dot" />
-              {statusLabel(debate.run_state ?? debate.status)}
-            </span>
-            {debate.completion?.humanReason ? (
-              <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
-                {debate.completion.humanReason}
-              </span>
-            ) : null}
           </div>
         </div>
         <div className="debateTopControlRow" ref={debateHeaderControlsRef}>
+          <ScoringErrorBoundary>
+            <button
+              type="button"
+              className="debateScoringPill"
+              data-debate-scoring-pill
+              aria-label="Open scoring diagnostics"
+              onClick={() => setScoringDiagnosticsOpen(true)}
+            >
+              <span className="debateScoringDot" aria-hidden />
+              Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
+            </button>
+          </ScoringErrorBoundary>
           {hasTree ? (
             <div className="segment" role="group" aria-label="View">
               <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
@@ -1133,22 +1136,8 @@ export default function DebatePageClient({
               </button>
             </div>
           ) : null}
-          <ModeToggle />
-          <ScoringErrorBoundary>
-            <div className="topSwitch">
-              <span>Scoring</span>
-              <button
-                type="button"
-                className="iconBtn"
-                aria-label="Open scoring diagnostics"
-                title="Scoring diagnostics"
-                onClick={() => setScoringDiagnosticsOpen(true)}
-              >
-                i
-              </button>
-            </div>
-          </ScoringErrorBoundary>
-          <div className="debateInlineActions" ref={debateHeaderInlineActionsRef}>
+          <ModeToggle compact />
+          <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef} aria-hidden="true">
             <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
               <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
             </Link>
@@ -1175,7 +1164,7 @@ export default function DebatePageClient({
             <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
             {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
           </div>
-          <details className="debateOverflow">
+          <details className="debateUtilityOverflow" aria-hidden="true">
             <summary className="iconBtn" role="button" aria-label="More debate actions" title="More debate actions">
               <span aria-hidden>⋯</span>
             </summary>

@@ -25,10 +25,6 @@ function source(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(`../../apps/ui/${relativePath}`, import.meta.url)), "utf8");
 }
 
-function duplicateWebSource(relativePath: string): string {
-  return readFileSync(fileURLToPath(new URL(`../../web/${relativePath}`, import.meta.url)), "utf8");
-}
-
 function region(text: string, start: string, end: string): string {
   const startIndex = text.indexOf(start);
   expect(startIndex, `missing region start: ${start}`).toBeGreaterThanOrEqual(0);
@@ -44,8 +40,8 @@ function buttonBlocksContaining(text: string, label: string): string[] {
 }
 
 const USER_ASK_FIELDS = [
-  { config: "risk_tier", state: "riskTier", source: "page", write: "setRiskTier(event.target.value" },
-  { config: "composition_budget_tier", state: "budgetTier", source: "page", write: "setBudgetTier(event.target.value" }
+  { config: "risk_tier", state: "riskTier", source: "page", write: "setRiskTier(value)" },
+  { config: "composition_budget_tier", state: "budgetTier", source: "page", write: "setBudgetTier(value as CompositionBudgetTier)" }
 ] as const;
 
 const MACHINE_ASK_FIELDS = ["decisionScope", "asOf"] as const;
@@ -55,8 +51,10 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
   const defaults = source("app/new/defaults.tsx");
 
   it.each(USER_ASK_FIELDS)("binds a control the asker can actually fill for $config", (field) => {
-    // A controlled input: the state is rendered as a value AND an onChange
-    // writes it back. State that is only declared can never be supplied.
+    // A controlled input: the state is rendered as a value AND a change
+    // handler writes it back. State that is only declared can never be
+    // supplied. The control is a segmented pill group rather than a select,
+    // so the write arrives as the chosen option's value.
     const controlSource = field.source === "page" ? newPage : defaults;
     expect(controlSource).toMatch(new RegExp(`value=\\{${field.state}\\}`));
     expect(controlSource).toContain(field.write);
@@ -90,29 +88,14 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
 
   it("offers the ruled depth range without exposing the computed tripwire", () => {
     expect(newPage).not.toContain("contractClient.readDeployment");
-    expect(newPage).toContain("[1, 2, 3, 4, 5].map");
+    // Depth is a slider now, so the 1..5 range lives in its bounds rather than
+    // in an option list — the gate is that neither end drifts.
+    expect(newPage).toContain("const DEPTH_MIN = 1;");
+    expect(newPage).toContain("const DEPTH_MAX = 5;");
+    expect(newPage).toMatch(/min=\{DEPTH_MIN\}\s+max=\{DEPTH_MAX\}/);
     expect(newPage).not.toContain("runCostEnvelope");
     expect(newPage).not.toContain("maxModelAttempts");
     expect(newPage).not.toContain("up to 9 model attempts");
-  });
-});
-
-describe("duplicate web /new follows DR-180 machine-owned fields", () => {
-  const newPage = duplicateWebSource("app/new/page.tsx");
-  const newForm = duplicateWebSource("app/new/NewQuestionForm.tsx");
-  const serverDefaults = duplicateWebSource("lib/serverAskDefaults.ts");
-
-  it("computes scope and as-of without rendering asker controls", () => {
-    expect(newPage).toContain('dynamic = "force-dynamic"');
-    expect(newPage).toContain("deriveMachineAskAsOf()");
-    expect(serverDefaults).toContain('import "server-only"');
-    expect(newForm).toContain('decision_scope: "personal"');
-    expect(newForm).toContain("as_of: machineAsOf");
-    expect(newForm).not.toMatch(/\b(?:new\s+Date|Date\.now)\b/);
-    expect(newForm).not.toContain('name="decision_scope"');
-    expect(newForm).not.toContain('name="as_of"');
-    expect(newForm).not.toContain('data.get("decision_scope")');
-    expect(newForm).not.toContain('data.get("as_of")');
   });
 });
 
@@ -266,15 +249,12 @@ describe("UI-02a: the node card shows V3's recorded numbers, in V2's own vocabul
 
 describe("v2-ui /admin/workers does not probe operator deployment state", () => {
   const workersPage = source("app/admin/workers/page.tsx");
-  const duplicateWorkersPage = duplicateWebSource("app/admin/workers/page.tsx");
-  const duplicateHomePage = duplicateWebSource("app/page.tsx");
+  const homePage = source("app/page.tsx");
 
-  it("keeps both ordinary routes honest without invoking operator APIs", () => {
-    for (const page of [workersPage, duplicateWorkersPage]) {
-      expect(page).toContain("Operator-only view");
-      expect(page).not.toMatch(/backendStatus|readDeployment|contractClient|setInterval/);
-    }
-    expect(duplicateHomePage).not.toContain('href="/admin/workers"');
+  it("keeps the ordinary route honest without invoking operator APIs", () => {
+    expect(workersPage).toContain("Operator-only view");
+    expect(workersPage).not.toMatch(/backendStatus|readDeployment|contractClient|setInterval/);
+    expect(homePage).not.toContain('href="/admin/workers"');
   });
 });
 

@@ -138,8 +138,8 @@ describe("chrome", () => {
     // PROPERTY: the signed-in library composer exposes the T3 prompt, helper,
     // and submit copy as three distinct strings.
     const rendered = await renderSignedInRoute();
-    const input = rendered.querySelector<HTMLInputElement>('input[aria-label="Debate claim"]');
-    const submit = rendered.querySelector<HTMLButtonElement>(".startBtn");
+    const input = rendered.querySelector<HTMLTextAreaElement>('textarea[aria-label="Debate claim"]');
+    const submit = rendered.querySelector<HTMLButtonElement>(".libStart");
 
     expect(input?.placeholder).toBe("Type a debatable claim or question…");
     expect(rendered.body.textContent).toContain("Models argue · you judge");

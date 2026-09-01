@@ -117,12 +117,20 @@ async function renderRealNewDebatePageState(): Promise<{ html: string; tree: Rea
   return { html, tree: evaluateElementTree(<NewDebatePage />) };
 }
 
+/* Risk tier is a segmented pill group: the asker's choice arrives as a click
+   on one radio-role button, not as a select's change event. */
+function chooseRiskTier(tree: ReactNode, value: string): void {
+  const pill = findElement(tree, (element) =>
+    element.type === "button"
+    && (element.props as Record<string, unknown>)["data-field"] === "riskTier"
+    && (element.props as Record<string, unknown>)["data-value"] === value);
+  expect(pill, `missing risk tier pill for ${value}`).not.toBeNull();
+  (pill!.props as { onClick: () => void }).onClick();
+}
+
 async function submitRenderedPage(): Promise<Record<string, unknown>> {
   const initial = await renderRealNewDebatePageState();
-  const riskSelect = findElement(initial.tree, (element) => element.type === "select" && element.props.id === "riskTier");
-  expect(riskSelect).not.toBeNull();
-  (riskSelect!.props as { onChange: (event: { target: { value: string } }) => void })
-    .onChange({ target: { value: "standard" } });
+  chooseRiskTier(initial.tree, "standard");
   hooks.beginRender();
   const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
   const rendered = { tree: evaluateElementTree(<NewDebatePage />) };
@@ -163,10 +171,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
 
   it("keeps the visible risk choice asker-owned through the real page", async () => {
     const initial = await renderRealNewDebatePageState();
-    const riskSelect = findElement(initial.tree, (element) => element.type === "select" && element.props.id === "riskTier");
-    expect(riskSelect).not.toBeNull();
-    (riskSelect!.props as { onChange: (event: { target: { value: string } }) => void })
-      .onChange({ target: { value: "casual" } });
+    chooseRiskTier(initial.tree, "casual");
     hooks.beginRender();
     const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
     const editedTree = evaluateElementTree(<NewDebatePage />);
@@ -220,11 +225,11 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
 
   it("R3 exposes aria-controls exactly while the rendered Options panel exists", async () => {
     const initial = await renderRealNewDebatePageState();
-    expect(initial.html).toMatch(/<button[^>]*class="optionsToggle"[^>]*aria-expanded="false"[^>]*>Options/);
+    expect(initial.html).toMatch(/<button[^>]*class="ndOptionsToggle"[^>]*aria-expanded="false"[^>]*>⚙ OPTIONS/);
     expect(initial.html).not.toContain('aria-controls="additionalRunOptions"');
     expect(initial.html).not.toContain('id="additionalRunOptions"');
     const optionsButton = findElement(initial.tree, (element) =>
-      element.type === "button" && element.props.className === "optionsToggle"
+      element.type === "button" && element.props.className === "ndOptionsToggle"
     );
     expect(optionsButton).not.toBeNull();
     (optionsButton!.props as { onClick: () => void }).onClick();
@@ -235,9 +240,41 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(openHtml).toContain('id="additionalRunOptions"');
   });
 
+  it("carries the two steering fields into the ask as trimmed non-empty lines", async () => {
+    const initial = await renderRealNewDebatePageState();
+    chooseRiskTier(initial.tree, "standard");
+    const write = (id: string, value: string) => {
+      const field = findElement(initial.tree, (element) =>
+        element.type === "textarea" && (element.props as { id?: string }).id === id);
+      expect(field, `missing ${id} field`).not.toBeNull();
+      // The auto-growing fields read currentTarget, so the event has to carry a
+      // node-shaped target rather than a bare value bag.
+      const node = { value, style: { height: "" }, scrollHeight: 50 };
+      (field!.props as { onChange: (event: unknown) => void })
+        .onChange({ target: node, currentTarget: node });
+    };
+    write("steeringPresets", "Prefer primary sources\n\n  Surface the strongest counter-case early  ");
+    write("steeringAnnotations", "Add a note the run will carry\n   ");
+    hooks.beginRender();
+    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
+    const form = findElement(evaluateElementTree(<NewDebatePage />), (element) => element.type === "form");
+    expect(form).not.toBeNull();
+    await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
+      .onSubmit({ preventDefault: vi.fn() });
+    expect(pageMocks.createDebate.mock.calls.at(-1)![1]).toMatchObject({
+      steering_presets: ["Prefer primary sources", "Surface the strongest counter-case early"],
+      steering_annotations: ["Add a note the run will carry"]
+    });
+  });
+
+  it("sends empty steering lists when the asker steers nothing", async () => {
+    const config = await submitRenderedPage();
+    expect(config).toMatchObject({ steering_presets: [], steering_annotations: [] });
+  });
+
   it("renders depth 1..5 while keeping retired apparatus and all machine-owned fields out of the DOM", async () => {
     const { html } = await renderRealNewDebatePageState();
-    for (const value of [1, 2, 3, 4, 5]) expect(html).toContain(`<option value="${value}"`);
+    expect(html).toMatch(/<input[^>]*id="treeDepth"[^>]*type="range"[^>]*min="1"[^>]*max="5"/);
     for (const retired of ["agentCount", "runCostEnvelope", "maxModelAttempts", "models found", "machineOwnedAskFields"]) {
       expect(html).not.toContain(retired);
     }

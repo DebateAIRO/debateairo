@@ -78,18 +78,17 @@ describe("POL-01 register-owned deployment floor", () => {
   });
 
   it("uses cookie-session validation without browser storage or manual credential gates", async () => {
-    const [authGate, debatePage, uiApi, webApi, debateTree, nodeDrawer] = await Promise.all([
+    const [authGate, debatePage, uiApi, debateTree, nodeDrawer] = await Promise.all([
       readFile(new URL("../../apps/ui/components/AuthGate.tsx", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/app/debate/[id]/DebatePageClient.tsx", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../web/lib/api.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/components/DebateTree.tsx", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/components/NodeDetailDrawer.tsx", import.meta.url), "utf8")
     ]);
     expect(authGate).toContain("validateSession()");
     expect(authGate).not.toContain("Saved token is no longer valid.");
     expect(debatePage).toContain("COOKIE_SESSION_MARKER");
-    for (const source of [authGate, debatePage, uiApi, webApi]) {
+    for (const source of [authGate, debatePage, uiApi]) {
       expect(source).not.toMatch(/getStoredToken|setStoredToken|clearStoredToken|localStorage/);
     }
     expect(debatePage).not.toContain("looksAuthRelated");

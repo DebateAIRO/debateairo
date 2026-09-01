@@ -7,14 +7,12 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContractClient } from "@debateai/contract";
 import { LegacyRunClaimControls as UiLegacyRunClaimControls } from "../../apps/ui/components/LegacyRunClaimControls.js";
-import { LegacyRunClaimControls as WebLegacyRunClaimControls } from "../../web/components/LegacyRunClaimControls.js";
 
 type ClaimClient = Pick<ContractClient, "claimLegacyRuns">;
 type ClaimControl = ComponentType<{ readonly client?: ClaimClient }>;
 
 const surfaces: ReadonlyArray<readonly [string, ClaimControl]> = [
-  ["apps/ui", UiLegacyRunClaimControls],
-  ["web", WebLegacyRunClaimControls]
+  ["apps/ui", UiLegacyRunClaimControls]
 ];
 
 let root: Root | null = null;
@@ -88,15 +86,14 @@ describe.each(surfaces)("S9 rendered legacy claim control — %s", (_surface, Co
   });
 });
 
-it("mounts the claim control on both settings pages without a browser persistence or logging sink", async () => {
+it("mounts the claim control on the settings page without a browser persistence or logging sink", async () => {
   const paths = [
     "apps/ui/components/LegacyRunClaimControls.tsx",
-    "web/components/LegacyRunClaimControls.tsx",
-    "apps/ui/app/settings/page.tsx",
-    "web/app/settings/page.tsx"
+    "apps/ui/app/settings/page.tsx"
   ];
-  const sources = await Promise.all(paths.map((path) => readFile(resolve(process.cwd(), path), "utf8")));
-  expect(sources[2]).toContain("<LegacyRunClaimControls");
-  expect(sources[3]).toContain("<LegacyRunClaimControls");
-  expect(`${sources[0]}\n${sources[1]}`).not.toMatch(/localStorage|sessionStorage|console\./);
+  const [control, settings] = await Promise.all(
+    paths.map((path) => readFile(resolve(process.cwd(), path), "utf8"))
+  );
+  expect(settings).toContain("<LegacyRunClaimControls");
+  expect(`${control}\n${settings}`).not.toMatch(/localStorage|sessionStorage|console\./);
 });

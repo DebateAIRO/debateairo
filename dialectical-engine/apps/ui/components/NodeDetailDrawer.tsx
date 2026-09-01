@@ -192,8 +192,15 @@ export function NodeDetailDrawer({
 
   return (
     <>
-      <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label="Argument detail">
+      <div className="drawerScrim" data-drawer-scrim onClick={onClose} />
+      <aside
+        className="drawer scroll"
+        data-drawer-panel
+        role="dialog"
+        aria-modal
+        aria-label="Argument detail"
+        style={{ width: "min(440px, 100vw)", boxSizing: "border-box", background: "var(--core)" }}
+      >
         <div className="drawerHead">
           <div className="drawerHeadMeta">
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
@@ -209,7 +216,13 @@ export function NodeDetailDrawer({
         </div>
 
         <div className="drawerBody">
-          <div className="nodeEyebrow">Argument</div>
+          {v3 ? (
+            <div className="nodeEyebrow drawerWayOfKnowing" data-drawer-way-of-knowing>
+              WAY OF KNOWING · {wayOfKnowingLabel(v3.way_of_knowing).toUpperCase()}
+            </div>
+          ) : (
+            <div className="nodeEyebrow">Argument</div>
+          )}
           {isAbandoned || isSetAsidePath(node) ? (
             <div className="drawerAbandonedBanner" role="status">
               <div className="drawerSectionTitle">Stopped path</div>
@@ -239,17 +252,19 @@ export function NodeDetailDrawer({
             <div className="drawerSelectHint">▲ Select any sentence above to challenge it.</div>
           ) : null}
 
-          <ScoringErrorBoundary>
-            <NodeScoringDetails
-              scoring={scoring}
-              scoringError={scoringError}
-              feedbackSummary={feedbackSummary}
-              currentUserFeedback={currentUserFeedback}
-              recommendationTargetButton={recommendationTargetButton}
-            />
-          </ScoringErrorBoundary>
-
           {v3 ? <NodeHonestyDetails v3={v3} /> : null}
+
+          {scoring || scoringError || feedbackSummary || currentUserFeedback ? (
+            <ScoringErrorBoundary>
+              <NodeScoringDetails
+                scoring={scoring}
+                scoringError={scoringError}
+                feedbackSummary={feedbackSummary}
+                currentUserFeedback={currentUserFeedback}
+                recommendationTargetButton={recommendationTargetButton}
+              />
+            </ScoringErrorBoundary>
+          ) : null}
 
           <div className="drawerActions">
             {onChallenge ? (
@@ -345,89 +360,96 @@ export function NodeDetailDrawer({
  */
 function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
   const [baseScore, finalStrength] = v3NodeScoreDetails(v3);
+  const reviewLabel = v3.review?.outcome === "agree"
+    ? "REVIEW AGREED BY:"
+    : v3.review?.outcome === "dispute"
+      ? "REVIEW DISPUTED BY:"
+      : v3.review?.outcome === "cannot-assess"
+        ? "REVIEW COULD NOT ASSESS:"
+        : null;
+  const defeaters = v3.defeater_refs.length > 0
+    ? v3.defeater_refs.join(", ")
+    : v3.defeater_exhaustion_marked
+      ? "Rotation exhausted and marked"
+      : "Obligation remains open";
+  const disagreement = v3.disagreement === null
+    ? "No disagreement record"
+    : JSON.stringify(v3.disagreement);
+  const rows = [
+    {
+      key: "BASE SCORE",
+      value: `${baseScore.percentage.text} · ${baseScore.source}`,
+      title: baseScore.percentage.detail
+    },
+    {
+      key: "FINAL STRENGTH",
+      value: `${finalStrength.percentage.text} · ${finalStrength.source}`,
+      title: finalStrength.percentage.detail
+    },
+    { key: "REPLAY", value: finalStrength.replay_handle, title: undefined },
+    {
+      key: "RESTATEMENT",
+      value: `Stranger restatement check ${v3.stranger_restatement.check_status.toLowerCase().replaceAll("_", " ")}`,
+      title: undefined
+    },
+    { key: "DEFEATERS", value: defeaters, title: undefined },
+    { key: "JUDGE DISAGREEMENT", value: disagreement, title: undefined }
+  ] as const;
+
   return (
-    <section className="drawerScoringRationale" aria-label="V3 node honesty">
-      <div className="drawerSectionTitle">V3 honesty</div>
-      <ul className="drawerFindingList">
-        <li className="drawerFindingItem">
-          <div className="drawerFindingMeta">
-            <span>way of knowing</span>
-            <span>{wayOfKnowingLabel(v3.way_of_knowing)}</span>
-          </div>
-          <div className="drawerFindingText">
-            Freshness {v3.staleness_state} · relevant as of {v3.relevant_as_of}
-          </div>
-        </li>
-        {/* UI-02a: a LabeledNumber is not a bare float — the contract's own
-            label (`kind`) and the organ that produced it ride with the value
-            here, where the drawer has room for the whole record. */}
-        <li className="drawerFindingItem">
-          <div className="drawerFindingMeta">
-            <span>{baseScore.label}</span>
-            <span title={baseScore.percentage.detail}>{baseScore.percentage.text}</span>
-          </div>
-          <div className="drawerFindingText">
-            produced by {baseScore.producer} · {baseScore.source} · replay {baseScore.replay_handle}
-          </div>
-        </li>
-        <li className="drawerFindingItem">
-          <div className="drawerFindingMeta">
-            <span>{finalStrength.label}</span>
-            <span title={finalStrength.percentage.detail}>{finalStrength.percentage.text}</span>
-          </div>
-          <div className="drawerFindingText">
-            produced by {finalStrength.producer} · {finalStrength.source} · replay {finalStrength.replay_handle}
-          </div>
-        </li>
-        <li className="drawerFindingItem">
-          <div className="drawerFindingMeta">
-            <span>stranger restatement</span>
-            <span>{v3.stranger_restatement.check_status}</span>
-          </div>
-        </li>
-        <li className="drawerFindingItem">
-          <div className="drawerFindingMeta">
-            <span>defeaters</span>
-          </div>
-          <div className="drawerFindingText">
-            {v3.defeater_refs.length > 0
-              ? v3.defeater_refs.join(", ")
-              : v3.defeater_exhaustion_marked
-                ? "Rotation exhausted and marked"
-                : "Obligation remains open"}
-          </div>
-        </li>
-        <li className="drawerFindingItem">
-          <div className="drawerFindingMeta">
-            <span>judge disagreement</span>
-          </div>
-          <div className="drawerFindingText">
-            {v3.disagreement === null ? "No disagreement record" : JSON.stringify(v3.disagreement)}
-          </div>
-        </li>
-        <li className="drawerFindingItem" data-node-review={v3.review?.outcome ?? "absent"}>
-          <div className="drawerFindingMeta">
-            <span>second-maker review</span>
-            <span>{v3.review?.outcome ?? "Review unavailable"}</span>
-          </div>
-          <ModelMetaLine
-            modelId={v3.review?.reviewer_lineage.model_id ?? null}
-            maker={v3.review?.reviewer_lineage.maker ?? null}
-          />
-          <div className="drawerFindingText">
-            {v3.review === null
-              ? "No completed second-maker review is recorded for this node."
-              : v3.review.reasons.join(" ")}
-          </div>
-        </li>
-      </ul>
-      {v3.condition_marks.length > 0 ? (
-        <div className="roleChips" style={{ marginTop: 8 }}>
-          {v3.condition_marks.map((mark) => (
-            <span key={mark} className="roleChip" title={mark}>
-              {conditionMarkLabel(mark)}
+    <section aria-label="V3 node honesty" className="drawerHonesty">
+      <div className="drawerFindingText">
+        Freshness {v3.staleness_state} · relevant as of {v3.relevant_as_of}
+      </div>
+
+      <div className="drawerReviewLine" data-node-review={v3.review?.outcome ?? "absent"}>
+        {reviewLabel === null ? (
+          <span className="drawerFindingText">
+            No completed second-maker review is recorded for this node.
+          </span>
+        ) : (
+          <>
+            <span
+              className={`drawerReviewLabel ${v3.review?.outcome === "agree" ? "agree" : "dispute"}`}
+              data-review-label
+            >
+              {reviewLabel}
             </span>
+            <ModelMetaLine
+              modelId={v3.review?.reviewer_lineage.model_id ?? null}
+              maker={v3.review?.reviewer_lineage.maker ?? null}
+              className="modelPill metaLine"
+            />
+          </>
+        )}
+      </div>
+      {v3.review === null ? null : <div className="drawerFindingText">{v3.review.reasons.join(" ")}</div>}
+
+      <table className="drawerRecordTable" data-drawer-section-table>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key} data-drawer-section-row>
+              <th scope="row" data-drawer-section-key>{row.key}</th>
+              <td data-drawer-section-value title={row.title}>{row.value}</td>
+            </tr>
           ))}
+        </tbody>
+      </table>
+
+      {v3.condition_marks.length > 0 ? (
+        <div className="drawerConditionPills">
+          {v3.condition_marks.map((mark) => {
+            const tone = mark === "UNFALSIFIED-AFTER-ROTATION"
+              ? "agree"
+              : mark === "UNDER-EXPLORED"
+                ? "gold"
+                : "dispute";
+            return (
+              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={mark}>
+                {conditionMarkLabel(mark)}
+              </span>
+            );
+          })}
         </div>
       ) : null}
       {v3.abstention !== null ? (

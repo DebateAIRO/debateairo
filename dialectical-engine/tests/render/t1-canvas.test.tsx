@@ -9,6 +9,7 @@ import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { DebateCanvas } from "../../apps/ui/components/DebateCanvas.js";
 import { DebateMap } from "../../apps/ui/components/DebateMap.js";
 import { ModelMetaLine } from "../../apps/ui/components/ModelPresentation.js";
+import { SynthesisPanel } from "../../apps/ui/components/SynthesisPanel.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
 
 const mocks = vi.hoisted(() => ({
@@ -159,6 +160,37 @@ describe("chrome and views", () => {
           .toBe(candidate === selected ? "true" : "false");
       }
     }
+  });
+
+  it("mounts the matching reference screen for every working navbar choice", async () => {
+    // A regression that leaves the navbar working but styles only Tree would
+    // keep aria-pressed green; each choice must mount its own designed screen.
+    const container = await mountDebate(answer);
+    const screens = [
+      ["Thread", ".thread"],
+      ["Split", ".split"],
+      ["Tree", ".canvasViewport"],
+      ["Map", ".map"]
+    ] as const;
+
+    for (const [label, selector] of screens) {
+      const button = [...container.querySelectorAll<HTMLButtonElement>(
+        '.debateTopControlRow .segment button'
+      )].find((candidate) => candidate.textContent?.trim() === label)!;
+      await act(async () => button.click());
+      expect(container.querySelector(selector), `${label} screen`).not.toBeNull();
+    }
+  });
+
+  it("uses the compact 1a instrument chrome instead of the legacy action toolbar", async () => {
+    const container = await mountDebate(answer);
+    const chrome = container.querySelector<HTMLElement>("[data-debate-reference-chrome]");
+
+    expect(chrome).not.toBeNull();
+    expect(chrome?.querySelector("[data-debate-scoring-pill]")?.textContent).toMatch(/^Scoring · \d+\/\d+$/);
+    expect(chrome?.querySelector("[data-mode-toggle]")?.textContent?.trim()).toBe("☾");
+    expect(chrome?.querySelector(".debateInlineActions")).toBeNull();
+    expect(chrome?.querySelector(".debateOverflow")).toBeNull();
   });
 
   it("mounts a working mode toggle on debate chrome", async () => {
@@ -511,5 +543,42 @@ describe("card anatomy", () => {
 });
 
 describe("set-aside and synthesis", () => {
-  it.todo("reserved for T1-C3");
+  it("uses the reference synthesis labels and semantic lean tokens", async () => {
+    const container = await mountElement(
+      <SynthesisPanel
+        ready
+        pending={false}
+        streaming={false}
+        structured={false}
+        proClaim="The strongest supporting case."
+        conClaim="The strongest opposing case."
+        verdict="The verdict under test."
+        meta="4 claims"
+        lean={{ pct: 62, label: "PRO 62%", source: "dialectical" }}
+      />
+    );
+
+    expect(container.textContent).toContain("↑ STRONGEST PRO");
+    expect(container.textContent).toContain("↓ STRONGEST CON");
+    expect(container.textContent).toContain("VERDICT");
+    expect(container.querySelector<HTMLElement>(".synthLeanBar")?.style.background)
+      .toBe("linear-gradient(90deg, var(--pro) 62%, var(--con) 62%)");
+  });
+
+  it("shows the public challenge lock without inventing regeneration", async () => {
+    const container = await mountElement(
+      <DebateCanvas
+        root={debateDetailFromAnswer(answer).tree!}
+        expanded={new Set()}
+        selectedNodeId={null}
+        meta={{ claims: 4, depth: 1, judged: 0, derivedStanding: 0, setAside: 0 }}
+        onOpenNode={() => {}}
+        onToggleExpand={() => {}}
+      />
+    );
+    const controls = container.querySelector(".nodeControls");
+
+    expect(controls?.textContent).toContain("🔒 Challenge");
+    expect(controls?.textContent).not.toContain("Regenerate");
+  });
 });

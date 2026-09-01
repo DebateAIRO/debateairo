@@ -87,7 +87,7 @@ describe("T9-C1 route split & chrome", () => {
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
 
-    expect(hero?.textContent).toContain("Find the weakest claim in your own argument.");
+    expect(hero?.textContent).toContain("Find the weakest joint in your own argument.");
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]')).toBeNull();
   });
 
@@ -100,7 +100,7 @@ describe("T9-C1 route split & chrome", () => {
       document.querySelector('.sectionHead[aria-label="Debate library"]'),
       "signed-in library discriminator"
     ).not.toBeNull();
-    expect(document.body.textContent).not.toContain("Find the weakest claim in your own argument.");
+    expect(document.body.textContent).not.toContain("Find the weakest joint in your own argument.");
   });
 
   it("renders an accessibly named mode control on the anonymous document", async () => {
@@ -159,9 +159,7 @@ describe("T9-C2 chrome labels & CTAs", () => {
     const expectedLinks = [
       ["Method", "#method"],
       ["Transcripts", "#transcripts"],
-      ["Pricing", "#pricing"],
-      ["Log in", "/login"],
-      ["Sign up", "/sign-up"]
+      ["Pricing", "#pricing"]
     ] as const;
 
     for (const [label, href] of expectedLinks) {
@@ -183,7 +181,7 @@ describe("T9-C2 chrome labels & CTAs", () => {
     const document = await renderRoute(null);
     const chrome = document.querySelector('[data-landing-section="chrome"]');
     const primary = [...chrome!.querySelectorAll("a")]
-      .find((candidate) => candidate.textContent?.trim() === "Start a debate");
+      .find((candidate) => (candidate.textContent ?? "").replace("→", "").trim() === "Start a round");
 
     expect(primary).toBeDefined();
     expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
@@ -298,7 +296,7 @@ describe("T9-C4 landing content", () => {
       [
         "03",
         "You challenge",
-        "Flag any sentence; the graph spawns a focused rebuttal where you pointed."
+        "Flag any sentence; the bench spawns a focused rebuttal where you pointed."
       ],
       [
         "04",
@@ -323,8 +321,8 @@ describe("T9-C4 landing content", () => {
     const sample = document.querySelector('[data-landing-section="sample"]');
 
     expect(sample).not.toBeNull();
-    expect(sample?.textContent).toContain("ONE DEBATE, FOUR TURNS");
-    expect(sample?.textContent).toContain("The pressure lands on the claim, not the wording.");
+    expect(sample?.textContent).toContain("One round, four turns");
+    expect(sample?.textContent).toContain("The pressure lands on the joint, not the wording.");
     for (const stance of ["pro", "con", "reasoning"] as const) {
       expect(sample?.querySelector(`[data-bezel="shell"][data-stance="${stance}"]`)).not.toBeNull();
     }
@@ -346,9 +344,9 @@ describe("T9-C4 landing content", () => {
     const hero = document.querySelector('[data-landing-section="hero"]');
     const pricing = document.querySelector('[data-landing-section="pricing"]');
 
-    expect(hero?.textContent).toContain("[PLACEHOLDER] debates argued this week");
+    expect(hero?.textContent).toContain("[PLACEHOLDER] rounds argued this week");
     expect(pricing?.textContent).toContain(
-      "First [PLACEHOLDER] debates free, then [PLACEHOLDER] per month. Cancel whenever."
+      "First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever."
     );
   });
 
@@ -362,10 +360,10 @@ describe("T9-C4 landing content", () => {
     const pricing = document.querySelector('[data-landing-section="pricing"]');
 
     expect(hero?.textContent).toContain(
-      "You argue. An opponent trained to locate the softest point in your reasoning presses on it until the claim holds or gives. Every turn is scored on evidence and on whether you actually answered the question — never on how well it was phrased."
+      "You argue. An opponent trained to locate the softest point in your reasoning presses on it until the joint holds or gives. Every turn is scored on evidence and on whether you actually answered the question — never on how well it was phrased."
     );
     expect(sample?.textContent).toContain(
-      "The debate ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the claim you conceded."
+      "The round ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the joint you conceded."
     );
     expect(method?.textContent).toContain("Four steps, then you do it again tomorrow.");
     expect(method?.textContent).toContain(
@@ -378,14 +376,14 @@ describe("T9-C4 landing content", () => {
       "Every claim is cross-reviewed by a rival model: agree or dispute, on the record."
     );
     expect(method?.textContent).toContain(
-      "Flag any sentence; the graph spawns a focused rebuttal where you pointed."
+      "Flag any sentence; the bench spawns a focused rebuttal where you pointed."
     );
     expect(method?.textContent).toContain(
       "Scores, condition marks, and replay handles — every number traces to its source."
     );
-    expect(method?.textContent).toContain("Your argument is only as strong as its weakest claim.");
+    expect(pricing?.textContent).toContain("Your argument is only as strong as its weakest joint.");
     expect(pricing?.textContent).toContain(
-      "Take one debate. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering."
+      "Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering."
     );
   });
 
@@ -395,23 +393,25 @@ describe("T9-C4 landing content", () => {
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
     const links = [...(hero?.querySelectorAll("a") ?? [])];
-    const primary = links.find((link) => link.textContent?.trim() === "Start a debate");
-    const secondary = links.find(
-      (link) => link.textContent?.trim() === "Read a scored transcript"
-    );
+    // The CTA carries a trailing arrow glyph, so compare the label itself.
+    const label = (link: Element): string =>
+      (link.textContent ?? "").replace("→", "").trim();
+    const primary = links.find((link) => label(link) === "Start a round");
+    const secondary = links.find((link) => label(link) === "Read a scored transcript");
 
     expect(primary).toBeDefined();
     expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
     expect(secondary).toBeDefined();
   });
 
-  it("renders the method-close CTA with the safe auth entry", async () => {
-    // PROPERTY: the tertiary Start action belongs to the method subtree and
-    // uses the same encoded /new auth-entry contract as the other primaries.
+  it("renders the closing CTA with the safe auth entry", async () => {
+    // PROPERTY: the tertiary Start action belongs to the closing subtree (the
+    // document moved it out of the method split) and uses the same encoded
+    // /new auth-entry contract as the other primaries.
     const document = await renderRoute(null);
-    const method = document.querySelector('[data-landing-section="method"]');
-    const primary = [...(method?.querySelectorAll("a") ?? [])]
-      .find((link) => link.textContent?.trim() === "Start a debate");
+    const closing = document.querySelector('[data-landing-section="pricing"]');
+    const primary = [...(closing?.querySelectorAll("a") ?? [])]
+      .find((link) => (link.textContent ?? "").replace("→", "").trim() === "Start a round");
 
     expect(primary).toBeDefined();
     expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 export type Mode = "terracotta" | "chamber";
 
-export function ModeToggle(): JSX.Element {
+export function ModeToggle({ compact = false }: { compact?: boolean } = {}): JSX.Element {
   const [mode, setMode] = useState<Mode>("terracotta");
 
   useEffect(() => {
@@ -28,13 +28,13 @@ export function ModeToggle(): JSX.Element {
   return (
     <button
       type="button"
-      className="modeToggle"
+      className={`modeToggle${compact ? " compact" : ""}`}
       data-mode-toggle
       aria-pressed={chamber}
       aria-label={chamber ? "Switch to Terracotta mode" : "Switch to Chamber mode"}
       onClick={toggleMode}
     >
-      {chamber ? "☀ Terracotta" : "☾ Chamber"}
+      {compact ? (chamber ? "☀" : "☾") : chamber ? "☀ Terracotta" : "☾ Chamber"}
     </button>
   );
 }

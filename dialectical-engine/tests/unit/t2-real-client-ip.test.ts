@@ -8,9 +8,7 @@ import {
   type RegistrationApplication
 } from "../../apps/api/src/registration.js";
 import * as restoredUiRoute from "../../apps/ui/app/api/[...path]/route.js";
-import * as webRoute from "../../web/app/api/[...path]/route.js";
 import { hardenIncomingProxyHeaders as hardenRestoredUiHeaders } from "../../apps/ui/trusted-client-ip.mjs";
-import { hardenIncomingProxyHeaders as hardenWebHeaders } from "../../web/trusted-client-ip.mjs";
 
 type ProxyRoute = Readonly<{
   POST(request: Request, context: {
@@ -149,8 +147,7 @@ async function forwardedHeaders(
 }
 
 describe.each([
-  ["apps/ui", restoredUiRoute as ProxyRoute],
-  ["web", webRoute as ProxyRoute]
+  ["apps/ui", restoredUiRoute as ProxyRoute]
 ])("T2 %s proxy header boundary", (_surface, route) => {
   it("uses an explicit allowlist and replaces every caller forwarding header", async () => {
     const headers = await forwardedHeaders(route, "203.0.113.9", {
@@ -192,8 +189,7 @@ describe.each([
 
 describe("T2 Next socket boundary", () => {
   it.each([
-    ["apps/ui", hardenRestoredUiHeaders],
-    ["web", hardenWebHeaders]
+    ["apps/ui", hardenRestoredUiHeaders]
   ])("%s overwrites duplicate/spoofed forwarding metadata with the socket peer", (_surface, harden) => {
     const headers: Record<string, string | string[] | undefined> = {
       forwarded: "for=198.51.100.250",
@@ -212,8 +208,7 @@ describe("T2 Next socket boundary", () => {
   });
 
   it.each([
-    ["apps/ui", hardenRestoredUiHeaders],
-    ["web", hardenWebHeaders]
+    ["apps/ui", hardenRestoredUiHeaders]
   ])("%s fails closed when the socket peer is not an IP literal", (_surface, harden) => {
     const headers: Record<string, string | string[] | undefined> = {
       "x-forwarded-for": "198.51.100.250",
@@ -223,10 +218,9 @@ describe("T2 Next socket boundary", () => {
     expect(headers).toEqual({});
   });
 
-  it("both executable UI servers replace caller forwarding metadata before Next sees it", async () => {
+  it("the executable UI server replaces caller forwarding metadata before Next sees it", async () => {
     for (const surface of [
-      new URL("../../apps/ui/", import.meta.url),
-      new URL("../../web/", import.meta.url)
+      new URL("../../apps/ui/", import.meta.url)
     ]) {
       const source = await readFile(new URL("server.mjs", surface), "utf8");
       expect(source).toContain("hardenIncomingProxyHeaders");

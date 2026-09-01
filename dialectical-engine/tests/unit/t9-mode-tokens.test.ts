@@ -128,7 +128,25 @@ const TERRACOTTA = {
   "--shadow-card": "0 18px 40px -20px rgba(41,38,31,.24)",
   "--shadow-pop": "0 30px 60px -26px rgba(41,38,31,.32)",
   "--shadow-drawer": "-22px 0 54px -22px rgba(41,38,31,.32)",
-  "--shadow-chrome": "0 20px 46px -22px rgba(26,22,19,.26)"
+  "--shadow-chrome": "0 20px 46px -22px rgba(26,22,19,.26)",
+  "--grid-dot": "rgba(41,38,31,.12)",
+  "--shadow-auth-card": "0 48px 90px -44px rgba(26,22,19,.5)",
+  "--lp-raised": "#EFE9E0",
+  "--lp-glass": "rgba(255,255,255,0.6)",
+  "--lp-nav-shadow": "0 20px 46px -22px rgba(26,22,19,0.26)",
+  "--lp-btn-shadow": "0 20px 40px -20px rgba(26,22,19,0.42)",
+  "--lp-card-shadow": "0 30px 62px -30px rgba(41,38,31,0.24),0 8px 20px -12px rgba(41,38,31,0.12)",
+  "--lp-core-inset": "inset 0 1px 0 rgba(255,255,255,0.85),inset 0 0 0 1px rgba(255,255,255,0.4)",
+  "--lp-arrow-bg": "rgba(255,255,255,0.14)",
+  "--lp-arrow-border": "rgba(255,255,255,0.26)",
+  "--lp-r-shell": "20px",
+  "--lp-r-core": "13px",
+  "--lp-r-btn": "12px",
+  "--lp-r-arrow": "9px",
+  "--lp-r-nav": "16px",
+  "--lp-fw-display": "480",
+  "--lp-ls-display": "-0.035em",
+  "--shadow-tab": "0 6px 16px -8px rgba(41,38,31,.55)"
 } as const satisfies Readonly<Record<TokenName, string>>;
 
 const CHAMBER = {
@@ -220,7 +238,25 @@ const CHAMBER = {
   "--shadow-card": "0 22px 48px -22px rgba(0,0,0,.8)",
   "--shadow-pop": "0 36px 70px -30px rgba(0,0,0,.9)",
   "--shadow-drawer": "-26px 0 62px -26px rgba(0,0,0,.9)",
-  "--shadow-chrome": "0 24px 52px -24px rgba(0,0,0,.85)"
+  "--shadow-chrome": "0 24px 52px -24px rgba(0,0,0,.85)",
+  "--grid-dot": "rgba(242,234,217,.08)",
+  "--shadow-auth-card": "0 48px 90px -44px rgba(0,0,0,.85)",
+  "--lp-raised": "#1D1915",
+  "--lp-glass": "rgba(29,25,21,0.66)",
+  "--lp-nav-shadow": "0 26px 60px -24px rgba(0,0,0,0.85)",
+  "--lp-btn-shadow": "0 22px 46px -20px rgba(0,0,0,0.8)",
+  "--lp-card-shadow": "0 60px 110px -40px rgba(0,0,0,0.9),0 18px 44px -20px rgba(0,0,0,0.7)",
+  "--lp-core-inset": "inset 0 1px 0 rgba(255,255,255,0.06),inset 0 0 0 1px rgba(255,255,255,0.02)",
+  "--lp-arrow-bg": "rgba(0,0,0,0.14)",
+  "--lp-arrow-border": "rgba(0,0,0,0.22)",
+  "--lp-r-shell": "28px",
+  "--lp-r-core": "18px",
+  "--lp-r-btn": "999px",
+  "--lp-r-arrow": "999px",
+  "--lp-r-nav": "999px",
+  "--lp-fw-display": "400",
+  "--lp-ls-display": "-0.045em",
+  "--shadow-tab": "0 6px 16px -8px rgba(0,0,0,.75)"
 } as const satisfies Readonly<Record<TokenName, string>>;
 
 const MODE_INDEPENDENT = {
@@ -256,7 +292,10 @@ const MODE_INDEPENDENT = {
   "--ls-hero": "-0.035em",
   "--ls-eyebrow": "0.18em",
   "--fvs-display": "\"SOFT\" 0, \"WONK\" 1",
-  "--fw-display": "480"
+  "--fw-display": "480",
+  "--shadow-thumb": "0 1px 4px rgba(0,0,0,.3)",
+  "--qr-paper": "#FFFFFF",
+  "--qr-ink": "#111111"
 } as const satisfies Readonly<Record<TokenName, string>>;
 
 const TEXT_TOKENS = [

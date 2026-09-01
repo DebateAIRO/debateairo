@@ -7,7 +7,7 @@ import { LandingSample } from "./LandingSample";
 
 export function LandingPage(): JSX.Element {
   return (
-    <main>
+    <main className="lpRoot">
       <LandingChrome />
       <LandingHero />
       <LandingSample />

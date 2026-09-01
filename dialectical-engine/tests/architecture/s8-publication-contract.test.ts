@@ -137,16 +137,13 @@ describe("Accounts S8 publication architecture", () => {
     expect(api).not.toContain('GET /v1/public/debates/{id}/events');
   });
 
-  it("ships the same deliberate controls and public-only reader in both UI compositions", async () => {
-    const [applicationControl, webControl, applicationHome, webHome, applicationPublic, webPublic] = await Promise.all([
+  it("ships the deliberate controls and public-only reader in the UI composition", async () => {
+    const [applicationControl, applicationHome, applicationPublic] = await Promise.all([
       read("apps/ui/components/PublicationControl.tsx"),
-      read("web/components/PublicationControl.tsx"),
       read("apps/ui/app/page.tsx"),
-      read("web/app/page.tsx"),
-      read("apps/ui/app/public/debate/[id]/page.tsx"),
-      read("web/app/public/debate/[id]/page.tsx")
+      read("apps/ui/app/public/debate/[id]/page.tsx")
     ]);
-    for (const control of [applicationControl, webControl]) {
+    for (const control of [applicationControl]) {
       expect(control).toContain("stepUp(password, code");
       expect(control).toContain("publishRun(runId, grant.token)");
       expect(control).toContain("unpublishRun(runId, grant.token)");
@@ -154,19 +151,20 @@ describe("Accounts S8 publication architecture", () => {
       expect(control).toContain("search engines to index it");
       expect(control.toLowerCase()).toContain("copies already");
     }
-    for (const home of [applicationHome, webHome]) {
+    // The home surface fetches the published list and states the indexing
+    // warning; the row component owns the per-debate public link.
+    const publicRows = await read("apps/ui/components/DebatesBuffer.tsx");
+    for (const home of [applicationHome]) {
       expect(home).toContain("readPublicDebates(50, 0)");
       expect(home).toContain("Published debates");
-      expect(home).toContain("/public/debate/");
-      const publicCard = home.slice(
-        home.indexOf("published.items.map"),
-        home.indexOf("</article>", home.indexOf("published.items.map"))
-      );
-      expect(publicCard).toContain("may be indexed by search engines");
-      expect(publicCard).toContain("Copies may persist after unpublishing");
+      expect(home).toContain("PublicDebatesBuffer");
+      expect(home).toContain("may be indexed by search engines");
+      expect(home).toContain("Copies may persist after unpublishing");
     }
+    expect(publicRows).toContain("/public/debate/");
+    expect(publicRows).toContain("author_pseudonym");
     const applicationPublicClient = await read("apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx");
-    for (const page of [applicationPublic + applicationPublicClient, webPublic]) {
+    for (const page of [applicationPublic + applicationPublicClient]) {
       expect(page).toContain("readPublicDebate(id)");
       expect(page).toContain("PublicAnswerDisclosure");
       for (const forbidden of ["readInspection", "readLedgerDigest", "readEvents", "memory_disclosure"]) {
