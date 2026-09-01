@@ -717,12 +717,57 @@ export class JudgementRepository {
     return result.rows[0]?.reviewer_maker ?? null;
   }
 
-  /** DR-184: ledger.node_review is the authoritative judged-basis source. */
+  /**
+   * DR-184: ledger.node_review is the authoritative judged-basis source.
+   *
+   * T6 / S4-2 — and only a review that REACHED a judgement seeds that basis.
+   * `cannot-assess` is the reviewer saying, in the closed outcome vocabulary,
+   * that the material did not support an honest judgement; counting it as a
+   * judged basis gave a node the standing of a judgement nobody made. `agree`
+   * and `dispute` are both judgements — they disagree about the claim, not
+   * about whether it could be judged — so both still seed.
+   *
+   * The predicate is a positive enumeration, matching the second consumer of
+   * this vocabulary (packages/evaluator/src/index.ts:2476-2480, which maps
+   * agree/dispute to numbers and everything else to no signal). Today the
+   * migration's CHECK pins the vocabulary to exactly three values
+   * (migrations/0019_xrev01_node_review.sql:8), so this is set-equal to
+   * excluding `cannot-assess`; stated positively, an outcome nobody has
+   * reasoned about cannot silently acquire standing. Nothing here renames or
+   * re-spells the vocabulary itself.
+   *
+   * This does NOT put the node back into any work set: `readUnreviewedNodes`
+   * below stays outcome-blind on purpose, because `UNIQUE (node_id)` plus the
+   * append-only triggers mean a second review of this node can never be
+   * written. The node is unjudged AND unreviewable — which is precisely the
+   * class-H condition, not a repairable gap.
+   */
   async readReviewedNodeIds(runId: string): Promise<readonly string[]> {
     const result = await this.pool.query<{ node_id: string }>(
       `SELECT node_id::text
        FROM ledger.node_review
-       WHERE run_id=$1
+       WHERE run_id=$1 AND outcome IN ('agree', 'dispute')
+       ORDER BY at_seq`,
+      [runId]
+    );
+    return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  /**
+   * T6 / S4-2 — the nodes whose cross-maker review came back `dispute`.
+   *
+   * The composition root feeds this into `applyDeclaredDisagreement`: a review
+   * that disputed the node is a declared disagreement about the debate's
+   * content, and the certainty band steps down through the sealed mapping. It
+   * is deliberately a separate read from `readReviewedNodeIds` — a disputed
+   * node still HAS a judged basis (it was judged, and judged against), so the
+   * two questions must not be answered by one query.
+   */
+  async readDisputedNodeIds(runId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ node_id: string }>(
+      `SELECT node_id::text
+       FROM ledger.node_review
+       WHERE run_id=$1 AND outcome = 'dispute'
        ORDER BY at_seq`,
       [runId]
     );

@@ -2584,6 +2584,68 @@ describe("apps/runner — legal command lifecycle", () => {
     expect(strengthOf(subject)).not.toBe(tauOf(subject));
   });
 
+  /**
+   * T6 / S4-2 — the PRODUCTION seam for the second half of "review outcomes get
+   * teeth": a `dispute` returned by the cross-maker reviewer feeds
+   * `applyDeclaredDisagreement`, so the served answer's certainty band is the
+   * SEALED one-step-down band rather than the candidate.
+   *
+   * The two arms differ in exactly one byte-level thing — the outcome string
+   * the secondary maker returns on its reviews. Everything else (question
+   * shape, judgement doubles, composition, conformance) is identical, so a band
+   * difference between them can come from nothing but the review outcome.
+   *
+   * The expectation is DERIVED from the sealed rows the fixture itself seals
+   * (`servePolicy.candidateConfidenceBand` and `panelPolicy.oneStepDown`),
+   * never from a band literal: a downgrade that is computed here instead of
+   * read from the register would be exactly the undeclared arithmetic S4-2
+   * outlaws.
+   */
+  it("T6 a disputed cross-maker review steps the served band down and an all-agree run leaves it", async () => {
+    const t06BandScenario = (label: string, secondaryOutcome: "agree" | "dispute") =>
+      executeResil01Scenario({
+        label,
+        primary: [
+          ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T6 position ${index + 1}`)),
+          ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T6 review ${index + 1}`)),
+          resil01Composition,
+          JSON.stringify({ conforms: true, findings: [] }),
+          JSON.stringify({ conforms: true, findings: [] }),
+          JSON.stringify({ pass: true })
+        ],
+        secondary: [
+          ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T6 position ${index + 1}`)),
+          ...Array.from({ length: 4 }, (_, index) => reviewDouble(secondaryOutcome, `Secondary T6 review ${index + 1}`))
+        ]
+      });
+
+    const settings = runnerSettings();
+    const candidateBand = settings.servePolicy!.candidateConfidenceBand;
+    const steppedDownBand = settings.panelPolicy!.oneStepDown[candidateBand]!;
+    // Without this the fixture could pass while showing no step at all.
+    expect(steppedDownBand).not.toBe(candidateBand);
+
+    const agreed = await t06BandScenario("t06-band-agree", "agree");
+    expect(agreed.error).toBeNull();
+    expect(agreed.result?.kind).toBe("COMPLETED");
+
+    const disputed = await t06BandScenario("t06-band-dispute", "dispute");
+    expect(disputed.error).toBeNull();
+    expect(disputed.result?.kind).toBe("COMPLETED");
+
+    const outcomesOf = async (runId: string): Promise<ReadonlySet<string>> => new Set(
+      (await database.pool.query<{ outcome: string }>(
+        "SELECT DISTINCT outcome FROM ledger.node_review WHERE run_id=$1", [runId]
+      )).rows.map((row) => row.outcome)
+    );
+    // The arms really are the two review populations they claim to be.
+    expect(await outcomesOf(agreed.runId)).toEqual(new Set(["agree"]));
+    expect(await outcomesOf(disputed.runId)).toEqual(new Set(["agree", "dispute"]));
+
+    expect(agreed.answer?.confidence_band).toBe(candidateBand);
+    expect(disputed.answer?.confidence_band).toBe(steppedDownBand);
+  });
+
   it("RESIL-01 rev2 R2 keeps a healthy tau-0.30 graph servable and makes class L presentation-only", async () => {
     const scenario = await executeResil01Scenario({
       label: "resil01-r2-tau-030",
