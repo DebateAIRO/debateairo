@@ -693,6 +693,7 @@ export function decideBranchFreezes(input: {
 export type RoundContinuationReason =
   | "ROUND_1_FLOOR"
   | "NO_PREVIOUS_ROUND"
+  | "NO_MEASURED_EDGE"
   | "DEPTH_CEILING"
   | "GLOBAL_DELTA_CONVERGED"
   | "ROOT_MOVED";
@@ -703,6 +704,21 @@ export interface RoundContinuationDecision {
   /** null only when no previous round exists to compare against. */
   readonly maxRootMovement: number | null;
   readonly movedRootNodeIds: readonly string[];
+  /**
+   * Ruling J15(b): the stop record carries the count of measured edges the
+   * decision considered, so an auditor can tell convergence from ignorance.
+   */
+  readonly measuredEdgeCount: number;
+}
+
+/**
+ * The edges that can actually move a strength: MEASURED, with a magnitude.
+ * `computeGraph` skips every other arrow, so this is exactly the evidence the
+ * round's root movement could have been made of.
+ */
+export function countMeasuredEdges(snapshot: EvaluationSnapshot): number {
+  return snapshot.arrows.filter((arrow) =>
+    arrow.magnitudeStatus === "MEASURED" && arrow.strength !== null).length;
 }
 
 /**
@@ -731,9 +747,17 @@ export function decideRoundContinuation(input: {
   readonly rootNodeIds: readonly string[];
   readonly previousStrengths: readonly NodeStrengthRecord[] | null;
   readonly currentStrengths: readonly NodeStrengthRecord[];
+  /** J15(b): how much measured evidence this decision had. `countMeasuredEdges`. */
+  readonly measuredEdgeCount: number;
   readonly delta: number;
 }): RoundContinuationDecision {
   assertUnitInterval(input.delta, "global stop delta");
+  if (!Number.isInteger(input.measuredEdgeCount) || input.measuredEdgeCount < 0) {
+    throw new TypedDomainError(
+      "STOPPING_MEASURED_EDGE_COUNT_INVALID",
+      "The measured-edge count must be a non-negative integer"
+    );
+  }
   if (!Number.isInteger(input.completedRounds) || input.completedRounds < 0) {
     throw new TypedDomainError("STOPPING_ROUND_COUNT_INVALID", "Completed rounds must be a non-negative integer");
   }
@@ -746,12 +770,14 @@ export function decideRoundContinuation(input: {
   const movement = input.previousStrengths === null
     ? null
     : rootMovement(input.rootNodeIds, input.previousStrengths, input.currentStrengths);
+  const measuredEdgeCount = input.measuredEdgeCount;
   if (input.completedRounds < 1) {
     return Object.freeze({
       kind: "CONTINUE",
       reason: "ROUND_1_FLOOR",
       maxRootMovement: movement === null ? null : movement.maximum,
-      movedRootNodeIds: Object.freeze([])
+      movedRootNodeIds: Object.freeze([]),
+      measuredEdgeCount
     });
   }
   if (input.completedRounds >= input.depthCeiling) {
@@ -759,7 +785,8 @@ export function decideRoundContinuation(input: {
       kind: "STOP",
       reason: "DEPTH_CEILING",
       maxRootMovement: movement === null ? null : movement.maximum,
-      movedRootNodeIds: movement === null ? Object.freeze([]) : movement.moved(input.delta)
+      movedRootNodeIds: movement === null ? Object.freeze([]) : movement.moved(input.delta),
+      measuredEdgeCount
     });
   }
   if (movement === null) {
@@ -768,7 +795,8 @@ export function decideRoundContinuation(input: {
         kind: "CONTINUE",
         reason: "NO_PREVIOUS_ROUND",
         maxRootMovement: null,
-        movedRootNodeIds: Object.freeze([])
+        movedRootNodeIds: Object.freeze([]),
+        measuredEdgeCount
       });
     }
     throw new TypedDomainError(
@@ -776,19 +804,37 @@ export function decideRoundContinuation(input: {
       "The global δ stop compares against the previous round, which was not supplied"
     );
   }
+  if (measuredEdgeCount === 0) {
+    // Ruling J15(b): a δ stop taken over zero measured edges is VACUOUS — the
+    // roots did not agree, nothing was ever weighed. Absence of evidence is not
+    // convergence, and reading it as convergence is the silent degradation this
+    // mission repeals. The degenerate all-UNKNOWN debate still terminates, and
+    // terminates honestly: every branch has zero leverage, so the ε rule freezes
+    // them all WITH marks and expansion ends by exhaustion. No loop-forever
+    // risk is created here.
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "NO_MEASURED_EDGE",
+      maxRootMovement: movement.maximum,
+      movedRootNodeIds: Object.freeze([]),
+      measuredEdgeCount
+    });
+  }
   const moved = movement.moved(input.delta);
   return Object.freeze(moved.length === 0
     ? {
         kind: "STOP",
         reason: "GLOBAL_DELTA_CONVERGED",
         maxRootMovement: movement.maximum,
-        movedRootNodeIds: Object.freeze([])
+        movedRootNodeIds: Object.freeze([]),
+        measuredEdgeCount
       }
     : {
         kind: "CONTINUE",
         reason: "ROOT_MOVED",
         maxRootMovement: movement.maximum,
-        movedRootNodeIds: moved
+        movedRootNodeIds: moved,
+        measuredEdgeCount
       });
 }
 

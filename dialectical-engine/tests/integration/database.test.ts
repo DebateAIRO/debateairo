@@ -1991,6 +1991,27 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r1:"))).toHaveLength(4);
       expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r2:"))).toHaveLength(8);
 
+      // T7 / J15(a) + J15(d): the stopping rule is LIVE in this loop, evaluated at
+      // the DERIVED global round boundary — round k completes when every root has
+      // finished round k, which in this root-major plan is the last leg carrying
+      // round k. Two rounds, two boundaries, and every one of them PROPAGATION:
+      // the boundary reaches no provider, so it cannot spend the envelope this
+      // fixture exhausts exactly.
+      const stoppingRounds = await database.pool.query<{ call_site_key: string; action_kind: string }>(
+        `SELECT call_site_key, action_kind FROM ledger.ledger_entry
+         WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:round:%' ORDER BY sequence`,
+        [runId]
+      );
+      expect(stoppingRounds.rows.map((row) => row.call_site_key))
+        .toEqual(["STOPPING:round:1", "STOPPING:round:2"]);
+      expect(new Set(stoppingRounds.rows.map((row) => row.action_kind))).toEqual(new Set(["PROPAGATION"]));
+      const stoppingModelCalls = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+         WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:round:%' AND action_kind='MODEL_CALL'`,
+        [runId]
+      );
+      expect(stoppingModelCalls.rows[0]?.count).toBe("0");
+
       const reviews = await database.pool.query<{
         node_id: string;
         author_maker: string;

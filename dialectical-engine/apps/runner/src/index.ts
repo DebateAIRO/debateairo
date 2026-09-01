@@ -52,6 +52,7 @@ import {
   type BudgetPressureDecision
 } from "@debateai/budget";
 import {
+  countMeasuredEdges,
   decideBranchFreezes,
   decideRoundContinuation,
   evaluate,
@@ -1213,6 +1214,29 @@ export function buildMultiMakerExpansionPlan(
   return Object.freeze(legs);
 }
 
+/**
+ * T7 / S3-2 · ruling J15(a) — the GLOBAL round boundary, derived.
+ *
+ * `buildMultiMakerExpansionPlan` emits legs rootIndex-OUTER, round-INNER, so
+ * `leg.round` RESETS at every root and a change in it is NOT a round boundary:
+ * for M=2, depth 2 the sequence is `1,1,2,2,2,2 | 1,1,2,2,2,2`, and the change
+ * at index 6 is root 0 finishing while root 1 has authored nothing. Acting on
+ * that reading cut root 1 off the debate entirely.
+ *
+ * Round k is complete when EVERY root's round-k legs have completed — which, in
+ * this ordering, is the LAST leg in the plan carrying round k. Returns leg index
+ * → the round that completes at it.
+ */
+export function deriveGlobalRoundCompletions(
+  plan: readonly MultiMakerExpansionLeg[]
+): ReadonlyMap<number, number> {
+  const finalIndexByRound = new Map<number, number>();
+  plan.forEach((leg, index) => finalIndexByRound.set(leg.round, index));
+  return Object.freeze(new Map([...finalIndexByRound]
+    .sort(([leftRound], [rightRound]) => leftRound - rightRound)
+    .map(([round, index]) => [index, round] as const)));
+}
+
 /** One response per ordered distinct maker pair: defend one root against each other root. */
 export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonly CrossRootExchangeLeg[] {
   if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
@@ -1343,12 +1367,15 @@ export async function runAdaptiveStoppingRound(
 ): Promise<AdaptiveStoppingRoundOutcome> {
   const startedAt = new Date();
   const propagation = evaluate(input.snapshot);
+  // J15(b): the evidence this decision had, carried onto its record.
+  const measuredEdgeCount = countMeasuredEdges(input.snapshot);
   const continuation = decideRoundContinuation({
     completedRounds: input.completedRounds,
     depthCeiling: input.depthCeiling,
     rootNodeIds: input.rootNodeIds,
     previousStrengths: input.previousStrengths,
     currentStrengths: propagation.strengths,
+    measuredEdgeCount,
     delta: input.controls.delta
   });
   const freezes = input.completedRounds < 1 || input.branchCarryingNodeIds.length === 0
@@ -2537,23 +2564,80 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...indices]);
     };
-    // T7 / S3-2 + S5-1 — HELD, NOT WIRED HERE. See this lane's handoff finding
-    // F-T7-1: `buildMultiMakerExpansionPlan` emits legs ROOT-MAJOR (rootIndex
-    // outer, round inner), so `leg.round` resets at every root and this site is
-    // not a global round boundary at all. Measured on the depth-2 two-maker
-    // fixture: the second transition reported completedRounds 2 and would have
-    // stopped the loop before root 1 expanded at all. The stopping rule itself
-    // is implemented and pinned (packages/propagation + runAdaptiveStoppingRound);
-    // WHERE the engine's round boundary lives is a question for the judge, and a
-    // guess here would silently truncate every multi-root debate.
-    const branchFrozenRecords: readonly ConditionMarkRecord[] = Object.freeze([]);
+    // T7 / S3-2 + S5-1 · ruling J15(a) — adaptive stopping, evaluated at the
+    // DERIVED global round boundary. `leg.round` resets at every root in this
+    // root-major plan, so a change in it is not a boundary; round k completes at
+    // the LAST leg carrying round k, when every root has finished round k.
+    const globalRoundCompletions = deriveGlobalRoundCompletions(expansionPlan);
+    const frozenIndices = new Set<number>();
+    const branchFrozenRecords: ConditionMarkRecord[] = [];
+    let previousRoundStrengths: readonly NodeStrengthRecord[] | null = null;
+    /**
+     * One GLOBAL round boundary: propagate (PURE CODE — no provider is reachable
+     * from here), then apply the ε branch freeze and the global δ stop. Returns
+     * true when the debate should stop expanding.
+     */
+    const closeGlobalRound = async (completedRounds: number): Promise<boolean> => {
+      const stoppingPolicy = this.settings.stoppingPolicy;
+      if (stoppingPolicy === undefined) return false;
+      const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
+      const roundStanding = projectJudgedStanding(
+        roundSnapshot,
+        await this.#judgements.readReviewedNodeIds(run.runId)
+      );
+      const scoredNodeIds = new Set(roundStanding.snapshot.nodes.map((node) => node.nodeId));
+      const rootNodeIds = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
+        .flatMap((root) => root !== undefined && scoredNodeIds.has(root.nodeId) ? [root.nodeId] : []);
+      if (rootNodeIds.length === 0) {
+        // No maker root survived into this round's standing, so root movement is
+        // unmeasurable. Continuing to the ASK-time ceiling never truncates a
+        // debate on absent evidence; inventing a stop would end a run on a
+        // number nobody measured.
+        return false;
+      }
+      // The branches that could expand next are the nodes this round authored.
+      const branchCarryingNodeIds = expansionPlan
+        .filter((candidate) => candidate.round === completedRounds
+          && !haltedIndices.has(candidate.childIndex)
+          && !frozenIndices.has(candidate.childIndex))
+        .flatMap((candidate) => {
+          const authored = authoredNodes.get(candidate.childIndex);
+          return authored !== undefined && scoredNodeIds.has(authored.nodeId)
+            ? [{ index: candidate.childIndex, nodeId: authored.nodeId }]
+            : [];
+        });
+      const boundary = await runAdaptiveStoppingRound({
+        runId: run.runId,
+        attemptId: runnerAttemptId,
+        completedRounds,
+        depthCeiling: expansionDepth,
+        rootNodeIds,
+        branchCarryingNodeIds: branchCarryingNodeIds.map((branch) => branch.nodeId),
+        previousStrengths: previousRoundStrengths,
+        snapshot: roundStanding.snapshot,
+        controls: stoppingPolicy,
+        propagationContractHash: this.settings.propagationContractHash,
+        propagationProducer: this.settings.propagationProducer
+      }, { appendLedger: (entry) => this.#ledger.append(entry) });
+      previousRoundStrengths = boundary.propagation.strengths;
+      const frozenNodeIds = new Set(boundary.frozenCarryingNodeIds);
+      for (const branch of branchCarryingNodeIds) {
+        if (!frozenNodeIds.has(branch.nodeId)) continue;
+        for (const index of subtreeIndices(branch.index)) frozenIndices.add(index);
+      }
+      for (const record of boundary.conditionMarkRecords) branchFrozenRecords.push(record);
+      return boundary.continuation.kind === "STOP";
+    };
     let activeExpansionRound = expansionPlan[0]?.round ?? null;
-    for (const leg of expansionPlan) {
+    let stoppedByAdaptiveRule = false;
+    for (const [legIndex, leg] of expansionPlan.entries()) {
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
         activeExpansionRound = leg.round;
       }
-      if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)) continue;
+      const skipped = haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
+        || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex);
+      if (!skipped) {
       const parent = authoredNodes.get(leg.parentIndex);
       if (parent === undefined) {
         throw new TypedDomainError("DEBATE_EXPANSION_PARENT_MISSING", `Node index ${leg.parentIndex}`);
@@ -2589,9 +2673,17 @@ export class WalkingSkeletonRunner {
         const indices = plannedSubtreeIndices;
         indices.forEach((index) => haltedIndices.add(index));
         haltedExpansionRecords.push({ ...authored.record, plannedLegCount: indices.length });
-        continue;
+      } else {
+        authoredNodes.set(leg.childIndex, authored.value);
       }
-      authoredNodes.set(leg.childIndex, authored.value);
+      }
+      // J15(a): every root has now finished this round, so the boundary is real.
+      const completedRound = globalRoundCompletions.get(legIndex);
+      if (completedRound !== undefined) {
+        await reviewPendingAuthoredNodes();
+        stoppedByAdaptiveRule = await closeGlobalRound(completedRound);
+        if (stoppedByAdaptiveRule) break;
+      }
     }
     await reviewPendingAuthoredNodes();
 

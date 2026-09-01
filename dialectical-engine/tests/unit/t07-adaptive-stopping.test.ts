@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  countMeasuredEdges,
   decideBranchFreezes,
   decideRoundContinuation,
   evaluate,
@@ -273,6 +274,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       rootNodeIds: TWO_ROOTS,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeConverged).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundThreeConverged),
       delta: 0.01
     });
 
@@ -280,7 +282,8 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       kind: "STOP",
       reason: "GLOBAL_DELTA_CONVERGED",
       maxRootMovement: 0.0029296875,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 2
     });
   });
 
@@ -291,6 +294,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       rootNodeIds: TWO_ROOTS,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
       delta: 0.01
     });
 
@@ -298,7 +302,8 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       kind: "CONTINUE",
       reason: "ROOT_MOVED",
       maxRootMovement: 0.046875,
-      movedRootNodeIds: ["root:A"]
+      movedRootNodeIds: ["root:A"],
+      measuredEdgeCount: 2
     });
   });
 
@@ -312,13 +317,15 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       rootNodeIds: TWO_ROOTS,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
       delta: 0.046875
     });
     expect(atDelta).toEqual({
       kind: "STOP",
       reason: "GLOBAL_DELTA_CONVERGED",
       maxRootMovement: 0.046875,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 2
     });
 
     const justBelowDelta = decideRoundContinuation({
@@ -327,6 +334,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       rootNodeIds: TWO_ROOTS,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
       delta: 0.0468749
     });
     expect(justBelowDelta.kind).toBe("CONTINUE");
@@ -340,6 +348,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       rootNodeIds: TWO_ROOTS,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
       delta: 0.01
     });
 
@@ -354,6 +363,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       rootNodeIds: ["root:A", "root:missing"],
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeConverged).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundThreeConverged),
       delta: 0.01
     })).toThrowError(expect.objectContaining({ code: "STOPPING_ROOT_STRENGTH_UNRESOLVED" }));
   });
@@ -369,6 +379,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       // inside delta. Only the floor keeps the debate alive.
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
       delta: 0.01
     });
 
@@ -376,7 +387,8 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       kind: "CONTINUE",
       reason: "ROUND_1_FLOOR",
       maxRootMovement: 0,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 1
     });
   });
 
@@ -387,6 +399,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       rootNodeIds: TWO_ROOTS,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
       delta: 0.01
     });
 
@@ -394,7 +407,8 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       kind: "STOP",
       reason: "GLOBAL_DELTA_CONVERGED",
       maxRootMovement: 0,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 1
     });
   });
 
@@ -405,29 +419,32 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       rootNodeIds: TWO_ROOTS,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
       delta: 0.01
     })).toEqual({
       kind: "CONTINUE",
       reason: "ROUND_1_FLOOR",
       maxRootMovement: null,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 1
     });
 
-    // "no root moved > δ VS THE PREVIOUS ROUND" needs a previous ROUND. After
-    // round 1 there is none — the pre-expansion graph is a baseline, not a
-    // round — so the δ stop cannot fire yet and the debate continues.
+    // Ruling J15(c): the pre-expansion graph is a BASELINE, not a round, so
+    // after round 1 there is no previous ROUND and the δ stop cannot fire yet.
     expect(decideRoundContinuation({
       completedRounds: 1,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
       delta: 0.01
     })).toEqual({
       kind: "CONTINUE",
       reason: "NO_PREVIOUS_ROUND",
       maxRootMovement: null,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 1
     });
 
     // From round 2 on a previous round exists; its absence is a caller defect.
@@ -437,6 +454,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       rootNodeIds: TWO_ROOTS,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
       delta: 0.01
     })).toThrowError(expect.objectContaining({ code: "STOPPING_PREVIOUS_ROUND_MISSING" }));
   });
@@ -448,12 +466,14 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       rootNodeIds: TWO_ROOTS,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
+      measuredEdgeCount: countMeasuredEdges(roundTwo),
       delta: 0.01
     })).toEqual({
       kind: "STOP",
       reason: "DEPTH_CEILING",
       maxRootMovement: null,
-      movedRootNodeIds: []
+      movedRootNodeIds: [],
+      measuredEdgeCount: 1
     });
   });
 });
@@ -574,5 +594,191 @@ describe("T7 — the per-round propagation is PURE CODE: zero model calls in the
     expect(third.freezes).toEqual(first.freezes);
     expect(second.continuation).toEqual(first.continuation);
     expect(third.continuation).toEqual(first.continuation);
+  });
+});
+
+describe("T7 / J15(a) — the GLOBAL round boundary, derived from a ROOT-MAJOR plan", () => {
+  /**
+   * `buildMultiMakerExpansionPlan` emits legs rootIndex-OUTER, round-INNER. For
+   * M=2, depth 2 the round sequence is 1,1,2,2,2,2 | 1,1,2,2,2,2 — it RESETS at
+   * every root. Ruling J15(a): round k is complete when EVERY root's round-k
+   * legs have completed, and the stop/freeze evaluation runs exactly there.
+   */
+  const plan = async () => (await import("@debateai/runner"))
+    .buildMultiMakerExpansionPlan(2, 2);
+
+  it("derives round completion at the LAST leg of each round across all roots", async () => {
+    const runner = await import("@debateai/runner");
+    const legs = await plan();
+
+    expect(legs).toHaveLength(12);
+    expect(legs.map((leg) => leg.round)).toEqual([1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2]);
+
+    // leg 7 is root 1's second round-1 leg; leg 11 is the plan's last leg.
+    expect(runner.deriveGlobalRoundCompletions(legs)).toEqual(new Map([[7, 1], [11, 2]]));
+  });
+
+  it("REFUTES the naive hook: a leg.round CHANGE is not a round completion", async () => {
+    const runner = await import("@debateai/runner");
+    const legs = await plan();
+
+    // The hook this lane first shipped fired wherever leg.round changed.
+    const naive = legs.flatMap((leg, index) =>
+      index > 0 && leg.round !== legs[index - 1]!.round ? [index] : []);
+    expect(naive).toEqual([2, 6, 8]);
+
+    // Index 6 is the killer: the naive rule reports "round 2 completed" at the
+    // transition from root 0's round 2 to root 1's round 1 — while root 1 has
+    // authored NOTHING. Acting on it cut root 1 off entirely.
+    expect(legs[5]!.round).toBe(2);
+    expect(legs[6]!).toMatchObject({ rootIndex: 1, round: 1 });
+
+    const derived = runner.deriveGlobalRoundCompletions(legs);
+    expect(derived.has(2)).toBe(false);
+    expect(derived.has(6)).toBe(false);
+    expect(derived.has(8)).toBe(false);
+  });
+
+  it("guarantees every root finished round k at the boundary it derives for k", async () => {
+    const runner = await import("@debateai/runner");
+    for (const [makers, depth] of [[2, 2], [2, 3], [3, 2], [4, 5]] as const) {
+      const legs = runner.buildMultiMakerExpansionPlan(depth, makers);
+      const derived = runner.deriveGlobalRoundCompletions(legs);
+
+      expect([...derived.values()]).toEqual(
+        Array.from({ length: depth }, (_, index) => index + 1)
+      );
+      for (const [boundaryIndex, round] of derived) {
+        const unfinished = legs.flatMap((leg, index) =>
+          leg.round === round && index > boundaryIndex ? [index] : []);
+        expect(unfinished).toEqual([]);
+        const rootsAtRound = new Set(legs
+          .filter((leg, index) => leg.round === round && index <= boundaryIndex)
+          .map((leg) => leg.rootIndex));
+        expect(rootsAtRound.size).toBe(makers);
+      }
+    }
+  });
+});
+
+describe("T7 / J15(b) — a δ stop must be NON-VACUOUS", () => {
+  /** Every edge UNKNOWN: nothing beneath a root carries a magnitude. */
+  const allUnknown = snapshot(
+    [node("root:A", 0.5), node("b1", 0.5), node("b2", 0.5)],
+    [
+      support("e:b1->A", "b1", "root:A", null, "UNKNOWN"),
+      { ...support("e:b2->A", "b2", "root:A", null, "UNKNOWN"), polarity: "attack", kind: "rebutting" }
+    ],
+    [resolution("root:A")]
+  );
+
+  it("counts the measured edges it considered, and carries that count on the record", () => {
+    expect(countMeasuredEdges(allUnknown)).toBe(0);
+    expect(countMeasuredEdges(roundTwo)).toBe(1);
+    expect(countMeasuredEdges(discriminator)).toBe(2);
+
+    const values = new Map(evaluate(allUnknown).strengths.map((row) => [row.nodeId, row.strength]));
+    // Nothing moves anything: every node sits at its own tau.
+    expect(values.get("root:A")).toBe(0.5);
+    expect(values.get("b1")).toBe(0.5);
+    expect(values.get("b2")).toBe(0.5);
+  });
+
+  it("REFUSES the stop when zero measured edges were considered, however still the roots are", () => {
+    const decision = decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      // Movement is exactly 0 — under the literal rule this would converge.
+      previousStrengths: evaluate(allUnknown).strengths,
+      currentStrengths: evaluate(allUnknown).strengths,
+      measuredEdgeCount: countMeasuredEdges(allUnknown),
+      delta: 0.01
+    });
+
+    expect(decision).toEqual({
+      kind: "CONTINUE",
+      reason: "NO_MEASURED_EDGE",
+      maxRootMovement: 0,
+      movedRootNodeIds: [],
+      measuredEdgeCount: 0
+    });
+
+    // One measured edge is enough to make the same zero movement a real stop.
+    expect(decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      previousStrengths: evaluate(allUnknown).strengths,
+      currentStrengths: evaluate(allUnknown).strengths,
+      measuredEdgeCount: 1,
+      delta: 0.01
+    }).reason).toBe("GLOBAL_DELTA_CONVERGED");
+  });
+
+  it("ends an all-UNKNOWN debate by MARKED FREEZE exhaustion, never by fake convergence", () => {
+    const decisions = decideBranchFreezes({
+      completedRounds: 1,
+      sensitivityRecords: evaluate(allUnknown).sensitivityRecords,
+      branchCarryingNodeIds: ["b1", "b2"],
+      rootNodeIds: ["root:A"],
+      epsilon: 0.01
+    });
+
+    // Zero leverage everywhere, so EVERY branch freezes — and each freeze is a
+    // disclosed mark, not a silent stop. That is the honest end of a debate
+    // where nothing was ever measured.
+    expect(decisions).toEqual([
+      { carryingNodeId: "b1", leverage: 0, verdict: "FROZEN" },
+      { carryingNodeId: "b2", leverage: 0, verdict: "FROZEN" }
+    ]);
+  });
+
+  it("reaches expansion exhaustion through the runner's own boundary, with a mark per frozen branch", async () => {
+    const runner = await import("@debateai/runner");
+
+    const outcome = await runner.runAdaptiveStoppingRound({
+      runId: "run:t07-unknown",
+      attemptId: "attempt:t07-unknown",
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      branchCarryingNodeIds: ["b1", "b2"],
+      previousStrengths: evaluate(allUnknown).strengths,
+      snapshot: allUnknown,
+      controls: {
+        registerVersion: 5,
+        delta: 0.01,
+        epsilon: 0.01,
+        sourceRefs: {
+          globalStopDelta: "register:v5:globalStopDelta",
+          branchFreezeEpsilon: "register:v5:branchFreezeEpsilon"
+        }
+      },
+      propagationContractHash: "contract:propagation",
+      propagationProducer: "producer:propagation"
+    }, { appendLedger: async () => undefined });
+
+    expect(outcome.continuation.kind).toBe("CONTINUE");
+    expect(outcome.continuation.reason).toBe("NO_MEASURED_EDGE");
+    expect(outcome.continuation.measuredEdgeCount).toBe(0);
+    expect(outcome.frozenCarryingNodeIds).toEqual(["b1", "b2"]);
+    expect(outcome.conditionMarkRecords.map((record) => record.mark))
+      .toEqual(["BRANCH-FROZEN-LOW-LEVERAGE", "BRANCH-FROZEN-LOW-LEVERAGE"]);
+  });
+});
+
+describe("T7 / J15(d) — the stopping consumer is LIVE in the expansion loop", () => {
+  it("calls the derived boundary from the runner's own round loop", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile(
+      new URL("../../apps/runner/src/index.ts", import.meta.url),
+      "utf8"
+    );
+
+    // F-T7-4 self-closes only if the loop really reaches the rule.
+    expect(source).toMatch(/deriveGlobalRoundCompletions\(expansionPlan\)/);
+    expect(source).toMatch(/await runAdaptiveStoppingRound\(/);
+    expect(source).toMatch(/globalRoundCompletions\.get\(legIndex\)/);
   });
 });
