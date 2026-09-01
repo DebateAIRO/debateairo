@@ -367,7 +367,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
     });
   });
 
-  it("continues with no previous round at all, and refuses a missing previous after round 1", () => {
+  it("continues with no previous round at all, and refuses a missing previous from round 2 on", () => {
     expect(decideRoundContinuation({
       completedRounds: 0,
       depthCeiling: 5,
@@ -382,14 +382,48 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       movedRootNodeIds: []
     });
 
-    expect(() => decideRoundContinuation({
+    // "no root moved > δ VS THE PREVIOUS ROUND" needs a previous ROUND. After
+    // round 1 there is none — the pre-expansion graph is a baseline, not a
+    // round — so the δ stop cannot fire yet and the debate continues.
+    expect(decideRoundContinuation({
       completedRounds: 1,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
       delta: 0.01
+    })).toEqual({
+      kind: "CONTINUE",
+      reason: "NO_PREVIOUS_ROUND",
+      maxRootMovement: null,
+      movedRootNodeIds: []
+    });
+
+    // From round 2 on a previous round exists; its absence is a caller defect.
+    expect(() => decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: TWO_ROOTS,
+      previousStrengths: null,
+      currentStrengths: evaluate(roundTwo).strengths,
+      delta: 0.01
     })).toThrowError(expect.objectContaining({ code: "STOPPING_PREVIOUS_ROUND_MISSING" }));
+  });
+
+  it("stops on the ceiling even at round 1, where movement cannot be consulted", () => {
+    expect(decideRoundContinuation({
+      completedRounds: 1,
+      depthCeiling: 1,
+      rootNodeIds: TWO_ROOTS,
+      previousStrengths: null,
+      currentStrengths: evaluate(roundTwo).strengths,
+      delta: 0.01
+    })).toEqual({
+      kind: "STOP",
+      reason: "DEPTH_CEILING",
+      maxRootMovement: null,
+      movedRootNodeIds: []
+    });
   });
 });
 

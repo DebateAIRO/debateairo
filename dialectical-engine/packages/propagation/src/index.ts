@@ -692,6 +692,7 @@ export function decideBranchFreezes(input: {
 
 export type RoundContinuationReason =
   | "ROUND_1_FLOOR"
+  | "NO_PREVIOUS_ROUND"
   | "DEPTH_CEILING"
   | "GLOBAL_DELTA_CONVERGED"
   | "ROOT_MOVED";
@@ -709,8 +710,20 @@ export interface RoundContinuationDecision {
  *
  * 1. ROUND-1 FLOOR — round 1 always runs; movement is not consulted before it.
  * 2. DEPTH CEILING — the ASK-time depth is a ceiling no convergence can raise.
- * 3. GLOBAL δ STOP — stop once no root moved more than δ against the previous
- *    round. The DoD requires this to be reachable BEFORE the ceiling.
+ *    It is checked before movement, because it never depends on movement.
+ * 3. GLOBAL δ STOP — stop once no root moved more than δ against THE PREVIOUS
+ *    ROUND. The DoD requires this to be reachable BEFORE the ceiling.
+ *
+ * The δ stop needs a previous ROUND, and after round 1 there is none: the
+ * pre-expansion graph is a baseline, not a round. Comparing round 1 against it
+ * would let a run whose first round measured nothing report convergence and
+ * stop — measured on a real fixture, roots sat at 0.72 before and after round 1
+ * purely because no edge beneath them carried a magnitude. Absence of
+ * measurement is not agreement, and this rule refuses to read it as agreement.
+ * The goal's own text is read the conservative way here: `NO_PREVIOUS_ROUND`
+ * continues, so the rule can only ever run MORE rounds, never fewer. The
+ * alternative reading (round 0 as the comparison baseline) is a live question
+ * for the judge; it is named in this lane's handoff, not settled here.
  */
 export function decideRoundContinuation(input: {
   readonly completedRounds: number;
@@ -741,19 +754,27 @@ export function decideRoundContinuation(input: {
       movedRootNodeIds: Object.freeze([])
     });
   }
-  if (movement === null) {
-    throw new TypedDomainError(
-      "STOPPING_PREVIOUS_ROUND_MISSING",
-      "The global δ stop compares against the previous round, which was not supplied"
-    );
-  }
   if (input.completedRounds >= input.depthCeiling) {
     return Object.freeze({
       kind: "STOP",
       reason: "DEPTH_CEILING",
-      maxRootMovement: movement.maximum,
-      movedRootNodeIds: movement.moved(input.delta)
+      maxRootMovement: movement === null ? null : movement.maximum,
+      movedRootNodeIds: movement === null ? Object.freeze([]) : movement.moved(input.delta)
     });
+  }
+  if (movement === null) {
+    if (input.completedRounds === 1) {
+      return Object.freeze({
+        kind: "CONTINUE",
+        reason: "NO_PREVIOUS_ROUND",
+        maxRootMovement: null,
+        movedRootNodeIds: Object.freeze([])
+      });
+    }
+    throw new TypedDomainError(
+      "STOPPING_PREVIOUS_ROUND_MISSING",
+      "The global δ stop compares against the previous round, which was not supplied"
+    );
   }
   const moved = movement.moved(input.delta);
   return Object.freeze(moved.length === 0

@@ -2995,6 +2995,48 @@ describe("apps/runner — legal command lifecycle", () => {
     }
   });
 
+  // T7 (S3-2/S5-1), same J12 shape and same place: a multi-maker run is the only run
+  // that expands, and expansion is what δ and ε govern. Running the ceiling with the
+  // stopping rule quietly absent — or with a δ/ε invented in the runner — is the same
+  // silent-degradation shape. The stop lands BEFORE the claim and BEFORE any spend.
+  it("T7 — refuses unsealed adaptive stopping on a multi-maker run before claiming or spending", async () => {
+    const primary = await startProviderDouble([]);
+    const secondary = await startProviderDouble([]);
+    try {
+      const work = await createRunnerWork("stopping-policy-before-claim");
+      const { stoppingPolicy: _omitted, ...settingsWithoutStoppingPolicy } = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "model:test-layer", maker: "maker:test-layer"
+      }), {
+        ...settingsWithoutStoppingPolicy,
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "model:test-layer:secondary", maker: "maker:test-layer:secondary"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "maker:test-layer:secondary"
+        },
+        // Supplied so the DR-074 guard is satisfied; panelPolicy is left in place so the
+        // STOPPING guard is demonstrably the one that fires, not its predecessor.
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(work.workItemId)).rejects.toMatchObject({
+        code: "ADAPTIVE_STOPPING_UNRESOLVED"
+      });
+      const state = await database.pool.query<{ state: string; claimed_by: string | null }>(
+        "SELECT state, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [work.workItemId]
+      );
+      expect(state.rows[0]).toEqual({ state: "READY", claimed_by: null });
+      expect(primary.calls()).toBe(0);
+      expect(secondary.calls()).toBe(0);
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
   /**
    * T3 r2 · B4 + B5 — the repeated-family MULTIPLIER and the PARTIAL mark, on one
    * M=3 real-database fixture.

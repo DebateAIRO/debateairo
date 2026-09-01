@@ -2537,82 +2537,23 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...indices]);
     };
-    // T7 / S3-2 + S5-1 — adaptive stopping state carried across round boundaries.
-    const frozenIndices = new Set<number>();
-    const branchFrozenRecords: ConditionMarkRecord[] = [];
-    let previousRoundStrengths: readonly NodeStrengthRecord[] | null = null;
-    let stoppedByAdaptiveRule = false;
-    /**
-     * One round boundary: propagate (PURE CODE — no provider is reachable from
-     * here), then apply the global δ stop and the ε branch freeze. Returns true
-     * when the debate should stop expanding.
-     */
-    const closeExpansionRound = async (completedRounds: number): Promise<boolean> => {
-      const stoppingPolicy = this.settings.stoppingPolicy;
-      if (stoppingPolicy === undefined) return false;
-      const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
-      const roundStanding = projectJudgedStanding(
-        roundSnapshot,
-        await this.#judgements.readReviewedNodeIds(run.runId)
-      );
-      const scoredNodeIds = new Set(roundStanding.snapshot.nodes.map((node) => node.nodeId));
-      const rootNodeIds = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
-        .flatMap((root) => root !== undefined && scoredNodeIds.has(root.nodeId) ? [root.nodeId] : []);
-      if (rootNodeIds.length === 0) {
-        // No maker root survived into this round's standing, so root movement is
-        // unmeasurable. Continuing to the ASK-time ceiling is the pre-T7
-        // behaviour and never truncates a debate on absent evidence; inventing a
-        // stop here would end a run on a number nobody measured.
-        return false;
-      }
-      // The branches that would expand next are the nodes this round authored.
-      const branchCarryingNodeIds = expansionPlan
-        .filter((candidate) => candidate.round === completedRounds
-          && !haltedIndices.has(candidate.childIndex)
-          && !frozenIndices.has(candidate.childIndex))
-        .flatMap((candidate) => {
-          const authored = authoredNodes.get(candidate.childIndex);
-          return authored !== undefined && scoredNodeIds.has(authored.nodeId)
-            ? [{ index: candidate.childIndex, nodeId: authored.nodeId }]
-            : [];
-        });
-      const boundary = await runAdaptiveStoppingRound({
-        runId: run.runId,
-        attemptId: runnerAttemptId,
-        completedRounds,
-        depthCeiling: expansionDepth,
-        rootNodeIds,
-        branchCarryingNodeIds: branchCarryingNodeIds.map((branch) => branch.nodeId),
-        previousStrengths: previousRoundStrengths,
-        snapshot: roundStanding.snapshot,
-        controls: stoppingPolicy,
-        propagationContractHash: this.settings.propagationContractHash,
-        propagationProducer: this.settings.propagationProducer
-      }, { appendLedger: (entry) => this.#ledger.append(entry) });
-      previousRoundStrengths = boundary.propagation.strengths;
-      const frozenNodeIds = new Set(boundary.frozenCarryingNodeIds);
-      for (const branch of branchCarryingNodeIds) {
-        if (!frozenNodeIds.has(branch.nodeId)) continue;
-        for (const index of subtreeIndices(branch.index)) frozenIndices.add(index);
-      }
-      for (const record of boundary.conditionMarkRecords) branchFrozenRecords.push(record);
-      return boundary.continuation.kind === "STOP";
-    };
-    // Round 0: the reviewed maker roots, before a single expansion round. This
-    // is the baseline the round-1 δ comparison is taken against, and the
-    // round-1 floor is what makes it a baseline rather than a stop — at
-    // completedRounds 0 the rule CONTINUES unconditionally and freezes nothing.
-    if (expansionPlan.length > 0) await closeExpansionRound(0);
+    // T7 / S3-2 + S5-1 — HELD, NOT WIRED HERE. See this lane's handoff finding
+    // F-T7-1: `buildMultiMakerExpansionPlan` emits legs ROOT-MAJOR (rootIndex
+    // outer, round inner), so `leg.round` resets at every root and this site is
+    // not a global round boundary at all. Measured on the depth-2 two-maker
+    // fixture: the second transition reported completedRounds 2 and would have
+    // stopped the loop before root 1 expanded at all. The stopping rule itself
+    // is implemented and pinned (packages/propagation + runAdaptiveStoppingRound);
+    // WHERE the engine's round boundary lives is a question for the judge, and a
+    // guess here would silently truncate every multi-root debate.
+    const branchFrozenRecords: readonly ConditionMarkRecord[] = Object.freeze([]);
     let activeExpansionRound = expansionPlan[0]?.round ?? null;
     for (const leg of expansionPlan) {
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
-        stoppedByAdaptiveRule = await closeExpansionRound(activeExpansionRound);
         activeExpansionRound = leg.round;
-        if (stoppedByAdaptiveRule) break;
       }
       if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)) continue;
-      if (frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)) continue;
       const parent = authoredNodes.get(leg.parentIndex);
       if (parent === undefined) {
         throw new TypedDomainError("DEBATE_EXPANSION_PARENT_MISSING", `Node index ${leg.parentIndex}`);
