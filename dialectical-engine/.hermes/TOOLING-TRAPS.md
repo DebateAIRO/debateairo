@@ -833,3 +833,10 @@ Found by CODE-T1C2-RW1 (2026-09-01): the amended row-8 gate adds
 control reproduce it. Do not count this as a product RED or replace the socket with a mock:
 run this gate in Hermes/non-sandboxed verification, or dispatch the worker in an environment
 whose approved permissions allow loopback listeners.
+
+## zsh does not word-split unquoted variables — silent watchdog false-positive
+Found by the orchestrator (2026-09-01): a watchdog looping `for f in $LANES` (LANES a
+space-separated string) ran ONCE with the whole string as `f` under zsh, so every `stat`
+failed, the fingerprint never changed, and it reported STAGNATION while all four lanes
+were actively writing. bash word-splits here; zsh does not. Use an explicit list or a
+real array (`LANES=(a b c)` + `"${LANES[@]}"`) in any polling loop.
