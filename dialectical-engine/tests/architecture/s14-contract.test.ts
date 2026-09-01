@@ -21,7 +21,7 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
       readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/lib/serverApi.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/app/api/[...path]/route.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../apps/ui/.env.local", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/.env.local.example", import.meta.url), "utf8")
     ]);
     expect(browser).toContain('"/api"');
     expect(server).toContain("DIALECTICAL_API_BASE");
