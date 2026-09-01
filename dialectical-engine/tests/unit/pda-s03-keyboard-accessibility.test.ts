@@ -111,8 +111,7 @@ describe("public debate navigation keyboard accessibility", () => {
     // marked as the current page, without borrowing ARIA tab semantics, and
     // clears the enumerated `knownConcealmentBarrier` check -- this is a
     // blacklist, not proof the controls are exposed to a real user or
-    // assistive technology; see this test's own "Failure it MISSES" list for
-    // what remains unchecked.
+    // assistive technology; browser and assistive-technology exposure remain out of scope.
     const document = await renderHomePage(selected);
     const navigation = document.querySelector('.sectionHead[aria-label="Debate library"]');
     expect(navigation).not.toBeNull();
@@ -120,6 +119,7 @@ describe("public debate navigation keyboard accessibility", () => {
 
     const links = [...navigation!.querySelectorAll("a")];
     expect(links).toHaveLength(2);
+    expect(navigation!.querySelector(".count")?.textContent?.trim(), "rendered row count").toBe("0 TOTAL");
 
     for (const expected of expectedTabs) {
       const matches = links.filter((link) => link.textContent?.trim() === expected.label);
