@@ -443,17 +443,21 @@ describe("S05 P5/P6 / FX-SRV-03..05 — append-only folds and sealed reads", () 
 
   it("folds number status and derives current answer degradation without mutating sealed state", () => {
     expect(foldServedNumberEvents(events)).toEqual({ status: "EVICTED", reason: "MISSING-NUMBER" });
+    // T8 / S5-2: WITHHELD is repealed with the branch that produced it. The fold
+    // still honours the sealed cursor and the at-sequence ordering — proved here
+    // with the two statuses that survive, out of order and cursor-clipped.
     expect(foldServedNumberEvents([
       { status: "EVICTED", reason: "MISSING-NUMBER", atSequence: 9 },
       { status: "PRESENT", reason: null, atSequence: 2 },
-      { status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED", atSequence: 4 }
+      { status: "EVICTED", reason: "MISSING-NUMBER", atSequence: 4 }
     ], 4)).toEqual({
-      status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED"
+      status: "EVICTED", reason: "MISSING-NUMBER"
     });
-    expect(foldServedNumberEvents([{
-      status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED", atSequence: 1
-    }])).toEqual({
-      status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED"
+    expect(foldServedNumberEvents([
+      { status: "PRESENT", reason: null, atSequence: 2 },
+      { status: "EVICTED", reason: "MISSING-NUMBER", atSequence: 9 }
+    ], 4)).toEqual({
+      status: "PRESENT", reason: null
     });
     expect(deriveAnswerServeState({
       sealedServeState: "COMPOSED",

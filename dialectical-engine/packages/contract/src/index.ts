@@ -330,14 +330,13 @@ export const LabeledNumberSchema = z.object({
   replay_handle: z.string().min(1)
 }).strict();
 
+// S5-2 (goal 119-128): the WITHHELD slot existed solely to carry the repealed
+// second operator's conjunct-withholding reason. With `accumulate` pinned as THE
+// operator nothing can produce it, so the slot is repealed together with its
+// branch rather than left as an unreachable status a later writer could revive.
 export const NumberSlotSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("PRESENT"), number: LabeledNumberSchema }).strict(),
-  z.object({ status: z.literal("EVICTED"), mark: z.literal("MISSING-NUMBER") }).strict(),
-  z.object({
-    status: z.literal("WITHHELD"),
-    reason: z.literal("STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED"),
-    components: z.array(LabeledNumberSchema)
-  }).strict()
+  z.object({ status: z.literal("EVICTED"), mark: z.literal("MISSING-NUMBER") }).strict()
 ]);
 
 export const ComposedSegmentSchema = z.object({

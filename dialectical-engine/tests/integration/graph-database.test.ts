@@ -216,7 +216,7 @@ describe("S02 migrated graph invariants", () => {
     expect(materialised.arrows).toHaveLength(1);
   });
 
-  it("S03 records operator, cluster, lift, rival, and removal-sensitivity receipts", async () => {
+  it("S03 records operator, cluster, lift, and removal-sensitivity receipts", async () => {
     const runId = await createRun("s03-receipts");
     const root = await rawNode({ runId, claimText: "Receipt root" });
     const supporter = await rawNode({ runId, claimText: "Receipt supporter" });
@@ -274,8 +274,8 @@ describe("S02 migrated graph invariants", () => {
       }))
     });
     const receipt = await database.pool.query(
-      `SELECT strength.operator_used, strength.operator_level, strength.rival_operator,
-              strength.rival_strength, strength.supported_by, strength.position_label,
+      `SELECT strength.operator_used, strength.operator_level,
+              strength.supported_by, strength.position_label,
               propagation.cluster_records, propagation.operator_by_parent,
               count(sensitivity.removed_node_id)::int AS sensitivity_count
        FROM ledger.propagation_run AS propagation
@@ -284,20 +284,26 @@ describe("S02 migrated graph invariants", () => {
        JOIN ledger.sensitivity_record AS sensitivity
          ON sensitivity.propagation_run_id=propagation.propagation_run_id
        WHERE propagation.propagation_run_id=$1
-       GROUP BY strength.operator_used, strength.operator_level, strength.rival_operator,
-                strength.rival_strength, strength.supported_by, strength.position_label,
+       GROUP BY strength.operator_used, strength.operator_level,
+                strength.supported_by, strength.position_label,
                 propagation.cluster_records, propagation.operator_by_parent`,
       [propagationRunId, root]
     );
     expect(receipt.rows[0]).toMatchObject({
       operator_used: "accumulate",
       operator_level: "deployment",
-      rival_operator: "strict-and",
-      rival_strength: 0.75,
       supported_by: [support],
       position_label: "supports",
       sensitivity_count: 2
     });
+    // T8 / S5-2: the retired receipt pair is gone from the table, not merely null.
+    const columns = await database.pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema='ledger' AND table_name='node_strength_record'`
+    );
+    const columnNames = columns.rows.map((row) => row.column_name);
+    expect(columnNames).not.toContain("rival_operator");
+    expect(columnNames).not.toContain("rival_strength");
   });
 
   it("DR-071 records a real undercut's pure-core reduction and the derived order end to end", async () => {

@@ -15,10 +15,10 @@ describe("FX-IND-01 / FX-IND-02 — replay isolation", () => {
   it("pins both the imported and exported arithmetic surface at symbol granularity", () => {
     expect(REPLAY_ISOLATION_PROOF).toEqual({
       workspaceImports: ["@debateai/published-arithmetic"],
-      sharedSymbols: ["agg", "σ", "product"],
+      sharedSymbols: ["agg", "σ"],
       localArithmeticSymbols: []
     });
-    expect(Object.keys(arithmetic).sort()).toEqual(["agg", "product", "σ"].sort());
+    expect(Object.keys(arithmetic).sort()).toEqual(["agg", "σ"].sort());
   });
 });
 

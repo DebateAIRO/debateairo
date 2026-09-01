@@ -17,7 +17,7 @@ export function DebateWorkspaceDrawer({ answer }: { answer: AnswerSurfaceProject
     <h3>What would reverse this</h3><p>{answer.reversalPoint}</p>
     {answer.valueHinges.map((hinge) => <section key={hinge.value_hinge_ref}><h3>Value hinge</h3><p>{hinge.left_option_ref} ↔ {hinge.right_option_ref} · weights: {hinge.weight_source}{hinge.weight_owner ? ` by ${hinge.weight_owner}` : ""}</p><p>Rejected criteria: {hinge.rejected_criteria.length === 0 ? "None recorded" : hinge.rejected_criteria.join(", ")}</p></section>)}
     <h3>Cost envelope</h3><p>{answer.costEnvelope.state} · protected core {answer.costEnvelope.protected_core}</p>
-    <h3>Numbers and replay</h3>{answer.numberSlots.map((slot, index) => <p key={index}>{slot.status === "PRESENT" ? `${slot.number.value} · ${slot.number.source} · ${slot.number.replay_handle}` : slot.status === "EVICTED" ? conditionMarkLabel(slot.mark) : slot.reason}</p>)}
+    <h3>Numbers and replay</h3>{answer.numberSlots.map((slot, index) => <p key={index}>{slot.status === "PRESENT" ? `${slot.number.value} · ${slot.number.source} · ${slot.number.replay_handle}` : conditionMarkLabel(slot.mark)}</p>)}
     <h3>Execution</h3><p>{answer.ledgerDigestHandle}</p>
   </aside>;
 }

@@ -298,8 +298,6 @@ export class LedgerRepository {
       readonly operatorLevel?: OperatorSupplyingLevel | null;
       readonly positionLabel?: string | null;
       readonly liftMarker?: readonly unknown[];
-      readonly rivalOperator?: ScoringOperator | null;
-      readonly rivalStrength?: number | null;
       readonly reducedJudgementRef?: string | null;
     }[];
   }): Promise<string> {
@@ -367,8 +365,8 @@ export class LedgerRepository {
             source_ref, producer, replay_handle, way_of_knowing,
             tau_source, cluster_id, judged_by, abstained, supported_by,
             attacked_by, operator_used, operator_level, position_label,
-            lift_marker, rival_operator, rival_strength, reduced_judgement_ref
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17,$18::jsonb,$19,$20,$21)`,
+            lift_marker, reduced_judgement_ref
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17,$18::jsonb,$19)`,
           [
             storedPropagationRunId,
             strength.nodeId,
@@ -388,8 +386,6 @@ export class LedgerRepository {
             strength.operatorLevel ?? null,
             strength.positionLabel ?? null,
             JSON.stringify(strength.liftMarker ?? []),
-            strength.rivalOperator ?? null,
-            strength.rivalStrength ?? null,
             strength.reducedJudgementRef ?? null
           ]
         );

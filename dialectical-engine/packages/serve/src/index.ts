@@ -697,7 +697,7 @@ export function projectProvenance(input: {
 }
 
 export interface ServedNumberEvent {
-  readonly status: "PRESENT" | "EVICTED" | "WITHHELD";
+  readonly status: "PRESENT" | "EVICTED";
   readonly reason: string | null;
   readonly atSequence: number;
 }
@@ -1467,7 +1467,7 @@ export class ServeRepository {
       replay_handle: string;
       provenance_ref: string;
       events: Array<{
-        status: "PRESENT" | "EVICTED" | "WITHHELD";
+        status: "PRESENT" | "EVICTED";
         reason: string | null;
         atSequence: number | string;
       }>;
@@ -1511,9 +1511,6 @@ export class ServeRepository {
         currentRead ? undefined : Number(row.sealed_at_seq)
       ).status;
       if (status === "EVICTED") return { status, mark: "MISSING-NUMBER" };
-      if (status === "WITHHELD") {
-        return { status, reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED", components: [] };
-      }
       return {
         status: "PRESENT",
         number: {
