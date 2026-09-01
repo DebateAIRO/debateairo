@@ -18,11 +18,18 @@ import { GraphRepository } from "@debateai/graph";
 import {
   Judge,
   JudgementRepository,
+  applyCorrelatedErrorDiscount,
+  applyDeclaredDisagreement,
   bindWayOfKnowingDowngrade,
   createUnmeasuredDisagreement,
+  measureDispersion,
   reduceAssessment,
+  runJudgePanel,
   selectReducedJudgement,
+  type ClaimType,
   type CompositionMapRegisterRow,
+  type JudgeAssessment,
+  type JudgeFamily,
   type JudgementSelectionRule,
   type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
@@ -114,6 +121,36 @@ export interface RunnerCritiqueSettings {
   readonly providerRef: string;
   readonly maker: string;
 }
+
+/**
+ * S2-2 / T3 — the sealed T16 panel inputs as the runner consumes them. Every
+ * member is READ from a register row by the deployment's boot; the runner binds
+ * identifiers only and never restates a value (T16 consumer discipline).
+ */
+export interface RunnerPanelPolicy {
+  readonly registerVersion: number;
+  readonly dispersionScale: number;
+  readonly repeatedFamilyMultiplier: number;
+  readonly disagreementThreshold: number;
+  /** The sealed band vocabulary's one-step-down map, total over the band order. */
+  readonly oneStepDown: Readonly<Record<string, string>>;
+  readonly providerFamilies: readonly {
+    readonly familyRef: string;
+    readonly providerRefs: readonly string[];
+  }[];
+  /** The sealed reason an unmapped provider carries; UNKNOWN is discount-exempt. */
+  readonly unmappedReason: string;
+  readonly sourceRefs: Readonly<Record<string, string>>;
+}
+
+/**
+ * confirm-item 5: the visible marks a degraded panel leaves on the node's
+ * receipt. A partial panel PROCEEDS with the voices that parsed and says so;
+ * a panel whose every non-author member failed is never allowed to look like a
+ * clean self-grade.
+ */
+export const PANEL_PARTIAL_MARK = "PANEL-PARTIAL" as const;
+export const PANEL_DEGRADED_SINGLE_VOICE_MARK = "PANEL-DEGRADED-SINGLE-VOICE" as const;
 
 export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
   authorMaker: string,
@@ -820,6 +857,14 @@ export interface WalkingSkeletonSettings {
     readonly judgeWeightVersion: string;
     readonly reducerVersion: string;
   };
+  /**
+   * S2-2 / T3: the sealed T16 panel inputs, READ from the register by the
+   * deployment's boot (`readPanelWeightingControls` + `readVerdictLabelControls`)
+   * and handed here whole. The runner never carries any of these values as a
+   * code constant — a missing family is the register reader's loud failure, not
+   * a default invented here.
+   */
+  readonly panelPolicy?: RunnerPanelPolicy;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1422,6 +1467,241 @@ export class WalkingSkeletonRunner {
     }
     const effectiveMakerCount = configuredMakers.length;
     const primaryMaker = configuredMakers[0]!;
+    const panelPolicy = this.settings.panelPolicy;
+
+    /**
+     * S2-2 / T3 — the judge panel for ONE authored node.
+     *
+     * Every OTHER healthy maker assesses the node; the author's own assessment
+     * is one member. The author is handed to `runJudgePanel` as a member too,
+     * so the FX-HR-H6 producer bulkhead is exercised by the code that owns it
+     * and leaves a recorded note, rather than being pre-filtered away here.
+     *
+     * S4-1: this is node-local and is NOT the cross-maker review call — the
+     * review leg (edge measurement) stays exactly where it was.
+     *
+     * Panel legs live in their OWN `PANEL:` call-site namespace. They are not
+     * authoring legs and must never be counted as one: the expansion-leg
+     * enumerations key off `JUDGE:%:root%`, so a panel call that borrowed the
+     * `JUDGE:` prefix would silently join that set.
+     */
+    const runNodePanel = async (input: {
+      readonly authorMaker: string;
+      readonly authorProviderRef: string;
+      readonly authorJudgementRef: string;
+      readonly authorAssessment: JudgeAssessment;
+      readonly authorTau: number;
+      readonly claimType: ClaimType;
+      readonly statement: string;
+      readonly callSiteKey: string;
+      readonly questionLine: string;
+    }): Promise<{
+      readonly selectedJudgementRef: string;
+      readonly tau: number;
+      readonly selectionScore: number;
+      readonly rule: JudgementSelectionRule;
+      readonly dispersion: number | null;
+      readonly panelContractHashes: readonly string[];
+      readonly disagreement: Readonly<Record<string, unknown>>;
+    }> => {
+      const judgeContractHash = this.settings.judgeContractHash;
+      const authorOnlySelection = (): {
+        readonly selectedJudgementRef: string;
+        readonly tau: number;
+        readonly selectionScore: number;
+        readonly rule: JudgementSelectionRule;
+      } => {
+        const selected = selectReducedJudgement([{
+          judgementRef: input.authorJudgementRef,
+          tau: input.authorTau,
+          effectiveWeight: judgementPolicy.earnedWeight
+        }], judgementPolicy.selectionRule);
+        if (selected.kind !== "SELECTED") {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
+        }
+        return {
+          selectedJudgementRef: selected.selectedJudgementRef,
+          tau: selected.tau,
+          selectionScore: selected.selectionScore,
+          rule: selected.rule
+        };
+      };
+
+      // S2-2: the walking-skeleton literal is reachable at M=1 ONLY.
+      if (effectiveMakerCount <= 1) {
+        return Object.freeze({
+          ...authorOnlySelection(),
+          dispersion: null,
+          panelContractHashes: Object.freeze([judgeContractHash]),
+          disagreement: createUnmeasuredDisagreement()
+        });
+      }
+      if (panelPolicy === undefined) {
+        // A multi-maker run whose deployment never sealed the T16 panel rows.
+        // NOT the M=1 skeleton literal and NOT a silent self-grade: the receipt
+        // names the missing configuration as the reason no panel was measured.
+        return Object.freeze({
+          ...authorOnlySelection(),
+          dispersion: null,
+          panelContractHashes: Object.freeze([judgeContractHash]),
+          disagreement: Object.freeze({
+            kind: "NOT_MEASURED",
+            reason: "PANEL_WEIGHTING_UNCONFIGURED",
+            marks: Object.freeze([PANEL_DEGRADED_SINGLE_VOICE_MARK]),
+            certaintyEffect: "UNCHANGED",
+            abstention: false
+          })
+        });
+      }
+
+      const panel = await runJudgePanel({
+        artifactProducerRef: input.authorProviderRef,
+        primary: {
+          judgementRef: input.authorJudgementRef,
+          assessment: input.authorAssessment,
+          memberRole: input.authorMaker
+        },
+        members: configuredMakers.map((member) => ({
+          memberRole: member.maker,
+          actorRef: member.providerRef,
+          contractHash: judgeContractHash,
+          judge: async () => {
+            const assessed = await member.judge.assess({
+              runId: run.runId,
+              subjectItemId: claimed.workItemId,
+              callSiteKey: `${input.callSiteKey}:${member.providerRef}`,
+              questionLine: input.questionLine,
+              statement: input.statement,
+              authorMaker: input.authorMaker,
+              providerRef: member.providerRef,
+              contractHash: judgeContractHash,
+              bound: this.settings.judgeBound
+            });
+            return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+          }
+        }))
+      });
+
+      // Each member's assessment is reduced through the SAME ratified
+      // composition as the author's, so the taus are commensurable.
+      const reducedMembers = panel.judgements.flatMap((entry) => {
+        const reducedMember = reduceAssessment({
+          claimType: input.claimType,
+          assessment: entry.assessment,
+          compositionRow,
+          reducerVersion: judgementPolicy.reducerVersion
+        });
+        return reducedMember.kind === "REDUCED"
+          ? [{ ...entry, tau: reducedMember.tau }]
+          : [];
+      });
+      if (reducedMembers.length === 0) {
+        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
+      }
+
+      const dispersion = measureDispersion(
+        reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
+        {
+          scale: panelPolicy.dispersionScale,
+          rowKey: "dispersionScale",
+          registerVersion: panelPolicy.registerVersion,
+          sourceRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason
+        }
+      );
+
+      const familyOf = (memberRole: string): JudgeFamily => {
+        const member = configuredMakers.find((candidate) => candidate.maker === memberRole);
+        const entry = member === undefined
+          ? undefined
+          : panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(member.providerRef));
+        return entry === undefined
+          ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
+          : { kind: "KNOWN", familyRef: entry.familyRef };
+      };
+      const weighted = applyCorrelatedErrorDiscount(
+        reducedMembers.map((entry) => ({
+          memberRole: entry.memberRole,
+          earnedWeight: judgementPolicy.earnedWeight,
+          family: familyOf(entry.memberRole)
+        })),
+        {
+          repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
+          rowKey: "repeatedFamilyMultiplier",
+          registerVersion: panelPolicy.registerVersion,
+          sourceRef: panelPolicy.sourceRefs.repeatedFamilyMultiplier ?? panelPolicy.unmappedReason
+        }
+      );
+      const selection = selectReducedJudgement(
+        reducedMembers.map((entry, index) => ({
+          judgementRef: entry.judgementRef,
+          tau: entry.tau,
+          effectiveWeight: weighted[index]!.effectiveWeight
+        })),
+        judgementPolicy.selectionRule
+      );
+      if (selection.kind !== "SELECTED") {
+        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
+      }
+
+      // confirm-item 5. The author is always judgement[0]; every other entry is
+      // a non-author voice that actually parsed.
+      const nonAuthorVoices = reducedMembers.length - 1;
+      const memberFailures = panel.notes.filter((note) => note.kind === "MEMBER_FAILED");
+      const marks: string[] = [];
+      if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
+      else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
+
+      const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
+      const steppedDownBand = candidateBand === null
+        ? null
+        : panelPolicy.oneStepDown[candidateBand] ?? null;
+      // A single surviving voice steps the band down one place in the sealed
+      // vocabulary; a measured spread at or above the sealed threshold fires
+      // the declared disagreement. Either way the downgrade is DECLARED, never
+      // computed from a value this file carries.
+      const disagreementFires = nonAuthorVoices === 0
+        || (dispersion.kind === "MEASURED" && dispersion.value >= panelPolicy.disagreementThreshold);
+      const declared = applyDeclaredDisagreement({
+        fires: disagreementFires && candidateBand !== null && steppedDownBand !== null,
+        predicateRef: panelPolicy.sourceRefs.disagreementThreshold ?? panelPolicy.unmappedReason,
+        observationRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason,
+        certaintyBand: candidateBand,
+        downgradedBand: steppedDownBand
+      });
+
+      return Object.freeze({
+        selectedJudgementRef: selection.selectedJudgementRef,
+        tau: selection.tau,
+        selectionScore: selection.selectionScore,
+        rule: selection.rule,
+        dispersion: dispersion.kind === "MEASURED" ? dispersion.value : null,
+        panelContractHashes: Object.freeze(reducedMembers.map(() => judgeContractHash)),
+        disagreement: Object.freeze({
+          ...declared,
+          marks: Object.freeze(marks),
+          dispersionAbsentReason: dispersion.kind === "ABSENT" ? dispersion.reason : null,
+          panel: Object.freeze({
+            authorMaker: input.authorMaker,
+            authorProviderRef: input.authorProviderRef,
+            voiceCount: reducedMembers.length,
+            nonAuthorVoiceCount: nonAuthorVoices,
+            members: Object.freeze(weighted.map((entry) => Object.freeze({
+              memberRole: entry.memberRole,
+              familyRef: entry.family.kind === "KNOWN" ? entry.family.familyRef : null,
+              familyOrdinal: entry.familyOrdinal,
+              earnedWeight: judgementPolicy.earnedWeight,
+              effectiveWeight: entry.effectiveWeight
+            }))),
+            notes: Object.freeze(panel.notes.map((note) => Object.freeze({
+              memberRole: note.memberRole,
+              kind: note.kind,
+              failureKind: note.failureKind,
+              reason: note.reason
+            })))
+          })
+        })
+      });
+    };
 
     const completable = await this.#ledger.findSuccessfulCommandArtifact({
       runId: run.runId,
@@ -1505,14 +1785,17 @@ export class WalkingSkeletonRunner {
     if (reduced.kind !== "REDUCED") {
       throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${reduced.claimType}`);
     }
-    const selection = selectReducedJudgement([{
-      judgementRef: judged.provenanceRef,
-      tau: reduced.tau,
-      effectiveWeight: judgementPolicy.earnedWeight
-    }], judgementPolicy.selectionRule);
-    if (selection.kind !== "SELECTED") {
-      throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
-    }
+    const selection = await runNodePanel({
+      authorMaker: primaryMaker.maker,
+      authorProviderRef: primaryMaker.providerRef,
+      authorJudgementRef: judged.provenanceRef,
+      authorAssessment: judged.assessment,
+      authorTau: reduced.tau,
+      claimType: judged.normalizedClaim.claimType,
+      statement: judged.statement,
+      callSiteKey: "PANEL:root",
+      questionLine: run.questionLine
+    });
     const nodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
       const created = await writer.addNode({
         runId: run.runId,
@@ -1552,9 +1835,9 @@ export class WalkingSkeletonRunner {
       reducerVersion: reduced.reducerVersion,
       judgeWeightVersion: judgementPolicy.judgeWeightVersion,
       selectedJudgementRef: selection.selectedJudgementRef,
-      dispersion: null,
-      panelContractHashes: [this.settings.judgeContractHash],
-      disagreement: createUnmeasuredDisagreement()
+      dispersion: selection.dispersion,
+      panelContractHashes: selection.panelContractHashes,
+      disagreement: selection.disagreement
     });
 
     interface AuthoredDebateNode {
@@ -1655,14 +1938,17 @@ export class WalkingSkeletonRunner {
         if (childReduced.kind !== "REDUCED") {
           throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
         }
-        const childSelection = selectReducedJudgement([{
-          judgementRef: childJudged.provenanceRef,
-          tau: childReduced.tau,
-          effectiveWeight: judgementPolicy.earnedWeight
-        }], judgementPolicy.selectionRule);
-        if (childSelection.kind !== "SELECTED") {
-          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", `The ${input.role} produced no selectable judgement`);
-        }
+        const childSelection = await runNodePanel({
+          authorMaker: selectedMaker.maker,
+          authorProviderRef: selectedMaker.providerRef,
+          authorJudgementRef: childJudged.provenanceRef,
+          authorAssessment: childJudged.assessment,
+          authorTau: childReduced.tau,
+          claimType: childJudged.normalizedClaim.claimType,
+          statement: childJudged.statement,
+          callSiteKey: `PANEL:${input.callSiteKey}`,
+          questionLine: input.questionLine
+        });
         const childNodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
             runId: run.runId,
@@ -1721,9 +2007,9 @@ export class WalkingSkeletonRunner {
           reducerVersion: childReduced.reducerVersion,
           judgeWeightVersion: judgementPolicy.judgeWeightVersion,
           selectedJudgementRef: childSelection.selectedJudgementRef,
-          dispersion: null,
-          panelContractHashes: [this.settings.judgeContractHash],
-          disagreement: createUnmeasuredDisagreement()
+          dispersion: childSelection.dispersion,
+          panelContractHashes: childSelection.panelContractHashes,
+          disagreement: childSelection.disagreement
         });
       return { kind: "AUTHORED", value: Object.freeze({
           nodeId: childNodeId,

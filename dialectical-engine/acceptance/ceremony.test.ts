@@ -51,6 +51,20 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      // T3 / S2-2: the judge panel asks every NON-AUTHOR maker to assess each
+      // authored node. That leg is answered straight from the contract rather
+      // than from `pending`, so every authoring/review/compose fixture below
+      // keeps its exact queue position — the panel adds calls, it does not
+      // re-order the ceremony's scripted ones.
+      if (body.includes("Assess an existing debate node authored by another maker")) {
+        calls += 1;
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+          id: `acceptance-panel-${calls}`,
+          model: "test-layer/model",
+          choices: [{ message: { content: panelAssessmentDouble() } }]
+        }));
+        return;
+      }
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
         : body.includes("\"statement\": non-empty string") ? "JUDGE"
           : body.includes("{conforms,findings}") ? "CONFORMANCE"
@@ -102,6 +116,17 @@ function judgementDouble(statement: string): string {
 
 function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
   return JSON.stringify({ outcome, reasons: [reason] });
+}
+
+/** T3 / S2-2: one panel member's assessment of a node another maker authored. */
+function panelAssessmentDouble(): string {
+  return JSON.stringify({
+    steelman: { summary: "The strongest reading of the assessed node.", fidelity: 0.61 },
+    critic: { summary: "A plausible counter to the assessed node.", counterargumentStrength: 0.34, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.61, relevance: 0.61 },
+    context: { fit: 0.61, ambiguityFlags: [] },
+    fallacy: { severity: 0.34, fatalFlags: [] }
+  });
 }
 
 beforeAll(async () => {
