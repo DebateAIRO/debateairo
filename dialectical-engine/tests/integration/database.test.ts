@@ -3965,6 +3965,32 @@ describe("T10/T11 · the served root and its label, through the production runne
   });
 
   /**
+   * Global DoD, goal 39-40: "every new policy value lives in sealed register
+   * rows; missing rows fail loudly". The label reads gamma, the two cuts and the
+   * disagreement threshold from T16's rows, so a deployment that never sealed
+   * the family must STOP — not fall back to a value this code chose. The stop is
+   * BEFORE any answer is written, on the same footing as J12's panel stop.
+   */
+  it("T11 stops loudly instead of labelling when the sealed verdict-label family is missing", async () => {
+    const question = `t11-unsealed-verdict-family-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    const provider = await startProviderDouble([...servedRunResponses("An unlabellable position.", 0.8)]);
+    const { verdictLabelPolicy: _omitted, ...settingsWithoutVerdictLabelPolicy } = runnerSettings();
+    try {
+      await expect(
+        runnerWithEndpoint(provider.endpoint, settingsWithoutVerdictLabelPolicy).executeWorkItem(work.workItemId)
+      ).rejects.toMatchObject({ code: "VERDICT_LABEL_CONTROLS_UNRESOLVED" });
+
+      // Nothing was served: the run refused rather than serving an unlabelled
+      // or default-labelled answer.
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [work.runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
+  });
+
+  /**
    * THE T10 RED, at run level. The FIRST configured provider authors the WEAKER
    * root; the second authors the stronger one. The served number, the served
    * root's disclosure and the receipt must all name the STRONGER root — under

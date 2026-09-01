@@ -173,6 +173,20 @@ describe("T11 · the three-state label ladder", () => {
       expect(derivation.trigger).toBe("DISAGREEMENT_AT_THRESHOLD");
     });
 
+    it("rung 2 · when BOTH conditions hold, the disclosed trigger is the margin", async () => {
+      const { deriveVerdictLabel } = await serve();
+
+      // Both limbs fire. The rung and label are the same either way, but the
+      // trigger is DISCLOSED on the receipt, so its precedence is documented
+      // and pinned rather than left to the order the disjuncts happen to have.
+      const derivation = deriveVerdictLabel({
+        winner: 0.95, margin: measured(0.01), disagreement: measured(0.9), controls
+      });
+
+      expect(derivation.rung).toBe(2);
+      expect(derivation.trigger).toBe("MARGIN_WITHIN_GAMMA");
+    });
+
     it("rung 3 · a clear winner at or above the high cut is SUPPORTED", async () => {
       const { deriveVerdictLabel } = await serve();
 
