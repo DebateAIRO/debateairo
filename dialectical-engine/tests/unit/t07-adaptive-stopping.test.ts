@@ -302,6 +302,37 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
     });
   });
 
+  it("stops at EXACTLY delta, the mirror image of epsilon's equality rule", () => {
+    // The two thresholds are deliberately opposite, and that is easy to get
+    // wrong in one place: the stop is "no root moved > δ", so movement equal to
+    // δ STOPS; the freeze is "leverage < ε", so leverage equal to ε CONTINUES.
+    const atDelta = decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: TWO_ROOTS,
+      previousStrengths: evaluate(roundTwo).strengths,
+      currentStrengths: evaluate(roundThreeMoved).strengths,
+      delta: 0.046875
+    });
+    expect(atDelta).toEqual({
+      kind: "STOP",
+      reason: "GLOBAL_DELTA_CONVERGED",
+      maxRootMovement: 0.046875,
+      movedRootNodeIds: []
+    });
+
+    const justBelowDelta = decideRoundContinuation({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: TWO_ROOTS,
+      previousStrengths: evaluate(roundTwo).strengths,
+      currentStrengths: evaluate(roundThreeMoved).strengths,
+      delta: 0.0468749
+    });
+    expect(justBelowDelta.kind).toBe("CONTINUE");
+    expect(justBelowDelta.movedRootNodeIds).toEqual(["root:A"]);
+  });
+
   it("stops on the ceiling even while a root is still moving", () => {
     const decision = decideRoundContinuation({
       completedRounds: 5,
