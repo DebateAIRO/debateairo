@@ -717,6 +717,13 @@ export interface RoundContinuationDecision {
    */
   readonly comparedRootNodeIds: readonly string[];
   readonly uncomparedRootNodeIds: readonly string[];
+  /**
+   * How many maker roots the RUN has. A root a caller dropped from the scope
+   * altogether appears in NEITHER list above, so the count is the only field
+   * that can reveal it — and δ-convergence is refused unless
+   * `comparedRootNodeIds.length` reaches it.
+   */
+  readonly expectedRootCount: number;
 }
 
 /**
@@ -779,8 +786,27 @@ export function decideRoundContinuation(input: {
   /** J15(b): how much measured evidence this decision had. `countMeasuredEdges`. */
   readonly measuredEdgeCount: number;
   readonly delta: number;
+  /**
+   * codex B1: how many maker roots the RUN has, when the caller knows. Omitted,
+   * it is the supplied scope itself — the historical behaviour, for a caller
+   * whose scope IS the whole run.
+   */
+  readonly expectedRootCount?: number;
 }): RoundContinuationDecision {
   assertUnitInterval(input.delta, "global stop delta");
+  if (input.expectedRootCount !== undefined
+    && (!Number.isInteger(input.expectedRootCount) || input.expectedRootCount < 0)) {
+    throw new TypedDomainError(
+      "STOPPING_EXPECTED_ROOT_COUNT_INVALID",
+      "The expected maker-root count must be a non-negative integer"
+    );
+  }
+  if (input.expectedRootCount !== undefined && input.rootNodeIds.length > input.expectedRootCount) {
+    throw new TypedDomainError(
+      "STOPPING_ROOT_SCOPE_OVERFULL",
+      "The supplied root scope holds more roots than the run has makers"
+    );
+  }
   if (!Number.isInteger(input.measuredEdgeCount) || input.measuredEdgeCount < 0) {
     throw new TypedDomainError(
       "STOPPING_MEASURED_EDGE_COUNT_INVALID",
@@ -803,9 +829,17 @@ export function decideRoundContinuation(input: {
   // This entry point is STRICT: it is contracted to compare every root it is
   // given, and `rootMovement` stops loudly if it cannot. Callers holding a live
   // scope that may be incomplete go through `decideRoundBoundary` instead.
+  //
+  // The record is TRUE about what was compared (J15 ADDENDUM-2): when there is
+  // no previous round there is no comparison, and no root may be listed as
+  // compared. `expectedRootCount` defaults to the supplied scope, so a caller
+  // that knows its run's maker count states it and a shortfall becomes visible.
+  const expectedRootCount = input.expectedRootCount ?? input.rootNodeIds.length;
+  const compared = movement === null ? [] : [...input.rootNodeIds];
   const fullScope = {
-    comparedRootNodeIds: Object.freeze([...input.rootNodeIds]),
-    uncomparedRootNodeIds: Object.freeze([] as readonly string[])
+    comparedRootNodeIds: Object.freeze(compared),
+    uncomparedRootNodeIds: Object.freeze(movement === null ? [...input.rootNodeIds] : []),
+    expectedRootCount
   };
   if (input.completedRounds < 1) {
     return Object.freeze({
@@ -861,6 +895,20 @@ export function decideRoundContinuation(input: {
     });
   }
   const moved = movement.moved(input.delta);
+  // codex B1 / J15 ADDENDUM-2, the whole law in one place: "no root moved > δ"
+  // is unproved for a root nobody compared, so convergence REQUIRES that the
+  // comparison covered every root the run has. Narrowing the scope upstream
+  // cannot buy a stop — it can only make this gate fail.
+  if (moved.length === 0 && compared.length !== expectedRootCount) {
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "ROOT_SCOPE_INCOMPLETE",
+      maxRootMovement: movement.maximum,
+      movedRootNodeIds: Object.freeze([]),
+      measuredEdgeCount,
+      ...fullScope
+    });
+  }
   return Object.freeze(moved.length === 0
     ? {
         kind: "STOP",
@@ -900,6 +948,8 @@ export function decideRoundBoundary(input: {
   readonly completedRounds: number;
   readonly depthCeiling: number;
   readonly rootNodeIds: readonly string[];
+  /** The run's maker-root count — the scope the decision is measured against. */
+  readonly expectedRootCount: number;
   readonly previousStrengths: readonly NodeStrengthRecord[] | null;
   readonly currentStrengths: readonly NodeStrengthRecord[];
   readonly measuredEdgeCount: number;
@@ -911,11 +961,16 @@ export function decideRoundBoundary(input: {
     previousStrengths: input.previousStrengths,
     currentStrengths: input.currentStrengths
   });
+  // Every supplied root is comparable: hand it to the STRICT decision, whose
+  // loud guard therefore stays reachable for the case it names — a caller
+  // asserting a comparison it cannot make — and whose convergence gate then
+  // measures `compared` against `expectedRootCount`.
   if (scope.uncompared.length === 0) return decideRoundContinuation(input);
   const recorded = {
     measuredEdgeCount: input.measuredEdgeCount,
     comparedRootNodeIds: scope.compared,
-    uncomparedRootNodeIds: scope.uncompared
+    uncomparedRootNodeIds: scope.uncompared,
+    expectedRootCount: input.expectedRootCount
   };
   if (input.completedRounds < 1) {
     return Object.freeze({

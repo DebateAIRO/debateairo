@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   countMeasuredEdges,
   decideBranchFreezes,
+  decideRoundBoundary,
   decideRoundContinuation,
   evaluate,
   resolveLeverage,
@@ -285,7 +286,8 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       movedRootNodeIds: [],
       measuredEdgeCount: 2,
       comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      uncomparedRootNodeIds: [],
+      expectedRootCount: 2
     });
   });
 
@@ -307,7 +309,8 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       movedRootNodeIds: ["root:A"],
       measuredEdgeCount: 2,
       comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      uncomparedRootNodeIds: [],
+      expectedRootCount: 2
     });
   });
 
@@ -331,7 +334,8 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       movedRootNodeIds: [],
       measuredEdgeCount: 2,
       comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      uncomparedRootNodeIds: [],
+      expectedRootCount: 2
     });
 
     const justBelowDelta = decideRoundContinuation({
@@ -396,7 +400,8 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
       comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      uncomparedRootNodeIds: [],
+      expectedRootCount: 2
     });
   });
 
@@ -417,15 +422,18 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       delta: 0.01
     });
 
-    // Round 0 — the floor, and it does not consult movement at all.
+    // Round 0 — the floor, and it does not consult movement at all. NOTHING was
+    // compared here, and the record says so: a decision that never looked at a
+    // root may not list it as compared (J15 ADDENDUM-2 — records must be TRUE).
     expect(at(0, false)).toEqual({
       kind: "CONTINUE",
       reason: "ROUND_1_FLOOR",
       maxRootMovement: null,
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
-      comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      comparedRootNodeIds: [],
+      uncomparedRootNodeIds: ["root:A", "root:B"],
+      expectedRootCount: 2
     });
     // Round 1 — J15(c): the pre-expansion graph is a baseline, not a round.
     expect(at(1, false)).toEqual({
@@ -434,8 +442,9 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       maxRootMovement: null,
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
-      comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      comparedRootNodeIds: [],
+      uncomparedRootNodeIds: ["root:A", "root:B"],
+      expectedRootCount: 2
     });
     // Round 2 — the first round with a real predecessor. NOW zero movement over
     // measured evidence is convergence, and the debate stops.
@@ -446,7 +455,8 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
       comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      uncomparedRootNodeIds: [],
+      expectedRootCount: 2
     });
   });
 
@@ -465,8 +475,9 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       maxRootMovement: null,
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
-      comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      comparedRootNodeIds: [],
+      uncomparedRootNodeIds: ["root:A", "root:B"],
+      expectedRootCount: 2
     });
 
     // Ruling J15(c): the pre-expansion graph is a BASELINE, not a round, so
@@ -485,8 +496,9 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       maxRootMovement: null,
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
-      comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      comparedRootNodeIds: [],
+      uncomparedRootNodeIds: ["root:A", "root:B"],
+      expectedRootCount: 2
     });
 
     // From round 2 on a previous round exists; its absence is a caller defect.
@@ -516,8 +528,9 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       maxRootMovement: null,
       movedRootNodeIds: [],
       measuredEdgeCount: 1,
-      comparedRootNodeIds: ["root:A", "root:B"],
-      uncomparedRootNodeIds: []
+      comparedRootNodeIds: [],
+      uncomparedRootNodeIds: ["root:A", "root:B"],
+      expectedRootCount: 2
     });
   });
 });
@@ -590,6 +603,7 @@ describe("T7 — the per-round propagation is PURE CODE: zero model calls in the
       completedRounds: 1,
       depthCeiling: 5,
       rootNodeIds: ROOTS,
+      expectedRootCount: 1,
       branchCarryingNodeIds: ["heavy", "light"],
       // Both branches still have descendants to author, so a freeze on either
       // really would prevent one (J15 ADDENDUM-2).
@@ -628,6 +642,7 @@ describe("T7 — the per-round propagation is PURE CODE: zero model calls in the
       completedRounds: 1,
       depthCeiling: 5,
       rootNodeIds: ROOTS,
+      expectedRootCount: 1,
       branchCarryingNodeIds: ["heavy", "light"],
       // Both branches still have descendants to author, so a freeze on either
       // really would prevent one (J15 ADDENDUM-2).
@@ -765,7 +780,8 @@ describe("T7 / J15(b) — a δ stop must be NON-VACUOUS", () => {
       movedRootNodeIds: [],
       measuredEdgeCount: 0,
       comparedRootNodeIds: ["root:A"],
-      uncomparedRootNodeIds: []
+      uncomparedRootNodeIds: [],
+      expectedRootCount: 1
     });
 
     // One measured edge is enough to make the same zero movement a real stop.
@@ -807,6 +823,7 @@ describe("T7 / J15(b) — a δ stop must be NON-VACUOUS", () => {
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: ["root:A"],
+      expectedRootCount: 1,
       branchCarryingNodeIds: ["b1", "b2"],
       preventableCarryingNodeIds: ["b1", "b2"],
       previousStrengths: evaluate(allUnknown).strengths,
@@ -886,6 +903,7 @@ describe("T7 / codex B1 — the live seam may never pre-filter a root out of the
       depthCeiling: 5,
       // The AUTHORITATIVE maker-root scope — both roots, unfiltered.
       rootNodeIds: AUTHORITATIVE_ROOTS,
+      expectedRootCount: 2,
       branchCarryingNodeIds: [],
       preventableCarryingNodeIds: [],
       previousStrengths: evaluate(partialStanding).strengths,
@@ -939,6 +957,7 @@ describe("T7 / codex B1 — the live seam may never pre-filter a root out of the
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: AUTHORITATIVE_ROOTS,
+      expectedRootCount: 2,
       branchCarryingNodeIds: [],
       preventableCarryingNodeIds: [],
       previousStrengths: evaluate(bothStanding).strengths,
@@ -996,6 +1015,7 @@ describe("T7 / codex B2 — a freeze mark must be TRUE (J15 ADDENDUM-2)", () => 
       completedRounds: 1,
       depthCeiling: 5,
       rootNodeIds: ROOTS,
+      expectedRootCount: 1,
       // `light` has zero root-scoped leverage, so it freezes either way.
       branchCarryingNodeIds: ["heavy", "light"],
       previousStrengths: null,
@@ -1043,5 +1063,245 @@ describe("T7 / codex B2 — a freeze mark must be TRUE (J15 ADDENDUM-2)", () => 
     // the whole truthful extent of the cut — and the reason may say so.
     expect(record.affectedNodeIds).toEqual(["light"]);
     expect(record.reason).toContain("nothing was expanded beneath it");
+  });
+});
+
+
+/**
+ * r3 · codex B1, the SEAM half — the half r3's first pass left unpinned.
+ *
+ * Preserving the scope at the one caller that exists today is a fix to that
+ * caller, not to the law. Mutant MB1a (restore `scoredNodeIds.has(root)` in the
+ * expansion loop) left the whole unit suite green, because every B1 assertion
+ * handed the scope in by hand. The law has to live where no caller can get
+ * around it: the decision is told how many roots the RUN has, and δ-convergence
+ * is refused unless it compared that many. A caller that narrows the scope now
+ * contradicts a count it does not own, and the stop it wanted is unreachable.
+ */
+describe("T7 / codex B1 — a SHORT root scope is never δ-convergence, whoever shortened it", () => {
+  const stableAndMeasured = snapshot(
+    [node("root:A", 0.5), node("heavy", 0.5)],
+    [support("e:heavy->A", "heavy", "root:A", 0.5)],
+    [resolution("root:A")]
+  );
+  const controls = {
+    registerVersion: 5,
+    delta: 0.01,
+    epsilon: 0.01,
+    sourceRefs: {
+      globalStopDelta: "register:v5:globalStopDelta",
+      branchFreezeEpsilon: "register:v5:branchFreezeEpsilon"
+    }
+  } as const;
+
+  it("refuses convergence when the scope carries fewer roots than the run authored", async () => {
+    const runner = await import("@debateai/runner");
+
+    // EXACTLY what a caller that pre-filtered an unscored root hands down: one
+    // root id, stable, measured, comparable in both rounds — from a run whose
+    // maker count is two. Everything the δ rule needs is present; the only
+    // thing missing is the root nobody looked at, and that is enough.
+    const outcome = await runner.runAdaptiveStoppingRound({
+      runId: "run:t07-short-scope",
+      attemptId: "attempt:t07-short-scope",
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      expectedRootCount: 2,
+      branchCarryingNodeIds: [],
+      preventableCarryingNodeIds: [],
+      previousStrengths: evaluate(stableAndMeasured).strengths,
+      snapshot: stableAndMeasured,
+      controls,
+      propagationContractHash: "contract:propagation",
+      propagationProducer: "producer:propagation"
+    }, { appendLedger: async () => undefined });
+
+    expect(outcome.continuation.reason).not.toBe("GLOBAL_DELTA_CONVERGED");
+    expect(outcome.continuation.kind).toBe("CONTINUE");
+    expect(outcome.continuation.reason).toBe("ROOT_SCOPE_INCOMPLETE");
+    // The record names what it did compare, and refuses on the arithmetic of
+    // the count — one compared against two expected.
+    expect(outcome.continuation.comparedRootNodeIds).toEqual(["root:A"]);
+    expect(outcome.continuation.expectedRootCount).toBe(2);
+  });
+
+  it("converges on the identical graph the moment the count matches what it compared", async () => {
+    const runner = await import("@debateai/runner");
+
+    const outcome = await runner.runAdaptiveStoppingRound({
+      runId: "run:t07-whole-scope",
+      attemptId: "attempt:t07-whole-scope",
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      expectedRootCount: 1,
+      branchCarryingNodeIds: [],
+      preventableCarryingNodeIds: [],
+      previousStrengths: evaluate(stableAndMeasured).strengths,
+      snapshot: stableAndMeasured,
+      controls,
+      propagationContractHash: "contract:propagation",
+      propagationProducer: "producer:propagation"
+    }, { appendLedger: async () => undefined });
+
+    // Same graph, same movement, same evidence: ONLY the expected count moved.
+    expect(outcome.continuation.reason).toBe("GLOBAL_DELTA_CONVERGED");
+    expect(outcome.continuation.expectedRootCount).toBe(1);
+  });
+
+  it("refuses at the pure decision too, so no wrapper is the load-bearing guard", () => {
+    expect(decideRoundBoundary({
+      completedRounds: 2,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      expectedRootCount: 2,
+      previousStrengths: evaluate(stableAndMeasured).strengths,
+      currentStrengths: evaluate(stableAndMeasured).strengths,
+      measuredEdgeCount: countMeasuredEdges(stableAndMeasured),
+      delta: 0.01
+    }).reason).toBe("ROOT_SCOPE_INCOMPLETE");
+  });
+
+  it("still stops on the ceiling with a short scope — the ceiling never consults movement", () => {
+    const decision = decideRoundBoundary({
+      completedRounds: 5,
+      depthCeiling: 5,
+      rootNodeIds: ["root:A"],
+      expectedRootCount: 2,
+      previousStrengths: evaluate(stableAndMeasured).strengths,
+      currentStrengths: evaluate(stableAndMeasured).strengths,
+      measuredEdgeCount: countMeasuredEdges(stableAndMeasured),
+      delta: 0.01
+    });
+
+    expect(decision.kind).toBe("STOP");
+    expect(decision.reason).toBe("DEPTH_CEILING");
+  });
+});
+
+describe("T7 / codex B1 — the authoritative root scope is built from the MAKER COUNT", () => {
+  it("names every authored maker root in maker order, and counts the makers, not the survivors", async () => {
+    const runner = await import("@debateai/runner");
+
+    expect(runner.selectAuthoritativeRootScope({
+      effectiveMakerCount: 3,
+      authoredRootNodeIdByMakerIndex: new Map([[0, "root:A"], [1, "root:B"], [2, "root:C"]])
+    })).toEqual({ expectedRootCount: 3, rootNodeIds: ["root:A", "root:B", "root:C"] });
+  });
+
+  it("keeps the expected count at the maker count when a maker root is absent", async () => {
+    const runner = await import("@debateai/runner");
+
+    // A root the run never authored cannot be compared and cannot be invented.
+    // The COUNT still says three, so the shortfall is visible to the decision
+    // instead of being silently absorbed into a smaller scope.
+    expect(runner.selectAuthoritativeRootScope({
+      effectiveMakerCount: 3,
+      authoredRootNodeIdByMakerIndex: new Map([[0, "root:A"], [2, "root:C"]])
+    })).toEqual({ expectedRootCount: 3, rootNodeIds: ["root:A", "root:C"] });
+  });
+});
+
+/**
+ * r3 · codex B2, the GENERAL half. The single (M=2, d=2) enumeration pins
+ * codex's own example. The property behind it is what the record's honesty
+ * rests on: a branch may publish a freeze mark only if the decision can still
+ * prevent its expansion, and such a branch has authored NOTHING yet — which is
+ * exactly why `affectedNodeIds` may be the carrying node alone.
+ */
+describe("T7 / codex B2 — the freeze record's truth holds over every plan shape", () => {
+  // `buildMultiMakerExpansionPlan(depth, effectiveMakerCount)` — DEPTH FIRST
+  // (apps/runner/src/index.ts:1183-1186). Written the other way round, every
+  // shape below still builds a legal plan and silently asserts about a
+  // different one; only the symmetric (2,2) case is safe from the confusion.
+  const SHAPES: readonly (readonly [depth: number, makerCount: number])[] =
+    [[2, 2], [3, 2], [2, 3], [4, 3]];
+
+  /** An oracle subtree walk, computed here and never borrowed from the product. */
+  const subtreeOf = (
+    plan: readonly { readonly parentIndex: number; readonly childIndex: number }[],
+    childIndex: number
+  ): Set<number> => {
+    const indices = new Set([childIndex]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const leg of plan) {
+        if (indices.has(leg.parentIndex) && !indices.has(leg.childIndex)) {
+          indices.add(leg.childIndex);
+          grew = true;
+        }
+      }
+    }
+    return indices;
+  };
+
+  it("gives every markable branch an EMPTY authored subtree, so the cut is the carrying node alone", async () => {
+    const runner = await import("@debateai/runner");
+    let markableBranchesSeen = 0;
+
+    for (const [depth, makerCount] of SHAPES) {
+      const plan = runner.buildMultiMakerExpansionPlan(depth, makerCount);
+      for (const [boundaryLegIndex, round] of runner.deriveGlobalRoundCompletions(plan)) {
+        const carrying = plan.filter((leg) => leg.round === round).map((leg) => leg.childIndex);
+        const preventable = runner.selectPreventableBranches({ plan, boundaryLegIndex, carryingChildIndices: carrying });
+        for (const childIndex of preventable) {
+          markableBranchesSeen += 1;
+          const subtree = subtreeOf(plan, childIndex);
+          const alreadyAuthored = plan
+            .map((leg, index) => ({ leg, index }))
+            .filter(({ leg, index }) => index <= boundaryLegIndex && subtree.has(leg.parentIndex))
+            .map(({ index }) => index);
+          // If this were ever non-empty the mark would omit real descendants —
+          // codex B2's false record, in the general case.
+          expect({ makerCount, depth, round, childIndex, alreadyAuthored })
+            .toEqual({ makerCount, depth, round, childIndex, alreadyAuthored: [] });
+        }
+      }
+    }
+
+    expect(markableBranchesSeen).toBeGreaterThan(0);
+  });
+
+  it("finds NO markable branch at the final round's boundary, where a freeze prevents nothing", async () => {
+    const runner = await import("@debateai/runner");
+
+    for (const [depth, makerCount] of SHAPES) {
+      const plan = runner.buildMultiMakerExpansionPlan(depth, makerCount);
+      const boundaries = [...runner.deriveGlobalRoundCompletions(plan)];
+      const [lastBoundaryLegIndex, lastRound] = boundaries[boundaries.length - 1]!;
+
+      expect(lastRound).toBe(depth);
+      expect(runner.selectPreventableBranches({
+        plan,
+        boundaryLegIndex: lastBoundaryLegIndex,
+        carryingChildIndices: plan.filter((leg) => leg.round === lastRound).map((leg) => leg.childIndex)
+      })).toEqual([]);
+    }
+  });
+
+  it("marks the LAST maker's branches and no earlier maker's, at every mid-plan boundary", async () => {
+    const runner = await import("@debateai/runner");
+
+    for (const [depth, makerCount] of SHAPES) {
+      if (depth < 2) continue;
+      const plan = runner.buildMultiMakerExpansionPlan(depth, makerCount);
+      for (const [boundaryLegIndex, round] of runner.deriveGlobalRoundCompletions(plan)) {
+        if (round === depth) continue;
+        const carrying = plan.filter((leg) => leg.round === round);
+        const preventable = new Set(runner.selectPreventableBranches({
+          plan,
+          boundaryLegIndex,
+          carryingChildIndices: carrying.map((leg) => leg.childIndex)
+        }));
+        // The late boundary J15 ADDENDUM accepted, stated as a property: only
+        // the last maker still has legs left when round k completes.
+        expect([...preventable].sort((a, b) => a - b)).toEqual(
+          carrying.filter((leg) => leg.rootIndex === makerCount - 1)
+            .map((leg) => leg.childIndex).sort((a, b) => a - b)
+        );
+      }
+    }
   });
 });

@@ -1270,6 +1270,42 @@ export function selectPreventableBranches(input: {
   }));
 }
 
+/**
+ * T7 · codex B1 — the AUTHORITATIVE maker-root scope.
+ *
+ * `expectedRootCount` is the run's maker count and nothing else. This function
+ * is deliberately blind to judged standing: it cannot narrow the scope to the
+ * roots that happen to have been scored, because it is never told which those
+ * are. A root the run never authored cannot be named, but it is still COUNTED,
+ * so the shortfall reaches the decision instead of vanishing into a smaller
+ * scope — which is exactly how r2 came to claim "no root moved > δ" about a
+ * root it had never compared.
+ */
+export interface AuthoritativeRootScope {
+  readonly expectedRootCount: number;
+  readonly rootNodeIds: readonly string[];
+}
+
+export function selectAuthoritativeRootScope(input: {
+  readonly effectiveMakerCount: number;
+  readonly authoredRootNodeIdByMakerIndex: ReadonlyMap<number, string>;
+}): AuthoritativeRootScope {
+  if (!Number.isInteger(input.effectiveMakerCount) || input.effectiveMakerCount < 1) {
+    throw new TypedDomainError(
+      "STOPPING_ROOT_SCOPE_MAKER_COUNT_INVALID",
+      "The authoritative root scope needs a positive integer maker count"
+    );
+  }
+  return Object.freeze({
+    expectedRootCount: input.effectiveMakerCount,
+    rootNodeIds: Object.freeze(
+      Array.from({ length: input.effectiveMakerCount }, (_, index) =>
+        input.authoredRootNodeIdByMakerIndex.get(index))
+        .flatMap((nodeId) => nodeId === undefined ? [] : [nodeId])
+    )
+  });
+}
+
 /** One response per ordered distinct maker pair: defend one root against each other root. */
 export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonly CrossRootExchangeLeg[] {
   if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
@@ -1360,6 +1396,12 @@ export interface AdaptiveStoppingRoundInput {
   readonly depthCeiling: number;
   /** J3: propagation has no root notion, so the runner supplies the root ids. */
   readonly rootNodeIds: readonly string[];
+  /**
+   * codex B1: the run's maker-root count, from `selectAuthoritativeRootScope`.
+   * δ-convergence is refused unless the decision compared this many roots, so
+   * no caller can buy a stop by handing down a narrower scope.
+   */
+  readonly expectedRootCount: number;
   readonly branchCarryingNodeIds: readonly string[];
   /**
    * J15 ADDENDUM-2: the subset of `branchCarryingNodeIds` whose expansion this
@@ -1413,6 +1455,7 @@ export async function runAdaptiveStoppingRound(
     completedRounds: input.completedRounds,
     depthCeiling: input.depthCeiling,
     rootNodeIds: input.rootNodeIds,
+    expectedRootCount: input.expectedRootCount,
     previousStrengths: input.previousStrengths,
     currentStrengths: propagation.strengths,
     measuredEdgeCount,
@@ -2635,9 +2678,14 @@ export class WalkingSkeletonRunner {
       // exhausted is uncomparable, and `decideRoundBoundary` refuses convergence
       // because of it — dropping it here is what let r2 claim "no root moved"
       // about a root it had never looked at.
-      const rootNodeIds = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
-        .flatMap((root) => root === undefined ? [] : [root.nodeId]);
-      if (rootNodeIds.length === 0) return false;
+      const rootScope = selectAuthoritativeRootScope({
+        effectiveMakerCount,
+        authoredRootNodeIdByMakerIndex: new Map(
+          Array.from({ length: effectiveMakerCount }, (_, index) => [index, authoredNodes.get(index)] as const)
+            .flatMap(([index, root]) => root === undefined ? [] : [[index, root.nodeId] as const])
+        )
+      });
+      if (rootScope.rootNodeIds.length === 0) return false;
       // The branches that could expand next are the nodes this round authored.
       const branchCarryingNodeIds = expansionPlan
         .filter((candidate) => candidate.round === completedRounds
@@ -2660,7 +2708,8 @@ export class WalkingSkeletonRunner {
         attemptId: runnerAttemptId,
         completedRounds,
         depthCeiling: expansionDepth,
-        rootNodeIds,
+        rootNodeIds: rootScope.rootNodeIds,
+        expectedRootCount: rootScope.expectedRootCount,
         branchCarryingNodeIds: branchCarryingNodeIds.map((branch) => branch.nodeId),
         preventableCarryingNodeIds: branchCarryingNodeIds
           .flatMap((branch) => preventableIndices.has(branch.index) ? [branch.nodeId] : []),
