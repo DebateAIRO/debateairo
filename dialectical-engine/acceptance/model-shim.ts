@@ -174,14 +174,26 @@ function createCodexAdapter(sessionsRoot: string): CliRelayAdapter {
 export const codexAdapter: CliRelayAdapter = createCodexAdapter(defaultCodexSessionsRoot());
 
 export async function startModelShim(options: ModelShimOptions): Promise<ModelShimHandle> {
+  // Codex is the only maker with a SECOND test-only seam, so it is the only
+  // one where baseline ordering has to be made explicit. At base the default
+  // command was a constant that could not throw, so "command seam, then
+  // sessions-root seam, then default" held implicitly; with an env-backed
+  // default, a blank ACCEPTANCE_CODEX_BINARY would pre-empt this pre-existing
+  // typed-loud code whenever no command seam is supplied. The command seam
+  // keeps its baseline precedence: when it is present resolveTestGuardedCommand
+  // decides first and never forces the thunk, so this guard defers to it — and
+  // that is also why the check no longer sits below the resolution, where it
+  // would now be unreachable in every combination.
+  if (options.testOnlyCommand === undefined
+    && options.testOnlySessionsRoot !== undefined
+    && process.env.NODE_ENV !== "test") {
+    throw new Error("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
+  }
   const command = resolveTestGuardedCommand(
     () => ({ binary: resolveCodexBinary(), prefixArguments: [] }),
     options.testOnlyCommand,
     "TEST_ONLY_CODEX_COMMAND_FORBIDDEN"
   );
-  if (options.testOnlySessionsRoot !== undefined && process.env.NODE_ENV !== "test") {
-    throw new Error("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
-  }
   const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot());
   const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs);
   const server = await startCliRelayServer({

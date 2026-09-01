@@ -301,6 +301,49 @@ describe("D10 Codex shim binary resolution", () => {
     }
   });
 
+  // r3 regression arm (codex r2 B1). Codex is the only maker with a SECOND
+  // test-only seam, and its guard sits after command resolution. With no
+  // command seam supplied the binary default is reached first, so a blank
+  // override must not be allowed to pre-empt this pre-existing typed-loud code.
+  // No testOnlyCommand here, but both the defective and the correct behaviour
+  // throw before invokeCli, so the codex default is never spawned.
+  it("rejects a forbidden testOnlySessionsRoot outside NODE_ENV=test when the override is blank and no command seam is supplied", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_CODEX_BINARY = "  ";
+    try {
+      await expect(startModelShim({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlySessionsRoot: fakeSessionsRoot
+      })).rejects.toThrow("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
+  });
+
+  // Companion to the arm above: the guard added for it is conditioned on the
+  // command seam being ABSENT, so that a supplied command seam keeps baseline
+  // precedence. Without this arm that condition is pinned by nothing — dropping
+  // it passes every other test in the file.
+  it("keeps TEST_ONLY_CODEX_COMMAND_FORBIDDEN ahead of the sessions-root code when both seams are supplied outside NODE_ENV=test", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      await expect(startModelShim({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] },
+        testOnlySessionsRoot: fakeSessionsRoot
+      })).rejects.toThrow("TEST_ONLY_CODEX_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_CODEX_COMMAND_FORBIDDEN when the override is blank", async () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previous = process.env.ACCEPTANCE_CODEX_BINARY;
