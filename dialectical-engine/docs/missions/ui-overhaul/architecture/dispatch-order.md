@@ -608,6 +608,81 @@ to T9-C2 — was not taken: it would split the hero across two clusters, since
 T9-C4 must still write the hero body copy (`T9-C4-4`), and one file with two
 writers in the same wave is the hazard the wave structure exists to avoid.
 
+#### T9-C4-4 amended — method bodies pinned POSITIONALLY, not by containment (AM10)
+
+T9-C4 PASSED and merged at `174735a`. Its review found the cell, not the code:
+the shipped ledger is correct today, and the pin cannot detect it becoming
+wrong.
+
+**The asymmetry, inside one cluster.** `T9-C4-1` pins number↔title
+**positionally** — `steps[index]` over an `expectedSteps` tuple list.
+`T9-C4-4` pins the four step bodies as **method-subtree containment** —
+`method.textContent.toContain(body)`, four times. Containment over a subtree is
+permutation-invariant, so any reordering of bodies among the four `<li>`s keeps
+every assertion true. The reviewer's M3 mutant swapped bodies 01↔02 *inside* the
+method subtree and the suite stayed **GREEN**. Their earlier MOVE mutant crossed
+subtrees, which the scoped pins do catch; a **same-subtree permutation is
+strictly harder**, and it slipped.
+
+**Re-derived here rather than taken on report** — the two assertion styles run
+over the shipped list and over M3's permutation:
+
+```
+tree                               T9-C4-4 today (subtree contains)   T9-C4-4 amended (steps[index])
+shipped (correct pairing)          GREEN                              GREEN
+M3: bodies 01<->02 swapped         GREEN  <- ships the defect         RED  <- caught
+
+ledger M3 actually renders:
+   01 Models argue           Every claim is cross-reviewed by a rival model: agree or dispute, on the record.
+   02 They review each other Five frontier models build the tree — pro, con, and the reasoning that binds them.
+```
+
+A reader gets a method ledger whose step 01 describes step 02, with every gate
+in the mission green. The strings are all present; only the **pairing** is
+wrong, and nothing pinned the pairing.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T9-C4-4** (amended, supersedes PLAN:234) | R7 · copy | The method ledger's four step **bodies sit beside their own titles**, not merely somewhere in the method subtree | In `tests/render/t9-landing.test.tsx` (T9-C4's block): extend the existing `expectedSteps` tuples from `[number, title]` to `[number, title, body]` and assert all three against `steps[index]?.textContent` **in the same loop** that already pins number and title. The four pairings are SPEC-fixed: `01`/`Models argue` → `Five frontier models build the tree — pro, con, and the reasoning that binds them.` · `02`/`They review each other` → `Every claim is cross-reviewed by a rival model: agree or dispute, on the record.` · `03`/`You challenge` → `Flag any sentence; the graph spawns a focused rebuttal where you pointed.` · `04`/`Verdict with receipts` → `Scores, condition marks, and replay handles — every number traces to its source.` **RED-proof required:** swap two bodies between `<li>`s, leaving both strings inside the method subtree, and show the cell fails. The remaining `T9-C4-4` assertions — hero body, after-sample close, method intro `Four steps, then you do it again tomorrow.`, the arena line, the closing line, the pricing lines — stay as subtree containment, correctly: **they are not per-step copy and have no index to pair with** |
+
+**Owning round: the T9-C4 addendum, worker session `01a05a71`.** It is a
+two-line change (widen the tuples, add one `toContain`) in
+`tests/render/t9-landing.test.tsx`, which is already in row 5's write surface —
+**no write surface changes**, and no product code moves, because the product is
+already correct.
+
+**Real-artifact check (AM7 rule).** The amended cell asserts against
+`steps[index]` taken from the real anonymous render's method subtree, the same
+nodes `T9-C4-1` already uses. Nothing is composed by the test.
+
+**Why containment was the wrong tool, stated as a rule rather than an apology.**
+`toContain` over a subtree answers *"does this string exist here"*. For copy that
+belongs to a specific slot, the question is *"is this string in **its** slot"*,
+and those two questions differ by exactly one permutation. **Where a SPEC fixes
+an ordered correspondence, the pin must assert the correspondence, not the
+membership.** `T9-C4-1` already did this; `T9-C4-4` should have been written the
+same way in the same cluster.
+
+#### Q-16 is OPEN — the sample block is not final-complete (AM10)
+
+SPEC `T9-S3` lists `Turns 01–04` as part of the sample block. It is pinned by
+**nothing** — not R6, not `T9-C4-2`, not row 5 — and PLAN HOW scopes
+`LandingSample` to *"`ONE DEBATE, FOUR TURNS` + the Pro/Con/Reasoning cards"*.
+It is **absent from the shipped sample subtree** (measured by the T9-C4
+reviewer). That is not a defect against T9-C4, which built R6, `T9-C4-2` and HOW
+exactly as written.
+
+**Routed to V as Q-16, ticket `t_adb4bfaf`, and it is OPEN.** The ruling is
+whether `Turns 01–04` binds the landing sample: amend `T9-S3` to drop it, or add
+a cell and a fill. It is a design-fidelity question, not a test-strength one, so
+it is V's and not mine.
+
+**Standing instruction until V rules: no seat may treat the landing sample as
+final-complete.** A later cluster or reviewer that finds `Turns 01–04` missing
+has found this open question, not a regression, and must not "fix" it — the same
+discipline the declared-kind law imposes (AM9/N6). Conversely nobody may close
+T9's sample surface as done while `t_adb4bfaf` is unresolved.
+
 #### T9-C2 addendum — N3 ratified, T9-C2-6 and T9-C2-7 (AM9)
 
 T9-C2 PASSED and merged at `6aa9f35`. These three items come from its review
@@ -1095,3 +1170,59 @@ applied, not extended.
 verify-survivability invariant holds at **32 rows, 5 exemptions, 0 violations**.
 AM8 changed no Writes and no Verify column, and the check was re-run rather than
 assumed.
+
+### 2026-09-01 — AM10: a pin that answered "does this string exist here" where the SPEC fixes a pairing (trigger: T9-C4 blind review, `t_b7c114a3` verdict 04:21, N2 and N1)
+
+**What was wrong.** `T9-C4-1` pins number↔title positionally through
+`steps[index]`; `T9-C4-4` pins the four step bodies as method-subtree
+containment. Containment over a subtree is permutation-invariant, so the
+reviewer's M3 — bodies 01↔02 swapped **inside** the method subtree — shipped
+**GREEN**. Their earlier MOVE mutant crossed subtrees, which the AM6 scoped pins
+catch; a same-subtree permutation is strictly harder and slipped. The asymmetry
+sat inside a single cluster, between two of my own cells.
+
+Reproduced here before amending, rather than taken on report:
+
+```
+tree                               T9-C4-4 today (subtree contains)   T9-C4-4 amended (steps[index])
+shipped (correct pairing)          GREEN                              GREEN
+M3: bodies 01<->02 swapped         GREEN  <- ships the defect         RED  <- caught
+```
+
+and the four published pairings were checked back against SPEC by harvesting
+`§Copy`'s `- 0N:` lines at run time rather than by transcription: **4 of 4
+verbatim**, titles matched to `§Copy`'s titles line.
+
+**The rule this produces.** `toContain` over a subtree answers *"does this string
+exist here"*. Where a SPEC fixes an ordered correspondence, the question is
+*"is this string in **its** slot"*, and the two differ by exactly one
+permutation. **Pin the correspondence, not the membership.**
+
+**Class sweep — every ordered correspondence on the landing, with how each is
+pinned.** Run, not assumed:
+
+| Site | Shape used | Verdict |
+|---|---|---|
+| Five section markers | `expect(order).toEqual([...])` — full ordered equality | strongest available; permutation-proof |
+| Method steps 01–04 | positional for number+title, **containment for bodies** | **the defect; amended above** |
+| Sample card anatomy | scoped to one card (`cardText` from a single `[data-bezel="shell"][data-stance]`) | correct — `T9-C4-2` requires the full anatomy on **≥1 card**, and the assertion is within-card, not across the sample subtree |
+| Sample card order (PRO/CON/REASONING) | existence per stance, not positional | correct — no SPEC fixes their order, which is why the reviewer's neighbour-control reorder was GREEN and correctly **not** filed |
+
+One of four was defective. The other three are recorded so the next lens does
+not re-derive them.
+
+**Q-16 folded in, and it is OPEN.** SPEC `T9-S3`'s `Turns 01–04` is pinned by
+nothing and absent from the shipped sample — the recurring unpinned-site class,
+now its fifth instance. It is a design-fidelity ruling, so it is V's
+(`t_adb4bfaf`), and until it lands **no seat may treat the landing sample as
+final-complete, and no seat may "fix" the absence unratified** — the same
+discipline AM9 applied to the declared kind.
+
+**Owning round:** the T9-C4 addendum, worker session `01a05a71`. Two lines in
+`tests/render/t9-landing.test.tsx`, already in row 5's write surface — **no write
+surface changes, no product change**, because the shipped ledger is correct
+today; only the pin was weak.
+
+**Verification re-run on the published markdown:** AM5 verify-survivability
+invariant holds at **32 rows, 5 exemptions, 0 violations**. AM10 changed no
+Writes and no Verify column; re-run rather than assumed.

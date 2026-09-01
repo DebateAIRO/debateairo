@@ -1164,3 +1164,97 @@ missing leg + the AM9 reconciliation note, the tightened kind, changelog) ·
 `T9-C2-6`, `T9-C2-7`, the PLAN:116 supersession) · `slices/T9/DECISIONS.md`
 (4 appended rows + new tally; nothing rewritten) · this report · board comment
 on `t_6c169645`.
+
+---
+
+# AM10 — containment where the SPEC fixes a pairing (ticket `t_bb3b97ff`)
+
+## The defect, and it sat between two of my own cells
+
+`T9-C4-1` pins number↔title **positionally** (`steps[index]` over an
+`expectedSteps` tuple list). `T9-C4-4` pins the four step **bodies** as
+method-subtree containment (`method.textContent.toContain(body)`, four times).
+Containment over a subtree is permutation-invariant, so the reviewer's M3 —
+bodies 01↔02 swapped *inside* the method subtree — shipped **GREEN**.
+
+The asymmetry is inside one cluster, between two cells I wrote, one of which
+already had the right shape. That is the part worth naming: I did not fail to
+think of positional pinning; I used it in the cell above and not in the cell
+below.
+
+Reproduced before amending, rather than taken on the reviewer's report:
+
+```
+tree                               T9-C4-4 today (subtree contains)   T9-C4-4 amended (steps[index])
+shipped (correct pairing)          GREEN                              GREEN
+M3: bodies 01<->02 swapped         GREEN  <- ships the defect         RED  <- caught
+
+ledger M3 actually renders:
+   01 Models argue           Every claim is cross-reviewed by a rival model: agree or dispute…
+   02 They review each other Five frontier models build the tree — pro, con, and the reasoning…
+```
+
+A reader gets a ledger whose step 01 describes step 02, every string present,
+every gate green.
+
+## The rule, stated so it transfers
+
+`toContain` over a subtree answers *"does this string exist here"*. Where a SPEC
+fixes an ordered correspondence, the question is *"is this string in **its**
+slot"* — and the two differ by exactly one permutation. **Pin the
+correspondence, not the membership.**
+
+This is the same family as AM7's synthetic-artifact rule: both are cases where a
+pin answers a weaker question than the property, and both ship green while the
+property is false.
+
+## Class sweep, run not assumed
+
+| Site | Shape | Verdict |
+|---|---|---|
+| Five section markers | `toEqual([...])`, full ordered equality | strongest available |
+| Method steps 01–04 | positional number+title, **containment bodies** | **the defect** |
+| Sample card anatomy | scoped to one card's `cardText` | correct — `T9-C4-2` requires the anatomy on ≥1 card, and the assertion is within-card |
+| Sample card order | existence per stance | correct — no SPEC fixes their order, which is why the reviewer's neighbour-control reorder was GREEN and rightly **not** filed |
+
+One of four defective. I recorded the three clean ones with their reasons so the
+next lens does not re-derive them — and so that "existence per stance" is not
+later mistaken for the same bug.
+
+## Verification
+
+- The four published pairings checked back against SPEC by harvesting `§Copy`'s
+  `- 0N:` lines **at run time** rather than by transcription: 4 of 4 verbatim,
+  titles matched against `§Copy`'s titles line. I have mis-transcribed a
+  published string before; this closes that route.
+- Containment-vs-pairing behaviour demonstrated over the shipped list and M3's
+  permutation.
+- AM5 verify-survivability invariant re-run on the published markdown:
+  **32 rows, 5 exemptions, 0 violations**.
+- Owning round checked, not assumed: `tests/render/t9-landing.test.tsx` is
+  already in row 5's write surface — **no write surface change, no product
+  change**. The shipped ledger is correct; only the pin was weak.
+
+## Q-16, folded in
+
+`T9-S3`'s `Turns 01–04` is pinned by nothing and absent from the shipped sample
+— the recurring unpinned-site class, fifth instance. It is a design-fidelity
+ruling, so it is V's (`t_adb4bfaf`). Until it lands I published a standing
+instruction: **no seat may treat the landing sample as final-complete, and no
+seat may "fix" the absence unratified.** That mirrors AM9's declared-kind
+discipline, and it exists because the failure mode here is a well-meaning worker
+closing a question that belongs to V.
+
+## What I did not verify
+
+I did not run the amended assertion inside the suite — `tests/render/t9-landing.test.tsx`
+is outside AM10's writes, and a parallel addendum lane was writing that same file
+during the review (the reviewer's N3). So the demonstration models the two
+assertion styles over the same data rather than executing vitest, and the
+RED-proof is required *of the addendum seat* in the cell rather than performed
+here. Stated rather than implied.
+
+## Writes
+
+`architecture/dispatch-order.md` (amended `T9-C4-4`, the Q-16 standing note, the
+class sweep, changelog) · this report · board comment on `t_bb3b97ff`.
