@@ -1617,6 +1617,419 @@ in either command after the correction above.)
 which is narrower than the ownership transfer it replaces: FID-1 and FID-2 get
 *no* edit rights over any pin they do not already own.
 
+## AM15 — fidelity cells for the first PARALLEL SLICE WAVE (rows 9, 11, 14)
+
+V ruled the vertical-slice law: **a slice is the unit of Done** (Done = V's veto after
+personally testing), **each slice runs in its own worktree**, fleets run **in parallel**
+across slices, and merge conflicts are handled at merge time. Shared files no longer
+serialize slices. The AM14 FIDELITY LAW gates this wave at pre-dispatch, so the three
+next clusters — planned in the string-assertion era — get their two halves here.
+
+**These are ADDITIONS. Every existing content/behaviour cell stays exactly as written.**
+The law adds the visual halves; it does not rewrite a working cell. Each block below
+opens by naming which cells are untouched.
+
+| cluster | row | tree |
+|---|---|---|
+| **T1-C3** | 9 | main tree — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine` (transition rule: T1 finishes where it started) |
+| **T5-C1** | 11 | `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/slice-t5/dialectical-engine` |
+| **T3-C2** | 14 | `/Users/vladmihaimiron/Documents/DebateAIRO-worktrees/slice-t3/dialectical-engine` |
+
+Both worktrees were cut from `dev` at `af0db9af`. **Every command in every cell below is
+cwd-relative and byte-identical across the three trees** — only the tree differs. No cell
+may hard-code a tree path.
+
+### What the slice law changes about the AM5 verify-survivability law — and what it does not
+
+The survivability law has two clauses that were previously fused. The slice law splits
+them, and the split must be said or the next seat will read the law as repealed.
+
+- **The ORDERING clause is relaxed ACROSS slices.** Its purpose was to stop two clusters
+  colliding on one file. V has now assigned that job to merge-time conflict resolution,
+  so `T1-C3`, `T5-C1` and `T3-C2` may proceed concurrently even though all three read
+  `tests/unit/v2ui-pages.test.ts` and two write it.
+- **The SATISFIABILITY clause is NOT relaxed, and applies WITHIN each worktree.** A
+  cluster still may not be dispatched into a verify command it cannot make green **in its
+  own tree**. That is the AF-1 defect class, it has cost this mission four preflight
+  blocks, and a worktree does not cure it — it multiplies it, because a seat in an
+  isolated tree cannot see that a sibling slice would have supplied the file it needs.
+
+**Therefore, the added law for parallel slices: a cluster's verify command must be green
+in a tree containing ONLY its own slice's work.** Each block below states its verify
+command's status measured that way.
+
+### The token map — measured once here, used by all three blocks
+
+The binding original (`ui_designs/DebateAI Design Document.html`) carries its whole
+palette as two literal objects, `tokensFor(dark)` and its light `: {` twin. Decoded and
+set beside the shipped surface:
+
+| original (light) | value | shipped | original (dark) | value | shipped |
+|---|---|---|---|---|---|
+| `page` | `#F9F6F1` | `--bg` | `page` | `#14110E` | `--bg` |
+| `headerBg` | `rgba(251,249,244,.8)` | `--header-bg` | `headerBg` | `rgba(20,17,14,.7)` | `--header-bg` |
+| `shell` | `#EFE9E0` | `--shell` | `shell` | `#221D17` | `--shell` |
+| `core` | `#FDFBF6` | `--core` | `core` | `#181410` | `--core` |
+| **`railBg`** | **`#F4F0E8`** | **`--surface-2`** | **`railBg`** | **`#171310`** | **`--surface-2`** |
+| `ink` | `#29261F` | `--ink` / `--text` | `ink` | `#F2EAD9` | `--ink` / `--text` |
+| `mute` | `#6E675C` | `--muted` | `mute` | `#9C907A` | `--muted` |
+| `hint` | `#555147` | `--text-2` | `hint` | `#B5A88F` | `--text-2` |
+| `hair` | `rgba(41,38,31,.1)` | `--line` | `hair` | `rgba(242,234,217,.09)` | `--line` |
+| `hairStrong` | `rgba(41,38,31,.2)` | `--line-strong` | `hairStrong` | `rgba(242,234,217,.18)` | `--line-strong` |
+| `gridDot` | `rgba(41,38,31,.12)` | `--line-2` | `gridDot` | `rgba(242,234,217,.08)` | `--line-2` |
+| `gold` | `#A8823E` | `--gold` | `gold` | `#C8A055` | `--gold` |
+| `pro` | `#3F7466` | `--pro` | `pro` | `#6E9E96` | `--pro` |
+| `con` | `#C15F3C` | `--con` | `con` | `#C8834F` | `--con` |
+| `okC` | `#3E7A4E` | `--agree` | `okC` | `#86B58D` | `--agree` |
+| `badC` | `#B0432F` | `--dispute` | `badC` | `#D67F65` | `--dispute` |
+| `shadow` | `0 18px 40px -20px rgba(41,38,31,.24)` | `--shadow-card` | `shadow` | `0 22px 48px -22px rgba(0,0,0,.8)` | `--shadow-card` |
+| `shadowBig` | `0 30px 60px -26px rgba(41,38,31,.32)` | `--shadow-pop` | `shadowBig` | `0 36px 70px -30px rgba(0,0,0,.9)` | `--shadow-pop` |
+
+**Eighteen rows, byte-identical in both modes** (`.1`/`.10` and `.2`/`.20` differ in
+notation only). **No cluster in this wave mints a token.** Any value below that is not in
+this table is geometry, and geometry ports as a literal — ADR-001's sweep is
+colour-only (AM14).
+
+The tint recipes, also from the original, so nobody re-derives them:
+`chip = tint(accent, dark ? .16 : .09)` fill / `tint(accent, dark ? .38 : .26)` border ·
+`maker pill = tint(dot, dark ? .16 : .12)` / `tint(dot, dark ? .5 : .42)` ·
+`condition pill = tint(c, dark ? .13 : .09)` / `tint(c, dark ? .5 : .4)` ·
+`status chip = tint(c, dark ? .13 : .09)` / `tint(c, dark ? .5 : .38)`. Each already has a
+shipped `-bg` / `-border` token pair; use the pair, never a fresh `color-mix`.
+
+---
+
+## T1-C3 (row 9) — set-aside, synthesis rail, public locks
+
+**Cells that STAY, unchanged:** `T1-C3-1` (set-aside toggle changes the visible count),
+`T1-C3-2` (synthesis/verdict labels present), `T1-C3-3` (publicMode locks the mutate
+path). They are content and behaviour cells and they are fine. The four cells below are
+the visual halves the AM14 law requires.
+
+### Shipped baseline, measured (main tree, `af0db9af`)
+
+```
+components/SynthesisPanel.tsx   106 lines, 20 CSS rules already in globals.css
+  ↑ STRONGEST PRO   0     ships "↑ Strongest Pro"  (title case)
+  ↓ STRONGEST CON   0     ships "↓ Strongest Con"  (title case)
+  VERDICT           0     ships "Verdict"          (title case)
+components/DebateCanvas.tsx
+  "Show set-aside"  1     the pill exists
+  publicMode        0     <- the prop does not reach this file at all
+```
+
+**The rail is largely built and the labels are wrong-cased; the drawer (T5) is not built
+at all.** Two different fidelity problems, and the cells differ accordingly.
+
+### Ported values — the synthesis rail, from the binding original's `1a Debate canvas`
+
+| element | original (verbatim inline style) | ships as |
+|---|---|---|
+| rail | `width:280px; flex:0 0 auto; border-left:1px solid {{ tA.hair }}; background:{{ tA.railBg }}; padding:18px 16px; display:flex; flex-direction:column; gap:12px` | `var(--line)`, **`var(--surface-2)`**, rest literal |
+| title row | `display:flex; align-items:center; gap:8px` + diamond `width:8px; height:8px; transform:rotate(45deg); background:{{ tA.gold }}` + `font-family:Fraunces,serif; font-size:15px; font-weight:600` — text `Synthesis` | `var(--gold)`, `var(--font-display)`; the shipped `.synthDiamond` is the diamond |
+| subtitle | `font-size:10.5px; color:{{ tA.mute }}; margin-top:-6px` — `The strongest case on each side, plus a verdict.` | `var(--muted)`; the string **already ships verbatim** (`SynthesisPanel.tsx:38`) |
+| the three cards | `border:1px solid {{ tA.hairStrong }}; border-radius:12px; background:{{ tA.core }}; padding:12px 13px` | `var(--line-strong)`, `var(--core)`, rest literal |
+| PRO label | `font-family:ui-monospace,Menlo,monospace; font-size:9px; font-weight:700; letter-spacing:.12em; color:{{ tA.pro }}; margin-bottom:7px` — **`↑ STRONGEST PRO`** | `var(--font-mono)`, `var(--pro-text)` |
+| CON label | same box, `color:{{ tA.con }}` — **`↓ STRONGEST CON`** | `var(--con-text)` |
+| VERDICT label | same box, **`color:{{ tA.gold }}`** — **`VERDICT`**, followed by a status span `font-size:9.5px; color:{{ tA.mute }}` (`Contested`) | **`var(--gold-text)`** — this is ADR-005's gold reservation, and the original is where it comes from |
+| card body | `font-family:Fraunces,serif; font-size:12.5px; line-height:1.5` | `var(--font-display)` |
+| leans row | `display:flex; align-items:center; gap:8px; margin-top:10px`; label `font-size:9.5px; font-weight:700; color:{{ tA.mute }}` (`Leans`); bar `flex:1; height:4px; border-radius:999px; background:linear-gradient(90deg, {{ tA.pro }} 0%, {{ tA.pro }} 46%, {{ tA.con }} 46%)`; right label `font-size:9.5px; font-weight:700; color:{{ tA.con }}` (`Con 54`) | `var(--muted)`, `var(--r-pill)`, and the gradient in **`var(--pro)` / `var(--con)`** |
+| footer | `font-size:10px; color:{{ tA.mute }}` — `Scoring · 24 of 31 claims scored · DF-QuAD` | `var(--muted)` |
+
+**The leans bar is a live ADR-001 residual and a fidelity gap in one object.**
+`SynthesisPanel.tsx:79` builds it from three raw literals:
+
+```
+background: `linear-gradient(90deg, oklch(0.6 0.08 165) 0%, oklch(0.6 0.08 165) ${pct}%,
+             oklch(0.5 0.01 70) ${pct}%, oklch(0.65 0.1 50) 100%)`
+```
+
+Those are the single `SynthesisPanel.tsx` line in ADR-001 §(b)'s residual table. They are
+also **not the design's colours** — the original's gradient is two stops, `pro` then
+`con`, hard-switching at the lean percentage, with no third grey. Porting the gradient
+therefore clears the residual as a side effect; **`T1-C3-4` requires both together**, so
+the residual cannot be closed by a token substitution that keeps the wrong shape.
+
+### Ported values — the set-aside pill, and the public lock
+
+| element | original (verbatim) | ships as |
+|---|---|---|
+| set-aside pill | `position:absolute; top:14px; left:14px; display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:9px; border:1px solid {{ tA.hairStrong }}; background:{{ tA.core }}; font-size:10.5px; font-weight:600; color:{{ tA.mute }}` — content **`☑ Show set-aside paths`** | `var(--line-strong)`, `var(--core)`, `var(--muted)`; radius literal `9px` |
+| public lock | on `3b Public debate view`, the card footer renders `<span style="opacity:.55;">🔒 Challenge</span>` beside `<span style="cursor:pointer;">Read ▾</span>` | see the ruling below |
+| public regenerate | **`↻ Regenerate` appears ZERO times in the whole `3b` screen** | absent, not disabled |
+
+**The public-mode signal inside `DebateCanvas.tsx` is NOT a `publicMode` prop — measured,
+and the existing `T1-C3-3` would be unsatisfiable if a seat looked for one.**
+`DebatePageClient.tsx:994` computes
+
+```ts
+const challengeProps = publicMode ? {} : { onChallengeNode: (node, anchor) => openChallenge(node, anchor) };
+```
+
+and spreads it. `DebatePageClient.tsx` is **row 7's** file (T1-C1, merged), not row 9's.
+So inside row 9's write surface, **public mode ⟺ `onChallengeNode === undefined`**, and
+every cell below says so rather than naming a prop the file never receives. `T1-C3-3`
+itself still passes as written — it asserts on the rendered result, not the prop — but
+the fidelity cell must name the real signal or a seat will add a prop it cannot wire.
+
+**RULING — `opacity:.55` ports verbatim ONLY together with genuine inactive semantics.**
+The design's locked label at `.55` over `--core` measures:
+
+```
+Terracotta  --muted #6E675C @55% on --core #FDFBF6  ->  rgb(174,170,161)  2.24:1
+Chamber     --muted #9C907A @55% on --core #181410  ->  rgb( 97, 88, 74)  2.62:1
+```
+
+Both fail WCAG 1.4.3 (4.5:1) and both fail even 1.4.11's 3:1. That is a direct collision
+between AM14's *port, do not reinterpret* and ADR-001's contrast law — so it is ruled
+rather than absorbed. **WCAG 2.2's "Incidental" exception exempts text that is part of an
+INACTIVE user interface component from 1.4.3, and 1.4.11 likewise exempts inactive
+components.** The design's `.55` is therefore correct *if and only if* the element really
+is inactive and is marked inactive — not merely painted dim. So:
+
+> The locked affordance ships at `opacity: .55` **and** carries `aria-disabled="true"`
+> **and** is not focusable and not clickable. All three, or none: an element styled at
+> `.55` without the disabled semantics is a 2.24:1 contrast failure with no exception to
+> stand on, and `T1-C3-7` asserts the three together so they cannot separate.
+>
+> **Fallback if the implementing seat cannot make it genuinely inactive** (e.g. it must
+> stay focusable for a tooltip): the minimum compliant opacities are **0.92 (Terracotta)
+> and 0.85 (Chamber)** for 4.5:1, and 0.72 / 0.62 for 3:1 — measured, not estimated. Use
+> `0.92`, declare the departure, and route it to V. Do not invent a dimmer token: at full
+> opacity `--muted` already measures 5.40:1 / 5.83:1 and is the dimmest compliant text
+> token that exists.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T1-C3-4** (new, jsdom half) | R6 · fidelity | The rail's three labels are the design's **uppercase mono** strings, the verdict label is **gold**, and the leans gradient is **stance-tokened** | In `tests/render/t1-canvas.test.tsx`, new describe `T1-C3 synthesis fidelity`: on a real render with synthesis data, assert `.synthCardLabel.pro` textContent is exactly `↑ STRONGEST PRO`, `.synthCardLabel.con` exactly `↓ STRONGEST CON`, `.synthCardLabel.verdict` exactly `VERDICT` (the shipped title-case strings are RED). **And** assert `SynthesisPanel.tsx` read as text contains **zero** matches of `oklch(` — the ADR-001 §(b) residual for this file — **and** that the leans bar's inline `background` names `var(--pro)` and `var(--con)` and does **not** name a third colour. **RED-proof required:** revert either label to title case, and separately restore one `oklch(` literal, and show the cell fails on each |
+| **T1-C3-5** (new, browser half) | R6 · fidelity | The rail reads as the design's rail, in **both** modes | **DOM-DUMP BROWSER KIT** (AM14), `terracotta` **and** `chamber`, output quoted in the cluster report: (1) `.synthPanel` `backgroundColor` resolves to `--surface-2` — `rgb(244,240,232)` / `rgb(23,19,16)` — and is **distinct from** the canvas `--bg` beside it, which is what makes it read as a rail; (2) `.synthCardLabel.verdict` `color` resolves to `--gold-text` — `rgb(130,101,48)` / `rgb(200,160,85)` — and **differs from** both `.pro` and `.con` labels' colours; (3) the three `.synthCard` elements have a non-`0px` `borderRadius` and a `backgroundColor` distinct from the panel's; (4) the leans bar's computed `backgroundImage` contains exactly two distinct colour stops and its `height` is `4px`; (5) all of (1)-(4) hold after flipping `data-mode` |
+| **T1-C3-6** (new, V-QA half) | R6 · fidelity | V's judgement, named | Does the debate view show a distinct synthesis rail down the right — strongest pro, strongest con, and a gold-marked verdict with a lean bar — that reads as part of the same instrument as the cards, in both modes? Answered by V on the running app, recorded on `t_6aad46ab`. Not a test |
+| **T1-C3-7** (new, both halves) | R8 · fidelity | The public canvas **locks** the challenge affordance and **omits** regenerate — visibly, and accessibly | jsdom half, in the same describe: render `DebateCanvas` with `onChallengeNode` **undefined** (the real public signal — `DebatePageClient.tsx:994`) and assert (a) the challenge affordance is **present** and carries `🔒`, (b) it carries `aria-disabled="true"`, (c) it has no `onClick` handler and is not in the tab order (`tabIndex` is `-1` or it is a `disabled` button), and (d) `↻ Regenerate` is **absent from the subtree entirely** — the design's `3b` screen contains the string zero times, so "present but disabled" is RED. Browser half: `getComputedStyle(lock).opacity` is `0.55` in both modes. **RED-proof required:** drop `aria-disabled` while keeping the `.55` opacity, and show the cell fails — that mutant is exactly the WCAG failure the ruling above exists to prevent |
+
+---
+
+## T5-C1 (row 11) — the node detail drawer
+
+**Cells that STAY, unchanged:** `T5-C1-1` through `T5-C1-6`. All six are content and
+behaviour, including the `T5-C1-3` / `T5-C1-4` review-line pair and its absence clause.
+
+### Shipped baseline, measured (`slice/t5` worktree, cut from `af0db9af`)
+
+```
+components/NodeDetailDrawer.tsx
+  BASE SCORE  FINAL STRENGTH  REPLAY  RESTATEMENT  DEFEATERS  JUDGE DISAGREEMENT
+      0            0            0          0           0             0
+```
+
+**Zero of the six section labels exist.** Unlike T1-C3, this surface has no partial port
+to correct — the anatomy is absent, which is the ABSENT class the FID-3 sweep is
+designed to catch, found here before the sweep ran.
+
+### Ported values — from the binding original's `5a Node detail drawer`
+
+| element | original (verbatim inline style) | ships as |
+|---|---|---|
+| scrim | `position:absolute; inset:0; background:rgba(10,8,6,.32)` | literal — it is a mode-invariant overlay in the original and has no token; declared |
+| panel | `position:absolute; top:0; right:0; bottom:0; width:440px; box-sizing:border-box; background:{{ tA.core }}; border-left:1px solid {{ tA.hairStrong }}; box-shadow:-30px 0 60px -30px rgba(0,0,0,.5); padding:20px 24px; overflow:hidden; display:flex; flex-direction:column; gap:13px` | `var(--core)`, `var(--line-strong)`, **shadow -> `var(--shadow-drawer)`**; geometry literal |
+| header row | `display:flex; align-items:center; gap:8px` — stance chip `padding:3px 9px; border-radius:7px; ...; font-size:9.5px; font-weight:700; letter-spacing:.1em` + author pill + spacer + close `display:grid; place-items:center; width:28px; height:28px; border-radius:999px; border:1px solid {{ tA.hairStrong }}; color:{{ tA.mute }}; font-size:14px` (`×`) | stance triple from the token map; author pill is **`<ModelPill size="sm" tone="maker">`** (AM14) |
+| eyebrow | `font-family:ui-monospace,Menlo,monospace; font-size:9px; font-weight:700; letter-spacing:.18em; color:{{ tA.gold }}` — `WAY OF KNOWING · EMPIRICAL` | `var(--font-mono)`, **`var(--gold-text)`** — gold's second reserved use, beside verdict |
+| title | `margin:9px 0 0; font-family:Fraunces,serif; font-weight:700; font-size:20px; line-height:1.3; letter-spacing:-.015em` | `var(--font-display)` |
+| claim | `margin:9px 0 0; font-family:Fraunces,serif; font-weight:400; font-size:13.5px; line-height:1.55; color:{{ tA.hint }}; text-wrap:pretty` | `var(--text-2)` |
+| **review line** | `display:flex; align-items:center; gap:6px` — chip `padding:4px 9px; border-radius:999px; border:1px solid {{ revBorder }}; background:{{ revBg }}; color:{{ revText }}; font-family:ui-monospace; font-size:8.5px; font-weight:700; letter-spacing:.06em` + reviewer pill `padding:3px 10px 3px 7px; border-radius:999px; background:{{ tA.shell }}; border:1px solid {{ tA.hairStrong }}; font-size:10px; font-weight:700` with dot `8px; border-radius:50%; box-shadow:0 0 0 2.5px {{ reviewerHalo }}` | chip -> `var(--agree-*)` / `var(--dispute-*)`; reviewer pill is **`<ModelPill size="sm" tone="neutral" halo>`** (AM14). **This is the surface Q-11 reserved the full review line for** |
+| section table | `border:1px solid {{ tA.hair }}; border-radius:12px; background:{{ tA.shell }}; padding:4px 14px`, each row `display:flex; align-items:baseline; gap:12px; padding:8px 0; border-bottom:1px solid {{ tA.hair }}`, key `flex:0 0 150px; font-family:ui-monospace; font-size:9px; font-weight:700; letter-spacing:.1em; color:{{ tA.mute }}`, value `font-size:11.5px; font-weight:600; color:{{ tA.ink }}` | `var(--line)`, `var(--shell)`, `var(--font-mono)`, `var(--muted)`, `var(--text)` |
+| condition pills | `padding:4px 11px; border-radius:999px; border:1px solid {{ p.border }}; background:{{ p.bg }}; color:{{ p.c }}; font-size:9.5px; font-weight:700`, wrapped in `display:flex; gap:6px; flex-wrap:wrap` | per-pill colour, see the data below |
+| actions | `display:flex; gap:10px` — `⚐ Challenge` `padding:8px 17px; border-radius:999px; background:{{ tA.ink }}; color:{{ tA.page }}; font-size:11.5px; font-weight:700` · `↻ Regenerate` `padding:8px 15px; border-radius:999px; border:1px solid {{ tA.hairStrong }}; color:{{ tA.mute }}; font-size:11.5px; font-weight:600` | `var(--ink)` on `var(--bg)`; outline in `var(--line-strong)` / `var(--muted)` |
+| history header | `display:flex; align-items:center; gap:10px; margin-top:2px` — `GENERATION HISTORY` in `ui-monospace; font-size:9px; font-weight:700; letter-spacing:.16em; color:{{ tA.mute }}` + a `flex:1; height:1px; background:{{ tA.hair }}` rule + `Compare versions` | `var(--muted)`, `var(--line)` |
+
+**The six section rows, verbatim from the original's `drawerRows`** — key and value both,
+because a key with an invented value is the placeholder failure AM14 was written for:
+
+```
+BASE SCORE          0.85 · judge-panel
+FINAL STRENGTH      0.85 · replayed
+REPLAY              replay:run-42/n-07
+RESTATEMENT         Stranger restatement check passed
+DEFEATERS           Obligation remains open
+JUDGE DISAGREEMENT  No disagreement record
+```
+
+The values are **fixture shape, not shipped copy** — the drawer renders real record data.
+What ports is the **key set, the order, and the value's shape** (a score with its source,
+a replay handle, a sentence-form mark). `T5-C1-2` and `T5-C1-5` already pin the keys;
+the cells below pin the two-column geometry the keys sit in.
+
+**The three condition pills, verbatim, with their colours** (`mkPill(label, c)`):
+
+```
+Not falsified after model rotation   okC   -> --agree-*
+Single model lineage                 badC  -> --dispute-*
+Under-explored                       gold  -> --gold-*
+```
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T5-C1-7** (new, jsdom half) | R2·R4·R5 · fidelity | The drawer's section table is a **two-column key/value table**, not six loose labels, and the condition pills carry their own verdict colour | In `tests/render/t5-drawer.test.tsx`, new describe `T5-C1 drawer fidelity`: on a real open-drawer render with the scored fixture, select the section table and assert it contains **exactly six** rows in the order `BASE SCORE · FINAL STRENGTH · REPLAY · RESTATEMENT · DEFEATERS · JUDGE DISAGREEMENT`, taken **positionally** (`rows[i]`, the `T9-C4-4` lesson), each row having a key element **and** a non-empty value element. **And** assert each condition pill carries a `data-mark` (or class) distinguishing agree / dispute / gold, so the three are not one flat style. **RED-proof required:** reorder two rows and show the cell fails; render all six keys inside one row and show it fails |
+| **T5-C1-8** (new, browser half) | R1 · fidelity | The drawer is an elevated right-edge panel over a scrim, in **both** modes | **DOM-DUMP BROWSER KIT**, both modes, output quoted: (1) the panel's `getBoundingClientRect().right` equals the viewport width (it is flush right) and its `width` is bounded — `440px` in the design, so assert `>= 380px` and `<= 520px`; (2) `getComputedStyle(panel).boxShadow` is **not** `none`; (3) the panel's `backgroundColor` is `--core` and **differs from** the section table's `--shell` — the two-surface bezel is the drawer's whole visual grammar; (4) a scrim element exists behind it whose `backgroundColor` alpha is `> 0` and `< 1`; (5) the three condition pills resolve to **three different** `color` values; (6) all of (1)-(5) hold in `chamber` |
+| **T5-C1-9** (new, V-QA half) | R1·R3 · fidelity | V's judgement, named | Opening a node: does a panel slide in over a dimmed canvas showing the claim, who argued it, who reviewed it and how, a readable table of scores and marks, and the condition chips — in both modes? Answered by V on the running app, recorded on the ticket |
+
+---
+
+## T3-C2 (row 14) — the library lists
+
+**Cells that STAY, unchanged:** `T3-C2-1` (both selectors + `4 TOTAL`), `T3-C2-2`
+(distinct membership), `T3-C2-3` (bezel markers). Row 14 also already carries the
+**`pda-s03` label-recase migration** (AM5 row 14: update `expectedTabs` at line 31 and
+the `.count` expectation) and the routed one-liner **`t_1867dac0`** (dangling comment
+fix) folds into its packet. Neither moves here.
+
+### Shipped baseline, measured (`slice/t3` worktree)
+
+```
+apps/ui/app/page.tsx:99   "Your Debates"    <- title case; SPEC recases to "Your debates"
+apps/ui/app/page.tsx:106  "Public Debates"  <- title case; SPEC recases to "Public debates"
+TOTAL                     0 occurrences     <- the count chrome does not exist
+```
+
+### Ported values — from the binding original's `3a Library`
+
+| element | original (verbatim) | ships as |
+|---|---|---|
+| selector pill | `padding:6px 15px; border-radius:999px; border:1px solid {{ ht.border }}; background:{{ ht.bg }}; color:{{ ht.color }}; font-size:11.5px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif` | `var(--r-pill)`, `var(--font-sans)`; **active** = `background: var(--ink)`, `color: var(--bg)`, `border-color: var(--ink)`; **inactive** = `background: transparent`, `color: var(--muted)`, `border-color: var(--line-strong)` |
+| selector row | `display:flex; align-items:center; gap:8px; margin:38px 0 14px` with a `flex:1` spacer before the count | literal |
+| count | `font-family:ui-monospace,Menlo,monospace; font-size:10px; color:{{ tA.mute }}` — `{{ homeCount }}` | `var(--font-mono)`, `var(--muted)` |
+| list | `display:flex; flex-direction:column; gap:10px` | literal |
+| row | `display:flex; align-items:center; gap:16px; background:{{ tA.core }}; border:1px solid {{ tA.hair }}; border-radius:13px; padding:14px 18px; cursor:pointer; transition:transform .4s cubic-bezier(.34,1.56,.64,1)`, hover `transform:translateX(4px); border-color:{{ tA.hairStrong }}` | `var(--core)`, `var(--line)`; hover border `var(--line-strong)`; geometry literal |
+| row claim | `font-family:Fraunces,serif; font-size:14.5px; font-weight:600; line-height:1.35` | `var(--font-display)` |
+| row meta | `margin-top:5px; font-size:11px; color:{{ tA.mute }}` — `{{ byLabel }}{{ by }}{{ meta }}`, where `by` is the pseudonym in `byColor: tA.gold` | `var(--muted)`, pseudonym in **`var(--gold-text)`** |
+| model dot stack | `width:12px; height:12px; border-radius:50%; background:{{ dd }}; border:2px solid {{ tA.core }}; margin-left:-4px`, repeated per model | `var(--m-{key})`, `var(--core)`, `var(--r-dot)`; the `-4px` overlap is the stack |
+| status chip | `display:flex; align-items:center; gap:6px; padding:4px 11px; border-radius:999px; border:1px solid {{ d.border }}; background:{{ d.bg }}; color:{{ d.c }}; font-size:10px; font-weight:700` + a `6px` dot in the same colour | `Complete` / `Supported` -> `--agree-*`; `Generating` -> `--gold-*` |
+| trailing chevron | `flex:0 0 auto; color:{{ tA.mute }}` — `→` | `var(--muted)` |
+| public-only note | `margin-top:12px; font-size:10.5px; font-style:italic; color:{{ tA.mute }}` — *Published debates may be indexed by search engines. Copies may persist after unpublishing.* rendered **only when the public tab is active** (`sc-if isPublicTab`) | `var(--muted)`; the string already ships, but **per row**, not once under the list — see `T3-C2-4` |
+
+### `4 TOTAL` is ARITHMETIC, and the original is what makes it so
+
+`T3-C2`'s own refutation table names the mutant its content cell cannot catch: *"a
+`4 TOTAL` chip whose number does not match the rows shown — the assertion is on the
+literal word and the presence of a count, not on arithmetic."* The binding original
+closes that hole by construction:
+
+```js
+const activeDebates = homeTab === 'your' ? yourDebates : publicDebates;   // 4 and 3 rows
+const homeCount     = `${activeDebates.length} TOTAL`;
+```
+
+The count is **the length of the visible list, per tab** — `4 TOTAL` on *Your debates*,
+`3 TOTAL` on *Public debates*. So the design makes the arithmetic normative, and
+`T3-C2-4` pins it. **This is an addition to the cluster's detectable-mutant set, not a
+change to `T3-C2-1`**, which keeps asserting the literal strings.
+
+**The element type does NOT port.** The original renders the selectors as `<button>` with
+an `onPick` handler; the shipped page renders `<Link href="/?tab=…">` with
+`aria-current="page"`, because the tab is a route in this product and is server-rendered.
+**The pill SKIN ports; the element stays a link.** Declared here so no seat converts
+routing into client state to match a template — and note `T3-C2`'s refutation table
+already names `role="tab"` conversion as a mutant it catches.
+
+| Row | SPEC | WHAT | Acceptance |
+|---|---|---|---|
+| **T3-C2-4** (new, jsdom half) | R3 · fidelity | The count is the **row count of the active tab**, and the public disclosure renders **once under the list**, not per row | In `tests/render/t3-library.test.tsx`, new describe `T3-C2 library fidelity`: with a fixture of **4** your-debates and **3** public-debates, assert the count element's text is exactly `4 TOTAL` on the *Your debates* tab and exactly `3 TOTAL` on *Public debates*, **and** that in each case the number equals the number of rendered row elements — computed from the DOM, not hard-coded. **And** assert the search-indexing disclosure appears **exactly once** on the public tab and **zero** times on the yours tab (the original renders it under the list via `sc-if isPublicTab`; the shipped page repeats it inside every row). **RED-proof required:** render a fifth row without changing the chip, and show the cell fails |
+| **T3-C2-5** (new, browser half) | R4 · fidelity | The rows are bezel cards with a model-dot stack and a status chip, in **both** modes | **DOM-DUMP BROWSER KIT**, both modes, output quoted: (1) each row's `backgroundColor` is `--core` and **differs from** the page `--bg` behind it, with a non-`0px` `borderRadius`; (2) the model dots **overlap** — for adjacent dots, `dots[i+1].left < dots[i].right` — which is the `margin-left:-4px` and the only thing that makes it a stack rather than a row; (3) each dot's `borderColor` resolves to `--core`, the ring that separates them; (4) a `Generating` row's status chip `color` **differs from** a `Complete` row's; (5) the active selector's `backgroundColor` is `--ink` and the inactive one's is transparent — `rgba(0, 0, 0, 0)`; (6) all of (1)-(5) hold in `chamber` |
+| **T3-C2-6** (new, V-QA half) | R3·R4 · fidelity | V's judgement, named | Does the library read as two pill selectors with a live count, over a stack of bezel cards each showing the claim, who asked, the models that argued it, and its status — in both modes? Answered by V on the running app, recorded on the ticket |
+
+### AM15 invariant
+
+**No Writes column moves and no verify command moves.** Every new cell writes only into a
+test file its cluster already owns:
+
+| cluster | new cell writes | already in the Writes column? |
+|---|---|---|
+| T1-C3 | `tests/render/t1-canvas.test.tsx`, new describe `T1-C3 synthesis fidelity` | **yes** (row 9) |
+| T5-C1 | `tests/render/t5-drawer.test.tsx`, new describe `T5-C1 drawer fidelity` | **yes** (row 11) |
+| T3-C2 | `tests/render/t3-library.test.tsx`, new describe `T3-C2 library fidelity` | **yes** (row 14) |
+
+Product writes are also already owned: `SynthesisPanel.tsx` and `DebateCanvas.tsx` (row
+9), `NodeDetailDrawer.tsx` (row 11), `app/page.tsx` and `DebatesBuffer.tsx` (row 14).
+Guard rail 3 holds — each cluster runs the test file it writes. Guard rail 2 holds — each
+cell **adds** a describe and deletes no case; `vitest list <file> | wc -l` before/after is
+required in each cluster report.
+
+**Satisfiability, measured per tree** — each command run in the tree that cluster will
+actually use. **Running it found a blocker in both worktrees**, which is the entire reason
+the law says run and not assume:
+
+```
+                                            AS FOUND                       AFTER THE FIX
+T1-C3  row 9   main tree            9 files / 93 passed / 1 todo    (unchanged, exit 0)
+T5-C1  row 11  slice-t5 worktree    4 FAILED / 2 passed             6 files / 64 passed
+T3-C2  row 14  slice-t3 worktree    7 FAILED / 2 passed             9 files / 32 passed
+```
+
+### BLOCKER, found and fixed here: a fresh worktree is not a runnable tree
+
+Every failure in both worktrees was the same collection error:
+
+```
+Error: Failed to resolve entry for package "@debateai/contract".
+       The package may have incorrect main/module/exports specified in its package.json.
+```
+
+Root cause, measured rather than guessed. `packages/contract/package.json` declares
+exactly one entry point — `"exports": "./generated/client.ts"` — and that file is
+**gitignored**:
+
+```
+$ git check-ignore -v packages/contract/generated/client.ts
+.gitignore:7:packages/contract/generated/    packages/contract/generated/client.ts
+
+$ for each tree: test -f packages/contract/generated/client.ts
+main tree            yes
+slice-t5 worktree    NO
+slice-t3 worktree    NO
+```
+
+`git worktree add` materialises **tracked** files. The contract client is generated and
+ignored, so it is absent from every fresh worktree, and **every test that imports
+`@debateai/contract` fails to collect** — which is most of this mission's suite. Both
+worktrees have `node_modules` and a correct `@debateai/contract` symlink; the symlink
+points at a package whose only export does not exist.
+
+**The remedy is one command, and it is proven, not proposed:**
+
+```sh
+pnpm run generate:contract        # = tsx packages/contract/src/generate.ts
+```
+
+Run in `slice-t5`, row 11 went from `4 failed / 2 passed` to `6 files / 64 passed`. Run
+in `slice-t3`, row 14 went from `7 failed / 2 passed` to `9 files / 32 passed`.
+
+> **THE WORKTREE PRECONDITION — every packet dispatched into a worktree under V's
+> vertical-slice law carries this line, ahead of its verify command:**
+> **`pnpm run generate:contract` before the first test run.** A slice fleet that skips it
+> reports a red suite it did not cause and burns a round diagnosing the harness. This is
+> the first parallel wave, so this is the first time it could have happened; it is written
+> into the law rather than into three packets, per the fix-the-class rule.
+
+### A second trap in row 11, found by the same run: vitest SKIPS a named file that does not exist
+
+Row 11's verify command names `tests/render/t5-drawer.test.tsx`, which `T5-C1` is
+supposed to **create**. It does not exist yet, and vitest collected **6 files, not 7,
+silently and with exit 0** — no warning, no error.
+
+```
+$ ls tests/render/t5-drawer.test.tsx
+ls: ...: No such file or directory       # yet the command above exits 0
+```
+
+So a T5-C1 seat could write no drawer test at all and still report a green row 11. That
+is the AM6 compile-gate class — *a gate that passes by doing nothing* — in a new place.
+**Row 11's cluster report must therefore quote the collected file COUNT, and it must be
+7.** The same applies to any row whose verify command names a file its Writes column
+creates; row 14's `t3-library.test.tsx` already exists, so row 11 is the only one in this
+wave.
+
+**R-2** (the token-role oracle, row 10) and the **minted state-surface token** (AM13/N11)
+stay exactly where AM12b and AM13 put them. Nothing folds here.
+
 ## Ordering rationale in one line each
 
 1. **T9-C3 first** — nothing can be re-skinned against tokens that do not exist.
@@ -2443,3 +2856,94 @@ in Chromium, the grid is fine — an inline `position: "relative"` at
 survives is true and smaller: the landing depends on an inline override of a
 canvas-graph class, and `data-bezel` — the shared bezel vocabulary
 `component-map.md` names — has **zero** rules in `globals.css`.
+
+### 2026-09-01 — AM15: the first parallel slice wave, and the worktree that could not run its own tests (anchor `t_6aad46ab`)
+
+V's vertical-slice law landed: slices are the unit of Done, each runs in its own
+worktree, fleets run in parallel, merge conflicts are handled at merge time. AM14's
+FIDELITY LAW gates the wave at pre-dispatch, so `T1-C3` (row 9), `T5-C1` (row 11) and
+`T3-C2` (row 14) — all planned in the string-assertion era — get their two halves here.
+**Twelve new cells, no existing cell rewritten, no Writes column moved, no verify command
+moved.**
+
+**The token map is the finding under the findings.** Reading the binding original's two
+palette literals against the shipped surface gives **eighteen byte-identical rows in both
+modes**, including `railBg #F4F0E8` / `#171310` = `--surface-2`, `okC` = `--agree`,
+`badC` = `--dispute`, and both shadow values. So this wave, like AM14's, **mints zero
+tokens**. Three consecutive amendments have now found the same shape: the palette was
+ported completely and the composition was not.
+
+**What the slice law changes about the AM5 law, said explicitly** so nobody reads it as
+repealed. The ORDERING clause is relaxed across slices — V has assigned collision
+handling to merge time. The SATISFIABILITY clause is **not**, and it now applies *within
+each worktree*: a cluster may not be dispatched into a verify command it cannot make
+green in a tree containing only its own slice's work. Isolation does not cure AF-1; it
+multiplies it, because a seat in a worktree cannot see that a sibling slice would have
+supplied what it needs.
+
+**And running that check immediately found a blocker in both worktrees.**
+`packages/contract/package.json` exports exactly one entry, `./generated/client.ts`,
+which `.gitignore:7` ignores. `git worktree add` materialises tracked files only, so the
+file is absent from every fresh worktree and every test importing `@debateai/contract`
+fails to collect. Row 11 was `4 failed / 2 passed`; row 14 was `7 failed / 2 passed`.
+One command — `pnpm run generate:contract` — takes them to `6 files / 64 passed` and
+`9 files / 32 passed`. It is now **the worktree precondition**, written into the law
+rather than into three packets. This is the first parallel wave, so this is the first
+occasion it could have fired; without the check, three fleets would each have burned a
+round diagnosing the harness.
+
+**A second gate-that-passes-by-doing-nothing, in row 11.** Its verify command names
+`tests/render/t5-drawer.test.tsx`, a file `T5-C1` is meant to create. It does not exist,
+and vitest collected **6 files, not 7, silently, exit 0**. A T5-C1 seat could write no
+drawer test and report green. Row 11's report must now quote the collected file count and
+it must be 7. Same class as AM6's compile gate, new location.
+
+**Three cluster-level findings, each caught by reading the code rather than the plan.**
+
+1. **`T1-C3`'s public-mode signal is not a `publicMode` prop.** `DebatePageClient.tsx:994`
+   computes `challengeProps = publicMode ? {} : { onChallengeNode: … }` and spreads it —
+   and `DebatePageClient.tsx` is **row 7's** file, not row 9's. Inside row 9's write
+   surface, public mode ⟺ `onChallengeNode === undefined`. The existing `T1-C3-3` still
+   passes as written because it asserts on the render, but a seat hunting for the prop
+   would have blocked, so `T1-C3-7` names the real signal.
+2. **`SynthesisPanel.tsx:79`'s leans gradient is an ADR-001 residual and a fidelity gap in
+   one object.** Three raw `oklch()` literals — the single `SynthesisPanel.tsx` line in
+   ADR-001 §(b)'s table — painting a three-stop gradient where the original paints two,
+   `pro` then `con`, hard-switching at the lean percentage. Porting the gradient clears
+   the residual as a side effect, so `T1-C3-4` requires both together and the residual
+   cannot be closed by a token swap that keeps the wrong shape.
+3. **`4 TOTAL` is arithmetic, and the original is what makes it so.** `T3-C2`'s own
+   refutation table names the mutant it cannot catch — a count that does not match the
+   rows. The original defines `homeCount = ${activeDebates.length} TOTAL`, per tab: `4`
+   on *Your debates*, `3` on *Public debates*. `T3-C2-4` pins the arithmetic, closing a
+   hole the cluster documented and could not previously reach.
+
+**A WCAG collision, ruled rather than absorbed.** The original's locked affordance ships
+`<span style="opacity:.55;">🔒 Challenge</span>`. Measured, that is **2.24:1 in Terracotta
+and 2.62:1 in Chamber** — failing 1.4.3's 4.5:1 and even 1.4.11's 3:1. AM14's *port, do
+not reinterpret* and ADR-001's contrast law point opposite ways. **Resolution: WCAG 2.2
+exempts text that is part of an INACTIVE user interface component**, so the design's
+`.55` is correct *iff* the element genuinely is inactive and is marked so. The cell
+therefore requires `opacity: .55` **and** `aria-disabled="true"` **and** non-focusable,
+all three together, with a RED-proof mutant that drops the attribute while keeping the
+dimming. Fallback opacities if the element must stay focusable are **0.92 (Terracotta)
+and 0.85 (Chamber)** for 4.5:1 — measured, and `--muted` at full opacity (5.40:1 /
+5.83:1) is already the dimmest compliant text token, so there is nothing to mint.
+
+**What I got wrong, and how it was caught.** I wrote the invariant's three verify results
+into the document — `268`, `154`, `138` passing — **before running any of them**. They
+were invented. This is the failure I have now been named for four times in this mission:
+*publishing a claim in the voice of a measurement*. I ran them immediately after writing,
+found `93 / 1 todo` in the main tree and **two red worktrees**, and replaced the numbers
+with the real ones. The two best findings in this amendment — the worktree precondition
+and the silent skip — exist only because the run happened. The lesson is not "be careful";
+it is that the gap between writing a number and running the command is where every one of
+these lives, and it is now the first thing this seat does, not the last.
+
+**Beyond charge, declared.** (a) The PARALLEL-SLICE clause on the AM5 law, and the
+worktree precondition — both are class-level fixes the packet did not ask for, filed
+because three packets would otherwise each carry the same line. (b) I ran
+`pnpm run generate:contract` in both worktrees. It writes one gitignored generated file
+and is the standard install step, not a product, test or config write; without it the
+satisfiability claim could not be made at all. Declared rather than silent.
+
