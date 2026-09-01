@@ -54,7 +54,7 @@ import {
 import {
   countMeasuredEdges,
   decideBranchFreezes,
-  decideRoundContinuation,
+  decideRoundBoundary,
   evaluate,
   type BranchFreezeDecision,
   type EvaluationSnapshot,
@@ -1237,6 +1237,39 @@ export function deriveGlobalRoundCompletions(
     .map(([round, index]) => [index, round] as const)));
 }
 
+/**
+ * T7 · ruling J15 ADDENDUM-2 — which frozen branches the decision can still
+ * prevent from expanding.
+ *
+ * The global boundary lands late in a root-major plan, so by the time round k
+ * completes, every root BEFORE the last has already authored its round-k
+ * descendants. Freezing such a branch prevents nothing, and a
+ * BRANCH-FROZEN-LOW-LEVERAGE mark on it would claim a skip that never happened
+ * — a false honesty mark, which the goal repeals categorically (goal 26).
+ *
+ * A branch is preventable iff some leg AFTER the boundary would author beneath
+ * it. Returns the preventable subset of `carryingChildIndices`, in the order
+ * given.
+ */
+export function selectPreventableBranches(input: {
+  readonly plan: readonly MultiMakerExpansionLeg[];
+  readonly boundaryLegIndex: number;
+  readonly carryingChildIndices: readonly number[];
+}): readonly number[] {
+  const subtreeOf = (childIndex: number): ReadonlySet<number> => {
+    const indices = new Set([childIndex]);
+    for (const candidate of input.plan) {
+      if (indices.has(candidate.parentIndex)) indices.add(candidate.childIndex);
+    }
+    return indices;
+  };
+  return Object.freeze(input.carryingChildIndices.filter((childIndex) => {
+    const subtree = subtreeOf(childIndex);
+    return input.plan.some((leg, index) =>
+      index > input.boundaryLegIndex && subtree.has(leg.parentIndex));
+  }));
+}
+
 /** One response per ordered distinct maker pair: defend one root against each other root. */
 export function buildCrossRootExchangePlan(effectiveMakerCount: number): readonly CrossRootExchangeLeg[] {
   if (!Number.isInteger(effectiveMakerCount) || effectiveMakerCount < 1) {
@@ -1328,6 +1361,13 @@ export interface AdaptiveStoppingRoundInput {
   /** J3: propagation has no root notion, so the runner supplies the root ids. */
   readonly rootNodeIds: readonly string[];
   readonly branchCarryingNodeIds: readonly string[];
+  /**
+   * J15 ADDENDUM-2: the subset of `branchCarryingNodeIds` whose expansion this
+   * decision can still prevent. Leverage is computed for every carrying branch;
+   * only a branch in THIS list may publish a freeze mark, because only its
+   * freeze actually skipped anything.
+   */
+  readonly preventableCarryingNodeIds: readonly string[];
   readonly previousStrengths: readonly NodeStrengthRecord[] | null;
   readonly snapshot: EvaluationSnapshot;
   /** δ and ε as read from T16's sealed rows — never a constant in this file. */
@@ -1369,7 +1409,7 @@ export async function runAdaptiveStoppingRound(
   const propagation = evaluate(input.snapshot);
   // J15(b): the evidence this decision had, carried onto its record.
   const measuredEdgeCount = countMeasuredEdges(input.snapshot);
-  const continuation = decideRoundContinuation({
+  const continuation = decideRoundBoundary({
     completedRounds: input.completedRounds,
     depthCeiling: input.depthCeiling,
     rootNodeIds: input.rootNodeIds,
@@ -1388,6 +1428,10 @@ export async function runAdaptiveStoppingRound(
       epsilon: input.controls.epsilon
     });
   const frozen = freezes.filter((decision) => decision.verdict === "FROZEN");
+  // J15 ADDENDUM-2: the freeze DECISION covers every carrying branch, but only a
+  // freeze that actually prevented an expansion may claim to have done so.
+  const preventable = new Set(input.preventableCarryingNodeIds);
+  const frozenAndPrevented = frozen.filter((decision) => preventable.has(decision.carryingNodeId));
   const epsilonSourceRef = input.controls.sourceRefs.branchFreezeEpsilon ?? "";
   await dependencies.appendLedger({
     runId: input.runId,
@@ -1408,7 +1452,7 @@ export async function runAdaptiveStoppingRound(
     continuation,
     freezes,
     frozenCarryingNodeIds: Object.freeze(frozen.map((decision) => decision.carryingNodeId)),
-    conditionMarkRecords: Object.freeze(frozen.map((decision) => buildBranchFrozenRecord({
+    conditionMarkRecords: Object.freeze(frozenAndPrevented.map((decision) => buildBranchFrozenRecord({
       carryingNodeId: decision.carryingNodeId,
       leverage: decision.leverage,
       epsilon: input.controls.epsilon,
@@ -2577,7 +2621,7 @@ export class WalkingSkeletonRunner {
      * from here), then apply the ε branch freeze and the global δ stop. Returns
      * true when the debate should stop expanding.
      */
-    const closeGlobalRound = async (completedRounds: number): Promise<boolean> => {
+    const closeGlobalRound = async (completedRounds: number, boundaryLegIndex: number): Promise<boolean> => {
       const stoppingPolicy = this.settings.stoppingPolicy;
       if (stoppingPolicy === undefined) return false;
       const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
@@ -2586,15 +2630,14 @@ export class WalkingSkeletonRunner {
         await this.#judgements.readReviewedNodeIds(run.runId)
       );
       const scoredNodeIds = new Set(roundStanding.snapshot.nodes.map((node) => node.nodeId));
+      // codex B1 / J15 ADDENDUM-2: the AUTHORITATIVE maker-root scope, NEVER
+      // narrowed to the roots that happen to have standing. A root whose review
+      // exhausted is uncomparable, and `decideRoundBoundary` refuses convergence
+      // because of it — dropping it here is what let r2 claim "no root moved"
+      // about a root it had never looked at.
       const rootNodeIds = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
-        .flatMap((root) => root !== undefined && scoredNodeIds.has(root.nodeId) ? [root.nodeId] : []);
-      if (rootNodeIds.length === 0) {
-        // No maker root survived into this round's standing, so root movement is
-        // unmeasurable. Continuing to the ASK-time ceiling never truncates a
-        // debate on absent evidence; inventing a stop would end a run on a
-        // number nobody measured.
-        return false;
-      }
+        .flatMap((root) => root === undefined ? [] : [root.nodeId]);
+      if (rootNodeIds.length === 0) return false;
       // The branches that could expand next are the nodes this round authored.
       const branchCarryingNodeIds = expansionPlan
         .filter((candidate) => candidate.round === completedRounds
@@ -2606,6 +2649,12 @@ export class WalkingSkeletonRunner {
             ? [{ index: candidate.childIndex, nodeId: authored.nodeId }]
             : [];
         });
+      // ...and only some of those still have anything left to prevent.
+      const preventableIndices = new Set(selectPreventableBranches({
+        plan: expansionPlan,
+        boundaryLegIndex,
+        carryingChildIndices: branchCarryingNodeIds.map((branch) => branch.index)
+      }));
       const boundary = await runAdaptiveStoppingRound({
         runId: run.runId,
         attemptId: runnerAttemptId,
@@ -2613,6 +2662,8 @@ export class WalkingSkeletonRunner {
         depthCeiling: expansionDepth,
         rootNodeIds,
         branchCarryingNodeIds: branchCarryingNodeIds.map((branch) => branch.nodeId),
+        preventableCarryingNodeIds: branchCarryingNodeIds
+          .flatMap((branch) => preventableIndices.has(branch.index) ? [branch.nodeId] : []),
         previousStrengths: previousRoundStrengths,
         snapshot: roundStanding.snapshot,
         controls: stoppingPolicy,
@@ -2681,7 +2732,7 @@ export class WalkingSkeletonRunner {
       const completedRound = globalRoundCompletions.get(legIndex);
       if (completedRound !== undefined) {
         await reviewPendingAuthoredNodes();
-        stoppedByAdaptiveRule = await closeGlobalRound(completedRound);
+        stoppedByAdaptiveRule = await closeGlobalRound(completedRound, legIndex);
         if (stoppedByAdaptiveRule) break;
       }
     }
