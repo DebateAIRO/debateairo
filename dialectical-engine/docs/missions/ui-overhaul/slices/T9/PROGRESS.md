@@ -79,3 +79,12 @@ REQUIREMENTS DRAFTED — awaiting review
 - After AM11: CODE-T9C2-N3 (session 01a05a3c) implements N8/N9/N11 rows. Then re-verdicts
   ride the SAME reviewer sessions; T9-C5 gets a fresh Opus review. That closes T9 except
   the V queue (Q-13..Q-16, closure lines, browser QA).
+
+## 2026-09-01 06:20 — T9 SLICE CLOSED
+- C5 zero-diff PASS (fresh Opus: blind re-audit zero divergence, five probes, classification
+  survived refutation). C2 addendum 3 SOUND (reviewer withdrew its own N9 form after a
+  7-drift probe; N8 exact via M17+M19; boundary rule refined -> N12). C4 addendum SOUND
+  (3-way fidelity, 3-cycle mutant, no over-conversion).
+- All five clusters merged-ready on dev through 3a637d35. Open: V queue (Q-13..Q-16,
+  closure lines, browser QA, merges/pushes) + ARCH AM12 batch (t_d20dcdb4, t_e10b860e,
+  t_db63b519, t_48ac899c). Findings ledger complete; murder-case material filed per seat.
