@@ -19,10 +19,13 @@ import { RECOVERY_POLICY_REGISTER_ROW } from "./recovery-policy.js";
 import { SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
-export const ENGINE_BRANCHING_FACTOR = 2 as const;
-export const ENGINE_COMPOSITION_SEGMENT_CAP = 2 as const;
-export const ENGINE_FIXED_ORGANS_PER_COMPOSITION = 1 + ENGINE_COMPOSITION_SEGMENT_CAP + 1;
-export const ENGINE_MAX_RECOMPOSE = 2 as const;
+export {
+  ENGINE_BAND_ORDER,
+  ENGINE_BRANCHING_FACTOR,
+  ENGINE_COMPOSITION_SEGMENT_CAP,
+  ENGINE_FIXED_ORGANS_PER_COMPOSITION,
+  ENGINE_MAX_RECOMPOSE
+} from "./engine-shape.js";
 
 const unitIntervalSchema = z.number().finite().min(0).max(1);
 const compositionMetricSchema = z.enum([
@@ -561,6 +564,35 @@ export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRe
     }
   }
 }
+
+export {
+  ADAPTIVE_STOPPING_ROW_KEYS,
+  ALGORITHM_REGISTER_ROW_FAMILIES,
+  ALGORITHM_REGISTER_ROW_KEYS,
+  ENVELOPE_FORMULA_ROW_KEYS,
+  PANEL_WEIGHTING_ROW_KEYS,
+  SYNTHESIS_ROLE_ROW_KEYS,
+  SYNTHESIS_ROLE_REFS_IDENTICAL_WARNING,
+  T16_ROLE_RULING_REF,
+  VERDICT_LABEL_ROW_KEYS,
+  buildAlgorithmRegisterRows,
+  buildOneStepDownBands,
+  warnOnIdenticalSynthesisRoleRefs,
+  readAdaptiveStoppingControls,
+  readEnvelopeFormulaInputs,
+  readPanelWeightingControls,
+  readSynthesisRoleControls,
+  readVerdictLabelControls,
+  type AdaptiveStoppingControls,
+  type AlgorithmRegisterRow,
+  type AlgorithmRegisterRowFamily,
+  type AlgorithmRegisterRowsInput,
+  type EnvelopeFormulaInputs,
+  type PanelWeightingControls,
+  type ProviderFamilyEntry,
+  type SynthesisRoleControls,
+  type VerdictLabelControls
+} from "./algorithm-policy.js";
 
 export {
   loadApiEnvironment,

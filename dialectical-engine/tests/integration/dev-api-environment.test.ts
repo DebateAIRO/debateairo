@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
+import { DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
 import { loadApiEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   DEVELOPMENT_API_ENVIRONMENT_KEYS,
@@ -232,7 +233,7 @@ describe("DEV-09 private local API environment", () => {
     await expect(assemble(test.repositoryRoot))
       .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     const upgraded = await readFile(test.outputFilePath, "utf8");
-    expect(upgraded).toContain("REGISTER_VERSION=4\n");
+    expect(upgraded).toContain(`REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`);
     expect(upgraded).toContain("PUBLICATION_ENABLED=true\n");
     expect(upgraded).toContain("PROVIDER_DISCOVERY_TARGETS_JSON=");
     expect(upgraded).toContain("PROVIDER_PROBE_TIMEOUT_MS=180000\n");
@@ -274,7 +275,7 @@ describe("DEV-09 private local API environment", () => {
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
     const legacy = current
-      .replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=3\n")
+      .replace(`REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`, "REGISTER_VERSION=3\n")
       .replace(
         `PROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(
           TEST_DEVELOPMENT_PROVIDER_DOCUMENT.providers.map((provider) => ({
@@ -292,7 +293,7 @@ describe("DEV-09 private local API environment", () => {
     await expect(assemble(test.repositoryRoot))
       .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     const upgraded = await readFile(test.outputFilePath, "utf8");
-    expect(upgraded).toContain("REGISTER_VERSION=4\n");
+    expect(upgraded).toContain(`REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`);
     expect(upgraded).toContain("development:codex-cli");
     expect(upgraded).not.toContain("qa-deterministic-v1");
   });
@@ -363,7 +364,7 @@ describe("DEV-09 private local API environment", () => {
     expect(cliSource).not.toMatch(/HATCHET_CLIENT_TOKEN|readFile|console\.log\([^)]*path/i);
     expect(topology.apiEnvironment).toMatchObject({
       STRANGER_SAMPLE_RATE: "0",
-      REGISTER_VERSION: "4",
+      REGISTER_VERSION: String(DEVELOPMENT_REGISTER_VERSION),
       BATTERY_VERSION: "dev-auth-v1",
       SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
       HATCHET_WORKFLOW_NAME: "debateai-dev"

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startStandingDatabase, type StandingDatabase } from "./standing-db.js";
-import { seedAcceptanceRegister } from "./seed-register.js";
+import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { runDualMakerProof } from "./dual-maker-proof.js";
 
 const fakeCodexCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
@@ -96,12 +96,12 @@ describe("FAIR-02 dual-maker proof", () => {
     try {
       await staleDatabase.pool.query(
         `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES (1, 'configuredProviderSet', $1::jsonb, $2)`,
+         VALUES ($3, 'configuredProviderSet', $1::jsonb, $2)`,
         [JSON.stringify({
           kind: "CONFIGURED_PROVIDER_SET",
           requiredDistinctMakers: 1,
           providers: [{ providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" }]
-        }), "acceptance:DR-133:V-approved"]
+        }), "acceptance:DR-133:V-approved", ACCEPTANCE_REGISTER_VERSION]
       );
 
       await expect(seedAcceptanceRegister(staleDatabase.pool))

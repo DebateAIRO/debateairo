@@ -42,7 +42,12 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     XDG_CONFIG_HOME: z.string().min(1).optional(),
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
-    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional()
+    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+    // T16 · operator overrides for the sealed synthesizer/evaluator role
+    // identities. Goal 84-85 permits identical refs; without an override the
+    // permitted case is unreachable and its startup warning is dead code.
+    DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: z.string().min(1).optional(),
+    DEBATEAI_DEV_EVALUATOR_ROLE_REF: z.string().min(1).optional()
   });
   return Object.freeze(Object.fromEntries(
     Object.entries(environment).filter((entry): entry is [string, string] => (
