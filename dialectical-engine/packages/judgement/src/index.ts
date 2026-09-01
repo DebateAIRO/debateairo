@@ -23,9 +23,42 @@ import {
 
 export * from "./s04.js";
 
+/**
+ * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. Nothing in the
+ * engine could ever execute anything on the judge's behalf, so the label was
+ * unreachable and its only real use was to dress a guess as a measurement.
+ * This constant is the ONE source both change sites read — the strict artifact
+ * schema below and the declared prompt schema in `Judge.judge` — so the two can
+ * no longer drift apart the way they had.
+ */
+export const JUDGE_WAYS_OF_KNOWING = ["LOOKED_UP", "REASONING"] as const;
+export type JudgeClaimedWayOfKnowing = typeof JUDGE_WAYS_OF_KNOWING[number];
+
+const JUDGE_WAY_OF_KNOWING_UNION = JUDGE_WAYS_OF_KNOWING.map((way) => `"${way}"`).join(" | ");
+
+/**
+ * S2-3: the honesty mark that discloses a downgraded way-of-knowing claim.
+ * Emitted by normalization, never by a caller.
+ */
+export const WAY_OF_KNOWING_DOWNGRADED = "WAY-OF-KNOWING-DOWNGRADED" as const;
+
+/**
+ * S2-3: the typed condition-mark record a downgrade must carry. It names the
+ * node the judgement is about and the value the judge CLAIMED, so the
+ * disclosure survives without the original artifact.
+ */
+export interface WayOfKnowingDowngradeRecord {
+  readonly mark: typeof WAY_OF_KNOWING_DOWNGRADED;
+  readonly scope: "node";
+  readonly subjectRef: string;
+  readonly claimedWayOfKnowing: JudgeClaimedWayOfKnowing;
+  readonly resolvedWayOfKnowing: WayOfKnowing;
+  readonly reason: string;
+}
+
 const judgeArtifactSchema = z.object({
   statement: z.string().trim().min(1),
-  way_of_knowing: z.enum(["LOOKED_UP", "RAN", "REASONING"]),
+  way_of_knowing: z.enum(JUDGE_WAYS_OF_KNOWING),
   locator: z.string().trim().min(1).nullable(),
   restatement_text: z.string().trim().min(1),
   restatement_status: z.enum(["PASS", "FAIL", "NOT_SAMPLED"]),
@@ -84,6 +117,12 @@ export interface JudgedNode {
   readonly statement: string;
   readonly wayOfKnowing: WayOfKnowing;
   readonly locator: string | null;
+  /**
+   * S2-3: non-null exactly when normalization resolved a way of knowing the
+   * judge did not claim. `null` means the claim survived untouched — the
+   * absence of a record is itself an assertion, not a missing field.
+   */
+  readonly wayOfKnowingDowngrade: WayOfKnowingDowngradeRecord | null;
   readonly restatementText: string;
   readonly restatementStatus: "PASS" | "FAIL" | "NOT_SAMPLED";
   readonly provenanceRef: string;
@@ -127,7 +166,7 @@ export class Judge {
           content: `Return only one JSON object with exactly the following schema and no additional keys. Arrays may be empty, but every string must be non-empty:
 {
   "statement": non-empty string,
-  "way_of_knowing": "LOOKED_UP" | "RAN" | "REASONING",
+  "way_of_knowing": ${JUDGE_WAY_OF_KNOWING_UNION},
   "locator": non-empty string | null,
   "restatement_text": non-empty string,
   "restatement_status": "PASS" | "FAIL" | "NOT_SAMPLED",
@@ -189,11 +228,24 @@ Never invent evidence, citations, or sources. Score relevance against the questi
     } catch (error) {
       throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", error instanceof Error ? error.message : String(error));
     }
-    const pinnedLookup = parsed.value.way_of_knowing === "LOOKED_UP" && parsed.value.locator !== null;
+    const claimedWayOfKnowing = parsed.value.way_of_knowing;
+    const pinnedLookup = claimedWayOfKnowing === "LOOKED_UP" && parsed.value.locator !== null;
+    const resolvedWayOfKnowing: WayOfKnowing = pinnedLookup ? "LOOKED_UP" : "REASONING";
     return {
       statement: parsed.value.statement,
-      wayOfKnowing: pinnedLookup ? "LOOKED_UP" : "REASONING",
+      wayOfKnowing: resolvedWayOfKnowing,
       locator: pinnedLookup ? parsed.value.locator : null,
+      // S2-3: normalization never absorbs a claim it overrode. The record is
+      // derived from the PROPERTY — resolved differs from claimed — not from
+      // the one case that satisfies it today.
+      wayOfKnowingDowngrade: resolvedWayOfKnowing === claimedWayOfKnowing ? null : Object.freeze({
+        mark: WAY_OF_KNOWING_DOWNGRADED,
+        scope: "node",
+        subjectRef: input.subjectItemId,
+        claimedWayOfKnowing,
+        resolvedWayOfKnowing,
+        reason: `Node ${input.subjectItemId} claimed way of knowing ${claimedWayOfKnowing}; normalization resolved ${resolvedWayOfKnowing}. A LOOKED_UP claim keeps its label only when it carries a resolving locator.`
+      }),
       restatementText: parsed.value.restatement_text,
       restatementStatus: parsed.value.restatement_status,
       provenanceRef: response.rawArtifactRef,
