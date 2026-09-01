@@ -221,25 +221,44 @@ const SKIPPED_DIRECTORIES = new Set(["node_modules", "generated", ".next", "dist
 const SHIPPED_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs"];
 
 /**
- * A line that fixes the expansion-depth ceiling with the literal 5 rather than
- * importing the contract constant. Deliberately narrow: it wants bound
- * positions (`.max(5)`, `> 5`, `>= 6`), not every mention of a depth and a five.
+ * The goal's negative invariant is literal: "No second literal 5". A duplicate
+ * SOURCE is therefore any shipped line that re-fixes the CEILING itself, in any
+ * of the three syntaxes the codebase actually uses to express a domain:
+ *
+ *   VALIDATOR      a schema re-validating the bound   `depth: z.…min(1).max(5)`
+ *   COMPARISON     a guard re-comparing against it    `depth <= 5`, `depth > 5`
+ *   OPTION_DOMAIN  an enumeration of the whole range  `[1, 2, 3, 4, 5]`
+ *
+ * Two deliberate exclusions, each reasoned rather than convenient:
+ *   · The OWNER's own declaration is not matched, because it names a constant
+ *     (`EXPANSION_DEPTH_MAX = 5`) rather than restating the bound in a bound
+ *     position. Assignment to a named export IS the single source; the scan is
+ *     therefore run over packages/contract too, and passes on its merits.
+ *   · A floor-only guard carrying no ceiling literal (`depth < 1`, as at
+ *     web/app/new/NewQuestionForm.tsx:18) is NOT a second definition of the 1–5
+ *     bound and contains no second literal 5. It is a separate completeness gap,
+ *     reported as finding F-T1-4 and owned by T2, not silenced here.
  */
-const LITERAL_DEPTH_CEILING = /depth.{0,80}?(?:\.max\(\s*5\s*\)|[<>]=?\s*5\b|>=\s*6\b)/i;
+type DuplicateKind = "VALIDATOR" | "COMPARISON" | "OPTION_DOMAIN";
 
-/**
- * Declarations that survive OUTSIDE this ticket's contract surface. T1 owns
- * packages/contract, the runner guard import and tests only, so these are
- * REPORTED, not edited (worker contract §5):
- *   · apps/ui/app/new/page.tsx:76  — `depth >= 1 && depth <= 5` submit gate (T1 finding F-T1-2)
- *   · packages/budget/src/index.ts:40 — `.min(1).max(5)` cost-envelope basis (T1 finding F-T1-1)
- * This is an exact-set assertion, not an allowlist: when either ticket lands,
- * the entry must be deleted or this test fails. The exemption cannot rot.
- */
-const DECLARED_SECOND_SOURCES = [
-  "apps/ui/app/new/page.tsx",
-  "packages/budget/src/index.ts"
+const CEILING_DETECTORS: ReadonlyArray<{ readonly kind: DuplicateKind; readonly pattern: RegExp }> = [
+  { kind: "VALIDATOR", pattern: /depth[^\n]{0,80}?\.max\(\s*5\s*\)/i },
+  { kind: "COMPARISON", pattern: /\bdepth\b[^\n]{0,40}?(?:<=?\s*[56]\b|>=?\s*[56]\b)/i },
+  { kind: "OPTION_DOMAIN", pattern: /\[\s*1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\s*\]/ }
 ];
+
+interface DuplicateSite {
+  readonly kind: DuplicateKind;
+  readonly line: number;
+  readonly text: string;
+}
+
+/** The oracle, over text — so it can be controlled with planted sources. */
+function duplicateBoundSites(source: string): DuplicateSite[] {
+  return source.split("\n").flatMap((text, index) => CEILING_DETECTORS
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ kind }) => ({ kind, line: index + 1, text: text.trim() })));
+}
 
 function shippedSourceFiles(): string[] {
   const found: string[] = [];
@@ -255,22 +274,42 @@ function shippedSourceFiles(): string[] {
   return found;
 }
 
-function filesDeclaringALiteralDepthCeiling(): string[] {
-  return shippedSourceFiles()
-    .filter((absolute) => readFileSync(absolute, "utf8").split("\n").some((line) => LITERAL_DEPTH_CEILING.test(line)))
-    .map((absolute) => relative(REPOSITORY_ROOT, absolute).split(sep).join("/"))
-    .sort();
+/** Every duplicate SITE in shipped code, addressed `path:line [KIND] text`. */
+function duplicateBoundSitesInShippedCode(): string[] {
+  return shippedSourceFiles().flatMap((absolute) => {
+    const path = relative(REPOSITORY_ROOT, absolute).split(sep).join("/");
+    return duplicateBoundSites(readFileSync(absolute, "utf8"))
+      .map((site) => `${path}:${site.line} [${site.kind}] ${site.text}`);
+  }).sort();
 }
 
 describe("S1-1 · the depth bound has a single source", () => {
-  // PROPERTY: packages/contract is the only place shipped code learns the
-  // ruled ceiling; the runner reads it rather than restating it.
-  it("keeps the runner guard free of a literal depth ceiling", () => {
-    expect(filesDeclaringALiteralDepthCeiling()).not.toContain("apps/runner/src/index.ts");
+  // PROPERTY: no shipped file re-fixes the ceiling in ANY syntax. Site-addressed,
+  // not file-addressed, so a second duplicate inside an already-listed file
+  // cannot hide behind the first.
+  it("leaves no duplicate definition of the ruled ceiling anywhere in shipped code", () => {
+    expect(duplicateBoundSitesInShippedCode()).toEqual([]);
   });
 
-  it("declares the ruled ceiling literally in exactly the sources on record", () => {
-    expect(filesDeclaringALiteralDepthCeiling()).toEqual(DECLARED_SECOND_SOURCES);
+  // POSITIVE CONTROLS — the oracle detects each syntax class it claims to cover.
+  // Without these, an oracle that silently matched nothing would also be "green".
+  it.each([
+    { kind: "VALIDATOR", planted: "  depth: z.number().int().min(1).max(5)," },
+    { kind: "COMPARISON", planted: "  const ready = depth >= 1 && depth <= 5;" },
+    { kind: "OPTION_DOMAIN", planted: "  {[1, 2, 3, 4, 5].map((value) => value)}" }
+  ])("detects a planted $kind duplicate", ({ kind, planted }) => {
+    expect(duplicateBoundSites(planted).map((site) => site.kind)).toContain(kind as DuplicateKind);
+  });
+
+  // NEGATIVE CONTROLS — unrelated depth concepts, and a floor-only guard, are
+  // not flagged. Each line is real code from this repo.
+  it.each([
+    "  if (depth >= limits.maxDepth) {",                              // logger recursion depth
+    "  const depthLimit = boundedDepth(options.causeDepthMax);",      // obs cause depth
+    "    topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 },", // a different depth field
+    "    if (!Number.isInteger(depth) || depth < 1) {"                // floor-only, no ceiling literal
+  ])("does not flag unrelated depth code: %s", (planted) => {
+    expect(duplicateBoundSites(planted)).toEqual([]);
   });
 
   it("names packages/contract as the exported single source", () => {

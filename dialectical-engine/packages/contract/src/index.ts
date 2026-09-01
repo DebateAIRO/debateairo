@@ -114,6 +114,18 @@ export const EXPANSION_DEPTH_MAX = 5;
 export const ExpansionDepthSchema = z.number().int().min(EXPANSION_DEPTH_MIN).max(EXPANSION_DEPTH_MAX);
 export type ExpansionDepth = z.infer<typeof ExpansionDepthSchema>;
 
+/**
+ * The ruled domain, DERIVED from the bound above. Selectors and option lists
+ * import this instead of enumerating the values by hand, so widening the bound
+ * widens every chooser without touching a consumer.
+ */
+export const EXPANSION_DEPTH_VALUES: readonly number[] = Object.freeze(
+  Array.from(
+    { length: EXPANSION_DEPTH_MAX - EXPANSION_DEPTH_MIN + 1 },
+    (_unused, index) => EXPANSION_DEPTH_MIN + index
+  )
+);
+
 /** Closed at the contract door: exactly one key, an integer inside the range. */
 export const DepthParamsSchema = z.object({ depth: ExpansionDepthSchema }).strict();
 export type DepthParams = z.infer<typeof DepthParamsSchema>;

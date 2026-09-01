@@ -367,6 +367,9 @@ importers:
 
   packages/budget:
     dependencies:
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@debateai/db':
         specifier: workspace:*
         version: link:../db
