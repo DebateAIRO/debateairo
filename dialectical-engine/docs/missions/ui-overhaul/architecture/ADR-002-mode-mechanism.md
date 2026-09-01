@@ -122,9 +122,33 @@ A seat that finds a **fourth** has found a route the map missed and must say so.
 | Debate chrome | `apps/ui/app/debate/[id]/DebatePageClient.tsx` — inside `<div className="debateTopControlRow">`, as a **sibling of** the `{hasTree ? …}` conditional, never inside it | `/debate/[id]` (T1, T5 drawer) and `/public/debate/[id]` (T3 3b, T5 public) |
 
 The "sibling of, never inside" is load-bearing: the `segment` view group is
-rendered only `{hasTree ? … : null}`, so a toggle placed inside it disappears on
-a debate whose tree has not been built yet — and T1's own acceptance opens a
-debate that may still be generating. Anchor on the class name
+rendered only `{hasTree ? … : null}`, so a toggle placed inside it disappears
+whenever `tree` is null.
+
+> **RATIONALE CORRECTED 2026-09-01 (AM12b/item 10, from `t_7fd7c80c`).** This
+> paragraph used to justify the placement with *"a debate whose tree has not
+> been built yet — and T1's own acceptance opens a debate that may still be
+> generating."* **That case is unreachable.** Every owner producer emits a
+> skeleton tree, and the truly-pending owner path early-returns a chromeless
+> loading screen before this chrome renders at all. Measured: the only product
+> site that produces `tree: null` is
+> `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx:46` —
+> `tree_included === true ? detail : { ...detail, tree: null }`, i.e. **a
+> published debate whose snapshot omits the tree.**
+>
+> **The placement is unchanged and still correct** — the reviewer's M2 mutant
+> fires — but for the public-debate reason, not the mid-generation one. So the
+> real requirement is sharper than the old wording: on `/public/debate/[id]`
+> with a tree-less snapshot, the reader must still be able to switch modes.
+> T5's public-drawer and T3's 3b work both land on that surface, and both
+> inherit this constraint.
+>
+> **Third recurrence of right-decision-wrong-reason**, a pattern this ADR's own
+> AM6 changelog named. The decision survived every time; the stated reason did
+> not, and a reason nobody can reach is a reason nobody can check. The standing
+> correction is the one AM6 produced and I keep re-learning: **a claim about
+> runtime behaviour must be read out of the file that produces it**, and for
+> "case X can happen" that means naming the site that produces X. Anchor on the class name
 `debateTopControlRow`, not on a line number; the file is 1958 lines and every
 cluster in T1/T3/T5 edits it.
 

@@ -246,5 +246,33 @@ If the ref format ever stops being a UUID, the signal is `T9-C2-7` going RED —
 both its accept-case and its schema-agreement row — and that is the moment to
 revisit this grammar, not before.
 
+> **DETECTION RULE CORRECTED 2026-09-01 (AM12b/item 8, from `t_db63b519`).** The
+> sentence above, and AM9's changelog, described the alarm as catching
+> *"public_ref ever stops being a UUID"*, and a later handoff narrowed that to
+> *"narrowing drift only"*. **Both readings are wrong, in both directions.** The
+> reviewer verified the true rule across seven simulated drifts:
+>
+> > **`T9-C2-7` goes RED if and only if the drifted schema REJECTS the fixture.**
+>
+> That is neither "narrowing" nor "widening". A fixture-preserving *narrowing*
+> (a strict UUID subset that still admits the fixture) stays **GREEN** and is
+> missed; a *format switch* — `uuid → ULID`, `uuid → number` — goes **RED** and
+> is caught, and the format switch contains the likeliest real migration.
+>
+> **Why the missed class is acceptable rather than a hole (AM12b/item 6,
+> `t_d20dcdb4`).** The alarm cannot see a *widening* — `z.uuid() → z.string()`,
+> after which slugs become issuable and the kind starts rejecting real refs. The
+> residual is named rather than papered over, and it is not charged a standing
+> generative alarm, for a measured reason: every schema that still admits the
+> fixture and is reachable by narrowing yields a **UUID subset**, and
+> `safeReturnPath` accepts every UUID — so **the missed class provably cannot
+> refuse a real ref**. The widening class *can*, but it requires an edit to the
+> contract that a reviewer reads, in a package with its own review lane, and
+> `REV2`'s 2,266-ref generative sweep is the check that belongs at that moment,
+> not on every `t9-return-path` run. **Declared covered-by-review, with the
+> trigger named:** any edit to `public_ref`'s schema re-runs the generative
+> sweep. A standing generative row here would pay a per-run cost forever to
+> watch a file this suite does not own.
+
 **Supersedes** `slices/T9/PLAN.md:116`, which quotes the old regex verbatim. PLAN
 stays frozen; the dispatch row carries the correction (AM7/AM8 practice).

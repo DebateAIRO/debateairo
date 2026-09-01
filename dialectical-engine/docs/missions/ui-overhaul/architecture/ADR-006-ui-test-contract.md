@@ -168,12 +168,19 @@ cd "$root" || exit 2
 pnpm exec tsc --version >/dev/null 2>&1 || { echo "GATE FAIL: 'pnpm exec tsc' does not run in $PWD"; exit 2; }
 
 # 3. The gate.
-pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
-  | grep -E 'error TS' \
-  | grep -v -e 'app/debate/\[id\]/DebatePageClient\.tsx(1488,11): error TS2322' \
-          -e 'app/layout\.tsx(3,8): error TS2882' \
-  | tee /dev/stderr \
-  | wc -l          # required: 0
+raw=$(pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 | grep -E 'error TS')
+
+# Baseline 1 — PDA-owned AnswerExport union mismatch. LINE-AGNOSTIC, COUNT-PINNED.
+b1=$(printf '%s\n' "$raw" | grep -cE 'app/debate/\[id\]/DebatePageClient\.tsx\([0-9]+,[0-9]+\): error TS2322')
+[ "$b1" -eq 1 ] || { echo "GATE FAIL: baseline TS2322 count is $b1, expected exactly 1"; exit 2; }
+# Baseline 2 — structural globals.css side-effect import.
+b2=$(printf '%s\n' "$raw" | grep -cE 'app/layout\.tsx\(3,8\): error TS2882')
+[ "$b2" -eq 1 ] || { echo "GATE FAIL: baseline TS2882 count is $b2, expected exactly 1"; exit 2; }
+
+printf '%s\n' "$raw" \
+  | grep -vE 'app/debate/\[id\]/DebatePageClient\.tsx\([0-9]+,[0-9]+\): error TS2322' \
+  | grep -vE 'app/layout\.tsx\(3,8\): error TS2882' \
+  | tee /dev/stderr | wc -l          # required: 0
 ```
 
 **Why an upward walk and not a hard-coded path.** The walk preserves the only
@@ -231,7 +238,7 @@ Measured 2026-08-31 by ARCH-01 on the tree at `55b18ee`:
 
 | # | Error | Pre-existing? | Owner |
 |---|---|---|---|
-| 1 | `app/debate/[id]/DebatePageClient.tsx(1488,11): error TS2322` — `AnswerExport` union mismatch | yes — file last touched at `3705955`, long before this mission | PDA lane, ticket `t_d9066400` |
+| 1 | `app/debate/[id]/DebatePageClient.tsx(<line>,11): error TS2322` — line-agnostic since AM12b; was `(1488,11)`, now `(1490,11)` — `AnswerExport` union mismatch | yes — file last touched at `3705955`, long before this mission | PDA lane, ticket `t_d9066400` |
 | 2 | `app/layout.tsx(3,8): error TS2882` — *Cannot find module or type declarations for side-effect import of `./globals.css`* | **yes** — `import "./globals.css"` is byte-identical at `55b18ee^`, and `web/app/layout.tsx:3` carries the same line | unowned; see below |
 
 > **DISCREPANCY WITH THE AM2 PACKET, reported rather than papered over.**
@@ -396,3 +403,38 @@ a directory a seat would plausibly be in**, before it is published.* Running the
 idea of the command is not running the command. Where a gate's output is a
 count, the run must also show the count moving — a gate only ever observed
 printing its pass value has not been shown to be a gate.
+### 2026-09-01 — AM12b/item 2: the gate was RED on a pre-existing error, and the fix is to stop pinning line numbers (trigger: `t_47057270`)
+
+**Measured at the start of this amendment — the published gate was failing:**
+
+```
+$ <the published block, as printed above this amendment>
+       1
+```
+
+T1-C1's rewrite moved the PDA-owned `AnswerExport` diagnostic from
+`(1488,11)` to `(1490,11)`. Same file, same code, same message, count still 1 —
+but the `grep -v` pinned the coordinates, so the baselined error stopped being
+filtered and **every cluster running the gate would have failed on somebody
+else's pre-existing defect.** That is the mirror of AM6's anti-gate: AM6's gate
+passed while compiling nothing; this one failed while nothing was wrong.
+
+**Decision: the filter is permanently LINE-AGNOSTIC, and the count is pinned.**
+Three more T1 clusters write near that line and each may shift it again;
+re-anchoring by hand every time is a standing tax that will be paid late, in a
+red gate, by whichever seat happens to run next.
+
+**Line-agnostic alone would be a loosening**, so it is not shipped alone. A bare
+`grep -v '…DebatePageClient\.tsx\([0-9]+,[0-9]+\): error TS2322'` would silently
+absorb a *second*, genuinely new TS2322 in that file. The count pin closes it —
+verified in this edit:
+
+```
+today (1 baseline)             count = 1 -> pass
+baseline + a NEW regression    count = 2 -> GATE FAIL: baseline TS2322 count is 2, expected exactly 1
+```
+
+So the gate now fails loudly in three separate ways — wrong directory, dead
+toolchain, and baseline drift — and its `0` still means "compiled, and nothing
+new". Both copies were corrected: this ADR and `dispatch-order.md`'s acceptance
+defaults.

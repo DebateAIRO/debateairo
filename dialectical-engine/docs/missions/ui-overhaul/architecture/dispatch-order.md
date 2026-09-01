@@ -44,12 +44,19 @@ cd "$root" || exit 2
 pnpm exec tsc --version >/dev/null 2>&1 || { echo "GATE FAIL: 'pnpm exec tsc' does not run in $PWD"; exit 2; }
 
 # 3. The gate.
-pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 \
-  | grep -E 'error TS' \
-  | grep -v -e 'app/debate/\[id\]/DebatePageClient\.tsx(1488,11): error TS2322' \
-          -e 'app/layout\.tsx(3,8): error TS2882' \
-  | tee /dev/stderr \
-  | wc -l          # required: 0
+raw=$(pnpm exec tsc --noEmit -p apps/ui/tsconfig.json 2>&1 | grep -E 'error TS')
+
+# Baseline 1 — PDA-owned AnswerExport union mismatch. LINE-AGNOSTIC, COUNT-PINNED.
+b1=$(printf '%s\n' "$raw" | grep -cE 'app/debate/\[id\]/DebatePageClient\.tsx\([0-9]+,[0-9]+\): error TS2322')
+[ "$b1" -eq 1 ] || { echo "GATE FAIL: baseline TS2322 count is $b1, expected exactly 1"; exit 2; }
+# Baseline 2 — structural globals.css side-effect import.
+b2=$(printf '%s\n' "$raw" | grep -cE 'app/layout\.tsx\(3,8\): error TS2882')
+[ "$b2" -eq 1 ] || { echo "GATE FAIL: baseline TS2882 count is $b2, expected exactly 1"; exit 2; }
+
+printf '%s\n' "$raw" \
+  | grep -vE 'app/debate/\[id\]/DebatePageClient\.tsx\([0-9]+,[0-9]+\): error TS2322' \
+  | grep -vE 'app/layout\.tsx\(3,8\): error TS2882' \
+  | tee /dev/stderr | wc -l          # required: 0
 ```
 
 > **CORRECTED 2026-09-01 (AM6/N2).** Steps 1 and 2 are new. The previous block
@@ -557,7 +564,7 @@ it imports `TopBar`.
 |---|---|---|---|
 | 4 | **T9-C2** — chrome labels, CTAs, stub nav, return path | `apps/ui/components/landing/LandingChrome.tsx` · `apps/ui/lib/returnPath.ts` · `apps/ui/components/LoginFlow.tsx` · `apps/ui/components/SignUpFlow.tsx` · `tests/unit/t9-return-path.test.ts` · `tests/render/t9-landing.test.tsx` · `tests/render/auth-flow-integration.test.tsx` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/render/auth-flow-integration.test.tsx tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/t9-return-path.test.ts tests/unit/v2ui-pages.test.ts` |
 | 5 | **T9-C4** — method ledger, sample cards, placeholders | `apps/ui/components/landing/LandingHero.tsx` · `LandingSample.tsx` · `LandingMethod.tsx` · `LandingPricing.tsx` · `tests/render/t9-landing.test.tsx` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/render/t9-landing.test.tsx tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
-| 6 | **T9-C5** — render-pin migration bind for T9 | `tests/unit/pda-s03-keyboard-accessibility.test.ts` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
+| 6 | **T9-C5** — render-pin migration bind for T9 (**the R9 MIGRATION bind only — it certifies the four INHERITED standing pins still hold after T9 rewrote their subject; it is NOT a slice-completeness gate and does NOT certify the mission's ten new T9 pins, which later slice regression sets run under the AM5 ownership law. A green row 6 does not mean "T9 is complete"** — AM12b/item 9) | `tests/unit/pda-s03-keyboard-accessibility.test.ts` | `pnpm exec vitest run tests/architecture/auth-front-door-parity.test.ts tests/architecture/s8-publication-contract.test.ts tests/unit/pda-s03-keyboard-accessibility.test.ts tests/unit/v2ui-pages.test.ts` |
 
 #### The R5 CTA sites — T9-C2-2 narrowed, T9-C4-5 and T9-C4-6 added (AM8)
 
@@ -1518,3 +1525,147 @@ who owns the file — not whether it feels like part of the cluster.
 **32 rows, 5 exemptions, 0 violations** — re-run after the row-8 surface change,
 not assumed, because this amendment is the first in a while that actually moved
 a Writes column.
+
+### 2026-09-01 — AM12b: the accumulated ruling batch, 10 items (anchor `t_4e80c7bf`)
+
+**Hard constraint honoured:** `CODE-T1C2-RW1` was live implementing `T1-C2-5/6`.
+**Row 8 and every T1-C2 cell are untouched by this amendment** — verified by
+diff intent, and every remedy that would have needed them is a routed row below
+instead.
+
+| # | Item | Ruling | Measurement |
+|---|---|---|---|
+| 1 | ADR-001 oracles are anti-gates | **ADOPTED** — both ADR-006 guards added to all three oracles | reproduced here: PATH-stripped `rg` → `0`; over-escaped pattern → `0` on a file that truly carries `1` |
+| 2 | ADR-006 baseline re-anchor | **ADOPTED + line-agnostic-with-count=1** | the published gate returned **`1`** at the start of this session — RED on a pre-existing error; count pin proven to catch a second TS2322 (`count = 2 → GATE FAIL`) |
+| 3 | Chamber `working ≡ contested`, gold out of reservation | **RETOKEN RULED → routed row R-1** | Chamber `working` and `contested` resolve byte-identical on all three properties; `--dispute-*` differs from `working` in **both** modes |
+| 4 | Token-role oracle | **SHIP IT → routed row R-2** (owner T1-C4, row 10) | three review rounds, four green mutants (T1-C1 M10; T1-C2 ME/MF/MH); reviewer-sized ~40 lines |
+| 4b | T1-C1 gold coupling | **RETOKEN RULED → routed row R-3** | `--gen-*`/`--score-uncertainty-*` byte-identical to `--gold*` in both modes → zero pixel change |
+| 5 | DebateMap depth ramp | **RETIRE the ramp, RECORDED; arc distinction folds into R-2** | `fillFor(node)` — the `depth` parameter is gone; depth survives geometrically in ring radius |
+| 6 | Widening-drift residual | **COVERED-BY-REVIEW, trigger named** | the missed class yields UUID subsets, all accepted by `safeReturnPath` — it provably cannot refuse a real ref |
+| 7 | N4 per-`li` exclusivity | **RATIFIED as no-change-needed** | reviewer's own counter-argument accepted: severity tracks reachability |
+| 8 | N12 wording | **ADOPTED** — ADR-004 now states the true rule | RED iff the drifted schema **rejects the fixture**; verified across 7 drifts |
+| 9 | T9 slice-close bind scope | **EXCLUSION IS BY DESIGN — now SAID in row 6** | later slice regression sets already run the t9 files under the AM5 law, so the new pins are not orphaned |
+| 10 | Mount rationale + source-tag sweep | **ADOPTED** (ADR-002 rewritten) + **SWEEP DESIGNED, not run** | only `tree: null` site is `PublicDebatePageClient.tsx:46` |
+
+#### Item 3 — routed row R-1: retoken `contested` off gold
+
+`lib/scrutiny.ts` binds `--gold-line/-bg/-text` exactly once, to the
+`contested` tier — which is neither reasoning nor verdict, so it is gold's one
+out-of-reservation binding. Measured on the shipped stylesheet:
+
+```
+family                        Terracotta                         Chamber
+working (reasoning)           ['#3D5A80','#E6E8E8','#3D5A80']    ['#C8A055','#342A1B','#C8A055']
+contested TODAY (gold)        ['#A5803D','#F3ECE0','#826530']    ['#C8A055','#342A1B','#C8A055']   <- identical
+candidate: dispute            ['#B0432F','#F4E5DE','#B0432F']    ['#D67F65','#36251E','#D67F65']   <- distinct in BOTH
+```
+
+**The reservation violation and the collision are the same fact**: in Chamber
+`--reasoning-*` *is* the gold family, exactly as *"gold reserved for reasoning &
+verdict"* intends — so anything else bound to gold necessarily collides with
+reasoning there. Two tiers that must be told apart render byte-identical.
+
+**Ruled: `contested → --dispute-*`.** Not an arbitrary pick — the tier map
+**already** binds `strengthened → --agree-*`, so `contested → --dispute-*`
+restores the agree/dispute symmetry that gold broke, keeps the vocabulary
+honest (a contested claim is one under dispute), and returns gold to its
+reservation. `--score-uncertainty-*` was measured and **rejected**: its Chamber
+`bg` and `text` still equal `working`'s, so it fixes the coupling without fixing
+the distinctness.
+
+**Owner: a post-RW1 T1-C2 addendum** — `scrutiny.ts` is row 8's and row 8 is
+frozen this session. It is a product change and must not enter RW1 mid-flight.
+**V-visible**, so it also carries a T1 DECISIONS row.
+
+#### Item 4 — routed row R-2: the token-role oracle, owner T1-C4 (row 10)
+
+Three rounds have now proven the same hole: **nothing mechanical guards which
+token a surface binds to.** T1-C1's M10 and T1-C2's ME/MF/MH all repainted roles
+— con arcs in `--pro-line`, the legend's Supports/Opposes collapsed to one
+colour — and all shipped green. Reviewer eyes are the only gate, and this
+mission has three reviewers' worth of evidence that they catch it *after* merge.
+
+**Ruled: ship it, at T1-C4 (row 10) — a migration cluster that already owns T1's
+pin surface and is NOT row 8**, so it is dispatchable without touching RW1. Sized
+by the T1-C2 reviewer at ~40 lines: a `role → token-family` map asserted against
+the rendered surface, so that repainting a role is RED regardless of which file
+did it. The DebateMap arc distinction (item 5's second half) folds in here rather
+than becoming its own pin — it is one row of the same map.
+
+**Why it is worth the weight, since "record why not" was the alternative:** every
+other oracle in this mission guards *whether* a literal exists (ADR-001) or
+*whether* a value is legible (ADR-005). Neither can see a correctly-tokenised,
+perfectly-contrasted surface wearing the **wrong role's** colour, and that is the
+one defect class this mission has produced repeatedly and caught only by eye.
+
+#### Item 4b — routed row R-3: T1-C1's gold coupling
+
+The AF-1 re-skin bound `--gold` to four surfaces that are neither reasoning nor
+verdict. **Harm today is zero and measured** — all four were amber literals
+before the re-skin, and `--gen-*`/`--score-uncertainty-*` are byte-identical to
+`--gold*` in both modes — so the defect is **coupling**, not appearance: a future
+gold retune drags four unrelated surfaces with it. **Ruled: retoken to
+`--gen-*`/`--score-uncertainty-*`, zero pixel change.** Owner: a T1-C1 addendum
+(row 7, already merged; not row 8). Not ratified as-is, because ratifying
+coupling means the next gold change is a silent four-surface regression.
+
+#### Item 5 — the DebateMap depth ramp is RETIRED, and that is recorded
+
+`fillFor(node, depth) → fillFor(node)` dropped the per-ring lightness ramp
+together with the `oklch(${…})` literals it interpolated — the exact class
+`ADR-001` names at `DebateMap.tsx:58-60`. **Ruled: retired, not restored.** Depth
+is still legible geometrically (ring radius), no SPEC requirement names a
+lightness ramp, and restoring it token-derived would re-introduce computed colour
+in the one file that taught this mission why computed colour is expensive to
+audit. Recorded here so the loss is a decision rather than an artefact of a
+refactor. The unpinned con-arc distinction is **not** dropped — it becomes a row
+of R-2's role map.
+
+#### Item 7 — per-`li` exclusivity: RATIFIED as no-change-needed
+
+Rendering all four method bodies into every `<li>` ships 16/16 green, so the
+positional pin proves each body sits in its own `<li>`, not that it is the only
+one there. **The reviewer argued against its own reflex and recommended closing
+it; I agree, and the reason is worth keeping as a rule:**
+
+> **Severity tracks reachability.** AM10's defect was reachable by a plausible
+> edit — a reordering — and the ledger still looked normal. This one requires a
+> deliberate render rewrite that visibly breaks the page first. If every
+> `toContain` that admits a pathological superset became a finding, every
+> containment assertion in the repo is a finding, and the class stops
+> discriminating.
+
+#### Item 9 — row 6's bind scope: the exclusion IS the design, now stated
+
+`T9-C5`'s four-file bind covers the **old standing pins** named by R9's sentence
+and excludes all ten mission-authored T9 pins. **Ruled: by design, and now said
+in the row rather than inferred.** Row 6 is the **R9 migration bind** — it
+certifies that the pins the mission *inherited* still hold after T9 rewrote their
+subject. It is not a slice-completeness gate, and widening it into one would
+duplicate coverage the AM5 ownership law already provides: later slice regression
+sets run the `t9-*` files, so the new pins are not orphaned. **What row 6 does
+NOT certify is now explicit**, so no seat reads a green row 6 as "T9 is complete".
+
+#### Item 10b — the source-tag counting sweep: DESIGNED, not run
+
+`pda-s02-affordance-drift.test.ts:65` counts `<(?:button|a|Link|summary)` in
+**source text** and asserts `20`. `<ModeToggle />` is a component tag, so it
+matches nothing: the count stayed 20 while the rendered top bar went to 21. The
+pin is **literally true of the source and silently stale about the surface** —
+and bumping it to 21 would fix the instance and keep the class.
+
+**The sweep, ready to dispatch:**
+
+| | |
+|---|---|
+| **Question** | which pins count or enumerate **source text** in order to describe a **rendered** surface? |
+| **Method** | over `tests/**`, find assertions whose subject is a source string (`readFile`/`source()`/`between()`/`occurrences()`) **and** whose predicate is a count or a closed enumeration — `.toBe(<n>)`, `.toHaveLength(<n>)`, `match(…).length`. Regex-shaped surfaces that count JSX tags (`/<(?:button\|a\|Link\|summary)\b/`) are the high-signal subset: any component tag is invisible to them |
+| **Per pin, decide one of three** | **(a) migrate to a render count** — assert against the rendered DOM, which is what the property is about; **(b) label it source-only** — rename so it claims what it tests (`sourceTagCount`, not `interactiveElementCount`); **(c) retire** if the rendered property is already pinned elsewhere |
+| **Owner** | a dedicated audit seat. **Not** a slice cluster: the pins span T1/T3/T5 surfaces and no single row owns them |
+| **When** | after the serial T1 wave (rows 7–13) closes. Running it during T1 would collide with three clusters editing the very files the sweep reads |
+| **Not this** | do **not** bump `20 → 21`. That is the instance; the class is the sweep |
+
+**Verification for this amendment:** AM5 ownership invariant re-run on the
+published markdown — **32 rows, 5 exemptions, 0 violations**. No Writes or Verify
+column moved; the two gate blocks changed only inside the acceptance-defaults
+text, and row 8 was not touched.

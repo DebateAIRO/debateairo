@@ -418,3 +418,61 @@ fixing what the number means — and the spine's own corollary names this exactl
 *choose the remedy by the SHAPE, not by your confidence about the source.* I had
 that corollary in front of me, quoted it in AM1, and still applied it to the
 source rather than the shape.
+
+---
+
+## 2026-09-01 — AM12b/item 1: this ADR's oracles were anti-gates, and they inherit ADR-006's two guards (trigger: N7, `t_4e80c7bf`)
+
+`ADR-006` §"Why step 2 exists" states the law: **the filter that makes a gate
+readable is the same filter that hides a harness failure.** That law was written
+for the compile gate. These colour-literal oracles never inherited it, and they
+have exactly the same shape — `rg | awk | wc -l`, where every failure of `rg`
+lands on `wc -l` as `0`, which is the required value.
+
+**Both failure modes reproduced in this amendment, on this tree:**
+
+```
+A. rg unavailable (non-interactive shell, stripped PATH)
+   $ env PATH=/usr/bin:/bin sh -c 'rg -n "oklch\(" apps/ui/components 2>/dev/null | wc -l'
+          0            <- rc 0, indistinguishable from a clean tree
+
+B. over-escaped pattern, on a file that TRULY carries one literal
+   correct pattern:      1        (apps/ui/components/SynthesisPanel.tsx)
+   over-escaped pattern: 0
+```
+
+Neither prints a warning a seat would notice: `2>/dev/null` is common in the
+published forms, and `rg`'s own parse error goes to stderr while the count comes
+from `wc -l` on an empty stdout.
+
+### The two guards — required before any oracle result in this ADR is quotable
+
+```sh
+# GUARD 1 — tool liveness. An oracle that cannot run its matcher has no result.
+command -v rg >/dev/null 2>&1 || { echo "ORACLE FAIL: rg not on PATH"; exit 2; }
+rg --version >/dev/null 2>&1   || { echo "ORACLE FAIL: rg present but not runnable"; exit 2; }
+
+# GUARD 2 — discrimination. Plant one literal, require the count to MOVE, remove it.
+#   Run on a scratch copy, never on the tree under audit:
+#     cp <file> /tmp/oracle-probe.bak
+#     printf '\n/* probe */ .x { color: #C15F3C; }\n' >> <file>
+#     <oracle>            # MUST print baseline+1
+#     cp /tmp/oracle-probe.bak <file>   # restore, verify by checksum
+#     <oracle>            # MUST print baseline again
+```
+
+**Guard 2 is the one that matters and it is not optional padding.** Guard 1
+catches a missing tool; only Guard 2 catches a *wrong pattern*, which is
+failure mode B and the one that produced `0` on a tree with 12. A run that has
+only ever been observed printing its pass value has not been shown to
+discriminate — the same sentence `ADR-006` already carries for the compile gate,
+now binding here.
+
+**Applies to all three oracles** — the wave-0 oracle §(a), the per-cluster
+oracles §(b), and the mission-final oracle §(c). A cluster report quoting
+`residual 0` without both guards is quoting an unverified number, and a reviewer
+should treat it as absent rather than as evidence.
+
+**Measured live residual at this amendment, with both guards satisfied:** `1`,
+in `apps/ui/components/SynthesisPanel.tsx` — owned by **T1-C3 (row 9)**, which
+writes that file, so it is on-track and not a residual without an owner.
