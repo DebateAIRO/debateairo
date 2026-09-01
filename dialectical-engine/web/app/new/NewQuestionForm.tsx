@@ -18,7 +18,6 @@ export function NewQuestionForm({ machineAsOf }: { readonly machineAsOf: string 
     if (!Number.isInteger(depth) || depth < 1) {
       setError("Depth must be an explicit positive whole number."); return;
     }
-    const lines = (name: string) => String(data.get(name) ?? "").split("\n").filter((line) => line.trim().length > 0);
     const ask: AskRequest = {
       question_line: String(data.get("question_line") ?? ""),
       risk_tier: String(data.get("risk_tier")) as AskRequest["risk_tier"],
@@ -28,8 +27,8 @@ export function NewQuestionForm({ machineAsOf }: { readonly machineAsOf: string 
       depth_params: { depth },
       decision_scope: "personal",
       as_of: machineAsOf,
-      steering_presets: lines("steering_presets"),
-      steering_annotations: lines("steering_annotations")
+      steering_presets: [],
+      steering_annotations: []
     };
     setSubmitting(true); setError(null);
     try {
@@ -47,8 +46,6 @@ export function NewQuestionForm({ machineAsOf }: { readonly machineAsOf: string 
       <label>Risk tier<select name="risk_tier" required defaultValue=""><option value="" disabled>Choose</option><option value="casual">Casual</option><option value="standard">Standard</option><option value="high-stakes">High stakes</option></select></label>
       <label>Composition budget tier<select name="composition_budget_tier" required defaultValue=""><option value="" disabled>Choose</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
       <label>Depth<input name="depth" inputMode="numeric" required /></label>
-      <label>Steering menu selections (one per line)<textarea name="steering_presets" rows={3} /></label>
-      <label>Free-text steering annotations (logged verbatim, one per line)<textarea name="steering_annotations" rows={3} /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}
       <button className="button primary" disabled={submitting}>{submitting ? "Submitting…" : "Start run"}</button>
     </form>
