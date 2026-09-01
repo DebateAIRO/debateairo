@@ -135,6 +135,25 @@ async function seedServedNumber(
   return result.rows[0]!.served_number_id;
 }
 
+/**
+ * A REAL node row. `gen_random_uuid()` would satisfy the column type but not the
+ * `core.node` foreign key, so the insert could fail before the operator CHECK is
+ * ever consulted — a rejection for the wrong reason is not evidence.
+ */
+async function seedRootNode(database: TestDatabase, runId: string): Promise<string> {
+  const result = await database.pool.query<{ node_id: string }>(`
+    INSERT INTO core.node (
+      run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
+      materialized_path, generation_status, path_status, exploration_decision,
+      way_of_knowing, provenance_ref, locator, value_laden, created_at_seq
+    ) VALUES ($1, 'T8 upgrade fixture claim', 'unknown', NULL, NULL, 0, 0, '0',
+              'complete', 'active', 'continue', 'REASONING', NULL, NULL, false,
+              ledger.allocate_sequence())
+    RETURNING node_id
+  `, [runId]);
+  return result.rows[0]!.node_id;
+}
+
 async function convalidated(
   database: TestDatabase, table: string, constraint: string
 ): Promise<boolean | null> {
@@ -255,23 +274,61 @@ describe("T8 upgrade — a database carrying neither legacy shape", () => {
     expect(await convalidated(database, "ledger.node_strength_record", "node_strength_record_operator_used_check")).toBe(true);
   });
 
-  it("after the upgrade both repealed shapes are REJECTED at the door", async () => {
-    const runId = await seedRun(database, "t8-post-upgrade");
+  it("after the upgrade the served-number door REJECTS the repealed status", async () => {
+    const runId = await seedRun(database, "t8-post-upgrade-event");
     const propagationRunId = await seedPropagationRun(database, runId, []);
     const servedNumberId = await seedServedNumber(database, runId, propagationRunId);
+    // Named constraint, not merely "something threw": a bare .rejects.toThrow()
+    // is satisfied by a typo just as happily as by the constraint under test.
+    //
+    // The repealed row violates BOTH narrowed constraints, and PostgreSQL reports
+    // the reason-pairing one — there is no row that isolates the status domain,
+    // because every status outside PRESENT/EVICTED also fails the pairing. The
+    // status domain itself is pinned by the `convalidated` assertion above.
     await expect(database.pool.query(
       `INSERT INTO serve.served_number_event (served_number_id, status, reason, at_seq)
        VALUES ($1, 'WITHHELD', $2, ledger.allocate_sequence())`,
       [servedNumberId, WITHHELD_REASON]
-    )).rejects.toThrow();
+    )).rejects.toThrow(/served_number_event_reason_matches_status/u);
+
+    // The control: the same table accepts a lawful row, so the rejection above is
+    // the constraint firing and not a malformed fixture.
+    const accepted = await database.pool.query(
+      `INSERT INTO serve.served_number_event (served_number_id, status, reason, at_seq)
+       VALUES ($1, 'PRESENT', NULL, ledger.allocate_sequence())`,
+      [servedNumberId]
+    );
+    expect(accepted.rowCount).toBe(1);
+  });
+
+  it("after the upgrade the strength-record door REJECTS the repealed operator", async () => {
+    const runId = await seedRun(database, "t8-post-upgrade-strength");
+    const propagationRunId = await seedPropagationRun(database, runId, []);
+    const nodeId = await seedRootNode(database, runId);
+
+    // The repealed operator is refused, and the error NAMES the constraint that
+    // refused it. Rejected first, so the row does not occupy the primary key.
     await expect(database.pool.query(
       `INSERT INTO ledger.node_strength_record (
          propagation_run_id, node_id, strength, number_kind, source_ref, producer,
-         replay_handle, way_of_knowing, supported_by, attacked_by, lift_marker,
-         operator_used, operator_level, at_seq
-       ) VALUES ($1, gen_random_uuid(), 0.5, 'k', 's', 'p', 'r', 'REASONING',
-                 '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, $2, 'parent', ledger.allocate_sequence())`,
-      [propagationRunId, REPEALED_OPERATOR]
-    )).rejects.toThrow();
+         replay_handle, way_of_knowing, operator_used, operator_level
+       ) VALUES ($1, $2, 0.5, 'fixture:t8', 'fixture:t8', 'fixture:t8', 'replay:t8',
+                 'REASONING', $3, 'parent')`,
+      [propagationRunId, nodeId, REPEALED_OPERATOR]
+    )).rejects.toThrow(/node_strength_record_operator_used_check/u);
+
+    // The control: the SAME row differing only in the operator is ACCEPTED. This
+    // is what makes the rejection evidence rather than coincidence — every other
+    // column, the core.node foreign key and the operator-pair CHECK are all
+    // exercised by this insert, so none of them can be what failed above.
+    const accepted = await database.pool.query(
+      `INSERT INTO ledger.node_strength_record (
+         propagation_run_id, node_id, strength, number_kind, source_ref, producer,
+         replay_handle, way_of_knowing, operator_used, operator_level
+       ) VALUES ($1, $2, 0.5, 'fixture:t8', 'fixture:t8', 'fixture:t8', 'replay:t8',
+                 'REASONING', 'accumulate', 'parent')`,
+      [propagationRunId, nodeId]
+    );
+    expect(accepted.rowCount).toBe(1);
   });
 });
