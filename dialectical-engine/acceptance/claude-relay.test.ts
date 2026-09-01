@@ -1,10 +1,40 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
+import {
+  CLAUDE_BINARY,
+  resolveClaudeBinary,
+  startClaudeRelay,
+  type ClaudeRelayHandle
+} from "./claude-relay.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
 const handles: ClaudeRelayHandle[] = [];
+const temporaryDirectories: string[] = [];
+
+function posixQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * A real executable at a path this test chooses, so the environment override
+ * can be observed the only honest way there is: by which binary is spawned.
+ * The relay takes no argument seam for the default command, so the fixture has
+ * to arrive as an executable file rather than as `node <fixture>`.
+ */
+async function hostBinary(name: string, fixture: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "relay-host-binary-"));
+  temporaryDirectories.push(directory);
+  const path = join(directory, name);
+  await writeFile(
+    path,
+    `#!/bin/sh\nexec ${posixQuote(process.execPath)} ${posixQuote(fixture)} "$@"\n`,
+    { mode: 0o755 }
+  );
+  return path;
+}
 
 async function start(timeoutMs = 1_000): Promise<ClaudeRelayHandle> {
   const handle = await startClaudeRelay({
@@ -32,6 +62,9 @@ async function postCompletion(handle: ClaudeRelayHandle, userContent: string): P
 
 afterEach(async () => {
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
+  await Promise.all(temporaryDirectories.splice(0).map((path) =>
+    rm(path, { recursive: true, force: true })
+  ));
 });
 
 describe("FAIR-02 Claude Code CLI relay", () => {
@@ -292,6 +325,92 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       })).rejects.toThrow("TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN");
     } finally {
       process.env.NODE_ENV = previous;
+    }
+  });
+});
+
+describe("D10 Claude relay binary resolution", () => {
+  it("keeps the compiled-in default when ACCEPTANCE_CLAUDE_BINARY is absent", () => {
+    // The literal is pinned here, not read from the constant, so that moving
+    // the default is a deliberate edit to this expectation (D10: unset ⇒
+    // byte-identical to the behavior before the override existed).
+    expect(CLAUDE_BINARY).toBe("/Users/vladmihaimiron/.local/bin/claude");
+    expect(resolveClaudeBinary({})).toBe("/Users/vladmihaimiron/.local/bin/claude");
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_CLAUDE_BINARY", () => {
+    expect(resolveClaudeBinary({ ACCEPTANCE_CLAUDE_BINARY: "/host/bin/claude" }))
+      .toBe("/host/bin/claude");
+  });
+
+  it("fails loudly with a typed code when ACCEPTANCE_CLAUDE_BINARY is present but blank", () => {
+    expect(() => resolveClaudeBinary({ ACCEPTANCE_CLAUDE_BINARY: "  " }))
+      .toThrow("CLAUDE_CLI_BINARY_UNRESOLVED");
+  });
+
+  it("keeps the NODE_ENV=test command seam ahead of the environment override", async () => {
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.ACCEPTANCE_CLAUDE_BINARY = "/nonexistent/host/claude";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("claude-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+
+  // r2 regression arms (codex r1 B1). A BLANK override must not reach the
+  // test-seam path at all: the override is only consulted when no
+  // testOnlyCommand is supplied, so resolveTestGuardedCommand stays the sole
+  // authority for selecting the seam and for rejecting it outside test.
+  it("selects the test command seam when the override is blank, instead of throwing the override's code", async () => {
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.ACCEPTANCE_CLAUDE_BINARY = "  ";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("claude-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+
+  it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN when the override is blank", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_CLAUDE_BINARY = "  ";
+    try {
+      await expect(startClaudeRelay({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      })).rejects.toThrow("TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+
+  it("spawns the binary named by ACCEPTANCE_CLAUDE_BINARY rather than the compiled-in default", async () => {
+    const binary = await hostBinary("claude", fakeCli);
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.ACCEPTANCE_CLAUDE_BINARY = binary;
+    try {
+      // No testOnlyCommand: this is the DEFAULT command path, the one the
+      // ceremony takes. The compiled-in default is another machine's home
+      // directory, so a relay that ignores the override cannot hand back a
+      // model id at all.
+      const relay = await startClaudeRelay({ port: 0, timeoutMs: 10_000 });
+      handles.push(relay);
+
+      expect(relay.model).toBe("claude-fake-cli-model");
+      expect(relay.maker).toBe("Anthropic");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
     }
   });
 });
