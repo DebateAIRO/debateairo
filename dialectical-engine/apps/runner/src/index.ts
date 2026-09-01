@@ -75,6 +75,7 @@ import {
   type ServeGateResult,
   type ServeNode
 } from "@debateai/serve";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
@@ -983,13 +984,18 @@ export function buildFixedSingleRootServeNodes(
   })));
 }
 
-/** DR-159 B3-B: depth is a closed, ASK-time count of expansion rounds. */
+/**
+ * DR-159 B3-B: depth is a closed, ASK-time count of expansion rounds.
+ * S1-1: the range itself is the contract's (EXPANSION_DEPTH_MIN/MAX) — this
+ * guard is defence in depth behind the contract door, never a second source.
+ */
 export function resolveExpansionDepth(depthParams: Readonly<Record<string, unknown>>): number {
   const depth = depthParams.depth;
-  if (!Number.isInteger(depth) || typeof depth !== "number" || depth < 1 || depth > 5) {
+  if (!Number.isInteger(depth) || typeof depth !== "number"
+    || depth < EXPANSION_DEPTH_MIN || depth > EXPANSION_DEPTH_MAX) {
     throw new TypedDomainError(
       "RUN_DEPTH_PARAMS_INVALID",
-      "DR-157/DR-159 require a pinned integer expansion depth from 1 through 5"
+      `DR-157/DR-159 require a pinned integer expansion depth from ${EXPANSION_DEPTH_MIN} through ${EXPANSION_DEPTH_MAX}`
     );
   }
   return depth;
