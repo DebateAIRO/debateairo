@@ -1,5 +1,7 @@
+import { headers } from "next/headers";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { TopBar } from "@/components/TopBar";
+import { NONCE_REQUEST_HEADER } from "../content-security-policy.mjs";
 import "./globals.css";
 
 const display = Fraunces({
@@ -29,11 +31,16 @@ export const metadata = {
   description: "A reasoning instrument — several AI models argue a claim in a structured tree."
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // F-08: the per-request nonce the middleware stamped on the request. Reading
+  // headers() also makes every route dynamic, so no prerendered HTML can ever
+  // carry a stale nonce.
+  const nonce = (await headers()).get(NONCE_REQUEST_HEADER) ?? undefined;
   return (
     <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html:
               "try{var m=localStorage.getItem('debateai.mode');" +

@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Answer } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
-import { USER_TOKEN_COOKIE, getDebateServer } from "@/lib/serverApi";
+import { getDebateServer, readSessionCookie } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 
@@ -34,7 +34,7 @@ export default async function DebatePage({
       />
     );
   }
-  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const token = readSessionCookie(await cookies());
   const userAgent = (await headers()).get("user-agent") ?? undefined;
 
   // SSR reads the asker-scoped projection with the identity cookie (S05).
