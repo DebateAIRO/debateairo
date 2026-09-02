@@ -109,10 +109,10 @@ describe("DR-184 review resilience mutation ledger", () => {
     // T17 (DR-184-v3): the grid moves because the ceiling now counts the panel
     // leg and both provider sequences a cooldown site can spend.
     const expected = [
-      [31, 31, 31, 31, 31],
-      [160, 296, 568, 1112, 2200],
-      [324, 564, 1044, 2004, 3924],
-      [576, 944, 1680, 3152, 6096]
+      [28, 28, 28, 28, 28],
+      [112, 200, 376, 728, 1432],
+      [234, 402, 738, 1410, 2754],
+      [432, 704, 1248, 2336, 4512]
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
@@ -129,7 +129,8 @@ describe("DR-184 review resilience mutation ledger", () => {
           fixedOrgansPerComposition: 4,
           reviewerCallsPerNode: 1,
           synthesizerMaxRounds: 3,
-          evaluatorMaxRounds: 3
+          evaluatorMaxRounds: 3,
+          maxDepth: 5
         });
         expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
         expect(basis.formula_version).toBe("DR-184-v3");

@@ -247,7 +247,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     fixedOrgansPerComposition: envelopeFormulaInputs.fixedOrgansPerComposition,
     reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
     synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
-    evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds
+    evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
+    maxDepth: envelopeFormulaInputs.maxDepth
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({

@@ -22,7 +22,8 @@ describe("DR-181 computed structural tripwire", () => {
         // T17: the panel leg — (M-1) non-author assessments at EVERY authored
         // node — and the cooldown site's two provider sequences.
         const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
-        const cooldownSite = 2 * 3 + 1;
+        // Cumulative per call-site key: sequence 2 only gets the final retry.
+        const cooldownSite = 3 + 1;
         const fixedSites = Math.max(2 * RUNNER_FIXED_ORGANS_PER_COMPOSITION, 3 + 3);
         const independentWorstCase = (authored + reviews) * cooldownSite
           + panelCalls * 3
@@ -40,7 +41,8 @@ describe("DR-181 computed structural tripwire", () => {
           fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION,
           reviewerCallsPerNode: 1,
           synthesizerMaxRounds: 3,
-          evaluatorMaxRounds: 3
+          evaluatorMaxRounds: 3,
+          maxDepth: 5
         });
         expect(basis.max_model_attempts).toBeGreaterThanOrEqual(independentWorstCase);
         expect(basis.max_model_attempts).toBeGreaterThanOrEqual(2 * authored);

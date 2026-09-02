@@ -51,7 +51,9 @@ const SEALED = Object.freeze({
    * (packages/register/src/algorithm-policy.ts:331) is the loud stop for any
    * other one, so the formula derives (M-1) from a sealed name, not a guess.
    */
-  panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE" as const
+  panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE" as const,
+  /** T17/B2: the sealed maximum depth admission refuses above. */
+  maxDepth: 5
 });
 
 /** The ruled per-organ attempt bounds the acceptance register seeds. */
@@ -95,8 +97,14 @@ function enumerateMaximumPathSites(
       materializedNodeIds.push(`exchange:${leg.authorRootIndex}->${leg.targetRootIndex}`);
     }
   }
-  // withCooldownRetry: base attempts, then base + final on the second sequence.
-  const cooldownSite = 2 * BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
+  /**
+   * A cooldown-wrapped site runs two sequences, but the gateway counts attempts
+   * CUMULATIVELY per call-site key (`remainingProviderAttempts`,
+   * apps/runner/src/index.ts:3565-3577), so the second sequence only gets the
+   * final-retry attempts that remain. Measured against a real ledger in
+   * tests/integration/t17-envelope-ledger.test.ts.
+   */
+  const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
   for (const _nodeId of materializedNodeIds) {
     sites.push({ kind: "AUTHOR", worstCaseAttempts: cooldownSite });
     if (panelSize === 1) continue;
@@ -125,14 +133,15 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
   /**
    * F36's undercount, stated ARITHMETICALLY: at M=2, depth=1 the live engine
    * opens 8 author sites, 8 panel sites and 8 reviewer sites, and the maximum
-   * path spends 160 attempts. DR-184-v2 minted 88 on the same topology — this
+   * path spends 112 attempts. DR-184-v2 minted 88 on the same topology — this
    * is the number the lane exists to repeal, named so the pin cannot silently
-   * drift back to it.
+   * drift back to it. The whole 24-attempt gap IS the panel leg (8 sites x 3
+   * attempts) that v2 counted at zero; v2's per-site attempt terms were right.
    */
-  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 160 attempts, not 88", () => {
+  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 112 attempts, not 88", () => {
     const DR_184_V2_UNDERCOUNT = 88;
-    expect(enumerateMaximumPathAttempts(2, 1)).toBe(160);
-    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(160);
+    expect(enumerateMaximumPathAttempts(2, 1)).toBe(112);
+    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(112);
     expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts)
       .toBeGreaterThan(DR_184_V2_UNDERCOUNT);
   });
@@ -170,10 +179,10 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
 
   it("pins the recomputed grid and the bumped formula version", () => {
     const expected = [
-      [31, 31, 31, 31, 31],
-      [160, 296, 568, 1112, 2200],
-      [324, 564, 1044, 2004, 3924],
-      [576, 944, 1680, 3152, 6096]
+      [28, 28, 28, 28, 28],
+      [112, 200, 376, 728, 1432],
+      [234, 402, 738, 1410, 2754],
+      [432, 704, 1248, 2336, 4512]
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
@@ -193,7 +202,7 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
       synthesis_loop_sites: 6,
       selected: "COMPOSITION"
     });
-    expect(basis.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 7 });
+    expect(basis.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 });
   });
 
   it("selects the synthesis loop once T9's retirement leaves fewer composition organs", () => {
@@ -218,7 +227,7 @@ describe("T17 · the receipt that carries the basis", () => {
   it("round-trips the recomputed basis through the run-head schema", () => {
     const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
     expect(parseCostEnvelopeBasis(basis)).toMatchObject({
-      maxModelAttempts: 160,
+      maxModelAttempts: 112,
       panelSize: 2,
       depth: 1
     });
@@ -243,15 +252,21 @@ describe("T17 · the receipt that carries the basis", () => {
    * it pins only "some field is missing" — it survives a schema that quietly
    * re-admits an incomplete `per_site_attempts`. Each disclosure field is
    * therefore pinned INDIVIDUALLY: drop exactly one from an otherwise valid
-   * v3 basis and the run head must still refuse.
+   * v3 basis and the run head must still refuse. The list below is ALL NINE
+   * members v3 newly requires (2 under per_site_attempts, 4 call_sites,
+   * 3 serve_leg) — a partial matrix lets any omitted member be weakened to
+   * `.optional()` with every case still green (codex r1 B3).
    */
   it.each([
     "per_site_attempts.panel_member",
     "per_site_attempts.cooldown_site",
+    "call_sites.author",
     "call_sites.panel",
     "call_sites.reviewer",
-    "serve_leg.selected",
-    "serve_leg.synthesis_loop_sites"
+    "call_sites.serve",
+    "serve_leg.composition_sites",
+    "serve_leg.synthesis_loop_sites",
+    "serve_leg.selected"
   ])("refuses a basis missing %s", (dottedPath) => {
     const basis = structuredClone(
       computeStructuralCeilingBasis(ceilingInput(2, 1)) as Record<string, Record<string, unknown>>
@@ -298,8 +313,40 @@ describe("T17 · an over-bound input still refuses loudly at admission", () => {
 
   it("admits a lawful ask and pins the basis it admits it with", async () => {
     await expect(evaluateAskAdmission(settings(), ask)).resolves.toMatchObject({
-      envelopeBasis: { max_model_attempts: 160, formula_version: "DR-184-v3" }
+      envelopeBasis: { max_model_attempts: 112, formula_version: "DR-184-v3" }
     });
+  });
+
+  /**
+   * B2 — the DoD's actual clause. The cases below it are malformed inputs
+   * (zero, fractional, negative); NONE of them is OVER-BOUND, i.e. above a
+   * sealed maximum. `packages/contract` accepts `depth_params` as an arbitrary
+   * record, so before this lane an ask with depth 6 minted a POSITIVE depth-6
+   * ceiling, passed admission, and only stopped later in the runner
+   * (`resolveExpansionDepth`) or when the stored basis was parsed — after the
+   * asker had been admitted. Admission must refuse it, on the 422 face.
+   */
+  it.each([6, 7, 42])("refuses an OVER-BOUND depth of %i at admission, above the sealed maximum", async (depth) => {
+    await expect(evaluateAskAdmission(settings(), { ...ask, depth_params: { depth } }))
+      .rejects.toMatchObject({
+        name: "AskRefusal",
+        code: "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM"
+      });
+  });
+
+  it("still admits the sealed maximum depth itself — the bound is inclusive", async () => {
+    await expect(evaluateAskAdmission(settings(), { ...ask, depth_params: { depth: 5 } }))
+      .resolves.toMatchObject({ envelopeBasis: { depth: 5, formula_version: "DR-184-v3" } });
+  });
+
+  it("reads the bound from the SEALED row, not from a constant in the formula", () => {
+    // A deployment that seals a smaller maximum refuses at that smaller value.
+    expect(() => computeStructuralCeilingBasis({ ...ceilingInput(2, 3), maxDepth: 2 }))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM"
+      }));
+    expect(computeStructuralCeilingBasis({ ...ceilingInput(2, 3), maxDepth: 3 }).depth).toBe(3);
   });
 
   it.each([

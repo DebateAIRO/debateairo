@@ -115,11 +115,12 @@ describe("ACC-01 acceptance runtime policy", () => {
         synthesizerMaxRounds: 3,
         evaluatorMaxRounds: 3,
         panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE",
+        maxDepth: 5,
         sourceRefs: { envelopeFormulaInputs: "test-layer:envelope" }
       }
     }, 2, 1)).toMatchObject({
-      max_model_attempts: 160,
-      per_site_attempts: { judge: 3, organ: 3, panel_member: 3, cooldown_site: 7 },
+      max_model_attempts: 112,
+      per_site_attempts: { judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 },
       call_sites: { author: 8, panel: 8, reviewer: 8, serve: 8 },
       formula_version: "DR-184-v3"
     });

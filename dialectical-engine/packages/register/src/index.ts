@@ -177,6 +177,12 @@ export interface StructuralCeilingInput {
   readonly reviewerCallsPerNode: number;
   readonly synthesizerMaxRounds: number;
   readonly evaluatorMaxRounds: number;
+  /**
+   * T17/B2 — the SEALED maximum depth. Admission refuses ABOVE it rather than
+   * minting a ceiling the run head's parser would reject later, after the ask
+   * was already admitted.
+   */
+  readonly maxDepth: number;
 }
 
 /**
@@ -189,7 +195,7 @@ const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Ob
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
-  "reviewerCallsPerNode", "synthesizerMaxRounds", "evaluatorMaxRounds"
+  "reviewerCallsPerNode", "synthesizerMaxRounds", "evaluatorMaxRounds", "maxDepth"
 ]);
 
 /**
@@ -199,11 +205,19 @@ const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Ob
  * The ceiling counts CALL SITES and multiplies each by the attempts that site
  * can spend. Four legs, each one measured off the shipped runner:
  *
- *  · AUTHOR — one call per materialized node. Wrapped in `withCooldownRetry`
- *    (apps/runner/src/index.ts:250), which spends `judgeMaxAttempts` and then,
- *    on transport exhaustion, a whole second sequence of
- *    `judgeMaxAttempts + finalRetryAttempts`. DR-184-v2 provisioned only
- *    `judge + final` and so undercounted every cooldown site by `judge`.
+ *  · AUTHOR — one call per materialized node, wrapped in `withCooldownRetry`
+ *    (apps/runner/src/index.ts:250). That helper runs TWO provider sequences,
+ *    but they do NOT each get a fresh allowance: the shipped gateway counts
+ *    attempts CUMULATIVELY per call-site key off the ledger and passes
+ *    `remaining = bound.maxAttempts - consumed` (apps/runner/src/index.ts
+ *    :3565-3577, `remainingProviderAttempts`). So sequence 1 spends
+ *    `judgeMaxAttempts` and sequence 2 spends only the `finalRetryAttempts`
+ *    that remain: `judgeMaxAttempts + finalRetryAttempts` for the SITE.
+ *    (An earlier draft of this formula read the second sequence as a fresh
+ *    allowance and provisioned `2*judge + final`. The maximum-path ledger test
+ *    in tests/integration/t17-envelope-ledger.test.ts measured 4 attempts at a
+ *    site it had modelled as 7 and refuted it — the reason that test reads a
+ *    real ledger instead of a second in-memory model of this same file.)
  *  · PANEL — the sealed row's `panelCallsPerNodeBasis` NAMES this leg's basis
  *    (`PANEL_SIZE_MINUS_ONE`) and its own zod literal is the loud stop for any
  *    other basis, so the derivation below is the row's, never this file's.
@@ -237,6 +251,17 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
       );
     }
   }
+  if (input.depth > input.maxDepth) {
+    // B2: the refusal belongs HERE, at admission. `evaluateAskAdmission` wraps
+    // this call and `markAskRefusal` turns a TypedDomainError into an
+    // AskRefusal, so an over-bound ask is refused on the 422 face before any
+    // provider spend — instead of minting a positive ceiling that only stops
+    // later when the runner resolves the depth or parses the stored basis.
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM",
+      `Requested depth ${input.depth} exceeds the sealed maximum depth ${input.maxDepth}`
+    );
+  }
   const nodesPerRoot = input.panelSize === 1
     ? 1
     : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
@@ -248,7 +273,7 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const materializedNodes = input.panelSize === 1
     ? 1
     : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
-  const cooldownSiteAttempts = 2 * input.judgeMaxAttempts + input.finalRetryAttempts;
+  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
   const authorSites = materializedNodes;
   const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
   const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;

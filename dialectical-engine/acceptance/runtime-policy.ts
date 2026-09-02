@@ -145,7 +145,8 @@ export function computeAcceptanceStructuralCeiling(
     fixedOrgansPerComposition: policy.envelopeFormulaInputs.fixedOrgansPerComposition,
     reviewerCallsPerNode: policy.envelopeFormulaInputs.reviewerCallsPerNode,
     synthesizerMaxRounds: policy.envelopeFormulaInputs.synthesizerMaxRounds,
-    evaluatorMaxRounds: policy.envelopeFormulaInputs.evaluatorMaxRounds
+    evaluatorMaxRounds: policy.envelopeFormulaInputs.evaluatorMaxRounds,
+    maxDepth: policy.envelopeFormulaInputs.maxDepth
   });
 }
 
