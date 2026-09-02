@@ -390,3 +390,154 @@ describe("L7-F1 front-door upgrade lifecycle", () => {
     }
   });
 });
+
+describe("L7-F9 front-door protocol hygiene", () => {
+  function scratchCertificate(root: string): Promise<{
+    certificatePath: string;
+    privateKeyPath: string;
+  }> {
+    const tlsDirectory = join(root, "tls");
+    const fakeMkcert = join(root, "mkcert");
+    writeFileSync(fakeMkcert, [
+      "#!/bin/sh",
+      "/usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost"
+        + " -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1'"
+        + " -out \"$2\" -keyout \"$4\" >/dev/null 2>&1"
+    ].join("\n"), { mode: 0o700 });
+    chmodSync(fakeMkcert, 0o700);
+    return ensureDevLocalCertificate({ tlsDirectory, mkcertExecutable: fakeMkcert });
+  }
+
+  function rawExchange(port: number, ca: Buffer, request: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const socket = connectTls({ ca, host: "127.0.0.1", port, servername: "localhost" });
+      socket.once("secureConnect", () => socket.write(request));
+      socket.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+      socket.once("error", reject);
+      socket.once("close", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      setTimeoutPromise(4_000).then(() => socket.destroy(), () => undefined);
+    });
+  }
+
+  it("strips request hop-by-hop headers and Connection-listed headers", async () => {
+    const root = temporaryRoot();
+    const certificate = await scratchCertificate(root);
+    let observed: Record<string, string | string[] | undefined> = {};
+    const upstream = createHttpServer((request, response) => {
+      observed = { ...request.headers };
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end("OK");
+    });
+    const upstreamPort = await listen(upstream);
+    const frontDoor = await startDevTlsFrontDoor({
+      certificatePath: certificate.certificatePath,
+      privateKeyPath: certificate.privateKeyPath,
+      listenPort: 0,
+      upstreamPort
+    });
+    const ca = readFileSync(certificate.certificatePath);
+    try {
+      const answer = await rawExchange(frontDoor.port, ca, [
+        "GET /login HTTP/1.1",
+        `Host: localhost:${frontDoor.port}`,
+        "Connection: keep-alive, X-Secret-Hop",
+        "Keep-Alive: timeout=5",
+        "TE: trailers",
+        "Trailer: X-Late",
+        "Proxy-Authorization: Basic ZGV2OmRldg==",
+        "X-Secret-Hop: must-not-reach-upstream",
+        "",
+        ""
+      ].join("\r\n"));
+      expect(answer).toContain("HTTP/1.1 200");
+      for (const header of [
+        "keep-alive",
+        "te",
+        "trailer",
+        "proxy-authorization",
+        "x-secret-hop"
+      ]) {
+        expect(observed[header], header).toBeUndefined();
+      }
+    } finally {
+      await frontDoor.close();
+      await close(upstream);
+    }
+  });
+
+  it("forwards a non-101 answer to an Upgrade request with explicit framing", async () => {
+    const root = temporaryRoot();
+    const certificate = await scratchCertificate(root);
+    const upstream = createHttpServer();
+    upstream.on("upgrade", (_request, socket) => {
+      socket.end(
+        "HTTP/1.1 404 Not Found\r\n"
+        + "Content-Type: text/plain\r\n"
+        + "Transfer-Encoding: chunked\r\n"
+        + "\r\n"
+        + "2\r\nab\r\n0\r\n\r\n"
+      );
+    });
+    const upstreamPort = await listen(upstream);
+    const frontDoor = await startDevTlsFrontDoor({
+      certificatePath: certificate.certificatePath,
+      privateKeyPath: certificate.privateKeyPath,
+      listenPort: 0,
+      upstreamPort
+    });
+    const ca = readFileSync(certificate.certificatePath);
+    try {
+      const answer = await rawExchange(frontDoor.port, ca, [
+        "GET /_next/webpack-hmr HTTP/1.1",
+        `Host: localhost:${frontDoor.port}`,
+        "Connection: Upgrade",
+        "Upgrade: websocket",
+        "",
+        ""
+      ].join("\r\n"));
+      expect(answer).toContain("HTTP/1.1 404 Not Found");
+      expect(answer.toLowerCase()).not.toContain("transfer-encoding");
+      expect(answer.toLowerCase()).toContain("content-length: 2");
+      expect(answer.endsWith("ab")).toBe(true);
+    } finally {
+      await frontDoor.close();
+      await close(upstream);
+    }
+  });
+
+  it("never appends an error body once response headers were sent", async () => {
+    const root = temporaryRoot();
+    const certificate = await scratchCertificate(root);
+    const upstream = createHttpServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.write("partial");
+      response.flushHeaders();
+      setTimeoutPromise(50).then(() => {
+        response.socket?.resetAndDestroy();
+      }, () => undefined);
+    });
+    const upstreamPort = await listen(upstream);
+    const frontDoor = await startDevTlsFrontDoor({
+      certificatePath: certificate.certificatePath,
+      privateKeyPath: certificate.privateKeyPath,
+      listenPort: 0,
+      upstreamPort
+    });
+    const ca = readFileSync(certificate.certificatePath);
+    try {
+      const answer = await rawExchange(frontDoor.port, ca, [
+        "GET /login HTTP/1.1",
+        `Host: localhost:${frontDoor.port}`,
+        "",
+        ""
+      ].join("\r\n"));
+      expect(answer).toContain("HTTP/1.1 200");
+      expect(answer).toContain("partial");
+      expect(answer).not.toContain("UPSTREAM_UNAVAILABLE");
+    } finally {
+      await frontDoor.close();
+      await close(upstream);
+    }
+  });
+});

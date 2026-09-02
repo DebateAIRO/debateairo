@@ -19,6 +19,7 @@ const DEFAULT_OPTIONS = Object.freeze({
 const FILE_MODE = 0o600;
 const MAX_HTML_BYTES = 512 * 1024;
 const MAX_JSON_BYTES = 1_024;
+const MAX_UPGRADE_FALLBACK_BYTES = 64 * 1024;
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -130,11 +131,35 @@ async function readPrivateFile(path) {
   return readFile(path);
 }
 
-function sanitizedHeaders(headers) {
+function connectionListedHeaders(headers) {
+  const listed = new Set();
+  for (const [name, value] of Object.entries(headers)) {
+    if (name.toLowerCase() !== "connection") continue;
+    for (const entry of Array.isArray(value) ? value : [value]) {
+      if (typeof entry !== "string") continue;
+      for (const token of entry.split(",")) {
+        const listedName = token.trim().toLowerCase();
+        if (listedName.length > 0) listed.add(listedName);
+      }
+    }
+  }
+  return listed;
+}
+
+// A proxy terminates hop-by-hop headers in both directions. Only the upgrade
+// handshake keeps its own Connection/Upgrade pair, because that pair is what
+// makes the upstream answer with 101 (L7-F9).
+function sanitizedHeaders(headers, preserveUpgrade = false) {
+  const listed = connectionListedHeaders(headers);
   const sanitized = { ...headers };
   for (const name of Object.keys(sanitized)) {
     const lower = name.toLowerCase();
-    if (lower === "forwarded" || lower.startsWith("x-forwarded-")) delete sanitized[name];
+    if (lower === "forwarded" || lower.startsWith("x-forwarded-")) {
+      delete sanitized[name];
+      continue;
+    }
+    if (preserveUpgrade && (lower === "connection" || lower === "upgrade")) continue;
+    if (HOP_BY_HOP_HEADERS.has(lower) || listed.has(lower)) delete sanitized[name];
   }
   return sanitized;
 }
@@ -145,6 +170,31 @@ function responseHeaders(headers) {
     if (HOP_BY_HOP_HEADERS.has(name.toLowerCase())) delete sanitized[name];
   }
   return sanitized;
+}
+
+function writeUpgradeFallbackResponse(socket, response, body) {
+  socket.write(`HTTP/1.1 ${response.statusCode ?? 502} ${response.statusMessage ?? ""}\r\n`);
+  for (let index = 0; index < response.rawHeaders.length; index += 2) {
+    const name = response.rawHeaders[index];
+    const value = response.rawHeaders[index + 1];
+    const lower = name?.toLowerCase();
+    if (name === undefined
+      || value === undefined
+      || lower === undefined
+      || lower === "proxy-authenticate"
+      || lower === "proxy-authorization"
+      || lower === "content-length"
+      || HOP_BY_HOP_HEADERS.has(lower)) {
+      continue;
+    }
+    socket.write(`${name}: ${value}\r\n`);
+  }
+  // The upstream body reaches us decoded, so replaying the upstream's
+  // Transfer-Encoding would describe bytes that no longer exist. Re-frame it.
+  socket.write(`Content-Length: ${body.byteLength}\r\n`);
+  socket.write("Connection: close\r\n");
+  socket.write("\r\n");
+  socket.end(body);
 }
 
 function writeUpgradeResponse(socket, response) {
@@ -185,12 +235,12 @@ export async function startDevTlsFrontDoor(options) {
   let activePort = listenPort;
   const expectedHost = () => `localhost:${activePort}`;
   const hostAllowed = (request) => request.headers.host === expectedHost();
-  const proxyOptions = (request) => ({
+  const proxyOptions = (request, preserveUpgrade = false) => ({
     host: upstreamHost,
     port: upstreamPort,
     method: request.method,
     path: request.url,
-    headers: sanitizedHeaders(request.headers)
+    headers: sanitizedHeaders(request.headers, preserveUpgrade)
   });
   // Upgraded sockets leave the server's connection table, so `server.close()`
   // waits on them forever unless they are tracked and destroyed here (L7-F1).
@@ -206,12 +256,19 @@ export async function startDevTlsFrontDoor(options) {
       const headers = responseHeaders(upstreamResponse.headers);
       if (upstreamResponse.statusMessage === undefined) response.writeHead(status, headers);
       else response.writeHead(status, upstreamResponse.statusMessage, headers);
+      upstreamResponse.once("error", () => response.destroy());
       upstreamResponse.pipe(response);
     });
     upstream.once("error", () => {
-      if (!response.headersSent) response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+      // Appending a message to a body already on the wire corrupts the answer.
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
+      response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
       response.end("UPSTREAM_UNAVAILABLE");
     });
+    request.once("error", () => upstream.destroy());
     request.pipe(upstream);
   });
   server.on("clientError", (_error, socket) => socket.destroy());
@@ -224,7 +281,7 @@ export async function startDevTlsFrontDoor(options) {
     }
     upgradedSockets.add(socket);
     socket.once("close", () => upgradedSockets.delete(socket));
-    const upstream = httpRequest(proxyOptions(request));
+    const upstream = httpRequest(proxyOptions(request, true));
     upstream.once("upgrade", (upstreamResponse, upstreamSocket, upstreamHead) => {
       upgradedSockets.add(upstreamSocket);
       // Either half failing takes the pair down; a reset upstream must never
@@ -245,8 +302,22 @@ export async function startDevTlsFrontDoor(options) {
       upstreamSocket.pipe(socket).pipe(upstreamSocket);
     });
     upstream.once("response", (upstreamResponse) => {
-      writeUpgradeResponse(socket, upstreamResponse);
-      upstreamResponse.pipe(socket);
+      const chunks = [];
+      let total = 0;
+      upstreamResponse.on("data", (chunk) => {
+        const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        total += bytes.byteLength;
+        if (total > MAX_UPGRADE_FALLBACK_BYTES) {
+          upstreamResponse.destroy();
+          socket.destroy();
+          return;
+        }
+        chunks.push(bytes);
+      });
+      upstreamResponse.once("error", () => socket.destroy());
+      upstreamResponse.once("end", () => {
+        writeUpgradeFallbackResponse(socket, upstreamResponse, Buffer.concat(chunks));
+      });
     });
     upstream.once("error", () => socket.destroy());
     upstream.end();
