@@ -1924,15 +1924,26 @@ describe("apps/runner — legal command lifecycle", () => {
   });
 
   it("runs a depth-2 two-maker tree and preserves the single-root disclosure at envelope terminal", async () => {
+    // T10 / codex r2 B1: the provider double is CLASS-KEYED, so each queue's first
+    // JUDGE entry is that maker's ROOT. The two roots MUST end up strictly
+    // unequal, with the FIRST-CONFIGURED one WEAKER — otherwise the served-root
+    // oracle below cannot tell the live max-strength selector from the retired
+    // provider-order rule (a tied first root satisfies both), and the lawful
+    // lexicographic tiebreak makes the winner depend on which random UUID sorts
+    // first. Both defects were live in the r2 version of this fixture.
+    const WEAK_FIRST_CONFIGURED_ROOT = 0.3;
+    const STRONG_SECOND_CONFIGURED_ROOT = 0.9;
     const primary = await startProviderDouble(
       [
-        ...Array.from({ length: 8 }, (_, index) => judgementDouble(`Primary maker position ${index + 1}`)),
+        judgementDouble("Primary maker position 1", WEAK_FIRST_CONFIGURED_ROOT),
+        ...Array.from({ length: 7 }, (_, index) => judgementDouble(`Primary maker position ${index + 2}`)),
         ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary review ${index + 1}`))
       ]
     );
     const secondary = await startProviderDouble(
       [
-        ...Array.from({ length: 8 }, (_, index) => judgementDouble(`Secondary maker position ${index + 1}`)),
+        judgementDouble("Secondary maker position 1", STRONG_SECOND_CONFIGURED_ROOT),
+        ...Array.from({ length: 7 }, (_, index) => judgementDouble(`Secondary maker position ${index + 2}`)),
         ...Array.from({ length: 8 }, (_, index) => reviewDouble("dispute", `Secondary review ${index + 1}`))
       ]
     );
@@ -2052,36 +2063,54 @@ describe("apps/runner — legal command lifecycle", () => {
       const unservedRecord = projection?.condition_mark_records.find(
         (record) => record.mark === "UNSERVED-MAKER-POSITION"
       );
-      // T10 (codex r1 B2): the record carries the LIVE rule. Migrated from the
-      // retired `first-configured-provider` literal, which this consumer still
-      // required after T10 landed.
+      // T10 (codex r1 B2, corrected per codex r2 B1): the record carries the LIVE
+      // rule AND its subject is the STRICTLY strongest root, read from the run's
+      // own node_strength_record. Roots are ordered by creation, so the first row
+      // is the FIRST-CONFIGURED maker's root.
       expect(unservedRecord).toMatchObject({
         served_root_rule: "max-propagated-strength-lexicographic-tiebreak"
       });
-      // ...and the SUBJECT is derived from the recorded strengths, not from
-      // provider order. Migrating the literal alone would leave the assertion
-      // compatible with a selector that still served whatever the first
-      // configured provider authored, so the oracle below is the run's OWN
-      // node_strength_record: the served subject must be a root, and no other
-      // root may carry a strictly greater recorded strength.
       const rootStrengthRows = await database.pool.query<{ node_id: string; strength: string }>(
         `SELECT strength.node_id, strength.strength::text
            FROM ledger.node_strength_record AS strength
            JOIN ledger.propagation_run AS propagation
              ON propagation.propagation_run_id = strength.propagation_run_id
            JOIN core.node AS node ON node.node_id = strength.node_id
-          WHERE propagation.run_id = $1 AND node.parent_node_id IS NULL`,
+          WHERE propagation.run_id = $1 AND node.parent_node_id IS NULL
+          ORDER BY node.created_at_seq`,
         [runId]
       );
-      expect(rootStrengthRows.rowCount).toBeGreaterThanOrEqual(2);
-      const servedStrength = rootStrengthRows.rows
-        .find((row) => row.node_id === unservedRecord?.subject_ref);
-      expect(servedStrength).toBeDefined();
-      for (const row of rootStrengthRows.rows) {
-        expect(Number(row.strength)).toBeLessThanOrEqual(Number(servedStrength!.strength));
-      }
-      expect(unservedRecord?.reason).toContain("test-layer");
-      expect(unservedRecord?.reason).toContain("Secondary test maker");
+      expect(rootStrengthRows.rowCount).toBe(2);
+      const firstConfiguredRoot = {
+        nodeId: rootStrengthRows.rows[0]!.node_id,
+        strength: Number(rootStrengthRows.rows[0]!.strength)
+      };
+      const secondConfiguredRoot = {
+        nodeId: rootStrengthRows.rows[1]!.node_id,
+        strength: Number(rootStrengthRows.rows[1]!.strength)
+      };
+
+      // (1) THE PIN, asserted BEFORE the winner assertion. If a fixture change
+      //     ever re-ties the roots, this fails here — loudly — instead of
+      //     silently disarming everything below it, which is exactly what the r2
+      //     version of this oracle did.
+      expect(secondConfiguredRoot.strength).toBeGreaterThan(firstConfiguredRoot.strength);
+
+      // (2) The served root is the STRICT winner, which is NOT the first
+      //     configured one. A selector that went back to provider order serves
+      //     `firstConfiguredRoot` and fails here; the lexicographic tiebreak
+      //     cannot decide this run, because there is no tie to break.
+      expect(unservedRecord?.subject_ref).toBe(secondConfiguredRoot.nodeId);
+      expect(unservedRecord?.subject_ref).not.toBe(firstConfiguredRoot.nodeId);
+
+      // (3) The disclosure names BOTH roots by the ids the strengths gave us —
+      //     never by a hard-coded maker name, which under the lawful tiebreak
+      //     depended on which random UUID happened to sort first.
+      expect(unservedRecord?.reason).toContain(secondConfiguredRoot.nodeId);
+      expect(unservedRecord?.reason).toContain(firstConfiguredRoot.nodeId);
+      expect(unservedRecord?.affected_node_ids).toEqual(
+        expect.arrayContaining([firstConfiguredRoot.nodeId, secondConfiguredRoot.nodeId])
+      );
       expect(projection?.nodes).toHaveLength(16);
       expect(projection?.nodes.every((node) => node.review !== null)).toBe(true);
       // If the shipped served-node set is widened to both roots, the same
@@ -4313,6 +4342,25 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
         client.release();
       }
     };
+
+    // N3 (codex r2): the constraint is VALIDATED, read from the catalogue rather
+    // than from the migration's text — `NOT VALID` can be reformatted across a
+    // newline, and a string check would pass on an unvalidated constraint while
+    // every historical row stayed permanently unchecked. This is the assertion
+    // that catches a NOT VALID regression.
+    const constraint = await database.pool.query<{ convalidated: boolean; condef: string }>(
+      `SELECT c.convalidated, pg_get_constraintdef(c.oid) AS condef
+         FROM pg_constraint AS c
+         JOIN pg_class AS t ON t.oid = c.conrelid
+         JOIN pg_namespace AS n ON n.oid = t.relnamespace
+        WHERE n.nspname='serve' AND t.relname='condition_mark'
+          AND c.conname='condition_mark_served_root_rule_rule_check'`
+    );
+    expect(constraint.rowCount).toBe(1);
+    expect(constraint.rows[0]!.convalidated).toBe(true);
+    // ...and it really is the DECLARED HISTORY, both members present.
+    expect(constraint.rows[0]!.condef).toContain("max-propagated-strength-lexicographic-tiebreak");
+    expect(constraint.rows[0]!.condef).toContain("first-configured-provider");
 
     // The live rule and the DECLARED retired rule are both storable — the second
     // is the write DR-184 catch-up performs when it carries an old record forward.

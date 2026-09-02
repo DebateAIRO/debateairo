@@ -7,10 +7,21 @@ import { describe, expect, it } from "vitest";
  * T10 (goal 188-195, rulings S6-1 / S6-3) — "Delete first-configured-provider
  * selection".
  *
- * DELETED means the rule cannot come back through any surface: not as the named
- * constant, not as the selector, not as a recordable rule string, and not as a
- * value the database will still accept. This scan is the repo-wide half of that;
- * the behavioural half lives in `tests/unit/t10-served-root-selection.test.ts`.
+ * DELETED means no NEW selection can be made under the retired rule: the named
+ * constant and the selector are gone from shipped source entirely, and the only
+ * shipped module that may still NAME the retired string is the kernel, where the
+ * read vocabulary is declared.
+ *
+ * DELETED does NOT mean the value is unreadable or unstorable (ruling J17).
+ * Migration 0055 PRESERVES rows sealed under the retired rule rather than
+ * relabelling them, so the database ADMITS the declared rule history — live rule
+ * plus retired rule — and the CHECK is VALIDATED over it. What stays live-only is
+ * the APPLICATION's write path: `ConditionMarkRecord.servedRootRule` cannot
+ * express a retired rule, `PreservedConditionMarkRecord` is the only shape that
+ * can, and `persist` refuses one on any answer that is not superseding an
+ * existing one. The DB-backed half of that law is exercised in
+ * `tests/integration/database.test.ts`'s T10/B3 block; the behavioural half of
+ * selection lives in `tests/unit/t10-served-root-selection.test.ts`.
  *
  * The oracle is deliberately LAYOUT-INDEPENDENT (whole file text, never a line
  * at a time), so a reformat cannot blind it — the same shape T8 used for the
@@ -141,16 +152,21 @@ describe("T10 · the first-configured-provider rule is deleted, not merely bypas
     expect(carrying).toEqual([...MIGRATIONS_CARRYING_THE_RETIRED_RULE].sort());
   });
 
-  it("ships a forward migration that stops the database accepting the retired rule", async () => {
+  it("ships a forward migration that replaces the CHECK with the declared rule history", async () => {
     const retirement = (await migrationSources())
       .find(({ path }) => path.endsWith(MIGRATIONS_CARRYING_THE_RETIRED_RULE[1]));
 
     expect(retirement).toBeDefined();
-    // The retirement replaces the CHECK; the new rule string is what remains writable.
+    // The retirement REPLACES 0018's one-member CHECK with the declared history:
+    // the live rule (what a fresh selection records) and the retired rule (what
+    // older rows already carry and DR-184 catch-up carries forward). J17.
     expect(retirement!.text).toContain("max-propagated-strength-lexicographic-tiebreak");
+    expect(retirement!.text).toContain("first-configured-provider");
     expect(retirement!.text.toUpperCase()).toContain("DROP CONSTRAINT");
-    // The constraint is VALIDATED over the declared history, not NOT VALID:
-    // the first draft left every historical row permanently unchecked.
-    expect(retirement!.text.toUpperCase()).not.toContain("NOT VALID");
+    // Whether the constraint is VALIDATED is NOT asserted from this file's text:
+    // `NOT VALID` can be reformatted across a newline and the string check would
+    // pass on an unvalidated constraint. The discriminating assertion reads
+    // pg_constraint.convalidated from a live database, in the T10/B3 block of
+    // tests/integration/database.test.ts.
   });
 });
