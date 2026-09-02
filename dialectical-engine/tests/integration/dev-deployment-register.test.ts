@@ -9,7 +9,6 @@ import { readDeploymentMakerCapability } from "../../packages/critique/src/index
 import {
   createPool,
   migrate,
-  ProviderProbeRepository,
   RunRepository,
   type Pool
 } from "../../packages/db/src/index.js";
@@ -41,7 +40,7 @@ import {
 } from "../../apps/runner/src/index.js";
 import { createInitialBatteryRows, WorkItemRepository } from "../../packages/battery/src/index.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
-import { probeTarget } from "../../packages/providers/src/index.js";
+import { observeProviderTarget } from "../../packages/providers/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
@@ -541,9 +540,11 @@ describe("DEV-05 complete development deployment register", () => {
         if (target === undefined) {
           return { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_GATEWAY_UNRESOLVED" };
         }
-        const observation = await probeTarget({
-          target, probes: new ProviderProbeRepository(database.pool),
-          timeoutMs: 1_000, fetchImplementation: fetch, clock: () => new Date()
+        // OBSERVE only, exactly as apps/runner/src/main.ts composes it: the runner
+        // owns persistence in both arms, so a persisting probe here writes the same
+        // re-probe twice (codex r1 B1 — this arm's RED was 4 rows where 2 are right).
+        const observation = await observeProviderTarget({
+          target, timeoutMs: 1_000, fetchImplementation: fetch, clock: () => new Date()
         });
         return {
           state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode
