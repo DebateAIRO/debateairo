@@ -5072,7 +5072,23 @@ describe("T10/T11 · the served root and its label, through the production runne
     // answer. codex r3 B2: run identity alone let exactly this artifact through
     // as both the candidate and the verdict reference.
     const question = `t09-wrong-producer-${randomUUID()}`;
-    const runId = await createRun(question, 90, 1, 1);
+    // Activation-free, for the reason codex r4 B2 gave: with `createRun`'s full
+    // battery, removing the guard under a mutant lets `persist` reach its
+    // TERMINAL progress event and die on `core.reject_terminal_with_wait`
+    // (23514 WAIT_DRAIN_REQUIRED) instead of on the assertion below. That is
+    // how R5M1/R5M2 were miscredited, and rebuilding the arms without also
+    // rebuilding this fixture reproduced it exactly (mutants B1M2/B1M3, first
+    // pass).
+    const runId = await new RunRepository(database.pool).startRun({
+      questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+      sessionId: `session:${question}`, callerScope: "ASKER",
+      asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual",
+      effectiveRiskTier: "casual", tierSource: "ASKER",
+      tierProvenanceRef: `asker-declaration:${question}`, compositionBudgetTier: "low",
+      depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
+      envelopeBasis: fixtureStructuralCeiling(90, 1, 1),
+      registerVersion: 1, batteryVersion: "s00", batteryRows: []
+    });
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
     });
@@ -5116,8 +5132,8 @@ describe("T10/T11 · the served root and its label, through the production runne
 
     // SAME RUN, real artifact, WRONG PRODUCER: the judge's call site is not a
     // synthesis call site, so the ledger has no such pairing.
-    await expect(persistTerminalRun({
-      pool: database.pool, runId, fixtureKey: question, factBundle, loopRounds: [round]
+    await expect(persistTerminalAnswer({
+      pool: database.pool, runId, workItemId, fixtureKey: question, factBundle, loopRounds: [round]
     })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
 
     // WRONG ROUND: a genuine round-1 synthesis pairing, filed as round 2. The
@@ -5149,9 +5165,9 @@ describe("T10/T11 · the served root and its label, through the production runne
     } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
     // The persist SHARES the work item the ledger entries name, so the pairing
     // resolves and ONLY the round binding can refuse this.
-    await expect(persistTerminalRun({
-      pool: database.pool, runId, fixtureKey: `${question}-wrong-round`, factBundle,
-      workItemId, loopRounds: [roundTwoWithRoundOneSites]
+    await expect(persistTerminalAnswer({
+      pool: database.pool, runId, workItemId, fixtureKey: `${question}-wrong-round`, factBundle,
+      loopRounds: [roundTwoWithRoundOneSites]
     })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
 
     // The whole answer rolled back with it.
