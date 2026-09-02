@@ -44,6 +44,7 @@ import {
   type ServeGateResult
 } from "@debateai/serve";
 import { AnswerSchema } from "@debateai/contract";
+import type { ServedRootRuleHistory } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -4334,6 +4335,13 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
       mark: "UNSERVED-MAKER-POSITION",
       served_root_rule: RETIRED_RULE
     }));
+    // Compile-level pin on the PROJECTION type specifically (codex r1 B3 named
+    // this read site): if it narrows back to the live rule alone, the projection
+    // would again assert that a value it really returns cannot exist.
+    const projectedRule: ServedRootRuleHistory | null | undefined = projection
+      ?.condition_mark_records.find((record) => record.mark === "UNSERVED-MAKER-POSITION")
+      ?.served_root_rule;
+    expect(projectedRule).toBe(RETIRED_RULE);
     // The exact call both answer routes make. Today this throws, so a pre-0055
     // answer is a 500 rather than an answer.
     expect(() => AnswerSchema.parse(projection)).not.toThrow();

@@ -1766,7 +1766,11 @@ export class ServeRepository {
       subject_ref: string;
       reason: string;
       lift_path: string | null;
-      served_root_rule: ServedRootRule | null;
+      // T10 / codex r1 B3: the READ vocabulary. This row may have been sealed
+      // before migration 0055, in which case it carries the retired rule — the
+      // migration preserves it deliberately. Typing it live-only here made the
+      // projection assert that a value it really returns cannot exist.
+      served_root_rule: ServedRootRuleHistory | null;
       call_site_key: string | null;
       planned_leg_count: number | null;
       terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
