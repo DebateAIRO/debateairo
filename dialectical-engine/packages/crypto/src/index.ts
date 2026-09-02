@@ -170,12 +170,28 @@ const kekMaterials = new WeakMap<KekHandle, Buffer>();
 const destroyedKekHandles = new WeakSet<KekHandle>();
 
 /**
- * L2-F7: `Buffer.from` of a 32-byte source is served from Node's shared 8 KiB
- * pool slab, so a key copy sits adjacent to unrelated allocations and survives
- * in the slab after the copy is dropped. `allocUnsafeSlow` gives this key its
- * own exactly-sized allocation, which `fill(0)` can then actually erase.
+ * Short-lived working copy for one encrypt/decrypt. Pooled on purpose: this is
+ * the per-message path, and every caller zeroes it in a `finally`.
  */
 function copyKey(material: Uint8Array): Buffer {
+  const key = Buffer.from(material);
+  if (key.byteLength !== KEY_BYTES) {
+    key.fill(0);
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return key;
+}
+
+/**
+ * L2-F7: `Buffer.from` of a 32-byte source is served from Node's shared 8 KiB
+ * pool slab, so the copy sits adjacent to unrelated allocations and `fill(0)`
+ * erases only the view — the bytes stay in the slab until it is reused.
+ * `allocUnsafeSlow` gives the key its own exactly-sized allocation that zeroing
+ * really erases. Reserved for the long-lived master copies and the key-file
+ * reads: a non-pooled allocation per message would cost RSS and GC for no
+ * benefit, since those copies are zeroed immediately anyway.
+ */
+function isolatedKeyCopy(material: Uint8Array): Buffer {
   if (material.byteLength !== KEY_BYTES) throw new CryptoInputError("CRYPTO_KEY_INVALID");
   const key = Buffer.allocUnsafeSlow(KEY_BYTES);
   key.set(material);
@@ -183,7 +199,7 @@ function copyKey(material: Uint8Array): Buffer {
 }
 
 function makeKekHandle(material: Uint8Array): KekHandle {
-  const key = copyKey(material);
+  const key = isolatedKeyCopy(material);
   const handle = Object.freeze(Object.create(null)) as KekHandle;
   kekMaterials.set(handle, key);
   return handle;
