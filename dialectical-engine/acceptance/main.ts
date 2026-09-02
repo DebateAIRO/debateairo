@@ -31,6 +31,7 @@ import {
 } from "@debateai/crypto";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import {
+  readAdaptiveStoppingControls,
   readPanelWeightingControls,
   readVerdictLabelControls,
   resolveEffectiveRiskTier
@@ -408,9 +409,11 @@ export async function createAcceptanceRuntime(input: {
   }
   const policy = await readAcceptanceRuntimePolicy(input.pool);
   const scoringOperator = await readOptionalScoringOperator(input.pool);
-  const [panelWeighting, verdictLabels] = await Promise.all([
+  const [panelWeighting, verdictLabels, adaptiveStopping] = await Promise.all([
     readPanelWeightingControls(input.pool, ACCEPTANCE_REGISTER_VERSION),
-    readVerdictLabelControls(input.pool, ACCEPTANCE_REGISTER_VERSION)
+    readVerdictLabelControls(input.pool, ACCEPTANCE_REGISTER_VERSION),
+    // T7 / S3-2: δ and ε come from the seeded register, never from a constant.
+    readAdaptiveStoppingControls(input.pool, ACCEPTANCE_REGISTER_VERSION)
   ]);
   const runRepository = new RunRepository(input.pool);
   const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
@@ -525,6 +528,9 @@ export async function createAcceptanceRuntime(input: {
       unmappedReason: panelWeighting.unmappedReason,
       sourceRefs: { ...verdictLabels.sourceRefs, ...panelWeighting.sourceRefs }
     },
+    // S3-2/S5-1 / T7: the sealed adaptive-stopping family, handed whole. δ and ε
+    // are the register's; the runner restates neither.
+    stoppingPolicy: adaptiveStopping,
     // S6-1 / T11: the sealed verdict-label family, READ from the same seeded
     // register. gamma, the two cuts and the disagreement threshold reach the
     // label ladder as identifiers; no value is restated here.

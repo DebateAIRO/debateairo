@@ -158,6 +158,20 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       providerFamilyMap: "test-layer:J1"
     }
   },
+  // T7 coherence consequence (same J12 class as panelPolicy directly above): a
+  // multi-maker run needs the sealed adaptive-stopping rows or it stops loudly.
+  // Provisioning only. δ and ε are set WIDE OF the fixtures' arithmetic so no
+  // existing fixture's expansion is truncated by this addition; the stopping
+  // rule's own numbers are pinned in tests/unit/t07-adaptive-stopping.test.ts.
+  stoppingPolicy: {
+    registerVersion: 1,
+    delta: 0,
+    epsilon: 0,
+    sourceRefs: {
+      globalStopDelta: "test-layer:T7",
+      branchFreezeEpsilon: "test-layer:T7"
+    }
+  },
   // T11 coherence consequence: every served answer now carries a code-derived
   // three-state label, so every fixture that reaches a served answer needs the
   // sealed verdict-label family. Provisioning only — no fixture's own subject
@@ -2027,6 +2041,27 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r1:"))).toHaveLength(4);
       expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r2:"))).toHaveLength(8);
 
+      // T7 / J15(a) + J15(d): the stopping rule is LIVE in this loop, evaluated at
+      // the DERIVED global round boundary — round k completes when every root has
+      // finished round k, which in this root-major plan is the last leg carrying
+      // round k. Two rounds, two boundaries, and every one of them PROPAGATION:
+      // the boundary reaches no provider, so it cannot spend the envelope this
+      // fixture exhausts exactly.
+      const stoppingRounds = await database.pool.query<{ call_site_key: string; action_kind: string }>(
+        `SELECT call_site_key, action_kind FROM ledger.ledger_entry
+         WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:round:%' ORDER BY sequence`,
+        [runId]
+      );
+      expect(stoppingRounds.rows.map((row) => row.call_site_key))
+        .toEqual(["STOPPING:round:1", "STOPPING:round:2"]);
+      expect(new Set(stoppingRounds.rows.map((row) => row.action_kind))).toEqual(new Set(["PROPAGATION"]));
+      const stoppingModelCalls = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+         WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:round:%' AND action_kind='MODEL_CALL'`,
+        [runId]
+      );
+      expect(stoppingModelCalls.rows[0]?.count).toBe("0");
+
       const reviews = await database.pool.query<{
         node_id: string;
         author_maker: string;
@@ -3553,6 +3588,48 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(state.rows[0]).toEqual({ state: "READY", claimed_by: null });
       // Zero model-call spend: the missing row can never become a degraded self-grade
       // paid for with real tokens.
+      expect(primary.calls()).toBe(0);
+      expect(secondary.calls()).toBe(0);
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
+  // T7 (S3-2/S5-1), same J12 shape and same place: a multi-maker run is the only run
+  // that expands, and expansion is what δ and ε govern. Running the ceiling with the
+  // stopping rule quietly absent — or with a δ/ε invented in the runner — is the same
+  // silent-degradation shape. The stop lands BEFORE the claim and BEFORE any spend.
+  it("T7 — refuses unsealed adaptive stopping on a multi-maker run before claiming or spending", async () => {
+    const primary = await startProviderDouble([]);
+    const secondary = await startProviderDouble([]);
+    try {
+      const work = await createRunnerWork("stopping-policy-before-claim");
+      const { stoppingPolicy: _omitted, ...settingsWithoutStoppingPolicy } = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "model:test-layer", maker: "maker:test-layer"
+      }), {
+        ...settingsWithoutStoppingPolicy,
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "model:test-layer:secondary", maker: "maker:test-layer:secondary"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "maker:test-layer:secondary"
+        },
+        // Supplied so the DR-074 guard is satisfied; panelPolicy is left in place so the
+        // STOPPING guard is demonstrably the one that fires, not its predecessor.
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(work.workItemId)).rejects.toMatchObject({
+        code: "ADAPTIVE_STOPPING_UNRESOLVED"
+      });
+      const state = await database.pool.query<{ state: string; claimed_by: string | null }>(
+        "SELECT state, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [work.workItemId]
+      );
+      expect(state.rows[0]).toEqual({ state: "READY", claimed_by: null });
       expect(primary.calls()).toBe(0);
       expect(secondary.calls()).toBe(0);
     } finally {
