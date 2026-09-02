@@ -7,6 +7,10 @@
 **Spine (v3.4.0 — amended at this intake with V's vertical-slice law):** `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/agent-protocols/debateai-heartbeat-protocol.md`
 **Tree state at packet-write (2026-09-01):** branch `dev` @ `8d38185c`, **111 dirty working-tree entries** belonging to the in-flight `ui-overhaul` mission. They are NOT yours: never touch, revert, stash, or "clean" them. If your work needs a clean tree, say so and stop.
 
+## 0. Roster (V, 2026-09-02 — supersedes the intake election)
+
+Orchestrator **Opus 5** · architecture and plans **Opus 5** · coding **Codex Sol Max** (`gpt-5.6-sol` @ `model_reasoning_effort=xhigh`) and Opus 5 · review **Opus 5 and Codex Sol Max**, always the house that did NOT author the artifact · QA **V personally**. Wave-1 requirements were authored by Fable 5.1 before a provider session limit ended those seats; that work stands and is not re-run.
+
 ## 1. Skills — load in this order, then reach for anything else in the Superpowers library
 1. `superpowers:using-superpowers`
 2. `heartbeat-protocol` (the router), then the role contract your packet names
@@ -36,6 +40,16 @@ Markers, each carrying `comments read through: <n>` (the number of comments on y
 - **QA is V personally.** Every SPEC acceptance section is numbered, human-runnable steps in the real dev stack with the expected observation per step — a browser, a terminal, a Postgres query V can paste. A green test suite is a worker milestone, never V's acceptance.
 - **Vertical-slice law (V, 2026-09-01):** a slice has a beginning and an end V can exercise; slices run in parallel in separate worktrees; Done on a slice is V's veto after personally testing, nothing less. Cut slices so the FIRST one is the smallest complete end-to-end proof.
 - SPEC.md is FROZEN at creation. PLAN.md is a SCAFFOLD here (SPEC-trace skeleton, quantifiability law, cluster table headers) — the architecture seat writes the steps. PROGRESS.md is an empty skeleton (orchestrator is its sole writer). DECISIONS.md is append-only: `date · question · choice · reason · who ruled`.
+
+## 4b. WRITE AS YOU GO — binding, and it is the difference between losing a seat and losing nothing
+
+**Write every artifact to disk the moment it is ready. Never batch writes to the end of your run.** Provider session limits have killed six seats of this mission mid-sentence with no warning; the seats that had been writing incrementally lost nothing, and the seats that were still holding their work in context lost everything they had done. Concretely:
+- Write each file as it is finished (one slice's SPEC, then its PLAN, then the next slice) rather than assembling them all and writing at the end.
+- Write your self-report EARLY, as soon as you have findings worth recording, and update it as you go. It is a case file, not a closing statement.
+- When you learn something another seat would otherwise re-derive, append it to `.hermes/TOOLING-TRAPS.md` immediately.
+- Post a `HEARTBEAT` comment on your ticket at each natural checkpoint naming what is now on disk, so the orchestrator can reconstruct your state without your final message.
+
+**Your final message is the least durable thing you produce.** Anything that exists only there does not exist.
 
 ## 5. Self-report — binding, BEFORE your handoff
 Path (in your `allowed` list): `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/observability-agents/agent-reports/<SEAT>.md`. The question it answers, VERBATIM from V:

@@ -3,8 +3,8 @@
 Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/observability-agents/packets/COMMON.md`, then `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/00-intake-H0.md`.
 
 ## 1. Ticket state
-- **board:** `observability-agents` · **ticket:** `t_ca8c42be` · **seat:** REQ-REV-FIX · **role:** reviewer (`heartbeat-reviewer`) · **model:** Fable 5.1 (Claude subagent) · **round:** 1 of max 3
-- **session:** record in your CLAIM comment · **comment cursor at dispatch:** __CURSOR__ (on the AUTHOR's ticket `t_80ef9dec`; read every comment through it)
+- **board:** `observability-agents` · **ticket:** `t_ca8c42be` · **seat:** REQ-REV-FIX · **role:** reviewer (`heartbeat-reviewer`) · **model:** Codex Sol Max (`gpt-5.6-sol` @ `model_reasoning_effort=xhigh`) — cross-house: the author is a Claude seat, you are not · **round:** 1 of max 3
+- **session:** record in your CLAIM comment · **comment cursor at dispatch:** 3 (on the AUTHOR's ticket `t_80ef9dec`; read every comment through it)
 - **the work under review:** seat REQ-FIX, ticket `t_80ef9dec`, artifacts below. You are BLIND to the other two product reviewers and must not read `docs/missions/observability-agents/reviews/REQ-REV-*.md` other than your own.
 - **allowed (exhaustive):**
   - `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/reviews/REQ-REV-FIX.md` (your verdict)
@@ -13,6 +13,15 @@ Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-eng
   - comments on `t_ca8c42be` (CLAIM, BLOCKED) and ONE verdict comment on the author's ticket `t_80ef9dec` (pass `--author REQ-REV-FIX`)
 - **forbidden:** everything else. You never edit the work under review. No git writes. No code. Read-only across the repo.
 
+## 1b. Skills — you CANNOT invoke the Skill tool; READ these files in full instead, and list them in `SKILLS LOADED`
+`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md` · `.../heartbeat-reviewer/SKILL.md` · `/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md` · `.../verification-before-completion/SKILL.md` · `.../systematic-debugging/SKILL.md` (when you judge a failure) · `.../receiving-code-review/SKILL.md` (if the author contests you). The whole `superpowers/6.3.0/skills/` directory is open to you.
+
+## 1c. THE AUTHOR IS DEAD — what that changes, and what it does not
+The author seat was killed at 00:11 by a provider session limit (HTTP 429) **after** writing every artifact below and its own self-report, but **before** posting a handoff comment. So:
+- There is **no `SKILLS LOADED` line to check**, and its absence is NOT a finding against the author. The orchestrator verified the gate from the seat's transcript instead and posted the evidence as a comment on your ticket: all four floor skills were invoked AND their bodies were delivered (`using-superpowers`, `heartbeat-protocol`, `heartbeat-requirements`, `brainstorming`). Treat that comment as the evidence, and say in your verdict that you did so.
+- **Judge the artifact set exactly as delivered.** Anything the packet demanded and the seat did not produce is a finding like any other — the death explains it, it does not excuse it, and the orchestrator decides whether to re-run or accept.
+- **Nobody can answer your questions.** Where you would normally contest a finding with the author, write the finding with your reasoning and let the orchestrator route it. Do not assume intent.
+
 ## 2. Artifacts under review (absolute paths)
 1. **The packet that dispatched the author — review it FIRST** (`heartbeat-reviewer` §1): `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/observability-agents/packets/REQ-FIX.md` and `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/observability-agents/packets/COMMON.md`. Check every quoted constant against reality (tree state, ticket ids, paths, "no /metrics anywhere", the demo numbers in H0), the `allowed` list against the deliverables demanded, and that every path resolves. A packet defect is a finding against the ORCHESTRATOR's packet, filed in your verdict like any other.
 2. `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/requirements/fixagent.md`
@@ -20,6 +29,9 @@ Read FIRST, in full: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-eng
 4. `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/observability-agents/slices/FIX-*/{SPEC,PLAN,PROGRESS,DECISIONS}.md`
 5. The author's handoff comment on `t_80ef9dec` and self-report `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/observability-agents/agent-reports/REQ-FIX.md`.
 6. V's verbatim goal and the contradiction table (H0) — the requirements must satisfy V's words, not the predecessor's.
+
+## 2b. Where you work
+Your working directory is the MAIN checkout `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine`, and **four other seats are writing in it right now** (an ObservationAgent completion seat and three architecture seats). Their paths are disjoint from yours. Therefore: touch ONLY the two output paths in your `allowed` list, run NO git write of any kind (not even `git add`), never `git stash`, `git checkout` or `git clean`, and do not be alarmed by files appearing under `slices/OBS-0[3-7]/` or `architecture/` while you work — they are not yours and not under your review. If you need a scratch file, put it in `/tmp/` and delete it.
 
 ## 3. Probes — build your own, never nod at the author's (`heartbeat-reviewer` §2)
 P1 **Stranger test, exhaustively:** every SPEC acceptance step and every PLAN-scaffold trace row — can V, with no context, run it in the real dev stack and observe the stated result? List every step that fails the test (file:line).

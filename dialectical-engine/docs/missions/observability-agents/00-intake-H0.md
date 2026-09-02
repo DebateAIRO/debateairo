@@ -68,6 +68,37 @@ loop_ownership:
 
 `[x]` R7 election · `[x]` contradiction check · `[x]` per-CLI probe (Codex; Claude subagents are in-harness) · `[x]` decorrelation recorded · `[x]` typed ticket per seat · `[x]` `rework rounds: max 3` in every packet · `[x]` self-report path in every `allowed` list · `[x]` `SKILLS LOADED` opening mandated · `[x]` watchdog armed at launch (`logs/watchdog.sh`) · `[ ]` compass + slice files (REQ seats, in flight) · `[ ]` slice tickets (created after REQ review) · `[ ]` packet review by the review seat (wave 2)
 
+## ROSTER CHANGE — V, 2026-09-02 (IMPORTANT OPERATION, roster law R4: only V edits the roster)
+
+V's words: *"continue with the rest of the goal using Fable 5.1 as orchestrator and Opus 5 and Codex Sol Max as coders and reviewers"*, then, after switching this session's model, *"restart the mission with Opus 5"*. The later instruction governs, and it is also the only workable one: all three Fable 5.1 requirements seats were killed at ~00:11 by a **Fable session limit** (HTTP 429, "resets 2:30am"), which is a provider-side cap on that model, not a fault of the seats.
+
+```yaml
+loop_ownership:                       # 2026-09-02 13:35, FINAL — restores V's standing goal text
+  orchestrator: claude-fable-5.1      # V's goal names Fable 5.1; this session's model is set by V via /model
+  requirements: [claude-fable-5.1]    # DONE (wave 1); the OBS completion seat is also Fable 5.1
+  architecture: [claude-fable-5.1]    # "Plans, architecture, are owned by Fable 5,1 agents" — restored
+  programming:  [codex@gpt-5.6-sol-xhigh]                  # "Codex Sol Max" = gpt-5.6-sol @ reasoning_effort=xhigh
+  review:       [claude-fable-5.1, codex@gpt-5.6-sol-xhigh, claude-opus-5]
+  qa:           [V]
+```
+
+**Why this moved twice in one day, recorded so nobody re-derives it.** The 00:11 Fable session limit killed three seats, and at 10:20 the mission was restarted on Opus 5 because Fable was still capped. The Opus limit then killed four architecture seats at 12:30. **Both caps have since reset**, and V's standing goal text puts plans, architecture and review on Fable 5.1 — so the roster is restored to it. Codex Sol Max runs on a separate account and was never affected by either cap; that is why coding and one review lane live there permanently. The durable lesson is in the ledger: a fleet whose seats all draw on one provider account has one point of failure, and the only defence that actually worked was writing artifacts to disk incrementally (COMMON §4b).
+
+**Decorrelation, improved by this change.** Wave 1's requirements were authored by Fable 5.1; their reviewers are now **Codex Sol Max**, a genuinely different house — stronger than the same-base-model diamond recorded at intake. Architecture authored by Opus 5 is reviewed by Codex Sol Max; code written by Codex Sol Max is reviewed by Opus 5. No seat reviews its own house's work on the same artifact.
+
+**Probe, 2026-09-02 10:20 EEST:** `codex exec -c model='"gpt-5.6-sol"' -c model_reasoning_effort='"xhigh"'` returned `SOLMAX-OK`. Codex runs on a separate provider account, so it is unaffected by the Anthropic session limit — this is why review and coding lanes are placed there.
+
+## Wave-1 outcome (2026-09-02 00:11)
+
+| Seat | Ticket | Outcome | Artifacts on disk | Self-report | Handoff comment |
+|---|---|---|---|---|---|
+| AUDIT-STATE | `t_0d8634a7` | **COMPLETE** | audit + 4 logs + 2 trap entries | yes | yes |
+| REQ-FIX | `t_80ef9dec` | killed by the limit AFTER writing everything | `fixagent.md`, compass, **16 slices × 4 files** | yes | no |
+| REQ-SUP | `t_217e59bf` | killed by the limit AFTER writing everything | `supportagent.md`, compass, **7 slices × 4 files** | yes | no |
+| REQ-OBS | `t_3af6affd` | killed mid-work | `observationagent.md`, compass declaring **OBS-01..07**; only OBS-01, OBS-02 written | no | no |
+
+All of it is committed at `d626538c`. REQ-FIX and REQ-SUP go to review as delivered; REQ-OBS is completed by a transcription seat (`REQ-OBS-FINISH`) that may not re-open the frozen requirements.
+
 ## Wave 1 dispatch — 2026-09-01
 
 | Seat | Ticket | Role | Packet (absolute) |

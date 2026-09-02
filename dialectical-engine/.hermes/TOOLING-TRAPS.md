@@ -982,3 +982,33 @@ I nearly filed a refutation of a correct measurement on this. Include the shorth
 `text-align: start|end`.
 Rule for reviewers: **a negative finding about a COUNT is produced by two differently-shaped probes
 before it is written down.** A confirmation that fails is loud; a refutation that fails is silent.
+- **A provider session limit kills EVERY subagent on that model at once, mid-sentence — plan the fleet so one
+  account cannot stop the mission.** (observability-agents, 2026-09-02 00:11.) Three Claude subagents on the same
+  model died within seconds of each other on HTTP 429 "You've hit your session limit · resets 2:30am"; the
+  notification's `result` field carried each seat's last narration ("Next I need the remaining twelve SPECs…"),
+  which is how far it got, not what it delivered. **Nothing was lost, and the reason is worth copying:** every
+  packet named ABSOLUTE output paths and put the self-report BEFORE the handoff, so two of three seats had already
+  filed their case files, and all their artifacts were on disk. Only the handoff COMMENTS died with the seats.
+  **Rules:** (1) mandate artifact-first, handoff-last ordering in every packet — never let a deliverable exist only
+  in a seat's final message; (2) before re-running a killed seat, INVENTORY ITS OUTPUT — re-running a seat whose
+  work is complete is the expensive mistake, and its own review will catch anything missing; (3) spread lanes
+  across providers (Codex on a separate account was untouched), and (4) `hermes kanban` state is unaffected by the
+  provider outage, so the board is the recovery record — reconstruct the handoff onto it from disk plus transcript.
+- **`hermes kanban complete` on a `todo` ticket fails with "unknown id or terminal state" — a message that names
+  neither the real cause nor the real state.** (observability-agents, 2026-09-02.) The id was valid and the state
+  was `todo`, not terminal. The true cause appears only if you run `promote` on the same ticket:
+  `unsatisfied parent dependencies: t_xxxxxxxx (use --force to override)`. **Diagnose a refused `complete` by
+  running `promote` and reading ITS error.** And note what the chain is protecting: closing a child whose parent
+  still has open work would assert something false about the parent. `--force` exists; wanting a tidier board is
+  not a reason to use it. Related: a batch `complete t_a t_b t_c` completes what it can and errors on the rest —
+  read every line, because the success and the failures are interleaved. Completing a parent AUTO-PROMOTES its
+  children `todo → ready`, so the board moves under you as you reconcile it; re-list after every closure.
+- **`codex exec -c sandbox_mode='"workspace-write"'` blocks `~/.hermes`, so the Kanban CLI cannot take its init
+  lock and EVERY board write fails.** (observability-agents, 2026-09-02.) Two Codex review seats spent ~100k tokens
+  each and stopped before their CLAIM with `Operation not permitted:
+  ~/.hermes/kanban/boards/<slug>/kanban.db.init.lock`. Both behaved correctly — they tried a fallback, changed
+  nothing, and said so — but the whole launch was wasted. **Fix: grant the board directory explicitly with
+  `-c sandbox_workspace_write.writable_roots='["/Users/vladmihaimiron/.hermes"]'`**, which is far narrower than
+  `danger-full-access` and is what a review seat actually needs. The general rule: a seat's sandbox must cover
+  every path its MANDATED duties touch, and the board is outside the repo. Probe one board write before launching
+  a fleet — the failure is silent until the seat is deep into its budget.
