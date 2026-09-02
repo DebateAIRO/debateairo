@@ -284,9 +284,9 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
       mark: "UNSERVED-MAKER-POSITION",
       scope: "answer",
       subjectRef: "node:openai-root",
-      reason: "The first configured maker's root was served: OpenAI position node:openai-root; Anthropic position node:anthropic-root remains graph-visible but unserved",
+      reason: "The strongest post-exclusion maker root was served: OpenAI position node:openai-root; Anthropic position node:anthropic-root remains graph-visible but unserved",
       liftPath: null,
-      servedRootRule: "first-configured-provider",
+      servedRootRule: "max-propagated-strength-lexicographic-tiebreak",
       affectedNodeIds: ["node:openai-root", "node:anthropic-root"]
     } as const satisfies ConditionMarkRecord;
     const envelopeRecord = {
@@ -313,9 +313,9 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
       mark: "UNSERVED-MAKER-POSITION",
       scope: "answer",
       subjectRef: "node:openai-root",
-      reason: "first-configured-provider served OpenAI root node:openai-root; Anthropic root node:anthropic-root remains unserved",
+      reason: "The strongest root served OpenAI root node:openai-root; Anthropic root node:anthropic-root remains unserved",
       liftPath: null,
-      servedRootRule: "first-configured-provider",
+      servedRootRule: "max-propagated-strength-lexicographic-tiebreak",
       affectedNodeIds: ["node:openai-root", "node:anthropic-root"]
     } as const;
 
@@ -427,10 +427,11 @@ describe("S05 AC-86..AC-90 — refusal, sanitize, reconcile, read expiry, honest
       deadline: new Date("2026-08-08T00:00:00.000Z"),
       readAt: new Date("2026-08-08T00:00:01.000Z")
     })).toEqual({ state: "FAILED", reason: "DEADLINE_EXPIRED" });
-    expect(deriveHonestVerdict({ usableBasis: false, reasonRef: "condition:test" })).toEqual({
+    expect(deriveHonestVerdict({ usableBasis: false, reasonRef: "condition:test", labelBasis: null })).toEqual({
       verdictState: null,
       confidenceBand: null,
-      unavailable: { reasonRef: "condition:test" }
+      unavailable: { reasonRef: "condition:test" },
+      derivation: null
     });
   });
 });
@@ -443,17 +444,21 @@ describe("S05 P5/P6 / FX-SRV-03..05 — append-only folds and sealed reads", () 
 
   it("folds number status and derives current answer degradation without mutating sealed state", () => {
     expect(foldServedNumberEvents(events)).toEqual({ status: "EVICTED", reason: "MISSING-NUMBER" });
+    // T8 / S5-2: WITHHELD is repealed with the branch that produced it. The fold
+    // still honours the sealed cursor and the at-sequence ordering — proved here
+    // with the two statuses that survive, out of order and cursor-clipped.
     expect(foldServedNumberEvents([
       { status: "EVICTED", reason: "MISSING-NUMBER", atSequence: 9 },
       { status: "PRESENT", reason: null, atSequence: 2 },
-      { status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED", atSequence: 4 }
+      { status: "EVICTED", reason: "MISSING-NUMBER", atSequence: 4 }
     ], 4)).toEqual({
-      status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED"
+      status: "EVICTED", reason: "MISSING-NUMBER"
     });
-    expect(foldServedNumberEvents([{
-      status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED", atSequence: 1
-    }])).toEqual({
-      status: "WITHHELD", reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED"
+    expect(foldServedNumberEvents([
+      { status: "PRESENT", reason: null, atSequence: 2 },
+      { status: "EVICTED", reason: "MISSING-NUMBER", atSequence: 9 }
+    ], 4)).toEqual({
+      status: "PRESENT", reason: null
     });
     expect(deriveAnswerServeState({
       sealedServeState: "COMPOSED",

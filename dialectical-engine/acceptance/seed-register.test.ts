@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { CLAIM_TYPES } from "@debateai/kernel";
+import { ALGORITHM_REGISTER_ROW_KEYS } from "@debateai/register";
 import {
   ACCEPTANCE_CONVERGENCE_SOURCE_REF,
   ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
@@ -43,6 +44,9 @@ describe("ACC-01 acceptance register", () => {
     const rows = await buildAcceptanceRegisterRows();
     const byKey = Object.fromEntries(rows.map((row) => [row.rowKey, row]));
 
+    // Rows carrying their OWN ruling provenance are exempt from the default
+    // ref; T16's algorithm rows join that set, each citing goal-v4 80-96 or
+    // the mission's J1 ruling behind its value.
     expect(rows.filter((row) => ![
       "convergenceStopDefaults",
       "panelDiscoveryPolicy",
@@ -50,7 +54,8 @@ describe("ACC-01 acceptance register", () => {
       "hiddenNodeScoreThreshold",
       "claimTypeCompositionMap",
       "configuredProviderSet",
-      "scoringOperator"
+      "scoringOperator",
+      ...ALGORITHM_REGISTER_ROW_KEYS
     ].includes(row.rowKey))
       .every((row) => row.sourceRef === ACCEPTANCE_REGISTER_SOURCE_REF)).toBe(true);
     expect(byKey.riskTier?.value).toBe("standard");

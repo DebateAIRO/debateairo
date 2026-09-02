@@ -120,9 +120,12 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "SKIPPED-BY-BUDGET": return "Enrichment skipped by budget";
     case "ENVELOPE_EXHAUSTED": return "Run envelope exhausted";
     case "LEVERAGE_UNRESOLVED": return "Leverage unresolved";
+    case "BRANCH-FROZEN-LOW-LEVERAGE": return "Branch not expanded: it could not move the answer";
     case "DEGRADED-DIVERSITY": return "Model diversity degraded";
     case "SINGLE-LINEAGE": return "Single model lineage";
     case "CRITIQUE-UNAVAILABLE": return "Independent critique unavailable";
+    case "PANEL-PARTIAL": return "Some judges could not assess this point";
+    case "PANEL-DEGRADED-SINGLE-VOICE": return "Only the author's own assessment survived";
     case "AMBIGUOUS_ATTRIBUTION": return "Attribution ambiguous";
     case "STALE": return "Stale";
     case "UNDER-REVIEW": return "Under review";
@@ -136,6 +139,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "NON-COMPARABLE": return "Results are not compute-matched";
     case "NOT_SAMPLED": return "Not sampled";
     case "OFF-SUBJECT-DOWNGRADE": return "Off-subject evidence downgraded";
+    case "WAY-OF-KNOWING-DOWNGRADED": return "Claimed lookup had no locator";
     case "AMENDED-SEARCH": return "Search amended during run";
     case "MISSING-NUMBER": return "Number removed after replay failure";
     case "OWED-CHECK-UNEXECUTED": return "Owed check not executed at completion";
@@ -143,6 +147,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
     case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";
     case "UNAUTHORED-BRANCH-HALTED": return "Expansion stopped here — nothing was written to hide or show";
+    case "LABEL-BASIS-INCOMPLETE": return "Verdict basis incomplete — no rival position or no second judge to compare";
   }
 }
 

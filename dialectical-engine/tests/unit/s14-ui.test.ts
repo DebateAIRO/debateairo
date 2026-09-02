@@ -113,7 +113,11 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
   });
 
   it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
-    expect(CONDITION_MARKS).toHaveLength(28);
+    // J13(b) 29 -> 31: PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE joined the
+    // vocabulary. T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE) and T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE) both joined it mid-list. Both renderers below are
+    // asserted to label every member non-empty and distinct.
+    expect(CONDITION_MARKS).toHaveLength(33);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");
@@ -154,10 +158,10 @@ describe("S14 / W10 — first-class graph edges", () => {
     const base = {
       edgeId: "edge:test", sourceNodeId: "node:child", sourceChildKind: "support",
       targetKind: "NODE" as const, targetRef: "node:parent", polarity: "support" as const,
-      strengthSource: "EVIDENCE_VERIFIER", provenanceRef: "provenance:edge"
+      strengthSource: "REVIEWER", provenanceRef: "provenance:edge"
     };
     expect(projectServeEdge({ ...base, magnitudeStatus: "MEASURED", strength: 0.6 }).strength).toMatchObject({
-      status: "PRESENT", number: { value: 0.6, source: "EVIDENCE_VERIFIER", replay_handle: "provenance:edge" }
+      status: "PRESENT", number: { value: 0.6, source: "REVIEWER", replay_handle: "provenance:edge" }
     });
     expect(projectServeEdge({ ...base, magnitudeStatus: "UNKNOWN", strength: null }).strength).toEqual({
       status: "UNKNOWN", reason: "NO_JUDGEMENT_OR_MAGNITUDE"

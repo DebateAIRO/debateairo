@@ -510,3 +510,12 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
     return this.#delegate.call(request);
   }
 }
+
+// DR-181/DR-182's provider health probe (moved here by ruling J21 so the API and
+// the runner share ONE implementation). See ./provider-probe.ts.
+export {
+  observeProviderTarget,
+  probeTarget,
+  type ProviderProbeObservation,
+  type ProviderProbeRecorder
+} from "./provider-probe.js";

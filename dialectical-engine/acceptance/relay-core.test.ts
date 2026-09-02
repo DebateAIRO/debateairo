@@ -9,6 +9,7 @@ import {
   RELAY_MESSAGE_MAX_UTF8_BYTES,
   RELAY_REQUEST_MAX_BYTES,
   RELAY_REQUEST_MAX_MESSAGES,
+  resolveConfiguredBinary,
   startCliRelayServer,
   type CliRelayAdapter,
   type CliRelayHandle
@@ -355,5 +356,32 @@ describe("P4-10 loopback relay authentication", () => {
     const observedChild = await readFile(primary.childObservation, "utf8");
     expect(observedChild).not.toContain(primary.handle.authorizationHeader);
     expect(observedChild).not.toContain(primary.handle.authorizationHeader.slice("Bearer ".length));
+  });
+});
+
+describe("D10 maker CLI binary resolution", () => {
+  const DEFAULT = "/compiled/in/default/fixture-cli";
+  const KEY = "ACCEPTANCE_FIXTURE_BINARY";
+  const CODE = "FIXTURE_CLI_BINARY_UNRESOLVED";
+
+  it("returns the compiled-in default when the maker's key is absent", () => {
+    expect(resolveConfiguredBinary(DEFAULT, KEY, CODE, {})).toBe(DEFAULT);
+  });
+
+  it("returns the host binary named by the maker's key, surrounding whitespace removed", () => {
+    expect(resolveConfiguredBinary(DEFAULT, KEY, CODE, {
+      [KEY]: "  /host/bin/fixture-cli\n"
+    })).toBe("/host/bin/fixture-cli");
+  });
+
+  it("fails loudly on a present-but-blank key instead of falling back to another machine's path", () => {
+    expect(() => resolveConfiguredBinary(DEFAULT, KEY, CODE, { [KEY]: "" })).toThrow(CODE);
+    expect(() => resolveConfiguredBinary(DEFAULT, KEY, CODE, { [KEY]: " \t " })).toThrow(CODE);
+  });
+
+  it("reads only its own maker's key", () => {
+    expect(resolveConfiguredBinary(DEFAULT, KEY, CODE, {
+      ACCEPTANCE_OTHER_BINARY: "/host/bin/other-cli"
+    })).toBe(DEFAULT);
   });
 });

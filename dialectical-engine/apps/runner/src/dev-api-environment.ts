@@ -5,6 +5,7 @@ import { lstat, open, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
+import { DEVELOPMENT_REGISTER_VERSION } from "./dev-deployment-register.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets,
@@ -369,7 +370,7 @@ export async function assembleDevelopmentApiEnvironment(
     ["API_HOST", "127.0.0.1"],
     ["API_PORT", "8790"],
     ["STRANGER_SAMPLE_RATE", "0"],
-    ["REGISTER_VERSION", "4"],
+    ["REGISTER_VERSION", String(DEVELOPMENT_REGISTER_VERSION)],
     ["BATTERY_VERSION", "dev-auth-v1"],
     ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
     ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
@@ -393,9 +394,23 @@ export async function assembleDevelopmentApiEnvironment(
       && !row.startsWith("PUBLICATION_KEY_STORE_PATH=")
       && !row.startsWith("PUBLICATION_CLEANUP_DATABASE_URL="))
     .join("\n");
-  const registerV3Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=3\n");
-  const registerV2Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=2\n");
-  const registerV1Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=1\n");
+  // T16 · every predecessor of the CURRENT register version is an accepted
+  // historical api.env. Generated from the constant, never hand-written: the
+  // r1 form replaced a literal "REGISTER_VERSION=4", so a version bump made
+  // every replacement a silent no-op and disarmed these fixtures.
+  const historicalRegisterSources = Object.freeze(
+    Array.from({ length: DEVELOPMENT_REGISTER_VERSION - 1 }, (_unused, index) => source.replace(
+      `REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`,
+      `REGISTER_VERSION=${index + 1}\n`
+    ))
+  );
+  if (historicalRegisterSources.some((historical) => historical === source)) {
+    throw new TypeError("DEV_API_ENVIRONMENT_HISTORICAL_REGISTER_SOURCE_INVALID");
+  }
+  // The removed dev scaffold shipped while the register was at version 3; that
+  // pairing is a historical fact and does not move with the current version.
+  const removedScaffoldRegisterSource = historicalRegisterSources[2]!;
+  const registerV1Source = historicalRegisterSources[0]!;
   const preDiscoverySource = registerV1Source
     .split("\n")
     .filter((row) => !row.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
@@ -405,7 +420,7 @@ export async function assembleDevelopmentApiEnvironment(
     .split("\n")
     .filter((row) => !row.startsWith("EVALUATOR_DEV_MENU_DATABASE_URL="))
     .join("\n");
-  const removedScaffoldSource = registerV3Source.replace(
+  const removedScaffoldSource = removedScaffoldRegisterSource.replace(
     `PROVIDER_DISCOVERY_TARGETS_JSON=${providerPanel.targetsJson}\n`,
     `PROVIDER_DISCOVERY_TARGETS_JSON=${REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON}\n`
   );
@@ -414,9 +429,7 @@ export async function assembleDevelopmentApiEnvironment(
     source,
     [
       publicationDisabledSource,
-      registerV3Source,
-      registerV2Source,
-      registerV1Source,
+      ...historicalRegisterSources,
       preDiscoverySource,
       preEvaluatorPrincipalSource,
       removedScaffoldSource

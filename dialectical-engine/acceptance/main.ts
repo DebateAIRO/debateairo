@@ -30,7 +30,12 @@ import {
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
-import { resolveEffectiveRiskTier } from "@debateai/register";
+import {
+  readAdaptiveStoppingControls,
+  readPanelWeightingControls,
+  readVerdictLabelControls,
+  resolveEffectiveRiskTier
+} from "@debateai/register";
 import {
   RUNNER_MAX_RECOMPOSE,
   createPostgresProviderGateway,
@@ -404,6 +409,12 @@ export async function createAcceptanceRuntime(input: {
   }
   const policy = await readAcceptanceRuntimePolicy(input.pool);
   const scoringOperator = await readOptionalScoringOperator(input.pool);
+  const [panelWeighting, verdictLabels, adaptiveStopping] = await Promise.all([
+    readPanelWeightingControls(input.pool, ACCEPTANCE_REGISTER_VERSION),
+    readVerdictLabelControls(input.pool, ACCEPTANCE_REGISTER_VERSION),
+    // T7 / S3-2: δ and ε come from the seeded register, never from a constant.
+    readAdaptiveStoppingControls(input.pool, ACCEPTANCE_REGISTER_VERSION)
+  ]);
   const runRepository = new RunRepository(input.pool);
   const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
   const discoveredProviders = policy.providers.flatMap((configured) => {
@@ -502,6 +513,34 @@ export async function createAcceptanceRuntime(input: {
       earnedWeight: 1,
       judgeWeightVersion: "acceptance:single-judge:v1",
       reducerVersion: "acceptance:DR-133:v1"
+    },
+    // S2-2 / T3: the sealed T16 panel inputs, READ from the seeded register.
+    // The panel weighting family carries the scale, the multiplier, the band
+    // downgrade map and the provider→family map; the disagreement threshold is
+    // sealed alongside the verdict-label family. Nothing is restated here.
+    panelPolicy: {
+      registerVersion: panelWeighting.registerVersion,
+      dispersionScale: panelWeighting.dispersionScale,
+      repeatedFamilyMultiplier: panelWeighting.repeatedFamilyMultiplier,
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      oneStepDown: panelWeighting.oneStepDown,
+      providerFamilies: panelWeighting.providerFamilies,
+      unmappedReason: panelWeighting.unmappedReason,
+      sourceRefs: { ...verdictLabels.sourceRefs, ...panelWeighting.sourceRefs }
+    },
+    // S3-2/S5-1 / T7: the sealed adaptive-stopping family, handed whole. δ and ε
+    // are the register's; the runner restates neither.
+    stoppingPolicy: adaptiveStopping,
+    // S6-1 / T11: the sealed verdict-label family, READ from the same seeded
+    // register. gamma, the two cuts and the disagreement threshold reach the
+    // label ladder as identifiers; no value is restated here.
+    verdictLabelPolicy: {
+      registerVersion: verdictLabels.registerVersion,
+      gamma: verdictLabels.gamma,
+      highCut: verdictLabels.highCut,
+      lowCut: verdictLabels.lowCut,
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      sourceRefs: verdictLabels.sourceRefs
     },
     // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
     // leg for M=2 compatibility. Every further configured maker is carried by
