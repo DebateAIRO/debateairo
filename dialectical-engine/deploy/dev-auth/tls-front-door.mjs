@@ -8,6 +8,7 @@ import { getCACertificates, setDefaultCACertificates } from "node:tls";
 import { lstat, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDevCustodyRoot } from "./custody-root.mjs";
 
 const DEFAULT_OPTIONS = Object.freeze({
   listenHost: "127.0.0.1",
@@ -318,7 +319,7 @@ export function createDevTlsReadinessOperations(repositoryRoot = ".") {
     ...getCACertificates("default"),
     ...getCACertificates("system")
   ]);
-  const root = resolve(repositoryRoot, ".local/dev-auth/tls");
+  const root = resolve(resolveDevCustodyRoot(repositoryRoot), "tls");
   return Object.freeze({
     isPublicPortOccupied: () => isTcpPortOccupied("127.0.0.1", 3_000),
     probePrivateUi: () => probeUi(

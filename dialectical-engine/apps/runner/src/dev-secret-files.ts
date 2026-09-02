@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { link, lstat, mkdir, open, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 export type DevelopmentSecretFile = Readonly<{
   id: string;
@@ -186,9 +187,9 @@ export async function generateDevelopmentSecretFiles(
   input: GenerateDevelopmentSecretFilesInput
 ): Promise<DevelopmentSecretReceipt> {
   const repositoryRoot = resolve(input.repositoryRoot);
-  const localRoot = join(repositoryRoot, ".local");
-  const custodyRoot = join(localRoot, "dev-auth");
-  await ensureDirectory(localRoot, false, "DEV_AUTH_CUSTODY_ROOT_INVALID");
+  const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
+  const localRoot = dirname(custodyRoot);
+  await ensureDirectory(localRoot, true, "DEV_AUTH_CUSTODY_ROOT_INVALID");
   await ensureDirectory(custodyRoot, true, "DEV_AUTH_CUSTODY_ROOT_INVALID");
   await ensureDirectory(join(custodyRoot, "secrets"), true, "DEV_AUTH_SECRET_STORE_INVALID");
   for (const { relativePath } of DEVELOPMENT_SECRET_STORES) {

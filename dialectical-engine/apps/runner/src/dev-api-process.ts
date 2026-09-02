@@ -10,6 +10,7 @@ import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets
 } from "./dev-provider-panel.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -61,7 +62,7 @@ export async function loadDevelopmentApiProcessEnvironment(
   repositoryRoot: string
 ): Promise<Readonly<Record<string, string>>> {
   const root = resolve(repositoryRoot);
-  const custodyRoot = join(root, ".local", "dev-auth");
+  const custodyRoot = resolveDevCustodyRoot(root);
   await assertPrivateDirectory(dirname(custodyRoot));
   await assertPrivateDirectory(custodyRoot);
   const values = parseExactEnvironment(
@@ -158,7 +159,7 @@ function validateExactEnvironment(
     const providerPanel = parseDevelopmentProviderPanelTargets(
       values.PROVIDER_DISCOVERY_TARGETS_JSON!
     );
-    const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+    const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
     const exact = new Map<string, string>([
       ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
       ["BLIND_INDEX_KEY_PATH", join(custodyRoot, "secrets", "blind-index-key.bin")],

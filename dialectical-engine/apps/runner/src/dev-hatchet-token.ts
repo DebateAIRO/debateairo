@@ -6,6 +6,7 @@ import { access, lstat, open, rename, unlink } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { HatchetClient } from "@hatchet-dev/typescript-sdk/v1/client/client.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -199,8 +200,8 @@ export async function provisionDevelopmentHatchetToken(
   input: ProvisionDevelopmentHatchetTokenInput
 ): Promise<DevelopmentHatchetTokenReceipt> {
   const repositoryRoot = resolve(input.repositoryRoot);
-  const localRoot = join(repositoryRoot, ".local");
-  const custodyRoot = join(localRoot, "dev-auth");
+  const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
+  const localRoot = dirname(custodyRoot);
   const tokenPath = join(custodyRoot, "hatchet.env");
   const lockPath = `${tokenPath}.lock`;
   await assertPrivateDirectory(localRoot);

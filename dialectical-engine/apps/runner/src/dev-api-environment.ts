@@ -11,6 +11,7 @@ import {
   type DevelopmentProviderPanel,
   REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON
 } from "./dev-provider-panel.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -322,8 +323,8 @@ export async function assembleDevelopmentApiEnvironment(
   input: AssembleDevelopmentApiEnvironmentInput
 ): Promise<DevelopmentApiEnvironmentReceipt> {
   const repositoryRoot = resolve(input.repositoryRoot);
-  const localRoot = join(repositoryRoot, ".local");
-  const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+  const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
+  const localRoot = dirname(custodyRoot);
   await assertPrivateDirectory(localRoot);
   await assertPrivateDirectory(custodyRoot);
   await Promise.all([
