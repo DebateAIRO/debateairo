@@ -37,4 +37,12 @@ describe("CI security gates (F-03)", () => {
     expect(wf).toMatch(/gitleaks" git [^\n]*--redact[^\n]*--config \.gitleaks\.toml[^\n]*--log-opts="--all"/);
     expect(wf).toContain("fetch-depth: 0");
   });
+  it("pins one Node version for humans, CI and the register (L6-F13)", () => {
+    const engines = JSON.parse(read("dialectical-engine/package.json")).engines.node as string;
+    expect(engines).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(existsSync(resolve(gitRoot, ".nvmrc")), ".nvmrc at the git root").toBe(true);
+    expect(read(".nvmrc").trim()).toBe(engines);
+    expect(read(".github/workflows/security.yml")).toContain(`node-version: ${engines}`);
+    expect(JSON.parse(read("dialectical-engine/register.bootstrap.json")).values.nodeRuntimeVersion).toBe(`v${engines}`);
+  });
 });
