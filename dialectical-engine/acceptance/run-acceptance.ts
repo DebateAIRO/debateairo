@@ -103,6 +103,12 @@ export interface LiveAcceptanceCeremony {
   readonly modelCallCount: number;
   readonly discoveredPanelSize: number;
   readonly structuralCeilingMaxModelAttempts: number;
+  /**
+   * T17: the ENVELOPE_STATE standing at the terminal, read from the same run's
+   * progress stream. The Global DoD requires WITHIN; EXHAUSTED is the only
+   * other value the runner can leave behind, and the live proofs refuse it.
+   */
+  readonly terminalEnvelopeState: "WITHIN" | "EXHAUSTED";
   /** Append-only probe evidence rows for this isolated ceremony (boot/admission/claim). */
   readonly providerProbeEvidenceCount: number;
   readonly nodeMakerLineage: readonly {
@@ -262,7 +268,7 @@ export async function runAcceptanceCeremony(
     // more than one node, more than one persisted maker, a real attack edge,
     // and a proven independence receipt, all read from the recorded run.
     const fairDebate = await assertFairDebate(database.pool, accepted.run_ref);
-    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence] = await Promise.all([
+    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence, envelopeState] = await Promise.all([
       database.pool.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM ledger.ledger_entry
          WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
@@ -312,12 +318,30 @@ export async function runAcceptanceCeremony(
       ),
       database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM core.provider_probe"
+      ),
+      /**
+       * T17 (goal 285-295 DoD, Global DoD "envelope WITHIN at terminal"): the
+       * envelope state as it stands at the TERMINAL, read from the same run's
+       * progress stream that `readCurrentState` reads. `DISTINCT ON (kind)
+       * ... ORDER BY at_seq DESC` is the last value written, so this is the
+       * terminal value and not the WITHIN the run head was seeded with.
+       */
+      database.pool.query<{ envelope_state: string }>(
+        `SELECT DISTINCT ON (kind) value_json #>> '{}' AS envelope_state
+         FROM core.run_progress_event
+         WHERE run_id=$1 AND kind='ENVELOPE_STATE'
+         ORDER BY kind, at_seq DESC`,
+        [accepted.run_ref]
       )
     ]);
     const modelCallCount = Number(modelCalls.rows[0]?.count ?? 0);
     const discoveredPanelSize = Number(runFacts.rows[0]?.panel_size);
     const structuralCeilingMaxModelAttempts = Number(runFacts.rows[0]?.structural_ceiling);
     const providerProbeEvidenceCount = Number(probeEvidence.rows[0]?.count ?? 0);
+    const terminalEnvelopeState = envelopeState.rows[0]?.envelope_state;
+    if (terminalEnvelopeState !== "WITHIN" && terminalEnvelopeState !== "EXHAUSTED") {
+      throw new Error(`ACCEPTANCE_TERMINAL_ENVELOPE_STATE_INVALID:${String(terminalEnvelopeState)}`);
+    }
     if (!Number.isInteger(discoveredPanelSize) || discoveredPanelSize < 1
       || !Number.isInteger(structuralCeilingMaxModelAttempts) || structuralCeilingMaxModelAttempts < 1) {
       throw new Error("ACCEPTANCE_RUN_DISCOVERY_FACTS_INVALID");
@@ -352,6 +376,10 @@ export async function runAcceptanceCeremony(
       `DISC-01 panel/ceiling/probe evidence: ${discoveredPanelSize} / ` +
       `${structuralCeilingMaxModelAttempts} / ${providerProbeEvidenceCount}`
     );
+    console.info(
+      `T17 envelope at terminal: ${terminalEnvelopeState} · ` +
+      `${modelCallCount}/${structuralCeilingMaxModelAttempts} model attempts (panel included)`
+    );
     console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
     console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
@@ -368,6 +396,7 @@ export async function runAcceptanceCeremony(
       modelCallCount,
       discoveredPanelSize,
       structuralCeilingMaxModelAttempts,
+      terminalEnvelopeState,
       providerProbeEvidenceCount,
       nodeMakerLineage,
       nodeReviewLineage,
