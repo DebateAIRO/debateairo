@@ -4553,10 +4553,35 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
 
     const factMarker = `s6-fact-${marker}`;
     const residualMarker = `s6-residual-${marker}`;
+    // T9 / J29: the round is written THROUGH `persist` on an ENCRYPTED run, so
+    // the carrier's sentinel-vs-plaintext choice is exercised by production code
+    // rather than by a hand-built row. A mutant that writes the request in
+    // plaintext here is refused by core.enforce_content_ciphertext.
+    const synthesisRequestMarker = `s6-synthesis-request-${marker}`;
+    const encryptedRound = {
+      round: 1,
+      synthesizerRequest: {
+        role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1,
+        instructions: synthesisRequestMarker,
+        digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 },
+        codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 }
+      },
+      candidateRef: authorArtifactId,
+      candidateStatement: `s6-candidate-${marker}`,
+      evaluatorRequest: {
+        role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i",
+        digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 },
+        codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 },
+        candidateStatement: `s6-candidate-${marker}`
+      },
+      verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
+      verdictRef: authorArtifactId
+    } as never;
     const terminal = await persistTerminalRun({
       pool: database.pool,
       runId,
       fixtureKey: marker,
+      loopRounds: [encryptedRound],
       factBundle: {
         facts: [factMarker],
         residualObjections: [residualMarker],
@@ -4597,36 +4622,17 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         composedAttestation]
     );
 
-    // T9 / J29: the synthesis round is a content carrier too. Only the
-    // synthesizer REQUEST lives here (the DoD's verbatim-objection claim is
-    // about the request as sent); the candidate and the verdict resolve through
-    // typed `ledger.raw_artifact` keys, which are already encrypted carriers.
-    const synthesisRoundId = randomUUID();
-    const synthesisRequestMarker = `s6-synthesis-request-${marker}`;
-    const preparedSynthesis = await cipher.prepareRun(runId);
-    const synthesisEnvelope = preparedSynthesis.encrypt(
-      "serve.synthesis_round", synthesisRoundId,
-      { synthesizerRequest: { stage: "INITIAL", instructions: synthesisRequestMarker } }
-    );
-    const synthesisAttestation = preparedSynthesis.attestEnvelope(
-      "serve.synthesis_round", synthesisRoundId, "content_ciphertext", synthesisEnvelope
-    );
-    preparedSynthesis.close();
-    const terminalAnswerVersion = (await database.pool.query<{ answer_version: number }>(
-      `SELECT answer_version FROM serve.answer
-        WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`,
-      [terminal.answerId]
-    )).rows[0]!.answer_version;
-    await database.pool.query(
-      `INSERT INTO serve.synthesis_round (
-         synthesis_round_id, answer_id, answer_version, run_id, round, synthesizer_stage,
-         candidate_artifact_ref, evaluator_artifact_ref, synthesizer_request,
-         content_ciphertext, content_attestation, evaluator_satisfied, sealed_at_seq
-       ) VALUES ($1,$2,$3,$4,1,'INITIAL',$5,$5,$6,$7::jsonb,$8,true,
-                 (SELECT COALESCE(MAX(sealed_at_seq),0)+1 FROM serve.synthesis_round))`,
-      [synthesisRoundId, terminal.answerId, terminalAnswerVersion, runId, authorArtifactId,
-        CONTENT_CIPHERTEXT_SENTINEL, JSON.stringify(synthesisEnvelope), synthesisAttestation]
-    );
+    // The round persist wrote is the carrier under test: sentinel in the
+    // plaintext column, body in content_ciphertext.
+    const synthesisRow = (await database.pool.query<{
+      synthesis_round_id: string; synthesizer_request: string;
+    }>(
+      `SELECT synthesis_round_id::text, synthesizer_request
+         FROM serve.synthesis_round WHERE run_id=$1 ORDER BY round LIMIT 1`,
+      [runId]
+    )).rows[0]!;
+    const synthesisRoundId = synthesisRow.synthesis_round_id;
+    expect(synthesisRow.synthesizer_request).toBe(CONTENT_CIPHERTEXT_SENTINEL);
 
     const evidence = new EvidenceRepository(database.pool);
     const sharedQueries = [

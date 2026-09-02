@@ -1783,14 +1783,21 @@ export class ServeRepository {
         // already refuse a reference that resolves to nothing; this refuses one
         // that resolves to ANOTHER RUN's artifact, which a foreign key cannot
         // see. codex r2 B2: `artifact:ghost` used to persist happily.
+        // DISTINCT refs: a round may legitimately name the same artifact for
+        // both roles (a single-provider deployment holding both). Counting ROWS
+        // would reject that; what must hold is that EVERY distinct reference
+        // resolves and belongs to this run.
+        const wanted = [...new Set([round.candidateRef, round.verdictRef])];
         const referenced = await client.query<{ raw_artifact_id: string; run_id: string | null }>(
           `SELECT raw_artifact_id::text, run_id::text
              FROM ledger.raw_artifact
             WHERE raw_artifact_id = ANY($1::uuid[])`,
-          [[round.candidateRef, round.verdictRef]]
+          [wanted]
         );
-        if (referenced.rows.length !== 2
-          || referenced.rows.some((row) => row.run_id !== input.runId)) {
+        const resolvedInRun = new Set(referenced.rows
+          .filter((row) => row.run_id === input.runId)
+          .map((row) => row.raw_artifact_id));
+        if (wanted.some((ref) => !resolvedInRun.has(ref))) {
           throw new TypedDomainError(
             "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
             `Round ${String(round.round)} references artifacts that do not both belong to run ${input.runId}`
