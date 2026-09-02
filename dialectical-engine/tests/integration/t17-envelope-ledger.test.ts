@@ -568,3 +568,148 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
     }
   }, 240_000);
 });
+
+/**
+ * T17B · B1 — the REFUSED-attempt equality boundary, driven through the RUNNER.
+ *
+ * J28 fixed one direction of the equality boundary: a run that COMPLETES with
+ * `consumed == max` records WITHIN and keeps its answer. The test above pins
+ * that direction. The opposite direction was left consuming the old meaning,
+ * and nothing entered it.
+ *
+ * THE PATH THIS FILE DID NOT COVER. `assertModelAttemptAllowed` refuses a NEXT
+ * provider call while `consumed >= max`. The runner catches that
+ * `RUN_COST_ENVELOPE_EXHAUSTED` and accepts the catch only when a re-evaluation
+ * returns `HARD_STOP`. Post-J28 that re-evaluation returns WITHIN at equality —
+ * so the runner rethrows and the run reaches NEITHER the ruled components-only
+ * envelope terminal NOR an `ENVELOPE_EXHAUSTED` record. Two different questions
+ * were being answered by one branch whose only input was the post-consumption
+ * count:
+ *
+ *   "has this run spent MORE than it was allowed?"   -> at equality, no  (J28)
+ *   "may this run spend ANOTHER attempt?"            -> at equality, no  (guard)
+ *
+ * HOW THIS RUN REACHES THE BOUNDARY, and why the number is not chosen to fit.
+ * The run is admitted under a receipt that UNDERCOUNTS its serve leg — exactly
+ * the drift the envelope guard exists to contain, and not a hypothetical one:
+ * `PRE_SERVE_ATTEMPTS` is 88, which is the DR-184-v2 ceiling the test above
+ * proves this same topology would have breached. Under that receipt the judge,
+ * reviewer and panel legs spend the entire envelope, the initial envelope
+ * evaluation sees `consumed == max` and reports WITHIN (J28, unchanged), the
+ * serve chain is entered, and its FIRST provider call is refused at equality.
+ *
+ * The run is then owed the ruled outcome, and this asserts it on the PERSISTED
+ * record through the runner wrapper rather than on a return value: a
+ * components-only envelope terminal, an ENVELOPE_EXHAUSTED mark, an EXHAUSTED
+ * envelope state, and not one serve attempt spent.
+ */
+const PRE_SERVE_ATTEMPTS =
+  MATERIALIZED_NODES * ATTEMPTS_PER_COOLDOWN_SITE      // author sites
+  + MATERIALIZED_NODES * ATTEMPTS_PER_COOLDOWN_SITE    // reviewer sites
+  + MATERIALIZED_NODES * ATTEMPTS_PER_PANEL_SITE;      // panel sites
+
+describe("T17B · a provider attempt REFUSED at the equality boundary reaches the envelope terminal", () => {
+  it("records ENVELOPE_EXHAUSTED and serves components-only instead of rethrowing", async () => {
+    // The boundary is DERIVED from the same per-site constants the maximum-path
+    // test measures, then stated: everything before the serve leg.
+    expect(PRE_SERVE_ATTEMPTS).toBe(88);
+    expect(PRE_SERVE_ATTEMPTS + SERVE_SITES * ATTEMPTS_PER_SERVE_SITE)
+      .toBe(ceilingBasis.max_model_attempts);
+
+    const primary = await startMaximumPathProvider("primary");
+    const secondary = await startMaximumPathProvider("secondary");
+    try {
+      const question = `t17b-envelope-refusal-${randomUUID()}`;
+      const runRepository = new RunRepository(database.pool);
+      // The undercounting receipt. Only the ceiling moves; the serve-leg
+      // disclosure is left exactly as the register minted it, so this is a
+      // basis the parser accepts, not a malformed one.
+      const undercountingBasis = { ...ceilingBasis, max_model_attempts: PRE_SERVE_ATTEMPTS };
+      const runId = await runRepository.startRun({
+        questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`, callerScope: "ASKER",
+        asOf: new Date("2026-09-03T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
+        tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low", depthParams: { depth: 1 },
+        discoveredPanel: fixtureDiscoveredPanel(PANEL_SIZE), strangerSampleRate: 1,
+        envelopeBasis: undercountingBasis,
+        registerVersion: 1, batteryVersion: "s00", batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t17b:${runId}`
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...runnerSettings(),
+        runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: FINAL_RETRY_ATTEMPTS, maxCooldownHoldsPerRun: 2 },
+        hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+        holdRecorder: {
+          countCooldownHolds: (candidate) => runRepository.countCooldownHolds(candidate),
+          record: (event) => runRepository.recordRunLifecycleEvent({
+            runId: event.runId, kind: event.kind,
+            value: {
+              state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+              hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+              transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+            }
+          }),
+          wait: async () => undefined
+        },
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        }
+      });
+
+      // (1) THE RUN SURVIVES THE REFUSAL. Before the fix the runner rethrew the
+      //     provider-boundary error here, so this line was where it died.
+      const result = await runner.executeWorkItem(workItemId);
+
+      // (2) THE LEDGER STOPPED AT THE BOUNDARY, measured, not assumed. The
+      //     envelope was spent exactly, and the refusal happened BEFORE the
+      //     next attempt was billed — so no serve site appears at all.
+      const ledger = await database.pool.query<{ total: string; serve: string }>(
+        `SELECT count(*)::text AS total,
+                count(*) FILTER (WHERE call_site_key LIKE 'COMPOSER:%'
+                              OR call_site_key LIKE 'CONFORMANCE:%'
+                              OR call_site_key LIKE 'POST_COMPOSE_R9:%')::text AS serve
+         FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
+        [runId]
+      );
+      expect(Number(ledger.rows[0]!.total)).toBe(PRE_SERVE_ATTEMPTS);
+      expect(Number(ledger.rows[0]!.serve)).toBe(0);
+
+      // (3) THE ENVELOPE STATE IS EXHAUSTED. This is the direction J28 does NOT
+      //     govern: a refused pending attempt, not a completed run. The
+      //     successful-completion direction stays WITHIN and is pinned above —
+      //     the two now answer their own question.
+      const envelopeState = await database.pool.query<{ value_json: unknown }>(
+        `SELECT DISTINCT ON (kind) value_json
+         FROM core.run_progress_event
+         WHERE run_id=$1 AND kind='ENVELOPE_STATE' ORDER BY kind, at_seq DESC`,
+        [runId]
+      );
+      expect(envelopeState.rows[0]?.value_json).toBe("EXHAUSTED");
+
+      // (4) THE PERSISTED ANSWER IS THE RULED COMPONENTS-ONLY TERMINAL.
+      const answer = await database.pool.query<{ terminal: string; condition_marks: readonly string[] }>(
+        `SELECT terminal, condition_marks FROM serve.answer
+         WHERE run_id=$1 ORDER BY answer_version DESC LIMIT 1`,
+        [runId]
+      );
+      // Non-vacuous: the row must EXIST before its marks mean anything.
+      expect(answer.rows).toHaveLength(1);
+      expect(answer.rows[0]!.terminal).toBe("COMPONENTS_ONLY");
+      expect(answer.rows[0]!.condition_marks).toContain("ENVELOPE_EXHAUSTED");
+      expect(result.kind).toBe("COMPLETED");
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  }, 240_000);
+});

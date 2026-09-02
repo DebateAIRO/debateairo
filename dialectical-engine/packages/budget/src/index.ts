@@ -187,11 +187,37 @@ export type BudgetPressureDecision =
 export function decideBudgetPressure(input: {
   readonly basis: CostEnvelopeBasis;
   readonly consumedModelAttempts: number;
+  /**
+   * T17B/B1 — how many FURTHER attempts the caller is asking about, default 0.
+   *
+   * THE TWO EQUALITY CONTEXTS. This function was being asked two different
+   * questions through one branch whose only input was the post-consumption
+   * count, and at `consumed == max` those questions have OPPOSITE answers:
+   *
+   *   pending 0 — "has this run spent MORE than it was allowed?"  no  -> WITHIN
+   *   pending 1 — "may this run spend ANOTHER attempt?"           no  -> HARD_STOP
+   *
+   * J28 ruled the first one, and it stays exactly as it was: a run that
+   * completes having spent its whole envelope is WITHIN and keeps its answer.
+   * The second is what `assertModelAttemptAllowed` has always decided when it
+   * refuses at `consumed >= max`; before this parameter existed the runner's
+   * catch re-derived that refusal from the count alone, got J28's WITHIN back,
+   * and rethrew — so a refused attempt reached neither the components-only
+   * envelope terminal nor an ENVELOPE_EXHAUSTED record.
+   *
+   * The caller now says WHICH question it is asking instead of the branch
+   * guessing from a number that cannot distinguish them.
+   */
+  readonly pendingModelAttempts?: number;
   readonly pendingRows: readonly PendingBudgetRow[];
   readonly verifiedNodeIds: readonly string[];
 }): BudgetPressureDecision {
   if (!Number.isInteger(input.consumedModelAttempts) || input.consumedModelAttempts < 0) {
     throw new TypeError("ATTEMPT_LEDGER_CONSUMPTION_INVALID");
+  }
+  const pendingModelAttempts = input.pendingModelAttempts ?? 0;
+  if (!Number.isInteger(pendingModelAttempts) || pendingModelAttempts < 0) {
+    throw new TypeError("ATTEMPT_LEDGER_PENDING_INVALID");
   }
   /**
    * J28 — the REPORTING comparison follows the PERMISSION comparison.
@@ -200,11 +226,16 @@ export function decideBudgetPressure(input: {
    * structure permits has not exceeded anything and is WITHIN. Reporting that
    * state as EXHAUSTED made a lawful maximum-path run complete and then say it
    * had run out — and, worse, fired the envelope terminal that REPLACED the
-   * answer it had just served (apps/runner/src/index.ts:3267-3274). Nothing
-   * about what is ALLOWED changes here; only what the run says about itself.
-   * V-S09-8 records the alternative reading, which is V's to choose.
+   * answer it had just served (`makeEnvelopeTerminal`, in the runner's serve
+   * section). Nothing about what is ALLOWED changes here; only what the run
+   * says about itself. V-S09-8 records the alternative reading, which is V's.
+   *
+   * The `+ pendingModelAttempts` term is what keeps that ruling intact while
+   * still telling the truth about a REFUSED attempt: at the default 0 this is
+   * character-for-character J28's comparison, and the refusal context supplies
+   * the 1 that makes its own question the one being answered.
    */
-  if (input.consumedModelAttempts <= input.basis.maxModelAttempts) {
+  if (input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
       state: "WITHIN",
@@ -334,12 +365,17 @@ export class BudgetRepository {
   async evaluateRunPressure(input: {
     readonly runId: string;
     readonly basis: CostEnvelopeBasis;
+    /** T17B/B1 — see `decideBudgetPressure`: which question the caller is asking. */
+    readonly pendingModelAttempts?: number;
     readonly pendingRows: readonly PendingBudgetRow[];
     readonly verifiedNodeIds: readonly string[];
   }): Promise<BudgetPressureDecision> {
     return decideBudgetPressure({
       basis: input.basis,
       consumedModelAttempts: await this.countRunModelAttempts(input.runId),
+      // Resolved here rather than forwarded as `undefined`: the repo builds under
+      // `exactOptionalPropertyTypes`, so an absent caller means 0, explicitly.
+      pendingModelAttempts: input.pendingModelAttempts ?? 0,
       pendingRows: input.pendingRows,
       verifiedNodeIds: input.verifiedNodeIds
     });
