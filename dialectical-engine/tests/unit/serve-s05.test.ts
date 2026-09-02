@@ -284,9 +284,9 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
       mark: "UNSERVED-MAKER-POSITION",
       scope: "answer",
       subjectRef: "node:openai-root",
-      reason: "The first configured maker's root was served: OpenAI position node:openai-root; Anthropic position node:anthropic-root remains graph-visible but unserved",
+      reason: "The strongest post-exclusion maker root was served: OpenAI position node:openai-root; Anthropic position node:anthropic-root remains graph-visible but unserved",
       liftPath: null,
-      servedRootRule: "first-configured-provider",
+      servedRootRule: "max-propagated-strength-lexicographic-tiebreak",
       affectedNodeIds: ["node:openai-root", "node:anthropic-root"]
     } as const satisfies ConditionMarkRecord;
     const envelopeRecord = {
@@ -313,9 +313,9 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
       mark: "UNSERVED-MAKER-POSITION",
       scope: "answer",
       subjectRef: "node:openai-root",
-      reason: "first-configured-provider served OpenAI root node:openai-root; Anthropic root node:anthropic-root remains unserved",
+      reason: "The strongest root served OpenAI root node:openai-root; Anthropic root node:anthropic-root remains unserved",
       liftPath: null,
-      servedRootRule: "first-configured-provider",
+      servedRootRule: "max-propagated-strength-lexicographic-tiebreak",
       affectedNodeIds: ["node:openai-root", "node:anthropic-root"]
     } as const;
 
@@ -427,10 +427,11 @@ describe("S05 AC-86..AC-90 — refusal, sanitize, reconcile, read expiry, honest
       deadline: new Date("2026-08-08T00:00:00.000Z"),
       readAt: new Date("2026-08-08T00:00:01.000Z")
     })).toEqual({ state: "FAILED", reason: "DEADLINE_EXPIRED" });
-    expect(deriveHonestVerdict({ usableBasis: false, reasonRef: "condition:test" })).toEqual({
+    expect(deriveHonestVerdict({ usableBasis: false, reasonRef: "condition:test", labelBasis: null })).toEqual({
       verdictState: null,
       confidenceBand: null,
-      unavailable: { reasonRef: "condition:test" }
+      unavailable: { reasonRef: "condition:test" },
+      derivation: null
     });
   });
 });

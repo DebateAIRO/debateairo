@@ -1,4 +1,5 @@
 import type { AbstentionKind, Answer, ConditionMark, StalenessState } from "@debateai/contract";
+import type { VerdictSummary } from "../types.js";
 
 export function riskTierSourceLabel(source: Answer["tier_source"]): string {
   switch (source) {
@@ -49,6 +50,26 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
     case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";
     case "UNAUTHORED-BRANCH-HALTED": return "Expansion stopped here — nothing was written to hide or show";
+    case "LABEL-BASIS-INCOMPLETE": return "Verdict basis incomplete — no rival position or no second judge to compare";
+  }
+}
+
+/**
+ * T11 confirm-item 4 — the live banner's verdict vocabulary, wired to the
+ * engine's three-state label. VOCABULARY WIRING ONLY: the banner, its bands and
+ * its copy are untouched, and renaming the UI vocabulary (the last pairing
+ * stretches the existing string's meaning) is UI-owned work for another lane.
+ *
+ * The switch is exhaustive over the engine's label union — a fourth state fails
+ * typecheck here rather than rendering as an unnamed verdict.
+ */
+export function liveVerdictState(
+  label: NonNullable<Answer["verdict_state"]>
+): NonNullable<VerdictSummary["verdictState"]> {
+  switch (label) {
+    case "SUPPORTED": return "endorsed";
+    case "CONTESTED": return "endorsed_with_caveat";
+    case "UNSUPPORTED": return "suppressed_no_evidence";
   }
 }
 

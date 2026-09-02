@@ -1,10 +1,15 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { readClaimTypeCompositionMap, type CompositionMapRegisterRow } from "@debateai/register";
+import {
+  readClaimTypeCompositionMap,
+  readVerdictLabelControls,
+  type CompositionMapRegisterRow
+} from "@debateai/register";
 import type { JudgementSelectionRule } from "@debateai/judgement";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
-import type { RunDeathPolicy, ScoringOperatorRegisterInput } from "./index.js";
+import type { RunDeathPolicy, RunnerVerdictLabelPolicy, ScoringOperatorRegisterInput } from "./index.js";
 import {
+  DEVELOPMENT_ALGORITHM_SOURCE_REF,
   DEVELOPMENT_RUNNER_SOURCE_REF,
   DEVELOPMENT_SOURCE_REF
 } from "./dev-deployment-register.js";
@@ -85,6 +90,16 @@ export interface DevelopmentRunnerPolicy {
   readonly scoringOperator: ScoringOperatorRegisterInput;
   readonly runDeathPolicy: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold: { readonly value: number; readonly sourceRef: string };
+  /**
+   * S6-1 / T11: the sealed T16 verdict-label family. Read through T16's OWN
+   * reader (`readVerdictLabelControls`), which fails loudly and names the
+   * missing rows — this file restates neither a value nor a schema. Every
+   * served answer carries a code-derived label, so this member is mandatory:
+   * a deployment that seals the family but never hands it to the runner is the
+   * defect codex r1 B1 names, and it is indistinguishable at the serve seam
+   * from a deployment that never sealed it at all.
+   */
+  readonly verdictLabelPolicy: RunnerVerdictLabelPolicy;
   readonly hashes: Readonly<Record<"judge" | "composer" | "conformance" | "propagation" | "serve", string>>;
 }
 
@@ -114,6 +129,15 @@ export async function readDevelopmentRunnerPolicy(
   ));
   const compositionRow = await readClaimTypeCompositionMap(pool, registerVersion);
   if (compositionRow.sourceRef !== DEVELOPMENT_RUNNER_SOURCE_REF) {
+    throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
+  }
+  // T16's reader owns the schema, the loud missing-row failure and the version;
+  // this caller only pins the deployment the rows must have been sealed BY, so
+  // a row seeded by another deployment cannot drift in under the same version.
+  const verdictLabels = await readVerdictLabelControls(pool, registerVersion);
+  if (Object.values(verdictLabels.sourceRefs).some(
+    (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
+  )) {
     throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
   }
   const compositionBudgets = Object.freeze(Object.fromEntries(
@@ -159,6 +183,14 @@ export async function readDevelopmentRunnerPolicy(
     hiddenNodeScoreThreshold: Object.freeze({
       value: parsed.hiddenNodeScoreThreshold,
       sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF
+    }),
+    verdictLabelPolicy: Object.freeze({
+      registerVersion: verdictLabels.registerVersion,
+      gamma: verdictLabels.gamma,
+      highCut: verdictLabels.highCut,
+      lowCut: verdictLabels.lowCut,
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      sourceRefs: verdictLabels.sourceRefs
     }),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,

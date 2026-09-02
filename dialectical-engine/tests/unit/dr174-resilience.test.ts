@@ -197,10 +197,12 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   });
 
   it("T32 mints exactly H/L/N and enforces typed required records without pretending class N is revealable", () => {
-    // J13(b) 29 -> 31: the two panel disclosure marks were minted MID-LIST, so the
-    // DR-176 positional tail this test depends on is unchanged (asserted below).
-    // T7 31 -> 32: BRANCH-FROZEN-LOW-LEVERAGE joined the vocabulary mid-list.
-    expect(CONDITION_MARKS).toHaveLength(32);
+    // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE): every new mark was minted MID-LIST, so the DR-176
+    // positional tail this test depends on is unchanged (asserted below). The two
+    // lanes each grew the vocabulary by one and both mints survive the merge, so
+    // the exact count is 33 — still an exact pin, not a loosened one.
+    expect(CONDITION_MARKS).toHaveLength(33);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

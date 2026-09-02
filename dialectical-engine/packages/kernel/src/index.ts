@@ -64,6 +64,51 @@ export const ABSTENTION_KINDS = [
 ] as const;
 export type AbstentionKind = typeof ABSTENTION_KINDS[number];
 
+/**
+ * T10 (goal 188-195, rulings S6-1 / S6-3) — the rule that picks the served root.
+ *
+ * DR-161's configuration-order rule is RETIRED — its retired string is named
+ * once, in migrations/0055_t10_served_root_selection.sql, and nowhere else in
+ * shipped source. Configuration order no longer decides the answer;
+ * propagation does. The served root is the one carrying the
+ * maximum propagated strength among the servable maker roots, and an exact tie
+ * is broken by lexicographic node id — deterministic, order-independent, and
+ * CONTESTED under T11's ladder anyway because a tie's margin is zero.
+ *
+ * Minted here, beside the other closed vocabularies, because the same string is
+ * a typed record field (serve), a wire literal (contract) and a DDL CHECK member
+ * (migrations). One declaration; every representation imports it.
+ */
+export const SERVED_ROOT_SELECTION_RULE = "max-propagated-strength-lexicographic-tiebreak" as const;
+/** The rule a NEW selection may record. The write vocabulary. */
+export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE;
+
+/**
+ * Rules that were lawful when older answers were sealed, and are therefore
+ * still present on their records. READ-ONLY: no new selection may record one,
+ * and no shipped writer contains the literal — the values only ever arrive by
+ * reading a row that was sealed before migration 0055.
+ *
+ * This list exists because migration 0055 PRESERVES those rows rather than
+ * relabelling them. A record is evidence of how an answer was actually chosen;
+ * rewriting it to today's rule would be a falsification, so the read vocabulary
+ * is a superset of the write vocabulary and says so in the type system.
+ */
+export const RETIRED_SERVED_ROOT_RULES = ["first-configured-provider"] as const;
+export type RetiredServedRootRule = typeof RETIRED_SERVED_ROOT_RULES[number];
+
+/** Every value a sealed record may lawfully carry — the READ vocabulary. */
+export const SERVED_ROOT_RULE_HISTORY = Object.freeze([
+  SERVED_ROOT_SELECTION_RULE,
+  ...RETIRED_SERVED_ROOT_RULES
+] as const);
+export type ServedRootRuleHistory = ServedRootRule | RetiredServedRootRule;
+
+/** True for a value that may be READ but never WRITTEN by a fresh selection. */
+export function isRetiredServedRootRule(value: string | null): value is RetiredServedRootRule {
+  return value !== null && (RETIRED_SERVED_ROOT_RULES as readonly string[]).includes(value);
+}
+
 // Spec §12.3 Home 2 is the sole minting authority. Every wire, UI and DDL
 // representation imports this vocabulary; no sibling package extends it.
 export const CONDITION_MARKS = [
@@ -112,6 +157,15 @@ export const CONDITION_MARKS = [
   "WAY-OF-KNOWING-DOWNGRADED",
   "AMENDED-SEARCH",
   "MISSING-NUMBER",
+  // S6-1 / T11, confirm-item 6: the three-state label was derived without a
+  // complete basis — no runner-up existed to measure a margin against, or the
+  // winning root's panel reported fewer than two parseable judgements, so no
+  // dispersion could be measured. The label is CONTESTED and says why: a solo
+  // voice can never print SUPPORTED, no matter how confident. Placed HERE,
+  // beside the other served-answer honesty disclosures, and NOT appended: the
+  // DR-176 tail of this vocabulary is read positionally by
+  // `CONDITION_MARKS.slice(-4)`.
+  "LABEL-BASIS-INCOMPLETE",
   // DR-139(4), TERM-01: a battery row ACTIVE at run completion whose owed
   // check has no recorded execution — the run settles and the served answer
   // names each such check loudly (one condition-mark record per row).

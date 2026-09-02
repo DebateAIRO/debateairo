@@ -142,3 +142,70 @@ Every entry below was paid for at least once. Do not pay for it again.
   uncommitted implementation work**, because HEAD is whatever you inherited. COMMIT the
   GREEN state before the first mutant, then mutate against your own commit. (t07 r3;
   caught before it fired, one harness rewrite)
+- **zsh does NOT word-split an unquoted variable.** `ZONE="a.test.ts b.test.ts"; npx vitest
+  run $ZONE` passes the whole string as ONE filter; vitest answers `No test files found,
+  exiting with code 1` — which reads like a broken glob, not like a shell difference, and
+  the run looks superficially normal (exit 1, no failures). Pass the paths as literal
+  arguments, or use `${=ZONE}`. Cost: one wasted zone run. (T6 r1)
+- **Reverting source WITHOUT touching the index**, for the paired base↔HEAD classification
+  the fleet keeps needing: `git show <sha>:<repo-relative-path> > <path>`, run, then
+  `git checkout -- <path>`. Unlike `git checkout <sha> -- <path>` (already recorded above)
+  this stages nothing, so `git status --porcelain` after the restore is genuinely empty.
+  It is what settled T6's `staleness_state ARCHIVED_REVIVED` failure as pre-existing in
+  one run instead of an argument. Note the repo-relative path inside a worktree still
+  carries the `dialectical-engine/` prefix even when your cwd IS `dialectical-engine`. (T6 r1)
+- **CORRECTION to the index-free base revert above (T6 r1) — it is only safe on COMMITTED
+  work.** `git checkout -- <path>` restores from the INDEX, so if the file you overwrote with
+  `git show <sha>:<path> > <path>` held UNCOMMITTED edits, the "restore" silently replaces
+  them with the last committed version and `git status --porcelain` then looks *clean*, which
+  reads as success. T6 r2 lost three product files this way while running the D16 base pair
+  mid-change; only a content grep (`grep -c review_outcome`) caught it, not git. COMMIT (or
+  `git stash`) BEFORE any base-pair revert, and verify the restore by grepping for a token
+  your change introduced — never by `git status` alone. (T6 r2)
+- **One vitest FILE = one embedded Postgres = ONE monotonic `ledger.allocate_sequence()`
+  counter shared by every test in it.** A fixture that hard-codes an `at_seq` /
+  `created_at_seq` literal is therefore a LANDMINE with a fuse: it detonates the moment
+  the file's own allocations climb to that number, and it detonates in *other people's*
+  tests, at setup, with `duplicate key value violates unique constraint
+  "run_created_at_seq_key"`. `database.test.ts` carried literals at 10001/10002/10005 with
+  only a few hundred allocations of headroom; adding ONE production scenario tripped it and
+  took out 23 unrelated tests, all failing in 1–2 ms. The symptom points at your change and
+  the cause is a decade-old constant. Diagnose by reading the DETAIL line (`Key
+  (created_at_seq)=(10001) already exists` — a suspiciously round number is the tell) and
+  `grep -oE "'s00',[0-9]+\)"`, then bisect PRODUCT vs TEST by running the file with the
+  previous round's test file against the new product code. (T6 r3)
+- **Base-pair classification: `git checkout --detach <base>` inside the lane worktree is
+  the safe form**, once the tree is committed and clean — run the gates, then `git checkout
+  <branch>`. It moves the whole tree coherently, so nothing half-reverted can compile-fail
+  in a way you then misread as a finding, and it cannot silently eat uncommitted work the
+  way the per-file `git show <sha>:<path> > <path>` form can. Verify the return by grepping
+  a token your change introduced, not by `git status`. (T6 r3)
+- **A parameterised INSERT built from string fragments must reference EVERY `$n` you bind.**
+  Postgres rejects the round trip with `bind message supplies 6 parameters, but prepared
+  statement "" requires 3` — which reads like a driver bug, not like a probe that varies its
+  own SQL. Pass the varying values as parameters (`$4,$5,$6`) and let them be NULL, instead
+  of interpolating `NULL` / `'literal'` into the statement text. (T6 r3)
+- **The scratchpad ROOT is shared between concurrent seats — one seat's tool file silently
+  replaces another's.** Reaching for this lane's r3 mutant harness at `<scratchpad>/mutant.sh`,
+  T6 r4 found the S06 seat's harness under the same name: hard-coded to `.worktrees/lane-s06`
+  and appending to `logs/s06/`. Invoking it blind — the natural move, since the path was
+  "mine" — would have mutated ANOTHER LANE'S WORKTREE and written into another lane's evidence
+  directory, from a seat with no contract over either. Put seat tooling under a seat-scoped
+  subdirectory (`<scratchpad>/t06-r4/…`), and `cat` any remembered scratch script before you
+  run it. (T6 r4)
+- **`assert t.count(old) == N` before a multi-site replace is NOT a safety check.** It proves N
+  occurrences exist; it proves nothing about whether they MEAN the same thing — and textual
+  identity is precisely what a HOMONYM has. T6 r3 narrowed a column type with a
+  `count == 2` assertion and hit two different columns whose annotations were spelled
+  identically (`ledger.node_review.outcome`, three lawful values, and
+  `serve.condition_mark.review_outcome`, one), shipping a copied comment that cited the wrong
+  constraint as justification. When a selector matches more than once, the count is a
+  REQUIREMENT TO DISAMBIGUATE: read every site, and if two are textually identical and
+  semantically different, make them textually different (name one) rather than being careful.
+  No type can express "narrowed in the right query" — a source assertion counting the narrowed
+  reads can. (T6 r4)
+- **Gate logs need a captured `EXIT STATUS:` line, not just clean output.** A typecheck log
+  containing the command and no diagnostics proves a command RAN; it does not prove it exited
+  0 (a crashed or filtered run looks identical). Wrap gates as
+  `{ echo "\$ cmd"; cmd 2>&1; echo "EXIT STATUS: $?"; } > log`. A static reviewer correctly
+  downgraded T6 r3's typecheck evidence to testimony-grade for exactly this. (T6 r4)

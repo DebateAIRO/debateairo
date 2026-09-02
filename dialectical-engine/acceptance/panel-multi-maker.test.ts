@@ -9,6 +9,7 @@ import { startStandingDatabase } from "./standing-db.js";
 import { readPanelWeightingControls } from "@debateai/register";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
+import { bearingsForRequest } from "../tests/support/reviewBearings.js";
 
 /**
  * T3 / S2-2 — the ACCEPTANCE-path receipt for the wired judge panel.
@@ -126,7 +127,15 @@ async function startProviderDouble(input: {
           content = JSON.stringify(assessmentBody(input.scores));
         }
       } else if (body.includes("Review an existing debate node")) {
-        content = JSON.stringify({ outcome: "agree", reasons: [`${input.label} review ${calls}`] });
+        // T5/S3-1: one bearing per edge THIS call offered, read off the wire.
+        // This double does not assess bearings, so every offered edge comes
+        // back cannot-assess (null) and stays UNKNOWN — which is why T3's panel
+        // numbers below are byte-identical to the day this lane landed.
+        content = JSON.stringify({
+          outcome: "agree",
+          reasons: [`${input.label} review ${calls}`],
+          edge_bearings: bearingsForRequest(body)
+        });
       } else if (body.includes("conforms,findings")) {
         content = JSON.stringify({ conforms: true, findings: [] });
       } else if (body.includes("served_number_refs")) {
