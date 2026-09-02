@@ -145,6 +145,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "SYNTHESIS-OBJECTION-STANDING": return "An evaluator objection is still standing on this statement";
     case "DIGEST-COMPRESSED": return "Node summaries shortened to fit the composition budget";
     case "DIGEST-CANNOT-EXIST": return "No digest could be built within the composition budget";
+    case "PROTECTED-CORE-GUARD-RETIRED": return "Run stopped on budget; the restatement check no longer gated it";
     case "HIDDEN-UNJUDGEABLE": return "Hidden: could not be judged — show hidden to read it";
     case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
     case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";

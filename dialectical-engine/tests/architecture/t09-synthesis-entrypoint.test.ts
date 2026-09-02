@@ -55,26 +55,36 @@ describe("T9 production entry point wiring", () => {
     expect(source).not.toMatch(/synthesisRolePolicy:\s*\{/u);
   });
 
-  it("refuses at CLAIM TIME, before the work item and before any model call", async () => {
+  /**
+   * codex r1 B1: the previous version of this test asserted SOURCE ORDER — that
+   * the missing-family check appears before the claim — and then separately
+   * that the late resolver's strings exist. Source order is not behaviour, and
+   * neither assertion could fail when a sealed ref was unresolvable.
+   *
+   * The three refusal DISCRIMINATORS are executed in
+   * `tests/integration/database.test.ts`, against a real database and real
+   * provider doubles: missing family, ref not configured (pre-claim), and
+   * configured ref absent at claim (no substitution, durable role-naming event).
+   * What remains here is the one property a running test cannot observe — that
+   * the resolver reads the CLAIM-ELIGIBLE set rather than the unfiltered one,
+   * which is the exact substitution codex r1 B1 found.
+   */
+  it("resolves sealed role refs against the CLAIM-ELIGIBLE providers, never the unfiltered set", async () => {
     const source = await readFile(
       new URL("../../apps/runner/src/index.ts", import.meta.url),
       "utf8"
     );
-    const gateIndex = source.indexOf("if (this.settings.synthesisRolePolicy === undefined) {");
-    const claimIndex = source.indexOf("const claimInput = { workerId: this.settings.workerId");
-    const verdictGateIndex = source.indexOf("if (this.settings.verdictLabelPolicy === undefined) {");
-
-    expect(gateIndex).toBeGreaterThan(-1);
-    // The gate stands beside J12's and T11's, and BEFORE the claim.
-    expect(gateIndex).toBeGreaterThan(verdictGateIndex);
-    expect(claimIndex).toBeGreaterThan(gateIndex);
-    expect(source).toContain("SYNTHESIS_ROLE_CONTROLS_UNRESOLVED");
-    // The role ref resolves to a configured provider by LOOKUP, never by
-    // position: "the first configured provider" is exactly the substitution
-    // the sealed row exists to prevent (T10's lesson, at the role seam).
+    // The resolver closes over the probed, claim-eligible list.
+    expect(source).toContain("const configured = configuredMakers.find((maker) => maker.providerRef === roleRef);");
+    // ...and never over the unfiltered membership, which is what let an
+    // already-absent role provider be called.
+    expect(source).not.toContain("this.#configuredMakers.find((maker) => maker.providerRef === roleRef)");
+    // Both refusals exist and are distinguishable from a post-claim death.
     expect(source).toContain("SYNTHESIS_ROLE_PROVIDER_UNRESOLVED");
-    expect(source).toContain("this.#configuredMakers.find((maker) => maker.providerRef === roleRef)");
-    expect(source).not.toContain("this.#configuredMakers[0]!.providerRef === roleRef");
+    expect(source).toContain("SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM");
+    expect(source).toContain("SYNTHESIS_TRANSPORT_DEATH");
+    // The roles are enumerated once, so a check cannot cover one and miss the other.
+    expect(source).toContain('export const SYNTHESIS_ROLES = Object.freeze(["SYNTHESIZER", "EVALUATOR"] as const);');
   });
 
   it("calls both roles under their own named provider roles", async () => {

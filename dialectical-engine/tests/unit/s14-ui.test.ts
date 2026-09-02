@@ -118,7 +118,7 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
     // renderers below are asserted to label every member non-empty and distinct.
     // T9 32 -> 35: SYNTHESIS-OBJECTION-STANDING, DIGEST-COMPRESSED and
     // DIGEST-CANNOT-EXIST joined the vocabulary (J5/J11 forced completion).
-    expect(CONDITION_MARKS).toHaveLength(35);
+    expect(CONDITION_MARKS).toHaveLength(36);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");

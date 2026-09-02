@@ -97,7 +97,10 @@ const SATISFIED: EvaluatorVerdict = {
 
 function passingDependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGateDependencies {
   return {
-    synthesize: async () => composed("A provisional answer.", "Research it with an independent source."),
+    synthesize: async () => ({
+      candidate: composed("A provisional answer.", "Research it with an independent source."),
+      candidateRef: "artifact:test-layer:synthesizer:1"
+    }),
     evaluate: async () => SATISFIED,
     applyBandCeiling: ({ basis, candidateConfidenceBand }) => ({
       kind: "NOT_CAPPED",
@@ -144,7 +147,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
 
   it("fails loudly when synthesis omits the required research-plan segment", async () => {
     await expect(runServeGateChain(reasoningInput(), passingDependencies({
-      synthesize: async () => composed("Only a hypothesis was composed.")
+      synthesize: async () => ({ candidate: composed("Only a hypothesis was composed."), candidateRef: "artifact:1" })
     }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
 
@@ -155,7 +158,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     input.nodes[0]!.locator = "https://example.invalid/test-fixture";
-    const result = await runServeGateChain(input, passingDependencies({ synthesize: async () => [] }));
+    const result = await runServeGateChain(input, passingDependencies({ synthesize: async () => ({ candidate: [], candidateRef: "artifact:1" }) }));
     expect(result.terminal).toBe("COMPONENTS_ONLY");
     expect(result.crashClass).toBe("NO_ARTIFACT");
     expect(result.conditionMarks).toEqual(["DEFECT"]);
@@ -163,13 +166,16 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
 
   it("refuses a segment that references a node outside the serve set", async () => {
     await expect(runServeGateChain(reasoningInput(), passingDependencies({
-      synthesize: async () => [{
-        segmentId: "segment:1",
-        text: "Out of set.",
-        loadBearing: true,
-        assertedNodeRefs: ["node:absent"],
-        servedNumberRefs: []
-      }]
+      synthesize: async () => ({
+        candidate: [{
+          segmentId: "segment:1",
+          text: "Out of set.",
+          loadBearing: true,
+          assertedNodeRefs: ["node:absent"],
+          servedNumberRefs: []
+        }],
+        candidateRef: "artifact:1"
+      })
     }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
 });
@@ -180,7 +186,7 @@ describe("FX-SRV-01a / FX-C52-01 — the Q51 FORM limb (T13 owns the form; T9 ke
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     input.nodes[0]!.locator = "https://example.invalid/test-fixture";
     const result = await runServeGateChain(input, passingDependencies({
-      synthesize: async () => composed("Evidence-backed verdict.")
+      synthesize: async () => ({ candidate: composed("Evidence-backed verdict."), candidateRef: "artifact:1" })
     }));
     expect(result.terminal).toBe("SERVED");
     expect(result.answerForm?.kind).toBe("VERDICT");
@@ -191,7 +197,7 @@ describe("FX-SRV-01a / FX-C52-01 — the Q51 FORM limb (T13 owns the form; T9 ke
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     const result = await runServeGateChain(input, passingDependencies({
-      synthesize: async () => composed("Unlocatable claim.")
+      synthesize: async () => ({ candidate: composed("Unlocatable claim."), candidateRef: "artifact:1" })
     }));
     expect(result.terminal).toBe("SERVED");
     expect(result.crashClass).toBeNull();

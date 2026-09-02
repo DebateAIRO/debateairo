@@ -997,7 +997,13 @@ export interface RunLoadingProjection {
 }
 
 export interface RunLifecycleEventValue {
-  readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "MAKER_POSITION_HALTED" | "EXPANSION_HALTED" | "REVIEW_HALTED";
+  readonly state:
+    | "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "MAKER_POSITION_HALTED" | "EXPANSION_HALTED" | "REVIEW_HALTED"
+    // T9 / J24: a sealed synthesis role whose provider is claim-eligible-absent.
+    // The run refuses without substitution, and this durable `ledger.could_not_do`
+    // event is what a reader sees — both live-event surfaces already render the
+    // kind, so no UI switch grows (they discriminate on event_type, not state).
+    | "SYNTHESIS_ROLE_PROVIDER_ABSENT";
   readonly call_site_key: string;
   readonly parent_node_ref: string | null;
   readonly hold_ms: number;

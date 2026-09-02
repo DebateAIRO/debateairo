@@ -145,7 +145,10 @@ const bandCeilingRow = (): BandCeilingRegisterRow => ({
 
 function dependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGateDependencies {
   return {
-    synthesize: async () => [segment("segment:verdict", "Evidence-backed verdict.", true)],
+    synthesize: async () => ({
+      candidate: [segment("segment:verdict", "Evidence-backed verdict.", true)],
+      candidateRef: "artifact:test-layer:synthesizer"
+    }),
     evaluate: async () => SATISFIED,
     applyBandCeiling: () => passCeiling,
     ...overrides
@@ -220,7 +223,10 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
       digestNodes: digestNodes().map((node) => ({ ...node, statement: "z".repeat(20_000) })),
       compositionBudget: { ...input().compositionBudget, bound: 64 }
     }, dependencies({
-      synthesize: async () => { synthesizeCalls += 1; return [segment("never", "never", true)]; }
+      synthesize: async () => {
+        synthesizeCalls += 1;
+        return { candidate: [segment("never", "never", true)], candidateRef: "artifact:never" };
+      }
     }));
 
     expect(result.terminal).toBe("COMPONENTS_ONLY");
@@ -258,11 +264,14 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     // EXHAUSTIVE by construction and there is no unsampled segment left.
     const judged: string[] = [];
     const result = await runServeGateChain(input(), dependencies({
-      synthesize: async () => [
-        segment("segment:load", "Load-bearing.", true),
-        segment("segment:second", "Second detail.", false),
-        segment("segment:third", "Third detail.", false)
-      ],
+      synthesize: async () => ({
+        candidate: [
+          segment("segment:load", "Load-bearing.", true),
+          segment("segment:second", "Second detail.", false),
+          segment("segment:third", "Third detail.", false)
+        ],
+        candidateRef: "artifact:test-layer:synthesizer"
+      }),
       evaluate: async (request) => {
         judged.push(request.candidateStatement);
         return SATISFIED;

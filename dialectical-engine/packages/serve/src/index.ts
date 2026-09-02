@@ -27,6 +27,7 @@ import {
 } from "@debateai/memory";
 import {
   DIGEST_CANNOT_EXIST_MARK,
+  PROTECTED_CORE_GUARD_RETIRED_MARK,
   DIGEST_COMPRESSED_MARK,
   SYNTHESIS_OBJECTION_STANDING_MARK,
   buildSynthesisDigest,
@@ -39,6 +40,7 @@ import {
   type SynthesisLoopOutcome,
   type EvaluatorRequest,
   type EvaluatorVerdict,
+  type SynthesizedCandidate,
   type SynthesizerRequest
 } from "./synthesis.js";
 
@@ -358,7 +360,9 @@ export interface ServeGateDependencies {
    * returns the candidate as composed segments. It replaces `compose`, whose
    * fact-bundle argument carried no digest and could not distinguish a retry.
    */
-  readonly synthesize: (request: SynthesizerRequest) => Promise<readonly ComposedSegment[]>;
+  readonly synthesize: (
+    request: SynthesizerRequest
+  ) => Promise<SynthesizedCandidate<readonly ComposedSegment[]>>;
   /**
    * T9: the EVALUATOR role call. It replaces BOTH retired provider limbs —
    * per-segment conformance and post-compose R9 — because both are now
@@ -544,10 +548,18 @@ export function createEnvelopeExhaustedResult(input: {
     conditionMarks.push("SKIPPED-BY-BUDGET");
   }
   if (!conditionMarks.includes("ENVELOPE_EXHAUSTED")) conditionMarks.push("ENVELOPE_EXHAUSTED");
+  // J25: the gate trace does not survive to a reader — persistence keeps only
+  // its LAST token in `verdict_unavailable.reason_ref`. So the retired guard's
+  // disclosure is a MARK, which persists on the answer and both label switches
+  // render. The trace token stays as well, for a reader of the whole path.
+  const guardRetired = input.protectedCoreRestatement !== "PASS";
+  if (guardRetired && !conditionMarks.includes(PROTECTED_CORE_GUARD_RETIRED_MARK)) {
+    conditionMarks.push(PROTECTED_CORE_GUARD_RETIRED_MARK);
+  }
   const gateTrace: LiveGateTrace[] = [];
   if (input.skippedEnrichmentRows.length > 0) gateTrace.push("ENVELOPE_ENRICHMENT_SKIPPED");
   gateTrace.push("PROTECTED_CORE_REFUSED_SKIP");
-  if (input.protectedCoreRestatement !== "PASS") gateTrace.push("PROTECTED_CORE_GUARD_RETIRED");
+  if (guardRetired) gateTrace.push("PROTECTED_CORE_GUARD_RETIRED");
   gateTrace.push("ENVELOPE_EXHAUSTED", SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.gateTrace);
   return Object.freeze({
     terminal: SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal,
@@ -684,7 +696,8 @@ export async function runServeGateChain(
       codeLabel: input.codeLabel
     }, {
       synthesize: async (request) => {
-        const composed = await dependencies.synthesize(request);
+        const produced = await dependencies.synthesize(request);
+        const composed = produced.candidate;
         if (composed.length === 0) {
           // NO_ARTIFACT: the role answered with nothing to serve. A crash
           // class, not a quality judgement — hence a typed escape rather than
@@ -702,15 +715,18 @@ export async function runServeGateChain(
         if (new Set(composed.map((segment) => segment.segmentId)).size !== composed.length) {
           throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
         }
-        return composed.map((segment) => Object.freeze({
-          ...segment,
-          loadBearing: segment.servedNumberRefs.length > 0
-            || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
-        }));
+        return {
+          candidate: composed.map((segment) => Object.freeze({
+            ...segment,
+            loadBearing: segment.servedNumberRefs.length > 0
+              || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
+          })),
+          // The adapter's OWN recorded reference travels through unchanged.
+          candidateRef: produced.candidateRef
+        };
       },
       evaluate: (request) => dependencies.evaluate(request),
-      readCandidateStatement: (candidate) => candidate.map((segment) => segment.text).join("\n"),
-      referenceCandidate: (_candidate, round) => `candidate:round-${round}`
+      readCandidateStatement: (candidate) => candidate.map((segment) => segment.text).join("\n")
     });
   } catch (error) {
     if (error instanceof TypedDomainError && error.code === "SYNTHESIS_NO_ARTIFACT") {
@@ -1130,6 +1146,18 @@ export function decideReplayEviction(input: ReplaySelfTestInput):
     : { kind: "EVICT", servedNumberId: input.servedNumberId, mark: "MISSING-NUMBER" };
 }
 
+/** T9 / J25 — one loop round as a READER gets it back from the database. */
+export interface PersistedSynthesisRound {
+  readonly round: number;
+  readonly synthesizerStage: "INITIAL" | "RETRY";
+  readonly synthesizerRequest: SynthesizerRequest;
+  readonly candidateRef: string;
+  readonly candidateStatement: string;
+  readonly evaluatorRequest: EvaluatorRequest;
+  readonly verdict: EvaluatorVerdict;
+  readonly roundObjection: string | null;
+}
+
 export interface PersistServeInput {
   readonly runId: string;
   readonly workItemId: string;
@@ -1197,7 +1225,7 @@ export interface ConditionMarkRecord {
   // J13(b): PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE are node-scope panel
   // degradation disclosures; the record union must name them or the runner cannot
   // project the mark the kernel now mints.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "LABEL-BASIS-INCOMPLETE";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "LABEL-BASIS-INCOMPLETE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1728,6 +1756,38 @@ export class ServeRepository {
             : JSON.stringify(input.result.projections.memoryDisclosure)
         ]
       );
+      // T9 / J25 — the loop-round records become DURABLE here, inside the
+      // answer's own write transaction, so a reader of the served answer can
+      // replay the convergence (or prove it never converged). The first filing
+      // returned these in memory and wrote nothing, which is the shape J25
+      // rules out. The EXACT recorded requests are stored, not a summary: the
+      // round-2 synthesizer request carries the round-1 objection verbatim, and
+      // its `priorCandidateRef` is the artifact reference round 1 recorded.
+      // A result with no rounds is lawful: the DR-184 catch-up path and every
+      // pre-T9 sealed shape ran no loop, and borrowing another version's rounds
+      // would be a fabricated record.
+      for (const round of input.result.loopRounds ?? []) {
+        await client.query(
+          `INSERT INTO serve.synthesis_round (
+             answer_id, answer_version, round, synthesizer_stage, synthesizer_request,
+             candidate_ref, candidate_statement, evaluator_request, evaluator_verdict,
+             round_objection, sealed_at_seq
+           ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb,$9::jsonb,$10,$11)`,
+          [
+            answer.rows[0]!.answer_id,
+            answerVersion,
+            round.round,
+            round.synthesizerRequest.stage,
+            JSON.stringify(round.synthesizerRequest),
+            round.candidateRef,
+            round.candidateStatement,
+            JSON.stringify(round.evaluatorRequest),
+            JSON.stringify(round.verdict),
+            round.verdict.objection,
+            await allocateSequence(client)
+          ]
+        );
+      }
       // T6 / J14 ADDENDUM — the reason each class-H/class-D record names is
       // checked against the ledger HERE, inside the write transaction, so a
       // concurrent review cannot land between the check and the insert. The
@@ -1829,6 +1889,49 @@ export class ServeRepository {
       [answerId, answerVersion]
     );
     return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  /**
+   * T9 / J25 — read the persisted loop-round records for one sealed answer
+   * version, in round order.
+   *
+   * This exists so the DoD's round assertions can be made where a READER
+   * stands, on the far side of the write. A test that inspects the array
+   * `runServeGateChain` just returned proves the function returned it and
+   * nothing more; this method is what lets the same claim be made about the
+   * record.
+   */
+  async readSynthesisRounds(
+    answerId: string,
+    answerVersion: number
+  ): Promise<readonly PersistedSynthesisRound[]> {
+    const result = await this.pool.query<{
+      round: number;
+      synthesizer_stage: "INITIAL" | "RETRY";
+      synthesizer_request: SynthesizerRequest;
+      candidate_ref: string;
+      candidate_statement: string;
+      evaluator_request: EvaluatorRequest;
+      evaluator_verdict: EvaluatorVerdict;
+      round_objection: string | null;
+    }>(
+      `SELECT round, synthesizer_stage, synthesizer_request, candidate_ref,
+              candidate_statement, evaluator_request, evaluator_verdict, round_objection
+         FROM serve.synthesis_round
+        WHERE answer_id=$1 AND answer_version=$2
+        ORDER BY round`,
+      [answerId, answerVersion]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      round: Number(row.round),
+      synthesizerStage: row.synthesizer_stage,
+      synthesizerRequest: row.synthesizer_request,
+      candidateRef: row.candidate_ref,
+      candidateStatement: row.candidate_statement,
+      evaluatorRequest: row.evaluator_request,
+      verdict: row.evaluator_verdict,
+      roundObjection: row.round_objection
+    })));
   }
 
   async readReviewCatchUpSource(runId: string): Promise<ReviewCatchUpSource> {

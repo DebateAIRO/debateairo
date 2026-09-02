@@ -200,7 +200,7 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
     // J13(b) 29 -> 31, then T11 31 -> 32: every new mark was minted MID-LIST, so
     // the DR-176 positional tail this test depends on is unchanged (asserted below).
     // T9 32 -> 35 (see tests/unit/s14-ui.test.ts for the three new marks).
-    expect(CONDITION_MARKS).toHaveLength(35);
+    expect(CONDITION_MARKS).toHaveLength(36);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

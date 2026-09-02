@@ -104,6 +104,9 @@ export const DIGEST_COMPRESSED_MARK = "DIGEST-COMPRESSED" as const;
 /** The mark the digest-cannot-exist crash class rides on. */
 export const DIGEST_CANNOT_EXIST_MARK = "DIGEST-CANNOT-EXIST" as const;
 
+/** F4 / J25: the envelope terminal fired with the R9 restatement FAILING. */
+export const PROTECTED_CORE_GUARD_RETIRED_MARK = "PROTECTED-CORE-GUARD-RETIRED" as const;
+
 /** The mark a served statement carrying an unsatisfied objection rides on. */
 export const SYNTHESIS_OBJECTION_STANDING_MARK = "SYNTHESIS-OBJECTION-STANDING" as const;
 
@@ -447,13 +450,28 @@ export interface SynthesisLoopOutcome<TCandidate> {
   readonly marks: readonly string[];
 }
 
+/**
+ * What one synthesizer call produced: the candidate itself and the RECORDED
+ * artifact reference for it.
+ *
+ * `candidateRef` must resolve to the artifact the provider call actually
+ * recorded. The first filing fabricated `candidate:round-N` here — a string
+ * that resembles an identifier and dereferences to nothing, so a retry's
+ * `priorCandidateRef` pointed at no artifact at all (codex r1 B2). Making the
+ * reference part of the synthesizer's OWN result is what removes the seam a
+ * label could be invented in: the loop has no way to name a candidate the
+ * adapter did not record.
+ */
+export interface SynthesizedCandidate<TCandidate> {
+  readonly candidate: TCandidate;
+  readonly candidateRef: string;
+}
+
 export interface SynthesisLoopDependencies<TCandidate> {
-  readonly synthesize: (request: SynthesizerRequest) => Promise<TCandidate>;
+  readonly synthesize: (request: SynthesizerRequest) => Promise<SynthesizedCandidate<TCandidate>>;
   readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatorVerdict>;
   /** The statement text the evaluator judges, read off the synthesizer's output. */
   readonly readCandidateStatement: (candidate: TCandidate) => string;
-  /** A stable reference the next round's retry request points back at. */
-  readonly referenceCandidate: (candidate: TCandidate, round: number) => string;
 }
 
 /**
@@ -489,9 +507,16 @@ export async function runSynthesisLoop<TCandidate>(
       codeLabel: input.codeLabel,
       prior
     });
-    candidate = await dependencies.synthesize(synthesizerRequest);
+    const synthesized = await dependencies.synthesize(synthesizerRequest);
+    candidate = synthesized.candidate;
+    const candidateRef = synthesized.candidateRef;
+    if (candidateRef.trim().length === 0) {
+      throw new TypedDomainError(
+        "SYNTHESIS_CANDIDATE_REF_MISSING",
+        "A round's candidate must carry the reference of the artifact the provider call recorded"
+      );
+    }
     candidateStatement = dependencies.readCandidateStatement(candidate);
-    const candidateRef = dependencies.referenceCandidate(candidate, round);
     const evaluatorRequest = buildEvaluatorRequest({
       controls: input.controls,
       round,

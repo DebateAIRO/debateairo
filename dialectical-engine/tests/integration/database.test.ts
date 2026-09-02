@@ -4027,6 +4027,7 @@ describe("apps/runner — legal command lifecycle", () => {
    * the synthesizer, earn the objection, and SERVE on the round that answers it.
    */
   it("serves a failed-restatement run through the evaluator instead of blocking it (former pre-compose R9 gate)", async () => {
+    const objection = "A stranger could not restate this claim from the digest alone.";
     const reasoningSegments = JSON.stringify({ segments: [
       { segment_id: "segment:hypothesis", text: "Hypothesis: the answer holds provisionally.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:research", text: "Research plan: find a source a stranger could restate.", node_refs: [], served_number_refs: [] }
@@ -4043,7 +4044,7 @@ describe("apps/runner — legal command lifecycle", () => {
       reasoningSegments,
       JSON.stringify({
         satisfied: false,
-        objection: "A stranger could not restate this claim from the digest alone.",
+        objection,
         criteria: {
           fairness_to_losers: true, statement_label_agreement: true,
           no_overstatement: true, restatement: false, citation_tracing: true
@@ -4077,8 +4078,83 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection?.condition_marks).not.toContain("DEFECT");
       // judge + (synthesizer, evaluator) x 2 rounds.
       expect(provider.calls()).toBe(5);
+
+      // ---- codex r1 B2 / J25: the ROUNDS, read back from the database ----
+      // Everything below crosses the persistence boundary. Asserting on the
+      // array `runServeGateChain` returned would prove only that it returned it.
+      const rounds = await new ServeRepository(database.pool)
+        .readSynthesisRounds(result.answerId, 1);
+      expect(rounds.map((round) => round.round)).toEqual([1, 2]);
+      expect(rounds.map((round) => round.synthesizerStage)).toEqual(["INITIAL", "RETRY"]);
+      const [first, second] = rounds;
+      // The DoD's "round-2 request contains the round-1 objection VERBATIM",
+      // asserted on the RECORDED request rather than a process-local object.
+      expect(first!.roundObjection).toBe(objection);
+      expect(first!.verdict.satisfied).toBe(false);
+      expect(second!.synthesizerRequest.stage).toBe("RETRY");
+      if (second!.synthesizerRequest.stage !== "RETRY") throw new Error("TEST_EXPECTED_RETRY");
+      expect(second!.synthesizerRequest.priorObjection).toBe(objection);
+      // The retry's back-reference RESOLVES to the round it names: it is the
+      // artifact reference round 1 recorded, not a label that resembles one.
+      expect(second!.synthesizerRequest.priorCandidateRef).toBe(first!.candidateRef);
+      expect(first!.candidateRef).not.toMatch(/^candidate:round-/u);
+      expect(first!.candidateRef).not.toBe(second!.candidateRef);
+      expect(second!.verdict.satisfied).toBe(true);
+      expect(second!.roundObjection).toBeNull();
+      expect(second!.evaluatorRequest.candidateStatement).toBe(second!.candidateStatement);
       const terminal = await database.pool.query("SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL'", [work.runId]);
       expect(terminal.rowCount).toBe(1);
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * F4 / codex r1 B3 / J25 — the RETIRED GUARD's disclosure, through persistence.
+   *
+   * Before T9 this run could not exist: the envelope terminal threw
+   * `PROTECTED_CORE_NOT_VERIFIED` whenever the served root's restatement had
+   * failed, because the guard was keyed on R9's gate-hood. R9 is an evaluator
+   * criterion now, so the terminal fires anyway — and the failing status must
+   * still reach a READER. The first filing put it in the gate trace, which
+   * persistence discards except for its last token, so nobody could see it.
+   */
+  it("F4 persists the retired-guard disclosure as a visible mark when the envelope stops a FAILED restatement", async () => {
+    const provider = await startProviderDouble([JSON.stringify({
+      statement: "A budget-bounded component.", way_of_knowing: "REASONING", locator: null,
+      restatement_text: "A different meaning.", restatement_status: "FAIL", value_laden: false,
+      steelman: { summary: "A budget-bounded component.", fidelity: 0.6 },
+      critic: { summary: "Plausible counter.", counterargumentStrength: 0.4, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.6, relevance: 0.6 }, context: { fit: 0.6, ambiguityFlags: [] },
+      fallacy: { severity: 0.4, fatalFlags: [] }
+    })]);
+    try {
+      const runId = await createRun("cost-envelope-retired-guard", 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: "runner-test:cost-envelope-retired-guard"
+      });
+      const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The mark is on the SERVED ANSWER a reader projects, not in a returned array.
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:cost-envelope-retired-guard");
+      expect(projection?.terminal).toBe("COMPONENTS_ONLY");
+      expect(projection?.condition_marks).toContain("PROTECTED-CORE-GUARD-RETIRED");
+      expect(projection?.condition_marks).toContain("ENVELOPE_EXHAUSTED");
+
+      // ...and it has a paired RECORD naming the node and saying what happened.
+      const record = projection?.condition_mark_records
+        .find((entry) => entry.mark === "PROTECTED-CORE-GUARD-RETIRED");
+      expect(record).toBeDefined();
+      expect(record?.reason).toContain("FAIL");
+      expect(record?.reason).toContain("no longer decides");
+
+      // The row itself carries it, so this is not a projection-only artifact.
+      const stored = await database.pool.query<{ condition_marks: string[] }>(
+        "SELECT condition_marks FROM serve.answer WHERE answer_id=$1 AND answer_version=1",
+        [result.answerId]
+      );
+      expect(stored.rows[0]?.condition_marks).toContain("PROTECTED-CORE-GUARD-RETIRED");
     } finally { await provider.stop(); }
   });
 
@@ -4665,6 +4741,135 @@ describe("T10/T11 · the served root and its label, through the production runne
       );
       expect(modelCalls.rows[0]?.count).toBe("0");
     } finally { await provider.stop(); }
+  });
+
+  /**
+   * J24 discriminator (2) / codex r1 B1 — a sealed ref naming a provider this
+   * deployment never configured is refused BEFORE the work item is claimed.
+   * The family being syntactically present is not the same as its refs being
+   * resolvable, and the r1 filing only checked the former.
+   */
+  it("T9/J24 refuses an unconfigured sealed role ref before claiming, and names the role", async () => {
+    const question = `t09-role-ref-unconfigured-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    const provider = await startProviderDouble([...servedRunResponses("Never synthesized.", 0.8)]);
+    const settings = runnerSettings();
+    const unconfigured: WalkingSkeletonSettings = {
+      ...settings,
+      synthesisRolePolicy: {
+        ...settings.synthesisRolePolicy!,
+        evaluatorRoleRef: "provider:never-configured-on-this-deployment"
+      }
+    };
+    try {
+      await expect(
+        runnerWithEndpoint(provider.endpoint, unconfigured).executeWorkItem(work.workItemId)
+      ).rejects.toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED" });
+
+      // Nothing claimed, nothing spent: the work item is untouched.
+      const state = await database.pool.query<{ state: string; settled_artifact_ref: string | null }>(
+        "SELECT state, settled_artifact_ref FROM core.work_item WHERE work_item_id=$1", [work.workItemId]
+      );
+      expect(state.rows[0]).toMatchObject({ state: "READY", settled_artifact_ref: null });
+      expect(provider.calls()).toBe(0);
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [work.runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * J24 discriminator (3) / codex r1 B1 — the sealed ref IS configured, but
+   * claim-time probing found its provider absent. The r1 filing dropped it from
+   * the healthy set and then looked the role up in the UNFILTERED set, so the
+   * run called an already-absent provider and recorded the result as an
+   * ordinary transport death. It must refuse instead, without substituting the
+   * still-healthy maker, and leave a durable event naming the ROLE (J25).
+   */
+  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and never substitutes the healthy maker", async () => {
+    const absentRolePrimary = await startProviderDouble([]);
+    const healthySecondary = await startProviderDouble([
+      judgementDouble("The healthy maker would have authored this", 0.4),
+      resil01Composition,
+      evaluatorSatisfied()
+    ]);
+    try {
+      const question = `t09-role-absent-at-claim-${randomUUID()}`;
+      const panel = fixtureDiscoveredPanel(2);
+      const primaryMember = panel[0]!;
+      const secondaryMember = panel[1]!;
+      const runId = await new RunRepository(database.pool).startRun({
+        questionLine: question,
+        principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`,
+        callerScope: "ASKER",
+        asOf: new Date("2026-08-07T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low",
+        depthParams: { depth: 1 },
+        discoveredPanel: panel,
+        strangerSampleRate: 1,
+        envelopeBasis: fixtureStructuralCeiling(10, 2, 1),
+        registerVersion: 1,
+        batteryVersion: "s00",
+        batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: absentRolePrimary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...settings,
+        maker: "Primary test maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: healthySecondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: secondaryMember.provider_ref,
+          maker: secondaryMember.maker
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // Only the ROLE's provider is absent; the other maker stays healthy, so
+        // the run could have continued — which is exactly the substitution J24
+        // forbids.
+        claimTimeProbe: async (member) => member.provider_ref === primaryMember.provider_ref
+          ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+          : { state: "HEALTHY", modelId: member.model_id, failureCode: null }
+      });
+
+      await expect(runner.executeWorkItem(workItemId))
+        .rejects.toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+
+      // NO substitution: the healthy secondary was never asked to synthesize.
+      expect(healthySecondary.calls()).toBe(0);
+      expect(absentRolePrimary.calls()).toBe(0);
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+
+      // J25: the disclosure is DURABLE and names the role, so a reader of the
+      // run sees why it stopped. Both live-event surfaces render this kind.
+      const events = await database.pool.query<{ value_json: { state: string; call_site_key: string } }>(
+        `SELECT value_json FROM core.run_progress_event
+          WHERE run_id=$1 AND kind='ledger.could_not_do'`, [runId]
+      );
+      expect(events.rows).toHaveLength(1);
+      expect(events.rows[0]?.value_json.state).toBe("SYNTHESIS_ROLE_PROVIDER_ABSENT");
+      expect(events.rows[0]?.value_json.call_site_key)
+        .toBe(`SYNTHESIZER:${primaryMember.provider_ref}`);
+    } finally {
+      await healthySecondary.stop();
+      await absentRolePrimary.stop();
+    }
   });
 
   /**

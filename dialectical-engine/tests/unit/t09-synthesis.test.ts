@@ -184,6 +184,8 @@ function unsatisfied(objection: string, failing: keyof EvaluatorVerdict["criteri
 function recorder(script: {
   readonly verdicts?: readonly EvaluatorVerdict[];
   readonly synthesize?: (request: SynthesizerRequest) => Promise<readonly ComposedSegment[]>;
+  /** Overrides the recorded artifact reference each round reports. */
+  readonly candidateRefFor?: (round: number) => string;
 }): {
   readonly dependencies: ServeGateDependencies;
   readonly synthesizerRequests: SynthesizerRequest[];
@@ -198,8 +200,15 @@ function recorder(script: {
     dependencies: {
       synthesize: async (request) => {
         synthesizerRequests.push(request);
-        if (script.synthesize !== undefined) return script.synthesize(request);
-        return segments(`candidate ${request.round}`);
+        const candidate = script.synthesize !== undefined
+          ? await script.synthesize(request)
+          : segments(`candidate ${request.round}`);
+        // A RECORDED artifact reference, the way the runner supplies one from
+        // its provider response — never a label the loop made up.
+        return {
+          candidate,
+          candidateRef: (script.candidateRefFor ?? ((round: number) => `artifact:recorded:${round}`))(request.round)
+        };
       },
       evaluate: async (request) => {
         evaluatorRequests.push(request);
@@ -307,7 +316,7 @@ describe("T9 roles — fresh context, and initial vs retry DISTINGUISHED", () =>
     if (retry.stage !== "RETRY") throw new Error("unreachable");
     // VERBATIM: byte-identical, not a paraphrase and not a truncation.
     expect(retry.priorObjection).toBe(objection);
-    expect(retry.priorCandidateRef).toBe("candidate:round-1");
+    expect(retry.priorCandidateRef).toBe("artifact:recorded:1");
     expect(JSON.parse(JSON.stringify(retry)).priorObjection).toBe(objection);
     // The initial request has no way to carry an objection at all.
     expect(Object.keys(initial)).not.toContain("priorObjection");
@@ -429,7 +438,7 @@ describe("T9 loop — bounded by the sealed row, serves after the last round", (
     expect(result.loopRounds[0]!.verdict.satisfied).toBe(false);
     expect(result.loopRounds[0]!.verdict.objection).toBe("Round 1 objection.");
     expect(result.loopRounds[1]!.verdict.satisfied).toBe(true);
-    expect(result.loopRounds[0]!.candidateRef).toBe("candidate:round-1");
+    expect(result.loopRounds[0]!.candidateRef).toBe("artifact:recorded:1");
     expect(result.loopRounds[0]!.candidateStatement).toContain("candidate 1");
     expect(result.loopRounds[1]!.evaluatorRequest.candidateStatement)
       .toBe(result.loopRounds[1]!.candidateStatement);

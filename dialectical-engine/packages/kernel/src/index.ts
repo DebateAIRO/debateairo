@@ -179,6 +179,14 @@ export const CONDITION_MARKS = [
   // enumerated COMPONENTS_ONLY crash classes — a death, not a quality
   // judgement, and never a silent subset of the nodes.
   "DIGEST-CANNOT-EXIST",
+  // F4 / T9 (goal 248-251): the envelope terminal fired while the served root's
+  // R9 restatement had FAILED. Before T9 that combination could not exist —
+  // `protectedCoreVerified` threw — because the guard was keyed on R9's
+  // GATE-HOOD. R9 is an evaluator objection criterion now, so the guard is
+  // knowingly retired and the failing status is DISCLOSED instead of deciding.
+  // Minted as a mark rather than left in the gate trace because J25 rules that
+  // a disclosure a reader of the answer cannot see is not a disclosure.
+  "PROTECTED-CORE-GUARD-RETIRED",
   // DR-176: authored material whose cross-maker review transport exhausted.
   // It remains append-only and revealable, but is excluded from the served
   // number and disclosed as unjudged when revealed.

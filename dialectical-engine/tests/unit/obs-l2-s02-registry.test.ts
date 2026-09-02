@@ -417,7 +417,7 @@ describe("S02 severity and unordered condition marks", () => {
     // the severity
     // map is DERIVED from CONDITION_MARKS, so it grew with the vocabulary; only
     // this count pin is stated by hand.
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(35);
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(36);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );

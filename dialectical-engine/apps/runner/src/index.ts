@@ -79,6 +79,7 @@ import {
   deriveBandCeiling,
   deriveVerdictLabel,
   LABEL_BASIS_INCOMPLETE_MARK,
+  PROTECTED_CORE_GUARD_RETIRED_MARK,
   runServeGateChain,
   ServeRepository,
   type BandCeilingRegisterRow,
@@ -98,6 +99,14 @@ import {
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
+
+/**
+ * T9 / J24 — the two sealed synthesis roles, named ONCE. Every check that has
+ * to refuse "without substitution" iterates this, so a role can never be
+ * checked in one place and forgotten in another.
+ */
+export const SYNTHESIS_ROLES = Object.freeze(["SYNTHESIZER", "EVALUATOR"] as const);
+export type SynthesisRoleName = typeof SYNTHESIS_ROLES[number];
 
 export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
 export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
@@ -1766,6 +1775,21 @@ export class WalkingSkeletonRunner {
         "T9: the synthesizer and evaluator role refs and the evaluator loop bound are sealed T16 register rows (J8); they are read from the register and never invented (goal 39-40)"
       );
     }
+    // J24 discriminator (2) — the family being PRESENT is not the same as its
+    // refs being RESOLVABLE. A sealed ref naming a provider this deployment
+    // never configured can be refused before the work item is claimed, because
+    // it needs no health information at all. Refusing here spends nothing.
+    for (const role of SYNTHESIS_ROLES) {
+      const roleRef = role === "SYNTHESIZER"
+        ? this.settings.synthesisRolePolicy.synthesizerRoleRef
+        : this.settings.synthesisRolePolicy.evaluatorRoleRef;
+      if (!this.#configuredMakers.some((maker) => maker.providerRef === roleRef)) {
+        throw new TypedDomainError(
+          "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",
+          `J24: the sealed ${role} role ref ${roleRef} (register version ${String(this.settings.synthesisRolePolicy.registerVersion)}) names no configured provider on this deployment; a sealed identity is never substituted`
+        );
+      }
+    }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
     const claimed = workItemId === undefined
       ? await this.#work.claimNext(claimInput)
@@ -1916,6 +1940,49 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError(
         "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
         "Every provider pinned at ask time was absent when the runner claimed the work item"
+      );
+    }
+    const synthesisRolePolicy = this.settings.synthesisRolePolicy;
+    if (synthesisRolePolicy === undefined) {
+      // Unreachable: the pre-claim gate refuses first. Typed rather than
+      // optional-chained so a future caller cannot reach synthesis without it.
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+        "T9: the sealed synthesis-role family is required before any role is resolved"
+      );
+    }
+    // J24 discriminator (3) — the sealed refs are resolved against the
+    // CLAIM-ELIGIBLE providers, i.e. after probing removed the absent ones. The
+    // r1 defect was exactly here: the late resolver looked the ref up in the
+    // UNFILTERED configured set, so a role provider that probing had just found
+    // absent was still called, and its inevitable transport death was recorded
+    // as an ordinary mid-call crash — a known role unavailability wearing the
+    // costume of a runtime accident. Refuse instead, without substitution, and
+    // leave a durable event naming the ROLE (J25: a disclosure a reader cannot
+    // see is not a disclosure).
+    for (const role of SYNTHESIS_ROLES) {
+      const roleRef = role === "SYNTHESIZER"
+        ? synthesisRolePolicy.synthesizerRoleRef
+        : synthesisRolePolicy.evaluatorRoleRef;
+      if (configuredMakers.some((maker) => maker.providerRef === roleRef)) continue;
+      const absent = absentAtClaim.find((entry) => entry.member.provider_ref === roleRef);
+      await this.#runs.recordRunLifecycleEvent({
+        runId: run.runId,
+        kind: "ledger.could_not_do",
+        value: {
+          state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+          call_site_key: `${role}:${roleRef}`,
+          parent_node_ref: null,
+          hold_ms: 0,
+          hold_until: null,
+          attempts_spent: 0,
+          transport_outcome: "FAILED",
+          planned_leg_count: 0
+        }
+      });
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
+        `J24: the sealed ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider the sealed row did not name`
       );
     }
     const effectiveMakerCount = configuredMakers.length;
@@ -3206,13 +3273,19 @@ export class WalkingSkeletonRunner {
      */
     const resolveSynthesisRoleMaker = (
       roleRef: string,
-      role: "SYNTHESIZER" | "EVALUATOR"
+      role: SynthesisRoleName
     ): { readonly provider: ProviderGateway; readonly providerRef: string } => {
-      const configured = this.#configuredMakers.find((maker) => maker.providerRef === roleRef);
+      // codex r1 B1: this looked the ref up in `this.#configuredMakers` — the
+      // UNFILTERED set — so a role provider that claim-time probing had already
+      // found absent was still called here. It resolves against the
+      // CLAIM-ELIGIBLE set now, and the claim-time discriminator above has
+      // already refused this run if either sealed ref is missing from it, so
+      // reaching this throw means a provider went away AFTER a healthy claim.
+      const configured = configuredMakers.find((maker) => maker.providerRef === roleRef);
       if (configured === undefined) {
         throw new TypedDomainError(
           "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",
-          `${role} role ref ${roleRef} (register version ${String(synthesisRoles.registerVersion)}) names no configured provider on this deployment`
+          `${role} role ref ${roleRef} (register version ${String(synthesisRoles.registerVersion)}) is not among the claim-eligible providers`
         );
       }
       return { provider: configured.provider, providerRef: configured.providerRef };
@@ -3296,7 +3369,20 @@ export class WalkingSkeletonRunner {
           liftPath: null,
           servedRootRule: null,
           affectedNodeIds: decision.terminal.servedNodeIds
-        })
+        }),
+        // F4 / J25: when the envelope terminal fires with the served root's R9
+        // restatement FAILING, the retired guard gets a RECORD, not only a
+        // trace token — `assertRequiredConditionMarkRecords` pairs every mark
+        // with one, and a reader of the answer sees the record, never the trace.
+        ...(servedRoot.restatementStatus === "PASS" ? [] : [Object.freeze({
+          mark: PROTECTED_CORE_GUARD_RETIRED_MARK,
+          scope: "answer" as const,
+          subjectRef: servedRoot.nodeId,
+          reason: `The envelope was exhausted with no served statement while the protected-core restatement status was ${servedRoot.restatementStatus}; under F4 that status is observed and disclosed, and no longer decides the terminal`,
+          liftPath: "Re-ask with a larger cost envelope, or restore a restatement a stranger can verify",
+          servedRootRule: null,
+          affectedNodeIds: Object.freeze([servedRoot.nodeId])
+        } satisfies ConditionMarkRecord)])
       ]);
       return createEnvelopeExhaustedResult({
         factBundle,
@@ -3467,7 +3553,13 @@ export class WalkingSkeletonRunner {
         // `serve_state` reads this: round 1 COMPOSED, a later round
         // RECOMPOSED_ONCE. The loop round IS the composition attempt now.
         compositionAttempt = request.round;
-        return partitioned.conformanceSegments;
+        return {
+          candidate: partitioned.conformanceSegments,
+          // codex r1 B2: the RECORDED artifact for THIS round. `compositionRawArtifactRef`
+          // is overwritten by the next round, so the retry's back-reference has to be
+          // the per-round value taken here, never that field read later.
+          candidateRef: response.rawArtifactRef
+        };
       },
       /**
        * The EVALUATOR role call. It replaces BOTH retired provider limbs —
