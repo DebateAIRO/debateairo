@@ -390,7 +390,9 @@ function canonicalJson(value: unknown): string {
       throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
     }
     const entries = Object.entries(value as Readonly<Record<string, unknown>>)
-      .sort(([left], [right]) => left.localeCompare(right));
+      // UTF-16 code-unit order: locale-independent and identical to the SQL
+      // chain's COLLATE "C" order for the ASCII keys the audit rows use (L2-F4).
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
     return `{${entries.map(([key, item]) =>
       `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
   }
