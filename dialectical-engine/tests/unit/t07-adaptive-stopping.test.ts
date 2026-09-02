@@ -1584,6 +1584,15 @@ describe("T7 / codex r2 B2 — a partial scope still computes, and still validat
     expect(new Set(arms.map((decision) => decision.maxRootMovement === null))).toEqual(new Set([true, false]));
   });
 
+  it("names the moved roots at the ROUND-1 FLOOR too, instead of erasing them", () => {
+    const decision = decideRoundBoundary({ ...boundaryInput, completedRounds: 0 });
+
+    expect(decision.kind).toBe("CONTINUE");
+    expect(decision.reason).toBe("ROUND_1_FLOOR");     // the floor still decides
+    expect(decision.maxRootMovement).toBe(0.25);       // ...and still tells the truth
+    expect(decision.movedRootNodeIds).toEqual(["root:A"]);
+  });
+
   it("runs the OVERFULL guard through the OUTER path, not only the strict helper", () => {
     expect(() => decideRoundBoundary({ ...boundaryInput, expectedRootCount: 1 }))
       .toThrowError(expect.objectContaining({ code: "STOPPING_ROOT_SCOPE_OVERFULL" }));

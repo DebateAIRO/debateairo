@@ -856,11 +856,15 @@ function decideWithScope(
   const maxRootMovement = movement === null ? null : movement.maximum;
   const moved = movement === null ? Object.freeze([]) : movement.moved(input.delta);
   if (input.completedRounds < 1) {
+    // The floor CONTINUES regardless of movement, but it does not erase it:
+    // the same honesty codex r2 B2 demanded of the partial arm (the ceiling arm
+    // already recorded `moved`, and an inconsistency between arms is how the
+    // first falsehood got in).
     return Object.freeze({
       kind: "CONTINUE",
       reason: "ROUND_1_FLOOR",
       maxRootMovement,
-      movedRootNodeIds: Object.freeze([]),
+      movedRootNodeIds: moved,
       measuredEdgeCount,
       ...scope
     });
