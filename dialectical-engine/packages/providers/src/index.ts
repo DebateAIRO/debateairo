@@ -41,6 +41,12 @@ export interface ProviderCallRequest {
   readonly packet: PromptPacket;
   readonly classifyContent?: (content: string) => ContentClassification;
   readonly buildRepairPacket?: (rejected: RejectedProviderContent) => PromptPacket;
+  /**
+   * L4-F8: re-evaluated before EVERY attempt, so a run-wide model-attempt ceiling checked once
+   * by the caller cannot be overshot by the gateway's own retry/repair loop. It throws to refuse;
+   * the refusal propagates untouched and no ledger row is written for the refused attempt.
+   */
+  readonly assertAttemptAllowed?: () => void;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -287,12 +293,32 @@ export interface OpenAICompatibleGatewayOptions {
   readonly appendLedgerEntry: (entry: ProviderLedgerInput) => Promise<string>;
   readonly assertNoOpenWriteTransaction: () => void;
   readonly fetchImplementation?: typeof fetch;
+  /** L4-F8: seam for the bounded backoff between HTTP attempts; real time by default. */
+  readonly sleepImplementation?: (milliseconds: number) => Promise<void>;
 }
 
 /** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */
 const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
+/**
+ * L4-F2: the serialised request packet is bounded before it is sent. The structural ceiling counts
+ * attempts, not tokens, so an unbounded packet turns one ask into unbounded model spend. An
+ * oversized packet is a refused attempt — recorded, never sent, never retried.
+ */
+const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+/** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
+const PROVIDER_BACKOFF_BASE_MS = 250;
+const PROVIDER_BACKOFF_CAP_MS = 4_000;
 const MAX_PROVIDER_MODEL_CHARS = 256;
 const MAX_USAGE_COUNTER = 2 ** 31 - 1;
+
+/** Delay before `attempt` (only attempts after the first back off). */
+function providerBackoffMs(attempt: number): number {
+  return Math.min(PROVIDER_BACKOFF_BASE_MS * 2 ** (attempt - 2), PROVIDER_BACKOFF_CAP_MS);
+}
+
+function realSleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => { setTimeout(resolve, milliseconds); });
+}
 
 const usageCounter = z.number().int().min(0).max(MAX_USAGE_COUNTER);
 const usageSchema = z.object({
@@ -384,6 +410,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }
     const fetcher = this.#options.fetchImplementation ?? fetch;
+    const sleep = this.#options.sleepImplementation ?? realSleep;
+    let attemptsMade = 0;
+    let packetRefused = false;
     let lastError: unknown;
     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
@@ -397,6 +426,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     } | null = null;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+      // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
+      // taken on the freshest state rather than on state read up to a backoff ago.
+      if (attempt > 1) await sleep(providerBackoffMs(attempt));
+      request.assertAttemptAllowed?.();
+      attemptsMade = attempt;
       const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
       const startedAt = new Date();
@@ -407,15 +441,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         if (this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
+        const body = JSON.stringify({
+          model: this.#options.model,
+          max_tokens: request.bound.tokenCeiling,
+          messages: attemptPacket.messages
+        });
+        if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
+          packetRefused = true;
+          throw new TypedDomainError(
+            "PROVIDER_PACKET_TOO_LARGE",
+            `Provider request packet exceeded ${MAX_PROVIDER_REQUEST_PACKET_BYTES} bytes`
+          );
+        }
         const response = await fetcher(`${this.#options.endpoint}/chat/completions`, {
           method: "POST",
           headers,
           signal: AbortSignal.timeout(request.bound.deadlineMs),
-          body: JSON.stringify({
-            model: this.#options.model,
-            max_tokens: request.bound.tokenCeiling,
-            messages: attemptPacket.messages
-          })
+          body
         });
         const rawText = await readBoundedResponseText(response);
         let decoded: unknown;
@@ -554,6 +596,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           });
         }
       }
+      // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
+      // an identical refusal, so the loop stops on the attempt that refused it.
+      if (packetRefused) break;
     }
     if (lastContentRejection !== null) {
       throw new ProviderContentUnacceptedError(
@@ -566,7 +611,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     }
     throw new ProviderCallFailedError(
       lastError,
-      request.bound.maxAttempts,
+      attemptsMade,
       lastOutcome,
       lastLedgerEntryRef
     );

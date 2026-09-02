@@ -54,7 +54,8 @@ function gatewayWith(fetchImplementation: typeof fetch) {
     fetchImplementation,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
-    assertNoOpenWriteTransaction: () => undefined
+    assertNoOpenWriteTransaction: () => undefined,
+    sleepImplementation: async () => {}
   });
   return { gateway, artifacts, ledger };
 }

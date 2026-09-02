@@ -196,6 +196,9 @@ importers:
       '@debateai/published-arithmetic':
         specifier: workspace:*
         version: link:../../packages/published-arithmetic
+      '@debateai/register':
+        specifier: workspace:*
+        version: link:../../packages/register
       pg:
         specifier: 8.22.0
         version: 8.22.0

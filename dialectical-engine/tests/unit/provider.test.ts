@@ -21,7 +21,8 @@ describe("FX-HR-H1 — one provider interface", () => {
       })),
       persistRawArtifact: async (artifact) => { artifacts.push(artifact.metadata); return artifact.artifactId; },
       appendLedgerEntry: async () => "ledger:test",
-      assertNoOpenWriteTransaction: () => undefined
+      assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {}
     });
     const request = {
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "JUDGE" as const,
@@ -47,7 +48,8 @@ describe("FX-HR-H1 — one provider interface", () => {
       })),
       persistRawArtifact: async (artifact) => { metadata.push(artifact.metadata); return artifact.artifactId; },
       appendLedgerEntry: async () => "ledger:test",
-      assertNoOpenWriteTransaction: () => undefined
+      assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {}
     });
     await expect(gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "JUDGE",
@@ -71,7 +73,8 @@ describe("FX-HR-H1 — one provider interface", () => {
     const gateway = new OpenAICompatibleProviderGateway({
       endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
       persistRawArtifact: async (artifact) => { recorded.push(artifact); return "artifact:classified"; },
-      appendLedgerEntry: async () => "ledger:classified", assertNoOpenWriteTransaction: () => undefined
+      appendLedgerEntry: async () => "ledger:classified", assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {}
     });
     const result = await gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
@@ -104,7 +107,8 @@ describe("FX-HR-H1 — one provider interface", () => {
       endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
       persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
       appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
-      assertNoOpenWriteTransaction: () => undefined
+      assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {}
     });
     const result = await gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
@@ -139,7 +143,8 @@ describe("FX-HR-H1 — one provider interface", () => {
       endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
       persistRawArtifact: async (artifact) => artifact.artifactId,
       appendLedgerEntry: async (entry) => `ledger:${entry.attemptId}`,
-      assertNoOpenWriteTransaction: () => undefined
+      assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {}
     });
     await expect(gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
@@ -176,7 +181,8 @@ describe("FX-HR-H1 — one provider interface", () => {
         endpoint: `http://127.0.0.1:${address.port}/v1`, model: "fixture/model", maker: "fixture",
         persistRawArtifact: async (artifact) => artifact.artifactId,
         appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
-        assertNoOpenWriteTransaction: () => undefined
+        assertNoOpenWriteTransaction: () => undefined,
+        sleepImplementation: async () => {}
       });
       await gateway.call({
         runId: null, subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
@@ -228,7 +234,8 @@ describe("FX-HR-H1 — one provider interface", () => {
         calls.push(`ledger:${entry.outcome}`);
         return "ledger:test";
       },
-      assertNoOpenWriteTransaction: () => calls.push("outside-transaction")
+      assertNoOpenWriteTransaction: () => calls.push("outside-transaction"),
+      sleepImplementation: async () => {}
     });
 
     const result = await gateway.call({
@@ -271,7 +278,8 @@ describe("FX-HR-H1 — one provider interface", () => {
         calls.push(`ledger:${entry.outcome}:${entry.rawArtifactRef}`);
         return "ledger:failure";
       },
-      assertNoOpenWriteTransaction: () => calls.push("outside-transaction")
+      assertNoOpenWriteTransaction: () => calls.push("outside-transaction"),
+      sleepImplementation: async () => {}
     });
     await expect(gateway.call({
       runId: null,
@@ -311,7 +319,8 @@ describe("FX-HR-H1 — one provider interface", () => {
         ledgerAttempts.push(entry.attemptId);
         return `ledger:${entry.attemptId}`;
       },
-      assertNoOpenWriteTransaction: () => undefined
+      assertNoOpenWriteTransaction: () => undefined,
+      sleepImplementation: async () => {}
     });
     await expect(gateway.call({
       runId: null,

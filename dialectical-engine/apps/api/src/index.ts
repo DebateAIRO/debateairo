@@ -198,6 +198,12 @@ export const API_MAX_PARAM_LENGTH = 100 as const;
  * password can never reach Argon2. A register-row maximum is proposed to V.
  */
 export const AUTH_PASSWORD_MAX_BYTES = 1_024 as const;
+/**
+ * L4-F2: `question_line` is trimmed but not bounded by the contract, and the runner re-sends it
+ * verbatim on every model attempt — so an unbounded question turns one ask into unbounded model
+ * spend. Bounded at the route (no contract edit) in UTF-8 bytes, measured after the contract trim.
+ */
+export const ASK_QUESTION_MAX_BYTES = 8_192 as const;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
@@ -961,6 +967,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     const ask = parseRequest(AskRequestSchema, request.body);
+    if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,
