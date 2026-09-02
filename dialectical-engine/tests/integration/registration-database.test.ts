@@ -8041,7 +8041,11 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       SELECT verification_token_hash FROM identity.channel_binding
       WHERE user_id=$1 AND channel_type='email'
     `, [registered.user.user_id]);
-    expect(stored.rows[0]!.verification_token_hash).toBe(
+    // pin updated 2026-09-02: tokens are hashed with a per-kind purpose prefix
+    // (L2-F12, hashToken); the column grammar stays sha256:<hex>.
+    expect(stored.rows[0]!.verification_token_hash).toBe(hashToken("verification", token));
+    expect(stored.rows[0]!.verification_token_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(stored.rows[0]!.verification_token_hash).not.toBe(
       `sha256:${createHash("sha256").update(token).digest("hex")}`
     );
     expect(stored.rows[0]!.verification_token_hash).not.toContain(token);
