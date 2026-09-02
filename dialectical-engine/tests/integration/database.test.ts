@@ -2044,9 +2044,34 @@ describe("apps/runner — legal command lifecycle", () => {
       const unservedRecord = projection?.condition_mark_records.find(
         (record) => record.mark === "UNSERVED-MAKER-POSITION"
       );
+      // T10 (codex r1 B2): the record carries the LIVE rule. Migrated from the
+      // retired `first-configured-provider` literal, which this consumer still
+      // required after T10 landed.
       expect(unservedRecord).toMatchObject({
-        served_root_rule: "first-configured-provider"
+        served_root_rule: "max-propagated-strength-lexicographic-tiebreak"
       });
+      // ...and the SUBJECT is derived from the recorded strengths, not from
+      // provider order. Migrating the literal alone would leave the assertion
+      // compatible with a selector that still served whatever the first
+      // configured provider authored, so the oracle below is the run's OWN
+      // node_strength_record: the served subject must be a root, and no other
+      // root may carry a strictly greater recorded strength.
+      const rootStrengthRows = await database.pool.query<{ node_id: string; strength: string }>(
+        `SELECT strength.node_id, strength.strength::text
+           FROM ledger.node_strength_record AS strength
+           JOIN ledger.propagation_run AS propagation
+             ON propagation.propagation_run_id = strength.propagation_run_id
+           JOIN core.node AS node ON node.node_id = strength.node_id
+          WHERE propagation.run_id = $1 AND node.parent_node_id IS NULL`,
+        [runId]
+      );
+      expect(rootStrengthRows.rowCount).toBeGreaterThanOrEqual(2);
+      const servedStrength = rootStrengthRows.rows
+        .find((row) => row.node_id === unservedRecord?.subject_ref);
+      expect(servedStrength).toBeDefined();
+      for (const row of rootStrengthRows.rows) {
+        expect(Number(row.strength)).toBeLessThanOrEqual(Number(servedStrength!.strength));
+      }
       expect(unservedRecord?.reason).toContain("test-layer");
       expect(unservedRecord?.reason).toContain("Secondary test maker");
       expect(projection?.nodes).toHaveLength(16);
