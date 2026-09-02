@@ -1,0 +1,66 @@
+# deploy/vps/systemd/debateai-api.service
+# One OS user per service (audit L7 "C2/C3 validation"): the UI must not be able to read
+# /etc/debateai/api.env, and the runner must not be able to read the blind-index key, the audit
+# key store or the audit source-IP salt. See README "Custody and the three service users" for the
+# one place where that separation is currently blocked (the shared user-DEK store).
+[Unit]
+Description=DebateAI API (Fastify)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target postgresql.service debateai-hatchet.service
+Wants=network-online.target
+Requires=postgresql.service debateai-hatchet.service
+
+[Service]
+Type=simple
+User=debateai-api
+Group=debateai-api
+# Postfix's sendmail is setgid postdrop; NoNewPrivileges=true neuters setgid, so the maildrop
+# write has to be reachable by group membership instead (README §7, MAIL_SENDMAIL_PATH).
+SupplementaryGroups=postdrop
+WorkingDirectory=/opt/debateai/dialectical-engine
+EnvironmentFile=/etc/debateai/api.env
+Environment=NODE_ENV=production
+Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
+ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/api/src/main.ts
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+# The three custody trees the API creates directories in at runtime (L2 out-of-scope: the DEK
+# store and the publication key store are written by @debateai/crypto). Everything else on the
+# box — including /opt and /etc/debateai — stays read-only under ProtectSystem=strict.
+ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
+
+# --- process and kernel ---
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+# Unix socket for PostgreSQL, INET/INET6 for the loopback listener and Hatchet gRPC.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,65 @@
+# deploy/vps/systemd/debateai-runner.service
+# The runner never writes custody: it loads the KEK from its OWN 0600 copy and READS the run
+# content keys the API wrote (packages/crypto FileRunContentKeyStore.load / FileUserDekStore.load
+# — only ContentCipher.provisionRun writes, and that runs on the API's content-provision path,
+# apps/api + packages/db/src/index.ts:1101). Hence ReadOnlyPaths, not ReadWritePaths.
+[Unit]
+Description=DebateAI runner (Hatchet worker)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target postgresql.service debateai-hatchet.service
+Wants=network-online.target
+Requires=postgresql.service debateai-hatchet.service
+
+[Service]
+Type=simple
+User=debateai-runner
+Group=debateai-runner
+WorkingDirectory=/opt/debateai/dialectical-engine
+EnvironmentFile=/etc/debateai/runner.env
+Environment=NODE_ENV=production
+Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
+# ProtectHome=true empties /home and /root, so the maker CLIs get a private HOME under the state
+# directory instead. Those credentials ARE the model-spend keys (asset 1.1.6): 0700, this user only.
+StateDirectory=debateai-runner
+StateDirectoryMode=0700
+Environment=HOME=/var/lib/debateai-runner
+Environment=XDG_CONFIG_HOME=/var/lib/debateai-runner/config
+ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/runner/src/main.ts
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+ReadOnlyPaths=/var/lib/debateai/api/user-deks
+
+# --- process and kernel ---
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
