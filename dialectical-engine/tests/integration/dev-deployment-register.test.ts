@@ -431,6 +431,9 @@ describe("DEV-05 complete development deployment register", () => {
       verdictLabelPolicy: policy.verdictLabelPolicy,
       // The line under test: the shipped composition passes what the reader loads.
       panelPolicy: policy.panelPolicy,
+      // T7's claim-time gate fires before J12's panel gate on any multi-maker
+      // run, so the mirror carries it too — see the merge note in dev-runner-policy.
+      stoppingPolicy: policy.stoppingPolicy,
       resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
         batteryRowId, state: "INACTIVE" as const,
         predicateInputs: { kind: "PRESENT", values: { fixture: "t3c", predicateResult: false } },
@@ -533,6 +536,7 @@ describe("DEV-05 complete development deployment register", () => {
       runDeathPolicy: policy.runDeathPolicy,
       hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
       verdictLabelPolicy: policy.verdictLabelPolicy, panelPolicy: policy.panelPolicy,
+      stoppingPolicy: policy.stoppingPolicy,
       // Composed exactly as apps/runner/src/main.ts composes it, from the ONE
       // probe implementation ruling J21 moved into @debateai/providers.
       claimTimeProbe: async (member) => {

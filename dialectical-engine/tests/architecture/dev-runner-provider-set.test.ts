@@ -59,6 +59,12 @@ describe("production runner provider topology", () => {
       // shipped composition that omits it refuses every multi-maker run on a
       // correctly sealed deployment.
       "panelPolicy: policy.panelPolicy",
+      // T3C merge (T7): T7 landed ADAPTIVE_STOPPING_UNRESOLVED — a claim-time gate
+      // on every multi-maker run — plus the acceptance composition, but never the
+      // shipped one. At 44836ecf that made a correctly sealed deployment refuse
+      // every multi-maker work item. Same class as the two entries above, so it is
+      // pinned the same way rather than left to the next merge to rediscover.
+      "stoppingPolicy: policy.stoppingPolicy",
       // T3C / F34 (J20): DR-182 VROW-5's claim-time re-probe. Its absence is not a
       // stop — both consumers are guarded by `!== undefined` — so a shipped
       // composition that omits it degrades SILENTLY: a member pinned at ask time

@@ -100,6 +100,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
   verdictLabelPolicy: policy.verdictLabelPolicy,
   panelPolicy: policy.panelPolicy,
+  stoppingPolicy: policy.stoppingPolicy,
   // T3C / F34 (ruling J20): DR-182 VROW-5's claim-time health re-probe. Without
   // this the runner's probe block is skipped entirely — a member pinned at ask
   // time that has since gone absent is trusted, the panel is never revised, and
