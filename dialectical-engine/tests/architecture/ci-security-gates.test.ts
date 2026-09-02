@@ -26,4 +26,15 @@ describe("CI security gates (F-03)", () => {
     const db = read(".github/dependabot.yml");
     expect(db.match(/target-branch: "dev"/g)?.length).toBe(2);
   });
+  it("runs gitleaks as a pinned, sha256-verified binary, not the licensed action (B7b)", () => {
+    const wf = read(".github/workflows/security.yml");
+    expect(wf).not.toContain("gitleaks-action");
+    expect(wf).not.toContain("GITLEAKS_LICENSE");
+    expect(wf).toMatch(/GITLEAKS_VERSION: \d+\.\d+\.\d+/);
+    expect(wf).toMatch(/GITLEAKS_SHA256: [0-9a-f]{64}/);
+    expect(wf).toMatch(/curl -sSfL[^\n]*gitleaks_\$\{GITLEAKS_VERSION\}_linux_x64\.tar\.gz/);
+    expect(wf).toMatch(/sha256sum (--check|-c)/);
+    expect(wf).toMatch(/gitleaks" git [^\n]*--redact[^\n]*--config \.gitleaks\.toml[^\n]*--log-opts="--all"/);
+    expect(wf).toContain("fetch-depth: 0");
+  });
 });

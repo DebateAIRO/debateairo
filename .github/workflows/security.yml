@@ -23,11 +23,24 @@ jobs:
       - run: pnpm audit --audit-level=moderate
   secrets:
     runs-on: ubuntu-latest
+    env:
+      # B7b: gitleaks runs as a pinned release binary; no organisation licence secret is needed.
+      # GITLEAKS_SHA256 is the linux_x64 line of gitleaks_8.30.1_checksums.txt from the v8.30.1
+      # release, cross-checked by hashing the downloaded asset on 2026-09-02.
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
-        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}", GITLEAKS_LICENSE: "${{ secrets.GITLEAKS_LICENSE }}", GITLEAKS_CONFIG: .gitleaks.toml }
+      - name: Install gitleaks (pinned release, sha256-verified)
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+      - name: Scan every ref for secrets
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner --config .gitleaks.toml --log-opts="--all" .
   codeql:
     runs-on: ubuntu-latest
     permissions: { contents: read, security-events: write }
