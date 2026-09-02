@@ -26,7 +26,52 @@ Orchestrator ledger (append-only). Baseline receipt: `BASELINE.md` (dev `b5a6b6e
 - Also failing at baseline (found by the C1 lane running loader-referencing suites): `obs-l3-s06` ×4, `s6-content-encryption` ×1 (its runner stub omits `REGISTER_VERSION`).
 
 ## Dev baseline drift (B20)
-(filled by the B20 lane: per file — original failure, action taken, what remains RED and why)
+
+Branch `security/fix-b20-dev-health`, merged onto `security/2026-09-01-hardening`.
+Every pin carries an inline `// pin updated 2026-09-02: …` comment pointing back here.
+Each file below was re-run once, single-file, on the merged tree.
+
+| File | Original failure (BASELINE.md) | Action | After |
+|---|---|---|---|
+| `tests/architecture/auth-front-door-parity.test.ts` | ENOENT on `web/package.json` and `web/components/LoginFlow.tsx` | Retired the `web/` halves of the parity reads; every `apps/ui` assertion unchanged (`05c3630e`) | 2/2 green |
+| `tests/architecture/evaluator-selector-unbound.test.ts` | ENOENT scandir `web/` (root-level `web/` app removed on dev) | Dropped `web` from the workspace source roots; the zero-caller assertion itself unchanged (`c33c775d`) | 1/1 green |
+| `tests/architecture/s04-contract.test.ts` | `apps/runner/src/main.ts` no longer names `readClaimTypeCompositionMap` | Pin updated — the loud register read moved into `readDevelopmentRunnerPolicy` (`apps/runner/src/dev-runner-policy.ts`), awaited by `main.ts` at startup; the pin follows that hop (`2c4485a4`) | 3/3 green |
+| `tests/architecture/s10-carrier-erasure-red.test.ts` | `packages/liveness` no longer embeds `serve.private_run_erasure_tombstone` | Pin updated — the completed-tombstone filter lives in `core.run_private_content_is_live` (migration 0040), consulted by both carriers' candidate reads before any key load; the pin checks the carriers call it and that the function body consults the tombstone table (`3862706d`) | 13/13 green |
+| `tests/architecture/s13-contract.test.ts` | `expected 402 to be less than -1` — the inline `FOR UPDATE` / `ORDER BY run_id FOR UPDATE` literals are gone from `packages/memory/src/index.ts`, so both `indexOf` pins returned -1 | Pin updated — both locks moved into `core.lock_owned_live_runs` (migration 0040), a SECURITY DEFINER function whose body does `ORDER BY run.run_id FOR UPDATE` plus the ownership and private-content-liveness checks. The deterministic sorted-run-id ordering is still asserted at the call site (`12175123`) | 3/3 green |
+| `tests/architecture/s14-contract.test.ts` | (1) `apps/ui/lib/types.ts` never imported `@debateai/contract`; (2) FX-ORPH-04 walks the removed `web/` tree; (3) `localeCompare` in `apps/ui/lib/recommendation.ts` | (1) Pin updated — the assertion was mechanically re-pointed from `web/lib/types.ts` at `3e7d83e9`; `apps/ui` keeps V2 presentation types and feeds them through `lib/v3/adapter.ts` (UI-01 / DR-145). (2) Retired; the `apps/ui` port is a follow-up. (3) **Left RED** (`379dca7a`) | 3 passed / 1 RED |
+| `tests/architecture/scaffold.test.ts` | ENOENT on `web/package.json` from the `web/` dependency-edge row | Retired that row (28 → 27). **Left RED** on both counts (`90348613`) | 6 passed / 2 RED |
+| `tests/unit/s14-ui.test.ts` | 8 typecheck errors from imports of the removed `web/lib/*` | Retired the `projectAnswerSurface` case, its fixture, and the S14/W6/FX-LG-17 live-lifecycle describe (no 1:1 `apps/ui` equivalent). The label, freshness and browser-client cases run against `apps/ui/lib/v3/labels.js` and `apps/ui/lib/api.js`, which are 1:1 (`d15297b8`) | 10/10 green |
+
+### Left RED on purpose
+
+**`scaffold.test.ts` — the three obs-capture env-read purity violations** (ruled: must stay RED).
+`expect(report.blocking).toEqual([])` at `tests/architecture/scaffold.test.ts:30`, received:
+
+```text
+packages/obs-capture/install/api.ts reads the process environment outside the register loader
+packages/obs-capture/install/runner.ts reads the process environment outside the register loader
+packages/obs-capture/install/scheduler.ts reads the process environment outside the register loader
+```
+
+**`scaffold.test.ts` — three undeclared dependency edges**, surfaced behind the retired `web/` ENOENT row.
+`expect(report.violations).toEqual([])` at `tests/architecture/scaffold.test.ts:25`, received:
+
+```text
+apps/api -> obs-capture is not a declared edge
+apps/runner -> obs-capture is not a declared edge
+apps/scheduler -> obs-capture is not a declared edge
+```
+
+**`s14-contract.test.ts` — deterministic locale tiebreak.**
+`AssertionError: expected 'import type { InvestigationAction, Ma…' not to contain 'localeCompare'` —
+a real defect in `apps/ui/lib/recommendation.ts`, owned by the `apps/` lane and out of B20's bounds.
+
+### Known, not touched (reproduced on the untouched base by another lane)
+
+- `obs-l3-s06` ×4
+- `s6-content-encryption` ×1 — its runner stub omits `REGISTER_VERSION`
+
+Neither is dev drift in a B20 file; both are recorded above under the known baseline failures.
 
 ## Full-suite runs (quiet host only, coordinated with the live-loop orchestrator)
 (appended when run: command, host state, tails)
