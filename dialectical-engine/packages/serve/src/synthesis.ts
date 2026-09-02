@@ -253,12 +253,12 @@ export interface SynthesisLoopControls {
 
 export const SYNTHESIZER_INSTRUCTIONS =
   "Write the served statement from the digest below. Every load-bearing claim must trace to a "
-  + "digest node. Do not overstate the evidence, and state the losing positions fairly." as const;
+  + "digest node. Do not overstate the evidence, and state the losing positions fairly.";
 
 export const EVALUATOR_INSTRUCTIONS =
   "Judge the candidate statement against the digest and the code label. Check fairness to the "
   + "losing positions, agreement between the statement and the code label, and overstatement. "
-  + "Return an objection whenever you are not satisfied." as const;
+  + "Return an objection whenever you are not satisfied.";
 
 /**
  * The synthesizer's recorded request. The key set IS the fresh-context
