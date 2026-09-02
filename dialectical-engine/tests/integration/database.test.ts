@@ -5000,6 +5000,38 @@ describe("T10/T11 · the served root and its label, through the production runne
       pool: database.pool, runId, fixtureKey: question, factBundle, loopRounds: [round]
     })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
 
+    // WRONG ROUND: a genuine round-1 synthesis pairing, filed as round 2. The
+    // ledger lookup would succeed — the pairing is real — so the round binding
+    // on the call site is the only thing that can refuse it.
+    const synthesisArtifactId = randomUUID();
+    const synthesisAttemptId = randomUUID();
+    await ledger.appendRawArtifact({
+      artifactId: synthesisArtifactId, attemptId: synthesisAttemptId, runId,
+      providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
+      maker: "test-layer", modelVersion: "v1",
+      rawText: JSON.stringify({ synthesizer: question }), metadata: {}, parseStatus: "PARSED",
+      inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: "b".repeat(64)
+    });
+    for (const callSiteKey of ["COMPOSER:SYNTHESIZER:INITIAL:1", "POST_COMPOSE_R9:EVALUATOR:1"]) {
+      await ledger.append({
+        runId, attemptId: synthesisAttemptId, actionKind: "MODEL_CALL", callSiteKey,
+        subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
+        actorRef: "provider:test-layer", inputHash: "input:test-layer",
+        contractHash: "9".repeat(64), rawArtifactRef: synthesisArtifactId,
+        startedAt: now, finishedAt: now
+      });
+    }
+    const roundTwoWithRoundOneSites = {
+      ...round,
+      round: 2,
+      candidateRef: synthesisArtifactId,
+      verdictRef: synthesisArtifactId
+    } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    await expect(persistTerminalRun({
+      pool: database.pool, runId, fixtureKey: `${question}-wrong-round`, factBundle,
+      loopRounds: [roundTwoWithRoundOneSites]
+    })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
     // The whole answer rolled back with it.
     const rows = await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
