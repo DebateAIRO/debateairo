@@ -17,12 +17,16 @@ import {
 } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDevCustodyRoot } from "./custody-root.mjs";
 
 const DIRECTORY_MODE = 0o700;
 const FILE_MODE = 0o600;
-const DEFAULT_TLS_DIRECTORY = resolve(".local/dev-auth/tls");
 const CERTIFICATE_NAME = "localhost.pem";
 const PRIVATE_KEY_NAME = "localhost-key.pem";
+
+function defaultTlsDirectory() {
+  return resolve(resolveDevCustodyRoot(process.cwd()), "tls");
+}
 
 class DevCertificateError extends Error {
   constructor(code) {
@@ -107,7 +111,7 @@ function runMkcert(executable, certificatePath, privateKeyPath) {
 }
 
 export async function ensureDevLocalCertificate(options = {}) {
-  const tlsDirectory = resolve(options.tlsDirectory ?? DEFAULT_TLS_DIRECTORY);
+  const tlsDirectory = resolve(options.tlsDirectory ?? defaultTlsDirectory());
   const mkcertExecutable = options.mkcertExecutable ?? "mkcert";
   await requirePrivateDirectory(tlsDirectory);
   const certificatePath = resolve(tlsDirectory, CERTIFICATE_NAME);

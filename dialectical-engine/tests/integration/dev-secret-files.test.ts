@@ -14,7 +14,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEV_CUSTODY_ROOT_ENV } from "../../deploy/dev-auth/custody-root.mjs";
 import {
   DEVELOPMENT_SECRET_FILES,
   DEVELOPMENT_SECRET_STORES,
@@ -213,5 +214,34 @@ describe("DEV-04 persistent development secret custody", () => {
       readFile(join(custodyRoot, relativePath))
     ));
     expect(after).toEqual(materials);
+  });
+
+  it("requires the custody parent to be exactly 0700, refusing rather than repairing it (B4 item 6)", async () => {
+    const repositoryRoot = await makeRepositoryRoot();
+    const localRoot = join(repositoryRoot, ".local");
+    await mkdir(localRoot, { mode: 0o755 });
+    await expect(generateDevelopmentSecretFiles({ repositoryRoot }))
+      .rejects.toThrow("DEV_AUTH_CUSTODY_ROOT_INVALID");
+    expect((await lstat(localRoot)).mode & 0o777).toBe(0o755);
+    expect(await readdir(localRoot)).toEqual([]);
+  });
+
+  it("publishes custody under DEBATEAI_DEV_CUSTODY_ROOT and writes nothing under the repository", async () => {
+    const repositoryRoot = await makeRepositoryRoot();
+    const custodyParent = join(await makeRepositoryRoot(), "keys");
+    const custodyRoot = join(custodyParent, "dev-auth");
+    vi.stubEnv(DEV_CUSTODY_ROOT_ENV, custodyRoot);
+    try {
+      const receipt = await generateDevelopmentSecretFiles({ repositoryRoot });
+      expect(receipt.custodyRoot).toBe(custodyRoot);
+      expect((await lstat(custodyParent)).mode & 0o777).toBe(0o700);
+      expect((await lstat(custodyRoot)).mode & 0o777).toBe(0o700);
+      expect(await readdir(repositoryRoot)).toEqual([]);
+      for (const { relativePath } of DEVELOPMENT_SECRET_FILES) {
+        expect((await lstat(join(custodyRoot, relativePath))).mode & 0o777).toBe(0o600);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

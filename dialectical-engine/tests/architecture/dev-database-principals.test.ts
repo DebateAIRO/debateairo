@@ -12,7 +12,7 @@ describe("DEV-03 development database principal provisioning source contract", (
       .toBe("tsx apps/runner/src/dev-database-principals-cli.ts");
     expect(gitignore.split("\n")).toContain(".local/dev-auth/");
     expect(cli).toContain("loadMigrationEnvironment()");
-    expect(cli).toContain('resolve(process.cwd(), ".local/dev-auth/database-principals.env")');
+    expect(cli).toContain('join(resolveDevCustodyRoot(process.cwd()), "database-principals.env")');
     expect(cli).not.toContain("DEV_AUTH_DATABASE_CREDENTIALS_PATH");
     expect(cli).toContain("DEV_DATABASE_PRINCIPALS_READY=");
     expect(cli).not.toMatch(/console\.(?:log|error)\([^)]*(?:DATABASE_URL|password)/s);

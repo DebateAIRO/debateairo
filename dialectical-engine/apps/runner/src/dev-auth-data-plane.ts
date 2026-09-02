@@ -4,6 +4,7 @@ import { delimiter, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
 const LOCAL_MIGRATOR_DATABASE_URL =
@@ -370,7 +371,7 @@ export function createDevelopmentAuthDataPlaneOperations(
         cwd,
         baseEnvironment: commandEnvironment,
         environment: {
-          DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(cwd, ".local/dev-auth/mail")
+          DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(resolveDevCustodyRoot(cwd, commandEnvironment), "mail")
         },
         failureCode: "DEV_AUTH_DATA_PLANE_MAIL_FAILED"
       });
