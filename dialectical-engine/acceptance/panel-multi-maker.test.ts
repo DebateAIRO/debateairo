@@ -445,6 +445,35 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
         // the candidate band the runtime started from.
         expect(row.disagreement.certaintyBand).not.toBe(ACCEPTANCE_CANDIDATE_BAND);
       }
+
+      /**
+       * S08 / board F30 — the END-TO-END leg: the step-down above is RECORDED
+       * on every receipt, and the SERVED ANSWER must now carry it too.
+       *
+       * Before S08 this assertion failed: `ledger.reduced_judgement` said
+       * `certaintyEffect: DOWNGRADED` while `serve.answer.confidence_band` was
+       * still the candidate band, because nothing consumed T3's record. A
+       * downgrade that is recorded and never applied is the silent degradation
+       * the goal repeals, so the served band is the assertion that matters.
+       *
+       * The expectation is read from T16's sealed row through the same
+       * `controls` the receipt assertions use — never a band literal.
+       */
+      const served = await runtime.api.inject({
+        method: "GET",
+        url: `/v1/runs/${runId}/answer`,
+        headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, false)
+      });
+      expect(served.statusCode).toBe(200);
+      const servedPayload = served.json() as {
+        confidence_band: string;
+        condition_marks: readonly string[];
+      };
+      expect(servedPayload.confidence_band)
+        .toBe(controls.oneStepDown[ACCEPTANCE_CANDIDATE_BAND]);
+      expect(servedPayload.confidence_band).not.toBe(ACCEPTANCE_CANDIDATE_BAND);
+      // The band the asker sees and the mark that explains it agree.
+      expect(servedPayload.condition_marks).toContain("PANEL-DEGRADED-SINGLE-VOICE");
     } finally {
       primaryProvider.failAssessCalls(false);
       secondProvider.failAssessCalls(false);

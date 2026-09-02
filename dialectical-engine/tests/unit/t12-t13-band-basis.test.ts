@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ENGINE_BAND_ORDER } from "@debateai/register";
-import { applySingleLineageBandCap } from "@debateai/runner";
+import { ENGINE_BAND_ORDER, buildOneStepDownBands } from "@debateai/register";
+import {
+  PANEL_DEGRADED_SINGLE_VOICE_MARK,
+  applyPanelDegradedBandStepDown,
+  applySingleLineageBandCap
+} from "@debateai/runner";
+import { auditSurfaceReachability } from "../../tools/orphan-audit/src/index.js";
 import {
   buildFactBundle,
   deriveBandCeiling,
@@ -319,5 +324,117 @@ describe("T12 — the mono-maker one-step-down is preserved", () => {
   it("stops loudly when no ruled band exists below the candidate", () => {
     expect(() => applySingleLineageBandCap(CEILING_BAND, ceilingRow()))
       .toThrowError(expect.objectContaining({ code: "CRITIC_UNAVAILABLE_BAND_CAP_UNRESOLVED" }));
+  });
+});
+
+/**
+ * Board F30 (packet AMENDMENT 2026-09-02) — T3 RECORDS the degraded-panel
+ * step-down on `ledger.reduced_judgement.disagreement`; until this change
+ * nothing CONSUMED it, so a served answer shipped the full band while its own
+ * receipt said DOWNGRADED. The band lane is where the enforcement belongs.
+ *
+ * The mapping is T16's sealed `downgradeBands` row, built here by the register's
+ * own builder over the sealed vocabulary — never a band literal (J1).
+ */
+const SEALED_ONE_STEP_DOWN = buildOneStepDownBands(ENGINE_BAND_ORDER);
+const PANEL_PREDICATE_REF = "test-layer:T16#downgradeBands";
+
+const degradation = (subjectRef: string, mark: string) => ({ subjectRef, mark });
+
+describe("F30 — the served band consumes T3's recorded degraded-panel step-down", () => {
+  it("steps the served root's band down one place through T16's sealed row", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: TOP_BAND,
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: SEALED_ONE_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(decision.certaintyBand).toBe(SEALED_ONE_STEP_DOWN[TOP_BAND]);
+    expect(decision.certaintyBand).toBe(CEILING_BAND);
+    // A real move, not the identity - the same guard T3's own receipt test uses.
+    expect(decision.certaintyBand).not.toBe(TOP_BAND);
+    expect(decision.certaintyEffect).toBe("DOWNGRADED");
+  });
+
+  it("names WHAT decided: the sealed row as predicate, the served root's own mark as observation", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: TOP_BAND,
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: SEALED_ONE_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(decision.predicateRef).toBe(PANEL_PREDICATE_REF);
+    expect(decision.observationRef).toContain(PANEL_DEGRADED_SINGLE_VOICE_MARK);
+    expect(decision.observationRef).toContain("node:served-root");
+  });
+
+  it("leaves the band alone when no panel degraded", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: TOP_BAND,
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [],
+      oneStepDown: SEALED_ONE_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(decision.certaintyBand).toBe(TOP_BAND);
+    expect(decision.certaintyEffect).toBe("UNCHANGED");
+    expect(decision.observationRef).toBeNull();
+  });
+
+  it("leaves the band alone when the degraded panel belongs to a node that is not the served root", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: TOP_BAND,
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:other-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: SEALED_ONE_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(decision.certaintyBand).toBe(TOP_BAND);
+    expect(decision.certaintyEffect).toBe("UNCHANGED");
+  });
+
+  it("does not fire on a PANEL-PARTIAL mark - only the single-voice collapse steps the band", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: TOP_BAND,
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", "PANEL-PARTIAL")],
+      oneStepDown: SEALED_ONE_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(decision.certaintyBand).toBe(TOP_BAND);
+    expect(decision.certaintyEffect).toBe("UNCHANGED");
+  });
+
+  it("is idempotent at the floor: a band with no ruled band below it stays put", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: CEILING_BAND,
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: SEALED_ONE_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    // T16 seals the weakest band as its own one-step-down target, so the floor
+    // is a fixed point rather than a throw - the disclosure has already fired.
+    expect(decision.certaintyBand).toBe(CEILING_BAND);
+  });
+});
+
+describe("F30 — the consumer is on the SHIPPED entry point, not only exported", () => {
+  it("reaches applyPanelDegradedBandStepDown from the declared production entry points", async () => {
+    const reachability = await auditSurfaceReachability();
+
+    expect(reachability.blocking).toEqual([]);
+    expect(reachability.declaredEntryPointFiles).toContain("apps/runner/src/main.ts");
+    // Declared-but-uncalled is NOT reachable: this fails if the arm is exported
+    // and never wired, which is exactly the F30 defect one level up.
+    expect(reachability.reachableCallables).toContain("applyPanelDegradedBandStepDown");
   });
 });
