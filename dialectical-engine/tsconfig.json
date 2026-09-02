@@ -27,6 +27,7 @@
     "apps/**/*.ts",
     "packages/**/*.ts",
     "tools/**/*.ts",
+    "acceptance/**/*.ts",
     "tests/**/*.ts",
     "vitest.config.ts",
     "drizzle.config.ts"

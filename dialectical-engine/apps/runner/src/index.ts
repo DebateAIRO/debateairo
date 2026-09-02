@@ -451,6 +451,53 @@ export type ReviewCatchUpRefusal =
   | "CATCH_UP_WOULD_DOWNGRADE"
   | "CATCH_UP_NUMBER_WOULD_MOVE";
 
+/** The previous answer's class-H/class-D row, as the catch-up lane reads it. */
+export interface StoredUnjudgedDisclosure {
+  readonly call_site_key: string | null;
+  readonly terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
+  /** Deliberately widened: this value arrives from a stored row, not from a literal. */
+  readonly review_outcome: string | null;
+}
+
+/**
+ * T6 / S4-2 / J14 (+ ADDENDUM) — the catch-up lane's read of the previous
+ * answer's disclosure, and its refusal to propagate a malformed one.
+ *
+ * `prepareVersion` rebuilds every class-H/class-D record from the PREVIOUS
+ * answer's records, so whatever shape it finds there it will write again. Two
+ * lawful shapes exist: a transport outcome (the review never landed) or the
+ * review outcome `cannot-assess` (it landed and could not judge). Anything
+ * else — both at once, neither, a review arm naming an outcome that REACHED a
+ * judgement, a record with no call site, or no record at all for a node the
+ * standing projection set aside — is a typed loud stop.
+ *
+ * `agree` and `dispute` are refused here as well as at the contract, the writer
+ * and the SQL layers (J14 addendum 1). The rule is restated at this layer
+ * rather than assumed from the others because this is the one layer that reads
+ * a row written by an EARLIER version of the schema, and the whole point of the
+ * catch-up lane is that it runs long after the answer it rebuilds.
+ */
+export function assertUnjudgedDisclosureShape(
+  nodeId: string,
+  stored: StoredUnjudgedDisclosure | undefined
+): {
+  readonly callSiteKey: string;
+  readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED" | null;
+  readonly reviewOutcome: "cannot-assess" | null;
+} {
+  const namesOneTrueReason = stored !== undefined
+    && (stored.terminal_transport_outcome === null) !== (stored.review_outcome === null)
+    && (stored.review_outcome === null || stored.review_outcome === "cannot-assess");
+  if (stored === undefined || stored.call_site_key === null || !namesOneTrueReason) {
+    throw new TypedDomainError("CATCH_UP_DISCLOSURE_MISMATCH", nodeId);
+  }
+  return Object.freeze({
+    callSiteKey: stored.call_site_key,
+    terminalTransportOutcome: stored.terminal_transport_outcome,
+    reviewOutcome: stored.review_outcome === null ? null : "cannot-assess" as const
+  });
+}
+
 /**
  * T5 r3 (codex r2 B1) — the review and the bearings that ONE call returned are
  * committed as a single fact, or not at all.
@@ -865,32 +912,54 @@ export function createPostgresReviewCatchUpDependencies(input: {
           servedRootRule: record.served_root_rule, affectedNodeIds: record.affected_node_ids,
           callSiteKey: record.call_site_key, plannedLegCount: record.planned_leg_count,
           terminalTransportOutcome: record.terminal_transport_outcome,
+          reviewOutcome: record.review_outcome,
           hiddenStrength: record.hidden_strength,
           hiddenScoreThreshold: record.hidden_score_threshold,
           hiddenScoreThresholdSourceRef: record.hidden_score_threshold_source_ref,
           excludedFromServedNumber: record.excluded_from_served_number,
           judgedBasisCount: record.judged_basis_count
         }));
-      const transportFields = (nodeId: string) => {
-        const old = oldReviewRecords.get(nodeId);
-        if (old?.call_site_key === null || old?.terminal_transport_outcome === null || old === undefined) {
-          throw new TypedDomainError("CATCH_UP_DISCLOSURE_MISMATCH", nodeId);
-        }
-        return { callSiteKey: old.call_site_key, terminalTransportOutcome: old.terminal_transport_outcome } as const;
+      /**
+       * T6 / S4-2 / J14 — the previous answer's disclosure is the provenance
+       * this version rebuilds from, and it now has TWO lawful shapes: a
+       * transport outcome (the review never landed) or a review outcome (it
+       * landed and could not judge). A record naming neither, or naming both,
+       * is still a typed loud stop — so is a hidden node with no record at all,
+       * which is what every run carrying a cannot-assess review used to be.
+       */
+      const disclosureFields = (nodeId: string) =>
+        assertUnjudgedDisclosureShape(nodeId, oldReviewRecords.get(nodeId));
+      // The sentence follows the ROUTE, never the version being written: a
+      // cannot-assess node must not be told its transport was exhausted, and
+      // its lift is not a retry — `UNIQUE (node_id)` refuses a second review.
+      const unjudgedDisclosure = (nodeId: string, kind: "hidden" | "derived") => {
+        const fields = disclosureFields(nodeId);
+        const unassessed = fields.reviewOutcome !== null;
+        return {
+          ...fields,
+          reason: kind === "hidden"
+            ? (unassessed
+              ? "The cross-maker review returned cannot-assess; the node has no judged basis and is excluded from the served number"
+              : "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number")
+            : (unassessed
+              ? "This node's own cross-house review returned cannot-assess; it serves on the authority of its judged arguments, not on its own unjudged assertion"
+              : "This node's own cross-house review did not land; it serves on the authority of its judged arguments, not on its own unreviewed assertion"),
+          liftPath: unassessed
+            ? "Ask again with material a cross-maker reviewer can assess; this run's review is sealed and cannot be retried"
+            : "Restore a valid cross-maker review"
+        } as const;
       };
       const reviewRecords: PreservedConditionMarkRecord[] = [
         ...standing.hiddenNodeIds.map((nodeId) => ({
           mark: "HIDDEN-UNJUDGEABLE" as const, scope: "node" as const, subjectRef: nodeId,
-          reason: "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number",
-          liftPath: "Restore a valid cross-maker review", servedRootRule: null,
-          affectedNodeIds: Object.freeze([nodeId]), ...transportFields(nodeId),
+          servedRootRule: null,
+          affectedNodeIds: Object.freeze([nodeId]), ...unjudgedDisclosure(nodeId, "hidden"),
           excludedFromServedNumber: true
         })),
         ...standing.derivedStandingNodeIds.map((nodeId) => ({
           mark: "DERIVED-STANDING-UNREVIEWED" as const, scope: "node" as const, subjectRef: nodeId,
-          reason: "This node's own cross-house review did not land; it serves on the authority of its judged arguments, not on its own unreviewed assertion",
-          liftPath: "Restore a valid cross-maker review", servedRootRule: null,
-          affectedNodeIds: Object.freeze([nodeId]), ...transportFields(nodeId),
+          servedRootRule: null,
+          affectedNodeIds: Object.freeze([nodeId]), ...unjudgedDisclosure(nodeId, "derived"),
           excludedFromServedNumber: false, judgedBasisCount: standing.judgedBasisCounts[nodeId]!
         }))
       ];
@@ -2150,6 +2219,19 @@ export class WalkingSkeletonRunner {
       readonly nodeId: string;
       readonly record: HaltedExpansionRecord;
     }> = [];
+    /**
+     * T6 / S4-2 / J14 — the SECOND route into class H/D. The review LANDED and
+     * returned `cannot-assess`, so the node carries no judged basis, exactly as
+     * if the review had died — but the call succeeded, so there is no transport
+     * outcome to name and `hiddenReviewRecords` above cannot hold it. The call
+     * site is real and is captured at the site that made the call, never
+     * reconstructed from the node id.
+     */
+    const unassessedReviewRecords: Array<{
+      readonly nodeId: string;
+      readonly callSiteKey: string;
+      readonly outcome: "cannot-assess";
+    }> = [];
 
     const authorPosition = async (input: {
       readonly authorIndex: number;
@@ -2413,6 +2495,13 @@ export class WalkingSkeletonRunner {
             reasons: review.reasons,
             measurements: review.edgeMeasurements
           });
+          // T6/J14: recorded only AFTER the review commits, so the disclosure
+          // can never name an outcome the ledger does not hold.
+          if (review.outcome === "cannot-assess") {
+            unassessedReviewRecords.push({
+              nodeId: authoredNode.nodeId, callSiteKey, outcome: review.outcome
+            });
+          }
         } catch (error) {
           if (error instanceof TypedDomainError && [
             "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -2713,8 +2802,47 @@ export class WalkingSkeletonRunner {
     const monoMakerConditionMarks = effectiveMakerCount === 1
       ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
       : [] as const;
-    const classHReviewRecords = hiddenReviewRecords.filter(({ nodeId }) => classHNodeIds.has(nodeId));
-    const classDReviewRecords = hiddenReviewRecords.filter(({ nodeId }) => classDNodeIds.has(nodeId));
+    /**
+     * T6 / S4-2 / J14 — the two routes into class H/D, carried as ONE list.
+     *
+     * The standing consequence is identical either way, so the MARK is the same
+     * and the class is not split; what differs is the REASON, which the record
+     * has always existed to carry. Each route states its own truth: the
+     * transport route names a transport outcome and a lift that is real (retry
+     * the review), the cannot-assess route names the review outcome and a lift
+     * that is honest about `UNIQUE (node_id)` — this run's review is sealed and
+     * no retry can reach it.
+     */
+    const unjudgedReviewDisclosures: readonly {
+      readonly nodeId: string;
+      readonly callSiteKey: string;
+      readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED" | null;
+      readonly reviewOutcome: "cannot-assess" | null;
+      readonly hiddenReason: string;
+      readonly derivedReason: string;
+      readonly liftPath: string;
+    }[] = Object.freeze([
+      ...hiddenReviewRecords.map(({ nodeId, record }) => Object.freeze({
+        nodeId,
+        callSiteKey: record.callSiteKey,
+        terminalTransportOutcome: record.terminalTransportOutcome,
+        reviewOutcome: null,
+        hiddenReason: "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number",
+        derivedReason: "This node's own cross-house review did not land; it serves on the authority of its judged arguments, not on its own unreviewed assertion",
+        liftPath: "Restore a valid cross-maker review"
+      })),
+      ...unassessedReviewRecords.map(({ nodeId, callSiteKey, outcome }) => Object.freeze({
+        nodeId,
+        callSiteKey,
+        terminalTransportOutcome: null,
+        reviewOutcome: outcome,
+        hiddenReason: "The cross-maker review returned cannot-assess; the node has no judged basis and is excluded from the served number",
+        derivedReason: "This node's own cross-house review returned cannot-assess; it serves on the authority of its judged arguments, not on its own unjudged assertion",
+        liftPath: "Ask again with material a cross-maker reviewer can assess; this run's review is sealed and cannot be retried"
+      }))
+    ]);
+    const classHReviewRecords = unjudgedReviewDisclosures.filter(({ nodeId }) => classHNodeIds.has(nodeId));
+    const classDReviewRecords = unjudgedReviewDisclosures.filter(({ nodeId }) => classDNodeIds.has(nodeId));
     const classHSubtree = (rootNodeId: string): readonly string[] => {
       const affected = new Set([rootNodeId]);
       let changed = true;
@@ -2798,38 +2926,40 @@ export class WalkingSkeletonRunner {
         servedRootRule: null,
         affectedNodeIds: Object.freeze([servedRoot.nodeId])
       })]),
-      ...classHReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({
+      ...classHReviewRecords.map((disclosure): ConditionMarkRecord => Object.freeze({
         mark: "HIDDEN-UNJUDGEABLE",
         scope: "node",
-        subjectRef: nodeId,
-        reason: "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number",
-        liftPath: "Restore a valid cross-maker review",
+        subjectRef: disclosure.nodeId,
+        reason: disclosure.hiddenReason,
+        liftPath: disclosure.liftPath,
         servedRootRule: null,
-        affectedNodeIds: classHSubtree(nodeId),
-        callSiteKey: record.callSiteKey,
+        affectedNodeIds: classHSubtree(disclosure.nodeId),
+        callSiteKey: disclosure.callSiteKey,
         plannedLegCount: null,
-        terminalTransportOutcome: record.terminalTransportOutcome,
+        terminalTransportOutcome: disclosure.terminalTransportOutcome,
+        reviewOutcome: disclosure.reviewOutcome,
         hiddenStrength: null,
         hiddenScoreThreshold: null,
         hiddenScoreThresholdSourceRef: null,
         excludedFromServedNumber: true
       })),
-      ...classDReviewRecords.map(({ nodeId, record }): ConditionMarkRecord => Object.freeze({
+      ...classDReviewRecords.map((disclosure): ConditionMarkRecord => Object.freeze({
         mark: "DERIVED-STANDING-UNREVIEWED",
         scope: "node",
-        subjectRef: nodeId,
-        reason: "This node's own cross-house review did not land; it serves on the authority of its judged arguments, not on its own unreviewed assertion",
-        liftPath: "Restore a valid cross-maker review",
+        subjectRef: disclosure.nodeId,
+        reason: disclosure.derivedReason,
+        liftPath: disclosure.liftPath,
         servedRootRule: null,
-        affectedNodeIds: Object.freeze([nodeId]),
-        callSiteKey: record.callSiteKey,
+        affectedNodeIds: Object.freeze([disclosure.nodeId]),
+        callSiteKey: disclosure.callSiteKey,
         plannedLegCount: null,
-        terminalTransportOutcome: record.terminalTransportOutcome,
+        terminalTransportOutcome: disclosure.terminalTransportOutcome,
+        reviewOutcome: disclosure.reviewOutcome,
         hiddenStrength: null,
         hiddenScoreThreshold: null,
         hiddenScoreThresholdSourceRef: null,
         excludedFromServedNumber: false,
-        judgedBasisCount: standing.judgedBasisCounts[nodeId]!
+        judgedBasisCount: standing.judgedBasisCounts[disclosure.nodeId]!
       })),
       ...lowScoreRows.map((row): ConditionMarkRecord => Object.freeze({
         mark: "HIDDEN-LOW-SCORE",
@@ -2956,12 +3086,58 @@ export class WalkingSkeletonRunner {
         protectedCoreVerified: servedRoot.restatementStatus === "PASS"
       });
     };
+    /**
+     * T6 / S4-2 — the review outcome reaches the certainty band.
+     *
+     * A cross-maker review that came back `dispute` is a DECLARED disagreement
+     * about the debate's content, so it fires the same primitive T3's panel
+     * spread fires: the band steps down through the SEALED one-step-down row,
+     * never through arithmetic this file performs. It is read after every
+     * review has landed, because that is the first moment the run knows what
+     * the reviewers said.
+     *
+     * The provenance names what actually decided: the sealed downgrade-bands
+     * row is the predicate consulted, and the observation is the node_review
+     * rows themselves. The panel's numeric disagreement threshold plays NO
+     * part on this path, so citing it here would be a false provenance.
+     *
+     * Deliberately a function called on the serve-gate path only. The band —
+     * mono-lineage cap included — was already computed nowhere else, and
+     * `applySingleLineageBandCap` can stop loudly; hoisting it would make an
+     * envelope-terminal answer that never needed a band fail for the want of
+     * one, which is a behaviour change this task did not ask for.
+     */
+    const servedCandidateConfidenceBand = async (): Promise<string> => {
+      const capped = effectiveMakerCount === 1
+        ? applySingleLineageBandCap(servePolicy.candidateConfidenceBand, servePolicy.bandCeiling)
+        : servePolicy.candidateConfidenceBand;
+      const disputedNodeIds = await this.#judgements.readDisputedNodeIds(run.runId);
+      if (disputedNodeIds.length === 0) return capped;
+      // A dispute can only exist where a cross-maker review ran, so the panel
+      // rows are sealed whenever this fires (a mono-maker run reviews nothing).
+      // The guard states that rather than assuming it.
+      if (panelPolicy === undefined) {
+        throw new TypedDomainError(
+          "PANEL_WEIGHTING_UNRESOLVED",
+          "J12: a disputed cross-maker review requires the sealed downgrade-bands row to declare its certainty downgrade"
+        );
+      }
+      const steppedDown = panelPolicy.oneStepDown[capped] ?? null;
+      return applyDeclaredDisagreement({
+        fires: steppedDown !== null,
+        predicateRef: panelPolicy.sourceRefs.downgradeBands ?? panelPolicy.unmappedReason,
+        observationRef: `ledger.node_review:dispute:${disputedNodeIds.join(",")}`,
+        certaintyBand: capped,
+        downgradedBand: steppedDown
+      }).certaintyBand ?? capped;
+    };
     const initialEnvelopeDecision = await evaluateEnvelope();
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
     if (initialEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
       result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
+      const candidateConfidenceBand = await servedCandidateConfidenceBand();
       try {
         result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
       nodes: servedNodes,
@@ -2969,9 +3145,9 @@ export class WalkingSkeletonRunner {
       maxRecompose: this.settings.maxRecompose,
       compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
       strangerSampleRate: run.strangerSampleRate,
-      candidateConfidenceBand: effectiveMakerCount === 1
-        ? applySingleLineageBandCap(servePolicy.candidateConfidenceBand, servePolicy.bandCeiling)
-        : servePolicy.candidateConfidenceBand
+      // T6 / S4-2: the mono-lineage cap and, on top of it, the declared
+      // downgrade a disputed cross-maker review fires.
+      candidateConfidenceBand
     }, {
       measureCompositionBundle: (facts) => Buffer.byteLength(JSON.stringify(facts), "utf8"),
       compose: async (facts, attempt) => {

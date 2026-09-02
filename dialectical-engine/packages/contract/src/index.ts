@@ -475,6 +475,68 @@ export const EdgeSchema = z.object({
 }).strict();
 export type Edge = z.infer<typeof EdgeSchema>;
 
+/**
+ * T6 / S4-2 / J14 (+ ADDENDUM) — the typed condition-mark record, extracted so
+ * the contract layer's own rules can be probed directly rather than only
+ * through a whole `Answer`.
+ *
+ * DR-139(4): each record names its subject (an OWED-CHECK-UNEXECUTED record
+ * names the battery row whose owed check has no recorded execution at
+ * terminal).
+ */
+export const ConditionMarkRecordSchema = z.object({
+  mark: ConditionMarkSchema,
+  scope: z.enum(["answer", "node"]),
+  subject_ref: z.string().min(1),
+  reason: z.string().min(1),
+  lift_path: z.string().nullable(),
+  // T10 / codex r1 B3 / J17: the READ vocabulary is the rule HISTORY, not the
+  // live rule alone. Answers sealed before migration 0055 carry the retired
+  // DR-161 value and 0055 preserves those rows rather than relabelling them, so
+  // a contract accepting only the live rule turned every pre-0055 multi-maker
+  // answer into a schema failure on both answer routes. Widening breaks no
+  // consumer: nothing switches or compares on this field.
+  served_root_rule: z.enum(SERVED_ROOT_RULE_HISTORY).nullable(),
+  call_site_key: z.string().min(1).nullable().default(null),
+  planned_leg_count: z.number().int().nonnegative().nullable().default(null),
+  terminal_transport_outcome: z.enum(["TIMED_OUT", "FAILED"]).nullable().default(null),
+  // T6 / S4-2 / J14: the second route into class H/D. A review that came back
+  // `cannot-assess` reached its reviewer, so it has no transport outcome; the
+  // reason it leaves the node unjudged is the outcome itself.
+  review_outcome: z.enum(["cannot-assess"]).nullable().default(null),
+  hidden_strength: z.number().min(0).max(1).nullable().default(null),
+  hidden_score_threshold: z.number().min(0).max(1).nullable().default(null),
+  hidden_score_threshold_source_ref: z.string().min(1).nullable().default(null),
+  excluded_from_served_number: z.boolean().nullable().default(null),
+  judged_basis_count: z.number().int().positive().nullable().default(null),
+  affected_node_ids: z.array(z.string().min(1)).default([])
+}).strict().superRefine((record, context) => {
+  // T6/J14: EXACTLY ONE reason. A transport outcome (the review never landed)
+  // or a review outcome (it landed and could not judge) — never both, never
+  // neither. Stated as an XOR so the transport route keeps the requirement it
+  // has always had instead of the second route weakening it into optional.
+  const namesOneUnjudgedReason = (record.terminal_transport_outcome === null)
+    !== (record.review_outcome === null);
+  if (record.mark === "HIDDEN-UNJUDGEABLE" && (
+    record.call_site_key === null || !namesOneUnjudgedReason
+    || record.excluded_from_served_number !== true || record.affected_node_ids.length === 0
+  )) context.addIssue({ code: "custom", message: "Class H requires a call site, exactly one unjudged reason, and affected hidden nodes" });
+  if (record.mark === "HIDDEN-LOW-SCORE" && (
+    record.hidden_strength === null || record.hidden_score_threshold === null
+    || record.hidden_score_threshold_source_ref === null
+    || record.excluded_from_served_number !== false || record.affected_node_ids.length === 0
+  )) context.addIssue({ code: "custom", message: "Class L requires threshold provenance, presentation-only status, and affected hidden nodes" });
+  if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
+    record.call_site_key === null || !namesOneUnjudgedReason
+    || record.excluded_from_served_number !== false
+    || record.judged_basis_count === null || record.affected_node_ids.length === 0
+  )) context.addIssue({ code: "custom", message: "Class D requires unjudged-review provenance and a positive judged basis" });
+  if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
+    record.call_site_key === null || record.planned_leg_count === null
+    || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0
+  )) context.addIssue({ code: "custom", message: "Class N requires halted-call provenance and a surviving parent" });
+});
+
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
@@ -500,48 +562,7 @@ export const AnswerSchema = z.object({
   // DR-139(4): typed loud condition-mark records on the served answer —
   // each names its subject (an OWED-CHECK-UNEXECUTED record names the battery
   // row whose owed check has no recorded execution at terminal).
-  condition_mark_records: z.array(z.object({
-    mark: ConditionMarkSchema,
-    scope: z.enum(["answer", "node"]),
-    subject_ref: z.string().min(1),
-    reason: z.string().min(1),
-    lift_path: z.string().nullable(),
-    // T10 / codex r1 B3: the READ vocabulary is the rule HISTORY, not the live
-    // rule alone. Answers sealed before migration 0055 carry the retired
-    // DR-161 value, and 0055 preserves those rows rather than relabelling them
-    // — so a contract that accepted only the live rule turned every pre-0055
-    // multi-maker answer into a schema failure on both answer routes. Widening
-    // here breaks no consumer: nothing switches or compares on this field.
-    served_root_rule: z.enum(SERVED_ROOT_RULE_HISTORY).nullable(),
-    call_site_key: z.string().min(1).nullable().default(null),
-    planned_leg_count: z.number().int().nonnegative().nullable().default(null),
-    terminal_transport_outcome: z.enum(["TIMED_OUT", "FAILED"]).nullable().default(null),
-    hidden_strength: z.number().min(0).max(1).nullable().default(null),
-    hidden_score_threshold: z.number().min(0).max(1).nullable().default(null),
-    hidden_score_threshold_source_ref: z.string().min(1).nullable().default(null),
-    excluded_from_served_number: z.boolean().nullable().default(null),
-    judged_basis_count: z.number().int().positive().nullable().default(null),
-    affected_node_ids: z.array(z.string().min(1)).default([])
-  }).strict().superRefine((record, context) => {
-    if (record.mark === "HIDDEN-UNJUDGEABLE" && (
-      record.call_site_key === null || record.terminal_transport_outcome === null
-      || record.excluded_from_served_number !== true || record.affected_node_ids.length === 0
-    )) context.addIssue({ code: "custom", message: "Class H requires transport provenance and affected hidden nodes" });
-    if (record.mark === "HIDDEN-LOW-SCORE" && (
-      record.hidden_strength === null || record.hidden_score_threshold === null
-      || record.hidden_score_threshold_source_ref === null
-      || record.excluded_from_served_number !== false || record.affected_node_ids.length === 0
-    )) context.addIssue({ code: "custom", message: "Class L requires threshold provenance, presentation-only status, and affected hidden nodes" });
-    if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
-      record.call_site_key === null || record.terminal_transport_outcome === null
-      || record.excluded_from_served_number !== false
-      || record.judged_basis_count === null || record.affected_node_ids.length === 0
-    )) context.addIssue({ code: "custom", message: "Class D requires failed-review provenance and a positive judged basis" });
-    if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
-      record.call_site_key === null || record.planned_leg_count === null
-      || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0
-    )) context.addIssue({ code: "custom", message: "Class N requires halted-call provenance and a surviving parent" });
-  })),
+  condition_mark_records: z.array(ConditionMarkRecordSchema),
   reversal_point: z.string().min(1),
   builds_on_previous: z.object({
     value: z.boolean(),
