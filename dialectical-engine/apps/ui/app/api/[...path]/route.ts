@@ -35,6 +35,8 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
 ] as const);
 /** L3-F1: aligned with the API's Fastify bodyLimit (B5); the proxy never buffers more. */
 const MAX_PROXY_BODY_BYTES = 1_048_576;
+/** L3-F12: ceiling for a non-stream upstream request; event streams are open-ended by design. */
+const UPSTREAM_TIMEOUT_MS = 30_000;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
@@ -176,6 +178,19 @@ async function readBoundedBody(request: Request): Promise<BufferSource | null> {
   return body;
 }
 
+/**
+ * L3-F12: the upstream request never outlives the client's. The run event
+ * feed (accept: text/event-stream, or a path ending in /events) follows the
+ * client signal alone; everything else also gets a 30 s ceiling.
+ */
+function upstreamSignal(request: Request, path: readonly string[]): AbortSignal {
+  const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
+    || path[path.length - 1] === "events";
+  return streaming
+    ? request.signal
+    : AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
+}
+
 async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {
   const { path } = await context.params;
   const target = createTargetUrl(request, path);
@@ -183,21 +198,28 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
 
   // exactOptionalPropertyTypes: a bodyless method must OMIT body, not pass
   // `undefined` for it, so the two shapes are built separately.
+  const signal = upstreamSignal(request, path);
   let init: RequestInit;
   if (BODYLESS_METHODS.has(request.method)) {
-    init = { method: request.method, headers, cache: "no-store" };
+    init = { method: request.method, headers, cache: "no-store", signal };
   } else {
     const body = await readBoundedBody(request);
     if (body === null) return payloadTooLarge();
-    init = { method: request.method, headers, body, cache: "no-store" };
+    init = { method: request.method, headers, body, cache: "no-store", signal };
   }
 
   let response: Response;
   try {
     response = await fetch(target, init);
-  } catch {
-    // fetch rejected before an HTTP response existed. 502 states only the
-    // observed proxy fact; it never fabricates an API-side verdict (DR-115).
+  } catch (failure) {
+    // fetch rejected before an HTTP response existed. 502/504 state only the
+    // observed proxy fact; they never fabricate an API-side verdict (DR-115).
+    if (failure instanceof Error && failure.name === "TimeoutError") {
+      return Response.json({
+        error: "API_UPSTREAM_TIMEOUT",
+        message: "The API upstream did not answer the proxy request in time."
+      }, { status: 504 });
+    }
     return Response.json({
       error: "API_UPSTREAM_UNREACHABLE",
       message: "The API upstream did not answer the proxy request."

@@ -158,3 +158,52 @@ test("L3-F1: a 512 KiB body is forwarded unchanged", async () => {
   assert.equal(bytes[1], 7);
   assert.equal(bytes[bytes.length - 1], 9);
 });
+
+// ---------------------------------------------------------------- L3-F12 abort / timeout
+
+test("L3-F12: the upstream fetch follows the client's abort signal and carries a timeout for non-stream requests", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  let seenSignal;
+  globalThis.fetch = async (_url, init) => {
+    seenSignal = init.signal;
+    return new Response("{}");
+  };
+  const { GET } = await loadRoute();
+  const controller = new AbortController();
+  const request = new Request("https://app.test/api/v1/session", { signal: controller.signal });
+  await GET(request, { params: Promise.resolve({ path: ["v1", "session"] }) });
+  assert(seenSignal instanceof AbortSignal, "the upstream fetch carries a signal");
+  assert.notEqual(seenSignal, request.signal, "a composite signal (client abort OR timeout) is used");
+  assert.equal(seenSignal.aborted, false);
+  controller.abort();
+  assert.equal(seenSignal.aborted, true, "aborting the client request aborts the upstream fetch");
+});
+
+test("L3-F12: event streams get only the client's signal, never a timeout", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  let seenSignal;
+  globalThis.fetch = async (_url, init) => {
+    seenSignal = init.signal;
+    return new Response("", { headers: { "content-type": "text/event-stream" } });
+  };
+  const { GET } = await loadRoute();
+  for (const [path, headers] of [
+    [["v1", "runs", "r1", "events"], {}],
+    [["v1", "session"], { accept: "text/event-stream" }]
+  ]) {
+    const request = new Request(`https://app.test/api/${path.join("/")}`, { headers });
+    await GET(request, { params: Promise.resolve({ path }) });
+    assert.equal(seenSignal, request.signal, `${path.join("/")} follows the client signal alone`);
+  }
+});
+
+test("L3-F12: an upstream timeout is reported as 504, never as a fabricated API verdict", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  globalThis.fetch = async () => {
+    throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+  };
+  const { GET } = await loadRoute();
+  const response = await GET(new Request("https://app.test/api/v1/session"), { params: Promise.resolve({ path: ["v1", "session"] }) });
+  assert.equal(response.status, 504);
+  assert.equal((await response.json()).error, "API_UPSTREAM_TIMEOUT");
+});
