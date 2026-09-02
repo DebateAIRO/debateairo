@@ -1,0 +1,61 @@
+# tests/ci-known-red.txt — recorded known-red allowlist for the CI `verify` job (B31).
+#
+# The gate is `pnpm run test:ci-gate` (tools/ci-known-red.mjs). It runs
+# `vitest run tests/unit tests/architecture` and fails ONLY on failures that are not
+# listed here. A listed test that PASSES is reported as a stale entry (warning, exit 0)
+# so this list can only shrink: delete the entry in the commit that turns it green.
+#
+# Format: one exact vitest full name per line — `<file path> > <describe…> > <it>`,
+# exactly as vitest prints it. `#` lines are comments. Every active entry is followed
+# by a `# source:` comment.
+#
+# Provenance of the two sources cited below:
+#   - "dev baseline b5a6b6eb (2026-09-02 full-suite classification)" — measured on this
+#     branch and classified in docs/missions/2026-09-01-security-hardening/VERIFICATION.md
+#     ("Full-suite runs"); names re-measured file-by-file on this worktree 2026-09-02.
+#   - "live-mission authority at dev@1c9578a, three full runs (seed file above)" — the
+#     Algorithm Live Loop mission's T0 baseline pin, failed in all three full runs, scope
+#     filtered to tests/unit + tests/architecture. Seed file:
+#     dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/ci-known-red-mission-seed.txt
+#
+# Deliberately NOT listed: the two load-coupled `registration-database` cases
+# ("deep-queue slack", "post-hash RSS tripwire"). They pass solo; listing them would hide
+# a real regression. They are integration tests and outside this job's directories anyway.
+
+tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification). Left RED on purpose by B20 (379dca7a): `localeCompare` in apps/ui/lib/recommendation.ts is a real defect owned by the apps/ lane.
+tests/architecture/s7-authorization-contract.test.ts > Accounts S7 ownership architecture > hardens every immutable memory scope carrier and derives it from run ownership
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > matches all 28 dependency-edge rows and structural rules 1–5
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > enforces purity, one provider gateway, source-constant, exhaustive-switch and labeled-number gates
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above). Ruled must stay RED (three obs-capture env-read purity violations).
+tests/unit/load01-run-projection.test.ts > LOAD-01 persisted run projection > reads the state only through the owning asker and prioritizes terminal failure
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+tests/unit/obs-l2-s04-zone.test.ts > S04 semantic zone boundary > calls the resolver over the real mount-list source and runs ZI-1..ZI-4
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+tests/unit/obs-l2-s04-zone.test.ts > S04 semantic zone boundary > passes all 15 required falsification mutants
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+tests/unit/pro01-runner-tree.test.ts > PRO-01 depth-driven pro/con expansion > stops a defender call loudly on the pinned RUN_COST_ENVELOPE_EXHAUSTED path
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+tests/unit/s6-content-encryption.test.ts > S6 per-run private content encryption > defaults content encryption off, retires the v1 blind-index path, and requires wrapping-key paths
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above). The runner stub omits REGISTER_VERSION, so the register schema parse throws.
+tests/unit/t9-mode-tokens.test.ts > T9-C3 mode control and document guard > leaves no mode-inert colour literal in the four Wave-0 product files
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification)
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification)
+tests/unit/xrev01-node-review.test.ts > XREV-01 cross-maker node review > stops a review loudly when the ratified model-call envelope is exhausted
+#   source: dev baseline b5a6b6eb (2026-09-02 full-suite classification); live-mission authority at dev@1c9578a, three full runs (seed file above)
+
+# --- From the live-mission seed, NOT active here: the exact name still exists on this
+# --- branch but the test is GREEN on it, so an active entry would warn on every run.
+# --- Measured file-by-file on this worktree, 2026-09-02 (21/21 passed).
+#
+# tests/architecture/s04-contract.test.ts > S04 DDL and runtime attachment contract > DR-128 mints only the claim-type composition structure and wires a loud register read
+#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at readDevelopmentRunnerPolicy (2c4485a4).
+# tests/architecture/s10-carrier-erasure-red.test.ts > S10 carrier erasure — RED acceptance contracts > filters completed private tombstones before any external key load
+#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at core.run_private_content_is_live (3862706d).
+# tests/architecture/s13-contract.test.ts > S13 / cross-run memory architecture > lands append-only memory carriers without a closure job or embedding dependency
+#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at core.lock_owned_live_runs (12175123).
+# tests/unit/v2ui-node-runner.test.ts > HYG-01 v2-ui Node test gate > keeps every active .test.mjs file in the explicit runner manifest
+#   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here and absent from the b5a6b6eb classification; fixed in the 1c9578a→b5a6b6eb range.

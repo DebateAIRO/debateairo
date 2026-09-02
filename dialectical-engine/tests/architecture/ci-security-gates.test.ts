@@ -10,7 +10,15 @@ describe("CI security gates (F-03)", () => {
   });
   it("pins the ruled Node and runs every gate", () => {
     const wf = read(".github/workflows/security.yml");
-    for (const needle of ["node-version: 22.23.1", "pnpm audit --audit-level=moderate", "gitleaks", "pnpm run typecheck", "vitest run tests/unit tests/architecture", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
+    for (const needle of ["node-version: 22.23.1", "pnpm audit --audit-level=moderate", "gitleaks", "pnpm run typecheck", "pnpm run test:ci-gate", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
+  });
+  it("runs the recorded known-red gate, not a raw vitest sweep (B31)", () => {
+    const wf = read(".github/workflows/security.yml");
+    expect(wf).toContain("pnpm run test:ci-gate");
+    expect(wf).not.toContain("vitest run tests/unit tests/architecture");
+    const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
+    expect(scripts["test:ci-gate"]).toBe("node tools/ci-known-red.mjs tests/unit tests/architecture");
+    expect(existsSync(resolve(gitRoot, "dialectical-engine/tests/ci-known-red.txt"))).toBe(true);
   });
   it("dependabot watches npm and actions weekly", () => {
     const db = read(".github/dependabot.yml");

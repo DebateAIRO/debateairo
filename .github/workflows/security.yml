@@ -21,7 +21,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run generate:contract
       - run: pnpm run typecheck
-      - run: pnpm exec vitest run tests/unit tests/architecture
+      # B31: the recorded known-red gate (tools/ci-known-red.mjs + tests/ci-known-red.txt).
+      # It runs the same two directories under vitest but fails only on failures that are not
+      # on the recorded list, and warns when a listed test starts passing.
+      - run: pnpm run test:ci-gate
       - run: pnpm audit --audit-level=moderate
   secrets:
     runs-on: ubuntu-latest
