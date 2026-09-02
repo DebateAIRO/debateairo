@@ -115,4 +115,92 @@ describe("API error envelopes (L1-F5, L1-F6)", () => {
       await close();
     }
   });
+
+  // L1-F6: unknown routes returned Fastify's own {message,error,statusCode}
+  // envelope, fingerprinting the framework and confirming route existence.
+  it("returns a typed NOT_FOUND envelope for an unknown route", async () => {
+    const { api, failureLog, close } = harness();
+    try {
+      const response = await api.inject({
+        method: "GET", url: "/v1/does-not-exist", headers: USER_READ_HEADERS
+      });
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "NOT_FOUND", message: "NOT_FOUND" });
+      expect(response.headers["x-content-type-options"]).toBe("nosniff");
+      expect(requestFailures(failureLog)).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+
+  // `exposeHeadRoutes:false` stays: HEAD and OPTIONS on a *known* url must take
+  // the same typed 404 as any unknown one, so neither confirms the route.
+  it("returns the typed NOT_FOUND envelope for HEAD and OPTIONS on known routes", async () => {
+    const { api, failureLog, close } = harness();
+    try {
+      const options = await api.inject({
+        method: "OPTIONS", url: "/v1/asks", headers: USER_READ_HEADERS
+      });
+      expect(options.statusCode).toBe(404);
+      expect(options.json()).toEqual({ error: "NOT_FOUND", message: "NOT_FOUND" });
+
+      const head = await api.inject({
+        method: "HEAD", url: "/v1/session", headers: USER_READ_HEADERS
+      });
+      expect(head.statusCode).toBe(404);
+      // `inject` does not strip the HEAD body the way a real transport does,
+      // so the envelope itself is observable here and must be the typed one.
+      expect(head.json()).toEqual({ error: "NOT_FOUND", message: "NOT_FOUND" });
+      expect(requestFailures(failureLog)).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+
+  // L1-F6: the 414 reflected the oversized parameter straight back at the caller.
+  it("returns a typed URI_TOO_LONG envelope that never echoes the parameter", async () => {
+    const { api, failureLog, close } = harness();
+    try {
+      const oversizedParam = "a".repeat(101);
+      const response = await api.inject({
+        method: "GET", url: `/v1/answers/${oversizedParam}`, headers: USER_READ_HEADERS
+      });
+      expect(response.statusCode).toBe(414);
+      expect(response.json()).toEqual({ error: "URI_TOO_LONG", message: "URI_TOO_LONG" });
+      expect(response.body).not.toContain(oversizedParam);
+      expect(response.body).not.toContain("FST_ERR");
+      expect(requestFailures(failureLog)).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+
+
+  // A contradicted content-length is refused by the transport, never by a
+  // route. `inject` normalises a non-numeric header away, so the reachable
+  // case is a truncated body; the two framework codes that `inject` cannot
+  // provoke are pinned at the source instead of being faked green.
+  it("maps content-length faults to the constant MALFORMED_REQUEST envelope", async () => {
+    const { api, failureLog, close } = harness();
+    try {
+      const truncated = await api.inject({
+        method: "POST",
+        url: "/v1/asks",
+        headers: { ...USER_MUTATION_HEADERS, ...JSON_HEADERS, "content-length": "3" },
+        payload: JSON.stringify({ question_line: "a lawful question" })
+      });
+      expect(truncated.statusCode).toBe(400);
+      expect(truncated.json()).toEqual({
+        error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST"
+      });
+
+      const source = await readFile("apps/api/src/index.ts", "utf8");
+      for (const code of ["FST_ERR_CTP_INVALID_CONTENT_LENGTH", "FST_ERR_BAD_URL"]) {
+        expect(source, code).toContain(`["${code}", { statusCode: 400, code: "MALFORMED_REQUEST" }]`);
+      }
+      expect(requestFailures(failureLog)).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
 });

@@ -217,14 +217,19 @@ const SECURITY_HEADERS = Object.freeze({
  * is a client fault with a constant envelope; none is a server failure.
  */
 type TransportFaultEnvelope = Readonly<{
-  statusCode: 400 | 413 | 415;
-  code: "MALFORMED_REQUEST" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE";
+  statusCode: 400 | 413 | 414 | 415;
+  code: "MALFORMED_REQUEST" | "PAYLOAD_TOO_LARGE" | "URI_TOO_LONG" | "UNSUPPORTED_MEDIA_TYPE";
 }>;
 const TRANSPORT_FAULT_ENVELOPES: ReadonlyMap<string, TransportFaultEnvelope> = new Map<string, TransportFaultEnvelope>([
   ["FST_ERR_CTP_BODY_TOO_LARGE", { statusCode: 413, code: "PAYLOAD_TOO_LARGE" }],
   ["FST_ERR_CTP_EMPTY_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
   ["FST_ERR_CTP_INVALID_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
-  ["FST_ERR_CTP_INVALID_MEDIA_TYPE", { statusCode: 415, code: "UNSUPPORTED_MEDIA_TYPE" }]
+  ["FST_ERR_CTP_INVALID_MEDIA_TYPE", { statusCode: 415, code: "UNSUPPORTED_MEDIA_TYPE" }],
+  ["FST_ERR_CTP_INVALID_CONTENT_LENGTH", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_BAD_URL", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  // L1-F6: the framework 414 echoed the oversized parameter back at the
+  // caller. The constant envelope reflects nothing.
+  ["FST_ERR_MAX_PARAM_LENGTH", { statusCode: 414, code: "URI_TOO_LONG" }]
 ]);
 
 function passwordWithinRequestBound(body: Readonly<Record<string, unknown>>): boolean {
@@ -396,7 +401,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     exposeHeadRoutes: false,
     bodyLimit: API_BODY_LIMIT_BYTES,
     requestTimeout: API_REQUEST_TIMEOUT_MS,
-    routerOptions: { maxParamLength: API_MAX_PARAM_LENGTH }
+    routerOptions: { maxParamLength: API_MAX_PARAM_LENGTH },
+    /**
+     * Router-level faults never reach `setErrorHandler`: Fastify serializes
+     * them itself, and its 414 quotes the offending URL straight back at the
+     * caller (L1-F6). They take the same constant typed envelopes here, and an
+     * unrecognised one falls back to the constant 400 rather than a framework
+     * body. Nothing here echoes any part of the request.
+     */
+    frameworkErrors: (error, _request, reply) => {
+      const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
+        ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
+      void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
+    }
   });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
@@ -523,6 +540,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
+  /**
+   * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
+   * stays false), returned Fastify's own {message,error,statusCode} envelope —
+   * a framework fingerprint and a route-existence oracle. One constant typed
+   * 404 covers all of them; it is a client fault, never an `api.request.failed`.
+   */
+  api.setNotFoundHandler((_request, reply) =>
+    reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" }));
   api.setErrorHandler((error, request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
