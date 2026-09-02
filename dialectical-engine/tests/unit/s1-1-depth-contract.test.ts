@@ -269,16 +269,152 @@ interface DuplicateSite {
   readonly text: string;
 }
 
-/** The oracle, over text — so it can be controlled with planted sources. */
+/** The two predicates, applied to one candidate text. Unchanged by T1B. */
+function kindOf(candidate: string): DuplicateKind | null {
+  if (MENTIONS_A_DEPTH.test(candidate) && (BARE_FIVE.test(candidate) || SIX_AS_EXCLUSIVE_BOUND.test(candidate))) {
+    return "DEPTH_BOUND_LITERAL";
+  }
+  return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
+}
+
+/**
+ * DECLARATION UNITS — the layout-independent half of the oracle (T1B, codex r3 B1).
+ *
+ * The r3 oracle scanned PHYSICAL LINES, so it could only see a ceiling whose depth
+ * token and whose literal happened to be typed on the same row. Three ordinary
+ * formattings defeated it — a wrapped Zod chain, a comparison split after the
+ * operator, and a wrapped `[1, 2, 3, 4, 5]`. That is a check that could not fail
+ * for the reason it exists (D56), and the fault was the UNIT, never the predicates.
+ *
+ * So the predicates above are untouched and only the unit changes: a unit is the
+ * enclosing DECLARATION, gathered by a lexer rather than by newline. Newlines are
+ * ordinary whitespace, so a ceiling reads the same however it is wrapped.
+ *
+ * A unit ENDS at:
+ *   · `;` or `,` at the unit's own bracket depth   — statement / element separator
+ *   · `{` or `}` at any depth                      — a block or object body is its own scope
+ *   · a closer that would drop below the start depth
+ *   · `&&`, `||`, `??` at the unit's own depth     — each conjunct is a separate claim
+ *
+ * The logical-operator boundary is not cosmetic: without it the widened unit joined
+ * `topic.trim().length > 6` to a `depth` five conjuncts away in
+ * apps/ui/app/new/page.tsx and manufactured a false site. It was measured, not
+ * guessed. It also costs coverage, disclosed below.
+ *
+ * Comments do NOT contribute to unit text — a comment defines no ceiling, and
+ * gluing prose into a joined unit invents pairings. Nothing is lost: the LINE scan
+ * is retained beside this one and still reads comments exactly as r3 did.
+ *
+ * WHAT THIS STILL CANNOT SEE, stated plainly rather than claimed away:
+ *   · indirection — `const CEILING = 5;` then `depth > CEILING` are two units
+ *   · a ceiling that is not the literal `5`: `2 + 3`, `0x5`, `5.0` (a PREDICATE
+ *     limit, not a layout one — `BARE_FIVE` never matched those on one line either)
+ *   · a bound split across `&&`, e.g. `isDepthField(x) && x <= 5`
+ *   · a bound assembled across two statements or across a brace
+ * A single-quoted or double-quoted string is closed at the newline, so a regex
+ * literal mis-read as a string can only desync within one line, never past it.
+ */
+const UNIT_BOUNDARY_OPERATORS = Object.freeze(["&&", "||", "??"]);
+
+function declarationUnits(source: string): { readonly line: number; readonly text: string }[] {
+  const units: { line: number; text: string }[] = [];
+  let buffer = "";
+  let bracketDepth = 0;
+  let startDepth = 0;
+  let line = 1;
+  let startLine = 0;
+  const flush = (): void => {
+    const text = buffer.replace(/\s+/g, " ").trim();
+    if (text) units.push({ line: startLine || 1, text });
+    buffer = "";
+    startLine = 0;
+  };
+  const begin = (): void => { flush(); startDepth = bracketDepth; };
+  const mark = (): void => { if (startLine === 0) startLine = line; };
+  let index = 0;
+  while (index < source.length) {
+    const char = source[index]!;
+    const next = source[index + 1];
+    if (char === "\n") { line += 1; buffer += " "; index += 1; continue; }
+    if (char === "/" && next === "/") {
+      let end = index;
+      while (end < source.length && source[end] !== "\n") end += 1;
+      buffer += " "; index = end; continue;
+    }
+    if (char === "/" && next === "*") {
+      const close = source.indexOf("*/", index + 2);
+      const end = close < 0 ? source.length : close + 2;
+      line += (source.slice(index, end).match(/\n/g) ?? []).length;
+      buffer += " "; index = end; continue;
+    }
+    if (char === "'" || char === '"') {
+      let end = index + 1;
+      while (end < source.length) {
+        if (source[end] === "\\") { end += 2; continue; }
+        if (source[end] === char) { end += 1; break; }
+        if (source[end] === "\n") break;
+        end += 1;
+      }
+      mark(); buffer += source.slice(index, end); index = end; continue;
+    }
+    if (char === "`") {
+      let end = index + 1;
+      while (end < source.length) {
+        if (source[end] === "\\") { end += 2; continue; }
+        if (source[end] === "`") { end += 1; break; }
+        if (source[end] === "$" && source[end + 1] === "{") {
+          let nested = 1; let scan = end + 2;
+          while (scan < source.length && nested > 0) {
+            if (source[scan] === "{") nested += 1;
+            else if (source[scan] === "}") nested -= 1;
+            scan += 1;
+          }
+          end = scan; continue;
+        }
+        if (source[end] === "\n") line += 1;
+        end += 1;
+      }
+      mark(); buffer += source.slice(index, end).replace(/\s+/g, " "); index = end; continue;
+    }
+    if (char === "{") { bracketDepth += 1; buffer += " "; begin(); index += 1; continue; }
+    if (char === "}") { bracketDepth -= 1; buffer += " "; begin(); index += 1; continue; }
+    if (char === "(" || char === "[") { mark(); bracketDepth += 1; buffer += char; index += 1; continue; }
+    if (char === ")" || char === "]") {
+      bracketDepth -= 1;
+      if (bracketDepth < startDepth) { begin(); index += 1; continue; }
+      mark(); buffer += char; index += 1; continue;
+    }
+    if ((char === ";" || char === ",") && bracketDepth === startDepth) { begin(); index += 1; continue; }
+    if (bracketDepth === startDepth && next !== undefined
+      && UNIT_BOUNDARY_OPERATORS.includes(`${char}${next}`)) { begin(); index += 2; continue; }
+    mark(); buffer += char; index += 1;
+  }
+  flush();
+  return units;
+}
+
+/**
+ * The oracle, over text — so it can be controlled with planted sources.
+ *
+ * The UNION of the r3 line scan and the T1B declaration-unit scan, so the change
+ * is additive: every site r3 reported is still reported, with r3's own text, and
+ * the multiline sites are added. Deduplicated on `line` + `kind`, line text winning,
+ * which keeps the owning-declaration exemption matching on its exact r3 text.
+ */
 function duplicateBoundSites(source: string): DuplicateSite[] {
-  return source.split("\n").flatMap((raw, index) => {
-    const text = raw.trim();
-    const kind: DuplicateKind | null =
-      MENTIONS_A_DEPTH.test(raw) && (BARE_FIVE.test(raw) || SIX_AS_EXCLUSIVE_BOUND.test(raw))
-        ? "DEPTH_BOUND_LITERAL"
-        : WHOLE_DOMAIN.test(raw) ? "DOMAIN_ENUMERATION" : null;
-    return kind === null ? [] : [{ kind, line: index + 1, text }];
+  const byAddress = new Map<string, DuplicateSite>();
+  source.split("\n").forEach((raw, index) => {
+    const kind = kindOf(raw);
+    if (kind !== null) byAddress.set(`${index + 1}:${kind}`, { kind, line: index + 1, text: raw.trim() });
   });
+  for (const unit of declarationUnits(source)) {
+    const kind = kindOf(unit.text);
+    const address = `${unit.line}:${kind}`;
+    if (kind !== null && !byAddress.has(address)) {
+      byAddress.set(address, { kind, line: unit.line, text: unit.text });
+    }
+  }
+  return [...byAddress.values()].sort((left, right) => left.line - right.line);
 }
 
 function shippedSourceFiles(): string[] {
@@ -340,6 +476,72 @@ describe("S1-1 · the depth bound has a single source", () => {
     { spelling: "set option domain", planted: "  const allowed = new Set([1, 2, 3, 4, 5]);" }
   ])("detects a duplicate written as $spelling", ({ planted }) => {
     expect(duplicateBoundSites(planted)).not.toEqual([]);
+  });
+
+  // LAYOUT CONTROLS (T1B, codex r3 B1) — the same three CLASSES as above, written
+  // across physical lines the way a formatter or a human ordinarily writes them.
+  // PROPERTY: a ceiling is found when the depth token and the ceiling literal share
+  // a syntactic UNIT, however many lines that unit occupies. The first two are the
+  // reviewer's own repro inputs verbatim.
+  it.each([
+    {
+      spelling: "multiline zod chain",
+      planted: [
+        "const depthSchema = z.number()",
+        "  .int()",
+        "  .gte(1)",
+        "  .lte(5);"
+      ].join("\n")
+    },
+    {
+      spelling: "refinement split across lines",
+      planted: [
+        ".superRefine((d, c) => {",
+        "  if (d.depth >",
+        "    5) c.addIssue({});",
+        "})"
+      ].join("\n")
+    },
+    {
+      spelling: "multiline domain enumeration",
+      planted: [
+        "  const allowed = [",
+        "    1,",
+        "    2,",
+        "    3,",
+        "    4,",
+        "    5",
+        "  ];"
+      ].join("\n")
+    },
+    {
+      spelling: "wrapped property inside an object literal",
+      planted: [
+        "const S = z.object({",
+        "  depth: z.number()",
+        "    .int()",
+        "    .max(5)",
+        "});"
+      ].join("\n")
+    }
+  ])("detects a duplicate laid out as $spelling", ({ planted }) => {
+    expect(duplicateBoundSites(planted)).not.toEqual([]);
+  });
+
+  // LAYOUT NEGATIVE CONTROL — MEASURED, not imagined. Widening the unit to the
+  // whole declaration is what makes the multiline ceilings visible, and the first
+  // build of it flagged apps/ui/app/new/page.tsx by pairing `topic.trim().length
+  // > 6` with a `depth` five conjuncts further down the same expression. This is
+  // that shape. It pins the `&&` boundary: delete `"&&"` from
+  // UNIT_BOUNDARY_OPERATORS and this control goes RED.
+  it("does not pair an unrelated ceiling with a depth several conjuncts away", () => {
+    const planted = [
+      "  const ready = topic.trim().length > 6 &&",
+      "    depth >= EXPANSION_DEPTH_MIN &&",
+      "    depth <= EXPANSION_DEPTH_MAX &&",
+      "    riskTier.length > 0;"
+    ].join("\n");
+    expect(duplicateBoundSites(planted)).toEqual([]);
   });
 
   // NEGATIVE CONTROLS — unrelated depth concepts, and a floor-only guard, are
