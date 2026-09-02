@@ -25,7 +25,9 @@ const sessionPolicy = sessionPolicyFromValue(
 
 const SESSION_TOKEN = "s".repeat(43);
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) DebateAI/1.0";
-const source = Object.freeze({ ip: "203.0.113.9", userAgent: USER_AGENT });
+const source = Object.freeze({
+  ip: "203.0.113.9", userAgent: USER_AGENT, requestId: "req-l2-f5"
+});
 
 /**
  * `authenticate` is the shortest path that hands a freshly derived binding hash
