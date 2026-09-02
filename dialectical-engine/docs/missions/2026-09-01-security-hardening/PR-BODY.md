@@ -4,7 +4,7 @@ Baseline `origin/dev@b5a6b6eb`. Plan, seven audit registers, consolidated triage
 
 ## What this branch changes
 - **Supply chain / repo:** pnpm audit clean (overrides for postcss/sharp/nanoid/esbuild, next 15.5.25, drizzle-kit removed), 7-day release-age cooldown + strict dep builds, exact pins in apps/ui, `.nvmrc`, digest-pinned postgres image, stale `web` importer and nested lockfile removed, tracked `.env.local`/scratch/log artefacts untracked and ignored.
-- **CI (new `.github/`):** typecheck + unit + architecture tests, `pnpm audit`, gitleaks as a pinned verified binary, CodeQL, Dependabot on `dev`, all actions SHA-pinned; `SECURITY.md`.
+- **CI (new `.github/`):** typecheck; unit + architecture tests behind a recorded known-red gate (`pnpm run test:ci-gate` fails only on failures not listed in `tests/ci-known-red.txt`, each entry sourced; a listed test that passes is a warning to remove it); `pnpm audit`; gitleaks as a pinned verified binary over all refs with a reviewed `.gitleaksignore` (13 non-live fingerprints, V-24); CodeQL; Dependabot on `dev`; all actions SHA-pinned; `SECURITY.md`.
 - **API:** explicit body/param/request-time limits with typed 413/400/414/415 envelopes and a single 400 shape; per-user ask admission and per-source public-read/recovery-start admission (sealed `admissionPolicy` row, V-1/V-12 pending); constant 400 envelope (no schema disclosure); typed 404; gapRef bound; ask question bound 8 KiB.
 - **Production floors (register):** remote DB URLs need `sslmode=verify-full` + CA, content encryption required, Hatchet TLS unless loopback, loopback API bind, cleartext provider targets refused, replay CLI floored.
 - **UI edge:** per-request nonce CSP with strict-dynamic (no `unsafe-inline` scripts), static CSP on `/api/*`, fail-closed fallback, explicit trusted reverse-proxy list + edge secret, 1 MiB proxy body cap, upgrade-socket teardown, SSR cookie grammar, proxy abort/timeout, `poweredByHeader` off, image optimizer off, dead export knob removed, production build restored.
@@ -19,7 +19,7 @@ Baseline `origin/dev@b5a6b6eb`. Plan, seven audit registers, consolidated triage
 See `VERIFICATION.md` (per-lane RED→GREEN, typecheck, build, smoke) and `findings/CONSOLIDATED.md` (84 findings: 2 HIGH, 25 MEDIUM, 47 LOW; dispositions).
 
 ## Needs V
-`V-DECISIONS-PACKET.md` (V-1 … V-18): admission values, KEK rotation, default branch, GitHub protections/scanning, tracked archives, dormant husky, production shape, runner-side containment handoff, password maximum, exclusion pruning, serve.answer follow-ups.
+`V-DECISIONS-PACKET.md` (V-1 … V-24): admission values, KEK rotation, default branch, GitHub protections/scanning, tracked archives, dormant husky, production shape, runner-side containment handoff, password maximum, exclusion pruning, serve.answer follow-ups, custody group for per-service users (V-19), the Cloudflare Workers Builds integration (V-23), the gitleaks history fingerprints (V-24).
 
 ## Merge order
 Agreed with the live algorithm mission: this branch → `dev` first; its DEV-SYNC then merges `dev` into the mission branch and re-baselines its obs zone pins.
