@@ -1937,6 +1937,17 @@ export class WalkingSkeletonRunner {
       configuredMakers.push(configured!);
     }
     if (configuredMakers.length === 0) {
+      // J26(b): this refusal is TERMINAL for the work item, for the same reason
+      // the sealed-role refusal below is — every pinned provider being absent is
+      // a condition only a deployment change can fix, so leaving the item
+      // CLAIMED hands it to the reaper to retry against an unchanged world.
+      // MEASURED, not assumed: before this line the item was left CLAIMED with a
+      // null terminal_reason, which the all-absent arm now pins.
+      await this.#work.recordTerminalFailure({
+        runId: run.runId,
+        workItemId: claimed.workItemId,
+        reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM"
+      });
       throw new TypedDomainError(
         "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
         "Every provider pinned at ask time was absent when the runner claimed the work item"
@@ -1966,19 +1977,28 @@ export class WalkingSkeletonRunner {
         : synthesisRolePolicy.evaluatorRoleRef;
       if (configuredMakers.some((maker) => maker.providerRef === roleRef)) continue;
       const absent = absentAtClaim.find((entry) => entry.member.provider_ref === roleRef);
+      // J26(c): a refusal's own shape. No hold, no attempts, no legs — the three
+      // zeros the first draft wrote were measurements nobody took.
       await this.#runs.recordRunLifecycleEvent({
         runId: run.runId,
         kind: "ledger.could_not_do",
         value: {
           state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
           call_site_key: `${role}:${roleRef}`,
-          parent_node_ref: null,
-          hold_ms: 0,
-          hold_until: null,
-          attempts_spent: 0,
-          transport_outcome: "FAILED",
-          planned_leg_count: 0
+          role_ref: roleRef,
+          role,
+          absent_failure_code: absent?.failureCode ?? null
         }
+      });
+      // J26(b): the refusal is TERMINAL for this work item. It is never released
+      // or re-queued — retrying a sealed identity that is absent would loop
+      // against a condition only a deployment change can fix, and substituting a
+      // healthy provider is what J24 forbids. The state is recorded BEFORE the
+      // throw so the terminal fact does not depend on who catches it.
+      await this.#work.recordTerminalFailure({
+        runId: run.runId,
+        workItemId: claimed.workItemId,
+        reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`
       });
       throw new TypedDomainError(
         "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",

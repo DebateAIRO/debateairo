@@ -4866,9 +4866,113 @@ describe("T10/T11 · the served root and its label, through the production runne
       expect(events.rows[0]?.value_json.state).toBe("SYNTHESIS_ROLE_PROVIDER_ABSENT");
       expect(events.rows[0]?.value_json.call_site_key)
         .toBe(`SYNTHESIZER:${primaryMember.provider_ref}`);
+      // J26(c): the refusal's OWN shape. It states the role and why the provider
+      // was not claim-eligible, and it states NO measurement it did not take —
+      // there is no hold_ms/attempts_spent/planned_leg_count to read as zero.
+      expect(events.rows[0]?.value_json).toEqual({
+        state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+        call_site_key: `SYNTHESIZER:${primaryMember.provider_ref}`,
+        role_ref: primaryMember.provider_ref,
+        role: "SYNTHESIZER",
+        absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+      });
+
+      // J26(b) / J25: the PERSISTED terminal state, not the thrown error. The
+      // item is never released or re-queued — only a deployment change can fix
+      // a sealed identity that is absent.
+      const item = await database.pool.query<{
+        state: string; terminal_reason: string | null; claimed_by: string | null;
+      }>(
+        "SELECT state, terminal_reason, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [workItemId]
+      );
+      expect(item.rows[0]).toEqual({
+        state: "FAILED",
+        terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER",
+        claimed_by: null
+      });
     } finally {
       await healthySecondary.stop();
       await absentRolePrimary.stop();
+    }
+  });
+
+  /**
+   * J26(b) — the ALL-ABSENT claim path. Every pinned provider is gone, so the
+   * pre-existing empty-panel refusal fires BEFORE the role check (it stands
+   * earlier in the same loop) and the role never gets to be the reason. What
+   * this arm pins is that the ordering does not cost the work item its terminal
+   * state: a claim-time refusal that only a deployment change can fix must not
+   * be left CLAIMED for the reaper to retry.
+   */
+  it("T9/J26 drives the all-absent claim path to a persisted terminal state", async () => {
+    const absentPrimary = await startProviderDouble([]);
+    const absentSecondary = await startProviderDouble([]);
+    try {
+      const question = `t09-all-absent-at-claim-${randomUUID()}`;
+      const panel = fixtureDiscoveredPanel(2);
+      const secondaryMember = panel[1]!;
+      const runId = await new RunRepository(database.pool).startRun({
+        questionLine: question,
+        principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`,
+        callerScope: "ASKER",
+        asOf: new Date("2026-08-07T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low",
+        depthParams: { depth: 1 },
+        discoveredPanel: panel,
+        strangerSampleRate: 1,
+        envelopeBasis: fixtureStructuralCeiling(10, 2, 1),
+        registerVersion: 1,
+        batteryVersion: "s00",
+        batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: absentPrimary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...settings,
+        maker: "Primary test maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: absentSecondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: secondaryMember.provider_ref,
+          maker: secondaryMember.maker
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        claimTimeProbe: async () => ({ state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" })
+      });
+
+      await expect(runner.executeWorkItem(workItemId))
+        .rejects.toMatchObject({ code: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" });
+
+      // THE ASSERTION THAT MATTERS: the persisted terminal state, read back.
+      const item = await database.pool.query<{
+        state: string; terminal_reason: string | null; claimed_by: string | null;
+      }>(
+        "SELECT state, terminal_reason, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [workItemId]
+      );
+      expect(item.rows[0]).toEqual({
+        state: "FAILED",
+        terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
+        claimed_by: null
+      });
+      expect(absentPrimary.calls()).toBe(0);
+      expect(absentSecondary.calls()).toBe(0);
+    } finally {
+      await absentSecondary.stop();
+      await absentPrimary.stop();
     }
   });
 
