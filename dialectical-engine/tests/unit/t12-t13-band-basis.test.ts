@@ -12,7 +12,8 @@ import {
   runServeGateChain,
   type BandCeilingRegisterRow,
   type ComposedSegment,
-  type ConformanceJudgement,
+  type DigestSourceNode,
+  type EvaluatorVerdict,
   type ServeGateDependencies,
   type ServeGateInput,
   type ServeNode
@@ -54,7 +55,41 @@ const segment = (
   servedNumberRefs: readonly string[] = []
 ): ComposedSegment => ({ segmentId, text, loadBearing: false, assertedNodeRefs, servedNumberRefs });
 
-const gateInput = (nodes: readonly ServeNode[], strangerSampleRate = 1): ServeGateInput => ({
+/**
+ * T9B PORT — the chain this file drives is T9's synthesis chain now. The serve
+ * input lost `maxRecompose` and `strangerSampleRate` (the composition retry and
+ * the conformance SAMPLE are both retired) and gained the digest inputs, the
+ * served root, the code label and the sealed role controls. Every T12/T13
+ * property below is unchanged; only the way the candidate reaches the chain is.
+ */
+const ROLE_CONTROLS = Object.freeze({
+  synthesizerRoleRef: "test-layer:synthesizer",
+  evaluatorRoleRef: "test-layer:evaluator",
+  evaluatorLoopMaxRounds: 3
+});
+
+const CODE_LABEL = Object.freeze({
+  verdictLabel: "CONTESTED",
+  servedNodeId: "node:served-root",
+  servedStrength: 0.7,
+  margin: 0.1,
+  registerVersion: 1
+});
+
+/** The digest source mirrors the serve set, so the served root always exists. */
+const digestNodesFor = (nodes: readonly ServeNode[]): readonly DigestSourceNode[] =>
+  nodes.map((entry, index) => Object.freeze({
+    nodeId: entry.nodeId,
+    statement: entry.text,
+    finalStrength: 0.7 - index * 0.05,
+    wayOfKnowing: entry.wayOfKnowing,
+    marks: Object.freeze([]),
+    polarityRelations: Object.freeze([]),
+    isPosition: index === 0,
+    isSurvivingObjection: false
+  }));
+
+const gateInput = (nodes: readonly ServeNode[]): ServeGateInput => ({
   nodes,
   factBundle: buildFactBundle({
     facts: nodes.map((entry) => entry.text),
@@ -65,16 +100,18 @@ const gateInput = (nodes: readonly ServeNode[], strangerSampleRate = 1): ServeGa
     buildsOnPrevious: { value: false, answerRef: null },
     memoryDisclosure: null
   }),
-  maxRecompose: 2,
   compositionBudget: {
     tier: "low",
-    bound: 10,
+    bound: 200_000,
     registerRowKey: "test-layer:composition-budget",
     registerVersion: 1,
     sourceRef: "test-layer:DR-078"
   },
-  strangerSampleRate,
-  candidateConfidenceBand: TOP_BAND
+  candidateConfidenceBand: TOP_BAND,
+  digestNodes: digestNodesFor(nodes),
+  servedRootNodeId: nodes[0]!.nodeId,
+  codeLabel: CODE_LABEL,
+  synthesisRoleControls: ROLE_CONTROLS
 });
 
 /** A test-layer ceiling row over the SEALED band vocabulary. */
@@ -101,24 +138,51 @@ const ceilingRow = (): BandCeilingRegisterRow => ({
 
 interface Recorded {
   readonly bases: Basis[];
-  readonly judgements: ConformanceJudgement[];
 }
 
+/** An evaluator that is satisfied on every criterion — the T12/T13 happy path. */
+const SATISFIED: EvaluatorVerdict = Object.freeze({
+  satisfied: true,
+  objection: null,
+  criteria: Object.freeze({
+    fairnessToLosers: true,
+    statementLabelAgreement: true,
+    noOverstatement: true,
+    restatement: true,
+    citationTracing: true
+  })
+});
+
+/**
+ * T9B PORT: `compose`/`selectSample`/`conform`/`postComposeR9` are gone; the
+ * candidate arrives from the SYNTHESIZER and the criteria from the EVALUATOR.
+ * Each arm supplies its segments through `segments`, exactly as it previously
+ * supplied them through `compose`.
+ */
 function dependencies(
   recorded: Recorded,
-  overrides: Partial<ServeGateDependencies> = {}
+  script: {
+    readonly segments?: () => readonly ComposedSegment[];
+    readonly verdict?: EvaluatorVerdict;
+    readonly applyBandCeiling?: ServeGateDependencies["applyBandCeiling"];
+  } = {}
 ): ServeGateDependencies {
   return {
-    measureCompositionBundle: () => 1,
-    compose: async () => [segment("segment:1", "A test-layer statement.", [])],
-    selectSample: () => true,
-    conform: async (candidate, state) => {
-      const judgement = { segmentId: candidate.segmentId, state, conforms: true } as const;
-      recorded.judgements.push(judgement);
-      return judgement;
-    },
-    postComposeR9: async () => true,
-    applyBandCeiling: ({ basis, candidateConfidenceBand }) => {
+    synthesize: async (request) => ({
+      candidate: script.segments !== undefined
+        ? script.segments()
+        : [segment("segment:1", "A test-layer statement.", [])],
+      // A RECORDED reference and its call site, the way the runner supplies
+      // them from a provider response — never a label invented by the loop.
+      candidateRef: `artifact:candidate:${request.round}`,
+      candidateCallSiteKey: `COMPOSER:SYNTHESIZER:${request.stage}:${request.round}`
+    }),
+    evaluate: async (request) => ({
+      verdict: script.verdict ?? SATISFIED,
+      verdictRef: `artifact:evaluator:${request.round}`,
+      verdictCallSiteKey: `POST_COMPOSE_R9:EVALUATOR:${request.round}`
+    }),
+    applyBandCeiling: script.applyBandCeiling ?? (({ basis, candidateConfidenceBand }) => {
       recorded.bases.push(basis);
       return {
         kind: "NOT_CAPPED",
@@ -132,12 +196,11 @@ function dependencies(
           liftPath: "test-layer:gather-evidence-to-lift"
         }
       };
-    },
-    ...overrides
+    })
   };
 }
 
-const recorder = (): Recorded => ({ bases: [], judgements: [] });
+const recorder = (): Recorded => ({ bases: [] });
 
 const share = (basis: Basis, way: keyof Basis): number =>
   basis[way] / (basis.LOOKED_UP + basis.RAN + basis.REASONING);
@@ -150,7 +213,7 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       node("node:looked-up", "LOOKED_UP", false, "https://example.invalid/test-fixture")
     ];
     const result = await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:1", "A statement resting on both facts.", ["node:reasoned", "node:looked-up"])
       ]
     }));
@@ -169,7 +232,7 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       node("node:uncited", "LOOKED_UP", true, "https://example.invalid/test-fixture")
     ];
     await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:1", "A hypothesis resting on the reasoned node alone.", ["node:reasoned"]),
         segment("segment:2", "The research plan that would lift it.", ["node:reasoned"])
       ]
@@ -185,7 +248,7 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       node("node:reasoned-b", "REASONING", true)
     ];
     await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:1", "A hypothesis resting on two reasoned nodes.", ["node:reasoned-a", "node:reasoned-b"]),
         segment("segment:2", "The research plan that would lift it.", ["node:reasoned-a"])
       ]
@@ -197,24 +260,36 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
     expect(share(recorded.bases[0]!, "RAN")).toBe(0);
   });
 
-  it("excludes the citations of a segment conformance never verified", async () => {
-    const recorded = recorder();
-    const nodes = [
-      node("node:reasoned", "REASONING", true),
-      node("node:unverified", "LOOKED_UP", false, "https://example.invalid/test-fixture")
-    ];
-    await runServeGateChain(gateInput(nodes, 0), dependencies(recorded, {
-      selectSample: () => false,
-      compose: async () => [
-        segment("segment:load", "A hypothesis the panel judged.", ["node:reasoned"], ["number:final-strength"]),
-        segment("segment:unsampled", "A detail nobody checked.", ["node:unverified"])
-      ]
-    }));
-
-    // The discrimination only exists while that segment really went unverified.
-    expect(recorded.judgements.map((judgement) => judgement.segmentId)).toEqual(["segment:load"]);
-    expect(recorded.bases).toEqual([{ LOOKED_UP: 0, RAN: 0, REASONING: 1 }]);
-  });
+  /**
+   * RETIRED ON THE RECORD — V ruling, 2026-09-03 (T9B lane, finding F-T9B-1).
+   *
+   * The assertion that stood here was S08's
+   *   it("excludes the citations of a segment conformance never verified")
+   * It drove `selectSample: () => false` so one segment landed
+   * `state: "NOT_SAMPLED"`, then asserted that segment's citations stayed out
+   * of the band basis.
+   *
+   * WHY IT IS GONE, and it is not because it failed. T9 retired the three-state
+   * sampled conformance gate into a single EVALUATOR criterion, so the chain no
+   * longer has a sample: `runServeGateChain` mints `state: "JUDGED"` for every
+   * segment and hard-sets `coverageMode = "EXHAUSTIVE"`. `NOT_SAMPLED` has no
+   * producer on this path, so the state this assertion pins cannot be reached
+   * by any input — it would pass vacuously rather than discriminate.
+   *
+   * WHAT REPLACED THE SAFETY PROPERTY, so nothing was merely dropped: the
+   * citation-tracing guard in `runServeGateChain` returns COMPONENTS_ONLY when
+   * the evaluator's `citationTracing` criterion is false. That reaches the same
+   * outcome S08's `!conformance.every((j) => j.conforms)` guard reached, through
+   * T9's one criterion instead of three sampled states. It is pinned by
+   * `it("refuses to band a statement whose citation tracing FAILED")` below.
+   *
+   * S08's cited-set filter itself STAYS in the product code and is deliberately
+   * not tidied away as dead: under this chain its state check is always true,
+   * it costs nothing, and it remains correct if a sampling path ever returns.
+   *
+   * This retires ONE named assertion for ONE stated reason. It is not licence
+   * to retire another.
+   */
 
   it("lets the register cut read the fractional share, so the ceiling stops firing on evidence-backed statements", async () => {
     const recorded = recorder();
@@ -224,7 +299,7 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       node("node:looked-up-b", "LOOKED_UP", false, "https://example.invalid/b")
     ];
     const result = await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:1", "A statement resting on one reasoned and two looked-up facts.", [
           "node:reasoned", "node:looked-up-a", "node:looked-up-b"
         ])
@@ -246,7 +321,7 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
     const recorded = recorder();
     const nodes = [node("node:ran", "RAN", true)];
     await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [segment("segment:1", "A statement resting on a run.", ["node:ran"])]
+      segments: () => [segment("segment:1", "A statement resting on a run.", ["node:ran"])]
     }));
 
     expect(recorded.bases).toEqual([{ LOOKED_UP: 0, RAN: 1, REASONING: 0 }]);
@@ -261,7 +336,7 @@ describe("T13 — the honest downgrade reads the same cited set the band reads",
       node("node:uncited", "LOOKED_UP", true, "https://example.invalid/test-fixture")
     ];
     const result = await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:hypothesis", "The provisional answer, as composed.", ["node:reasoned"]),
         segment("segment:plan", "The research plan that would lift it, as composed.", ["node:reasoned"])
       ]
@@ -294,7 +369,7 @@ describe("T13 — the honest downgrade reads the same cited set the band reads",
       node("node:looked-up", "LOOKED_UP", false, "https://example.invalid/test-fixture")
     ];
     const result = await runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:1", "An evidence-backed verdict.", ["node:reasoned", "node:looked-up"])
       ]
     }));
@@ -308,7 +383,7 @@ describe("T13 — the honest downgrade reads the same cited set the band reads",
     const recorded = recorder();
     const nodes = [node("node:reasoned", "REASONING", true)];
     await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      compose: async () => [
+      segments: () => [
         segment("segment:1", "A hypothesis citing nothing.", [], ["number:final-strength"]),
         segment("segment:2", "A plan citing nothing.", [], ["number:final-strength"])
       ]
