@@ -427,8 +427,25 @@ describe("F30 — the served band consumes T3's recorded degraded-panel step-dow
   });
 });
 
-describe("F30 — the consumer is on the SHIPPED entry point, not only exported", () => {
-  it("reaches applyPanelDegradedBandStepDown from the declared production entry points", async () => {
+/**
+ * SCOPE OF THIS PROOF (codex r2 B1) — this is a STATIC CALL-GRAPH audit, and
+ * nothing more. It proves the arm is not orphaned: that a path of textual call
+ * references runs from a declared production entry point to
+ * `applyPanelDegradedBandStepDown`, so an arm that were exported and never
+ * wired (the F30 defect one level up, and mutant f4) fails it.
+ *
+ * It does NOT prove the arm EXECUTES in production. At this lane's base
+ * `e040b1ee`, `apps/runner/src/main.ts` and `apps/runner/src/dev-runner-policy.ts`
+ * do not load or pass `panelPolicy` — board F33, owned by lane T3C under
+ * J20/J22 and NOT merged into this base — so a real M>=2 run stops at
+ * `PANEL_WEIGHTING_UNRESOLVED` (runner index.ts, the claim-time gate) before
+ * this arm is ever reached. Executable F30 proof is therefore CONDITIONAL on
+ * T3C landing, and is demonstrated by the integration pairing and the closing
+ * W12 run, not by this test. Wiring main.ts here would be taking another lane's
+ * charge.
+ */
+describe("F30 — static call-graph reachability from the production entry points (NOT executable proof)", () => {
+  it("reaches applyPanelDegradedBandStepDown by call reference from apps/runner/src/main.ts", async () => {
     const reachability = await auditSurfaceReachability();
 
     expect(reachability.blocking).toEqual([]);
@@ -436,5 +453,58 @@ describe("F30 — the consumer is on the SHIPPED entry point, not only exported"
     // Declared-but-uncalled is NOT reachable: this fails if the arm is exported
     // and never wired, which is exactly the F30 defect one level up.
     expect(reachability.reachableCallables).toContain("applyPanelDegradedBandStepDown");
+  });
+});
+
+/**
+ * codex r2 N4 — closing F-S08-5.
+ *
+ * The SEALED production vocabulary has two members, so "one step down" and
+ * "collapse to the floor" land on the same band and no assertion over the
+ * sealed order can tell them apart. The helper takes a generic
+ * `Record<string, string>`, so a TEST-LAYER three-band map makes the
+ * distinction observable WITHOUT touching the production vocabulary: a
+ * double-step implementation returns the floor where one step returns the
+ * middle band.
+ */
+const TEST_LAYER_THREE_BAND_STEP_DOWN = Object.freeze({
+  "test-layer:TOP": "test-layer:MID",
+  "test-layer:MID": "test-layer:FLOOR",
+  "test-layer:FLOOR": "test-layer:FLOOR"
+});
+
+describe("F30 — the step is exactly ONE place (three-band test-layer fixture)", () => {
+  it("steps TOP to MID and stops there, never collapsing to the floor", () => {
+    const decision = applyPanelDegradedBandStepDown({
+      certaintyBand: "test-layer:TOP",
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: TEST_LAYER_THREE_BAND_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(decision.certaintyBand).toBe("test-layer:MID");
+    expect(decision.certaintyBand).not.toBe("test-layer:FLOOR");
+    expect(decision.certaintyEffect).toBe("DOWNGRADED");
+  });
+
+  it("steps MID to FLOOR and stays there at the floor", () => {
+    const fromMid = applyPanelDegradedBandStepDown({
+      certaintyBand: "test-layer:MID",
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: TEST_LAYER_THREE_BAND_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+    const fromFloor = applyPanelDegradedBandStepDown({
+      certaintyBand: "test-layer:FLOOR",
+      servedRootNodeId: "node:served-root",
+      panelDegradations: [degradation("node:served-root", PANEL_DEGRADED_SINGLE_VOICE_MARK)],
+      oneStepDown: TEST_LAYER_THREE_BAND_STEP_DOWN,
+      predicateRef: PANEL_PREDICATE_REF
+    });
+
+    expect(fromMid.certaintyBand).toBe("test-layer:FLOOR");
+    expect(fromFloor.certaintyBand).toBe("test-layer:FLOOR");
   });
 });
