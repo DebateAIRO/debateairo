@@ -5217,19 +5217,32 @@ describe("T10/T11 · the served root and its label, through the production runne
     // TWO genuine artifacts, each recorded at its own genuine call site.
     const synthesizerArtifactId = randomUUID();
     const evaluatorArtifactId = randomUUID();
+    // A THIRD artifact, recorded at BOTH role call sites. This is not exotic:
+    // the wrong-round fixture above records one artifact at both. It is the
+    // ONLY shape in which the derived-key ledger lookup cannot tell the roles
+    // apart, so it is the shape the equality predicate has to carry alone —
+    // mutant B1M1 SURVIVED until this arm existed (D56: construct the input
+    // that should make the check fail, or it is not a check).
+    const ambidextrousArtifactId = randomUUID();
     const pairs = [
       { artifactId: synthesizerArtifactId, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", contentHash: "c".repeat(64) },
-      { artifactId: evaluatorArtifactId, callSiteKey: "POST_COMPOSE_R9:EVALUATOR:1", contentHash: "d".repeat(64) }
+      { artifactId: evaluatorArtifactId, callSiteKey: "POST_COMPOSE_R9:EVALUATOR:1", contentHash: "d".repeat(64) },
+      { artifactId: ambidextrousArtifactId, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", contentHash: "e".repeat(64) },
+      { artifactId: ambidextrousArtifactId, callSiteKey: "POST_COMPOSE_R9:EVALUATOR:1", contentHash: "e".repeat(64) }
     ];
+    const alreadyAppended = new Set<string>();
     for (const pair of pairs) {
       const attemptId = randomUUID();
-      await ledger.appendRawArtifact({
+      if (!alreadyAppended.has(pair.artifactId)) {
+        alreadyAppended.add(pair.artifactId);
+        await ledger.appendRawArtifact({
         artifactId: pair.artifactId, attemptId, runId,
         providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
         maker: "test-layer", modelVersion: "v1",
         rawText: JSON.stringify({ at: pair.callSiteKey }), metadata: {}, parseStatus: "PARSED",
         inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: pair.contentHash
-      });
+        });
+      }
       await ledger.append({
         runId, attemptId, actionKind: "MODEL_CALL", callSiteKey: pair.callSiteKey,
         subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
@@ -5289,6 +5302,17 @@ describe("T10/T11 · the served root and its label, through the production runne
       verdictCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
       candidateRef: synthesizerArtifactId,
       candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // 4. THE EQUALITY ARM. `ambidextrousArtifactId` is legitimately recorded at
+    //    BOTH role call sites, so the ledger lookup by the DERIVED key finds a
+    //    row whichever role it is offered as. Nothing but the supplied key
+    //    disagreeing with the derived key can refuse this one.
+    await expect(persistRound({
+      ...correctRound,
+      candidateRef: ambidextrousArtifactId,
+      candidateCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
     } as NonNullable<ServeGateResult["loopRounds"]>[number]))
       .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
 
