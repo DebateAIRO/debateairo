@@ -6,13 +6,21 @@ import { TypedDomainError } from "@debateai/kernel";
  *
  * THE SPEND GATE IS THE POINT. The goal makes this run an important-operation
  * gate: "projected call count printed BEFORE any provider call and the run
- * proceeds only on explicit V approval". Everything in this module before
- * `applyApprovalGate` is free — register reads, fixture reads, arithmetic — and
- * the gate is the LAST thing that happens before the first provider call, so a
- * refusal cannot leave spend behind it.
+ * proceeds only on explicit V approval". Everything in `runEvalHarness` before
+ * its `options.approved` branch is free — register reads, fixture reads,
+ * arithmetic — and that branch is the LAST thing before the first provider
+ * call, so a refusal cannot leave spend behind it.
  *
- * WHAT THIS MODULE OWNS: the matrix, the projection, the blind grader
- * assignment, the refusals, and the comparison table T15b routes to V.
+ * WHAT THIS MODULE OWNS: the matrix, the projection, the candidate arm set, the
+ * blind grader assignment, the DEGRADATIONS and their disclosures, the few
+ * remaining refusals, and the comparison table T15b routes to V.
+ *
+ * DEGRADE AND DISCLOSE, DO NOT REFUSE (V-S11-1). A capacity shortfall — too few
+ * identities for three arms, too few for two independent graders, or a single
+ * identity holding both roles — RUNS on what the deployment can express and
+ * emits a visible condition mark naming what was compromised. Only an ABSENCE
+ * refuses: an empty provider set, an unconfigured sealed ref (J24), missing
+ * recorded debates, an absent T9 surface, and the approval gate itself.
  *
  * WHAT IT DOES NOT OWN: the synthesizer and evaluator request shapes and the
  * evaluator loop. Those are T9's (`packages/serve/src/synthesis.ts`, lane/s07,
@@ -29,8 +37,13 @@ import { TypedDomainError } from "@debateai/kernel";
  * The goal's EXACT matrix, quoted: "5 recorded debates (reused fixtures from
  * acceptance runs — no new debate generation) × 3 candidate role configs × ≤2
  * evaluator rounds; graded blind by 2 graders that are never the candidate".
- * These four numbers are the task text, not a preference, and the harness
- * refuses rather than running a smaller matrix.
+ *
+ * These four numbers are the task text and the harness never exceeds them. It
+ * may fall SHORT of them: under V-S11-1 a deployment that cannot express three
+ * arms, or cannot seat two non-candidate graders, runs the largest meaningful
+ * matrix it can and marks the reduction — `recordedDebateCount` is the one
+ * figure that still refuses, because the debates are reused rather than a
+ * capacity of the deployment (V-S11-3).
  */
 export const EVAL_HARNESS_MATRIX = Object.freeze({
   recordedDebateCount: 5,

@@ -231,9 +231,12 @@ describe("T15 · the spend gate (DoD: projected-count output test)", () => {
     const projectionIndex = emitted.findIndex((line) => line.startsWith("projected provider calls (worst case):"));
     const refusalIndex = emitted.findIndex((line) => line.includes("EVAL_HARNESS_NOT_APPROVED"));
     expect(projectionIndex).toBe(6);
-    // 8..11 are the evidence-gap and non-commensurability disclosures: even on four identities
-    // C3 draws a different independent pair than C1/C2, so the arms face different panels.
-    expect(refusalIndex).toBe(12);
+    // The refusal is the LAST line emitted. The r3 form hard-coded index 12, which made this
+    // assertion fail whenever the NUMBER of emitted marks changed — so four mutants that alter
+    // the mark set (m14, m17, m18, m19) were credited to this test without it discriminating
+    // their mutation at all. Pinning "last" states the actual property and cannot be moved by
+    // an unrelated mark; the distinct mark set and its ordering are pinned by their own test.
+    expect(refusalIndex).toBe(emitted.length - 1);
   });
 
   test("WITH explicit approval it does not refuse — the gate is a gate, not a wall", async () => {
