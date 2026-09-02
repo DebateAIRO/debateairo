@@ -212,7 +212,10 @@ function recorder(script: {
       },
       evaluate: async (request) => {
         evaluatorRequests.push(request);
-        return verdicts[Math.min(evaluatorRequests.length - 1, verdicts.length - 1)]!;
+        return {
+          verdict: verdicts[Math.min(evaluatorRequests.length - 1, verdicts.length - 1)]!,
+          verdictRef: `artifact:evaluator:${request.round}`
+        };
       },
       applyBandCeiling: ({ basis, candidateConfidenceBand }) => ({
         kind: "NOT_CAPPED",
@@ -439,6 +442,7 @@ describe("T9 loop — bounded by the sealed row, serves after the last round", (
     expect(result.loopRounds[0]!.verdict.objection).toBe("Round 1 objection.");
     expect(result.loopRounds[1]!.verdict.satisfied).toBe(true);
     expect(result.loopRounds[0]!.candidateRef).toBe("artifact:recorded:1");
+    expect(result.loopRounds[0]!.verdictRef).toBe("artifact:evaluator:1");
     expect(result.loopRounds[0]!.candidateStatement).toContain("candidate 1");
     expect(result.loopRounds[1]!.evaluatorRequest.candidateStatement)
       .toBe(result.loopRounds[1]!.candidateStatement);

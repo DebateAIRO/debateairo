@@ -101,7 +101,7 @@ function passingDependencies(overrides: Partial<ServeGateDependencies> = {}): Se
       candidate: composed("A provisional answer.", "Research it with an independent source."),
       candidateRef: "artifact:test-layer:synthesizer:1"
     }),
-    evaluate: async () => SATISFIED,
+    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" }),
     applyBandCeiling: ({ basis, candidateConfidenceBand }) => ({
       kind: "NOT_CAPPED",
       confidenceBand: candidateConfidenceBand,
@@ -124,7 +124,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
     const result = await runServeGateChain(reasoningInput(), passingDependencies({
       evaluate: async (request) => {
         judgedStatements.push(request.candidateStatement);
-        return SATISFIED;
+        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" };
       }
     }));
 

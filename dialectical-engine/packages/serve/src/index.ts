@@ -39,6 +39,7 @@ import {
   type SynthesisLoopControls,
   type SynthesisLoopOutcome,
   type EvaluatorRequest,
+  type EvaluatedCandidate,
   type EvaluatorVerdict,
   type SynthesizedCandidate,
   type SynthesizerRequest
@@ -368,7 +369,7 @@ export interface ServeGateDependencies {
    * per-segment conformance and post-compose R9 — because both are now
    * evaluator objection criteria rather than terminals.
    */
-  readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatorVerdict>;
+  readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatedCandidate>;
   readonly applyBandCeiling: (input: {
     readonly basis: Readonly<Record<WayOfKnowing, number>>;
     readonly candidateConfidenceBand: string;
@@ -1150,12 +1151,12 @@ export function decideReplayEviction(input: ReplaySelfTestInput):
 export interface PersistedSynthesisRound {
   readonly round: number;
   readonly synthesizerStage: "INITIAL" | "RETRY";
+  /** The request AS SENT — the only body this table stores, and it is encrypted. */
   readonly synthesizerRequest: SynthesizerRequest;
-  readonly candidateRef: string;
-  readonly candidateStatement: string;
-  readonly evaluatorRequest: EvaluatorRequest;
-  readonly verdict: EvaluatorVerdict;
-  readonly roundObjection: string | null;
+  /** Typed `ledger.raw_artifact` keys; resolve them for the bodies. */
+  readonly candidateArtifactRef: string;
+  readonly evaluatorArtifactRef: string;
+  readonly evaluatorSatisfied: boolean;
 }
 
 export interface PersistServeInput {
@@ -1609,6 +1610,20 @@ export class ServeRepository {
         );
       }
     }
+    // T9 / J29: one encrypted payload per round, prepared HERE beside the other
+    // carriers — `encryptAttestedContentForRun` must run outside the answer
+    // transaction, exactly as the fact bundle's does.
+    const roundCarriers = await Promise.all((input.result.loopRounds ?? []).map(async (round) => {
+      const synthesisRoundId = randomUUID();
+      return {
+        round,
+        synthesisRoundId,
+        content: await encryptAttestedContentForRun(
+          this.pool, input.runId, "serve.synthesis_round", synthesisRoundId,
+          { synthesizerRequest: round.synthesizerRequest }
+        )
+      };
+    }));
     const factBundleId = randomUUID();
     const factContent = await encryptAttestedContentForRun(
       this.pool, input.runId, "serve.fact_bundle", factBundleId,
@@ -1756,34 +1771,50 @@ export class ServeRepository {
             : JSON.stringify(input.result.projections.memoryDisclosure)
         ]
       );
-      // T9 / J25 — the loop-round records become DURABLE here, inside the
-      // answer's own write transaction, so a reader of the served answer can
-      // replay the convergence (or prove it never converged). The first filing
-      // returned these in memory and wrote nothing, which is the shape J25
-      // rules out. The EXACT recorded requests are stored, not a summary: the
-      // round-2 synthesizer request carries the round-1 objection verbatim, and
-      // its `priorCandidateRef` is the artifact reference round 1 recorded.
-      // A result with no rounds is lawful: the DR-184 catch-up path and every
-      // pre-T9 sealed shape ran no loop, and borrowing another version's rounds
-      // would be a fabricated record.
-      for (const round of input.result.loopRounds ?? []) {
+      // T9 / J25 + J29 — the loop-round records become DURABLE here, inside the
+      // answer's own write transaction. They store TYPED RAW-ARTIFACT KEYS and a
+      // single encrypted request payload; no candidate statement, evaluator
+      // request or verdict text is duplicated into this table, because each of
+      // those resolves through `ledger.raw_artifact`, which is already an
+      // encrypted carrier with crypto-erasure.
+      for (const carrier of roundCarriers) {
+        const round = carrier.round;
+        // REFERENTIAL INTEGRITY, proven before the commit. The foreign keys
+        // already refuse a reference that resolves to nothing; this refuses one
+        // that resolves to ANOTHER RUN's artifact, which a foreign key cannot
+        // see. codex r2 B2: `artifact:ghost` used to persist happily.
+        const referenced = await client.query<{ raw_artifact_id: string; run_id: string | null }>(
+          `SELECT raw_artifact_id::text, run_id::text
+             FROM ledger.raw_artifact
+            WHERE raw_artifact_id = ANY($1::uuid[])`,
+          [[round.candidateRef, round.verdictRef]]
+        );
+        if (referenced.rows.length !== 2
+          || referenced.rows.some((row) => row.run_id !== input.runId)) {
+          throw new TypedDomainError(
+            "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
+            `Round ${String(round.round)} references artifacts that do not both belong to run ${input.runId}`
+          );
+        }
         await client.query(
           `INSERT INTO serve.synthesis_round (
-             answer_id, answer_version, round, synthesizer_stage, synthesizer_request,
-             candidate_ref, candidate_statement, evaluator_request, evaluator_verdict,
-             round_objection, sealed_at_seq
-           ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb,$9::jsonb,$10,$11)`,
+             synthesis_round_id, answer_id, answer_version, run_id, round, synthesizer_stage,
+             candidate_artifact_ref, evaluator_artifact_ref, synthesizer_request,
+             content_ciphertext, content_attestation, evaluator_satisfied, sealed_at_seq
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13)`,
           [
+            carrier.synthesisRoundId,
             answer.rows[0]!.answer_id,
             answerVersion,
+            input.runId,
             round.round,
             round.synthesizerRequest.stage,
-            JSON.stringify(round.synthesizerRequest),
             round.candidateRef,
-            round.candidateStatement,
-            JSON.stringify(round.evaluatorRequest),
-            JSON.stringify(round.verdict),
-            round.verdict.objection,
+            round.verdictRef,
+            carrier.content === null ? JSON.stringify(round.synthesizerRequest) : CONTENT_CIPHERTEXT_SENTINEL,
+            carrier.content === null ? null : JSON.stringify(carrier.content.envelope),
+            carrier.content?.attestation ?? null,
+            round.verdict.satisfied,
             await allocateSequence(client)
           ]
         );
@@ -1901,37 +1932,77 @@ export class ServeRepository {
    * nothing more; this method is what lets the same claim be made about the
    * record.
    */
+  /**
+   * T9 / J25 + J29 — read the persisted loop-round records for one sealed answer
+   * version, in round order.
+   *
+   * OWNERSHIP AND LEASE, like every other content reader. codex r2 B1: the first
+   * version took only `(answerId, answerVersion)` and returned plaintext, so any
+   * caller holding another answer's UUID could pull its whole transcript, and no
+   * lease guarded the decrypt. It now normalizes ownership exactly as
+   * `readAnswerProjection` does, reads under the run's content lease, and
+   * decrypts the one carrier this table holds.
+   *
+   * The candidate statement, the evaluator request and the verdict are NOT read
+   * from here — they are not stored here. Each round hands back the two typed
+   * artifact keys so a caller resolves them through `ledger.raw_artifact`.
+   */
   async readSynthesisRounds(
     answerId: string,
+    ownership: RunOwnershipInput,
     answerVersion: number
   ): Promise<readonly PersistedSynthesisRound[]> {
-    const result = await this.pool.query<{
+    const access = normalizeRunOwnership(ownership);
+    const rows = await this.pool.query<{
+      synthesis_round_id: string;
+      run_id: string;
       round: number;
       synthesizer_stage: "INITIAL" | "RETRY";
-      synthesizer_request: SynthesizerRequest;
-      candidate_ref: string;
-      candidate_statement: string;
-      evaluator_request: EvaluatorRequest;
-      evaluator_verdict: EvaluatorVerdict;
-      round_objection: string | null;
+      synthesizer_request: string;
+      content_ciphertext: CryptoEnvelope | null;
+      candidate_artifact_ref: string;
+      evaluator_artifact_ref: string;
+      evaluator_satisfied: boolean;
     }>(
-      `SELECT round, synthesizer_stage, synthesizer_request, candidate_ref,
-              candidate_statement, evaluator_request, evaluator_verdict, round_objection
-         FROM serve.synthesis_round
-        WHERE answer_id=$1 AND answer_version=$2
-        ORDER BY round`,
-      [answerId, answerVersion]
+      `SELECT synthesis_round.synthesis_round_id::text, synthesis_round.run_id::text, synthesis_round.round,
+              synthesis_round.synthesizer_stage, synthesis_round.synthesizer_request,
+              synthesis_round.content_ciphertext,
+              synthesis_round.candidate_artifact_ref::text,
+              synthesis_round.evaluator_artifact_ref::text,
+              synthesis_round.evaluator_satisfied
+         FROM serve.synthesis_round AS synthesis_round
+         JOIN serve.answer AS answer
+           ON answer.answer_id = synthesis_round.answer_id
+          AND answer.answer_version = synthesis_round.answer_version
+         JOIN core.run AS run ON run.run_id = answer.run_id
+        WHERE synthesis_round.answer_id=$1 AND synthesis_round.answer_version=$2
+          AND core.run_is_owned_by(run.run_id,$3,$4)
+        ORDER BY synthesis_round.round`,
+      [answerId, answerVersion, access.ownerRef, access.legacyAskerId]
     );
-    return Object.freeze(result.rows.map((row) => Object.freeze({
-      round: Number(row.round),
-      synthesizerStage: row.synthesizer_stage,
-      synthesizerRequest: row.synthesizer_request,
-      candidateRef: row.candidate_ref,
-      candidateStatement: row.candidate_statement,
-      evaluatorRequest: row.evaluator_request,
-      verdict: row.evaluator_verdict,
-      roundObjection: row.round_objection
-    })));
+    if (rows.rows.length === 0) return Object.freeze([]);
+    const runId = rows.rows[0]!.run_id;
+    return withRunContentLease(this.pool, [runId], async () => Object.freeze(
+      await Promise.all(rows.rows.map(async (row) => {
+        const request = row.content_ciphertext === null
+          ? JSON.parse(row.synthesizer_request) as SynthesizerRequest
+          // The encryption primary key is the ROUND's id — the value the write
+          // encrypted under — never the answer's.
+          : (await decryptContentForRun<{ synthesizerRequest: SynthesizerRequest }>(
+              this.pool, runId, "serve.synthesis_round", row.synthesis_round_id,
+              row.content_ciphertext,
+              { synthesizerRequest: null as unknown as SynthesizerRequest }
+            )).synthesizerRequest;
+        return Object.freeze({
+          round: Number(row.round),
+          synthesizerStage: row.synthesizer_stage,
+          synthesizerRequest: request,
+          candidateArtifactRef: row.candidate_artifact_ref,
+          evaluatorArtifactRef: row.evaluator_artifact_ref,
+          evaluatorSatisfied: row.evaluator_satisfied
+        });
+      }))
+    ));
   }
 
   async readReviewCatchUpSource(runId: string): Promise<ReviewCatchUpSource> {

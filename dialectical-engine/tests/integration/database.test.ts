@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { persistTerminalRun } from "../support/settledRun.js";
 import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { once } from "node:events";
@@ -4079,29 +4080,62 @@ describe("apps/runner — legal command lifecycle", () => {
       // judge + (synthesizer, evaluator) x 2 rounds.
       expect(provider.calls()).toBe(5);
 
-      // ---- codex r1 B2 / J25: the ROUNDS, read back from the database ----
-      // Everything below crosses the persistence boundary. Asserting on the
-      // array `runServeGateChain` returned would prove only that it returned it.
-      const rounds = await new ServeRepository(database.pool)
-        .readSynthesisRounds(result.answerId, 1);
+      // ---- J25 + J29: the ROUNDS, read back and RESOLVED ----
+      // Ownership-aware read, like every other content reader.
+      const rounds = await new ServeRepository(database.pool).readSynthesisRounds(
+        result.answerId, "asker:pre-compose-block", 1
+      );
       expect(rounds.map((round) => round.round)).toEqual([1, 2]);
       expect(rounds.map((round) => round.synthesizerStage)).toEqual(["INITIAL", "RETRY"]);
       const [first, second] = rounds;
       // The DoD's "round-2 request contains the round-1 objection VERBATIM",
-      // asserted on the RECORDED request rather than a process-local object.
-      expect(first!.roundObjection).toBe(objection);
-      expect(first!.verdict.satisfied).toBe(false);
+      // asserted on the RECORDED request after it came back out of storage.
       expect(second!.synthesizerRequest.stage).toBe("RETRY");
       if (second!.synthesizerRequest.stage !== "RETRY") throw new Error("TEST_EXPECTED_RETRY");
       expect(second!.synthesizerRequest.priorObjection).toBe(objection);
-      // The retry's back-reference RESOLVES to the round it names: it is the
-      // artifact reference round 1 recorded, not a label that resembles one.
-      expect(second!.synthesizerRequest.priorCandidateRef).toBe(first!.candidateRef);
-      expect(first!.candidateRef).not.toMatch(/^candidate:round-/u);
-      expect(first!.candidateRef).not.toBe(second!.candidateRef);
-      expect(second!.verdict.satisfied).toBe(true);
-      expect(second!.roundObjection).toBeNull();
-      expect(second!.evaluatorRequest.candidateStatement).toBe(second!.candidateStatement);
+
+      // codex r2 B2: RESOLVE the references instead of pattern-matching them.
+      // The retry's back-reference must be round 1's artifact, and every stored
+      // key must join to a `ledger.raw_artifact` row belonging to THIS run.
+      expect(second!.synthesizerRequest.priorCandidateRef).toBe(first!.candidateArtifactRef);
+      const resolved = await database.pool.query<{ raw_artifact_id: string; run_id: string }>(
+        `SELECT artifact.raw_artifact_id::text, artifact.run_id::text
+           FROM serve.synthesis_round AS synthesis_round
+           JOIN serve.answer AS answer
+             ON answer.answer_id = synthesis_round.answer_id
+            AND answer.answer_version = synthesis_round.answer_version
+           JOIN ledger.raw_artifact AS artifact
+             ON artifact.raw_artifact_id IN (synthesis_round.candidate_artifact_ref,
+                                             synthesis_round.evaluator_artifact_ref)
+            AND artifact.run_id = answer.run_id
+          WHERE synthesis_round.answer_id=$1 AND synthesis_round.answer_version=1`,
+        [result.answerId]
+      );
+      // Two rounds x two keys, every one resolving inside this run.
+      expect(resolved.rows).toHaveLength(4);
+      expect(new Set(resolved.rows.map((row) => row.run_id))).toEqual(new Set([work.runId]));
+      expect(new Set(resolved.rows.map((row) => row.raw_artifact_id))).toEqual(new Set([
+        first!.candidateArtifactRef, first!.evaluatorArtifactRef,
+        second!.candidateArtifactRef, second!.evaluatorArtifactRef
+      ]));
+      expect(first!.evaluatorSatisfied).toBe(false);
+      expect(second!.evaluatorSatisfied).toBe(true);
+
+      // A reader who is not the owner gets nothing.
+      await expect(new ServeRepository(database.pool).readSynthesisRounds(
+        result.answerId, "asker:someone-else", 1
+      )).resolves.toEqual([]);
+
+      // And no plaintext transcript is sitting in the table.
+      const stored = await database.pool.query<{ columns: string[] }>(
+        `SELECT array_agg(column_name::text) AS columns
+           FROM information_schema.columns
+          WHERE table_schema='serve' AND table_name='synthesis_round'`
+      );
+      for (const banned of ["candidate_statement", "evaluator_request", "evaluator_verdict", "round_objection"]) {
+        expect(stored.rows[0]?.columns).not.toContain(banned);
+      }
+
       const terminal = await database.pool.query("SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL'", [work.runId]);
       expect(terminal.rowCount).toBe(1);
     } finally { await provider.stop(); }
@@ -4895,6 +4929,64 @@ describe("T10/T11 · the served root and its label, through the production runne
       await healthySecondary.stop();
       await absentRolePrimary.stop();
     }
+  });
+
+  /**
+   * codex r2 B2 / J29 — a round reference must RESOLVE, and resolve INSIDE THIS
+   * RUN. The foreign key already refuses `artifact:ghost` (it resolves to
+   * nothing); what a foreign key cannot see is a reference to a real artifact
+   * belonging to a DIFFERENT run, which is why `persist` proves run membership
+   * before the answer transaction commits.
+   */
+  it("T9/J29 refuses a round whose artifact reference belongs to another run", async () => {
+    const provider = await startProviderDouble([...servedRunResponses("A neighbour run.", 0.8)]);
+    try {
+      // A real, resolvable artifact — produced by a DIFFERENT run.
+      const neighbour = await createRunnerWork(`t09-foreign-artifact-neighbour-${randomUUID()}`);
+      const neighbourResult = await runnerWithEndpoint(provider.endpoint)
+        .executeWorkItem(neighbour.workItemId);
+      expect(neighbourResult.kind).toBe("COMPLETED");
+      const foreign = await database.pool.query<{ raw_artifact_id: string }>(
+        "SELECT raw_artifact_id::text FROM ledger.raw_artifact WHERE run_id=$1 LIMIT 1",
+        [neighbour.runId]
+      );
+      const foreignArtifactId = foreign.rows[0]!.raw_artifact_id;
+
+      const question = `t09-foreign-artifact-${randomUUID()}`;
+      const runId = await createRun(question, 90, 1, 1);
+      const round = {
+        round: 1,
+        synthesizerStage: "INITIAL",
+        synthesizerRequest: { role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 }, codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 } },
+        candidateRef: foreignArtifactId,
+        candidateStatement: "A statement.",
+        evaluatorRequest: { role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 }, codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 }, candidateStatement: "A statement." },
+        verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
+        verdictRef: foreignArtifactId
+      } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+
+      await expect(persistTerminalRun({
+        pool: database.pool,
+        runId,
+        fixtureKey: question,
+        factBundle: {
+          facts: ["A fact."], residualObjections: [], badges: [], conditionMarks: [],
+          reversalPoint: "A contrary observation would reverse this.",
+          buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null
+        },
+        loopRounds: [round]
+      })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+      // The whole answer rolled back with it: no half-written round record.
+      const rows = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
+      );
+      expect(rows.rows[0]?.count).toBe("0");
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
   });
 
   /**

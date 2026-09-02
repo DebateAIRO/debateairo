@@ -4597,6 +4597,37 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         composedAttestation]
     );
 
+    // T9 / J29: the synthesis round is a content carrier too. Only the
+    // synthesizer REQUEST lives here (the DoD's verbatim-objection claim is
+    // about the request as sent); the candidate and the verdict resolve through
+    // typed `ledger.raw_artifact` keys, which are already encrypted carriers.
+    const synthesisRoundId = randomUUID();
+    const synthesisRequestMarker = `s6-synthesis-request-${marker}`;
+    const preparedSynthesis = await cipher.prepareRun(runId);
+    const synthesisEnvelope = preparedSynthesis.encrypt(
+      "serve.synthesis_round", synthesisRoundId,
+      { synthesizerRequest: { stage: "INITIAL", instructions: synthesisRequestMarker } }
+    );
+    const synthesisAttestation = preparedSynthesis.attestEnvelope(
+      "serve.synthesis_round", synthesisRoundId, "content_ciphertext", synthesisEnvelope
+    );
+    preparedSynthesis.close();
+    const terminalAnswerVersion = (await database.pool.query<{ answer_version: number }>(
+      `SELECT answer_version FROM serve.answer
+        WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`,
+      [terminal.answerId]
+    )).rows[0]!.answer_version;
+    await database.pool.query(
+      `INSERT INTO serve.synthesis_round (
+         synthesis_round_id, answer_id, answer_version, run_id, round, synthesizer_stage,
+         candidate_artifact_ref, evaluator_artifact_ref, synthesizer_request,
+         content_ciphertext, content_attestation, evaluator_satisfied, sealed_at_seq
+       ) VALUES ($1,$2,$3,$4,1,'INITIAL',$5,$5,$6,$7::jsonb,$8,true,
+                 (SELECT COALESCE(MAX(sealed_at_seq),0)+1 FROM serve.synthesis_round))`,
+      [synthesisRoundId, terminal.answerId, terminalAnswerVersion, runId, authorArtifactId,
+        CONTENT_CIPHERTEXT_SENTINEL, JSON.stringify(synthesisEnvelope), synthesisAttestation]
+    );
+
     const evidence = new EvidenceRepository(database.pool);
     const sharedQueries = [
       { text: `s6-support-${marker}`, polarity: "SUPPORTING" as const, derivedFromQuestion: true },
@@ -4922,9 +4953,12 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       { carrier: "evidence.query_set" as const, id: querySetId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.query_set WHERE query_set_id=$1", [querySetId])).rows[0].content_ciphertext },
       { carrier: "evidence.query_amendment" as const, id: queryAmendmentId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.query_amendment WHERE query_amendment_id=$1", [queryAmendmentId])).rows[0].content_ciphertext },
       { carrier: "evidence.evidence_item" as const, id: evidenceItemId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.evidence_item WHERE evidence_item_id=$1", [evidenceItemId])).rows[0].content_ciphertext },
-      { carrier: "evidence.absence_row" as const, id: absenceRowId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.absence_row WHERE absence_row_id=$1", [absenceRowId])).rows[0].content_ciphertext }
+      { carrier: "evidence.absence_row" as const, id: absenceRowId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.absence_row WHERE absence_row_id=$1", [absenceRowId])).rows[0].content_ciphertext },
+      { carrier: "serve.synthesis_round" as const, id: synthesisRoundId, envelope: (await database.pool.query("SELECT content_ciphertext FROM serve.synthesis_round WHERE synthesis_round_id=$1", [synthesisRoundId])).rows[0].content_ciphertext }
     ];
-    expect(envelopes).toHaveLength(14);
+    // T9 / J29: 14 -> 15. The synthesis round joins the carrier set rather than
+    // holding a plaintext duplicate of content the other carriers protect.
+    expect(envelopes).toHaveLength(15);
     for (const item of envelopes) {
       await expect(cipher.decrypt(runId, item.carrier, item.id, item.envelope as never))
         .resolves.toBeTypeOf("object");
@@ -5051,9 +5085,20 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
           SELECT (jsonb_populate_record(NULL::evidence.absence_row, to_jsonb(source)
             || jsonb_build_object('query_text',$2::text))).*
           FROM evidence.absence_row AS source WHERE absence_row_id=$1`
+      },
+      {
+        carrier: "serve.synthesis_round",
+        id: synthesisRoundId,
+        sql: `INSERT INTO serve.synthesis_round
+          SELECT (jsonb_populate_record(NULL::serve.synthesis_round, to_jsonb(source)
+            || jsonb_build_object('synthesis_round_id',gen_random_uuid(),
+                                  'sealed_at_seq',(SELECT MAX(sealed_at_seq)+1 FROM serve.synthesis_round),
+                                  'round',source.round + 1,
+                                  'synthesizer_request',$2::text))).*
+          FROM serve.synthesis_round AS source WHERE synthesis_round_id=$1`
       }
     ] as const;
-    expect(plaintextMutations).toHaveLength(14);
+    expect(plaintextMutations).toHaveLength(15);
     for (const mutation of plaintextMutations) {
       await expect(database.pool.query(mutation.sql, [
         mutation.id, `s6-plaintext-mutation-${mutation.carrier}-${marker}`

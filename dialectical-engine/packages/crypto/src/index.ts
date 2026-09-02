@@ -1294,7 +1294,13 @@ export const CONTENT_CARRIERS = Object.freeze([
   "evidence.query_set",
   "evidence.query_amendment",
   "evidence.evidence_item",
-  "evidence.absence_row"
+  "evidence.absence_row",
+  // T9 / J29: the synthesis loop's round records. Only the synthesizer REQUEST
+  // is stored here (the DoD's verbatim-objection claim is about the request as
+  // sent, which `ledger.raw_artifact` cannot answer — it holds the response
+  // body, and its input_hash is null for encrypted runs). Everything else in a
+  // round resolves through two typed raw-artifact keys.
+  "serve.synthesis_round"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

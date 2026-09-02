@@ -3587,7 +3587,7 @@ export class WalkingSkeletonRunner {
        * objection criteria rather than terminals, and one grader that sees the
        * whole candidate can weigh them against each other.
        */
-      evaluate: async (request: EvaluatorRequest): Promise<EvaluatorVerdict> => {
+      evaluate: async (request: EvaluatorRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
         const packet: PromptPacket = { messages: [
           { role: "system", content: "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null." },
@@ -3613,15 +3613,21 @@ export class WalkingSkeletonRunner {
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
         return Object.freeze({
-          satisfied: parsed.satisfied,
-          objection: parsed.objection,
-          criteria: Object.freeze({
-            fairnessToLosers: parsed.criteria.fairness_to_losers,
-            statementLabelAgreement: parsed.criteria.statement_label_agreement,
-            noOverstatement: parsed.criteria.no_overstatement,
-            restatement: parsed.criteria.restatement,
-            citationTracing: parsed.criteria.citation_tracing
-          })
+          verdict: Object.freeze({
+            satisfied: parsed.satisfied,
+            objection: parsed.objection,
+            criteria: Object.freeze({
+              fairnessToLosers: parsed.criteria.fairness_to_losers,
+              statementLabelAgreement: parsed.criteria.statement_label_agreement,
+              noOverstatement: parsed.criteria.no_overstatement,
+              restatement: parsed.criteria.restatement,
+              citationTracing: parsed.criteria.citation_tracing
+            })
+          }),
+          // J29: the evaluator's own recorded artifact, so the round's verdict
+          // and objection resolve through `ledger.raw_artifact` rather than
+          // being duplicated into a second plaintext table.
+          verdictRef: response.rawArtifactRef
         });
       },
       applyBandCeiling: ({ basis, candidateConfidenceBand: band }) => deriveBandCeiling({

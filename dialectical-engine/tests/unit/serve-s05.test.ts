@@ -149,7 +149,7 @@ function dependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGate
       candidate: [segment("segment:verdict", "Evidence-backed verdict.", true)],
       candidateRef: "artifact:test-layer:synthesizer"
     }),
-    evaluate: async () => SATISFIED,
+    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" }),
     applyBandCeiling: () => passCeiling,
     ...overrides
   };
@@ -198,7 +198,7 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
       factBundle: buildFactBundle({ ...factBundle(), residualObjections: ["test-layer objection"] })
     }, dependencies());
     const servedDespiteUntracedCitation = await runServeGateChain(input(), dependencies({
-      evaluate: async () => unsatisfied("A claim traces to no digest node.")
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e" })
     }));
 
     expect(preSynthesisTerminal).toMatchObject({
@@ -274,7 +274,7 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
       }),
       evaluate: async (request) => {
         judged.push(request.candidateStatement);
-        return SATISFIED;
+        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" };
       }
     }));
 
@@ -303,14 +303,17 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
 
     let evaluateCalls = 0;
     const recovered = await runServeGateChain(input(), dependencies({
-      evaluate: async () => ++evaluateCalls > 1 ? SATISFIED : unsatisfied("Round 1 objection.")
+      evaluate: async () => ({
+        verdict: ++evaluateCalls > 1 ? SATISFIED : unsatisfied("Round 1 objection."),
+        verdictRef: `artifact:round-${String(evaluateCalls)}`
+      })
     }));
     expect(recovered.terminal).toBe("SERVED");
     expect(recovered.gateTrace).toContain("RECOMPOSED_ONCE");
     expect(recovered.loopRounds).toHaveLength(2);
 
     const exhausted = await runServeGateChain(input(), dependencies({
-      evaluate: async () => unsatisfied("A claim traces to no digest node.")
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e" })
     }));
     expect(exhausted.terminal).toBe("SERVED");
     expect(exhausted.standingObjection).toBe("A claim traces to no digest node.");

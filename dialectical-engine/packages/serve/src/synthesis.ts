@@ -438,6 +438,8 @@ export interface SynthesisLoopRound {
   readonly candidateStatement: string;
   readonly evaluatorRequest: EvaluatorRequest;
   readonly verdict: EvaluatorVerdict;
+  /** The `ledger.raw_artifact` id of the evaluator call for this round. */
+  readonly verdictRef: string;
 }
 
 export interface SynthesisLoopOutcome<TCandidate> {
@@ -464,12 +466,24 @@ export interface SynthesisLoopOutcome<TCandidate> {
  */
 export interface SynthesizedCandidate<TCandidate> {
   readonly candidate: TCandidate;
+  /**
+   * The `ledger.raw_artifact` id of the call that produced this candidate.
+   * codex r2 B2: a TYPED KEY, not a label — persistence stores it as a uuid
+   * foreign key and proves it belongs to this run before committing.
+   */
   readonly candidateRef: string;
+}
+
+/** The evaluator's verdict together with the artifact its call recorded. */
+export interface EvaluatedCandidate {
+  readonly verdict: EvaluatorVerdict;
+  /** The `ledger.raw_artifact` id of the evaluator call. */
+  readonly verdictRef: string;
 }
 
 export interface SynthesisLoopDependencies<TCandidate> {
   readonly synthesize: (request: SynthesizerRequest) => Promise<SynthesizedCandidate<TCandidate>>;
-  readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatorVerdict>;
+  readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatedCandidate>;
   /** The statement text the evaluator judges, read off the synthesizer's output. */
   readonly readCandidateStatement: (candidate: TCandidate) => string;
 }
@@ -524,14 +538,22 @@ export async function runSynthesisLoop<TCandidate>(
       codeLabel: input.codeLabel,
       candidateStatement
     });
-    const verdict = assertEvaluatorVerdict(await dependencies.evaluate(evaluatorRequest));
+    const evaluated = await dependencies.evaluate(evaluatorRequest);
+    const verdict = assertEvaluatorVerdict(evaluated.verdict);
+    if (evaluated.verdictRef.trim().length === 0) {
+      throw new TypedDomainError(
+        "SYNTHESIS_CANDIDATE_REF_MISSING",
+        "A round's verdict must carry the reference of the artifact the evaluator call recorded"
+      );
+    }
     rounds.push(Object.freeze({
       round,
       synthesizerRequest,
       candidateRef,
       candidateStatement,
       evaluatorRequest,
-      verdict
+      verdict,
+      verdictRef: evaluated.verdictRef
     }));
     if (verdict.satisfied) {
       prior = null;

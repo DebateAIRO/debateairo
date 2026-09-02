@@ -14,6 +14,11 @@ export interface PersistTerminalRunInput {
   readonly runId: string;
   readonly fixtureKey: string;
   readonly factBundle: FactBundle;
+  /**
+   * T9 / J29: optional loop-round records, so a fixture can drive the
+   * same-run/producer proof `persist` performs before it commits.
+   */
+  readonly loopRounds?: ServeGateResult["loopRounds"];
 }
 
 export interface PersistedTerminalRun {
@@ -59,7 +64,7 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     // class existed when this shape was written, so all four are absent rather
     // than back-filled with a class this answer never had.
     digest: null,
-    loopRounds: Object.freeze([]),
+    loopRounds: input.loopRounds ?? Object.freeze([]),
     standingObjection: null,
     crashClass: null,
     projections: Object.freeze({
