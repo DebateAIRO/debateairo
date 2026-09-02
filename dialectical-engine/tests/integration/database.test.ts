@@ -78,6 +78,26 @@ async function persistHttpIdentity(identity:TestHttpIdentity,label:string):Promi
   ]);
 }
 
+/**
+ * T9: the EVALUATOR's wire shape. One EVALUATOR call replaced BOTH retired
+ * serve-path organs — per-segment CONFORMANCE and post-compose R9 — so the two
+ * conformance responses plus the r9 response that every served-run fixture used
+ * to script are now ONE satisfied verdict, and a satisfied evaluator ends the
+ * loop in round 1. Fixture provisioning only: no fixture's own subject
+ * assertions change.
+ */
+const evaluatorSatisfied = (): string => JSON.stringify({
+  satisfied: true,
+  objection: null,
+  criteria: {
+    fairness_to_losers: true,
+    statement_label_agreement: true,
+    no_overstatement: true,
+    restatement: true,
+    citation_tracing: true
+  }
+});
+
 const runnerSettings = (): WalkingSkeletonSettings => ({
   workerId: "runner:test-layer", claimMs: 10_000, claimMarginMs: 1_000,
   judgeBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
@@ -361,7 +381,10 @@ async function startProviderDouble(
 ): Promise<{
   endpoint: string; calls(): number; stop(): Promise<void>;
 }> {
-  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  // T9: the EVALUATOR is a class of its own. The retired CONFORMANCE and R9
+  // classes stay in the vocabulary so a fixture that still scripts one is
+  // dispatched rather than silently served a judgement.
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "EVALUATOR" | "GENERAL";
   const classifyContent = (content: ProviderDoubleResponse): ResponseClass => {
     if (typeof content !== "string") return "GENERAL";
     try {
@@ -369,6 +392,7 @@ async function startProviderDouble(
       if ("statement" in value) return "JUDGE";
       if ("outcome" in value) return "REVIEW";
       if ("segments" in value) return "COMPOSE";
+      if ("satisfied" in value) return "EVALUATOR";
       if ("conforms" in value) return "CONFORMANCE";
       if ("pass" in value) return "R9";
     } catch { /* malformed fixtures retain FIFO semantics */ }
@@ -409,11 +433,17 @@ async function startProviderDouble(
       // T3 N4 (same defect as acceptance/ceremony.test.ts): the JUDGE discriminator must
       // be ESCAPE-SAFE — the packet reaches the wire JSON-encoded, so `"statement":`
       // arrives as \"statement\" and the old check never matched.
+      // T9: `fairness_to_losers` appears in the EVALUATOR system prompt and
+      // nowhere else, and it is checked BEFORE the composer discriminator
+      // because an evaluator request carries the candidate statement, not the
+      // segment contract. Without this the evaluator was handed whatever sat at
+      // the head of the queue — a judgement — and failed its own schema.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
         : body.includes("restatement_text") ? "JUDGE"
-          : body.includes("conforms,findings") ? "CONFORMANCE"
-            : body.includes("{pass}") ? "R9"
-              : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+          : body.includes("fairness_to_losers") ? "EVALUATOR"
+            : body.includes("conforms,findings") ? "CONFORMANCE"
+              : body.includes("{pass}") ? "R9"
+                : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
       // T5/S3-1: a review response must measure exactly the edges THIS call
@@ -933,9 +963,7 @@ describe("BUG-03 asker-scoped debates index", () => {
         { segment_id: "segment:verdict", text: "A served test-layer answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const served = await runnerWithEndpoint(provider.endpoint).executeWorkItem(servedWork.workItemId);
@@ -1754,9 +1782,7 @@ describe("apps/runner — legal command lifecycle", () => {
     const healthySecondary = await startProviderDouble([
       judgementDouble("The surviving real CLI authors the primary position", 0.4),
       resil01Composition,
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const question = `claim-primary-reselection-${randomUUID()}`;
@@ -1802,12 +1828,27 @@ describe("apps/runner — legal command lifecycle", () => {
           providerRef: secondaryMember.provider_ref,
           maker: secondaryMember.maker
         },
-        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // T9/J8: the sealed role refs name a CONFIGURED PROVIDER IDENTITY and are
+        // resolved by lookup, never by health — so on a deployment whose primary
+        // is absent, the rows must name the provider that actually holds the
+        // roles. Substituting a healthy provider for the sealed one is exactly
+        // what the sealed row exists to prevent, so the fixture states the
+        // identity rather than expecting the runner to guess it.
+        synthesisRolePolicy: {
+          ...runnerSettings().synthesisRolePolicy!,
+          synthesizerRoleRef: secondaryMember.provider_ref,
+          evaluatorRoleRef: secondaryMember.provider_ref
+        }
       });
 
       await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
       expect(absentPrimary.calls()).toBe(0);
-      expect(healthySecondary.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(healthySecondary.calls()).toBe(3);
     } finally {
       await healthySecondary.stop();
       await absentPrimary.stop();
@@ -2307,9 +2348,7 @@ describe("apps/runner — legal command lifecycle", () => {
       judgementDouble("Primary hidden-frame position 4"),
       reviewDouble("agree", "Primary review 4"),
       composition,
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     const secondary = await startProviderDouble([
       judgementDouble("Secondary hidden-frame position 1"),
@@ -2563,9 +2602,7 @@ describe("apps/runner — legal command lifecycle", () => {
       judgementDouble("Primary unassessable-frame position 4"),
       reviewDouble("agree", "Primary review 4"),
       composition,
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     const secondary = await startProviderDouble([
       judgementDouble("Secondary unassessable-frame position 1"),
@@ -2852,9 +2889,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary D position ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary D review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary D position ${index + 1}`)),
@@ -2961,9 +2996,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary R1 position ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary R1 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary R1 position ${index + 1}`)),
@@ -2991,9 +3024,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { status: 503 }, { status: 503 },
         ...Array.from({ length: 3 }, (_, index) => reviewDouble("agree", `Primary no-root review ${index + 2}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary no-root position ${index + 1}`)),
@@ -3033,9 +3064,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T5 position ${index + 1}`, 0.5)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T5 review ${index + 1}`, bearings)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T5 position ${index + 1}`, 0.5)),
@@ -3145,9 +3174,7 @@ describe("apps/runner — legal command lifecycle", () => {
           ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T6 position ${index + 1}`)),
           ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T6 review ${index + 1}`)),
           resil01Composition,
-          JSON.stringify({ conforms: true, findings: [] }),
-          JSON.stringify({ conforms: true, findings: [] }),
-          JSON.stringify({ pass: true })
+          evaluatorSatisfied()
         ],
         secondary: [
           ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T6 position ${index + 1}`)),
@@ -3189,9 +3216,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary low position ${index + 1}`, 0.30)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary low review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary low position ${index + 1}`, 0.30)),
@@ -3218,9 +3243,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary attack-control ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary attack review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         judgementDouble("Secondary attack-control root"),
@@ -3260,9 +3283,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary boundary ${index + 1}`, 0.35)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary boundary review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary boundary ${index + 1}`, 0.35)),
@@ -3314,9 +3335,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Primary depth-2 surviving ${index + 1}`)),
         ...Array.from({ length: 7 }, (_, index) => reviewDouble("agree", `Primary depth-2 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         judgementDouble("Secondary depth-2 root"),
@@ -3385,9 +3404,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T12 ${index + 1}`)),
         ...Array.from({ length: 3 }, (_, index) => reviewDouble("agree", `Primary T12 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Secondary T12 ${index + 1}`)),
@@ -3427,9 +3444,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary T4 position ${index + 2}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T4 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T4 position ${index + 1}`)),
@@ -3610,9 +3625,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "Family A position 1", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     // B parses, and scores ABOVE the author — only the discount keeps it from winning.
     const makerB = await startProviderDouble([
@@ -3776,15 +3789,17 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "A provisional answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const work = await createRunnerWork("happy-path");
       const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
       expect(result.kind).toBe("COMPLETED");
-      expect(provider.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(provider.calls()).toBe(3);
       const row = await database.pool.query<{ state: string; terminal: string; base_kind: string; final_kind: string; base_producer: string; final_producer: string; reduced_judgement_id: string; walked_reduced_judgement_ref: string; disagreement: unknown }>(
         `SELECT work.state, answer.terminal, judgement.number_kind AS base_kind, strength.number_kind AS final_kind,
                 judgement.producer AS base_producer, strength.producer AS final_producer,
@@ -3979,9 +3994,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const work = await createRunnerWork("band-ceiling-capped");
@@ -3998,17 +4011,48 @@ describe("apps/runner — legal command lifecycle", () => {
           register_row_key: "wayOfKnowingCeiling"
         }
       });
-      expect(provider.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(provider.calls()).toBe(3);
     } finally { await provider.stop(); }
   });
 
-  it("persists and settles a pre-compose R9 block as components-only + DEFECT", async () => {
-    const provider = await startProviderDouble([JSON.stringify({
-      statement: "A blocked answer.", way_of_knowing: "REASONING", locator: null,
-      restatement_text: "Different meaning.", restatement_status: "FAIL", value_laden: false,
-      steelman: { summary: "A blocked answer.", fidelity: 0.4 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
-      evidence: { quality: 0.4, relevance: 0.4 }, context: { fit: 0.4, ambiguityFlags: [] }, fallacy: { severity: 0.6, fatalFlags: [] }
-    })]);
+  /**
+   * T9 (goal 248-251), at RUN level. This fixture used to prove the pre-compose
+   * R9 GATE: a load-bearing node whose restatement FAILED ended the run in
+   * COMPONENTS_ONLY + DEFECT after exactly one model call. That gate is retired
+   * — R9 is an EVALUATOR OBJECTION CRITERION now — so the same input must reach
+   * the synthesizer, earn the objection, and SERVE on the round that answers it.
+   */
+  it("serves a failed-restatement run through the evaluator instead of blocking it (former pre-compose R9 gate)", async () => {
+    const reasoningSegments = JSON.stringify({ segments: [
+      { segment_id: "segment:hypothesis", text: "Hypothesis: the answer holds provisionally.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Research plan: find a source a stranger could restate.", node_refs: [], served_number_refs: [] }
+    ] });
+    const provider = await startProviderDouble([
+      JSON.stringify({
+        statement: "A blocked answer.", way_of_knowing: "REASONING", locator: null,
+        restatement_text: "Different meaning.", restatement_status: "FAIL", value_laden: false,
+        steelman: { summary: "A blocked answer.", fidelity: 0.4 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.4, relevance: 0.4 }, context: { fit: 0.4, ambiguityFlags: [] }, fallacy: { severity: 0.6, fatalFlags: [] }
+      }),
+      // round 1: the synthesizer writes, the evaluator objects ON RESTATEMENT —
+      // the very predicate the retired gate used to terminate on.
+      reasoningSegments,
+      JSON.stringify({
+        satisfied: false,
+        objection: "A stranger could not restate this claim from the digest alone.",
+        criteria: {
+          fairness_to_losers: true, statement_label_agreement: true,
+          no_overstatement: true, restatement: false, citation_tracing: true
+        }
+      }),
+      // round 2: the feedback is answered and the run serves.
+      reasoningSegments,
+      evaluatorSatisfied()
+    ]);
     try {
       const work = await createRunnerWork("pre-compose-block");
       const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
@@ -4018,22 +4062,21 @@ describe("apps/runner — legal command lifecycle", () => {
          FROM core.work_item AS work JOIN serve.answer AS answer ON answer.answer_id = work.settled_artifact_ref
          WHERE work.work_item_id = $1`, [work.workItemId]
       );
-      expect(row.rows[0]).toEqual({
-        state: "DONE", terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY", composed_text_id: null
+      // NOT components-only, and the second round is recorded as the recompose.
+      expect(row.rows[0]).toMatchObject({
+        state: "DONE", terminal: "DOWNGRADED", serve_state: "RECOMPOSED_ONCE"
       });
+      expect(row.rows[0]?.composed_text_id).not.toBeNull();
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
       const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:pre-compose-block");
-      expect(projection?.conformance_outcome).toBe("NOT_RUN");
       expect(projection).toMatchObject({
-        terminal: "COMPONENTS_ONLY",
-        serve_state: "COMPONENTS_ONLY",
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
-        verdict_state: null,
-        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
-        confidence_band: null,
-        band_ceiling: null
+        terminal: "DOWNGRADED",
+        serve_state: "RECOMPOSED_ONCE",
+        verdict_unavailable: null
       });
-      expect(provider.calls()).toBe(1);
+      expect(projection?.condition_marks).not.toContain("DEFECT");
+      // judge + (synthesizer, evaluator) x 2 rounds.
+      expect(provider.calls()).toBe(5);
       const terminal = await database.pool.query("SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL'", [work.runId]);
       expect(terminal.rowCount).toBe(1);
     } finally { await provider.stop(); }
@@ -4122,7 +4165,14 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
-  it("persists and settles the pre-compose composition-budget terminal as components-only", async () => {
+  /**
+   * T9 (goal 252-254, 263-266): the composition byte budget stopped being a
+   * quality GATE and became a code PRECONDITION on the digest. A bound of 1 is
+   * below the digest's size at MAXIMUM compression, so no digest can exist —
+   * the DIGEST_CANNOT_EXIST crash class, which carries its OWN named mark
+   * rather than the generic DEFECT, and never a silently truncated node set.
+   */
+  it("persists and settles the digest-cannot-exist crash class as components-only with its own mark", async () => {
     const provider = await startProviderDouble([JSON.stringify({
       statement: "A budget-bounded answer.", way_of_knowing: "REASONING", locator: null,
       restatement_text: "A budget-bounded answer.", restatement_status: "PASS", value_laden: false,
@@ -4159,7 +4209,7 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(row.rows[0]).toMatchObject({
         state: "DONE", terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY",
         composed_text_id: null, conformance_record_id: null,
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DIGEST-CANNOT-EXIST"],
         fact_bundle_id: expect.any(String)
       });
       expect(row.rows[0]?.settled_artifact_ref).toBe(result.kind === "COMPLETED" ? result.answerId : null);
@@ -4170,10 +4220,10 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection).toMatchObject({
         terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY",
         verdict_state: null,
-        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
+        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DIGEST" },
         confidence_band: null, band_ceiling: null,
         composed_text: [],
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DIGEST-CANNOT-EXIST"],
         conformance_outcome: "NOT_RUN"
       });
       const terminal = await database.pool.query(
@@ -4193,8 +4243,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "Replayable answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Verify it independently.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }), JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const work = await createRunnerWork("redelivery-completion");
@@ -4207,11 +4256,23 @@ describe("apps/runner — legal command lifecycle", () => {
       );
       const redelivery = await runner.executeWorkItem(work.workItemId);
       expect(redelivery).toEqual({ kind: "COMPLETED", answerId: first.answerId });
-      expect(provider.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(provider.calls()).toBe(3);
     } finally { await provider.stop(); }
   });
 
-  it("completes redelivery from a pre-compose components-only artifact without another provider call", async () => {
+  /**
+   * T9: the artifact this fixture redelivers from is no longer a pre-compose
+   * GATE block — that gate is retired. The scripted double answers the judge and
+   * nothing else, so the SYNTHESIZER's transport dies, which is one of the four
+   * enumerated crash classes (TRANSPORT_DEATH) and lands components-only + DEFECT.
+   * The fixture's SUBJECT is unchanged and is what the counts pin: redelivery
+   * reuses the sealed artifact and makes NO further provider call.
+   */
+  it("completes redelivery from a components-only artifact without another provider call", async () => {
     const provider = await startProviderDouble([JSON.stringify({
       statement: "Durably blocked answer.", way_of_knowing: "REASONING", locator: null,
       restatement_text: "Different meaning.", restatement_status: "FAIL", value_laden: false,
@@ -4223,13 +4284,23 @@ describe("apps/runner — legal command lifecycle", () => {
       const runner = runnerWithEndpoint(provider.endpoint);
       const first = await runner.executeWorkItem(work.workItemId);
       if (first.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      // judge + the synthesizer call whose transport died.
+      const callsAfterFirstRun = provider.calls();
+      expect(callsAfterFirstRun).toBe(2);
+      const sealed = await new ServeRepository(database.pool)
+        .readAnswerProjection(first.answerId, "asker:blocked-redelivery-completion");
+      expect(sealed).toMatchObject({
+        terminal: "COMPONENTS_ONLY",
+        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" }
+      });
       await database.pool.query(
         "UPDATE core.work_item SET state='READY', settled_attempt_id=NULL, settled_artifact_ref=NULL WHERE work_item_id=$1",
         [work.workItemId]
       );
       const redelivery = await runner.executeWorkItem(work.workItemId);
       expect(redelivery).toEqual({ kind: "COMPLETED", answerId: first.answerId });
-      expect(provider.calls()).toBe(1);
+      // THE SUBJECT: redelivery added nothing.
+      expect(provider.calls()).toBe(callsAfterFirstRun);
     } finally { await provider.stop(); }
   });
 
@@ -4348,7 +4419,10 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
   // behaves exactly like the live model: it returns the observed
   // under-segmented shape UNLESS the system prompt declares the contract.
   const reasoningContractFragments = [
-    "When the supplied nodes rest on reasoning alone",
+    // T9/J23: the prompt now names the DIGEST nodes a segment cites, because
+    // the citable set follows the digest. The fragment tracks the stable
+    // clause so the test keeps proving that the contract is DECLARED.
+    "rest on reasoning alone",
     "at least two segments",
     "first segment states the provisional answer as a hypothesis",
     "second segment states the research plan"
@@ -4397,10 +4471,12 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
             : JSON.stringify({ segments: [
                 { segment_id: "segment:verdict", text: "A reasoning-only provisional answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] }
               ] });
-        } else if (system.includes("{conforms,findings}")) {
-          content = JSON.stringify({ conforms: true, findings: [] });
         } else {
-          content = JSON.stringify({ pass: true });
+          // T9: the CONFORMANCE and post-compose-R9 prompts no longer exist on
+          // the serve path; the EVALUATOR's is the only non-composer prompt a
+          // served run can produce, and it is matched by its own text rather
+          // than by falling through to a retired organ's shape.
+          content = evaluatorSatisfied();
         }
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: "composer-contract-double", model: "test-layer/model",
@@ -4638,9 +4714,7 @@ describe("T10/T11 · the served root and its label, through the production runne
         ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary child ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         // The SECOND-configured maker authors the STRONGER root.
@@ -4760,9 +4834,7 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`B3 primary position ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `B3 primary review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`B3 secondary position ${index + 1}`)),

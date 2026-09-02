@@ -1394,6 +1394,59 @@ export function buildFixedSingleRootServeNodes(
   })));
 }
 
+/**
+ * J23 / T9 — the SERVED and CITABLE node set follows the DIGEST.
+ *
+ * The goal's premise that T10 replaced `buildFixedSingleRootServeNodes` is
+ * false: T10 replaced the served-root SELECTION RULE only, so the serve set
+ * stayed one node and the composer could only ever cite `"primary"`. With one
+ * node in the set, the way-of-knowing basis can only ever be 0/1 — production
+ * shares were structurally incapable of being fractional.
+ *
+ * DR-159 B2-A, stated explicitly, is TWO constraints:
+ *   (1) "project exactly the selected root into the served-node set" — exactly
+ *       ONE maker POSITION is served;
+ *   (2) the two-segment cap on composer output (`partitionServedSegments`,
+ *       `RUNNER_COMPOSITION_SEGMENT_CAP`).
+ *
+ * This widening SATISFIES both rather than breaking either. Constraint (1) is
+ * about which position is SERVED, not about which nodes may be CITED: exactly
+ * one node here is load-bearing and it is the served root, and this function
+ * refuses any other shape. The remaining materialized nodes — the losing maker
+ * positions included — enter as CITABLE, NON-load-bearing evidence, which is
+ * what the evaluator's fairness-to-losers and citation-tracing criteria require
+ * a synthesizer to be able to reach. Constraint (2) is untouched: this changes
+ * the citable node set, never the segment count.
+ */
+export function buildDigestFollowingServeNodes(input: {
+  readonly authored: readonly FixedRootServeCandidate[];
+  readonly servedRootNodeId: string;
+}): readonly ServeNode[] {
+  const served = buildFixedSingleRootServeNodes(input.authored, input.servedRootNodeId);
+  const citable = input.authored
+    .filter((node) => node.nodeId !== input.servedRootNodeId)
+    .map((node) => Object.freeze({
+      nodeId: node.nodeId,
+      text: node.statement,
+      wayOfKnowing: node.wayOfKnowing,
+      provenanceRef: node.provenanceRef,
+      locator: node.locator,
+      restatementStatus: node.restatementStatus,
+      loadBearing: false
+    }));
+  const nodes = Object.freeze([...served, ...citable]);
+  if (nodes.filter((node) => node.loadBearing).length !== 1) {
+    throw new TypedDomainError(
+      "FIXED_SINGLE_ROOT_SERVE_VIOLATED",
+      "DR-159 B2-A requires exactly one served root; widening the citable set may never add a second"
+    );
+  }
+  if (new Set(nodes.map((node) => node.nodeId)).size !== nodes.length) {
+    throw new TypedDomainError("SERVE_NODE_IDS_NOT_UNIQUE", "A materialized node appears twice in the serve set");
+  }
+  return nodes;
+}
+
 /** DR-159 B3-B: depth is a closed, ASK-time count of expansion rounds. */
 export function resolveExpansionDepth(depthParams: Readonly<Record<string, unknown>>): number {
   const depth = depthParams.depth;
@@ -2816,10 +2869,14 @@ export class WalkingSkeletonRunner {
       })
     });
     const verdictLabel = deriveVerdictLabel(verdictLabelBasis);
-    const servedNodes = buildFixedSingleRootServeNodes(
-      authoredMakerPositions,
-      servedRoot.nodeId
-    );
+    // J23: the citable set follows the DIGEST — same source, same membership,
+    // so "every load-bearing claim traces to a digest node" is satisfiable by
+    // construction rather than by the synthesizer guessing. Exactly one node is
+    // load-bearing (DR-159 B2-A clause 1); the rest are citable evidence.
+    const servedNodes = buildDigestFollowingServeNodes({
+      authored: authoredNodeList,
+      servedRootNodeId: servedRoot.nodeId
+    });
     const replayHandle = `replay:${run.runId}:${servedRoot.nodeId}`;
     const propagationRunId = await this.#ledger.recordPropagation({
       runId: run.runId,
@@ -3355,7 +3412,7 @@ export class WalkingSkeletonRunner {
       synthesize: async (request: SynthesizerRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER");
         const packet: PromptPacket = { messages: [
-          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the digest and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
+          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
           { role: "user", content: JSON.stringify(request) }
         ] };
         const response = await callSynthesisRole(role.provider, {
@@ -3388,11 +3445,16 @@ export class WalkingSkeletonRunner {
           segmentId: segment.segment_id,
           text: segment.text,
           loadBearing: false,
+          // J23: a citation may name ANY node in the digest-following set by its
+          // real id. `"primary"` stays admissible as the served root's alias so
+          // sealed prompts and fixtures written against the one-node set keep
+          // working; an unknown ref is still a loud contract error.
           assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => {
-            if (ref !== "primary") {
+            if (ref === "primary") return servedRoot.nodeId;
+            if (!servedNodes.some((node) => node.nodeId === ref)) {
               throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${ref}`);
             }
-            return servedRoot.nodeId;
+            return ref;
           })),
           servedNumberRefs: Object.freeze([...segment.served_number_refs])
           });
