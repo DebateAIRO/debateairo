@@ -53,11 +53,30 @@ type EnrollmentHistory = Readonly<{
   replaceState(state: unknown, unused: string, url?: string | URL | null): void;
 }>;
 
+const TOKEN_FRAGMENT_PREFIX = "token=";
+
+/** The `&`-separated pieces of a fragment; an empty fragment has none. */
+function fragmentPieces(hash: string): string[] {
+  const body = hash.startsWith("#") ? hash.slice(1) : hash;
+  return body === "" ? [] : body.split("&");
+}
+
+function navigationPath(url: URL, pieces: readonly string[]): string {
+  return `${url.pathname}${url.search}${pieces.length === 0 ? "" : `#${pieces.join("&")}`}`;
+}
+
 /**
  * Takes the mailed bearer out of browser-visible navigation state before the
  * first network await, then proves email possession through the same-origin
  * verification route. The returned value lives only in the current component
  * state; this helper never writes browser storage or a cookie.
+ *
+ * The mail carries the bearer in the URL fragment (`#token=…`), which the
+ * browser never sends to a server, proxy or access log (L3-F8); this helper
+ * runs only after hydration, so SSR never sees it either. The retired query
+ * form (`?token=…`) is still read for one release: it is first rewritten to the
+ * fragment form so the query form leaves navigation state, then consumed
+ * exactly like a fragment bearer.
  */
 export async function consumeMailedEnrollmentTokenFromUrl(
   location: EnrollmentLocation,
@@ -65,15 +84,17 @@ export async function consumeMailedEnrollmentTokenFromUrl(
   verify: (token: string) => Promise<void> = verifyMfaEmail
 ): Promise<string | null> {
   const url = new URL(location.href);
-  const token = url.searchParams.get("token");
-  if (token === null) return null;
-  url.searchParams.delete("token");
-  const query = url.searchParams.toString();
-  history.replaceState(
-    history.state,
-    "",
-    `${url.pathname}${query === "" ? "" : `?${query}`}${url.hash}`
-  );
+  let pieces = fragmentPieces(url.hash);
+  const legacyToken = url.searchParams.get("token");
+  if (legacyToken !== null) {
+    url.searchParams.delete("token");
+    pieces = [...pieces, `${TOKEN_FRAGMENT_PREFIX}${legacyToken}`];
+    history.replaceState(history.state, "", navigationPath(url, pieces));
+  }
+  const index = pieces.findIndex((piece) => piece.startsWith(TOKEN_FRAGMENT_PREFIX));
+  if (index === -1) return null;
+  const token = pieces[index]!.slice(TOKEN_FRAGMENT_PREFIX.length);
+  history.replaceState(history.state, "", navigationPath(url, pieces.filter((_, at) => at !== index)));
   await verify(token);
   return token;
 }
