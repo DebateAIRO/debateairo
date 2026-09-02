@@ -135,6 +135,25 @@ function safeTokenHash(kind: TokenKind, token: string): string | null {
   }
 }
 
+/**
+ * The two purpose labels. Written out in full so a reader — and the source
+ * invariant in tests/unit/session-key-derivation.test.ts — can see exactly
+ * which key each HMAC below is under.
+ */
+const SESSION_BINDING_KDF_LABEL = "debateai:kdf:session-binding:v1" as const;
+const LOGIN_RATE_KDF_LABEL = "debateai:kdf:login-rate:v1" as const;
+type SessionKdfLabel = typeof SESSION_BINDING_KDF_LABEL | typeof LOGIN_RATE_KDF_LABEL;
+
+/**
+ * HMAC-SHA-256(root, label) — one independent 32-byte key
+ * per purpose, so the root secret is never itself an HMAC key and a purpose key
+ * cannot be run backwards to the root. The label is the whole message: it is
+ * fixed-length and unambiguous, so no length prefix is needed.
+ */
+function deriveSessionPurposeKey(root: Uint8Array, label: SessionKdfLabel): Buffer {
+  return createHmac("sha256", root).update(label, "utf8").digest();
+}
+
 function sameHash(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left, "utf8");
   const rightBytes = Buffer.from(right, "utf8");
@@ -154,7 +173,8 @@ export class SessionService implements SessionApplication {
     mfaPolicy: MfaPolicy;
     sessionPolicy: SessionPolicy;
     blindIndexKey: Uint8Array;
-    bindingKey: Uint8Array;
+    sessionBindingKey: Buffer;
+    loginRateKey: Buffer;
     dummyPasswordHash: string;
     clock?: () => Date;
   }>) {
@@ -180,16 +200,25 @@ export class SessionService implements SessionApplication {
       const dummy = randomBytes(32).toString("base64url");
       generated = await hashPassword(dependencies.argon2, dummy, dependencies.authPolicy.password.argon2id);
     }
-    const bindingKey = dependencies.bindingKey === undefined
+    const rootKey = dependencies.bindingKey === undefined
       ? Buffer.from(dependencies.blindIndexKey)
       : Buffer.from(dependencies.bindingKey);
-    if (bindingKey.byteLength < 32) {
-      bindingKey.fill(0);
+    if (rootKey.byteLength < 32) {
+      rootKey.fill(0);
       throw new TypeError("SESSION_BINDING_KEY_INVALID");
     }
+    // L2-F5: the raw root secret is the email blind-index key by default, so
+    // keying the session HMACs with it directly made one 32-byte secret serve
+    // three purposes: rotating the blind index silently invalidated every
+    // session binding and login challenge, and vice versa. Each purpose now
+    // gets its own key, derived so the root never appears as an HMAC key.
+    const sessionBindingKey = deriveSessionPurposeKey(rootKey, SESSION_BINDING_KDF_LABEL);
+    const loginRateKey = deriveSessionPurposeKey(rootKey, LOGIN_RATE_KDF_LABEL);
+    rootKey.fill(0);
     return new SessionService(Object.freeze({
       ...dependencies,
-      bindingKey,
+      sessionBindingKey,
+      loginRateKey,
       dummyPasswordHash: dependencies.dummyPasswordHash ?? generated!
     }));
   }
@@ -201,13 +230,13 @@ export class SessionService implements SessionApplication {
   private bindingHash(source: AuthSourceContext): string {
     const userAgent = typeof source?.userAgent === "string" && source.userAgent.trim() !== ""
       ? source.userAgent.trim().slice(0, 256) : "unknown";
-    return `sha256:${createHmac("sha256", this.dependencies.bindingKey)
+    return `sha256:${createHmac("sha256", this.dependencies.sessionBindingKey)
       .update("debateai:session-user-agent:v1\0", "utf8")
       .update(userAgent, "utf8").digest("hex")}`;
   }
 
   private challengeRateKey(input: string): string {
-    return createHmac("sha256", this.dependencies.bindingKey)
+    return createHmac("sha256", this.dependencies.loginRateKey)
       .update("debateai:login-rate-key:v1\0", "utf8").update(input, "utf8").digest("hex");
   }
 
