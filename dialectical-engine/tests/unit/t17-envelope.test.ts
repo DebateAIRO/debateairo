@@ -355,6 +355,27 @@ describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
   });
 
   /**
+   * T17B — the LANDED count check gets its own pin back.
+   *
+   * Adding the larger-arm guard made the landed count check redundant: a
+   * campaign mutant that disabled the count check entirely left all 38 tests
+   * green, because the larger-arm guard refused the same inputs. A guard no
+   * test can kill is a guard that can be deleted silently, so it is pinned the
+   * same way the two new guards are — on the refusal it produces, not merely on
+   * the fact that something refused.
+   *
+   * The three cross-field guards overlap by construction (any two imply the
+   * third), so NO input can make exactly one of them fire. Asserting the
+   * message is what makes each one individually killable regardless.
+   */
+  it("names the COUNT disagreement, so the landed count check stays killable", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 6;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrow("serve call sites 6 disagree with the COMPOSITION arm 7");
+  });
+
+  /**
    * T17B/B2 — the checks above are ONE cross-field check, and one is not enough.
    *
    * r3 required TWO independent cross-field checks: the selected arm must agree
