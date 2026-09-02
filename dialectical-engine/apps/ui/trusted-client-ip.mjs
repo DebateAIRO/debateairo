@@ -24,6 +24,11 @@ export function normalizeClientIp(value) {
 /**
  * Runs on the Node socket before Next performs its caller-preserving `??=`
  * forwarding-header synthesis. No value supplied by the HTTP caller survives.
+ *
+ * L3-F3 C-3: Next takes the script nonce from the REQUEST
+ * `content-security-policy` header and applies middleware rewrites from
+ * `x-middleware-*` headers, so a caller may never name either; only
+ * apps/ui/middleware.ts does (it sets them after this ran).
  */
 export function hardenIncomingProxyHeaders(headers, remoteAddress) {
   for (const name of Object.keys(headers)) {
@@ -33,7 +38,11 @@ export function hardenIncomingProxyHeaders(headers, remoteAddress) {
       || lower === "cf-connecting-ip"
       || lower === "true-client-ip"
       || lower === TRUSTED_CLIENT_IP_HEADER
-      || lower.startsWith("x-forwarded-")) {
+      || lower === "content-security-policy"
+      || lower === "content-security-policy-report-only"
+      || lower === "x-nonce"
+      || lower.startsWith("x-forwarded-")
+      || lower.startsWith("x-middleware-")) {
       delete headers[name];
     }
   }

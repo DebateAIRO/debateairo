@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import next from "next";
+import { FALLBACK_CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
 import { hardenIncomingProxyHeaders } from "./trusted-client-ip.mjs";
 
 const development = process.argv.includes("--dev");
@@ -19,6 +20,10 @@ const handle = app.getRequestHandler();
 const upgrade = app.getUpgradeHandler();
 const server = createServer((request, response) => {
   hardenIncomingProxyHeaders(request.headers, request.socket.remoteAddress);
+  // L3-F3 C-2 (fail-closed): a policy exists before Next runs. The middleware
+  // replaces it on every route it matches; anything it does not match —
+  // static chunks, a skipped middleware — still carries this one.
+  response.setHeader("content-security-policy", FALLBACK_CONTENT_SECURITY_POLICY);
   void handle(request, response).catch((error) => {
     console.error("[UI_REQUEST_FAILED]", error);
     if (!response.headersSent) response.statusCode = 500;
