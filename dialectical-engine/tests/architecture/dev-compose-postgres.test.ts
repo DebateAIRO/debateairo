@@ -42,4 +42,15 @@ describe("DEV-02 loopback-only development PostgreSQL", () => {
       source.replace("condition: service_healthy", "condition: service_started")
     )).toThrow("DEV_POSTGRES_HEALTH_DEPENDENCY_REQUIRED");
   });
+
+  it("pins the postgres image by digest while keeping the ruled-major interpolation (L6-F14)", async () => {
+    const source = await readFile("compose.dev.yaml", "utf8");
+    const postgresImage = source.match(/^    image: (postgres:[^\n]+)$/m)?.[1];
+    expect(postgresImage).toMatch(/^postgres:\$\{POSTGRES_MAJOR_VERSION:\?[^}]+\}@sha256:[0-9a-f]{64}$/);
+    const images = [...source.matchAll(/^    image: ([^\n]+)$/gm)].map((match) => match[1]);
+    expect(images).toHaveLength(3); // postgres, hatchet-lite, vllm
+    for (const reference of images) expect(reference).toMatch(/@sha256:[0-9a-f]{64}$/);
+    const digest = postgresImage!.match(/@(sha256:[0-9a-f]{64})$/)![1];
+    expect(await readFile("deploy/IMAGE-PINS.md", "utf8")).toContain(digest);
+  });
 });
