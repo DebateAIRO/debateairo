@@ -20,7 +20,7 @@ import {
   generatePseudonym,
   generateVerificationToken,
   hashPassword,
-  hashVerificationToken,
+  hashToken,
   loadKek,
   verifyPassword,
   type UserDekStoreFileSystem
@@ -606,8 +606,8 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
   it("creates single-purpose opaque tokens and stable-format non-derived pseudonym candidates", () => {
     const token = generateVerificationToken();
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(hashVerificationToken(token)).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(hashVerificationToken(token)).not.toContain(token);
+    expect(hashToken("verification", token)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(hashToken("verification", token)).not.toContain(token);
 
     const forbidden = ["alice", "example", "00000000", "secret-value"];
     const pseudonyms = new Set(Array.from({ length: 200 }, () => generatePseudonym()));

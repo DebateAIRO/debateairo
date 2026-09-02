@@ -126,7 +126,8 @@ class CryptoInputError extends CryptoError {
     | "CRYPTO_AUDIT_CHAIN_INVALID"
     | "CRYPTO_CANONICAL_VALUE_INVALID"
     | "CRYPTO_EMAIL_INVALID"
-    | "CRYPTO_KEY_INVALID") {
+    | "CRYPTO_KEY_INVALID"
+    | "CRYPTO_TOKEN_KIND_INVALID") {
     super(code, code);
     this.name = "CryptoInputError";
   }
@@ -1042,6 +1043,37 @@ export function generateVerificationToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant" | "verification";
+
+const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
+  "session", "csrf", "login-challenge", "step-up-grant", "verification"
+]);
+
+/**
+ * Purpose-bound opaque-token hash: `sha256("debateai:token:<kind>:v1\0" || token)`,
+ * rendered in the `sha256:<hex>` grammar every token-hash column CHECKs. A token
+ * presented as one kind can never match a hash stored for another kind (L2-F12).
+ * The MFA enrolment token is the consumed verification credential (looked up by
+ * `channel_binding.verification_token_hash`), so it hashes as "verification".
+ */
+export function hashToken(kind: TokenKind, token: string): string {
+  if (typeof kind !== "string" || !TOKEN_KINDS.has(kind)) {
+    throw new CryptoInputError("CRYPTO_TOKEN_KIND_INVALID");
+  }
+  if (typeof token !== "string" || token.length < 32) {
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return `sha256:${createHash("sha256")
+    .update(`debateai:token:${kind}:v1\0`, "utf8")
+    .update(token, "utf8")
+    .digest("hex")}`;
+}
+
+/**
+ * @deprecated Unkeyed, purpose-free digest. No production call site uses it;
+ * it remains only for fixtures that need an opaque `sha256:<hex>` value.
+ * Use `hashToken(kind, token)` for every stored or compared token hash.
+ */
 export function hashVerificationToken(token: string): string {
   if (typeof token !== "string" || token.length < 32) {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");

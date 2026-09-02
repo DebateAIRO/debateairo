@@ -16,7 +16,7 @@ import {
   generateVerificationToken,
   hashPassword,
   hashRecoveryCode,
-  hashVerificationToken,
+  hashToken,
   matchTotpStep,
   normalizeEmailForBlindIndex,
   normalizeRecoveryCode,
@@ -24,7 +24,8 @@ import {
   verifyPassword,
   verifyRecoveryCode,
   type Argon2Executor,
-  type ReadableUserDekStore
+  type ReadableUserDekStore,
+  type TokenKind
 } from "@debateai/crypto";
 import { AuthFlowError } from "./registration.js";
 import { MfaVerificationLimiter } from "./mfa.js";
@@ -125,10 +126,10 @@ function sessionFor(ownerRef: string, sessionId: string): Session {
   });
 }
 
-function safeTokenHash(token: string): string | null {
+function safeTokenHash(kind: TokenKind, token: string): string | null {
   if (!TOKEN_PATTERN.test(token)) return null;
   try {
-    return hashVerificationToken(token);
+    return hashToken(kind, token);
   } catch {
     return null;
   }
@@ -227,7 +228,7 @@ export class SessionService implements SessionApplication {
   }
 
   async authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null> {
-    const tokenHash = safeTokenHash(sessionToken);
+    const tokenHash = safeTokenHash("session", sessionToken);
     if (tokenHash === null) return null;
     const now = this.now();
     const record = await this.dependencies.repository.authenticateSession({
@@ -249,7 +250,7 @@ export class SessionService implements SessionApplication {
   async authenticateErasureStatus(
     sessionToken:string,source:AuthSourceContext
   ):Promise<AuthenticatedSession|null> {
-    const tokenHash=safeTokenHash(sessionToken);
+    const tokenHash=safeTokenHash("session", sessionToken);
     if (tokenHash===null) return null;
     const record=await this.dependencies.repository.authenticateAccountErasureStatusSession({
       tokenHash,bindingHash:this.bindingHash(source),occurredAt:this.now()
@@ -262,7 +263,7 @@ export class SessionService implements SessionApplication {
   }
 
   verifyCsrf(session: AuthenticatedSession, suppliedToken: string): boolean {
-    const suppliedHash = safeTokenHash(suppliedToken);
+    const suppliedHash = safeTokenHash("csrf", suppliedToken);
     return suppliedHash !== null && sameHash(suppliedHash, session.csrfTokenHash);
   }
 
@@ -293,7 +294,7 @@ export class SessionService implements SessionApplication {
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
       const challengeToken = generateVerificationToken();
-      const challengeTokenHash = hashVerificationToken(challengeToken);
+      const challengeTokenHash = hashToken("login-challenge", challengeToken);
       const created = await this.dependencies.repository.createLoginChallenge({
         identity,
         challengeId: randomUUID(),
@@ -324,9 +325,9 @@ export class SessionService implements SessionApplication {
     return Object.freeze({
       sessionId: randomUUID(),
       sessionToken,
-      sessionTokenHash: hashVerificationToken(sessionToken),
+      sessionTokenHash: hashToken("session", sessionToken),
       csrfToken,
-      csrfTokenHash: hashVerificationToken(csrfToken),
+      csrfTokenHash: hashToken("csrf", csrfToken),
       idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
       absoluteExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.absoluteTtlMs)
     });
@@ -359,7 +360,7 @@ export class SessionService implements SessionApplication {
     source: AuthSourceContext
   ): Promise<LoginResult> {
     const now = this.now();
-    const challengeTokenHash = safeTokenHash(input.challengeToken);
+    const challengeTokenHash = safeTokenHash("login-challenge", input.challengeToken);
     const rateKey = this.challengeRateKey(challengeTokenHash ?? "invalid-challenge");
     await this.requireRateBudget(rateKey, source, now);
     try {
@@ -528,7 +529,7 @@ export class SessionService implements SessionApplication {
       const challenge: LoginChallengeRecord = Object.freeze({
         ...identity,
         challengeId: randomUUID(),
-        challengeTokenHash: hashVerificationToken(generateVerificationToken()),
+        challengeTokenHash: hashToken("login-challenge", generateVerificationToken()),
         bindingHash: this.bindingHash(source),
         expiresAt: now,
         consumedAt: null
@@ -548,8 +549,8 @@ export class SessionService implements SessionApplication {
         currentSessionId: input.session.session.session_id,
         currentTokenHash: input.session.tokenHash,
         acceptedStep,
-        replacementTokenHash: hashVerificationToken(replacementToken),
-        replacementCsrfHash: hashVerificationToken(replacementCsrf),
+        replacementTokenHash: hashToken("session", replacementToken),
+        replacementCsrfHash: hashToken("csrf", replacementCsrf),
         bindingContext: Object.freeze({ user_agent_hash: this.bindingHash(source) }),
         occurredAt: now,
         idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
@@ -559,13 +560,13 @@ export class SessionService implements SessionApplication {
           : { grant: input.authorization.action === "DELETE_ACCOUNT"
               ? {
                   grantId: randomUUID(),
-                  grantTokenHash: hashVerificationToken(grantToken),
+                  grantTokenHash: hashToken("step-up-grant", grantToken),
                   action: input.authorization.action,
                   expiresAt: grantExpiresAt
                 }
               : {
                   grantId: randomUUID(),
-                  grantTokenHash: hashVerificationToken(grantToken),
+                  grantTokenHash: hashToken("step-up-grant", grantToken),
                   action: input.authorization.action,
                   targetRunId: input.authorization.targetRunId,
                   expiresAt: grantExpiresAt

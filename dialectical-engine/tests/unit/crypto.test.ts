@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,6 +9,9 @@ import {
   decrypt,
   encrypt,
   generateDek,
+  generateVerificationToken,
+  hashToken,
+  hashVerificationToken,
   loadKek,
   unwrapDek,
   wrapDek
@@ -94,6 +98,26 @@ describe("S1 crypto foundation", () => {
     await chmod(validPath, 0o644);
     expect(() => loadKek(validPath)).toThrowError(
       expect.objectContaining({ code: "KEK_UNRESOLVED" })
+    );
+  });
+
+  it("domain-separates token hashes per kind while keeping the sha256:<hex> column grammar", () => {
+    // L2-F12: one unkeyed SHA-256 served session, CSRF, login-challenge,
+    // step-up-grant and verification tokens with no per-purpose domain.
+    const token = generateVerificationToken();
+    const kinds = ["session", "csrf", "login-challenge", "step-up-grant", "verification"] as const;
+    const hashes = kinds.map((kind) => hashToken(kind, token));
+    for (const hash of hashes) expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(new Set(hashes).size).toBe(kinds.length);
+    expect(hashes).not.toContain(hashVerificationToken(token));
+    expect(hashToken("session", token)).toBe(`sha256:${createHash("sha256")
+      .update("debateai:token:session:v1\0", "utf8").update(token, "utf8").digest("hex")}`);
+    expect(hashToken("session", token)).toBe(hashToken("session", token));
+    expect(() => hashToken("session", "too-short")).toThrowError(
+      expect.objectContaining({ code: "CRYPTO_KEY_INVALID" })
+    );
+    expect(() => hashToken("cookie" as never, token)).toThrowError(
+      expect.objectContaining({ code: "CRYPTO_TOKEN_KIND_INVALID" })
     );
   });
 

@@ -23,7 +23,7 @@ import {
 import {
   ContentCipher,
   generateDek,
-  hashVerificationToken,
+  hashToken,
   MemoryRunContentKeyStore,
   type AuditContextHasher,
   type KeyDestroyResult,
@@ -277,7 +277,7 @@ export async function createAcceptanceServiceSession(
       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at,revoked_at
     ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$6,$7,$8,$6,NULL)
   `, [
-    sessionId,userId,hashVerificationToken(sessionToken),hashVerificationToken(csrfToken),
+    sessionId,userId,hashToken("session", sessionToken),hashToken("csrf", csrfToken),
     JSON.stringify({ user_agent_hash: bindingHash }),now,
     new Date(now.getTime() + 14 * 24 * 60 * 60 * 1_000),
     new Date(now.getTime() + 30 * 24 * 60 * 60 * 1_000)
@@ -297,7 +297,7 @@ export async function createAcceptanceServiceSession(
   const application: SessionApplication = Object.freeze({
     async authenticate(presented: string, source: AuthSourceContext): Promise<AuthenticatedSession | null> {
       if (!SERVICE_CREDENTIAL_PATTERN.test(presented)) return null;
-      const tokenHash = hashVerificationToken(presented);
+      const tokenHash = hashToken("session", presented);
       const record = await repository.authenticateSession({
         tokenHash,
         bindingHash: acceptanceBindingHash(bindingKey, source),
@@ -321,7 +321,7 @@ export async function createAcceptanceServiceSession(
     },
     verifyCsrf(authenticated: AuthenticatedSession, suppliedToken: string): boolean {
       if (!SERVICE_CREDENTIAL_PATTERN.test(suppliedToken)) return false;
-      return exactHashEqual(hashVerificationToken(suppliedToken), authenticated.csrfTokenHash);
+      return exactHashEqual(hashToken("csrf", suppliedToken), authenticated.csrfTokenHash);
     },
     beginLogin: async () => unsupported(),
     completeLogin: async () => unsupported(),
