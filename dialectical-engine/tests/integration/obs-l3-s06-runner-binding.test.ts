@@ -259,7 +259,7 @@ describe("S06 provider gateway binding", () => {
                 panel_size: 1,
                 depth: 1,
                 per_site_attempts: { judge: 2, organ: 2, panel_member: 2, cooldown_site: 5 },
-                call_sites: { author: 1, panel: 0, reviewer: 0, serve: 8 },
+                call_sites: { author: 1, panel: 0, reviewer: 0, serve: 7 },
                 serve_leg: {
                   composition_sites: 7, composition_sites_per_round: 3,
                   post_compose_sites_per_run: 1, synthesis_loop_sites: 6, selected: "COMPOSITION"
