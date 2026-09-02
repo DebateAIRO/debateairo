@@ -502,33 +502,41 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
       expect(dr184v2Ceiling).toBe(88);
       expect(observed).toBeGreaterThan(dr184v2Ceiling);
 
-      // (5) THE BOUNDARY, measured rather than assumed. This run spends the
-      //     envelope EXACTLY, and the envelope is exclusive on both sides:
-      //     `assertModelAttemptAllowed` refuses when `consumed >= max`
-      //     (packages/budget/src/index.ts:286) and `decideBudgetPressure`
-      //     reports WITHIN only while `consumed < max` (:167). So a run that
-      //     takes the true maximum path is allowed every one of its attempts —
-      //     nothing was refused, the run COMPLETED above — and then stands
-      //     EXHAUSTED at the terminal because there is nothing left.
-      //
-      //     A ceiling set exactly at the measured maximum therefore cannot also
-      //     leave a maximum-path run WITHIN at terminal. That is a real
-      //     consequence of the recomputed number, filed as F-S09-8, not a
-      //     defect this test can assert away. The flagship W12 run is a CLEAN
-      //     run (~28 attempts) and stays WITHIN with wide margin; the acceptance
-      //     proofs assert that separately.
+      // (5) THE BOUNDARY, measured — and under J28 it is WITHIN.
+      //     `assertModelAttemptAllowed` PERMITS exactly `max` attempts (it
+      //     refuses at `consumed >= max`), so this run spent exactly what the
+      //     structure allows and exceeded nothing. J28 rules the REPORTING
+      //     comparison to follow the PERMISSION comparison: WITHIN while
+      //     `consumed <= max`. Before that ruling this state reported
+      //     EXHAUSTED, which fired the envelope terminal and REPLACED the
+      //     answer the chain had just served — a lawful run losing its answer
+      //     for spending its whole envelope. V-S09-8 records the alternative.
       const envelopeState = await database.pool.query<{ value_json: unknown }>(
         `SELECT DISTINCT ON (kind) value_json
          FROM core.run_progress_event
          WHERE run_id=$1 AND kind='ENVELOPE_STATE' ORDER BY kind, at_seq DESC`,
         [runId]
       );
-      expect(envelopeState.rows[0]?.value_json).toBe("EXHAUSTED");
+      expect(envelopeState.rows[0]?.value_json).toBe("WITHIN");
       expect(observed).toBe(ceiling);
 
-      // No call was REFUSED: the ledger holds no attempt beyond the ceiling and
-      // the run reached a terminal of its own accord.
-      expect(observed).toBeLessThanOrEqual(ceiling);
+      // (6) THE ANSWER SURVIVES. The served answer is the one the chain
+      //     produced, not an envelope terminal that replaced it.
+      expect(result.kind).toBe("COMPLETED");
+      const answer = await database.pool.query<{ terminal: string; condition_marks: readonly string[] }>(
+        `SELECT terminal, condition_marks FROM serve.answer
+         WHERE run_id=$1 ORDER BY answer_version DESC LIMIT 1`,
+        [runId]
+      );
+      // Non-vacuous: the row must EXIST before its marks mean anything. An
+      // assertion over `rows[0]?.x ?? []` passes when the query found nothing.
+      expect(answer.rows).toHaveLength(1);
+      const marks = answer.rows[0]!.condition_marks;
+      expect(Array.isArray(marks)).toBe(true);
+      expect(marks).not.toContain("ENVELOPE_EXHAUSTED");
+      // The terminal is the chain's own, not the envelope's. These nodes are all
+      // REASONING, so the ruled terminal is DOWNGRADED (GATE4_Q51_DOWNGRADE).
+      expect(answer.rows[0]!.terminal).toBe("DOWNGRADED");
     } finally {
       await secondary.stop();
       await primary.stop();

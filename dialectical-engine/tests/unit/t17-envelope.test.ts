@@ -291,7 +291,7 @@ describe("T17 · the receipt that carries the basis", () => {
    * it pins only "some field is missing" — it survives a schema that quietly
    * re-admits an incomplete `per_site_attempts`. Each disclosure field is
    * therefore pinned INDIVIDUALLY: drop exactly one from an otherwise valid
-   * v3 basis and the run head must still refuse. The list below is ALL NINE
+   * v3 basis and the run head must still refuse. The list below is ALL ELEVEN
    * members v3 newly requires (2 under per_site_attempts, 4 call_sites,
    * 3 serve_leg) — a partial matrix lets any omitted member be weakened to
    * `.optional()` with every case still green (codex r1 B3).
@@ -304,6 +304,8 @@ describe("T17 · the receipt that carries the basis", () => {
     "call_sites.reviewer",
     "call_sites.serve",
     "serve_leg.composition_sites",
+    "serve_leg.composition_sites_per_round",
+    "serve_leg.post_compose_sites_per_run",
     "serve_leg.synthesis_loop_sites",
     "serve_leg.selected"
   ])("refuses a basis missing %s", (dottedPath) => {
@@ -314,6 +316,42 @@ describe("T17 · the receipt that carries the basis", () => {
     delete basis[group]![field];
     expect(() => parseCostEnvelopeBasis(basis))
       .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+});
+
+describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
+  function basis(): Record<string, Record<string, unknown>> {
+    return structuredClone(
+      computeStructuralCeilingBasis(ceilingInput(2, 1)) as Record<string, Record<string, unknown>>
+    );
+  }
+
+  it("refuses a serve call-site count that disagrees with the selected arm", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 6;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it("refuses a COMPOSITION arm that disagrees with the serve call-site count", () => {
+    const wire = basis();
+    wire.serve_leg!.composition_sites = 10;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it("refuses a composition arm that is not its own disclosed decomposition", () => {
+    const wire = basis();
+    // 7 sites, but claiming 4 per round + 1 per run: 6 is not divisible by 4.
+    wire.serve_leg!.composition_sites_per_round = 4;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it("accepts the SYNTHESIS_LOOP arm when the serve count follows it", () => {
+    const loop = computeStructuralCeilingBasis({ ...ceilingInput(2, 1), maxRecompose: 1 });
+    expect(loop.serve_leg).toMatchObject({ selected: "SYNTHESIS_LOOP" });
+    expect(parseCostEnvelopeBasis(loop)).toMatchObject({ panelSize: 2 });
   });
 });
 

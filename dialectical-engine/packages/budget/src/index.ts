@@ -70,7 +70,36 @@ const costEnvelopeBasisSchema = z.object({
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
   bounds_source_ref: z.string().trim().min(1)
-}).strict();
+}).strict().superRefine((basis, ctx) => {
+  /**
+   * S09B: the split receipt was accepted in CONTRADICTORY forms. The serve leg
+   * is disclosed twice — once as the selected site count (`call_sites.serve`)
+   * and once as the arms it was chosen from (`serve_leg`) — and nothing made
+   * them agree, so a basis could name a COMPOSITION arm of 7 while billing 6
+   * serve sites, or split 7 into halves that sum to something else.
+   */
+  const { composition_sites, composition_sites_per_round, post_compose_sites_per_run,
+    synthesis_loop_sites, selected } = basis.serve_leg;
+  const selectedArm = selected === "COMPOSITION" ? composition_sites : synthesis_loop_sites;
+  if (basis.call_sites.serve !== selectedArm) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["call_sites", "serve"],
+      message: `serve call sites ${basis.call_sites.serve} disagree with the ${selected} arm ${selectedArm}`
+    });
+  }
+  // The composition arm must equal its own disclosed decomposition for SOME
+  // whole number of rounds: per-round sites x rounds, plus the per-run organ.
+  const roundedSites = composition_sites - post_compose_sites_per_run;
+  if (roundedSites <= 0 || roundedSites % composition_sites_per_round !== 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["serve_leg", "composition_sites"],
+      message: `composition sites ${composition_sites} are not ${composition_sites_per_round} per round `
+        + `plus ${post_compose_sites_per_run} per run`
+    });
+  }
+});
 
 export interface CostEnvelopeBasis {
   readonly maxModelAttempts: number;
@@ -164,7 +193,18 @@ export function decideBudgetPressure(input: {
   if (!Number.isInteger(input.consumedModelAttempts) || input.consumedModelAttempts < 0) {
     throw new TypeError("ATTEMPT_LEDGER_CONSUMPTION_INVALID");
   }
-  if (input.consumedModelAttempts < input.basis.maxModelAttempts) {
+  /**
+   * J28 — the REPORTING comparison follows the PERMISSION comparison.
+   * `assertModelAttemptAllowed` PERMITS exactly `maxModelAttempts` attempts
+   * (it refuses at `consumed >= max`), so a run that spends exactly what the
+   * structure permits has not exceeded anything and is WITHIN. Reporting that
+   * state as EXHAUSTED made a lawful maximum-path run complete and then say it
+   * had run out — and, worse, fired the envelope terminal that REPLACED the
+   * answer it had just served (apps/runner/src/index.ts:3267-3274). Nothing
+   * about what is ALLOWED changes here; only what the run says about itself.
+   * V-S09-8 records the alternative reading, which is V's to choose.
+   */
+  if (input.consumedModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
       state: "WITHIN",
