@@ -6,6 +6,7 @@ import {
   lstat,
   mkdir,
   open,
+  readdir,
   rename,
   unlink
 } from "node:fs/promises";
@@ -16,6 +17,9 @@ const CAPTURE_DIRECTORY_ENV = "DEBATEAI_DEV_MAIL_CAPTURE_DIR";
 const MAX_MESSAGE_BYTES = 256 * 1024;
 const DIRECTORY_MODE = 0o700;
 const MESSAGE_MODE = 0o600;
+// Captured mail holds a recipient address and a working verification link, and
+// is never needed beyond the local debugging session that produced it (L7-F8).
+const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
 // The mailer emits exactly one `To:` holding one bare address. A display name,
 // angle brackets, a second address, a folded continuation or a `Cc:`/`Bcc:`
@@ -80,6 +84,29 @@ async function requirePrivateDirectory(path) {
   }
 }
 
+async function pruneExpiredMessages(directory, now) {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    // Regular files only. A dirent reports a symlink as a symlink, and lstat
+    // confirms it, so the spool can never delete a target outside itself.
+    if (!entry.isFile() || !entry.name.endsWith(".eml")) continue;
+    const path = resolve(directory, entry.name);
+    try {
+      const metadata = await lstat(path);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
+      if (now - metadata.mtimeMs > RETENTION_MS) await unlink(path);
+    } catch {
+      // A concurrent send may have renamed or removed it. Retention is
+      // best-effort and must never fail the capture that triggered it.
+    }
+  }
+}
+
 async function readBoundedMessage() {
   const chunks = [];
   let total = 0;
@@ -140,6 +167,7 @@ async function main() {
   }
   const directory = resolve(configuredDirectory);
   await requirePrivateDirectory(directory);
+  await pruneExpiredMessages(directory, Date.now());
   if (process.argv[2] === "--preflight") return;
   const message = await readBoundedMessage();
   requireSingleRecipient(message);

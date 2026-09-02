@@ -6,7 +6,9 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  symlinkSync
+  symlinkSync,
+  utimesSync,
+  writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -183,4 +185,59 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
     }
   });
 
+  it("prunes captured mail older than seven days on every invocation (L7-F8)", () => {
+    const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
+    const spool = join(root, "mail");
+    const outside = join(root, "outside.eml");
+    const day = 24 * 60 * 60 * 1000;
+    const stale = join(spool, "11111111-1111-4111-8111-111111111111.eml");
+    const fresh = join(spool, "22222222-2222-4222-8222-222222222222.eml");
+    const dangling = join(spool, "33333333-3333-4333-8333-333333333333.eml");
+    try {
+      expect(spawnSync(executable, ["--preflight"], {
+        encoding: "utf8",
+        env: { ...process.env, [captureEnvironmentKey]: spool }
+      }).status).toBe(0);
+
+      writeFileSync(stale, "To: developer@example.test\r\n\r\nold\r\n", { mode: 0o600 });
+      writeFileSync(fresh, "To: developer@example.test\r\n\r\nrecent\r\n", { mode: 0o600 });
+      writeFileSync(outside, "not in the spool\n", { mode: 0o600 });
+      // A symlink is never followed: only regular files are pruned, so the
+      // target outside the spool cannot be deleted through it.
+      symlinkSync(outside, dangling);
+      const old = new Date(Date.now() - 8 * day);
+      utimesSync(stale, old, old);
+      utimesSync(outside, old, old);
+      const yesterday = new Date(Date.now() - 1 * day);
+      utimesSync(fresh, yesterday, yesterday);
+
+      const captured = spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
+        encoding: "utf8",
+        env: { ...process.env, [captureEnvironmentKey]: spool },
+        input: "To: developer@example.test\r\n\r\nbody\r\n"
+      });
+      expect(captured.status).toBe(0);
+      expect(captured.stderr).toBe("");
+
+      const remaining = readdirSync(spool);
+      expect(remaining).not.toContain("11111111-1111-4111-8111-111111111111.eml");
+      expect(remaining).toContain("22222222-2222-4222-8222-222222222222.eml");
+      expect(remaining).toContain("33333333-3333-4333-8333-333333333333.eml");
+      expect(lstatSync(outside).isFile()).toBe(true);
+      // The just-captured message plus the fresh one and the untouched symlink.
+      expect(remaining).toHaveLength(3);
+
+      // The prune runs on every invocation, preflight included.
+      const older = new Date(Date.now() - 9 * day);
+      utimesSync(fresh, older, older);
+      expect(spawnSync(executable, ["--preflight"], {
+        encoding: "utf8",
+        env: { ...process.env, [captureEnvironmentKey]: spool }
+      }).status).toBe(0);
+      expect(readdirSync(spool))
+        .not.toContain("22222222-2222-4222-8222-222222222222.eml");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

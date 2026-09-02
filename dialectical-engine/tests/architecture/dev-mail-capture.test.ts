@@ -60,4 +60,18 @@ describe("DEV-06 mail capture executable contract", () => {
     expect(capture).toContain("DEV_MAIL_CAPTURE_RECIPIENT_INVALID");
   });
 
+  it("prunes the spool on every invocation and never follows a symlink (L7-F8)", () => {
+    const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
+    expect(capture).toContain("RETENTION_MS");
+    expect(capture).toContain("7 * 24 * 60 * 60 * 1000");
+    expect(capture).toContain("pruneExpiredMessages");
+    // Regular files only, resolved through lstat so a symlink in the spool can
+    // never delete its target.
+    expect(capture).toContain("lstat");
+    expect(capture).toMatch(/mtimeMs/);
+
+    const readme = readFileSync("deploy/dev-auth/README.md", "utf8");
+    expect(readme).toMatch(/7 days|seven days/);
+    expect(readme).toContain(".eml");
+  });
 });
