@@ -1,0 +1,47 @@
+# deploy/postgres/pg_hba.conf.template
+# Rendered verbatim to /etc/postgresql/18/main/pg_hba.conf on the VPS (PLAN §8 C3, audit L5-F7).
+# PostgreSQL runs NATIVELY on the host: every DebateAI principal connects over the Unix socket
+# (/var/run/postgresql) with SCRAM-SHA-256; TCP exists only on loopback and only with TLS;
+# everything else is rejected. First match wins, so order is load-bearing. No trailing comments:
+# tests/architecture/vps-deployment-baseline.test.ts parses every non-comment line.
+#
+# TYPE    DATABASE   USER                                    [ADDRESS]       METHOD
+#
+# Maintenance and backups: root runs `sudo -u postgres ...` over the socket (peer = OS identity).
+local     all        postgres                                                peer
+#
+# Just-in-time superuser for `pnpm db:migrate` / `pnpm db:provision-principals` (README §6):
+# its password is NULL between ceremonies and VALID UNTIL <= 15 minutes during one.
+local     debateai   debateai_prod_migrator                                  scram-sha-256
+#
+# The 16 managed service principals from P3-01 (`pnpm db:provision-principals`), socket + SCRAM.
+local     debateai   debateai_prod_api_runtime               scram-sha-256
+local     debateai   debateai_prod_api_content_provision     scram-sha-256
+local     debateai   debateai_prod_api_erasure               scram-sha-256
+local     debateai   debateai_prod_api_authorization         scram-sha-256
+local     debateai   debateai_prod_api_publication_cleanup   scram-sha-256
+local     debateai   debateai_prod_runner_runtime            scram-sha-256
+local     debateai   debateai_prod_scheduler_replay          scram-sha-256
+local     debateai   debateai_prod_scheduler_liveness        scram-sha-256
+local     debateai   debateai_prod_scheduler_settlement      scram-sha-256
+local     debateai   debateai_prod_evaluator_worker          scram-sha-256
+local     debateai   debateai_prod_evaluator_api             scram-sha-256
+local     debateai   debateai_prod_evaluator_reader          scram-sha-256
+local     debateai   debateai_obs_writer                     scram-sha-256
+local     debateai   debateai_obs_listener                   scram-sha-256
+local     debateai   debateai_obs_watchdog                   scram-sha-256
+local     debateai   debateai_obs_human                      scram-sha-256
+#
+# Hatchet-lite reaches the socket through a bind mount (compose.prod.yaml); it owns only `hatchet`.
+local     hatchet    debateai_prod_hatchet                                   scram-sha-256
+#
+# Loopback TCP is TLS-only (server.crt has SAN IP:127.0.0.1 + IP:::1, TLSv1.3 floor in
+# postgresql.hardening.conf). Clients use sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt.
+hostssl   debateai   debateai_prod_api_runtime,debateai_prod_api_content_provision,debateai_prod_api_erasure,debateai_prod_api_authorization,debateai_prod_api_publication_cleanup,debateai_prod_runner_runtime,debateai_prod_scheduler_replay,debateai_prod_scheduler_liveness,debateai_prod_scheduler_settlement,debateai_prod_evaluator_worker,debateai_prod_evaluator_api,debateai_prod_evaluator_reader,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human 127.0.0.1/32 scram-sha-256
+hostssl   debateai   debateai_prod_api_runtime,debateai_prod_api_content_provision,debateai_prod_api_erasure,debateai_prod_api_authorization,debateai_prod_api_publication_cleanup,debateai_prod_runner_runtime,debateai_prod_scheduler_replay,debateai_prod_scheduler_liveness,debateai_prod_scheduler_settlement,debateai_prod_evaluator_worker,debateai_prod_evaluator_api,debateai_prod_evaluator_reader,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human ::1/128 scram-sha-256
+hostssl   hatchet    debateai_prod_hatchet                   127.0.0.1/32    scram-sha-256
+hostssl   hatchet    debateai_prod_hatchet                   ::1/128         scram-sha-256
+#
+# Catch-all: no plaintext TCP, no other address, no other role. Keep these two lines LAST.
+host      all        all                                     0.0.0.0/0       reject
+host      all        all                                     ::/0            reject
