@@ -21,4 +21,9 @@ describe("CI security gates (F-03)", () => {
     expect(existsSync(resolve(gitRoot, "SECURITY.md"))).toBe(true);
     expect(read("SECURITY.md")).toContain("Report a vulnerability");
   });
+  it("dependabot targets dev, the live integration branch (L6-F4)", () => {
+    // main is the GitHub default branch but is 285 commits stale and has no /dialectical-engine tree.
+    const db = read(".github/dependabot.yml");
+    expect(db.match(/target-branch: "dev"/g)?.length).toBe(2);
+  });
 });
