@@ -98,6 +98,26 @@ function digestNodes(): readonly DigestSourceNode[] {
   ]);
 }
 
+/**
+ * MEASURE, never guess (the fleet's own lesson): a bound that forces the digest
+ * to compress but still lets it exist is derived from the artifact — the
+ * uncompressed size and the size at MAXIMUM compression, which the
+ * DIGEST_CANNOT_EXIST outcome reports — not from a number a test author liked.
+ */
+function boundForcingCompression(nodes: readonly DigestSourceNode[]): number {
+  const uncompressed = buildSynthesisDigest({
+    nodes, servedRootNodeId: "root:A", budgetBound: Number.MAX_SAFE_INTEGER
+  });
+  const atMaxCompression = buildSynthesisDigest({ nodes, servedRootNodeId: "root:A", budgetBound: 0 });
+  if (uncompressed.kind !== "DIGEST" || atMaxCompression.kind !== "DIGEST_CANNOT_EXIST") {
+    throw new Error("fixture does not span the compression ladder");
+  }
+  const floor = atMaxCompression.byteSizeAtMaxCompression;
+  const ceiling = uncompressed.digest.byteSize;
+  expect(ceiling).toBeGreaterThan(floor);
+  return Math.floor((floor + ceiling) / 2);
+}
+
 function serveNode(overrides: Partial<ServeNode> = {}): ServeNode {
   return {
     nodeId: "root:A",
@@ -238,8 +258,12 @@ describe("T9 digest — membership is total; the byte budget governs summary LEN
 
     // Membership is invariant under tightening: same ids, in the same order,
     // at the widest and the tightest level a real budget can select.
-    const wide = buildSynthesisDigest({ nodes, servedRootNodeId: "root:A", budgetBound: 1_000_000 });
-    const tight = buildSynthesisDigest({ nodes, servedRootNodeId: "root:A", budgetBound: 1_200 });
+    const wide = buildSynthesisDigest({
+      nodes, servedRootNodeId: "root:A", budgetBound: Number.MAX_SAFE_INTEGER
+    });
+    const tight = buildSynthesisDigest({
+      nodes, servedRootNodeId: "root:A", budgetBound: boundForcingCompression(nodes)
+    });
     expect(wide.kind).toBe("DIGEST");
     expect(tight.kind).toBe("DIGEST");
     if (wide.kind !== "DIGEST" || tight.kind !== "DIGEST") throw new Error("unreachable");
@@ -257,7 +281,9 @@ describe("T9 digest — membership is total; the byte budget governs summary LEN
       ...digestNodes(),
       digestNode({ nodeId: "objection:3", isSurvivingObjection: true, finalStrength: 0.9 })
     ];
-    const outcome = buildSynthesisDigest({ nodes, servedRootNodeId: "root:A", budgetBound: 1_000_000 });
+    const outcome = buildSynthesisDigest({
+      nodes, servedRootNodeId: "root:A", budgetBound: Number.MAX_SAFE_INTEGER
+    });
     if (outcome.kind !== "DIGEST") throw new Error("unreachable");
     expect(outcome.digest.emphasis.topSurvivingObjectionNodeIds).toEqual(["objection:3", "objection:1"]);
     expect(outcome.digest.emphasis.runnerUpPositionNodeIds).toEqual(["root:B"]);
@@ -451,10 +477,11 @@ describe("T9 legacy gate disposition — one test per former gate path, naming i
     // Former terminal: COMPONENTS_ONLY + DEFECT, trace
     // COMPOSITION_BUDGET_EXCEEDED. New terminal: SERVED, digest compressed.
     const long = "y".repeat(3_000);
+    const compressible = digestNodes().map((node) => digestNode({ ...node, statement: long }));
     const double = recorder({});
     const result = await runServeGateChain(chainInput({
-      digestNodes: digestNodes().map((node) => digestNode({ ...node, statement: long })),
-      compositionBudget: { ...BUDGET, bound: 1_400 }
+      digestNodes: compressible,
+      compositionBudget: { ...BUDGET, bound: boundForcingCompression(compressible) }
     }), double.dependencies);
 
     expect(result.terminal).toBe("SERVED");
@@ -655,10 +682,14 @@ describe("T9 DoD row 2 — no NON-CRASH path returns COMPONENTS_ONLY", () => {
     },
     {
       name: "digest over budget but compressible (former byte-budget gate)",
-      run: async () => runServeGateChain(chainInput({
-        digestNodes: digestNodes().map((node) => digestNode({ ...node, statement: "w".repeat(3_000) })),
-        compositionBudget: { ...BUDGET, bound: 1_400 }
-      }), recorder({}).dependencies)
+      run: async () => {
+        const compressible = digestNodes()
+          .map((node) => digestNode({ ...node, statement: "w".repeat(3_000) }));
+        return runServeGateChain(chainInput({
+          digestNodes: compressible,
+          compositionBudget: { ...BUDGET, bound: boundForcingCompression(compressible) }
+        }), recorder({}).dependencies);
+      }
     },
     {
       name: "citation tracing objected (former conformance gate)",
