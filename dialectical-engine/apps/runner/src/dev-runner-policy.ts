@@ -1,13 +1,21 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import {
+  readAdaptiveStoppingControls,
   readClaimTypeCompositionMap,
+  readPanelWeightingControls,
   readVerdictLabelControls,
+  type AdaptiveStoppingControls,
   type CompositionMapRegisterRow
 } from "@debateai/register";
 import type { JudgementSelectionRule } from "@debateai/judgement";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
-import type { RunDeathPolicy, RunnerVerdictLabelPolicy, ScoringOperatorRegisterInput } from "./index.js";
+import type {
+  RunDeathPolicy,
+  RunnerPanelPolicy,
+  RunnerVerdictLabelPolicy,
+  ScoringOperatorRegisterInput
+} from "./index.js";
 import {
   DEVELOPMENT_ALGORITHM_SOURCE_REF,
   DEVELOPMENT_RUNNER_SOURCE_REF,
@@ -100,6 +108,27 @@ export interface DevelopmentRunnerPolicy {
    * from a deployment that never sealed it at all.
    */
   readonly verdictLabelPolicy: RunnerVerdictLabelPolicy;
+  /**
+   * S2-2 / T3 (F33): the sealed T16 PANEL family, read through T16's own readers.
+   * J12 gates every multi-maker run on this at claim time, so a deployment that
+   * seals the rows and never hands them to the runner cannot run a panel at all —
+   * it refuses each multi-maker work item on a register that is, in fact, correct.
+   * The disagreement threshold lives in the VERDICT-LABEL family and is paired in
+   * here exactly as the acceptance composition pairs it; nothing is restated.
+   */
+  readonly panelPolicy: RunnerPanelPolicy;
+  /**
+   * S3-2 / T7, wired here by the T3C merge: the sealed T16 ADAPTIVE-STOPPING
+   * family, read through T7's own reader. T7 landed the claim-time gate and the
+   * acceptance composition but not this one, so at 44836ecf the shipped entry
+   * point refused every multi-maker work item on ADAPTIVE_STOPPING_UNRESOLVED
+   * against a register that had sealed the rows correctly. That is the same
+   * seal-but-never-hand-over defect as F33 and F34, and it is why this member is
+   * mandatory rather than optional here: the runner's setting stays optional for
+   * single-maker callers, but a deployment reader that can return without it
+   * cannot be told apart at the claim seam from one that never sealed the rows.
+   */
+  readonly stoppingPolicy: AdaptiveStoppingControls;
   readonly hashes: Readonly<Record<"judge" | "composer" | "conformance" | "propagation" | "serve", string>>;
 }
 
@@ -135,7 +164,13 @@ export async function readDevelopmentRunnerPolicy(
   // this caller only pins the deployment the rows must have been sealed BY, so
   // a row seeded by another deployment cannot drift in under the same version.
   const verdictLabels = await readVerdictLabelControls(pool, registerVersion);
-  if (Object.values(verdictLabels.sourceRefs).some(
+  const panelWeighting = await readPanelWeightingControls(pool, registerVersion);
+  const adaptiveStopping = await readAdaptiveStoppingControls(pool, registerVersion);
+  if ([
+    ...Object.values(verdictLabels.sourceRefs),
+    ...Object.values(panelWeighting.sourceRefs),
+    ...Object.values(adaptiveStopping.sourceRefs)
+  ].some(
     (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
   )) {
     throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
@@ -184,6 +219,21 @@ export async function readDevelopmentRunnerPolicy(
       value: parsed.hiddenNodeScoreThreshold,
       sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF
     }),
+    panelPolicy: Object.freeze({
+      registerVersion: panelWeighting.registerVersion,
+      dispersionScale: panelWeighting.dispersionScale,
+      repeatedFamilyMultiplier: panelWeighting.repeatedFamilyMultiplier,
+      // The threshold is the verdict-label family's row, paired here the same way
+      // the acceptance composition pairs it — one identifier, never a restatement.
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      oneStepDown: panelWeighting.oneStepDown,
+      providerFamilies: panelWeighting.providerFamilies,
+      unmappedReason: panelWeighting.unmappedReason,
+      sourceRefs: Object.freeze({ ...verdictLabels.sourceRefs, ...panelWeighting.sourceRefs })
+    }),
+    // The reader already froze it and owns every field; passing its result
+    // through verbatim is exactly what the acceptance composition does.
+    stoppingPolicy: adaptiveStopping,
     verdictLabelPolicy: Object.freeze({
       registerVersion: verdictLabels.registerVersion,
       gamma: verdictLabels.gamma,

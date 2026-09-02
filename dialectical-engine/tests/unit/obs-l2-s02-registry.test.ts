@@ -412,10 +412,10 @@ describe("S02 severity and unordered condition marks", () => {
     expect(new Set(Object.keys(CONDITION_MARK_SEVERITY))).toEqual(
       new Set(CONDITION_MARKS),
     );
-    // J13(b) 29 -> 31, then T11 31 -> 32 (LABEL-BASIS-INCOMPLETE): the severity
-    // map is DERIVED from CONDITION_MARKS, so it grew with the vocabulary; only
-    // this count pin is stated by hand.
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(32);
+    // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE): the severity map is DERIVED from CONDITION_MARKS,
+    // so it grew with the vocabulary; only this count pin is stated by hand.
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(33);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );

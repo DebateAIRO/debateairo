@@ -545,14 +545,79 @@ export async function runServeGateChain(
     return componentsOnly(input, trace, segments, conformance, coverageMode);
   }
 
+  /**
+   * T12 + T13 (S08) — the CITED set: what the served statement actually rests on.
+   *
+   * One set answers both questions the goal asks here: what FORM the answer may
+   * take (T13's honest downgrade) and how CONFIDENT it may claim to be (T12's
+   * band basis). That set is the nodes the composed statement CITES, restricted
+   * to the segments conformance actually verified.
+   *
+   * Two exclusions, each for its own reason:
+   *  · a served node the statement never mentions did not carry the answer, so
+   *    it may not lift the band or hold off a downgrade;
+   *  · a citation inside a segment conformance never sampled was checked by
+   *    nobody, so it is not evidence either (the goal's own parenthesis:
+   *    "conformance-verified set").
+   *
+   * Before this, both read `input.nodes.filter(loadBearing)` — the serve set,
+   * which `buildFixedSingleRootServeNodes` fixes at exactly one root. That
+   * one-node basis is the STRUCTURAL origin of the forced 0/1 way-of-knowing
+   * shares the goal names; T10 replaced the SELECTION of that root, not the set,
+   * so the basis had to stop reading the set. The runner's served node set is
+   * still single-rooted today: this change removes the forced 0/1 from the
+   * ENGINE, and the moment the composer can cite more than the root the shares
+   * become real without another edit here.
+   */
+  /**
+   * THE COUPLING, named because the predicate does not carry it on its own terms
+   * (judge's product read, S08 verdict). `ConformanceJudgement` has TWO
+   * independent axes: `state` (JUDGED · SAMPLED_PASSED · NOT_SAMPLED) says
+   * whether the segment was looked at, `conforms` says what the look concluded.
+   * The filter below tests only the first, so read literally it would admit a
+   * JUDGED-but-NON-CONFORMING segment and let its citations into the band.
+   *
+   * It cannot, and the reason is thirty lines up, not here: the
+   * `!conformance.every((judgement) => judgement.conforms)` guard returns
+   * componentsOnly, so control only reaches this line when every judgement
+   * conforms and `state !== "NOT_SAMPLED"` means exactly "verified and passing".
+   * Whoever moves either piece must move both — dropping that guard silently
+   * widens this set.
+   */
+  const verifiedSegmentIds = new Set(
+    conformance
+      .filter((judgement) => judgement.state !== "NOT_SAMPLED")
+      .map((judgement) => judgement.segmentId)
+  );
+  const citedNodeIds = new Set(
+    segments
+      .filter((segment) => verifiedSegmentIds.has(segment.segmentId))
+      .flatMap((segment) => [...segment.assertedNodeRefs])
+  );
+  const citedNodes = input.nodes.filter((node) => citedNodeIds.has(node.nodeId));
+  if (citedNodes.length === 0) {
+    // Banding on an empty basis is the silent degradation this gate exists to
+    // refuse: `deriveBandCeiling` would reject it downstream anyway, but the
+    // FORM decision happens first, and `[].every(...)` is `true` — an uncited
+    // statement would otherwise downgrade itself on a vacuous truth.
+    throw new TypedDomainError(
+      "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
+      "A served statement must cite at least one conformance-verified node: its form and its confidence band are both read from what it cites"
+    );
+  }
+
   let terminal: ServeGateResult["terminal"];
   let answerForm: AnswerForm;
   const loadBearingNodes = input.nodes.filter((node) => node.loadBearing);
+  // NOT moved to the cited set. Q51's locator limb is a provenance check on the
+  // nodes the run declared load-bearing, and the goal's S08 text changes the
+  // BASIS and the DOWNGRADE only. Widening it here would be a silent scope
+  // change; the divergence is reported as a finding instead (F-S08-2).
   if (loadBearingNodes.some((node) => node.wayOfKnowing === "LOOKED_UP" && node.locator === null)) {
     trace.push("GATE4_Q51_LOCATOR_BLOCK", "COMPONENTS_ONLY_DEFECT");
     return componentsOnly(input, trace, segments, conformance, coverageMode);
   }
-  if (loadBearingNodes.every((node) => node.wayOfKnowing === "REASONING")) {
+  if (citedNodes.every((node) => node.wayOfKnowing === "REASONING")) {
     if (segments.length < 2 || segments[0] === undefined || segments[1] === undefined) {
       throw new TypedDomainError(
         "COMPOSITION_CONTRACT_ERROR",
@@ -578,11 +643,17 @@ export async function runServeGateChain(
     return componentsOnly(input, trace, segments, conformance, coverageMode);
   }
   trace.push("POST_COMPOSE_R9_PASS");
-  const loadBearing = input.nodes.filter((node) => node.loadBearing);
+  // T12: counted over the CITED set derived above — the same set T13's form
+  // decision read, so an answer's shape and its confidence can never describe
+  // different evidence.
   const basis = {
-    LOOKED_UP: loadBearing.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
-    RAN: loadBearing.filter((node) => node.wayOfKnowing === "RAN").length,
-    REASONING: loadBearing.filter((node) => node.wayOfKnowing === "REASONING").length
+    LOOKED_UP: citedNodes.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
+    // F5 / DECISIONS J4 do-not-tidy: T4 removed RAN from the judge schema, so
+    // this bucket can only be 0 today. It stays. The register's cut matrix and
+    // the persisted `band_ceiling.basis` both still name RAN, and the goal
+    // parks enum-reachability lint out of scope — deleting it is a TICKET.
+    RAN: citedNodes.filter((node) => node.wayOfKnowing === "RAN").length,
+    REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length
   };
   const ceilingDecision = dependencies.applyBandCeiling({
     basis,
@@ -1002,7 +1073,12 @@ export interface ConditionMarkRecord {
   // J13(b): PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE are node-scope panel
   // degradation disclosures; the record union must name them or the runner cannot
   // project the mark the kernel now mints.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "LABEL-BASIS-INCOMPLETE";
+  // T7 / S3-2: BRANCH-FROZEN-LOW-LEVERAGE is the adaptive-stopping freeze
+  // disclosure; S6-1 / T11: LABEL-BASIS-INCOMPLETE is the served label's
+  // incomplete-basis disclosure. The runner cannot project a mark the kernel
+  // mints unless the record union names it, so BOTH lanes' mints are named here.
+  // Union order is not semantic; it mirrors the kernel's mid-list placement.
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1182,10 +1258,24 @@ export async function resolveTrueUnjudgedReasons(
   source: Pool | PoolClient,
   runId: string,
   // MERGE (S06 x T6): widened from ConditionMarkRecord to the union `persist`
-  // actually holds. T6's resolver reads only `mark` and `subjectRef`, neither of
-  // which differs between the fresh and preserved shapes, so admitting a
-  // preserved record changes nothing this function decides — it only stops the
-  // S06 catch-up path from being unrepresentable at T6's call site.
+  // actually holds.
+  //
+  // CORRECTED in r4b (codex merge N1): an earlier version of this comment said
+  // the resolver reads only `mark` and `subjectRef`. It reads FOUR fields —
+  // `mark`, `subjectRef`, `reviewOutcome` and `terminalTransportOutcome` — and
+  // the last two are exactly what select and validate T6's review-versus-
+  // transport truth arm. Calling them irrelevant is the kind of note that lets a
+  // later change to either one pass review unexamined.
+  //
+  // The widening is safe for a stronger reason than "few fields are read".
+  // `PreservedConditionMarkRecord` is
+  //   Omit<ConditionMarkRecord, "servedRootRule">
+  //     & { servedRootRule: ServedRootRuleHistory | null }
+  // so EVERY field has the same type and meaning in both arms; the ONLY
+  // difference is `servedRootRule`, and this function never reads it. The body
+  // is otherwise unchanged from integration 362299d1, so no T6 truth-binding
+  // decision is weakened — the widening only stops the S06 catch-up path from
+  // being unrepresentable at T6's call site.
   records: readonly PersistableConditionMarkRecord[]
 ): Promise<readonly UnjudgedReasonProvenance[]> {
   const carriesUnjudgedReason = (record: PersistableConditionMarkRecord): boolean =>
@@ -1534,9 +1624,16 @@ export class ServeRepository {
         ]
       );
       // T6 / J14 ADDENDUM — the reason each class-H/class-D record names is
-      // checked against the ledger HERE, inside the write transaction, so a
-      // concurrent review cannot land between the check and the insert. The
-      // review arm's provenance is RESOLVED rather than accepted: what goes
+      // checked against the ledger HERE. Two mechanisms do two different jobs,
+      // and the transaction is NOT the one that excludes a concurrent review:
+      // it makes this check atomic with the answer version, so a later failure
+      // rolls the whole version back. What stops a review INSERT landing
+      // between the negative SELECT and the condition-mark INSERT is the shared
+      // per-run content lease — `ServeRepository.persist` takes it above, and
+      // `recordReviewWithMeasurements`, the review writer, takes the same one.
+      // The mutual-exclusion note on `resolveTrueUnjudgedReasons` carries the
+      // full argument and the condition under which it expires.
+      // The review arm's provenance is RESOLVED rather than accepted: what goes
       // into `review_ref` is the row the ledger actually holds.
       const unjudgedProvenance = await resolveTrueUnjudgedReasons(client, input.runId, conditionMarkRecords);
       for (const [recordIndex, record] of conditionMarkRecords.entries()) {
