@@ -110,6 +110,38 @@ Every entry below was paid for at least once. Do not pay for it again.
   DERIVED fact with an expiry — it silently becomes false when a later round edits the
   kernel. Re-run the gate greps immediately before freezing a report, never once at the
   start. (T3 r3)
+- `git stash push -u` is NOT a time machine once your work is COMMITTED: it stashes only the
+  uncommitted delta, so a "base classification" run done after a checkpoint commit still runs
+  YOUR tip and will happily tell you your own regression is pre-existing. Use
+  `git checkout <base-sha>` (detached), and make every base-classification command print
+  `git rev-parse HEAD` in its own output so the log proves which tree was tested. (T7 r1)
+- Under `zsh`, `grep -rn "x" --include=*.ts .` dies with `no matches found` before grep ever
+  runs — the shell expands `--include=*.ts`. Quote it: `--include='*.ts'`. (T7 r1)
+- A vitest spy declared `vi.fn(async () => undefined)` has no parameter type, so
+  `spy.mock.calls.map(([entry]) => entry.someField)` fails `tsc` with TS2493/TS2352 even
+  though the test runs. Declare the parameter on the mock:
+  `vi.fn(async (_entry: { readonly actionKind: string }) => undefined)`. (T7 r1)
+- `buildMultiMakerExpansionPlan` (`apps/runner/src/index.ts`) emits legs ROOT-MAJOR —
+  `rootIndex` OUTER, `round` INNER — so `leg.round` RESETS at every root and the consumption
+  loop's `activeExpansionRound` is a per-root index, not a global round counter. It is safe
+  for its existing job (triggering reviews) and wrong for anything that must happen "once per
+  round". Read the PRODUCER's loop nesting before attaching to the consumer. (T7 r1)
+- `buildMultiMakerExpansionPlan(depth, effectiveMakerCount)` takes **DEPTH FIRST**
+  (apps/runner/src/index.ts:1183-1186). Both arguments are small positive integers, so
+  the reversed call builds a perfectly legal plan for a DIFFERENT shape and every
+  assertion about it is quietly about the wrong tree — only the symmetric `(2,2)` case
+  is safe from the confusion. Symptom: a generalisation loop over `(M, depth)` pairs
+  fails on the shapes you did not hand-check. Print `legs.length` and the distinct
+  `rootIndex` set before asserting. (t07 r3; two false RED failures + one diagnostic run)
+- zsh does **no word splitting on a plain scalar**, so `Z="a.ts b.ts"; vitest run $Z`
+  passes ONE argument and vitest answers `No test files found, exiting with code 1` —
+  instantly, three runs in a row, looking exactly like a broken zone. Use an array:
+  `Z=(a.ts b.ts); vitest run "${Z[@]}"`. (t07 r3; the generic form of this trap was
+  already recorded and it still cost a cluster round — the fix is the ARRAY, write it down)
+- A mutant harness that restores with `git checkout HEAD -- <file>` **destroys
+  uncommitted implementation work**, because HEAD is whatever you inherited. COMMIT the
+  GREEN state before the first mutant, then mutate against your own commit. (t07 r3;
+  caught before it fired, one harness rewrite)
 - **zsh does NOT word-split an unquoted variable.** `ZONE="a.test.ts b.test.ts"; npx vitest
   run $ZONE` passes the whole string as ONE filter; vitest answers `No test files found,
   exiting with code 1` — which reads like a broken glob, not like a shell difference, and
