@@ -74,6 +74,10 @@ a real defect in `apps/ui/lib/recommendation.ts`, owned by the `apps/` lane and 
 
 Neither is dev drift in a B20 file; both are recorded above under the known baseline failures.
 
+## Merged-branch checks (orchestrator, security worktree)
+- 2026-09-02 12:37 @ 9f6e1dbc: light gates — repo-hygiene, ci-security-gates, dependency-floors, dev-compose-loopback, dev-custody-root, dev-compose-postgres → 6 files 35/35; api-request-limits, api-admission-limits, b10-admission-policy-register, production-environment-floors, provider-gateway-response-cap, crypto → 6 files 47/47; UI node tests exit 0 after the authRoutes pin fix (8e0b0ee0).
+- 2026-09-02 12:40 @ 43e5ee06: `pnpm --filter dialectical-engine-v2ui build` GREEN (`AUTH_PRODUCTION_ROUTES_VERIFIED=apps-ui:/login,/sign-up,/verify-email,/enroll-mfa`, middleware 34.4 kB); `node tests/integration/s5-ui-security-smoke.mjs` PASS ("live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip, upgrade teardown"; orphan upgrade socket closed after 1 ms); `pnpm run typecheck` → `tsc --noEmit` with zero errors (host Node v25.7.0, engines warning only).
+
 ## Full-suite runs (quiet host only, coordinated with the live-loop orchestrator)
 (appended when run: command, host state, tails)
 
