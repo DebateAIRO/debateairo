@@ -1002,7 +1002,12 @@ export interface ConditionMarkRecord {
   // J13(b): PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE are node-scope panel
   // degradation disclosures; the record union must name them or the runner cannot
   // project the mark the kernel now mints.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "LABEL-BASIS-INCOMPLETE";
+  // T7 / S3-2: BRANCH-FROZEN-LOW-LEVERAGE is the adaptive-stopping freeze
+  // disclosure; S6-1 / T11: LABEL-BASIS-INCOMPLETE is the served label's
+  // incomplete-basis disclosure. The runner cannot project a mark the kernel
+  // mints unless the record union names it, so BOTH lanes' mints are named here.
+  // Union order is not semantic; it mirrors the kernel's mid-list placement.
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1182,10 +1187,24 @@ export async function resolveTrueUnjudgedReasons(
   source: Pool | PoolClient,
   runId: string,
   // MERGE (S06 x T6): widened from ConditionMarkRecord to the union `persist`
-  // actually holds. T6's resolver reads only `mark` and `subjectRef`, neither of
-  // which differs between the fresh and preserved shapes, so admitting a
-  // preserved record changes nothing this function decides — it only stops the
-  // S06 catch-up path from being unrepresentable at T6's call site.
+  // actually holds.
+  //
+  // CORRECTED in r4b (codex merge N1): an earlier version of this comment said
+  // the resolver reads only `mark` and `subjectRef`. It reads FOUR fields —
+  // `mark`, `subjectRef`, `reviewOutcome` and `terminalTransportOutcome` — and
+  // the last two are exactly what select and validate T6's review-versus-
+  // transport truth arm. Calling them irrelevant is the kind of note that lets a
+  // later change to either one pass review unexamined.
+  //
+  // The widening is safe for a stronger reason than "few fields are read".
+  // `PreservedConditionMarkRecord` is
+  //   Omit<ConditionMarkRecord, "servedRootRule">
+  //     & { servedRootRule: ServedRootRuleHistory | null }
+  // so EVERY field has the same type and meaning in both arms; the ONLY
+  // difference is `servedRootRule`, and this function never reads it. The body
+  // is otherwise unchanged from integration 362299d1, so no T6 truth-binding
+  // decision is weakened — the widening only stops the S06 catch-up path from
+  // being unrepresentable at T6's call site.
   records: readonly PersistableConditionMarkRecord[]
 ): Promise<readonly UnjudgedReasonProvenance[]> {
   const carriesUnjudgedReason = (record: PersistableConditionMarkRecord): boolean =>
