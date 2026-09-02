@@ -895,3 +895,7 @@ Evidence: `findings/L7-ops-deploy.md` (3 MEDIUM, 7 LOW, 1 INFO; listener + secre
 - **B29f (L7-F9):** front door strips hop-by-hop headers from requests too, forwards non-101 upgrade responses without re-serialising a decoded body as chunked, and never writes after `headersSent`.
 - **ASK-V V-9:** production shape questions from L7: native Postgres on the VPS (recommended, adopted in C3), whether the Hatchet dashboard exists in production at all (recommended: no, loopback API only), and the production maker path (the acceptance relays are dev-only code) — V must rule before go-live.
 - **ASK-V V-10:** are other-uid local co-tenants (actor A4) in scope on your single-user Mac? If not, L7-F2/F4/F7 drop to LOW (they stay fixed anyway; only the grade changes).
+
+### 9.9 Surfaced by B20 (2026-09-02) — B30
+- **B30 (defect, apps/ui):** `apps/ui/lib/recommendation.ts` sorts with `localeCompare` (locale-dependent ordering, same class as L2-F4); the scaffold purity test flags it. Fix: code-unit comparison; test in the UI node tests. Small; folded into the next UI-touching lane.
+- Left RED by ruling: 3 obs-capture env-read purity violations (`packages/obs-capture/install/{api,runner,scheduler}.ts`), 3 undeclared `apps/{api,runner,scheduler} → obs-capture` edges — owned by the observability lanes / live mission (recorded in VERIFICATION.md).
