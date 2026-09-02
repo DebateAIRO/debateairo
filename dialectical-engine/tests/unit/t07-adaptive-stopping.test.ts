@@ -117,6 +117,18 @@ const roundThreeMoved = snapshot(
   [resolution("root:A")]
 );
 
+/**
+ * The next representable binary64 above a positive finite value: increment the
+ * bit pattern by one. For positives the IEEE-754 encoding is monotonic in the
+ * unsigned integer reading, so +1 is exactly one ULP up. (codex r2 N2)
+ */
+const nextUpBinary64 = (value: number): number => {
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, value);
+  view.setBigUint64(0, view.getBigUint64(0) + 1n);
+  return view.getFloat64(0);
+};
+
 const TWO_ROOTS = ["root:A", "root:B"] as const;
 
 describe("T7 / S3-2 + S5-1 — the graph the sensitivity is read from", () => {
@@ -243,15 +255,28 @@ describe("T7 DoD (d) — EQUALITY AT ε CONTINUES (it is not frozen)", () => {
     ]);
   });
 
-  it("freezes the same branch the moment epsilon rises one representable step above it", () => {
+  it("freezes the same branch the moment epsilon rises ONE REPRESENTABLE STEP above it", () => {
+    // codex r2 N2: `0.126` is above 1/8 but it is NOT the next binary64 value,
+    // and in a lane contracted to exact threshold arithmetic the claim has to be
+    // exact. 1/8 = 2^-3, so the spacing immediately above it is 2^(-3-52) =
+    // 2^-55 and the true successor is 1/8 + 2^-55. Two independent derivations
+    // agree below: a bit-pattern increment, and the closed form.
+    const epsilon = nextUpBinary64(0.125);
+
+    expect(epsilon).not.toBe(0.125);
+    expect(epsilon).toBe(0.125 + 2 ** -55);           // closed form, exactly representable
+    expect(epsilon).toBeLessThan(0.126);              // strictly below the old literal
+    expect((epsilon - 0.125) / 2 ** -55).toBe(1);     // exactly ONE step, not two
+
     const decisions = decideBranchFreezes({
       completedRounds: 1,
       sensitivityRecords: evaluate(discriminator).sensitivityRecords,
       branchCarryingNodeIds: ["heavy"],
       rootNodeIds: ROOTS,
-      epsilon: 0.126
+      epsilon
     });
 
+    // The smallest epsilon in binary64 that can freeze a leverage of exactly 1/8.
     expect(decisions).toEqual([{ carryingNodeId: "heavy", leverage: 0.125, verdict: "FROZEN" }]);
   });
 });
@@ -273,6 +298,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeConverged).strengths,
       measuredEdgeCount: countMeasuredEdges(roundThreeConverged),
@@ -296,6 +322,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
       measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
@@ -322,6 +349,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
       measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
@@ -342,6 +370,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
       measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
@@ -356,6 +385,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       completedRounds: 5,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeMoved).strengths,
       measuredEdgeCount: countMeasuredEdges(roundThreeMoved),
@@ -371,6 +401,7 @@ describe("T7 DoD (a) — the global δ stop fires BEFORE the depth ceiling", () 
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: ["root:A", "root:missing"],
+      expectedRootCount: 2,
       previousStrengths: evaluate(roundTwo).strengths,
       currentStrengths: evaluate(roundThreeConverged).strengths,
       measuredEdgeCount: countMeasuredEdges(roundThreeConverged),
@@ -385,6 +416,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       completedRounds: 0,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       // The identical graph on both sides: movement is exactly 0, which is well
       // inside delta. Only the floor keeps the debate alive.
       previousStrengths: evaluate(roundTwo).strengths,
@@ -416,6 +448,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       completedRounds,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: previous ? evaluate(roundTwo).strengths : null,
       currentStrengths: evaluate(roundTwo).strengths,
       measuredEdgeCount: countMeasuredEdges(roundTwo),
@@ -465,6 +498,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       completedRounds: 0,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
       measuredEdgeCount: countMeasuredEdges(roundTwo),
@@ -486,6 +520,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       completedRounds: 1,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
       measuredEdgeCount: countMeasuredEdges(roundTwo),
@@ -506,6 +541,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
       measuredEdgeCount: countMeasuredEdges(roundTwo),
@@ -518,6 +554,7 @@ describe("T7 DoD (c) — the round-1 floor", () => {
       completedRounds: 1,
       depthCeiling: 1,
       rootNodeIds: TWO_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: null,
       currentStrengths: evaluate(roundTwo).strengths,
       measuredEdgeCount: countMeasuredEdges(roundTwo),
@@ -766,6 +803,7 @@ describe("T7 / J15(b) — a δ stop must be NON-VACUOUS", () => {
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: ["root:A"],
+      expectedRootCount: 1,
       // Movement is exactly 0 — under the literal rule this would converge.
       previousStrengths: evaluate(allUnknown).strengths,
       currentStrengths: evaluate(allUnknown).strengths,
@@ -789,6 +827,7 @@ describe("T7 / J15(b) — a δ stop must be NON-VACUOUS", () => {
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: ["root:A"],
+      expectedRootCount: 1,
       previousStrengths: evaluate(allUnknown).strengths,
       currentStrengths: evaluate(allUnknown).strengths,
       measuredEdgeCount: 1,
@@ -963,6 +1002,7 @@ describe("T7 / codex B1 — the live seam may never pre-filter a root out of the
       completedRounds: 2,
       depthCeiling: 5,
       rootNodeIds: AUTHORITATIVE_ROOTS,
+      expectedRootCount: 2,
       previousStrengths: evaluate(partialStanding).strengths,
       currentStrengths: evaluate(partialStanding).strengths,
       measuredEdgeCount: countMeasuredEdges(partialStanding),
@@ -1365,5 +1405,202 @@ describe("T7 / codex B2 — the freeze record's truth holds over every plan shap
         );
       }
     }
+  });
+});
+
+/**
+ * r4 · codex r2 B1 — the authoritative count must be REQUIRED at the law's own
+ * API, not merely supplied by today's only caller.
+ *
+ * r3 made `expectedRootCount` optional on the exported strict decision with a
+ * fallback to `rootNodeIds.length`. A direct caller that narrowed the roots and
+ * omitted the count therefore got its own narrowed scope back as the standard to
+ * measure against — `compared.length === expectedRootCount` — and bought
+ * GLOBAL_DELTA_CONVERGED with the other maker root never compared. That is r1's
+ * B1, resurrected at the public pure API.
+ */
+describe("T7 / codex r2 B1 — the expected root count is REQUIRED, with no fallback", () => {
+  const stable = snapshot(
+    [node("root:A", 0.5), node("root:B", null), node("heavy", 0.5)],
+    [support("e:heavy->A", "heavy", "root:A", 0.5)],
+    [resolution("root:A")]
+  );
+  const strictInput = {
+    completedRounds: 2,
+    depthCeiling: 5,
+    rootNodeIds: ["root:A"],
+    previousStrengths: evaluate(stable).strengths,
+    currentStrengths: evaluate(stable).strengths,
+    measuredEdgeCount: countMeasuredEdges(stable),
+    delta: 0.01
+  };
+
+  it("REJECTS the omission at compile time, and refuses loudly if it is forced past the compiler", () => {
+    // COMPILE-TIME NEGATIVE FIXTURE. If `expectedRootCount` ever becomes
+    // optional again, this directive reports "unused" (TS2578) and `tsc` fails —
+    // which is the only mechanical way to keep codex r2 B1 closed.
+    // @ts-expect-error expectedRootCount is REQUIRED on the strict decision
+    expect(() => decideRoundContinuation(strictInput)).toThrowError(
+      expect.objectContaining({ code: "STOPPING_EXPECTED_ROOT_COUNT_INVALID" })
+    );
+  });
+
+  it("refuses the shortened scope when the count IS stated — the run has two roots", () => {
+    const decision = decideRoundContinuation({ ...strictInput, expectedRootCount: 2 });
+
+    expect(decision.reason).toBe("ROOT_SCOPE_INCOMPLETE");
+    expect(decision.kind).toBe("CONTINUE");
+    expect(decision.comparedRootNodeIds).toEqual(["root:A"]);
+    expect(decision.expectedRootCount).toBe(2);
+  });
+
+  it("converges on that identical graph only when the count matches the scope", () => {
+    const decision = decideRoundContinuation({ ...strictInput, expectedRootCount: 1 });
+
+    expect(decision.reason).toBe("GLOBAL_DELTA_CONVERGED");
+    expect(decision.maxRootMovement).toBe(0);
+  });
+});
+
+/**
+ * r4 · codex r2 B2 — the partial-scope boundary erases no fact and skips no guard.
+ *
+ * r3's `decideRoundBoundary` partitioned BEFORE validating and then returned
+ * literal records with `maxRootMovement: null` and `movedRootNodeIds: []` for
+ * every partial scope — even when a comparable root had moved, and even when the
+ * input was invalid. Two falsehoods in one arm: the interface says
+ * `maxRootMovement` is null ONLY when there is no previous round, and
+ * `comparedRootNodeIds` names roots the decision actually compared, while the
+ * partial arm only checked map membership and never subtracted anything.
+ */
+describe("T7 / codex r2 B2 — a partial scope still computes, and still validates", () => {
+  /** root:A at exactly 1/2 — one MEASURED edge carrying magnitude 0. */
+  const before = snapshot(
+    [node("root:A", 0.5), node("root:B", null), node("heavy", 0.5)],
+    [support("e:heavy->A", "heavy", "root:A", 0)],
+    [resolution("root:A")]
+  );
+  /** the same graph with the edge at full magnitude: root:A = 1/2 + (1/2)(1/2) = 3/4. */
+  const after = snapshot(
+    [node("root:A", 0.5), node("root:B", null), node("heavy", 0.5)],
+    [support("e:heavy->A", "heavy", "root:A", 1)],
+    [resolution("root:A")]
+  );
+  const boundaryInput = {
+    completedRounds: 2,
+    depthCeiling: 5,
+    rootNodeIds: ["root:A", "root:B"],
+    expectedRootCount: 2,
+    previousStrengths: evaluate(before).strengths,
+    currentStrengths: evaluate(after).strengths,
+    measuredEdgeCount: countMeasuredEdges(after),
+    delta: 0.01
+  };
+
+  it("scores codex's exact counterexample: A moves 1/2 -> 3/4 while B is uncomparable", () => {
+    const scored = (s: EvaluationSnapshot) =>
+      new Map(evaluate(s).strengths.map((row) => [row.nodeId, row.strength]));
+
+    expect(scored(before).get("root:A")).toBe(0.5);
+    expect(scored(after).get("root:A")).toBe(0.75);
+    expect(scored(before).has("root:B")).toBe(false);
+    expect(scored(after).has("root:B")).toBe(false);
+    expect(countMeasuredEdges(after)).toBe(1);
+  });
+
+  it("records the exact movement of the comparable root instead of erasing it", () => {
+    const decision = decideRoundBoundary(boundaryInput);
+
+    // The dominant reason stays the coverage shortfall — that is the durable
+    // fact that forbids convergence — but NO fact is erased.
+    expect(decision.kind).toBe("CONTINUE");
+    expect(decision.reason).toBe("ROOT_SCOPE_INCOMPLETE");
+    expect(decision.maxRootMovement).toBe(0.25);        // |3/4 - 1/2| = 1/4, exactly
+    expect(decision.movedRootNodeIds).toEqual(["root:A"]);
+    expect(decision.comparedRootNodeIds).toEqual(["root:A"]);
+    expect(decision.uncomparedRootNodeIds).toEqual(["root:B"]);
+    expect(decision.expectedRootCount).toBe(2);
+  });
+
+  it("keeps maxRootMovement null ONLY when there is no previous round, as the interface says", () => {
+    const decision = decideRoundBoundary({ ...boundaryInput, previousStrengths: null, completedRounds: 0 });
+
+    expect(decision.maxRootMovement).toBeNull();
+    expect(decision.reason).toBe("ROUND_1_FLOOR");
+  });
+
+  it("records the movement on the CEILING arm of a partial scope too", () => {
+    const decision = decideRoundBoundary({ ...boundaryInput, completedRounds: 5, depthCeiling: 5 });
+
+    expect(decision.kind).toBe("STOP");
+    expect(decision.reason).toBe("DEPTH_CEILING");
+    expect(decision.maxRootMovement).toBe(0.25);
+    expect(decision.movedRootNodeIds).toEqual(["root:A"]);
+  });
+
+  it("never converges below full coverage, however small the movement", () => {
+    const decision = decideRoundBoundary({
+      ...boundaryInput,
+      currentStrengths: evaluate(before).strengths,   // movement exactly 0
+      measuredEdgeCount: countMeasuredEdges(before)
+    });
+
+    expect(decision.kind).toBe("CONTINUE");
+    expect(decision.reason).toBe("ROOT_SCOPE_INCOMPLETE");
+    expect(decision.maxRootMovement).toBe(0);
+    expect(decision.movedRootNodeIds).toEqual([]);
+  });
+
+  it("holds the interface contract: maxRootMovement is null EXACTLY when nothing was compared", () => {
+    // The doc used to say "null only when no previous round exists", which the
+    // partial arm broke. The truthful contract is about `comparedRootNodeIds`,
+    // and it is checkable on every arm this function can return.
+    const arms = [
+      decideRoundBoundary(boundaryInput),                                                   // partial, moved
+      decideRoundBoundary({ ...boundaryInput, completedRounds: 0 }),                        // floor
+      decideRoundBoundary({ ...boundaryInput, completedRounds: 5, depthCeiling: 5 }),       // ceiling
+      decideRoundBoundary({ ...boundaryInput, measuredEdgeCount: 0 }),                      // no evidence
+      decideRoundBoundary({ ...boundaryInput, previousStrengths: null, completedRounds: 1 }), // no previous round
+      decideRoundBoundary({                                                                 // nothing comparable at all
+        ...boundaryInput,
+        previousStrengths: evaluate(before).strengths.filter((row) => row.nodeId !== "root:A"),
+        currentStrengths: evaluate(after).strengths.filter((row) => row.nodeId !== "root:A")
+      }),
+      decideRoundContinuation({                                                             // full scope, converged
+        completedRounds: 2,
+        depthCeiling: 5,
+        rootNodeIds: ["root:A"],
+        expectedRootCount: 1,
+        previousStrengths: evaluate(before).strengths,
+        currentStrengths: evaluate(before).strengths,
+        measuredEdgeCount: countMeasuredEdges(before),
+        delta: 0.01
+      })
+    ];
+
+    expect(arms.map((decision) => decision.maxRootMovement === null))
+      .toEqual(arms.map((decision) => decision.comparedRootNodeIds.length === 0));
+    // ...and the arms really do cover both sides of the biconditional.
+    expect(new Set(arms.map((decision) => decision.maxRootMovement === null))).toEqual(new Set([true, false]));
+  });
+
+  it("runs the OVERFULL guard through the OUTER path, not only the strict helper", () => {
+    expect(() => decideRoundBoundary({ ...boundaryInput, expectedRootCount: 1 }))
+      .toThrowError(expect.objectContaining({ code: "STOPPING_ROOT_SCOPE_OVERFULL" }));
+  });
+
+  it("runs every input guard through the OUTER path while a root is uncomparable", () => {
+    expect(() => decideRoundBoundary({ ...boundaryInput, delta: 1.5 }))
+      .toThrowError();
+    expect(() => decideRoundBoundary({ ...boundaryInput, measuredEdgeCount: -1 }))
+      .toThrowError(expect.objectContaining({ code: "STOPPING_MEASURED_EDGE_COUNT_INVALID" }));
+    expect(() => decideRoundBoundary({ ...boundaryInput, completedRounds: -1 }))
+      .toThrowError(expect.objectContaining({ code: "STOPPING_ROUND_COUNT_INVALID" }));
+    expect(() => decideRoundBoundary({ ...boundaryInput, depthCeiling: 0 }))
+      .toThrowError(expect.objectContaining({ code: "STOPPING_DEPTH_CEILING_INVALID" }));
+    expect(() => decideRoundBoundary({ ...boundaryInput, expectedRootCount: 2.5 }))
+      .toThrowError(expect.objectContaining({ code: "STOPPING_EXPECTED_ROOT_COUNT_INVALID" }));
+    expect(() => decideRoundBoundary({ ...boundaryInput, rootNodeIds: [], expectedRootCount: 0 }))
+      .toThrowError(expect.objectContaining({ code: "STOPPING_ROOT_SCOPE_EMPTY" }));
   });
 });
