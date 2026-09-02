@@ -117,6 +117,12 @@ export const CONDITION_MARKS = [
   "SKIPPED-BY-BUDGET",
   "ENVELOPE_EXHAUSTED",
   "LEVERAGE_UNRESOLVED",
+  // S3-2/S5-1 (goal-v4 T7): adaptive stopping froze this branch — its
+  // root-scoped leverage fell strictly below ε (mission ruling J3), so nothing
+  // was expanded beneath it. Placed HERE beside the other leverage disclosure
+  // and NOT appended: the DR-176 tail of this vocabulary is read positionally
+  // by `CONDITION_MARKS.slice(-4)`.
+  "BRANCH-FROZEN-LOW-LEVERAGE",
   "DEGRADED-DIVERSITY",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",

@@ -588,12 +588,478 @@ export function evaluate(snapshot: EvaluationSnapshot): PropagationOutcome {
   return evaluateInternal(snapshot, true);
 }
 
+export interface RootScopedLeverage {
+  readonly kind: "LEVERAGE_RESOLVED";
+  /** The branch's subtree-root node — the node whose removal was simulated. */
+  readonly carryingNodeId: string;
+  readonly leverage: number;
+  /** The root scope the maximum was restricted to, recorded for audit. */
+  readonly rootNodeIds: readonly string[];
+}
+
+/**
+ * T7 / S3-2 · mission ruling J3 — LEVERAGE IS ROOT-SCOPED (reading (b)).
+ *
+ * The freeze quantity for a branch is the ROOT-RESTRICTED maximum |Δstrength|
+ * taken over the recorded per-node fragility rows of the branch's subtree-root
+ * sensitivity record. Propagation has no root notion, so the CALLER (the
+ * runner) supplies the root ids. The recorded all-nodes `leverage` field on
+ * `SensitivityRecord` stays recorded and is deliberately left UNCONSUMED here:
+ * a branch that cannot move any root cannot change the served answer, which is
+ * what the goal's own rationale sentence reasons about.
+ *
+ * A fragility row with a `null` difference contributes nothing. That is the
+ * same rule the goal states for UNKNOWN edges — an unmeasured influence cannot
+ * unfreeze a branch — applied to the one other way a difference can be absent.
+ */
 export function resolveLeverage(input: {
+  /** The round-1 floor at the leverage door: K=1 must complete first. */
   readonly completedRounds: number;
   readonly carryingNodeId: string;
-}): { readonly kind: "LEVERAGE_UNRESOLVED"; readonly carryingNodeId: string } {
-  if (input.completedRounds < 1) {
-    throw new TypedDomainError("LEVERAGE_ROUND_INCOMPLETE", "K=1 must complete before leverage can be unresolved");
+  readonly sensitivityRecords: readonly SensitivityRecord[];
+  readonly rootNodeIds: readonly string[];
+}): RootScopedLeverage {
+  if (!Number.isInteger(input.completedRounds) || input.completedRounds < 1) {
+    throw new TypedDomainError("LEVERAGE_ROUND_INCOMPLETE", "K=1 must complete before leverage can be resolved");
   }
-  return Object.freeze({ kind: "LEVERAGE_UNRESOLVED", carryingNodeId: input.carryingNodeId });
+  if (input.rootNodeIds.length === 0) {
+    // An empty root scope would read every branch as leverage 0 and freeze the
+    // whole debate in silence. J3 puts the root ids on the caller, so their
+    // absence is the caller's defect and it stops loudly.
+    throw new TypedDomainError(
+      "LEVERAGE_ROOT_SCOPE_EMPTY",
+      "J3 restricts the freeze quantity to caller-supplied roots; none were supplied"
+    );
+  }
+  const record = input.sensitivityRecords.find((candidate) => candidate.removedNodeId === input.carryingNodeId);
+  if (record === undefined) {
+    throw new TypedDomainError(
+      "LEVERAGE_SUBTREE_ROOT_UNRECORDED",
+      `No sensitivity record exists for subtree root ${input.carryingNodeId}`
+    );
+  }
+  const rootScope = new Set(input.rootNodeIds);
+  const leverage = record.fragility.reduce(
+    (maximum, row) => rootScope.has(row.nodeId) ? Math.max(maximum, row.difference ?? 0) : maximum,
+    0
+  );
+  return Object.freeze({
+    kind: "LEVERAGE_RESOLVED",
+    carryingNodeId: input.carryingNodeId,
+    leverage,
+    rootNodeIds: Object.freeze([...input.rootNodeIds])
+  });
+}
+
+export type BranchFreezeVerdict = "FROZEN" | "CONTINUES";
+
+export interface BranchFreezeDecision {
+  readonly carryingNodeId: string;
+  readonly leverage: number;
+  readonly verdict: BranchFreezeVerdict;
+}
+
+/**
+ * T7 · branch freeze: leverage < ε ⇒ no expansion beneath the branch.
+ *
+ * STRICTLY less than. Equality at ε CONTINUES — a branch that moves a root by
+ * exactly the threshold is still moving the answer, and the goal's own DoD
+ * makes that case one of its four required examples.
+ */
+export function decideBranchFreezes(input: {
+  readonly completedRounds: number;
+  readonly sensitivityRecords: readonly SensitivityRecord[];
+  readonly branchCarryingNodeIds: readonly string[];
+  readonly rootNodeIds: readonly string[];
+  readonly epsilon: number;
+}): readonly BranchFreezeDecision[] {
+  assertUnitInterval(input.epsilon, "branch freeze epsilon");
+  return Object.freeze(input.branchCarryingNodeIds.map((carryingNodeId) => {
+    const { leverage } = resolveLeverage({
+      completedRounds: input.completedRounds,
+      carryingNodeId,
+      sensitivityRecords: input.sensitivityRecords,
+      rootNodeIds: input.rootNodeIds
+    });
+    return Object.freeze({
+      carryingNodeId,
+      leverage,
+      // STRICT: equality at ε continues.
+      verdict: leverage < input.epsilon ? "FROZEN" : "CONTINUES"
+    } as BranchFreezeDecision);
+  }));
+}
+
+export type RoundContinuationReason =
+  | "ROUND_1_FLOOR"
+  | "NO_PREVIOUS_ROUND"
+  | "NO_MEASURED_EDGE"
+  | "ROOT_SCOPE_INCOMPLETE"
+  | "DEPTH_CEILING"
+  | "GLOBAL_DELTA_CONVERGED"
+  | "ROOT_MOVED";
+
+export interface RoundContinuationDecision {
+  readonly kind: "CONTINUE" | "STOP";
+  readonly reason: RoundContinuationReason;
+  /**
+   * The maximum |Δstrength| over the roots this decision COMPARED, or null when
+   * it compared none. codex r2 B2: `comparedRootNodeIds` is the single source of
+   * truth for that — this is null EXACTLY when that list is empty (no previous
+   * round to compare against, or no expected root was comparable in both
+   * rounds), and a number whenever it is not. A partial scope still computes it.
+   */
+  readonly maxRootMovement: number | null;
+  readonly movedRootNodeIds: readonly string[];
+  /**
+   * Ruling J15(b): the stop record carries the count of measured edges the
+   * decision considered, so an auditor can tell convergence from ignorance.
+   */
+  readonly measuredEdgeCount: number;
+  /**
+   * J15 ADDENDUM-2 / codex B1: exactly which of the expected maker roots this
+   * decision actually compared. A stop may only ever be claimed when nothing is
+   * uncompared — "no root moved > δ" is unproved for a root nobody looked at.
+   */
+  readonly comparedRootNodeIds: readonly string[];
+  readonly uncomparedRootNodeIds: readonly string[];
+  /**
+   * How many maker roots the RUN has. A root a caller dropped from the scope
+   * altogether appears in NEITHER list above, so the count is the only field
+   * that can reveal it — and δ-convergence is refused unless
+   * `comparedRootNodeIds.length` reaches it.
+   */
+  readonly expectedRootCount: number;
+}
+
+/**
+ * Split an AUTHORITATIVE maker-root scope into the roots that can be compared
+ * across the two rounds and those that cannot. A root is comparable only when
+ * BOTH rounds scored it; an unjudged root (its cross-maker review exhausted,
+ * so it never reached judged standing) is uncomparable, not absent.
+ */
+export function partitionComparableRoots(input: {
+  readonly rootNodeIds: readonly string[];
+  readonly previousStrengths: readonly NodeStrengthRecord[];
+  readonly currentStrengths: readonly NodeStrengthRecord[];
+}): { readonly compared: readonly string[]; readonly uncompared: readonly string[] } {
+  const before = new Set(input.previousStrengths.map((record) => record.nodeId));
+  const after = new Set(input.currentStrengths.map((record) => record.nodeId));
+  const compared: string[] = [];
+  const uncompared: string[] = [];
+  for (const nodeId of input.rootNodeIds) {
+    (before.has(nodeId) && after.has(nodeId) ? compared : uncompared).push(nodeId);
+  }
+  return Object.freeze({ compared: Object.freeze(compared), uncompared: Object.freeze(uncompared) });
+}
+
+/**
+ * The edges that can actually move a strength: MEASURED, with a magnitude.
+ * `computeGraph` skips every other arrow, so this is exactly the evidence the
+ * round's root movement could have been made of.
+ */
+export function countMeasuredEdges(snapshot: EvaluationSnapshot): number {
+  return snapshot.arrows.filter((arrow) =>
+    arrow.magnitudeStatus === "MEASURED" && arrow.strength !== null).length;
+}
+
+/**
+ * Every guard the round decision owes its caller, in one place. codex r2 B2: the
+ * boundary used to partition BEFORE validating, so an invalid delta, round,
+ * ceiling, measured-edge count, expected count or overfull scope slipped through
+ * unchecked whenever any root happened to be uncomparable. Both entry points now
+ * run this first, on the scope the CALLER supplied.
+ */
+function assertRoundDecisionInputs(input: {
+  readonly completedRounds: number;
+  readonly depthCeiling: number;
+  readonly rootNodeIds: readonly string[];
+  readonly measuredEdgeCount: number;
+  readonly delta: number;
+  readonly expectedRootCount: number;
+}): void {
+  assertUnitInterval(input.delta, "global stop delta");
+  if (!Number.isInteger(input.expectedRootCount) || input.expectedRootCount < 0) {
+    throw new TypedDomainError(
+      "STOPPING_EXPECTED_ROOT_COUNT_INVALID",
+      "The expected maker-root count must be a non-negative integer"
+    );
+  }
+  if (input.rootNodeIds.length > input.expectedRootCount) {
+    throw new TypedDomainError(
+      "STOPPING_ROOT_SCOPE_OVERFULL",
+      "The supplied root scope holds more roots than the run has makers"
+    );
+  }
+  if (!Number.isInteger(input.measuredEdgeCount) || input.measuredEdgeCount < 0) {
+    throw new TypedDomainError(
+      "STOPPING_MEASURED_EDGE_COUNT_INVALID",
+      "The measured-edge count must be a non-negative integer"
+    );
+  }
+  if (!Number.isInteger(input.completedRounds) || input.completedRounds < 0) {
+    throw new TypedDomainError("STOPPING_ROUND_COUNT_INVALID", "Completed rounds must be a non-negative integer");
+  }
+  if (!Number.isInteger(input.depthCeiling) || input.depthCeiling < 1) {
+    throw new TypedDomainError("STOPPING_DEPTH_CEILING_INVALID", "The depth ceiling must be a positive integer");
+  }
+  if (input.rootNodeIds.length === 0) {
+    throw new TypedDomainError("STOPPING_ROOT_SCOPE_EMPTY", "The global stop is measured on roots; none were supplied");
+  }
+}
+
+/**
+ * The ONE decision body. `comparable` are the expected roots this decision may
+ * subtract; `uncomparable` are expected roots present in the scope that one of
+ * the two rounds never scored.
+ *
+ * codex r2 B2 named the cost of having had two: the boundary's partial arm was a
+ * second, hand-written copy of the arm ordering whose movement fields were
+ * hard-coded to null/empty, so a comparable root could move by exactly 1/4 and
+ * the record would deny it. There is now one body, so a fact can be erased in
+ * one place only — and it is erased in none.
+ *
+ * PRECEDENCE, documented: ceiling > floor > missing-previous > no-measured-edge >
+ * ROOT_SCOPE_INCOMPLETE > {GLOBAL_DELTA_CONVERGED | ROOT_MOVED}. Short coverage
+ * outranks ROOT_MOVED as the REASON because it is the durable fact that forbids
+ * convergence for the rest of the run; the movement it outranks is still
+ * recorded in `maxRootMovement` and `movedRootNodeIds`.
+ */
+function decideWithScope(
+  input: {
+    readonly completedRounds: number;
+    readonly depthCeiling: number;
+    readonly previousStrengths: readonly NodeStrengthRecord[] | null;
+    readonly currentStrengths: readonly NodeStrengthRecord[];
+    readonly measuredEdgeCount: number;
+    readonly delta: number;
+    readonly expectedRootCount: number;
+  },
+  comparable: readonly string[],
+  uncomparable: readonly string[]
+): RoundContinuationDecision {
+  // A root is only COMPARED if it was actually subtracted. `rootMovement` stops
+  // loudly when a supplied root is missing — which is how the strict entry point
+  // keeps its contract, since it passes its whole scope as comparable.
+  const movement = input.previousStrengths === null || comparable.length === 0
+    ? null
+    : rootMovement(comparable, input.previousStrengths, input.currentStrengths);
+  const measuredEdgeCount = input.measuredEdgeCount;
+  const compared = movement === null ? [] : [...comparable];
+  const scope = {
+    comparedRootNodeIds: Object.freeze(compared),
+    uncomparedRootNodeIds: Object.freeze(
+      movement === null ? [...comparable, ...uncomparable] : [...uncomparable]
+    ),
+    expectedRootCount: input.expectedRootCount
+  };
+  const maxRootMovement = movement === null ? null : movement.maximum;
+  const moved = movement === null ? Object.freeze([]) : movement.moved(input.delta);
+  if (input.completedRounds < 1) {
+    // The floor CONTINUES regardless of movement, but it does not erase it:
+    // the same honesty codex r2 B2 demanded of the partial arm (the ceiling arm
+    // already recorded `moved`, and an inconsistency between arms is how the
+    // first falsehood got in).
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "ROUND_1_FLOOR",
+      maxRootMovement,
+      movedRootNodeIds: moved,
+      measuredEdgeCount,
+      ...scope
+    });
+  }
+  if (input.completedRounds >= input.depthCeiling) {
+    return Object.freeze({
+      kind: "STOP",
+      reason: "DEPTH_CEILING",
+      maxRootMovement,
+      movedRootNodeIds: moved,
+      measuredEdgeCount,
+      ...scope
+    });
+  }
+  if (movement === null) {
+    if (input.previousStrengths === null) {
+      if (input.completedRounds === 1) {
+        return Object.freeze({
+          kind: "CONTINUE",
+          reason: "NO_PREVIOUS_ROUND",
+          maxRootMovement: null,
+          movedRootNodeIds: Object.freeze([]),
+          measuredEdgeCount,
+          ...scope
+        });
+      }
+      throw new TypedDomainError(
+        "STOPPING_PREVIOUS_ROUND_MISSING",
+        "The global δ stop compares against the previous round, which was not supplied"
+      );
+    }
+    // A previous round exists and not one expected root was comparable: nothing
+    // was measured, so nothing is claimed — and convergence is out of reach.
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "ROOT_SCOPE_INCOMPLETE",
+      maxRootMovement: null,
+      movedRootNodeIds: Object.freeze([]),
+      measuredEdgeCount,
+      ...scope
+    });
+  }
+  if (measuredEdgeCount === 0) {
+    // Ruling J15(b): a δ stop taken over zero measured edges is VACUOUS — the
+    // roots did not agree, nothing was ever weighed. Absence of evidence is not
+    // convergence, and reading it as convergence is the silent degradation this
+    // mission repeals. The degenerate all-UNKNOWN debate still terminates, and
+    // terminates honestly: every branch has zero leverage, so the ε rule freezes
+    // them all WITH marks and expansion ends by exhaustion. No loop-forever
+    // risk is created here.
+    //
+    // T7B (V-authorized, codex r3 B1): the reason outranks the movement, it does
+    // not delete it. This arm used to publish the computed `maxRootMovement`
+    // beside an empty moved list — a record that named A as compared, put its
+    // maximum movement ABOVE δ, and simultaneously denied that any root moved
+    // more than δ. Dominant reason and diagnostic truth are independent.
+    //
+    // T6B: the quantity is named here, never quoted. A comment that spells out
+    // a sealed register value goes false the moment V retunes the row, and the
+    // T16 consumer scan reads comment text as source.
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "NO_MEASURED_EDGE",
+      maxRootMovement,
+      movedRootNodeIds: moved,
+      measuredEdgeCount,
+      ...scope
+    });
+  }
+  // codex B1 / J15 ADDENDUM-2, the whole law in one place: "no root moved > δ"
+  // is unproved for a root nobody compared, so convergence REQUIRES that the
+  // comparison covered every root the run has. Narrowing the scope upstream
+  // cannot buy a stop — it can only make this gate fail. codex r2 B2: the roots
+  // that DID move are still named here; only the reason is outranked.
+  if (compared.length !== input.expectedRootCount) {
+    return Object.freeze({
+      kind: "CONTINUE",
+      reason: "ROOT_SCOPE_INCOMPLETE",
+      maxRootMovement,
+      movedRootNodeIds: moved,
+      measuredEdgeCount,
+      ...scope
+    });
+  }
+  return Object.freeze(moved.length === 0
+    ? {
+        kind: "STOP",
+        reason: "GLOBAL_DELTA_CONVERGED",
+        maxRootMovement,
+        movedRootNodeIds: Object.freeze([]),
+        measuredEdgeCount,
+        ...scope
+      }
+    : {
+        kind: "CONTINUE",
+        reason: "ROOT_MOVED",
+        maxRootMovement,
+        movedRootNodeIds: moved,
+        measuredEdgeCount,
+        ...scope
+      });
+}
+
+/**
+ * T7 · the STRICT round decision (S3-2). It is contracted to compare EVERY root
+ * it is given: `rootMovement` stops loudly if it cannot, which is the guard
+ * codex r1 named. A caller holding a live scope that may be incomplete goes
+ * through `decideRoundBoundary` instead.
+ *
+ * `expectedRootCount` is REQUIRED (codex r2 B1). r3 made it optional with a
+ * fallback to `rootNodeIds.length`, which handed a narrowed caller its own
+ * narrowed scope back as the standard to measure against — so omitting it bought
+ * GLOBAL_DELTA_CONVERGED with the other maker root never compared. There is no
+ * fallback: the run's maker count is a fact the caller must state.
+ */
+export function decideRoundContinuation(input: {
+  readonly completedRounds: number;
+  readonly depthCeiling: number;
+  readonly rootNodeIds: readonly string[];
+  readonly previousStrengths: readonly NodeStrengthRecord[] | null;
+  readonly currentStrengths: readonly NodeStrengthRecord[];
+  /** J15(b): how much measured evidence this decision had. `countMeasuredEdges`. */
+  readonly measuredEdgeCount: number;
+  readonly delta: number;
+  /** How many maker roots the RUN has. REQUIRED — see the note above. */
+  readonly expectedRootCount: number;
+}): RoundContinuationDecision {
+  assertRoundDecisionInputs(input);
+  return decideWithScope(input, input.rootNodeIds, []);
+}
+
+/**
+ * T7 · the LIVE round boundary — ruling J15 ADDENDUM-2 / codex B1, B2.
+ *
+ * The caller hands the AUTHORITATIVE maker-root scope and never narrows it. A
+ * root can legitimately be uncomparable at a live boundary — its cross-maker
+ * review exhausted, so it never reached judged standing — and that is a fact
+ * about the debate, not a caller defect. r2 filtered such roots out before the
+ * decision, which let a run report "no root moved > δ" while one root had never
+ * been compared at all; the claimed predicate was simply unproved.
+ *
+ * codex r2 B2: this function used to partition BEFORE validating and then
+ * hand-write its own record for every partial scope, with `maxRootMovement`
+ * hard-coded null and `movedRootNodeIds` hard-coded empty — so a comparable root
+ * that moved by exactly 1/4 was denied, and every input guard was skipped. It
+ * now validates the SUPPLIED scope first and then runs the one shared decision
+ * body over the comparable subset. An uncompared root still makes δ-convergence
+ * impossible; nothing else about the round is erased to say so.
+ */
+export function decideRoundBoundary(input: {
+  readonly completedRounds: number;
+  readonly depthCeiling: number;
+  readonly rootNodeIds: readonly string[];
+  /** The run's maker-root count — the scope the decision is measured against. */
+  readonly expectedRootCount: number;
+  readonly previousStrengths: readonly NodeStrengthRecord[] | null;
+  readonly currentStrengths: readonly NodeStrengthRecord[];
+  readonly measuredEdgeCount: number;
+  readonly delta: number;
+}): RoundContinuationDecision {
+  assertRoundDecisionInputs(input);
+  if (input.previousStrengths === null) return decideWithScope(input, input.rootNodeIds, []);
+  const scope = partitionComparableRoots({
+    rootNodeIds: input.rootNodeIds,
+    previousStrengths: input.previousStrengths,
+    currentStrengths: input.currentStrengths
+  });
+  return decideWithScope(input, scope.compared, scope.uncompared);
+}
+
+function rootMovement(
+  rootNodeIds: readonly string[],
+  previousStrengths: readonly NodeStrengthRecord[],
+  currentStrengths: readonly NodeStrengthRecord[]
+): { readonly maximum: number; moved(delta: number): readonly string[] } {
+  const before = new Map(previousStrengths.map((record) => [record.nodeId, record.strength]));
+  const after = new Map(currentStrengths.map((record) => [record.nodeId, record.strength]));
+  const perRoot = rootNodeIds.map((nodeId) => {
+    const from = before.get(nodeId);
+    const to = after.get(nodeId);
+    if (from === undefined || to === undefined) {
+      // A root the engine failed to score in one of the two rounds cannot be
+      // declared unmoved. Guessing here would let the debate stop on a root
+      // nobody measured, so it is a typed loud stop.
+      throw new TypedDomainError(
+        "STOPPING_ROOT_STRENGTH_UNRESOLVED",
+        `Root ${nodeId} has no strength in ${from === undefined ? "the previous" : "the current"} round`
+      );
+    }
+    return { nodeId, movement: Math.abs(to - from) };
+  });
+  return {
+    maximum: perRoot.reduce((maximum, row) => Math.max(maximum, row.movement), 0),
+    moved: (delta: number) => Object.freeze(perRoot
+      .filter((row) => row.movement > delta)
+      .map((row) => row.nodeId))
+  };
 }

@@ -197,6 +197,10 @@ export function loadRunnerEnvironment() {
     VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
     VLLM_AUTHORIZATION: z.string().min(1).optional(),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
+    // T3C / F34: the runner re-probes each pinned panel member at claim time
+    // (DR-182 VROW-5), so it needs the same probe timeout the API already reads.
+    // Same key, same shape, same default — one knob, two entry points.
+    PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
     ...hatchetShape
   });
   if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {

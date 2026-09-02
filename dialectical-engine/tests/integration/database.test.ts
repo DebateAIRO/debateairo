@@ -28,6 +28,7 @@ import {
 } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
+  applySingleLineageBandCap,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
   projectJudgedStanding,
@@ -176,6 +177,20 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       disagreementThreshold: "test-layer:J1",
       downgradeBands: "test-layer:J1",
       providerFamilyMap: "test-layer:J1"
+    }
+  },
+  // T7 coherence consequence (same J12 class as panelPolicy directly above): a
+  // multi-maker run needs the sealed adaptive-stopping rows or it stops loudly.
+  // Provisioning only. δ and ε are set WIDE OF the fixtures' arithmetic so no
+  // existing fixture's expansion is truncated by this addition; the stopping
+  // rule's own numbers are pinned in tests/unit/t07-adaptive-stopping.test.ts.
+  stoppingPolicy: {
+    registerVersion: 1,
+    delta: 0,
+    epsilon: 0,
+    sourceRefs: {
+      globalStopDelta: "test-layer:T7",
+      branchFreezeEpsilon: "test-layer:T7"
     }
   },
   // T11 coherence consequence: every served answer now carries a code-derived
@@ -2087,6 +2102,27 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r1:"))).toHaveLength(4);
       expect(expansionCalls.rows.filter((row) => row.call_site_key.includes(":r2:"))).toHaveLength(8);
 
+      // T7 / J15(a) + J15(d): the stopping rule is LIVE in this loop, evaluated at
+      // the DERIVED global round boundary — round k completes when every root has
+      // finished round k, which in this root-major plan is the last leg carrying
+      // round k. Two rounds, two boundaries, and every one of them PROPAGATION:
+      // the boundary reaches no provider, so it cannot spend the envelope this
+      // fixture exhausts exactly.
+      const stoppingRounds = await database.pool.query<{ call_site_key: string; action_kind: string }>(
+        `SELECT call_site_key, action_kind FROM ledger.ledger_entry
+         WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:round:%' ORDER BY sequence`,
+        [runId]
+      );
+      expect(stoppingRounds.rows.map((row) => row.call_site_key))
+        .toEqual(["STOPPING:round:1", "STOPPING:round:2"]);
+      expect(new Set(stoppingRounds.rows.map((row) => row.action_kind))).toEqual(new Set(["PROPAGATION"]));
+      const stoppingModelCalls = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+         WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:round:%' AND action_kind='MODEL_CALL'`,
+        [runId]
+      );
+      expect(stoppingModelCalls.rows[0]?.count).toBe("0");
+
       const reviews = await database.pool.query<{
         node_id: string;
         author_maker: string;
@@ -3595,6 +3631,48 @@ describe("apps/runner — legal command lifecycle", () => {
     }
   });
 
+  // T7 (S3-2/S5-1), same J12 shape and same place: a multi-maker run is the only run
+  // that expands, and expansion is what δ and ε govern. Running the ceiling with the
+  // stopping rule quietly absent — or with a δ/ε invented in the runner — is the same
+  // silent-degradation shape. The stop lands BEFORE the claim and BEFORE any spend.
+  it("T7 — refuses unsealed adaptive stopping on a multi-maker run before claiming or spending", async () => {
+    const primary = await startProviderDouble([]);
+    const secondary = await startProviderDouble([]);
+    try {
+      const work = await createRunnerWork("stopping-policy-before-claim");
+      const { stoppingPolicy: _omitted, ...settingsWithoutStoppingPolicy } = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "model:test-layer", maker: "maker:test-layer"
+      }), {
+        ...settingsWithoutStoppingPolicy,
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "model:test-layer:secondary", maker: "maker:test-layer:secondary"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "maker:test-layer:secondary"
+        },
+        // Supplied so the DR-074 guard is satisfied; panelPolicy is left in place so the
+        // STOPPING guard is demonstrably the one that fires, not its predecessor.
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      await expect(runner.executeWorkItem(work.workItemId)).rejects.toMatchObject({
+        code: "ADAPTIVE_STOPPING_UNRESOLVED"
+      });
+      const state = await database.pool.query<{ state: string; claimed_by: string | null }>(
+        "SELECT state, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [work.workItemId]
+      );
+      expect(state.rows[0]).toEqual({ state: "READY", claimed_by: null });
+      expect(primary.calls()).toBe(0);
+      expect(secondary.calls()).toBe(0);
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  });
+
   /**
    * T3 r2 · B4 + B5 — the repeated-family MULTIPLIER and the PARTIAL mark, on one
    * M=3 real-database fixture.
@@ -4630,8 +4708,32 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
       expect(provider.composerCalls()).toBe(2);
       expect(reasoningContractFragments.every((fragment) => provider.composerSystemPrompt().includes(fragment)))
         .toBe(true);
-      const answer = await database.pool.query<{ terminal: string; answer_form: { kind: string; hypothesis: string; researchPlan: string } }>(
-        `SELECT answer.terminal, answer.answer_form
+      /**
+       * T13 (S08) / J25 — the WHOLE tuple, on the PERSISTED row.
+       *
+       * The goal's T13 asks for an all-reasoned run that yields DOWNGRADED,
+       * the hypothesis form, both synthesizer-written segments, AND the label
+       * and band still shown. A unit assertion on `runServeGateChain`'s return
+       * value cannot see the last of those: the gate result carries no verdict
+       * state, so the label only exists once the runner attaches
+       * `verdictLabelBasis` and `ServeRepository.persist` derives
+       * `answer.verdict_state` from it. This query is the only place the full
+       * co-occurrence is observable, and J25 says a disclosure is proved where
+       * a reader of the served answer can see it.
+       *
+       * `verdict_state` is the LABEL. `band_ceiling.label` is the ceiling's
+       * name and is a different thing (codex r2 B2) - both are asserted.
+       */
+      const answer = await database.pool.query<{
+        terminal: string;
+        answer_form: { kind: string; hypothesis: string; researchPlan: string };
+        verdict_state: string | null;
+        verdict_unavailable: unknown;
+        confidence_band: string | null;
+        band_ceiling: { basis: Record<string, number> } | null;
+      }>(
+        `SELECT answer.terminal, answer.answer_form, answer.verdict_state,
+                answer.verdict_unavailable, answer.confidence_band, answer.band_ceiling
          FROM serve.answer AS answer
          JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
          WHERE work.work_item_id = $1`,
@@ -4643,6 +4745,24 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         hypothesis: "Hypothesis: the reasoning answer holds provisionally.",
         researchPlan: "Research plan: gather independent evidence that could lift or defeat the hypothesis."
       });
+      // The LABEL is still shown on a downgraded answer. A regression at the
+      // attachment or persistence boundary lands here as a null verdict_state
+      // with a populated verdict_unavailable, which the gate-result assertions
+      // above cannot see.
+      expect(answer.rows[0]?.verdict_state).toBe("CONTESTED");
+      expect(answer.rows[0]?.verdict_unavailable).toBeNull();
+      // The BAND is still shown, and it is the mono-lineage cap of the sealed
+      // candidate band - read from the same sealed rows the run used, never a
+      // band literal.
+      const cappedBand = applySingleLineageBandCap(
+        settings.servePolicy!.candidateConfidenceBand,
+        settings.servePolicy!.bandCeiling
+      );
+      expect(cappedBand).not.toBe(settings.servePolicy!.candidateConfidenceBand);
+      expect(answer.rows[0]?.confidence_band).toBe(cappedBand);
+      // T12: the basis the band was decided on is the CITED set - one reasoned
+      // node, the only node the two segments cite.
+      expect(answer.rows[0]?.band_ceiling?.basis).toEqual({ LOOKED_UP: 0, RAN: 0, REASONING: 1 });
       const composerAttempts = await database.pool.query<{ outcome: string; parse_status: string }>(
         `SELECT entry.outcome, artifact.parse_status
          FROM ledger.ledger_entry AS entry
