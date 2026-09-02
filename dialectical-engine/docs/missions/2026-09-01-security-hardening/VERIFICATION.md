@@ -102,3 +102,4 @@ Neither is dev drift in a B20 file; both are recorded above under the known base
 - Run 3 (38654929, known-red gate): secrets: success · codeql: success · verify: gate `new=1 known=12 stale=0` — the one new name is the host-specific RSS-curve bound (273.1 MiB on ubuntu vs 256 sealed on macOS; V-25); added to the allowlist with its CI source.
 - Follow-up to run 3: the RSS-curve case is a measurement sealed for `darwin_arm64`; instead of an allowlist line (which would disable it as a detector on Linux) it now `it.skipIf`s loudly off that platform/arch; allowlist back to 12 entries.
 - Run 4 (746b3bd3): **secrets: success · codeql: success · verify: success** — first fully green run of `.github/workflows/security.yml` on PR #8 (typecheck, known-red gate, pnpm audit).
+- Run 5 (2d893415, loud platform skip, 12-entry allowlist): **secrets: success · codeql: success · verify: success**. The PR's security workflow is green at the final tip.
