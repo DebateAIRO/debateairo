@@ -3987,6 +3987,16 @@ describe("T10/T11 · the served root and its label, through the production runne
         "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [work.runId]
       );
       expect(answers.rows[0]?.count).toBe("0");
+      // S06 B1 (codex r1): the refusal must land BEFORE the run spends anything.
+      // Stopping after judgement and propagation still refuses honestly, but it
+      // bills a deployment for a run it was always going to reject — so the gate
+      // sits at claim time, on the same footing as J12's panel-weighting stop.
+      expect(provider.calls()).toBe(0);
+      const modelCalls = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+          WHERE run_id=$1 AND action_kind='MODEL_CALL'`, [work.runId]
+      );
+      expect(modelCalls.rows[0]?.count).toBe("0");
     } finally { await provider.stop(); }
   });
 

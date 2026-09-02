@@ -1530,6 +1530,19 @@ export class WalkingSkeletonRunner {
         "J12: a multi-maker run requires the sealed T16 panel-weighting rows (dispersion scale, repeated-family multiplier, downgrade bands, provider-family map) and the sealed disagreement threshold; they are read from the register and never invented"
       );
     }
+    if (this.settings.verdictLabelPolicy === undefined) {
+      // S6-1 / T11 x codex r1 B1: EVERY served answer carries a code-derived
+      // three-state label, so the sealed T16 verdict-label family is mandatory
+      // for every maker count — unlike J12's panel rows, which only bind at
+      // M>=2. The gate sits HERE, beside J12's, before the work item is claimed
+      // and before a single model call: a deployment that never handed the
+      // runner these rows is going to refuse anyway, and refusing after
+      // judgement and propagation bills it for a run that was always rejected.
+      throw new TypedDomainError(
+        "VERDICT_LABEL_CONTROLS_UNRESOLVED",
+        "T11: the served answer's label reads gamma, the two cuts and the disagreement threshold from T16's sealed register rows; they are read from the register and never invented (goal 39-40)"
+      );
+    }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
     const claimed = workItemId === undefined
       ? await this.#work.claimNext(claimInput)
@@ -2579,6 +2592,10 @@ export class WalkingSkeletonRunner {
     // result below, once the terminal is known.
     const verdictLabelControls = this.settings.verdictLabelPolicy;
     if (verdictLabelControls === undefined) {
+      // Unreachable from executeWorkItem: the claim-time gate above refuses
+      // first. Kept as the typed defence for any future caller that reaches
+      // selection by another path — the label is never derived from a value
+      // this file chose.
       throw new TypedDomainError(
         "VERDICT_LABEL_CONTROLS_UNRESOLVED",
         "T11: the served answer's label reads gamma, the two cuts and the disagreement threshold from T16's sealed register rows; a deployment that never sealed them stops loudly rather than labelling on invented values (goal 39-40)"

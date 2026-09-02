@@ -49,6 +49,11 @@ describe("production runner provider topology", () => {
       "scoringOperator: policy.scoringOperator",
       "runDeathPolicy: policy.runDeathPolicy",
       "hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold",
+      // S06 B1 (codex r1): every served answer carries a code-derived label, so
+      // the sealed T16 verdict-label family is a MANDATORY entry-point setting.
+      // Omitting it does not disable the label — it makes the run stop after
+      // spending judgement and propagation.
+      "verdictLabelPolicy: policy.verdictLabelPolicy",
       "holdRecorder:"
     ]) expect(source).toContain(setting);
   });

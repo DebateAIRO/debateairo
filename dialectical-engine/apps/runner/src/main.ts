@@ -98,6 +98,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   scoringOperator: policy.scoringOperator,
   runDeathPolicy: policy.runDeathPolicy,
   hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
+  verdictLabelPolicy: policy.verdictLabelPolicy,
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({
