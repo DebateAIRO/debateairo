@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -34,7 +37,12 @@ async function availablePort() {
  * policy on /api/* is the UI's static one and never the upstream's.
  */
 async function startStubApi() {
+  const seen = [];
   const server = createHttpServer((request, response) => {
+    seen.push({
+      forwardedFor: request.headers["x-forwarded-for"] ?? null,
+      edgeSecret: request.headers["x-debateai-edge-secret"] ?? null
+    });
     response.writeHead(401, {
       "content-type": "application/json",
       "content-security-policy": "default-src 'none'; report-uri /upstream-marker",
@@ -50,6 +58,7 @@ async function startStubApi() {
   assert(address && typeof address === "object");
   return {
     base: `http://127.0.0.1:${address.port}`,
+    last: () => seen[seen.length - 1] ?? null,
     stop: () => new Promise((resolveClosed) => {
       server.closeAllConnections();
       server.close(() => resolveClosed());
@@ -123,10 +132,38 @@ async function stopServer(child) {
   ]);
 }
 
+/** C2 fail-closed: a wrong edge configuration must refuse to start, naming its code. */
+async function assertRefusesToStart(root, env, code) {
+  const stderr = [];
+  const child = spawn(process.execPath, ["server.mjs"], {
+    cwd: root,
+    env: { ...process.env, NODE_ENV: "production", DIALECTICAL_UI_HOST: "127.0.0.1", PORT: "1", ...env },
+    stdio: ["ignore", "ignore", "pipe"]
+  });
+  child.stderr.on("data", (chunk) => stderr.push(chunk.toString()));
+  const exitCode = await Promise.race([
+    new Promise((resolveExit) => child.once("exit", (exit) => resolveExit(exit))),
+    new Promise((_, reject) => setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`server.mjs did not refuse ${code} within 20 s`));
+    }, 20_000))
+  ]);
+  assert.notEqual(exitCode, 0, `${code}: server.mjs must exit non-zero`);
+  assert.match(stderr.join(""), new RegExp(code), `${code}: the refusal names its code`);
+}
+
 async function smoke(surface) {
   const port = await availablePort();
   const root = resolve(repositoryRoot, surface);
   const stubApi = await startStubApi();
+  const secretDir = mkdtempSync(join(tmpdir(), "s5-ui-edge-"));
+  const secretPath = join(secretDir, "ui-edge.secret");
+  const edgeSecret = randomBytes(32).toString("base64url");
+  writeFileSync(secretPath, `${edgeSecret}\n`);
+  chmodSync(secretPath, 0o600);
+  const worldReadablePath = join(secretDir, "world.secret");
+  writeFileSync(worldReadablePath, edgeSecret);
+  chmodSync(worldReadablePath, 0o644);
   const log = [];
   const child = spawn(process.execPath, ["server.mjs"], {
     cwd: root,
@@ -135,6 +172,9 @@ async function smoke(surface) {
       NODE_ENV: "production",
       DIALECTICAL_UI_HOST: "127.0.0.1",
       DIALECTICAL_API_BASE: stubApi.base,
+      // C2 / C2b: this loopback client plays the trusted reverse proxy.
+      DIALECTICAL_UI_TRUSTED_PROXIES: "127.0.0.1, ::1",
+      DIALECTICAL_UI_EDGE_SECRET_PATH: secretPath,
       PORT: String(port)
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -195,16 +235,37 @@ async function smoke(surface) {
     assert.equal(session.headers.get("x-upstream-marker"), null, `${surface}: upstream headers stay behind the allowlist`);
     assertCommonHeaders(session, surface, "/api/v1/session");
     assert.deepEqual(await session.json(), { error: "UNAUTHENTICATED" });
+    assert.deepEqual(stubApi.last(), { forwardedFor: "127.0.0.1", edgeSecret: null }, `${surface}: without x-forwarded-for the socket address is the client`);
+
+    // C2 / C2b (R2, L3-F11): the trusted peer with the edge secret names the
+    // client by the LAST hop; without the secret, or with a wrong one, the
+    // socket address stays the client; the secret header never travels on.
+    const spoofAttempt = "198.51.100.7, 203.0.113.9";
+    for (const [label, headers, expected] of [
+      ["trusted peer + secret", { "x-forwarded-for": spoofAttempt, "x-debateai-edge-secret": edgeSecret }, "203.0.113.9"],
+      ["trusted peer, no secret", { "x-forwarded-for": spoofAttempt }, "127.0.0.1"],
+      ["trusted peer, wrong secret", { "x-forwarded-for": spoofAttempt, "x-debateai-edge-secret": `${edgeSecret.slice(0, -1)}!` }, "127.0.0.1"],
+      ["trusted peer + secret, malformed hop", { "x-forwarded-for": "203.0.113.9:443", "x-debateai-edge-secret": edgeSecret }, "127.0.0.1"]
+    ]) {
+      const probe = await fetch(`${base}/api/v1/session`, { headers });
+      assert.equal(probe.status, 401);
+      await probe.arrayBuffer();
+      assert.deepEqual(stubApi.last(), { forwardedFor: expected, edgeSecret: null }, `${surface}: ${label}`);
+    }
+
+    await assertRefusesToStart(root, { DIALECTICAL_UI_TRUSTED_PROXIES: "10.0.0.0/8" }, "DIALECTICAL_UI_TRUSTED_PROXIES_INVALID");
+    await assertRefusesToStart(root, { DIALECTICAL_UI_EDGE_SECRET_PATH: worldReadablePath }, "DIALECTICAL_UI_EDGE_SECRET_INVALID");
 
     // L3-F4: the image optimizer (sharp) is off the runtime path.
     const image = await fetch(`${base}/_next/image?url=%2Ficon.svg&w=64&q=75`);
     assert.equal(image.status, 404, `${surface}: /_next/image is disabled`);
     await image.arrayBuffer();
 
-    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer PASS\n`);
+    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip PASS\n`);
   } finally {
     await stopServer(child);
     await stubApi.stop();
+    rmSync(secretDir, { recursive: true, force: true });
   }
 }
 
