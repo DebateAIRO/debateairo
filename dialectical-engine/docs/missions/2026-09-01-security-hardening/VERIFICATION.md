@@ -94,3 +94,6 @@ Neither is dev drift in a B20 file; both are recorded above under the known base
 - 2026-09-02 ~10:30: account 5-hour limit killed 3 Opus lanes; resumed 12:35 by message.
 - 2026-09-02 13:39: a Claude Code process restart killed the first detached-less full-suite run; re-run detached (run-suite.sh).
 - PR #8 checks: the Cloudflare "Workers Builds: dezbatere" integration fails on the PR tip AND on the dev tip b5a6b6eb (pre-existing, V-23).
+
+## CI on PR #8 (first run of .github/workflows/security.yml)
+- codeql: success. secrets: FAILED on 13 gitleaks matches over all refs → classified (V-24) and recorded by fingerprint in `.gitleaksignore`; local re-scan with the same pinned 8.30.1 binary: 0 leaks. verify: red on the inherited known-red tests → B31 recorded-baseline gate (in progress).

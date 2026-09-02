@@ -1,0 +1,25 @@
+# .gitleaksignore — exact fingerprints (commit:file:rule:line) reviewed by the 2026-09-01 security-hardening mission.
+# Every entry below is either a non-secret high-entropy constant or a historical, non-live value; see
+# dialectical-engine/docs/missions/2026-09-01-security-hardening/V-DECISIONS-PACKET.md (V-24).
+# Adding an entry requires a comment naming why the match is not a live secret.
+
+# current tree — obs-capture install fingerprints: sha256 content hashes of the installer sources, not credentials (reviewed 2026-09-02)
+14965fc1bfe83017ffce6b62a01060abd3f625a3:dialectical-engine/packages/obs-capture/install/scheduler.ts:generic-api-key:19
+14965fc1bfe83017ffce6b62a01060abd3f625a3:dialectical-engine/packages/obs-capture/install/api.ts:generic-api-key:19
+14965fc1bfe83017ffce6b62a01060abd3f625a3:dialectical-engine/packages/obs-capture/install/runner.ts:generic-api-key:19
+
+# history — Next.js dev-build cache keys committed once in 7ba6bed0 (2026-08-11) and removed the next day; per-build ephemeral keys, dev only
+7ba6bed0e0cacda92f1b1759b73c7ba600ac0a45:DebateAI-V3/apps/v2-ui/.next-dev/cache/.rscinfo:generic-api-key:1
+7ba6bed0e0cacda92f1b1759b73c7ba600ac0a45:DebateAI-V3/apps/v2-ui/.next-dev/prerender-manifest.json:generic-api-key:8
+7ba6bed0e0cacda92f1b1759b73c7ba600ac0a45:DebateAI-V3/apps/v2-ui/.next-dev/prerender-manifest.json:generic-api-key:9
+7ba6bed0e0cacda92f1b1759b73c7ba600ac0a45:DebateAI-V3/apps/v2-ui/.next-dev/server/server-reference-manifest.json:generic-api-key:4
+
+# history — the retired x-user-dev-token quoted in a review packet (dev token retired by S9, migration 0041)
+46c11a76811e2b036fb4a71d30107add46dd1fa2:DebateAI-V3/docs/missions/2026-08-06-v3-programming/reviews/bug03-opus-rev1.md:generic-api-key:151
+6ff9bc5e12eefd31011e486b7b54d0f3093db09b:DebateAI-V3/docs/missions/2026-08-06-v3-programming/reviews/bug03-opus-rev1.md:generic-api-key:151
+
+# history — prose/fixture/log strings in the removed DebateAI-V3 tree and a 2026-07 planning log; not credentials
+f59aaf5cdc748ab0b0614c656a2179bd0191d193:DebateAI-V3/docs/missions/2026-08-06-v3-programming/reviews/pre-10-codex.md:generic-api-key:199
+f59aaf5cdc748ab0b0614c656a2179bd0191d193:DebateAI-V3/tests/integration/database.test.ts:generic-api-key:217
+3b98e4ae4864f89e6a6f43c5c5c00eec7c90d601:.hermes/planning/responsive-ui-20260724/logs/a7-s6-rework.log:generic-api-key:1407
+3b98e4ae4864f89e6a6f43c5c5c00eec7c90d601:.hermes/planning/responsive-ui-20260724/logs/a7-s6-rework.log:generic-api-key:3177
