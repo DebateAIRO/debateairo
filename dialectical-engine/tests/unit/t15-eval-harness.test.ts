@@ -319,8 +319,15 @@ describe("T15b · the comparison table that routes to V", () => {
     });
     const table = renderComparisonTable({ configs, cells: [] });
     const rows = table.filter((line) => line.startsWith("| C"));
-    expect(rows).toHaveLength(3);
-    for (const row of rows) expect(row).toContain("UNGRADED");
+    // Mutant m8 survived a `toContain("UNGRADED")` row check: the GRADES column
+    // still said UNGRADED while the SCORE column rendered NaN, and "somewhere in
+    // this row is the word UNGRADED" cannot tell those apart. The row is the
+    // artifact V reads, so the row is what the assertion pins.
+    expect(rows).toEqual([
+      "| C1 | acceptance:codex-cli | acceptance:claude-cli | baseline (currently sealed) | UNGRADED | UNGRADED |",
+      "| C2 | acceptance:claude-cli | acceptance:codex-cli | candidate | UNGRADED | UNGRADED |",
+      "| C3 | acceptance:claude-cli | acceptance:fourth-cli | candidate | UNGRADED | UNGRADED |"
+    ]);
     expect(table).toContain("UNGRADED: no V-approved run has produced a grade for this cell");
   });
 
@@ -337,9 +344,11 @@ describe("T15b · the comparison table that routes to V", () => {
         { configId: "C1", debateRef: "run-1", graderRoleRef: "acceptance:fourth-cli", score: 2 }
       ]
     });
-    const c1 = table.find((line) => line.startsWith("| C1 "));
-    expect(c1).toContain("3.00");
-    expect(c1).toContain("2 grades");
-    expect(table.find((line) => line.startsWith("| C2 "))).toContain("UNGRADED");
+    expect(table.find((line) => line.startsWith("| C1 "))).toBe(
+      "| C1 | acceptance:codex-cli | acceptance:claude-cli | baseline (currently sealed) | 3.00 | 2 grades |"
+    );
+    expect(table.find((line) => line.startsWith("| C2 "))).toBe(
+      "| C2 | acceptance:claude-cli | acceptance:codex-cli | candidate | UNGRADED | UNGRADED |"
+    );
   });
 });
