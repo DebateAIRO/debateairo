@@ -45,4 +45,9 @@ describe("CI security gates (F-03)", () => {
     expect(read(".github/workflows/security.yml")).toContain(`node-version: ${engines}`);
     expect(JSON.parse(read("dialectical-engine/register.bootstrap.json")).values.nodeRuntimeVersion).toBe(`v${engines}`);
   });
+  it("pins every action to a full commit SHA with its release tag as a comment (L6-F7)", () => {
+    const uses = read(".github/workflows/security.yml").split("\n").filter((line) => /^\s*-?\s*uses:/.test(line));
+    expect(uses.length).toBeGreaterThan(0);
+    for (const line of uses) expect(line).toMatch(/uses: [\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+  });
 });
