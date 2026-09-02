@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:s00": "vitest run tests/unit tests/integration tests/architecture",
+    "test:ci-gate": "node tools/ci-known-red.mjs tests/unit tests/architecture",
     "lint": "pnpm run audit:architecture && pnpm run audit:source",
     "audit:architecture": "tsx tools/orphan-audit/src/cli.ts architecture",
     "audit:source": "tsx tools/orphan-audit/src/cli.ts source",
