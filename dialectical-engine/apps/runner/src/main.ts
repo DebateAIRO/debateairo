@@ -10,7 +10,7 @@ import { configureContentEncryption, createPool, RunRepository } from "@debateai
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { loadRunnerEnvironment } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { parseProviderDiscoveryTargets } from "@debateai/providers";
+import { observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import { createRunnerProviderTopology } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
@@ -99,6 +99,39 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   runDeathPolicy: policy.runDeathPolicy,
   hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
   verdictLabelPolicy: policy.verdictLabelPolicy,
+  panelPolicy: policy.panelPolicy,
+  stoppingPolicy: policy.stoppingPolicy,
+  // T3C / F34 (ruling J20): DR-182 VROW-5's claim-time health re-probe. Without
+  // this the runner's probe block is skipped entirely — a member pinned at ask
+  // time that has since gone absent is trusted, the panel is never revised, and
+  // no CLAIM_PANEL_REVISED disclosure is emitted. That is a SILENT degradation,
+  // which the Scope law forbids.
+  //
+  // It is the SAME probe the API runs at ask time (moved to @debateai/providers
+  // by J21 so there is exactly one implementation), and it is immediate: VROW-5
+  // asks for one no-hold check at claim, so no freshness window is consulted.
+  // A member with no configured target is ABSENT with the reason the runner
+  // already understands, never a silent pass.
+  claimTimeProbe: async (member) => {
+    const target = providerTargets.find((candidate) => candidate.providerRef === member.provider_ref);
+    if (target === undefined) {
+      return { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_GATEWAY_UNRESOLVED" };
+    }
+    // OBSERVE only. The runner persists the claim-time verdict itself in both
+    // arms (DR-182), so a persisting probe here would write the same re-probe
+    // twice under two evidence refs — codex r1 B1.
+    const observation = await observeProviderTarget({
+      target,
+      timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
+      fetchImplementation: fetch,
+      clock: () => new Date()
+    });
+    return {
+      state: observation.state,
+      modelId: observation.modelId,
+      failureCode: observation.failureCode
+    };
+  },
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({
