@@ -4,7 +4,7 @@ import type {
   ProviderProbeRecord
 } from "@debateai/db";
 import type { ProviderDiscoveryTarget } from "@debateai/providers";
-export { parseProviderDiscoveryTargets } from "@debateai/providers";
+export { assertProductionProviderTargets, parseProviderDiscoveryTargets } from "@debateai/providers";
 
 const MAX_PROBE_RESPONSE_BYTES = 64 * 1024;
 

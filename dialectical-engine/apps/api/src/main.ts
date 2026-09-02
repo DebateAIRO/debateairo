@@ -54,6 +54,7 @@ import { installGracefulShutdown } from "./graceful-shutdown.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
+  assertProductionProviderTargets,
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
@@ -147,6 +148,7 @@ if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
 }
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
+assertProductionProviderTargets(parseProviderDiscoveryTargets(environment.PROVIDER_DISCOVERY_TARGETS_JSON, deploymentMakers.configuredProviders), environment.NODE_ENV);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: parseProviderDiscoveryTargets(

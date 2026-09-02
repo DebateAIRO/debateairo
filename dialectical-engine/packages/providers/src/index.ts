@@ -201,6 +201,26 @@ export function parseProviderDiscoveryTargets(
   }));
 }
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
+
+/**
+ * L4-F7: in production a cleartext `http:` base URL may only point at a loopback relay; any
+ * other `http:` target would carry the bearer `authorization_header` and every prompt off-box
+ * unencrypted. `https:` targets and non-production environments are untouched.
+ */
+export function assertProductionProviderTargets(
+  targets: readonly ProviderDiscoveryTarget[],
+  nodeEnv: string | undefined
+): void {
+  if (nodeEnv !== "production") return;
+  for (const target of targets) {
+    const parsed = new URL(target.baseUrl);
+    if (parsed.protocol === "http:" && !LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())) {
+      throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
+    }
+  }
+}
+
 export interface ProviderAdapterRegistration {
   readonly providerRef: string;
   readonly adapterKind: string;

@@ -8,6 +8,7 @@ import {
   parseRunnerEnvironment,
   parseSettlementEnvironment
 } from "@debateai/register";
+import { assertProductionProviderTargets, parseProviderDiscoveryTargets } from "@debateai/providers";
 import {
   validApiEnvironmentFixture,
   validRunnerEnvironmentFixture
@@ -167,5 +168,54 @@ describe("production configuration floors (R2)", () => {
     expect(source).toContain("validateApiEnvironment(parseEnvironment(apiEnvironmentShape))");
     expect(source).toContain("validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source))");
     expect(source).toContain("assertProductionFloors(environment)");
+  });
+});
+
+const configuredProviders = (size: number) => Array.from({ length: size }, (_, index) => Object.freeze({
+  providerRef: `provider-${index + 1}`,
+  maker: `maker-${index + 1}`
+}));
+
+const providerTargets = (baseUrls: readonly string[]) => parseProviderDiscoveryTargets(
+  JSON.stringify(baseUrls.map((base_url, index) => ({
+    provider_ref: `provider-${index + 1}`,
+    base_url,
+    model: `model-${index + 1}`,
+    ...(index === 0 ? { authorization_header: "Bearer fixture-secret" } : {})
+  }))),
+  configuredProviders(baseUrls.length)
+);
+
+describe("production provider targets refuse cleartext off-box (L4-F7)", () => {
+  it("accepts loopback http targets and any https target in production", () => {
+    expect(() => assertProductionProviderTargets(providerTargets([
+      "http://127.0.0.1:8791/v1", "http://[::1]:8791/v1", "http://localhost:8791/v1", "https://gateway.internal/v1"
+    ]), "production")).not.toThrow();
+  });
+
+  it("refuses a non-loopback http target and names the provider", () => {
+    expect(() => assertProductionProviderTargets(
+      providerTargets(["http://127.0.0.1:8791/v1", "http://gateway.internal/v1"]),
+      "production"
+    )).toThrow("PROVIDER_BASE_URL_TLS_REQUIRED:provider-2");
+    expect(() => assertProductionProviderTargets(providerTargets(["http://10.0.0.9:8000/v1"]), "production"))
+      .toThrowError(/^PROVIDER_BASE_URL_TLS_REQUIRED:provider-1$/u);
+    expect(() => assertProductionProviderTargets(providerTargets(["http://10.0.0.9:8000/v1"]), "production"))
+      .toThrowError(TypeError);
+  });
+
+  it("applies nothing outside production", () => {
+    for (const nodeEnv of ["development", "test", undefined]) {
+      expect(() => assertProductionProviderTargets(providerTargets(["http://gateway.internal/v1"]), nodeEnv))
+        .not.toThrow();
+    }
+  });
+
+  it("is applied where both process roots parse their targets", async () => {
+    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
+      const source = await readFile(new URL(path, import.meta.url), "utf8");
+      expect(source).toContain("assertProductionProviderTargets(");
+      expect(source).toContain("environment.NODE_ENV");
+    }
   });
 });
