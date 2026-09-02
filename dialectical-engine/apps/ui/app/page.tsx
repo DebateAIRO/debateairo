@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies, headers } from "next/headers";
-import { createServerContractClient, USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
+import { createServerContractClient, listDebatesPageServer, readSessionCookie } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -17,7 +17,7 @@ export default async function HomePage({
   // UI-01 (S05): the V3 answer index is asker-scoped; without a server session
   // cookie the list honestly stays empty with a sign-in hint — never an
   // anonymous global listing.
-  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const token = readSessionCookie(await cookies());
   if (token === null) return <LandingPage />;
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
