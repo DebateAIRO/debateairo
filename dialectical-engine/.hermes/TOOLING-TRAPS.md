@@ -153,3 +153,27 @@ Every entry below was paid for at least once. Do not pay for it again.
   statement "" requires 3` — which reads like a driver bug, not like a probe that varies its
   own SQL. Pass the varying values as parameters (`$4,$5,$6`) and let them be NULL, instead
   of interpolating `NULL` / `'literal'` into the statement text. (T6 r3)
+- **The scratchpad ROOT is shared between concurrent seats — one seat's tool file silently
+  replaces another's.** Reaching for this lane's r3 mutant harness at `<scratchpad>/mutant.sh`,
+  T6 r4 found the S06 seat's harness under the same name: hard-coded to `.worktrees/lane-s06`
+  and appending to `logs/s06/`. Invoking it blind — the natural move, since the path was
+  "mine" — would have mutated ANOTHER LANE'S WORKTREE and written into another lane's evidence
+  directory, from a seat with no contract over either. Put seat tooling under a seat-scoped
+  subdirectory (`<scratchpad>/t06-r4/…`), and `cat` any remembered scratch script before you
+  run it. (T6 r4)
+- **`assert t.count(old) == N` before a multi-site replace is NOT a safety check.** It proves N
+  occurrences exist; it proves nothing about whether they MEAN the same thing — and textual
+  identity is precisely what a HOMONYM has. T6 r3 narrowed a column type with a
+  `count == 2` assertion and hit two different columns whose annotations were spelled
+  identically (`ledger.node_review.outcome`, three lawful values, and
+  `serve.condition_mark.review_outcome`, one), shipping a copied comment that cited the wrong
+  constraint as justification. When a selector matches more than once, the count is a
+  REQUIREMENT TO DISAMBIGUATE: read every site, and if two are textually identical and
+  semantically different, make them textually different (name one) rather than being careful.
+  No type can express "narrowed in the right query" — a source assertion counting the narrowed
+  reads can. (T6 r4)
+- **Gate logs need a captured `EXIT STATUS:` line, not just clean output.** A typecheck log
+  containing the command and no diagnostics proves a command RAN; it does not prove it exited
+  0 (a crashed or filtered run looks identical). Wrap gates as
+  `{ echo "\$ cmd"; cmd 2>&1; echo "EXIT STATUS: $?"; } > log`. A static reviewer correctly
+  downgraded T6 r3's typecheck evidence to testimony-grade for exactly this. (T6 r4)
