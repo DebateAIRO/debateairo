@@ -6,6 +6,7 @@ import { readSynthesisRoleControls } from "@debateai/register";
 import {
   EVAL_HARNESS_MATRIX,
   EVAL_HARNESS_SPEND,
+  assertSpendCeilingWithinSealedBound,
   projectCallCount,
   renderProjection,
   runEvalHarness,
@@ -138,14 +139,30 @@ export async function main(argv: readonly string[]): Promise<EvalHarnessOutcome 
     const dependencies: EvalHarnessDependencies = {
       emit,
       readSynthesisRoleControls: async () => readSynthesisRoleControls(pool, ACCEPTANCE_REGISTER_VERSION),
-      // The maker travels WITH the ref, off the same sealed configuredProviderSet
-      // row, so same-family provenance needs no second register read (V-S11-1).
-      readConfiguredProviders: async () => Object.freeze(
-        (await readAcceptanceRuntimePolicy(pool)).providers.map((provider) => Object.freeze({
+      // The maker travels WITH the ref, off the same sealed configuredProviderSet row, so
+      // same-MAKER provenance needs no second register read (V-S11-1). `model` is deliberately
+      // NOT synthesised here: the register carries no model, and inventing one would let the
+      // artifact claim an exact model relationship it has not observed (codex r2 B3). The
+      // adapter that reports the observed model is what fills this in — see
+      // EVAL_PROVENANCE_ADAPTER_REQUIREMENTS.
+      readConfiguredProviders: async () => {
+        const policy = await readAcceptanceRuntimePolicy(pool);
+        // N5 / F-S11-2: the harness's stated per-call ceiling is checked against the
+        // deployment's OWN sealed organ bound rather than assumed to still match it.
+        const judgeBound = policy.bounds.JUDGE;
+        const ceiling = assertSpendCeilingWithinSealedBound({
+          stated: {
+            maxAttempts: EVAL_HARNESS_SPEND.maxAttemptsPerCall,
+            tokenCeiling: EVAL_HARNESS_SPEND.tokenCeilingPerCall
+          },
+          sealed: { maxAttempts: judgeBound.maxAttempts, tokenCeiling: judgeBound.tokenCeiling }
+        });
+        for (const mark of ceiling.marks) emit(`CONDITION MARK ${mark} · ${ceiling.disclosure}`);
+        return Object.freeze(policy.providers.map((provider) => Object.freeze({
           providerRef: provider.providerRef,
           maker: provider.maker
-        }))
-      ),
+        })));
+      },
       readRecordedDebates: async () =>
         readRecordedDebatesFrom(pool, EVAL_HARNESS_MATRIX.recordedDebateCount),
       resolveSynthesisSurface: () => resolveSynthesisSurfaceFrom(serveModule),
