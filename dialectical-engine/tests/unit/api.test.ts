@@ -398,7 +398,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       headers:USER_HEADERS
     });
     expect(oversized.statusCode).toBe(400);
-    expect(oversized.json()).toEqual({ error:"MALFORMED_REQUEST" });
+    expect(oversized.json()).toEqual({ error:"MALFORMED_REQUEST", message:"MALFORMED_REQUEST" });
     expect(answerIndexCalls).toBe(0);
     await indexApi.close();
   });

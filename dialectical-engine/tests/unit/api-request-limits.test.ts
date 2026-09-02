@@ -259,7 +259,7 @@ describe("API request limits (F-07, L1-F4)", () => {
           method: "POST", url: "/v1/auth/register", payload: registerBody(password)
         });
         expect(refused.statusCode).toBe(400);
-        expect(refused.json()).toEqual({ error: "MALFORMED_REQUEST" });
+        expect(refused.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       expect(registration.register).not.toHaveBeenCalled();
       const admitted = await api.inject({
@@ -273,7 +273,7 @@ describe("API request limits (F-07, L1-F4)", () => {
         payload: { email: "alice@example.test", password: overByLength }
       });
       expect(login.statusCode).toBe(400);
-      expect(login.json()).toEqual({ error: "MALFORMED_REQUEST" });
+      expect(login.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       expect(sessions.beginLogin).not.toHaveBeenCalled();
 
       const stepUp = await api.inject({
@@ -281,7 +281,7 @@ describe("API request limits (F-07, L1-F4)", () => {
         payload: { password: overByLength, code: "123456" }
       });
       expect(stepUp.statusCode).toBe(400);
-      expect(stepUp.json()).toEqual({ error: "MALFORMED_REQUEST" });
+      expect(stepUp.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       expect(sessions.stepUp).not.toHaveBeenCalled();
       expect(failureLog).not.toHaveBeenCalled();
     } finally {

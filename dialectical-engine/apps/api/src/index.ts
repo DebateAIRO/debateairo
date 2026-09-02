@@ -309,8 +309,14 @@ export class AskRefusal extends Error {
 }
 
 class MalformedRequestError extends Error {
+  /**
+   * L1-F5: a ZodError message is the entire issue list — every field path,
+   * every expected enum value, and each `.strict()` extra-key name. The
+   * transport message is therefore the constant code, and the schema detail
+   * survives only on `cause`, which never leaves the process.
+   */
   constructor(error: Error) {
-    super(error.message);
+    super("MALFORMED_REQUEST", { cause: error });
     this.name = "MalformedRequestError";
   }
 }
@@ -579,7 +585,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(statusCode).send({
       error: errorCode,
-      message: statusCode >= 500 ? errorCode : knownError.message
+      message: statusCode >= 500 || malformed ? errorCode : knownError.message
     });
   });
 
@@ -587,7 +593,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.post("/v1/auth/login", credentialRoutePolicy("POST /v1/auth/login"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
-      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       if (typeof body.challenge_token === "string") {
         const result = await options.sessions!.completeLogin({
           challengeToken: body.challenge_token,
@@ -645,7 +653,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
-      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
@@ -805,7 +815,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const offset = Number(request.query.offset);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100
         || !Number.isInteger(offset) || offset < 0) {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       if (options.publications === undefined) {
         return reply.send(PublicDebateListSchema.parse({ items: [], total: 0 }));
@@ -836,7 +846,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
-      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       const response = await options.registration!.register({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : "",
@@ -935,7 +947,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const body = request.body;
       if (typeof body !== "object" || body === null || !("model_id" in body)
         || typeof body.model_id !== "string" || body.model_id.trim() === "") {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       try {
         const selection = await options.evaluatorDevMenu!.selectConsumerModel({
@@ -977,7 +989,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const offset = Number(request.query.offset);
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
       || !Number.isInteger(offset) || offset < 0) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(
       request.session, limit, offset, ownershipFor(request)
@@ -990,7 +1002,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const answer = await options.application.readAnswer(
       answerId.data, request.session, version, ownershipFor(request)
@@ -1004,7 +1016,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const inspection = await options.application.readInspection(
       answerId.data, request.session, version, ownershipFor(request)
