@@ -104,65 +104,176 @@ describe("production runner provider topology", () => {
   });
 
   /**
-   * J27 — THE CLASS GATE. Three lanes have now each found one instance of the same
-   * defect: a `WalkingSkeletonSettings` member that some caller wires (a test, the
-   * acceptance composition) and the SHIPPED entry point does not. F33 was
-   * `panelPolicy`, F34 was `claimTimeProbe`, and T7's `stoppingPolicy` arrived
-   * through a merge and made a correctly sealed deployment refuse every
-   * multi-maker work item. Each was closed with a per-setting pin, and a
-   * per-setting pin cannot catch the NEXT member — it only re-checks the last one.
+   * J27 — THE CLASS GATE. Three lanes each found one instance of the same defect: a
+   * `WalkingSkeletonSettings` member that some caller wires (a test, the acceptance
+   * composition) and the SHIPPED entry point does not. F33 was `panelPolicy`, F34
+   * `claimTimeProbe`, and T7's `stoppingPolicy` arrived through a merge and made a
+   * correctly sealed deployment refuse every multi-maker work item. Each was closed
+   * with a per-setting pin, and a per-setting pin cannot catch the NEXT member.
    *
-   * This enumerates the interface instead, so a new optional member is accounted
-   * for by construction: either the entry point composes it, or it is listed below
-   * as intentionally absent WITH a reason. There is no third state.
+   * This enumerates BOTH sides and compares them semantically:
+   *   - the interface's optional members, at depth 1 (not members of nested types);
+   *   - the keys the entry point composes, at the TOP LEVEL of the settings literal
+   *     (not keys nested inside a member's own object argument), with spreads resolved.
+   *
+   * Both halves must be depth-aware or the gate reports success while the class stays
+   * open. Both mistakes have now actually been made here, and each has a mutant.
    */
   it("composes every optional WalkingSkeletonSettings member, or declares it intentionally absent", async () => {
     const runnerSource = await readFile("apps/runner/src/index.ts", "utf8");
     const mainSource = await readFile("apps/runner/src/main.ts", "utf8");
 
-    /** Brace-matched slice of `source` beginning at the first `{` at or after `from`. */
-    const balanced = (source: string, from: number): string => {
-      const open = source.indexOf("{", from);
-      let depth = 0;
-      for (let index = open; index < source.length; index += 1) {
-        const character = source[index];
-        if (character === "{") depth += 1;
-        else if (character === "}") {
-          depth -= 1;
-          if (depth === 0) return source.slice(open, index + 1);
+    /**
+     * Blanks comments and string/template literals in place (length-preserving), so a
+     * key-looking sequence inside a comment or a string cannot be read as a property.
+     */
+    const blank = (source: string): string => {
+      let out = "";
+      let index = 0;
+      while (index < source.length) {
+        const character = source.charAt(index);
+        const next = source.charAt(index + 1);
+        if (character === "/" && next === "/") {
+          while (index < source.length && source.charAt(index) !== "\n") { out += " "; index += 1; }
+          continue;
         }
+        if (character === "/" && next === "*") {
+          out += "  "; index += 2;
+          while (index < source.length && !(source.charAt(index) === "*" && source.charAt(index + 1) === "/")) {
+            out += source.charAt(index) === "\n" ? "\n" : " "; index += 1;
+          }
+          out += "  "; index += 2;
+          continue;
+        }
+        if (character === '"' || character === "'" || character === "`") {
+          out += " "; index += 1;
+          while (index < source.length && source.charAt(index) !== character) {
+            if (source.charAt(index) === "\\") { out += "  "; index += 2; continue; }
+            out += source.charAt(index) === "\n" ? "\n" : " "; index += 1;
+          }
+          out += " "; index += 1;
+          continue;
+        }
+        out += character; index += 1;
       }
-      return "";
+      return out;
     };
 
-    // DEPTH-1 ONLY. A regex over the whole interface body also matches members of
-    // NESTED object types — `resolveTerminalActivations`' return type declares
-    // `executedCheckRef?` and `typeFallbackConsulted?`, which are not settings and
-    // can never be "composed" by an entry point. A depth-blind enumeration reports
-    // them as unwired, and the only way to quiet it is to invent a reason for a
-    // field that was never a setting. (That is not hypothetical: the first draft of
-    // this gate did exactly that.)
-    // Anchored on the brace: a bare indexOf substring-matches a RENAMED interface
-    // (`WalkingSkeletonSettingsRenamed` contains the searched string), so the
-    // enumeration would silently read some other interface's members and the whole
-    // gate would pass vacuously. The rename mutant proved exactly that.
-    const declaration = runnerSource.search(/interface WalkingSkeletonSettings\s*\{/u);
-    expect(declaration).toBeGreaterThan(-1);
-    const body = balanced(runnerSource, declaration);
-    let depth = 0;
-    let topLevel = "";
-    for (const character of body) {
-      if (character === "{") { depth += 1; continue; }
-      if (character === "}") { depth -= 1; continue; }
-      if (depth === 1) topLevel += character;
-    }
-    const optionalMembers = [...topLevel.matchAll(/readonly\s+(\w+)\?\s*:/gu)]
-      .map((match) => match[1] ?? "");
+    /** [openIndex, closeIndex] of the balanced pair starting at `start`. */
+    const balanced = (source: string, start: number, open: string, close: string): [number, number] | null => {
+      let depth = 0;
+      for (let index = start; index < source.length; index += 1) {
+        const character = source.charAt(index);
+        if (character === open) depth += 1;
+        else if (character === close) { depth -= 1; if (depth === 0) return [start, index]; }
+      }
+      return null;
+    };
 
-    // The oracle must DISCRIMINATE. If the interface is renamed, or the brace
-    // matcher breaks, `optionalMembers` goes empty and every assertion below passes
-    // while proving nothing. These pin that the enumeration actually ran, and that
-    // it stayed at depth 1.
+    /**
+     * Keys an object literal contributes AT ITS OWN TOP LEVEL. Depth counts every
+     * bracket family, so `clock:` inside `observeProviderTarget({ ... })` — which sits
+     * at depth 2 within the settings literal — is NOT a composed setting. A spread at
+     * depth 1 is resolved by collecting the keys of each object literal inside it, so
+     * the conditional `...(x === undefined ? {} : { critique: x })` contributes
+     * `critique`.
+     */
+    const literalKeys = (source: string, from: number, to: number): readonly string[] => {
+      const keys: string[] = [];
+      const spreads: number[] = [];
+      let depth = 0;
+      for (let index = from; index <= to; index += 1) {
+        const character = source.charAt(index);
+        if (character === "{" || character === "(" || character === "[") { depth += 1; continue; }
+        if (character === "}" || character === ")" || character === "]") { depth -= 1; continue; }
+        if (depth !== 1) continue;
+        if (character === "." && source.charAt(index + 1) === "." && source.charAt(index + 2) === ".") {
+          spreads.push(index + 3); index += 2; continue;
+        }
+        if (/[A-Za-z_$]/u.test(character)) {
+          let wordEnd = index;
+          while (wordEnd <= to && /[\w$]/u.test(source.charAt(wordEnd))) wordEnd += 1;
+          const word = source.slice(index, wordEnd);
+          let after = wordEnd;
+          while (after <= to && /\s/u.test(source.charAt(after))) after += 1;
+          if (source.charAt(after) === ":") keys.push(word);
+          index = wordEnd - 1;
+        }
+      }
+      for (const spreadStart of spreads) {
+        let cursor = spreadStart;
+        while (cursor < source.length && /\s/u.test(source.charAt(cursor))) cursor += 1;
+        const opener = source.charAt(cursor);
+        const span = opener === "(" ? balanced(source, cursor, "(", ")")
+          : opener === "{" ? balanced(source, cursor, "{", "}")
+            : null;
+        if (span === null) continue;
+        for (let index = span[0]; index <= span[1]; index += 1) {
+          if (source.charAt(index) !== "{") continue;
+          const block = balanced(source, index, "{", "}");
+          if (block === null) continue;
+          keys.push(...literalKeys(source, block[0], block[1]));
+          index = block[1];
+        }
+      }
+      return keys;
+    };
+
+    // ---- side 1: the interface's OPTIONAL members, at depth 1 -----------------
+    // A regex over the whole interface body also matches members of NESTED types —
+    // `resolveTerminalActivations`' return type declares `executedCheckRef?` and
+    // `typeFallbackConsulted?`, which are not settings and can never be composed.
+    // Anchored on the brace: a bare indexOf substring-matches a RENAMED interface
+    // (`WalkingSkeletonSettingsRenamed` contains the searched string) and the gate
+    // would read some other interface's members and pass vacuously.
+    const blankedRunner = blank(runnerSource);
+    const declaration = blankedRunner.search(/interface WalkingSkeletonSettings\s*\{/u);
+    expect(declaration).toBeGreaterThan(-1);
+    const interfaceSpan = balanced(blankedRunner, blankedRunner.indexOf("{", declaration), "{", "}");
+    expect(interfaceSpan).not.toBeNull();
+    let interfaceDepth = 0;
+    let topLevelBody = "";
+    for (let index = interfaceSpan![0]; index <= interfaceSpan![1]; index += 1) {
+      const character = blankedRunner.charAt(index);
+      if (character === "{") { interfaceDepth += 1; continue; }
+      if (character === "}") { interfaceDepth -= 1; continue; }
+      if (interfaceDepth === 1) topLevelBody += character;
+    }
+    const optionalMembers = [...topLevelBody.matchAll(/readonly\s+(\w+)\?\s*:/gu)].map((match) => match[1] ?? "");
+
+    // ---- side 2: the TOP-LEVEL keys the entry point actually composes ---------
+    const blankedMain = blank(mainSource);
+    const constructor = blankedMain.indexOf("new WalkingSkeletonRunner(");
+    expect(constructor).toBeGreaterThan(-1);
+    const argumentSpan = balanced(blankedMain, blankedMain.indexOf("(", constructor), "(", ")");
+    expect(argumentSpan).not.toBeNull();
+    let argumentDepth = 0;
+    let lastArgumentStart = argumentSpan![0] + 1;
+    for (let index = argumentSpan![0] + 1; index < argumentSpan![1]; index += 1) {
+      const character = blankedMain.charAt(index);
+      if ("({[".includes(character)) argumentDepth += 1;
+      else if (")}]".includes(character)) argumentDepth -= 1;
+      else if (character === "," && argumentDepth === 0) lastArgumentStart = index + 1;
+    }
+    while (/\s/u.test(blankedMain.charAt(lastArgumentStart))) lastArgumentStart += 1;
+    const settingsSpan = balanced(blankedMain, lastArgumentStart, "{", "}");
+    expect(settingsSpan).not.toBeNull();
+    const composed = [...new Set(literalKeys(blankedMain, settingsSpan![0], settingsSpan![1]))];
+
+    // ---- the scan must PROVE its own depth and spread rules -------------------
+    // Depth: `clock:` really is present inside the settings literal, nested one level
+    // down inside `observeProviderTarget({ ... })`. A depth-blind scan reports it as
+    // composed, and then adding `readonly clock?: () => Date;` to the interface would
+    // be silently "accounted for" while nothing composes it. That is the exact hole
+    // this gate exists to prevent, and it shipped in the first version.
+    expect(mainSource).toContain("clock: () => new Date()");
+    expect(composed).not.toContain("clock");
+    // Spread: `critique` is contributed ONLY by a conditional top-level spread, so a
+    // scan that ignores spreads would wrongly report a composed member as unwired.
+    expect(mainSource).toContain("{ critique: providerTopology.critique }");
+    expect(composed).toContain("critique");
+
+    // ---- the enumeration must DISCRIMINATE ------------------------------------
     expect(optionalMembers.length).toBeGreaterThanOrEqual(10);
     for (const known of ["panelPolicy", "stoppingPolicy", "claimTimeProbe", "verdictLabelPolicy"]) {
       expect(optionalMembers).toContain(known);
@@ -170,29 +281,21 @@ describe("production runner provider topology", () => {
     expect(optionalMembers).not.toContain("executedCheckRef");
     expect(optionalMembers).not.toContain("typeFallbackConsulted");
 
-    // Scoped to the settings literal the entry point actually hands the runner, so
-    // an unrelated key elsewhere in main.ts cannot be mistaken for a composed one.
-    const settingsLiteral = balanced(mainSource, mainSource.indexOf("new WalkingSkeletonRunner("));
-    expect(settingsLiteral).not.toHaveLength(0);
-    const composes = (member: string): boolean =>
-      new RegExp(`(^|[\\s{,])${member}\\s*:`, "mu").test(settingsLiteral);
-
     /**
-     * Members the shipped entry point deliberately does NOT pass, each with the
-     * reason. Empty today: all 14 optional members are composed. An entry here is
-     * a claim that absence is correct — state why, and the pins below keep it
-     * honest (a member that is listed AND composed, or listed but no longer a
-     * member, fails as a stale declaration).
+     * Members the shipped entry point deliberately does NOT pass, each with the reason.
+     * Empty today: all optional members are composed. An entry here is a claim that
+     * absence is correct — state why; the pins below fail a stale or dishonest entry
+     * (one that is listed AND composed, or listed but no longer a member).
      */
     const INTENTIONALLY_ABSENT: Readonly<Record<string, string>> = {};
 
     const unaccounted = optionalMembers
-      .filter((member) => !composes(member) && !(member in INTENTIONALLY_ABSENT));
+      .filter((member) => !composed.includes(member) && !(member in INTENTIONALLY_ABSENT));
     expect(unaccounted).toEqual([]);
 
     for (const [member, reason] of Object.entries(INTENTIONALLY_ABSENT)) {
       expect(optionalMembers).toContain(member);
-      expect(composes(member)).toBe(false);
+      expect(composed).not.toContain(member);
       expect(reason.trim().length).toBeGreaterThan(40);
     }
   });
