@@ -27,6 +27,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   createPostgresProviderGateway,
+  createPostgresReviewCatchUpDependencies,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
@@ -1304,6 +1305,17 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
     )).rejects.toThrow();
   });
 
+  /**
+   * T6 r3 · F-T6-6 — these rows once hard-coded `created_at_seq` in the 10 000s.
+   * `ledger.allocate_sequence()` is a monotonic counter shared by the whole
+   * file, so those literals were a LANDMINE: the moment the file's own
+   * allocations reached 10 001, every later `startRun` in this file died on
+   * `run_created_at_seq_key`, at setup, in a test that had nothing to do with
+   * this one. The headroom was small enough that adding a single production
+   * scenario tripped it (23 tests, all at setup). Nothing here asserts on the
+   * numbers — they only had to be unique — so they now come from the allocator
+   * like every other row, and the cliff is gone rather than moved.
+   */
   it("round-trips ASK ER and policy-raise carriers and rejects a policy lowering", async () => {
     const asker = await database.pool.query(`
       INSERT INTO core.run (
@@ -1312,7 +1324,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('a','a','s','ASKER',now(),'casual','casual','ASKER','asker:a','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10001)
+      ) VALUES ('a','a','s','ASKER',now(),'casual','casual','ASKER','asker:a','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(asker.rows[0]).toEqual({ tier_source: "ASKER", tier_provenance_ref: "asker:a" });
@@ -1323,7 +1335,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('machine','machine','s','ASKER',now(),'standard','standard','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10005)
+      ) VALUES ('machine','machine','s','ASKER',now(),'standard','standard','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(machineDefault.rows[0]).toEqual({
@@ -1337,7 +1349,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('asker-raised','asker-raised','s','ASKER',now(),'casual','high-stakes','ASKER','asker:raised','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10006)
+      ) VALUES ('asker-raised','asker-raised','s','ASKER',now(),'casual','high-stakes','ASKER','asker:raised','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
     `)).rejects.toThrow();
     await expect(database.pool.query(`
       INSERT INTO core.run (
@@ -1346,7 +1358,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('machine-raised','machine-raised','s','ASKER',now(),'casual','high-stakes','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10007)
+      ) VALUES ('machine-raised','machine-raised','s','ASKER',now(),'casual','high-stakes','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
     `)).rejects.toThrow();
     await expect(database.pool.query(`
       INSERT INTO core.run (
@@ -1355,7 +1367,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('machine-lowered','machine-lowered','s','ASKER',now(),'high-stakes','casual','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10008)
+      ) VALUES ('machine-lowered','machine-lowered','s','ASKER',now(),'high-stakes','casual','MACHINE_DEFAULT','machine:deployment-floor','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
     `)).rejects.toThrow();
     const raised = await database.pool.query(`
       INSERT INTO core.run (
@@ -1364,7 +1376,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('b','b','s','ASKER',now(),'casual','standard','DEPLOYMENT_POLICY','asker:b','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10002)
+      ) VALUES ('b','b','s','ASKER',now(),'casual','standard','DEPLOYMENT_POLICY','asker:b','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
       RETURNING tier_source, tier_provenance_ref
     `);
     expect(raised.rows[0]).toEqual({ tier_source: "DEPLOYMENT_POLICY", tier_provenance_ref: "asker:b" });
@@ -1375,7 +1387,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('c','c','s','ASKER',now(),'standard','casual','DEPLOYMENT_POLICY','asker:c','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10003)
+      ) VALUES ('c','c','s','ASKER',now(),'standard','casual','DEPLOYMENT_POLICY','asker:c','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
     `)).rejects.toThrow();
     await expect(database.pool.query(`
       INSERT INTO core.run (
@@ -1384,7 +1396,7 @@ describe("P5 / FX-DB-02 / FX-DB-07 — run initialization is atomic and event-de
         composition_budget_tier, depth_params, agent_count, discovered_panel,
         stranger_sample_rate, envelope_basis, register_version,
         battery_version, created_at_seq
-      ) VALUES ('d','d','s','ASKER',now(),'casual','standard','DERIVED','asker:d','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',10004)
+      ) VALUES ('d','d','s','ASKER',now(),'casual','standard','DERIVED','asker:d','low','{}',1,'[{"provider_ref":"provider:raw","maker":"maker:raw","model_id":"model:raw","probe_evidence_ref":"00000000-0000-4000-8000-000000000001","probed_at":"2026-08-14T12:00:00.000Z"}]',1,'{}',1,'s00',ledger.allocate_sequence())
     `)).rejects.toThrow();
   });
 });
@@ -2418,6 +2430,431 @@ describe("apps/runner — legal command lifecycle", () => {
     }
   });
 
+  /**
+   * T6 r2 / J14 — the SECOND route into hidden-unjudgeable gets its disclosure.
+   *
+   * This is T33's fixture with one byte-level change: the review that T33 kills
+   * with transport failures (`{status:503}` twice) instead comes back as an
+   * honest `cannot-assess`. The reviewer was reached, answered, and said it
+   * could not judge. Under T6's outcome filter that node has no judged basis
+   * and lands in exactly the same class — but the class-H record schema demands
+   * a transport outcome that truthfully does not exist here, so before J14 the
+   * node left the served graph with NO record and NO mark: a silent skip, which
+   * goal 26 forbids.
+   *
+   * The two assertions are the two halves of the consequence: the answer
+   * discloses the route (naming the review outcome instead of a transport
+   * outcome), and the review-catch-up lane can still READ that disclosure —
+   * `transportFields` threw CATCH_UP_DISCLOSURE_MISMATCH for any hidden node
+   * whose record was missing, so the silent route did not merely under-disclose,
+   * it stopped the catch-up lane on every run containing one.
+   */
+  const runCannotAssessClassHScenario = async () => {
+    const composition = JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "The judged position survives.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+    ] });
+    const primary = await startProviderDouble([
+      judgementDouble("Primary unassessable-frame position 1"),
+      reviewDouble("agree", "Primary review 1"),
+      judgementDouble("Primary unassessable-frame position 2"),
+      judgementDouble("Primary unassessable-frame position 3"),
+      reviewDouble("cannot-assess", "Primary cannot assess position 2"),
+      reviewDouble("agree", "Primary review 3"),
+      judgementDouble("Primary unassessable-frame position 4"),
+      reviewDouble("agree", "Primary review 4"),
+      composition,
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ conforms: true, findings: [] }),
+      JSON.stringify({ pass: true })
+    ]);
+    const secondary = await startProviderDouble([
+      judgementDouble("Secondary unassessable-frame position 1"),
+      reviewDouble("agree", "Secondary review 1"),
+      judgementDouble("Secondary unassessable-frame position 2"),
+      judgementDouble("Secondary unassessable-frame position 3"),
+      reviewDouble("agree", "Secondary review 2"),
+      reviewDouble("agree", "Secondary review 3"),
+      judgementDouble("Secondary unassessable-frame position 4"),
+      reviewDouble("agree", "Secondary review 4")
+    ]);
+    try {
+      const question = `t06-cannot-assess-class-h-${randomUUID()}`;
+      const runId = await createRun(question, 40, 2, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t06-cannot-assess-class-h:${runId}`
+      });
+      const runRepository = new RunRepository(database.pool);
+      const scoringOperator = { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" } as const;
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...settings,
+        claimMs: 1_204_000,
+        runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
+        hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+        holdRecorder: {
+          countCooldownHolds: (candidateRunId) => runRepository.countCooldownHolds(candidateRunId),
+          record: (event: HoldProgressEvent) => runRepository.recordRunLifecycleEvent({
+            runId: event.runId,
+            kind: event.kind,
+            value: {
+              state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+              hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+              transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+            }
+          }),
+          wait: async () => undefined
+        },
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        },
+        scoringOperator
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The run really did take the honest-cannot-assess route, not a transport
+      // death: exactly one stored review says so, and no review call was lost.
+      const outcomes = await database.pool.query<{ outcome: string; count: string }>(
+        "SELECT outcome, count(*)::text AS count FROM ledger.node_review WHERE run_id=$1 GROUP BY outcome ORDER BY outcome",
+        [runId]
+      );
+      expect(outcomes.rows).toEqual([
+        { outcome: "agree", count: "7" },
+        { outcome: "cannot-assess", count: "1" }
+      ]);
+
+      return {
+        runId,
+        settings,
+        scoringOperator,
+        answer: await new ServeRepository(database.pool)
+          .readAnswerProjection(result.answerId, `asker:${question}`)
+      };
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  };
+
+  it("T6/J14 discloses the cannot-assess hidden route with the review outcome in place of a transport outcome", async () => {
+    const scenario = await runCannotAssessClassHScenario();
+
+    // The mark is raised and its typed record names the REAL reason — the
+    // review outcome — where the transport route names a transport outcome.
+    // Neither route may name both, and neither may name none.
+    expect(scenario.answer?.condition_marks).toContain("HIDDEN-UNJUDGEABLE");
+    const hiddenRecord = scenario.answer?.condition_mark_records.find(
+      (candidate) => candidate.mark === "HIDDEN-UNJUDGEABLE"
+    );
+    expect(hiddenRecord).toMatchObject({
+      call_site_key: expect.stringMatching(/^JUDGE:review:/),
+      terminal_transport_outcome: null,
+      review_outcome: "cannot-assess",
+      excluded_from_served_number: true
+    });
+    const hiddenNodeId = hiddenRecord?.affected_node_ids[0];
+    if (hiddenNodeId === undefined) throw new Error("TEST_EXPECTED_HIDDEN_NODE");
+    expect(scenario.answer?.nodes.find((node) => node.node_id === hiddenNodeId)).toMatchObject({
+      final_strength: null,
+      condition_marks: expect.arrayContaining(["HIDDEN-UNJUDGEABLE"])
+    });
+
+    const answerId = scenario.answer?.answer_id;
+    const answerVersion = scenario.answer?.answer_version;
+    if (answerId === undefined || answerVersion === undefined) throw new Error("TEST_EXPECTED_ANSWER");
+
+    // T6 r3 / J14 ADDENDUM (2) — the stored row's PROVENANCE is the review row
+    // itself. The writer did not take the caller's word for which review it
+    // meant: it looked the node's own `cannot-assess` review up in the ledger,
+    // and the answer row carries that `node_review_id` under a composite
+    // foreign key. So the disclosure cannot drift from the fact it reports.
+    const reviews = await database.pool.query<{ node_review_id: string; node_id: string; outcome: string }>(
+      `SELECT node_review_id::text, node_id::text, outcome FROM ledger.node_review
+        WHERE run_id=$1 ORDER BY outcome, at_seq`,
+      [scenario.runId]
+    );
+    const unassessedReview = reviews.rows.find((row) => row.outcome === "cannot-assess")!;
+    const agreedReview = reviews.rows.find((row) => row.outcome === "agree")!;
+    expect(unassessedReview.node_id).toBe(hiddenNodeId);
+    const storedHidden = await database.pool.query<{
+      review_ref: string | null; review_node_ref: string | null; terminal_transport_outcome: string | null;
+    }>(
+      `SELECT review_ref::text AS review_ref, review_node_ref::text AS review_node_ref,
+              terminal_transport_outcome
+         FROM serve.condition_mark
+        WHERE answer_id=$1 AND answer_version=$2 AND mark='HIDDEN-UNJUDGEABLE'`,
+      [answerId, answerVersion]
+    );
+    expect(storedHidden.rows).toEqual([{
+      review_ref: unassessedReview.node_review_id,
+      review_node_ref: hiddenNodeId,
+      terminal_transport_outcome: null
+    }]);
+
+    // What the DATABASE itself refuses, probed against the real constraints in
+    // a rolled-back transaction and named one by one — a probe that only shows
+    // "something threw" cannot tell a vocabulary rule from a foreign key.
+    //
+    // The one shape the DDL still ACCEPTS is called out rather than blessed:
+    // a transport reason on a node whose review landed is cross-table truth,
+    // which no CHECK can express and which J14's addendum (3) explicitly
+    // declines to mandate a trigger for. That row is refused by the atomic
+    // writer guard instead — proved in `t06-review-teeth-database.test.ts`.
+    const ddlClient = await database.pool.connect();
+    const probe = (input: {
+      readonly transport?: "TIMED_OUT" | "FAILED";
+      readonly review?: string;
+      readonly reviewRef?: string;
+      readonly reviewNodeRef?: string;
+      readonly subject?: string;
+    }) => ddlClient.query(
+      `INSERT INTO serve.condition_mark (
+         answer_id, answer_version, mark, scope, subject_ref, reason,
+         call_site_key, terminal_transport_outcome, review_outcome,
+         review_ref, review_node_ref, excluded_from_served_number, at_seq
+       ) VALUES ($1,$2,'HIDDEN-UNJUDGEABLE','node',$3,'ddl-probe',
+         'JUDGE:review:test',$4,$5,$6::uuid,$7::uuid,true,ledger.allocate_sequence())`,
+      [answerId, answerVersion, input.subject ?? hiddenNodeId,
+        input.transport ?? null, input.review ?? null,
+        input.reviewRef ?? null, input.reviewNodeRef ?? null]
+    );
+    const rolledBack = async (name: string, run: () => Promise<unknown>) => {
+      await ddlClient.query(`SAVEPOINT ${name}`);
+      await run();
+      await ddlClient.query(`ROLLBACK TO SAVEPOINT ${name}`);
+    };
+    try {
+      await ddlClient.query("BEGIN");
+      // ACCEPTED by DDL, refused by the writer: the transport arm for a node
+      // whose review landed. Named as the DDL's honest limit, not as a
+      // correct row.
+      await rolledBack("transport_arm_ddl_limit", async () => {
+        await expect(probe({ transport: "FAILED" })).resolves.toBeDefined();
+      });
+      // ACCEPTED, and true: the review arm naming this node's own review row.
+      await rolledBack("review_arm_true", async () => {
+        await expect(probe({
+          review: "cannot-assess",
+          reviewRef: unassessedReview.node_review_id,
+          reviewNodeRef: hiddenNodeId
+        })).resolves.toBeDefined();
+      });
+      // Cardinality (r2's rule, kept): never both, never neither.
+      await rolledBack("both_reasons", async () => {
+        await expect(probe({
+          transport: "FAILED",
+          review: "cannot-assess",
+          reviewRef: unassessedReview.node_review_id,
+          reviewNodeRef: hiddenNodeId
+        })).rejects.toThrow(/condition_mark_unjudged_reason_check/);
+      });
+      await rolledBack("no_reason", async () => {
+        await expect(probe({})).rejects.toThrow(/condition_mark_unjudged_reason_check/);
+      });
+      // J14 addendum (1) at the SQL layer: `agree` and `dispute` both SEED
+      // judged standing, so the review arm admits neither.
+      for (const [name, outcome] of [["agree_arm", "agree"], ["dispute_arm", "dispute"]] as const) {
+        await rolledBack(name, async () => {
+          await expect(probe({
+            review: outcome,
+            reviewRef: agreedReview.node_review_id,
+            reviewNodeRef: agreedReview.node_id,
+            subject: agreedReview.node_id
+          })).rejects.toThrow(/condition_mark_review_outcome_check/);
+        });
+      }
+      // J14 addendum (2) at the SQL layer: the review arm without provenance,
+      // with provenance for the WRONG node, and with provenance for a review
+      // that reached a judgement — codex's LIE 1 made unspellable.
+      await rolledBack("review_arm_no_ref", async () => {
+        await expect(probe({ review: "cannot-assess" }))
+          .rejects.toThrow(/condition_mark_review_provenance_check/);
+      });
+      await rolledBack("review_arm_other_subject", async () => {
+        await expect(probe({
+          review: "cannot-assess",
+          reviewRef: unassessedReview.node_review_id,
+          reviewNodeRef: agreedReview.node_id
+        })).rejects.toThrow(/condition_mark_review_subject_check/);
+      });
+      await rolledBack("review_arm_judged_row", async () => {
+        await expect(probe({
+          review: "cannot-assess",
+          reviewRef: agreedReview.node_review_id,
+          reviewNodeRef: agreedReview.node_id,
+          subject: agreedReview.node_id
+        })).rejects.toThrow(/condition_mark_review_row_fk/);
+      });
+    } finally {
+      await ddlClient.query("ROLLBACK");
+      ddlClient.release();
+    }
+  });
+
+  /**
+   * The consequence T6 r1 could only READ, executed. `prepareVersion` rebuilds
+   * every class-H/class-D record from the PREVIOUS answer's records, and a
+   * hidden node with no record there is a typed loud stop. So the silent route
+   * did not merely under-disclose: it stopped the review-catch-up lane on every
+   * run that contained a cannot-assess review, including runs where catch-up
+   * had no work to do at all.
+   */
+  it("T6/J14 the review-catch-up lane reads the cannot-assess disclosure instead of stopping on it", async () => {
+    const scenario = await runCannotAssessClassHScenario();
+    const source = await new ServeRepository(database.pool).readReviewCatchUpSource(scenario.runId);
+    const dependencies = createPostgresReviewCatchUpDependencies({
+      pool: database.pool,
+      reviewers: [],
+      scoringOperator: scenario.scoringOperator,
+      propagationContractHash: scenario.settings.propagationContractHash,
+      propagationNumberKind: scenario.settings.propagationNumberKind,
+      propagationProducer: scenario.settings.propagationProducer,
+      judgementSelectionRule: { ...scenario.settings.judgementPolicy!.selectionRule },
+      compositionBudget: scenario.settings.servePolicy!.compositionBudgets.low
+    });
+
+    const candidate = await dependencies.prepareVersion({
+      runId: scenario.runId, answerId: source.answerId, fromVersion: source.answerVersion
+    });
+    // The set-aside node is still set aside — catch-up cannot repair it
+    // (`UNIQUE (node_id)` refuses a second review) — but the lane now READS
+    // that state instead of stopping on it.
+    expect(candidate.stillSetAside).toBeGreaterThan(0);
+  });
+
+  /**
+   * T6 r3 / codex r1 N1 — the class-D twin gets its own PRODUCTION arm.
+   *
+   * r2 proved the cannot-assess route at the production seam for class H only,
+   * and proved class D for cannot-assess only at the standing projection. So a
+   * mutant that filtered review-outcome disclosures out of `classDReviewRecords`
+   * left every J14 production assertion green while restoring, for class D,
+   * exactly the silence F-T6-4 says was fixed.
+   *
+   * This is DR-184 C-5's own fixture with one change: the review that C-5 kills
+   * with two transport failures instead comes back as an honest
+   * `cannot-assess`. The node keeps its judged arguments, so it still SERVES —
+   * it is included in the served number, unlike the class-H route — and the
+   * record must name the review outcome, carry the ledger review row, count a
+   * positive judged basis, and stay readable by the catch-up lane.
+   */
+  it("T6/J14 discloses the cannot-assess class-D route, served and counted, with the review outcome as its reason", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "t06-cannot-assess-class-d",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary D position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary D review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary D position ${index + 1}`)),
+        reviewDouble("cannot-assess", "Secondary D cannot assess review 1"),
+        ...Array.from({ length: 3 }, (_, index) => reviewDouble("dispute", `Secondary D review ${index + 2}`))
+      ]
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    // The run really took the honest cannot-assess route: one stored review
+    // says so, and no review call was lost to transport.
+    const outcomes = await database.pool.query<{ outcome: string; count: string }>(
+      `SELECT outcome, count(*)::text AS count FROM ledger.node_review
+        WHERE run_id=$1 GROUP BY outcome ORDER BY outcome`,
+      [scenario.runId]
+    );
+    expect(outcomes.rows.find((row) => row.outcome === "cannot-assess")).toEqual({
+      outcome: "cannot-assess", count: "1"
+    });
+
+    // The class-D record names the REVIEW outcome, not a transport outcome,
+    // and keeps class D's own presentation contract: a positive judged basis
+    // and INCLUSION in the served number.
+    expect(scenario.answer?.condition_marks).toContain("DERIVED-STANDING-UNREVIEWED");
+    const derivedRecords = (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "DERIVED-STANDING-UNREVIEWED");
+    const unassessedDerived = derivedRecords.find((record) => record.review_outcome !== null);
+    expect(unassessedDerived).toMatchObject({
+      call_site_key: expect.stringMatching(/^JUDGE:review:/),
+      terminal_transport_outcome: null,
+      review_outcome: "cannot-assess",
+      excluded_from_served_number: false
+    });
+    expect(unassessedDerived?.judged_basis_count ?? 0).toBeGreaterThan(0);
+    const derivedNodeId = unassessedDerived?.subject_ref;
+    if (derivedNodeId === undefined) throw new Error("TEST_EXPECTED_DERIVED_NODE");
+
+    // The disclosure is bound to the ledger row it reports, and the node it
+    // reports on is the node whose review actually came back cannot-assess.
+    const unassessedReview = await database.pool.query<{ node_review_id: string; node_id: string }>(
+      `SELECT node_review_id::text, node_id::text FROM ledger.node_review
+        WHERE run_id=$1 AND outcome='cannot-assess'`,
+      [scenario.runId]
+    );
+    expect(unassessedReview.rows[0]?.node_id).toBe(derivedNodeId);
+    const storedDerived = await database.pool.query<{ review_ref: string; review_node_ref: string }>(
+      `SELECT review_ref::text AS review_ref, review_node_ref::text AS review_node_ref
+         FROM serve.condition_mark
+        WHERE answer_id=$1 AND answer_version=$2
+          AND mark='DERIVED-STANDING-UNREVIEWED' AND review_outcome='cannot-assess'`,
+      [scenario.answer?.answer_id, scenario.answer?.answer_version]
+    );
+    expect(storedDerived.rows).toEqual([{
+      review_ref: unassessedReview.rows[0]!.node_review_id,
+      review_node_ref: derivedNodeId
+    }]);
+
+    // T6 r4 / codex r2 B1 — the node projection reports the LEDGER's own
+    // review vocabulary, not the narrowed disclosure one. This run stores
+    // `agree`, `dispute` AND `cannot-assess` reviews, so a served node must be
+    // able to carry a live judged verdict. r3 typed that column as
+    // `"cannot-assess" | null` at the serve boundary while runtime kept putting
+    // `agree` through it; this asserts the value the type was lying about.
+    const projectedReviewOutcomes = new Set(
+      (scenario.answer?.nodes ?? [])
+        .map((node) => node.review?.outcome)
+        .filter((outcome): outcome is NonNullable<typeof outcome> => outcome !== undefined)
+    );
+    expect(projectedReviewOutcomes.size).toBeGreaterThan(0);
+    for (const outcome of projectedReviewOutcomes) {
+      expect(["agree", "dispute", "cannot-assess"]).toContain(outcome);
+    }
+    expect([...projectedReviewOutcomes].some((outcome) => outcome !== "cannot-assess")).toBe(true);
+
+    // Class D SERVES — that is the whole difference from class H. The node
+    // still carries a final strength and is not excluded from the number.
+    expect(scenario.answer?.nodes.find((node) => node.node_id === derivedNodeId)?.final_strength)
+      .not.toBeNull();
+
+    // ... and the catch-up lane reads the disclosure instead of stopping on it.
+    const source = await new ServeRepository(database.pool).readReviewCatchUpSource(scenario.runId);
+    const settings = runnerSettings();
+    const dependencies = createPostgresReviewCatchUpDependencies({
+      pool: database.pool,
+      reviewers: [],
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      propagationContractHash: settings.propagationContractHash,
+      propagationNumberKind: settings.propagationNumberKind,
+      propagationProducer: settings.propagationProducer,
+      judgementSelectionRule: { ...settings.judgementPolicy!.selectionRule },
+      compositionBudget: settings.servePolicy!.compositionBudgets.low
+    });
+    await expect(dependencies.prepareVersion({
+      runId: scenario.runId, answerId: source.answerId, fromVersion: source.answerVersion
+    })).resolves.toBeDefined();
+  });
+
   it("DR-184 C-5 serves a class-D root when its own review dies but judged arguments remain", async () => {
     const scenario = await executeResil01Scenario({
       label: "resil01-r1-served-review-dead",
@@ -2582,6 +3019,68 @@ describe("apps/runner — legal command lifecycle", () => {
     expect(strengthOf(subject)).toBeCloseTo(oracle, 12);
     // The headline: the tree moved the number off tau.
     expect(strengthOf(subject)).not.toBe(tauOf(subject));
+  });
+
+  /**
+   * T6 / S4-2 — the PRODUCTION seam for the second half of "review outcomes get
+   * teeth": a `dispute` returned by the cross-maker reviewer feeds
+   * `applyDeclaredDisagreement`, so the served answer's certainty band is the
+   * SEALED one-step-down band rather than the candidate.
+   *
+   * The two arms differ in exactly one byte-level thing — the outcome string
+   * the secondary maker returns on its reviews. Everything else (question
+   * shape, judgement doubles, composition, conformance) is identical, so a band
+   * difference between them can come from nothing but the review outcome.
+   *
+   * The expectation is DERIVED from the sealed rows the fixture itself seals
+   * (`servePolicy.candidateConfidenceBand` and `panelPolicy.oneStepDown`),
+   * never from a band literal: a downgrade that is computed here instead of
+   * read from the register would be exactly the undeclared arithmetic S4-2
+   * outlaws.
+   */
+  it("T6 a disputed cross-maker review steps the served band down and an all-agree run leaves it", async () => {
+    const t06BandScenario = (label: string, secondaryOutcome: "agree" | "dispute") =>
+      executeResil01Scenario({
+        label,
+        primary: [
+          ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T6 position ${index + 1}`)),
+          ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T6 review ${index + 1}`)),
+          resil01Composition,
+          JSON.stringify({ conforms: true, findings: [] }),
+          JSON.stringify({ conforms: true, findings: [] }),
+          JSON.stringify({ pass: true })
+        ],
+        secondary: [
+          ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T6 position ${index + 1}`)),
+          ...Array.from({ length: 4 }, (_, index) => reviewDouble(secondaryOutcome, `Secondary T6 review ${index + 1}`))
+        ]
+      });
+
+    const settings = runnerSettings();
+    const candidateBand = settings.servePolicy!.candidateConfidenceBand;
+    const steppedDownBand = settings.panelPolicy!.oneStepDown[candidateBand]!;
+    // Without this the fixture could pass while showing no step at all.
+    expect(steppedDownBand).not.toBe(candidateBand);
+
+    const agreed = await t06BandScenario("t06-band-agree", "agree");
+    expect(agreed.error).toBeNull();
+    expect(agreed.result?.kind).toBe("COMPLETED");
+
+    const disputed = await t06BandScenario("t06-band-dispute", "dispute");
+    expect(disputed.error).toBeNull();
+    expect(disputed.result?.kind).toBe("COMPLETED");
+
+    const outcomesOf = async (runId: string): Promise<ReadonlySet<string>> => new Set(
+      (await database.pool.query<{ outcome: string }>(
+        "SELECT DISTINCT outcome FROM ledger.node_review WHERE run_id=$1", [runId]
+      )).rows.map((row) => row.outcome)
+    );
+    // The arms really are the two review populations they claim to be.
+    expect(await outcomesOf(agreed.runId)).toEqual(new Set(["agree"]));
+    expect(await outcomesOf(disputed.runId)).toEqual(new Set(["agree", "dispute"]));
+
+    expect(agreed.answer?.confidence_band).toBe(candidateBand);
+    expect(disputed.answer?.confidence_band).toBe(steppedDownBand);
   });
 
   it("RESIL-01 rev2 R2 keeps a healthy tau-0.30 graph servable and makes class L presentation-only", async () => {
