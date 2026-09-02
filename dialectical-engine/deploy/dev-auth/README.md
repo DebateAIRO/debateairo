@@ -102,6 +102,27 @@ Refusal codes (fail closed; nothing is repaired or moved):
 - `DEV_AUTH_CUSTODY_ROOT_INVALID` — the custody root or its parent exists but
   is a symlink, is not owned by you, or is not exactly `0700`.
 
+## Captured mail
+
+`pnpm dev:auth:up` points the API at `deploy/dev-auth/sendmail-capture.mjs`, a
+sendmail-compatible sink that writes each message to one `0600` file named by a
+random UUID under `<custody root>/mail` (mode `0700`). It opens no socket and
+never prints the message.
+
+The API invokes it as `sendmail -i -t -f <envelope sender>`. No recipient
+address is passed on the command line, because argv is readable by every local
+user through `ps`. The sink takes the recipient from the single `To:` header on
+stdin and refuses a message that carries none, carries more than one, folds the
+header, adds `Cc:`/`Bcc:`, or spells the address as anything other than one
+bare address.
+
+Captured mail holds a real recipient address and a working verification link,
+so it is not kept: on **every** invocation the sink deletes regular `.eml`
+files in the spool whose mtime is older than **7 days**. Symbolic links are
+never followed and never removed, so nothing outside the spool can be deleted
+through it, and a failed prune never fails the capture that triggered it. You
+can delete the whole spool at any time; nothing reads it back.
+
 ## Moving to a new machine
 
 Never copy `.local/dev-auth` or the override directory between machines,
