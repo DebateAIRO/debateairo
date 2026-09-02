@@ -5,6 +5,10 @@ import { modelMeta } from "@/lib/models";
 import { isComplete, relativeTime, statusLabel } from "@/lib/format";
 import type { DebateSummary } from "@/lib/types";
 
+function joinMeta(parts: readonly (string | null | undefined)[]): string {
+  return parts.filter((part): part is string => typeof part === "string" && part.length > 0).join(" · ");
+}
+
 /* The design document's Turn 3 library row: claim, meta line, overlapping
    model dots, a status pill and the arrow. */
 function LibraryRow({
@@ -22,7 +26,7 @@ function LibraryRow({
   meta: string;
   models: readonly string[];
   status: string;
-  state: "complete" | "generating" | "failed";
+  state: "complete" | "generating" | "failed" | "contested" | "unsupported";
 }) {
   return (
     <Link className="libRow" href={href}>
@@ -61,10 +65,10 @@ export function DebatesBuffer({ debates }: { readonly debates: readonly DebateSu
   return debates.map((debate) => {
     const failed = debate.status === "failed";
     const meta = debate.terminal_reason === null || debate.terminal_reason === undefined
-      ? [relativeTime(debate.created_at),
+      ? joinMeta([relativeTime(debate.created_at),
          debate.models.length > 0
            ? `${debate.models.length} model${debate.models.length === 1 ? "" : "s"}`
-           : null].filter((part) => part !== null).join(" · ")
+           : null])
       : `Debate generation failed: ${debate.terminal_reason}`;
     return (
       <LibraryRow
@@ -80,8 +84,8 @@ export function DebatesBuffer({ debates }: { readonly debates: readonly DebateSu
   });
 }
 
-/* The public tab. The published projection carries no model list, so these
-   rows show no dots and no model count rather than inventing either. */
+/* Public summaries carry only model IDs already disclosed by the published
+   nodes. Legacy answer-only publications keep the same typed absence. */
 export function PublicDebatesBuffer({
   debates
 }: {
@@ -91,6 +95,10 @@ export function PublicDebatesBuffer({
     return <div className="libEmpty">No debates have been published yet.</div>;
   }
   return debates.map((debate) => {
+    const models = debate.models ?? [];
+    const modelCount = models.length > 0
+      ? `${models.length} model${models.length === 1 ? "" : "s"}`
+      : null;
     const verdict = debate.verdict === null
       ? "Verdict unavailable"
       : debate.verdict.charAt(0) + debate.verdict.slice(1).toLowerCase();
@@ -100,11 +108,20 @@ export function PublicDebatesBuffer({
         href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}
         claim={debate.question}
         by={debate.author_pseudonym}
-        meta={[relativeTime(debate.published_at), debate.confidence_band?.toLowerCase()]
-          .filter((part) => part !== null && part !== undefined).join(" · ")}
-        models={[]}
+        meta={joinMeta([
+          relativeTime(debate.published_at),
+          modelCount,
+          debate.confidence_band?.toLowerCase()
+        ])}
+        models={debate.models ?? []}
         status={verdict}
-        state={debate.verdict === null ? "generating" : "complete"}
+        state={debate.verdict === null
+          ? "generating"
+          : debate.verdict === "CONTESTED"
+            ? "contested"
+            : debate.verdict === "UNSUPPORTED"
+              ? "unsupported"
+              : "complete"}
       />
     );
   });

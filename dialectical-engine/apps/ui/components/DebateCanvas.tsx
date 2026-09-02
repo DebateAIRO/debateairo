@@ -13,10 +13,9 @@ import {
   roleOf,
   type PlacedClaim
 } from "@/lib/debatePresentation";
-import { ModelBadge, ModelMetaLine } from "@/components/ModelPresentation";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
 import {
-  formatIndependencePill,
   formatScoreBadgeLabel,
   formatScorePercent,
   formatStrengthPill,
@@ -109,6 +108,7 @@ export function DebateCanvas({
 
   const visibleRoot = showSetAsidePaths ? root : withoutSetAsidePaths(root);
   const layout = layoutTree(visibleRoot, heightOf);
+  const allCardsMeasured = layout.placed.every((placed) => heights[placed.id] !== undefined);
 
   // Measure rendered cards and re-layout when their real heights differ.
   useLayoutEffect(() => {
@@ -141,6 +141,7 @@ export function DebateCanvas({
     <CanvasViewport
       layoutWidth={layout.width}
       layoutHeight={layout.height}
+      initialAnchorTop={allCardsMeasured ? layout.placed[0]?.y ?? null : null}
       canvasRef={canvasRef}
       stickyControl={
         <div className="canvasStickyControl">
@@ -251,20 +252,11 @@ function CanvasCard({
   // Task 13 (P1.5): sourcing-breadth chip, derived straight from the node's
   // own EVIDENCE children -- independent of whether scoring has run, so it
   // renders alongside (not inside) the scoring badges below.
-  const independencePill = formatIndependencePill(node.evidence_independence);
   // UI-02a: V3's own recorded numbers for this card. `undefined` keeps V2-only
   // callers byte-identical; anything else renders either both numbers or the
   // typed reason there are none (never 0, never a dash — DR-115).
   const v3Scores =
     v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById));
-  const v3Review = v3NodesById?.get(node.id)?.review ?? null;
-  const compactReview = v3Review?.outcome === "agree"
-    ? "agreed"
-    : v3Review?.outcome === "dispute"
-      ? "disputed"
-      : v3Review?.outcome === "cannot-assess"
-        ? "unassessed"
-        : "absent";
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -284,16 +276,17 @@ function CanvasCard({
     width: CARD_W,
     opacity: (scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38) * lowStrengthDim,
     background: "var(--shell)",
-    borderRadius: "var(--r-card)",
     boxShadow: "var(--shadow-card)",
     boxSizing: "border-box",
-    padding: 4
+    border: "1px solid var(--line-strong)",
+    borderRadius: 16,
+    padding: role === "root" ? 7 : 6
   };
 
   const innerStyle: CSSProperties = scrutiny
     ? {
         background: "var(--core)",
-        borderRadius: "var(--r-card)",
+        borderRadius: role === "root" ? 10 : 11,
         position: "relative",
         borderColor: scrutiny.color,
         boxShadow: `0 0 0 4px ${scrutiny.bg}, var(--shadow-card)`
@@ -301,7 +294,7 @@ function CanvasCard({
     : role === "root"
       ? {
           background: "var(--core)",
-          borderRadius: "var(--r-card)",
+          borderRadius: 11,
           position: "relative",
           borderColor: "var(--line-2)",
           boxShadow: "var(--shadow-card)"
@@ -352,9 +345,9 @@ function CanvasCard({
             display: "block",
             position: "absolute",
             top: 0,
-            left: 0,
-            width: "100%",
-            height: 3,
+            left: role === "root" ? 20 : 15,
+            width: role === "root" ? 52 : 44,
+            height: 4,
             borderRadius: "var(--r-tab)",
             background: stanceLine
           }}
@@ -433,13 +426,19 @@ function CanvasCard({
           </div>
         ) : (
           <>
-            <div className="nodeHeader">
+            <div className="nodeArgHeader">
               <span className="roleBadge" style={{ color: pal?.text, background: pal?.bg, borderColor: pal?.border }}>
                 {pal?.arrow} {roleLabel(node)}
               </span>
               {generation || node.maker !== undefined ? (
-                <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
+                <ModelMetaLine
+                  modelId={generation?.model_id ?? null}
+                  maker={node.maker}
+                  className="modelPill metaLine"
+                />
               ) : null}
+            </div>
+            <div className="nodeScoreRow">
               <ScoringErrorBoundary>
                 {scoring ? (
                   <ScoreBadges node={node} scoring={scoring} openNodeDetails={openNodeDetails} />
@@ -451,51 +450,7 @@ function CanvasCard({
                 {v3Scores ? (
                   <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} />
                 ) : null}
-                {v3NodesById !== undefined ? (
-                  <span
-                    className="nodeReviewBadges"
-                    data-node-review={v3Review?.outcome ?? "absent"}
-                    data-review={compactReview}
-                  >
-                    <span
-                      className="nodeReviewDot"
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 6,
-                        height: 6,
-                        borderRadius: "var(--r-dot)",
-                        background: compactReview === "agreed"
-                          ? "var(--agree-text)"
-                          : compactReview === "disputed"
-                            ? "var(--dispute-text)"
-                            : "var(--muted)"
-                      }}
-                    />
-                    <ModelBadge
-                      modelId={v3Review?.reviewer_lineage.model_id ?? null}
-                      maker={v3Review?.reviewer_lineage.maker ?? null}
-                    />
-                    <span
-                      className={`scoreBadge ${v3Review === null ? "unavailable" : "v3"}`}
-                      title={v3Review === null
-                        ? "No completed second-maker review is recorded for this node."
-                        : v3Review.reasons.join(" ")}
-                    >
-                      {v3Review === null ? "REVIEW N/A" : `REVIEW ${v3Review.outcome.toUpperCase()}`}
-                    </span>
-                  </span>
-                ) : null}
               </ScoringErrorBoundary>
-              {independencePill ? (
-                <span
-                  className="scoreBadge independence"
-                  aria-label={`Evidence sourcing for ${node.claim}: ${independencePill.title}`}
-                  title={independencePill.title}
-                >
-                  {independencePill.pillText}
-                </span>
-              ) : null}
             </div>
 
             {state === "pending" ? (
@@ -510,37 +465,8 @@ function CanvasCard({
               </div>
             ) : (
               <>
-                <div className="nodeClaim">{node.claim}</div>
-                {expanded && generation?.argument ? (
-                  <div
-                    className="nodeProse scroll"
-                    onMouseUp={(event) => onProseSelect?.(node, event)}
-                  >
-                    {generation.argument}
-                  </div>
-                ) : null}
-                <div className="nodeControls">
-                  {onChallengeNode ? (
-                    <button
-                      type="button"
-                      className="nodeCtrl challenge"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onChallengeNode(node, event.currentTarget);
-                      }}
-                    >
-                      ⚐ Challenge
-                    </button>
-                  ) : (
-                    <span
-                      className="nodeCtrl challenge"
-                      aria-disabled="true"
-                      tabIndex={-1}
-                      style={{ opacity: 0.55 }}
-                    >
-                      🔒 Challenge
-                    </span>
-                  )}
+                <div className="nodeClaim treePreview">{node.claim}</div>
+                <div className="nodeControls nodeReferenceFooter" data-reference-tree-footer>
                   {onChallengeNode ? (
                     <button
                       type="button"
@@ -563,16 +489,6 @@ function CanvasCard({
                     }}
                   >
                     Details <span aria-hidden="true">▸</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="nodeCtrl"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleExpand(node.id);
-                    }}
-                  >
-                    {expanded ? "Collapse" : "Read"} <span style={{ fontSize: 9 }}>{expanded ? "▲" : "▼"}</span>
                   </button>
                 </div>
               </>

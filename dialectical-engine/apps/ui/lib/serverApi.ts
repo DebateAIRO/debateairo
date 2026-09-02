@@ -49,10 +49,30 @@ export async function listDebatesPageServer(
   client?: ContractClient,
   userAgent?: string
 ): Promise<DebateListPage> {
-  const index = await (client ?? createServerContractClient(fetch, token, userAgent))
-    .readAnswerIndex(HOME_PAGE_SIZE, 0);
+  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
+  const index = await resolvedClient.readAnswerIndex(HOME_PAGE_SIZE, 0);
+  const modelsByAnswerId = new Map<string, string[]>();
+  for (const item of index.items) {
+    try {
+      const answer = await resolvedClient.readAnswer(item.answer_id);
+      const models = [...new Set(answer.nodes.flatMap((node) =>
+        node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
+      ))];
+      modelsByAnswerId.set(item.answer_id, models);
+    } catch {
+      // Model lineage is decorative library metadata. If an individual owned
+      // answer becomes unavailable between the index read and this hydration,
+      // preserve the usable row and render typed absence instead of failing
+      // the entire library page or inventing a model.
+      modelsByAnswerId.set(item.answer_id, []);
+    }
+  }
+  const summaries = debateSummariesFromIndex(index).map((summary) => ({
+    ...summary,
+    models: modelsByAnswerId.get(summary.id) ?? summary.models
+  }));
   return {
-    summaries: debateSummariesFromIndex(index),
+    summaries,
     shown: index.items.length,
     total: index.total
   };

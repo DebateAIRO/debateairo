@@ -131,6 +131,7 @@ export interface PublicationApplication {
       author_pseudonym: string;
       question: string;
       published_at: string;
+      models?: readonly string[];
       verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
       confidence_band: string | null;
     }>[];
@@ -411,6 +412,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       author_pseudonym: string;
       question: string;
       published_at: string;
+      models?: readonly string[];
       verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
       confidence_band: string | null;
     }>[];
@@ -426,6 +428,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
         author_pseudonym: debate.author_pseudonym,
         question: debate.question,
         published_at: debate.published_at,
+        models: Object.freeze([...new Set((debate.answer.nodes ?? []).flatMap((node) =>
+          node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
+        ))]),
         verdict: debate.answer.verdict,
         confidence_band: debate.answer.confidence_band
       }));

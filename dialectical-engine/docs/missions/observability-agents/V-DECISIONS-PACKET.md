@@ -43,3 +43,21 @@ Rows only V can rule. Each row is self-contained: what the thing IS, why it exis
 **What it is.** The repo's lint (`pnpm audit:source`) blocks any file that reads `process.env` except one register file. The observability plan mandates the capture layer read its eight `OBS_*` bounds from `process.env` and nowhere else. Both cannot hold; five files trip today and the count grows with every slice. `tools/**` is floor-deny, so only you may authorize the fix.
 **Options.** (A) extend the exemption to a named set of obs files · (B) carve out the `packages/obs-capture/` directory (like `apps/ui` already is) · (C) give obs a validated config surface in the register (reopens an adopted plan section) · (D) accept the red rows and record them.
 **Recommendation:** (A) now, revisit (C) when the ObservationAgent needs validated config anyway — its metrics thresholds will want a schema, which is the argument (C) always had.
+
+---
+
+## V-7 · A change was merged into `dev` without anyone reviewing it. Retrospective review, or accept it?
+
+**What it is.** In the previous observability mission, a coding seat finished a change to the error-code registry (commit `5f0bd546`, "make declaration validation exhaustive"), posted "ready for peer review" on its ticket, and **no reviewer ever answered**. Eight days later that commit was merged into `dev` along with the rest of the lane. Today's audit found it while reconciling the board.
+**Why it matters.** Every other change in that lane has a reviewer's verdict behind it. This one has none, so nobody but its author has looked at it. The code may well be fine — the audit ran the registry tests three times and they pass. But "the tests pass" and "a second pair of eyes checked it" are different claims, and right now only the first is true.
+**Example of what a review would catch that tests do not.** A test proves the code does what the test says. A reviewer asks whether the test pins the right property at all — this fleet has shipped three assertions in a row that caught exactly their demo case and nothing behind it.
+**Options.** (a) a reviewer reads `5f0bd546` now, as a small standalone job, before any FixAgent slice touches that file · (b) accept it as reviewed-by-merge and record that the exception was deliberate · (c) fold it into the review of the first FixAgent slice that edits the registry.
+**Recommendation:** (c). It costs nothing extra, the reviewer is already reading that file, and it keeps the debt attached to work rather than becoming a separate errand.
+
+## V-8 · The repo's type check is red right now, for a reason that is not ours. Do the coders start anyway?
+
+**What it is.** `pnpm typecheck` currently fails on `dev` with 8 errors, all in one file, `tests/unit/s14-ui.test.ts`. The cause is last night's UI consolidation, which deleted the old `web/` directory while that test still imports from it. **None of the 8 errors is in observability code.**
+**Why it matters.** Every coding seat in this mission is required to run the repo-wide type check before handing off, and to report a clean result. With the repo already red, a seat cannot tell its own breakage from the pre-existing one unless it is told the exact baseline — and a seat that "fixes" the red it did not cause has silently crossed into another mission's files.
+**Example.** A FixAgent coder adds a capture call, runs the type check, sees 8 errors, and spends an hour hunting a bug it never introduced.
+**Options.** (a) coders start now; every packet states the exact baseline (8 errors, that one file) and each seat asserts *no new errors* rather than *zero errors* · (b) the UI mission fixes its test first and the coders wait · (c) I ask the UI mission to fix it while the coders start under (a).
+**Recommendation:** (c), with (a) as the working rule regardless — the delta assertion is the honest one even on a green repo, and it is what protects a seat from inheriting someone else's red.

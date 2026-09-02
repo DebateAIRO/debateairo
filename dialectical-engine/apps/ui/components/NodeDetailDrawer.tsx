@@ -196,6 +196,7 @@ export function NodeDetailDrawer({
       <aside
         className="drawer scroll"
         data-drawer-panel
+        data-design-turn="5"
         role="dialog"
         aria-modal
         aria-label="Argument detail"
@@ -207,7 +208,11 @@ export function NodeDetailDrawer({
               {pal.arrow} {roleLabel(node)}
             </span>
             {generation || node.maker !== undefined ? (
-              <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
+              <ModelMetaLine
+                modelId={generation?.model_id ?? null}
+                maker={node.maker}
+                className="modelPill metaLine"
+              />
             ) : null}
           </div>
           <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
@@ -216,6 +221,7 @@ export function NodeDetailDrawer({
         </div>
 
         <div className="drawerBody">
+          <div className="drawerIntro">
           {v3 ? (
             <div className="nodeEyebrow drawerWayOfKnowing" data-drawer-way-of-knowing>
               WAY OF KNOWING · {wayOfKnowingLabel(v3.way_of_knowing).toUpperCase()}
@@ -243,30 +249,15 @@ export function NodeDetailDrawer({
             <div className="drawerProse" onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
-          ) : (
-            <div className="muted" style={{ marginTop: 12 }}>
-              No argument text yet.
-            </div>
-          )}
+          ) : null}
           {generation?.argument && onChallenge ? (
             <div className="drawerSelectHint">▲ Select any sentence above to challenge it.</div>
           ) : null}
+          </div>
 
           {v3 ? <NodeHonestyDetails v3={v3} /> : null}
 
-          {scoring || scoringError || feedbackSummary || currentUserFeedback ? (
-            <ScoringErrorBoundary>
-              <NodeScoringDetails
-                scoring={scoring}
-                scoringError={scoringError}
-                feedbackSummary={feedbackSummary}
-                currentUserFeedback={currentUserFeedback}
-                recommendationTargetButton={recommendationTargetButton}
-              />
-            </ScoringErrorBoundary>
-          ) : null}
-
-          <div className="drawerActions">
+          <div className="drawerActions drawerReferenceActions">
             {onChallenge ? (
               <button
                 type="button"
@@ -286,12 +277,10 @@ export function NodeDetailDrawer({
               ↻ Regenerate
             </button>
           </div>
-          <div className="drawerHintMuted">{V3_MISSING_CAPABILITIES.nodeRegeneration}</div>
-
-          <div className="drawerDivider" />
 
           <div className="drawerHistoryHead">
             <span>Generation history</span>
+            <span className="drawerHistoryRule" aria-hidden />
             {history.length > 1 ? (
               <button type="button" className="linkBtn" onClick={() => setCompareOn((value) => !value)}>
                 {compareOn ? "Hide compare" : "Compare versions"}
@@ -305,7 +294,7 @@ export function NodeDetailDrawer({
                 <div className="compareCellHead">
                   <span className="compareTag">Current</span>
                   {generation || node.maker !== undefined ? (
-                    <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
+                    <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} className="modelPill metaLine" />
                   ) : null}
                 </div>
                 <div className="compareClaim">{node.claim}</div>
@@ -338,7 +327,7 @@ export function NodeDetailDrawer({
                     }}
                   >
                     <div className="historyCardHead">
-                      <ModelMetaLine modelId={item.model_id} />
+                      <ModelMetaLine modelId={item.model_id} className="modelPill metaLine" />
                       <span className="historyTag">{item.is_active ? "active" : "archived"}</span>
                     </div>
                     <div className="historyCardBody">{item.argument}</div>
@@ -347,6 +336,18 @@ export function NodeDetailDrawer({
               })
             )}
           </div>
+
+          {scoring || scoringError || feedbackSummary || currentUserFeedback ? (
+            <ScoringErrorBoundary>
+              <NodeScoringDetails
+                scoring={scoring}
+                scoringError={scoringError}
+                feedbackSummary={feedbackSummary}
+                currentUserFeedback={currentUserFeedback}
+                recommendationTargetButton={recommendationTargetButton}
+              />
+            </ScoringErrorBoundary>
+          ) : null}
         </div>
       </aside>
     </>
@@ -398,7 +399,7 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
 
   return (
     <section aria-label="V3 node honesty" className="drawerHonesty">
-      <div className="drawerFindingText">
+      <div className="drawerFindingText drawerFreshness">
         Freshness {v3.staleness_state} · relevant as of {v3.relevant_as_of}
       </div>
 

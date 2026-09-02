@@ -56,6 +56,7 @@ type WebKitGestureEvent = Event & {
 export type CanvasViewportProps = {
   layoutWidth: number;
   layoutHeight: number;
+  initialAnchorTop?: number | null;
   stickyControl: ReactNode;
   children: ReactNode;
   canvasRef?: (element: HTMLDivElement | null) => void;
@@ -83,6 +84,7 @@ function eventPoint(event: PointerEvent): PointerSample {
 export function CanvasViewport({
   layoutWidth,
   layoutHeight,
+  initialAnchorTop,
   stickyControl,
   children,
   canvasRef
@@ -104,6 +106,7 @@ export function CanvasViewport({
   const didPanRef = useRef(false);
   const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
   const previousLayoutWidthRef = useRef(layoutWidth);
+  const didInitialAnchorRef = useRef(false);
 
   const setSurface = useCallback(
     (element: HTMLDivElement | null) => {
@@ -196,6 +199,13 @@ export function CanvasViewport({
     surface.scrollTop = pending.top;
     pendingScrollRef.current = null;
   }, [fitState.zoom]);
+
+  useLayoutEffect(() => {
+    const surface = surfaceRef.current;
+    if (surface === null || initialAnchorTop == null || didInitialAnchorRef.current) return;
+    surface.scrollTo({ left: 0, top: Math.max(0, initialAnchorTop * fitStateRef.current.zoom - 120) });
+    didInitialAnchorRef.current = true;
+  }, [initialAnchorTop]);
 
   useLayoutEffect(() => {
     const entranceHost = surfaceRef.current?.closest<HTMLElement>(".fadeup");

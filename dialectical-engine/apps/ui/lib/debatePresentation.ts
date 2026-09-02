@@ -124,11 +124,11 @@ export function renderStateOf(node: DebateNode): ClaimRenderState {
 
 // ---- layout (ported from the design comp) --------------------------------
 
-export const CARD_W = 320;
-const COL = 404;
-const VGAP = 24;
+export const CARD_W = 392;
+const COL = 444;
+const VGAP = 30;
 const PADX = 44;
-const PADY = 40;
+const PADY = 56;
 
 export type PlacedClaim = {
   id: string;
@@ -173,16 +173,15 @@ type Internal = {
 
 export function estimateHeight(node: DebateNode, state: ClaimRenderState, expanded: boolean): number {
   if (state === "root") {
-    const lines = Math.max(2, Math.ceil((node.claim?.length || 0) / 34));
-    return 96 + lines * 26;
+    const lines = Math.max(2, Math.ceil((node.claim?.length || 0) / 42));
+    return 112 + lines * 27;
   }
   if (state === "abandoned") return 76;
   if (state === "failed") return 92;
   if (state === "empty") return 92;
   if (state === "pending" || state === "streaming") return 138;
-  const claimLines = Math.max(1, Math.ceil((node.claim?.length || 0) / 38));
-  const base = 96 + claimLines * 22;
-  return expanded ? base + 118 : base;
+  const claimLines = Math.min(2, Math.max(1, Math.ceil((node.claim?.length || 0) / 42)));
+  return 128 + claimLines * 22 + 42;
 }
 
 /**

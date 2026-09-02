@@ -1012,3 +1012,23 @@ before it is written down.** A confirmation that fails is loud; a refutation tha
   `danger-full-access` and is what a review seat actually needs. The general rule: a seat's sandbox must cover
   every path its MANDATED duties touch, and the board is outside the repo. Probe one board write before launching
   a fleet — the failure is silent until the seat is deep into its budget.
+
+## `git add -A` in a tree that two sessions are writing (2026-09-02, cost: three files committed under wrong messages)
+Two missions were writing the same checkout. A consolidation commit staged with `git add -A` swept three
+half-written packet files belonging to the OTHER mission into commits whose messages describe unrelated
+work — a SupportAgent review packet landed under "supplier requirements packet". No content was lost, but
+the history now attributes files to the wrong mission, and a half-written file can be committed mid-edit.
+**Rule: stage by path, always, in any repo where more than one session may be writing.** `git add -A` and
+`git commit -a` are never correct here. Before committing, run `git status --porcelain` and confirm every
+staged path belongs to the work you are describing. When you see untracked directories belonging to another
+mission (`docs/missions/<other>/`, `.hermes/planning/<other>/`, `.hermes/reports/<other>/`), they are not
+yours to stage, clean, stash, or revert.
+Reported cross-session by the observability-agents orchestrator; verified against the commit.
+
+## An "empty" directory that a deletion commit left behind reads as a live app (2026-09-02)
+`dialectical-engine/web/` looks present — `ls -d web` succeeds — but commit `3e7d83e9` deleted all 50 of its
+tracked files (6278 lines) and left one UNTRACKED stray, `web/next.config.mjs`. `git ls-files web` returns
+zero, which is the probe that tells the truth; `ls` does not. `tests/unit/s14-ui.test.ts:19,230` still import
+`web/lib/v3Presentation.js` and `web/lib/api.js`, so root `pnpm typecheck` exits 1 with 8 diagnostics and
+`pnpm build` is red with it. **Rule: to ask whether a directory still exists as part of the project, ask git
+(`git ls-files <dir>`), not the filesystem.** A deletion commit does not remove untracked leftovers.

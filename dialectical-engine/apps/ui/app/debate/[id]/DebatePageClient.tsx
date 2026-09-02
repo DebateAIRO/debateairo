@@ -343,7 +343,7 @@ export default function DebatePageClient({
   publicNodesById = null,
   publicExport = null,
   renderPublicHonesty = null,
-  publicHeader = null
+  publicOverview = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -366,8 +366,11 @@ export default function DebatePageClient({
   publicNodesById?: ReturnType<typeof contractNodesById> | null;
   publicExport?: AnswerExport | null;
   renderPublicHonesty?: ((close: () => void) => ReactNode) | null;
-  /** Publication-only chrome: byline, published date, disclosure, answer cards. */
-  publicHeader?: ReactNode;
+  /** Turn 3b publication overview, rendered as the public Tree view. */
+  publicOverview?: ((actions: Readonly<{
+    onDetails: () => void;
+    onRead: (nodeId: string) => void;
+  }>) => ReactNode) | null;
 }) {
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
@@ -754,7 +757,7 @@ export default function DebatePageClient({
   // payload.
   const answerExport = useMemo(
     () => publicMode
-      ? (publicExport ?? { available: false, reason: "ANSWER_UNAVAILABLE", message: "Export is not available for this debate." } as const)
+      ? (publicExport ?? { available: false, reason: "NO_SERVED_ANSWER", message: "Export is not available for this debate." } as const)
       : buildAnswerExport({ answer, ledgerDigest, ledgerError, live }),
     [publicMode, publicExport, answer, ledgerDigest, ledgerError, live]
   );
@@ -1088,6 +1091,7 @@ export default function DebatePageClient({
   return (
     <div
       className="debateView"
+      data-public-mode={publicMode ? "true" : "false"}
       data-scoring-state={scoringState.status}
       data-scoring-enabled={true}
       data-scoring-visibility={scoringVisibility.kind}
@@ -1108,24 +1112,35 @@ export default function DebatePageClient({
           </div>
         </div>
         <div className="debateTopControlRow" ref={debateHeaderControlsRef}>
-          <ScoringErrorBoundary>
-            <button
-              type="button"
-              className="debateScoringPill"
-              data-debate-scoring-pill
-              aria-label="Open scoring diagnostics"
-              onClick={() => setScoringDiagnosticsOpen(true)}
-            >
-              <span className="debateScoringDot" aria-hidden />
-              Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
-            </button>
-          </ScoringErrorBoundary>
+          {publicMode ? (
+            <span className="publicViewPill"><span aria-hidden>🔒</span> Public view · actions locked</span>
+          ) : (
+            <ScoringErrorBoundary>
+              <button
+                type="button"
+                className="debateScoringPill"
+                data-debate-scoring-pill
+                aria-label="Open scoring diagnostics"
+                onClick={() => setScoringDiagnosticsOpen(true)}
+              >
+                <span className="debateScoringDot" aria-hidden />
+                Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
+              </button>
+            </ScoringErrorBoundary>
+          )}
           {hasTree ? (
             <div className="segment" role="group" aria-label="View">
               <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
                 Thread
               </button>
-              <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")}>
+              <button
+                type="button"
+                aria-pressed={view === "split"}
+                onClick={() => {
+                  setFocusNodeId((current) => current ?? debate.tree?.children[0]?.id ?? debate.tree?.id ?? null);
+                  setView("split");
+                }}
+              >
                 Split
               </button>
               <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
@@ -1199,10 +1214,8 @@ export default function DebatePageClient({
         </div>
       </header>
 
-      {publicMode && publicHeader ? publicHeader : null}
-
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
-      {process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
+      {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
 
       <ScoringErrorBoundary>
         {scoringInsightsExpandable ? (
@@ -1295,7 +1308,13 @@ export default function DebatePageClient({
       ) : null}
 
       {/* ---- main split ---- */}
-      <div className="debateMain">
+      {publicMode && view === "tree" && publicOverview ? publicOverview({
+        onDetails: () => setHonestyOpen(true),
+        onRead: (nodeId) => {
+          setSelectedNodeId(nodeId);
+          setDetailNodeId(nodeId);
+        }
+      }) : <div className="debateMain">
         <div key={`${view}-${replayNonce}`} className="fadeup" style={{ flex: 1, minWidth: 0, display: "flex" }}>
           {hasTree && debate.tree ? (
             view === "thread" ? (
@@ -1304,6 +1323,7 @@ export default function DebatePageClient({
                 expanded={expanded}
                 collapsed={collapsed}
                 scrutiny={scrutiny}
+                v3NodesById={v3NodeById ?? undefined}
                 meta={{ nodes: countClaims(debate.tree), depth: treeDepth(debate.tree) }}
                 onOpenNode={(nodeId) => {
                   setSelectedNodeId(nodeId);
@@ -1320,6 +1340,7 @@ export default function DebatePageClient({
                 focusNodeId={focusNodeId}
                 expanded={expanded}
                 scrutiny={scrutiny}
+                v3NodesById={v3NodeById ?? undefined}
                 onFocus={setFocusNodeId}
                 onOpenNode={(nodeId) => {
                   setSelectedNodeId(nodeId);
@@ -1392,7 +1413,7 @@ export default function DebatePageClient({
           lean={lean}
           sections={synthesisSections}
         />
-      </div>
+      </div>}
 
       {/* ---- overlays ---- */}
       {detailNode ? (

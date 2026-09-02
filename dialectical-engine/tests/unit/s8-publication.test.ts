@@ -238,6 +238,10 @@ function publicationHarness() {
     withContentLease: async <T>(_publicationRef: string, use: () => Promise<T>) => use(),
     readPublic: async (publicationRef: string) =>
       storedSnapshot?.publicationRef === publicationRef ? storedSnapshot : null,
+    listPublicRefs: async () => ({
+      refs: storedSnapshot === null ? [] : [storedSnapshot.publicationRef],
+      total: storedSnapshot === null ? 0 : 1
+    }),
     revalidatePublic: async () => true
   } as unknown as PostgresPublicationRepository;
   const application = new PostgresPublicationApplication(
@@ -1088,6 +1092,42 @@ describe("S8 publication crypto and projection", () => {
     expect.soft(read!.answer.nodes).toEqual(published.debate.answer.nodes);
     expect.soft(read!.answer.edges).toEqual(published.debate.answer.edges);
     expect(PublicDebateSchema.safeParse(read).success).toBe(true);
+  });
+
+  it("lists each published model once in first-seen order", async () => {
+    const answer = answerWithTree();
+    const first = {
+      ...answer.nodes[0]!,
+      maker_lineage: {
+        maker: "OpenAI",
+        model_id: "gpt-5.6-sol",
+        transport: "responses",
+        provider_ref: "provider:openai"
+      }
+    };
+    answer.nodes = [
+      first,
+      { ...first, node_id: "node:public-tree-duplicate" },
+      {
+        ...first,
+        node_id: "node:public-tree-claude",
+        maker_lineage: {
+          maker: "Anthropic",
+          model_id: "claude-opus-5",
+          transport: "responses",
+          provider_ref: "provider:anthropic"
+        }
+      }
+    ];
+    const harness = publicationHarness();
+    await harness.publish(answer);
+
+    const listed = await harness.application.list(20, 0);
+
+    expect(listed.items[0]?.models).toEqual([
+      "gpt-5.6-sol",
+      "claude-opus-5"
+    ]);
   });
 
   it("reads a legacy answer-only snapshot without fabricating a tree", async () => {
