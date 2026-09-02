@@ -563,6 +563,7 @@ export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRe
 }
 
 export {
+  assertProductionFloors,
   loadApiEnvironment,
   loadDevelopmentCommandEnvironment,
   loadLivenessEnvironment,
@@ -570,7 +571,12 @@ export {
   loadReplaySelfTestEnvironment,
   loadRunnerEnvironment,
   loadSettlementEnvironment,
-  parseApiEnvironment
+  parseApiEnvironment,
+  parseLivenessEnvironment,
+  parseMigrationEnvironment,
+  parseReplaySelfTestEnvironment,
+  parseRunnerEnvironment,
+  parseSettlementEnvironment
 } from "./runtime-environment.js";
 
 export {
