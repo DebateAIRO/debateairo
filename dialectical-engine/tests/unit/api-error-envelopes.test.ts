@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { buildApi, type AskApplication } from "@debateai/api";
+import { API_MAX_PARAM_LENGTH, buildApi, type AskApplication } from "@debateai/api";
 import {
   TEST_APP_ORIGIN,
   testHttpIdentity,
@@ -198,6 +198,50 @@ describe("API error envelopes (L1-F5, L1-F6)", () => {
       for (const code of ["FST_ERR_CTP_INVALID_CONTENT_LENGTH", "FST_ERR_BAD_URL"]) {
         expect(source, code).toContain(`["${code}", { statusCode: 400, code: "MALFORMED_REQUEST" }]`);
       }
+      expect(requestFailures(failureLog)).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+
+  // L1-F7: `{gapRef}` was model-authored free text with no bound of its own.
+  // `maxParamLength` stays 100 (L1's ruling), so the two refusals differ: a
+  // gapRef the router will not carry takes the typed 414, and one it does
+  // carry but the route rejects takes the constant 400.
+  it("bounds a model-authored gapRef at the route", async () => {
+    const { api, failureLog, close, recordInvestigation } = harness();
+    try {
+      const overLength = "a".repeat(API_MAX_PARAM_LENGTH + 1);
+      const tooLong = await api.inject({
+        method: "POST",
+        url: `/v1/answers/${RUN_ID}/investigations/${overLength}`,
+        headers: { ...USER_MUTATION_HEADERS, ...JSON_HEADERS },
+        payload: JSON.stringify({ user_input: "why", human_steer_input: true })
+      });
+      expect(tooLong.statusCode).toBe(414);
+      expect(tooLong.json()).toEqual({ error: "URI_TOO_LONG", message: "URI_TOO_LONG" });
+      expect(tooLong.body).not.toContain(overLength);
+
+      const blank = await api.inject({
+        method: "POST",
+        url: `/v1/answers/${RUN_ID}/investigations/%20%20`,
+        headers: { ...USER_MUTATION_HEADERS, ...JSON_HEADERS },
+        payload: JSON.stringify({ user_input: "why", human_steer_input: true })
+      });
+      expect(blank.statusCode).toBe(400);
+      expect(blank.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+
+      // Neither refusal reached the application.
+      expect(recordInvestigation).not.toHaveBeenCalled();
+
+      const admitted = await api.inject({
+        method: "POST",
+        url: `/v1/answers/${RUN_ID}/investigations/${"g".repeat(API_MAX_PARAM_LENGTH)}`,
+        headers: { ...USER_MUTATION_HEADERS, ...JSON_HEADERS },
+        payload: JSON.stringify({ user_input: "why", human_steer_input: true })
+      });
+      expect(admitted.statusCode).toBe(202);
+      expect(recordInvestigation).toHaveBeenCalledTimes(1);
       expect(requestFailures(failureLog)).toEqual([]);
     } finally {
       await close();

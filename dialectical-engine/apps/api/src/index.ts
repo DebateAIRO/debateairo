@@ -203,6 +203,17 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
 const ResourceIdSchema = z.uuid();
 const SessionIdSchema = ResourceIdSchema;
+/**
+ * L1-F7: `{gapRef}` was unvalidated free text bounded only by the router's
+ * parameter length. It is model-authored, so it is bounded here at the route
+ * rather than in `@debateai/contract`, which is a live-mission surface. The
+ * blank guard mirrors the contract's `gap_ref` (`z.string().trim().min(1)`)
+ * while keeping the caller's value verbatim — the API never silently repairs.
+ * A gapRef longer than the router's `maxParamLength` never reaches this
+ * schema; it takes the typed 414 (L1-F6) instead.
+ */
+const InvestigationGapRefSchema = z.string().min(1).max(API_MAX_PARAM_LENGTH)
+  .refine((value) => value.trim().length > 0);
 const SECURITY_HEADERS = Object.freeze({
   "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
   "strict-transport-security": "max-age=31536000; includeSubDomains",
@@ -1071,9 +1082,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", routePolicy("POST /v1/answers/{id}/investigations/{gapRef}"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
+    const gapRef = parseRequest(InvestigationGapRefSchema, request.params.gapRef);
     const input = parseRequest(InvestigationRequestSchema, request.body);
     const accepted = await options.application.recordInvestigation(
-      answerId.data, request.params.gapRef, input.user_input, request.session, ownershipFor(request)
+      answerId.data, gapRef, input.user_input, request.session, ownershipFor(request)
     );
     return accepted === null ? reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" }) : reply.status(202).send(InvestigationAcceptedSchema.parse(accepted));
   });
