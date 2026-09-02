@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const root = new URL("../../", import.meta.url);
@@ -17,6 +17,44 @@ describe("S6 content-encryption architecture contract", () => {
     expect(migration).toContain("content_ciphertext");
     expect(migration).toContain("CONTENT_PLAINTEXT_WRITE_FORBIDDEN");
     expect(migration).toContain("IF NOT EXISTS");
+  });
+
+  it("declares serve.answer as the fifteenth carrier through the B21 forward migration (L5-F2)", async () => {
+    // The migration number is provisional until fold time, so locate it by suffix.
+    const names = (await readdir(new URL("migrations/", root)))
+      .filter((name) => /^\d+_serve_answer_content_carrier\.sql$/.test(name));
+    expect(names).toHaveLength(1);
+    const migration = await read(`migrations/${names[0]}`);
+    expect(migration).toContain("ALTER TABLE serve.answer");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_ciphertext jsonb");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_attestation bytea");
+    expect(migration).toContain("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer");
+    expect(migration).toContain("WHEN 'serve.answer' THEN row_json->>'answer_id'");
+    for (const trigger of [
+      "aaa_enforce_content_attestation_v2", "enforce_content_ciphertext", "enforce_erasure_barrier"
+    ]) {
+      expect(migration).toContain(`DROP TRIGGER IF EXISTS ${trigger} ON serve.answer`);
+      expect(migration).toContain(`CREATE TRIGGER ${trigger}\nBEFORE INSERT ON serve.answer`);
+    }
+
+    const crypto = await read("packages/crypto/src/index.ts");
+    const carriers = crypto.slice(
+      crypto.indexOf("export const CONTENT_CARRIERS"), crypto.indexOf("export type ContentCarrier")
+    );
+    expect(carriers).toContain('"serve.answer"');
+
+    const serve = await read("packages/serve/src/index.ts");
+    expect(serve).toMatch(
+      /encryptAttestedContentForRun\(\s*this\.pool, input\.runId, "serve\.answer", answerId,\s*\{ answerForm: input\.result\.answerForm \}/
+    );
+    expect(serve).toContain(
+      "JSON.stringify(answerContent === null ? input.result.answerForm : CONTENT_JSON_SENTINEL)"
+    );
+    expect(serve).toMatch(
+      /decryptContentForRun<\{ answerForm: unknown \}>\(\s*this\.pool, row\.run_id, "serve\.answer", row\.answer_id,\s*row\.answer_content_ciphertext, \{ answerForm: row\.answer_form \}/
+    );
+    expect(serve).toContain("answer_form: hasEviction ? null : answerContent.answerForm");
+    expect(serve).not.toContain("answer_form: hasEviction ? null : row.answer_form");
   });
 
   it("keeps irreversible enablement default-off and wires both API and runner through the external key store", async () => {

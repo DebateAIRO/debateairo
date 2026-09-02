@@ -4,6 +4,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
+  CONTENT_JSON_SENTINEL,
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   allocateSequence,
   decryptContentForRun,
@@ -1028,6 +1029,11 @@ export class ServeRepository {
         this.pool, input.runId, "serve.composed_text", nextComposedTextId,
         { segments: storedSegments }
       );
+    const answerId = input.supersedes?.answerId ?? randomUUID();
+    const answerContent = await encryptAttestedContentForRun(
+      this.pool, input.runId, "serve.answer", answerId,
+      { answerForm: input.result.answerForm }
+    );
     return withWriteTransaction(this.pool, async (client) => {
       const prior = input.supersedes === undefined ? null : await client.query<{
         answer_id: string;
@@ -1113,18 +1119,19 @@ export class ServeRepository {
           answer_id, answer_version, run_id, work_item_id, terminal, serve_state, verdict_state,
           answer_form, condition_marks, fact_bundle_id, composed_text_id,
           conformance_record_id, sealed_at_seq, confidence_band, band_ceiling,
-          reversal_point, builds_on_previous, badges, verdict_unavailable, memory_disclosure
-        ) VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18::jsonb,$19::jsonb,$20::jsonb)
+          reversal_point, builds_on_previous, badges, verdict_unavailable, memory_disclosure,
+          content_ciphertext, content_attestation
+        ) VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18::jsonb,$19::jsonb,$20::jsonb,$21::jsonb,$22)
         RETURNING answer_id`,
         [
-          priorAnswer?.answer_id ?? null,
+          answerId,
           answerVersion,
           input.runId,
           input.workItemId,
           input.result.terminal,
           serveState,
           priorAnswer === undefined ? verdict.verdictState : priorAnswer.verdict_state,
-          JSON.stringify(input.result.answerForm),
+          JSON.stringify(answerContent === null ? input.result.answerForm : CONTENT_JSON_SENTINEL),
           JSON.stringify(input.result.conditionMarks),
           storedFactBundleId,
           composedTextId,
@@ -1154,7 +1161,9 @@ export class ServeRepository {
             : JSON.stringify({ reason_ref: verdict.unavailable.reasonRef }),
           input.result.projections.memoryDisclosure === null
             ? null
-            : JSON.stringify(input.result.projections.memoryDisclosure)
+            : JSON.stringify(input.result.projections.memoryDisclosure),
+          answerContent === null ? null : JSON.stringify(answerContent.envelope),
+          answerContent?.attestation ?? null
         ]
       );
       for (const record of conditionMarkRecords) {
@@ -1376,6 +1385,7 @@ export class ServeRepository {
       confidence_band: string | null;
       band_ceiling: Answer["band_ceiling"];
       answer_form: unknown;
+      answer_content_ciphertext: CryptoEnvelope | null;
       segments: Answer["composed_text"] | null;
       residual_objections: string[];
       condition_marks: string[];
@@ -1405,7 +1415,8 @@ export class ServeRepository {
               answer.terminal,
               answer.serve_state, answer.verdict_state, answer.verdict_unavailable,
               answer.confidence_band, answer.band_ceiling,
-              answer.answer_form, composed.segments, facts.residual_objections, answer.condition_marks,
+              answer.answer_form, answer.content_ciphertext AS answer_content_ciphertext,
+              composed.segments, facts.residual_objections, answer.condition_marks,
                answer.badges, answer.reversal_point, answer.builds_on_previous, answer.memory_disclosure, answer.sealed_at_seq,
                run.risk_tier, run.tier_source, run.tier_provenance_ref, run.envelope_basis,
                (SELECT value_json #>> '{}' FROM core.run_progress_event
@@ -1432,7 +1443,7 @@ export class ServeRepository {
     const row = answer.rows[0];
     if (row === undefined) return null;
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
-    const [runContent, factContent, composedContent] = await Promise.all([
+    const [runContent, factContent, composedContent, answerContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
         this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
         { questionLine: row.question_line }
@@ -1447,7 +1458,11 @@ export class ServeRepository {
         : decryptContentForRun<{ segments: Answer["composed_text"] }>(
           this.pool, row.run_id, "serve.composed_text", row.composed_text_id,
           row.composed_content_ciphertext, { segments: row.segments ?? [] }
-        )
+        ),
+      decryptContentForRun<{ answerForm: unknown }>(
+        this.pool, row.run_id, "serve.answer", row.answer_id,
+        row.answer_content_ciphertext, { answerForm: row.answer_form }
+      )
     ]);
     const staleness = await this.#liveness.readSubjectStaleness({
       runId: row.run_id,
@@ -1597,7 +1612,7 @@ export class ServeRepository {
         : row.verdict_unavailable,
       confidence_band: hasEviction ? null : row.confidence_band,
       band_ceiling: hasEviction ? null : row.band_ceiling,
-      answer_form: hasEviction ? null : row.answer_form,
+      answer_form: hasEviction ? null : answerContent.answerForm,
       serve_state: answerServeState.serveState,
       composed_text: hasEviction ? [] : composedContent.segments,
       number_slots: numberSlots,
