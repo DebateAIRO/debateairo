@@ -722,8 +722,10 @@ export async function runServeGateChain(
             loadBearing: segment.servedNumberRefs.length > 0
               || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
           })),
-          // The adapter's OWN recorded reference travels through unchanged.
-          candidateRef: produced.candidateRef
+          // The adapter's OWN recorded reference and producer identity travel
+          // through unchanged.
+          candidateRef: produced.candidateRef,
+          candidateCallSiteKey: produced.candidateCallSiteKey
         };
       },
       evaluate: (request) => dependencies.evaluate(request),
@@ -1151,11 +1153,16 @@ export function decideReplayEviction(input: ReplaySelfTestInput):
 export interface PersistedSynthesisRound {
   readonly round: number;
   readonly synthesizerStage: "INITIAL" | "RETRY";
-  /** The request AS SENT — the only body this table stores, and it is encrypted. */
-  readonly synthesizerRequest: SynthesizerRequest;
-  /** Typed `ledger.raw_artifact` keys; resolve them for the bodies. */
+  /**
+   * Typed, PRODUCER-BOUND `ledger.raw_artifact` keys. Each was resolved through
+   * the ledger entry that recorded it before the answer committed, so it names
+   * the artifact this run produced at that call site — not merely an artifact
+   * that happens to share the run.
+   */
   readonly candidateArtifactRef: string;
+  readonly candidateCallSiteKey: string;
   readonly evaluatorArtifactRef: string;
+  readonly evaluatorCallSiteKey: string;
   readonly evaluatorSatisfied: boolean;
 }
 
@@ -1610,20 +1617,6 @@ export class ServeRepository {
         );
       }
     }
-    // T9 / J29: one encrypted payload per round, prepared HERE beside the other
-    // carriers — `encryptAttestedContentForRun` must run outside the answer
-    // transaction, exactly as the fact bundle's does.
-    const roundCarriers = await Promise.all((input.result.loopRounds ?? []).map(async (round) => {
-      const synthesisRoundId = randomUUID();
-      return {
-        round,
-        synthesisRoundId,
-        content: await encryptAttestedContentForRun(
-          this.pool, input.runId, "serve.synthesis_round", synthesisRoundId,
-          { synthesizerRequest: round.synthesizerRequest }
-        )
-      };
-    }));
     const factBundleId = randomUUID();
     const factContent = await encryptAttestedContentForRun(
       this.pool, input.runId, "serve.fact_bundle", factBundleId,
@@ -1771,56 +1764,69 @@ export class ServeRepository {
             : JSON.stringify(input.result.projections.memoryDisclosure)
         ]
       );
-      // T9 / J25 + J29 — the loop-round records become DURABLE here, inside the
-      // answer's own write transaction. They store TYPED RAW-ARTIFACT KEYS and a
-      // single encrypted request payload; no candidate statement, evaluator
-      // request or verdict text is duplicated into this table, because each of
-      // those resolves through `ledger.raw_artifact`, which is already an
-      // encrypted carrier with crypto-erasure.
-      for (const carrier of roundCarriers) {
-        const round = carrier.round;
-        // REFERENTIAL INTEGRITY, proven before the commit. The foreign keys
-        // already refuse a reference that resolves to nothing; this refuses one
-        // that resolves to ANOTHER RUN's artifact, which a foreign key cannot
-        // see. codex r2 B2: `artifact:ghost` used to persist happily.
-        // DISTINCT refs: a round may legitimately name the same artifact for
-        // both roles (a single-provider deployment holding both). Counting ROWS
-        // would reject that; what must hold is that EVERY distinct reference
-        // resolves and belongs to this run.
-        const wanted = [...new Set([round.candidateRef, round.verdictRef])];
-        const referenced = await client.query<{ raw_artifact_id: string; run_id: string | null }>(
-          `SELECT raw_artifact_id::text, run_id::text
-             FROM ledger.raw_artifact
-            WHERE raw_artifact_id = ANY($1::uuid[])`,
-          [wanted]
-        );
-        const resolvedInRun = new Set(referenced.rows
-          .filter((row) => row.run_id === input.runId)
-          .map((row) => row.raw_artifact_id));
-        if (wanted.some((ref) => !resolvedInRun.has(ref))) {
-          throw new TypedDomainError(
-            "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
-            `Round ${String(round.round)} references artifacts that do not both belong to run ${input.runId}`
+      // T9 / J25 + J29 (+ ADDENDUM) — the loop-round records become DURABLE
+      // here, inside the answer's own write transaction.
+      //
+      // NO REQUEST BODY. The frozen SPEC asks for recorded-request ASSERTIONS
+      // and loop-round RECORDS; it never asks for the request to be persisted.
+      // The carrier I kept for the verbatim-objection claim could not prove it
+      // anyway: the SAME in-memory object feeds the provider packet and the row,
+      // so the row showed the object existed, never that it was the request AS
+      // SENT. It is gone, and with it the encryption machinery it needed.
+      //
+      // What remains is structural facts and TYPED PRODUCER-BOUND REFERENCES.
+      for (const round of input.result.loopRounds ?? []) {
+        // codex r3 B2: "same run" is not a producer binding. Each reference is
+        // resolved through the LEDGER ENTRY that recorded it — this run, this
+        // work item, a successful MODEL_CALL, at the EXPECTED call site — so an
+        // unrelated judge artifact from the same run can no longer stand in.
+        for (const bound of [
+          { ref: round.candidateRef, callSiteKey: round.candidateCallSiteKey, role: "SYNTHESIZER" },
+          { ref: round.verdictRef, callSiteKey: round.verdictCallSiteKey, role: "EVALUATOR" }
+        ]) {
+          // The call site must name THIS round, so a round-1 artifact cannot be
+          // filed as round 2's under an otherwise valid pairing.
+          if (!bound.callSiteKey.endsWith(`:${String(round.round)}`)) {
+            throw new TypedDomainError(
+              "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
+              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} does not name that round`
+            );
+          }
+          const producer = await client.query<{ raw_artifact_ref: string }>(
+            `SELECT entry.raw_artifact_ref::text
+               FROM ledger.ledger_entry AS entry
+               JOIN ledger.raw_artifact AS artifact
+                 ON artifact.raw_artifact_id = entry.raw_artifact_ref
+                AND artifact.run_id = entry.run_id
+              WHERE entry.run_id=$1 AND entry.subject_item_id=$2
+                AND entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
+                AND entry.call_site_key=$3 AND entry.raw_artifact_ref=$4::uuid`,
+            [input.runId, input.workItemId, bound.callSiteKey, bound.ref]
           );
+          if (producer.rows.length !== 1) {
+            throw new TypedDomainError(
+              "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
+              `Round ${String(round.round)}'s ${bound.role} reference ${bound.ref} is not the artifact this run recorded at ${bound.callSiteKey}`
+            );
+          }
         }
         await client.query(
           `INSERT INTO serve.synthesis_round (
-             synthesis_round_id, answer_id, answer_version, run_id, round, synthesizer_stage,
-             candidate_artifact_ref, evaluator_artifact_ref, synthesizer_request,
-             content_ciphertext, content_attestation, evaluator_satisfied, sealed_at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13)`,
+             answer_id, answer_version, run_id, round, synthesizer_stage,
+             candidate_artifact_ref, candidate_call_site_key,
+             evaluator_artifact_ref, evaluator_call_site_key,
+             evaluator_satisfied, sealed_at_seq
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [
-            carrier.synthesisRoundId,
             answer.rows[0]!.answer_id,
             answerVersion,
             input.runId,
             round.round,
             round.synthesizerRequest.stage,
             round.candidateRef,
+            round.candidateCallSiteKey,
             round.verdictRef,
-            carrier.content === null ? JSON.stringify(round.synthesizerRequest) : CONTENT_CIPHERTEXT_SENTINEL,
-            carrier.content === null ? null : JSON.stringify(carrier.content.envelope),
-            carrier.content?.attestation ?? null,
+            round.verdictCallSiteKey,
             round.verdict.satisfied,
             await allocateSequence(client)
           ]
@@ -1961,21 +1967,19 @@ export class ServeRepository {
   ): Promise<readonly PersistedSynthesisRound[]> {
     const access = normalizeRunOwnership(ownership);
     const rows = await this.pool.query<{
-      synthesis_round_id: string;
       run_id: string;
       round: number;
       synthesizer_stage: "INITIAL" | "RETRY";
-      synthesizer_request: string;
-      content_ciphertext: CryptoEnvelope | null;
       candidate_artifact_ref: string;
+      candidate_call_site_key: string;
       evaluator_artifact_ref: string;
+      evaluator_call_site_key: string;
       evaluator_satisfied: boolean;
     }>(
-      `SELECT synthesis_round.synthesis_round_id::text, synthesis_round.run_id::text, synthesis_round.round,
-              synthesis_round.synthesizer_stage, synthesis_round.synthesizer_request,
-              synthesis_round.content_ciphertext,
-              synthesis_round.candidate_artifact_ref::text,
-              synthesis_round.evaluator_artifact_ref::text,
+      `SELECT synthesis_round.run_id::text, synthesis_round.round,
+              synthesis_round.synthesizer_stage,
+              synthesis_round.candidate_artifact_ref::text, synthesis_round.candidate_call_site_key,
+              synthesis_round.evaluator_artifact_ref::text, synthesis_round.evaluator_call_site_key,
               synthesis_round.evaluator_satisfied
          FROM serve.synthesis_round AS synthesis_round
          JOIN serve.answer AS answer
@@ -1988,26 +1992,18 @@ export class ServeRepository {
       [answerId, answerVersion, access.ownerRef, access.legacyAskerId]
     );
     if (rows.rows.length === 0) return Object.freeze([]);
-    const runId = rows.rows[0]!.run_id;
-    return withRunContentLease(this.pool, [runId], async () => Object.freeze(
-      await Promise.all(rows.rows.map(async (row) => {
-        const request = row.content_ciphertext === null
-          ? JSON.parse(row.synthesizer_request) as SynthesizerRequest
-          // The encryption primary key is the ROUND's id — the value the write
-          // encrypted under — never the answer's.
-          : (await decryptContentForRun<{ synthesizerRequest: SynthesizerRequest }>(
-              this.pool, runId, "serve.synthesis_round", row.synthesis_round_id,
-              row.content_ciphertext,
-              { synthesizerRequest: null as unknown as SynthesizerRequest }
-            )).synthesizerRequest;
-        return Object.freeze({
-          round: Number(row.round),
-          synthesizerStage: row.synthesizer_stage,
-          synthesizerRequest: request,
-          candidateArtifactRef: row.candidate_artifact_ref,
-          evaluatorArtifactRef: row.evaluator_artifact_ref,
-          evaluatorSatisfied: row.evaluator_satisfied
-        });
+    // The lease is kept even though this table now holds no content: the rows
+    // point AT content carriers, and a reader that resolves them must not race
+    // an erasure that is shredding the run's key underneath it.
+    return withRunContentLease(this.pool, [rows.rows[0]!.run_id], async () => Object.freeze(
+      rows.rows.map((row) => Object.freeze({
+        round: Number(row.round),
+        synthesizerStage: row.synthesizer_stage,
+        candidateArtifactRef: row.candidate_artifact_ref,
+        candidateCallSiteKey: row.candidate_call_site_key,
+        evaluatorArtifactRef: row.evaluator_artifact_ref,
+        evaluatorCallSiteKey: row.evaluator_call_site_key,
+        evaluatorSatisfied: row.evaluator_satisfied
       }))
     ));
   }

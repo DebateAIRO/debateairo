@@ -4080,60 +4080,68 @@ describe("apps/runner — legal command lifecycle", () => {
       // judge + (synthesizer, evaluator) x 2 rounds.
       expect(provider.calls()).toBe(5);
 
-      // ---- J25 + J29: the ROUNDS, read back and RESOLVED ----
-      // Ownership-aware read, like every other content reader.
+      // ---- J25 + J29 (+ ADDENDUM): the ROUNDS, read back and RESOLVED ----
+      // The verbatim-objection claim is asserted on the RECORDED REQUEST at the
+      // provider seam (tests/unit/t09-synthesis.test.ts), which is where the
+      // frozen SPEC puts it. This table holds no request body: the same
+      // in-memory object fed the packet and the row, so a stored copy could
+      // never have evidenced "as sent".
       const rounds = await new ServeRepository(database.pool).readSynthesisRounds(
         result.answerId, "asker:pre-compose-block", 1
       );
       expect(rounds.map((round) => round.round)).toEqual([1, 2]);
       expect(rounds.map((round) => round.synthesizerStage)).toEqual(["INITIAL", "RETRY"]);
+      expect(rounds.map((round) => round.evaluatorSatisfied)).toEqual([false, true]);
       const [first, second] = rounds;
-      // The DoD's "round-2 request contains the round-1 objection VERBATIM",
-      // asserted on the RECORDED request after it came back out of storage.
-      expect(second!.synthesizerRequest.stage).toBe("RETRY");
-      if (second!.synthesizerRequest.stage !== "RETRY") throw new Error("TEST_EXPECTED_RETRY");
-      expect(second!.synthesizerRequest.priorObjection).toBe(objection);
+      // Each round names its OWN producer call sites, round number included.
+      expect(first!.candidateCallSiteKey).toBe("COMPOSER:SYNTHESIZER:INITIAL:1");
+      expect(second!.candidateCallSiteKey).toBe("COMPOSER:SYNTHESIZER:RETRY:2");
+      expect(first!.evaluatorCallSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:1");
+      expect(second!.evaluatorCallSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:2");
+      expect(first!.candidateArtifactRef).not.toBe(second!.candidateArtifactRef);
 
-      // codex r2 B2: RESOLVE the references instead of pattern-matching them.
-      // The retry's back-reference must be round 1's artifact, and every stored
-      // key must join to a `ledger.raw_artifact` row belonging to THIS run.
-      expect(second!.synthesizerRequest.priorCandidateRef).toBe(first!.candidateArtifactRef);
-      const resolved = await database.pool.query<{ raw_artifact_id: string; run_id: string }>(
-        `SELECT artifact.raw_artifact_id::text, artifact.run_id::text
+      // codex r3 B2: resolve each reference through the LEDGER ENTRY that
+      // recorded it — this run, this work item, a successful MODEL_CALL, at the
+      // stored call site. "Belongs to the run" was not a producer binding.
+      const bound = await database.pool.query<{ round: number; role: string }>(
+        `SELECT synthesis_round.round,
+                CASE WHEN entry.raw_artifact_ref = synthesis_round.candidate_artifact_ref
+                     THEN 'SYNTHESIZER' ELSE 'EVALUATOR' END AS role
            FROM serve.synthesis_round AS synthesis_round
            JOIN serve.answer AS answer
              ON answer.answer_id = synthesis_round.answer_id
             AND answer.answer_version = synthesis_round.answer_version
-           JOIN ledger.raw_artifact AS artifact
-             ON artifact.raw_artifact_id IN (synthesis_round.candidate_artifact_ref,
-                                             synthesis_round.evaluator_artifact_ref)
-            AND artifact.run_id = answer.run_id
-          WHERE synthesis_round.answer_id=$1 AND synthesis_round.answer_version=1`,
-        [result.answerId]
+           JOIN ledger.ledger_entry AS entry
+             ON entry.run_id = answer.run_id
+            AND entry.subject_item_id = $2
+            AND entry.action_kind = 'MODEL_CALL'
+            AND entry.outcome = 'OK'
+            AND ((entry.raw_artifact_ref = synthesis_round.candidate_artifact_ref
+                  AND entry.call_site_key = synthesis_round.candidate_call_site_key)
+              OR (entry.raw_artifact_ref = synthesis_round.evaluator_artifact_ref
+                  AND entry.call_site_key = synthesis_round.evaluator_call_site_key))
+          WHERE synthesis_round.answer_id=$1 AND synthesis_round.answer_version=1
+          ORDER BY synthesis_round.round, role`,
+        [result.answerId, work.workItemId]
       );
-      // Two rounds x two keys, every one resolving inside this run.
-      expect(resolved.rows).toHaveLength(4);
-      expect(new Set(resolved.rows.map((row) => row.run_id))).toEqual(new Set([work.runId]));
-      expect(new Set(resolved.rows.map((row) => row.raw_artifact_id))).toEqual(new Set([
-        first!.candidateArtifactRef, first!.evaluatorArtifactRef,
-        second!.candidateArtifactRef, second!.evaluatorArtifactRef
-      ]));
-      expect(first!.evaluatorSatisfied).toBe(false);
-      expect(second!.evaluatorSatisfied).toBe(true);
+      // Two rounds x two producers, each resolving to the call the ledger recorded.
+      expect(bound.rows.map((row) => `${String(row.round)}:${row.role}`))
+        .toEqual(["1:EVALUATOR", "1:SYNTHESIZER", "2:EVALUATOR", "2:SYNTHESIZER"]);
 
       // A reader who is not the owner gets nothing.
       await expect(new ServeRepository(database.pool).readSynthesisRounds(
         result.answerId, "asker:someone-else", 1
       )).resolves.toEqual([]);
 
-      // And no plaintext transcript is sitting in the table.
-      const stored = await database.pool.query<{ columns: string[] }>(
+      // No content column exists on this table at all.
+      const columns = await database.pool.query<{ columns: string[] }>(
         `SELECT array_agg(column_name::text) AS columns
            FROM information_schema.columns
           WHERE table_schema='serve' AND table_name='synthesis_round'`
       );
-      for (const banned of ["candidate_statement", "evaluator_request", "evaluator_verdict", "round_objection"]) {
-        expect(stored.rows[0]?.columns).not.toContain(banned);
+      for (const banned of ["synthesizer_request", "candidate_statement", "evaluator_request",
+        "evaluator_verdict", "round_objection", "content_ciphertext", "content_attestation"]) {
+        expect(columns.rows[0]?.columns).not.toContain(banned);
       }
 
       const terminal = await database.pool.query("SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL'", [work.runId]);
@@ -4938,55 +4946,69 @@ describe("T10/T11 · the served root and its label, through the production runne
    * belonging to a DIFFERENT run, which is why `persist` proves run membership
    * before the answer transaction commits.
    */
-  it("T9/J29 refuses a round whose artifact reference belongs to another run", async () => {
-    const provider = await startProviderDouble([...servedRunResponses("A neighbour run.", 0.8)]);
-    try {
-      // A real, resolvable artifact — produced by a DIFFERENT run.
-      const neighbour = await createRunnerWork(`t09-foreign-artifact-neighbour-${randomUUID()}`);
-      const neighbourResult = await runnerWithEndpoint(provider.endpoint)
-        .executeWorkItem(neighbour.workItemId);
-      expect(neighbourResult.kind).toBe("COMPLETED");
-      const foreign = await database.pool.query<{ raw_artifact_id: string }>(
-        "SELECT raw_artifact_id::text FROM ledger.raw_artifact WHERE run_id=$1 LIMIT 1",
-        [neighbour.runId]
-      );
-      const foreignArtifactId = foreign.rows[0]!.raw_artifact_id;
+  it("T9/J29 refuses a round reference that is not the producer's artifact", async () => {
+    // A run with a JUDGE artifact and NO answer yet, so the same-run
+    // wrong-producer case can be persisted without colliding with an existing
+    // answer. codex r3 B2: run identity alone let exactly this artifact through
+    // as both the candidate and the verdict reference.
+    const question = `t09-wrong-producer-${randomUUID()}`;
+    const runId = await createRun(question, 90, 1, 1);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+    });
+    const ledger = new LedgerRepository(database.pool);
+    const judgeArtifactId = randomUUID();
+    const attemptId = randomUUID();
+    await ledger.appendRawArtifact({
+      artifactId: judgeArtifactId, attemptId, runId,
+      providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
+      maker: "test-layer", modelVersion: "v1",
+      rawText: JSON.stringify({ judge: question }), metadata: {}, parseStatus: "PARSED",
+      inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: "a".repeat(64)
+    });
+    const now = new Date();
+    await ledger.append({
+      runId, attemptId, actionKind: "MODEL_CALL", callSiteKey: "JUDGE",
+      subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
+      actorRef: "provider:test-layer", inputHash: "input:test-layer",
+      contractHash: "9".repeat(64), rawArtifactRef: judgeArtifactId,
+      startedAt: now, finishedAt: now
+    });
 
-      const question = `t09-foreign-artifact-${randomUUID()}`;
-      const runId = await createRun(question, 90, 1, 1);
-      const round = {
-        round: 1,
-        synthesizerStage: "INITIAL",
-        synthesizerRequest: { role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 }, codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 } },
-        candidateRef: foreignArtifactId,
-        candidateStatement: "A statement.",
-        evaluatorRequest: { role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 }, codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 }, candidateStatement: "A statement." },
-        verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
-        verdictRef: foreignArtifactId
-      } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    const emptyDigest = { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 };
+    const codeLabel = { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 };
+    const round = {
+      round: 1,
+      synthesizerRequest: { role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel },
+      candidateRef: judgeArtifactId,
+      candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
+      candidateStatement: "A statement.",
+      evaluatorRequest: { role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel, candidateStatement: "A statement." },
+      verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
+      verdictRef: judgeArtifactId,
+      verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    const factBundle = {
+      facts: ["A fact."], residualObjections: [], badges: [], conditionMarks: [],
+      reversalPoint: "A contrary observation would reverse this.",
+      buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null
+    };
 
-      await expect(persistTerminalRun({
-        pool: database.pool,
-        runId,
-        fixtureKey: question,
-        factBundle: {
-          facts: ["A fact."], residualObjections: [], badges: [], conditionMarks: [],
-          reversalPoint: "A contrary observation would reverse this.",
-          buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null
-        },
-        loopRounds: [round]
-      })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+    // SAME RUN, real artifact, WRONG PRODUCER: the judge's call site is not a
+    // synthesis call site, so the ledger has no such pairing.
+    await expect(persistTerminalRun({
+      pool: database.pool, runId, fixtureKey: question, factBundle, loopRounds: [round]
+    })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
 
-      // The whole answer rolled back with it: no half-written round record.
-      const rows = await database.pool.query<{ count: string }>(
-        "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
-      );
-      expect(rows.rows[0]?.count).toBe("0");
-      const answers = await database.pool.query<{ count: string }>(
-        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
-      );
-      expect(answers.rows[0]?.count).toBe("0");
-    } finally { await provider.stop(); }
+    // The whole answer rolled back with it.
+    const rows = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
+    );
+    expect(rows.rows[0]?.count).toBe("0");
+    const answers = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
+    );
+    expect(answers.rows[0]?.count).toBe("0");
   });
 
   /**

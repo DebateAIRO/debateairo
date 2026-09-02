@@ -147,9 +147,9 @@ function dependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGate
   return {
     synthesize: async () => ({
       candidate: [segment("segment:verdict", "Evidence-backed verdict.", true)],
-      candidateRef: "artifact:test-layer:synthesizer"
+      candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
     }),
-    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" }),
+    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" }),
     applyBandCeiling: () => passCeiling,
     ...overrides
   };
@@ -198,7 +198,7 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
       factBundle: buildFactBundle({ ...factBundle(), residualObjections: ["test-layer objection"] })
     }, dependencies());
     const servedDespiteUntracedCitation = await runServeGateChain(input(), dependencies({
-      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e" })
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
 
     expect(preSynthesisTerminal).toMatchObject({
@@ -225,7 +225,7 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     }, dependencies({
       synthesize: async () => {
         synthesizeCalls += 1;
-        return { candidate: [segment("never", "never", true)], candidateRef: "artifact:never" };
+        return { candidate: [segment("never", "never", true)], candidateRef: "artifact:never", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" };
       }
     }));
 
@@ -270,11 +270,11 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
           segment("segment:second", "Second detail.", false),
           segment("segment:third", "Third detail.", false)
         ],
-        candidateRef: "artifact:test-layer:synthesizer"
+        candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
       }),
       evaluate: async (request) => {
         judged.push(request.candidateStatement);
-        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" };
+        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" };
       }
     }));
 
@@ -305,7 +305,8 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     const recovered = await runServeGateChain(input(), dependencies({
       evaluate: async () => ({
         verdict: ++evaluateCalls > 1 ? SATISFIED : unsatisfied("Round 1 objection."),
-        verdictRef: `artifact:round-${String(evaluateCalls)}`
+        verdictRef: `artifact:round-${String(evaluateCalls)}`,
+        verdictCallSiteKey: `POST_COMPOSE_R9:EVALUATOR:${String(evaluateCalls)}`
       })
     }));
     expect(recovered.terminal).toBe("SERVED");
@@ -313,7 +314,7 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     expect(recovered.loopRounds).toHaveLength(2);
 
     const exhausted = await runServeGateChain(input(), dependencies({
-      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e" })
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
     expect(exhausted.terminal).toBe("SERVED");
     expect(exhausted.standingObjection).toBe("A claim traces to no digest node.");

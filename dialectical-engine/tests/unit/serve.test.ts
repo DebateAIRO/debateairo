@@ -99,9 +99,9 @@ function passingDependencies(overrides: Partial<ServeGateDependencies> = {}): Se
   return {
     synthesize: async () => ({
       candidate: composed("A provisional answer.", "Research it with an independent source."),
-      candidateRef: "artifact:test-layer:synthesizer:1"
+      candidateRef: "artifact:test-layer:synthesizer:1", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
     }),
-    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" }),
+    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" }),
     applyBandCeiling: ({ basis, candidateConfidenceBand }) => ({
       kind: "NOT_CAPPED",
       confidenceBand: candidateConfidenceBand,
@@ -124,7 +124,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
     const result = await runServeGateChain(reasoningInput(), passingDependencies({
       evaluate: async (request) => {
         judgedStatements.push(request.candidateStatement);
-        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator" };
+        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" };
       }
     }));
 
@@ -147,7 +147,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
 
   it("fails loudly when synthesis omits the required research-plan segment", async () => {
     await expect(runServeGateChain(reasoningInput(), passingDependencies({
-      synthesize: async () => ({ candidate: composed("Only a hypothesis was composed."), candidateRef: "artifact:1" })
+      synthesize: async () => ({ candidate: composed("Only a hypothesis was composed."), candidateRef: "artifact:1", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" })
     }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
 
@@ -158,7 +158,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     input.nodes[0]!.locator = "https://example.invalid/test-fixture";
-    const result = await runServeGateChain(input, passingDependencies({ synthesize: async () => ({ candidate: [], candidateRef: "artifact:1" }) }));
+    const result = await runServeGateChain(input, passingDependencies({ synthesize: async () => ({ candidate: [], candidateRef: "artifact:1", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" }) }));
     expect(result.terminal).toBe("COMPONENTS_ONLY");
     expect(result.crashClass).toBe("NO_ARTIFACT");
     expect(result.conditionMarks).toEqual(["DEFECT"]);
@@ -174,7 +174,7 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 sha
           assertedNodeRefs: ["node:absent"],
           servedNumberRefs: []
         }],
-        candidateRef: "artifact:1"
+        candidateRef: "artifact:1", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
       })
     }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
@@ -186,7 +186,7 @@ describe("FX-SRV-01a / FX-C52-01 — the Q51 FORM limb (T13 owns the form; T9 ke
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     input.nodes[0]!.locator = "https://example.invalid/test-fixture";
     const result = await runServeGateChain(input, passingDependencies({
-      synthesize: async () => ({ candidate: composed("Evidence-backed verdict."), candidateRef: "artifact:1" })
+      synthesize: async () => ({ candidate: composed("Evidence-backed verdict."), candidateRef: "artifact:1", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" })
     }));
     expect(result.terminal).toBe("SERVED");
     expect(result.answerForm?.kind).toBe("VERDICT");
@@ -197,7 +197,7 @@ describe("FX-SRV-01a / FX-C52-01 — the Q51 FORM limb (T13 owns the form; T9 ke
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     const result = await runServeGateChain(input, passingDependencies({
-      synthesize: async () => ({ candidate: composed("Unlocatable claim."), candidateRef: "artifact:1" })
+      synthesize: async () => ({ candidate: composed("Unlocatable claim."), candidateRef: "artifact:1", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" })
     }));
     expect(result.terminal).toBe("SERVED");
     expect(result.crashClass).toBeNull();

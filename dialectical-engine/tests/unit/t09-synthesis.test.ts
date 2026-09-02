@@ -207,14 +207,16 @@ function recorder(script: {
         // its provider response — never a label the loop made up.
         return {
           candidate,
-          candidateRef: (script.candidateRefFor ?? ((round: number) => `artifact:recorded:${round}`))(request.round)
+          candidateRef: (script.candidateRefFor ?? ((round: number) => `artifact:recorded:${round}`))(request.round),
+          candidateCallSiteKey: `COMPOSER:SYNTHESIZER:${request.stage}:${request.round}`
         };
       },
       evaluate: async (request) => {
         evaluatorRequests.push(request);
         return {
           verdict: verdicts[Math.min(evaluatorRequests.length - 1, verdicts.length - 1)]!,
-          verdictRef: `artifact:evaluator:${request.round}`
+          verdictRef: `artifact:evaluator:${request.round}`,
+          verdictCallSiteKey: `POST_COMPOSE_R9:EVALUATOR:${request.round}`
         };
       },
       applyBandCeiling: ({ basis, candidateConfidenceBand }) => ({

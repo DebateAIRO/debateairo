@@ -4553,35 +4553,10 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
 
     const factMarker = `s6-fact-${marker}`;
     const residualMarker = `s6-residual-${marker}`;
-    // T9 / J29: the round is written THROUGH `persist` on an ENCRYPTED run, so
-    // the carrier's sentinel-vs-plaintext choice is exercised by production code
-    // rather than by a hand-built row. A mutant that writes the request in
-    // plaintext here is refused by core.enforce_content_ciphertext.
-    const synthesisRequestMarker = `s6-synthesis-request-${marker}`;
-    const encryptedRound = {
-      round: 1,
-      synthesizerRequest: {
-        role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1,
-        instructions: synthesisRequestMarker,
-        digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 },
-        codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 }
-      },
-      candidateRef: authorArtifactId,
-      candidateStatement: `s6-candidate-${marker}`,
-      evaluatorRequest: {
-        role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i",
-        digest: { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 },
-        codeLabel: { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 },
-        candidateStatement: `s6-candidate-${marker}`
-      },
-      verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
-      verdictRef: authorArtifactId
-    } as never;
     const terminal = await persistTerminalRun({
       pool: database.pool,
       runId,
       fixtureKey: marker,
-      loopRounds: [encryptedRound],
       factBundle: {
         facts: [factMarker],
         residualObjections: [residualMarker],
@@ -4621,18 +4596,6 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       [composedTextId, factBundleId, authorArtifactId, JSON.stringify(composedEnvelope),
         composedAttestation]
     );
-
-    // The round persist wrote is the carrier under test: sentinel in the
-    // plaintext column, body in content_ciphertext.
-    const synthesisRow = (await database.pool.query<{
-      synthesis_round_id: string; synthesizer_request: string;
-    }>(
-      `SELECT synthesis_round_id::text, synthesizer_request
-         FROM serve.synthesis_round WHERE run_id=$1 ORDER BY round LIMIT 1`,
-      [runId]
-    )).rows[0]!;
-    const synthesisRoundId = synthesisRow.synthesis_round_id;
-    expect(synthesisRow.synthesizer_request).toBe(CONTENT_CIPHERTEXT_SENTINEL);
 
     const evidence = new EvidenceRepository(database.pool);
     const sharedQueries = [
@@ -4959,12 +4922,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       { carrier: "evidence.query_set" as const, id: querySetId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.query_set WHERE query_set_id=$1", [querySetId])).rows[0].content_ciphertext },
       { carrier: "evidence.query_amendment" as const, id: queryAmendmentId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.query_amendment WHERE query_amendment_id=$1", [queryAmendmentId])).rows[0].content_ciphertext },
       { carrier: "evidence.evidence_item" as const, id: evidenceItemId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.evidence_item WHERE evidence_item_id=$1", [evidenceItemId])).rows[0].content_ciphertext },
-      { carrier: "evidence.absence_row" as const, id: absenceRowId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.absence_row WHERE absence_row_id=$1", [absenceRowId])).rows[0].content_ciphertext },
-      { carrier: "serve.synthesis_round" as const, id: synthesisRoundId, envelope: (await database.pool.query("SELECT content_ciphertext FROM serve.synthesis_round WHERE synthesis_round_id=$1", [synthesisRoundId])).rows[0].content_ciphertext }
+      { carrier: "evidence.absence_row" as const, id: absenceRowId, envelope: (await database.pool.query("SELECT content_ciphertext FROM evidence.absence_row WHERE absence_row_id=$1", [absenceRowId])).rows[0].content_ciphertext }
     ];
-    // T9 / J29: 14 -> 15. The synthesis round joins the carrier set rather than
-    // holding a plaintext duplicate of content the other carriers protect.
-    expect(envelopes).toHaveLength(15);
+    expect(envelopes).toHaveLength(14);
     for (const item of envelopes) {
       await expect(cipher.decrypt(runId, item.carrier, item.id, item.envelope as never))
         .resolves.toBeTypeOf("object");
@@ -5091,20 +5051,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
           SELECT (jsonb_populate_record(NULL::evidence.absence_row, to_jsonb(source)
             || jsonb_build_object('query_text',$2::text))).*
           FROM evidence.absence_row AS source WHERE absence_row_id=$1`
-      },
-      {
-        carrier: "serve.synthesis_round",
-        id: synthesisRoundId,
-        sql: `INSERT INTO serve.synthesis_round
-          SELECT (jsonb_populate_record(NULL::serve.synthesis_round, to_jsonb(source)
-            || jsonb_build_object('synthesis_round_id',gen_random_uuid(),
-                                  'sealed_at_seq',(SELECT MAX(sealed_at_seq)+1 FROM serve.synthesis_round),
-                                  'round',source.round + 1,
-                                  'synthesizer_request',$2::text))).*
-          FROM serve.synthesis_round AS source WHERE synthesis_round_id=$1`
       }
     ] as const;
-    expect(plaintextMutations).toHaveLength(15);
+    expect(plaintextMutations).toHaveLength(14);
     for (const mutation of plaintextMutations) {
       await expect(database.pool.query(mutation.sql, [
         mutation.id, `s6-plaintext-mutation-${mutation.carrier}-${marker}`

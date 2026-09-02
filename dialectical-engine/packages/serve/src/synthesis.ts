@@ -440,6 +440,8 @@ export interface SynthesisLoopRound {
   readonly verdict: EvaluatorVerdict;
   /** The `ledger.raw_artifact` id of the evaluator call for this round. */
   readonly verdictRef: string;
+  readonly candidateCallSiteKey: string;
+  readonly verdictCallSiteKey: string;
 }
 
 export interface SynthesisLoopOutcome<TCandidate> {
@@ -472,6 +474,14 @@ export interface SynthesizedCandidate<TCandidate> {
    * foreign key and proves it belongs to this run before committing.
    */
   readonly candidateRef: string;
+  /**
+   * The call-site key the synthesizer call was recorded under. codex r3 B2: a
+   * reference that only proves "some artifact in this run" is not a producer
+   * binding — an unrelated JUDGE artifact from the same run satisfied it. The
+   * call site is what the ledger uses to tell producers apart, so it travels
+   * with the reference and `persist` resolves the pair against the ledger.
+   */
+  readonly candidateCallSiteKey: string;
 }
 
 /** The evaluator's verdict together with the artifact its call recorded. */
@@ -479,6 +489,8 @@ export interface EvaluatedCandidate {
   readonly verdict: EvaluatorVerdict;
   /** The `ledger.raw_artifact` id of the evaluator call. */
   readonly verdictRef: string;
+  /** The call-site key the evaluator call was recorded under. */
+  readonly verdictCallSiteKey: string;
 }
 
 export interface SynthesisLoopDependencies<TCandidate> {
@@ -553,7 +565,9 @@ export async function runSynthesisLoop<TCandidate>(
       candidateStatement,
       evaluatorRequest,
       verdict,
-      verdictRef: evaluated.verdictRef
+      verdictRef: evaluated.verdictRef,
+      candidateCallSiteKey: synthesized.candidateCallSiteKey,
+      verdictCallSiteKey: evaluated.verdictCallSiteKey
     }));
     if (verdict.satisfied) {
       prior = null;

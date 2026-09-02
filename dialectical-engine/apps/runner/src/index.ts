@@ -3517,6 +3517,7 @@ export class WalkingSkeletonRunner {
        */
       synthesize: async (request: SynthesizerRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER");
+        const synthesizerCallSiteKey = `COMPOSER:SYNTHESIZER:${request.stage}:${request.round}`;
         const packet: PromptPacket = { messages: [
           { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
           { role: "user", content: JSON.stringify(request) }
@@ -3532,7 +3533,7 @@ export class WalkingSkeletonRunner {
           // not where the slot is, so the prefix stays and the role is named
           // inside it. Renaming the slots needs a migration that redefines
           // that function — filed as a follow-up, not smuggled in here.
-          callSiteKey: `COMPOSER:SYNTHESIZER:${request.stage}:${request.round}`,
+          callSiteKey: synthesizerCallSiteKey,
           role: "SYNTHESIZER",
           lane: "served",
           bound: this.settings.composerBound,
@@ -3578,7 +3579,10 @@ export class WalkingSkeletonRunner {
           // codex r1 B2: the RECORDED artifact for THIS round. `compositionRawArtifactRef`
           // is overwritten by the next round, so the retry's back-reference has to be
           // the per-round value taken here, never that field read later.
-          candidateRef: response.rawArtifactRef
+          candidateRef: response.rawArtifactRef,
+          // codex r3 B2: the producer identity travels with the reference, and
+          // `persist` checks the pair against the ledger before committing.
+          candidateCallSiteKey: synthesizerCallSiteKey
         };
       },
       /**
@@ -3589,6 +3593,7 @@ export class WalkingSkeletonRunner {
        */
       evaluate: async (request: EvaluatorRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
+        const evaluatorCallSiteKey = `POST_COMPOSE_R9:EVALUATOR:${request.round}`;
         const packet: PromptPacket = { messages: [
           { role: "system", content: "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null." },
           { role: "user", content: JSON.stringify(request) }
@@ -3600,7 +3605,7 @@ export class WalkingSkeletonRunner {
           // feeds `r9_calls`, which the R9 battery row prints in its executed
           // check ref. The evaluator IS the restatement check now, so the slot
           // is still occupied and the ref still names something that happened.
-          callSiteKey: `POST_COMPOSE_R9:EVALUATOR:${request.round}`,
+          callSiteKey: evaluatorCallSiteKey,
           role: "EVALUATOR",
           lane: "served",
           bound: this.settings.conformanceBound,
@@ -3627,7 +3632,8 @@ export class WalkingSkeletonRunner {
           // J29: the evaluator's own recorded artifact, so the round's verdict
           // and objection resolve through `ledger.raw_artifact` rather than
           // being duplicated into a second plaintext table.
-          verdictRef: response.rawArtifactRef
+          verdictRef: response.rawArtifactRef,
+          verdictCallSiteKey: evaluatorCallSiteKey
         });
       },
       applyBandCeiling: ({ basis, candidateConfidenceBand: band }) => deriveBandCeiling({
