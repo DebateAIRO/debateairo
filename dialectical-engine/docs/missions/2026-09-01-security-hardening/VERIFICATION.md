@@ -97,3 +97,4 @@ Neither is dev drift in a B20 file; both are recorded above under the known base
 
 ## CI on PR #8 (first run of .github/workflows/security.yml)
 - codeql: success. secrets: FAILED on 13 gitleaks matches over all refs → classified (V-24) and recorded by fingerprint in `.gitleaksignore`; local re-scan with the same pinned 8.30.1 binary: 0 leaks. verify: red on the inherited known-red tests → B31 recorded-baseline gate (in progress).
+- Run 2 (344b26d0, after `.gitleaksignore`): secrets: success · codeql: success · verify: failure on the raw `vitest run tests/unit tests/architecture` step (inherited known-red tests; replaced by the B31 gate).
