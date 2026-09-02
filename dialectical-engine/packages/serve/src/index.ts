@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
-import type { WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError } from "@debateai/kernel";
+// UNION of both lanes: S06 needs the served-root rule vocabularies and the
+// retired-rule predicate; T6 needs PoolClient for its writer-resolved FK path.
+import type { ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
@@ -679,12 +681,178 @@ export function deriveWorkReadState(input: {
     : { state: input.storedState };
 }
 
-export function deriveHonestVerdict(input: { readonly usableBasis: boolean; readonly reasonRef: string }):
-  | { readonly verdictState: "SUPPORTED"; readonly confidenceBand: null; readonly unavailable: null }
-  | { readonly verdictState: null; readonly confidenceBand: null; readonly unavailable: { readonly reasonRef: string } } {
-  return input.usableBasis
-    ? { verdictState: "SUPPORTED", confidenceBand: null, unavailable: null }
-    : { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef } };
+/**
+ * T11 (goal 196-221) — the three-state verdict label.
+ *
+ * A label input is either MEASURED or ABSENT. ABSENT is a RUNTIME value with a
+ * reason, never NaN and never a silent zero: a single servable root has no
+ * runner-up to measure a margin against, and a panel that produced fewer than
+ * two parseable judgements has no dispersion to compare (s04 `measureDispersion`
+ * returns exactly that shape).
+ */
+export type VerdictLabelQuantity =
+  | { readonly kind: "MEASURED"; readonly value: number }
+  | { readonly kind: "ABSENT"; readonly reason: string };
+
+/**
+ * gamma, the two cuts and the disagreement threshold, as the caller read them
+ * from T16's sealed register rows (`readVerdictLabelControls`). This module
+ * carries NO default for any of them — a label derived from a value this file
+ * invented would be uncalibratable and untunable, which is what the sealed rows
+ * exist to prevent (goal 39-40).
+ */
+export interface VerdictLabelControls {
+  readonly gamma: number;
+  readonly highCut: number;
+  readonly lowCut: number;
+  readonly disagreementThreshold: number;
+}
+
+export interface VerdictLabelBasis {
+  /** The served root's propagated strength. */
+  readonly winner: number;
+  /** The served root's margin over the runner-up root. */
+  readonly margin: VerdictLabelQuantity;
+  /**
+   * The recorded panel dispersion of the WINNING root's reduced judgement
+   * (T3's `dispersion` field), on T16's seeded scale.
+   */
+  readonly disagreement: VerdictLabelQuantity;
+  readonly controls: VerdictLabelControls;
+}
+
+export const LABEL_BASIS_INCOMPLETE_MARK = "LABEL-BASIS-INCOMPLETE" as const;
+
+export type VerdictLabelTrigger =
+  | "BASIS_INCOMPLETE"
+  | "BELOW_LOW_CUT"
+  | "MARGIN_WITHIN_GAMMA"
+  | "DISAGREEMENT_AT_THRESHOLD"
+  | "AT_OR_ABOVE_HIGH_CUT"
+  | "MID_BAND";
+
+export interface VerdictLabelDerivation {
+  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them. */
+  readonly rung: 0 | 1 | 2 | 3 | 4;
+  readonly trigger: VerdictLabelTrigger;
+  /** Which basis limbs were ABSENT; empty unless rung 0 fired. */
+  readonly basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
+  readonly marks: readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];
+}
+
+function assertLabelNumber(value: number, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_INPUT_INVALID",
+      `${label} must be a finite number; an unmeasurable input is ABSENT with a reason, never NaN`
+    );
+  }
+  return value;
+}
+
+/**
+ * The ORDERED, TOTAL, DISJOINT ladder, defined over the runtime domain with
+ * absent inputs included (goal 197-207). Exactly one rung fires at every point:
+ * the FIRST whose guard holds. Nothing here consults the round-3 evaluator
+ * objection — the derivation is acyclic and runs BEFORE synthesis, from the
+ * propagated numbers only (confirm-item 3, default NO).
+ */
+export function deriveVerdictLabel(input: VerdictLabelBasis): VerdictLabelDerivation {
+  const { gamma, highCut, lowCut, disagreementThreshold } = input.controls;
+  for (const [value, label] of [
+    [gamma, "gamma"], [highCut, "the high cut"], [lowCut, "the low cut"],
+    [disagreementThreshold, "the disagreement threshold"]
+  ] as const) assertLabelNumber(value, label);
+  if (!(lowCut < highCut)) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_CONTROLS_INVALID",
+      "The low cut must sit strictly below the high cut"
+    );
+  }
+  const winner = assertLabelNumber(input.winner, "the winning strength");
+  const margin = input.margin;
+  const disagreement = input.disagreement;
+  if (margin.kind === "MEASURED") assertLabelNumber(margin.value, "the margin");
+  if (disagreement.kind === "MEASURED") assertLabelNumber(disagreement.value, "the disagreement");
+
+  // Rung 0 — the basis itself is incomplete.
+  if (margin.kind === "ABSENT" || disagreement.kind === "ABSENT") {
+    return Object.freeze({
+      label: "CONTESTED", rung: 0, trigger: "BASIS_INCOMPLETE",
+      basisAbsence: Object.freeze([
+        ...(margin.kind === "ABSENT" ? ["MARGIN" as const] : []),
+        ...(disagreement.kind === "ABSENT" ? ["DISAGREEMENT" as const] : [])
+      ]),
+      marks: Object.freeze([LABEL_BASIS_INCOMPLETE_MARK])
+    });
+  }
+  const noAbsence = Object.freeze([]) as readonly ("MARGIN" | "DISAGREEMENT")[];
+  const noMarks = Object.freeze([]) as readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];
+
+  // Rung 1 — below the low cut.
+  if (winner < lowCut) {
+    return Object.freeze({
+      label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 2 — a tie-adjacent margin, or a panel that disagreed at the threshold.
+  const marginWithinGamma = margin.value <= gamma;
+  if (marginWithinGamma || disagreement.value >= disagreementThreshold) {
+    return Object.freeze({
+      label: "CONTESTED", rung: 2,
+      trigger: marginWithinGamma ? "MARGIN_WITHIN_GAMMA" : "DISAGREEMENT_AT_THRESHOLD",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 3 — at or above the high cut, with a clear margin and low disagreement.
+  if (winner >= highCut) {
+    return Object.freeze({
+      label: "SUPPORTED", rung: 3, trigger: "AT_OR_ABOVE_HIGH_CUT",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 4 — the mid band: low <= winner < high.
+  return Object.freeze({
+    label: "CONTESTED", rung: 4, trigger: "MID_BAND",
+    basisAbsence: noAbsence, marks: noMarks
+  });
+}
+
+/**
+ * The served answer's verdict projection: exactly one of a label or an
+ * unavailability reason (the contract refuses both and neither). The label
+ * itself is T11's ladder above — never a constant this function chose.
+ */
+export function deriveHonestVerdict(input: {
+  readonly usableBasis: boolean;
+  readonly reasonRef: string;
+  readonly labelBasis: VerdictLabelBasis | null;
+}):
+  | {
+      readonly verdictState: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+      readonly confidenceBand: null;
+      readonly unavailable: null;
+      readonly derivation: VerdictLabelDerivation;
+    }
+  | {
+      readonly verdictState: null;
+      readonly confidenceBand: null;
+      readonly unavailable: { readonly reasonRef: string };
+      readonly derivation: null;
+    } {
+  if (!input.usableBasis) {
+    return { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef }, derivation: null };
+  }
+  if (input.labelBasis === null) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_BASIS_UNRESOLVED",
+      "A servable answer must carry the propagated label basis (winner, margin, disagreement, sealed controls); no label is invented here"
+    );
+  }
+  const derivation = deriveVerdictLabel(input.labelBasis);
+  return { verdictState: derivation.label, confidenceBand: null, unavailable: null, derivation };
 }
 
 export function projectProvenance(input: {
@@ -778,7 +946,7 @@ export interface PersistServeInput {
   readonly compositionRawArtifactRef: string | null;
   readonly compositionAttempt: number;
   readonly conformanceRawArtifactRefs: readonly string[];
-  readonly conditionMarkRecords?: readonly ConditionMarkRecord[];
+  readonly conditionMarkRecords?: readonly PersistableConditionMarkRecord[];
   readonly servedNumber: {
     readonly numberRef: string;
     readonly value: number;
@@ -788,6 +956,13 @@ export interface PersistServeInput {
     readonly replayHandle: string;
     readonly propagationRunId: string;
   } | null;
+  /**
+   * T11: the propagated numbers this answer's three-state label is derived
+   * from, computed BEFORE synthesis. Required whenever the answer will carry a
+   * label (a served number on a SERVED/DOWNGRADED terminal); omitted on the
+   * DR-184 superseding path, which preserves the prior answer's projection.
+   */
+  readonly verdictLabelBasis?: VerdictLabelBasis | null;
   /** DR-184: append a new immutable version of an already-served answer. */
   readonly supersedes?: { readonly answerId: string };
 }
@@ -827,12 +1002,17 @@ export interface ConditionMarkRecord {
   // J13(b): PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE are node-scope panel
   // degradation disclosures; the record union must name them or the runner cannot
   // project the mark the kernel now mints.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "LABEL-BASIS-INCOMPLETE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
   readonly liftPath: string | null;
-  readonly servedRootRule: "first-configured-provider" | null;
+  /**
+   * The rule a FRESH selection recorded. Live vocabulary only: a new selection
+   * cannot even express a retired rule (T10 / codex r1 B3). A record carried
+   * forward from an older answer version uses `PreservedConditionMarkRecord`.
+   */
+  readonly servedRootRule: ServedRootRule | null;
   readonly affectedNodeIds: readonly string[];
   readonly callSiteKey?: string | null;
   readonly plannedLegCount?: number | null;
@@ -857,6 +1037,20 @@ export interface ConditionMarkRecord {
   readonly judgedBasisCount?: number | null;
 }
 
+/**
+ * A record carried forward onto a NEW VERSION of an existing answer (DR-184
+ * catch-up). It may carry a RETIRED rule, because the version it describes was
+ * selected under that rule and relabelling it would falsify the record. This is
+ * the only shape allowed to hold one, and only on a superseding write — the law
+ * is enforced at `persist`, which names it if it is broken.
+ */
+export type PreservedConditionMarkRecord =
+  Omit<ConditionMarkRecord, "servedRootRule">
+  & { readonly servedRootRule: ServedRootRuleHistory | null };
+
+/** Either shape; `persist` decides which is lawful from `supersedes`. */
+export type PersistableConditionMarkRecord = ConditionMarkRecord | PreservedConditionMarkRecord;
+
 const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "SKIPPED-BY-BUDGET",
   "ENVELOPE_EXHAUSTED",
@@ -868,13 +1062,16 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "HIDDEN-UNJUDGEABLE",
   "DERIVED-STANDING-UNREVIEWED",
   "HIDDEN-LOW-SCORE",
-  "UNAUTHORED-BRANCH-HALTED"
+  "UNAUTHORED-BRANCH-HALTED",
+  // T11: a label derived without a complete basis is disclosed on the answer it
+  // labelled, with a typed record naming which limb of the basis was absent.
+  "LABEL-BASIS-INCOMPLETE"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
 export function assertRequiredConditionMarkRecords(
   conditionMarks: readonly string[],
-  records: readonly ConditionMarkRecord[]
+  records: readonly PersistableConditionMarkRecord[]
 ): void {
   for (const mark of REQUIRED_CONDITION_MARK_RECORDS) {
     if (conditionMarks.includes(mark) && !records.some((record) => record.mark === mark)) {
@@ -984,9 +1181,28 @@ export interface UnjudgedReasonProvenance {
 export async function resolveTrueUnjudgedReasons(
   source: Pool | PoolClient,
   runId: string,
-  records: readonly ConditionMarkRecord[]
+  // MERGE (S06 x T6): widened from ConditionMarkRecord to the union `persist`
+  // actually holds.
+  //
+  // CORRECTED in r4b (codex merge N1): an earlier version of this comment said
+  // the resolver reads only `mark` and `subjectRef`. It reads FOUR fields —
+  // `mark`, `subjectRef`, `reviewOutcome` and `terminalTransportOutcome` — and
+  // the last two are exactly what select and validate T6's review-versus-
+  // transport truth arm. Calling them irrelevant is the kind of note that lets a
+  // later change to either one pass review unexamined.
+  //
+  // The widening is safe for a stronger reason than "few fields are read".
+  // `PreservedConditionMarkRecord` is
+  //   Omit<ConditionMarkRecord, "servedRootRule">
+  //     & { servedRootRule: ServedRootRuleHistory | null }
+  // so EVERY field has the same type and meaning in both arms; the ONLY
+  // difference is `servedRootRule`, and this function never reads it. The body
+  // is otherwise unchanged from integration 362299d1, so no T6 truth-binding
+  // decision is weakened — the widening only stops the S06 catch-up path from
+  // being unrepresentable at T6's call site.
+  records: readonly PersistableConditionMarkRecord[]
 ): Promise<readonly UnjudgedReasonProvenance[]> {
-  const carriesUnjudgedReason = (record: ConditionMarkRecord): boolean =>
+  const carriesUnjudgedReason = (record: PersistableConditionMarkRecord): boolean =>
     record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED";
   const subjects = [...new Set(records.filter(carriesUnjudgedReason).map((record) => record.subjectRef))];
   const landed = new Map<string, { readonly nodeReviewId: string; readonly outcome: string }>();
@@ -1143,17 +1359,47 @@ export class ServeRepository {
     }
     const conditionMarkRecords = input.conditionMarkRecords ?? [];
     assertRequiredConditionMarkRecords(input.result.conditionMarks, conditionMarkRecords);
+    // T10 / codex r1 B3 — the read vocabulary is wider than the write one, and
+    // this is where the difference is enforced. A SUPERSEDING version may carry
+    // a retired rule forward, because the version it describes really was
+    // selected under it. A FRESH answer may not: there is no history to carry,
+    // so a retired value there could only be a relabelling or a fabrication.
+    if (input.supersedes === undefined) {
+      const retired = conditionMarkRecords.find((record) => isRetiredServedRootRule(record.servedRootRule));
+      if (retired !== undefined) {
+        throw new TypedDomainError(
+          "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE",
+          `${retired.mark} records the retired served-root rule "${retired.servedRootRule}" on a fresh answer; retired rules are readable history, never a new selection's rule`
+        );
+      }
+    }
     if (conditionMarkRecords.some((record) =>
       record.subjectRef.trim() === "" || record.reason.trim() === "" || record.affectedNodeIds.length === 0
     )) {
       throw new TypedDomainError("CONDITION_MARK_AFFECTED_NODES_REQUIRED", "Every S09 mark must inspect affected nodes");
     }
     return withRunContentLease(this.pool,[input.runId],async () => {
+    // DR-184's superseding path never re-derives: the prior answer's verdict
+    // projection is carried forward below, so it needs no label basis.
     const verdict = deriveHonestVerdict({
-      usableBasis: input.servedNumber !== null
+      usableBasis: input.supersedes === undefined
+        && input.servedNumber !== null
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
-      reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`
+      reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`,
+      labelBasis: input.verdictLabelBasis ?? null
     });
+    // The mark and the label are ONE decision. A derivation that says the basis
+    // was incomplete while the answer's marks stay silent is the facsimile shape
+    // this record exists to prevent, so it stops loudly instead of persisting.
+    if (verdict.derivation !== null) {
+      const declared = input.result.conditionMarks.includes(LABEL_BASIS_INCOMPLETE_MARK);
+      if (declared !== (verdict.derivation.marks.length > 0)) {
+        throw new TypedDomainError(
+          "LABEL_BASIS_DISCLOSURE_MISMATCH",
+          `The derived label basis ${verdict.derivation.marks.length > 0 ? "IS" : "is NOT"} incomplete, but the answer's condition marks say otherwise`
+        );
+      }
+    }
     const factBundleId = randomUUID();
     const factContent = await encryptAttestedContentForRun(
       this.pool, input.runId, "serve.fact_bundle", factBundleId,
@@ -1693,7 +1939,11 @@ export class ServeRepository {
       subject_ref: string;
       reason: string;
       lift_path: string | null;
-      served_root_rule: "first-configured-provider" | null;
+      // T10 / codex r1 B3: the READ vocabulary. This row may have been sealed
+      // before migration 0055, in which case it carries the retired rule — the
+      // migration preserves it deliberately. Typing it live-only here made the
+      // projection assert that a value it really returns cannot exist.
+      served_root_rule: ServedRootRuleHistory | null;
       call_site_key: string | null;
       planned_leg_count: number | null;
       terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;

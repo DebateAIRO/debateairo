@@ -395,6 +395,8 @@ describe("ACC-01 dry-run ceremony", () => {
     // DR-139(4): the served answer names each owed-but-unexecuted check.
     const answerPayload = owned.json() as {
       condition_marks: string[];
+      // T11: the code-derived three-state label the served answer carries.
+      verdict_state: string | null;
       condition_mark_records: {
         mark: string;
         subject_ref: string;
@@ -492,21 +494,36 @@ describe("ACC-01 dry-run ceremony", () => {
     expect(new Set(graphPayload.nodes.map((node) => node.review!.outcome))).toEqual(
       new Set(["agree", "dispute"])
     );
+    // T10: the served root is the STRONGER of the two authored roots, whichever
+    // maker configured first. The expectation is derived from the run's own
+    // propagated numbers — asserting node[0] here would be re-asserting the
+    // retired configuration-order rule under a new name.
+    const rootsByStrength = [positionNode, secondRootNode]
+      .slice()
+      .sort((left, right) => right.final_strength.value - left.final_strength.value
+        || (left.node_id < right.node_id ? -1 : left.node_id > right.node_id ? 1 : 0));
+    const servedRootNode = rootsByStrength[0]!;
+    const unservedRootNode = rootsByStrength[1]!;
     const unservedMakerRecord = answerPayload.condition_mark_records.find(
       (record) => record.mark === "UNSERVED-MAKER-POSITION"
     );
     expect(unservedMakerRecord).toEqual(expect.objectContaining({
-      subject_ref: positionNode.node_id,
-      served_root_rule: "first-configured-provider"
+      subject_ref: servedRootNode.node_id,
+      served_root_rule: "max-propagated-strength-lexicographic-tiebreak"
     }));
     expect(unservedMakerRecord?.reason).toContain("OpenAI");
     expect(unservedMakerRecord?.reason).toContain("Anthropic");
     expect(unservedMakerRecord?.reason).toContain(positionNode.node_id);
     expect(unservedMakerRecord?.reason).toContain(secondRootNode.node_id);
+    // A-r2-2 survives the rule change: the raw rule token stays off the human
+    // reason and lives only on the typed field. Both the retired and the live
+    // token are checked, so neither can leak back in.
     expect(unservedMakerRecord?.reason).not.toContain("first-configured-provider");
+    expect(unservedMakerRecord?.reason).not.toContain("max-propagated-strength");
     // The carried rule outcome must match served reality, not merely name a
     // policy: the served number belongs to the record's subject root.
-    expect(unservedMakerRecord?.subject_ref).toBe(positionNode.node_id);
+    expect(unservedMakerRecord?.subject_ref).toBe(servedRootNode.node_id);
+    expect(unservedRootNode.node_id).not.toBe(servedRootNode.node_id);
 
     // Honest per-node strength lineage: each recorded strength cites ITS node's
     // artifact, never the position's artifact stamped onto the counter.
@@ -524,11 +541,19 @@ describe("ACC-01 dry-run ceremony", () => {
       expect(row.source_ref).toBe(row.provenance_ref);
     }
 
-    // The served number remains the POSITION's final strength.
+    // T10: the served number is the SERVED root's final strength — the maximum
+    // over the authored roots, not the first-configured one's.
     const presentSlot = graphPayload.number_slots.find((slot) => slot.status === "PRESENT") as
       | { status: "PRESENT"; number: { value: number } }
       | undefined;
-    expect(presentSlot?.number.value).toBe(positionNode.final_strength.value);
+    expect(presentSlot?.number.value).toBe(servedRootNode.final_strength.value);
+    expect(presentSlot!.number.value).toBeGreaterThanOrEqual(unservedRootNode.final_strength.value);
+
+    // T11: the served answer carries a code-derived three-state label. Two
+    // parseable panel voices and two roots make the basis complete, so the
+    // incomplete-basis disclosure must be ABSENT here.
+    expect(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).toContain(answerPayload.verdict_state);
+    expect(answerPayload.condition_marks).not.toContain("LABEL-BASIS-INCOMPLETE");
 
     // DR-141(4): a run carrying critique packets REFUSES at terminal (Q42) —
     // the fair debate therefore records NO packet; the counter's independence

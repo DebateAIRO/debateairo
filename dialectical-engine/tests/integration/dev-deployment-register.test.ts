@@ -276,6 +276,30 @@ describe("DEV-05 complete development deployment register", () => {
     expect(policy.hiddenNodeScoreThreshold.value).toBe(0.35);
     for (const value of Object.values(policy.hashes)) expect(value).toMatch(/^[a-f0-9]{64}$/u);
 
+    // S06 B1 (codex r1): the sealed T16 verdict-label family IS present in this
+    // deployment — the dev seeder writes it. The production policy reader must
+    // therefore RETURN it, so the runner entry point can pass it. Before this
+    // fix the family was sealed and the only production reader never looked,
+    // which is a different failure from a genuinely unresolved family: the run
+    // spent judgement and propagation and only then stopped.
+    expect(policy.verdictLabelPolicy).toMatchObject({
+      registerVersion: first.registerVersion,
+      gamma: 0.05,
+      highCut: 0.7,
+      lowCut: 0.35,
+      disagreementThreshold: 0.25
+    });
+    // Provenance travels with the values — the row refs are the dev algorithm
+    // deployment's, not invented here and not the runner-policy deployment's.
+    for (const rowKey of [
+      "verdictMarginGamma", "verdictHighCut", "verdictLowCut",
+      "disagreementThreshold", "disagreementQuantity"
+    ]) {
+      expect(policy.verdictLabelPolicy.sourceRefs[rowKey]).toContain(
+        "DEV-T16-algorithm-register.md#goal-v4:80-96"
+      );
+    }
+
     const legacyAfter = await database.pool.query(
       "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=$1 ORDER BY row_key",
       [bootstrap.registerVersion]

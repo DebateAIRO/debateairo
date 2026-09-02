@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -490,7 +490,13 @@ export const ConditionMarkRecordSchema = z.object({
   subject_ref: z.string().min(1),
   reason: z.string().min(1),
   lift_path: z.string().nullable(),
-  served_root_rule: z.literal("first-configured-provider").nullable(),
+  // T10 / codex r1 B3 / J17: the READ vocabulary is the rule HISTORY, not the
+  // live rule alone. Answers sealed before migration 0055 carry the retired
+  // DR-161 value and 0055 preserves those rows rather than relabelling them, so
+  // a contract accepting only the live rule turned every pre-0055 multi-maker
+  // answer into a schema failure on both answer routes. Widening breaks no
+  // consumer: nothing switches or compares on this field.
+  served_root_rule: z.enum(SERVED_ROOT_RULE_HISTORY).nullable(),
   call_site_key: z.string().min(1).nullable().default(null),
   planned_leg_count: z.number().int().nonnegative().nullable().default(null),
   terminal_transport_outcome: z.enum(["TIMED_OUT", "FAILED"]).nullable().default(null),
