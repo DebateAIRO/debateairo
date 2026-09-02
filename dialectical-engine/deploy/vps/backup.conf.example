@@ -1,0 +1,35 @@
+# deploy/vps/backup.conf.example -> /etc/debateai/backup.conf (0600 root:root)
+# Sourced by backup.sh and restore-drill.sh. Contains no secret: age RECIPIENTS are public keys.
+# The matching private keys live off this host — that is the whole point (audit L2-F3, L5-F8).
+
+# Public key of the data recipient. Opens the nightly dump + custody envelope. Its private key is
+# needed for a restore, so it is held by the operator offline, NOT on the VPS.
+BACKUP_DATA_RECIPIENT=age1exampledatarecipientreplacewiththerealpublickey000000000000
+
+# Public key of the escrow recipient. Opens the envelope holding the four raw 32-byte secrets.
+# Its private key is held by V, offline, on different media from the data key: whoever holds one
+# envelope alone can restore nothing.
+BACKUP_ESCROW_RECIPIENT=age1exampleescrowrecipientreplacewiththerealpublickey00000000000
+
+# Local staging and retention root (0700 root:root). Retention is 14 daily / 8 weekly, pruned by
+# backup.sh; the off-host copy keeps whatever the remote's own policy keeps.
+BACKUP_DIR=/var/backups/debateai
+
+# Exactly one off-host destination. Encrypted before it leaves the box, so the remote is
+# untrusted by construction and needs no more than append/write access.
+BACKUP_RCLONE_REMOTE=debateai-offsite:debateai
+#BACKUP_SCP_TARGET=backup@offsite.example:/srv/debateai
+
+# Custody paths — must match /etc/debateai/api.env exactly. The three stores go into the data
+# envelope; the four raw keys go to the escrow recipient instead.
+USER_DEK_STORE_PATH=/var/lib/debateai/api/user-deks
+PUBLICATION_KEY_STORE_PATH=/var/lib/debateai/api/publication-keys
+AUDIT_KEY_STORE_PATH=/var/lib/debateai/api/audit-keys
+KEK_PATH=/etc/debateai/api/kek.bin
+CORPUS_KEK_PATH=/etc/debateai/api/corpus-kek.bin
+BLIND_INDEX_KEY_PATH=/etc/debateai/api/blind-index-key.bin
+AUDIT_SOURCE_IP_SALT_PATH=/etc/debateai/api/audit-source-ip-salt.bin
+
+# Set only for the duration of a drill, from removable media; never written into this file.
+#BACKUP_AGE_IDENTITY=/media/operator/data.age.key
+#BACKUP_ESCROW_IDENTITY=/media/operator/escrow.age.key
