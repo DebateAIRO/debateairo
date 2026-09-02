@@ -64,7 +64,16 @@ describe("production runner provider topology", () => {
       // composition that omits it degrades SILENTLY: a member pinned at ask time
       // that has gone absent is trusted and no disclosure is emitted.
       "claimTimeProbe:",
+      // codex r1 B1: the entry point must compose the OBSERVE-only probe. The
+      // runner persists the claim-time verdict itself in both arms, so composing
+      // the persisting `probeTarget` writes one re-probe as two append-only rows
+      // under two evidence refs. Only a source assertion can pin this: the
+      // behavioural arm composes its own probe and so cannot see what main.ts does.
+      "observeProviderTarget(",
       "holdRecorder:"
     ]) expect(source).toContain(setting);
+    // The persisting variant belongs to the API's ask-time discovery, where nothing
+    // else records. It must not be what the runner composes.
+    expect(source).not.toContain("probeTarget({");
   });
 });
