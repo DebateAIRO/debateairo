@@ -707,12 +707,6 @@ describe("T9 DoD row 2 — no NON-CRASH path returns COMPONENTS_ONLY", () => {
       }
     },
     {
-      name: "citation tracing objected (former conformance gate)",
-      run: async () => runServeGateChain(chainInput(), recorder({
-        verdicts: [unsatisfied("Untraced claim.", "citationTracing")]
-      }).dependencies)
-    },
-    {
       name: "locator-less LOOKED_UP (former Q51 locator gate)",
       run: async () => runServeGateChain(
         chainInput({ nodes: [serveNode({ locator: null })] }),
@@ -744,6 +738,45 @@ describe("T9 DoD row 2 — no NON-CRASH path returns COMPONENTS_ONLY", () => {
       expect(result.terminal).not.toBe("COMPONENTS_ONLY");
     });
   }
+
+  /**
+   * THE FORMER CONFORMANCE GATE, RE-PINNED — V ruling 2026-09-03, finding
+   * F-T9B-1. This case used to sit in `nonCrashArms` above and assert that a
+   * citation-tracing objection SERVES. It is lifted out and stated on its own
+   * because its outcome changed, and it is changed here rather than quietly
+   * inside the list, where a reader would not see it.
+   *
+   * WHAT CHANGED AND WHY. `conforms` is a live axis of the served statement's
+   * cited-set filter now: a run whose citation tracing failed must not have its
+   * citations counted into the confidence band. Under this chain every
+   * judgement carries the same `finalCriteria.citationTracing`, so a failed
+   * criterion leaves NO verified segment, the cited set is empty, and S08's
+   * empty-basis guard refuses — the case that guard was written for.
+   *
+   * WHAT DID NOT CHANGE, and this is the DoD row this describe block is named
+   * for: the path still does not return COMPONENTS_ONLY, and it still mints no
+   * crash class. goal-v4 closes that terminal at four enumerated classes and
+   * says no non-crash path returns it; both remain true. The refusal is a
+   * TypedDomainError, asserted below, not a fifth crash class — adding one
+   * would be a goal override, which is V's alone and is NOT taken here.
+   *
+   * The neighbouring criteria are unaffected: an objection on fairness,
+   * restatement, overstatement or label agreement still SERVES with its
+   * standing objection, which the arms above and the three-unsatisfied-rounds
+   * arm continue to pin.
+   */
+  it("citation tracing objected (former conformance gate): refuses loudly, and NOT through a crash class", async () => {
+    const run = runServeGateChain(chainInput(), recorder({
+      verdicts: [unsatisfied("Untraced claim.", "citationTracing")]
+    }).dependencies);
+
+    await expect(run).rejects.toMatchObject({ code: "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE" });
+    // It is a typed refusal, not a COMPONENTS_ONLY terminal wearing a new name.
+    // Asserted on the ENUMERATION, which can actually fail: a `rejects.not`
+    // check on the thrown error's `terminal` cannot — a TypedDomainError has no
+    // such field, so it would pass whatever the chain did (D56).
+    expect(Object.keys(SERVE_CRASH_CLASSES)).not.toContain("CITATION_TRACING_FAILED");
+  });
 
   it("reaches components-only ONLY through an enumerated crash class", async () => {
     const crashing = await runServeGateChain(chainInput({

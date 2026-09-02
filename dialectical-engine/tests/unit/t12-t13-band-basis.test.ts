@@ -153,6 +153,13 @@ const SATISFIED: EvaluatorVerdict = Object.freeze({
   })
 });
 
+/** The evaluator that FAILED citation tracing and is still objecting at the last round. */
+const CITATION_TRACING_FAILED: EvaluatorVerdict = Object.freeze({
+  satisfied: false,
+  objection: "Claim 2 traces to no digest node.",
+  criteria: Object.freeze({ ...SATISFIED.criteria, citationTracing: false })
+});
+
 /**
  * T9B PORT: `compose`/`selectSample`/`conform`/`postComposeR9` are gone; the
  * candidate arrives from the SYNTHESIZER and the criteria from the EVALUATOR.
@@ -315,6 +322,40 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
     expect(result.confidenceBand).toBe(TOP_BAND);
     expect(result.gateTrace).toContain("BAND_CEILING_PASS");
     expect(result.gateTrace).not.toContain("BAND_CEILING_CAPPED");
+  });
+
+  /**
+   * V ruling 2026-09-03 (F-T9B-1), implemented as its PURPOSE rather than as a
+   * new terminal: "a run whose citation tracing failed must not have its
+   * citations counted into the confidence band".
+   *
+   * `conforms` is a REAL axis of the cited-set filter now, not just `state`.
+   * Under T9's chain every judgement carries the same
+   * `finalCriteria.citationTracing`, so when the evaluator's tracing criterion
+   * failed NO segment is verified, the cited set is empty, and S08's existing
+   * empty-basis guard refuses loudly — which is exactly the case S08 wrote it
+   * for. Nothing is banded on citations nobody could trace.
+   *
+   * This deliberately does NOT add a fifth COMPONENTS_ONLY crash class: goal-v4
+   * re-routes the conformance gate to an objection criterion and closes the
+   * terminal at four crash classes ("no non-crash path returns
+   * COMPONENTS_ONLY"), and the sibling arm in t09-synthesis.test.ts still pins
+   * that a citation-tracing objection is not a terminal.
+   */
+  it("refuses to band a statement whose citation tracing FAILED", async () => {
+    const recorded = recorder();
+    const nodes = [node("node:reasoned", "REASONING", true)];
+    await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
+      verdict: CITATION_TRACING_FAILED,
+      segments: () => [
+        segment("segment:1", "A statement whose citations were never traced.", ["node:reasoned"], ["number:final-strength"]),
+        segment("segment:2", "The research plan that would lift it.", ["node:reasoned"])
+      ]
+    }))).rejects.toMatchObject({ code: "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE" });
+
+    // The band was never computed at all — the refusal happens BEFORE the
+    // ceiling is consulted, so no untraced citation ever reached a basis.
+    expect(recorded.bases).toEqual([]);
   });
 
   it("keeps the RAN bucket in the basis vocabulary (F5 do-not-tidy)", async () => {

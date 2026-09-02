@@ -786,23 +786,34 @@ export async function runServeGateChain(
    * THE COUPLING, RESTATED AT THE T9B MERGE — do not read the pre-merge version
    * of this comment, which described a mechanism this chain no longer has.
    *
-   * S08 wrote here that the `state !== "NOT_SAMPLED"` filter is safe because a
+   * S08 wrote here that testing `state` alone is safe because a
    * `!conformance.every((judgement) => judgement.conforms)` guard upstream
-   * returns componentsOnly before control arrives. That guard belonged to the
-   * three-state sampled conformance gate, which T9 retired into an evaluator
-   * objection criterion.
+   * returns componentsOnly before control arrives, and warned in the same
+   * breath: "whoever moves either piece must move both". T9 moved one piece —
+   * it retired the three-state sampled conformance gate into a single EVALUATOR
+   * criterion, and the synthesis loop SERVES a standing objection rather than
+   * withholding the answer. The guard went with it.
    *
-   * The safety property it carried is NOT retired — see the citation-tracing
-   * guard immediately above, which reaches the same outcome through T9's single
-   * criterion. What the filter below still does at this tree: every judgement is
-   * minted `state: "JUDGED"`, so it admits every segment and the first exclusion
-   * axis is VACUOUS BY CONSTRUCTION — which is what `coverageMode = "EXHAUSTIVE"`
-   * means. It is kept deliberately (V ruling, 2026-09-03): it costs nothing and
-   * stays correct if a sampling path ever returns. It is not dead code to tidy.
+   * So `conforms` is tested HERE now (V ruling, 2026-09-03, finding F-T9B-1):
+   * a run whose citation tracing failed must not have its citations counted
+   * into the confidence band. Both of S08's axes are live again, reached
+   * through T9's one criterion instead of three sampled states:
+   *   · `state !== "NOT_SAMPLED"` — vacuous at this tree, because every
+   *     judgement is minted JUDGED and `coverageMode` is EXHAUSTIVE. Kept
+   *     deliberately, not tidied: it costs nothing and is correct again the
+   *     moment a sampling path returns.
+   *   · `conforms` — the live one. Under this chain every judgement carries the
+   *     same `finalCriteria.citationTracing`, so a failed tracing criterion
+   *     empties the cited set and the empty-basis guard below refuses loudly.
+   *
+   * This is deliberately NOT a fifth COMPONENTS_ONLY crash class. goal-v4
+   * re-routes the conformance gate to an objection criterion and closes the
+   * terminal at four ("no non-crash path returns COMPONENTS_ONLY"); adding one
+   * would need a goal override. The purpose V ruled is satisfied without one.
    */
   const verifiedSegmentIds = new Set(
     conformance
-      .filter((judgement) => judgement.state !== "NOT_SAMPLED")
+      .filter((judgement) => judgement.state !== "NOT_SAMPLED" && judgement.conforms)
       .map((judgement) => judgement.segmentId)
   );
   const citedNodeIds = new Set(
