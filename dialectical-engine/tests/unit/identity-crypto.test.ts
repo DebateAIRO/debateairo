@@ -1,4 +1,7 @@
-import { createHmac } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { createHash, createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   appendAuditEvent,
@@ -46,6 +49,63 @@ describe("S2 tamper-evident audit chain", () => {
 
     expect(second.thisHash).toBe(reorderedSecond.thisHash);
     expect(verifyChain([first, second])).toBe(true);
+  });
+
+  it("canonicalizes keys by UTF-16 code units, identically under any locale, in the SQL chain order", () => {
+    // L2-F4: `localeCompare` sorted `ch` after `h` under cs_CZ, so a verifier on
+    // a Czech-locale host rejected a chain that an en_US host produced.
+    const cryptoModule = new URL("../../packages/crypto/src/index.ts", import.meta.url).href;
+    const program = `
+      const { appendAuditEvent } = await import(${JSON.stringify(cryptoModule)});
+      process.stdout.write(appendAuditEvent(null, { city: 1, change: 2, h: 3, ch: 4 }).thisHash);
+    `;
+    const hashes = ["cs_CZ.UTF-8", "en_US.UTF-8"].map((locale) => execFileSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", program],
+      {
+        cwd: fileURLToPath(new URL("../../", import.meta.url)),
+        env: { ...process.env, LANG: locale, LC_ALL: locale, LC_COLLATE: locale },
+        encoding: "utf8"
+      }
+    ));
+    const codeUnitCanonical = '{"ch":4,"change":2,"city":1,"h":3}';
+    expect(hashes[0]).toBe(hashes[1]);
+    expect(hashes[1]).toBe(createHash("sha256").update(codeUnitCanonical, "utf8").digest("hex"));
+
+    // The production chain is hashed in SQL with a fixed key order
+    // (migrations/0040 `identity.audit_event_append`, nested objects through
+    // `identity.audit_canonical_jsonb` ORDER BY key COLLATE "C"). Pin the TS
+    // canonical form to that order for one fixture row.
+    const migration = readFileSync(
+      new URL("../../migrations/0040_account_erasure.sql", import.meta.url), "utf8"
+    );
+    const payloadStart = migration.indexOf("v_payload := '{'");
+    const payloadBlock = migration.slice(payloadStart, migration.indexOf("||'}';", payloadStart));
+    const sqlKeyOrder = [...payloadBlock.matchAll(/\|\|'"([A-Za-z]+)":/g)].map((match) => match[1]);
+    expect(sqlKeyOrder).toHaveLength(11);
+    const row = {
+      targetType: "identity.user",
+      success: true,
+      sourceContext: { ua: "vitest", ip: "192.0.2.10", asn: 64512 },
+      occurredAt: "2026-08-19T09:00:01.000Z",
+      justification: null,
+      eventType: "identity.test.1",
+      decision: "ALLOW",
+      auditId: "00000000-0000-4000-8000-000000000001",
+      actorKeyRef: "audit-key:user:test",
+      actorCiphertext: null,
+      targetId: "user:test"
+    };
+    expect(Object.keys(row).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)))
+      .toEqual(sqlKeyOrder);
+    const sqlCanonical = '{"actorCiphertext":null,"actorKeyRef":"audit-key:user:test",'
+      + '"auditId":"00000000-0000-4000-8000-000000000001","decision":"ALLOW",'
+      + '"eventType":"identity.test.1","justification":null,'
+      + '"occurredAt":"2026-08-19T09:00:01.000Z",'
+      + '"sourceContext":{"asn":64512,"ip":"192.0.2.10","ua":"vitest"},'
+      + '"success":true,"targetId":"user:test","targetType":"identity.user"}';
+    expect(appendAuditEvent(null, row).thisHash)
+      .toBe(createHash("sha256").update(sqlCanonical, "utf8").digest("hex"));
   });
 
   it("detects a tampered row and a deleted middle row", () => {
