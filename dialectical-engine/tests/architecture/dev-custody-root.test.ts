@@ -1,9 +1,11 @@
-import { mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadDevelopmentCommandEnvironment } from "@debateai/register";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  assertDevCustodyDirectory,
+  assertDevCustodyRootCustody,
   DEV_CUSTODY_ROOT_ENV,
   DevCustodyRootError,
   resolveDevCustodyRoot
@@ -146,6 +148,55 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       if (!importsTheResolver.test(text)) violations.push(`${source}: does not import resolveDevCustodyRoot`);
     }
     expect(violations).toEqual([]);
+  });
+
+  it("owns the exact-0700 parent-directory custody policy and never repairs it (L7-F10)", async () => {
+    const root = await temporaryRoot();
+    const localRoot = join(root, ".local");
+    const custodyRoot = join(localRoot, "dev-auth");
+    await mkdir(custodyRoot, { recursive: true, mode: 0o700 });
+    await chmod(localRoot, 0o700);
+    await chmod(custodyRoot, 0o700);
+    await expect(assertDevCustodyRootCustody(custodyRoot)).resolves.toBeUndefined();
+
+    // A permissive parent used to pass generate-secrets and fail much later.
+    await chmod(localRoot, 0o755);
+    await expect(assertDevCustodyRootCustody(custodyRoot)).rejects.toMatchObject({
+      name: "DevCustodyRootError",
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    expect((await lstat(localRoot)).mode & 0o777).toBe(0o755);
+
+    await chmod(localRoot, 0o700);
+    await chmod(custodyRoot, 0o750);
+    await expect(assertDevCustodyRootCustody(custodyRoot)).rejects.toMatchObject({
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    // The drift is an exposure event, so it must still be observable.
+    expect((await lstat(custodyRoot)).mode & 0o777).toBe(0o750);
+
+    // The single-directory arm carries the same no-repair policy for callers
+    // that are handed a path rather than the custody root.
+    await expect(assertDevCustodyDirectory(custodyRoot)).rejects.toMatchObject({
+      code: "DEV_AUTH_CUSTODY_ROOT_INVALID"
+    });
+    await chmod(custodyRoot, 0o700);
+    await expect(assertDevCustodyDirectory(custodyRoot)).resolves.toBeUndefined();
+  });
+
+  it("is the single custody-mode authority: no command repairs a drifted mode (L7-F10)", async () => {
+    // The token command owns a real custody root, so it asserts the root and its
+    // parent. The principals command is handed an arbitrary credential path, so
+    // it asserts that one directory. Neither spells the policy itself any more.
+    const sources: ReadonlyArray<readonly [file: string, helper: string]> = [
+      ["apps/runner/src/dev-database-principals.ts", "assertDevCustodyDirectory"],
+      ["apps/runner/src/dev-hatchet-token.ts", "assertDevCustodyRootCustody"]
+    ];
+    for (const [source, helper] of sources) {
+      const text = await readFile(join(REPOSITORY_ROOT, source), "utf8");
+      expect(text, source).toContain(helper);
+      expect(text, source).not.toMatch(/\bchmod\(\s*(?:credentialRoot|resolvedPath)/u);
+    }
   });
 
   it("forwards the override to every child through the allow-listed command environment", async () => {

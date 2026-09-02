@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { chmod, lstat, mkdir, open, readFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
+import { assertDevCustodyDirectory } from "../../../deploy/dev-auth/custody-root.mjs";
 
 export type DevelopmentDatabasePrincipal = Readonly<{
   roleName: string;
@@ -148,11 +149,9 @@ async function ensureCredentialFile(
   const resolvedPath = resolve(credentialFilePath);
   const credentialRoot = dirname(resolvedPath);
   await mkdir(credentialRoot, { recursive: true, mode: 0o700 });
-  const rootStatus = await lstat(credentialRoot);
-  if (rootStatus.isSymbolicLink() || !rootStatus.isDirectory()) {
-    throw new TypeError("DEV_DATABASE_CREDENTIAL_ROOT_INVALID");
-  }
-  await chmod(credentialRoot, 0o700);
+  // The custody-mode policy lives in the B4 resolver and refuses drift instead
+  // of narrowing a mode back, which would hide the exposure event (L7-F10).
+  await assertDevCustodyDirectory(credentialRoot);
 
   try {
     const fileStatus = await lstat(resolvedPath);
@@ -173,10 +172,12 @@ async function ensureCredentialFile(
     }
   }
   const finalStatus = await lstat(resolvedPath);
-  if (finalStatus.isSymbolicLink() || !finalStatus.isFile()) {
+  if (finalStatus.isSymbolicLink()
+    || !finalStatus.isFile()
+    || finalStatus.nlink !== 1
+    || (finalStatus.mode & 0o777) !== 0o600) {
     throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
   }
-  await chmod(resolvedPath, 0o600);
   const existingSource = await readFile(resolvedPath, "utf8");
   const existing = readCredentials(existingSource, adminDatabaseUrl, false);
   const missing = DEVELOPMENT_DATABASE_PRINCIPALS.filter(
