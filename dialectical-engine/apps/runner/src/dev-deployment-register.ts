@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { Pool, PoolClient } from "pg";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
+  ADMISSION_POLICY_REGISTER_ROW,
   AUTH_POLICY_REGISTER_ROWS,
   MFA_POLICY_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
@@ -235,6 +236,7 @@ function developmentRows(
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
+    ADMISSION_POLICY_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {

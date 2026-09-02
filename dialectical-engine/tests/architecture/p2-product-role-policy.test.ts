@@ -131,7 +131,7 @@ describe("P2-14 sealed product-role catalog", () => {
     const devSeed = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
     const api = await readFile("apps/api/src/index.ts", "utf8");
     expect(registerSource).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
-    expect(registerSource).toContain("AUTH_POLICY_REGISTER_ROWS.length + 4");
+    expect(registerSource).toContain("AUTH_POLICY_REGISTER_ROWS.length + 5");
     expect(devSeed).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     const readIndex = apiMain.indexOf("await readProductRolePolicy(pool, environment.REGISTER_VERSION)");
     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
