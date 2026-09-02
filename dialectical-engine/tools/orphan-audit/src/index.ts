@@ -32,7 +32,7 @@ const rows: readonly Row[] = [
   ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
-  ["web", "web", ["contract"]],
+  // web/ row retired 2026-09-02: the root-level app was removed (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
   ["tools/orphan-audit", "tools/orphan-audit", ["kernel", "contract"]],
   ["tools/acceptance-bundle", "tools/acceptance-bundle", ["kernel", "contract", "register", "db"]]
 ];
