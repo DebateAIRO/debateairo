@@ -102,4 +102,94 @@ describe("production runner provider topology", () => {
     expect(claimTimeProbeBlock).not.toContain("probes:");
     expect(claimTimeProbeBlock).toContain("observeProviderTarget(");
   });
+
+  /**
+   * J27 — THE CLASS GATE. Three lanes have now each found one instance of the same
+   * defect: a `WalkingSkeletonSettings` member that some caller wires (a test, the
+   * acceptance composition) and the SHIPPED entry point does not. F33 was
+   * `panelPolicy`, F34 was `claimTimeProbe`, and T7's `stoppingPolicy` arrived
+   * through a merge and made a correctly sealed deployment refuse every
+   * multi-maker work item. Each was closed with a per-setting pin, and a
+   * per-setting pin cannot catch the NEXT member — it only re-checks the last one.
+   *
+   * This enumerates the interface instead, so a new optional member is accounted
+   * for by construction: either the entry point composes it, or it is listed below
+   * as intentionally absent WITH a reason. There is no third state.
+   */
+  it("composes every optional WalkingSkeletonSettings member, or declares it intentionally absent", async () => {
+    const runnerSource = await readFile("apps/runner/src/index.ts", "utf8");
+    const mainSource = await readFile("apps/runner/src/main.ts", "utf8");
+
+    /** Brace-matched slice of `source` beginning at the first `{` at or after `from`. */
+    const balanced = (source: string, from: number): string => {
+      const open = source.indexOf("{", from);
+      let depth = 0;
+      for (let index = open; index < source.length; index += 1) {
+        const character = source[index];
+        if (character === "{") depth += 1;
+        else if (character === "}") {
+          depth -= 1;
+          if (depth === 0) return source.slice(open, index + 1);
+        }
+      }
+      return "";
+    };
+
+    // DEPTH-1 ONLY. A regex over the whole interface body also matches members of
+    // NESTED object types — `resolveTerminalActivations`' return type declares
+    // `executedCheckRef?` and `typeFallbackConsulted?`, which are not settings and
+    // can never be "composed" by an entry point. A depth-blind enumeration reports
+    // them as unwired, and the only way to quiet it is to invent a reason for a
+    // field that was never a setting. (That is not hypothetical: the first draft of
+    // this gate did exactly that.)
+    const declaration = runnerSource.indexOf("interface WalkingSkeletonSettings");
+    expect(declaration).toBeGreaterThan(-1);
+    const body = balanced(runnerSource, declaration);
+    let depth = 0;
+    let topLevel = "";
+    for (const character of body) {
+      if (character === "{") { depth += 1; continue; }
+      if (character === "}") { depth -= 1; continue; }
+      if (depth === 1) topLevel += character;
+    }
+    const optionalMembers = [...topLevel.matchAll(/readonly\s+(\w+)\?\s*:/gu)]
+      .map((match) => match[1] ?? "");
+
+    // The oracle must DISCRIMINATE. If the interface is renamed, or the brace
+    // matcher breaks, `optionalMembers` goes empty and every assertion below passes
+    // while proving nothing. These pin that the enumeration actually ran, and that
+    // it stayed at depth 1.
+    expect(optionalMembers.length).toBeGreaterThanOrEqual(10);
+    for (const known of ["panelPolicy", "stoppingPolicy", "claimTimeProbe", "verdictLabelPolicy"]) {
+      expect(optionalMembers).toContain(known);
+    }
+    expect(optionalMembers).not.toContain("executedCheckRef");
+    expect(optionalMembers).not.toContain("typeFallbackConsulted");
+
+    // Scoped to the settings literal the entry point actually hands the runner, so
+    // an unrelated key elsewhere in main.ts cannot be mistaken for a composed one.
+    const settingsLiteral = balanced(mainSource, mainSource.indexOf("new WalkingSkeletonRunner("));
+    expect(settingsLiteral).not.toHaveLength(0);
+    const composes = (member: string): boolean =>
+      new RegExp(`(^|[\\s{,])${member}\\s*:`, "mu").test(settingsLiteral);
+
+    /**
+     * Members the shipped entry point deliberately does NOT pass, each with the
+     * reason. Empty today: all 14 optional members are composed. An entry here is
+     * a claim that absence is correct — state why, and the pins below keep it
+     * honest (a member that is listed AND composed, or listed but no longer a
+     * member, fails as a stale declaration).
+     */
+    const INTENTIONALLY_ABSENT: Readonly<Record<string, string>> = {};
+
+    const unaccounted = optionalMembers
+      .filter((member) => !composes(member) && !(member in INTENTIONALLY_ABSENT));
+    expect(unaccounted).toEqual([]);
+
+    for (const [member, reason] of Object.entries(INTENTIONALLY_ABSENT)) {
+      expect(optionalMembers).toContain(member);
+      expect(composes(member)).toBe(false);
+      expect(reason.trim().length).toBeGreaterThan(40);
+    }
+  });
 });
