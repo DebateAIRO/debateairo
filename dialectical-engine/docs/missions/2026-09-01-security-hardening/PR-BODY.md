@@ -19,7 +19,7 @@ Baseline `origin/dev@b5a6b6eb`. Plan, seven audit registers, consolidated triage
 See `VERIFICATION.md` (per-lane RED→GREEN, typecheck, build, smoke) and `findings/CONSOLIDATED.md` (84 findings: 2 HIGH, 25 MEDIUM, 47 LOW; dispositions).
 
 ## Needs V
-`V-DECISIONS-PACKET.md` (V-1 … V-24): admission values, KEK rotation, default branch, GitHub protections/scanning, tracked archives, dormant husky, production shape, runner-side containment handoff, password maximum, exclusion pruning, serve.answer follow-ups, custody group for per-service users (V-19), the Cloudflare Workers Builds integration (V-23), the gitleaks history fingerprints (V-24).
+`V-DECISIONS-PACKET.md` (V-1 … V-24): admission values, KEK rotation, default branch, GitHub protections/scanning, tracked archives, dormant husky, production shape, runner-side containment handoff, password maximum, exclusion pruning, serve.answer follow-ups, custody group for per-service users (V-19), the Cloudflare Workers Builds integration (V-23), the gitleaks history fingerprints (V-24), the host-specific RSS-curve bound seen on the ubuntu runner (V-25).
 
 ## Merge order
 Agreed with the live algorithm mission: this branch → `dev` first; its DEV-SYNC then merges `dev` into the mission branch and re-baselines its obs zone pins.
