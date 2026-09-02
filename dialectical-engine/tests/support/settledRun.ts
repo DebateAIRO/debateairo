@@ -19,6 +19,12 @@ export interface PersistTerminalRunInput {
    * same-run/producer proof `persist` performs before it commits.
    */
   readonly loopRounds?: ServeGateResult["loopRounds"];
+  /**
+   * Reuse an existing work item instead of enqueueing one. A fixture that has
+   * pre-seeded ledger entries needs the persist to share their
+   * `subject_item_id`, or the producer binding refuses for the wrong reason.
+   */
+  readonly workItemId?: string;
 }
 
 export interface PersistedTerminalRun {
@@ -32,7 +38,7 @@ export interface PersistedTerminalRun {
  */
 export async function persistTerminalRun(input: PersistTerminalRunInput): Promise<PersistedTerminalRun> {
   const work = new WorkItemRepository(input.pool);
-  const workItemId = await work.enqueue({
+  const workItemId = input.workItemId ?? await work.enqueue({
     runId: input.runId,
     batteryRowId: "Q1",
     nodeSet: [],

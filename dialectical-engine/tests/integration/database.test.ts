@@ -5027,9 +5027,11 @@ describe("T10/T11 · the served root and its label, through the production runne
       candidateRef: synthesisArtifactId,
       verdictRef: synthesisArtifactId
     } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    // The persist SHARES the work item the ledger entries name, so the pairing
+    // resolves and ONLY the round binding can refuse this.
     await expect(persistTerminalRun({
       pool: database.pool, runId, fixtureKey: `${question}-wrong-round`, factBundle,
-      loopRounds: [roundTwoWithRoundOneSites]
+      workItemId, loopRounds: [roundTwoWithRoundOneSites]
     })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
 
     // The whole answer rolled back with it.
