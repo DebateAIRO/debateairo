@@ -9,6 +9,7 @@ Orchestrator ledger (append-only). Baseline receipt: `BASELINE.md` (dev `b5a6b6e
 | Baseline + deps (B0, B1) | security/fix-b1-deps | d6c38666, 35cb8bf1 | dependency-floors 6/6; `pnpm audit --audit-level=low` clean; typecheck: only the 8 pre-existing s14-ui errors; architecture 313 passed / 12 failed (identical failing set to baseline); UI node tests 46/46; UI build RED at baseline (DebatePageClient.tsx:1479) — fixed by B20a in the UI-edge lane |
 | Production floors (C1) | security/fix-c1-prod-floors | 62f38d08, 6da9ca82 | production-environment-floors 17/17; 12 loader/provider suites 85 passed / 7 failed, all 7 reproduced identically on the untouched base (see below); typecheck: no new errors |
 | Custody resolver (B4) | security/fix-b4-custody | 7b70eec5, 15fb413d, b1ec12e8 | dev-custody-root 10/10; six pin files 15/15; eight mutants each caught; typecheck: no new errors |
+| API limits + admission (B5, B10) | security/fix-b5-b10-api-limits | c7c5d69d, 55060c8f | api-request-limits 6/6; api-admission-limits 7 + register 3; broad run 21 files 223 passed / 3 failed (all three pre-existing on the base: s7 memory-scope pin, obs-l2-s04-zone ×2); typecheck: no new errors |
 
 ## Known baseline failures on dev `b5a6b6eb` (not caused by this mission)
 - `pnpm run typecheck`: 8 errors, all `tests/unit/s14-ui.test.ts` (imports of the removed `web/lib/*`). Ruled (live-loop orchestrator, 2026-09-02): retire only the web-only cases (B20).
