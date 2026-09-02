@@ -278,6 +278,32 @@ function kindOf(candidate: string): DuplicateKind | null {
 }
 
 /**
+ * The CEILING-LITERAL arms only — the composition the DECLARATION-UNIT scan uses.
+ *
+ * r3's `kindOf` above is unchanged and is what the line scan still applies. This
+ * narrower set exists because the two arms are not the same kind of evidence, and
+ * therefore do not deserve the same window:
+ *
+ *   · `5` and the enumerated domain `1,2,3,4,5` ARE the ceiling. Wherever they
+ *     appear inside a declaration that mentions a depth, the ceiling is there.
+ *     Widening their window finds real ceilings that wrapping had hidden.
+ *   · `6` is NOT the ceiling. It is an INFERENCE from an exclusive comparison
+ *     (`depth < 6`), and that inference is carried entirely by the `6` sitting
+ *     next to its own operator. Widen its window and it stops finding ceilings and
+ *     starts manufacturing pairings: a `topic.trim().length > 6` several conjuncts
+ *     from an unrelated `depth` is the measured example, at
+ *     apps/ui/app/new/page.tsx:73. So the `6` keeps exactly r3's line window.
+ *
+ * This is a UNIT decision, not a predicate one: all four regexes and r3's `kindOf`
+ * are byte-unchanged, the line scan still applies the full set, and the union can
+ * therefore only grow relative to r3.
+ */
+function kindOfCeilingLiteral(candidate: string): DuplicateKind | null {
+  if (MENTIONS_A_DEPTH.test(candidate) && BARE_FIVE.test(candidate)) return "DEPTH_BOUND_LITERAL";
+  return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
+}
+
+/**
  * DECLARATION UNITS — the layout-independent half of the oracle (T1B, codex r3 B1).
  *
  * The r3 oracle scanned PHYSICAL LINES, so it could only see a ceiling whose depth
@@ -294,12 +320,18 @@ function kindOf(candidate: string): DuplicateKind | null {
  *   · `;` or `,` at the unit's own bracket depth   — statement / element separator
  *   · `{` or `}` at any depth                      — a block or object body is its own scope
  *   · a closer that would drop below the start depth
- *   · `&&`, `||`, `??` at the unit's own depth     — each conjunct is a separate claim
  *
- * The logical-operator boundary is not cosmetic: without it the widened unit joined
- * `topic.trim().length > 6` to a `depth` five conjuncts away in
- * apps/ui/app/new/page.tsx and manufactured a false site. It was measured, not
- * guessed. It also costs coverage, disclosed below.
+ * Every one of those is a boundary between DISTINCT declarations, elements or
+ * scopes. Nothing splits WITHIN an expression — in particular `&&`, `||` and `??`
+ * are ordinary characters here.
+ *
+ * T1B r1 did flush at `&&`, and codex was right to block it: the same expression
+ * was then caught on one line and missed when wrapped, which is precisely the
+ * layout dependence this ticket exists to remove. The false positive that boundary
+ * was defending against is handled where it belongs — in the WINDOW of the
+ * exclusive-`6` arm, see `kindOfCeilingLiteral` above — not by cutting expressions
+ * in half. An operand-order rule was rejected outright: `&&` commutes, so a verdict
+ * that depended on which conjunct came first would be layout dependence again.
  *
  * Comments do NOT contribute to unit text — a comment defines no ceiling, and
  * gluing prose into a joined unit invents pairings. Nothing is lost: the LINE scan
@@ -309,13 +341,16 @@ function kindOf(candidate: string): DuplicateKind | null {
  *   · indirection — `const CEILING = 5;` then `depth > CEILING` are two units
  *   · a ceiling that is not the literal `5`: `2 + 3`, `0x5`, `5.0` (a PREDICATE
  *     limit, not a layout one — `BARE_FIVE` never matched those on one line either)
- *   · a bound split across `&&`, e.g. `isDepthField(x) && x <= 5`
  *   · a bound assembled across two statements or across a brace
+ *   · an exclusive `6` separated from its own operator by a newline (`depth <`
+ *     newline `6`). The `6` arm is line-scoped by the argument above, so this one
+ *     residual layout case survives. `... ||` newline `depth < 6` IS still caught,
+ *     because there the `6` and its operator stay together. Narrowing it needs the
+ *     `6` bound to its comparison's left operand, which is a PREDICATE change and
+ *     is frozen out of this ticket
  * A single-quoted or double-quoted string is closed at the newline, so a regex
  * literal mis-read as a string can only desync within one line, never past it.
  */
-const UNIT_BOUNDARY_OPERATORS = Object.freeze(["&&", "||", "??"]);
-
 function declarationUnits(source: string): { readonly line: number; readonly text: string }[] {
   const units: { line: number; text: string }[] = [];
   let buffer = "";
@@ -385,8 +420,6 @@ function declarationUnits(source: string): { readonly line: number; readonly tex
       mark(); buffer += char; index += 1; continue;
     }
     if ((char === ";" || char === ",") && bracketDepth === startDepth) { begin(); index += 1; continue; }
-    if (bracketDepth === startDepth && next !== undefined
-      && UNIT_BOUNDARY_OPERATORS.includes(`${char}${next}`)) { begin(); index += 2; continue; }
     mark(); buffer += char; index += 1;
   }
   flush();
@@ -408,7 +441,7 @@ function duplicateBoundSites(source: string): DuplicateSite[] {
     if (kind !== null) byAddress.set(`${index + 1}:${kind}`, { kind, line: index + 1, text: raw.trim() });
   });
   for (const unit of declarationUnits(source)) {
-    const kind = kindOf(unit.text);
+    const kind = kindOfCeilingLiteral(unit.text);
     const address = `${unit.line}:${kind}`;
     if (kind !== null && !byAddress.has(address)) {
       byAddress.set(address, { kind, line: unit.line, text: unit.text });
@@ -528,19 +561,48 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(duplicateBoundSites(planted)).not.toEqual([]);
   });
 
-  // LAYOUT NEGATIVE CONTROL — MEASURED, not imagined. Widening the unit to the
-  // whole declaration is what makes the multiline ceilings visible, and the first
-  // build of it flagged apps/ui/app/new/page.tsx by pairing `topic.trim().length
-  // > 6` with a `depth` five conjuncts further down the same expression. This is
-  // that shape. It pins the `&&` boundary: delete `"&&"` from
-  // UNIT_BOUNDARY_OPERATORS and this control goes RED.
-  it("does not pair an unrelated ceiling with a depth several conjuncts away", () => {
-    const planted = [
-      "  const ready = topic.trim().length > 6 &&",
-      "    depth >= EXPANSION_DEPTH_MIN &&",
-      "    depth <= EXPANSION_DEPTH_MAX &&",
-      "    riskTier.length > 0;"
-    ].join("\n");
+  // WRAPPED-CONJUNCT CONTROLS (T1B r1, codex B1). The r1 oracle flushed a unit at
+  // `&&`, so the SAME expression was caught on one line and missed when wrapped —
+  // which is the one thing this ticket exists to remove. Both orders are asserted,
+  // because `&&` commutes: a rule that discriminated by operand order would make
+  // the verdict depend on how the author happened to sequence the conjuncts, which
+  // is layout dependence wearing a different hat.
+  it.each([
+    { order: "depth token first", planted: ["const ok = isDepthField(v) &&", "  v <= 5;"].join("\n") },
+    { order: "ceiling first", planted: ["const ok = v <= 5 &&", "  isDepthField(v);"].join("\n") },
+    { order: "same expression on one line", planted: "const ok = isDepthField(v) && v <= 5;" }
+  ])("detects a ceiling wrapped across a conjunct — $order", ({ planted }) => {
+    expect(duplicateBoundSites(planted)).not.toEqual([]);
+  });
+
+  // LAYOUT NEGATIVE CONTROL — MEASURED, not imagined. This is the real shape of
+  // apps/ui/app/new/page.tsx:73, which correct code and NOT a second definition:
+  // it uses the imported constants. An early T1B build paired its
+  // `topic.trim().length > 6` with the `depth` a conjunct away and reported it as
+  // a duplicate. Both conjunct orders are asserted, because `&&` commutes and a
+  // control that held for only one order would pin nothing.
+  //
+  // This is what makes the exclusive-`6` arm line-scoped: widen its window and
+  // this control goes RED. See `kindOfCeilingLiteral`.
+  it.each([
+    {
+      order: "ceiling first",
+      planted: [
+        "  const ready = topic.trim().length > 6 &&",
+        "    depth >= EXPANSION_DEPTH_MIN &&",
+        "    depth <= EXPANSION_DEPTH_MAX &&",
+        "    riskTier.length > 0;"
+      ].join("\n")
+    },
+    {
+      order: "depth token first",
+      planted: [
+        "  const ready = depth >= EXPANSION_DEPTH_MIN &&",
+        "    topic.trim().length > 6 &&",
+        "    riskTier.length > 0;"
+      ].join("\n")
+    }
+  ])("does not pair an unrelated ceiling with a depth a conjunct away — $order", ({ planted }) => {
     expect(duplicateBoundSites(planted)).toEqual([]);
   });
 
