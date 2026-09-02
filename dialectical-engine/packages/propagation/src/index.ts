@@ -915,11 +915,17 @@ function decideWithScope(
     // terminates honestly: every branch has zero leverage, so the ε rule freezes
     // them all WITH marks and expansion ends by exhaustion. No loop-forever
     // risk is created here.
+    //
+    // T7B (V-authorized, codex r3 B1): the reason outranks the movement, it does
+    // not delete it. This arm used to publish the computed `maxRootMovement`
+    // beside an empty moved list — a record that named A as compared, put its
+    // maximum movement at 0.25, and simultaneously denied that any root moved
+    // more than δ. Dominant reason and diagnostic truth are independent.
     return Object.freeze({
       kind: "CONTINUE",
       reason: "NO_MEASURED_EDGE",
       maxRootMovement,
-      movedRootNodeIds: Object.freeze([]),
+      movedRootNodeIds: moved,
       measuredEdgeCount,
       ...scope
     });

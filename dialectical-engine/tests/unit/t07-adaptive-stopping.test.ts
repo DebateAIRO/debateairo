@@ -1551,6 +1551,43 @@ describe("T7 / codex r2 B2 — a partial scope still computes, and still validat
     expect(decision.movedRootNodeIds).toEqual([]);
   });
 
+  /**
+   * T7B — V-authorized micro-ticket (V-T7-codex-r3-1), NOT a fourth rework round.
+   *
+   * codex r3 B1: the no-evidence arm published the movement it had just computed
+   * beside an EMPTY moved list. The record then said, at once, that root:A was
+   * compared, that the maximum movement was 0.25, and that no root moved by more
+   * than δ = 0.01. Two of those three cannot both be true.
+   *
+   * This is codex's input verbatim — the r4 counterexample with ONLY the evidence
+   * count changed to 0. The dominant reason is unchanged and still conservative;
+   * what changes is that the arm stops deleting a fact it had in hand.
+   */
+  it("keeps NO_MEASURED_EDGE as the reason WITHOUT deleting the movement it computed", () => {
+    const decision = decideRoundBoundary({ ...boundaryInput, measuredEdgeCount: 0 });
+
+    // The reason outranks the movement (J15(b): absence of evidence is not
+    // convergence) — and says nothing false about it.
+    expect(decision.kind).toBe("CONTINUE");
+    expect(decision.reason).toBe("NO_MEASURED_EDGE");
+    expect(decision.measuredEdgeCount).toBe(0);
+    // The record, in full: every field the shared body computed, unerased.
+    expect(decision.maxRootMovement).toBe(0.25);            // |3/4 - 1/2| = 1/4, exact
+    expect(decision.movedRootNodeIds).toEqual(["root:A"]);  // was [] — codex r3 B1
+    expect(decision.comparedRootNodeIds).toEqual(["root:A"]);
+    expect(decision.uncomparedRootNodeIds).toEqual(["root:B"]);
+    expect(decision.expectedRootCount).toBe(2);
+  });
+
+  it("still refuses to convergence-stop on that same no-evidence record", () => {
+    // The point of J15(b) is unaffected by T7B: a moved root named on a
+    // zero-evidence record must not become a reason to stop.
+    const decision = decideRoundBoundary({ ...boundaryInput, measuredEdgeCount: 0 });
+
+    expect(decision.kind).not.toBe("STOP");
+    expect(decision.reason).not.toBe("GLOBAL_DELTA_CONVERGED");
+  });
+
   it("holds the interface contract: maxRootMovement is null EXACTLY when nothing was compared", () => {
     // The doc used to say "null only when no previous round exists", which the
     // partial arm broke. The truthful contract is about `comparedRootNodeIds`,
