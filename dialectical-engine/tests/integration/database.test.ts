@@ -27,6 +27,7 @@ import {
 } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
+  applySingleLineageBandCap,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
   projectJudgedStanding,
@@ -4494,8 +4495,32 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
       expect(provider.composerCalls()).toBe(2);
       expect(reasoningContractFragments.every((fragment) => provider.composerSystemPrompt().includes(fragment)))
         .toBe(true);
-      const answer = await database.pool.query<{ terminal: string; answer_form: { kind: string; hypothesis: string; researchPlan: string } }>(
-        `SELECT answer.terminal, answer.answer_form
+      /**
+       * T13 (S08) / J25 — the WHOLE tuple, on the PERSISTED row.
+       *
+       * The goal's T13 asks for an all-reasoned run that yields DOWNGRADED,
+       * the hypothesis form, both synthesizer-written segments, AND the label
+       * and band still shown. A unit assertion on `runServeGateChain`'s return
+       * value cannot see the last of those: the gate result carries no verdict
+       * state, so the label only exists once the runner attaches
+       * `verdictLabelBasis` and `ServeRepository.persist` derives
+       * `answer.verdict_state` from it. This query is the only place the full
+       * co-occurrence is observable, and J25 says a disclosure is proved where
+       * a reader of the served answer can see it.
+       *
+       * `verdict_state` is the LABEL. `band_ceiling.label` is the ceiling's
+       * name and is a different thing (codex r2 B2) - both are asserted.
+       */
+      const answer = await database.pool.query<{
+        terminal: string;
+        answer_form: { kind: string; hypothesis: string; researchPlan: string };
+        verdict_state: string | null;
+        verdict_unavailable: unknown;
+        confidence_band: string | null;
+        band_ceiling: { basis: Record<string, number> } | null;
+      }>(
+        `SELECT answer.terminal, answer.answer_form, answer.verdict_state,
+                answer.verdict_unavailable, answer.confidence_band, answer.band_ceiling
          FROM serve.answer AS answer
          JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
          WHERE work.work_item_id = $1`,
@@ -4507,6 +4532,24 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
         hypothesis: "Hypothesis: the reasoning answer holds provisionally.",
         researchPlan: "Research plan: gather independent evidence that could lift or defeat the hypothesis."
       });
+      // The LABEL is still shown on a downgraded answer. A regression at the
+      // attachment or persistence boundary lands here as a null verdict_state
+      // with a populated verdict_unavailable, which the gate-result assertions
+      // above cannot see.
+      expect(answer.rows[0]?.verdict_state).toBe("CONTESTED");
+      expect(answer.rows[0]?.verdict_unavailable).toBeNull();
+      // The BAND is still shown, and it is the mono-lineage cap of the sealed
+      // candidate band - read from the same sealed rows the run used, never a
+      // band literal.
+      const cappedBand = applySingleLineageBandCap(
+        settings.servePolicy!.candidateConfidenceBand,
+        settings.servePolicy!.bandCeiling
+      );
+      expect(cappedBand).not.toBe(settings.servePolicy!.candidateConfidenceBand);
+      expect(answer.rows[0]?.confidence_band).toBe(cappedBand);
+      // T12: the basis the band was decided on is the CITED set - one reasoned
+      // node, the only node the two segments cite.
+      expect(answer.rows[0]?.band_ceiling?.basis).toEqual({ LOOKED_UP: 0, RAN: 0, REASONING: 1 });
       const composerAttempts = await database.pool.query<{ outcome: string; parse_status: string }>(
         `SELECT entry.outcome, artifact.parse_status
          FROM ledger.ledger_entry AS entry

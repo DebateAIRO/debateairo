@@ -1710,6 +1710,79 @@ export function applySingleLineageBandCap(
   return bandCeiling.value.bandOrder[candidateIndex - 1]!;
 }
 
+/**
+ * Board F30 / T12 — ENFORCE the degraded-panel step-down T3 already RECORDS.
+ *
+ * T3's confirm-item 5 records, on every reduced judgement, that a panel
+ * collapsed to the author's own voice (`PANEL-DEGRADED-SINGLE-VOICE`) and that
+ * the certainty band therefore steps one place down through T16's sealed
+ * `downgradeBands` row. Nothing consumed that record on the served answer:
+ * `ledger.reduced_judgement.disagreement.certaintyEffect` said `DOWNGRADED`
+ * while `serve.answer.confidence_band` still shipped the candidate band. A
+ * downgrade that is recorded and not applied is the silent-degradation shape
+ * the goal repeals, so the band lane applies it.
+ *
+ * SCOPE — the SERVED ROOT's own record. The band is the answer's confidence in
+ * the served position, and J16(a) reads every answer-scope quantity from the
+ * served root: T11 takes its dispersion from exactly that node. A panel that
+ * degraded on a node which never reached the answer is still disclosed on that
+ * node (`panelDegradations` → node-scope condition marks) and does not restate
+ * the served claim's confidence. The disputed-review arm beside this one is
+ * run-scope on purpose and for a different reason: a dispute is a DECLARED
+ * disagreement about the debate's content, wherever it was declared.
+ *
+ * Only the single-voice collapse steps the band. `PANEL-PARTIAL` means some
+ * members were lost, not that the author graded itself, and T3 does not record
+ * a step-down for it — inventing one here would be this file deciding a band.
+ *
+ * The move itself is `applyDeclaredDisagreement`'s, over the mapping the SEALED
+ * row supplies; no band value is chosen here. At the weakest band T16 seals the
+ * one-step-down target as the band itself, so the floor is a fixed point.
+ */
+export function applyPanelDegradedBandStepDown(input: {
+  readonly certaintyBand: string;
+  readonly servedRootNodeId: string;
+  readonly panelDegradations: readonly {
+    readonly subjectRef: string;
+    readonly mark: string;
+  }[];
+  readonly oneStepDown: Readonly<Record<string, string>>;
+  readonly predicateRef: string;
+}): {
+  readonly certaintyBand: string;
+  readonly certaintyEffect: "DOWNGRADED" | "UNCHANGED";
+  readonly predicateRef: string;
+  readonly observationRef: string | null;
+} {
+  const degraded = input.panelDegradations.some((record) =>
+    record.subjectRef === input.servedRootNodeId
+    && record.mark === PANEL_DEGRADED_SINGLE_VOICE_MARK);
+  if (!degraded) {
+    return Object.freeze({
+      certaintyBand: input.certaintyBand,
+      certaintyEffect: "UNCHANGED" as const,
+      predicateRef: input.predicateRef,
+      observationRef: null
+    });
+  }
+  const observationRef =
+    `ledger.reduced_judgement:${PANEL_DEGRADED_SINGLE_VOICE_MARK}:${input.servedRootNodeId}`;
+  const steppedDown = input.oneStepDown[input.certaintyBand] ?? null;
+  const declared = applyDeclaredDisagreement({
+    fires: steppedDown !== null,
+    predicateRef: input.predicateRef,
+    observationRef,
+    certaintyBand: input.certaintyBand,
+    downgradedBand: steppedDown
+  });
+  return Object.freeze({
+    certaintyBand: declared.certaintyBand ?? input.certaintyBand,
+    certaintyEffect: declared.certaintyEffect,
+    predicateRef: declared.predicateRef,
+    observationRef
+  });
+}
+
 async function runnerStage<T>(code: string, operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -3506,9 +3579,36 @@ export class WalkingSkeletonRunner {
      * one, which is a behaviour change this task did not ask for.
      */
     const servedCandidateConfidenceBand = async (): Promise<string> => {
-      const capped = effectiveMakerCount === 1
+      const monoCapped = effectiveMakerCount === 1
         ? applySingleLineageBandCap(servePolicy.candidateConfidenceBand, servePolicy.bandCeiling)
         : servePolicy.candidateConfidenceBand;
+      /**
+       * F30: T3's recorded degraded-panel step-down, APPLIED to the served
+       * answer. A mono-maker run has no panel at all, so this and the cap above
+       * are mutually exclusive in practice; they are written as a chain because
+       * each is an independent declared downgrade and neither may swallow the
+       * other silently.
+       */
+      const servedRootPanelDegraded = panelDegradations.some((record) =>
+        record.subjectRef === servedRoot.nodeId
+        && record.mark === PANEL_DEGRADED_SINGLE_VOICE_MARK);
+      if (servedRootPanelDegraded && panelPolicy === undefined) {
+        // Unreachable: only an M>=2 run has a panel, and J12's claim-time gate
+        // refuses an M>=2 deployment whose T16 panel rows were never sealed.
+        // Typed rather than defaulted, so the missing-row condition can never
+        // re-acquire a degraded, proceeding shape.
+        throw new TypedDomainError(
+          "PANEL_WEIGHTING_UNRESOLVED",
+          "J12: a degraded panel requires the sealed downgrade-bands row to declare its certainty downgrade"
+        );
+      }
+      const capped = panelPolicy === undefined ? monoCapped : applyPanelDegradedBandStepDown({
+        certaintyBand: monoCapped,
+        servedRootNodeId: servedRoot.nodeId,
+        panelDegradations,
+        oneStepDown: panelPolicy.oneStepDown,
+        predicateRef: panelPolicy.sourceRefs.downgradeBands ?? panelPolicy.unmappedReason
+      }).certaintyBand;
       const disputedNodeIds = await this.#judgements.readDisputedNodeIds(run.runId);
       if (disputedNodeIds.length === 0) return capped;
       // A dispute can only exist where a cross-maker review ran, so the panel
