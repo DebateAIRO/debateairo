@@ -69,3 +69,92 @@ test("S5 proxy filters request cookies and response cookies/headers", async () =
     "__Host-debateai-session", "__Host-debateai-csrf"
   ]);
 });
+
+// ---------------------------------------------------------------- L3-F1 body cap
+
+const PROXY_CONTEXT = { params: Promise.resolve({ path: ["v1", "asks"] }) };
+
+test("L3-F1: a declared body over 1 MiB is refused with 413 before the upstream is called; exactly 1 MiB passes", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response("{}", { headers: { "content-type": "application/json" } });
+  };
+  const { POST } = await loadRoute();
+
+  const tooLarge = await POST(new Request("https://app.test/api/v1/asks", {
+    method: "POST",
+    headers: { "content-length": "1048577", "content-type": "application/json" },
+    body: "{}"
+  }), PROXY_CONTEXT);
+  assert.equal(tooLarge.status, 413);
+  const refusal = await tooLarge.json();
+  assert.equal(refusal.error, "PAYLOAD_TOO_LARGE");
+  assert.equal(typeof refusal.message, "string");
+  assert.equal(fetchCalls, 0, "the upstream is never called for a refused body");
+
+  const atCap = await POST(new Request("https://app.test/api/v1/asks", {
+    method: "POST",
+    headers: { "content-length": "1048576", "content-type": "application/octet-stream" },
+    body: new Uint8Array(1_048_576)
+  }), PROXY_CONTEXT);
+  assert.equal(atCap.status, 200);
+  assert.equal(fetchCalls, 1);
+});
+
+test("L3-F1: an unbounded chunked body is cut off at 1 MiB with 413 and never reaches the upstream", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response("{}");
+  };
+  const { POST } = await loadRoute();
+  const chunk = new Uint8Array(64 * 1024).fill(1);
+  let pulled = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      pulled += 1;
+      if (pulled > 256) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(chunk);
+    }
+  });
+  const response = await POST(new Request("https://app.test/api/v1/asks", {
+    method: "POST",
+    headers: { "content-type": "application/octet-stream" },
+    body,
+    duplex: "half"
+  }), PROXY_CONTEXT);
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).error, "PAYLOAD_TOO_LARGE");
+  assert.equal(fetchCalls, 0);
+  assert(pulled <= 20, `the proxy stopped reading at the cap instead of draining the stream (pulled ${pulled} chunks)`);
+});
+
+test("L3-F1: a 512 KiB body is forwarded unchanged", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  let forwardedBody;
+  globalThis.fetch = async (_url, init) => {
+    forwardedBody = init.body;
+    return new Response("{}");
+  };
+  const { POST } = await loadRoute();
+  const payload = new Uint8Array(512 * 1024).fill(7);
+  payload[0] = 1;
+  payload[payload.length - 1] = 9;
+  const response = await POST(new Request("https://app.test/api/v1/asks", {
+    method: "POST",
+    headers: { "content-type": "application/octet-stream" },
+    body: payload
+  }), PROXY_CONTEXT);
+  assert.equal(response.status, 200);
+  const bytes = new Uint8Array(await new Response(forwardedBody).arrayBuffer());
+  assert.equal(bytes.length, 512 * 1024);
+  assert.equal(bytes[0], 1);
+  assert.equal(bytes[1], 7);
+  assert.equal(bytes[bytes.length - 1], 9);
+});

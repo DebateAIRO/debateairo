@@ -33,6 +33,8 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "retry-after",
   "vary"
 ] as const);
+/** L3-F1: aligned with the API's Fastify bodyLimit (B5); the proxy never buffers more. */
+const MAX_PROXY_BODY_BYTES = 1_048_576;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
@@ -131,6 +133,49 @@ function createDownstreamHeaders(upstream: Headers): Headers {
   return headers;
 }
 
+function payloadTooLarge(): Response {
+  return Response.json({
+    error: "PAYLOAD_TOO_LARGE",
+    message: `The request body exceeds the proxy limit of ${MAX_PROXY_BODY_BYTES} bytes.`
+  }, { status: 413 });
+}
+
+/**
+ * L3-F1: a declared content-length over the cap is refused before a byte is
+ * read; every other body is read through a counting loop that cancels the
+ * stream the moment the cap is passed, so a chunked or lying-length body can
+ * never be materialised in memory. Returns null once the cap is exceeded.
+ */
+async function readBoundedBody(request: Request): Promise<BufferSource | null> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null && /^\d{1,15}$/.test(declared) && Number(declared) > MAX_PROXY_BODY_BYTES) return null;
+  if (request.body === null) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_PROXY_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {
   const { path } = await context.params;
   const target = createTargetUrl(request, path);
@@ -138,9 +183,14 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
 
   // exactOptionalPropertyTypes: a bodyless method must OMIT body, not pass
   // `undefined` for it, so the two shapes are built separately.
-  const init: RequestInit = BODYLESS_METHODS.has(request.method)
-    ? { method: request.method, headers, cache: "no-store" }
-    : { method: request.method, headers, body: await request.arrayBuffer(), cache: "no-store" };
+  let init: RequestInit;
+  if (BODYLESS_METHODS.has(request.method)) {
+    init = { method: request.method, headers, cache: "no-store" };
+  } else {
+    const body = await readBoundedBody(request);
+    if (body === null) return payloadTooLarge();
+    init = { method: request.method, headers, body, cache: "no-store" };
+  }
 
   let response: Response;
   try {
