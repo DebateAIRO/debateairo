@@ -9,17 +9,17 @@ import {
 } from "../../apps/ui/lib/mfaEnrollment.js";
 
 describe("S4 mailed-token enrolment UI", () => {
-  it("takes the query bearer once, removes it before verification, and preserves unrelated URL state", async () => {
+  it("takes the fragment bearer once, removes it before verification, and preserves unrelated URL state", async () => {
     const order: string[] = [];
-    let replacedWith = "";
+    const replacedWith: string[] = [];
     const token = "A".repeat(43);
     const consumed = await consumeMailedEnrollmentTokenFromUrl(
-      { href: `https://debate.test/verify-email?campaign=welcome&token=${token}#setup` },
+      { href: `https://debate.test/enroll-mfa?campaign=welcome#setup&token=${token}` },
       {
         state: { navigation: 1 },
         replaceState(_state: unknown, _unused: string, url?: string | URL | null) {
           order.push("replace");
-          replacedWith = String(url);
+          replacedWith.push(String(url));
         }
       },
       async (presented) => {
@@ -29,7 +29,45 @@ describe("S4 mailed-token enrolment UI", () => {
     );
     expect(consumed).toBe(token);
     expect(order).toEqual(["replace", "verify"]);
-    expect(replacedWith).toBe("/verify-email?campaign=welcome#setup");
+    expect(replacedWith).toEqual(["/enroll-mfa?campaign=welcome#setup"]);
+  });
+
+  it("keeps the legacy query form for one release: rewrites it to the fragment form, then clears it before verification", async () => {
+    const order: string[] = [];
+    const replacedWith: string[] = [];
+    const token = "L".repeat(43);
+    const consumed = await consumeMailedEnrollmentTokenFromUrl(
+      { href: `https://debate.test/verify-email?campaign=welcome&token=${token}#setup` },
+      {
+        state: null,
+        replaceState(_state: unknown, _unused: string, url?: string | URL | null) {
+          order.push("replace");
+          replacedWith.push(String(url));
+        }
+      },
+      async (presented) => {
+        order.push("verify");
+        expect(presented).toBe(token);
+      }
+    );
+    expect(consumed).toBe(token);
+    expect(order).toEqual(["replace", "replace", "verify"]);
+    expect(replacedWith).toEqual([
+      `/verify-email?campaign=welcome#setup&token=${token}`,
+      "/verify-email?campaign=welcome#setup"
+    ]);
+    expect(replacedWith.at(-1)).not.toContain(token);
+  });
+
+  it("returns null and touches navigation state when neither form carries a bearer", async () => {
+    let replaced = 0;
+    const consumed = await consumeMailedEnrollmentTokenFromUrl(
+      { href: "https://debate.test/enroll-mfa#setup" },
+      { state: null, replaceState() { replaced += 1; } },
+      async () => { throw new Error("must not verify without a bearer"); }
+    );
+    expect(consumed).toBeNull();
+    expect(replaced).toBe(0);
   });
 
   it("mounts the one-shot consumer at the exact URL emitted by the real mailer", async () => {
@@ -54,8 +92,12 @@ describe("S4 mailed-token enrolment UI", () => {
       });
       const message = await readFile(messageFile, "utf8");
       const mailedHref = message.match(/https:\/\/[^\s]+/)?.[0];
-      expect(mailedHref).toBe(`https://debate.test/verify-email?token=${expectedToken}`);
+      expect(mailedHref).toBe(`https://debate.test/verify-email#token=${expectedToken}`);
+      expect(message).not.toContain("?token=");
       const mailedUrl = new URL(mailedHref!);
+      // The bearer rides in the fragment: the request line a server, proxy or
+      // access log ever sees is the bare path (L3-F8).
+      expect(mailedUrl.search).toBe("");
 
       const routeModule = await readFile(
         join(process.cwd(), "apps/ui/app", mailedUrl.pathname, "page.tsx"),

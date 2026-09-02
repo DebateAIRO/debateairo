@@ -64,8 +64,11 @@ export class SendmailMailSender implements MailSender {
       || !/^[A-Za-z0-9_-]{43}$/.test(mail.token)) {
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
     }
+    // The bearer rides in the URL fragment: browsers never send it to the
+    // server, so it cannot reach a proxy or access log (L3-F8). The token
+    // grammar above is fragment-safe verbatim; nothing is percent-encoded.
     const verificationUrl = new URL("/verify-email", this.options.publicAppUrl);
-    verificationUrl.searchParams.set("token", mail.token);
+    verificationUrl.hash = `token=${mail.token}`;
     const message = [
       `From: ${this.options.from}`,
       `To: ${mail.recipient}`,
