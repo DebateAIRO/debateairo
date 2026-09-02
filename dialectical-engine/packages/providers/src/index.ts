@@ -289,16 +289,24 @@ export interface OpenAICompatibleGatewayOptions {
   readonly fetchImplementation?: typeof fetch;
 }
 
+/** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */
+const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
+const MAX_PROVIDER_MODEL_CHARS = 256;
+const MAX_USAGE_COUNTER = 2 ** 31 - 1;
+
+const usageCounter = z.number().int().min(0).max(MAX_USAGE_COUNTER);
 const usageSchema = z.object({
-  prompt_tokens: z.number().int().nonnegative().optional(),
-  completion_tokens: z.number().int().nonnegative().optional(),
-  total_tokens: z.number().int().nonnegative().optional(),
+  prompt_tokens: usageCounter.optional(),
+  completion_tokens: usageCounter.optional(),
+  total_tokens: usageCounter.optional(),
   x_cost_usd: z.number().nonnegative().optional()
-}).passthrough();
+}).strict();
+
+const modelIdSchema = z.string().min(1).max(MAX_PROVIDER_MODEL_CHARS);
 
 const responseSchema = z.object({
   id: z.string().min(1),
-  model: z.string().min(1),
+  model: modelIdSchema,
   usage: usageSchema.nullable().optional(),
   choices: z.array(z.object({
     message: z.object({ content: z.string() })
@@ -315,6 +323,51 @@ function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
     return "PARSED";
   } catch {
     return "UNPARSED";
+  }
+}
+
+/** Reads the body through its stream and cancels it the moment the cap is crossed (L4-F3). */
+async function readBoundedResponseText(response: Response): Promise<string> {
+  if (response.body === null) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > MAX_PROVIDER_RESPONSE_BYTES) {
+        const refusal = new TypedDomainError(
+          "PROVIDER_RESPONSE_TOO_LARGE",
+          `Provider response body exceeded ${MAX_PROVIDER_RESPONSE_BYTES} bytes`
+        );
+        await reader.cancel(refusal);
+        throw refusal;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return new TextDecoder("utf-8").decode(Buffer.concat(chunks));
+}
+
+/** Typed refusals for an over-long model id or a usage block outside the four bounded fields (L4-F3). */
+function assertBoundedProviderResponse(decoded: unknown): void {
+  if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return;
+  const row = decoded as Readonly<Record<string, unknown>>;
+  if (typeof row.model === "string" && !modelIdSchema.safeParse(row.model).success) {
+    throw new TypedDomainError(
+      "PROVIDER_MODEL_INVALID",
+      `Provider model id must be 1..${MAX_PROVIDER_MODEL_CHARS} characters`
+    );
+  }
+  if (row.usage !== undefined && row.usage !== null && !usageSchema.safeParse(row.usage).success) {
+    throw new TypedDomainError(
+      "PROVIDER_USAGE_INVALID",
+      "Provider usage may carry only bounded prompt_tokens, completion_tokens, total_tokens and x_cost_usd"
+    );
   }
 }
 
@@ -364,14 +417,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             messages: attemptPacket.messages
           })
         });
-        const rawText = await response.text();
+        const rawText = await readBoundedResponseText(response);
         let decoded: unknown;
         try {
           decoded = JSON.parse(rawText);
         } catch {
           decoded = null;
         }
-        const candidate = z.object({ id: z.string(), model: z.string() }).passthrough().safeParse(decoded);
+        const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
         const strict = responseSchema.safeParse(decoded);
@@ -415,6 +468,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contentHash: digest(rawText)
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
+        assertBoundedProviderResponse(decoded);
         const responseJson = responseSchema.parse(decoded);
         if (
           request.classifyContent !== undefined
