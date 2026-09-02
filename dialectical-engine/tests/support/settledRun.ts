@@ -33,6 +33,25 @@ export interface PersistedTerminalRun {
 }
 
 /**
+ * The PRODUCTION WRITER alone — `ServeRepository.persist` — with no work-item
+ * settle after it (codex r4 B2, D43).
+ *
+ * Why this exists as its own entry point. A negative arm that drives the whole
+ * `persistTerminalRun` cannot tell its own guard from the settle that follows
+ * it: when R5M2 removed the round guard, `persist` correctly RESOLVED and the
+ * run then died in `work.settle` on `23514 WAIT_DRAIN_REQUIRED`. The arm went
+ * RED and looked like a kill, but a work-item constraint had killed it, not the
+ * binding assertion it was credited to. Anything asserting on the producer
+ * binding calls THIS, so removing the guard makes the call resolve and the
+ * assertion itself is the only thing left that can fail.
+ */
+export async function persistTerminalAnswer(
+  input: PersistTerminalRunInput & { readonly workItemId: string }
+): Promise<{ readonly answerId: string }> {
+  return buildAndPersist(input.pool, input.runId, input.workItemId, input.factBundle, input.loopRounds);
+}
+
+/**
  * Persists one terminal answer through the production serve path and settles its
  * work item. ServeRepository.persist owns the sole TERMINAL progress event.
  */
@@ -44,7 +63,22 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     nodeSet: [],
     commandKey: `test-layer:terminal-run:${input.fixtureKey}:${input.runId}`
   });
-  const factBundle = buildFactBundle(input.factBundle);
+  const persisted = await buildAndPersist(
+    input.pool, input.runId, workItemId, input.factBundle, input.loopRounds
+  );
+  await work.settle({ workItemId, attemptId: randomUUID(), artifactRef: persisted.answerId });
+  return Object.freeze({ answerId: persisted.answerId, workItemId });
+}
+
+/** The one place the terminal result shape and the persist call are built. */
+async function buildAndPersist(
+  pool: Pool,
+  runId: string,
+  workItemId: string,
+  inputFactBundle: FactBundle,
+  loopRounds: ServeGateResult["loopRounds"] | undefined
+): Promise<{ readonly answerId: string }> {
+  const factBundle = buildFactBundle(inputFactBundle);
   const gateTrace: readonly GateTrace[] = Object.freeze(["GATE1_R9_BLOCK", "COMPONENTS_ONLY_DEFECT"]);
   const result: ServeGateResult = Object.freeze({
     terminal: "COMPONENTS_ONLY",
@@ -70,7 +104,7 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     // class existed when this shape was written, so all four are absent rather
     // than back-filled with a class this answer never had.
     digest: null,
-    loopRounds: input.loopRounds ?? Object.freeze([]),
+    loopRounds: loopRounds ?? Object.freeze([]),
     standingObjection: null,
     crashClass: null,
     projections: Object.freeze({
@@ -80,8 +114,8 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     })
   });
   const factBundleContentHash = createHash("sha256").update(JSON.stringify(factBundle)).digest("hex");
-  const persisted = await new ServeRepository(input.pool).persist({
-    runId: input.runId,
+  const persisted = await new ServeRepository(pool).persist({
+    runId,
     workItemId,
     factBundleVersion: 1,
     factBundleContentHash,
@@ -93,6 +127,5 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     conformanceRawArtifactRefs: [],
     servedNumber: null
   });
-  await work.settle({ workItemId, attemptId: randomUUID(), artifactRef: persisted.answerId });
-  return Object.freeze({ answerId: persisted.answerId, workItemId });
+  return Object.freeze({ answerId: persisted.answerId });
 }

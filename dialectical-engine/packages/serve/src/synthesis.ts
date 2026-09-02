@@ -291,6 +291,42 @@ export type SynthesizerRequest =
       readonly priorCandidateRef: string;
     };
 
+/**
+ * THE ONE call-site key builder, used by BOTH the runner that RECORDS the call
+ * and the persistence that VERIFIES it (codex r4 B1).
+ *
+ * Before this, the runner built these keys with two template literals and
+ * persistence accepted whatever the caller supplied, checking only that the key
+ * ended in `:<round>`. A real round-1 SYNTHESIZER artifact offered as the
+ * round's verdict therefore passed both the suffix check and the ledger lookup,
+ * and a synthesizer response committed as the evaluator verdict.
+ *
+ * Deriving the EXPECTED key here, from the typed role and the round's own
+ * fields, makes the role a PREDICATE. It also makes a future format change fail
+ * closed: the runner and the verifier move together or not at all, because
+ * there is only one place the format exists.
+ *
+ * The two prefixes are load-bearing beyond this module and are NOT free to
+ * rename: `core.read_terminal_recorded_facts` (migrations/0049) counts
+ * `COMPOSER:%` into `composer_calls` and `POST_COMPOSE_R9:%` into `r9_calls`,
+ * which battery-row predicates read.
+ */
+export type SynthesisCallSiteBinding =
+  | { readonly role: "SYNTHESIZER"; readonly stage: "INITIAL" | "RETRY"; readonly round: number }
+  | { readonly role: "EVALUATOR"; readonly round: number };
+
+export function synthesisCallSiteKey(binding: SynthesisCallSiteBinding): string {
+  if (!Number.isInteger(binding.round) || binding.round < 1) {
+    throw new TypedDomainError(
+      "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
+      `A synthesis call site needs a positive integer round, not ${String(binding.round)}`
+    );
+  }
+  return binding.role === "SYNTHESIZER"
+    ? `COMPOSER:SYNTHESIZER:${binding.stage}:${binding.round}`
+    : `POST_COMPOSE_R9:EVALUATOR:${binding.round}`;
+}
+
 export interface EvaluatorRequest {
   readonly role: "EVALUATOR";
   readonly roleRef: string;

@@ -32,6 +32,7 @@ import {
   SYNTHESIS_OBJECTION_STANDING_MARK,
   buildSynthesisDigest,
   runSynthesisLoop,
+  synthesisCallSiteKey,
   type DigestSourceNode,
   type SynthesisCodeLabel,
   type SynthesisDigest,
@@ -1878,16 +1879,41 @@ export class ServeRepository {
         // resolved through the LEDGER ENTRY that recorded it — this run, this
         // work item, a successful MODEL_CALL, at the EXPECTED call site — so an
         // unrelated judge artifact from the same run can no longer stand in.
+        // codex r4 B1 — ROLE IS A PREDICATE. Each reference is bound to the
+        // call site its ROLE must have occupied, derived HERE from the typed
+        // role, the round's own synthesizer stage and its round number through
+        // the ONE builder the runner records with. Before this, `role` reached
+        // only the error text: the supplied key was checked for a `:<round>`
+        // suffix and then handed to the ledger as given, so a real
+        // `COMPOSER:SYNTHESIZER:INITIAL:1` artifact offered as the verdict
+        // passed both checks and a synthesizer response committed as the
+        // evaluator verdict. No stored round column is needed for this — every
+        // input is already in the round record.
         for (const bound of [
-          { ref: round.candidateRef, callSiteKey: round.candidateCallSiteKey, role: "SYNTHESIZER" },
-          { ref: round.verdictRef, callSiteKey: round.verdictCallSiteKey, role: "EVALUATOR" }
+          {
+            ref: round.candidateRef,
+            callSiteKey: round.candidateCallSiteKey,
+            role: "SYNTHESIZER" as const,
+            expected: synthesisCallSiteKey({
+              role: "SYNTHESIZER",
+              stage: round.synthesizerRequest.stage,
+              round: round.round
+            })
+          },
+          {
+            ref: round.verdictRef,
+            callSiteKey: round.verdictCallSiteKey,
+            role: "EVALUATOR" as const,
+            expected: synthesisCallSiteKey({ role: "EVALUATOR", round: round.round })
+          }
         ]) {
-          // The call site must name THIS round, so a round-1 artifact cannot be
-          // filed as round 2's under an otherwise valid pairing.
-          if (!bound.callSiteKey.endsWith(`:${String(round.round)}`)) {
+          // EQUALITY, not a suffix. This subsumes the round check it replaces —
+          // the round is part of the derived key — and it is what refuses a
+          // real artifact recorded under the other role's call site.
+          if (bound.callSiteKey !== bound.expected) {
             throw new TypedDomainError(
               "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
-              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} does not name that round`
+              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected}`
             );
           }
           const producer = await client.query<{ raw_artifact_ref: string }>(
@@ -1899,7 +1925,7 @@ export class ServeRepository {
               WHERE entry.run_id=$1 AND entry.subject_item_id=$2
                 AND entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
                 AND entry.call_site_key=$3 AND entry.raw_artifact_ref=$4::uuid`,
-            [input.runId, input.workItemId, bound.callSiteKey, bound.ref]
+            [input.runId, input.workItemId, bound.expected, bound.ref]
           );
           if (producer.rows.length !== 1) {
             throw new TypedDomainError(

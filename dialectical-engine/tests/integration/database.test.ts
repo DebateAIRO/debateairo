@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { persistTerminalRun } from "../support/settledRun.js";
+import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
 import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { once } from "node:events";
@@ -5163,6 +5163,147 @@ describe("T10/T11 · the served root and its label, through the production runne
       "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
     );
     expect(answers.rows[0]?.count).toBe("0");
+  });
+
+  /**
+   * codex r4 B1 — ROLE IS A PREDICATE, not error text.
+   *
+   * The arm above supplies a NONEXISTENT synthesis key, so it proves an
+   * INVENTED pairing is rejected. It cannot see this defect: until the fix,
+   * `bound.role` was only ever interpolated into an error message, so a REAL,
+   * same-run, same-round pairing recorded under the OTHER role's call site
+   * satisfied both the suffix check and the ledger lookup, and a synthesizer
+   * response committed as the evaluator verdict.
+   *
+   * Three properties, one fixture. Both artifacts below are genuine: each is
+   * recorded at its OWN real call site, so nothing here is a forgery — the only
+   * thing wrong is WHICH ROLE each is offered as.
+   *
+   *  1. the CANDIDATE must be the artifact recorded at the SYNTHESIZER call
+   *     site for this round and stage; a real EVALUATOR artifact is refused
+   *  2. the VERDICT must be the artifact recorded at the EVALUATOR call site;
+   *     a real SYNTHESIZER artifact is refused
+   *  3. one artifact and key cannot hold BOTH roles in one round
+   *
+   * These call `persistTerminalAnswer`, the production writer with no work-item
+   * settle after it (D43): removing the guard must make the call RESOLVE, so
+   * the assertion here is the only thing that can go red.
+   */
+  it("T9/J29 refuses a REAL producer pair supplied for the WRONG ROLE", async () => {
+    const question = `t09-wrong-role-${randomUUID()}`;
+    // NO battery rows, deliberately (codex r4 B2 / D43). `createRun` seeds the
+    // full battery, whose undrained activations make `core.reject_terminal_with_wait`
+    // raise 23514 WAIT_DRAIN_REQUIRED the moment `persist` writes its TERMINAL
+    // progress event. That is precisely how R5M2 died and was miscredited: with
+    // the guard removed the arm went RED on a work-item constraint rather than
+    // on the binding assertion. An activation-free run lets `persist` RESOLVE
+    // when the guard is absent, so only the assertion below can refuse.
+    const runId = await new RunRepository(database.pool).startRun({
+      questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+      sessionId: `session:${question}`, callerScope: "ASKER",
+      asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual",
+      effectiveRiskTier: "casual", tierSource: "ASKER",
+      tierProvenanceRef: `asker-declaration:${question}`, compositionBudgetTier: "low",
+      depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
+      envelopeBasis: fixtureStructuralCeiling(90, 1, 1),
+      registerVersion: 1, batteryVersion: "s00", batteryRows: []
+    });
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+    });
+    const ledger = new LedgerRepository(database.pool);
+    const now = new Date();
+
+    // TWO genuine artifacts, each recorded at its own genuine call site.
+    const synthesizerArtifactId = randomUUID();
+    const evaluatorArtifactId = randomUUID();
+    const pairs = [
+      { artifactId: synthesizerArtifactId, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", contentHash: "c".repeat(64) },
+      { artifactId: evaluatorArtifactId, callSiteKey: "POST_COMPOSE_R9:EVALUATOR:1", contentHash: "d".repeat(64) }
+    ];
+    for (const pair of pairs) {
+      const attemptId = randomUUID();
+      await ledger.appendRawArtifact({
+        artifactId: pair.artifactId, attemptId, runId,
+        providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
+        maker: "test-layer", modelVersion: "v1",
+        rawText: JSON.stringify({ at: pair.callSiteKey }), metadata: {}, parseStatus: "PARSED",
+        inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: pair.contentHash
+      });
+      await ledger.append({
+        runId, attemptId, actionKind: "MODEL_CALL", callSiteKey: pair.callSiteKey,
+        subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
+        actorRef: "provider:test-layer", inputHash: "input:test-layer",
+        contractHash: "9".repeat(64), rawArtifactRef: pair.artifactId,
+        startedAt: now, finishedAt: now
+      });
+    }
+
+    const emptyDigest = { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 };
+    const codeLabel = { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 };
+    const correctRound = {
+      round: 1,
+      synthesizerRequest: { role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel },
+      candidateRef: synthesizerArtifactId,
+      candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
+      candidateStatement: "A statement.",
+      evaluatorRequest: { role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel, candidateStatement: "A statement." },
+      verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
+      verdictRef: evaluatorArtifactId,
+      verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    const factBundle = {
+      facts: ["A fact."], residualObjections: [], badges: [], conditionMarks: [],
+      reversalPoint: "A contrary observation would reverse this.",
+      buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null
+    };
+    const persistRound = (round: NonNullable<ServeGateResult["loopRounds"]>[number]) =>
+      persistTerminalAnswer({
+        pool: database.pool, runId, workItemId, fixtureKey: question, factBundle, loopRounds: [round]
+      });
+
+    // 1. EVALUATOR-AS-CANDIDATE. A real evaluator artifact at its real
+    //    evaluator call site, offered as the round's candidate.
+    await expect(persistRound({
+      ...correctRound,
+      candidateRef: evaluatorArtifactId,
+      candidateCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // 2. SYNTHESIZER-AS-VERDICT, the same swap in the other direction.
+    await expect(persistRound({
+      ...correctRound,
+      verdictRef: synthesizerArtifactId,
+      verdictCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // 3. ONE ARTIFACT AND KEY FOR BOTH ROLES — codex r4 B1's exact
+    //    counterexample: a legitimate round-1 synthesizer artifact submitted as
+    //    candidate AND verdict. Both suffix checks pass and both ledger lookups
+    //    return the same valid row, so only a role predicate can refuse it.
+    await expect(persistRound({
+      ...correctRound,
+      verdictRef: synthesizerArtifactId,
+      verdictCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
+      candidateRef: synthesizerArtifactId,
+      candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // The CORRECT pairing still commits — the guard refuses a wrong role, not
+    // every round. Without this the three arms above would pass against a
+    // predicate that simply refused everything.
+    await expect(persistRound(correctRound)).resolves.toMatchObject({
+      answerId: expect.any(String)
+    });
+
+    // Nothing from the three refusals survived.
+    const rows = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
+    );
+    expect(rows.rows[0]?.count).toBe("1");
   });
 
   /**
