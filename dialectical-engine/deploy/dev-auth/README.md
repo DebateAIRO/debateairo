@@ -92,13 +92,13 @@ Refusal codes (fail closed; nothing is repaired or moved):
 - `DEV_AUTH_CUSTODY_ROOT_RELATIVE` — the override is not an absolute path.
 - `DEV_AUTH_CUSTODY_ROOT_CLOUD_SYNCED` — the custody root (default or
   override), after resolving symlinks, is inside a cloud-synced folder: a path
-  segment starting with `OneDrive`, `Dropbox`, `Nextcloud`, `Proton Drive`,
-  `pCloud`, `MEGA`, `Google Drive` / `GoogleDrive`, `Box`, or `iCloud Drive`
-  (case-insensitive), or the pairs `Library/CloudStorage` and
-  `Library/Mobile Documents`. The message names the variable and the suggested
-  path. Keys must never sync; the repository itself may stay synced, so set the
-  override and keep working. A private folder whose name merely starts with one
-  of those words is refused too; use the override.
+  segment that is `OneDrive`, `Dropbox`, `Nextcloud`, `Proton Drive`, `pCloud`,
+  `MEGA`, `MEGAsync`, `Google Drive` / `GoogleDrive`, `Box`, or `iCloud Drive`
+  (case-insensitive) or starts with one of them followed by a non-letter, such
+  as `OneDrive-Work` or `Box Sync`; or the pairs `Library/CloudStorage` and
+  `Library/Mobile Documents`. The message names the variable and suggests
+  `<your home>/.debateai/dev-auth`. Keys must never sync; the repository itself
+  may stay synced, so set the override and keep working.
 - `DEV_AUTH_CUSTODY_ROOT_INVALID` — the custody root or its parent exists but
   is a symlink, is not owned by you, or is not exactly `0700`.
 

@@ -1,5 +1,5 @@
 import { mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadDevelopmentCommandEnvironment } from "@debateai/register";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -72,6 +72,8 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       ["/Users/v/Proton Drive/v/engine", "Proton Drive"],
       ["/Users/v/pCloud Drive/engine", "pCloud Drive"],
       ["/Users/v/MEGAsync/engine", "MEGAsync"],
+      ["/Users/v/MEGA/engine", "MEGA"],
+      ["/Users/v/Box Sync/engine", "Box Sync"],
       ["/Users/v/Google Drive/My Drive/engine", "Google Drive"],
       ["/Users/v/Box/engine", "Box"],
       ["/Users/v/Dropbox/engine", "Dropbox"],
@@ -84,7 +86,9 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       expect(error.code, root).toBe(CLOUD_SYNCED_CODE);
       expect(error.message, root).toContain(`(${segment})`);
     }
-    expect(resolveDevCustodyRoot("/Users/v/src/engine", {})).toBe("/Users/v/src/engine/.local/dev-auth");
+    for (const root of ["/Users/v/src/engine", "/Users/v/megan/engine", "/Users/v/boxes/engine"]) {
+      expect(resolveDevCustodyRoot(root, {}), root).toBe(`${root}/.local/dev-auth`);
+    }
   });
 
   it("refuses a cloud-synced override even when the repository is private", () => {
@@ -94,12 +98,12 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
     expect(error.code).toBe(CLOUD_SYNCED_CODE);
   });
 
-  it("names the variable and a private suggestion in the exact refusal message", () => {
+  it("names the variable and a suggestion under the real home directory in the exact refusal message", () => {
     const error = capture(() => resolveDevCustodyRoot("/Users/v/OneDrive-adessoGroup/Debate/engine", {}));
     expect(error.message).toBe(
       "DEV_AUTH_CUSTODY_ROOT_CLOUD_SYNCED: dev key custody must not live in a cloud-synced folder "
       + "(OneDrive-adessoGroup). Set DEBATEAI_DEV_CUSTODY_ROOT to a private absolute path, "
-      + "e.g. /Users/<you>/.debateai/dev-auth; the repository itself may stay synced."
+      + `e.g. ${homedir()}/.debateai/dev-auth; the repository itself may stay synced.`
     );
   });
 

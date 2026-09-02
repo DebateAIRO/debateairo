@@ -3,13 +3,19 @@
 // Fail-closed: a custody root inside a cloud-synced folder is refused, so the
 // source tree may stay synced between machines while keys never sync (R4).
 import { realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 export const DEV_CUSTODY_ROOT_ENV = "DEBATEAI_DEV_CUSTODY_ROOT";
 
-const SUGGESTED_CUSTODY_ROOT = "/Users/<you>/.debateai/dev-auth";
+function suggestedCustodyRoot() {
+  return `${homedir()}/.debateai/dev-auth`;
+}
 
-// Matched per path segment, by case-insensitive prefix, after canonicalisation.
+// Matched per path segment after canonicalisation: the segment starts with the marker
+// (case-insensitive) and the next character is absent or not a letter, so
+// "OneDrive-adessoGroup", "OneDrive - adesso" and "Box Sync" match while "megan" and
+// "boxes" do not. Explicit markers cover client folder names that are one word.
 const CLOUD_SYNC_SEGMENT_PREFIXES = Object.freeze([
   "OneDrive",
   "Dropbox",
@@ -17,6 +23,7 @@ const CLOUD_SYNC_SEGMENT_PREFIXES = Object.freeze([
   "Proton Drive",
   "pCloud",
   "MEGA",
+  "MEGAsync",
   "Google Drive",
   "GoogleDrive",
   "Box",
@@ -55,6 +62,10 @@ function canonicalPath(candidate) {
   }
 }
 
+function isLetter(character) {
+  return character !== undefined && /\p{L}/u.test(character);
+}
+
 function findCloudSyncMarker(canonical) {
   const segments = canonical.split(/[\\/]+/u).filter((segment) => segment.length > 0);
   for (let index = 0; index < segments.length; index += 1) {
@@ -66,7 +77,9 @@ function findCloudSyncMarker(canonical) {
         return `${segment}/${next}`;
       }
     }
-    if (CLOUD_SYNC_SEGMENT_PREFIXES.some((prefix) => lowered.startsWith(prefix))) {
+    if (CLOUD_SYNC_SEGMENT_PREFIXES.some((prefix) => (
+      lowered.startsWith(prefix) && !isLetter(lowered[prefix.length])
+    ))) {
       return segment;
     }
   }
@@ -87,7 +100,7 @@ export function resolveDevCustodyRoot(repositoryRoot, environment = process.env)
   if (!isAbsolute(candidate)) {
     throw new DevCustodyRootError(
       "DEV_AUTH_CUSTODY_ROOT_RELATIVE",
-      `${DEV_CUSTODY_ROOT_ENV} must be an absolute path, e.g. ${SUGGESTED_CUSTODY_ROOT}.`
+      `${DEV_CUSTODY_ROOT_ENV} must be an absolute path, e.g. ${suggestedCustodyRoot()}.`
     );
   }
   const marker = findCloudSyncMarker(canonicalPath(candidate));
@@ -95,7 +108,7 @@ export function resolveDevCustodyRoot(repositoryRoot, environment = process.env)
     throw new DevCustodyRootError(
       "DEV_AUTH_CUSTODY_ROOT_CLOUD_SYNCED",
       `dev key custody must not live in a cloud-synced folder (${marker}). `
-      + `Set ${DEV_CUSTODY_ROOT_ENV} to a private absolute path, e.g. ${SUGGESTED_CUSTODY_ROOT}; `
+      + `Set ${DEV_CUSTODY_ROOT_ENV} to a private absolute path, e.g. ${suggestedCustodyRoot()}; `
       + "the repository itself may stay synced."
     );
   }
