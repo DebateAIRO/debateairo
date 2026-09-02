@@ -80,7 +80,34 @@ export type AbstentionKind = typeof ABSTENTION_KINDS[number];
  * (migrations). One declaration; every representation imports it.
  */
 export const SERVED_ROOT_SELECTION_RULE = "max-propagated-strength-lexicographic-tiebreak" as const;
+/** The rule a NEW selection may record. The write vocabulary. */
 export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE;
+
+/**
+ * Rules that were lawful when older answers were sealed, and are therefore
+ * still present on their records. READ-ONLY: no new selection may record one,
+ * and no shipped writer contains the literal — the values only ever arrive by
+ * reading a row that was sealed before migration 0055.
+ *
+ * This list exists because migration 0055 PRESERVES those rows rather than
+ * relabelling them. A record is evidence of how an answer was actually chosen;
+ * rewriting it to today's rule would be a falsification, so the read vocabulary
+ * is a superset of the write vocabulary and says so in the type system.
+ */
+export const RETIRED_SERVED_ROOT_RULES = ["first-configured-provider"] as const;
+export type RetiredServedRootRule = typeof RETIRED_SERVED_ROOT_RULES[number];
+
+/** Every value a sealed record may lawfully carry — the READ vocabulary. */
+export const SERVED_ROOT_RULE_HISTORY = Object.freeze([
+  SERVED_ROOT_SELECTION_RULE,
+  ...RETIRED_SERVED_ROOT_RULES
+] as const);
+export type ServedRootRuleHistory = ServedRootRule | RetiredServedRootRule;
+
+/** True for a value that may be READ but never WRITTEN by a fresh selection. */
+export function isRetiredServedRootRule(value: string | null): value is RetiredServedRootRule {
+  return value !== null && (RETIRED_SERVED_ROOT_RULES as readonly string[]).includes(value);
+}
 
 // Spec §12.3 Home 2 is the sole minting authority. Every wire, UI and DDL
 // representation imports this vocabulary; no sibling package extends it.

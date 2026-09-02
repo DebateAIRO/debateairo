@@ -76,26 +76,57 @@ async function migrationSources(): Promise<readonly { readonly path: string; rea
   return files;
 }
 
-/** The retired rule token, the retired constant, and the retired selector. */
-const RETIRED = [
-  "first-configured-provider",
-  "SERVED_ROOT_RULE",
-  "selectServedRoot("
+/**
+ * The retired constant and the retired selector: gone from shipped source
+ * entirely. Matched on WORD BOUNDARIES, not as substrings — `_` is a word
+ * character, so `\bSERVED_ROOT_RULE\b` cannot fire on the live
+ * `SERVED_ROOT_RULE_HISTORY` / `RETIRED_SERVED_ROOT_RULES` names, while a
+ * genuine reintroduction of the old constant still fails here.
+ */
+const RETIRED: readonly { readonly name: string; readonly pattern: RegExp }[] = [
+  { name: "SERVED_ROOT_RULE (the retired constant)", pattern: /\bSERVED_ROOT_RULE\b/u },
+  { name: "selectServedRoot( (the retired selector)", pattern: /\bselectServedRoot\s*\(/u }
+];
+
+/**
+ * The retired rule STRING is different from the retired constant and selector.
+ * Migration 0055 preserves rows that carry it, so the value must remain
+ * READABLE — which means exactly one shipped module may name it: the kernel,
+ * where the read vocabulary is declared. No writer may contain it, so the
+ * permitted set is pinned EXACTLY and a second occurrence fails as loudly as a
+ * writer would (codex r1 B3).
+ */
+const FILES_PERMITTED_TO_NAME_THE_RETIRED_RULE = [
+  "packages/kernel/src/index.ts"
 ] as const;
 
 describe("T10 · the first-configured-provider rule is deleted, not merely bypassed", () => {
-  it("leaves no first-configured-provider token in shipped product source", async () => {
-    const offenders = (await shippedSources())
+  it("names the retired rule in exactly one shipped module — the read vocabulary", async () => {
+    const naming = (await shippedSources())
       .filter(({ text }) => text.includes("first-configured-provider"))
-      .map(({ path }) => path);
+      .map(({ path }) => path)
+      .sort();
 
-    expect(offenders).toEqual([]);
+    expect(naming).toEqual([...FILES_PERMITTED_TO_NAME_THE_RETIRED_RULE].sort());
+  });
+
+  it("declares the retired rule as READ-ONLY history, never as a writable rule", async () => {
+    const kernel = await import("@debateai/kernel");
+
+    // It is in the read vocabulary...
+    expect(kernel.SERVED_ROOT_RULE_HISTORY).toContain("first-configured-provider");
+    expect(kernel.RETIRED_SERVED_ROOT_RULES).toEqual(["first-configured-provider"]);
+    expect(kernel.isRetiredServedRootRule("first-configured-provider")).toBe(true);
+    // ...and it is NOT the rule a fresh selection records.
+    expect(kernel.SERVED_ROOT_SELECTION_RULE).toBe("max-propagated-strength-lexicographic-tiebreak");
+    expect(kernel.isRetiredServedRootRule(kernel.SERVED_ROOT_SELECTION_RULE)).toBe(false);
+    expect(kernel.isRetiredServedRootRule(null)).toBe(false);
   });
 
   it("leaves no retired constant or selector anywhere in shipped product source", async () => {
     const sources = await shippedSources();
-    const offenders = RETIRED.flatMap((token) =>
-      sources.filter(({ text }) => text.includes(token)).map(({ path }) => `${token} @ ${path}`)
+    const offenders = RETIRED.flatMap(({ name, pattern }) =>
+      sources.filter(({ text }) => pattern.test(text)).map(({ path }) => `${name} @ ${path}`)
     );
 
     expect(offenders).toEqual([]);
@@ -118,5 +149,8 @@ describe("T10 · the first-configured-provider rule is deleted, not merely bypas
     // The retirement replaces the CHECK; the new rule string is what remains writable.
     expect(retirement!.text).toContain("max-propagated-strength-lexicographic-tiebreak");
     expect(retirement!.text.toUpperCase()).toContain("DROP CONSTRAINT");
+    // The constraint is VALIDATED over the declared history, not NOT VALID:
+    // the first draft left every historical row permanently unchecked.
+    expect(retirement!.text.toUpperCase()).not.toContain("NOT VALID");
   });
 });

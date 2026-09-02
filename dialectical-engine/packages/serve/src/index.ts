@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ServedRootRule, WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError } from "@debateai/kernel";
+import type { ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
@@ -924,7 +924,7 @@ export interface PersistServeInput {
   readonly compositionRawArtifactRef: string | null;
   readonly compositionAttempt: number;
   readonly conformanceRawArtifactRefs: readonly string[];
-  readonly conditionMarkRecords?: readonly ConditionMarkRecord[];
+  readonly conditionMarkRecords?: readonly PersistableConditionMarkRecord[];
   readonly servedNumber: {
     readonly numberRef: string;
     readonly value: number;
@@ -985,6 +985,11 @@ export interface ConditionMarkRecord {
   readonly subjectRef: string;
   readonly reason: string;
   readonly liftPath: string | null;
+  /**
+   * The rule a FRESH selection recorded. Live vocabulary only: a new selection
+   * cannot even express a retired rule (T10 / codex r1 B3). A record carried
+   * forward from an older answer version uses `PreservedConditionMarkRecord`.
+   */
   readonly servedRootRule: ServedRootRule | null;
   readonly affectedNodeIds: readonly string[];
   readonly callSiteKey?: string | null;
@@ -996,6 +1001,20 @@ export interface ConditionMarkRecord {
   readonly excludedFromServedNumber?: boolean | null;
   readonly judgedBasisCount?: number | null;
 }
+
+/**
+ * A record carried forward onto a NEW VERSION of an existing answer (DR-184
+ * catch-up). It may carry a RETIRED rule, because the version it describes was
+ * selected under that rule and relabelling it would falsify the record. This is
+ * the only shape allowed to hold one, and only on a superseding write — the law
+ * is enforced at `persist`, which names it if it is broken.
+ */
+export type PreservedConditionMarkRecord =
+  Omit<ConditionMarkRecord, "servedRootRule">
+  & { readonly servedRootRule: ServedRootRuleHistory | null };
+
+/** Either shape; `persist` decides which is lawful from `supersedes`. */
+export type PersistableConditionMarkRecord = ConditionMarkRecord | PreservedConditionMarkRecord;
 
 const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "SKIPPED-BY-BUDGET",
@@ -1017,7 +1036,7 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
 /** DR-161: required typed records and answer marks are a two-way contract. */
 export function assertRequiredConditionMarkRecords(
   conditionMarks: readonly string[],
-  records: readonly ConditionMarkRecord[]
+  records: readonly PersistableConditionMarkRecord[]
 ): void {
   for (const mark of REQUIRED_CONDITION_MARK_RECORDS) {
     if (conditionMarks.includes(mark) && !records.some((record) => record.mark === mark)) {
@@ -1178,6 +1197,20 @@ export class ServeRepository {
     }
     const conditionMarkRecords = input.conditionMarkRecords ?? [];
     assertRequiredConditionMarkRecords(input.result.conditionMarks, conditionMarkRecords);
+    // T10 / codex r1 B3 — the read vocabulary is wider than the write one, and
+    // this is where the difference is enforced. A SUPERSEDING version may carry
+    // a retired rule forward, because the version it describes really was
+    // selected under it. A FRESH answer may not: there is no history to carry,
+    // so a retired value there could only be a relabelling or a fabrication.
+    if (input.supersedes === undefined) {
+      const retired = conditionMarkRecords.find((record) => isRetiredServedRootRule(record.servedRootRule));
+      if (retired !== undefined) {
+        throw new TypedDomainError(
+          "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE",
+          `${retired.mark} records the retired served-root rule "${retired.servedRootRule}" on a fresh answer; retired rules are readable history, never a new selection's rule`
+        );
+      }
+    }
     if (conditionMarkRecords.some((record) =>
       record.subjectRef.trim() === "" || record.reason.trim() === "" || record.affectedNodeIds.length === 0
     )) {

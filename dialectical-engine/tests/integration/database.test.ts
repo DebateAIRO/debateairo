@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
+import { readFile } from "node:fs/promises";
 import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -36,7 +37,13 @@ import {
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
-import { ServeRepository, type ConditionMarkRecord } from "@debateai/serve";
+import {
+  ServeRepository,
+  type ConditionMarkRecord,
+  type PreservedConditionMarkRecord,
+  type ServeGateResult
+} from "@debateai/serve";
+import { AnswerSchema } from "@debateai/contract";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -2322,7 +2329,7 @@ describe("apps/runner — legal command lifecycle", () => {
                        FROM serve.served_number n WHERE n.answer_id=$1 AND n.answer_version=1)
          ) AS payload`, [source.answerId]
       );
-      const records = source.answer.condition_mark_records.map((record): ConditionMarkRecord => ({
+      const records = source.answer.condition_mark_records.map((record): PreservedConditionMarkRecord => ({
         mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope, subjectRef: record.subject_ref,
         reason: record.reason, liftPath: record.lift_path, servedRootRule: record.served_root_rule,
         affectedNodeIds: record.affected_node_ids, callSiteKey: record.call_site_key,
@@ -4126,5 +4133,313 @@ describe("T10/T11 · the served root and its label, through the production runne
     //     incomplete-basis disclosure must NOT ride this answer.
     expect(weakerFirst.answer?.condition_marks).not.toContain("LABEL-BASIS-INCOMPLETE");
     expect(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).toContain(weakerFirst.answer?.verdict_state);
+  });
+});
+
+/**
+ * T10 / codex r1 B3 — migration 0055 preserved the pre-0055 rule VALUES, but
+ * every reader was rewritten as if only the live vocabulary could exist.
+ *
+ * The three failure cases below are the ones a real deployment hits the day it
+ * upgrades: it already holds answers sealed under the retired DR-161 rule.
+ * Reading one through the public contract must not throw, catching one up must
+ * not relabel it, and the database must be able to hold its own history.
+ */
+describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-able", () => {
+  const RETIRED_RULE = "first-configured-provider";
+
+  /**
+   * Produces a genuine pre-0055 answer: a real two-maker run, then a SUPERSEDING
+   * version written through the PRODUCTION writer whose preserved unserved-maker
+   * record carries the retired rule — which is exactly the row shape a database
+   * sealed before this migration holds. `serve.condition_mark` is append-only,
+   * so nothing is rewritten; the historical version is appended.
+   *
+   * The live CHECK is lifted for that one write and restored by RE-APPLYING THE
+   * SHIPPED MIGRATION, never by re-typing its DDL here, so this helper cannot
+   * drift away from whatever 0055 actually ships.
+   */
+  async function sealedBeforeMigration0055(label: string): Promise<{
+    readonly runId: string;
+    readonly answerId: string;
+    readonly askerId: string;
+    readonly subjectRef: string;
+  }> {
+    const scenario = await executeResil01Scenario({
+      label,
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`B3 primary position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `B3 primary review ${index + 1}`)),
+        resil01Composition,
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ conforms: true, findings: [] }),
+        JSON.stringify({ pass: true })
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`B3 secondary position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `B3 secondary review ${index + 1}`))
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    if (scenario.result?.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+    const answerId = scenario.result.answerId;
+    const serve = new ServeRepository(database.pool);
+    const source = await serve.readReviewCatchUpSource(scenario.runId);
+
+    await database.pool.query(
+      "ALTER TABLE serve.condition_mark DROP CONSTRAINT IF EXISTS condition_mark_served_root_rule_rule_check"
+    );
+    try {
+      await serve.persist(supersedingInput(source, scenario.runId, answerId, source.answer.condition_mark_records.map(
+        (record) => ({ ...preservedRecord(record), ...(record.mark === "UNSERVED-MAKER-POSITION"
+          ? { servedRootRule: RETIRED_RULE as never } : {}) })
+      )));
+    } finally {
+      await database.pool.query(await readFile("migrations/0055_t10_served_root_selection.sql", "utf8"));
+    }
+    const subject = source.answer.condition_mark_records
+      .find((record) => record.mark === "UNSERVED-MAKER-POSITION")!.subject_ref;
+    // The scenario derives its asker from a randomised question line, so read the
+    // real one back rather than reconstructing it.
+    const asker = await database.pool.query<{ asker_id: string }>(
+      "SELECT asker_id FROM core.run WHERE run_id=$1", [scenario.runId]
+    );
+    return Object.freeze({
+      runId: scenario.runId, answerId,
+      askerId: asker.rows[0]!.asker_id, subjectRef: subject
+    });
+  }
+
+  /** The record shape `prepareVersion` carries forward, field for field. */
+  function preservedRecord(record: {
+    mark: string; scope: "answer" | "node"; subject_ref: string; reason: string;
+    lift_path: string | null; served_root_rule: string | null; affected_node_ids: readonly string[];
+    call_site_key: string | null; planned_leg_count: number | null;
+    terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null; hidden_strength: number | null;
+    hidden_score_threshold: number | null; hidden_score_threshold_source_ref: string | null;
+    excluded_from_served_number: boolean | null; judged_basis_count: number | null;
+  }): ConditionMarkRecord {
+    return {
+      mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope,
+      subjectRef: record.subject_ref, reason: record.reason, liftPath: record.lift_path,
+      servedRootRule: record.served_root_rule as ConditionMarkRecord["servedRootRule"],
+      affectedNodeIds: record.affected_node_ids, callSiteKey: record.call_site_key,
+      plannedLegCount: record.planned_leg_count,
+      terminalTransportOutcome: record.terminal_transport_outcome,
+      hiddenStrength: record.hidden_strength,
+      hiddenScoreThreshold: record.hidden_score_threshold,
+      hiddenScoreThresholdSourceRef: record.hidden_score_threshold_source_ref,
+      excludedFromServedNumber: record.excluded_from_served_number,
+      judgedBasisCount: record.judged_basis_count
+    };
+  }
+
+  /** A superseding persist over an existing answer — what catch-up performs. */
+  function supersedingInput(
+    source: Awaited<ReturnType<ServeRepository["readReviewCatchUpSource"]>>,
+    runId: string,
+    answerId: string,
+    records: readonly ConditionMarkRecord[]
+  ) {
+    return {
+      runId, workItemId: source.workItemId,
+      factBundleVersion: source.factBundleVersion,
+      factBundleContentHash: source.factBundleContentHash,
+      factBundle: source.factBundle,
+      result: {
+        terminal: source.answer.terminal,
+        answerForm: source.answer.answer_form as ServeGateResult["answerForm"],
+        factBundle: source.factBundle, gateTrace: [],
+        conditionMarks: source.answer.condition_marks, conformance: [],
+        coverageMode: "NOT_RUN", segments: [],
+        compositionBudget: {
+          tier: "low" as const, bound: 10_000, registerRowKey: "compositionBundleBudget.low",
+          registerVersion: 1, sourceRef: "test-layer:B3"
+        },
+        confidenceBand: source.answer.confidence_band,
+        // The stored pair must stay paired (answer_band_ceiling_pair): carry the
+        // source's ceiling forward exactly as the production catch-up path does.
+        bandCeiling: source.answer.band_ceiling === null ? null : {
+          label: source.answer.band_ceiling.label,
+          basis: source.answer.band_ceiling.basis,
+          registerRowKey: source.answer.band_ceiling.register_row_key,
+          registerVersion: source.answer.band_ceiling.register_version,
+          sourceRef: source.answer.band_ceiling.source_ref,
+          liftPath: source.answer.band_ceiling.lift_path
+        },
+        projections: {
+          reversalPoint: source.answer.reversal_point,
+          buildsOnPrevious: source.factBundle.buildsOnPrevious,
+          memoryDisclosure: source.factBundle.memoryDisclosure
+        }
+      } as unknown as ServeGateResult,
+      segments: source.answer.composed_text.map((segment) => ({
+        segmentId: segment.segment_id, text: segment.text,
+        loadBearing: segment.load_bearing, assertedNodeRefs: [],
+        servedNumberRefs: segment.served_number_refs
+      })),
+      compositionRawArtifactRef: null, compositionAttempt: 0,
+      conformanceRawArtifactRefs: [], conditionMarkRecords: records,
+      servedNumber: null, supersedes: { answerId }
+    };
+  }
+
+  /** FAILURE CASE 3, at the DDL — the database must be able to hold its own history. */
+  it("B3-a the shipped CHECK admits the declared rule history without being lifted", async () => {
+    const legacy = await sealedBeforeMigration0055(`b3-check-${randomUUID()}`);
+    const latest = await database.pool.query<{ answer_version: number }>(
+      "SELECT max(answer_version) AS answer_version FROM serve.answer WHERE answer_id=$1",
+      [legacy.answerId]
+    );
+    const answerVersion = latest.rows[0]!.answer_version;
+    const insertRule = async (rule: string): Promise<void> => {
+      const client = await database.pool.connect();
+      try {
+        // condition_mark is append-only, so the probe INSERTS (never updates) and
+        // the transaction is rolled back: this measures the CONSTRAINT, and
+        // leaves no row behind.
+        await client.query("BEGIN");
+        await client.query(
+          `INSERT INTO serve.condition_mark
+             (answer_id, answer_version, mark, scope, subject_ref, reason, lift_path,
+              served_root_rule, at_seq)
+           VALUES ($1, $4, 'UNSERVED-MAKER-POSITION', 'answer', $2, 'B3 constraint probe',
+                   NULL, $3, ledger.allocate_sequence())`,
+          [legacy.answerId, legacy.subjectRef, rule, answerVersion]
+        );
+      } finally {
+        await client.query("ROLLBACK").catch(() => undefined);
+        client.release();
+      }
+    };
+
+    // The live rule and the DECLARED retired rule are both storable — the second
+    // is the write DR-184 catch-up performs when it carries an old record forward.
+    await expect(insertRule("max-propagated-strength-lexicographic-tiebreak")).resolves.toBeUndefined();
+    await expect(insertRule(RETIRED_RULE)).resolves.toBeUndefined();
+    // ...and a value outside the declared history is still refused, so the
+    // constraint admits HISTORY, not anything at all.
+    await expect(insertRule("some-rule-nobody-ever-ruled")).rejects.toThrow(
+      /condition_mark_served_root_rule_rule_check/u
+    );
+  });
+
+  /** FAILURE CASES 1 and 2 — projection and both public API routes. */
+  it("B3-b a pre-0055 answer projects and parses through the public contract and both routes", async () => {
+    const legacy = await sealedBeforeMigration0055(`b3-read-${randomUUID()}`);
+    const projection = await new ServeRepository(database.pool)
+      .readAnswerProjection(legacy.answerId, legacy.askerId);
+
+    expect(projection?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNSERVED-MAKER-POSITION",
+      served_root_rule: RETIRED_RULE
+    }));
+    // The exact call both answer routes make. Today this throws, so a pre-0055
+    // answer is a 500 rather than an answer.
+    expect(() => AnswerSchema.parse(projection)).not.toThrow();
+
+    const identity = testHttpIdentity(`b3-reader-${randomUUID()}`);
+    await persistHttpIdentity(identity, "b3-reader");
+    const api = buildApi({
+      application: {
+        readAnswer: async () => projection,
+        readRunAnswer: async () => projection
+      } as unknown as AskApplication,
+      sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN
+    });
+    try {
+      for (const url of [
+        `/v1/answers/${encodeURIComponent(legacy.answerId)}`,
+        `/v1/runs/${encodeURIComponent(legacy.runId)}/answer`
+      ]) {
+        const response = await api.inject({ method: "GET", url, headers: testSessionHeaders(identity) });
+        expect({ url, statusCode: response.statusCode }).toEqual({ url, statusCode: 200 });
+        const body = response.json() as { condition_mark_records: { served_root_rule: string | null }[] };
+        // The route returns the PRESERVED value — it is not relabelled on the wire.
+        expect(body.condition_mark_records.map((record) => record.served_root_rule))
+          .toContain(RETIRED_RULE);
+      }
+    } finally { await api.close(); }
+  });
+
+  /** FAILURE CASE 3 — DR-184 catch-up re-persists the preserved record. */
+  it("B3-c catch-up carries the historical rule forward without relabelling it", async () => {
+    const legacy = await sealedBeforeMigration0055(`b3-catchup-${randomUUID()}`);
+    const serve = new ServeRepository(database.pool);
+    const source = await serve.readReviewCatchUpSource(legacy.runId);
+    expect(source.answerId).toBe(legacy.answerId);
+
+    // Exactly what prepareVersion(...).persist() does: a new immutable version
+    // of the same answer, carrying the preserved records forward verbatim.
+    const preserved = source.answer.condition_mark_records.map(preservedRecord);
+    expect(preserved.some((record) => String(record.servedRootRule) === RETIRED_RULE)).toBe(true);
+
+    await serve.persist(supersedingInput(source, legacy.runId, legacy.answerId, preserved));
+
+    // Three versions now exist, and NO version was rewritten: the original
+    // fresh selection still says the live rule, and every version sealed under
+    // the retired rule still says the retired rule. Catch-up neither relabels
+    // history forward nor rewrites it backward.
+    const versions = await database.pool.query<{ answer_version: number; served_root_rule: string | null }>(
+      `SELECT mark.answer_version, mark.served_root_rule
+         FROM serve.condition_mark AS mark
+        WHERE mark.answer_id=$1 AND mark.mark='UNSERVED-MAKER-POSITION'
+        ORDER BY mark.answer_version`,
+      [legacy.answerId]
+    );
+    expect(versions.rows.length).toBeGreaterThanOrEqual(3);
+    expect(versions.rows[0]!.served_root_rule).toBe("max-propagated-strength-lexicographic-tiebreak");
+    expect(versions.rows.at(-1)!.served_root_rule).toBe(RETIRED_RULE);
+    expect(versions.rows.slice(1).every((row) => row.served_root_rule === RETIRED_RULE)).toBe(true);
+  });
+
+  /** The other half of the law: a FRESH selection may never record a retired rule. */
+  it("B3-d refuses a retired rule on a fresh (non-superseding) answer", async () => {
+    const legacy = await sealedBeforeMigration0055(`b3-fresh-${randomUUID()}`);
+    const serve = new ServeRepository(database.pool);
+    const source = await serve.readReviewCatchUpSource(legacy.runId);
+
+    const work = new WorkItemRepository(database.pool);
+    const freshWorkItemId = await work.enqueue({
+      runId: legacy.runId, batteryRowId: "Q1", nodeSet: [],
+      commandKey: `b3-fresh-selection:${randomUUID()}`
+    });
+    const freshInput = {
+      runId: legacy.runId, workItemId: freshWorkItemId,
+      // A distinct fact-bundle version: this is a FRESH answer for the run, not
+      // another version of the existing one.
+      factBundleVersion: source.factBundleVersion + 5,
+      factBundleContentHash: source.factBundleContentHash,
+      factBundle: source.factBundle,
+      result: {
+        terminal: "COMPONENTS_ONLY", answerForm: null, factBundle: source.factBundle,
+        gateTrace: ["COMPONENTS_ONLY_DEFECT"], conditionMarks: ["UNSERVED-MAKER-POSITION"],
+        conformance: [], coverageMode: "NOT_RUN", segments: [],
+        compositionBudget: {
+          tier: "low" as const, bound: 10_000, registerRowKey: "compositionBundleBudget.low",
+          registerVersion: 1, sourceRef: "test-layer:B3"
+        },
+        confidenceBand: null, bandCeiling: null,
+        projections: {
+          reversalPoint: source.answer.reversal_point,
+          buildsOnPrevious: source.factBundle.buildsOnPrevious,
+          memoryDisclosure: source.factBundle.memoryDisclosure
+        }
+      } as unknown as ServeGateResult,
+      segments: [], compositionRawArtifactRef: null, compositionAttempt: 0,
+      conformanceRawArtifactRefs: [],
+      conditionMarkRecords: [{
+        mark: "UNSERVED-MAKER-POSITION" as const, scope: "answer" as const,
+        subjectRef: legacy.subjectRef,
+        reason: "a fresh selection trying to claim the retired rule",
+        liftPath: null, servedRootRule: RETIRED_RULE as never,
+        affectedNodeIds: [legacy.subjectRef]
+      }],
+      servedNumber: null
+    };
+
+    await expect(
+      serve.persist(freshInput as Parameters<ServeRepository["persist"]>[0])
+    ).rejects.toMatchObject({ code: "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE" });
   });
 });

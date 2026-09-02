@@ -16,14 +16,29 @@
 --    collation, so the tiebreak cannot change with the host). A tie is CONTESTED
 --    under T11's ladder anyway, because its margin is zero.
 --
---    NOT VALID is deliberate and is the whole mechanism. Rows already sealed
---    under the retired rule are HISTORY: they are never rewritten and never
---    relabelled, because a record that says which rule actually served it is the
---    only honest record. NOT VALID exempts exactly those existing rows from
---    validation while enforcing the constraint on every INSERT and UPDATE from
---    here on. So: history keeps saying 'first-configured-provider'; no new row
---    can. Do NOT "tidy" this into a VALIDATE CONSTRAINT — validating it would
---    reject the very history it is meant to preserve.
+--    The constraint admits the DECLARED RULE HISTORY: the live rule, plus every
+--    rule that was lawful when older rows were sealed. It is VALIDATED, not NOT
+--    VALID — every existing row is proven to be inside that history, and so is
+--    every future one, which the first draft of this file (live-rule-only, NOT
+--    VALID) could not say: it left historical rows permanently unchecked.
+--
+--    Why the retired member is still admitted on WRITE, and where "not writable"
+--    actually lives (codex r1 B3): DR-184 review catch-up appends a NEW VERSION
+--    of an existing answer and carries its condition-mark records forward. For an
+--    answer sealed before this migration, the record it carries says
+--    'first-configured-provider' — and that is TRUE of the version being written,
+--    because catch-up does not re-select a root, it inherits one. A constraint
+--    that refused the value would force catch-up to either relabel history (a
+--    falsification) or refuse an operation that is otherwise lawful. SQL cannot
+--    tell a fresh selection from a preserved one, so the distinction is enforced
+--    where it can be: `ConditionMarkRecord.servedRootRule` (the FRESH-selection
+--    write type) admits the live rule only, a retired value can only reach
+--    `persist` through the separate preserved shape, and `persist` refuses a
+--    retired rule on any answer that is not superseding an existing one
+--    (RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE). The repo-wide source scan in
+--    tests/architecture/t10-first-configured-provider-removed.test.ts proves no
+--    shipped writer contains the retired literal at all: it only ever arrives by
+--    reading a row.
 --
 -- 2. THE MARGIN, ON THE RECEIPT. The goal requires "margins to runner-up
 --    recorded in the receipt". The receipt for a run's numbers is
@@ -52,11 +67,15 @@ ALTER TABLE serve.condition_mark
   ADD CONSTRAINT condition_mark_served_root_rule_rule_check
   CHECK (
     served_root_rule IS NULL
+    -- The live rule: what every fresh selection records.
     OR served_root_rule = 'max-propagated-strength-lexicographic-tiebreak'
-  ) NOT VALID;
+    -- Declared history: rows sealed under the retired DR-161 rule, and the value
+    -- DR-184 catch-up carries forward onto their later versions.
+    OR served_root_rule = 'first-configured-provider'
+  );
 
 COMMENT ON CONSTRAINT condition_mark_served_root_rule_rule_check ON serve.condition_mark IS
-  'T10: only the live served-root rule is writable. NOT VALID preserves rows sealed under the retired DR-161 rule first-configured-provider without rewriting them; it is never to be validated.';
+  'T10: served_root_rule holds the DECLARED RULE HISTORY — the live max-propagated-strength rule plus the retired DR-161 first-configured-provider rule that older rows were sealed under and that DR-184 catch-up carries forward. Anything outside that history is refused. "A retired rule is never a NEW selection" is enforced in the application (ConditionMarkRecord.servedRootRule is live-only; persist refuses a retired rule on a non-superseding answer), because SQL cannot tell a fresh selection from a preserved one.';
 
 -- ---------------------------------------------------------------------------
 -- 2 · ledger.propagation_run.served_root_selection — the receipt limb that

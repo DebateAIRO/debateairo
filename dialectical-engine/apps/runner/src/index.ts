@@ -86,6 +86,7 @@ import {
   type CompositionBudgetResolution,
   type ConditionMarkRecord,
   type FactBundle,
+  type PreservedConditionMarkRecord,
   type ServeGateResult,
   type ServeNode,
   type VerdictLabelBasis
@@ -851,7 +852,12 @@ export function createPostgresReviewCatchUpDependencies(input: {
       const oldReviewRecords = new Map(source.answer.condition_mark_records
         .filter((record) => record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED")
         .map((record) => [record.subject_ref, record] as const));
-      const preservedRecords: ConditionMarkRecord[] = source.answer.condition_mark_records
+      // T10 / codex r1 B3: these records are HISTORY. One sealed before
+      // migration 0055 carries the retired rule, and carrying it forward is the
+      // point — relabelling it to today's rule would falsify how that answer was
+      // actually chosen. The preserved shape is the only one that may hold a
+      // retired rule, and only a superseding persist accepts it.
+      const preservedRecords: PreservedConditionMarkRecord[] = source.answer.condition_mark_records
         .filter((record) => record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "DERIVED-STANDING-UNREVIEWED")
         .map((record) => ({
           mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope,
@@ -872,7 +878,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
         }
         return { callSiteKey: old.call_site_key, terminalTransportOutcome: old.terminal_transport_outcome } as const;
       };
-      const reviewRecords: ConditionMarkRecord[] = [
+      const reviewRecords: PreservedConditionMarkRecord[] = [
         ...standing.hiddenNodeIds.map((nodeId) => ({
           mark: "HIDDEN-UNJUDGEABLE" as const, scope: "node" as const, subjectRef: nodeId,
           reason: "Cross-maker review transport exhausted; disclosed as unjudged and excluded from the served number",

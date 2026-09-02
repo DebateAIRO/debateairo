@@ -334,6 +334,28 @@ describe("T11 · the three-state label ladder", () => {
     });
   });
 
+  describe("the served-root rule history (codex r1 B3)", () => {
+    it("keeps the READ vocabulary wider than the WRITE vocabulary", async () => {
+      const [kernel, contract] = await Promise.all([
+        import("@debateai/kernel"),
+        import("@debateai/contract")
+      ]);
+
+      // Compile-level pin: if the read type ever narrows back to the live rule
+      // alone, this assignment stops compiling — which is exactly how the
+      // defect was visible before it was fixed.
+      const historical: import("@debateai/kernel").ServedRootRuleHistory = "first-configured-provider";
+      expect(kernel.isRetiredServedRootRule(historical)).toBe(true);
+
+      // The public contract accepts a preserved historical value...
+      expect(contract.AnswerSchema.shape.condition_mark_records.element
+        .shape.served_root_rule.parse("first-configured-provider")).toBe("first-configured-provider");
+      // ...and still refuses a rule nobody ever ruled.
+      expect(() => contract.AnswerSchema.shape.condition_mark_records.element
+        .shape.served_root_rule.parse("some-rule-nobody-ever-ruled")).toThrow();
+    });
+  });
+
   describe("live-UI vocabulary wiring (confirm-item 4)", () => {
     it("maps each engine label to the banner's own vocabulary", async () => {
       const { liveVerdictState } = await import("../../apps/ui/lib/v3/labels.js");
