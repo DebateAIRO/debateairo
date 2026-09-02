@@ -6,6 +6,7 @@ import { access, lstat, open, rename, unlink } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { HatchetClient } from "@hatchet-dev/typescript-sdk/v1/client/client.js";
+import { developmentComposeSecretsPath } from "./dev-compose-secrets.js";
 import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 const PRIVATE_FILE_MODE = 0o600;
@@ -336,11 +337,15 @@ async function resolveDockerExecutable(
   throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_DOCKER_UNAVAILABLE");
 }
 
-function composeArguments(...arguments_: readonly string[]): readonly string[] {
+function composeArguments(
+  secretsEnvFile: string,
+  ...arguments_: readonly string[]
+): readonly string[] {
   return Object.freeze([
     "compose",
     "--progress", "quiet",
     "--env-file", ".env.compose",
+    "--env-file", secretsEnvFile,
     "-f", "compose.dev.yaml",
     ...arguments_
   ]);
@@ -351,6 +356,9 @@ export function createDevelopmentHatchetTokenOperations(
   commandEnvironment: Readonly<Record<string, string>>
 ): DevelopmentHatchetTokenOperations {
   const cwd = resolve(repositoryRoot);
+  const secretsEnvFile = developmentComposeSecretsPath(
+    resolveDevCustodyRoot(cwd, commandEnvironment)
+  );
   let dockerExecutable: string | undefined;
   const docker = async (): Promise<string> => {
     if (dockerExecutable !== undefined) return dockerExecutable;
@@ -374,7 +382,7 @@ export function createDevelopmentHatchetTokenOperations(
       const executable = await docker();
       const running = await runCommand({
         executable,
-        arguments: composeArguments("ps", "--status", "running", "--services"),
+        arguments: composeArguments(secretsEnvFile, "ps", "--status", "running", "--services"),
         cwd,
         baseEnvironment: commandEnvironment,
         environment: { VLLM_MODEL: "dev-auth-not-started" },
@@ -385,7 +393,7 @@ export function createDevelopmentHatchetTokenOperations(
       }
       return runCommand({
         executable,
-        arguments: composeArguments("exec", "-T", "hatchet-lite", ...TOKEN_COMMAND),
+        arguments: composeArguments(secretsEnvFile, "exec", "-T", "hatchet-lite", ...TOKEN_COMMAND),
         cwd,
         baseEnvironment: commandEnvironment,
         environment: { VLLM_MODEL: "dev-auth-not-started" },

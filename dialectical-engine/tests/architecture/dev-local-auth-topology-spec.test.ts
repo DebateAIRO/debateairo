@@ -230,6 +230,9 @@ describe("DEV-01 local-auth topology specification", () => {
     expect(uiServer).toContain('process.env.PORT?.trim() || "3000"');
     expect(compose).toContain('"127.0.0.1:8888:8888"');
     expect(compose).toContain('"127.0.0.1:7077:7077"');
+    // DEV-01 promised a dedicated hatchet owner; compose now uses it (L7-F2).
+    expect(compose).toContain("postgresql://debateai_dev_hatchet:");
+    expect(compose).not.toContain("postgresql://debateai:");
     expect(evaluatorMigration).toContain(
       "CREATE SCHEMA IF NOT EXISTS evaluator AUTHORIZATION debateai_evaluator_ddl"
     );
