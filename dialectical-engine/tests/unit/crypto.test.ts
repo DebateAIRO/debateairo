@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmod, link, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -12,6 +12,7 @@ import {
   generateVerificationToken,
   hashToken,
   hashVerificationToken,
+  assertPublicationSecretDomains,
   destroyKek,
   loadKek,
   loadSecretKey,
@@ -243,6 +244,83 @@ describe("S1 crypto foundation", () => {
       new URL("../../apps/api/src/graceful-shutdown.ts", import.meta.url), "utf8"
     );
     expect(shutdown).toContain("destroyKek");
+  });
+
+  it("refuses aliased secret domains even when publication is disabled", async () => {
+    // L2-F8: the pairwise key-domain check ran only under PUBLICATION_ENABLED,
+    // so with publication off an operator could point KEK_PATH and
+    // BLIND_INDEX_KEY_PATH at one file and silently make the KEK the email
+    // HMAC key.
+    const directory = await mkdtemp(join(tmpdir(), "debateai-domains-"));
+    temporaryDirectories.push(directory);
+    const kekPath = join(directory, "kek");
+    const blindIndexPath = join(directory, "blind-index-key");
+    const saltPath = join(directory, "audit-source-ip-salt");
+    const storePath = join(directory, "user-dek-store");
+    const auditStorePath = join(directory, "audit-key-store");
+    const kekMaterial = generateDek();
+    const blindIndexKey = generateDek();
+    const salt = generateDek();
+    await writeFile(kekPath, kekMaterial, { mode: 0o600 });
+    await writeFile(blindIndexPath, blindIndexKey, { mode: 0o600 });
+    await writeFile(saltPath, salt, { mode: 0o600 });
+    await mkdir(storePath, { mode: 0o700 });
+    await mkdir(auditStorePath, { mode: 0o700 });
+    const kek = loadKek(kekMaterial);
+
+    const separated = Object.freeze({
+      privateKek: kek,
+      privateKekPath: kekPath,
+      privateStorePath: storePath,
+      additionalSecrets: [
+        { path: blindIndexPath, material: blindIndexKey },
+        { path: saltPath, material: salt }
+      ],
+      additionalStorePaths: [auditStorePath]
+    });
+    // A correctly provisioned private-only deployment passes with no corpus KEK.
+    expect(() => assertPublicationSecretDomains(separated)).not.toThrow();
+
+    // KEK_PATH === BLIND_INDEX_KEY_PATH.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalSecrets: [
+        { path: kekPath, material: blindIndexKey },
+        { path: saltPath, material: salt }
+      ]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // Distinct paths, identical bytes.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalSecrets: [
+        { path: blindIndexPath, material: kekMaterial },
+        { path: saltPath, material: salt }
+      ]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // The audit-key store nested inside the user DEK store.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalStorePaths: [join(storePath, "audit")]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // A symlinked alias resolves to the same inode.
+    const aliasPath = join(directory, "kek-alias");
+    await symlink(kekPath, aliasPath);
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalSecrets: [
+        { path: aliasPath, material: blindIndexKey },
+        { path: saltPath, material: salt }
+      ]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // The API process root must run this check with no publication guard.
+    const apiMain = await readFile(
+      new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
+    );
+    expect(apiMain).toMatch(/^assertPublicationSecretDomains\(\{/m);
   });
 
   it("makes both process compositions refuse a missing KEK_PATH with the typed code", () => {

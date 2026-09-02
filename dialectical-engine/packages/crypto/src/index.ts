@@ -233,30 +233,44 @@ function pathsOverlap(left: string, right: string): boolean {
   return left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`);
 }
 
-/** Fail closed if any configured secret path or store root aliases another. */
+/**
+ * Fail closed if any configured secret path or store root aliases another.
+ *
+ * L2-F8: this ran only when publication was enabled, so a private-only
+ * deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one file and
+ * silently make the KEK the email HMAC key — after which "rotating the blind
+ * index" would be a KEK rotation. The corpus KEK and publication store are now
+ * optional and every other domain is checked unconditionally. A private-only
+ * violation reports SECRET_DOMAIN_MUST_BE_SEPARATE; the publication pair keeps
+ * its established PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE code.
+ */
 export function assertPublicationSecretDomains(input: Readonly<{
   privateKek: KekHandle;
-  corpusKek: KekHandle;
+  corpusKek?: KekHandle | undefined;
   privateKekPath: string;
-  corpusKekPath: string;
+  corpusKekPath?: string | undefined;
   privateStorePath: string;
-  publicationStorePath: string;
+  publicationStorePath?: string | undefined;
   additionalSecrets?: readonly Readonly<{
     path: string;
     material: Uint8Array;
   }>[];
   additionalStorePaths?: readonly string[];
 }>): void {
+  const code = input.corpusKek === undefined
+    ? "SECRET_DOMAIN_MUST_BE_SEPARATE"
+    : "PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE";
   const materials: Buffer[] = [];
   try {
-    materials.push(readKek(input.privateKek), readKek(input.corpusKek));
+    materials.push(readKek(input.privateKek));
+    if (input.corpusKek !== undefined) materials.push(readKek(input.corpusKek));
     for (const secret of input.additionalSecrets ?? []) {
       materials.push(copyKey(secret.material));
     }
     for (let leftIndex = 0; leftIndex < materials.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < materials.length; rightIndex += 1) {
         if (timingSafeEqual(materials[leftIndex]!, materials[rightIndex]!)) {
-          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+          throw new TypeError(code);
         }
       }
     }
@@ -266,8 +280,9 @@ export function assertPublicationSecretDomains(input: Readonly<{
   const paths = [
     canonicalCandidatePath(input.privateKekPath),
     canonicalCandidatePath(input.privateStorePath),
-    canonicalCandidatePath(input.corpusKekPath),
-    canonicalCandidatePath(input.publicationStorePath),
+    ...(input.corpusKekPath === undefined ? [] : [canonicalCandidatePath(input.corpusKekPath)]),
+    ...(input.publicationStorePath === undefined
+      ? [] : [canonicalCandidatePath(input.publicationStorePath)]),
     ...(input.additionalSecrets ?? []).map((secret) => canonicalCandidatePath(secret.path)),
     ...(input.additionalStorePaths ?? []).map(canonicalCandidatePath)
   ];
@@ -276,13 +291,13 @@ export function assertPublicationSecretDomains(input: Readonly<{
       const left = paths[leftIndex]!;
       const right = paths[rightIndex]!;
       if (pathsOverlap(left, right)) {
-        throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+        throw new TypeError(code);
       }
       try {
         const leftStat = statSync(left);
         const rightStat = statSync(right);
         if (leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino) {
-          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+          throw new TypeError(code);
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

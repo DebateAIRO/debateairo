@@ -67,21 +67,25 @@ const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
-if (corpusKek !== undefined) {
-  assertPublicationSecretDomains({
-    privateKek: kek,
+// L2-F8: this guarded the whole check on publication being enabled, so a
+// private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
+// file and boot. The private domains are always checked; the corpus KEK and
+// publication store join the same check only when publication is on.
+assertPublicationSecretDomains({
+  privateKek: kek,
+  ...(corpusKek === undefined ? {} : {
     corpusKek,
-    privateKekPath: environment.KEK_PATH,
     corpusKekPath: environment.CORPUS_KEK_PATH!,
-    privateStorePath: environment.USER_DEK_STORE_PATH,
-    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!,
-    additionalSecrets: [
-      { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
-      { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
-    ],
-    additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
-  });
-}
+    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!
+  }),
+  privateKekPath: environment.KEK_PATH,
+  privateStorePath: environment.USER_DEK_STORE_PATH,
+  additionalSecrets: [
+    { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
+    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
+  ],
+  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
+});
 const pool = createPool(environment.DATABASE_URL);
 const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!);
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
