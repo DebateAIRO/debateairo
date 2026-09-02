@@ -59,12 +59,3 @@ tests/unit/xrev01-node-review.test.ts > XREV-01 cross-maker node review > stops 
 #   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here: B20 re-pointed the pin at core.lock_owned_live_runs (12175123).
 # tests/unit/v2ui-node-runner.test.ts > HYG-01 v2-ui Node test gate > keeps every active .test.mjs file in the explicit runner manifest
 #   source: live-mission authority at dev@1c9578a, three full runs (seed file above) — GREEN here and absent from the b5a6b6eb classification; fixed in the 1c9578a→b5a6b6eb range.
-
-# Environment-sensitive measured bound (not a code regression). The 256 MiB RSS bound was sealed on
-# V's macOS host (local measurements 247-252 MiB; five interleaved A/B rounds vs. the base showed no
-# change from this branch). The GitHub ubuntu runner measures 273.1 MiB (run 33628453671 @ 38654929).
-# Listed so CI is honest about it; passes locally, so the gate reports it as stale on macOS — expected.
-# See V-25 (re-measure and seal per platform, or scope the case to the measured host).
-tests/unit/registration.test.ts > S3 ruled authentication policy > S3c B4 keeps the isolated production RSS curve below the published measured bound
-# source: GitHub ubuntu-latest runner, Node 22.23.1, PR #8 run 33628453671 @ 38654929 (2026-09-02); green on macOS
-
