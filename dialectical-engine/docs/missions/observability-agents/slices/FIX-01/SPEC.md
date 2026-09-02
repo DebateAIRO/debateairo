@@ -1,0 +1,60 @@
+# FIX-01 — First row: a real scheduler-job fault becomes a row V can query
+
+**FROZEN at creation — 2026-09-01, seat REQ-FIX (Fable 5.1). No agent edits this file. Scope changes are a new SPEC version ratified by V.**
+Gate: **G1 capture** · Depends-on for dispatch: none (obs schema, 15 tables and the five `debateai_obs_*` roles are LIVE on the dev Postgres — probed read-only 2026-09-01) · Depends-on for acceptance: none.
+Absorbs predecessor tickets: **S05b `t_3a04cc06`** (runtime capture wiring — the mission's central defect: the product stores nothing) · **S10 `t_6c5e1a6e`** (scheduler binding). Cites: S05 `t_6e99d607` (frozen installers, read-only), S03b `t_9b5ca941` (core, read-only), S01 `t_1fde033d` (store, read-only).
+D-criteria evidenced: **D1** (scheduler surface, "nothing silently dropped"), **D4** (partial — pre-arm loss becomes a counted `obs.capture_gap` row), **D5** (partial — a planted DSN password never reaches any sink), **D6** (structural — the runtime imports no zone module, never `@debateai/db`).
+Seam obligations that bind this slice: **S05b O-1, O-2, O-3, O-4** (`t_3a04cc06`, comments 2026-08-22) — restated as FIX-01-R05.
+
+## 1. Intent
+The predecessor built a capture package whose default queue is `{ offer: () => false }`: every `emit()` in production is dropped. FIX-01 makes the pipeline real on the ONE surface V can drive from a single terminal command with nothing else running — the scheduler's one-shot CLI (`apps/scheduler/src/cli.ts`, 24 lines) — and proves it with a genuine fault in unmodified product code producing a genuine `obs.occurrence` row. Everything downstream (tracing, tickets, proposals, PRs) consumes rows; without this slice there are no rows.
+
+## 2. Requirements
+- **FIX-01-R01** The `@debateai/obs-capture/runtime` subpath (already declared in `packages/obs-capture/package.json:11`, target absent today) exists and exports `startCaptureRuntime` / `stopCaptureRuntime` whose shape satisfies, at compile time, the frozen `RuntimeCaptureModule` declaration in `packages/obs-capture/install/*.ts`; renaming the function, renaming any of the three argument fields (`runtime`, `spoolFd`, `installExitSink`), changing the arity, or making the signature positional each raises a `pnpm typecheck` diagnostic.
+- **FIX-01-R02** When the runtime arms, a real bounded reference queue replaces the installer's drop-everything default; an `emit()` that occurs before arming is counted, and after the first flush an `obs.capture_gap` row with `gap_class = 'QUEUE_FULL'` and `lost_count >= 1` exists for it.
+- **FIX-01-R03** The flusher writes post-redaction envelopes to `obs.occurrence` through the `pg` driver as role `debateai_obs_writer` over `OBS_WRITER_DATABASE_URL`; a runtime resolve-hook trace of `import("@debateai/obs-capture/runtime")` shows `pg` and shows ZERO `@debateai/db`, ZERO `apps/**`, ZERO zone-manifest paths; `import("@debateai/obs-capture")` (the root barrel) shows ZERO `pg` (the `./runtime` subtree is never re-exported from the root barrel).
+- **FIX-01-R04** Spool: only post-redaction envelopes are written, through the installer's pre-opened fd; on the next arm of any instrumented process, spooled records drain into `obs.occurrence` with `capture_status = 'SPOOLED'` and one `obs.spool_receipt` row each; re-ingesting the same file changes neither count (UNIQUE `(source, source_event_ref)`); files whose owning pid is alive are skipped; the rule for a 0-byte file whose pid is dead is stated in the slice's DECISIONS.md and asserted by a test.
+- **FIX-01-R05** The Tier-1 exit sink installed by the runtime: (O-1) writes at most one record per process death — never a Tier-1 record plus a Tier-0 fallback; (O-2) completes its write synchronously and never returns without writing; (O-3) registers no `uncaughtException`/`unhandledRejection` listener of its own and never writes through the raw fd outside the sink; (O-4) never calls `process.exit`.
+- **FIX-01-R06** `apps/scheduler/src/cli.ts` imports `@debateai/obs-capture/install/scheduler` as its first statement and runs each of the three jobs inside a lifecycle wrapper that emits `started`, then exactly one of `succeeded | failed | noop`, where `noop` carries the job's input count (versions scanned / rows considered / rows archived), then flushes with a deadline before the process exits.
+- **FIX-01-R07** A scheduler job that throws produces exactly one `obs.occurrence` row with `runtime = 'scheduler'`, `capture_point = 'job'`, `capture_status = 'PERSISTED'`, a non-empty `fingerprint`, within `obs.flushDeadlineMs` of the process exit (seed **5000 ms**; V ratifies the number at this slice's acceptance).
+- **FIX-01-R08** No planted secret survives: a database URL carrying a password, passed to the failing job, leaves the password absent from every text/jsonb column of every `obs.*` table and from the raw bytes of every spool file; no `message` text is stored anywhere in `obs.*` (Batch-3 row 6).
+- **FIX-01-R09** Least privilege is real in both directions: the sink succeeds as `debateai_obs_writer`; `SELECT 1 FROM core.run LIMIT 1` and `UPDATE obs.occurrence SET code = 'x'` on that role are DENIED; a sink pointed at `debateai_obs_human` fails closed (spools, does not throw into the product).
+- **FIX-01-R10** The product is unaffected: the failing job's exit code and its stderr byte length are identical with and without the installer import; the emit path performs no synchronous I/O and no serialization on the calling thread.
+- **FIX-01-R11** With Postgres down, the failing job's envelope is spooled, the job's exit code is unchanged, and after Postgres returns the next instrumented process drains it (R04).
+- **FIX-01-R12** Two identical faults produce two occurrence rows sharing one `fingerprint` (no occurrence-level dedup; folding is the incident projection's job, FIX-09).
+- **FIX-01-R13** The runtime reads its bounds from `OBS_*` environment variables with declared calibration seeds (predecessor L2-ADDENDUM-PLAN §3.7); the slice handoff records the `pnpm audit:source` `blocking` rows it adds, verbatim, against V-6 (`t_d821f99e`) — `pnpm lint` is NOT a Done criterion for this slice until V rules V-6.
+- **FIX-01-R14** Nothing in this slice imports, reads, stats, lists or names by import any zone path; zone membership stays path-string data in `packages/obs-capture/src/zone/manifest.ts` (read-only to this slice).
+- **FIX-01-R15** A green test suite is a worker milestone only; Done is V's veto after running §5 personally.
+
+## 3. States
+Runtime: `UNARMED` (installer loaded, queue drops and counts) → `ARMING` (dynamic import in flight, bounded by one flush interval) → `ARMED` (queue real, flusher ticking) → `DRAINING` (spool files of dead pids being ingested) → `STOPPED` (`stopCaptureRuntime`, final flush with deadline).
+Record: `QUEUED` → `PERSISTED` | `SPOOLED` → `PERSISTED` (via drain, receipt written) | `LOST` (counted in `obs.capture_gap`, never silent).
+Job: `started` → `succeeded` | `failed` | `noop(input_count)`.
+
+## 4. Copy and vocabulary
+"occurrence" (one captured event, one row) · "arm" (the runtime replacing the drop-default queue) · "drain" (spool → store) · "flush deadline" (`obs.flushDeadlineMs`) · "writer role" (`debateai_obs_writer`) · "gap row" (`obs.capture_gap`). Never "log", never "message" for stored content.
+
+## 5. Acceptance — V runs this personally in the real dev stack (repo root, one terminal)
+Expected observation follows each step. `PSQL` below means `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c`.
+1. `docker ps --format '{{.Names}} {{.Status}}' | grep postgres` → `debateai-v3-postgres-1 Up … (healthy)`.
+2. One-time V act (V is the DB owner; no seat does this): `PSQL "ALTER ROLE debateai_obs_writer PASSWORD 'dev-only-writer'"` → `ALTER ROLE`.
+3. `PSQL "SELECT count(*) FROM obs.occurrence"` → an integer; call it N.
+4. Cause a real fault in unmodified product code (a job whose database URL names a database that does not exist, carrying a planted password): `mkdir -p .obs-spool && OBS_SPOOL_DIR=$PWD/.obs-spool OBS_WRITER_DATABASE_URL='postgres://debateai_obs_writer:dev-only-writer@127.0.0.1:55432/debateai' LIVENESS_DATABASE_URL='postgres://debateai:PLANTED-SECRET-7731@127.0.0.1:55432/no_such_database' pnpm job:liveness-sweep; echo "exit=$?"` → the job prints a Postgres error to stderr and `exit=1`; NO obs-related text appears on stderr.
+5. Within 5 s: `PSQL "SELECT count(*) FROM obs.occurrence"` → N+1.
+6. `PSQL "SELECT runtime, capture_point, taxonomy_class, code, severity, capture_status, fallback_minimized, run_ref FROM obs.occurrence ORDER BY occ_seq DESC LIMIT 1"` → `scheduler|job|JOB_FAILURE or DB_FAILURE|<a registry code, or OBS_CAPTURE_SELF with fallback_minimized=true if the thrown code is not registered — record which>|SEVERE or FATAL|PERSISTED|…|UNKNOWN:DECLARED_KIND_REQUIRED (before FIX-03 is merged) or NOT_APPLICABLE (after)`.
+7. `PSQL "SELECT count(*) FROM (SELECT o::text t FROM obs.occurrence o UNION ALL SELECT d::text FROM obs.occurrence_detail d) s WHERE t LIKE '%PLANTED-SECRET-7731%' OR t LIKE '%password=%'"` → `0`; and `grep -rc 'PLANTED-SECRET-7731' .obs-spool/ ; echo "grep-exit=$?"` → every count `0` (or no files) and `grep-exit=1`.
+8. Repeat step 4 once → `PSQL "SELECT count(*), count(DISTINCT fingerprint) FROM obs.occurrence WHERE occ_seq > (SELECT max(occ_seq) - 2 FROM obs.occurrence)"` → `2|1`.
+9. `docker exec -e PGPASSWORD=dev-only-writer debateai-v3-postgres-1 psql -U debateai_obs_writer -d debateai -At -c 'SELECT 1 FROM core.run LIMIT 1'` → `ERROR:  permission denied` (schema or table).
+10. Chaos, DB down: `docker stop debateai-v3-postgres-1`, then step 4's command again → `exit=1`, stderr shows the connection error only; `ls .obs-spool/` shows a `scheduler-<pid>-<uuid>.spool` file with exactly one line (`wc -l`).
+11. `docker start debateai-v3-postgres-1`; wait for `(healthy)`; run step 4's command once more (any instrumented process arms and drains) → `PSQL "SELECT count(*) FROM obs.occurrence WHERE capture_status='SPOOLED'"` ≥ 1 and `PSQL "SELECT count(*) FROM obs.spool_receipt"` ≥ 1; the spool file is renamed `*.ingested`.
+12. `pnpm audit:source; echo "exit=$?"` → the `blocking` array is printed; the slice handoff lists these rows verbatim (expected: the three frozen installers plus the runtime's `config.ts` and `sink.ts`); this step records, it does not gate (V-6).
+V vetoes Done only after steps 1–12 match. Any mismatch is a finding with the step number.
+
+## 6. Out of scope
+Cause-chain preservation (FIX-02) · runner/API/provider/client surfaces (FIX-03/04/05/06) · per-runtime heartbeat and the "quiet vs off" query (FIX-07) · the full adversarial corpus and the nine chaos cases (FIX-08) · any listener, tracer, ticket, proposal or PR (FIX-09+) · the `audit:source` remedy (V-6) · any migration (0034 is live; 0035 is reserved by name for capture-gap closure and NOT claimed) · scheduling the scheduler jobs (E6-06 → ObservationAgent) · fixing the register's unvalidated `OBS_*` config (V-6 option C).
+
+## 7. File surface (single-writer) and parallel safety
+Allowed: `packages/obs-capture/src/runtime/**` (new: `index.ts`, `sink.ts`, `drain.ts`, `config.ts`) · `apps/scheduler/src/cli.ts` (whole file) · tests `tests/integration/fix01-*.test.ts`, `tests/unit/fix01-*.test.ts`.
+Read-only: `packages/obs-capture/src/{index,emit,queue,flusher,redactor,spool,health,context}.ts` · `packages/obs-capture/install/*.ts` (frozen) · `packages/obs-capture/src/registry/**` · `migrations/0034_obs_foundation.sql` · `tests/support/testDatabase.ts`.
+Forbidden: `@debateai/db` at any depth · `packages/obs-capture/src/index.ts` (no runtime re-export) · `install/*.ts`, `src/zone/**`, `src/registry/**` · `migrations/**` · `packages/register/src/runtime-environment.ts` · any DELETE/UPDATE/TRUNCATE · `obs.run_correlation_v`, `core.*`, `ledger.*`, `register.*`.
+Parallel-safe with: FIX-02, FIX-03, FIX-04, FIX-05, FIX-08 (files), FIX-09, FIX-10, FIX-11, FIX-16. Must NOT run concurrently with: **FIX-07** (same `src/runtime/**` surface — FIX-07 dispatches after FIX-01 merges).

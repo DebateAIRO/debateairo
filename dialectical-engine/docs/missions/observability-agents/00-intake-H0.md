@@ -1,6 +1,6 @@
 # H0 INTAKE — mission `observability-agents`
 
-- **Date:** 2026-09-01 · **Orchestrator:** Claude Code, Fable 5.1 (Claude-Router seat) · **Spine:** v3.3.0 · **Board:** `observability-agents` (Hermes Kanban :9119)
+- **Date:** 2026-09-01 · **Orchestrator:** Claude Code, Fable 5.1 (Claude-Router seat) · **Spine:** v3.4.0 (v3.3.0 at intake; the vertical-slice skew was closed the same evening — see the protocol commit) · **Board:** `observability-agents` (Hermes Kanban :9119)
 - **Predecessor:** `2026-08-21-observability-loop` (capture layer + error-listener loop). Stalled since 2026-08-27 on RP-0, V's own custodian act. This mission ABSORBS its remaining scope as the **FixAgent** product and adds two new products.
 
 ## V's goal (verbatim, `/goal`, 2026-09-01)
@@ -43,6 +43,8 @@ loop_ownership:
 
 ## Measured state at intake (2026-09-01, dev @ `8d38185c`)
 
+> **Tree moved during intake (recorded 23:50).** A concurrent `ui-overhaul` session committed six times on `dev` between 23:30 and 23:35 — `3e7d83e9` consolidated the 111 dirty UI entries, `690ebe14` and `1c1039d5` merged `slice/t3` and `slice/t5`, and `c25e8803` / `f03ded2d` / `b5a6b6eb` swept three of this mission's in-progress packets into commits with wrong messages ("supplier requirements packet" = REQ-SUP). The orchestrator then committed the spine amendment `4f764037`. Seats were told on their tickets to cite the HEAD they measured on. The figures below describe `8d38185c`.
+
 - `dev` is 86 commits ahead of `origin/dev`; 111 dirty working-tree entries belong to `ui-overhaul` (in flight, untouched here).
 - **D12 demo** (the predecessor's V-runnable demo): `PASSED 6 / FAILED 1 / SKIPPED 21`, exit 1 — full log `logs/d12-demo-2026-09-01.log`. Stage 16 (D6, textual half) FAILED: `packages/obs-capture/src/zone/manifest.ts` names zone prefixes. The 2026-08-27 run passed 7/0/21 before S04's manifest was merged. Settled by AUDIT-STATE (charge D).
 - **G1 capture:** package landed (`packages/obs-capture`: registry, emit, queue, flusher, redactor, spool, health, zone; five installers; migration `0034_obs_foundation.sql`). Runtime wiring (S05b) and every binding (S06 runner, S08 api, S09 client, S10 scheduler, S11 provider) ABSENT. **G2 listener, G3 dispatch, G4/G5 fix arms: ABSENT.** Root preservation is impossible today: `TypedDomainError` discards `cause` (S07 owns it).
@@ -76,4 +78,6 @@ loop_ownership:
 | AUDIT-STATE | `t_0d8634a7` | verification | `…/packets/AUDIT-STATE.md` |
 | V-DECISIONS | `t_a273e880` | V | `docs/missions/observability-agents/V-DECISIONS-PACKET.md` |
 
-Wave 2 (after wave 1 lands): REQ-REV-{FIX,OBS,SUP} — Fable 5.1 blind reviewers, one per product, each also reviewing the packet that dispatched the work · REQ-SYNTH — assembles `INSTRUCTIONS.md` (≤100 lines) from the three compass blocks · slice tickets created on this board · ARCH seats per slice · Codex fleets per slice in one worktree each.
+**Finding F-01 (t_b701a8e9, 23:50):** REQ-SUP fanned out three read-only `Explore` children on model `opus` without a grant; disposition = disclosure duty + review check P8b, class fixed in COMMON §3 (bounded read-only fan-out, model `fable`, receipts). No other seat spawned children.
+
+Wave 2 (after wave 1 lands; tickets pre-created 2026-09-01 23:52): REQ-REV-FIX `t_ca8c42be` · REQ-REV-OBS `t_f1236b44` · REQ-REV-SUP `t_d819e88e` — Fable 5.1 blind reviewers, one per product, each also reviewing the packet that dispatched the work (packets `…/packets/REQ-REV-{FIX,OBS,SUP}.md`) · REQ-SYNTH `t_63e08f55` — assembles `INSTRUCTIONS.md` (≤100 lines) from the three compass blocks (packet `…/packets/REQ-SYNTH.md`) · slice tickets created on this board · ARCH seats per slice · Codex fleets per slice in one worktree each.

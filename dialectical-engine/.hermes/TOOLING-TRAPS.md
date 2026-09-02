@@ -860,3 +860,125 @@ Found by CODE-T5C1 (2026-09-01): a jsdom dump test passed a URL derived from
 `import.meta.url` to `mkdirSync` and failed with `ERR_INVALID_URL_SCHEME` before writing
 the artifact. For repo-local throwaway artifacts, resolve the authorized destination from
 the test command's pinned `process.cwd()` with `node:path`; this cost one failed dump run.
+
+## zsh + vitest: an unquoted `$FILES` is ONE filter token — "No test files found" is BROKEN, not RED (2026-09-01, AUDIT-STATE)
+Third recurrence of the no-word-split trap already recorded above, in a new costume: `pnpm vitest run $FILES`
+(seven space-separated paths in one variable) under zsh hands vitest a single filter string. vitest 4.1.10
+prints `No test files found, exiting with code 1` and its `filter:` line echoes ALL seven paths joined —
+that echo is the tell. The run cost one wasted suite round and would have been filed as RED by a
+zero-vs-nonzero classifier. Pass the paths literally, or use `${=FILES}`, and treat `No test files found`
+as BROKEN every time (it is already in the BROKEN signature list above; the gate rule reads: never RED
+until you prove the command RAN).
+
+## `git diff/log/ls-tree -- <pathspec>` from inside `dialectical-engine/`: a git-root-relative path matches NOTHING and returns an EMPTY diff that reads as "unchanged" (2026-09-01, AUDIT-STATE)
+`git show --format= --name-only <sha>` prints paths from the GIT ROOT (`dialectical-engine/apps/...`). Feeding
+those back into `git diff <a>..<b> -- dialectical-engine/apps/runner/src/index.ts` while your cwd already IS
+`dialectical-engine/` makes git look for `dialectical-engine/dialectical-engine/apps/...`, find nothing, and print
+nothing — indistinguishable from "no change". This produced a false "dev did not move under lane-3" for one
+round; the corrected run (`git -C <git-root> diff ... -- dialectical-engine/...`, or `./apps/...` from the
+subdirectory) showed 166+/115- on the very file. Tell: a numstat that is EMPTY for a file you know was
+touched. Rule: when a pathspec comes from `--name-only`, run the follow-up from the git root or strip the prefix.
+
+## Claude Code Bash outputs over ~30 KB are PERSISTED with a 2 KB preview — and re-reading the persisted file overflows again (REQ-SUP, 2026-09-01)
+Symptom: a `cat -n` of a 400-line file returns "Output too large … saved to …/tool-results/<id>.txt"
+with a 2 KB preview; a plain `cat` of that persisted file produces a SECOND persisted file with
+another 2 KB preview. Paid three times in one seat (TOOLING-TRAPS itself, a 330-line synthesis
+section, three template files in one call) ≈ 6k tokens of previews and three round trips.
+Fix: chunk by BYTES, not lines, under ~25 KB per call — `head -c 25000 <file>` then
+`tail -c +25001 <file> | head -c 25000` — or `sed -n 'a,bp'` on ranges you know are short.
+Rule of thumb: ≈ 170 bytes/line for dense markdown, so ~150 lines per call is the ceiling.
+
+- **`hermes kanban --board <slug> show <ticket> --json` wraps the ticket under `.task`** — `.title`,
+  `.status`, `.body` at the top level are `null`; use `.task.title`, `.task.status`, `.task.body`;
+  comments are `.comments[]` with `.author`/`.body`/`.created_at`, and Router comments carry
+  `author: "default"` (pass `--author` or the record cannot say who wrote). (REQ-FIX, 2026-09-01;
+  one wasted probe)
+- **`psql` is NOT on this Mac's PATH.** Every "V pastes a Postgres query" step must go through the
+  container: `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "<sql>"`
+  (credentials from `compose.dev.yaml`). A SPEC that says `psql …` is unrunnable by V. (REQ-FIX,
+  2026-09-01; caught before 16 SPECs were written against it)
+- **The obs lane worktrees live under `dialectical-engine/.worktrees/obs-lane-N`**, not under the
+  git root `DebateAIRO/.worktrees/` — `git worktree list` is the only reliable map, and the intake's
+  "obs-lane-3 carries UNCOMMITTED S06 work" was stale: that work was checkpointed as `e8d99d33` and
+  merged by `1c9578a2`. **Grep before you believe an intake's ABSENT/UNCOMMITTED:** the same intake
+  said every binding was absent while `apps/runner/src/main.ts:1` already imported the installer.
+  (REQ-FIX, 2026-09-01; one failed probe, one near mis-cut slice)
+
+## The root `typescript@7.0.2` package ships NO JavaScript compiler API (REQ-01, translation, 2026-09-02)
+The existing entry above says the repo has two TypeScript installs and `pnpm exec` resolves the
+nearest — true, and it describes a DIAGNOSTICS difference, which sends you looking for a version
+mismatch. The sharper fact: `node_modules/typescript/lib/` at the repo ROOT contains only
+`getExePath.{js,d.ts}`, `tsc.js`, `version.cjs` and `version.d.cts` — **there is no
+`lib/typescript.js`**, so `import ts from "typescript"` / `require("typescript")` cannot work at the
+root at all. It is a native-binary wrapper, not a library.
+Symptom: a scratch script dies with `ERR_MODULE_NOT_FOUND` inside tsx's `resolveTsPathsSync`, which
+reads like a path problem and is not.
+Fix: the full API lives at
+`node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/lib/typescript.js` (pinned by
+`apps/ui`). Load it by ABSOLUTE path with `createRequire(import.meta.url)` from a plain `.mjs`
+script run with `node` — not with `pnpm exec tsx`, because tsx resolves modules from the SCRIPT's
+directory, so a scratch file outside the repo resolves nothing regardless of the cwd. Naming the
+scratch file `.mts` (the earlier entry) is necessary and not sufficient.
+Cost: three probes, ~8 minutes.
+
+## `grep 'direction *:'` over `globals.css` counts `flex-direction`, not text direction (REQ-01, 2026-09-02)
+An RTL audit that greps for `direction:` gets 28 hits in `apps/ui/app/globals.css` and every one is
+`flex-direction:`. Zero are the CSS `direction` property. A seat sizing the right-to-left work from
+that number is sizing flex rows.
+The real physical-direction surface is **79** declarations, itemised: `left:` 16, `margin-left` 14,
+`border-left` 9, `text-align: left` 8, `right:` 7, `padding-left` 7, `text-align: right` 6,
+`padding-right` 5, `border-left-width` 4, `border-left-color` 2, `border-bottom-left-radius` 1.
+`margin-right`, `border-right` and `float` do not occur. Table in
+`docs/missions/translation/requirements/census.md`.
+General rule, and it is the family this file keeps recording: **a bare property-name grep matches
+every compound property that ends in it.** Anchor on `[; {]` or on the exact declaration.
+
+## A string classifier's error rate is invisible in what it KEPT (REQ-01, 2026-09-02)
+Building the translatable-string census, four successive versions of the AST classifier all produced
+output that read as clean. Every defect was found by reading the **EXCLUDED** set, never the included
+one: single-word JSX text (`<span>depth {n}</span>`) thrown away as a "kebab-case identifier";
+`{"true"}` counted as rendered text when it was the right operand of `process.env.X === "true"`;
+`new Error("API_UPSTREAM_UNREACHABLE")` counted as user-visible copy; `` `${n}px` `` counted as prose.
+Three of the four share ONE rule that was never written down: **a string's POSITION decides whether
+shape heuristics may fire at all** — a JSX text node or a JSX child expression is on screen whatever
+it looks like, and shape tests apply only to strings in weak positions.
+Rule: when you build a filter, sample the rejected set with a query designed to find things that
+should have been kept (here: "rejected entries that contain a space", then "rejected entries in a
+strong position"). A filter validated only on what it accepted has never been shown to reject
+correctly — the mirror of this file's standing "validate a checker on known-GOOD input".
+Cost: four full runs, ~35 minutes.
+
+## `--include=*.tsx` on a `grep -r` explodes under zsh before grep sees it (REQ-REV-01, 2026-09-02)
+`grep -rn '<ModeToggle' apps/ui --include=*.tsx` fails with `(eval):2: no matches found: --include=*.tsx`.
+zsh globs every unquoted word on the line, including the value glued to a long option, and there is no
+`*.tsx` in the cwd to match. bash would have passed it through unexpanded. It is not a grep problem and
+the error message names the flag, so it reads like an unsupported option.
+Fix: quote it (`--include='*.tsx'`) or drop it and pass directories
+(`grep -rn '<ModeToggle' apps/ui/app apps/ui/components`).
+Same shape bites `--exclude=*.log`, `--exclude-dir=node_modules/*`, `find -name *.ts` and any
+`--opt=<glob>`. **Rule: in this harness's shell, every glob that is an ARGUMENT rather than a path is
+quoted.** Cost: one failed call and a wrong first hypothesis (that the flag was unsupported).
+
+## Counting mission-requirement citations with a bare id regex counts the slice-local ids (REQ-REV-01, 2026-09-02)
+A requirements artifact defines mission ids `R01…R56` and its slice SPECs define slice-local ids
+`I01-R01…`, `L-ar-R16…`. A coverage check that greps a slice SPEC for `/R\d\d/` matches `R10` **inside**
+`I01-R10`, so every mission id from R01 to the slice's own requirement count appears "cited" whether or
+not anything traces to it. Measured live: the check reported 56 of 56 mission requirements covered; the
+true figure was 54, and the two orphans (R10, R12) were the two that encoded the user's own acceptance
+criterion. The report was wrong in three places because the number had been copied into three documents.
+Fix: anchor on the trace COLUMN, not the body —
+`^\|\s*` + backtick-id-backtick + `\s*\|.*\|([^|]*)\|\s*$` — and take the ids from that capture only.
+General rule, and this file already holds its sibling: **a verifier is validated against an input that
+must FAIL it.** One document with a deliberately-orphaned requirement, run once, exposes this in a
+second. A verifier that has only ever seen conforming input has not been shown to report a violation.
+
+## A logical-CSS-property audit must match the SHORTHANDS, not only `-start`/`-end` (REQ-REV-01, 2026-09-02)
+Probing `apps/ui/app/globals.css` for logical properties with
+`/(margin|padding|border|inset)-(inline|block)-(start|end)/` returns **0** and the file genuinely has
+**8**: `padding-inline:` × 7 and `padding-block:` × 1. The shorthand forms carry no `-start`/`-end`
+segment, so the obvious regex reports a clean sweep on a stylesheet that is already partly converted.
+I nearly filed a refutation of a correct measurement on this. Include the shorthands
+(`margin-inline`, `padding-inline`, `inset-inline`, `border-inline`, and their `-block` twins) and
+`text-align: start|end`.
+Rule for reviewers: **a negative finding about a COUNT is produced by two differently-shaped probes
+before it is written down.** A confirmation that fails is loud; a refutation that fails is silent.

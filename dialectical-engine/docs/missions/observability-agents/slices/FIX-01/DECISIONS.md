@@ -1,0 +1,22 @@
+# FIX-01 — DECISIONS (append-only: date · question · choice · reason · who ruled). Never edited, never deleted. Before asking V anything, read this file.
+
+- 2026-09-01 · Does the predecessor D11 auto-merge apply in phase 1? · NO — every FixAgent action is approval-first; QUICK auto-merge is a V-flipped later phase (`quick_arm` OFF, FIX-14) · V newer statement "Initially I want to be in charge of everything" wins (intake C1); row V-1 asks CONFIRM · orchestrator (intake), V to confirm
+- 2026-09-01 · Is a shared read-only `obs.*` store coupling between two "standalone" agents? · NO — standalone = separately deployable, startable, killable processes with their own kill switch · intake C3 · orchestrator
+- 2026-09-01 · Who detects "it just does not work" (stalls, non-draining queues, blind periods)? · ObservationAgent detects and emits a typed signal; the FixAgent consumes only error/defect-shaped input · intake C4 default; row V-3 pending · orchestrator, V to confirm
+- 2026-09-01 · Do predecessor S-tickets carry over as slice tickets? · NO — FIX slices are fresh on board `observability-agents`, each citing the S-tickets it absorbs; the old board is history · intake C7 · orchestrator
+- 2026-09-01 · What is Done for this slice? · V personally runs SPEC §5 and vetoes; green suites and PASS verdicts are milestones · V vertical-slice law, spine v3.4.0 item 2 · V
+- 2026-09-01 · User-linked identifiers in any obs row? · NONE — `asker_id`/`session_id` inexpressible; correlation via declared kinds only · R-E4 (V 2026-08-21) + Batch-7 (V 2026-08-22) · V
+- 2026-09-01 · Free-text remnant anywhere in `obs.*`? · NONE — codes, chain codes, typed template parameters only · Batch-3 row 6 (V 2026-08-21) · V
+- 2026-09-01 · How many custodians? · ONE — V; additional approvers are a future grant · E6-02 as amended (V 2026-08-22) · V
+- 2026-09-01 · Filesystem metadata on zone files? · NONE — no read, import, listing, hash/size/mtime/mode; no SQL against `identity.*`; mount reality from the text of `apps/api/src/index.ts` only · Batch-8 (V 2026-08-26) · V
+- 2026-09-01 · Model access for any worker this slice spawns? · CLI relay only; a DR-179 lift swaps the adapter and expands no authority · DR-179 + OBS-R090 · V
+- 2026-09-01 · Deletion or pruning of obs data? · NONE absent an explicit V retention law · DR-188 · V
+- 2026-09-01 · Test-file partition for this mission? · `tests/<suite>/fix<NN>-*.test.ts(x)` per slice; landed `obs-l*` files keep their names · REQ-FIX (extends predecessor GLOBAL-TEST-SURFACE) · REQ-FIX seat
+- 2026-09-01 · Banned words in any step or criterion? · improve, better, robust, handle, appropriate — never · COMMON §4 · orchestrator
+- 2026-09-01 · Which surface carries the first complete proof? · The scheduler one-shot CLI (`apps/scheduler/src/cli.ts`) · the only surface V drives from one terminal with the https stack DOWN and no Hatchet dispatch; smallest binding file (24 lines); the fault (bad database URL) is real and repeatable · REQ-FIX seat (contested row F-3; V may veto)
+- 2026-09-01 · Must V run a migration before FIX-01? · NO — `obs` schema, 15 tables and the five `debateai_obs_*` roles are live on 127.0.0.1:55432 (read-only probe 2026-09-01) · measured, not assumed · REQ-FIX seat
+- 2026-09-01 · Is migration 0035 claimed? · NO — reserved by name for capture-gap closure · S05b ticket R-4 · predecessor ARCH
+- 2026-09-01 · Flush deadline number? · seed `obs.flushDeadlineMs = 5000`; V ratifies at acceptance · no seat-grounded number exists; a seed labelled as such is honest · REQ-FIX seat
+- 2026-09-01 · Is `pnpm lint` (audit:source) a Done criterion? · NO — rows are recorded verbatim; V-6 (`t_d821f99e`) is unruled · the plan mandates env reads the audit forbids · orchestrator (V-6 pending)
+- 2026-09-01 · Rule for a 0-byte spool file whose owning pid is dead? · OPEN — the architecture seat states it in PLAN.md and a test asserts it · S05b carry-forward 2026-08-27 · pending ARCH
+- 2026-09-01 · Do O-1..O-4 bind this slice? · YES — the runtime installs the Tier-1 exit sink · `t_3a04cc06` seam addendum, confirmed by execution · predecessor security lens
