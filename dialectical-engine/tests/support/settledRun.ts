@@ -53,6 +53,15 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     }),
     confidenceBand: null,
     bandCeiling: null,
+    // A PRE-T9 sealed answer, kept deliberately: its `GATE1_R9_BLOCK` trace is
+    // exactly the retired history the READ vocabulary exists to accept
+    // (`RETIRED_GATE_TRACE`, J17's shape). No digest, no loop and no T9 crash
+    // class existed when this shape was written, so all four are absent rather
+    // than back-filled with a class this answer never had.
+    digest: null,
+    loopRounds: Object.freeze([]),
+    standingObjection: null,
+    crashClass: null,
     projections: Object.freeze({
       reversalPoint: factBundle.reversalPoint,
       buildsOnPrevious: factBundle.buildsOnPrevious,

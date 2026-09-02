@@ -1034,6 +1034,15 @@ export function createPostgresReviewCatchUpDependencies(input: {
           sourceRef: source.answer.band_ceiling.source_ref,
           liftPath: source.answer.band_ceiling.lift_path
         },
+        // DR-184 review catch-up appends a new VERSION of an answer that was
+        // already synthesized: it re-reads standing, it never re-runs the
+        // digest or the loop. So T9's four fields are absent rather than
+        // fabricated — projecting a loop this path did not run would put a
+        // synthesis record on an answer nobody synthesized.
+        digest: null,
+        loopRounds: Object.freeze([]),
+        standingObjection: null,
+        crashClass: null,
         projections: {
           reversalPoint: source.answer.reversal_point,
           buildsOnPrevious: source.factBundle.buildsOnPrevious,
@@ -1091,6 +1100,16 @@ export interface WalkingSkeletonSettings {
   readonly conformanceContractHash: string;
   readonly propagationContractHash: string;
   readonly serveContractHash: string;
+  /**
+   * T9 RETIRED this setting's only reader inside the runner: composition
+   * retries are gone, and the loop's bound is the sealed
+   * `evaluatorLoopMaxRounds` row. It stays on the settings because the
+   * deployment still declares it and T17's envelope formula still reads
+   * `maxRecompose * fixedOrgansPerComposition` as its call-site term — a term
+   * that is now WRONG for the serve leg (the real count is
+   * `rounds x 2 roles`). Refitting that formula is T17's, and is reported as a
+   * finding rather than changed here.
+   */
   readonly maxRecompose: number;
   readonly factBundleVersion: number;
   readonly judgementNumberKind: string;
