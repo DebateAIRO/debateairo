@@ -162,12 +162,41 @@ function routePolicy(route: AuthorizationRoute): { readonly config: {
   });
 }
 
+/**
+ * Credential, token, and management routes carry at most ~1.1 KiB of
+ * legitimate body (L1 "B5"); each declares the 16 KiB ceiling explicitly.
+ */
+function credentialRoutePolicy(route: AuthorizationRoute): ReturnType<typeof routePolicy> & {
+  readonly bodyLimit: typeof AUTH_BODY_LIMIT_BYTES;
+} {
+  return Object.freeze({ ...routePolicy(route), bodyLimit: AUTH_BODY_LIMIT_BYTES });
+}
+
 function canonicalRoute(method: string, url: string): string {
   return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
 }
 
 export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
+/**
+ * F-07 / L1-F4 request ceilings. The server default bounds the free-text
+ * routes (asks, investigations: realistic worst case is tens of KiB); every
+ * credential, token, and management route declares the 16 KiB ceiling (its
+ * largest legitimate field is a 1024-byte legacy token). The request timeout
+ * bounds how long a client may take to deliver one request; SSE responses are
+ * unaffected. The param length stays at Fastify's default: L1 ruled against
+ * loosening it to 128.
+ */
+export const API_BODY_LIMIT_BYTES = 262_144 as const;
+export const AUTH_BODY_LIMIT_BYTES = 16_384 as const;
+export const API_REQUEST_TIMEOUT_MS = 30_000 as const;
+export const API_MAX_PARAM_LENGTH = 100 as const;
+/**
+ * The sealed password policy carries no maximum length (register rows are
+ * V-ruled); the request shape is bounded here instead so an unbounded
+ * password can never reach Argon2. A register-row maximum is proposed to V.
+ */
+export const AUTH_PASSWORD_MAX_BYTES = 1_024 as const;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
@@ -181,6 +210,26 @@ const SECURITY_HEADERS = Object.freeze({
   "referrer-policy": "no-referrer",
   "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 });
+
+/**
+ * Fastify classifies a request body before any handler runs. Each of these
+ * is a client fault with a constant envelope; none is a server failure.
+ */
+type TransportFaultEnvelope = Readonly<{
+  statusCode: 400 | 413 | 415;
+  code: "MALFORMED_REQUEST" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE";
+}>;
+const TRANSPORT_FAULT_ENVELOPES: ReadonlyMap<string, TransportFaultEnvelope> = new Map<string, TransportFaultEnvelope>([
+  ["FST_ERR_CTP_BODY_TOO_LARGE", { statusCode: 413, code: "PAYLOAD_TOO_LARGE" }],
+  ["FST_ERR_CTP_EMPTY_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_CTP_INVALID_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_CTP_INVALID_MEDIA_TYPE", { statusCode: 415, code: "UNSUPPORTED_MEDIA_TYPE" }]
+]);
+
+function passwordWithinRequestBound(body: Readonly<Record<string, unknown>>): boolean {
+  return typeof body.password !== "string"
+    || Buffer.byteLength(body.password, "utf8") <= AUTH_PASSWORD_MAX_BYTES;
+}
 
 declare module "fastify" {
   interface FastifyContextConfig {
@@ -334,7 +383,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const api = Fastify({
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
-    exposeHeadRoutes: false
+    exposeHeadRoutes: false,
+    bodyLimit: API_BODY_LIMIT_BYTES,
+    requestTimeout: API_REQUEST_TIMEOUT_MS,
+    routerOptions: { maxParamLength: API_MAX_PARAM_LENGTH }
   });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
@@ -456,6 +508,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return;
     }
     const knownError = error instanceof Error ? error : new Error(String(error));
+    const frameworkCode = (knownError as Error & Readonly<{ code?: unknown }>).code;
+    const transportFault = typeof frameworkCode === "string"
+      ? TRANSPORT_FAULT_ENVELOPES.get(frameworkCode) : undefined;
+    if (transportFault !== undefined) {
+      // Too large, empty or invalid JSON, unsupported media type: the client
+      // is at fault, so the envelope is constant and the >=500 failure log
+      // below is never reached (L1-F4).
+      return reply.status(transportFault.statusCode).send({
+        error: transportFault.code, message: transportFault.code
+      });
+    }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
     const authFlow = knownError instanceof AuthFlowError;
     // Only an error marked at the ask-evaluation stage is a refusal. Register,
@@ -492,9 +555,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   if (options.sessions !== undefined) {
-    api.post("/v1/auth/login", routePolicy("POST /v1/auth/login"), async (request, reply) => {
+    api.post("/v1/auth/login", credentialRoutePolicy("POST /v1/auth/login"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
+      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
       if (typeof body.challenge_token === "string") {
         const result = await options.sessions!.completeLogin({
           challengeToken: body.challenge_token,
@@ -518,7 +582,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
     });
-    api.post("/v1/auth/logout", routePolicy("POST /v1/auth/logout"), async (request, reply) => {
+    api.post("/v1/auth/logout", credentialRoutePolicy("POST /v1/auth/logout"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       await options.sessions!.logout(authenticated, sourceFor(request));
@@ -530,7 +594,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       return reply.send({ sessions: await options.sessions!.listSessions(authenticated) });
     });
-    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", routePolicy("DELETE /v1/auth/sessions/{id}"), async (request, reply) => {
+    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", credentialRoutePolicy("DELETE /v1/auth/sessions/{id}"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const parsedSessionId = SessionIdSchema.safeParse(request.params.id);
@@ -540,18 +604,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (parsedSessionId.data === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
       return reply.status(204).send();
     });
-    api.delete("/v1/auth/sessions", routePolicy("DELETE /v1/auth/sessions"), async (request, reply) => {
+    api.delete("/v1/auth/sessions", credentialRoutePolicy("DELETE /v1/auth/sessions"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const revoked = await options.sessions!.revokeAllSessions(authenticated, sourceFor(request));
       reply.header("set-cookie", expiredCookies());
       return reply.send({ revoked });
     });
-    api.post("/v1/auth/step-up", routePolicy("POST /v1/auth/step-up"), async (request, reply) => {
+    api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
+      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
       const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
@@ -591,7 +656,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       });
     });
   }
-  api.delete("/v1/account",routePolicy("DELETE /v1/account"),async (request,reply)=>{
+  api.delete("/v1/account",credentialRoutePolicy("DELETE /v1/account"),async (request,reply)=>{
     const authenticated=request.authenticatedSession;
     if (authenticated===undefined) {
       return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
@@ -631,7 +696,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post(
     "/v1/account/erasure/cancel",
-    routePolicy("POST /v1/account/erasure/cancel"),
+    credentialRoutePolicy("POST /v1/account/erasure/cancel"),
     async (request,reply)=>{
       const authenticated=request.authenticatedSession;
       if (authenticated===undefined) {
@@ -651,7 +716,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   api.post(
     "/v1/account/legacy-runs/claim",
-    routePolicy("POST /v1/account/legacy-runs/claim"),
+    credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
     async (request,reply)=>{
       const authenticated=request.authenticatedSession;
       if (authenticated===undefined) {
@@ -674,7 +739,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   api.delete<{ Params:{ id:string } }>(
     "/v1/debates/:id",
-    routePolicy("DELETE /v1/debates/{id}"),
+    credentialRoutePolicy("DELETE /v1/debates/{id}"),
     async (request,reply)=>{
       const runId=ResourceIdSchema.safeParse(request.params.id);
       const authenticated=request.authenticatedSession;
@@ -736,10 +801,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   );
   if (options.registration !== undefined) {
-    api.post("/v1/auth/register", routePolicy("POST /v1/auth/register"), async (request, reply) => {
+    api.post("/v1/auth/register", credentialRoutePolicy("POST /v1/auth/register"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
+      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
       const response = await options.registration!.register({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : "",
@@ -748,7 +814,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.status(202).send(response);
     });
-    api.post("/v1/auth/verify-email", routePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
+    api.post("/v1/auth/verify-email", credentialRoutePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -757,7 +823,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.send(response);
     });
-    api.post("/v1/auth/resend-verification", routePolicy("POST /v1/auth/resend-verification"), async (request, reply) => {
+    api.post("/v1/auth/resend-verification", credentialRoutePolicy("POST /v1/auth/resend-verification"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -769,7 +835,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   if (options.recovery !== undefined) {
-    api.post("/v1/auth/recovery/start", routePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+    api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -781,7 +847,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   if (options.mfa !== undefined) {
-    api.post("/v1/auth/mfa/totp/begin", routePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
+    api.post("/v1/auth/mfa/totp/begin", credentialRoutePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -789,7 +855,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/totp/verify", routePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
+    api.post("/v1/auth/mfa/totp/verify", credentialRoutePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -798,7 +864,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         code: typeof body.code === "string" ? body.code : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/recovery-codes/generate", routePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
+    api.post("/v1/auth/mfa/recovery-codes/generate", credentialRoutePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -806,7 +872,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/recovery-codes/confirm", routePolicy("POST /v1/auth/mfa/recovery-codes/confirm"), async (request, reply) => {
+    api.post("/v1/auth/mfa/recovery-codes/confirm", credentialRoutePolicy("POST /v1/auth/mfa/recovery-codes/confirm"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -994,7 +1060,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",
-    routePolicy("POST /v1/runs/{id}/publish"),
+    credentialRoutePolicy("POST /v1/runs/{id}/publish"),
     async (request, reply) => {
       const runId = ResourceIdSchema.safeParse(request.params.id);
       const authenticated = request.authenticatedSession;
@@ -1039,7 +1105,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/unpublish",
-    routePolicy("POST /v1/runs/{id}/unpublish"),
+    credentialRoutePolicy("POST /v1/runs/{id}/unpublish"),
     async (request, reply) => {
       const runId = ResourceIdSchema.safeParse(request.params.id);
       const authenticated = request.authenticatedSession;
