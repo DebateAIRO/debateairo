@@ -88,6 +88,40 @@ const costEnvelopeBasisSchema = z.object({
       message: `serve call sites ${basis.call_sites.serve} disagree with the ${selected} arm ${selectedArm}`
     });
   }
+  /**
+   * T17B/B2 — the check above compares serve against whichever arm THE RECEIPT
+   * nominated, so it can never ask whether that nomination is the one the
+   * constructor would have made. A receipt naming the SMALLER arm satisfied it
+   * and parsed: serve 6 against a 6-site synthesis arm, while a 7-site
+   * composition arm sat beside it and the constructor would have billed seven
+   * and selected COMPOSITION. The persisted receipt then claimed the opposite
+   * topology and a smaller ceiling leg than the run was actually admitted under.
+   *
+   * These two guards restate the constructor's own two decisions, and they are
+   * INDEPENDENT of the one above rather than a restatement of it:
+   *   `serveSites = Math.max(compositionSites, synthesisLoopSites)`
+   *   `selected   = compositionSites >= synthesisLoopSites ? COMPOSITION : ...`
+   *
+   * The second is load-bearing precisely at a TIE, where both arms are the
+   * larger arm and neither the count check nor the larger-arm check can
+   * distinguish the nominations — only the `>=` policy can.
+   */
+  const largerArm = Math.max(composition_sites, synthesis_loop_sites);
+  if (basis.call_sites.serve !== largerArm) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["call_sites", "serve"],
+      message: `serve call sites ${basis.call_sites.serve} are not the larger arm ${largerArm}`
+    });
+  }
+  const tiePolicySelection = composition_sites >= synthesis_loop_sites ? "COMPOSITION" : "SYNTHESIS_LOOP";
+  if (selected !== tiePolicySelection) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["serve_leg", "selected"],
+      message: `selected ${selected} disagrees with the constructor tie policy ${tiePolicySelection}`
+    });
+  }
   // The composition arm must equal its own disclosed decomposition for SOME
   // whole number of rounds: per-round sites x rounds, plus the per-run organ.
   const roundedSites = composition_sites - post_compose_sites_per_run;
@@ -111,9 +145,25 @@ export interface CostEnvelopeBasis {
 export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
   const parsed = costEnvelopeBasisSchema.safeParse(value);
   if (!parsed.success) {
+    /**
+     * T17B/B2 — the refusal names WHICH check refused.
+     *
+     * Every basis defect used to produce one identical sentence, so no caller
+     * and no test could tell the cross-field guards apart. That is the shape
+     * D56 rules out: a guard whose firing cannot be observed cannot be shown to
+     * fire for the reason it exists, and two guards that are indistinguishable
+     * at the surface are indistinguishable to a mutant too — one of them can be
+     * deleted with every test still green.
+     *
+     * The CODE is unchanged, and the original sentence is kept as the prefix,
+     * so the existing consumers and the assertion that matches that sentence
+     * are unaffected. Only the numbers and enum names already present in the
+     * rejected receipt are appended.
+     */
     throw new TypedDomainError(
       "RUN_COST_ENVELOPE_UNRESOLVED",
-      "The run head has no valid register-supplied cost-envelope basis"
+      "The run head has no valid register-supplied cost-envelope basis: "
+        + parsed.error.issues.map((issue) => issue.message).join("; ")
     );
   }
   return Object.freeze({

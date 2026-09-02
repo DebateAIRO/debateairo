@@ -353,6 +353,89 @@ describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
     expect(loop.serve_leg).toMatchObject({ selected: "SYNTHESIS_LOOP" });
     expect(parseCostEnvelopeBasis(loop)).toMatchObject({ panelSize: 2 });
   });
+
+  /**
+   * T17B/B2 — the checks above are ONE cross-field check, and one is not enough.
+   *
+   * r3 required TWO independent cross-field checks: the selected arm must agree
+   * with `call_sites.serve`, AND `selected` must not name the SMALLER arm. Only
+   * the first was built, so a receipt could name the smaller arm and parse: the
+   * count check passes because it compares serve against whichever arm the
+   * receipt itself nominated, and it never asks whether that nomination is the
+   * one the constructor would have made.
+   *
+   * The constructor bills `Math.max(composition_sites, synthesis_loop_sites)`
+   * and selects `composition_sites >= synthesis_loop_sites ? COMPOSITION :
+   * SYNTHESIS_LOOP`. A receipt is a claim about what was billed, so a receipt
+   * the constructor could never have minted is a false claim about a persisted
+   * ceiling — the same class of statement this mission repeals everywhere else.
+   */
+  it("refuses a receipt that selects the SMALLER arm (the count check alone accepts it)", () => {
+    const wire = basis();
+    // The exact input from the S09B review. Its point is that EVERY check that
+    // existed before this test passes on it:
+    //   selected arm  = synthesis_loop_sites = 6 = call_sites.serve -> agrees
+    //   (7 - 1) % 3   = 0                                           -> decomposes
+    // while the constructor computes max(7, 6) = 7, bills SEVEN sites and
+    // selects COMPOSITION. The accepted receipt claims the opposite topology
+    // and a smaller ceiling leg than the one that was actually billed.
+    wire.call_sites!.serve = 6;
+    wire.serve_leg = {
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 6,
+      selected: "SYNTHESIS_LOOP"
+    };
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+    // WHICH check refused is part of the assertion. Without this the test is
+    // satisfied by either guard alone and cannot tell a two-check parser from a
+    // one-check parser — which is precisely how the first hole survived review.
+    expect(() => parseCostEnvelopeBasis(wire)).toThrow("are not the larger arm 7");
+  });
+
+  /**
+   * The TIE is what makes the second check independent rather than decorative.
+   *
+   * When the arms are equal both are the larger arm, so the serve-count check
+   * and the larger-arm check are BOTH satisfied by either nomination. Only the
+   * tie policy distinguishes them, and the constructor's is explicit: `>=`
+   * selects COMPOSITION. This input is therefore refused by exactly one guard,
+   * which is what lets a mutant of that guard be credited to this assertion.
+   */
+  it("refuses SYNTHESIS_LOOP on a TIE, where only the tie policy can tell", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 7;
+    wire.serve_leg = {
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 7,
+      selected: "SYNTHESIS_LOOP"
+    };
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+    expect(() => parseCostEnvelopeBasis(wire)).toThrow("disagrees with the constructor tie policy COMPOSITION");
+  });
+
+  /**
+   * The NEIGHBOUR these two guards must NOT catch: a tie resolved the way the
+   * constructor resolves it. If this ever refuses, the guards are over-tight
+   * and every legitimately tied receipt has been made unparseable.
+   */
+  it("accepts a TIE resolved as COMPOSITION, exactly as the constructor resolves it", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 7;
+    wire.serve_leg = {
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 7,
+      selected: "COMPOSITION"
+    };
+    expect(parseCostEnvelopeBasis(wire)).toMatchObject({ panelSize: 2 });
+  });
 });
 
 describe("T17 · an over-bound input still refuses loudly at admission", () => {
