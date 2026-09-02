@@ -1,6 +1,6 @@
 import type { AdmissionPolicy } from "@debateai/register";
 
-export type AdmissionScope = "asks" | "publicReads";
+export type AdmissionScope = "asks" | "publicReads" | "recoveryStart";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -18,7 +18,8 @@ interface AdmissionEntry {
 }
 
 interface AdmissionBucket {
-  readonly policy: AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"];
+  readonly policy: AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"]
+    | AdmissionPolicy["recoveryStart"];
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -42,7 +43,8 @@ export class AdmissionLimiter {
   constructor(policy: AdmissionPolicy) {
     this.buckets = new Map<AdmissionScope, AdmissionBucket>([
       ["asks", { policy: policy.asks, entries: new Map() }],
-      ["publicReads", { policy: policy.publicReads, entries: new Map() }]
+      ["publicReads", { policy: policy.publicReads, entries: new Map() }],
+      ["recoveryStart", { policy: policy.recoveryStart, entries: new Map() }]
     ]);
   }
 

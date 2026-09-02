@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   AccountErasureScheduleRequestSchema,
@@ -209,6 +209,17 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
 const ResourceIdSchema = z.uuid();
 const SessionIdSchema = ResourceIdSchema;
+/**
+ * L1-F7: `{gapRef}` was unvalidated free text bounded only by the router's
+ * parameter length. It is model-authored, so it is bounded here at the route
+ * rather than in `@debateai/contract`, which is a live-mission surface. The
+ * blank guard mirrors the contract's `gap_ref` (`z.string().trim().min(1)`)
+ * while keeping the caller's value verbatim — the API never silently repairs.
+ * A gapRef longer than the router's `maxParamLength` never reaches this
+ * schema; it takes the typed 414 (L1-F6) instead.
+ */
+const InvestigationGapRefSchema = z.string().min(1).max(API_MAX_PARAM_LENGTH)
+  .refine((value) => value.trim().length > 0);
 const SECURITY_HEADERS = Object.freeze({
   "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
   "strict-transport-security": "max-age=31536000; includeSubDomains",
@@ -223,14 +234,19 @@ const SECURITY_HEADERS = Object.freeze({
  * is a client fault with a constant envelope; none is a server failure.
  */
 type TransportFaultEnvelope = Readonly<{
-  statusCode: 400 | 413 | 415;
-  code: "MALFORMED_REQUEST" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE";
+  statusCode: 400 | 413 | 414 | 415;
+  code: "MALFORMED_REQUEST" | "PAYLOAD_TOO_LARGE" | "URI_TOO_LONG" | "UNSUPPORTED_MEDIA_TYPE";
 }>;
 const TRANSPORT_FAULT_ENVELOPES: ReadonlyMap<string, TransportFaultEnvelope> = new Map<string, TransportFaultEnvelope>([
   ["FST_ERR_CTP_BODY_TOO_LARGE", { statusCode: 413, code: "PAYLOAD_TOO_LARGE" }],
   ["FST_ERR_CTP_EMPTY_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
   ["FST_ERR_CTP_INVALID_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
-  ["FST_ERR_CTP_INVALID_MEDIA_TYPE", { statusCode: 415, code: "UNSUPPORTED_MEDIA_TYPE" }]
+  ["FST_ERR_CTP_INVALID_MEDIA_TYPE", { statusCode: 415, code: "UNSUPPORTED_MEDIA_TYPE" }],
+  ["FST_ERR_CTP_INVALID_CONTENT_LENGTH", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_BAD_URL", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  // L1-F6: the framework 414 echoed the oversized parameter back at the
+  // caller. The constant envelope reflects nothing.
+  ["FST_ERR_MAX_PARAM_LENGTH", { statusCode: 414, code: "URI_TOO_LONG" }]
 ]);
 
 function passwordWithinRequestBound(body: Readonly<Record<string, unknown>>): boolean {
@@ -315,8 +331,14 @@ export class AskRefusal extends Error {
 }
 
 class MalformedRequestError extends Error {
+  /**
+   * L1-F5: a ZodError message is the entire issue list — every field path,
+   * every expected enum value, and each `.strict()` extra-key name. The
+   * transport message is therefore the constant code, and the schema detail
+   * survives only on `cause`, which never leaves the process.
+   */
   constructor(error: Error) {
-    super(error.message);
+    super("MALFORMED_REQUEST", { cause: error });
     this.name = "MalformedRequestError";
   }
 }
@@ -396,7 +418,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     exposeHeadRoutes: false,
     bodyLimit: API_BODY_LIMIT_BYTES,
     requestTimeout: API_REQUEST_TIMEOUT_MS,
-    routerOptions: { maxParamLength: API_MAX_PARAM_LENGTH }
+    routerOptions: { maxParamLength: API_MAX_PARAM_LENGTH },
+    /**
+     * Router-level faults never reach `setErrorHandler`: Fastify serializes
+     * them itself, and its 414 quotes the offending URL straight back at the
+     * caller (L1-F6). They take the same constant typed envelopes here, and an
+     * unrecognised one falls back to the constant 400 rather than a framework
+     * body. Nothing here echoes any part of the request.
+     */
+    frameworkErrors: (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
+      const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
+        ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
+      void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
+    }
   });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
@@ -523,6 +557,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
+  /**
+   * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
+   * stays false), returned Fastify's own {message,error,statusCode} envelope —
+   * a framework fingerprint and a route-existence oracle. One constant typed
+   * 404 covers all of them; it is a client fault, never an `api.request.failed`.
+   */
+  api.setNotFoundHandler((_request, reply) =>
+    reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" }));
   api.setErrorHandler((error, request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
@@ -585,7 +627,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(statusCode).send({
       error: errorCode,
-      message: statusCode >= 500 ? errorCode : knownError.message
+      message: statusCode >= 500 || malformed ? errorCode : knownError.message
     });
   });
 
@@ -593,7 +635,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.post("/v1/auth/login", credentialRoutePolicy("POST /v1/auth/login"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
-      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       if (typeof body.challenge_token === "string") {
         const result = await options.sessions!.completeLogin({
           challengeToken: body.challenge_token,
@@ -651,7 +695,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
-      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
@@ -811,7 +857,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const offset = Number(request.query.offset);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100
         || !Number.isInteger(offset) || offset < 0) {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       if (options.publications === undefined) {
         return reply.send(PublicDebateListSchema.parse({ items: [], total: 0 }));
@@ -842,7 +888,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
-      if (!passwordWithinRequestBound(body)) return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       const response = await options.registration!.register({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : "",
@@ -873,6 +921,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+      // L1-F3: this route had no per-source admission control at all — only a
+      // 500 ms enumeration floor — so one source could drive unbounded blind
+      // -index computations, recovery-start round trips and risk-signal writes.
+      // The budget is charged to the SOURCE and never to the address, so the
+      // refusal is identical whether or not the account exists: it adds no
+      // enumeration oracle to a route whose whole design is generic.
+      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", sourceFor(request).ip)) {
+        return reply;
+      }
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -941,7 +998,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const body = request.body;
       if (typeof body !== "object" || body === null || !("model_id" in body)
         || typeof body.model_id !== "string" || body.model_id.trim() === "") {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       try {
         const selection = await options.evaluatorDevMenu!.selectConsumerModel({
@@ -986,7 +1043,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const offset = Number(request.query.offset);
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
       || !Number.isInteger(offset) || offset < 0) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(
       request.session, limit, offset, ownershipFor(request)
@@ -999,7 +1056,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const answer = await options.application.readAnswer(
       answerId.data, request.session, version, ownershipFor(request)
@@ -1013,7 +1070,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const inspection = await options.application.readInspection(
       answerId.data, request.session, version, ownershipFor(request)
@@ -1043,9 +1100,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", routePolicy("POST /v1/answers/{id}/investigations/{gapRef}"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
+    const gapRef = parseRequest(InvestigationGapRefSchema, request.params.gapRef);
     const input = parseRequest(InvestigationRequestSchema, request.body);
     const accepted = await options.application.recordInvestigation(
-      answerId.data, request.params.gapRef, input.user_input, request.session, ownershipFor(request)
+      answerId.data, gapRef, input.user_input, request.session, ownershipFor(request)
     );
     return accepted === null ? reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" }) : reply.status(202).send(InvestigationAcceptedSchema.parse(accepted));
   });

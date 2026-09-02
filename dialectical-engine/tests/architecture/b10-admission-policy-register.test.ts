@@ -14,15 +14,19 @@ describe("B10 sealed admission-policy register row", () => {
     expect(ADMISSION_POLICY_REGISTER_ROW.value).toEqual({
       kind: "ADMISSION_POLICY",
       asks: { key: "owner", limit: 20, window_ms: 3_600_000, capacity: 8_192 },
-      public_reads: { key: "source", limit: 120, window_ms: 900_000, capacity: 65_536 }
+      public_reads: { key: "source", limit: 120, window_ms: 900_000, capacity: 65_536 },
+      // B25a appended this scope to the same unratified row (V-12).
+      recovery_start: { key: "source", limit: 15, window_ms: 3_600_000, capacity: 65_536 }
     });
     expect(ADMISSION_POLICY_REGISTER_ROW.sourceRef).toContain("PLAN B10 proposed values, V ratification pending (V-1)");
+    expect(ADMISSION_POLICY_REGISTER_ROW.sourceRef).toContain("PLAN B25a recovery_start, V ratification pending (V-12)");
     const policy = admissionPolicyFromValue(
       ADMISSION_POLICY_REGISTER_ROW.value, ADMISSION_POLICY_REGISTER_ROW.sourceRef
     );
     expect(policy).toEqual({
       asks: { key: "owner", limit: 20, windowMs: 3_600_000, capacity: 8_192 },
       publicReads: { key: "source", limit: 120, windowMs: 900_000, capacity: 65_536 },
+      recoveryStart: { key: "source", limit: 15, windowMs: 3_600_000, capacity: 65_536 },
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);
@@ -60,7 +64,7 @@ describe("B10 sealed admission-policy register row", () => {
       source_ref: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     }] });
     await expect(readAdmissionPolicy({ query } as never, 1)).resolves.toMatchObject({
-      asks: { limit: 20 }, publicReads: { limit: 120 }
+      asks: { limit: 20 }, publicReads: { limit: 120 }, recoveryStart: { limit: 15 }
     });
   });
 
