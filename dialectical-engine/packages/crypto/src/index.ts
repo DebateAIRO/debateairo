@@ -8,7 +8,15 @@ import {
   randomInt,
   timingSafeEqual
 } from "node:crypto";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  openSync,
+  readSync,
+  realpathSync,
+  statSync
+} from "node:fs";
 import type { Dirent } from "node:fs";
 import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -117,6 +125,18 @@ export class KekUnresolvedError extends CryptoError {
   constructor() {
     super("KEK_UNRESOLVED", "KEK_UNRESOLVED");
     this.name = "KekUnresolvedError";
+  }
+}
+
+/**
+ * A key file that exists but does not satisfy the custody contract. Distinct
+ * from KEK_UNRESOLVED (nothing is configured at that path) so an operator can
+ * tell "you did not provision this" from "this file is not safe to trust".
+ */
+export class CryptoCustodyError extends CryptoError {
+  constructor(code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID") {
+    super(code, code);
+    this.name = "CryptoCustodyError";
   }
 }
 
@@ -316,30 +336,96 @@ export function decrypt(dek: Uint8Array, envelope: CryptoEnvelope, aad: AeadAad)
   }
 }
 
-export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
+/**
+ * The production custody contract for a raw 32-byte secret file (L2-F6). It is
+ * the discipline `apps/runner/src/dev-secret-files.ts` already enforced for dev
+ * secrets, which the production loaders did not:
+ *
+ * - `O_NOFOLLOW` so a symlinked key path is refused rather than followed;
+ * - every check taken from `fstat` on the descriptor actually read, so there is
+ *   no stat -> read window another process can slip through;
+ * - `uid` owned by this process, `nlink === 1` (no second name for the key),
+ *   exact 0600, exact 32 bytes;
+ * - a 0700 parent owned by the same uid, because a key anyone may replace is
+ *   not a key.
+ *
+ * The bytes land in an exactly-sized `allocUnsafeSlow` buffer (L2-F7) so the
+ * caller's `fill(0)` really erases them instead of a shared pool slab.
+ */
+function readCustodyKey(
+  path: string,
+  code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID"
+): Buffer {
+  let descriptor: number;
   try {
-    if (typeof pathOrBuffer !== "string") return makeKekHandle(pathOrBuffer);
-    const metadata = statSync(pathOrBuffer);
-    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+    descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch (error) {
+    // Nothing provisioned at all stays the configuration code. ELOOP means the
+    // path WAS a symlink, which is a custody decision, not a missing file.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new KekUnresolvedError();
+    throw new CryptoCustodyError(code);
+  }
+  let material: Buffer | undefined;
+  try {
+    const metadata = fstatSync(descriptor);
+    const parent = statSync(dirname(resolve(path)));
+    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+    if (!metadata.isFile()
+      || metadata.nlink !== 1
+      || (metadata.mode & 0o777) !== 0o600
+      || metadata.size !== KEY_BYTES
+      || (uid !== undefined && metadata.uid !== uid)
+      || !parent.isDirectory()
+      || (parent.mode & 0o777) !== 0o700
+      || (uid !== undefined && parent.uid !== uid)) {
+      throw new CryptoCustodyError(code);
+    }
+    material = Buffer.allocUnsafeSlow(KEY_BYTES);
+    if (readSync(descriptor, material, 0, KEY_BYTES, 0) !== KEY_BYTES) {
+      throw new CryptoCustodyError(code);
+    }
+    return material;
+  } catch (error) {
+    material?.fill(0);
+    if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
+    throw new CryptoCustodyError(code);
+  } finally {
+    try {
+      closeSync(descriptor);
+    } catch {
+      // The key is already read or already refused; a failed close must not
+      // turn a good load into a custody refusal.
+    }
+  }
+}
+
+export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
+  if (typeof pathOrBuffer !== "string") {
+    try {
+      return makeKekHandle(pathOrBuffer);
+    } catch {
       throw new KekUnresolvedError();
     }
-    return makeKekHandle(readFileSync(pathOrBuffer));
-  } catch (error) {
-    if (error instanceof KekUnresolvedError) throw error;
+  }
+  const material = readCustodyKey(pathOrBuffer, "KEK_CUSTODY_INVALID");
+  try {
+    return makeKekHandle(material);
+  } catch {
     throw new KekUnresolvedError();
+  } finally {
+    material.fill(0);
   }
 }
 
 export function loadSecretKey(path: string): Buffer {
+  const material = readCustodyKey(path, "SECRET_CUSTODY_INVALID");
   try {
-    const metadata = statSync(path);
-    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-      throw new KekUnresolvedError();
-    }
-    return copyKey(readFileSync(path));
+    return copyKey(material);
   } catch (error) {
-    if (error instanceof KekUnresolvedError || error instanceof CryptoInputError) throw error;
+    if (error instanceof CryptoInputError) throw error;
     throw new KekUnresolvedError();
+  } finally {
+    material.fill(0);
   }
 }
 
@@ -1133,6 +1219,41 @@ const defaultUserDekStoreFileSystem: UserDekStoreFileSystem = Object.freeze({
   stat
 });
 
+/**
+ * The async half of the custody contract (L2-F6), for the wrapped-key JSON
+ * records the three file stores hold. Same discipline as `readCustodyKey`
+ * minus the 32-byte size rule, because these records are JSON envelopes:
+ * O_NOFOLLOW, decisions taken from the opened descriptor, exactly one link,
+ * 0600 inside a 0700 directory, both owned by this process.
+ *
+ * It throws a bare TypeError; every caller already converts an unexpected
+ * failure into its own typed `*_UNRESOLVED` code, so the store contracts that
+ * the rest of the system asserts on are unchanged.
+ */
+async function readCustodyRecord(
+  location: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "open" | "stat">
+): Promise<unknown> {
+  const handle = await fileSystem.open(location, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const metadata = await handle.stat();
+    const parent = await fileSystem.stat(dirname(location));
+    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+    if (!metadata.isFile()
+      || metadata.nlink !== 1
+      || (metadata.mode & 0o777) !== 0o600
+      || (uid !== undefined && metadata.uid !== uid)
+      || !parent.isDirectory()
+      || (parent.mode & 0o777) !== 0o700
+      || (uid !== undefined && parent.uid !== uid)) {
+      throw new TypeError("SECRET_CUSTODY_INVALID");
+    }
+    return JSON.parse(await handle.readFile("utf8")) as unknown;
+  } finally {
+    await handle.close();
+  }
+}
+
 function assertUserDekStoreUserId(userId: string): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
     throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
@@ -1268,9 +1389,7 @@ export class FileUserDekStore implements ReadableUserDekStore {
     assertUserDekStoreUserId(userId);
     const location = join(this.root, "users", userId, "dek.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) throw new KekUnresolvedError();
-      const parsed = JSON.parse(await this.fileSystem.readFile(location, "utf8")) as unknown;
+      const parsed = await readCustodyRecord(location, this.fileSystem);
       if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
       const record = parsed as Record<string, unknown>;
       const envelope = record.wrapped_dek;
@@ -1625,11 +1744,9 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     const location = join(this.root, "runs", runId, "content-key.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new RunContentKeyUnresolvedError();
-      }
-      const record = parseStoredRunContentKey(JSON.parse(await this.fileSystem.readFile(location, "utf8")), runId);
+      const record = parseStoredRunContentKey(
+        await readCustodyRecord(location, this.fileSystem), runId
+      );
       return await unwrapRunContentKey(this.users, this.resolveUserId, record);
     } catch (error) {
       if (error instanceof RunContentKeyUnresolvedError) throw error;
@@ -1652,12 +1769,8 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     try {
       const location = join(this.root, "runs", runId, "content-key.v1.json");
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new RunContentKeyUnresolvedError();
-      }
       return parseStoredRunContentKey(
-        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        await readCustodyRecord(location, this.fileSystem),
         runId
       ).owner_ref;
     } catch (error) {
@@ -2058,12 +2171,8 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     assertPublicationRef(publicationRef);
     const location = join(this.root, "publications", publicationRef, "publication-key.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new PublicationKeyUnresolvedError();
-      }
       const record = parseStoredPublicationKey(
-        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        await readCustodyRecord(location, this.fileSystem),
         publicationRef
       );
       return unwrapPublicationKey(this.corpusKek, record);

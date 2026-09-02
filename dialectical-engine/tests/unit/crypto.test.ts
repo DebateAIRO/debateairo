@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, link, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -13,6 +13,7 @@ import {
   hashToken,
   hashVerificationToken,
   loadKek,
+  loadSecretKey,
   unwrapDek,
   wrapDek
 } from "../../packages/crypto/src/index.js";
@@ -97,7 +98,7 @@ describe("S1 crypto foundation", () => {
 
     await chmod(validPath, 0o644);
     expect(() => loadKek(validPath)).toThrowError(
-      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
     );
   });
 
@@ -141,6 +142,79 @@ describe("S1 crypto foundation", () => {
     expect(() => recover()).toThrow("WRAPPED_DEK_DESTROYED");
     expect(() => decrypt(generateDek(), retainedCiphertext, contentAad)).toThrowError(
       expect.objectContaining({ code: "CRYPTO_AUTHENTICATION_FAILED" })
+    );
+  });
+
+  it("refuses key files that fail the custody contract instead of following them", async () => {
+    // L2-F6: the production loaders checked only isFile + 0600, so they
+    // followed symlinks, accepted a file owned by anyone, ignored extra hard
+    // links, and never looked at the parent directory. The dev launchers
+    // already enforced O_NOFOLLOW + uid + nlink + size.
+    const directory = await mkdtemp(join(tmpdir(), "debateai-custody-"));
+    temporaryDirectories.push(directory);
+    await chmod(directory, 0o700);
+    const validPath = join(directory, "kek");
+    await writeFile(validPath, generateDek(), { mode: 0o600 });
+    await chmod(validPath, 0o600);
+
+    // The contract-satisfying file still loads through both loaders.
+    expect(Object.keys(loadKek(validPath))).toEqual([]);
+    expect(loadSecretKey(validPath)).toHaveLength(32);
+
+    // A symlink pointing at a perfectly valid key is still refused: the
+    // custody decision must be made about the file the loader opened.
+    const linkPath = join(directory, "kek-symlink");
+    await symlink(validPath, linkPath);
+    expect(() => loadKek(linkPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    expect(() => loadSecretKey(linkPath)).toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+
+    // A second hard link means a second name can outlive a custody rotation.
+    const hardPath = join(directory, "kek-hardlink");
+    await link(validPath, hardPath);
+    expect(() => loadKek(hardPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    await rm(hardPath);
+
+    // A raw key is exactly 32 bytes; 31 or 33 is a different secret.
+    const shortPath = join(directory, "kek-short");
+    await writeFile(shortPath, Buffer.alloc(31), { mode: 0o600 });
+    await chmod(shortPath, 0o600);
+    expect(() => loadKek(shortPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    expect(() => loadSecretKey(shortPath)).toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+
+    // A group/world-readable key file.
+    await chmod(validPath, 0o640);
+    expect(() => loadKek(validPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    await chmod(validPath, 0o600);
+
+    // A 0600 key inside a 0755 directory is a key anyone can replace.
+    await chmod(directory, 0o755);
+    expect(() => loadKek(validPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    expect(() => loadSecretKey(validPath)).toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+    await chmod(directory, 0o700);
+    expect(Object.keys(loadKek(validPath))).toEqual([]);
+
+    // A path that is simply not there stays the unresolved-configuration code.
+    expect(() => loadKek(join(directory, "absent"))).toThrowError(
+      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+    );
+    expect(() => loadSecretKey(join(directory, "absent"))).toThrowError(
+      expect.objectContaining({ code: "KEK_UNRESOLVED" })
     );
   });
 
