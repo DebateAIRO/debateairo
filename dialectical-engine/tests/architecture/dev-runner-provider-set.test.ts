@@ -142,7 +142,11 @@ describe("production runner provider topology", () => {
     // them as unwired, and the only way to quiet it is to invent a reason for a
     // field that was never a setting. (That is not hypothetical: the first draft of
     // this gate did exactly that.)
-    const declaration = runnerSource.indexOf("interface WalkingSkeletonSettings");
+    // Anchored on the brace: a bare indexOf substring-matches a RENAMED interface
+    // (`WalkingSkeletonSettingsRenamed` contains the searched string), so the
+    // enumeration would silently read some other interface's members and the whole
+    // gate would pass vacuously. The rename mutant proved exactly that.
+    const declaration = runnerSource.search(/interface WalkingSkeletonSettings\s*\{/u);
     expect(declaration).toBeGreaterThan(-1);
     const body = balanced(runnerSource, declaration);
     let depth = 0;
