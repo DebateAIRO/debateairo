@@ -919,8 +919,12 @@ function decideWithScope(
     // T7B (V-authorized, codex r3 B1): the reason outranks the movement, it does
     // not delete it. This arm used to publish the computed `maxRootMovement`
     // beside an empty moved list — a record that named A as compared, put its
-    // maximum movement at 0.25, and simultaneously denied that any root moved
+    // maximum movement ABOVE δ, and simultaneously denied that any root moved
     // more than δ. Dominant reason and diagnostic truth are independent.
+    //
+    // T6B: the quantity is named here, never quoted. A comment that spells out
+    // a sealed register value goes false the moment V retunes the row, and the
+    // T16 consumer scan reads comment text as source.
     return Object.freeze({
       kind: "CONTINUE",
       reason: "NO_MEASURED_EDGE",

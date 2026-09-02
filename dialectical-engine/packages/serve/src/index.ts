@@ -1553,9 +1553,16 @@ export class ServeRepository {
         ]
       );
       // T6 / J14 ADDENDUM — the reason each class-H/class-D record names is
-      // checked against the ledger HERE, inside the write transaction, so a
-      // concurrent review cannot land between the check and the insert. The
-      // review arm's provenance is RESOLVED rather than accepted: what goes
+      // checked against the ledger HERE. Two mechanisms do two different jobs,
+      // and the transaction is NOT the one that excludes a concurrent review:
+      // it makes this check atomic with the answer version, so a later failure
+      // rolls the whole version back. What stops a review INSERT landing
+      // between the negative SELECT and the condition-mark INSERT is the shared
+      // per-run content lease — `ServeRepository.persist` takes it above, and
+      // `recordReviewWithMeasurements`, the review writer, takes the same one.
+      // The mutual-exclusion note on `resolveTrueUnjudgedReasons` carries the
+      // full argument and the condition under which it expires.
+      // The review arm's provenance is RESOLVED rather than accepted: what goes
       // into `review_ref` is the row the ledger actually holds.
       const unjudgedProvenance = await resolveTrueUnjudgedReasons(client, input.runId, conditionMarkRecords);
       for (const [recordIndex, record] of conditionMarkRecords.entries()) {
