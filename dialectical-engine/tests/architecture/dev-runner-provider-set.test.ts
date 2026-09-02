@@ -72,8 +72,28 @@ describe("production runner provider topology", () => {
       "observeProviderTarget(",
       "holdRecorder:"
     ]) expect(source).toContain(setting);
-    // The persisting variant belongs to the API's ask-time discovery, where nothing
-    // else records. It must not be what the runner composes.
-    expect(source).not.toContain("probeTarget({");
+    // codex r2 B1: a `not.toContain("probeTarget({")` token guard does NOT reach the
+    // real regression. Importing the persisting helper under the expected local name
+    // — `probeTarget as observeProviderTarget` — restoring a repository and passing
+    // it as `probes` is buildable, writes twice, and leaves the call site reading
+    // `observeProviderTarget(`. Two assertions that DO reach it:
+    //
+    // (1) the providers import must bind the observe-only symbol WITHOUT aliasing,
+    //     so `probeTarget` cannot enter this module under any local name;
+    const providersImport = source
+      .split("\n")
+      .find((line) => line.includes("@debateai/providers") && line.startsWith("import"));
+    expect(providersImport).toBeDefined();
+    expect(providersImport).toContain("observeProviderTarget");
+    expect(providersImport).not.toContain("probeTarget");
+    // (2) the composed probe must hand NO recorder to the probe call. The runner
+    //     owns persistence; a `probes:` member here is the double write, whatever
+    //     the function is called locally.
+    const claimTimeProbeBlock = source.slice(
+      source.indexOf("claimTimeProbe:"),
+      source.indexOf("holdRecorder:")
+    );
+    expect(claimTimeProbeBlock).not.toContain("probes:");
+    expect(claimTimeProbeBlock).toContain("observeProviderTarget(");
   });
 });
