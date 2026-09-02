@@ -10,7 +10,7 @@ import {
   generateRecoveryCodes,
   generateTotpSecret,
   hashRecoveryCode,
-  hashVerificationToken,
+  hashToken,
   matchTotpStep,
   normalizeRecoveryCode,
   recoveryCodeSlot,
@@ -140,7 +140,9 @@ function enrollmentHash(token: string): string {
   if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
   }
-  return hashVerificationToken(token);
+  // The enrolment token is the consumed verification credential itself
+  // (channel_binding.verification_token_hash), so it shares that kind.
+  return hashToken("verification", token);
 }
 
 function normalizedSourceIp(source: AuthSourceContext): string {

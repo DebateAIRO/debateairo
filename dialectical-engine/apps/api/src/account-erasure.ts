@@ -1,6 +1,6 @@
 import {
   decrypt,
-  hashVerificationToken,
+  hashToken,
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import {
@@ -53,7 +53,7 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
         userId:input.authenticated.userId,
         ownerRef:input.authenticated.ownerRef,
         sessionId:input.authenticated.session.session_id,
-        grantTokenHash:hashVerificationToken(input.grantToken)
+        grantTokenHash:hashToken("step-up-grant", input.grantToken)
       });
     } catch (error) {
       if (error instanceof Error
@@ -103,7 +103,7 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
       userId:input.authenticated.userId,
       ownerRef:input.authenticated.ownerRef,
       sessionId:input.authenticated.session.session_id,
-      grantTokenHash:hashVerificationToken(input.grantToken),
+      grantTokenHash:hashToken("step-up-grant", input.grantToken),
       source:input.source
     });
     if (outcome==="CLEANED" || outcome==="ERASED") return "CLEANED";

@@ -355,9 +355,9 @@ describe("S8 publication crypto and projection", () => {
     await writeFile(privateKekPath, Buffer.alloc(32, 0x11), { mode: 0o600 });
     await writeFile(corpusKekPath, Buffer.alloc(32, 0x22), { mode: 0o600 });
     await writeFile(equalKekPath, Buffer.alloc(32, 0x11), { mode: 0o600 });
-    await mkdir(privateStorePath);
-    await mkdir(publicationStorePath);
-    await mkdir(auditStorePath);
+    await mkdir(privateStorePath, { mode: 0o700 });
+    await mkdir(publicationStorePath, { mode: 0o700 });
+    await mkdir(auditStorePath, { mode: 0o700 });
     await writeFile(blindIndexPath, Buffer.alloc(32, 0x33), { mode: 0o600 });
     await writeFile(contentBlindIndexPath, Buffer.alloc(32, 0x44), { mode: 0o600 });
     await writeFile(auditSourceSaltPath, Buffer.alloc(32, 0x55), { mode: 0o600 });
@@ -417,19 +417,19 @@ describe("S8 publication crypto and projection", () => {
       .toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
 
     expect(() => assertPublicationSecretDomains({
-      privateKek: loadKek(privateKekPath), corpusKek: loadKek(equalKekPath),
+      privateKek: baseline.privateKek, corpusKek: loadKek(equalKekPath),
       privateKekPath, corpusKekPath: equalKekPath, privateStorePath, publicationStorePath
     })).toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
 
     await link(privateKekPath, aliasKekPath);
     expect(() => assertPublicationSecretDomains({
-      privateKek: loadKek(privateKekPath), corpusKek: loadKek(aliasKekPath),
+      privateKek: baseline.privateKek, corpusKek: baseline.corpusKek,
       privateKekPath, corpusKekPath: aliasKekPath, privateStorePath, publicationStorePath
     })).toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
 
     await symlink(privateStorePath, aliasedPublicationStore);
     expect(() => assertPublicationSecretDomains({
-      privateKek: loadKek(privateKekPath), corpusKek: loadKek(corpusKekPath),
+      privateKek: baseline.privateKek, corpusKek: baseline.corpusKek,
       privateKekPath, corpusKekPath, privateStorePath,
       publicationStorePath: aliasedPublicationStore
     })).toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
@@ -437,7 +437,7 @@ describe("S8 publication crypto and projection", () => {
     const nestedPrivateKekPath = join(privateStorePath, "private.kek");
     await writeFile(nestedPrivateKekPath, Buffer.alloc(32, 0x11), { mode: 0o600 });
     expect(() => assertPublicationSecretDomains({
-      privateKek: loadKek(nestedPrivateKekPath), corpusKek: loadKek(corpusKekPath),
+      privateKek: loadKek(nestedPrivateKekPath), corpusKek: baseline.corpusKek,
       privateKekPath: nestedPrivateKekPath, corpusKekPath,
       privateStorePath, publicationStorePath
     })).toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
@@ -445,7 +445,7 @@ describe("S8 publication crypto and projection", () => {
     const nestedCorpusKekPath = join(publicationStorePath, "corpus.kek");
     await writeFile(nestedCorpusKekPath, Buffer.alloc(32, 0x22), { mode: 0o600 });
     expect(() => assertPublicationSecretDomains({
-      privateKek: loadKek(privateKekPath), corpusKek: loadKek(nestedCorpusKekPath),
+      privateKek: baseline.privateKek, corpusKek: loadKek(nestedCorpusKekPath),
       privateKekPath, corpusKekPath: nestedCorpusKekPath,
       privateStorePath, publicationStorePath
     })).toThrow("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");

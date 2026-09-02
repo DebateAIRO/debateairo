@@ -13,6 +13,7 @@ import {
   generateDek,
   generateTotpSecret,
   hashPassword,
+  hashToken,
   hashVerificationToken,
   totpCodeAtStep,
   type AuditContextHasher,
@@ -272,8 +273,8 @@ describe("S5 sessions on real PostgreSQL", () => {
       challenge,
       bindingHash: hash("b"),
       sessionId: randomUUID(),
-      sessionTokenHash: hashVerificationToken("locked-totp-session-token-material-01"),
-      csrfTokenHash: hashVerificationToken("locked-totp-csrf-token-material-002"),
+      sessionTokenHash: hashToken("session", "locked-totp-session-token-material-01"),
+      csrfTokenHash: hashToken("csrf", "locked-totp-csrf-token-material-002"),
       sessionBindingContext: { user_agent_hash: hash("b") },
       occurredAt: now,
       idleExpiresAt: new Date(now.getTime() + 86_400_000),
@@ -308,7 +309,7 @@ describe("S5 sessions on real PostgreSQL", () => {
     const occurredAt = new Date();
     const missingChallenge: LoginChallengeRecord = Object.freeze({
       challengeId: randomUUID(),
-      challengeTokenHash: hashVerificationToken(`challenge-${randomUUID()}`),
+      challengeTokenHash: hashToken("login-challenge", `challenge-${randomUUID()}`),
       bindingHash: hashVerificationToken(`binding-${randomUUID()}`),
       expiresAt: new Date(occurredAt.getTime()+300_000),
       consumedAt: null,
@@ -339,16 +340,16 @@ describe("S5 sessions on real PostgreSQL", () => {
       ...common,
       acceptedStep: 11,
       sessionId: randomUUID(),
-      sessionTokenHash: hashVerificationToken(`totp-session-${randomUUID()}`),
-      csrfTokenHash: hashVerificationToken(`totp-csrf-${randomUUID()}`)
+      sessionTokenHash: hashToken("session", `totp-session-${randomUUID()}`),
+      csrfTokenHash: hashToken("csrf", `totp-csrf-${randomUUID()}`)
     })).resolves.toBe(false);
     await expect(repository.completeRecoveryLogin({
       ...common,
       recoveryCodeId,
       replacementHash: hashVerificationToken(`replacement-${randomUUID()}`),
       sessionId: randomUUID(),
-      sessionTokenHash: hashVerificationToken(`recovery-session-${randomUUID()}`),
-      csrfTokenHash: hashVerificationToken(`recovery-csrf-${randomUUID()}`)
+      sessionTokenHash: hashToken("session", `recovery-session-${randomUUID()}`),
+      csrfTokenHash: hashToken("csrf", `recovery-csrf-${randomUUID()}`)
     })).resolves.toBe(false);
     const after = await database.pool.query<{
       audits: string;
@@ -545,8 +546,8 @@ describe("S5 sessions on real PostgreSQL", () => {
       `, [userId]);
       expect(persisted.rows).toHaveLength(1);
       expect(persisted.rows[0]).toMatchObject({
-        token_hash: hashVerificationToken(completed.sessionToken),
-        csrf_token_hash: hashVerificationToken(completed.csrfToken),
+        token_hash: hashToken("session", completed.sessionToken),
+        csrf_token_hash: hashToken("csrf", completed.csrfToken),
         count: "1"
       });
       expect(JSON.stringify(persisted.rows[0])).not.toContain(completed.sessionToken);

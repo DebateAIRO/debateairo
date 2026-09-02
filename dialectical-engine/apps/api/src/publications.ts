@@ -8,7 +8,7 @@ import {
   type PublicNode
 } from "@debateai/contract";
 import {
-  hashVerificationToken,
+  hashToken,
   PublicationCipher
 } from "@debateai/crypto";
 import {
@@ -156,7 +156,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       runId: input.runId,
       userId: input.authenticated.userId,
       sessionId: input.authenticated.session.session_id,
-      grantTokenHash: hashVerificationToken(input.grantToken)
+      grantTokenHash: hashToken("step-up-grant", input.grantToken)
     }, input.action);
   }
 
@@ -198,7 +198,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     source: AuthSourceContext;
   }>): Promise<Readonly<{ state: "PUBLISHED"; public_ref: string }> | null> {
     if (input.answer.run_ref !== input.runId || input.answer.terminal === "BLOCKED") return null;
-    const grantTokenHash = hashVerificationToken(input.grantToken);
+    const grantTokenHash = hashToken("step-up-grant", input.grantToken);
     if (!await this.preflightGrant({
       runId: input.runId,
       authenticated: input.authenticated,
@@ -303,7 +303,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     grantToken: string;
     source: AuthSourceContext;
   }>): Promise<Readonly<{ state: "PRIVATE"; public_ref: null }> | null> {
-    const grantTokenHash = hashVerificationToken(input.grantToken);
+    const grantTokenHash = hashToken("step-up-grant", input.grantToken);
     if (!await this.preflightGrant({
       runId: input.runId,
       authenticated: input.authenticated,
