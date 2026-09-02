@@ -2,7 +2,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
 
-export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER"] as const;
+// T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
+// not organ aliases. A debater's model may hold either role; the CALL is
+// fresh-context, and the ledger records which role made it under its own
+// name rather than under COMPOSER/CONFORMANCE, which mean other things.
+export const MODEL_ROLES = [
+  "JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER", "SYNTHESIZER", "EVALUATOR"
+] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
 export type Lane = "served" | "uniform-panel" | "critic-exempt" | "evaluator";
 

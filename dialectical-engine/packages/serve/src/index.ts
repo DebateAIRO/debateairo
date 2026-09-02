@@ -25,6 +25,26 @@ import {
   type MemoryDisclosure,
   type MemoryPullPolicy
 } from "@debateai/memory";
+import {
+  DIGEST_CANNOT_EXIST_MARK,
+  DIGEST_COMPRESSED_MARK,
+  SYNTHESIS_OBJECTION_STANDING_MARK,
+  buildSynthesisDigest,
+  runSynthesisLoop,
+  type DigestSourceNode,
+  type SynthesisCodeLabel,
+  type SynthesisDigest,
+  type SynthesisLoopRound,
+  type SynthesisLoopControls,
+  type SynthesisLoopOutcome,
+  type EvaluatorRequest,
+  type EvaluatorVerdict,
+  type SynthesizerRequest
+} from "./synthesis.js";
+
+// T9's digest, roles and loop live in `./synthesis.ts`; the package publishes a
+// single entry point, so they are re-exported here.
+export * from "./synthesis.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -103,10 +123,26 @@ export interface CompositionBudgetResolution {
 export interface ServeGateInput {
   readonly nodes: readonly ServeNode[];
   factBundle: FactBundle;
-  readonly maxRecompose: number;
+  /**
+   * T9 retired `maxRecompose` from this input. DR-049's `max_recompose = 2`
+   * bounded COMPOSITION RETRIES, and composition retries are gone: the loop's
+   * bound is `synthesisRoleControls.evaluatorLoopMaxRounds`, a sealed T16 row
+   * (goal 39-40 — no code constant may stand in for a register value). The
+   * runner setting itself is untouched; T17's envelope formula still reads it.
+   */
   readonly compositionBudget: CompositionBudgetResolution;
-  readonly strangerSampleRate: number;
   readonly candidateConfidenceBand: string;
+  /**
+   * T9 — every materialized node, for the digest. Membership here is
+   * membership in the digest: the byte budget shortens summaries, never this
+   * list. The served root must be a member.
+   */
+  readonly digestNodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+  /** T10/T11's numbers, computed BEFORE synthesis and handed to both roles. */
+  readonly codeLabel: SynthesisCodeLabel;
+  /** T16's sealed synthesis-role rows. Never a code constant (J8). */
+  readonly synthesisRoleControls: SynthesisLoopControls;
 }
 
 export interface ConformanceJudgement {
@@ -316,45 +352,114 @@ function validateBandCeilingDecision(
 }
 
 export interface ServeGateDependencies {
-  readonly measureCompositionBundle: (facts: FactBundle) => number;
-  readonly compose: (facts: FactBundle, attempt: number) => Promise<readonly ComposedSegment[]>;
-  readonly selectSample: (segment: ComposedSegment, sampleRate: number) => boolean;
-  readonly conform: (
-    segment: ComposedSegment,
-    state: "JUDGED" | "SAMPLED_PASSED"
-  ) => Promise<ConformanceJudgement>;
-  readonly postComposeR9: (segments: readonly ComposedSegment[]) => Promise<boolean>;
+  /**
+   * T9: the SYNTHESIZER role call. It receives the recorded request — digest,
+   * code label/numbers and, on a retry, the prior objection verbatim — and
+   * returns the candidate as composed segments. It replaces `compose`, whose
+   * fact-bundle argument carried no digest and could not distinguish a retry.
+   */
+  readonly synthesize: (request: SynthesizerRequest) => Promise<readonly ComposedSegment[]>;
+  /**
+   * T9: the EVALUATOR role call. It replaces BOTH retired provider limbs —
+   * per-segment conformance and post-compose R9 — because both are now
+   * evaluator objection criteria rather than terminals.
+   */
+  readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatorVerdict>;
   readonly applyBandCeiling: (input: {
     readonly basis: Readonly<Record<WayOfKnowing, number>>;
     readonly candidateConfidenceBand: string;
   }) => BandCeilingDecision;
 }
 
-export type GateTrace =
-  | "GATE1_R9_PASS"
-  | "GATE1_R9_BLOCK"
-  | "GATE2_Q53_PASS_VACUOUS"
-  | "GATE2_Q53_BLOCK"
-  | "COMPOSITION_BUDGET_PASS"
-  | "COMPOSITION_BUDGET_EXCEEDED"
+/**
+ * T9 — the gate-trace vocabulary a FRESH serve may write.
+ *
+ * The five former COMPONENTS_ONLY quality gates are gone: R9 (pre- and
+ * post-compose), residual-objections-empty, the composition byte budget, the
+ * conformance limb and the Q51 locator block. Their tokens survive only in
+ * `RETIRED_GATE_TRACE` below, which is a READ vocabulary — the same shape J17
+ * ruled lawful for `served_root_rule`: the kernel declares the history, the
+ * reader accepts it, and no fresh selection may write it. `runServeGateChain`
+ * builds a `LiveGateTrace[]`, so the compiler is what enforces that.
+ */
+export type LiveGateTrace =
+  | "DIGEST_BUILT"
+  | "DIGEST_COMPRESSED"
+  | "DIGEST_CANNOT_EXIST"
+  | "SYNTHESIS_LOOP_SATISFIED"
+  | "SYNTHESIS_LOOP_EXHAUSTED"
+  | "SYNTHESIS_OBJECTION_STANDING"
   | "COMPOSED"
-  | "GATE3_CONFORMANCE_PASS_EXHAUSTIVE"
-  | "GATE3_CONFORMANCE_PASS_SAMPLED"
-  | "GATE3_CONFORMANCE_FAIL"
   | "RECOMPOSED_ONCE"
   | "GATE4_Q51_PASS"
-  | "GATE4_Q51_LOCATOR_BLOCK"
   | "GATE4_Q51_DOWNGRADE"
-  | "POST_COMPOSE_R9_PASS"
-  | "POST_COMPOSE_R9_FAIL"
   | "BAND_CEILING_PASS"
   | "BAND_CEILING_CAPPED"
   | "ENVELOPE_ENRICHMENT_SKIPPED"
   | "PROTECTED_CORE_REFUSED_SKIP"
+  | "PROTECTED_CORE_GUARD_RETIRED"
   | "ENVELOPE_EXHAUSTED"
   | "COMPONENTS_ONLY_ENVELOPE"
+  | "COMPONENTS_ONLY_DIGEST"
   | "COMPONENTS_ONLY_DEFECT"
   | "SERVE";
+
+/**
+ * Retired by T9 (goal 248-266). Readable — sealed answers from before the
+ * synthesis chain carry these in `serve-gate:` reason refs — never writable.
+ */
+export const RETIRED_GATE_TRACE = Object.freeze([
+  "GATE1_R9_PASS",
+  "GATE1_R9_BLOCK",
+  "GATE2_Q53_PASS_VACUOUS",
+  "GATE2_Q53_BLOCK",
+  "COMPOSITION_BUDGET_PASS",
+  "COMPOSITION_BUDGET_EXCEEDED",
+  "GATE3_CONFORMANCE_PASS_EXHAUSTIVE",
+  "GATE3_CONFORMANCE_PASS_SAMPLED",
+  "GATE3_CONFORMANCE_FAIL",
+  "GATE4_Q51_LOCATOR_BLOCK",
+  "POST_COMPOSE_R9_PASS",
+  "POST_COMPOSE_R9_FAIL"
+] as const);
+export type RetiredGateTrace = typeof RETIRED_GATE_TRACE[number];
+
+/** True for a token a fresh serve may READ but never WRITE. */
+export function isRetiredGateTrace(value: string): value is RetiredGateTrace {
+  return (RETIRED_GATE_TRACE as readonly string[]).includes(value);
+}
+
+/** The READ union: live tokens plus the retired history. */
+export type GateTrace = LiveGateTrace | RetiredGateTrace;
+
+/**
+ * T9 — the ONLY reasons a COMPONENTS_ONLY terminal may exist (goal 263-266).
+ * Every entry names its terminal, its trace token and its condition mark, so
+ * "terminal + mark named per path" is a table a stranger can read, not a claim.
+ */
+export const SERVE_CRASH_CLASSES = Object.freeze({
+  TRANSPORT_DEATH: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_DEFECT" as const,
+    conditionMark: "DEFECT" as const
+  }),
+  NO_ARTIFACT: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_DEFECT" as const,
+    conditionMark: "DEFECT" as const
+  }),
+  DIGEST_CANNOT_EXIST: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_DIGEST" as const,
+    conditionMark: DIGEST_CANNOT_EXIST_MARK
+  }),
+  ENVELOPE_EXHAUSTED: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_ENVELOPE" as const,
+    conditionMark: "ENVELOPE_EXHAUSTED" as const
+  })
+});
+export type ServeCrashClass = keyof typeof SERVE_CRASH_CLASSES;
 
 export type AnswerForm =
   | { readonly kind: "VERDICT"; readonly text: string }
@@ -376,6 +481,14 @@ export interface ServeGateResult {
   readonly compositionBudget: CompositionBudgetResolution;
   readonly confidenceBand: string | null;
   readonly bandCeiling: BandCeiling | null;
+  /** T9: the digest handed to both roles, or null on a pre-digest crash. */
+  readonly digest: SynthesisDigest | null;
+  /** T9: one record per evaluator loop round, in order. Empty on a crash class. */
+  readonly loopRounds: readonly SynthesisLoopRound[];
+  /** T9: the objection still standing when the loop ended, or null. */
+  readonly standingObjection: string | null;
+  /** T9: the crash class, when and only when the terminal is COMPONENTS_ONLY. */
+  readonly crashClass: ServeCrashClass | null;
   readonly projections: {
     readonly reversalPoint: string;
     readonly buildsOnPrevious: FactBundle["buildsOnPrevious"];
@@ -389,18 +502,39 @@ export function compositionEvidenceRequired(
   return !(result.terminal === "COMPONENTS_ONLY" && result.coverageMode === "NOT_RUN");
 }
 
+/**
+ * The ENVELOPE_EXHAUSTED crash class — a RESOURCE death, not a quality
+ * judgement (goal 263-266). T17 owns keeping the ceiling big enough; T9 owns
+ * what happens when it is hit anyway.
+ *
+ * F4 / goal 248-251: the `protectedCoreVerified` guard that used to throw here
+ * was keyed on R9's GATE-HOOD, and R9 is no longer a gate — it is an evaluator
+ * objection criterion. The guard is therefore KNOWINGLY RETIRED with it: an
+ * exhausted envelope with no served statement takes this terminal even when
+ * restatement failed, and never serves over budget. The restatement status is
+ * still OBSERVED and DISCLOSED — it rides the trace as
+ * `PROTECTED_CORE_GUARD_RETIRED` — it simply no longer decides.
+ *
+ * `PROTECTED_CORE_REFUSED_SKIP` stays and means what it always meant: the
+ * protected-core battery rows refuse to be SKIPPED BY BUDGET. That is a
+ * different proposition from R9's gate-hood and T9 does not touch it.
+ */
 export function createEnvelopeExhaustedResult(input: {
   readonly factBundle: FactBundle;
   readonly compositionBudget: CompositionBudgetResolution;
   readonly verifiedNodeIds: readonly string[];
   readonly skippedEnrichmentRows: readonly string[];
-  readonly protectedCoreVerified: boolean;
+  readonly protectedCoreRestatement: ServeNode["restatementStatus"];
+  readonly servedStatementExists: boolean;
 }): ServeGateResult {
   if (input.verifiedNodeIds.length === 0) {
     throw new TypedDomainError("ENVELOPE_VERIFIED_NODE_SET_EMPTY", "Envelope hard stop requires inspected verified nodes");
   }
-  if (!input.protectedCoreVerified) {
-    throw new TypedDomainError("PROTECTED_CORE_NOT_VERIFIED", "R9 must pass; it cannot be skipped by the envelope");
+  if (input.servedStatementExists) {
+    throw new TypedDomainError(
+      "ENVELOPE_TERMINAL_OVER_SERVED_STATEMENT",
+      "The envelope terminal replaces an UNSERVED statement; a served answer is never retracted into components-only"
+    );
   }
   if (input.factBundle.conditionMarks.includes("DEFECT")) {
     throw new TypedDomainError("INDEPENDENT_BUDGET_MARKS_CONFLATED", "DEFECT and ENVELOPE_EXHAUSTED are independent terminals");
@@ -410,11 +544,13 @@ export function createEnvelopeExhaustedResult(input: {
     conditionMarks.push("SKIPPED-BY-BUDGET");
   }
   if (!conditionMarks.includes("ENVELOPE_EXHAUSTED")) conditionMarks.push("ENVELOPE_EXHAUSTED");
-  const gateTrace: GateTrace[] = [];
+  const gateTrace: LiveGateTrace[] = [];
   if (input.skippedEnrichmentRows.length > 0) gateTrace.push("ENVELOPE_ENRICHMENT_SKIPPED");
-  gateTrace.push("PROTECTED_CORE_REFUSED_SKIP", "ENVELOPE_EXHAUSTED", "COMPONENTS_ONLY_ENVELOPE");
+  gateTrace.push("PROTECTED_CORE_REFUSED_SKIP");
+  if (input.protectedCoreRestatement !== "PASS") gateTrace.push("PROTECTED_CORE_GUARD_RETIRED");
+  gateTrace.push("ENVELOPE_EXHAUSTED", SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.gateTrace);
   return Object.freeze({
-    terminal: "COMPONENTS_ONLY",
+    terminal: SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal,
     answerForm: null,
     factBundle: input.factBundle,
     gateTrace: Object.freeze(gateTrace),
@@ -425,6 +561,10 @@ export function createEnvelopeExhaustedResult(input: {
     compositionBudget: input.compositionBudget,
     confidenceBand: null,
     bandCeiling: null,
+    digest: null,
+    loopRounds: Object.freeze([]),
+    standingObjection: null,
+    crashClass: "ENVELOPE_EXHAUSTED",
     projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
       buildsOnPrevious: input.factBundle.buildsOnPrevious,
@@ -433,125 +573,178 @@ export function createEnvelopeExhaustedResult(input: {
   });
 }
 
+/**
+ * The COMPONENTS_ONLY constructor. It takes a CRASH CLASS, not a trace: after
+ * T9 there is no other way to reach this terminal, so the enumerated set is
+ * the only thing that can name it (goal 263-266, DoD "no non-crash path
+ * returns COMPONENTS_ONLY").
+ */
 function componentsOnly(
   input: ServeGateInput,
-  gateTrace: readonly GateTrace[],
-  segments: readonly ComposedSegment[],
-  conformance: readonly ConformanceJudgement[],
-  coverageMode: ServeGateResult["coverageMode"]
+  crashClass: Exclude<ServeCrashClass, "ENVELOPE_EXHAUSTED">,
+  trace: readonly LiveGateTrace[],
+  digest: SynthesisDigest | null
 ): ServeGateResult {
-  return {
-    terminal: "COMPONENTS_ONLY",
+  const wiring = SERVE_CRASH_CLASSES[crashClass];
+  return Object.freeze({
+    terminal: wiring.terminal,
     answerForm: null,
     factBundle: input.factBundle,
-    gateTrace,
-    conditionMarks: input.factBundle.conditionMarks.includes("DEFECT")
-      ? input.factBundle.conditionMarks
-      : [...input.factBundle.conditionMarks, "DEFECT"],
-    conformance,
-    coverageMode,
-    segments,
+    gateTrace: Object.freeze([...trace, wiring.gateTrace]),
+    conditionMarks: Object.freeze(input.factBundle.conditionMarks.includes(wiring.conditionMark)
+      ? [...input.factBundle.conditionMarks]
+      : [...input.factBundle.conditionMarks, wiring.conditionMark]),
+    conformance: Object.freeze([]),
+    coverageMode: "NOT_RUN",
+    segments: Object.freeze([]),
     compositionBudget: input.compositionBudget,
     confidenceBand: null,
     bandCeiling: null,
-    projections: {
+    digest,
+    loopRounds: Object.freeze([]),
+    standingObjection: null,
+    crashClass,
+    projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
       buildsOnPrevious: input.factBundle.buildsOnPrevious,
       memoryDisclosure: input.factBundle.memoryDisclosure
-    }
-  };
+    })
+  });
 }
 
+/**
+ * T9 — the SYNTHESIS serve chain (goal-v4 222-270).
+ *
+ * What this used to be: five quality gates, each of which could end the run in
+ * COMPONENTS_ONLY with a DEFECT mark — pre-compose R9, residual-objections-
+ * empty, the composition byte budget, conformance, the Q51 locator block and
+ * post-compose R9. What it is now: a digest, a synthesizer/evaluator loop, and
+ * a serve. Their disposition, one by one (goal 248-262):
+ *
+ * - pre-compose R9 restatement → an EVALUATOR objection criterion. Its
+ *   companion, the envelope terminal's `protectedCoreVerified` guard, was
+ *   keyed on R9's gate-hood and is KNOWINGLY RETIRED with it (F4;
+ *   `createEnvelopeExhaustedResult` above).
+ * - residual-objections-empty → DELETED. Objections are now REQUIRED input to
+ *   the digest's emphasis fields, so a gate demanding their absence is
+ *   obsolete, not merely unused.
+ * - composition byte budget → a code PRECONDITION inside the digest builder:
+ *   tighten the per-node summaries and retry, then serve WITH the compression
+ *   mark. It reaches a crash class only when the digest cannot exist at all.
+ * - conformance ≤2 → an EVALUATOR objection criterion (citation tracing:
+ *   every load-bearing claim traces to a digest node).
+ * - the Q51 LOCATOR block → DELETED, unreachable by construction: it fired
+ *   when a load-bearing LOOKED_UP node had no locator, and T4 now normalizes
+ *   exactly that node to REASONING with a WAY-OF-KNOWING-DOWNGRADED mark
+ *   before serve ever sees it, so no input can satisfy the old predicate. The
+ *   Q51 DOWNGRADE limb is untouched — it is the answer FORM, which T13 owns.
+ * - post-compose R9 → an EVALUATOR objection criterion.
+ *
+ * After this, COMPONENTS_ONLY has exactly four causes, all of them deaths
+ * rather than quality judgements: `SERVE_CRASH_CLASSES`.
+ */
 export async function runServeGateChain(
   input: ServeGateInput,
   dependencies: ServeGateDependencies
 ): Promise<ServeGateResult> {
-  const trace: GateTrace[] = [];
+  const trace: LiveGateTrace[] = [];
 
   if (input.nodes.length === 0) {
     throw new TypedDomainError("SERVE_NODE_SET_EMPTY", "A serve chain requires at least one node");
   }
-  if (input.nodes.some((node) => node.loadBearing && node.restatementStatus !== "PASS")) {
-    trace.push("GATE1_R9_BLOCK", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, [], [], "NOT_RUN");
-  }
-  trace.push("GATE1_R9_PASS");
-
-  if (input.factBundle.residualObjections.length > 0) {
-    trace.push("GATE2_Q53_BLOCK", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, [], [], "NOT_RUN");
-  }
-  trace.push("GATE2_Q53_PASS_VACUOUS");
-
-  if (input.maxRecompose !== 2) {
-    throw new TypedDomainError("MAX_RECOMPOSE_INVALID", "DR-049 requires max_recompose = 2");
-  }
   if (!Number.isFinite(input.compositionBudget.bound) || input.compositionBudget.bound < 0) {
     throw new TypedDomainError("COMPOSITION_BUDGET_UNRESOLVED", "A V-ratified composition budget is required");
   }
-  const measuredBundle = dependencies.measureCompositionBundle(input.factBundle);
-  if (!Number.isFinite(measuredBundle) || measuredBundle < 0) {
-    throw new TypedDomainError("COMPOSITION_MEASUREMENT_INVALID", "The composition-bundle measurement must be finite");
-  }
-  if (measuredBundle > input.compositionBudget.bound) {
-    trace.push("COMPOSITION_BUDGET_EXCEEDED", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, [], [], "NOT_RUN");
-  }
-  trace.push("COMPOSITION_BUDGET_PASS");
 
-  let segments: readonly ComposedSegment[] = [];
-  let conformance: readonly ConformanceJudgement[] = [];
-  let coverageMode: ServeGateResult["coverageMode"] = "NOT_RUN";
-  for (let attempt = 1; attempt <= input.maxRecompose; attempt += 1) {
-    const composed = await dependencies.compose(input.factBundle, attempt);
-    const nodeIds = new Set(input.nodes.map((node) => node.nodeId));
-    const loadBearingNodeIds = new Set(input.nodes.filter((node) => node.loadBearing).map((node) => node.nodeId));
-    if (composed.some((segment) => segment.assertedNodeRefs.some((nodeRef) => !nodeIds.has(nodeRef)))) {
-      throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "A composed segment references a node outside the serve set");
+  // ---- DIGEST (goal 223-231) -------------------------------------------
+  const digestOutcome = buildSynthesisDigest({
+    nodes: input.digestNodes,
+    servedRootNodeId: input.servedRootNodeId,
+    budgetBound: input.compositionBudget.bound
+  });
+  if (digestOutcome.kind === "DIGEST_CANNOT_EXIST") {
+    // LOUD, never a silent subset: the enumerated crash class and its mark.
+    trace.push("DIGEST_CANNOT_EXIST");
+    return componentsOnly(input, "DIGEST_CANNOT_EXIST", trace, null);
+  }
+  const digest = digestOutcome.digest;
+  trace.push("DIGEST_BUILT");
+  if (digestOutcome.marks.length > 0) trace.push("DIGEST_COMPRESSED");
+
+  // ---- LOOP (goal 232-247) ---------------------------------------------
+  const nodeIds = new Set(input.nodes.map((node) => node.nodeId));
+  const loadBearingNodeIds = new Set(
+    input.nodes.filter((node) => node.loadBearing).map((node) => node.nodeId)
+  );
+  let loop: SynthesisLoopOutcome<readonly ComposedSegment[]>;
+  try {
+    loop = await runSynthesisLoop<readonly ComposedSegment[]>({
+      controls: input.synthesisRoleControls,
+      digest,
+      codeLabel: input.codeLabel
+    }, {
+      synthesize: async (request) => {
+        const composed = await dependencies.synthesize(request);
+        if (composed.length === 0) {
+          // NO_ARTIFACT: the role answered with nothing to serve. A crash
+          // class, not a quality judgement — hence a typed escape rather than
+          // a terminal invented inside the loop.
+          throw new TypedDomainError("SYNTHESIS_NO_ARTIFACT", "The synthesizer returned no segment to serve");
+        }
+        if (composed.some((segment) => segment.assertedNodeRefs.some((nodeRef) => !nodeIds.has(nodeRef)))) {
+          throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "A composed segment references a node outside the serve set");
+        }
+        if (composed.some((segment) =>
+          segment.segmentId.trim().length === 0 || segment.text.trim().length === 0
+        )) {
+          throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "A composed segment carries no id or no text");
+        }
+        if (new Set(composed.map((segment) => segment.segmentId)).size !== composed.length) {
+          throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
+        }
+        return composed.map((segment) => Object.freeze({
+          ...segment,
+          loadBearing: segment.servedNumberRefs.length > 0
+            || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
+        }));
+      },
+      evaluate: (request) => dependencies.evaluate(request),
+      readCandidateStatement: (candidate) => candidate.map((segment) => segment.text).join("\n"),
+      referenceCandidate: (_candidate, round) => `candidate:round-${round}`
+    });
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === "SYNTHESIS_NO_ARTIFACT") {
+      return componentsOnly(input, "NO_ARTIFACT", trace, digest);
     }
-    segments = composed.map((segment) => Object.freeze({
-      ...segment,
-      loadBearing: segment.servedNumberRefs.length > 0
-        || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
-    }));
-    if (segments.length === 0 || segments.some((segment) =>
-      segment.segmentId.trim().length === 0 || segment.text.trim().length === 0
-    )) {
-      throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composition returned no segments");
+    if (error instanceof TypedDomainError && error.code === "SYNTHESIS_TRANSPORT_DEATH") {
+      return componentsOnly(input, "TRANSPORT_DEATH", trace, digest);
     }
-    if (new Set(segments.map((segment) => segment.segmentId)).size !== segments.length) {
-      throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
-    }
-    trace.push(attempt === 1 ? "COMPOSED" : "RECOMPOSED_ONCE");
-    coverageMode = input.strangerSampleRate >= 1 ? "EXHAUSTIVE" : "SAMPLED";
-    conformance = await Promise.all(segments.map(async (segment) => {
-      if (segment.loadBearing) return dependencies.conform(segment, "JUDGED");
-      if (input.strangerSampleRate >= 1 || dependencies.selectSample(segment, input.strangerSampleRate)) {
-        return dependencies.conform(segment, "SAMPLED_PASSED");
-      }
-      return { segmentId: segment.segmentId, state: "NOT_SAMPLED", conforms: true } as const;
-    }));
-    if (conformance.every((judgement) => judgement.conforms)) {
-      trace.push(coverageMode === "EXHAUSTIVE"
-        ? "GATE3_CONFORMANCE_PASS_EXHAUSTIVE"
-        : "GATE3_CONFORMANCE_PASS_SAMPLED");
-      break;
-    }
-    trace.push("GATE3_CONFORMANCE_FAIL");
+    throw error;
   }
 
-  if (!conformance.every((judgement) => judgement.conforms)) {
-    trace.push("COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, segments, conformance, coverageMode);
-  }
+  const segments = loop.candidate;
+  // `serve_state` reads this pair (COMPOSED vs RECOMPOSED_ONCE); a loop that
+  // needed a second round recomposed exactly once, by the same definition the
+  // retired composition retry used.
+  trace.push(loop.rounds.length > 1 ? "RECOMPOSED_ONCE" : "COMPOSED");
+  trace.push(loop.standingObjection === null ? "SYNTHESIS_LOOP_SATISFIED" : "SYNTHESIS_LOOP_EXHAUSTED");
+  if (loop.standingObjection !== null) trace.push("SYNTHESIS_OBJECTION_STANDING");
 
+  // The retired conformance record now holds the evaluator's CITATION TRACING
+  // criterion, per segment. The evaluator traces every load-bearing claim, so
+  // the coverage is exhaustive by construction — there is no sample any more.
+  const finalCriteria = loop.rounds.at(-1)!.verdict.criteria;
+  const conformance: readonly ConformanceJudgement[] = Object.freeze(segments.map((segment) => Object.freeze({
+    segmentId: segment.segmentId,
+    state: "JUDGED" as const,
+    conforms: finalCriteria.citationTracing
+  })));
+  const coverageMode: ServeGateResult["coverageMode"] = "EXHAUSTIVE";
+
+  // ---- SERVE ------------------------------------------------------------
   let terminal: ServeGateResult["terminal"];
   let answerForm: AnswerForm;
   const loadBearingNodes = input.nodes.filter((node) => node.loadBearing);
-  if (loadBearingNodes.some((node) => node.wayOfKnowing === "LOOKED_UP" && node.locator === null)) {
-    trace.push("GATE4_Q51_LOCATOR_BLOCK", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, segments, conformance, coverageMode);
-  }
   if (loadBearingNodes.every((node) => node.wayOfKnowing === "REASONING")) {
     if (segments.length < 2 || segments[0] === undefined || segments[1] === undefined) {
       throw new TypedDomainError(
@@ -572,17 +765,10 @@ export async function runServeGateChain(
     answerForm = { kind: "VERDICT", text: segments.map((segment) => segment.text).join("\n") };
   }
 
-  // DR-129 ratifies Q51 before the post-compose verdict-R9 limb; keep this citation at the chain.
-  if (!await dependencies.postComposeR9(segments)) {
-    trace.push("POST_COMPOSE_R9_FAIL", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, segments, conformance, coverageMode);
-  }
-  trace.push("POST_COMPOSE_R9_PASS");
-  const loadBearing = input.nodes.filter((node) => node.loadBearing);
   const basis = {
-    LOOKED_UP: loadBearing.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
-    RAN: loadBearing.filter((node) => node.wayOfKnowing === "RAN").length,
-    REASONING: loadBearing.filter((node) => node.wayOfKnowing === "REASONING").length
+    LOOKED_UP: loadBearingNodes.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
+    RAN: loadBearingNodes.filter((node) => node.wayOfKnowing === "RAN").length,
+    REASONING: loadBearingNodes.filter((node) => node.wayOfKnowing === "REASONING").length
   };
   const ceilingDecision = dependencies.applyBandCeiling({
     basis,
@@ -590,24 +776,33 @@ export async function runServeGateChain(
   });
   validateBandCeilingDecision(ceilingDecision, input.candidateConfidenceBand, basis);
   trace.push(ceilingDecision.kind === "CAPPED" ? "BAND_CEILING_CAPPED" : "BAND_CEILING_PASS", "SERVE");
-  return {
+
+  const conditionMarks = [...input.factBundle.conditionMarks];
+  for (const mark of [...digestOutcome.marks, ...loop.marks]) {
+    if (!conditionMarks.includes(mark)) conditionMarks.push(mark);
+  }
+  return Object.freeze({
     terminal,
     answerForm,
     factBundle: input.factBundle,
-    gateTrace: trace,
-    conditionMarks: input.factBundle.conditionMarks,
+    gateTrace: Object.freeze(trace),
+    conditionMarks: Object.freeze(conditionMarks),
     conformance,
     coverageMode,
     segments,
     compositionBudget: input.compositionBudget,
     confidenceBand: ceilingDecision.confidenceBand,
     bandCeiling: ceilingDecision.ceiling,
-    projections: {
+    digest,
+    loopRounds: loop.rounds,
+    standingObjection: loop.standingObjection,
+    crashClass: null,
+    projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
       buildsOnPrevious: input.factBundle.buildsOnPrevious,
       memoryDisclosure: input.factBundle.memoryDisclosure
-    }
-  };
+    })
+  });
 }
 
 const SERVE_ITEM_STATUSES = ["READY", "PENDING", "ERROR"] as const;

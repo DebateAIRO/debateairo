@@ -142,6 +142,9 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     case "AMENDED-SEARCH": return "Search amended during run";
     case "MISSING-NUMBER": return "Number removed after replay failure";
     case "OWED-CHECK-UNEXECUTED": return "Owed check not executed at completion";
+    case "SYNTHESIS-OBJECTION-STANDING": return "An evaluator objection is still standing on this statement";
+    case "DIGEST-COMPRESSED": return "Node summaries shortened to fit the composition budget";
+    case "DIGEST-CANNOT-EXIST": return "No digest could be built within the composition budget";
     case "HIDDEN-UNJUDGEABLE": return "Hidden: could not be judged — show hidden to read it";
     case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
     case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";

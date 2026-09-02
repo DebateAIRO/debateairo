@@ -164,6 +164,21 @@ export const CONDITION_MARKS = [
   // check has no recorded execution — the run settles and the served answer
   // names each such check loudly (one condition-mark record per row).
   "OWED-CHECK-UNEXECUTED",
+  // S6-2 / T9, confirm-items 2-3: the synthesis loop reached its sealed round
+  // bound with the evaluator still unsatisfied. The statement is SERVED
+  // regardless — the loop never withholds an answer — and the objection that
+  // is still standing rides it VISIBLY rather than being dropped on the floor.
+  "SYNTHESIS-OBJECTION-STANDING",
+  // T9 (goal 223-231): the digest's per-node summaries had to be tightened to
+  // fit the composition byte budget. MEMBERSHIP is untouched — every
+  // materialized node is still in the digest — so this names a loss of detail,
+  // never a loss of nodes.
+  "DIGEST-COMPRESSED",
+  // T9 (goal 226-228, 263-266): even at maximum compression the digest exceeds
+  // the byte budget, so no digest exists to synthesize from. One of the four
+  // enumerated COMPONENTS_ONLY crash classes — a death, not a quality
+  // judgement, and never a silent subset of the nodes.
+  "DIGEST-CANNOT-EXIST",
   // DR-176: authored material whose cross-maker review transport exhausted.
   // It remains append-only and revealable, but is excluded from the served
   // number and disclosed as unjudged when revealed.

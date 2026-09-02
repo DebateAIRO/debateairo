@@ -3,9 +3,23 @@ import {
   buildFactBundle,
   runServeGateChain,
   type ComposedSegment,
+  type DigestSourceNode,
+  type EvaluatorVerdict,
   type ServeGateDependencies,
   type ServeGateInput
 } from "@debateai/serve";
+
+/**
+ * T9 (goal 248-266) retired every COMPONENTS_ONLY QUALITY gate this file used
+ * to pin — R9 at position 1, Q53's residual-objections limb, the composition
+ * byte budget, conformance, and the Q51 LOCATOR block. Their new terminals are
+ * proved one by one in `tests/unit/t09-synthesis.test.ts`, which is the DoD's
+ * "one test per former gate path" file.
+ *
+ * What stays HERE is what T9 did not touch: the ordered legal serve path, the
+ * Q51 DOWNGRADE limb (the answer FORM, which T13 owns) and the composition
+ * contract errors that are loud stops rather than terminals.
+ */
 
 const composed = (...texts: string[]): readonly ComposedSegment[] => texts.map((text, index) => ({
   segmentId: `segment:${index + 1}`,
@@ -14,6 +28,17 @@ const composed = (...texts: string[]): readonly ComposedSegment[] => texts.map((
   assertedNodeRefs: ["node:test"],
   servedNumberRefs: []
 }));
+
+const digestNode = (): readonly DigestSourceNode[] => [{
+  nodeId: "node:test",
+  statement: "A provisional answer.",
+  finalStrength: 0.4,
+  wayOfKnowing: "REASONING",
+  marks: [],
+  polarityRelations: [],
+  isPosition: true,
+  isSurvivingObjection: false
+}];
 
 const reasoningInput = (): ServeGateInput => ({
   nodes: [{
@@ -34,25 +59,46 @@ const reasoningInput = (): ServeGateInput => ({
     buildsOnPrevious: { value: false, answerRef: null },
     memoryDisclosure: null
   }),
-  maxRecompose: 2,
   compositionBudget: {
     tier: "low",
-    bound: 10,
+    bound: 100_000,
     registerRowKey: "test-layer:composition-budget",
     registerVersion: 1,
     sourceRef: "test-layer:DR-078"
   },
-  strangerSampleRate: 1,
-  candidateConfidenceBand: "TEST_BAND"
+  candidateConfidenceBand: "TEST_BAND",
+  digestNodes: digestNode(),
+  servedRootNodeId: "node:test",
+  codeLabel: {
+    verdictLabel: "CONTESTED",
+    servedNodeId: "node:test",
+    servedStrength: 0.4,
+    margin: null,
+    registerVersion: 1
+  },
+  synthesisRoleControls: {
+    synthesizerRoleRef: "test-layer:synthesizer",
+    evaluatorRoleRef: "test-layer:evaluator",
+    evaluatorLoopMaxRounds: 3
+  }
 });
+
+const SATISFIED: EvaluatorVerdict = {
+  satisfied: true,
+  objection: null,
+  criteria: {
+    fairnessToLosers: true,
+    statementLabelAgreement: true,
+    noOverstatement: true,
+    restatement: true,
+    citationTracing: true
+  }
+};
 
 function passingDependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGateDependencies {
   return {
-    measureCompositionBundle: () => 1,
-    compose: async () => composed("A provisional answer.", "Research it with an independent source."),
-    selectSample: () => true,
-    conform: async (segment, state) => ({ segmentId: segment.segmentId, state, conforms: true }),
-    postComposeR9: async () => true,
+    synthesize: async () => composed("A provisional answer.", "Research it with an independent source."),
+    evaluate: async () => SATISFIED,
     applyBandCeiling: ({ basis, candidateConfidenceBand }) => ({
       kind: "NOT_CAPPED",
       confidenceBand: candidateConfidenceBand,
@@ -69,13 +115,13 @@ function passingDependencies(overrides: Partial<ServeGateDependencies> = {}): Se
   };
 }
 
-describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path", () => {
-  it("runs R9 → Q53 → composition budget → conformance → Q51 and defaults to DOWNGRADED", async () => {
-    const judgedSegments: string[] = [];
+describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path (T9 shape)", () => {
+  it("runs digest → synthesis loop → Q51 form → band ceiling and defaults to DOWNGRADED", async () => {
+    const judgedStatements: string[] = [];
     const result = await runServeGateChain(reasoningInput(), passingDependencies({
-      conform: async (segment, state) => {
-        judgedSegments.push(segment.text);
-        return { segmentId: segment.segmentId, state, conforms: true };
+      evaluate: async (request) => {
+        judgedStatements.push(request.candidateStatement);
+        return SATISFIED;
       }
     }));
 
@@ -86,85 +132,69 @@ describe("FX-SRV-17 / FX-SRV-01b / FX-LG-06 — ordered legal serve path", () =>
       researchPlan: "Research it with an independent source."
     });
     expect(result.gateTrace).toEqual([
-      "GATE1_R9_PASS", "GATE2_Q53_PASS_VACUOUS", "COMPOSITION_BUDGET_PASS",
-      "COMPOSED", "GATE3_CONFORMANCE_PASS_EXHAUSTIVE", "GATE4_Q51_DOWNGRADE",
-      "POST_COMPOSE_R9_PASS", "BAND_CEILING_PASS", "SERVE"
+      "DIGEST_BUILT", "COMPOSED", "SYNTHESIS_LOOP_SATISFIED",
+      "GATE4_Q51_DOWNGRADE", "BAND_CEILING_PASS", "SERVE"
     ]);
-    expect(judgedSegments).toEqual(["A provisional answer.", "Research it with an independent source."]);
+    // ONE evaluator call sees the WHOLE candidate — the retired per-segment
+    // conformance sweep is gone with the gate it fed.
+    expect(judgedStatements).toEqual([
+      "A provisional answer.\nResearch it with an independent source."
+    ]);
   });
 
-  it("fails loudly when composition omits the required research-plan segment", async () => {
+  it("fails loudly when synthesis omits the required research-plan segment", async () => {
     await expect(runServeGateChain(reasoningInput(), passingDependencies({
-      compose: async () => composed("Only a hypothesis was composed.")
+      synthesize: async () => composed("Only a hypothesis was composed.")
     }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
 
-  it("rejects an empty composed segment list inside the serve package", async () => {
+  it("reaches the NO_ARTIFACT crash class when synthesis returns no segment", async () => {
+    // Before T9 this threw COMPOSITION_CONTRACT_ERROR. The goal enumerates
+    // "no-artifact" as one of the four COMPONENTS_ONLY survivors, so it is a
+    // terminal with a named mark now, not a run failure.
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     input.nodes[0]!.locator = "https://example.invalid/test-fixture";
-    await expect(runServeGateChain(input, passingDependencies({ compose: async () => [] })))
-      .rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
-  });
-});
-
-describe("FX-C52-03 — R9 occupies gate position 1", () => {
-  it("routes a pre-compose R9 block to components-only + DEFECT", async () => {
-    const input = reasoningInput();
-    input.nodes[0]!.restatementStatus = "FAIL";
-    let compositionCalls = 0;
-    const result = await runServeGateChain(input, passingDependencies({
-      compose: async () => { compositionCalls += 1; return composed("should not run"); }
-    }));
+    const result = await runServeGateChain(input, passingDependencies({ synthesize: async () => [] }));
     expect(result.terminal).toBe("COMPONENTS_ONLY");
+    expect(result.crashClass).toBe("NO_ARTIFACT");
     expect(result.conditionMarks).toEqual(["DEFECT"]);
-    expect(result.gateTrace).toEqual(["GATE1_R9_BLOCK", "COMPONENTS_ONLY_DEFECT"]);
-    expect(compositionCalls).toBe(0);
+  });
+
+  it("refuses a segment that references a node outside the serve set", async () => {
+    await expect(runServeGateChain(reasoningInput(), passingDependencies({
+      synthesize: async () => [{
+        segmentId: "segment:1",
+        text: "Out of set.",
+        loadBearing: true,
+        assertedNodeRefs: ["node:absent"],
+        servedNumberRefs: []
+      }]
+    }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
 });
 
-describe("FX-SRV-01a / FX-C52-01 — Q51 verdict and locator limbs", () => {
+describe("FX-SRV-01a / FX-C52-01 — the Q51 FORM limb (T13 owns the form; T9 kept it)", () => {
   it("serves LOOKED_UP with a resolving locator as a verdict", async () => {
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     input.nodes[0]!.locator = "https://example.invalid/test-fixture";
     const result = await runServeGateChain(input, passingDependencies({
-      compose: async () => composed("Evidence-backed verdict.")
+      synthesize: async () => composed("Evidence-backed verdict.")
     }));
     expect(result.terminal).toBe("SERVED");
     expect(result.answerForm?.kind).toBe("VERDICT");
   });
 
-  it("serves components-only + DEFECT when Q51 provenance cannot resolve", async () => {
+  it("serves a LOOKED_UP node whose provenance cannot resolve — the locator BLOCK is deleted", async () => {
+    // Former terminal: COMPONENTS_ONLY + DEFECT via GATE4_Q51_LOCATOR_BLOCK.
     const input = reasoningInput();
     input.nodes[0]!.wayOfKnowing = "LOOKED_UP";
     const result = await runServeGateChain(input, passingDependencies({
-      compose: async () => composed("Unlocatable claim.")
+      synthesize: async () => composed("Unlocatable claim.")
     }));
-    expect(result.terminal).toBe("COMPONENTS_ONLY");
-    expect(result.conditionMarks).toEqual(["DEFECT"]);
-    expect(result.gateTrace.slice(-2)).toEqual(["GATE4_Q51_LOCATOR_BLOCK", "COMPONENTS_ONLY_DEFECT"]);
-  });
-});
-
-describe("FX-SRV-18 — AC-53 route 1", () => {
-  it("reaches components-only + DEFECT after two conformance failures", async () => {
-    let composeCalls = 0;
-    const result = await runServeGateChain(reasoningInput(), passingDependencies({
-      compose: async () => { composeCalls += 1; return composed(`attempt ${composeCalls}`); },
-      conform: async (segment, state) => ({ segmentId: segment.segmentId, state, conforms: false })
-    }));
-    expect(composeCalls).toBe(2);
-    expect(result.terminal).toBe("COMPONENTS_ONLY");
-    expect(result.conditionMarks).toContain("DEFECT");
-  });
-
-  it("reaches components-only + DEFECT when post-compose verdict-R9 blocks", async () => {
-    const result = await runServeGateChain(reasoningInput(), passingDependencies({
-      postComposeR9: async () => false
-    }));
-    expect(result.terminal).toBe("COMPONENTS_ONLY");
-    expect(result.conditionMarks).toEqual(["DEFECT"]);
-    expect(result.gateTrace.slice(-2)).toEqual(["POST_COMPOSE_R9_FAIL", "COMPONENTS_ONLY_DEFECT"]);
+    expect(result.terminal).toBe("SERVED");
+    expect(result.crashClass).toBeNull();
+    expect(result.gateTrace).not.toContain("GATE4_Q51_LOCATOR_BLOCK");
   });
 });

@@ -99,6 +99,10 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   runDeathPolicy: policy.runDeathPolicy,
   hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
   verdictLabelPolicy: policy.verdictLabelPolicy,
+  // S6-2 / T9 (board F33 class): the SHIPPED entry point must LOAD and PASS
+  // every register family the run reads. Without this line the claim-time
+  // gate refuses every work item and no statement is ever synthesized.
+  synthesisRolePolicy: policy.synthesisRolePolicy,
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({

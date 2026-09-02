@@ -175,6 +175,25 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       disagreementQuantity: "test-layer:goal-v4:80-96"
     }
   },
+  // T9 coherence consequence: every served statement now comes out of the
+  // synthesizer/evaluator loop, so every fixture that reaches a served answer
+  // needs the sealed synthesis-role family. Both refs name THIS fixture's one
+  // configured provider — the fixture has a single maker, so the loop's two
+  // roles are held by the same identity, which stays lawful (goal 84-85) and is
+  // exactly the case T16's identical-refs warning describes. Provisioning only:
+  // no fixture's own subject assertions change.
+  synthesisRolePolicy: {
+    registerVersion: 1,
+    synthesizerRoleRef: "provider:test-layer",
+    evaluatorRoleRef: "provider:test-layer",
+    evaluatorLoopMaxRounds: 3,
+    identicalRoleRefs: true,
+    sourceRefs: {
+      synthesizerRoleRef: "test-layer:J8",
+      evaluatorRoleRef: "test-layer:J8",
+      evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+    }
+  },
   resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
     batteryRowId,
     state: "INACTIVE" as const,
@@ -4463,9 +4482,20 @@ describe("T10/T11 · the served root and its label, through the production runne
       { segment_id: "segment:verdict", text: statement, node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
     ] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ pass: true })
+    // T9: the two retired organs (per-segment CONFORMANCE, post-compose R9)
+    // are one EVALUATOR call now, and a satisfied evaluator ends the loop in
+    // round 1 — so the serve path is exactly two model calls, not four.
+    JSON.stringify({
+      satisfied: true,
+      objection: null,
+      criteria: {
+        fairness_to_losers: true,
+        statement_label_agreement: true,
+        no_overstatement: true,
+        restatement: true,
+        citation_tracing: true
+      }
+    })
   ];
 
   /**
@@ -4552,6 +4582,36 @@ describe("T10/T11 · the served root and its label, through the production runne
       // Stopping after judgement and propagation still refuses honestly, but it
       // bills a deployment for a run it was always going to reject — so the gate
       // sits at claim time, on the same footing as J12's panel-weighting stop.
+      expect(provider.calls()).toBe(0);
+      const modelCalls = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+          WHERE run_id=$1 AND action_kind='MODEL_CALL'`, [work.runId]
+      );
+      expect(modelCalls.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * T9 × board F33 × J12, at run level. The synthesis-role family binds at
+   * EVERY maker count — every served statement is written by the synthesizer
+   * and graded by the evaluator — so a deployment that never handed the runner
+   * the sealed rows must refuse at claim time, before it spends anything, the
+   * same way T11's label family and J12's panel rows do.
+   */
+  it("T9 stops loudly instead of synthesizing when the sealed synthesis-role family is missing", async () => {
+    const question = `t09-unsealed-synthesis-family-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
+    const { synthesisRolePolicy: _omitted, ...settingsWithoutSynthesisRolePolicy } = runnerSettings();
+    try {
+      await expect(
+        runnerWithEndpoint(provider.endpoint, settingsWithoutSynthesisRolePolicy).executeWorkItem(work.workItemId)
+      ).rejects.toMatchObject({ code: "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED" });
+
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [work.runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
       expect(provider.calls()).toBe(0);
       const modelCalls = await database.pool.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM ledger.ledger_entry

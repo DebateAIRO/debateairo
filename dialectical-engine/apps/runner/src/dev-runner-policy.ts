@@ -2,12 +2,18 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import {
   readClaimTypeCompositionMap,
+  readSynthesisRoleControls,
   readVerdictLabelControls,
   type CompositionMapRegisterRow
 } from "@debateai/register";
 import type { JudgementSelectionRule } from "@debateai/judgement";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
-import type { RunDeathPolicy, RunnerVerdictLabelPolicy, ScoringOperatorRegisterInput } from "./index.js";
+import type {
+  RunDeathPolicy,
+  RunnerSynthesisRolePolicy,
+  RunnerVerdictLabelPolicy,
+  ScoringOperatorRegisterInput
+} from "./index.js";
 import {
   DEVELOPMENT_ALGORITHM_SOURCE_REF,
   DEVELOPMENT_RUNNER_SOURCE_REF,
@@ -100,6 +106,20 @@ export interface DevelopmentRunnerPolicy {
    * from a deployment that never sealed it at all.
    */
   readonly verdictLabelPolicy: RunnerVerdictLabelPolicy;
+  /**
+   * S6-2 / T9: the sealed T16 synthesis-role family — the SYNTHESIZER and
+   * EVALUATOR role refs and the evaluator loop bound — read through T16's OWN
+   * reader (`readSynthesisRoleControls`), which fails loudly and names the
+   * missing rows, and which prints the identical-refs startup warning (J7).
+   * This file restates neither a value nor a schema.
+   *
+   * MANDATORY, exactly like `verdictLabelPolicy` and for the same reason (S06
+   * codex r1 B1, board F33): every served statement now comes out of the
+   * synthesis loop, so a deployment that seals the family but never hands it
+   * to the runner is indistinguishable at the serve seam from one that never
+   * sealed it at all. The runner's claim-time gate refuses either.
+   */
+  readonly synthesisRolePolicy: RunnerSynthesisRolePolicy;
   readonly hashes: Readonly<Record<"judge" | "composer" | "conformance" | "propagation" | "serve", string>>;
 }
 
@@ -136,6 +156,12 @@ export async function readDevelopmentRunnerPolicy(
   // a row seeded by another deployment cannot drift in under the same version.
   const verdictLabels = await readVerdictLabelControls(pool, registerVersion);
   if (Object.values(verdictLabels.sourceRefs).some(
+    (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
+  )) {
+    throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
+  }
+  const synthesisRoles = await readSynthesisRoleControls(pool, registerVersion);
+  if (Object.values(synthesisRoles.sourceRefs).some(
     (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
   )) {
     throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
@@ -191,6 +217,14 @@ export async function readDevelopmentRunnerPolicy(
       lowCut: verdictLabels.lowCut,
       disagreementThreshold: verdictLabels.disagreementThreshold,
       sourceRefs: verdictLabels.sourceRefs
+    }),
+    synthesisRolePolicy: Object.freeze({
+      registerVersion: synthesisRoles.registerVersion,
+      synthesizerRoleRef: synthesisRoles.synthesizerRoleRef,
+      evaluatorRoleRef: synthesisRoles.evaluatorRoleRef,
+      evaluatorLoopMaxRounds: synthesisRoles.evaluatorLoopMaxRounds,
+      identicalRoleRefs: synthesisRoles.identicalRoleRefs,
+      sourceRefs: synthesisRoles.sourceRefs
     }),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,

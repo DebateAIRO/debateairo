@@ -412,10 +412,12 @@ describe("S02 severity and unordered condition marks", () => {
     expect(new Set(Object.keys(CONDITION_MARK_SEVERITY))).toEqual(
       new Set(CONDITION_MARKS),
     );
-    // J13(b) 29 -> 31, then T11 31 -> 32 (LABEL-BASIS-INCOMPLETE): the severity
+    // J13(b) 29 -> 31, T11 31 -> 32 (LABEL-BASIS-INCOMPLETE), T9 32 -> 35
+    // (SYNTHESIS-OBJECTION-STANDING, DIGEST-COMPRESSED, DIGEST-CANNOT-EXIST):
+    // the severity
     // map is DERIVED from CONDITION_MARKS, so it grew with the vocabulary; only
     // this count pin is stated by hand.
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(32);
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(35);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );
