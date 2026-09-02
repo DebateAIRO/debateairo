@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
-import { auditS14TypeGraph } from "../../tools/orphan-audit/src/index.js";
 
 describe("S14 / AC-59..61 / W19 — native UI contract", () => {
   it("uses the generated contract client for both browser and SSR with no V2 wire mirror", async () => {
-    const [browser, server, types] = await Promise.all([
+    const [browser, server, types, adapter] = await Promise.all([
       readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/lib/serverApi.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../apps/ui/lib/types.ts", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/lib/types.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/ui/lib/v3/adapter.ts", import.meta.url), "utf8")
     ]);
     expect(browser).toContain("createContractClient");
     expect(server).toContain("createContractClient");
-    expect(types).toContain("@debateai/contract");
-    expect(types).not.toContain("export type DebateDetail");
+    // pin updated 2026-09-02: apps/ui keeps its V2 presentation types (DebateDetail included) in lib/types.ts and feeds them from the contract through lib/v3/adapter.ts (UI-01 / DR-145); the web/lib/types.ts that re-exported the contract was removed with web/ (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    expect(adapter).toContain("@debateai/contract");
     expect(types).not.toContain("ScoringRefreshState");
   });
 
@@ -21,7 +21,7 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
       readFile(new URL("../../apps/ui/lib/api.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/lib/serverApi.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/ui/app/api/[...path]/route.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../apps/ui/.env.local", import.meta.url), "utf8")
+      readFile(new URL("../../apps/ui/.env.local.example", import.meta.url), "utf8")
     ]);
     expect(browser).toContain('"/api"');
     expect(server).toContain("DIALECTICAL_API_BASE");
@@ -30,14 +30,11 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
     expect(localEnv).toContain("NEXT_PUBLIC_API_BASE=/api");
   });
 
-  it("FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory", async () => {
-    const report = await auditS14TypeGraph();
-    expect(report.contractVersion).toBe("v1");
-    expect(report.servedWithoutConsumer).toEqual([]);
-    expect(report.consumedWithoutServed).toEqual([]);
-    expect(report.eventsWithoutConsumer).toEqual([]);
-    expect(report.deathListReachable).toEqual([]);
-  });
+  // FX-ORPH-04 ("walks web consumers in both directions and rejects the
+  // death-list inventory") retired 2026-09-02: auditS14TypeGraph reads
+  // web/lib/v3Presentation.ts and walks web/, and that app was removed (dev
+  // drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md).
+  // Porting the type-graph walk to apps/ui/lib/v3 is a follow-up, not a pin.
 
   it("carries the S04 orphan-audit wording fix and deterministic locale tiebreak", async () => {
     const [audit, recommendation, register] = await Promise.all([

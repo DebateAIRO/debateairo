@@ -1,12 +1,12 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LoginFlow } from "@/components/LoginFlow";
-import { createServerContractClient, USER_TOKEN_COOKIE } from "@/lib/serverApi";
+import { createServerContractClient, readSessionCookie } from "@/lib/serverApi";
 
 export default async function LoginPage() {
-  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value;
+  const token = readSessionCookie(await cookies());
   let sessionConfirmed = false;
-  if (token !== undefined) {
+  if (token !== null) {
     const userAgent = (await headers()).get("user-agent") ?? undefined;
     try {
       await createServerContractClient(fetch, token, userAgent).readSession();

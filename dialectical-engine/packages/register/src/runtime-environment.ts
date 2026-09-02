@@ -29,8 +29,15 @@ const kekPath = z.preprocess((value) => {
   return value;
 }, z.string().min(1));
 
+type EnvironmentSource = Readonly<Record<string, string | undefined>>;
+const nodeEnvironment = z.enum(["development", "test", "production"]).optional();
+
+export function parseMigrationEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({ MIGRATION_DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
+}
+
 export function loadMigrationEnvironment() {
-  return parseEnvironment({ MIGRATION_DATABASE_URL: z.string().url() });
+  return parseMigrationEnvironment(process.env);
 }
 
 export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, string>> {
@@ -42,7 +49,8 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     XDG_CONFIG_HOME: z.string().min(1).optional(),
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
-    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional()
+    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+    DEBATEAI_DEV_CUSTODY_ROOT: z.string().min(1).optional()
   });
   return Object.freeze(Object.fromEntries(
     Object.entries(environment).filter((entry): entry is [string, string] => (
@@ -51,16 +59,28 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
   ));
 }
 
+export function parseReplaySelfTestEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({ REPLAY_SELF_TEST_DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
+}
+
 export function loadReplaySelfTestEnvironment() {
-  return parseEnvironment({ REPLAY_SELF_TEST_DATABASE_URL: z.string().url() });
+  return parseReplaySelfTestEnvironment(process.env);
+}
+
+export function parseLivenessEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({ LIVENESS_DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
 }
 
 export function loadLivenessEnvironment() {
-  return parseEnvironment({ LIVENESS_DATABASE_URL: z.string().url() });
+  return parseLivenessEnvironment(process.env);
+}
+
+export function parseSettlementEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({ SETTLEMENT_DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
 }
 
 export function loadSettlementEnvironment() {
-  return parseEnvironment({ SETTLEMENT_DATABASE_URL: z.string().url() });
+  return parseSettlementEnvironment(process.env);
 }
 
 const positiveInteger = z.coerce.number().int().positive();
@@ -103,6 +123,75 @@ const apiEnvironmentShape = {
     EVALUATOR_DEV_MENU_DATABASE_URL: z.string().url().optional(),
     ...hatchetShape
 } as const;
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
+
+function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_HOSTS.has(host.toLowerCase());
+}
+
+/** Host of a `host:port` pair; bracketed and bare IPv6 literals keep their whole address. */
+function hostOfHostPort(value: string): string {
+  if (value.startsWith("[")) {
+    const close = value.indexOf("]");
+    return close === -1 ? value : value.slice(0, close + 1);
+  }
+  return value.split(":").length === 2 ? value.replace(/:\d+$/u, "") : value;
+}
+
+/**
+ * pg 8 / pg-connection-string 2.14 honour only the URL: `verify-full` checks chain + hostname,
+ * a private CA needs `sslrootcert=`, `uselibpqcompat` downgrades `require` to unverified,
+ * `no-verify` and `ssl=0` disable verification. Loopback and unix-socket hosts are exempt.
+ */
+function databaseUrlSatisfiesTlsFloor(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  const parameters = parsed.searchParams;
+  const hosts = parsed.hostname === "" ? (parameters.get("host") ?? "").split(",") : [parsed.hostname];
+  if (hosts.every((host) => host === "" || host.startsWith("/") || isLoopbackHost(host))) return true;
+  return parameters.get("sslmode") === "verify-full"
+    && (parameters.get("sslrootcert") ?? "").trim() !== ""
+    && !parameters.has("uselibpqcompat")
+    && !["0", "false"].includes(parameters.get("ssl") ?? "");
+}
+
+/**
+ * Fail-closed floors for `NODE_ENV === "production"` (R2; L5-F3, L5-F5, L4-F5, L1 q10).
+ * Every `*_DATABASE_URL` off-box must pin verified TLS; content encryption must be on
+ * wherever the shape carries the flag; cleartext Hatchet gRPC and a public API bind are refused.
+ */
+export function assertProductionFloors(environment: Readonly<Record<string, unknown>>): void {
+  if (environment.NODE_ENV !== "production") return;
+  for (const [key, value] of Object.entries(environment)) {
+    if ((key === "DATABASE_URL" || key.endsWith("_DATABASE_URL"))
+      && typeof value === "string" && !databaseUrlSatisfiesTlsFloor(value)) {
+      throw new TypeError(`DATABASE_URL_TLS_REQUIRED:${key}`);
+    }
+  }
+  if (environment.CONTENT_ENCRYPTION_ENABLED !== undefined
+    && environment.CONTENT_ENCRYPTION_ENABLED !== "true") {
+    throw new TypeError("CONTENT_ENCRYPTION_REQUIRED_IN_PRODUCTION");
+  }
+  if (environment.HATCHET_TLS_STRATEGY === "none") {
+    const hatchetHost = typeof environment.HATCHET_HOST_PORT === "string"
+      ? hostOfHostPort(environment.HATCHET_HOST_PORT)
+      : "";
+    if (!isLoopbackHost(hatchetHost)) throw new TypeError("HATCHET_TLS_REQUIRED");
+  }
+  if (typeof environment.API_HOST === "string" && !isLoopbackHost(environment.API_HOST)) {
+    throw new TypeError("API_HOST_MUST_BE_LOOPBACK");
+  }
+}
+
+function withProductionFloors<T extends Readonly<Record<string, unknown>>>(environment: T): T {
+  assertProductionFloors(environment);
+  return environment;
+}
 
 function validateApiEnvironment(
   environment: z.infer<z.ZodObject<typeof apiEnvironmentShape>>
@@ -158,6 +247,7 @@ function validateApiEnvironment(
       || environment.PUBLICATION_KEY_STORE_PATH === environment.USER_DEK_STORE_PATH)) {
     throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
   }
+  assertProductionFloors(environment);
   return environment;
 }
 
@@ -172,9 +262,13 @@ export function loadApiEnvironment() {
 }
 
 export function loadRunnerEnvironment() {
-  const environment = parseEnvironment({
+  return parseRunnerEnvironment(process.env);
+}
+
+export function parseRunnerEnvironment(source: EnvironmentSource) {
+  const environment = parseEnvironmentSource({
     KEK_PATH: kekPath, DATABASE_URL: z.string().url(), RUNNER_WORKER_ID: z.string().min(1),
-    REGISTER_VERSION: positiveInteger,
+    REGISTER_VERSION: positiveInteger, NODE_ENV: nodeEnvironment,
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     USER_DEK_STORE_PATH: z.string().min(1).optional(),
@@ -193,7 +287,7 @@ export function loadRunnerEnvironment() {
     VLLM_AUTHORIZATION: z.string().min(1).optional(),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
     ...hatchetShape
-  });
+  }, source);
   if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {
     throw new TypeError("CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED");
   }
@@ -201,5 +295,6 @@ export function loadRunnerEnvironment() {
     && environment.USER_DEK_STORE_PATH === undefined) {
     throw new TypeError("CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED");
   }
+  assertProductionFloors(environment);
   return environment;
 }

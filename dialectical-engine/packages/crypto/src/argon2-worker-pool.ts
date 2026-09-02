@@ -175,6 +175,13 @@ export interface Argon2WorkerPoolOptions {
   readonly terminationConfirmTimeoutMs?: number;
   readonly spawn?: (index: number) => Argon2WorkerHandle;
   readonly now?: () => number;
+  /**
+   * Invoked exactly once, when the rolling restart breaker trips. The pool
+   * cannot end the process itself; this is how its owner learns that every
+   * future credential operation will fail closed and that a supervisor restart
+   * is the only cure (L2-F9).
+   */
+  readonly onBreakerTripped?: () => void;
 }
 
 export interface Argon2PoolStats {
@@ -457,6 +464,7 @@ export class Argon2WorkerPool {
   private readonly terminationConfirmMs: number;
   private readonly spawnWorker: (index: number) => Argon2WorkerHandle;
   private readonly now: () => number;
+  private readonly onBreakerTripped: (() => void) | undefined;
 
   /**
    * Every handle whose `terminate()` has been called but not yet confirmed.
@@ -489,6 +497,7 @@ export class Argon2WorkerPool {
     this.terminationConfirmMs = options.terminationConfirmTimeoutMs
       ?? ARGON2_PROVISIONAL_BOUNDS.terminationConfirmTimeoutMs;
     this.now = options.now ?? Date.now;
+    this.onBreakerTripped = options.onBreakerTripped;
     this.spawnWorker = options.spawn ?? ((index) => Argon2WorkerPool.spawnRealWorker(index));
     if (!Number.isInteger(this.workerCount) || this.workerCount < 1) {
       throw new TypeError("ARGON2_POOL_WORKER_COUNT_INVALID");
@@ -1052,6 +1061,22 @@ export class Argon2WorkerPool {
   private tripBreaker(): void {
     if (this.breakerTripped) return;
     this.breakerTripped = true;
+    // L2-F9: the breaker latches for the life of the process, so without this
+    // announcement four worker losses inside the window became a silent,
+    // permanent authentication outage — the process stayed up, so systemd's
+    // Restart=on-failure never fired. Operational counters only: no password,
+    // no salt, no digest may ride this record.
+    try {
+      console.error(JSON.stringify({
+        event: "argon2.breaker.tripped",
+        workers: this.workerCount,
+        restartBudget: this.restartBudget,
+        restartWindowMs: this.restartWindowMs,
+        restartsInWindow: this.restarts.length
+      }));
+    } catch {
+      // Announcing must never replace failing closed.
+    }
     this.settleReady();
     this.rejectAllQueued(new Argon2InfrastructureError("ARGON2_POOL_UNAVAILABLE"));
     for (const slot of this.slots) {
@@ -1066,6 +1091,13 @@ export class Argon2WorkerPool {
       slot.generation += 1;
       this.clearReadyTimer(slot);
       if (handle !== undefined) void this.retire(handle);
+    }
+    // Last, so the owner observes a pool that has already failed closed. The
+    // guard above makes this at-most-once for the life of the pool.
+    try {
+      this.onBreakerTripped?.();
+    } catch {
+      // A failing handler must not corrupt the breaker's own state.
     }
   }
 

@@ -217,6 +217,24 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
+  it("bounds every owned stop so one hung service cannot orphan the rest (L7-F1)", async () => {
+    const base = operations();
+    const stack = await startDevelopmentAuthStack({
+      ...base,
+      startTls: vi.fn(async () => {
+        base.calls.push("tls:start");
+        return Object.freeze({ stop: vi.fn(() => new Promise<void>(() => undefined)) });
+      })
+    }, 50);
+
+    await expect(stack.stop()).rejects.toThrow("DEV_AUTH_STACK_STOP_TIMEOUT");
+    expect(base.calls).toContain("ui:stop");
+    expect(base.calls).toContain("runner:stop");
+    expect(base.calls).toContain("api:stop");
+    expect(base.calls).toContain("data:stop");
+    expect(base.calls).toContain("providers:stop");
+  });
+
   it("exposes one fixed CLI, owns the runner, and never starts a substitute provider", async () => {
     const [packageSource, source, cli] = await Promise.all([
       readFile("package.json", "utf8"),
@@ -233,8 +251,9 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(source).not.toMatch(/mkcert\s+-install|seedAccount/iu);
     expect(source).not.toContain("process.env");
     expect(cli).toContain("DEV_AUTH_STACK_READY=https://localhost:3000:RUNNER_REGISTERED");
-    expect(cli).toContain("process.once(\"uncaughtException\"");
-    expect(cli).toContain("process.once(\"unhandledRejection\"");
+    expect(cli).toContain("process.on(\"uncaughtException\"");
+    expect(cli).toContain("process.on(\"unhandledRejection\"");
+    expect(cli).not.toContain("process.once(\"SIGINT\"");
     expect(cli).toContain("runtimeFault.dispose()");
   });
 

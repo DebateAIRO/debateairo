@@ -8,7 +8,15 @@ import {
   randomInt,
   timingSafeEqual
 } from "node:crypto";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  openSync,
+  readSync,
+  realpathSync,
+  statSync
+} from "node:fs";
 import type { Dirent } from "node:fs";
 import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -120,13 +128,34 @@ export class KekUnresolvedError extends CryptoError {
   }
 }
 
+/**
+ * A key file that exists but does not satisfy the custody contract. Distinct
+ * from KEK_UNRESOLVED (nothing is configured at that path) so an operator can
+ * tell "you did not provision this" from "this file is not safe to trust".
+ */
+export class CryptoCustodyError extends CryptoError {
+  constructor(code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID") {
+    super(code, code);
+    this.name = "CryptoCustodyError";
+  }
+}
+
+/** The handle's master copy has been zeroed; it can never be revived. */
+export class KekDestroyedError extends CryptoError {
+  constructor() {
+    super("KEK_DESTROYED", "KEK_DESTROYED");
+    this.name = "KekDestroyedError";
+  }
+}
+
 class CryptoInputError extends CryptoError {
   constructor(code:
     | "CRYPTO_AAD_INVALID"
     | "CRYPTO_AUDIT_CHAIN_INVALID"
     | "CRYPTO_CANONICAL_VALUE_INVALID"
     | "CRYPTO_EMAIL_INVALID"
-    | "CRYPTO_KEY_INVALID") {
+    | "CRYPTO_KEY_INVALID"
+    | "CRYPTO_TOKEN_KIND_INVALID") {
     super(code, code);
     this.name = "CryptoInputError";
   }
@@ -138,7 +167,12 @@ export interface KekHandle {
 }
 
 const kekMaterials = new WeakMap<KekHandle, Buffer>();
+const destroyedKekHandles = new WeakSet<KekHandle>();
 
+/**
+ * Short-lived working copy for one encrypt/decrypt. Pooled on purpose: this is
+ * the per-message path, and every caller zeroes it in a `finally`.
+ */
 function copyKey(material: Uint8Array): Buffer {
   const key = Buffer.from(material);
   if (key.byteLength !== KEY_BYTES) {
@@ -148,8 +182,24 @@ function copyKey(material: Uint8Array): Buffer {
   return key;
 }
 
+/**
+ * L2-F7: `Buffer.from` of a 32-byte source is served from Node's shared 8 KiB
+ * pool slab, so the copy sits adjacent to unrelated allocations and `fill(0)`
+ * erases only the view — the bytes stay in the slab until it is reused.
+ * `allocUnsafeSlow` gives the key its own exactly-sized allocation that zeroing
+ * really erases. Reserved for the long-lived master copies and the key-file
+ * reads: a non-pooled allocation per message would cost RSS and GC for no
+ * benefit, since those copies are zeroed immediately anyway.
+ */
+function isolatedKeyCopy(material: Uint8Array): Buffer {
+  if (material.byteLength !== KEY_BYTES) throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  const key = Buffer.allocUnsafeSlow(KEY_BYTES);
+  key.set(material);
+  return key;
+}
+
 function makeKekHandle(material: Uint8Array): KekHandle {
-  const key = copyKey(material);
+  const key = isolatedKeyCopy(material);
   const handle = Object.freeze(Object.create(null)) as KekHandle;
   kekMaterials.set(handle, key);
   return handle;
@@ -157,8 +207,26 @@ function makeKekHandle(material: Uint8Array): KekHandle {
 
 function readKek(handle: KekHandle): Buffer {
   const material = kekMaterials.get(handle);
-  if (material === undefined) throw new KekUnresolvedError();
-  return Buffer.from(material);
+  if (material === undefined) {
+    // A destroyed handle is a shutdown-ordering fault, not a missing config.
+    if (destroyedKekHandles.has(handle)) throw new KekDestroyedError();
+    throw new KekUnresolvedError();
+  }
+  return copyKey(material);
+}
+
+/**
+ * Zeroes the KEK master copy and forgets the handle (L2-F7). Idempotent, so the
+ * shutdown lifecycle may run it on both the signal and the controller path.
+ * Every later wrap/unwrap through this handle fails closed with KEK_DESTROYED.
+ */
+export function destroyKek(handle: KekHandle): void {
+  const material = kekMaterials.get(handle);
+  if (material !== undefined) {
+    material.fill(0);
+    kekMaterials.delete(handle);
+  }
+  destroyedKekHandles.add(handle);
 }
 
 function canonicalCandidatePath(candidate: string): string {
@@ -181,30 +249,44 @@ function pathsOverlap(left: string, right: string): boolean {
   return left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`);
 }
 
-/** Fail closed if any configured secret path or store root aliases another. */
+/**
+ * Fail closed if any configured secret path or store root aliases another.
+ *
+ * L2-F8: this ran only when publication was enabled, so a private-only
+ * deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one file and
+ * silently make the KEK the email HMAC key — after which "rotating the blind
+ * index" would be a KEK rotation. The corpus KEK and publication store are now
+ * optional and every other domain is checked unconditionally. A private-only
+ * violation reports SECRET_DOMAIN_MUST_BE_SEPARATE; the publication pair keeps
+ * its established PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE code.
+ */
 export function assertPublicationSecretDomains(input: Readonly<{
   privateKek: KekHandle;
-  corpusKek: KekHandle;
+  corpusKek?: KekHandle | undefined;
   privateKekPath: string;
-  corpusKekPath: string;
+  corpusKekPath?: string | undefined;
   privateStorePath: string;
-  publicationStorePath: string;
+  publicationStorePath?: string | undefined;
   additionalSecrets?: readonly Readonly<{
     path: string;
     material: Uint8Array;
   }>[];
   additionalStorePaths?: readonly string[];
 }>): void {
+  const code = input.corpusKek === undefined
+    ? "SECRET_DOMAIN_MUST_BE_SEPARATE"
+    : "PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE";
   const materials: Buffer[] = [];
   try {
-    materials.push(readKek(input.privateKek), readKek(input.corpusKek));
+    materials.push(readKek(input.privateKek));
+    if (input.corpusKek !== undefined) materials.push(readKek(input.corpusKek));
     for (const secret of input.additionalSecrets ?? []) {
       materials.push(copyKey(secret.material));
     }
     for (let leftIndex = 0; leftIndex < materials.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < materials.length; rightIndex += 1) {
         if (timingSafeEqual(materials[leftIndex]!, materials[rightIndex]!)) {
-          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+          throw new TypeError(code);
         }
       }
     }
@@ -214,8 +296,9 @@ export function assertPublicationSecretDomains(input: Readonly<{
   const paths = [
     canonicalCandidatePath(input.privateKekPath),
     canonicalCandidatePath(input.privateStorePath),
-    canonicalCandidatePath(input.corpusKekPath),
-    canonicalCandidatePath(input.publicationStorePath),
+    ...(input.corpusKekPath === undefined ? [] : [canonicalCandidatePath(input.corpusKekPath)]),
+    ...(input.publicationStorePath === undefined
+      ? [] : [canonicalCandidatePath(input.publicationStorePath)]),
     ...(input.additionalSecrets ?? []).map((secret) => canonicalCandidatePath(secret.path)),
     ...(input.additionalStorePaths ?? []).map(canonicalCandidatePath)
   ];
@@ -224,13 +307,13 @@ export function assertPublicationSecretDomains(input: Readonly<{
       const left = paths[leftIndex]!;
       const right = paths[rightIndex]!;
       if (pathsOverlap(left, right)) {
-        throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+        throw new TypeError(code);
       }
       try {
         const leftStat = statSync(left);
         const rightStat = statSync(right);
         if (leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino) {
-          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+          throw new TypeError(code);
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -315,30 +398,96 @@ export function decrypt(dek: Uint8Array, envelope: CryptoEnvelope, aad: AeadAad)
   }
 }
 
-export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
+/**
+ * The production custody contract for a raw 32-byte secret file (L2-F6). It is
+ * the discipline `apps/runner/src/dev-secret-files.ts` already enforced for dev
+ * secrets, which the production loaders did not:
+ *
+ * - `O_NOFOLLOW` so a symlinked key path is refused rather than followed;
+ * - every check taken from `fstat` on the descriptor actually read, so there is
+ *   no stat -> read window another process can slip through;
+ * - `uid` owned by this process, `nlink === 1` (no second name for the key),
+ *   exact 0600, exact 32 bytes;
+ * - a 0700 parent owned by the same uid, because a key anyone may replace is
+ *   not a key.
+ *
+ * The bytes land in an exactly-sized `allocUnsafeSlow` buffer (L2-F7) so the
+ * caller's `fill(0)` really erases them instead of a shared pool slab.
+ */
+function readCustodyKey(
+  path: string,
+  code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID"
+): Buffer {
+  let descriptor: number;
   try {
-    if (typeof pathOrBuffer !== "string") return makeKekHandle(pathOrBuffer);
-    const metadata = statSync(pathOrBuffer);
-    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+    descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch (error) {
+    // Nothing provisioned at all stays the configuration code. ELOOP means the
+    // path WAS a symlink, which is a custody decision, not a missing file.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new KekUnresolvedError();
+    throw new CryptoCustodyError(code);
+  }
+  let material: Buffer | undefined;
+  try {
+    const metadata = fstatSync(descriptor);
+    const parent = statSync(dirname(resolve(path)));
+    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+    if (!metadata.isFile()
+      || metadata.nlink !== 1
+      || (metadata.mode & 0o777) !== 0o600
+      || metadata.size !== KEY_BYTES
+      || (uid !== undefined && metadata.uid !== uid)
+      || !parent.isDirectory()
+      || (parent.mode & 0o777) !== 0o700
+      || (uid !== undefined && parent.uid !== uid)) {
+      throw new CryptoCustodyError(code);
+    }
+    material = Buffer.allocUnsafeSlow(KEY_BYTES);
+    if (readSync(descriptor, material, 0, KEY_BYTES, 0) !== KEY_BYTES) {
+      throw new CryptoCustodyError(code);
+    }
+    return material;
+  } catch (error) {
+    material?.fill(0);
+    if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
+    throw new CryptoCustodyError(code);
+  } finally {
+    try {
+      closeSync(descriptor);
+    } catch {
+      // The key is already read or already refused; a failed close must not
+      // turn a good load into a custody refusal.
+    }
+  }
+}
+
+export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
+  if (typeof pathOrBuffer !== "string") {
+    try {
+      return makeKekHandle(pathOrBuffer);
+    } catch {
       throw new KekUnresolvedError();
     }
-    return makeKekHandle(readFileSync(pathOrBuffer));
-  } catch (error) {
-    if (error instanceof KekUnresolvedError) throw error;
+  }
+  const material = readCustodyKey(pathOrBuffer, "KEK_CUSTODY_INVALID");
+  try {
+    return makeKekHandle(material);
+  } catch {
     throw new KekUnresolvedError();
+  } finally {
+    material.fill(0);
   }
 }
 
 export function loadSecretKey(path: string): Buffer {
+  const material = readCustodyKey(path, "SECRET_CUSTODY_INVALID");
   try {
-    const metadata = statSync(path);
-    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-      throw new KekUnresolvedError();
-    }
-    return copyKey(readFileSync(path));
+    return copyKey(material);
   } catch (error) {
-    if (error instanceof KekUnresolvedError || error instanceof CryptoInputError) throw error;
+    if (error instanceof CryptoInputError) throw error;
     throw new KekUnresolvedError();
+  } finally {
+    material.fill(0);
   }
 }
 
@@ -390,7 +539,9 @@ function canonicalJson(value: unknown): string {
       throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
     }
     const entries = Object.entries(value as Readonly<Record<string, unknown>>)
-      .sort(([left], [right]) => left.localeCompare(right));
+      // UTF-16 code-unit order: locale-independent and identical to the SQL
+      // chain's COLLATE "C" order for the ASCII keys the audit rows use (L2-F4).
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
     return `{${entries.map(([key, item]) =>
       `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
   }
@@ -1040,6 +1191,37 @@ export function generateVerificationToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant" | "verification";
+
+const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
+  "session", "csrf", "login-challenge", "step-up-grant", "verification"
+]);
+
+/**
+ * Purpose-bound opaque-token hash: `sha256("debateai:token:<kind>:v1\0" || token)`,
+ * rendered in the `sha256:<hex>` grammar every token-hash column CHECKs. A token
+ * presented as one kind can never match a hash stored for another kind (L2-F12).
+ * The MFA enrolment token is the consumed verification credential (looked up by
+ * `channel_binding.verification_token_hash`), so it hashes as "verification".
+ */
+export function hashToken(kind: TokenKind, token: string): string {
+  if (typeof kind !== "string" || !TOKEN_KINDS.has(kind)) {
+    throw new CryptoInputError("CRYPTO_TOKEN_KIND_INVALID");
+  }
+  if (typeof token !== "string" || token.length < 32) {
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return `sha256:${createHash("sha256")
+    .update(`debateai:token:${kind}:v1\0`, "utf8")
+    .update(token, "utf8")
+    .digest("hex")}`;
+}
+
+/**
+ * @deprecated Unkeyed, purpose-free digest. No production call site uses it;
+ * it remains only for fixtures that need an opaque `sha256:<hex>` value.
+ * Use `hashToken(kind, token)` for every stored or compared token hash.
+ */
 export function hashVerificationToken(token: string): string {
   if (typeof token !== "string" || token.length < 32) {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");
@@ -1098,6 +1280,41 @@ const defaultUserDekStoreFileSystem: UserDekStoreFileSystem = Object.freeze({
   rm,
   stat
 });
+
+/**
+ * The async half of the custody contract (L2-F6), for the wrapped-key JSON
+ * records the three file stores hold. Same discipline as `readCustodyKey`
+ * minus the 32-byte size rule, because these records are JSON envelopes:
+ * O_NOFOLLOW, decisions taken from the opened descriptor, exactly one link,
+ * 0600 inside a 0700 directory, both owned by this process.
+ *
+ * It throws a bare TypeError; every caller already converts an unexpected
+ * failure into its own typed `*_UNRESOLVED` code, so the store contracts that
+ * the rest of the system asserts on are unchanged.
+ */
+async function readCustodyRecord(
+  location: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "open" | "stat">
+): Promise<unknown> {
+  const handle = await fileSystem.open(location, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const metadata = await handle.stat();
+    const parent = await fileSystem.stat(dirname(location));
+    const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+    if (!metadata.isFile()
+      || metadata.nlink !== 1
+      || (metadata.mode & 0o777) !== 0o600
+      || (uid !== undefined && metadata.uid !== uid)
+      || !parent.isDirectory()
+      || (parent.mode & 0o777) !== 0o700
+      || (uid !== undefined && parent.uid !== uid)) {
+      throw new TypeError("SECRET_CUSTODY_INVALID");
+    }
+    return JSON.parse(await handle.readFile("utf8")) as unknown;
+  } finally {
+    await handle.close();
+  }
+}
 
 function assertUserDekStoreUserId(userId: string): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
@@ -1234,9 +1451,7 @@ export class FileUserDekStore implements ReadableUserDekStore {
     assertUserDekStoreUserId(userId);
     const location = join(this.root, "users", userId, "dek.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) throw new KekUnresolvedError();
-      const parsed = JSON.parse(await this.fileSystem.readFile(location, "utf8")) as unknown;
+      const parsed = await readCustodyRecord(location, this.fileSystem);
       if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
       const record = parsed as Record<string, unknown>;
       const envelope = record.wrapped_dek;
@@ -1591,11 +1806,9 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     const location = join(this.root, "runs", runId, "content-key.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new RunContentKeyUnresolvedError();
-      }
-      const record = parseStoredRunContentKey(JSON.parse(await this.fileSystem.readFile(location, "utf8")), runId);
+      const record = parseStoredRunContentKey(
+        await readCustodyRecord(location, this.fileSystem), runId
+      );
       return await unwrapRunContentKey(this.users, this.resolveUserId, record);
     } catch (error) {
       if (error instanceof RunContentKeyUnresolvedError) throw error;
@@ -1618,12 +1831,8 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     try {
       const location = join(this.root, "runs", runId, "content-key.v1.json");
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new RunContentKeyUnresolvedError();
-      }
       return parseStoredRunContentKey(
-        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        await readCustodyRecord(location, this.fileSystem),
         runId
       ).owner_ref;
     } catch (error) {
@@ -2024,12 +2233,8 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     assertPublicationRef(publicationRef);
     const location = join(this.root, "publications", publicationRef, "publication-key.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new PublicationKeyUnresolvedError();
-      }
       const record = parseStoredPublicationKey(
-        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        await readCustodyRecord(location, this.fileSystem),
         publicationRef
       );
       return unwrapPublicationKey(this.corpusKek, record);

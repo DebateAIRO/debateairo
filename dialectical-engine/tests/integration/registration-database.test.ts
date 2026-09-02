@@ -20,7 +20,7 @@ import {
   FileUserDekStore,
   generateDek,
   generateVerificationToken,
-  hashVerificationToken,
+  hashToken,
   Argon2WorkerPool,
   AuditContextHasher,
   hashAuditSourceIp,
@@ -1245,7 +1245,7 @@ setTimeout(() => undefined, 500);
         new AuditContextHasher(sharedArgon2Pool(), sourceIpSalt, basePolicy.auditSourceIpKdf)
       );
       await expect(runtimeRepository.findAuditIdentityByVerificationHash(
-        hashVerificationToken(token)
+        hashToken("verification", token)
       )).resolves.toEqual({
         auditToken: registered.user.audit_token,
         addressKey: createEmailBlindIndex(blindIndexKey, registered.email).toString("hex")
@@ -1406,7 +1406,7 @@ setTimeout(() => undefined, 500);
     const flow = buildService({ initialNow: new Date() });
     const registered = await registerAccount(flow.service, `runtime-mfa-${randomUUID()}`);
     const token = (flow.mail as MemoryMailSender).messages[0]!.token;
-    const tokenHash = hashVerificationToken(token);
+    const tokenHash = hashToken("verification", token);
     await expect(flow.service.verifyEmail({ token }, source)).resolves.toEqual({ status: "mfa_required" });
 
     const factorId = randomUUID();
@@ -2060,7 +2060,7 @@ setTimeout(() => undefined, 500);
       argon2: completedPasswordHashArgon2(),
       verificationTokenFactory() {
         const token = generateVerificationToken();
-        generatedTokenHashes.add(hashVerificationToken(token));
+        generatedTokenHashes.add(hashToken("verification", token));
         return token;
       }
     });
@@ -2199,7 +2199,7 @@ setTimeout(() => undefined, 500);
     const activeRawTokenSet = new Set(activeRawTokens);
     const generatedTokenStringsInSnapshot = [...saturatedTokenStrings].filter(
       (token) => !baselineTokenStrings.has(token)
-        && generatedTokenHashes.has(hashVerificationToken(token))
+        && generatedTokenHashes.has(hashToken("verification", token))
     );
     const rawTokensOutsideActiveSend = generatedTokenStringsInSnapshot.filter(
       (token) => !activeRawTokenSet.has(token)
@@ -6992,7 +6992,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     try {
       const registered = await registerAccount(flow.service, "t9-a-expired-verify");
       const expiredToken = mail.messages[0]!.token;
-      const expiredHash = hashVerificationToken(expiredToken);
+      const expiredHash = hashToken("verification", expiredToken);
       const channelBindingId = await emailChannelOf(registered.user.user_id);
       // Production TTL and cooldown: past the token's own 24 h life the
       // credential is expired AND resend is eligible.
@@ -7079,7 +7079,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       // every live row preserved; no partial verification.
       expect(mail.messages).toHaveLength(2);
       expect(credentials.rows).toHaveLength(1);
-      expect(credentials.rows[0]!.token_hash).toBe(hashVerificationToken(mail.messages[1]!.token));
+      expect(credentials.rows[0]!.token_hash).toBe(hashToken("verification", mail.messages[1]!.token));
       expect(credentials.rows[0]!.consumed_at).toBeNull();
       expect(credentials.rows.some((row) => row.token_hash === expiredHash)).toBe(false);
       expect(account.rows[0]).toEqual({
@@ -7388,7 +7388,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     try {
       const registered = await registerAccount(flow.service, "t9-c-explicit-order");
       const liveToken = mail.messages[0]!.token;
-      const liveHash = hashVerificationToken(liveToken);
+      const liveHash = hashToken("verification", liveToken);
       const channelBindingId = await emailChannelOf(registered.user.user_id);
       const deadlocksBefore = await databaseDeadlockCount();
 
@@ -8041,7 +8041,11 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       SELECT verification_token_hash FROM identity.channel_binding
       WHERE user_id=$1 AND channel_type='email'
     `, [registered.user.user_id]);
-    expect(stored.rows[0]!.verification_token_hash).toBe(
+    // pin updated 2026-09-02: tokens are hashed with a per-kind purpose prefix
+    // (L2-F12, hashToken); the column grammar stays sha256:<hex>.
+    expect(stored.rows[0]!.verification_token_hash).toBe(hashToken("verification", token));
+    expect(stored.rows[0]!.verification_token_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(stored.rows[0]!.verification_token_hash).not.toBe(
       `sha256:${createHash("sha256").update(token).digest("hex")}`
     );
     expect(stored.rows[0]!.verification_token_hash).not.toContain(token);
@@ -8282,7 +8286,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const enrollmentToken = (flow.mail as MemoryMailSender).messages[0]!.token;
     await expect(flow.service.verifyEmail({ token: enrollmentToken }, source))
       .resolves.toEqual({ status: "mfa_required" });
-    const enrollmentTokenHash = hashVerificationToken(enrollmentToken);
+    const enrollmentTokenHash = hashToken("verification", enrollmentToken);
     const missingFactorId = randomUUID();
     const missingRecoveryCodeId = randomUUID();
     const before = await database.pool.query<{

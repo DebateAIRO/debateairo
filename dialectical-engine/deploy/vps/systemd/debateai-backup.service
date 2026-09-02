@@ -1,0 +1,20 @@
+# deploy/vps/systemd/debateai-backup.service
+# Runs as root: it reaches PostgreSQL as the postgres OS user over the socket and reads custody
+# files owned by three different service users. No DebateAI principal can do either, and the
+# P3-01 manifest forbids minting one a long-lived superuser credential (audit L5-F8).
+[Unit]
+Description=DebateAI encrypted backup
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/debateai/dialectical-engine/deploy/vps/backup.sh
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+TimeoutStartSec=3600
+# Receipts land in the journal: `journalctl -u debateai-backup.service | grep BACKUP_OK`.
+StandardOutput=journal
+StandardError=journal

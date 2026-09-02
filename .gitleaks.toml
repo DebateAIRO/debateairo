@@ -1,0 +1,7 @@
+# .gitleaks.toml
+[extend]
+useDefault = true
+[allowlist]
+description = "Test fixtures and documented non-secrets"
+paths = [ '''dialectical-engine/tests/.*''', '''dialectical-engine/docs/.*''', '''dialectical-engine/\.hermes/.*''' ]
+regexes = [ '''correct horse battery staple''', '''debateai-dev-only''' ]

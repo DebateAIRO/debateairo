@@ -113,10 +113,10 @@ describe("P2-02 sealed recovery-policy register", () => {
     const apiMain = await readFile("apps/api/src/main.ts", "utf8");
     const devSeed = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
     expect(registerSource).toContain("RECOVERY_POLICY_REGISTER_ROW");
-    expect(registerSource).toContain("AUTH_POLICY_REGISTER_ROWS.length + 4");
+    expect(registerSource).toContain("AUTH_POLICY_REGISTER_ROWS.length + 5");
     expect(devSeed).toContain("RECOVERY_POLICY_REGISTER_ROW");
     const readIndex = apiMain.indexOf("await readRecoveryPolicy(pool, environment.REGISTER_VERSION)");
-    const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
+    const workerIndex = apiMain.indexOf("new Argon2WorkerPool(") /* pin updated 2026-09-02: pool takes options (L2-F9) */;
     expect(readIndex).toBeGreaterThan(-1);
     expect(workerIndex).toBeGreaterThan(readIndex);
   });

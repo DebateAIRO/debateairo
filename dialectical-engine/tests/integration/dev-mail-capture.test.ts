@@ -6,7 +6,9 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  symlinkSync
+  symlinkSync,
+  utimesSync,
+  writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -74,7 +76,8 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
 
       const message = readFileSync(join(spool, files[0]!), "utf8");
       expect(message).toContain("To: developer@example.test\r\n");
-      expect(message).toContain(`https://localhost:3000/verify-email?token=${token}`);
+      expect(message).toContain(`https://localhost:3000/verify-email#token=${token}`);
+      expect(message).not.toContain("?token=");
       expect(message).not.toContain("attempt-not-persisted-by-the-sink");
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -86,7 +89,7 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
     const spool = join(root, "mail");
     const message = "To: developer@example.test\r\n\r\nsecret-token-value\r\n";
     try {
-      const first = spawnSync(executable, ["-i", "-f", "noreply@localhost.test", "--", "developer@example.test"], {
+      const first = spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
         encoding: "utf8",
         env: { ...process.env, [captureEnvironmentKey]: spool },
         input: message
@@ -96,7 +99,7 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
       expect(first.stderr).toBe("");
 
       chmodSync(spool, 0o755);
-      const refused = spawnSync(executable, ["-i", "-f", "noreply@localhost.test", "--", "developer@example.test"], {
+      const refused = spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
         encoding: "utf8",
         env: { ...process.env, [captureEnvironmentKey]: spool },
         input: message
@@ -115,7 +118,7 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
   it("refuses symlink custody and oversized input without leaving a message", () => {
     const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
     const spool = join(root, "mail");
-    const args = ["-i", "-f", "noreply@localhost.test", "--", "developer@example.test"];
+    const args = ["-i", "-t", "-f", "noreply@localhost.test"];
     try {
       symlinkSync(root, spool);
       const symlinked = spawnSync(executable, args, {
@@ -135,6 +138,104 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
       expect(oversized.status).not.toBe(0);
       expect(oversized.stderr).toBe("DEV_MAIL_CAPTURE_MESSAGE_TOO_LARGE\n");
       expect(readdirSync(spool)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("takes the recipient from a single strict To: header and refuses anything else", () => {
+    const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
+    const spool = join(root, "mail");
+    const run = (input: string) => spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
+      encoding: "utf8",
+      env: { ...process.env, [captureEnvironmentKey]: spool },
+      input
+    });
+    try {
+      const accepted = run("To: developer@example.test\r\nSubject: hello\r\n\r\nbody\r\n");
+      expect(accepted.status).toBe(0);
+      expect(accepted.stderr).toBe("");
+      expect(readdirSync(spool)).toHaveLength(1);
+
+      // Every rejected shape either hides a second recipient from the argv
+      // reader or is simply not the message the mailer emits (L7-F7).
+      for (const input of [
+        "Subject: no recipient at all\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nTo: attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test, attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test;attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nCc: attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nBcc: attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\n\t, attacker@example.test\r\n\r\nbody\r\n",
+        "To: <developer@example.test>\r\n\r\nbody\r\n",
+        "To: Developer <developer@example.test>\r\n\r\nbody\r\n",
+        "To: not-an-email\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nbody with no header separator\r\n"
+      ]) {
+        const refused = run(input);
+        expect(refused.status, input).not.toBe(0);
+        expect(refused.stdout).toBe("");
+        expect(refused.stderr).toMatch(/^DEV_MAIL_CAPTURE_[A-Z_]+\n$/);
+        expect(refused.stderr).not.toContain("attacker@example.test");
+      }
+      // Only the one accepted message was ever written.
+      expect(readdirSync(spool)).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("prunes captured mail older than seven days on every invocation (L7-F8)", () => {
+    const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
+    const spool = join(root, "mail");
+    const outside = join(root, "outside.eml");
+    const day = 24 * 60 * 60 * 1000;
+    const stale = join(spool, "11111111-1111-4111-8111-111111111111.eml");
+    const fresh = join(spool, "22222222-2222-4222-8222-222222222222.eml");
+    const dangling = join(spool, "33333333-3333-4333-8333-333333333333.eml");
+    try {
+      expect(spawnSync(executable, ["--preflight"], {
+        encoding: "utf8",
+        env: { ...process.env, [captureEnvironmentKey]: spool }
+      }).status).toBe(0);
+
+      writeFileSync(stale, "To: developer@example.test\r\n\r\nold\r\n", { mode: 0o600 });
+      writeFileSync(fresh, "To: developer@example.test\r\n\r\nrecent\r\n", { mode: 0o600 });
+      writeFileSync(outside, "not in the spool\n", { mode: 0o600 });
+      // A symlink is never followed: only regular files are pruned, so the
+      // target outside the spool cannot be deleted through it.
+      symlinkSync(outside, dangling);
+      const old = new Date(Date.now() - 8 * day);
+      utimesSync(stale, old, old);
+      utimesSync(outside, old, old);
+      const yesterday = new Date(Date.now() - 1 * day);
+      utimesSync(fresh, yesterday, yesterday);
+
+      const captured = spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
+        encoding: "utf8",
+        env: { ...process.env, [captureEnvironmentKey]: spool },
+        input: "To: developer@example.test\r\n\r\nbody\r\n"
+      });
+      expect(captured.status).toBe(0);
+      expect(captured.stderr).toBe("");
+
+      const remaining = readdirSync(spool);
+      expect(remaining).not.toContain("11111111-1111-4111-8111-111111111111.eml");
+      expect(remaining).toContain("22222222-2222-4222-8222-222222222222.eml");
+      expect(remaining).toContain("33333333-3333-4333-8333-333333333333.eml");
+      expect(lstatSync(outside).isFile()).toBe(true);
+      // The just-captured message plus the fresh one and the untouched symlink.
+      expect(remaining).toHaveLength(3);
+
+      // The prune runs on every invocation, preflight included.
+      const older = new Date(Date.now() - 9 * day);
+      utimesSync(fresh, older, older);
+      expect(spawnSync(executable, ["--preflight"], {
+        encoding: "utf8",
+        env: { ...process.env, [captureEnvironmentKey]: spool }
+      }).status).toBe(0);
+      expect(readdirSync(spool))
+        .not.toContain("22222222-2222-4222-8222-222222222222.eml");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

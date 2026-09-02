@@ -10,7 +10,7 @@ import {
   generatePseudonym,
   generateVerificationToken,
   hashPassword,
-  hashVerificationToken,
+  hashToken,
   normalizeEmailForBlindIndex,
   type Argon2Executor,
   type UserDekStore
@@ -1224,7 +1224,7 @@ export class RegistrationService implements RegistrationApplication {
       const userId = randomUUID();
       const pseudonym = generatePseudonym();
       const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
-      const tokenHash = hashVerificationToken(token);
+      const tokenHash = hashToken("verification", token);
       const expiresAt = new Date(
         input.requestedAt.getTime() + this.dependencies.policy.verification.tokenTtlMs
       );
@@ -1503,7 +1503,7 @@ export class RegistrationService implements RegistrationApplication {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
     const source = sourceContext(rawSource);
-    const tokenHash = hashVerificationToken(input.token);
+    const tokenHash = hashToken("verification", input.token);
     const identity = await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
     const now = this.clock();
     const limit = this.dependencies.limiter.consume({
@@ -1560,7 +1560,7 @@ export class RegistrationService implements RegistrationApplication {
       const expiresAt = new Date(now.getTime() + this.dependencies.policy.verification.tokenTtlMs);
       const prepared = await this.dependencies.repository.prepareVerificationResend({
         emailBlindIndex,
-        tokenHash: hashVerificationToken(token),
+        tokenHash: hashToken("verification", token),
         expiresAt,
         occurredAt: now,
         cooldownMs: this.dependencies.policy.verification.resendCooldownMs,

@@ -8,3 +8,5 @@ packages/contract/generated/
 .test-postgres/
 .local/dev-auth/
 *.log
+.env.local
+.env.*.local

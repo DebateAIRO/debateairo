@@ -45,3 +45,11 @@ dialectical-engine/apps/**/.next-build*/
 **/.pgdata/
 **/.pgdata-*
 **/.pgdata-*/
+
+# Browser-automation session logs (were tracked once; contain page dumps)
+.playwright-mcp/
+# Local env files are never source; the *.example files are.
+**/.env.local
+**/.env.*.local
+# Dev custody (keys, tokens, credentials, TLS). Mirrors dialectical-engine/.gitignore.
+**/.local/

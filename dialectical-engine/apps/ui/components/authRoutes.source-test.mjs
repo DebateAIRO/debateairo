@@ -83,7 +83,9 @@ test("the project home confirms a real session before exposing its debate compos
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {
-  assert.match(loginPage, /USER_TOKEN_COOKIE/);
+  // pin updated 2026-09-02: the page reads the session through readSessionCookie
+  // (grammar-checked, L3-F5) instead of touching USER_TOKEN_COOKIE directly.
+  assert.match(loginPage, /readSessionCookie\(await cookies\(\)\)/);
   assert.match(loginPage, /createServerContractClient/);
   assert.match(loginPage, /\.readSession\(\)/);
   assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);

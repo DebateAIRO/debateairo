@@ -12,6 +12,25 @@ import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.j
  */
 
 export const USER_TOKEN_COOKIE = "__Host-debateai-session";
+const SESSION_COOKIE_GRAMMAR = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * L3-F5: the only cookie value that is a session is the exact 43-character
+ * grammar the API mints and the /api proxy enforces. Next decodes cookie
+ * values before handing them over, so anything else — a smuggled second
+ * pair, a control character, a truncated value — is treated as signed out
+ * and never interpolated into an upstream Cookie header.
+ */
+export function sessionCookieValue(value: unknown): string | null {
+  return typeof value === "string" && SESSION_COOKIE_GRAMMAR.test(value) ? value : null;
+}
+
+/** The session from Next's cookie store, or null when absent or malformed. */
+export function readSessionCookie(
+  store: Readonly<{ get(name: string): Readonly<{ value: string }> | undefined }>
+): string | null {
+  return sessionCookieValue(store.get(USER_TOKEN_COOKIE)?.value);
+}
 
 export function createServerContractClient(
   fetchImplementation: typeof fetch = fetch,
@@ -22,10 +41,11 @@ export function createServerContractClient(
   if (baseUrl === undefined || baseUrl.length === 0) {
     throw new Error("DIALECTICAL_API_BASE_REQUIRED");
   }
+  const session = sessionCookieValue(sessionCookie);
   return createContractClient(baseUrl, fetchImplementation, {
     mode: "cookie",
-    ...(sessionCookie === undefined ? {} : {
-      cookieHeader: `${USER_TOKEN_COOKIE}=${sessionCookie}`
+    ...(session === null ? {} : {
+      cookieHeader: `${USER_TOKEN_COOKIE}=${session}`
     }),
     ...(userAgent === undefined ? {} : { userAgent })
   });

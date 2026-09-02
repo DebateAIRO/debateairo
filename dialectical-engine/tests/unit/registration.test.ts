@@ -20,7 +20,7 @@ import {
   generatePseudonym,
   generateVerificationToken,
   hashPassword,
-  hashVerificationToken,
+  hashToken,
   loadKek,
   verifyPassword,
   type UserDekStoreFileSystem
@@ -268,7 +268,13 @@ describe("S3 ruled authentication policy", () => {
       );
   });
 
-  it("S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
+  // The bound is a MEASUREMENT sealed for one runtime (see the row's
+  // isolated_limiter_resident_measurement.runtime = node_v22.23.1_darwin_arm64).
+  // On any other platform/arch the case skips LOUDLY instead of comparing against
+  // a number that was never measured there (the GitHub ubuntu runner reads 273 MiB
+  // against the 256 MiB macOS bound). Sealing a bound per platform is V-25.
+  it.skipIf(`${process.platform}_${process.arch}` !== "darwin_arm64")(
+    "S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
     const sketch = (rateLimitRow.value as {
       sketch_design: {
@@ -606,8 +612,8 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
   it("creates single-purpose opaque tokens and stable-format non-derived pseudonym candidates", () => {
     const token = generateVerificationToken();
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(hashVerificationToken(token)).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(hashVerificationToken(token)).not.toContain(token);
+    expect(hashToken("verification", token)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(hashToken("verification", token)).not.toContain(token);
 
     const forbidden = ["alice", "example", "00000000", "secret-value"];
     const pseudonyms = new Set(Array.from({ length: 200 }, () => generatePseudonym()));
@@ -1163,7 +1169,14 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     for (const recipient of [
       "not-an-email",
       "victim@example.test\r\nBcc: attacker@example.test",
-      "victim@example.test\r\nBcc: attacker.example.test"
+      "victim@example.test\r\nBcc: attacker.example.test",
+      // Under `-t` the MTA parses the `To:` header, so a separator inside a
+      // single address fans the message out to a mailbox we never vetted
+      // (L7-F7). These carry one `@`, so the address shape alone accepts them.
+      "victim,attacker@example.test",
+      "victim;attacker@example.test",
+      "victim@example.test,attacker",
+      "victim@example.test;attacker"
     ]) {
       await expect(mail.sendVerification({
         attemptId: "00000000-0000-4000-8000-000000000780",
@@ -1174,7 +1187,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     }
   });
 
-  it("S3 rework4 fold-in terminates sendmail options before the recipient", async () => {
+  it("never puts a recipient address on the sendmail argv (L7-F7)", async () => {
     const root = await mkdtemp(join(tmpdir(), "debateai-s3-sendmail-args-"));
     const executable = join(root, "capture-sendmail");
     const argumentsFile = join(root, "arguments.txt");
@@ -1188,7 +1201,8 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
-      timeoutMs: 1_000
+      // This test pins argv, not timing; a 1s budget flakes on a loaded host.
+      timeoutMs: 30_000
     });
     try {
       await mail.sendVerification({
@@ -1197,9 +1211,18 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
         token: "a".repeat(43),
         expiresAt: new Date("2026-08-20T00:00:00.000Z")
       });
-      expect((await readFile(argumentsFile, "utf8")).trim().split("\n")).toEqual([
-        "-i", "-f", "noreply@debateai.test", "--", "alice@example.test"
-      ]);
+      const argv = (await readFile(argumentsFile, "utf8")).trim().split("\n");
+      // `-t` makes the MTA read recipients from the header block, so the
+      // address never reaches argv, where every local user can read it out of
+      // `ps` (L7-F7). The envelope sender is a fixed operator constant, not a
+      // user asset, and stays on `-f`.
+      expect(argv).toEqual(["-i", "-t", "-f", "noreply@debateai.test"]);
+      expect(argv).not.toContain("--");
+      for (const argument of argv) {
+        expect(argument).not.toContain("alice@example.test");
+      }
+      expect(argv.filter((argument) => argument.includes("@")))
+        .toEqual(["noreply@debateai.test"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

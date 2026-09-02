@@ -1,0 +1,16 @@
+# .github/dependabot.yml
+# L6-F4: the GitHub default branch (main) is 285 commits behind dev and has no /dialectical-engine
+# tree, so every update PR targets dev, the live integration branch. Security updates and the
+# dependency graph still key on the default branch (ASK-V: make dev the default).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/dialectical-engine"
+    target-branch: "dev"
+    schedule: { interval: "weekly", day: "monday" }
+    groups: { minor-and-patch: { update-types: ["minor", "patch"] } }
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "dev"
+    schedule: { interval: "weekly", day: "monday" }

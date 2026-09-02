@@ -4,6 +4,11 @@ import { delimiter, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import {
+  developmentComposeSecretsPath,
+  ensureDevelopmentComposeSecrets
+} from "./dev-compose-secrets.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
 const LOCAL_MIGRATOR_DATABASE_URL =
@@ -232,11 +237,17 @@ async function resolveDockerExecutable(
   throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_DOCKER_UNAVAILABLE");
 }
 
-function composeArguments(...arguments_: readonly string[]): readonly string[] {
+function composeArguments(
+  secretsEnvFile: string,
+  ...arguments_: readonly string[]
+): readonly string[] {
   return Object.freeze([
     "compose",
     "--progress", "quiet",
     "--env-file", ".env.compose",
+    // Service credentials never live in the repository: compose reads them from
+    // the 0600 custody file, and refuses to start without it (L7-F2 .. L7-F4).
+    "--env-file", secretsEnvFile,
     "-f", "compose.dev.yaml",
     ...arguments_
   ]);
@@ -248,6 +259,8 @@ export function createDevelopmentAuthDataPlaneOperations(
   providerPanel: DevelopmentProviderPanel
 ): DevelopmentAuthDataPlaneOperations {
   const cwd = resolve(repositoryRoot);
+  const custodyRoot = resolveDevCustodyRoot(cwd, commandEnvironment);
+  const secretsEnvFile = developmentComposeSecretsPath(custodyRoot);
   const composeEnvironment = Object.freeze({ VLLM_MODEL: "dev-auth-not-started" });
   const migrationEnvironment = Object.freeze({
     MIGRATION_DATABASE_URL: LOCAL_MIGRATOR_DATABASE_URL
@@ -268,7 +281,7 @@ export function createDevelopmentAuthDataPlaneOperations(
     failureCode: string
   ) => runCommand({
     executable: dockerExecutable,
-    arguments: composeArguments(...arguments_),
+    arguments: composeArguments(secretsEnvFile, ...arguments_),
     cwd,
     baseEnvironment: commandEnvironment,
     environment: composeEnvironment,
@@ -278,6 +291,10 @@ export function createDevelopmentAuthDataPlaneOperations(
   return Object.freeze({
     async prepareComposeEnvironment() {
       await runPnpm(["compose:env"], "DEV_AUTH_DATA_PLANE_COMPOSE_ENV_FAILED");
+      await fixedStep(
+        "DEV_AUTH_DATA_PLANE_COMPOSE_ENV_FAILED",
+        () => ensureDevelopmentComposeSecrets(custodyRoot)
+      );
     },
     async resolveDockerExecutable() {
       return resolveDockerExecutable(commandEnvironment);
@@ -370,7 +387,7 @@ export function createDevelopmentAuthDataPlaneOperations(
         cwd,
         baseEnvironment: commandEnvironment,
         environment: {
-          DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(cwd, ".local/dev-auth/mail")
+          DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail")
         },
         failureCode: "DEV_AUTH_DATA_PLANE_MAIL_FAILED"
       });

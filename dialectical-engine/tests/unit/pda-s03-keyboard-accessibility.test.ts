@@ -15,7 +15,9 @@ type JSDOMModule = {
 };
 
 const serverMocks = vi.hoisted(() => ({
-  sessionCookie: "pda-s03-render-test" as string | null,
+  // pin updated 2026-09-02: readSessionCookie enforces the 43-char base64url grammar
+  // (L3-F5), so the fixture carries a lawful opaque token instead of a label.
+  sessionCookie: "pda-s03-render-test-token-00000000000000000" as string | null,
   readPublicDebates: vi.fn(async () => ({ items: [], total: 0 })),
   listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 }))
 }));
@@ -80,7 +82,7 @@ function knownConcealmentBarrier(element: Element): string | null {
 
 async function renderHomePage(
   selected: "yours" | "public",
-  sessionCookie: string | null = "pda-s03-render-test"
+  sessionCookie: string | null = "pda-s03-render-test-token-00000000000000000"
 ): Promise<Document> {
   serverMocks.sessionCookie = sessionCookie;
   const [{ default: HomePage }, { renderToStaticMarkup }, { JSDOM }] = await Promise.all([
@@ -100,7 +102,7 @@ function applyGlobalStyles(document: Document): void {
 
 describe("public debate navigation keyboard accessibility", () => {
   beforeEach(() => {
-    serverMocks.sessionCookie = "pda-s03-render-test";
+    serverMocks.sessionCookie = "pda-s03-render-test-token-00000000000000000";
     serverMocks.readPublicDebates.mockClear();
     serverMocks.listDebatesPageServer.mockClear();
   });

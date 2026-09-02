@@ -25,6 +25,7 @@ import {
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
   readPanelDiscoveryPolicy,
+  readAdmissionPolicy,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -40,6 +41,7 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { AdmissionLimiter } from "./admission.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
@@ -54,6 +56,7 @@ import { installGracefulShutdown } from "./graceful-shutdown.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
+  assertProductionProviderTargets,
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
@@ -64,21 +67,25 @@ const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
-if (corpusKek !== undefined) {
-  assertPublicationSecretDomains({
-    privateKek: kek,
+// L2-F8: this guarded the whole check on publication being enabled, so a
+// private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
+// file and boot. The private domains are always checked; the corpus KEK and
+// publication store join the same check only when publication is on.
+assertPublicationSecretDomains({
+  privateKek: kek,
+  ...(corpusKek === undefined ? {} : {
     corpusKek,
-    privateKekPath: environment.KEK_PATH,
     corpusKekPath: environment.CORPUS_KEK_PATH!,
-    privateStorePath: environment.USER_DEK_STORE_PATH,
-    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!,
-    additionalSecrets: [
-      { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
-      { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
-    ],
-    additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
-  });
-}
+    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!
+  }),
+  privateKekPath: environment.KEK_PATH,
+  privateStorePath: environment.USER_DEK_STORE_PATH,
+  additionalSecrets: [
+    { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
+    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
+  ],
+  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
+});
 const pool = createPool(environment.DATABASE_URL);
 const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!);
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
@@ -122,12 +129,20 @@ const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
 const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
 const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
 const recoveryPolicy = await readRecoveryPolicy(pool, environment.REGISTER_VERSION);
+const admissionPolicy = await readAdmissionPolicy(pool, environment.REGISTER_VERSION);
 await readProductRolePolicy(pool, environment.REGISTER_VERSION);
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
 // instance, and every worker completes its ready handshake before `listen`, so
 // no request can arrive while a worker is still booting.
-const argon2Pool = new Argon2WorkerPool();
+// L2-F9: the pool cannot end the process itself, and a latched breaker means
+// every credential route fails closed forever. `shutdown` does not exist yet at
+// this point in the boot order, so the handler is late-bound; before it is
+// installed the fallback still marks the process for its supervisor.
+let announceArgon2BreakerTrip = (): void => { process.exitCode = 75; };
+const argon2Pool = new Argon2WorkerPool({
+  onBreakerTripped: () => { announceArgon2BreakerTrip(); }
+});
 await argon2Pool.ready();
 const auditContextHasher = new AuditContextHasher(
   argon2Pool, sourceIpSalt, authPolicy.auditSourceIpKdf
@@ -147,6 +162,7 @@ if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
 }
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
+assertProductionProviderTargets(parseProviderDiscoveryTargets(environment.PROVIDER_DISCOVERY_TARGETS_JSON, deploymentMakers.configuredProviders), environment.NODE_ENV);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: parseProviderDiscoveryTargets(
@@ -347,6 +363,8 @@ const api = buildApi({
   mfa,
   sessions,
   legacyRunClaim,
+  // B10: the sealed admission budgets are always composed in production.
+  admission: new AdmissionLimiter(admissionPolicy),
   ...(publications === undefined ? {} : { publications }),
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
@@ -381,8 +399,21 @@ const shutdown = installGracefulShutdown({
         || erasurePool === contentProvisionPool
       ? [] : [erasurePool]),
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])
-  ]
+  ],
+  // L2-F7: zeroed after every pool that borrows from them has closed.
+  kekHandles: [kek, ...(corpusKek === undefined ? [] : [corpusKek])]
 });
+
+// EX_TEMPFAIL (75): a transient, restartable failure. systemd's
+// Restart=on-failure then replaces the process instead of leaving a latched
+// 503 on every authentication route until a human notices.
+announceArgon2BreakerTrip = (): void => {
+  console.error(JSON.stringify({
+    event: "argon2.breaker.tripped", action: "graceful-shutdown", exit_code: 75
+  }));
+  process.exitCode = 75;
+  void shutdown.close("ARGON2_BREAKER_TRIPPED").catch(() => undefined);
+};
 try {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });
   // Queue draining is deliberately background-only. A bounded sendmail
