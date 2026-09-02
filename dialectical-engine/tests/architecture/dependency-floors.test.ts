@@ -44,3 +44,30 @@ describe("dependency floors (F-02)", () => {
     expect(existsSync(resolve(root, "apps/ui/pnpm-lock.yaml"))).toBe(false);
   });
 });
+
+// L6-F3 / L6-F12 (2026-09-01 security hardening, task B24a): the install policy lives in
+// pnpm-workspace.yaml (pnpm 11 reads settings there, not from .npmrc). A registry hijack is
+// worthless if a freshly published version cannot be resolved for a week, and a new lifecycle
+// script must stop the install instead of being skipped silently.
+const workspace = readFileSync(resolve(root, "pnpm-workspace.yaml"), "utf8");
+
+function topLevelScalar(key: string): string | undefined {
+  return workspace.match(new RegExp(`^${key}:[ \\t]*(\\S+)[ \\t]*$`, "m"))?.[1];
+}
+
+describe("supply-chain install policy (L6-F3, L6-F12)", () => {
+  it("enforces a release-age cooldown of at least 7 days", () => {
+    const minutes = Number(topLevelScalar("minimumReleaseAge"));
+    expect(Number.isInteger(minutes), "minimumReleaseAge must be set in pnpm-workspace.yaml").toBe(true);
+    expect(minutes).toBeGreaterThanOrEqual(10080);
+  });
+  it("fails the install loudly on an unlisted build script", () => {
+    expect(topLevelScalar("strictDepBuilds")).toBe("true");
+  });
+  it("only excludes exact name@version pins from the cooldown, never a range", () => {
+    const block = workspace.match(/^minimumReleaseAgeExclude:\n((?:  (?:- |#)[^\n]*\n?)+)/m)?.[1] ?? "";
+    const entries = block.split("\n").filter((line) => line.startsWith("  - ")).map((line) => line.replace(/^  - /, "").replace(/^'|'$/g, ""));
+    expect(entries.length).toBeGreaterThanOrEqual(5); // the three pre-existing pins plus next and sharp
+    for (const entry of entries) expect(entry).toMatch(/^(@[a-z0-9-]+\/)?[a-z0-9.-]+@\d+\.\d+\.\d+$/);
+  });
+});

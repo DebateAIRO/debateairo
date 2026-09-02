@@ -5,6 +5,10 @@ packages:
   - "tools/*"
 allowBuilds:
   '@embedded-postgres/darwin-arm64': true
+  # L6-F12 (task B24a): the Linux variants ship the same postinstall (scripts/hydrate-symlinks.js,
+  # local relative symlinks only); ubuntu CI installs linux-x64, so strictDepBuilds needs them listed.
+  '@embedded-postgres/linux-arm64': true
+  '@embedded-postgres/linux-x64': true
   '@hatchet-dev/typescript-sdk': true
   cpu-features: false
   esbuild: true
@@ -12,10 +16,59 @@ allowBuilds:
   sharp: true
   ssh2: false
 
+# L6-F12 (task B24a): a dependency whose build script is neither allowed nor denied above fails the
+# install instead of being skipped silently.
+strictDepBuilds: true
+
+# L6-F3 (task B24a): 7-day release-age cooldown (minutes). A version published less than a week ago
+# is not resolvable unless it is listed below as an exact name@version. Enforced by
+# tests/architecture/dependency-floors.test.ts.
+minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@types/node@26.2.0'
   - '@types/pg@8.21.0'
   - tsx@4.23.11
+  # B1 (F-02) pins younger than 7 days when this cooldown landed (2026-09-02). pnpm 11 verifies the
+  # lockfile against the cooldown even on --frozen-lockfile, so every young entry must be listed as an
+  # exact name@version (never a pattern). Drop the sharp family after 2026-09-02T09:46Z and the next
+  # family after 2026-09-07T20:00Z (npm publish time + 7 days).
+  - next@15.5.25
+  - '@next/env@15.5.25'
+  - '@next/swc-darwin-arm64@15.5.25'
+  - '@next/swc-darwin-x64@15.5.25'
+  - '@next/swc-linux-arm64-gnu@15.5.25'
+  - '@next/swc-linux-arm64-musl@15.5.25'
+  - '@next/swc-linux-x64-gnu@15.5.25'
+  - '@next/swc-linux-x64-musl@15.5.25'
+  - '@next/swc-win32-arm64-msvc@15.5.25'
+  - '@next/swc-win32-x64-msvc@15.5.25'
+  - sharp@0.35.4
+  - '@img/sharp-darwin-arm64@0.35.4'
+  - '@img/sharp-darwin-x64@0.35.4'
+  - '@img/sharp-freebsd-wasm32@0.35.4'
+  - '@img/sharp-libvips-darwin-arm64@1.3.3'
+  - '@img/sharp-libvips-darwin-x64@1.3.3'
+  - '@img/sharp-libvips-linux-arm@1.3.3'
+  - '@img/sharp-libvips-linux-arm64@1.3.3'
+  - '@img/sharp-libvips-linux-ppc64@1.3.3'
+  - '@img/sharp-libvips-linux-riscv64@1.3.3'
+  - '@img/sharp-libvips-linux-s390x@1.3.3'
+  - '@img/sharp-libvips-linux-x64@1.3.3'
+  - '@img/sharp-libvips-linuxmusl-arm64@1.3.3'
+  - '@img/sharp-libvips-linuxmusl-x64@1.3.3'
+  - '@img/sharp-linux-arm@0.35.4'
+  - '@img/sharp-linux-arm64@0.35.4'
+  - '@img/sharp-linux-ppc64@0.35.4'
+  - '@img/sharp-linux-riscv64@0.35.4'
+  - '@img/sharp-linux-s390x@0.35.4'
+  - '@img/sharp-linux-x64@0.35.4'
+  - '@img/sharp-linuxmusl-arm64@0.35.4'
+  - '@img/sharp-linuxmusl-x64@0.35.4'
+  - '@img/sharp-wasm32@0.35.4'
+  - '@img/sharp-webcontainers-wasm32@0.35.4'
+  - '@img/sharp-win32-arm64@0.35.4'
+  - '@img/sharp-win32-ia32@0.35.4'
+  - '@img/sharp-win32-x64@0.35.4'
 
 # F-02 (2026-09-01 security hardening, task B1): dependency floors for the advisories
 # reachable through next (postcss, sharp, nanoid) and any transitive esbuild (0.24.3 was never
