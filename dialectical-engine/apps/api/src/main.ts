@@ -20,10 +20,7 @@ import {
   loadApiEnvironment,
   readDeploymentRiskTier,
   computeStructuralCeilingBasis,
-  ENGINE_BRANCHING_FACTOR,
-  ENGINE_COMPOSITION_SEGMENT_CAP,
-  ENGINE_FIXED_ORGANS_PER_COMPOSITION,
-  ENGINE_MAX_RECOMPOSE,
+  readEnvelopeFormulaInputs,
   readPanelDiscoveryPolicy,
   readAuthPolicy,
   readMfaPolicy,
@@ -146,6 +143,14 @@ if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
 }
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
+/**
+ * T17: the sealed `envelopeFormulaInputs` row (T16). The reader is the loud
+ * stop — a deployment that never sealed the row cannot boot the API, so no ask
+ * is ever admitted against an envelope this file invented. The engine shape
+ * constants that used to be re-declared at the call site below now come from
+ * this row, which seeds them from the same `engine-shape.ts` exports.
+ */
+const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
@@ -236,10 +241,14 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     ...structuralInputs,
     panelSize: input.panelSize,
     depth: Number(input.depthParams.depth),
-    maxRecompose: ENGINE_MAX_RECOMPOSE,
-    branchingFactor: ENGINE_BRANCHING_FACTOR,
-    compositionSegmentCap: ENGINE_COMPOSITION_SEGMENT_CAP,
-    fixedOrgansPerComposition: ENGINE_FIXED_ORGANS_PER_COMPOSITION
+    maxRecompose: envelopeFormulaInputs.maxRecompose,
+    branchingFactor: envelopeFormulaInputs.branchingFactor,
+    compositionSegmentCap: envelopeFormulaInputs.compositionSegmentCap,
+    fixedOrgansPerComposition: envelopeFormulaInputs.fixedOrgansPerComposition,
+    reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
+    synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
+    evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
+    maxDepth: envelopeFormulaInputs.maxDepth
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({

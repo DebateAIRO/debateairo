@@ -248,7 +248,13 @@ export function buildAlgorithmRegisterRows(
         reviewerCallsPerNode: 1,
         synthesizerMaxRounds: 3,
         evaluatorMaxRounds: 3,
-        panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE"
+        panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE",
+        // T17/B2: the SEALED maximum the admission formula refuses above. The
+        // engine's own expansion rule is 1..5 (apps/runner resolveExpansionDepth,
+        // and the stored-basis parser in packages/budget); sealing it here is what
+        // lets ADMISSION refuse an over-bound ask instead of minting a ceiling the
+        // runner rejects later, after the asker has been admitted.
+        maxDepth: 5
       },
       sourceRef: ref(T16_ENVELOPE_REF)
     }
@@ -329,7 +335,8 @@ const rowSchemas = {
     reviewerCallsPerNode: positiveInteger,
     synthesizerMaxRounds: positiveInteger,
     evaluatorMaxRounds: positiveInteger,
-    panelCallsPerNodeBasis: z.literal("PANEL_SIZE_MINUS_ONE")
+    panelCallsPerNodeBasis: z.literal("PANEL_SIZE_MINUS_ONE"),
+    maxDepth: positiveInteger
   }).strict()
 } as const;
 
@@ -544,6 +551,8 @@ export interface EnvelopeFormulaInputs {
   readonly synthesizerMaxRounds: number;
   readonly evaluatorMaxRounds: number;
   readonly panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE";
+  /** T17/B2: the sealed maximum depth admission refuses above. */
+  readonly maxDepth: number;
   readonly sourceRefs: Readonly<Record<string, string>>;
 }
 
@@ -564,6 +573,7 @@ export async function readEnvelopeFormulaInputs(
     synthesizerMaxRounds: value.synthesizerMaxRounds,
     evaluatorMaxRounds: value.evaluatorMaxRounds,
     panelCallsPerNodeBasis: value.panelCallsPerNodeBasis,
+    maxDepth: value.maxDepth,
     sourceRefs: family.sourceRefs
   });
 }
