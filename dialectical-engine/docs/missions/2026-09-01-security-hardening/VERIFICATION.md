@@ -12,6 +12,12 @@ Orchestrator ledger (append-only). Baseline receipt: `BASELINE.md` (dev `b5a6b6e
 | API limits + admission (B5, B10) | security/fix-b5-b10-api-limits | c7c5d69d, 55060c8f | api-request-limits 6/6; api-admission-limits 7 + register 3; broad run 21 files 223 passed / 3 failed (all three pre-existing on the base: s7 memory-scope pin, obs-l2-s04-zone ×2); typecheck: no new errors |
 | serve.answer encryption handoff (B21) — NOT merged here | security/handoff-b21-serve-answer @ 40d1e3a3 (base b5a6b6eb) | 40d1e3a3 | integration serve-answer-content-encryption 2/2 (RED on base at :244); s6 contract 7/7; s6 unit 15/16 (1 pre-existing REGISTER_VERSION NaN); typecheck: no new errors; patch applies with `git am --3way` on clean b5a6b6eb |
 | Supply-chain config (B24a-f, B7b) | security/fix-supply-chain-config | ac8dbef5, a610982f, 643a9d28, baffe9db, 9975e85d, cfe685d9, 29152c08 | dependency-floors 9/9; ci-security-gates 8/8; dev-compose-postgres + loopback pass; `pnpm install --frozen-lockfile` → "Lockfile passes supply-chain policies" / "Already up to date"; gitleaks v8.30.1 sha256 551f6fc8…, postgres:18 digest sha256:4ef4dbc9…, 4 actions SHA-pinned |
+| UI edge (B20a, B9, C2+C2b, B23a-d) | security/fix-ui-edge | ef1ce42c, 103ba4cc, 9752e6f2, 57d577fb, 2bb6407a, 2f51543d, 508a3813 | lane killed by the Fable limit before its final report; each commit was a green step per the lane's running notes (build GREEN with AUTH_PRODUCTION_ROUTES_VERIFIED after ef1ce42c); smoke + node tests to be re-run at final verification |
+| Migration 0056 (B22) | security/fix-b22-migration-0056 | e18b89a3 | committed after its real-PostgreSQL test went green; the two pin files (p3 principals, s10 erasure evidence) not yet re-run — final verification |
+| Dev baseline drift (B20, partial) | security/fix-b20-dev-health | 05c3630e, 2c4485a4, 3862706d, 379dca7a, d15297b8, 90348613 (+1) | pins for auth-front-door-parity, s04, s10-carrier-erasure-red, s14-contract, scaffold; web-only s14-ui cases retired; s13 and the VERIFICATION section still pending |
+| Mail hardening (B27, partial) | security/fix-b27-mail | 8b8ea406 | tokens in the URL fragment (L3-F8) landed; sendmail -t and spool pruning pending |
+| Provider caps (B26, partial) | security/fix-b26-provider-caps | e957fae1 | 4 MiB response cap, strict usage, bounded model id (L4-F3) landed; packet cap, question bound, backoff, replay floor pending |
+| Crypto bundle (B12 only) | security/fix-crypto-bundle | 63e4d2cc | locale-independent canonical order (L2-F4) landed; B19 hashToken half-done uncommitted in the lane worktree; B13-B17 pending |
 
 ## Known baseline failures on dev `b5a6b6eb` (not caused by this mission)
 - `pnpm run typecheck`: 8 errors, all `tests/unit/s14-ui.test.ts` (imports of the removed `web/lib/*`). Ruled (live-loop orchestrator, 2026-09-02): retire only the web-only cases (B20).
@@ -24,3 +30,7 @@ Orchestrator ledger (append-only). Baseline receipt: `BASELINE.md` (dev `b5a6b6e
 
 ## Full-suite runs (quiet host only, coordinated with the live-loop orchestrator)
 (appended when run: command, host state, tails)
+
+## Interruptions
+- 2026-09-02 ~04:00: account 5-hour limit killed 11 lanes (resumed 07:30 by message, worktree state intact).
+- 2026-09-02 ~09:20: Fable model limit killed 8 lanes; all completed commits merged into the branch at aa8db8d8; continuation pending V's ruling on model/credits.
