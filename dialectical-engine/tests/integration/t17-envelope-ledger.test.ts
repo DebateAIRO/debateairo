@@ -118,12 +118,15 @@ function classify(body: string): RequestKind {
 }
 
 /**
- * A provider double that drives every COOLDOWN-WRAPPED site to its maximum.
+ * A provider double that drives EVERY reachable namespace to its maximum.
  *
- * Panel and serve-organ legs answer first time: the panel leg is the quantity
- * this test asserts EXACTLY (one call per non-author member per node), and the
- * serve organs are not cooldown-wrapped, so failing them would only end the run
- * early without exercising the term under test.
+ * Each site fails to its last allowed attempt and succeeds there: cooldown-
+ * wrapped judge sites at 4 (the two sequences share one cumulative allowance),
+ * panel sites at 3, and serve sites at 3. Failures are counted PER SITE, keyed
+ * by the request packet and reset on that site's success, because a single
+ * global counter cannot survive the interleaving. Round 1's conformance also
+ * returns a VALID but false verdict so the recompose loop runs a second round
+ * — that verdict, not a transport failure, is what makes the serve leg maximal.
  */
 async function startMaximumPathProvider(label: string): Promise<{
   readonly endpoint: string;
