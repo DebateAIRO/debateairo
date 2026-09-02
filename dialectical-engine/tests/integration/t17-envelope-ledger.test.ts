@@ -308,6 +308,28 @@ function runnerSettings(): WalkingSkeletonSettings {
         providerFamilyMap: "test-layer:J1"
       }
     },
+    // T17B MERGE REPAIR (integration 19bbb4c4 brought T7 in). T7 added a
+    // multi-maker guard beside panelPolicy's: a run that expands needs the
+    // sealed adaptive-stopping rows or `execute` throws
+    // ADAPTIVE_STOPPING_UNRESOLVED before a single model call. This fixture is
+    // multi-maker (a `critique` provider is configured), so it needs them.
+    //
+    // PROVISIONING ONLY, and δ/ε carry the landed lane's own non-truncating
+    // values — the identical block in tests/integration/database.test.ts states
+    // that 0/0 is set WIDE OF the fixtures' arithmetic so no existing fixture's
+    // expansion is truncated. That claim is not taken on trust here: the
+    // maximum-path assertions below still require SEVEN serve sites, both
+    // composition rounds, and exactly 109 observed attempts, so a δ/ε that
+    // truncated this run's expansion would fail this file rather than pass it.
+    stoppingPolicy: {
+      registerVersion: 1,
+      delta: 0,
+      epsilon: 0,
+      sourceRefs: {
+        globalStopDelta: "test-layer:T7",
+        branchFreezeEpsilon: "test-layer:T7"
+      }
+    },
     verdictLabelPolicy: {
       registerVersion: 1, gamma: 0.05, highCut: 0.7, lowCut: 0.35, disagreementThreshold: 0.25,
       sourceRefs: {
