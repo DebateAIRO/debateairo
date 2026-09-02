@@ -35,6 +35,11 @@ services:
       - "127.0.0.1:7077:7077"
     environment:
       DATABASE_URL: postgresql://debateai_dev_hatchet:${HATCHET_DATABASE_PASSWORD:?generated into dev key custody by pnpm dev:auth:up}@postgres:5432/hatchet?sslmode=disable
+      # Overrides the image's documented seeded admin login, which would
+      # otherwise hand tenant admin, token minting, and model spend to any
+      # process that can reach the dashboard (L7-F3).
+      ADMIN_EMAIL: ${HATCHET_ADMIN_EMAIL:?generated into dev key custody by pnpm dev:auth:up}
+      ADMIN_PASSWORD: ${HATCHET_ADMIN_PASSWORD:?generated into dev key custody by pnpm dev:auth:up}
       SERVER_MSGQUEUE_KIND: postgres
       SERVER_AUTH_COOKIE_DOMAIN: localhost
       SERVER_AUTH_COOKIE_INSECURE: "true"
@@ -52,6 +57,9 @@ services:
     command:
       - --model
       - ${VLLM_MODEL:?VLLM_MODEL must name a real provisioned model}
+      # Without this any local process gets free inference on 8000 (L7-F4).
+      - --api-key
+      - ${VLLM_API_KEY:?generated into dev key custody by pnpm dev:auth:up}
 
 volumes:
   postgres-data:

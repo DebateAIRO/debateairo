@@ -15,7 +15,10 @@ const SECRET_FILE_NAME = "compose-secrets.env";
  * default-credentialled Hatchet or an unauthenticated vLLM (L7-F2, L7-F3, L7-F4).
  */
 export const DEVELOPMENT_COMPOSE_SECRET_KEYS = Object.freeze([
-  "HATCHET_DATABASE_PASSWORD"
+  "HATCHET_DATABASE_PASSWORD",
+  "HATCHET_ADMIN_EMAIL",
+  "HATCHET_ADMIN_PASSWORD",
+  "VLLM_API_KEY"
 ] as const);
 
 export class DevelopmentComposeSecretsError extends Error {
