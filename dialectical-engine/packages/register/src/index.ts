@@ -16,7 +16,7 @@ import { AUTH_POLICY_REGISTER_ROWS } from "./auth-policy.js";
 import { MFA_POLICY_REGISTER_ROW } from "./mfa-policy.js";
 import { PRODUCT_ROLE_POLICY_REGISTER_ROW } from "./product-role-policy.js";
 import { RECOVERY_POLICY_REGISTER_ROW } from "./recovery-policy.js";
-import { SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
+import { ADMISSION_POLICY_REGISTER_ROW, SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export const ENGINE_BRANCHING_FACTOR = 2 as const;
@@ -475,9 +475,10 @@ export async function persistBootstrapRegister(pool: Pool, bootstrap: BootstrapR
     MFA_POLICY_REGISTER_ROW,
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
-    PRODUCT_ROLE_POLICY_REGISTER_ROW
+    PRODUCT_ROLE_POLICY_REGISTER_ROW,
+    ADMISSION_POLICY_REGISTER_ROW
   ];
-  const expectedRowCount = bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 4;
+  const expectedRowCount = bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 5;
   const canonicalJson = (value: unknown): string => {
     if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
     if (typeof value === "object" && value !== null) {
@@ -591,10 +592,17 @@ export {
   type MfaPolicyValue
 } from "./mfa-policy.js";
 export {
+  ADMISSION_POLICY_REGISTER_ROW,
+  ADMISSION_POLICY_ROW_KEY,
   SESSION_POLICY_REGISTER_ROW,
   SESSION_POLICY_ROW_KEY,
+  admissionPolicyFromValue,
+  readAdmissionPolicy,
   readSessionPolicy,
   sessionPolicyFromValue,
+  type AdmissionPolicy,
+  type AdmissionPolicyValue,
+  type AdmissionScopePolicy,
   type SessionPolicy,
   type SessionPolicyValue
 } from "./session-policy.js";

@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { z } from "zod";
 import {
   AccountErasureScheduleRequestSchema,
@@ -66,6 +66,7 @@ import {
   AuthFlowError,
   type RegistrationApplication
 } from "./registration.js";
+import type { AdmissionLimiter, AdmissionScope } from "./admission.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
@@ -277,6 +278,9 @@ export interface ApiOptions {
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+  /** B10 admission budgets; optional for test compositions, always supplied by main. */
+  readonly admission?: AdmissionLimiter;
+  readonly admissionClock?: () => Date;
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -417,6 +421,31 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : "unknown",
     requestId: request.id
   });
+  const admissionRefusalAuditedUntil = new Map<string, number>();
+  /**
+   * B10: refuses when the sealed admission budget for `key` is spent. The
+   * audit is one structured line per route, reason, and window; never one
+   * per request, and never carrying an address or owner.
+   */
+  const admitOrRefuse = (
+    reply: FastifyReply, scope: AdmissionScope, route: AuthorizationRoute, key: string
+  ): boolean => {
+    if (options.admission === undefined) return true;
+    const now = options.admissionClock?.() ?? new Date();
+    const decision = options.admission.decide(scope, key, now);
+    if (decision.allowed) return true;
+    const auditKey = `${route}:${decision.reason}`;
+    if ((admissionRefusalAuditedUntil.get(auditKey) ?? 0) <= now.getTime()) {
+      admissionRefusalAuditedUntil.set(auditKey, now.getTime() + decision.windowMs);
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.admission.refused", route, reason: decision.reason, windowMs: decision.windowMs
+      })));
+    }
+    void reply.status(429)
+      .header("retry-after", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1_000))))
+      .send({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
+    return false;
+  };
   const ownershipFor = (request: Readonly<{
     session: Session;
     authenticatedSession?: AuthenticatedSession;
@@ -771,6 +800,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/public/debates",
     routePolicy("GET /v1/public/debates"),
     async (request, reply) => {
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates", sourceFor(request).ip)) return reply;
       const limit = Number(request.query.limit);
       const offset = Number(request.query.offset);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100
@@ -790,6 +820,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/public/debates/:id",
     routePolicy("GET /v1/public/debates/{id}"),
     async (request, reply) => {
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates/{id}", sourceFor(request).ip)) return reply;
       const publicationRef = ResourceIdSchema.safeParse(request.params.id);
       if (!publicationRef.success || options.publications === undefined) {
         return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
@@ -927,6 +958,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
+      request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     const ask = parseRequest(AskRequestSchema, request.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,

@@ -25,6 +25,7 @@ import {
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
   readPanelDiscoveryPolicy,
+  readAdmissionPolicy,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -40,6 +41,7 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { AdmissionLimiter } from "./admission.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
@@ -122,6 +124,7 @@ const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
 const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
 const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
 const recoveryPolicy = await readRecoveryPolicy(pool, environment.REGISTER_VERSION);
+const admissionPolicy = await readAdmissionPolicy(pool, environment.REGISTER_VERSION);
 await readProductRolePolicy(pool, environment.REGISTER_VERSION);
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
@@ -347,6 +350,8 @@ const api = buildApi({
   mfa,
   sessions,
   legacyRunClaim,
+  // B10: the sealed admission budgets are always composed in production.
+  admission: new AdmissionLimiter(admissionPolicy),
   ...(publications === undefined ? {} : { publications }),
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
