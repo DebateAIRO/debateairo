@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DevelopmentHatchetTokenError,
   provisionDevelopmentHatchetToken,
   type DevelopmentHatchetTokenOperations
 } from "../../apps/runner/src/dev-hatchet-token.js";
@@ -51,8 +52,10 @@ async function fixture(): Promise<Readonly<{
 function operations(token: string = tokenFor()): DevelopmentHatchetTokenOperations & Readonly<{
   issueToken: ReturnType<typeof vi.fn>;
   attestToken: ReturnType<typeof vi.fn>;
+  revokeToken: ReturnType<typeof vi.fn>;
 }> {
   return {
+    revokeToken: vi.fn(async () => undefined),
     issueToken: vi.fn(async () => token),
     attestToken: vi.fn(async (candidate: string, tenantId: string) => {
       expect(candidate).toBe(token);
@@ -154,6 +157,71 @@ describe("DEV-10A local Hatchet token custody", () => {
     })).rejects.toThrow("DEV_HATCHET_TOKEN_ATTESTATION_FAILED");
     expect(authority.issueToken).toHaveBeenCalledTimes(1);
     expect(authority.attestToken).toHaveBeenCalledTimes(1);
+    await expect(readFile(test.tokenFilePath, "utf8")).rejects.toThrow();
+  });
+
+  it("rotates by revoking the existing token before minting its replacement (L7-F5)", async () => {
+    const test = await fixture();
+    await provisionDevelopmentHatchetToken({
+      repositoryRoot: test.repositoryRoot,
+      operations: operations()
+    });
+
+    const replacement = tokenFor({ token_id: "33333333-3333-4333-8333-333333333333" });
+    const rotating = operations(replacement);
+    const receipt = await provisionDevelopmentHatchetToken({
+      repositoryRoot: test.repositoryRoot,
+      operations: rotating,
+      rotate: true
+    });
+
+    expect(receipt).toEqual({ reused: false, authority: "ATTESTED", workflowApi: "REACHABLE" });
+    expect(rotating.revokeToken).toHaveBeenCalledTimes(1);
+    expect(rotating.revokeToken).toHaveBeenCalledWith(TOKEN_ID);
+    expect(rotating.issueToken).toHaveBeenCalledTimes(1);
+    expect(await readFile(test.tokenFilePath, "utf8"))
+      .toBe(`HATCHET_CLIENT_TOKEN=${replacement}\n`);
+    const metadata = await lstat(test.tokenFilePath);
+    expect(metadata.mode & 0o777).toBe(0o600);
+    expect(metadata.nlink).toBe(1);
+  });
+
+  it("publishes no replacement when the revoke step fails (L7-F5)", async () => {
+    const test = await fixture();
+    await provisionDevelopmentHatchetToken({
+      repositoryRoot: test.repositoryRoot,
+      operations: operations()
+    });
+    const rotating = operations(tokenFor({ token_id: "33333333-3333-4333-8333-333333333333" }));
+    rotating.revokeToken.mockRejectedValueOnce(new Error("secret admin failure"));
+
+    await expect(provisionDevelopmentHatchetToken({
+      repositoryRoot: test.repositoryRoot,
+      operations: rotating,
+      rotate: true
+    })).rejects.toThrow("DEV_HATCHET_TOKEN_REVOKE_FAILED");
+    expect(rotating.issueToken).not.toHaveBeenCalled();
+    expect(await readFile(test.tokenFilePath, "utf8")).toBe(`HATCHET_CLIENT_TOKEN=${tokenFor()}\n`);
+  });
+
+  it("refuses a token inside the expiry floor and names the rotation command (L7-F5)", async () => {
+    const test = await fixture();
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    const authority = operations(tokenFor({
+      iat: nowSeconds - 60,
+      exp: nowSeconds + 10 * 24 * 60 * 60
+    }));
+
+    const failure: unknown = await provisionDevelopmentHatchetToken({
+      repositoryRoot: test.repositoryRoot,
+      operations: authority
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DevelopmentHatchetTokenError);
+    expect((failure as DevelopmentHatchetTokenError).message).toBe("DEV_HATCHET_TOKEN_EXPIRING");
+    expect((failure as DevelopmentHatchetTokenError).detail)
+      .toContain("pnpm dev:auth:provision-hatchet-token --rotate");
+    expect(authority.attestToken).not.toHaveBeenCalled();
     await expect(readFile(test.tokenFilePath, "utf8")).rejects.toThrow();
   });
 

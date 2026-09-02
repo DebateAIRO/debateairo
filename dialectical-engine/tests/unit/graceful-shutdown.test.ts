@@ -31,7 +31,10 @@ class FakeProcess extends EventEmitter {
   }
 }
 
-function harness(overrides: Partial<GracefulShutdownRegistration> = {}) {
+function harness(
+  overrides: Partial<GracefulShutdownRegistration> = {},
+  bounds: Readonly<{ deadlineMs?: number; escalationGraceMs?: number }> = {}
+) {
   const order: string[] = [];
   const api = Fastify({ logger: false });
   const registration: GracefulShutdownRegistration = {
@@ -62,7 +65,8 @@ function harness(overrides: Partial<GracefulShutdownRegistration> = {}) {
     argon2Pool,
     databasePools: [primaryDatabase, evaluatorDatabase],
     process,
-    logger
+    logger,
+    ...bounds
   });
   return {
     api,
@@ -251,6 +255,51 @@ describe("T3 graceful shutdown", () => {
     expect(flow.process.exitCalls).toEqual([1]);
     expect(flow.process.listenerCount("SIGTERM")).toBe(1);
     expect(flow.process.listenerCount("SIGINT")).toBe(1);
+  });
+
+  it("force-closes and exits 1 with one structured line when the drain passes the deadline (L7-F6)", async () => {
+    const flow = harness(
+      { drainRateLimitAuditFlushes: vi.fn(() => new Promise<void>(() => undefined)) },
+      { deadlineMs: 60 }
+    );
+
+    void flow.shutdown.close("api.close").catch(() => undefined);
+    await vi.waitFor(() => { expect(flow.process.exitCalls).toEqual([1]); }, { timeout: 2_000 });
+
+    expect(flow.process.exitCode).toBe(1);
+    expect(flow.logger.error).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(flow.logger.error.mock.calls))
+      .toContain("API_SHUTDOWN_DEADLINE_EXCEEDED");
+  });
+
+  it("escalates immediately when a second signal arrives during an in-progress drain (L7-F6)", async () => {
+    const flow = harness(
+      { drainRegistrationAdmissions: vi.fn(() => new Promise<void>(() => undefined)) },
+      { deadlineMs: 10_000, escalationGraceMs: 0 }
+    );
+
+    flow.process.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => {
+      expect(flow.registration.drainRegistrationAdmissions).toHaveBeenCalledTimes(1);
+    });
+    expect(flow.process.exitCalls).toEqual([]);
+
+    expect(() => flow.process.emit("SIGINT", "SIGINT")).not.toThrow();
+    expect(flow.process.exitCalls).toEqual([1]);
+    expect(flow.process.exitCode).toBe(1);
+  });
+
+  it("drains on SIGHUP exactly as on SIGTERM (L7-F6)", async () => {
+    const flow = harness();
+    expect(flow.process.listenerCount("SIGHUP")).toBe(1);
+
+    flow.process.emit("SIGHUP", "SIGHUP");
+    await vi.waitFor(() => { expect(flow.order).toContain("evaluator-database"); });
+
+    expect(flow.process.exitCalls).toEqual([]);
+    expect(flow.logger.error).not.toHaveBeenCalled();
+    expect(flow.process.listenerCount("SIGHUP")).toBe(0);
+    expect(flow.process.listenerCount("SIGTERM")).toBe(0);
   });
 
   it("attempts every DB pool when Argon2 worker closure fails", async () => {

@@ -3,10 +3,12 @@
 // Fail-closed: a custody root inside a cloud-synced folder is refused, so the
 // source tree may stay synced between machines while keys never sync (R4).
 import { realpathSync } from "node:fs";
+import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 export const DEV_CUSTODY_ROOT_ENV = "DEBATEAI_DEV_CUSTODY_ROOT";
+const PRIVATE_DIRECTORY_MODE = 0o700;
 
 function suggestedCustodyRoot() {
   return `${homedir()}/.debateai/dev-auth`;
@@ -113,4 +115,36 @@ export function resolveDevCustodyRoot(repositoryRoot, environment = process.env)
     );
   }
   return resolve(candidate);
+}
+
+/**
+ * One directory of the custody chain: a real directory, not a symlink, owned by
+ * this uid, at exactly 0700. Never repaired — narrowing a drifted mode back
+ * would hide the exposure event instead of surfacing it (L7-F10).
+ */
+export async function assertDevCustodyDirectory(directory) {
+  const path = resolve(directory);
+  const metadata = await lstat(path).catch(() => null);
+  const uid = typeof process.getuid === "function" ? process.getuid() : null;
+  if (metadata === null
+    || metadata.isSymbolicLink()
+    || !metadata.isDirectory()
+    || (uid !== null && metadata.uid !== uid)
+    || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE) {
+    throw new DevCustodyRootError(
+      "DEV_AUTH_CUSTODY_ROOT_INVALID",
+      `${path} must be a directory you own with mode 0700; it is not repaired for you.`
+    );
+  }
+}
+
+/**
+ * The custody root and the parent it lives in, so a permissive parent is
+ * refused by every command at the same point rather than passing one command
+ * and failing another much later.
+ */
+export async function assertDevCustodyRootCustody(custodyRoot) {
+  const root = resolve(custodyRoot);
+  await assertDevCustodyDirectory(dirname(root));
+  await assertDevCustodyDirectory(root);
 }

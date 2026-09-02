@@ -98,14 +98,50 @@ async function fixedStage<T>(code: string, operation: () => Promise<T>): Promise
   }
 }
 
-async function stopOwned(resources: readonly Stoppable[]): Promise<void> {
+/**
+ * Per-service teardown deadline. Each owned child already bounds its own
+ * SIGTERM -> SIGKILL escalation; this is the outer bound that keeps one hung
+ * stop (a front door waiting on an upgraded socket) from leaving every service
+ * behind it running as an orphan (L7-F1).
+ */
+export const DEV_AUTH_STACK_STOP_TIMEOUT_MS = 10_000;
+
+async function stopWithinDeadline(
+  resource: Stoppable,
+  timeoutMs: number
+): Promise<"stopped" | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stopping = resource.stop().then(() => "stopped" as const);
+  // The abandoned stop may still reject later; never let that be unhandled.
+  stopping.catch(() => undefined);
+  try {
+    return await Promise.race<"stopped" | "timeout">([
+      stopping,
+      new Promise<"timeout">((resolveTimeout) => {
+        timer = setTimeout(() => resolveTimeout("timeout"), timeoutMs);
+        timer.unref?.();
+      })
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+async function stopOwned(
+  resources: readonly Stoppable[],
+  timeoutMs: number
+): Promise<void> {
   let firstFailure: unknown;
+  let timedOutComponents = 0;
   for (const resource of [...resources].reverse()) {
     try {
-      await resource.stop();
+      if (await stopWithinDeadline(resource, timeoutMs) === "timeout") timedOutComponents += 1;
     } catch (error) {
       firstFailure ??= error;
     }
+  }
+  if (timedOutComponents > 0) {
+    throw new DevelopmentAuthStackError("DEV_AUTH_STACK_STOP_TIMEOUT", firstFailure);
   }
   if (firstFailure !== undefined) {
     throw new DevelopmentAuthStackError("DEV_AUTH_STACK_CLEANUP_FAILED", firstFailure);
@@ -113,7 +149,8 @@ async function stopOwned(resources: readonly Stoppable[]): Promise<void> {
 }
 
 export async function startDevelopmentAuthStack(
-  operations: DevelopmentAuthStackOperations
+  operations: DevelopmentAuthStackOperations,
+  stopTimeoutMs: number = DEV_AUTH_STACK_STOP_TIMEOUT_MS
 ): Promise<DevelopmentAuthStack> {
   const occupied = await fixedStage(
     "DEV_AUTH_STACK_PREFLIGHT_FAILED",
@@ -172,12 +209,12 @@ export async function startDevelopmentAuthStack(
       }),
       exited,
       stop() {
-        stopPromise ??= stopOwned(owned);
+        stopPromise ??= stopOwned(owned, stopTimeoutMs);
         return stopPromise;
       }
     });
   } catch (error) {
-    await stopOwned(owned);
+    await stopOwned(owned, stopTimeoutMs);
     throw error;
   }
 }

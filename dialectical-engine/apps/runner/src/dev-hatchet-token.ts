@@ -6,10 +6,13 @@ import { access, lstat, open, rename, unlink } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { HatchetClient } from "@hatchet-dev/typescript-sdk/v1/client/client.js";
-import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
+import { developmentComposeSecretsPath } from "./dev-compose-secrets.js";
+import {
+  assertDevCustodyRootCustody,
+  resolveDevCustodyRoot
+} from "../../../deploy/dev-auth/custody-root.mjs";
 
 const PRIVATE_FILE_MODE = 0o600;
-const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_TOKEN_BYTES = 16 * 1024;
 const MAX_CHILD_OUTPUT_BYTES = 16 * 1024;
 const MIN_REMAINING_TOKEN_SECONDS = 30 * 24 * 60 * 60;
@@ -23,6 +26,10 @@ const TOKEN_COMMAND = Object.freeze([
   "./hatchet-admin", "--config", "/config", "token", "create",
   "--name", "debateai-local-auth", "--expiresIn", "8760h"
 ] as const);
+const REVOKE_COMMAND = Object.freeze([
+  "./hatchet-admin", "--config", "/config", "token", "revoke", "--id"
+] as const);
+const ROTATION_COMMAND = "pnpm dev:auth:provision-hatchet-token --rotate";
 
 export type DevelopmentHatchetTokenReceipt = Readonly<{
   reused: boolean;
@@ -32,18 +39,24 @@ export type DevelopmentHatchetTokenReceipt = Readonly<{
 
 export type DevelopmentHatchetTokenOperations = Readonly<{
   issueToken(): Promise<string>;
+  revokeToken(tokenId: string): Promise<void>;
   attestToken(token: string, tenantId: string): Promise<void>;
 }>;
 
 export type ProvisionDevelopmentHatchetTokenInput = Readonly<{
   repositoryRoot: string;
   operations: DevelopmentHatchetTokenOperations;
+  rotate?: boolean;
 }>;
 
 export class DevelopmentHatchetTokenError extends Error {
-  constructor(code: string, cause?: unknown) {
+  /** Operator guidance. Never carries token material. */
+  readonly detail: string | undefined;
+
+  constructor(code: string, cause?: unknown, detail?: string) {
     super(code, cause === undefined ? undefined : { cause });
     this.name = "DevelopmentHatchetTokenError";
+    this.detail = detail;
   }
 }
 
@@ -58,14 +71,12 @@ function isFileSystemError(error: unknown, code: string): error is NodeJS.ErrnoE
   return error instanceof Error && "code" in error && error.code === code;
 }
 
-async function assertPrivateDirectory(path: string): Promise<void> {
-  const metadata = await lstat(path).catch(() => null);
-  if (metadata === null
-    || metadata.isSymbolicLink()
-    || !metadata.isDirectory()
-    || metadata.uid !== currentUid()
-    || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE) {
-    throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_CUSTODY_INVALID");
+async function assertCustodyRoot(custodyRoot: string): Promise<void> {
+  try {
+    await assertDevCustodyRootCustody(custodyRoot);
+  } catch (error) {
+    // One shared code for the one shared policy (L7-F10).
+    throw new DevelopmentHatchetTokenError("DEV_AUTH_CUSTODY_ROOT_INVALID", error);
   }
 }
 
@@ -142,11 +153,37 @@ function tenantIdFromToken(token: string, now: Date = new Date()): string {
       || payload.iat > nowSeconds + 300
       || typeof payload.exp !== "number"
       || !Number.isInteger(payload.exp)
-      || payload.exp - nowSeconds < MIN_REMAINING_TOKEN_SECONDS
       || payload.exp <= payload.iat) {
       throw new TypeError("invalid JWT authority");
     }
+    if (payload.exp - nowSeconds < MIN_REMAINING_TOKEN_SECONDS) {
+      // A distinct code, because the fix is a rotation, not a repair.
+      throw new DevelopmentHatchetTokenError(
+        "DEV_HATCHET_TOKEN_EXPIRING",
+        undefined,
+        "The local Hatchet token has less than 30 days of validity left. "
+          + `Rotate it with: ${ROTATION_COMMAND}`
+      );
+    }
     return payload.sub;
+  } catch (error) {
+    if (error instanceof DevelopmentHatchetTokenError) throw error;
+    throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_INVALID");
+  }
+}
+
+// The superseded token is normally at or past the expiry floor, so this reads
+// only the identifier the revoke call needs, never the full authority contract.
+function tokenIdFromToken(token: string): string {
+  if (Buffer.byteLength(token, "utf8") > MAX_TOKEN_BYTES || !TOKEN_PATTERN.test(token)) {
+    throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_INVALID");
+  }
+  try {
+    const payload = decodeJsonPart(token.split(".")[1]!);
+    if (typeof payload.token_id !== "string" || !UUID_PATTERN.test(payload.token_id)) {
+      throw new TypeError("invalid JWT token identifier");
+    }
+    return payload.token_id;
   } catch (error) {
     if (error instanceof DevelopmentHatchetTokenError) throw error;
     throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_INVALID");
@@ -201,11 +238,9 @@ export async function provisionDevelopmentHatchetToken(
 ): Promise<DevelopmentHatchetTokenReceipt> {
   const repositoryRoot = resolve(input.repositoryRoot);
   const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
-  const localRoot = dirname(custodyRoot);
   const tokenPath = join(custodyRoot, "hatchet.env");
   const lockPath = `${tokenPath}.lock`;
-  await assertPrivateDirectory(localRoot);
-  await assertPrivateDirectory(custodyRoot);
+  await assertCustodyRoot(custodyRoot);
 
   let lock;
   for (let attempt = 0; attempt < 200; attempt += 1) {
@@ -229,9 +264,18 @@ export async function provisionDevelopmentHatchetToken(
 
   try {
     const existingSource = await readPrivateTokenFile(tokenPath);
-    const reused = existingSource !== undefined;
+    if (input.rotate === true && existingSource !== undefined) {
+      // Revoke first: a rotation that leaves the superseded token live is not a
+      // rotation, and nothing is published if the revoke fails (L7-F5).
+      const supersededId = tokenIdFromToken(parseTokenFile(existingSource));
+      await fixedStep(
+        "DEV_HATCHET_TOKEN_REVOKE_FAILED",
+        () => input.operations.revokeToken(supersededId)
+      );
+    }
+    const reused = input.rotate !== true && existingSource !== undefined;
     const token = reused
-      ? parseTokenFile(existingSource)
+      ? parseTokenFile(existingSource!)
       : await fixedStep("DEV_HATCHET_TOKEN_ISSUE_FAILED", () => input.operations.issueToken());
     const tenantId = tenantIdFromToken(token);
     await fixedStep(
@@ -336,11 +380,15 @@ async function resolveDockerExecutable(
   throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_DOCKER_UNAVAILABLE");
 }
 
-function composeArguments(...arguments_: readonly string[]): readonly string[] {
+function composeArguments(
+  secretsEnvFile: string,
+  ...arguments_: readonly string[]
+): readonly string[] {
   return Object.freeze([
     "compose",
     "--progress", "quiet",
     "--env-file", ".env.compose",
+    "--env-file", secretsEnvFile,
     "-f", "compose.dev.yaml",
     ...arguments_
   ]);
@@ -351,6 +399,9 @@ export function createDevelopmentHatchetTokenOperations(
   commandEnvironment: Readonly<Record<string, string>>
 ): DevelopmentHatchetTokenOperations {
   const cwd = resolve(repositoryRoot);
+  const secretsEnvFile = developmentComposeSecretsPath(
+    resolveDevCustodyRoot(cwd, commandEnvironment)
+  );
   let dockerExecutable: string | undefined;
   const docker = async (): Promise<string> => {
     if (dockerExecutable !== undefined) return dockerExecutable;
@@ -374,7 +425,7 @@ export function createDevelopmentHatchetTokenOperations(
       const executable = await docker();
       const running = await runCommand({
         executable,
-        arguments: composeArguments("ps", "--status", "running", "--services"),
+        arguments: composeArguments(secretsEnvFile, "ps", "--status", "running", "--services"),
         cwd,
         baseEnvironment: commandEnvironment,
         environment: { VLLM_MODEL: "dev-auth-not-started" },
@@ -385,11 +436,24 @@ export function createDevelopmentHatchetTokenOperations(
       }
       return runCommand({
         executable,
-        arguments: composeArguments("exec", "-T", "hatchet-lite", ...TOKEN_COMMAND),
+        arguments: composeArguments(secretsEnvFile, "exec", "-T", "hatchet-lite", ...TOKEN_COMMAND),
         cwd,
         baseEnvironment: commandEnvironment,
         environment: { VLLM_MODEL: "dev-auth-not-started" },
         failureCode: "DEV_HATCHET_TOKEN_ISSUE_FAILED"
+      });
+    },
+    async revokeToken(tokenId) {
+      const executable = await docker();
+      await runCommand({
+        executable,
+        arguments: composeArguments(
+          secretsEnvFile, "exec", "-T", "hatchet-lite", ...REVOKE_COMMAND, tokenId
+        ),
+        cwd,
+        baseEnvironment: commandEnvironment,
+        environment: { VLLM_MODEL: "dev-auth-not-started" },
+        failureCode: "DEV_HATCHET_TOKEN_REVOKE_FAILED"
       });
     },
     async attestToken(token, tenantId) {

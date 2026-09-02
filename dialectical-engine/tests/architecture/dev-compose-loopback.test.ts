@@ -23,3 +23,21 @@ describe("compose.dev.yaml publishes only on loopback (F-04)", () => {
     expect(ports.filter((port) => !port.startsWith("127.0.0.1:"))).toEqual([]);
   });
 });
+
+describe("compose.dev.yaml takes every service credential from dev key custody (L7-F3, L7-F4)", () => {
+  it("sets the hatchet admin login by substitution and never ships the seeded default", () => {
+    expect(compose).toMatch(/^ {6}ADMIN_EMAIL: \$\{HATCHET_ADMIN_EMAIL:\?[^}]+\}$/mu);
+    expect(compose).toMatch(/^ {6}ADMIN_PASSWORD: \$\{HATCHET_ADMIN_PASSWORD:\?[^}]+\}$/mu);
+    expect(compose).not.toContain("Admin123");
+    expect(compose).not.toContain("admin@example.com");
+  });
+
+  it("authenticates vllm with an api key taken from custody", () => {
+    expect(compose).toContain("--api-key");
+    expect(compose).toMatch(/\$\{VLLM_API_KEY:\?[^}]+\}/u);
+  });
+
+  it("refuses network_mode: host for every service", () => {
+    expect(compose).not.toMatch(/^\s*network_mode:\s*["']?host["']?\s*$/mu);
+  });
+});
