@@ -17,6 +17,7 @@ Orchestrator ledger (append-only). Baseline receipt: `BASELINE.md` (dev `b5a6b6e
 | Dev baseline drift (B20, partial) | security/fix-b20-dev-health | 05c3630e, 2c4485a4, 3862706d, 379dca7a, d15297b8, 90348613 (+1) | pins for auth-front-door-parity, s04, s10-carrier-erasure-red, s14-contract, scaffold; web-only s14-ui cases retired; s13 and the VERIFICATION section still pending |
 | Mail hardening (B27, partial) | security/fix-b27-mail | 8b8ea406 | tokens in the URL fragment (L3-F8) landed; sendmail -t and spool pruning pending |
 | Provider caps (B26) | security/fix-b26-provider-caps | e957fae1, ac771e7b, 6ab67cff, 795f45b9, 865187a4, 7e3f9668 | packet cap 4/4, ask bound 3/3, backoff 7/7, replay floors 5/5, regression 16/16; typecheck exit 0 (Opus lane, host quiet) |
+| VPS baseline (C3) | security/fix-c3-vps | bfe6af0d, 57144284, d38b7511, 4e9935dc | vps-deployment-baseline 22/22 (RED 22/22 ENOENT before); `bash -n` clean on backup.sh and restore-drill.sh; shellcheck not installed on this host (not run); Opus lane |
 | Crypto bundle (B12 only) | security/fix-crypto-bundle | 63e4d2cc | locale-independent canonical order (L2-F4) landed; B19 hashToken half-done uncommitted in the lane worktree; B13-B17 pending |
 
 ## Known baseline failures on dev `b5a6b6eb` (not caused by this mission)
