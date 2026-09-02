@@ -2,12 +2,18 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import {
   readClaimTypeCompositionMap,
+  readPanelWeightingControls,
   readVerdictLabelControls,
   type CompositionMapRegisterRow
 } from "@debateai/register";
 import type { JudgementSelectionRule } from "@debateai/judgement";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
-import type { RunDeathPolicy, RunnerVerdictLabelPolicy, ScoringOperatorRegisterInput } from "./index.js";
+import type {
+  RunDeathPolicy,
+  RunnerPanelPolicy,
+  RunnerVerdictLabelPolicy,
+  ScoringOperatorRegisterInput
+} from "./index.js";
 import {
   DEVELOPMENT_ALGORITHM_SOURCE_REF,
   DEVELOPMENT_RUNNER_SOURCE_REF,
@@ -100,6 +106,15 @@ export interface DevelopmentRunnerPolicy {
    * from a deployment that never sealed it at all.
    */
   readonly verdictLabelPolicy: RunnerVerdictLabelPolicy;
+  /**
+   * S2-2 / T3 (F33): the sealed T16 PANEL family, read through T16's own readers.
+   * J12 gates every multi-maker run on this at claim time, so a deployment that
+   * seals the rows and never hands them to the runner cannot run a panel at all —
+   * it refuses each multi-maker work item on a register that is, in fact, correct.
+   * The disagreement threshold lives in the VERDICT-LABEL family and is paired in
+   * here exactly as the acceptance composition pairs it; nothing is restated.
+   */
+  readonly panelPolicy: RunnerPanelPolicy;
   readonly hashes: Readonly<Record<"judge" | "composer" | "conformance" | "propagation" | "serve", string>>;
 }
 
@@ -135,7 +150,8 @@ export async function readDevelopmentRunnerPolicy(
   // this caller only pins the deployment the rows must have been sealed BY, so
   // a row seeded by another deployment cannot drift in under the same version.
   const verdictLabels = await readVerdictLabelControls(pool, registerVersion);
-  if (Object.values(verdictLabels.sourceRefs).some(
+  const panelWeighting = await readPanelWeightingControls(pool, registerVersion);
+  if ([...Object.values(verdictLabels.sourceRefs), ...Object.values(panelWeighting.sourceRefs)].some(
     (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
   )) {
     throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
@@ -183,6 +199,18 @@ export async function readDevelopmentRunnerPolicy(
     hiddenNodeScoreThreshold: Object.freeze({
       value: parsed.hiddenNodeScoreThreshold,
       sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF
+    }),
+    panelPolicy: Object.freeze({
+      registerVersion: panelWeighting.registerVersion,
+      dispersionScale: panelWeighting.dispersionScale,
+      repeatedFamilyMultiplier: panelWeighting.repeatedFamilyMultiplier,
+      // The threshold is the verdict-label family's row, paired here the same way
+      // the acceptance composition pairs it — one identifier, never a restatement.
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      oneStepDown: panelWeighting.oneStepDown,
+      providerFamilies: panelWeighting.providerFamilies,
+      unmappedReason: panelWeighting.unmappedReason,
+      sourceRefs: Object.freeze({ ...verdictLabels.sourceRefs, ...panelWeighting.sourceRefs })
     }),
     verdictLabelPolicy: Object.freeze({
       registerVersion: verdictLabels.registerVersion,

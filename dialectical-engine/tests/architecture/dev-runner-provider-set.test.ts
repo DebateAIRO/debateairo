@@ -54,6 +54,16 @@ describe("production runner provider topology", () => {
       // Omitting it does not disable the label — it makes the run stop after
       // spending judgement and propagation.
       "verdictLabelPolicy: policy.verdictLabelPolicy",
+      // T3C (F33): T3's panel family is mandatory at the entry point for the same
+      // reason the verdict-label family is — J12's claim-time gate reads it, so a
+      // shipped composition that omits it refuses every multi-maker run on a
+      // correctly sealed deployment.
+      "panelPolicy: policy.panelPolicy",
+      // T3C / F34 (J20): DR-182 VROW-5's claim-time re-probe. Its absence is not a
+      // stop — both consumers are guarded by `!== undefined` — so a shipped
+      // composition that omits it degrades SILENTLY: a member pinned at ask time
+      // that has gone absent is trusted and no disclosure is emitted.
+      "claimTimeProbe:",
       "holdRecorder:"
     ]) expect(source).toContain(setting);
   });
