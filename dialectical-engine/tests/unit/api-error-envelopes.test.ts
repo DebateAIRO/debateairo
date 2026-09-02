@@ -54,10 +54,12 @@ function harness() {
 }
 
 /** Every `api.request.failed` line this suite must never provoke. */
-function requestFailures(failureLog: ReturnType<typeof vi.spyOn>): readonly string[] {
+function requestFailures(
+  failureLog: Readonly<{ mock: Readonly<{ calls: readonly (readonly unknown[])[] }> }>
+): readonly string[] {
   return failureLog.mock.calls
-    .map((call) => String(call[0]))
-    .filter((line) => line.includes("api.request.failed"));
+    .map((call): string => String(call[0]))
+    .filter((line): boolean => line.includes("api.request.failed"));
 }
 
 describe("API error envelopes (L1-F5, L1-F6)", () => {

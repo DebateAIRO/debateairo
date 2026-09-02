@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   AccountErasureScheduleRequestSchema,
@@ -420,7 +420,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
      * unrecognised one falls back to the constant 400 rather than a framework
      * body. Nothing here echoes any part of the request.
      */
-    frameworkErrors: (error, _request, reply) => {
+    frameworkErrors: (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
       const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
         ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
       void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
