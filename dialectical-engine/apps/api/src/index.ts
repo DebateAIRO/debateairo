@@ -915,6 +915,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+      // L1-F3: this route had no per-source admission control at all — only a
+      // 500 ms enumeration floor — so one source could drive unbounded blind
+      // -index computations, recovery-start round trips and risk-signal writes.
+      // The budget is charged to the SOURCE and never to the address, so the
+      // refusal is identical whether or not the account exists: it adds no
+      // enumeration oracle to a route whose whole design is generic.
+      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", sourceFor(request).ip)) {
+        return reply;
+      }
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};

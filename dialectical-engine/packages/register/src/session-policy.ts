@@ -116,7 +116,8 @@ const admissionScopeValueSchema = <K extends "owner" | "source">(key: K) => z.ob
 const admissionPolicyValueSchema = z.object({
   kind: z.literal("ADMISSION_POLICY"),
   asks: admissionScopeValueSchema("owner"),
-  public_reads: admissionScopeValueSchema("source")
+  public_reads: admissionScopeValueSchema("source"),
+  recovery_start: admissionScopeValueSchema("source")
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -131,6 +132,7 @@ export type AdmissionScopePolicy<K extends "owner" | "source"> = Readonly<{
 export type AdmissionPolicy = Readonly<{
   asks: AdmissionScopePolicy<"owner">;
   publicReads: AdmissionScopePolicy<"source">;
+  recoveryStart: AdmissionScopePolicy<"source">;
   sourceRef: string;
 }>;
 
@@ -142,13 +144,18 @@ export type AdmissionPolicy = Readonly<{
  */
 export const ADMISSION_POLICY_REGISTER_ROW = Object.freeze({
   rowKey: ADMISSION_POLICY_ROW_KEY,
-  sourceRef: "PLAN B10 proposed values, V ratification pending (V-1); L1-F1; L1-F2",
+  sourceRef: "PLAN B10 proposed values, V ratification pending (V-1); L1-F1; L1-F2"
+    + " + PLAN B25a recovery_start, V ratification pending (V-12); L1-F3",
   value: Object.freeze({
     kind: "ADMISSION_POLICY" as const,
     // Model spend per authenticated user: 20 asks per hour per owner.
     asks: Object.freeze({ key: "owner" as const, limit: 20, window_ms: 60 * 60_000, capacity: 8_192 }),
     // Anonymous corpus decryption: 120 public reads per 15 minutes per source.
-    public_reads: Object.freeze({ key: "source" as const, limit: 120, window_ms: 15 * 60_000, capacity: 65_536 })
+    public_reads: Object.freeze({ key: "source" as const, limit: 120, window_ms: 15 * 60_000, capacity: 65_536 }),
+    // Unauthenticated recovery starts: 15 per hour per source, mirroring the
+    // sealed resend per-IP ceiling. Keyed by source and never by address, so
+    // the refusal carries no signal about whether an account exists.
+    recovery_start: Object.freeze({ key: "source" as const, limit: 15, window_ms: 60 * 60_000, capacity: 65_536 })
   })
 });
 
@@ -170,6 +177,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.public_reads.limit,
       windowMs: policy.public_reads.window_ms,
       capacity: policy.public_reads.capacity
+    }),
+    recoveryStart: Object.freeze({
+      key: policy.recovery_start.key,
+      limit: policy.recovery_start.limit,
+      windowMs: policy.recovery_start.window_ms,
+      capacity: policy.recovery_start.capacity
     }),
     sourceRef
   });
