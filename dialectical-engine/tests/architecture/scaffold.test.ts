@@ -20,7 +20,8 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
 
   it("matches all 28 dependency-edge rows and structural rules 1–5", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(28);
+    // pin updated 2026-09-02: the web/ dependency-edge row was retired with the removed web/ app, 28 -> 27 rows (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    expect(report.edgeRowsChecked).toBe(27);
     expect(report.violations).toEqual([]);
   });
 

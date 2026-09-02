@@ -19,11 +19,12 @@ describe("S04 DDL and runtime attachment contract", () => {
   });
 
   it("DR-128 mints only the claim-type composition structure and wires a loud register read", async () => {
-    const [skeleton, sql, register, runnerMain] = await Promise.all([
+    const [skeleton, sql, register, runnerMain, runnerPolicy] = await Promise.all([
       readFile(new URL("../../docs/architecture/05-register-skeleton.md", import.meta.url), "utf8"),
       readFile(reworkMigrationUrl, "utf8"),
       readFile(new URL("../../packages/register/src/index.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8")
+      readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/runner/src/dev-runner-policy.ts", import.meta.url), "utf8")
     ]);
     expect(skeleton).toContain("`claimTypeCompositionMap`");
     expect(skeleton).toContain("`ClaimTypeCompositionMember`");
@@ -33,7 +34,9 @@ describe("S04 DDL and runtime attachment contract", () => {
     expect(register).toContain('CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap"');
     expect(register).toContain("readClaimTypeCompositionMap");
     expect(register).toContain("CLAIM_TYPE_COMPOSITION_MAP_UNRESOLVED");
-    expect(runnerMain).toContain("readClaimTypeCompositionMap");
+    // pin updated 2026-09-02: the runner's loud register read moved from main.ts into readDevelopmentRunnerPolicy (dev-runner-policy.ts), which main.ts awaits at startup (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    expect(runnerMain).toContain("readDevelopmentRunnerPolicy(");
+    expect(runnerPolicy).toContain("readClaimTypeCompositionMap");
   });
 
   it("DR-077 records declared selection-rule provenance and attaches selection to the runner", async () => {

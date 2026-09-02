@@ -42,7 +42,8 @@ describe("auth front-door parity", () => {
       "/verify-email",
       "/enroll-mfa"
     ]);
-    for (const packagePath of ["apps/ui/package.json", "web/package.json"]) {
+    // pin updated 2026-09-02: the root-level web/ Next app was removed, apps/ui is the only front door (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    for (const packagePath of ["apps/ui/package.json"]) {
       const packageJson = JSON.parse(await read(packagePath)) as { scripts: { build: string } };
       expect(packageJson.scripts.build).toContain("assert-auth-front-door-routes.mjs");
     }
@@ -56,19 +57,16 @@ describe("auth front-door parity", () => {
   });
 
   it("pins the same supported auth state machines and excludes invented affordances", async () => {
-    const [uiLogin, webLogin, uiSignUp, webSignUp, uiVerify, webVerify, uiEnroll, webEnroll] =
+    // pin updated 2026-09-02: the web/ halves of the parity reads went with the removed web/ app (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    const [uiLogin, uiSignUp, uiVerify, uiEnroll] =
       await Promise.all([
         read("apps/ui/components/LoginFlow.tsx"),
-        read("web/components/LoginFlow.tsx"),
         read("apps/ui/components/SignUpFlow.tsx"),
-        read("web/components/SignUpFlow.tsx"),
         read("apps/ui/app/verify-email/page.tsx"),
-        read("web/app/verify-email/page.tsx"),
-        read("apps/ui/app/enroll-mfa/page.tsx"),
-        read("web/app/enroll-mfa/page.tsx")
+        read("apps/ui/app/enroll-mfa/page.tsx")
       ]);
 
-    for (const login of [uiLogin, webLogin]) {
+    for (const login of [uiLogin]) {
       expect(login).toMatch(/client\.beginLogin/);
       expect(login).toMatch(/client\.completeLogin/);
       expect(login).toMatch(/replacement_recovery_code/);
@@ -78,18 +76,18 @@ describe("auth front-door parity", () => {
       expect(login).toMatch(/Back to sign in/);
       expect(login).not.toMatch(/localStorage|sessionStorage|Bearer|OAuth|forgot|remember/i);
     }
-    for (const signUp of [uiSignUp, webSignUp]) {
+    for (const signUp of [uiSignUp]) {
       expect(signUp).toMatch(/client\.register/);
       expect(signUp).toMatch(/client\.resendVerification/);
       expect(signUp).toMatch(/section-primary-email email/);
       expect(signUp).toMatch(/section-recovery-email email/);
       expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API|terms/i);
     }
-    for (const verify of [uiVerify, webVerify]) {
+    for (const verify of [uiVerify]) {
       expect(verify).toMatch(/export \{ default \} from "\.\.\/enroll-mfa\/page"/);
       expect(verify).not.toMatch(/<form\b/);
     }
-    for (const enroll of [uiEnroll, webEnroll]) {
+    for (const enroll of [uiEnroll]) {
       expect(enroll).toContain('id="totp-code"');
       expect(enroll).toContain('id="recovery-typeback"');
       expect(enroll).not.toMatch(/<form\b/);

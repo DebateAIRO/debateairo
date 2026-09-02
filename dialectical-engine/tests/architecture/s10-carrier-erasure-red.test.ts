@@ -86,13 +86,17 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
   });
 
   it("filters completed private tombstones before any external key load", async () => {
-    const [liveness, memory] = await Promise.all([
+    const [liveness, memory, migration] = await Promise.all([
       source("packages/liveness/src/index.ts"),
-      source("packages/memory/src/index.ts")
+      source("packages/memory/src/index.ts"),
+      source("migrations/0040_account_erasure.sql")
     ]);
 
-    expect(liveness.includes("serve.private_run_erasure_tombstone")).toBe(true);
-    expect(memory.includes("serve.private_run_erasure_tombstone")).toBe(true);
+    // pin updated 2026-09-02: the completed-tombstone filter moved from inline carrier SQL into core.run_private_content_is_live (migration 0040), which both carriers consult in their candidate reads before any key load (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    expect(liveness.includes("core.run_private_content_is_live(")).toBe(true);
+    expect(memory.includes("core.run_private_content_is_live(")).toBe(true);
+    expect(/FUNCTION core\.run_private_content_is_live\(p_run_id uuid\)[\s\S]{0,900}serve\.private_run_erasure_tombstone/
+      .test(migration)).toBe(true);
   });
 
   it("holds a PostgreSQL session content lease across prepared decrypt and use", async () => {

@@ -3,121 +3,27 @@ import fc from "fast-check";
 import { ABSTENTION_KINDS, CONDITION_MARKS } from "@debateai/kernel";
 import {
   ContractHttpError,
-  EVENT_TYPES,
   createContractClient,
-  type Answer,
   type RunEvent,
   type StalenessState
 } from "@debateai/contract";
-import {
-  abstentionKindLabel,
-  applyRunEvent,
-  conditionMarkLabel,
-  createEmptyLiveAnswerState,
-  projectAnswerSurface,
-  summarizeFreshness
-} from "../../web/lib/v3Presentation.js";
 import { projectNodeMakerLineage, projectServeEdge } from "@debateai/serve";
-import { conditionMarkLabel as v2ConditionMarkLabel } from "../../apps/ui/lib/v3/labels.js";
+import { abstentionKindLabel, conditionMarkLabel, summarizeFreshness } from "../../apps/ui/lib/v3/labels.js";
 
-const labeledNumber = Object.freeze({
-  value: 0.75,
-  kind: "strength",
-  source: "test-layer:FX-PT-D4",
-  producer: "test-layer",
-  provenance_ref: "provenance:test",
-  replay_handle: "replay:test"
-});
-
-function answer(overrides: Partial<Answer> = {}): Answer {
-  return {
-    answer_id: "answer:test",
-    answer_version: 1,
-    run_ref: "run:test",
-    question_line: "What follows?",
-    terminal: "SERVED",
-    verdict_state: "SUPPORTED",
-    verdict_unavailable: null,
-    confidence_band: "TEST_LAYER_BAND",
-    band_ceiling: {
-      label: "TEST_LAYER_CEILING",
-      basis: { LOOKED_UP: 1, RAN: 0, REASONING: 0 },
-      register_row_key: "wayOfKnowingCeiling",
-      register_version: 1,
-      source_ref: "test-layer:DR-086",
-      lift_path: "test-layer:improve-basis"
-    },
-    answer_form: { kind: "EMPIRICAL" },
-    serve_state: "COMPOSED",
-    composed_text: [{ segment_id: "segment:test", text: "A composed answer.", load_bearing: true, served_number_refs: ["number:test"] }],
-    number_slots: [{ status: "PRESENT", number: labeledNumber }],
-    abstention: null,
-    shadow_suppressions: [],
-    nodes: [{
-      node_id: "node:test",
-      claim: "A recorded claim",
-      way_of_knowing: "LOOKED_UP",
-      base_score: labeledNumber,
-      final_strength: labeledNumber,
-      provenance_ref: "provenance:test",
-      maker_lineage: null,
-      review: null,
-      locator: "https://example.test/source",
-      stranger_restatement: { check_status: "PASS" },
-      defeater_refs: [],
-      defeater_exhaustion_marked: true,
-      disagreement: null,
-      condition_marks: [],
-      abstention: null,
-      staleness_state: "FRESH",
-      relevant_as_of: "2026-08-09T00:00:00.000Z"
-    }],
-    edges: [],
-    badges: [],
-    residual_objections: [],
-    value_hinges: [],
-    condition_marks: [],
-    condition_mark_records: [],
-    reversal_point: "A contrary observation would reverse it.",
-    builds_on_previous: { value: false, answer_ref: null },
-    memory_disclosure: null,
-    risk_tier: "standard",
-    tier_source: "ASKER",
-    tier_provenance_ref: "asker:test",
-    cost_envelope: { basis: { source_ref: "test-layer" }, state: "WITHIN", consumed_model_attempts: 1, protected_core: "NEVER_SKIPPABLE" },
-    composition_budget_tier: "low",
-    conformance_outcome: "PASS",
-    ledger_digest_handle: "ledger:test",
-    inspection_handle: "inspection:test",
-    as_of: "2026-08-09T00:00:00.000Z",
-    staleness_state: "FRESH",
-    relevant_as_of: "2026-08-09T00:00:00.000Z",
-    ...overrides
-  };
-}
+// Retired 2026-09-02 with the removed web/ app (dev drift, see
+// docs/missions/2026-09-01-security-hardening/VERIFICATION.md): the
+// projectAnswerSurface case and the "S14 / W6 / FX-LG-17" live-lifecycle
+// describe — web/lib/v3Presentation.js has no 1:1 apps/ui equivalent for
+// either. The label, freshness and browser-client cases now run against
+// apps/ui/lib/v3/labels.js and apps/ui/lib/api.js, which are 1:1.
 
 describe("S14 / W20 / W8-W15 — typed UI projections", () => {
-  it("renders composed and components-only answers without parsing prose", () => {
-    expect(projectAnswerSurface(answer())).toMatchObject({ mode: "COMPOSED", text: ["A composed answer."], defect: false });
-    expect(projectAnswerSurface(answer({
-      terminal: "COMPONENTS_ONLY",
-      verdict_state: null,
-      verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
-      confidence_band: null,
-      band_ceiling: null,
-      answer_form: null,
-      serve_state: "COMPONENTS_ONLY",
-      composed_text: [],
-      condition_marks: ["DEFECT"]
-    }))).toMatchObject({ mode: "COMPONENTS_ONLY", text: [], defect: true });
-  });
-
   it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
     expect(CONDITION_MARKS).toHaveLength(28);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");
-    for (const render of [conditionMarkLabel, v2ConditionMarkLabel]) {
+    for (const render of [conditionMarkLabel]) {
       const labels = CONDITION_MARKS.map(render);
       expect(labels.every((label) => label.trim().length > 0)).toBe(true);
       expect(new Set(labels).size).toBe(CONDITION_MARKS.length);
@@ -187,47 +93,9 @@ describe("UI-02b — recorded per-node maker lineage", () => {
   });
 });
 
-describe("S14 / W6 / FX-LG-17 — live lifecycle and freshness", () => {
-  it("connects a spawned placeholder and renders generating -> being judged -> scored", () => {
-    const events: RunEvent[] = [
-      { event_id: "1", event_type: "node.spawned", run_ref: "run:test", subject_ref: "node:child", at_sequence: 1, payload: { parent_ref: "node:parent", relation: "support" } },
-      { event_id: "2", event_type: "node.generating", run_ref: "run:test", subject_ref: "node:child", at_sequence: 2, payload: {} },
-      { event_id: "3", event_type: "node.being_judged", run_ref: "run:test", subject_ref: "node:child", at_sequence: 3, payload: {} },
-      { event_id: "4", event_type: "node.scored", run_ref: "run:test", subject_ref: "node:child", at_sequence: 4, payload: {} }
-    ];
-    const state = events.reduce(applyRunEvent, createEmptyLiveAnswerState());
-    expect(state.nodes["node:child"]?.lifecycle).toBe("scored");
-    expect(state.placeholderEdges).toEqual([{ from: "node:child", to: "node:parent", relation: "support" }]);
-  });
-
-  it("marks a current-answer refresh required after a staleness wake-up", () => {
-    const state = applyRunEvent(
-      createEmptyLiveAnswerState(),
-      { event_id: "wake", event_type: "honesty.staleness_trigger_fired", run_ref: "run:test", at_sequence: 1, payload: {} }
-    );
-    expect(state.refreshRequired).toBe(true);
-  });
-
-  it("observes every member of the closed event vocabulary", () => {
-    const state = EVENT_TYPES.reduce((current, event_type, index) => applyRunEvent(current, {
-      event_id: `event:${index}`,
-      event_type,
-      run_ref: "run:test",
-      subject_ref: event_type.startsWith("node.") ? "node:test" : null,
-      at_sequence: index + 1,
-      payload: event_type === "honesty.investigation_gap_opened" ? {
-        gap_ref: "gap:test", gap: "A test-layer gap", verdict: "UNINSTRUMENTED",
-        why: "Test-layer coverage", effort_grade: "test-layer",
-        constructed_prompt: "Test-layer constructed prompt", accepts_user_input: true, model_authored: true
-      } : {}
-    }), createEmptyLiveAnswerState());
-    expect(Object.keys(state.consumedEvents).sort()).toEqual([...EVENT_TYPES].sort());
-  });
-});
-
 describe("S14 / W4 / FX-LG-13 — generated client error taxonomy", () => {
   it("prefixes browser contract requests with the same-origin /api route", async () => {
-    const { createBrowserContractClient } = await import("../../web/lib/api.js");
+    const { createBrowserContractClient } = await import("../../apps/ui/lib/api.js");
     const calls: Array<{ input: string; headers: Headers; credentials: RequestCredentials | undefined }> = [];
     const client = createBrowserContractClient(async (input, init) => {
       calls.push({ input: String(input), headers: new Headers(init?.headers), credentials: init?.credentials });
