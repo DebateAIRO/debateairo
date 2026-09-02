@@ -169,35 +169,125 @@ export interface StructuralCeilingInput {
   readonly branchingFactor: number;
   readonly compositionSegmentCap: number;
   readonly fixedOrgansPerComposition: number;
+  /**
+   * T17 — the sealed `envelopeFormulaInputs` row's terms. Every one of them is
+   * READ from the register (`readEnvelopeFormulaInputs`) and passed by the
+   * entry point; none is a code constant and none is re-declared here.
+   */
+  readonly reviewerCallsPerNode: number;
+  readonly synthesizerMaxRounds: number;
+  readonly evaluatorMaxRounds: number;
 }
 
-/** DR-181/182: an invisible bug tripwire derived from the engine's exported facts. */
+/**
+ * The DECLARED members, checked by name. Iterating `Object.entries(input)`
+ * instead — as DR-184-v2 did — validates only the members a caller happened to
+ * pass, so an omitted term reached the arithmetic as `undefined` and minted a
+ * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
+ */
+const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Object.freeze([
+  "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
+  "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
+  "compositionSegmentCap", "fixedOrgansPerComposition",
+  "reviewerCallsPerNode", "synthesizerMaxRounds", "evaluatorMaxRounds"
+]);
+
+/**
+ * DR-181/182 + T17 (DR-184-v3): an invisible bug tripwire derived from the
+ * engine's exported facts and T16's sealed envelope row.
+ *
+ * The ceiling counts CALL SITES and multiplies each by the attempts that site
+ * can spend. Four legs, each one measured off the shipped runner:
+ *
+ *  · AUTHOR — one call per materialized node. Wrapped in `withCooldownRetry`
+ *    (apps/runner/src/index.ts:250), which spends `judgeMaxAttempts` and then,
+ *    on transport exhaustion, a whole second sequence of
+ *    `judgeMaxAttempts + finalRetryAttempts`. DR-184-v2 provisioned only
+ *    `judge + final` and so undercounted every cooldown site by `judge`.
+ *  · PANEL — the sealed row's `panelCallsPerNodeBasis` NAMES this leg's basis
+ *    (`PANEL_SIZE_MINUS_ONE`) and its own zod literal is the loud stop for any
+ *    other basis, so the derivation below is the row's, never this file's.
+ *    `runNodePanel` hands every configured maker to `runJudgePanel`,
+ *    which skips the author (PRODUCER_GRADING_FORBIDDEN) and calls the rest:
+ *    `panelSize - 1` calls per materialized node, at every node, not just the
+ *    roots. Not cooldown-wrapped, so `judgeMaxAttempts` each. DR-184-v2
+ *    counted this leg at ZERO — the defect F36 exists to close.
+ *  · REVIEWER — `reviewerCallsPerNode` cross-maker reviews per materialized
+ *    node, deduped by node and cooldown-wrapped like the author leg.
+ *  · SERVE — the two serve chains are MUTUALLY EXCLUSIVE: the composition
+ *    organs (`maxRecompose * fixedOrgansPerComposition`) are what ships today;
+ *    T9 retires them and leaves the synthesizer/evaluator loop
+ *    (`synthesizerMaxRounds + evaluatorMaxRounds` role calls, one synthesizer
+ *    and one evaluator per round). The leg is therefore the MAXIMUM of the two
+ *    — a tight cover in both worlds, where the sum would be slack in both.
+ *
+ * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
+ * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
+ * so a repair is one of the `maxAttempts` the site already provisions.
+ */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
   readonly max_model_attempts: number;
 } {
-  for (const [name, value] of Object.entries(input)) {
-    if (!Number.isInteger(value) || value < 1) throw new TypeError(`STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`);
+  for (const name of STRUCTURAL_CEILING_MEMBERS) {
+    const value = input[name];
+    if (!Number.isInteger(value) || value < 1) {
+      throw new TypedDomainError(
+        `STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`,
+        `The structural ceiling input ${name} must be a positive integer`
+      );
+    }
   }
   const nodesPerRoot = input.panelSize === 1
     ? 1
     : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
-  if (!Number.isInteger(nodesPerRoot)) throw new TypeError("STRUCTURAL_CEILING_TREE_INVALID");
-  const authored = input.panelSize === 1
+  if (!Number.isInteger(nodesPerRoot)) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_TREE_INVALID", "The expansion tree is not integral");
+  }
+  // S2-2: the walking-skeleton literal is reachable at M=1 only — one node, no
+  // panel, no cross-maker review.
+  const materializedNodes = input.panelSize === 1
     ? 1
     : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
-  const reviews = input.panelSize === 1 ? 0 : authored;
-  const fixedSites = input.maxRecompose * input.fixedOrgansPerComposition;
-  const maxModelAttempts = (authored + reviews) * (input.judgeMaxAttempts + input.finalRetryAttempts)
-    + fixedSites * input.organMaxAttempts;
+  const cooldownSiteAttempts = 2 * input.judgeMaxAttempts + input.finalRetryAttempts;
+  const authorSites = materializedNodes;
+  const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
+  const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
+  const compositionSites = input.maxRecompose * input.fixedOrgansPerComposition;
+  const synthesisLoopSites = input.synthesizerMaxRounds + input.evaluatorMaxRounds;
+  const serveSites = Math.max(compositionSites, synthesisLoopSites);
+  const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
+    + panelSites * input.judgeMaxAttempts
+    + serveSites * input.organMaxAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
     panel_size: input.panelSize,
     depth: input.depth,
-    per_site_attempts: Object.freeze({ judge: input.judgeMaxAttempts, organ: input.organMaxAttempts }),
+    per_site_attempts: Object.freeze({
+      judge: input.judgeMaxAttempts,
+      organ: input.organMaxAttempts,
+      panel_member: input.judgeMaxAttempts,
+      cooldown_site: cooldownSiteAttempts
+    }),
+    call_sites: Object.freeze({
+      author: authorSites,
+      panel: panelSites,
+      reviewer: reviewerSites,
+      serve: serveSites
+    }),
+    /**
+     * Which serve chain bound the leg, so a reader of a stored receipt can see
+     * WHICH topology the run was admitted under. After T9 merges, a basis that
+     * still reports COMPOSITION is a basis minted against a retired chain.
+     */
+    serve_leg: Object.freeze({
+      composition_sites: compositionSites,
+      synthesis_loop_sites: synthesisLoopSites,
+      selected: compositionSites >= synthesisLoopSites ? "COMPOSITION" : "SYNTHESIS_LOOP"
+    }),
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-184-v2",
+    formula_version: "DR-184-v3",
     bounds_source_ref: "engine-exports+register"
   });
 }

@@ -106,11 +106,13 @@ describe("DR-184 review resilience mutation ledger", () => {
   });
 
   it("T5 pins the corrected per-site final-retry ceiling and formula version", () => {
+    // T17 (DR-184-v3): the grid moves because the ceiling now counts the panel
+    // leg and both provider sequences a cooldown site can spend.
     const expected = [
-      [28, 28, 28, 28, 28],
-      [88, 152, 280, 536, 1048],
-      [144, 240, 432, 816, 1584],
-      [216, 344, 600, 1112, 2136]
+      [31, 31, 31, 31, 31],
+      [160, 296, 568, 1112, 2200],
+      [324, 564, 1044, 2004, 3924],
+      [576, 944, 1680, 3152, 6096]
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
@@ -124,10 +126,13 @@ describe("DR-184 review resilience mutation ledger", () => {
           finalRetryAttempts: 1,
           branchingFactor: 2,
           compositionSegmentCap: 2,
-          fixedOrgansPerComposition: 4
+          fixedOrgansPerComposition: 4,
+          reviewerCallsPerNode: 1,
+          synthesizerMaxRounds: 3,
+          evaluatorMaxRounds: 3
         });
         expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
-        expect(basis.formula_version).toBe("DR-184-v2");
+        expect(basis.formula_version).toBe("DR-184-v3");
       }
     }
   });

@@ -33,12 +33,35 @@ export const BATTERY_BUDGET_CONTRACTS = Object.freeze(
   }))
 );
 
+/**
+ * T17 (DR-184-v3): the run head's basis carries the four call-site legs and the
+ * serve chain it was minted against, so an audit of a stored receipt can see
+ * WHICH topology the run was admitted under. The schema is strict on purpose —
+ * a DR-184-v2 basis, which counted no panel leg, is REFUSED loudly here rather
+ * than enforced as an undercount against a live panel.
+ */
 const costEnvelopeBasisSchema = z.object({
   kind: z.literal("COMPUTED_STRUCTURAL_CEILING"),
   max_model_attempts: z.number().int().positive(),
   panel_size: z.number().int().positive(),
   depth: z.number().int().min(1).max(5),
-  per_site_attempts: z.object({ judge: z.number().int().positive(), organ: z.number().int().positive() }).strict(),
+  per_site_attempts: z.object({
+    judge: z.number().int().positive(),
+    organ: z.number().int().positive(),
+    panel_member: z.number().int().positive(),
+    cooldown_site: z.number().int().positive()
+  }).strict(),
+  call_sites: z.object({
+    author: z.number().int().positive(),
+    panel: z.number().int().min(0),
+    reviewer: z.number().int().min(0),
+    serve: z.number().int().positive()
+  }).strict(),
+  serve_leg: z.object({
+    composition_sites: z.number().int().positive(),
+    synthesis_loop_sites: z.number().int().positive(),
+    selected: z.enum(["COMPOSITION", "SYNTHESIS_LOOP"])
+  }).strict(),
   hold_cap: z.number().int().positive(),
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),

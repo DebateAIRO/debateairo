@@ -101,10 +101,27 @@ describe("ACC-01 acceptance runtime policy", () => {
         COMPOSER: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 },
         CONFORMANCE: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 }
       },
-      runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 }
+      runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
+      // T17: the sealed T16 envelope row, as `readAcceptanceRuntimePolicy`
+      // resolves it. The acceptance ceiling reads its shape from the register,
+      // never from engine constants re-declared at this call site.
+      envelopeFormulaInputs: {
+        registerVersion: 1,
+        branchingFactor: 2,
+        compositionSegmentCap: 2,
+        fixedOrgansPerComposition: 4,
+        maxRecompose: 2,
+        reviewerCallsPerNode: 1,
+        synthesizerMaxRounds: 3,
+        evaluatorMaxRounds: 3,
+        panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE",
+        sourceRefs: { envelopeFormulaInputs: "test-layer:envelope" }
+      }
     }, 2, 1)).toMatchObject({
-      max_model_attempts: 88,
-      per_site_attempts: { judge: 3, organ: 3 }
+      max_model_attempts: 160,
+      per_site_attempts: { judge: 3, organ: 3, panel_member: 3, cooldown_site: 7 },
+      call_sites: { author: 8, panel: 8, reviewer: 8, serve: 8 },
+      formula_version: "DR-184-v3"
     });
     for (const proofSource of [panelProofSource, reviewProofSource]) {
       expect(proofSource).toContain("structuralCeilingMaxModelAttempts");
