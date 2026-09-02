@@ -192,6 +192,9 @@ export async function startDevTlsFrontDoor(options) {
     path: request.url,
     headers: sanitizedHeaders(request.headers)
   });
+  // Upgraded sockets leave the server's connection table, so `server.close()`
+  // waits on them forever unless they are tracked and destroyed here (L7-F1).
+  const upgradedSockets = new Set();
   const server = createHttpsServer({ cert: certificate, key: privateKey }, (request, response) => {
     if (!hostAllowed(request)) {
       response.writeHead(421, { "content-type": "text/plain; charset=utf-8" });
@@ -213,12 +216,29 @@ export async function startDevTlsFrontDoor(options) {
   });
   server.on("clientError", (_error, socket) => socket.destroy());
   server.on("upgrade", (request, socket, head) => {
+    // Without this an ordinary client RST before the handshake is an uncaught error.
+    socket.on("error", () => socket.destroy());
     if (!hostAllowed(request)) {
       socket.end("HTTP/1.1 421 Misdirected Request\r\nConnection: close\r\n\r\n");
       return;
     }
+    upgradedSockets.add(socket);
+    socket.once("close", () => upgradedSockets.delete(socket));
     const upstream = httpRequest(proxyOptions(request));
     upstream.once("upgrade", (upstreamResponse, upstreamSocket, upstreamHead) => {
+      upgradedSockets.add(upstreamSocket);
+      // Either half failing takes the pair down; a reset upstream must never
+      // surface as an uncaught error that tears the whole dev stack down.
+      const destroyPair = () => {
+        upgradedSockets.delete(socket);
+        upgradedSockets.delete(upstreamSocket);
+        socket.destroy();
+        upstreamSocket.destroy();
+      };
+      socket.on("error", destroyPair);
+      upstreamSocket.on("error", destroyPair);
+      socket.once("close", destroyPair);
+      upstreamSocket.once("close", destroyPair);
       writeUpgradeResponse(socket, upstreamResponse);
       if (upstreamHead.byteLength > 0) socket.write(upstreamHead);
       if (head.byteLength > 0) upstreamSocket.write(head);
@@ -251,6 +271,8 @@ export async function startDevTlsFrontDoor(options) {
     host: listenHost,
     port: activePort,
     close: () => new Promise((resolvePromise, rejectPromise) => {
+      for (const upgraded of [...upgradedSockets]) upgraded.destroy();
+      upgradedSockets.clear();
       server.close((error) => error === undefined ? resolvePromise() : rejectPromise(error));
       server.closeAllConnections();
     })

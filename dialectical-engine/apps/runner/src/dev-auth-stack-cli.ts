@@ -9,8 +9,20 @@ import {
 
 function terminationSignal(): Promise<NodeJS.Signals> {
   return new Promise((resolveSignal) => {
-    process.once("SIGINT", () => resolveSignal("SIGINT"));
-    process.once("SIGTERM", () => resolveSignal("SIGTERM"));
+    let signalled = false;
+    const onSignal = (signal: NodeJS.Signals): void => {
+      if (signalled) {
+        // Teardown is already bounded per service. Absorbing repeats keeps the
+        // default signal action from killing this supervisor mid-teardown and
+        // orphaning the API, runner, and UI it owns (L7-F1).
+        console.error("DEV_AUTH_STACK_STOP_IN_PROGRESS");
+        return;
+      }
+      signalled = true;
+      resolveSignal(signal);
+    };
+    process.on("SIGINT", () => onSignal("SIGINT"));
+    process.on("SIGTERM", () => onSignal("SIGTERM"));
   });
 }
 
@@ -22,8 +34,10 @@ function runtimeFaultSignal(): Readonly<{ promise: Promise<never>; dispose(): vo
   void promise.catch(() => undefined);
   const onUncaughtException = (error: Error) => rejectFault(error);
   const onUnhandledRejection = (reason: unknown) => rejectFault(reason);
-  process.once("uncaughtException", onUncaughtException);
-  process.once("unhandledRejection", onUnhandledRejection);
+  // Persistent, not once: a second fault during teardown must not fall through
+  // to the default action and abandon the children.
+  process.on("uncaughtException", onUncaughtException);
+  process.on("unhandledRejection", onUnhandledRejection);
   return Object.freeze({
     promise,
     dispose() {
