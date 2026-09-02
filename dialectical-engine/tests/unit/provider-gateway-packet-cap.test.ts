@@ -72,9 +72,12 @@ describe("L4-F2 — request packet cap", () => {
     let fetchCalls = 0;
     const { gateway } = gatewayWith(async () => { fetchCalls += 1; return okCompletion(); });
     const overhead = wireBytes([{ role: "user", content: "" }]);
-    // 3-byte characters: 256 KiB - overhead + 1 byte over the cap once serialised.
-    const content = "€".repeat(Math.floor((256 * KIB - overhead) / 3)) + "aa";
+    // 3-byte characters, enough of them to put the packet at least one byte over the cap once
+    // serialised whatever the overhead leaves as a remainder.
+    const content = "€".repeat(Math.ceil((256 * KIB - overhead + 1) / 3));
     const packet: PromptPacket = { messages: [{ role: "user", content }] };
+    // Well under the cap counted in characters, over it counted in UTF-8 bytes.
+    expect(content.length).toBeLessThan(256 * KIB);
     expect(wireBytes(packet.messages)).toBeGreaterThan(256 * KIB);
 
     await expect(gateway.call(callRequest(packet, 1))).rejects.toMatchObject({ cause: { code: "PROVIDER_PACKET_TOO_LARGE" } });
