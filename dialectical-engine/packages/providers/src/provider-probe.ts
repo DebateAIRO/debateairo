@@ -40,11 +40,24 @@ export type ProviderProbeRecorder = Readonly<{
 
 const MAX_PROBE_RESPONSE_BYTES = 64 * 1024;
 
-export async function probeTarget(input: Readonly<{
+/**
+ * The network probe ONLY — it observes and returns, and persists nothing.
+ *
+ * Split out in T3C r2 (codex r1 B1). The moved `probeTarget` both observed AND
+ * recorded, which is right for the API's ask-time discovery, where nothing else
+ * writes. It is WRONG for the runner's claim-time re-probe: DR-182 already has the
+ * runner persist the claim-time verdict itself (apps/runner/src/index.ts, both the
+ * ABSENT and HEALTHY arms), and the established `claimTimeProbe` contract — see the
+ * acceptance composition, which persists nothing — is "return the observation, the
+ * runner records it". Composing the persisting variant there produced TWO
+ * append-only rows and two independent-looking evidence refs per single re-probe.
+ *
+ * So: one network implementation (J21), and exactly one persistence owner per
+ * caller. The API keeps `probeTarget` (observe + record); the runner composes
+ * `observeProviderTarget` and lets its own recorder own the row.
+ */
+export async function observeProviderTarget(input: Readonly<{
   target: ProviderDiscoveryTarget;
-  // MOVED: was `ProviderDiscoveryProbeStore` (apps/api). Structurally the same
-  // for this function, which only ever calls `record`.
-  probes: ProviderProbeRecorder;
   timeoutMs: number;
   fetchImplementation: typeof fetch;
   clock: () => Date;
@@ -110,6 +123,23 @@ export async function probeTarget(input: Readonly<{
       probedAt
     });
   }
-  await input.probes.record(state);
+  return state;
+}
+
+/**
+ * Observe AND persist — the ask-time discovery shape, byte-equivalent to the
+ * function apps/api defined before J21's move. `createProviderDiscoveryResolver`
+ * still calls exactly this, so the API's behaviour is unchanged.
+ */
+export async function probeTarget(input: Readonly<{
+  target: ProviderDiscoveryTarget;
+  probes: ProviderProbeRecorder;
+  timeoutMs: number;
+  fetchImplementation: typeof fetch;
+  clock: () => Date;
+}>): Promise<ProviderProbeObservation> {
+  const { probes, ...observation } = input;
+  const state = await observeProviderTarget(observation);
+  await probes.record(state);
   return state;
 }

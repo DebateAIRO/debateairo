@@ -565,25 +565,28 @@ describe("DEV-05 complete development deployment register", () => {
 
     // ...and RECORDED: the probe wrote its verdict, so the absence is evidence
     // rather than a decision that left no trace.
-    // Each absent member yields TWO rows — `probeTarget` records its own verdict and
-    // the runner records the claim-time absence — so an `ORDER BY ... LIMIT 2` reads
-    // two rows for the SAME member. (It did, and said the set had one element.)
-    // Assert the DISTINCT set instead, which is what the claim is actually about.
-    const after = await database.pool.query<{ provider_ref: string }>(
-      `SELECT DISTINCT provider_ref FROM core.provider_probe
-        WHERE provider_ref = ANY($1::text[]) AND state='ABSENT' AND probed_at >= $2
+    // ONE re-probe per member, ONE recorded row per member (codex r1 B1). The
+    // earlier version of this assertion said DISTINCT provider_ref, which stayed
+    // green while the composition wrote the SAME re-probe twice under two
+    // independent-looking evidence refs — a deduplicating assertion cannot see a
+    // duplication defect. Exact counts and identities, per member.
+    const rows = await database.pool.query<{
+      provider_ref: string; state: string; probe_id: string; failure_code: string | null;
+    }>(
+      `SELECT provider_ref, state, probe_id::text AS probe_id, failure_code
+         FROM core.provider_probe
+        WHERE provider_ref = ANY($1::text[]) AND probed_at >= $2
         ORDER BY provider_ref`,
       [targets.map((target) => target.providerRef), probedAtFloor]
     );
-    expect(new Set(after.rows.map((row) => row.provider_ref)))
-      .toEqual(new Set(targets.map((target) => target.providerRef)));
-    // Every row written in this window is an ABSENCE — no member was recorded healthy.
-    const healthy = await database.pool.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM core.provider_probe
-        WHERE provider_ref = ANY($1::text[]) AND state='HEALTHY' AND probed_at >= $2`,
-      [targets.map((target) => target.providerRef), probedAtFloor]
-    );
-    expect(healthy.rows[0]?.count).toBe("0");
+    // Exactly two rows for two members — not "at least", not deduplicated.
+    expect(rows.rowCount).toBe(2);
+    expect(rows.rows.map((row) => row.provider_ref))
+      .toEqual([...targets.map((target) => target.providerRef)].sort());
+    // One row each, every one an ABSENCE, each with its own evidence id.
+    expect(rows.rows.every((row) => row.state === "ABSENT")).toBe(true);
+    expect(new Set(rows.rows.map((row) => row.probe_id)).size).toBe(2);
+    expect(rows.rows.every((row) => row.failure_code !== null)).toBe(true);
 
     const modelCalls = await database.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM ledger.ledger_entry

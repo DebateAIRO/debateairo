@@ -6,11 +6,11 @@ import {
   FileUserDekStore,
   loadKek
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, ProviderProbeRepository, RunRepository } from "@debateai/db";
+import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { loadRunnerEnvironment } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { parseProviderDiscoveryTargets, probeTarget } from "@debateai/providers";
+import { observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import { createRunnerProviderTopology } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
@@ -62,8 +62,6 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
   })
 );
 const runRepository = new RunRepository(pool);
-// One probe store for the process, not one per claim-time probe call.
-const providerProbes = new ProviderProbeRepository(pool);
 if (providerTopology.primary.providerRef !== environment.PROVIDER_REF
   || providerTopology.primary.maker !== environment.VLLM_MAKER
   || providerTargets[0]?.baseUrl !== environment.VLLM_BASE_URL.replace(/\/$/u, "")
@@ -102,35 +100,6 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
   verdictLabelPolicy: policy.verdictLabelPolicy,
   panelPolicy: policy.panelPolicy,
-  // T3C / F34 (ruling J20): DR-182 VROW-5's claim-time health re-probe. Without
-  // this the runner's probe block is skipped entirely — a member pinned at ask
-  // time that has since gone absent is trusted, the panel is never revised, and
-  // no CLAIM_PANEL_REVISED disclosure is emitted. That is a SILENT degradation,
-  // which the Scope law forbids.
-  //
-  // It is the SAME probe the API runs at ask time (moved to @debateai/providers
-  // by J21 so there is exactly one implementation), and it is immediate: VROW-5
-  // asks for one no-hold check at claim, so no freshness window is consulted.
-  // A member with no configured target is ABSENT with the reason the runner
-  // already understands, never a silent pass.
-  claimTimeProbe: async (member) => {
-    const target = providerTargets.find((candidate) => candidate.providerRef === member.provider_ref);
-    if (target === undefined) {
-      return { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_GATEWAY_UNRESOLVED" };
-    }
-    const observation = await probeTarget({
-      target,
-      probes: providerProbes,
-      timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
-      fetchImplementation: fetch,
-      clock: () => new Date()
-    });
-    return {
-      state: observation.state,
-      modelId: observation.modelId,
-      failureCode: observation.failureCode
-    };
-  },
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({
