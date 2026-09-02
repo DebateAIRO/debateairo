@@ -228,8 +228,18 @@ const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Ob
  *    counted this leg at ZERO — the defect F36 exists to close.
  *  · REVIEWER — `reviewerCallsPerNode` cross-maker reviews per materialized
  *    node, deduped by node and cooldown-wrapped like the author leg.
- *  · SERVE — the two serve chains are MUTUALLY EXCLUSIVE: the composition
- *    organs (`maxRecompose * fixedOrgansPerComposition`) are what ships today;
+ *  · SERVE — the two serve chains are MUTUALLY EXCLUSIVE. The composition
+ *    organs are what ships today, and their count is DECOMPOSED rather than
+ *    taken as `maxRecompose * fixedOrgansPerComposition`: the chain
+ *    (packages/serve/src/index.ts:505-580) calls the composer once and
+ *    conformance once per segment INSIDE the recompose loop, but post-compose
+ *    R9 ONCE AFTER it. `ENGINE_FIXED_ORGANS_PER_COMPOSITION` bundles all three
+ *    as `1 + segmentCap + 1` and multiplying it by the rounds bills R9 once per
+ *    round, which the chain never does. Measured from a ledger in
+ *    tests/integration/t17-envelope-ledger.test.ts: 2 composers + 4 conformance
+ *    + 1 R9 = SEVEN sites at maxRecompose=2, segmentCap=2 — not eight.
+ *    (This was the second unmeasured premise, of the same class as the cooldown
+ *    term: a constant multiplied by rounds without anyone counting the sites.)
  *    T9 retires them and leaves the synthesizer/evaluator loop
  *    (`synthesizerMaxRounds + evaluatorMaxRounds` role calls, one synthesizer
  *    and one evaluator per round). The leg is therefore the MAXIMUM of the two
@@ -277,7 +287,21 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const authorSites = materializedNodes;
   const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
   const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
-  const compositionSites = input.maxRecompose * input.fixedOrgansPerComposition;
+  // Per ROUND: one composer + one conformance per segment. Per RUN: one
+  // post-compose R9, outside the loop.
+  const compositionSitesPerRound = 1 + input.compositionSegmentCap;
+  const postComposeSitesPerRun = 1;
+  const compositionSites = input.maxRecompose * compositionSitesPerRound + postComposeSitesPerRun;
+  // The sealed row still declares `fixedOrgansPerComposition`. It is no longer
+  // multiplied by the rounds, but it must stay COHERENT with the shape above,
+  // or a deployment could seal a topology this decomposition never measured.
+  if (input.fixedOrgansPerComposition !== compositionSitesPerRound + postComposeSitesPerRun) {
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT",
+      `fixedOrgansPerComposition ${input.fixedOrgansPerComposition} does not equal `
+      + `1 composer + ${input.compositionSegmentCap} conformance + 1 post-compose organ`
+    );
+  }
   const synthesisLoopSites = input.synthesizerMaxRounds + input.evaluatorMaxRounds;
   const serveSites = Math.max(compositionSites, synthesisLoopSites);
   const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
@@ -307,6 +331,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
      */
     serve_leg: Object.freeze({
       composition_sites: compositionSites,
+      composition_sites_per_round: compositionSitesPerRound,
+      post_compose_sites_per_run: postComposeSitesPerRun,
       synthesis_loop_sites: synthesisLoopSites,
       selected: compositionSites >= synthesisLoopSites ? "COMPOSITION" : "SYNTHESIS_LOOP"
     }),

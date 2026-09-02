@@ -24,7 +24,10 @@ describe("DR-181 computed structural tripwire", () => {
         const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
         // Cumulative per call-site key: sequence 2 only gets the final retry.
         const cooldownSite = 3 + 1;
-        const fixedSites = Math.max(2 * RUNNER_FIXED_ORGANS_PER_COMPOSITION, 3 + 3);
+        // Walked, not multiplied: composer + one conformance per segment per
+        // recompose round, then ONE post-compose organ after the loop.
+        const compositionSites = RUNNER_MAX_RECOMPOSE * (1 + RUNNER_COMPOSITION_SEGMENT_CAP) + 1;
+        const fixedSites = Math.max(compositionSites, 3 + 3);
         const independentWorstCase = (authored + reviews) * cooldownSite
           + panelCalls * 3
           + fixedSites * 3;

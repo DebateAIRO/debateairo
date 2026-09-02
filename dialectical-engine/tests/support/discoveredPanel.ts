@@ -24,7 +24,10 @@ export function fixtureStructuralCeiling(maxModelAttempts: number, panelSize = 1
     depth,
     per_site_attempts: { judge: 1, organ: 1, panel_member: 1, cooldown_site: 3 },
     call_sites: { author: 1, panel: 0, reviewer: 0, serve: 8 },
-    serve_leg: { composition_sites: 8, synthesis_loop_sites: 6, selected: "COMPOSITION" as const },
+    serve_leg: {
+      composition_sites: 7, composition_sites_per_round: 3, post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 6, selected: "COMPOSITION" as const
+    },
     hold_cap: 1,
     final_retry_attempts: 1,
     formula_version: "test-v1",

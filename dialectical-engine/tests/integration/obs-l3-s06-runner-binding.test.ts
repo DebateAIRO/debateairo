@@ -260,7 +260,10 @@ describe("S06 provider gateway binding", () => {
                 depth: 1,
                 per_site_attempts: { judge: 2, organ: 2, panel_member: 2, cooldown_site: 5 },
                 call_sites: { author: 1, panel: 0, reviewer: 0, serve: 8 },
-                serve_leg: { composition_sites: 8, synthesis_loop_sites: 6, selected: "COMPOSITION" },
+                serve_leg: {
+                  composition_sites: 7, composition_sites_per_round: 3,
+                  post_compose_sites_per_run: 1, synthesis_loop_sites: 6, selected: "COMPOSITION"
+                },
                 hold_cap: 1,
                 final_retry_attempts: 1,
                 formula_version: "s06-test",

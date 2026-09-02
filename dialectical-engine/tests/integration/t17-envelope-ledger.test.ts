@@ -26,22 +26,32 @@ import { withRequestDerivedBearings } from "../support/reviewBearings.js";
  * and asserts the recomputed ceiling covers it — panel attempts included,
  * counted from the same ledger by their own `PANEL:` call-site namespace.
  *
- * MAXIMUM PATH, exactly. Every site is driven to the last attempt it is allowed
- * and succeeds there:
+ * MAXIMUM PATH, and every reachable namespace is in it. Each site is driven to
+ * the LAST provider attempt it is allowed and succeeds there:
  *
- *   cooldown-wrapped judge sites (author, reviewer): 4 attempts
+ *   author + reviewer (cooldown-wrapped judge sites): 4 attempts each.
  *     `withCooldownRetry` runs two sequences, but the gateway counts attempts
  *     CUMULATIVELY per call-site key and passes `remaining = maxAttempts -
- *     consumed` (apps/runner/src/index.ts:3565-3577). Sequence 1 spends
- *     judgeMaxAttempts (3); sequence 2 gets only the 1 final-retry attempt that
- *     remains. THIS TEST MEASURED THAT: an earlier draft of the formula modelled
- *     the site at 7 and this run reported 4, refuting it.
- *   panel sites: 3 attempts — one sequence, judgeMaxAttempts, no cooldown wrap.
+ *     consumed` (apps/runner/src/index.ts:3565-3577), so the two sequences
+ *     share ONE allowance: judgeMaxAttempts (3) + finalRetry (1). An earlier
+ *     draft modelled this site at 7 and THIS TEST measured 4, refuting it.
+ *   panel: 3 attempts each — one sequence, judgeMaxAttempts, no cooldown wrap.
+ *   serve: 3 attempts at EVERY reachable site. Round 1's conformance is driven
+ *     to a valid-but-false verdict so the recompose loop runs a SECOND round,
+ *     which then passes. That is what makes this the maximum rather than a
+ *     bracketing run: an earlier draft gave the serve organs a zero failure
+ *     budget and always answered `conforms: true`, so one composition round ran
+ *     and four serve calls answered first time (92 attempts total). 92 sits
+ *     above the old ceiling and below the new one — it proves the old ceiling
+ *     would have refused a lawful run, which stands — but it is NOT a maximum
+ *     and is not quoted as one.
  *
- * The panel leg is the whole of the correction: DR-184-v2 provisioned ZERO for
- * it, so this run spends MORE than v2's entire ceiling for this topology (88)
- * while staying inside v3's (112). The assertion at the foot of this file is
- * what makes F36's undercount a measured fact rather than a derivation.
+ * The serve topology this run MEASURES is the second correction: the chain
+ * (packages/serve/src/index.ts:505-580) calls composer + conformance inside the
+ * recompose loop and post-compose R9 ONCE AFTER it, so the maximum is
+ * 2 composers + 4 conformance + 1 R9 = SEVEN sites — not the eight that
+ * `maxRecompose * ENGINE_FIXED_ORGANS_PER_COMPOSITION` bills by multiplying a
+ * per-run organ across rounds.
  */
 
 let database: TestDatabase;
@@ -56,6 +66,10 @@ const FINAL_RETRY_ATTEMPTS = 1;
 const ATTEMPTS_PER_COOLDOWN_SITE = JUDGE_MAX_ATTEMPTS + FINAL_RETRY_ATTEMPTS;
 /** A panel member call is one sequence, not cooldown-wrapped. */
 const ATTEMPTS_PER_PANEL_SITE = JUDGE_MAX_ATTEMPTS;
+/** Serve organs are not cooldown-wrapped either: one sequence, organ bound. */
+const ATTEMPTS_PER_SERVE_SITE = ORGAN_MAX_ATTEMPTS;
+/** 2 composers + (2 rounds x 2 segments) conformance + 1 post-compose R9. */
+const SERVE_SITES = 2 + 2 * 2 + 1;
 
 /** M=2, depth=1: 2 roots + 4 expansion children + 2 cross-root exchange nodes. */
 const MATERIALIZED_NODES = 8;
@@ -129,6 +143,20 @@ async function startMaximumPathProvider(label: string): Promise<{
    */
   const failuresByPacket = new Map<string, number>();
   const attemptsByPacket = new Map<string, number>();
+  const contentResponsesByPacket = new Map<string, number>();
+  /**
+   * The recompose loop breaks as soon as every segment conforms, so a maximum
+   * path needs round 1 to fail on a real verdict — not on transport. Each
+   * segment's FIRST content response is round 1 and returns `conforms: false`;
+   * its second is round 2 and passes.
+   */
+  const conformanceVerdict = (packetKey: string): { conforms: boolean; findings: string[] } => {
+    const seen = (contentResponsesByPacket.get(packetKey) ?? 0) + 1;
+    contentResponsesByPacket.set(packetKey, seen);
+    return seen === 1
+      ? { conforms: false, findings: ["test-layer: first composition round is rejected"] }
+      : { conforms: true, findings: [] };
+  };
   let served = 0;
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
@@ -138,12 +166,11 @@ async function startMaximumPathProvider(label: string): Promise<{
       const kind = classify(body);
       counts[kind] += 1;
       served += 1;
-      // The serve organs are not cooldown-wrapped and failing them only ends
-      // the run early, so they answer first time. Panel and judge legs are
-      // driven to the LAST attempt each is allowed.
-      const failureBudget = kind === "COMPOSE" || kind === "CONFORMANCE" || kind === "R9"
-        ? 0
-        : kind === "PANEL" ? ATTEMPTS_PER_PANEL_SITE - 1 : ATTEMPTS_PER_COOLDOWN_SITE - 1;
+      // EVERY reachable namespace is driven to its final allowed attempt.
+      const failureBudget = kind === "PANEL" ? ATTEMPTS_PER_PANEL_SITE - 1
+        : kind === "COMPOSE" || kind === "CONFORMANCE" || kind === "R9"
+          ? ATTEMPTS_PER_SERVE_SITE - 1
+          : ATTEMPTS_PER_COOLDOWN_SITE - 1;
       const packetKey = `${kind}:${createHash("sha256").update(body).digest("hex")}`;
       attemptsByPacket.set(packetKey, (attemptsByPacket.get(packetKey) ?? 0) + 1);
       if (failureBudget > 0) {
@@ -169,7 +196,11 @@ async function startMaximumPathProvider(label: string): Promise<{
             body
           )
           : kind === "COMPOSE" ? COMPOSITION
-            : kind === "CONFORMANCE" ? JSON.stringify({ conforms: true, findings: [] })
+            : kind === "CONFORMANCE"
+              // Round 1 returns a VALID but false verdict, so the chain
+              // recomposes; round 2 passes and the run still completes. Counted
+              // per packet, so each segment's first content response is round 1.
+              ? JSON.stringify(conformanceVerdict(packetKey))
               : kind === "R9" ? JSON.stringify({ pass: true })
                 : judgementDouble(`${label} position ${served}`);
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
@@ -417,17 +448,48 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
       expect(perSite.rows.length).toBeGreaterThan(0);
       expect(perSite.rows.every((row) => Number(row.attempts) === ATTEMPTS_PER_COOLDOWN_SITE)).toBe(true);
 
+      // (2b) THE SERVE LEG, MEASURED per namespace from the same ledger. This
+      //      is the second correction: R9 appears ONCE for the run, not once
+      //      per recompose round, so the maximum is SEVEN sites and not the
+      //      eight `maxRecompose * fixedOrgansPerComposition` bills.
+      const serve = await database.pool.query<{ call_site_key: string; attempts: string }>(
+        `SELECT call_site_key, count(*)::text AS attempts
+         FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL'
+           AND (call_site_key LIKE 'COMPOSER:%' OR call_site_key LIKE 'CONFORMANCE:%'
+                OR call_site_key LIKE 'POST_COMPOSE_R9:%')
+         GROUP BY call_site_key ORDER BY call_site_key`,
+        [runId]
+      );
+      expect(serve.rows.map((row) => `${row.call_site_key}=${row.attempts}`)).toEqual([
+        "COMPOSER:1=3", "COMPOSER:2=3",
+        "CONFORMANCE:1:0=3", "CONFORMANCE:1:1=3",
+        "CONFORMANCE:2:0=3", "CONFORMANCE:2:1=3",
+        // Keyed by the LAST composition round, not by a round of its own —
+        // which is itself the evidence that R9 runs once AFTER the loop.
+        "POST_COMPOSE_R9:2=3"
+      ]);
+      expect(serve.rows).toHaveLength(SERVE_SITES);
+      // BOTH composition rounds ran: round 2's sites exist at all.
+      expect(serve.rows.some((row) => row.call_site_key === "COMPOSER:2")).toBe(true);
+      // The receipt's own composition count agrees with what the run opened.
+      expect(ceilingBasis.serve_leg).toMatchObject({
+        composition_sites: SERVE_SITES,
+        composition_sites_per_round: 3,
+        post_compose_sites_per_run: 1
+      });
+
       // (3) THE DoD: the recomputed ceiling COVERS the observed attempt count.
       //     The total is pinned EXACTLY, not merely compared — a comparison any
-      //     state satisfies is not evidence (D27 ADDENDUM). 8 author sites and
-      //     8 reviewer sites at 4 attempts, 8 panel sites at 3, and the serve
-      //     leg's COMPOSER + 2 CONFORMANCE + POST_COMPOSE_R9 at 1 each.
+      //     state satisfies is not evidence (D27 ADDENDUM).
       expect(observed).toBe(8 * ATTEMPTS_PER_COOLDOWN_SITE
         + 8 * ATTEMPTS_PER_COOLDOWN_SITE
         + 8 * ATTEMPTS_PER_PANEL_SITE
-        + 4);
-      expect(observed).toBe(92);
+        + SERVE_SITES * ATTEMPTS_PER_SERVE_SITE);
+      expect(observed).toBe(109);
       expect(observed).toBeLessThanOrEqual(ceiling);
+      // The ceiling is TIGHT: at the true maximum path it is spent exactly.
+      expect(ceiling).toBe(109);
 
       // (4) …and the DR-184-v2 ceiling for this exact topology would have been
       //     BREACHED by this same run. Without this arm, (3) is satisfiable by
@@ -438,17 +500,35 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
         * (JUDGE_MAX_ATTEMPTS + FINAL_RETRY_ATTEMPTS)
         + 2 * 4 * ORGAN_MAX_ATTEMPTS;
       expect(dr184v2Ceiling).toBe(88);
-      expect(ceiling).toBe(112);
       expect(observed).toBeGreaterThan(dr184v2Ceiling);
 
-      // (5) The envelope stands WITHIN at the terminal, read from the same run.
+      // (5) THE BOUNDARY, measured rather than assumed. This run spends the
+      //     envelope EXACTLY, and the envelope is exclusive on both sides:
+      //     `assertModelAttemptAllowed` refuses when `consumed >= max`
+      //     (packages/budget/src/index.ts:286) and `decideBudgetPressure`
+      //     reports WITHIN only while `consumed < max` (:167). So a run that
+      //     takes the true maximum path is allowed every one of its attempts —
+      //     nothing was refused, the run COMPLETED above — and then stands
+      //     EXHAUSTED at the terminal because there is nothing left.
+      //
+      //     A ceiling set exactly at the measured maximum therefore cannot also
+      //     leave a maximum-path run WITHIN at terminal. That is a real
+      //     consequence of the recomputed number, filed as F-S09-8, not a
+      //     defect this test can assert away. The flagship W12 run is a CLEAN
+      //     run (~28 attempts) and stays WITHIN with wide margin; the acceptance
+      //     proofs assert that separately.
       const envelopeState = await database.pool.query<{ value_json: unknown }>(
         `SELECT DISTINCT ON (kind) value_json
          FROM core.run_progress_event
          WHERE run_id=$1 AND kind='ENVELOPE_STATE' ORDER BY kind, at_seq DESC`,
         [runId]
       );
-      expect(envelopeState.rows[0]?.value_json).toBe("WITHIN");
+      expect(envelopeState.rows[0]?.value_json).toBe("EXHAUSTED");
+      expect(observed).toBe(ceiling);
+
+      // No call was REFUSED: the ledger holds no attempt beyond the ceiling and
+      // the run reached a terminal of its own accord.
+      expect(observed).toBeLessThanOrEqual(ceiling);
     } finally {
       await secondary.stop();
       await primary.stop();

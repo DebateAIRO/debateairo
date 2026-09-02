@@ -12,26 +12,36 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 /**
  * T17 — the cost envelope for the LIVE topology (goal-v4 285-295, F36).
  *
- * `DR-184-v2` counted two model sites per node and no synthesis loop. Three
- * legs of the shipped engine are missing from it, and each one is a MEASURED
- * call site, not an estimate:
+ * `DR-184-v2` counted no panel leg and billed the serve leg per recompose
+ * round. Two legs of the shipped engine were wrong, and BOTH were established
+ * by MEASUREMENT against a real ledger, not by reading call sites:
  *
- *  1. PANEL. `runNodePanel` (apps/runner/src/index.ts:1797) hands every
- *     configured maker to `runJudgePanel`, which skips the author
- *     (PRODUCER_GRADING_FORBIDDEN, packages/judgement/src/s04.ts:233) and calls
- *     the rest — `panelSize - 1` model calls for EVERY materialized node, roots
- *     (:2105) and children/exchange nodes (:2299) alike. v2 counts none.
- *  2. COOLDOWN SITES. `withCooldownRetry` (apps/runner/src/index.ts:250) spends
- *     `baseMaxAttempts` and THEN, on transport exhaustion, a whole second
- *     sequence of `baseMaxAttempts + finalRetryAttempts` (:288-299, :336). The
- *     worst case at an author or reviewer site is therefore
- *     `2 * judgeMaxAttempts + finalRetryAttempts`, not `judge + final`.
- *  3. SERVE LEG. T9 replaces the composition organs (COMPOSER + per-segment
- *     CONFORMANCE + post-compose R9) with the synthesizer/evaluator loop: one
- *     SYNTHESIZER call and one EVALUATOR call per round
- *     (packages/serve/src/synthesis.ts `runSynthesisLoop`). The two chains are
- *     mutually exclusive, so the serve leg is the MAXIMUM of the two — never
- *     their sum, which would be slack in both worlds.
+ *  1. PANEL — the one real undercount. `runNodePanel`
+ *     (apps/runner/src/index.ts:1797) hands every configured maker to
+ *     `runJudgePanel`, which skips the author (PRODUCER_GRADING_FORBIDDEN,
+ *     packages/judgement/src/s04.ts:233) and calls the rest — `panelSize - 1`
+ *     model calls for EVERY materialized node, roots (:2105) and
+ *     children/exchange nodes (:2299) alike. v2 counted this leg at ZERO.
+ *  2. SERVE — an OVER-count. `ENGINE_FIXED_ORGANS_PER_COMPOSITION` is
+ *     `1 + segmentCap + 1`, and multiplying it by `maxRecompose` bills a
+ *     post-compose R9 in every round. The chain
+ *     (packages/serve/src/index.ts:505-580) calls the composer and conformance
+ *     INSIDE the recompose loop but R9 ONCE AFTER it: 2 composers + 4
+ *     conformance + 1 R9 = SEVEN sites, not eight.
+ *
+ * PER-SITE ATTEMPTS ARE NOT A CORRECTION — v2 had them right. A cooldown-wrapped
+ * site spends `judgeMaxAttempts + finalRetryAttempts`, NOT two fresh sequences:
+ * `withCooldownRetry` runs two sequences but `createPostgresProviderGateway`
+ * (apps/runner/src/index.ts:3565-3577) counts attempts CUMULATIVELY per
+ * call-site key and passes `remaining = maxAttempts - consumed`, so the second
+ * sequence gets only the final retry. An earlier draft of this file asserted
+ * `2 * judgeMaxAttempts + finalRetryAttempts` and called it a second
+ * undercount; the ledger measured 4 where that predicted 7, and the claim is
+ * RETRACTED. Mutant M2b keeps it retracted.
+ *
+ * The serve chains are mutually exclusive — T9 replaces the composition organs
+ * with the synthesizer/evaluator loop — so the serve leg is the MAXIMUM of the
+ * two, never their sum.
  *
  * Every policy number below comes from T16's sealed `envelopeFormulaInputs`
  * row (packages/register/src/algorithm-policy.ts:241). Nothing here invents one.
@@ -98,11 +108,9 @@ function enumerateMaximumPathSites(
     }
   }
   /**
-   * A cooldown-wrapped site runs two sequences, but the gateway counts attempts
-   * CUMULATIVELY per call-site key (`remainingProviderAttempts`,
-   * apps/runner/src/index.ts:3565-3577), so the second sequence only gets the
-   * final-retry attempts that remain. Measured against a real ledger in
-   * tests/integration/t17-envelope-ledger.test.ts.
+   * Attempts are counted CUMULATIVELY per call-site key, so a cooldown-wrapped
+   * site's two sequences share ONE allowance — never two fresh ones.
+   * Measured at 4 in tests/integration/t17-envelope-ledger.test.ts.
    */
   const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
   for (const _nodeId of materializedNodeIds) {
@@ -116,9 +124,25 @@ function enumerateMaximumPathSites(
       sites.push({ kind: "REVIEW", worstCaseAttempts: cooldownSite });
     }
   }
-  const compositionSites = SEALED.maxRecompose * SEALED.fixedOrgansPerComposition;
+  /**
+   * The serve leg is WALKED, not multiplied: one composer plus one conformance
+   * per segment inside each recompose round, then ONE post-compose organ after
+   * the loop (packages/serve/src/index.ts:505-580). Deriving it as
+   * `maxRecompose * fixedOrgansPerComposition` is the over-count this lane
+   * removed, and copying that expression here would make this enumeration a
+   * restatement of the formula rather than a check on it.
+   */
+  const compositionSites: string[] = [];
+  for (let round = 1; round <= SEALED.maxRecompose; round += 1) {
+    compositionSites.push(`COMPOSER:${round}`);
+    for (let segment = 0; segment < SEALED.compositionSegmentCap; segment += 1) {
+      compositionSites.push(`CONFORMANCE:${round}:${segment}`);
+    }
+  }
+  // Once per RUN, keyed by the last round it followed (measured: POST_COMPOSE_R9:2).
+  compositionSites.push(`POST_COMPOSE_R9:${SEALED.maxRecompose}`);
   const synthesisLoopSites = SEALED.synthesizerMaxRounds + SEALED.evaluatorMaxRounds;
-  for (let site = 0; site < Math.max(compositionSites, synthesisLoopSites); site += 1) {
+  for (let site = 0; site < Math.max(compositionSites.length, synthesisLoopSites); site += 1) {
     sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts });
   }
   return Object.freeze(sites);
@@ -133,15 +157,16 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
   /**
    * F36's undercount, stated ARITHMETICALLY: at M=2, depth=1 the live engine
    * opens 8 author sites, 8 panel sites and 8 reviewer sites, and the maximum
-   * path spends 112 attempts. DR-184-v2 minted 88 on the same topology — this
-   * is the number the lane exists to repeal, named so the pin cannot silently
-   * drift back to it. The whole 24-attempt gap IS the panel leg (8 sites x 3
-   * attempts) that v2 counted at zero; v2's per-site attempt terms were right.
+   * path spends 109 attempts, measured from a real ledger. DR-184-v2 minted 88
+   * on the same topology. The gap is TWO corrections in opposite directions:
+   * +24 for the panel leg v2 counted at zero (8 sites x 3 attempts), and -3
+   * for the post-compose organ v2 billed once per recompose round instead of
+   * once per run. v2's per-site attempt terms were right.
    */
-  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 112 attempts, not 88", () => {
+  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 109 attempts, not 88", () => {
     const DR_184_V2_UNDERCOUNT = 88;
-    expect(enumerateMaximumPathAttempts(2, 1)).toBe(112);
-    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(112);
+    expect(enumerateMaximumPathAttempts(2, 1)).toBe(109);
+    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(109);
     expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts)
       .toBeGreaterThan(DR_184_V2_UNDERCOUNT);
   });
@@ -179,10 +204,10 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
 
   it("pins the recomputed grid and the bumped formula version", () => {
     const expected = [
-      [28, 28, 28, 28, 28],
-      [112, 200, 376, 728, 1432],
-      [234, 402, 738, 1410, 2754],
-      [432, 704, 1248, 2336, 4512]
+      [25, 25, 25, 25, 25],
+      [109, 197, 373, 725, 1429],
+      [231, 399, 735, 1407, 2751],
+      [429, 701, 1245, 2333, 4509]
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
@@ -196,9 +221,11 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
   it("discloses the four call-site legs on the receipt, panel attempts included", () => {
     const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
     // M=2, depth=1: 2 roots + 4 expansion children + 2 exchange nodes = 8 nodes.
-    expect(basis.call_sites).toEqual({ author: 8, panel: 8, reviewer: 8, serve: 8 });
+    expect(basis.call_sites).toEqual({ author: 8, panel: 8, reviewer: 8, serve: 7 });
     expect(basis.serve_leg).toEqual({
-      composition_sites: 8,
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
       synthesis_loop_sites: 6,
       selected: "COMPOSITION"
     });
@@ -208,17 +235,29 @@ describe("T17 · the ceiling covers the live topology's maximum path", () => {
   it("selects the synthesis loop once T9's retirement leaves fewer composition organs", () => {
     // After T9 the composition organs are retired; the loop is the only serve
     // chain left, and the leg must follow it rather than a dead constant.
-    const basis = computeStructuralCeilingBasis({
-      ...ceilingInput(2, 1),
-      maxRecompose: 1,
-      fixedOrgansPerComposition: 1
-    });
+    // One recompose round: 1 composer + 2 conformance + 1 post-compose = 4 < 6.
+    const basis = computeStructuralCeilingBasis({ ...ceilingInput(2, 1), maxRecompose: 1 });
     expect(basis.serve_leg).toEqual({
-      composition_sites: 1,
+      composition_sites: 4,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
       synthesis_loop_sites: 6,
       selected: "SYNTHESIS_LOOP"
     });
     expect(basis.call_sites).toEqual({ author: 8, panel: 8, reviewer: 8, serve: 6 });
+  });
+
+  it("refuses a sealed composition shape it has never measured", () => {
+    // The sealed row's `fixedOrgansPerComposition` must stay coherent with the
+    // decomposition (1 composer + segmentCap conformance + 1 post-compose), or
+    // the formula is costing a topology nobody counted.
+    expect(() => computeStructuralCeilingBasis({
+      ...ceilingInput(2, 1),
+      fixedOrgansPerComposition: 5
+    })).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",
+      code: "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT"
+    }));
   });
 
 });
@@ -227,7 +266,7 @@ describe("T17 · the receipt that carries the basis", () => {
   it("round-trips the recomputed basis through the run-head schema", () => {
     const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
     expect(parseCostEnvelopeBasis(basis)).toMatchObject({
-      maxModelAttempts: 112,
+      maxModelAttempts: 109,
       panelSize: 2,
       depth: 1
     });
@@ -313,7 +352,7 @@ describe("T17 · an over-bound input still refuses loudly at admission", () => {
 
   it("admits a lawful ask and pins the basis it admits it with", async () => {
     await expect(evaluateAskAdmission(settings(), ask)).resolves.toMatchObject({
-      envelopeBasis: { max_model_attempts: 112, formula_version: "DR-184-v3" }
+      envelopeBasis: { max_model_attempts: 109, formula_version: "DR-184-v3" }
     });
   });
 

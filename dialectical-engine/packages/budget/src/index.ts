@@ -59,6 +59,10 @@ const costEnvelopeBasisSchema = z.object({
   }).strict(),
   serve_leg: z.object({
     composition_sites: z.number().int().positive(),
+    /** Per ROUND: composer + one conformance per segment. */
+    composition_sites_per_round: z.number().int().positive(),
+    /** Per RUN: post-compose R9, outside the recompose loop. */
+    post_compose_sites_per_run: z.number().int().positive(),
     synthesis_loop_sites: z.number().int().positive(),
     selected: z.enum(["COMPOSITION", "SYNTHESIS_LOOP"])
   }).strict(),

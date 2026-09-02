@@ -106,13 +106,14 @@ describe("DR-184 review resilience mutation ledger", () => {
   });
 
   it("T5 pins the corrected per-site final-retry ceiling and formula version", () => {
-    // T17 (DR-184-v3): the grid moves because the ceiling now counts the panel
-    // leg and both provider sequences a cooldown site can spend.
+    // T17 (DR-184-v3): the grid moves for TWO measured reasons — the panel leg
+    // v2 counted at zero, and the post-compose organ v2 billed once per
+    // recompose round instead of once per run. Per-site attempts are unchanged.
     const expected = [
-      [28, 28, 28, 28, 28],
-      [112, 200, 376, 728, 1432],
-      [234, 402, 738, 1410, 2754],
-      [432, 704, 1248, 2336, 4512]
+      [25, 25, 25, 25, 25],
+      [109, 197, 373, 725, 1429],
+      [231, 399, 735, 1407, 2751],
+      [429, 701, 1245, 2333, 4509]
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
