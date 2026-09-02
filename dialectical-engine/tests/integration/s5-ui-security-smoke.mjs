@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -130,6 +130,32 @@ async function stopServer(child) {
     new Promise((resolveExit) => child.once("exit", resolveExit)),
     new Promise((_, reject) => setTimeout(() => reject(new Error("UI server did not stop")), 5_000))
   ]);
+}
+
+/**
+ * L3-F2: a raw Upgrade request for a path nothing serves must not leave the
+ * socket open. Resolves with the time to closure; rejects after the deadline.
+ */
+function probeOrphanUpgrade(port, deadlineMs) {
+  return new Promise((resolveClosed, reject) => {
+    const started = Date.now();
+    const socket = connect(port, "127.0.0.1");
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`orphan upgrade socket still open after ${deadlineMs} ms (L3-F2)`));
+    }, deadlineMs);
+    socket.once("error", () => {});
+    socket.once("close", () => {
+      clearTimeout(timer);
+      resolveClosed(Date.now() - started);
+    });
+    socket.once("connect", () => {
+      socket.write(
+        "GET /s5-nope HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+      );
+    });
+  });
 }
 
 /** C2 fail-closed: a wrong edge configuration must refuse to start, naming its code. */
@@ -261,7 +287,11 @@ async function smoke(surface) {
     assert.equal(image.status, 404, `${surface}: /_next/image is disabled`);
     await image.arrayBuffer();
 
-    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip PASS\n`);
+    // L3-F2: production has no WebSocket surface; an orphan upgrade closes.
+    const closedAfter = await probeOrphanUpgrade(port, 1_000);
+    process.stdout.write(`${surface}: orphan upgrade socket closed after ${closedAfter} ms\n`);
+
+    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip, upgrade teardown PASS\n`);
   } finally {
     await stopServer(child);
     await stubApi.stop();

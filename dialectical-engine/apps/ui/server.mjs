@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import next from "next";
 import { FALLBACK_CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
+import { acceptsUpgrade } from "./edge-upgrade.mjs";
 import { hardenIncomingProxyHeaders, parseTrustedProxies, readEdgeSecret } from "./trusted-client-ip.mjs";
 
 function refuse(code) {
@@ -43,6 +44,18 @@ const server = createServer((request, response) => {
 });
 server.on("upgrade", (request, socket, head) => {
   hardenIncomingProxyHeaders(request.headers, request.socket.remoteAddress, trustedProxies, edgeSecret);
+  // L3-F2: Next leaves an unmatched upgrade socket open forever; only what
+  // the edge knows it serves (dev HMR) is delegated, everything else dies here.
+  if (!acceptsUpgrade(development, request.url)) {
+    socket.destroy();
+    return;
+  }
   void upgrade(request, socket, head).catch(() => socket.destroy());
 });
+// L3-F2: the pre-request phases are bounded explicitly (Node's defaults,
+// stated). Deliberately no socket-inactivity timeout (server.timeout): the
+// proxied run event stream is SSE without a heartbeat and would be severed
+// mid-silence; orphaned upgrades are impossible after the gate above.
+server.headersTimeout = 60_000;
+server.requestTimeout = 300_000;
 server.listen(port, hostname);
