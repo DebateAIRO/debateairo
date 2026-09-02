@@ -237,6 +237,30 @@ describe("T17 · the receipt that carries the basis", () => {
       bounds_source_ref: "engine-exports+register"
     })).toThrow("The run head has no valid register-supplied cost-envelope basis");
   });
+
+  /**
+   * The v2 fixture above is refused for SEVERAL reasons at once, so on its own
+   * it pins only "some field is missing" — it survives a schema that quietly
+   * re-admits an incomplete `per_site_attempts`. Each disclosure field is
+   * therefore pinned INDIVIDUALLY: drop exactly one from an otherwise valid
+   * v3 basis and the run head must still refuse.
+   */
+  it.each([
+    "per_site_attempts.panel_member",
+    "per_site_attempts.cooldown_site",
+    "call_sites.panel",
+    "call_sites.reviewer",
+    "serve_leg.selected",
+    "serve_leg.synthesis_loop_sites"
+  ])("refuses a basis missing %s", (dottedPath) => {
+    const basis = structuredClone(
+      computeStructuralCeilingBasis(ceilingInput(2, 1)) as Record<string, Record<string, unknown>>
+    );
+    const [group, field] = dottedPath.split(".") as [string, string];
+    delete basis[group]![field];
+    expect(() => parseCostEnvelopeBasis(basis))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
 });
 
 describe("T17 · an over-bound input still refuses loudly at admission", () => {
