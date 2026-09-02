@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ConditionMarkRecordSchema } from "@debateai/contract";
+import { ConditionMarkRecordSchema, type NodeReview } from "@debateai/contract";
 import { assertUnjudgedDisclosureShape } from "@debateai/runner";
-import { assertRequiredConditionMarkRecords, type ConditionMarkRecord } from "@debateai/serve";
+import {
+  assertRequiredConditionMarkRecords,
+  type ConditionMarkRecord,
+  type StoredNodeReviewOutcome
+} from "@debateai/serve";
 
 /**
  * T6 r3 / J14 ADDENDUM (1) — the review arm admits ONLY `cannot-assess`, and it
@@ -147,5 +152,72 @@ describe("T6 r3 · the review-catch-up reader refuses a malformed disclosure (J1
     }
     expect(() => assertUnjudgedDisclosureShape("node:1", undefined))
       .toThrowError(expect.objectContaining({ code: "CATCH_UP_DISCLOSURE_MISMATCH" }));
+  });
+});
+
+/**
+ * T6 r4 / codex r2 B1 — the LEDGER's review vocabulary is three values, and the
+ * serve boundary that reads it must say so.
+ *
+ * r3 narrowed `review_outcome` to `"cannot-assess" | null` in TWO pg result
+ * generics in `packages/serve/src/index.ts`. One reads
+ * `serve.condition_mark.review_outcome`, whose CHECK this round narrowed to a
+ * single value — correct. The other reads `review.outcome` from
+ * `ledger.node_review`, whose CHECK (`migrations/0019_xrev01_node_review.sql:8`)
+ * still lawfully admits `agree | dispute | cannot-assess`. Runtime therefore put
+ * `"agree"` into a variable whose database-boundary type said that value was
+ * impossible, and a typed consumer could omit both live states and still
+ * compile: the exact HOMONYM the do-not-tidy guard exists to catch, committed by
+ * the same round that claimed to have avoided it.
+ *
+ * Two guards, because the defect had two halves — a wrong TYPE and a wrong
+ * PLACE:
+ *
+ *   1. the exhaustive switch below fails to compile if `StoredNodeReviewOutcome`
+ *      is ever narrowed (TS2678 on the unreachable `case`) or widened (TS2322 on
+ *      the `never`); and
+ *   2. the source assertion pins that exactly ONE narrowed review-outcome read
+ *      type exists in serve and that it is the condition-mark one — the count
+ *      is what tells a legitimate narrowing from a homonym, and no type can
+ *      express "in the right query".
+ */
+const nameEveryLawfulLedgerOutcome = (outcome: StoredNodeReviewOutcome): string => {
+  switch (outcome) {
+    case "agree": return "agree";
+    case "dispute": return "dispute";
+    case "cannot-assess": return "cannot-assess";
+    default: {
+      const unreachable: never = outcome;
+      return unreachable;
+    }
+  }
+};
+
+describe("T6 r4 · the serve boundary keeps the ledger's three-value review vocabulary (codex r2 B1)", () => {
+  it("keeps the ledger column and the contract's review enum the SAME set", () => {
+    // `readNodesForRun` assigns the ledger column straight into the contract's
+    // `NodeReview.outcome` at the projection, so a narrowing on either side is
+    // a lie on the other. Mutual assignability, checked by the compiler:
+    // narrow either and `true` stops being assignable to `false`.
+    type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+    const sameSet: MutuallyAssignable<StoredNodeReviewOutcome, NodeReview["outcome"]> = true;
+    expect(sameSet).toBe(true);
+  });
+
+  it("reaches every outcome the ledger CHECK admits", () => {
+    const lawful: readonly StoredNodeReviewOutcome[] = ["agree", "dispute", "cannot-assess"];
+    expect(lawful.map(nameEveryLawfulLedgerOutcome)).toEqual(["agree", "dispute", "cannot-assess"]);
+  });
+
+  it("narrows review_outcome in exactly ONE serve read — the condition-mark one, not the ledger one", () => {
+    const serveSource = readFileSync(
+      new URL("../../packages/serve/src/index.ts", import.meta.url), "utf8"
+    );
+    // The condition-mark disclosure read: narrowed at the READ because the
+    // column is narrowed at the WRITE. Exactly one such site may exist.
+    expect(serveSource.split('review_outcome: "cannot-assess" | null;').length - 1).toBe(1);
+    // The ledger read: named, so a future narrowing has to delete the name
+    // rather than quietly retype a column.
+    expect(serveSource.split("review_outcome: StoredNodeReviewOutcome | null;").length - 1).toBe(1);
   });
 });

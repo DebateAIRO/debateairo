@@ -24,6 +24,26 @@ import {
   type MemoryPullPolicy
 } from "@debateai/memory";
 
+/**
+ * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
+ *
+ * SOURCE OF TRUTH: the ledger's own CHECK,
+ * `migrations/0019_xrev01_node_review.sql:8`, which admits
+ * `agree | dispute | cannot-assess` and which no round of T6 has changed.
+ * `agree` and `dispute` are ordinary, LIVE states of a normally judged node.
+ *
+ * Named and exported so the invariant has somewhere to be asserted, because
+ * this column and `serve.condition_mark.review_outcome` are HOMONYMS: they
+ * share the words "review" and "outcome" and mean different things. The
+ * condition-mark column holds the single outcome that can be a REASON A NODE
+ * IS UNJUDGED, and J14's addendum narrowed it to `cannot-assess`. This one
+ * holds what a reviewer actually said. r3 retyped this column as if it were
+ * that one — the trap the do-not-tidy guard exists for — so the two now differ
+ * by name and not only by literal, and `tests/unit/t06-review-teeth.test.ts`
+ * pins that exactly one narrowed review-outcome read exists in this file.
+ */
+export type StoredNodeReviewOutcome = "agree" | "dispute" | "cannot-assess";
+
 export interface ServeNode {
   readonly nodeId: string;
   readonly text: string;
@@ -943,10 +963,19 @@ export interface UnjudgedReasonProvenance {
  * `ServeRepository.persist` stores, under a composite foreign key. A
  * mis-binding is therefore not merely refused, it is unspellable.
  *
- * Run inside the writer's OWN transaction, so the check and the insert cannot
- * be separated by a concurrent review write. J14's addendum (3) accepts this
- * atomic-writer guard, rather than a database trigger, as the floor for the
- * transport arm's cross-table negative.
+ * WHAT ACTUALLY SERIALISES THIS (codex r2 N1): not the transaction. A
+ * transaction alone would not stop a concurrent review INSERT landing between
+ * this negative SELECT and the condition-mark INSERT — READ COMMITTED simply
+ * would not see it. The exclusion comes from the exclusive per-run content
+ * lease: `ServeRepository.persist` wraps its whole body in
+ * `withRunContentLease(pool, [runId], …)`, and so does
+ * `recordReviewWithMeasurements`, the ONLY production writer of
+ * `ledger.node_review`. Both take the same `pg_advisory_lock` on that run, so
+ * they cannot interleave at all. The transaction supplies ATOMICITY of the
+ * marks with the answer; the lease supplies the MUTUAL EXCLUSION this guard
+ * depends on. That is the floor J14's addendum (3) accepts in place of a
+ * database trigger — and it holds only while the review writer keeps taking
+ * the lease, which is why it is named here rather than left implicit.
  *
  * Marks outside class H/D carry no unjudged reason and are passed through
  * untouched — a HIDDEN-LOW-SCORE row names a threshold, not a review, and its
@@ -2161,10 +2190,10 @@ export class ServeRepository {
       model_version: string | null;
       provider: string | null;
       provider_ref: string | null;
-      // T6 / J14 ADDENDUM (1): narrowed at the READ because the column is
-      // narrowed at the WRITE — `condition_mark_review_outcome_check` admits
-      // only `cannot-assess` in this arm, VALID over the existing rows.
-      review_outcome: "cannot-assess" | null;
+      // T6 r4: `review.outcome` from `ledger.node_review` — the reviewer's own
+      // verdict, whose CHECK admits all three outcomes. NOT the condition-mark
+      // disclosure column narrowed below; see `StoredNodeReviewOutcome`.
+      review_outcome: StoredNodeReviewOutcome | null;
       review_reasons: string[] | null;
       node_review_id: string | null;
       review_content_ciphertext: CryptoEnvelope | null;

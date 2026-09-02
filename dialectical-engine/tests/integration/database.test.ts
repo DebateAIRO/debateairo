@@ -2815,6 +2815,23 @@ describe("apps/runner — legal command lifecycle", () => {
       review_node_ref: derivedNodeId
     }]);
 
+    // T6 r4 / codex r2 B1 — the node projection reports the LEDGER's own
+    // review vocabulary, not the narrowed disclosure one. This run stores
+    // `agree`, `dispute` AND `cannot-assess` reviews, so a served node must be
+    // able to carry a live judged verdict. r3 typed that column as
+    // `"cannot-assess" | null` at the serve boundary while runtime kept putting
+    // `agree` through it; this asserts the value the type was lying about.
+    const projectedReviewOutcomes = new Set(
+      (scenario.answer?.nodes ?? [])
+        .map((node) => node.review?.outcome)
+        .filter((outcome): outcome is NonNullable<typeof outcome> => outcome !== undefined)
+    );
+    expect(projectedReviewOutcomes.size).toBeGreaterThan(0);
+    for (const outcome of projectedReviewOutcomes) {
+      expect(["agree", "dispute", "cannot-assess"]).toContain(outcome);
+    }
+    expect([...projectedReviewOutcomes].some((outcome) => outcome !== "cannot-assess")).toBe(true);
+
     // Class D SERVES — that is the whole difference from class H. The node
     // still carries a final strength and is not excluded from the number.
     expect(scenario.answer?.nodes.find((node) => node.node_id === derivedNodeId)?.final_strength)
