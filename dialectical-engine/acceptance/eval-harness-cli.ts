@@ -138,8 +138,13 @@ export async function main(argv: readonly string[]): Promise<EvalHarnessOutcome 
     const dependencies: EvalHarnessDependencies = {
       emit,
       readSynthesisRoleControls: async () => readSynthesisRoleControls(pool, ACCEPTANCE_REGISTER_VERSION),
-      readConfiguredProviderRefs: async () => Object.freeze(
-        (await readAcceptanceRuntimePolicy(pool)).providers.map((provider) => provider.providerRef)
+      // The maker travels WITH the ref, off the same sealed configuredProviderSet
+      // row, so same-family provenance needs no second register read (V-S11-1).
+      readConfiguredProviders: async () => Object.freeze(
+        (await readAcceptanceRuntimePolicy(pool)).providers.map((provider) => Object.freeze({
+          providerRef: provider.providerRef,
+          maker: provider.maker
+        }))
       ),
       readRecordedDebates: async () =>
         readRecordedDebatesFrom(pool, EVAL_HARNESS_MATRIX.recordedDebateCount),

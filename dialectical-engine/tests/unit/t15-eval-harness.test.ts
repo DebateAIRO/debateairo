@@ -4,6 +4,12 @@ import {
   EVAL_HARNESS_MATRIX,
   EVAL_HARNESS_SPEND,
   GRADER_REQUEST_KEYS,
+  BLIND_GRADING_DEGRADED_MARK,
+  GRADER_IS_CANDIDATE_EVALUATOR_MARK,
+  GRADER_IS_CANDIDATE_SYNTHESIZER_MARK,
+  GRADER_REPEATS_IDENTITY_MARK,
+  GRADER_SET_VARIES_BY_CONFIG_MARK,
+  GRADER_SHARES_CANDIDATE_FAMILY_MARK,
   assignBlindGraders,
   buildGraderRequest,
   deriveCandidateConfigs,
@@ -12,7 +18,9 @@ import {
   renderProjection,
   resolveRoundCap,
   runEvalHarness,
+  summariseGradingProvenance,
   type CandidateRoleConfig,
+  type ConfiguredProviderIdentity,
   type EvalHarnessDependencies,
   type RecordedDebate
 } from "../../acceptance/eval-harness.js";
@@ -31,15 +39,24 @@ import {
  * identity, which no deployment seals today, so it appears only as a fixture.
  */
 
-/** The three identities the acceptance deployment actually seals. */
-const ACCEPTANCE_SEALED_REFS = Object.freeze([
-  "acceptance:codex-cli",
-  "acceptance:claude-cli",
-  "acceptance:grok-cli"
+/**
+ * The three identities the acceptance deployment actually seals, with the maker
+ * each one belongs to — both read off the same sealed configuredProviderSet row
+ * (acceptance/seed-register.ts, anchor proven unique in the citation record).
+ */
+const ACCEPTANCE_SEALED: readonly ConfiguredProviderIdentity[] = Object.freeze([
+  Object.freeze({ providerRef: "acceptance:codex-cli", maker: "OpenAI" }),
+  Object.freeze({ providerRef: "acceptance:claude-cli", maker: "Anthropic" }),
+  Object.freeze({ providerRef: "acceptance:grok-cli", maker: "xAI" })
 ]);
+const ACCEPTANCE_SEALED_REFS = Object.freeze(ACCEPTANCE_SEALED.map((identity) => identity.providerRef));
 
-/** A four-identity deployment: the smallest set the goal's matrix can run on. */
-const FOUR_IDENTITY_REFS = Object.freeze([...ACCEPTANCE_SEALED_REFS, "acceptance:fourth-cli"]);
+/** A four-identity deployment: the smallest set that seats two INDEPENDENT graders. */
+const FOUR_IDENTITY: readonly ConfiguredProviderIdentity[] = Object.freeze([
+  ...ACCEPTANCE_SEALED,
+  Object.freeze({ providerRef: "acceptance:fourth-cli", maker: "Mistral" })
+]);
+const FOUR_IDENTITY_REFS = Object.freeze(FOUR_IDENTITY.map((identity) => identity.providerRef));
 
 const SEALED_CONTROLS = Object.freeze({
   registerVersion: 7,
@@ -90,7 +107,7 @@ function spyingDependencies(overrides: Partial<EvalHarnessDependencies> = {}): {
   const dependencies: EvalHarnessDependencies = {
     emit: (line) => { emitted.push(line); },
     readSynthesisRoleControls: async () => SEALED_CONTROLS,
-    readConfiguredProviderRefs: async () => FOUR_IDENTITY_REFS,
+    readConfiguredProviders: async () => FOUR_IDENTITY,
     readRecordedDebates: async () => recordedDebates(EVAL_HARNESS_MATRIX.recordedDebateCount),
     resolveSynthesisSurface: () => ({
       synthesize: async (request) => {
@@ -157,7 +174,12 @@ describe("T15 · the goal's exact matrix and its projected call count", () => {
       tokenCeilingPerCall: 2_048
     }));
     expect(lines).toContain("matrix: 5 recorded debates x 3 candidate role configs x <=2 evaluator rounds");
-    expect(lines).toContain("blind graders per cell: 2 (never the candidate)");
+    // V-S11-1 removed the unconditional promise: a grader MAY be a candidate identity on a
+    // short deployment, so the projection may not claim otherwise.
+    expect(lines).toContain(
+      "blind graders per cell: 2 (independent of the candidate where the deployment allows; "
+      + "any shortfall is disclosed below)"
+    );
     expect(lines).toContain("per-call max attempts: 2");
     expect(lines).toContain("per-call token ceiling: 2048");
     expect(lines).toContain("projected provider calls (nominal): 90");
@@ -185,7 +207,9 @@ describe("T15 · the spend gate (DoD: projected-count output test)", () => {
     const projectionIndex = emitted.findIndex((line) => line.startsWith("projected provider calls (worst case):"));
     const refusalIndex = emitted.findIndex((line) => line.includes("EVAL_HARNESS_NOT_APPROVED"));
     expect(projectionIndex).toBe(6);
-    expect(refusalIndex).toBe(8);
+    // 8 is the GRADER-SET-VARIES-BY-CONFIG disclosure: even on four identities C3 draws a
+    // different independent pair than C1/C2, so the arms are not graded by one panel.
+    expect(refusalIndex).toBe(9);
   });
 
   test("WITH explicit approval it does not refuse — the gate is a gate, not a wall", async () => {
@@ -205,7 +229,7 @@ describe("T15 · the spend gate (DoD: projected-count output test)", () => {
   });
 });
 
-describe("T15 · blind grading by graders that are never the candidate", () => {
+describe("T15 · blind grading DEGRADES WITH DISCLOSURE, it never hard-refuses (V-S11-1)", () => {
   const candidate: CandidateRoleConfig = Object.freeze({
     configId: "C1",
     synthesizerRoleRef: "acceptance:codex-cli",
@@ -213,19 +237,80 @@ describe("T15 · blind grading by graders that are never the candidate", () => {
     baseline: true
   });
 
-  test("exactly two graders, and neither is either of the candidate's role refs", () => {
-    const graders = assignBlindGraders({ candidate, graderPoolRefs: FOUR_IDENTITY_REFS, gradersPerCell: 2 });
-    expect(graders).toEqual(["acceptance:fourth-cli", "acceptance:grok-cli"]);
-    expect(graders).not.toContain(candidate.synthesizerRoleRef);
-    expect(graders).not.toContain(candidate.evaluatorRoleRef);
+  test("with enough identities: two INDEPENDENT seats, nothing degraded, no mark", () => {
+    const assignment = assignBlindGraders({ candidate, graderPool: FOUR_IDENTITY, gradersPerCell: 2 });
+    expect(assignment.seats).toEqual([
+      { graderRoleRef: "acceptance:fourth-cli", relation: "INDEPENDENT", repeatOfEarlierSeat: false },
+      { graderRoleRef: "acceptance:grok-cli", relation: "INDEPENDENT", repeatOfEarlierSeat: false }
+    ]);
+    expect(assignment.degraded).toBe(false);
+    expect(assignment.marks).toEqual([]);
+    expect(assignment.sameModelAsCandidate).toBe(false);
+    expect(assignment.sameFamilyAsCandidate).toBe(false);
   });
 
-  test("the REAL three-identity acceptance deployment cannot supply two, and says so loudly", () => {
-    expectRefusalCode(() => assignBlindGraders({
+  test("the REAL three-identity deployment RUNS on a repeated independent grader and discloses it", () => {
+    const assignment = assignBlindGraders({ candidate, graderPool: ACCEPTANCE_SEALED, gradersPerCell: 2 });
+    // V-S11-1: "graded by another AI" is preserved for BOTH seats by repeating the one
+    // independent identity, rather than seating a member of the candidate config.
+    expect(assignment.seats).toEqual([
+      { graderRoleRef: "acceptance:grok-cli", relation: "INDEPENDENT", repeatOfEarlierSeat: false },
+      { graderRoleRef: "acceptance:grok-cli", relation: "INDEPENDENT", repeatOfEarlierSeat: true }
+    ]);
+    expect(assignment.degraded).toBe(true);
+    expect(assignment.marks).toEqual([BLIND_GRADING_DEGRADED_MARK, GRADER_REPEATS_IDENTITY_MARK]);
+    expect(assignment.sameModelAsCandidate).toBe(false);
+    expect(assignment.sameFamilyAsCandidate).toBe(false);
+    expect(assignment.disclosure).toBe(
+      "C1: 2 grader seats filled from 1 distinct identity that is not the candidate's; "
+      + "the two grades are fresh instances of the same model and are not independent of each other"
+    );
+  });
+
+  test("ONE model available: the candidate's own identities grade it, evaluator seated before author", () => {
+    // V-S11-1 verbatim in intent: "if only one model is available the whole debate runs on one
+    // model; that is a legitimate configuration, not a failure state."
+    const assignment = assignBlindGraders({
       candidate,
-      graderPoolRefs: ACCEPTANCE_SEALED_REFS,
+      graderPool: ACCEPTANCE_SEALED.filter((identity) => identity.providerRef !== "acceptance:grok-cli"),
       gradersPerCell: 2
-    }), "EVAL_BLIND_GRADER_POOL_INSUFFICIENT");
+    });
+    expect(assignment.seats).toEqual([
+      { graderRoleRef: "acceptance:claude-cli", relation: "CANDIDATE_EVALUATOR", repeatOfEarlierSeat: false },
+      { graderRoleRef: "acceptance:codex-cli", relation: "CANDIDATE_SYNTHESIZER", repeatOfEarlierSeat: false }
+    ]);
+    expect(assignment.degraded).toBe(true);
+    expect(assignment.marks).toEqual([
+      BLIND_GRADING_DEGRADED_MARK,
+      GRADER_IS_CANDIDATE_EVALUATOR_MARK,
+      GRADER_IS_CANDIDATE_SYNTHESIZER_MARK,
+      GRADER_SHARES_CANDIDATE_FAMILY_MARK
+    ]);
+    expect(assignment.sameModelAsCandidate).toBe(true);
+    expect(assignment.sameFamilyAsCandidate).toBe(true);
+  });
+
+  test("a grader sharing the candidate's MAKER but not its identity is disclosed as same-family", () => {
+    const twoOpenAi: readonly ConfiguredProviderIdentity[] = Object.freeze([
+      Object.freeze({ providerRef: "acceptance:codex-cli", maker: "OpenAI" }),
+      Object.freeze({ providerRef: "acceptance:claude-cli", maker: "Anthropic" }),
+      Object.freeze({ providerRef: "acceptance:codex-two", maker: "OpenAI" })
+    ]);
+    const assignment = assignBlindGraders({ candidate, graderPool: twoOpenAi, gradersPerCell: 2 });
+    expect(assignment.seats.map((seat) => seat.graderRoleRef)).toEqual([
+      "acceptance:codex-two",
+      "acceptance:codex-two"
+    ]);
+    expect(assignment.sameModelAsCandidate).toBe(false);
+    expect(assignment.sameFamilyAsCandidate).toBe(true);
+    expect(assignment.marks).toContain(GRADER_SHARES_CANDIDATE_FAMILY_MARK);
+  });
+
+  test("an EMPTY pool is an absence, not a degradation, and still refuses loudly", () => {
+    expectRefusalCode(
+      () => assignBlindGraders({ candidate, graderPool: [], gradersPerCell: 2 }),
+      "EVAL_BLIND_GRADER_POOL_EMPTY"
+    );
   });
 
   test("the grader request is BLIND: its key set carries no config or author identity", () => {
@@ -239,6 +324,41 @@ describe("T15 · blind grading by graders that are never the candidate", () => {
     expect(JSON.stringify(request)).not.toContain("C1");
     expect(JSON.stringify(request)).not.toContain(candidate.synthesizerRoleRef);
     expect(JSON.stringify(request)).not.toContain(candidate.evaluatorRoleRef);
+  });
+});
+
+describe("T15 · run-level grading provenance", () => {
+  test("configs that draw DIFFERENT grader sets confound the comparison, and that is disclosed", () => {
+    // Measured, not assumed: on the sealed three, C1/C2 leave grok independent while C3
+    // leaves codex, so the three arms are not graded by the same panel.
+    const configs = deriveCandidateConfigs({
+      sealed: SEALED_CONTROLS,
+      configuredProviderRefs: ACCEPTANCE_SEALED_REFS,
+      candidateConfigCount: 3
+    });
+    const assignments = configs.map((candidate) =>
+      assignBlindGraders({ candidate, graderPool: ACCEPTANCE_SEALED, gradersPerCell: 2 }));
+    const summary = summariseGradingProvenance(assignments);
+    expect(summary.graderSetsByConfig).toEqual({
+      C1: ["acceptance:grok-cli", "acceptance:grok-cli"],
+      C2: ["acceptance:grok-cli", "acceptance:grok-cli"],
+      C3: ["acceptance:codex-cli", "acceptance:codex-cli"]
+    });
+    expect(summary.marks).toContain(GRADER_SET_VARIES_BY_CONFIG_MARK);
+    expect(summary.anyDegraded).toBe(true);
+  });
+
+  test("one shared, fully independent panel across every config raises no run-level mark", () => {
+    const configs = deriveCandidateConfigs({
+      sealed: SEALED_CONTROLS,
+      configuredProviderRefs: FOUR_IDENTITY_REFS,
+      candidateConfigCount: 1
+    });
+    const assignments = configs.map((candidate) =>
+      assignBlindGraders({ candidate, graderPool: FOUR_IDENTITY, gradersPerCell: 2 }));
+    const summary = summariseGradingProvenance(assignments);
+    expect(summary.marks).toEqual([]);
+    expect(summary.anyDegraded).toBe(false);
   });
 });
 
@@ -289,15 +409,40 @@ describe("T15 · the harness reads sealed identities and refuses loudly when rea
     expect(outcome.providerCallsMade).toBe(0);
   });
 
-  test("the real three-identity deployment refuses the whole run, spending nothing", async () => {
+  test("the real three-identity deployment RUNS, and emits the degradation marks BEFORE the gate", async () => {
+    // V-S11-1: a short grader pool is a degradation to disclose, never a stop. The marks are
+    // emitted during the FREE preflight, so V reads what was compromised alongside the count
+    // it is being asked to approve — a disclosure that arrives after approval discloses nothing.
+    const { dependencies, calls, emitted } = spyingDependencies({
+      readConfiguredProviders: async () => ACCEPTANCE_SEALED
+    });
+    const unapproved = await runEvalHarness({ approved: false }, dependencies);
+    expect(unapproved.decision).toBe("REFUSED_AWAITING_APPROVAL");
+    expect(calls).toEqual([]);
+    const markIndex = emitted.findIndex((line) => line.includes(BLIND_GRADING_DEGRADED_MARK));
+    const gateIndex = emitted.findIndex((line) => line.includes("EVAL_HARNESS_NOT_APPROVED"));
+    expect(markIndex).toBeGreaterThan(-1);
+    expect(gateIndex).toBeGreaterThan(markIndex);
+    expect(emitted).toContain(
+      `CONDITION MARK ${BLIND_GRADING_DEGRADED_MARK} · C1: 2 grader seats filled from 1 distinct `
+      + "identity that is not the candidate's; the two grades are fresh instances of the same "
+      + "model and are not independent of each other"
+    );
+    expect(unapproved.gradingProvenance.marks).toContain(GRADER_SET_VARIES_BY_CONFIG_MARK);
+  });
+
+  test("approved, the three-identity deployment grades every cell rather than refusing", async () => {
     const { dependencies, calls } = spyingDependencies({
-      readConfiguredProviderRefs: async () => ACCEPTANCE_SEALED_REFS
+      readConfiguredProviders: async () => ACCEPTANCE_SEALED
     });
     const outcome = await runEvalHarness({ approved: true }, dependencies);
-    expect(outcome.decision).toBe("REFUSED_MATRIX_UNSATISFIABLE");
-    expect(outcome.refusalCode).toBe("EVAL_BLIND_GRADER_POOL_INSUFFICIENT");
-    expect(calls).toEqual([]);
-    expect(outcome.providerCallsMade).toBe(0);
+    expect(outcome.decision).toBe("PROCEEDED");
+    expect(outcome.refusalCode).toBe(null);
+    // 5 debates x 3 configs x (1 synthesizer + 1 evaluator + 2 graders); the doubles satisfy
+    // the evaluator on round 1, so each cell spends one round.
+    expect(outcome.providerCallsMade).toBe(60);
+    expect(calls.filter((call) => call.startsWith("GRADER:"))).toHaveLength(30);
+    expect(outcome.cells).toHaveLength(30);
   });
 
   test("an absent T9 synthesis surface refuses loudly instead of grading nothing", async () => {
@@ -311,18 +456,21 @@ describe("T15 · the harness reads sealed identities and refuses loudly when rea
 });
 
 describe("T15b · the comparison table that routes to V", () => {
+  const configs = deriveCandidateConfigs({
+    sealed: SEALED_CONTROLS,
+    configuredProviderRefs: FOUR_IDENTITY_REFS,
+    candidateConfigCount: 3
+  });
+  const assignments = configs.map((candidate) =>
+    assignBlindGraders({ candidate, graderPool: FOUR_IDENTITY, gradersPerCell: 2 }));
+
   test("one row per candidate config, and an ungraded cell says so instead of showing a number", () => {
-    const configs = deriveCandidateConfigs({
-      sealed: SEALED_CONTROLS,
-      configuredProviderRefs: FOUR_IDENTITY_REFS,
-      candidateConfigCount: 3
-    });
-    const table = renderComparisonTable({ configs, cells: [] });
+    const table = renderComparisonTable({ configs, assignments, cells: [] });
     const rows = table.filter((line) => line.startsWith("| C"));
-    // Mutant m8 survived a `toContain("UNGRADED")` row check: the GRADES column
-    // still said UNGRADED while the SCORE column rendered NaN, and "somewhere in
-    // this row is the word UNGRADED" cannot tell those apart. The row is the
-    // artifact V reads, so the row is what the assertion pins.
+    // Mutant m8 survived a `toContain("UNGRADED")` row check: the GRADES column still said
+    // UNGRADED while the SCORE column rendered NaN, and "somewhere in this row is the word
+    // UNGRADED" cannot tell those apart. The row is the artifact V reads, so the row is what
+    // the assertion pins.
     expect(rows).toEqual([
       "| C1 | acceptance:codex-cli | acceptance:claude-cli | baseline (currently sealed) | UNGRADED | UNGRADED |",
       "| C2 | acceptance:claude-cli | acceptance:codex-cli | candidate | UNGRADED | UNGRADED |",
@@ -332,13 +480,9 @@ describe("T15b · the comparison table that routes to V", () => {
   });
 
   test("a graded cell shows its mean and the count it was computed from", () => {
-    const configs = deriveCandidateConfigs({
-      sealed: SEALED_CONTROLS,
-      configuredProviderRefs: FOUR_IDENTITY_REFS,
-      candidateConfigCount: 3
-    });
     const table = renderComparisonTable({
       configs,
+      assignments,
       cells: [
         { configId: "C1", debateRef: "run-1", graderRoleRef: "acceptance:grok-cli", score: 4 },
         { configId: "C1", debateRef: "run-1", graderRoleRef: "acceptance:fourth-cli", score: 2 }
@@ -350,5 +494,63 @@ describe("T15b · the comparison table that routes to V", () => {
     expect(table.find((line) => line.startsWith("| C2 "))).toBe(
       "| C2 | acceptance:claude-cli | acceptance:codex-cli | candidate | UNGRADED | UNGRADED |"
     );
+  });
+
+  // The sealed-three deployment, whose configs and grader pool must come from the SAME
+  // deployment — deriving configs from four identities and grading them against three
+  // describes a deployment that does not exist, and the first draft of this test did.
+  const sealedThreeConfigs = deriveCandidateConfigs({
+    sealed: SEALED_CONTROLS,
+    configuredProviderRefs: ACCEPTANCE_SEALED_REFS,
+    candidateConfigCount: 3
+  });
+  const sealedThreeAssignments = sealedThreeConfigs.map((candidate) =>
+    assignBlindGraders({ candidate, graderPool: ACCEPTANCE_SEALED, gradersPerCell: 2 }));
+
+  test("THE PROVENANCE TABLE names which identity filled which role, per config", () => {
+    // V-S11-1: "same-model provenance is RECORDED, never hidden". A table that reports a score
+    // without saying who produced and who graded it cannot support the role decision it exists
+    // to inform.
+    const table = renderComparisonTable({
+      configs: sealedThreeConfigs,
+      assignments: sealedThreeAssignments,
+      cells: []
+    });
+    const rows = table.filter((line) => line.startsWith("| prov C"));
+    expect(rows).toEqual([
+      "| prov C1 | synthesizer acceptance:codex-cli | evaluator acceptance:claude-cli "
+        + "| graders acceptance:grok-cli (INDEPENDENT), acceptance:grok-cli (INDEPENDENT, repeat) "
+        + "| same-model no | same-family no |",
+      "| prov C2 | synthesizer acceptance:claude-cli | evaluator acceptance:codex-cli "
+        + "| graders acceptance:grok-cli (INDEPENDENT), acceptance:grok-cli (INDEPENDENT, repeat) "
+        + "| same-model no | same-family no |",
+      "| prov C3 | synthesizer acceptance:claude-cli | evaluator acceptance:grok-cli "
+        + "| graders acceptance:codex-cli (INDEPENDENT), acceptance:codex-cli (INDEPENDENT, repeat) "
+        + "| same-model no | same-family no |"
+    ]);
+  });
+
+  test("the table carries every condition mark the run raised, and says a clean run raised none", () => {
+    const table = renderComparisonTable({
+      configs: sealedThreeConfigs,
+      assignments: sealedThreeAssignments,
+      cells: []
+    });
+    expect(table).toContain(`CONDITION MARKS: ${BLIND_GRADING_DEGRADED_MARK}, `
+      + `${GRADER_REPEATS_IDENTITY_MARK}, ${GRADER_SET_VARIES_BY_CONFIG_MARK}`);
+
+    // A single fully independent arm is the only shape that raises nothing at all.
+    const oneCleanConfig = deriveCandidateConfigs({
+      sealed: SEALED_CONTROLS,
+      configuredProviderRefs: FOUR_IDENTITY_REFS,
+      candidateConfigCount: 1
+    });
+    const clean = renderComparisonTable({
+      configs: oneCleanConfig,
+      assignments: oneCleanConfig.map((candidate) =>
+        assignBlindGraders({ candidate, graderPool: FOUR_IDENTITY, gradersPerCell: 2 })),
+      cells: []
+    });
+    expect(clean).toContain("CONDITION MARKS: none — every cell was graded by two independent identities");
   });
 });
