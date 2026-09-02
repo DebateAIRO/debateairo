@@ -58,7 +58,8 @@ describe("S13 / cross-run memory architecture", () => {
 
     const candidatePrepare = evaluate.indexOf("prepareLeasedContentEncryptionForRun");
     const candidateTransaction = evaluate.indexOf("withWriteTransaction");
-    const candidateLock = evaluate.indexOf("FOR UPDATE", candidateTransaction);
+    // pin updated 2026-09-02: the inline FOR UPDATE candidate lock became core.lock_owned_live_runs (migration 0040, FOR UPDATE inside the function) (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    const candidateLock = evaluate.indexOf("core.lock_owned_live_runs", candidateTransaction);
     const candidateOwner = evaluate.indexOf("core.run_is_owned_by", candidateLock);
     const candidateFetch = evaluate.indexOf("const candidateRows = await client.query", candidateOwner);
     const candidateDecrypt = evaluate.indexOf("decryptLeasedContentForRun", candidateFetch);
@@ -75,7 +76,8 @@ describe("S13 / cross-run memory architecture", () => {
     const finalTransaction = record.indexOf("await withWriteTransaction");
     const finalCallback = record.indexOf("async (client) =>", finalTransaction);
     const sortedRunIds = record.indexOf("[input.key.runId, selected.priorRunId].sort()", finalCallback);
-    const finalLock = record.indexOf("ORDER BY run_id FOR UPDATE", sortedRunIds);
+    // pin updated 2026-09-02: the final sorted-run lock is core.lock_owned_live_runs (ORDER BY run_id FOR UPDATE inside the function) (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    const finalLock = record.indexOf("core.lock_owned_live_runs", sortedRunIds);
     const sourceOwner = record.indexOf("core.run_is_owned_by", finalLock);
     const selectedOwner = record.indexOf("core.run_is_owned_by", sourceOwner + 1);
     const firstWrite = record.indexOf("INSERT INTO memory.question_key", selectedOwner);
