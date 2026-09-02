@@ -306,6 +306,36 @@ describe("T15 · blind grading DEGRADES WITH DISCLOSURE, it never hard-refuses (
     expect(assignment.marks).toContain(GRADER_SHARES_CANDIDATE_FAMILY_MARK);
   });
 
+  test("EXACTLY ONE identity available: it grades its own statement, and every seat is disclosed", () => {
+    // This is V-S11-1's headline case, verbatim in intent: "if only one model is available, the
+    // whole debate runs on that one model; that is a legitimate configuration, not a failure
+    // state." Mutant m10 survived the first r2 campaign precisely because nothing pinned the
+    // boundary at one identity — the centre of the ruling was unasserted.
+    const assignment = assignBlindGraders({
+      candidate,
+      graderPool: [{ providerRef: "acceptance:codex-cli", maker: "OpenAI" }],
+      gradersPerCell: 2
+    });
+    expect(assignment.seats).toEqual([
+      { graderRoleRef: "acceptance:codex-cli", relation: "CANDIDATE_SYNTHESIZER", repeatOfEarlierSeat: false },
+      { graderRoleRef: "acceptance:codex-cli", relation: "CANDIDATE_SYNTHESIZER", repeatOfEarlierSeat: true }
+    ]);
+    expect(assignment.degraded).toBe(true);
+    expect(assignment.sameModelAsCandidate).toBe(true);
+    expect(assignment.sameFamilyAsCandidate).toBe(true);
+    expect(assignment.marks).toEqual([
+      BLIND_GRADING_DEGRADED_MARK,
+      GRADER_REPEATS_IDENTITY_MARK,
+      GRADER_IS_CANDIDATE_SYNTHESIZER_MARK,
+      GRADER_SHARES_CANDIDATE_FAMILY_MARK
+    ]);
+    expect(assignment.disclosure).toBe(
+      "C1: the candidate's own identities grade it — acceptance:codex-cli as CANDIDATE_SYNTHESIZER, "
+      + "acceptance:codex-cli as CANDIDATE_SYNTHESIZER; each seat is a fresh instance under its own "
+      + "grading prompt, and the grade is not independent of the configuration it scores"
+    );
+  });
+
   test("an EMPTY pool is an absence, not a degradation, and still refuses loudly", () => {
     expectRefusalCode(
       () => assignBlindGraders({ candidate, graderPool: [], gradersPerCell: 2 }),
