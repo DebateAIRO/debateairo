@@ -140,6 +140,14 @@ export class CryptoCustodyError extends CryptoError {
   }
 }
 
+/** The handle's master copy has been zeroed; it can never be revived. */
+export class KekDestroyedError extends CryptoError {
+  constructor() {
+    super("KEK_DESTROYED", "KEK_DESTROYED");
+    this.name = "KekDestroyedError";
+  }
+}
+
 class CryptoInputError extends CryptoError {
   constructor(code:
     | "CRYPTO_AAD_INVALID"
@@ -159,13 +167,18 @@ export interface KekHandle {
 }
 
 const kekMaterials = new WeakMap<KekHandle, Buffer>();
+const destroyedKekHandles = new WeakSet<KekHandle>();
 
+/**
+ * L2-F7: `Buffer.from` of a 32-byte source is served from Node's shared 8 KiB
+ * pool slab, so a key copy sits adjacent to unrelated allocations and survives
+ * in the slab after the copy is dropped. `allocUnsafeSlow` gives this key its
+ * own exactly-sized allocation, which `fill(0)` can then actually erase.
+ */
 function copyKey(material: Uint8Array): Buffer {
-  const key = Buffer.from(material);
-  if (key.byteLength !== KEY_BYTES) {
-    key.fill(0);
-    throw new CryptoInputError("CRYPTO_KEY_INVALID");
-  }
+  if (material.byteLength !== KEY_BYTES) throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  const key = Buffer.allocUnsafeSlow(KEY_BYTES);
+  key.set(material);
   return key;
 }
 
@@ -178,8 +191,26 @@ function makeKekHandle(material: Uint8Array): KekHandle {
 
 function readKek(handle: KekHandle): Buffer {
   const material = kekMaterials.get(handle);
-  if (material === undefined) throw new KekUnresolvedError();
-  return Buffer.from(material);
+  if (material === undefined) {
+    // A destroyed handle is a shutdown-ordering fault, not a missing config.
+    if (destroyedKekHandles.has(handle)) throw new KekDestroyedError();
+    throw new KekUnresolvedError();
+  }
+  return copyKey(material);
+}
+
+/**
+ * Zeroes the KEK master copy and forgets the handle (L2-F7). Idempotent, so the
+ * shutdown lifecycle may run it on both the signal and the controller path.
+ * Every later wrap/unwrap through this handle fails closed with KEK_DESTROYED.
+ */
+export function destroyKek(handle: KekHandle): void {
+  const material = kekMaterials.get(handle);
+  if (material !== undefined) {
+    material.fill(0);
+    kekMaterials.delete(handle);
+  }
+  destroyedKekHandles.add(handle);
 }
 
 function canonicalCandidatePath(candidate: string): string {

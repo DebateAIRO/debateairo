@@ -12,6 +12,7 @@ import {
   generateVerificationToken,
   hashToken,
   hashVerificationToken,
+  destroyKek,
   loadKek,
   loadSecretKey,
   unwrapDek,
@@ -216,6 +217,32 @@ describe("S1 crypto foundation", () => {
     expect(() => loadSecretKey(join(directory, "absent"))).toThrowError(
       expect.objectContaining({ code: "KEK_UNRESOLVED" })
     );
+  });
+
+  it("destroys the KEK master copy so nothing can wrap or unwrap after shutdown", async () => {
+    // L2-F7: the WeakMap master copy was never zeroed and there was no destroy
+    // API, so the KEK stayed in process memory for a core dump or swap to find
+    // long after the pools closed.
+    const kek = loadKek(generateDek());
+    const dek = generateDek();
+    const wrapped = wrapDek(kek, dek, wrappedDekAad);
+    expect(unwrapDek(kek, wrapped, wrappedDekAad)).toEqual(dek);
+
+    destroyKek(kek);
+
+    expect(() => wrapDek(kek, dek, wrappedDekAad)).toThrowError(
+      expect.objectContaining({ code: "KEK_DESTROYED" })
+    );
+    expect(() => unwrapDek(kek, wrapped, wrappedDekAad)).toThrowError(
+      expect.objectContaining({ code: "KEK_DESTROYED" })
+    );
+    // Shutdown may run twice (signal then controller close); destroy is idempotent.
+    expect(() => destroyKek(kek)).not.toThrow();
+
+    const shutdown = await readFile(
+      new URL("../../apps/api/src/graceful-shutdown.ts", import.meta.url), "utf8"
+    );
+    expect(shutdown).toContain("destroyKek");
   });
 
   it("makes both process compositions refuse a missing KEK_PATH with the typed code", () => {

@@ -388,7 +388,9 @@ const shutdown = installGracefulShutdown({
         || erasurePool === contentProvisionPool
       ? [] : [erasurePool]),
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])
-  ]
+  ],
+  // L2-F7: zeroed after every pool that borrows from them has closed.
+  kekHandles: [kek, ...(corpusKek === undefined ? [] : [corpusKek])]
 });
 try {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });

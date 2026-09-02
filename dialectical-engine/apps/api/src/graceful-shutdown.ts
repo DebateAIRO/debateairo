@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { destroyKek, type KekHandle } from "@debateai/crypto";
 
 const SHUTDOWN_FAILURE_CODE = "API_SHUTDOWN_FAILED" as const;
 type ShutdownSignal = "SIGTERM" | "SIGINT";
@@ -69,7 +70,8 @@ export async function drainGracefulShutdownResources(
   registration: GracefulShutdownRegistration,
   auditContextHasher: ClosableAuditContextHasher,
   argon2Pool: ClosableArgon2Pool,
-  databasePools: readonly ClosableDatabasePool[] = []
+  databasePools: readonly ClosableDatabasePool[] = [],
+  kekHandles: readonly KekHandle[] = []
 ): Promise<void> {
   // This is a cached join in production because `preClose` already started it.
   // Keeping it in the indivisible order contract makes the resource primitive
@@ -109,6 +111,22 @@ export async function drainGracefulShutdownResources(
       closeFailed = true;
     }
   }
+
+  // L2-F7: the KEK master copy outlives every pool that borrows from it, so it
+  // is zeroed LAST — after the final wrap/unwrap any drain above could need.
+  // `destroyKek` is idempotent, and a failure here must not mask a real close
+  // failure. The `typeof` guards keep the architecture harness able to execute
+  // these exact bytes with only its three free identifiers, exactly as the
+  // `databasePools` guard above does.
+  if (typeof kekHandles !== "undefined" && typeof destroyKek === "function") {
+    for (const handle of kekHandles) {
+      try {
+        destroyKek(handle);
+      } catch {
+        // Nothing downstream can act on a failed zeroisation.
+      }
+    }
+  }
   if (closeFailed) throw firstCloseFailure;
 }
 
@@ -128,6 +146,7 @@ export function installGracefulShutdown(options: Readonly<{
   auditContextHasher: ClosableAuditContextHasher;
   argon2Pool: ClosableArgon2Pool;
   databasePools: readonly ClosableDatabasePool[];
+  kekHandles?: readonly KekHandle[];
   process?: ShutdownProcess;
   logger?: ShutdownLogger;
 }>): Readonly<{ close(reason?: string): Promise<void> }> {
@@ -180,7 +199,8 @@ export function installGracefulShutdown(options: Readonly<{
       lifecycleRegistration,
       options.auditContextHasher,
       options.argon2Pool,
-      options.databasePools
+      options.databasePools,
+      options.kekHandles ?? []
     ).then(() => {
       resourcesClosed = true;
       removeSignalHandlers();
