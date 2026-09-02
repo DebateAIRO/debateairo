@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { describe, expect, it, vi } from "vitest";
 import {
   ARGON2_PROVISIONAL_BOUNDS,
   ARGON2ID_ENCODING_BOUNDS,
@@ -503,6 +504,81 @@ describe("T1 Argon2 worker pool — faults, breaker and close", () => {
     await expect(afterTrip).rejects.toBeInstanceOf(Argon2InfrastructureError);
     await expect(afterTrip).rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
     await pool.close();
+  });
+
+  it("announces a breaker trip once, structurally, and hands the process to its supervisor", async () => {
+    // L2-F9: the breaker latched for the life of the process and nothing
+    // observed it, so four worker losses inside 60 s became an authentication
+    // outage that persisted until a human restarted the API. systemd's
+    // Restart=on-failure never fired because the process stayed up.
+    let clock = 0;
+    const workers: FakeWorker[] = [];
+    const tripped: number[] = [];
+    const announcements: string[] = [];
+    const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      if (typeof args[0] === "string" && args[0].includes("argon2.breaker.tripped")) {
+        announcements.push(args[0]);
+      }
+    });
+    try {
+      const pool = new Argon2WorkerPool({
+        workers: 1,
+        restartBudget: 3,
+        restartWindowMs: 60_000,
+        closeDrainMs: 20,
+        now: () => clock,
+        onBreakerTripped: () => { tripped.push(clock); },
+        spawn: (index) => {
+          const worker = createFakeWorker(index, true);
+          workers.push(worker);
+          return worker;
+        }
+      });
+      await pool.ready();
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        clock += 1_000;
+        workers[workers.length - 1]!.crash();
+        await flush();
+        workers[workers.length - 1]?.emitReady();
+        await flush();
+      }
+
+      expect(pool.stats().breakerTripped).toBe(true);
+      expect(tripped).toEqual([4_000]);
+      expect(announcements).toHaveLength(1);
+
+      // Every later refusal rides the SAME trip: the supervisor is told once,
+      // never once per rejected credential.
+      await expect(pool.verifyPassword(bytes(8), ENCODED_HASH))
+        .rejects.toMatchObject({ code: "ARGON2_POOL_UNAVAILABLE" });
+      await pool.close();
+      expect(tripped).toHaveLength(1);
+      expect(announcements).toHaveLength(1);
+
+      const record = JSON.parse(announcements[0]!) as Record<string, unknown>;
+      expect(record).toMatchObject({
+        event: "argon2.breaker.tripped",
+        restartBudget: 3,
+        restartWindowMs: 60_000,
+        restartsInWindow: 4
+      });
+      // A structured operational record, never key or credential material.
+      expect(announcements[0]!).not.toMatch(/\$argon2id\$|password|secret|salt/i);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("wires the API process root to exit 75 for its supervisor when the breaker trips", async () => {
+    // The pool cannot exit the process itself; main.ts owns that. EX_TEMPFAIL
+    // (75) tells systemd this is a restartable transient failure.
+    const apiMain = await readFile(
+      new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
+    );
+    expect(apiMain).toContain("onBreakerTripped");
+    expect(apiMain).toContain("argon2.breaker.tripped");
+    expect(apiMain).toMatch(/exitCode\s*=\s*75|exit\(75\)/);
   });
 
   it("does not trip the breaker when failures fall outside the rolling window", async () => {
