@@ -87,7 +87,7 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
     const spool = join(root, "mail");
     const message = "To: developer@example.test\r\n\r\nsecret-token-value\r\n";
     try {
-      const first = spawnSync(executable, ["-i", "-f", "noreply@localhost.test", "--", "developer@example.test"], {
+      const first = spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
         encoding: "utf8",
         env: { ...process.env, [captureEnvironmentKey]: spool },
         input: message
@@ -97,7 +97,7 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
       expect(first.stderr).toBe("");
 
       chmodSync(spool, 0o755);
-      const refused = spawnSync(executable, ["-i", "-f", "noreply@localhost.test", "--", "developer@example.test"], {
+      const refused = spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
         encoding: "utf8",
         env: { ...process.env, [captureEnvironmentKey]: spool },
         input: message
@@ -116,7 +116,7 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
   it("refuses symlink custody and oversized input without leaving a message", () => {
     const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
     const spool = join(root, "mail");
-    const args = ["-i", "-f", "noreply@localhost.test", "--", "developer@example.test"];
+    const args = ["-i", "-t", "-f", "noreply@localhost.test"];
     try {
       symlinkSync(root, spool);
       const symlinked = spawnSync(executable, args, {
@@ -140,4 +140,47 @@ describe.sequential("DEV-06 local sendmail-compatible capture", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("takes the recipient from a single strict To: header and refuses anything else", () => {
+    const root = mkdtempSync(join(tmpdir(), "debateai-dev-mail-"));
+    const spool = join(root, "mail");
+    const run = (input: string) => spawnSync(executable, ["-i", "-t", "-f", "noreply@localhost.test"], {
+      encoding: "utf8",
+      env: { ...process.env, [captureEnvironmentKey]: spool },
+      input
+    });
+    try {
+      const accepted = run("To: developer@example.test\r\nSubject: hello\r\n\r\nbody\r\n");
+      expect(accepted.status).toBe(0);
+      expect(accepted.stderr).toBe("");
+      expect(readdirSync(spool)).toHaveLength(1);
+
+      // Every rejected shape either hides a second recipient from the argv
+      // reader or is simply not the message the mailer emits (L7-F7).
+      for (const input of [
+        "Subject: no recipient at all\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nTo: attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test, attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test;attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nCc: attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nBcc: attacker@example.test\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\n\t, attacker@example.test\r\n\r\nbody\r\n",
+        "To: <developer@example.test>\r\n\r\nbody\r\n",
+        "To: Developer <developer@example.test>\r\n\r\nbody\r\n",
+        "To: not-an-email\r\n\r\nbody\r\n",
+        "To: developer@example.test\r\nbody with no header separator\r\n"
+      ]) {
+        const refused = run(input);
+        expect(refused.status, input).not.toBe(0);
+        expect(refused.stdout).toBe("");
+        expect(refused.stderr).toMatch(/^DEV_MAIL_CAPTURE_[A-Z_]+\n$/);
+        expect(refused.stderr).not.toContain("attacker@example.test");
+      }
+      // Only the one accepted message was ever written.
+      expect(readdirSync(spool)).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 });
