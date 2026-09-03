@@ -189,6 +189,47 @@ function requireMatch(source: string, expression: RegExp, label: string): string
   return value;
 }
 
+/**
+ * F-SEALEDROWS-A · V RULING 2026-09-04 — the conformance fingerprint covers the
+ * EVALUATOR prompt ALONE, the writer's prompt having its own slot already.
+ *
+ * The DEVELOPMENT twin of the ceremony deployment's extractor of the same
+ * name, and deliberately a twin rather than a shared import: the one home both
+ * deployments can reach is `@debateai/register`,
+ * whose barrel re-exports by explicit name, and that barrel is outside this
+ * lane's contract. Filed as F-SEALEDROWS-C. The two copies are pinned to agree
+ * by `tests/unit/f-sealedrows-a-conformance-extractor.test.ts`, which runs both
+ * over the same source and requires the same fingerprint — so a future edit to
+ * one alone fails loudly instead of splitting the two deployments apart.
+ * (DEV-05 forbids this file from naming the ceremony seeder's path, so the twin
+ * is described by role rather than located by path.)
+ *
+ * The retired locator quoted the prompt's own wording and required two matches;
+ * `c1d8e09d` rewrote the prompt, it matched zero, and this seeder threw before
+ * writing a row. This one derives its search key from the evaluator's OWN
+ * response parser in the same source: the evaluator prompt is the system
+ * message naming EVERY criterion that parser declares.
+ */
+export function extractEvaluatorContractText(runnerSource: string, code: string): string {
+  const declared = runnerSource.match(/criteria: z\.object\(\{([\s\S]*?)\}\)/);
+  const criteria = declared === null ? [] : [...declared[1]!.matchAll(
+    /([A-Za-z_][A-Za-z0-9_]*): z\.boolean\(\)/g
+  )].map((match) => match[1]!);
+  if (criteria.length === 0) {
+    throw new TypeError(`${code}:conformance — the evaluator response parser declares no criteria`);
+  }
+  const naming = [...runnerSource.matchAll(/content: "([^"]+)"/g)]
+    .map((match) => match[1]!)
+    .filter((text) => criteria.every((criterion) => text.includes(criterion)));
+  if (naming.length !== 1) {
+    throw new TypeError(
+      `${code}:conformance — expected exactly 1 system prompt naming every declared criterion `
+      + `(${criteria.join(",")}), found ${naming.length}`
+    );
+  }
+  return naming[0]!;
+}
+
 async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
   const [judge, runner, propagation, serve] = await Promise.all([
     readFile(new URL("../../../packages/judgement/src/index.ts", import.meta.url), "utf8"),
@@ -196,11 +237,6 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
     readFile(new URL("../../../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
-    .map((match) => match[1]!);
-  if (conformanceTexts.length !== 2) {
-    throw new TypeError("DEV_RUNNER_CONTRACT_TEXT_UNRESOLVED:conformance");
-  }
   const values = Object.freeze({
     judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
     composerContractHash: digest(requireMatch(
@@ -208,7 +244,7 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
       /content: "(Return only JSON with a segments array[^"]+)"/,
       "composer"
     )),
-    conformanceContractHash: digest(conformanceTexts.join("\n")),
+    conformanceContractHash: digest(extractEvaluatorContractText(runner, "DEV_RUNNER_CONTRACT_TEXT_UNRESOLVED")),
     propagationContractHash: digest(propagation),
     serveContractHash: digest(serve)
   });
@@ -251,7 +287,7 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
       rowKey: "wayOfKnowingCeiling",
       value: Object.freeze({
         bandOrder: ENGINE_BAND_ORDER,
-        ceilingLabels: Object.freeze(["DEFAULT_CEILING", "REASONING_CEILING"]),
+        ceilingLabels: Object.freeze(["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"]),
         defaultCeiling: Object.freeze({
           label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band"
         }),
@@ -259,7 +295,16 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
           minimumShares: Object.freeze({ REASONING: 0.5 }),
           label: "REASONING_CEILING", ceilingBand: "CAPPED",
           liftPath: "gather-evidence-to-lift"
-        })])
+        })]),
+        // F-T9B-3, the DEVELOPMENT twin of the acceptance entry: the floor a
+        // run is entitled to on NO VERIFIED EVIDENCE. The reasoning-share cut
+        // above names the right band for that case and the wrong reason — its
+        // trigger cannot fire on an empty basis.
+        emptyBasisFloor: Object.freeze({
+          label: "NO_VERIFIED_EVIDENCE_FLOOR",
+          ceilingBand: "CAPPED",
+          liftPath: "gather-any-verified-evidence-to-lift"
+        })
       }),
       sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF
     },

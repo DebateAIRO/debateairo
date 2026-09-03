@@ -69,7 +69,15 @@ const runnerRowsSchema = z.object({
       label: z.string().trim().min(1),
       ceilingBand: z.string().trim().min(1),
       liftPath: z.string().trim().min(1)
-    }).strict())
+    }).strict()),
+    // F-T9B-3: the entry whose trigger is the EMPTY BASIS itself. Optional for
+    // the same reason as the acceptance twin — a row without it parses and
+    // then fails closed at derivation.
+    emptyBasisFloor: z.object({
+      label: z.string().trim().min(1),
+      ceilingBand: z.string().trim().min(1),
+      liftPath: z.string().trim().min(1)
+    }).strict().optional()
   }).strict(),
   judgementSelectionPolicy: z.object({
     kind: z.literal("MAXIMIZE_WEIGHTED_TAU"),

@@ -25,15 +25,22 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
   ]);
   const judgeText = judge.match(/content: `([\s\S]*?)`/)?.[1];
   const composerText = runner.match(/content: "(Return only JSON with a segments array[^"]+)"/)?.[1];
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
+  // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints the
+  // EVALUATOR prompt alone. Located here by its shipped opening, DELIBERATELY a
+  // different method from the seeder's (which derives its key from the
+  // evaluator's response parser) — two independent locators agreeing is the
+  // cross-check. The retired version of this line searched for the same retired
+  // wording as the seeder, so both went stale together and neither could catch
+  // the other.
+  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{satisfied,objection,criteria\}[^"]+)"/g)]
     .map((match) => match[1]);
-  if (judgeText === undefined || composerText === undefined || conformanceTexts.length !== 2) {
+  if (judgeText === undefined || composerText === undefined || conformanceTexts.length !== 1) {
     throw new Error("TEST_CONTRACT_TEXT_EXTRACTION_FAILED");
   }
   return {
     judgeContractHash: sha256(judgeText),
     composerContractHash: sha256(composerText),
-    conformanceContractHash: sha256(conformanceTexts.join("\n")),
+    conformanceContractHash: sha256(conformanceTexts[0]!),
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };
@@ -101,14 +108,24 @@ describe("ACC-01 acceptance register", () => {
       .toEqual([...CLAIM_TYPES].sort());
     expect(byKey.wayOfKnowingCeiling?.value).toEqual({
       bandOrder: ["CAPPED", "FULL"],
-      ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING"],
+      ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
       defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
       cuts: [{
         minimumShares: { REASONING: 0.5 },
         label: "REASONING_CEILING",
         ceilingBand: "CAPPED",
         liftPath: "gather-evidence-to-lift"
-      }]
+      }],
+      // F-T9B-3: the empty-basis floor. The reasoning cut above names the right
+      // band for a tracing-failed run and the WRONG REASON — its share trigger
+      // cannot fire on an empty basis — so the row carries an entry whose
+      // trigger IS the empty basis and whose lift path asks for ANY verified
+      // evidence rather than more of it.
+      emptyBasisFloor: {
+        label: "NO_VERIFIED_EVIDENCE_FLOOR",
+        ceilingBand: "CAPPED",
+        liftPath: "gather-any-verified-evidence-to-lift"
+      }
     });
     expect(byKey.acceptanceOrganCostBounds).toEqual({
       rowKey: "acceptanceOrganCostBounds",

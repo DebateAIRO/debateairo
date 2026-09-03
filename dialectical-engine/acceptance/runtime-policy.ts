@@ -66,7 +66,13 @@ const runtimeRowsSchema = z.object({
     cuts: z.array(z.object({
       minimumShares: minimumSharesSchema,
       label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
-    }).strict())
+    }).strict()),
+    // F-T9B-3: the entry whose trigger is the EMPTY BASIS itself. Optional so a
+    // row that predates it still parses and then FAILS CLOSED at derivation,
+    // rather than being rejected at read time.
+    emptyBasisFloor: z.object({
+      label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
+    }).strict().optional()
   }).strict(),
   // FAIR-02 (DR-140): both real makers, in seeded order. The floor stays 1
   // (DR-137 mono-model admission); the honest 2-maker report comes from the

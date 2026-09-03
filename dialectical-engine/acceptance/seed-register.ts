@@ -110,6 +110,48 @@ function requireMatch(source: string, expression: RegExp, label: string): string
   return value;
 }
 
+/**
+ * F-SEALEDROWS-A · V RULING 2026-09-04 — the conformance fingerprint covers the
+ * EVALUATOR prompt ALONE. The writer's prompt already carries its own slot
+ * (`composerContractHash`), so the checker's slot fingerprints the checker's
+ * prompt and nothing else: one slot, one prompt, one fingerprint, so a later
+ * edit to either wording says WHICH one moved.
+ *
+ * WHY THIS LOCATOR IS SHAPED THIS WAY. The retired one quoted the prompt's own
+ * words — `Return only JSON {conforms,findings}` and `{pass}` — and required
+ * exactly two matches. `c1d8e09d` replaced both prompts with one combined
+ * evaluator prompt, the pattern matched ZERO, and BOTH deployment seeders threw
+ * before writing a single register row. A fingerprint slot cannot tell "the
+ * text changed" from "I can no longer find the text", so a locator built out of
+ * the volatile thing it is locating fails silently until something runs it.
+ *
+ * So the search key is derived from the evaluator's OWN response parser in the
+ * same source: the evaluator prompt is the system message naming EVERY
+ * criterion that parser declares. Rewording the prompt is now free; letting the
+ * prompt and the parser disagree is loud, which is the bug worth being loud
+ * about. Exported so a test can drive it over synthetic sources and prove it
+ * refuses, without editing the shipped runner.
+ */
+export function extractEvaluatorContractText(runnerSource: string, code: string): string {
+  const declared = runnerSource.match(/criteria: z\.object\(\{([\s\S]*?)\}\)/);
+  const criteria = declared === null ? [] : [...declared[1]!.matchAll(
+    /([A-Za-z_][A-Za-z0-9_]*): z\.boolean\(\)/g
+  )].map((match) => match[1]!);
+  if (criteria.length === 0) {
+    throw new Error(`${code}:conformance — the evaluator response parser declares no criteria`);
+  }
+  const naming = [...runnerSource.matchAll(/content: "([^"]+)"/g)]
+    .map((match) => match[1]!)
+    .filter((text) => criteria.every((criterion) => text.includes(criterion)));
+  if (naming.length !== 1) {
+    throw new Error(
+      `${code}:conformance — expected exactly 1 system prompt naming every declared criterion `
+      + `(${criteria.join(",")}), found ${naming.length}`
+    );
+  }
+  return naming[0]!;
+}
+
 async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]> {
   const [judge, runner, propagation, serve] = await Promise.all([
     readFile(new URL("../packages/judgement/src/index.ts", import.meta.url), "utf8"),
@@ -117,11 +159,6 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     readFile(new URL("../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
-    .map((match) => match[1]!);
-  if (conformanceTexts.length !== 2) {
-    throw new Error("SHIPPED_CONTRACT_TEXT_UNRESOLVED:conformance");
-  }
   const values = {
     judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
     composerContractHash: digest(requireMatch(
@@ -129,7 +166,7 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
       /content: "(Return only JSON with a segments array[^"]+)"/,
       "composer"
     )),
-    conformanceContractHash: digest(conformanceTexts.join("\n")),
+    conformanceContractHash: digest(extractEvaluatorContractText(runner, "SHIPPED_CONTRACT_TEXT_UNRESOLVED")),
     propagationContractHash: digest(propagation),
     serveContractHash: digest(serve)
   };
@@ -220,14 +257,26 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
       rowKey: "wayOfKnowingCeiling",
       value: {
         bandOrder: [...ENGINE_BAND_ORDER],
-        ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING"],
+        ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
         defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
         cuts: [{
           minimumShares: { REASONING: 0.5 },
           label: "REASONING_CEILING",
           ceilingBand: "CAPPED",
           liftPath: "gather-evidence-to-lift"
-        }]
+        }],
+        // F-T9B-3: the floor a run is entitled to on NO VERIFIED EVIDENCE —
+        // reached when the evaluator's citation-tracing criterion failed and
+        // the cited set is empty. It exists because the reasoning-share cut
+        // above names the right band for that case and the WRONG REASON: its
+        // trigger is a REASONING share of 0.5, which cannot fire on an empty
+        // basis. The lift path is "gather ANY evidence" rather than "gather
+        // evidence to lift", because nothing was verified at all.
+        emptyBasisFloor: {
+          label: "NO_VERIFIED_EVIDENCE_FLOOR",
+          ceilingBand: "CAPPED",
+          liftPath: "gather-any-verified-evidence-to-lift"
+        }
       },
       sourceRef: ACCEPTANCE_REGISTER_SOURCE_REF
     },
