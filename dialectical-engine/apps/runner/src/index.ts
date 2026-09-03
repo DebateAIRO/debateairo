@@ -3819,14 +3819,28 @@ export class WalkingSkeletonRunner {
         && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack")
     })));
     const serveStartedAt = new Date();
-    const evaluateEnvelope = (): Promise<BudgetPressureDecision> => this.#budget.evaluateRunPressure({
-      runId: run.runId,
-      basis: envelopeBasis,
-      pendingRows: BATTERY_BUDGET_CONTRACTS
-        .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
-        .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
-      verifiedNodeIds: [servedRoot.nodeId]
-    });
+    /**
+     * T17B/B1 — `pendingModelAttempts` names WHICH question is being asked.
+     *
+     * 0 (the default, and every caller that reports on what the run has already
+     * spent) asks "has this run spent MORE than it was allowed?" — J28's
+     * comparison, WITHIN at equality, unchanged.
+     *
+     * 1 asks "may this run spend ANOTHER attempt?", which is the only question
+     * the refused-attempt catch below has ever been asking. At `consumed ==
+     * max` those two have opposite answers, and before this argument existed
+     * both were being derived from the post-consumption count alone.
+     */
+    const evaluateEnvelope = (pendingModelAttempts = 0): Promise<BudgetPressureDecision> =>
+      this.#budget.evaluateRunPressure({
+        runId: run.runId,
+        basis: envelopeBasis,
+        pendingModelAttempts,
+        pendingRows: BATTERY_BUDGET_CONTRACTS
+          .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
+          .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
+        verifiedNodeIds: [servedRoot.nodeId]
+      });
     const recordEnvelope = (decision: BudgetPressureDecision): Promise<void> => this.#budget.recordDecision({
       runId: run.runId,
       workItemId: claimed.workItemId,
@@ -4145,8 +4159,15 @@ export class WalkingSkeletonRunner {
         }));
       } catch (error) {
         if (!(error instanceof TypedDomainError) || error.code !== "RUN_COST_ENVELOPE_EXHAUSTED") throw error;
-        const exhausted = await evaluateEnvelope();
-        if (exhausted.kind !== "HARD_STOP") throw error;
+        // The gateway REFUSED a next provider call, so the question here is
+        // whether one more attempt fits — not whether the run has overspent.
+        // Asking with the pending attempt counted is what makes this context
+        // stop sharing J28's branch: at `consumed == max` a completed run is
+        // WITHIN and keeps its answer, while this refused attempt is a
+        // HARD_STOP and gets the ruled components-only terminal instead of a
+        // rethrow that produced no envelope record at all.
+        const exhausted = await evaluateEnvelope(1);
+        if (exhausted.kind !== "HARD_STOP" || servedRoot.restatementStatus !== "PASS") throw error;
         result = await makeEnvelopeTerminal(exhausted);
       }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {

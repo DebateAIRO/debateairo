@@ -37,9 +37,25 @@ describe("S09 / DR-108 — the ratified 71-row budget split", () => {
       reason: "PROTECTED_CORE_REFUSES_SKIP"
     });
 
+    // J28 (T17/S09B): the REPORTING comparison follows the PERMISSION
+    // comparison. `assertModelAttemptAllowed` PERMITS exactly `max` attempts,
+    // so spending exactly `max` has exceeded nothing and is WITHIN; the hard
+    // stop belongs one attempt LATER. Both sides of that boundary are pinned:
+    // the equality arm below, and the over-spend arm that follows.
     expect(decideBudgetPressure({
       basis,
       consumedModelAttempts: basis.maxModelAttempts,
+      pendingRows: [{ batteryRowId: "Q27", affectedNodeIds: ["node:test:q27"] }],
+      verifiedNodeIds: ["node:test:verified"]
+    })).toEqual({
+      kind: "WITHIN_ENVELOPE",
+      state: "WITHIN",
+      consumedModelAttempts: basis.maxModelAttempts
+    });
+
+    expect(decideBudgetPressure({
+      basis,
+      consumedModelAttempts: basis.maxModelAttempts + 1,
       pendingRows: [
         { batteryRowId: "Q27", affectedNodeIds: ["node:test:q27"] },
         { batteryRowId: "Q49", affectedNodeIds: ["node:test:q49"] },
@@ -49,7 +65,7 @@ describe("S09 / DR-108 — the ratified 71-row budget split", () => {
     })).toEqual({
       kind: "HARD_STOP",
       state: "EXHAUSTED",
-      consumedModelAttempts: basis.maxModelAttempts,
+      consumedModelAttempts: basis.maxModelAttempts + 1,
       enrichmentSkips: [
         {
           batteryRowId: "Q27",
