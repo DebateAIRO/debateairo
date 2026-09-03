@@ -996,7 +996,11 @@ export interface RunLoadingProjection {
   readonly holdUntil: Date | null;
 }
 
-export interface RunLifecycleEventValue {
+/**
+ * The COOLDOWN-shaped lifecycle value: a leg that was attempted, held and
+ * eventually halted. Every field here is a MEASUREMENT of that attempt.
+ */
+export interface RunCooldownLifecycleValue {
   readonly state: "COOLDOWN_HOLD" | "COOLDOWN_RETRY" | "MAKER_POSITION_HALTED" | "EXPANSION_HALTED" | "REVIEW_HALTED";
   readonly call_site_key: string;
   readonly parent_node_ref: string | null;
@@ -1006,6 +1010,29 @@ export interface RunLifecycleEventValue {
   readonly transport_outcome: "TIMED_OUT" | "FAILED";
   readonly planned_leg_count: number;
 }
+
+/**
+ * T9 / J24 / J26(c) — a sealed synthesis role whose provider is not
+ * claim-eligible. This is a REFUSAL, not an attempt: nothing was held, nothing
+ * was spent, no transport was touched. It gets its own shape rather than
+ * borrowing the cooldown one, because writing `hold_ms: 0`,
+ * `attempts_spent: 0`, `planned_leg_count: 0` would state three measurements
+ * that were never taken, and a reader sees zeros as measurements. Same standard
+ * as J15 ADDENDUM-2's false freeze marks: a record may not state a quantity it
+ * did not measure.
+ */
+export interface RunSynthesisRoleRefusalValue {
+  readonly state: "SYNTHESIS_ROLE_PROVIDER_ABSENT";
+  /** `<ROLE>:<sealed provider ref>` — the role that could not be resolved. */
+  readonly call_site_key: string;
+  /** The sealed role ref, named on its own so a reader need not parse the key. */
+  readonly role_ref: string;
+  readonly role: "SYNTHESIZER" | "EVALUATOR";
+  /** Why the provider was not claim-eligible, or null when it was never probed. */
+  readonly absent_failure_code: string | null;
+}
+
+export type RunLifecycleEventValue = RunCooldownLifecycleValue | RunSynthesisRoleRefusalValue;
 
 export interface CompletionActivationResolution {
   readonly batteryRowId: string;

@@ -4,6 +4,7 @@ import {
   readAdaptiveStoppingControls,
   readClaimTypeCompositionMap,
   readPanelWeightingControls,
+  readSynthesisRoleControls,
   readVerdictLabelControls,
   type AdaptiveStoppingControls,
   type CompositionMapRegisterRow
@@ -13,6 +14,7 @@ import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debat
 import type {
   RunDeathPolicy,
   RunnerPanelPolicy,
+  RunnerSynthesisRolePolicy,
   RunnerVerdictLabelPolicy,
   ScoringOperatorRegisterInput
 } from "./index.js";
@@ -129,6 +131,20 @@ export interface DevelopmentRunnerPolicy {
    * cannot be told apart at the claim seam from one that never sealed the rows.
    */
   readonly stoppingPolicy: AdaptiveStoppingControls;
+  /**
+   * S6-2 / T9: the sealed T16 synthesis-role family — the SYNTHESIZER and
+   * EVALUATOR role refs and the evaluator loop bound — read through T16's OWN
+   * reader (`readSynthesisRoleControls`), which fails loudly and names the
+   * missing rows, and which prints the identical-refs startup warning (J7).
+   * This file restates neither a value nor a schema.
+   *
+   * MANDATORY, exactly like `verdictLabelPolicy` and for the same reason (S06
+   * codex r1 B1, board F33): every served statement now comes out of the
+   * synthesis loop, so a deployment that seals the family but never hands it
+   * to the runner is indistinguishable at the serve seam from one that never
+   * sealed it at all. The runner's claim-time gate refuses either.
+   */
+  readonly synthesisRolePolicy: RunnerSynthesisRolePolicy;
   readonly hashes: Readonly<Record<"judge" | "composer" | "conformance" | "propagation" | "serve", string>>;
 }
 
@@ -171,6 +187,12 @@ export async function readDevelopmentRunnerPolicy(
     ...Object.values(panelWeighting.sourceRefs),
     ...Object.values(adaptiveStopping.sourceRefs)
   ].some(
+    (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
+  )) {
+    throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
+  }
+  const synthesisRoles = await readSynthesisRoleControls(pool, registerVersion);
+  if (Object.values(synthesisRoles.sourceRefs).some(
     (sourceRef) => !sourceRef.startsWith(DEVELOPMENT_ALGORITHM_SOURCE_REF)
   )) {
     throw new TypeError("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
@@ -241,6 +263,14 @@ export async function readDevelopmentRunnerPolicy(
       lowCut: verdictLabels.lowCut,
       disagreementThreshold: verdictLabels.disagreementThreshold,
       sourceRefs: verdictLabels.sourceRefs
+    }),
+    synthesisRolePolicy: Object.freeze({
+      registerVersion: synthesisRoles.registerVersion,
+      synthesizerRoleRef: synthesisRoles.synthesizerRoleRef,
+      evaluatorRoleRef: synthesisRoles.evaluatorRoleRef,
+      evaluatorLoopMaxRounds: synthesisRoles.evaluatorLoopMaxRounds,
+      identicalRoleRefs: synthesisRoles.identicalRoleRefs,
+      sourceRefs: synthesisRoles.sourceRefs
     }),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCrossRootExchangePlan,
   buildUnservedMakerPositionRecord,
+  buildDigestFollowingServeNodes,
   buildFixedSingleRootServeNodes,
   buildMultiMakerExpansionPlan,
   createPostgresProviderGateway,
@@ -110,6 +111,48 @@ describe("PANEL-01 multi-maker root authorship", () => {
     expect(() => buildFixedSingleRootServeNodes(authoredRoots, "node:absent")).toThrowError(
       expect.objectContaining({ code: "FIXED_SINGLE_ROOT_SERVE_VIOLATED" })
     );
+  });
+
+  /**
+   * J23 / T9: the citable set follows the DIGEST, and DR-159 B2-A clause 1 —
+   * exactly ONE maker position is SERVED — survives the widening. Before this,
+   * the serve set held one node and the composer could cite only "primary", so
+   * the way-of-knowing basis was structurally incapable of being fractional.
+   */
+  it("widens the CITABLE set to every materialized node while serving exactly one root", () => {
+    const authored = [
+      {
+        nodeId: "node:primary", statement: "Primary position", wayOfKnowing: "REASONING" as const,
+        provenanceRef: "artifact:primary", locator: null, restatementStatus: "PASS" as const
+      },
+      {
+        nodeId: "node:secondary", statement: "Secondary position", wayOfKnowing: "LOOKED_UP" as const,
+        provenanceRef: "artifact:secondary", locator: "https://example.invalid/j23", restatementStatus: "PASS" as const
+      },
+      {
+        nodeId: "node:measurement", statement: "A measured objection", wayOfKnowing: "RAN" as const,
+        provenanceRef: "artifact:measurement", locator: null, restatementStatus: "PASS" as const
+      }
+    ];
+    const nodes = buildDigestFollowingServeNodes({ authored, servedRootNodeId: "node:primary" });
+
+    // MEMBERSHIP follows the digest source: every materialized node is citable.
+    expect(nodes.map((node) => node.nodeId))
+      .toEqual(["node:primary", "node:secondary", "node:measurement"]);
+    // DR-159 B2-A clause 1: exactly one served root, and it is the selected one.
+    expect(nodes.filter((node) => node.loadBearing).map((node) => node.nodeId)).toEqual(["node:primary"]);
+    // The citable nodes carry their REAL way of knowing, which is the whole
+    // point: a mixed-way citation can now produce a fractional share once the
+    // basis reads the cited set.
+    expect(nodes.map((node) => node.wayOfKnowing)).toEqual(["REASONING", "LOOKED_UP", "RAN"]);
+    expect(new Set(nodes.map((node) => node.wayOfKnowing)).size).toBe(3);
+    // The guard still refuses a served root that is not in the authored set.
+    expect(() => buildDigestFollowingServeNodes({ authored, servedRootNodeId: "node:absent" }))
+      .toThrowError(expect.objectContaining({ code: "FIXED_SINGLE_ROOT_SERVE_VIOLATED" }));
+    // ...and refuses a duplicated materialized node rather than serving it twice.
+    expect(() => buildDigestFollowingServeNodes({
+      authored: [...authored, authored[1]!], servedRootNodeId: "node:primary"
+    })).toThrowError(expect.objectContaining({ code: "SERVE_NODE_IDS_NOT_UNIQUE" }));
   });
 });
 
