@@ -4167,7 +4167,14 @@ export class WalkingSkeletonRunner {
         // HARD_STOP and gets the ruled components-only terminal instead of a
         // rethrow that produced no envelope record at all.
         const exhausted = await evaluateEnvelope(1);
-        if (exhausted.kind !== "HARD_STOP" || servedRoot.restatementStatus !== "PASS") throw error;
+        // NO restatement conjunct. F4 / goal 248-251: the protected-core guard
+        // was keyed on R9's gate-hood and is KNOWINGLY RETIRED with it, so the
+        // envelope terminal fires on HARD_STOP whenever no served statement
+        // exists yet, INDEPENDENT OF RESTATEMENT STATUS. The status is observed
+        // and disclosed as a condition mark instead of deciding the terminal.
+        // The two changes are orthogonal and both stand: T17B's `pendingModelAttempts`
+        // fixes WHICH question is asked, F4 removes a guard from the answer.
+        if (exhausted.kind !== "HARD_STOP") throw error;
         result = await makeEnvelopeTerminal(exhausted);
       }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
