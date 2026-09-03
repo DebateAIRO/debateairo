@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { TextDecoder } from "node:util";
 
 import { TypedDomainError } from "@debateai/kernel";
 
@@ -55,12 +56,14 @@ const INSTRUCTION_LIKE_PATTERNS = [
   /\bsystem\s*:/iu,
   /\byou\s+are\s+now\b/iu,
 ] as const;
+const UNSAFE_VISITOR_CONTROL = /[\p{Cc}\p{Cf}]/u;
+const CYRILLIC_VISITOR_TEXT = /\p{Script=Cyrillic}/u;
 
 type ParsedFile = Readonly<{
   filename: string;
   filenameId: string;
   filenameLang: HelpCorpusLanguage;
-  bytes: string;
+  bytes: Buffer;
   entry: HelpCorpusEntry;
 }>;
 
@@ -72,6 +75,35 @@ function isIsoDate(value: string): boolean {
   if (!RATIFIED_DATE.test(value)) return false;
   const instant = Date.parse(`${value}T00:00:00.000Z`);
   return Number.isFinite(instant) && new Date(instant).toISOString().slice(0, 10) === value;
+}
+
+function decodeUtf8(bytes: Buffer, filename: string): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    fail("SUPPORT_KB_UTF8_INVALID", filename, "file must contain valid UTF-8");
+  }
+}
+
+function lintVisitorText(visitorText: string, filename: string): void {
+  for (const codePoint of visitorText) {
+    if (
+      codePoint !== "\t"
+      && codePoint !== "\n"
+      && codePoint !== "\r"
+      && UNSAFE_VISITOR_CONTROL.test(codePoint)
+    ) {
+      fail("SUPPORT_KB_INSTRUCTION_LIKE_TEXT", filename, "instruction-like text is forbidden");
+    }
+  }
+
+  const lintText = visitorText.normalize("NFKC");
+  if (
+    CYRILLIC_VISITOR_TEXT.test(lintText)
+    || INSTRUCTION_LIKE_PATTERNS.some((pattern) => pattern.test(lintText))
+  ) {
+    fail("SUPPORT_KB_INSTRUCTION_LIKE_TEXT", filename, "instruction-like text is forbidden");
+  }
 }
 
 function parseScalar(rawValue: string, filename: string, key: string): string {
@@ -192,9 +224,7 @@ function parseEntry(bytes: string, filename: string): HelpCorpusEntry {
   const body = bodySection.replace(/^\r?\n/u, "").replace(/\r?\n$/u, "");
   if (body.trim() === "") fail("SUPPORT_KB_FRONT_MATTER_INVALID", filename, "body must be nonblank");
   const visitorText = `${title}\n${body}`;
-  if (INSTRUCTION_LIKE_PATTERNS.some((pattern) => pattern.test(visitorText))) {
-    fail("SUPPORT_KB_INSTRUCTION_LIKE_TEXT", filename, "instruction-like text is forbidden");
-  }
+  lintVisitorText(visitorText, filename);
 
   return Object.freeze({
     id,
@@ -209,7 +239,7 @@ function parseEntry(bytes: string, filename: string): HelpCorpusEntry {
   });
 }
 
-function sha256(bytes: string): string {
+function sha256(bytes: string | Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
@@ -235,13 +265,14 @@ export function loadHelpCorpus(directory: string): LoadedHelpCorpus {
       if (filenameMatch === null || filenameMatch[1] === undefined || filenameMatch[2] === undefined) {
         fail("SUPPORT_KB_FRONT_MATTER_INVALID", directoryEntry.name, "filename must be <id>.<en|ro>.md");
       }
-      const bytes = readFileSync(join(directory, directoryEntry.name), "utf8");
+      const bytes = readFileSync(join(directory, directoryEntry.name));
+      const text = decodeUtf8(bytes, directoryEntry.name);
       return {
         filename: directoryEntry.name,
         filenameId: filenameMatch[1],
         filenameLang: filenameMatch[2] as HelpCorpusLanguage,
         bytes,
-        entry: parseEntry(bytes, directoryEntry.name),
+        entry: parseEntry(text, directoryEntry.name),
       };
     });
 

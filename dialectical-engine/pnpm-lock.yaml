@@ -660,6 +660,12 @@ importers:
         specifier: workspace:*
         version: link:../register
 
+  packages/support-kb:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
   packages/valuation:
     dependencies:
       '@debateai/db':
