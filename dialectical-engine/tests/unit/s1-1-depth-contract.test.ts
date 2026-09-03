@@ -288,19 +288,37 @@ function kindOf(candidate: string): DuplicateKind | null {
  *     appear inside a declaration that mentions a depth, the ceiling is there.
  *     Widening their window finds real ceilings that wrapping had hidden.
  *   · `6` is NOT the ceiling. It is an INFERENCE from an exclusive comparison
- *     (`depth < 6`), and that inference is carried entirely by the `6` sitting
- *     next to its own operator. Widen its window and it stops finding ceilings and
- *     starts manufacturing pairings: a `topic.trim().length > 6` several conjuncts
- *     from an unrelated `depth` is the measured example, at
- *     apps/ui/app/new/page.tsx:73. So the `6` keeps exactly r3's line window.
+ *     (`depth < 6`), and that inference is carried by the `6` and the depth token
+ *     belonging to the SAME comparison. Widen its window to the declaration and it
+ *     stops finding ceilings and starts manufacturing pairings — the measured
+ *     example is `topic.trim().length > 6` a conjunct from an unrelated `depth`, at
+ *     apps/ui/app/new/page.tsx:75.
  *
- * This is a UNIT decision, not a predicate one: all four regexes and r3's `kindOf`
- * are byte-unchanged, the line scan still applies the full set, and the union can
- * therefore only grow relative to r3.
+ * r1 got that distinction right and then drew the wrong conclusion from it: it made
+ * the `6` arm LINE-scoped. Comparison-local is not line-local, and refuting the
+ * too-wide declaration window was never evidence for the too-narrow line one. The
+ * line window turned out to be wrong in BOTH directions — a newline inside one
+ * comparison hid a real bound, and collapsing the negative control onto one line
+ * manufactured the false one it exists to forbid.
+ *
+ * So the `6` arm gets the unit that actually matches its own argument: the
+ * CONJUNCT. Same lexer, same layout independence, one extra boundary.
+ *
+ * This is a UNIT decision, not a predicate one: all four regexes are byte-unchanged
+ * and r3's `kindOf` is retained verbatim above. It is the one place the oracle is
+ * NOT a superset of r3, and that divergence is asserted, not left silent — see
+ * "narrows r3 in exactly one place".
  */
 function kindOfCeilingLiteral(candidate: string): DuplicateKind | null {
   if (MENTIONS_A_DEPTH.test(candidate) && BARE_FIVE.test(candidate)) return "DEPTH_BOUND_LITERAL";
   return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
+}
+
+/** The exclusive-bound arm only — the composition the CONJUNCT-unit scan uses. */
+function kindOfExclusiveBound(candidate: string): DuplicateKind | null {
+  return MENTIONS_A_DEPTH.test(candidate) && SIX_AS_EXCLUSIVE_BOUND.test(candidate)
+    ? "DEPTH_BOUND_LITERAL"
+    : null;
 }
 
 /**
@@ -325,13 +343,18 @@ function kindOfCeilingLiteral(candidate: string): DuplicateKind | null {
  * scopes. Nothing splits WITHIN an expression — in particular `&&`, `||` and `??`
  * are ordinary characters here.
  *
- * T1B r1 did flush at `&&`, and codex was right to block it: the same expression
- * was then caught on one line and missed when wrapped, which is precisely the
- * layout dependence this ticket exists to remove. The false positive that boundary
- * was defending against is handled where it belongs — in the WINDOW of the
- * exclusive-`6` arm, see `kindOfCeilingLiteral` above — not by cutting expressions
- * in half. An operand-order rule was rejected outright: `&&` commutes, so a verdict
- * that depended on which conjunct came first would be layout dependence again.
+ * `splitConjuncts` adds ONE further boundary — `&&`, `||`, `??`, at ANY bracket
+ * depth — and is used ONLY for the exclusive-`6` arm, whose own argument is that a
+ * `6` is evidence about the comparison it sits in. At any depth, not the unit's own
+ * depth: a logical operator separates conjuncts just as much inside `if (...)` as
+ * at statement level, and the shallower rule let `if (topic.length > 6 && depth >=
+ * MIN)` join into one unit.
+ *
+ * T1B r1 applied that boundary to the CEILING-LITERAL arm instead, and codex was
+ * right to block it: the same expression was then caught on one line and missed
+ * when wrapped. The boundary was never wrong — it was on the wrong arm. An
+ * operand-order rule was rejected outright: `&&` commutes, so a verdict that
+ * depended on which conjunct came first would be layout dependence again.
  *
  * Comments do NOT contribute to unit text — a comment defines no ceiling, and
  * gluing prose into a joined unit invents pairings. Nothing is lost: the LINE scan
@@ -342,16 +365,15 @@ function kindOfCeilingLiteral(candidate: string): DuplicateKind | null {
  *   · a ceiling that is not the literal `5`: `2 + 3`, `0x5`, `5.0` (a PREDICATE
  *     limit, not a layout one — `BARE_FIVE` never matched those on one line either)
  *   · a bound assembled across two statements or across a brace
- *   · an exclusive `6` separated from its own operator by a newline (`depth <`
- *     newline `6`). The `6` arm is line-scoped by the argument above, so this one
- *     residual layout case survives. `... ||` newline `depth < 6` IS still caught,
- *     because there the `6` and its operator stay together. Narrowing it needs the
- *     `6` bound to its comparison's left operand, which is a PREDICATE change and
- *     is frozen out of this ticket
+ *   · a `6` whose depth token lives in a DIFFERENT conjunct of the same comparison
+ *     chain — deliberate, and the whole reason the `6` arm is conjunct-scoped
  * A single-quoted or double-quoted string is closed at the newline, so a regex
  * literal mis-read as a string can only desync within one line, never past it.
  */
-function declarationUnits(source: string): { readonly line: number; readonly text: string }[] {
+function declarationUnits(
+  source: string,
+  splitConjuncts = false
+): { readonly line: number; readonly text: string }[] {
   const units: { line: number; text: string }[] = [];
   let buffer = "";
   let bracketDepth = 0;
@@ -420,6 +442,8 @@ function declarationUnits(source: string): { readonly line: number; readonly tex
       mark(); buffer += char; index += 1; continue;
     }
     if ((char === ";" || char === ",") && bracketDepth === startDepth) { begin(); index += 1; continue; }
+    if (splitConjuncts && next !== undefined && char === next
+      && (char === "&" || char === "|" || char === "?")) { begin(); index += 2; continue; }
     mark(); buffer += char; index += 1;
   }
   flush();
@@ -429,24 +453,29 @@ function declarationUnits(source: string): { readonly line: number; readonly tex
 /**
  * The oracle, over text — so it can be controlled with planted sources.
  *
- * The UNION of the r3 line scan and the T1B declaration-unit scan, so the change
- * is additive: every site r3 reported is still reported, with r3's own text, and
- * the multiline sites are added. Deduplicated on `line` + `kind`, line text winning,
- * which keeps the owning-declaration exemption matching on its exact r3 text.
+ * THREE WINDOWS, each carrying the arms whose evidence it fits:
+ *
+ *   LINE        · ceiling-literal arms · r3's own window. Kept so that a `5` and a
+ *                 depth crowded onto one line still register even where a unit
+ *                 boundary falls between them, and so comments stay covered.
+ *   DECLARATION · ceiling-literal arms · the ceiling is the ceiling wherever it
+ *                 sits in the declaration.
+ *   CONJUNCT    · exclusive-`6` arm    · a `6` is evidence only about its own
+ *                 comparison.
+ *
+ * Deduplicated on `line` + `kind`, line text winning, which keeps the
+ * owning-declaration exemption matching on its exact r3 text.
  */
 function duplicateBoundSites(source: string): DuplicateSite[] {
   const byAddress = new Map<string, DuplicateSite>();
-  source.split("\n").forEach((raw, index) => {
-    const kind = kindOf(raw);
-    if (kind !== null) byAddress.set(`${index + 1}:${kind}`, { kind, line: index + 1, text: raw.trim() });
-  });
-  for (const unit of declarationUnits(source)) {
-    const kind = kindOfCeilingLiteral(unit.text);
-    const address = `${unit.line}:${kind}`;
-    if (kind !== null && !byAddress.has(address)) {
-      byAddress.set(address, { kind, line: unit.line, text: unit.text });
-    }
-  }
+  const record = (kind: DuplicateKind | null, line: number, text: string): void => {
+    if (kind === null) return;
+    const address = `${line}:${kind}`;
+    if (!byAddress.has(address)) byAddress.set(address, { kind, line, text });
+  };
+  source.split("\n").forEach((raw, index) => record(kindOfCeilingLiteral(raw), index + 1, raw.trim()));
+  for (const unit of declarationUnits(source)) record(kindOfCeilingLiteral(unit.text), unit.line, unit.text);
+  for (const unit of declarationUnits(source, true)) record(kindOfExclusiveBound(unit.text), unit.line, unit.text);
   return [...byAddress.values()].sort((left, right) => left.line - right.line);
 }
 
@@ -604,6 +633,47 @@ describe("S1-1 · the depth bound has a single source", () => {
     }
   ])("does not pair an unrelated ceiling with a depth a conjunct away — $order", ({ planted }) => {
     expect(duplicateBoundSites(planted)).toEqual([]);
+  });
+
+  // EXCLUSIVE-SIX WINDOW — the PAIRED controls (T1B r2, codex B1).
+  //
+  // r1 argued that the `6` arm is comparison-local and then implemented it as
+  // LINE-local, which is not the same claim. Refuting the too-wide declaration
+  // window said nothing about the too-narrow line one, and the line window turned
+  // out to be wrong in BOTH directions. These two assertions are the pair:
+  //
+  //   · split   — a newline INSIDE one comparison must not change the verdict
+  //   · joined  — collapsing the negative control onto one line must not
+  //               manufacture a site
+  //
+  // Neither can be satisfied by a line window, in either direction, so together
+  // they force a layout-independent conjunct unit.
+  it.each([
+    { layout: "split after the operator", planted: ["if (depth <", "  6) c.stop();"].join("\n") },
+    { layout: "same comparison on one line", planted: "if (depth < 6) c.stop();" },
+    { layout: "split after a logical operator", planted: ["if (!Number.isInteger(depth) ||", "  depth < 6) {"].join("\n") }
+  ])("detects an exclusive six however the comparison is wrapped — $layout", ({ planted }) => {
+    expect(duplicateBoundSites(planted)).not.toEqual([]);
+  });
+
+  it("does not manufacture a site when the negative control is collapsed onto one line", () => {
+    const collapsed =
+      "  const ready = topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX && riskTier.length > 0;";
+    expect(duplicateBoundSites(collapsed)).toEqual([]);
+  });
+
+  // THE ONE DELIBERATE NARROWING, asserted rather than left silent.
+  //
+  // Everywhere else this oracle is a superset of r3. Here it is not, and the
+  // divergence is the whole point of giving the `6` arm its own window: r3 read a
+  // crowded LINE and paired a `6` with a `depth` belonging to another conjunct.
+  // Both halves are asserted, so if anyone ever restores the `6` arm to the line
+  // pass this control fails and says exactly what changed.
+  it("narrows r3 in exactly one place: a six bound to something other than the depth", () => {
+    const collapsed =
+      "  const ready = topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX && riskTier.length > 0;";
+    expect(kindOf(collapsed)).toBe("DEPTH_BOUND_LITERAL");
+    expect(duplicateBoundSites(collapsed)).toEqual([]);
   });
 
   // NEGATIVE CONTROLS — unrelated depth concepts, and a floor-only guard, are
