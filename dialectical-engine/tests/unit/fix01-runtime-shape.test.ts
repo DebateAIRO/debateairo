@@ -67,14 +67,29 @@ describe("FIX-01 runtime module contract", () => {
         /interface RuntimeCaptureModule\s*\{\s*readonly startCaptureRuntime: \(options: \{(?<options>[\s\S]*?)\}\) => void \| Promise<void>;\s*\}/,
       );
       expect(privateStartContract).not.toBeNull();
-      expect(
-        Array.from(
-          privateStartContract?.groups?.options?.matchAll(
-            /readonly\s+([A-Za-z_$][\w$]*)\s*:/g,
-          ) ?? [],
-          (match) => match[1],
-        ),
-      ).toEqual(["runtime", "spoolFd", "installExitSink"]);
+      const optionFields: string[] = [];
+      let nestingDepth = 0;
+      for (const line of privateStartContract?.groups?.options?.split("\n") ?? []) {
+        if (nestingDepth === 0) {
+          const field = line.match(
+            /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*\??\s*:/,
+          );
+          const fieldName = field?.[1];
+          if (fieldName !== undefined) optionFields.push(fieldName);
+        }
+        for (const character of line) {
+          if (character === "(" || character === "{" || character === "[") {
+            nestingDepth += 1;
+          } else if (
+            character === ")" ||
+            character === "}" ||
+            character === "]"
+          ) {
+            nestingDepth -= 1;
+          }
+        }
+      }
+      expect(optionFields).toEqual(["runtime", "spoolFd", "installExitSink"]);
     }
   });
 
