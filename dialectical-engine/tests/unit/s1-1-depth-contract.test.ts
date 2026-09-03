@@ -656,6 +656,15 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(duplicateBoundSites(planted)).not.toEqual([]);
   });
 
+  // The conjunct boundary must apply at ANY bracket depth, not at the unit's own.
+  // A logical operator separates conjuncts just as much inside `if (...)` as at
+  // statement level, and with the shallower rule this shape joins into one unit and
+  // pairs `> 6` with a `depth` that is not its comparison's operand. Mutant m10 is
+  // exactly that shallower rule, and this control is what kills it.
+  it("does not pair a six with a depth in another conjunct of the same condition", () => {
+    expect(duplicateBoundSites("  if (topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN) {")).toEqual([]);
+  });
+
   it("does not manufacture a site when the negative control is collapsed onto one line", () => {
     const collapsed =
       "  const ready = topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX && riskTier.length > 0;";
