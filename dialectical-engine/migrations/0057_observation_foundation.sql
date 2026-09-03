@@ -224,7 +224,10 @@ GRANT SELECT ON
   obs.budget_usage,obs.spool_receipt,obs.capture_gap,obs.zone_daily,obs.source_link,
   obs.incident,obs.consumer_cursor,obs.component_health,obs.run_correlation_v
   TO debateai_observation_agent;
+GRANT USAGE ON SCHEMA observation TO debateai_obs_listener;
 GRANT SELECT ON observation.defect_signal_v TO debateai_obs_listener;
 
 REVOKE UPDATE,DELETE,TRUNCATE ON ALL TABLES IN SCHEMA observation
   FROM PUBLIC,debateai_observation_agent;
+GRANT UPDATE ON observation.heartbeat,observation.sample_ring
+  TO debateai_observation_agent;

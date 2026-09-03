@@ -71,6 +71,105 @@ describe("OBS-01 observation schema foundation", () => {
     expect(escaped.rows).toEqual([]);
   });
 
+  it("lets the listener read only the defect view", async () => {
+    const listener = await pool().connect();
+    try {
+      await listener.query("BEGIN");
+      await listener.query("SET LOCAL ROLE debateai_obs_listener");
+      await expect(listener.query("SELECT * FROM observation.defect_signal_v LIMIT 1"))
+        .resolves.toMatchObject({ rows: [] });
+
+      for (const statement of [
+        "CREATE TABLE observation.listener_escape(id integer)",
+        "SELECT * FROM observation.signal LIMIT 1",
+        "SELECT * FROM observation.open_signal_v LIMIT 1"
+      ]) {
+        await listener.query("SAVEPOINT listener_boundary");
+        try {
+          await expect(listener.query(statement)).rejects.toMatchObject({ code: "42501" });
+        } finally {
+          await listener.query("ROLLBACK TO SAVEPOINT listener_boundary");
+        }
+      }
+    } finally {
+      await listener.query("ROLLBACK");
+      listener.release();
+    }
+  });
+
+  it("gives the agent only the required mutable-table updates", async () => {
+    const agent = await pool().connect();
+    try {
+      await agent.query("BEGIN");
+      await agent.query("SET LOCAL ROLE debateai_observation_agent");
+      await agent.query(`
+        INSERT INTO observation.heartbeat(
+          singleton,observed_at,pid,version,thresholds_version
+        ) VALUES (true,'2026-09-03T08:00:00.000Z',123,'test-v1',1)
+      `);
+      await agent.query(`
+        UPDATE observation.heartbeat
+        SET observed_at='2026-09-03T08:00:05.000Z',thresholds_version=2
+        WHERE singleton=true
+      `);
+      await agent.query(`
+        INSERT INTO observation.sample_ring(metric_key,bucket,observed_at,value)
+        VALUES ('test.listener_boundary',0,'2026-09-03T08:00:00.000Z',1)
+      `);
+      await agent.query(`
+        UPDATE observation.sample_ring SET value=2
+        WHERE metric_key='test.listener_boundary' AND bucket=0
+      `);
+      await expect(agent.query(`
+        SELECT
+          (SELECT thresholds_version FROM observation.heartbeat WHERE singleton=true) AS version,
+          (SELECT value::text FROM observation.sample_ring
+            WHERE metric_key='test.listener_boundary' AND bucket=0) AS sample_value
+      `)).resolves.toMatchObject({ rows: [{ version: 2, sample_value: "2" }] });
+
+      for (const statement of [
+        "UPDATE observation.signal SET recorded_at=recorded_at WHERE false",
+        "UPDATE observation.delivery SET attempted_at=attempted_at WHERE false",
+        "UPDATE observation.threshold_policy SET applied_at=applied_at WHERE false",
+        "UPDATE observation.sample_hourly SET hour=hour WHERE false",
+        "UPDATE observation.job_completion SET completed_at=completed_at WHERE false"
+      ]) {
+        await agent.query("SAVEPOINT agent_immutable_boundary");
+        try {
+          await expect(agent.query(statement)).rejects.toMatchObject({ code: "42501" });
+        } finally {
+          await agent.query("ROLLBACK TO SAVEPOINT agent_immutable_boundary");
+        }
+      }
+    } finally {
+      await agent.query("ROLLBACK");
+      agent.release();
+    }
+
+    const agentWrites = await pool().query<{
+      table_schema: string;
+      table_name: string;
+      privilege_type: string;
+    }>(`
+      SELECT table_schema,table_name,privilege_type
+      FROM information_schema.role_table_grants
+      WHERE grantee='debateai_observation_agent'
+        AND privilege_type IN ('INSERT','UPDATE','DELETE','TRUNCATE')
+      ORDER BY table_schema,table_name,privilege_type
+    `);
+    expect(agentWrites.rows).toEqual([
+      { table_schema: "observation", table_name: "delivery", privilege_type: "INSERT" },
+      { table_schema: "observation", table_name: "heartbeat", privilege_type: "INSERT" },
+      { table_schema: "observation", table_name: "heartbeat", privilege_type: "UPDATE" },
+      { table_schema: "observation", table_name: "job_completion", privilege_type: "INSERT" },
+      { table_schema: "observation", table_name: "sample_hourly", privilege_type: "INSERT" },
+      { table_schema: "observation", table_name: "sample_ring", privilege_type: "INSERT" },
+      { table_schema: "observation", table_name: "sample_ring", privilege_type: "UPDATE" },
+      { table_schema: "observation", table_name: "signal", privilege_type: "INSERT" },
+      { table_schema: "observation", table_name: "threshold_policy", privilege_type: "INSERT" }
+    ]);
+  });
+
   it("keeps signal vocabulary closed and immutable rows trigger-guarded", async () => {
     await expect(pool().query(`
       INSERT INTO observation.signal(
