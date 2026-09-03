@@ -25,13 +25,31 @@ afterAll(async () => {
 });
 
 describe("OBS-01 four liveness probes and state transitions", () => {
-  it("loads the committed OBS-01 target fragment with all four components", async () => {
+  it("loads the exact four OBS-01 target contracts alongside additive slice targets", async () => {
     const { loadObservationTargets } = await import(
       "../../apps/observation-agent/src/core/targets.js"
     );
-    expect((await loadObservationTargets("deploy/observation-agent/targets.dev.d"))
-      .map((target) => target.component).sort()).toEqual([
-      "docker", "hatchet", "observation_agent", "postgres"
+    const coreComponents = new Set(["docker", "hatchet", "observation_agent", "postgres"]);
+    const coreTargets = (await loadObservationTargets("deploy/observation-agent/targets.dev.d"))
+      .filter((target) => coreComponents.has(target.component))
+      .sort((left, right) => left.component.localeCompare(right.component));
+    expect(coreTargets).toEqual([
+      { component: "docker", kind: "docker" },
+      {
+        component: "hatchet",
+        kind: "hatchet",
+        live_url: "http://127.0.0.1:8888/api/live",
+        ready_url: "http://127.0.0.1:8888/api/ready",
+        container: "debateai-v3-hatchet-lite-1"
+      },
+      { component: "observation_agent", kind: "self" },
+      {
+        component: "postgres",
+        kind: "postgres",
+        host: "127.0.0.1",
+        port: 55_432,
+        container: "debateai-v3-postgres-1"
+      }
     ]);
   });
 
