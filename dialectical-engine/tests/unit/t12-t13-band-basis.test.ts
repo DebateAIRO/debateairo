@@ -332,7 +332,12 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
    * goal-v4, which says a run that reaches its round bound with the evaluator
    * still objecting SERVES REGARDLESS, carrying the objection as a visible mark.
    * This one uses the ladder the engine already has: the run serves, the mark is
-   * emitted, and the terminal is DOWNGRADED — T13's own honest downgrade.
+   * emitted, and the terminal is DOWNGRADED — the floor of the terminal ladder.
+   * It does NOT route through T13's REASONING-only limb: that limb is for a
+   * VERIFIED reasoning-only cited set and requires a hypothesis and a research
+   * plan, and collapsing the two causes onto it is what made a one-segment
+   * tracing-failed run crash. The two are separated, and the arm below pins
+   * that this one serves at any segment count.
    *
    * What the band does. `conforms` is a live axis of the cited-set filter, so a
    * failed citation-tracing criterion leaves NO verified segment and the basis

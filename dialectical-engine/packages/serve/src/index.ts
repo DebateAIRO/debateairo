@@ -870,12 +870,18 @@ export async function runServeGateChain(
    *     moment a sampling path returns.
    *   · `conforms` — the live one. Under this chain every judgement carries the
    *     same `finalCriteria.citationTracing`, so a failed tracing criterion
-   *     empties the cited set and the empty-basis guard below refuses loudly.
+   *     empties the cited set. That case does NOT reach S08's empty-basis guard
+   *     below — it is separated out at `citationTracingFailed`, serves what was
+   *     composed, and reports the band at the register row's FLOOR. The guard
+   *     still refuses the different input it was written for: a statement that
+   *     cites nothing while tracing SUCCEEDED.
    *
-   * This is deliberately NOT a fifth COMPONENTS_ONLY crash class. goal-v4
-   * re-routes the conformance gate to an objection criterion and closes the
-   * terminal at four ("no non-crash path returns COMPONENTS_ONLY"); adding one
-   * would need a goal override. The purpose V ruled is satisfied without one.
+   * This is deliberately NOT a fifth COMPONENTS_ONLY crash class, and not a
+   * refusal either. goal-v4 re-routes the conformance gate to an objection
+   * criterion, closes the terminal at four ("no non-crash path returns
+   * COMPONENTS_ONLY"), and says a run reaching its round bound with the
+   * evaluator still objecting SERVES REGARDLESS. The purpose V ruled is
+   * satisfied without touching any of that.
    */
   const verifiedSegmentIds = new Set(
     conformance
