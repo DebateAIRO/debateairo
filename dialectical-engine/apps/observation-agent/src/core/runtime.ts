@@ -12,6 +12,7 @@ import {
   STATUS_STATES,
   STATUS_TEMPLATES,
   STATUS_UNITS,
+  STATUS_VIEW_PATTERN,
   type ModuleConfigurationObject,
   type Module,
   type ModuleStatusProjection,
@@ -26,6 +27,8 @@ const sampleIntentSchema = z.object({
   value: z.number().finite(),
   observedAt: z.date()
 }).strict();
+
+const statusViewSchema = z.string().regex(STATUS_VIEW_PATTERN);
 
 const probeObservationSchema = z.object({
   component: z.enum(OBSERVATION_COMPONENTS),
@@ -45,6 +48,7 @@ const probeObservationSchema = z.object({
       kind: z.literal("state"),
       key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
       state: z.enum(STATUS_STATES),
+      view: statusViewSchema.optional(),
       observedAt: z.date().optional()
     }).strict(),
     z.object({
@@ -52,18 +56,21 @@ const probeObservationSchema = z.object({
       key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
       value: z.number().finite(),
       unit: z.enum(STATUS_UNITS),
+      view: statusViewSchema.optional(),
       observedAt: z.date().optional()
     }).strict(),
     z.object({
       kind: z.literal("timestamp"),
       key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
-      value: z.date().nullable()
+      value: z.date().nullable(),
+      view: statusViewSchema.optional()
     }).strict(),
     z.object({
       kind: z.literal("template"),
       key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
       template: z.enum(STATUS_TEMPLATES),
-      count: z.number().int().nonnegative().optional()
+      count: z.number().int().nonnegative().optional(),
+      view: statusViewSchema.optional()
     }).strict()
   ])).max(128).optional()
 }).strict().superRefine((observation, context) => {
@@ -95,6 +102,7 @@ function parseProbeObservation(input: unknown): ProbeObservation {
             kind: projection.kind,
             key: projection.key,
             state: projection.state,
+            ...(projection.view === undefined ? {} : { view: projection.view }),
             ...(projection.observedAt === undefined ? {} : { observedAt: projection.observedAt })
           });
         }
@@ -104,15 +112,24 @@ function parseProbeObservation(input: unknown): ProbeObservation {
             key: projection.key,
             value: projection.value,
             unit: projection.unit,
+            ...(projection.view === undefined ? {} : { view: projection.view }),
             ...(projection.observedAt === undefined ? {} : { observedAt: projection.observedAt })
           });
         }
-        if (projection.kind === "timestamp") return Object.freeze(projection);
+        if (projection.kind === "timestamp") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            value: projection.value,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
         return Object.freeze({
           kind: projection.kind,
           key: projection.key,
           template: projection.template,
-          ...(projection.count === undefined ? {} : { count: projection.count })
+          ...(projection.count === undefined ? {} : { count: projection.count }),
+          ...(projection.view === undefined ? {} : { view: projection.view })
         });
       }))
     })

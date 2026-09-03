@@ -151,7 +151,7 @@ describe("OBS-01 typed durable journal", () => {
       },
       {
         class: "CAPACITY", impact_code: "IMPACT_PG_CAPACITY",
-        evidence: { count: 81, limit: 100, percent: 81, threshold_percent: 80, unit: "connections" }
+        evidence: { used: 81, max: 100, percent: 81, threshold_percent: 80, unit: "connections" }
       },
       {
         class: "CAPACITY", impact_code: "IMPACT_PG_LOCKS",
@@ -247,6 +247,73 @@ describe("OBS-01 typed durable journal", () => {
         window_minutes: 5, observed_at: timestamp, product_text: "private debate text"
       }
     })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+  });
+
+  it("accepts only measured used/max Postgres connection evidence and renders those values", async () => {
+    const { renderImpact, signalSchema } = await import(
+      "../../apps/observation-agent/src/core/signals.js"
+    );
+    const measured = {
+      ...openSignal(203),
+      class: "CAPACITY",
+      component: "postgres",
+      severity: "SEVERE",
+      impact_code: "IMPACT_PG_CAPACITY",
+      evidence: {
+        used: 31,
+        max: 100,
+        percent: 31,
+        threshold_percent: 20,
+        unit: "connections"
+      }
+    };
+    expect(() => signalSchema.parse(measured)).not.toThrow();
+    expect(renderImpact(measured)).toBe(
+      "Postgres is at 31/100 connections: new requests fail when the limit is reached."
+    );
+    expect(() => signalSchema.parse({
+      ...measured,
+      evidence: {
+        count: 31,
+        limit: 100,
+        percent: 31,
+        threshold_percent: 20,
+        unit: "connections"
+      }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...measured,
+      evidence: {
+        used: 31,
+        max: 100,
+        count: 31,
+        limit: 100,
+        percent: 31,
+        threshold_percent: 20,
+        unit: "connections"
+      }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...measured,
+      state: "CLEARED",
+      impact_code: "IMPACT_CLEARED",
+      evidence: { duration_seconds: 30 },
+      clears_signal_id: "00000000-0000-4000-8000-000000000203"
+    })).not.toThrow();
+    expect(() => signalSchema.parse({
+      ...measured,
+      state: "CLEARED",
+      impact_code: "IMPACT_CLEARED",
+      evidence: {
+        count: 31,
+        limit: 100,
+        percent: 31,
+        threshold_percent: 20,
+        unit: "connections",
+        duration_seconds: 30
+      },
+      clears_signal_id: "00000000-0000-4000-8000-000000000203"
+    })).not.toThrow();
   });
 
   it("fsyncs one JSON line before a mirror can observe the signal", async () => {

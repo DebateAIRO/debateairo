@@ -110,7 +110,7 @@ export async function loadObservationTargetCatalog(directory: string): Promise<O
       .sort();
     const targets: ObservationTarget[] = [];
     const fragments: ModuleTargetFragment[] = [];
-    const components = new Set<string>();
+    const targetIdentities = new Set<string>();
     const configurationOwners = new Set<string>();
     for (const basename of basenames) {
       const fragment: z.infer<typeof targetFragmentSchema> = targetFragmentSchema.parse(JSON.parse(
@@ -125,10 +125,11 @@ export async function loadObservationTargetCatalog(directory: string): Promise<O
       }
       const fragmentTargets: ObservationTarget[] = [];
       for (const target of fragment.targets) {
-        if (components.has(target.component)) {
+        const identity = `${target.component}:${target.kind}`;
+        if (targetIdentities.has(identity)) {
           throw new ObservationError("OBSERVATION_DUPLICATE_TARGET");
         }
-        components.add(target.component);
+        targetIdentities.add(identity);
         const frozen = Object.freeze(target);
         fragmentTargets.push(frozen);
         targets.push(frozen);

@@ -180,6 +180,15 @@ const capacityCountEvidenceSchema = z.object({
   observed_at: timestamp.optional()
 }).strict();
 
+const postgresCapacityEvidenceSchema = z.object({
+  used: finiteNonnegative,
+  max: finitePositive,
+  percent: finiteNonnegative,
+  threshold_percent: finiteNonnegative,
+  unit: z.literal("connections"),
+  observed_at: timestamp.optional()
+}).strict();
+
 const capacityDurationEvidenceSchema = z.object({
   count: finiteNonnegative.optional(),
   duration_seconds: finiteNonnegative,
@@ -330,7 +339,7 @@ const clearedEvidenceByClass = {
 
 const evidenceByImpact = {
   IMPACT_PG_DOWN: livenessEvidenceSchema,
-  IMPACT_PG_CAPACITY: capacityCountEvidenceSchema,
+  IMPACT_PG_CAPACITY: postgresCapacityEvidenceSchema,
   IMPACT_PG_LOCKS: capacityDurationEvidenceSchema,
   IMPACT_PG_LONG_XACT: capacityDurationEvidenceSchema,
   IMPACT_DOCKER_DOWN: livenessEvidenceSchema,
@@ -506,7 +515,7 @@ function stringEvidence(signal: RenderableSignal, key: string): string {
 
 const IMPACT_RENDERERS: Readonly<Record<ImpactCode, (signal: RenderableSignal) => string>> = Object.freeze({
   IMPACT_PG_DOWN: () => "Postgres is down: every debate read and write fails; nothing can be dispatched or recorded.",
-  IMPACT_PG_CAPACITY: (s) => `Postgres is at ${numberEvidence(s, "count")}/${numberEvidence(s, "limit")} connections: new requests fail when the limit is reached.`,
+  IMPACT_PG_CAPACITY: (s) => `Postgres is at ${numberEvidence(s, "used")}/${numberEvidence(s, "max")} connections: new requests fail when the limit is reached.`,
   IMPACT_PG_LOCKS: (s) => `${numberEvidence(s, "count")} Postgres sessions have waited on locks for ${numberEvidence(s, "duration_seconds")} seconds: requests are queuing behind each other.`,
   IMPACT_PG_LONG_XACT: (s) => `A transaction has been open for ${numberEvidence(s, "duration_seconds")} seconds: vacuum and locks are held back.`,
   IMPACT_DOCKER_DOWN: () => "The Docker engine is unreachable: Postgres and Hatchet state is unknown.",

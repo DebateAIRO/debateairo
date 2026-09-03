@@ -227,6 +227,7 @@ async function boot(): Promise<void> {
             kind: projection.kind,
             key: projection.key,
             state: projection.state,
+            ...(projection.view === undefined ? {} : { view: projection.view }),
             ...(projection.observedAt === undefined ? {} : {
               observed_at: projection.observedAt.toISOString()
             })
@@ -238,6 +239,7 @@ async function boot(): Promise<void> {
             key: projection.key,
             value: projection.value,
             unit: projection.unit,
+            ...(projection.view === undefined ? {} : { view: projection.view }),
             ...(projection.observedAt === undefined ? {} : {
               observed_at: projection.observedAt.toISOString()
             })
@@ -247,14 +249,16 @@ async function boot(): Promise<void> {
           return Object.freeze({
             kind: projection.kind,
             key: projection.key,
-            value: projection.value?.toISOString() ?? null
+            value: projection.value?.toISOString() ?? null,
+            ...(projection.view === undefined ? {} : { view: projection.view })
           });
         }
         return Object.freeze({
           kind: projection.kind,
           key: projection.key,
           template: projection.template,
-          ...(projection.count === undefined ? {} : { count: projection.count })
+          ...(projection.count === undefined ? {} : { count: projection.count }),
+          ...(projection.view === undefined ? {} : { view: projection.view })
         });
       });
       if (projections.length === 0) moduleStatus.delete(moduleName);

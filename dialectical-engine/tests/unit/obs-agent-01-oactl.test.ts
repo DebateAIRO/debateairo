@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const scratchDirectories: string[] = [];
@@ -101,6 +101,90 @@ describe("OBS-01 core oactl controls", () => {
     expect(output).toMatch(/^hatchet\s+DOWN$/m);
     expect(output).toMatch(/^dev_stack\s+NOT_RUNNING$/m);
     expect(output).toMatch(/^evaluator_worker\s+UNBOUND by register$/m);
+  });
+
+  it("renders typed status views and rejects every invalid selector", async () => {
+    const home = await scratch("obs-01-status-views-");
+    const stateDir = join(home, ".local/state/dialectical-engine/observation-agent");
+    await mkdir(stateDir, { recursive: true });
+    await writeFile(join(stateDir, "status.json"), JSON.stringify({
+      pid: 456,
+      version: "0.1.0",
+      thresholds_version: 7,
+      mute: null,
+      components: {
+        postgres: { state: "UP", last_probe_at: null, last_ok_at: null, open_signal_ids: [] }
+      },
+      modules: {
+        "capacity-fixture": [
+          { kind: "metric", key: "postgres.connections.used", value: 31, unit: "COUNT", view: "capacity" },
+          { kind: "metric", key: "postgres.connections.max", value: 100, unit: "COUNT", view: "capacity" },
+          { kind: "template", key: "slow_queries", template: "SLOW_QUERIES_NOT_OBSERVABLE", view: "capacity" }
+        ],
+        "throughput-fixture": [
+          { kind: "metric", key: "throughput.runs", value: 4, unit: "COUNT", view: "throughput" }
+        ],
+        "unscoped-fixture": [
+          { kind: "state", key: "shared.health", state: "UP" }
+        ]
+      }
+    }));
+    const { runOactl } = await import(
+      "../../apps/observation-agent/src/oactl/core/commands.js"
+    );
+    const run = async (...args: readonly string[]) => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const code = await runOactl(["status", ...args], {
+        stdout: (value) => { stdout.push(value); },
+        stderr: (value) => { stderr.push(value); }
+      }, {
+        repoRoot: resolve("."), home, uid: 501,
+        execute: async () => undefined
+      });
+      return { code, stdout, stderr };
+    };
+
+    const capacity = await run("--capacity");
+    expect(capacity).toEqual({
+      code: 0,
+      stderr: [],
+      stdout: [[
+        `state_dir ${stateDir}`,
+        "pid 456",
+        "thresholds v7",
+        "postgres                     UP",
+        "postgres.connections.max     100 count",
+        "postgres.connections.used    31 count",
+        "slow_queries: NOT OBSERVABLE (pg_stat_statements disabled)"
+      ].join("\n")]
+    });
+    const throughput = await run("--throughput");
+    expect(throughput.stdout[0]).toContain("throughput.runs              4 count");
+    expect(throughput.stdout[0]).not.toContain("postgres.connections");
+    expect(throughput.stdout[0]).not.toContain("shared.health");
+
+    const plain = await run();
+    expect(plain.code).toBe(0);
+    expect(plain.stdout[0]).toContain("postgres.connections.used    31 count");
+    expect(plain.stdout[0]).toContain("throughput.runs              4 count");
+    expect(plain.stdout[0]).toContain("shared.health                UP");
+
+    for (const args of [
+      ["--unknown"],
+      ["--capacity", "--throughput"],
+      ["capacity"],
+      ["--"],
+      ["---capacity"],
+      ["--Capacity"],
+      ["--capacity=value"]
+    ]) {
+      await expect(run(...args)).resolves.toEqual({
+        code: 2,
+        stdout: [],
+        stderr: ["OBSERVATION_ARGUMENTS_INVALID"]
+      });
+    }
   });
 
   it("provisions one repo-root 0600 credential file without returning the secret", async () => {

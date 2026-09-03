@@ -35,12 +35,15 @@ export const STATUS_TEMPLATES = Object.freeze([
 ] as const);
 
 export type StatusTemplate = typeof STATUS_TEMPLATES[number];
+export const STATUS_VIEW_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u;
+export type StatusView = string;
 
 export type ModuleStatusProjection =
   | Readonly<{
       kind: "state";
       key: string;
       state: StatusState;
+      view?: StatusView;
       observedAt?: Date;
     }>
   | Readonly<{
@@ -48,18 +51,21 @@ export type ModuleStatusProjection =
       key: string;
       value: number;
       unit: StatusUnit;
+      view?: StatusView;
       observedAt?: Date;
     }>
   | Readonly<{
       kind: "timestamp";
       key: string;
       value: Date | null;
+      view?: StatusView;
     }>
   | Readonly<{
       kind: "template";
       key: string;
       template: StatusTemplate;
       count?: number;
+      view?: StatusView;
     }>;
 
 export interface ModuleConfigurationObject {

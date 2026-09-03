@@ -153,6 +153,74 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     });
   });
 
+  it("owns target facets by component and kind while preserving fragment scope", async () => {
+    const { loadObservationTargetCatalog } = await import(
+      "../../apps/observation-agent/src/core/targets.js"
+    );
+    const root = await scratch();
+    await writeFile(join(root, "OBS-01.json"), JSON.stringify({
+      schema_version: 1,
+      targets: [{
+        component: "hatchet", kind: "hatchet",
+        live_url: "http://127.0.0.1:8888/api/live",
+        ready_url: "http://127.0.0.1:8888/api/ready",
+        container: "debateai-v3-hatchet-lite-1"
+      }]
+    }));
+    await writeFile(join(root, "OBS-02.json"), JSON.stringify({
+      schema_version: 1,
+      targets: [{
+        component: "tls_front_door", kind: "http",
+        live_url: "https://localhost:3000/login"
+      }]
+    }));
+    await writeFile(join(root, "OBS-05.json"), JSON.stringify({
+      schema_version: 1,
+      targets: [{
+        component: "tls_front_door", kind: "certificate",
+        path: ".local/dev-auth/tls/localhost.pem"
+      }]
+    }));
+    await writeFile(join(root, "OBS-06.json"), JSON.stringify({
+      schema_version: 1,
+      targets: [{
+        component: "hatchet", kind: "hatchet_metrics",
+        rest_url: "http://127.0.0.1:8888/api/v1/tenants/local/queue-metrics"
+      }]
+    }));
+
+    const catalog = await loadObservationTargetCatalog(root);
+    expect(catalog.targets.map((target) => [target.component, target.kind])).toEqual([
+      ["hatchet", "hatchet"],
+      ["tls_front_door", "http"],
+      ["tls_front_door", "certificate"],
+      ["hatchet", "hatchet_metrics"]
+    ]);
+    expect(catalog.fragments.map((fragment) => ({
+      basename: fragment.basename,
+      facets: fragment.targets.map((target) => {
+        const facet = target as Readonly<{ component: string; kind: string }>;
+        return [facet.component, facet.kind];
+      })
+    }))).toEqual([
+      { basename: "OBS-01.json", facets: [["hatchet", "hatchet"]] },
+      { basename: "OBS-02.json", facets: [["tls_front_door", "http"]] },
+      { basename: "OBS-05.json", facets: [["tls_front_door", "certificate"]] },
+      { basename: "OBS-06.json", facets: [["hatchet", "hatchet_metrics"]] }
+    ]);
+
+    await writeFile(join(root, "OBS-06.json"), JSON.stringify({
+      schema_version: 1,
+      targets: [{
+        component: "tls_front_door", kind: "http",
+        live_url: "https://localhost:3000/api/v1/session"
+      }]
+    }));
+    await expect(loadObservationTargetCatalog(root)).rejects.toMatchObject({
+      code: "OBSERVATION_DUPLICATE_TARGET"
+    });
+  });
+
   it("preserves validated module fragments while core targets stay closed", async () => {
     const { loadObservationTargetCatalog } = await import(
       "../../apps/observation-agent/src/core/targets.js"
@@ -386,7 +454,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
             management: "module", statusState: "NOT_RUNNING",
             status: [{
               kind: "template", key: "evaluator_worker",
-              template: "EVALUATOR_UNBOUND_BY_REGISTER"
+              template: "EVALUATOR_UNBOUND_BY_REGISTER", view: "capacity"
             }]
           }] as const;
         },
@@ -410,12 +478,12 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
           management: "module", statusState: "NOT_RUNNING",
           status: [{
             kind: "template", key: "evaluator_worker",
-            template: "EVALUATOR_UNBOUND_BY_REGISTER"
+            template: "EVALUATOR_UNBOUND_BY_REGISTER", view: "capacity"
           }]
         }],
         projections: [{
           kind: "template", key: "evaluator_worker",
-          template: "EVALUATOR_UNBOUND_BY_REGISTER"
+          template: "EVALUATOR_UNBOUND_BY_REGISTER", view: "capacity"
         }]
       }
     }]);

@@ -7,7 +7,7 @@ import pg from "pg";
 import { z } from "zod";
 import { normalizeObservationError, ObservationError } from "../../core/errors.js";
 import { discoverObservationModules } from "../../core/modules.js";
-import { OBSERVATION_COMPONENTS } from "../../core/types.js";
+import { OBSERVATION_COMPONENTS, STATUS_VIEW_PATTERN } from "../../core/types.js";
 import type { OactlVerbContribution } from "../../core/types.js";
 import {
   installLaunchAgent,
@@ -96,6 +96,19 @@ function requireNoArgs(args: readonly string[]): void {
   if (args.length !== 0) throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
 }
 
+function statusView(args: readonly string[]): string | undefined {
+  if (args.length === 0) return undefined;
+  const selector = args[0];
+  if (args.length !== 1 || selector === undefined || !selector.startsWith("--")) {
+    throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
+  }
+  const view = selector.slice(2);
+  if (!STATUS_VIEW_PATTERN.test(view)) {
+    throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
+  }
+  return view;
+}
+
 function exhaustive(value: never): never {
   throw new ObservationError("OBSERVATION_VERB_UNKNOWN", value);
 }
@@ -169,8 +182,7 @@ async function runCoreVerb(
       io.stdout("KILLED");
       return 0;
     case "status":
-      requireNoArgs(args);
-      io.stdout(await renderStatus(stateDir));
+      io.stdout(await renderStatus(stateDir, statusView(args)));
       return 0;
     case "mute": {
       const duration = args[0];

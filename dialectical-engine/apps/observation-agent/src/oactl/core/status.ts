@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { statusSnapshotSchema } from "../../store/status.js";
 import { ObservationError } from "../../core/errors.js";
+import { STATUS_VIEW_PATTERN } from "../../core/types.js";
 
 type StoredProjection = NonNullable<ReturnType<typeof statusSnapshotSchema.parse>["modules"]>[string][number];
 
@@ -28,7 +29,10 @@ function renderProjection(projection: StoredProjection): string {
   return `${projection.key}: NOT OBSERVABLE`;
 }
 
-export async function renderStatus(stateDir: string): Promise<string> {
+export async function renderStatus(stateDir: string, view?: string): Promise<string> {
+  if (view !== undefined && !STATUS_VIEW_PATTERN.test(view)) {
+    throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
+  }
   try {
     const status = statusSnapshotSchema.parse(JSON.parse(
       await readFile(join(stateDir, "status.json"), "utf8")
@@ -39,8 +43,12 @@ export async function renderStatus(stateDir: string): Promise<string> {
     const moduleRows = Object.entries(status.modules ?? {})
       .sort(([left], [right]) => left.localeCompare(right))
       .flatMap(([, projections]) => [...projections]
+        .filter((projection) => view === undefined || projection.view === view)
         .sort((left, right) => left.key.localeCompare(right.key))
         .map(renderProjection));
+    if (view !== undefined && moduleRows.length === 0) {
+      throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
+    }
     return [
       `state_dir ${stateDir}`,
       `pid ${status.pid}`,
