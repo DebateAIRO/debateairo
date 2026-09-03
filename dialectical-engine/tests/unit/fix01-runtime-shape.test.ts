@@ -1,30 +1,19 @@
+import { readFileSync } from "node:fs";
+
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   startCaptureRuntime,
   stopCaptureRuntime,
-  type CaptureRuntimeHandle,
+  type CaptureRuntimeStartOptions,
   type CaptureRuntimeName,
+  type FatalExitSink,
+  type RuntimeCaptureModule,
 } from "@debateai/obs-capture/runtime";
 import { readObsBounds } from "../../packages/obs-capture/src/runtime/config.js";
 
-type FatalExitSink = () => void;
-
-interface FrozenRuntimeCaptureModuleContract {
-  readonly startCaptureRuntime: (options: {
-    readonly runtime: CaptureRuntimeName;
-    readonly spoolFd: number | undefined;
-    readonly installExitSink: (nextExitSink: FatalExitSink) => void;
-  }) => Promise<CaptureRuntimeHandle>;
-  readonly stopCaptureRuntime: (
-    handle: CaptureRuntimeHandle,
-    options: { readonly deadlineMs: number },
-  ) => Promise<void>;
-}
-
-const runtimeModule: FrozenRuntimeCaptureModuleContract = {
+const installerModule: RuntimeCaptureModule = {
   startCaptureRuntime,
-  stopCaptureRuntime,
 };
 
 const OBS_KEYS = [
@@ -47,19 +36,46 @@ afterEach(() => {
 
 describe("FIX-01 runtime module contract", () => {
   it("keeps the named installer arguments and explicit stop deadline", () => {
-    expect(runtimeModule.startCaptureRuntime).toBe(startCaptureRuntime);
-    expect(runtimeModule.stopCaptureRuntime).toBe(stopCaptureRuntime);
+    expect(installerModule.startCaptureRuntime).toBe(startCaptureRuntime);
+    expectTypeOf<CaptureRuntimeStartOptions>().toEqualTypeOf<{
+      readonly runtime: CaptureRuntimeName;
+      readonly spoolFd: number | undefined;
+      readonly installExitSink: (nextExitSink: FatalExitSink) => void;
+    }>();
     expectTypeOf<Parameters<typeof startCaptureRuntime>>().toEqualTypeOf<[
-      {
-        readonly runtime: CaptureRuntimeName;
-        readonly spoolFd: number | undefined;
-        readonly installExitSink: (nextExitSink: FatalExitSink) => void;
-      },
+      CaptureRuntimeStartOptions,
     ]>();
+    expectTypeOf<ReturnType<typeof startCaptureRuntime>>().toEqualTypeOf<
+      Promise<void>
+    >();
     expectTypeOf<Parameters<typeof stopCaptureRuntime>>().toEqualTypeOf<[
-      CaptureRuntimeHandle,
       { readonly deadlineMs: number },
     ]>();
+
+    const installers = ["api", "runner", "scheduler"] as const;
+    for (const name of installers) {
+      const source = readFileSync(
+        new URL(`../../packages/obs-capture/install/${name}.ts`, import.meta.url),
+        "utf8",
+      );
+      expect(source).toMatch(/readonly runtime: typeof RUNTIME/);
+      expect(source).toMatch(/readonly spoolFd: number \| undefined/);
+      expect(source).toMatch(/readonly installExitSink:/);
+      expect(source).toMatch(/\}\) => void \| Promise<void>/);
+
+      const privateStartContract = source.match(
+        /interface RuntimeCaptureModule\s*\{\s*readonly startCaptureRuntime: \(options: \{(?<options>[\s\S]*?)\}\) => void \| Promise<void>;\s*\}/,
+      );
+      expect(privateStartContract).not.toBeNull();
+      expect(
+        Array.from(
+          privateStartContract?.groups?.options?.matchAll(
+            /readonly\s+([A-Za-z_$][\w$]*)\s*:/g,
+          ) ?? [],
+          (match) => match[1],
+        ),
+      ).toEqual(["runtime", "spoolFd", "installExitSink"]);
+    }
   });
 
   it("uses disclosed defaults when OBS bounds are absent", () => {

@@ -10,24 +10,31 @@ export type CaptureRuntimeName =
   | "watchdog"
   | "ingest";
 
-type FatalExitSink = () => void;
+export type FatalExitSink = () => void;
 
-export interface CaptureRuntimeHandle {
-  readonly runtime: CaptureRuntimeName;
-}
-
-export async function startCaptureRuntime(options: {
+export interface CaptureRuntimeStartOptions {
   readonly runtime: CaptureRuntimeName;
   readonly spoolFd: number | undefined;
   readonly installExitSink: (nextExitSink: FatalExitSink) => void;
-}): Promise<CaptureRuntimeHandle> {
+}
+
+export interface RuntimeCaptureModule {
+  readonly startCaptureRuntime: (
+    options: CaptureRuntimeStartOptions,
+  ) => void | Promise<void>;
+}
+
+export async function startCaptureRuntime(
+  options: CaptureRuntimeStartOptions,
+): Promise<void> {
   void pg;
-  return Object.freeze({ runtime: options.runtime });
+  void options;
 }
 
 export async function stopCaptureRuntime(
-  _handle: CaptureRuntimeHandle,
-  _options: { readonly deadlineMs: number },
-): Promise<void> {}
+  options: { readonly deadlineMs: number },
+): Promise<void> {
+  void options;
+}
 
 export { readObsBounds, type ObsBounds } from "./config.js";
