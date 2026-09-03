@@ -1142,6 +1142,28 @@ describe.sequential("FIX-01 C4 hostile spool boundaries", () => {
     expect(existsSync(`${path}.ingested`)).toBe(false);
   });
 
+  it("rejects an indexed hardlinked source before any sink call or publication", async () => {
+    const directory = createScratchDirectory();
+    const envelope = safeEnvelope("scheduler");
+    const victimPath = join(directory, "source-hardlink-victim");
+    const sourcePath = join(directory, spoolName("scheduler", DEAD_PID));
+    const original = Buffer.from(serializedEnvelope(envelope), "utf8");
+    writeFileSync(victimPath, original, { mode: 0o600 });
+    linkSync(victimPath, sourcePath);
+    appendIndexRecord(directory, basename(sourcePath));
+    const victimNlink = statSync(victimPath).nlink;
+    const result = recordingSink();
+
+    await drainWithSink(directory, result.sink, false);
+
+    expect(result.calls).toHaveLength(0);
+    expect(readFileSync(victimPath)).toEqual(original);
+    expect(readFileSync(sourcePath)).toEqual(original);
+    expect(statSync(victimPath).nlink).toBe(victimNlink);
+    expect(existsSync(`${sourcePath}.ingested`)).toBe(false);
+    expect(existsSync(expectedStagingPath(sourcePath))).toBe(false);
+  });
+
   it("makes fair bounded progress across a large retained completion backlog", async () => {
     const directory = createScratchDirectory();
     const paths = Array.from(
@@ -1987,7 +2009,41 @@ describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
     expect(readFileSync(stagePath)).toEqual(readFileSync(path));
     expect(readFileSync(`${path}.ingested`)).toEqual(readFileSync(path));
     expect(statSync(stagePath).ino).toBe(statSync(`${path}.ingested`).ino);
+    expect(statSync(stagePath).nlink).toBe(2);
+    expect(statSync(`${path}.ingested`).nlink).toBe(2);
     expect(existsSync(path)).toBe(true);
+  });
+
+  it.each([
+    { label: "exact bytes", exact: true },
+    { label: "different bytes", exact: false },
+  ])("does not publish a planted $label stage hardlink", async ({ exact }) => {
+    const directory = createScratchDirectory();
+    const envelope = safeEnvelope("scheduler");
+    const sourcePath = join(directory, spoolName("scheduler", DEAD_PID));
+    writeEnvelope(sourcePath, envelope);
+    const sourceBytes = readFileSync(sourcePath);
+    const stagePath = expectedStagingPath(sourcePath);
+    const victimPath = join(directory, `stage-victim-${exact ? "exact" : "different"}`);
+    const victimBytes = exact
+      ? sourceBytes
+      : Buffer.from("DIFFERENT-STAGE-VICTIM\n", "utf8");
+    writeFileSync(victimPath, victimBytes, { mode: 0o600 });
+    linkSync(victimPath, stagePath);
+    appendIndexRecord(directory, basename(sourcePath));
+    const victimNlink = statSync(victimPath).nlink;
+    const result = recordingSink();
+
+    await drainWithSink(directory, result.sink, false);
+
+    expect(result.calls.map((entry) => entry.source_event_ref)).toEqual([
+      envelope.source_event_ref,
+    ]);
+    expect(readFileSync(sourcePath)).toEqual(sourceBytes);
+    expect(existsSync(`${sourcePath}.ingested`)).toBe(false);
+    expect(readFileSync(victimPath)).toEqual(victimBytes);
+    expect(readFileSync(stagePath)).toEqual(victimBytes);
+    expect(statSync(victimPath).nlink).toBe(victimNlink);
   });
 
   it("resumes a completion left staged by a crash before publication", async () => {

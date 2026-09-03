@@ -113,6 +113,7 @@ async function snapshotStillMatches(
   const descriptorStat = await handle.stat();
   if (
     !descriptorStat.isFile()
+    || descriptorStat.nlink !== 1
     || !sameIdentity(descriptorStat, expected)
     || descriptorStat.size !== bytes.length
   ) {
@@ -121,7 +122,9 @@ async function snapshotStillMatches(
   const currentBytes = await readExactBytes(handle, bytes.length);
   if (currentBytes === undefined || !currentBytes.equals(bytes)) return false;
   const pathStat = await lstat(path);
-  return pathStat.isFile() && sameIdentity(pathStat, expected);
+  return pathStat.isFile()
+    && pathStat.nlink === 1
+    && sameIdentity(pathStat, expected);
 }
 
 async function exactCompletionExists(
@@ -201,10 +204,12 @@ async function materializeCompletion(
     const stagePathStat = await lstat(stagePath);
     if (
       !stageStat.isFile()
+      || stageStat.nlink !== 1
       || stageStat.size !== bytes.length
       || staged === undefined
       || !staged.equals(bytes)
       || !stagePathStat.isFile()
+      || stagePathStat.nlink !== 1
       || !sameIdentity(stagePathStat, stageStat)
     ) {
       return false;
@@ -216,6 +221,21 @@ async function materializeCompletion(
         sourceIdentity,
         bytes,
       ))
+    ) {
+      return false;
+    }
+    const finalStageStat = await stageHandle.stat();
+    const finalStaged = await readExactBytes(stageHandle, bytes.length);
+    const finalStagePathStat = await lstat(stagePath);
+    if (
+      !finalStageStat.isFile()
+      || finalStageStat.nlink !== 1
+      || finalStageStat.size !== bytes.length
+      || finalStaged === undefined
+      || !finalStaged.equals(bytes)
+      || !finalStagePathStat.isFile()
+      || finalStagePathStat.nlink !== 1
+      || !sameIdentity(finalStagePathStat, finalStageStat)
     ) {
       return false;
     }
@@ -232,8 +252,14 @@ async function materializeCompletion(
     }
     const destinationStat = await lstat(destination);
     const currentStageStat = await lstat(stagePath);
-    return destinationStat.isFile()
+    const currentStageDescriptor = await stageHandle.stat();
+    return currentStageDescriptor.isFile()
+      && currentStageDescriptor.nlink === 2
+      && destinationStat.isFile()
+      && destinationStat.nlink === 2
       && currentStageStat.isFile()
+      && currentStageStat.nlink === 2
+      && sameIdentity(currentStageDescriptor, stageStat)
       && sameIdentity(destinationStat, stageStat)
       && sameIdentity(currentStageStat, stageStat)
       && await exactCompletionExists(destination, bytes);
@@ -270,7 +296,7 @@ async function drainFile(
   if (ownerMayBeAlive(parsed.pid)) return false;
   const path = join(directory, name);
   const pathStat = await lstat(path);
-  if (!pathStat.isFile()) return false;
+  if (!pathStat.isFile() || pathStat.nlink !== 1) return false;
   const handle = await open(
     path,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
@@ -279,6 +305,7 @@ async function drainFile(
     const fileStat = await handle.stat();
     if (
       !fileStat.isFile()
+      || fileStat.nlink !== 1
       || !sameIdentity(fileStat, pathStat)
       || !Number.isSafeInteger(fileStat.size)
       || fileStat.size < 0
@@ -312,6 +339,9 @@ async function drainFile(
       }
       if (!isSerializedSafeEnvelope(value, parsed.runtime)) return false;
       envelopes.push(value as unknown as PostRedactionEnvelope);
+    }
+    if (!(await snapshotStillMatches(handle, path, fileStat, bytes))) {
+      return false;
     }
     for (const envelope of envelopes) {
       budget.remainingTransactions -= 1;

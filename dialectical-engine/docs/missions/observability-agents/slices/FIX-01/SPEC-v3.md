@@ -61,13 +61,14 @@ For `PASS_INDEXED`, the verifier must:
 
 1. `lstat` every directory entry without following a symlink.
 2. Sort by basename and reject duplicate or non-canonical names. A non-canonical name is represented in durable evidence only by an opaque SHA-256 reference; its raw bytes must not appear in the manifest or command output.
-3. Treat every canonical `.spool` regular file with `nlink === 1` as a candidate, including zero-byte, partial, invalid, and oversized files. Unsafe entries are retained and recorded as rejected; they are never opened through a followed link.
-4. Stream each candidate to compute SHA-256, then prove unchanged `dev`, `ino`, `nlink`, `size`, and `mtimeMs` with descriptor and pathname checks.
-5. Classify the bytes as `lawful_empty`, `lawful_envelopes`, or `retained_invalid_bytes`. A lawful spool is an empty file or a file whose complete newline-delimited records all satisfy the frozen durable-envelope contract. Invalid and partial candidates are still indexed and retained so they are visible to the bounded runtime reader; they are not silently discarded.
-6. Create or append self-delimiting index records for every candidate not already covered. It must not delete, rename, truncate, or overwrite a spool.
-7. Verify the index is a regular single-link file, verify every lawful spool is covered, and verify the index's final exact bytes by SHA-256.
-8. Repeat the sorted source-entry snapshot. Source-entry snapshots exclude the two reserved index/cursor basenames, which are verified separately. Any source-entry difference is `FAIL_CHANGED`.
-9. Re-read the index after the second source snapshot and immediately before manifest construction. Its descriptor/path identity, size, modification time, and exact SHA-256 must equal the evidence returned by repair; any difference is `FAIL_CHANGED`.
+3. Before any index repair, parse the PID from every canonical regular single-link candidate and call `process.kill(pid, 0)`. Only `ESRCH` proves the PID dead. A successful probe or any other error, including permission denial, is `FAIL_LIVE_OWNER`; it writes no index or manifest. Because V has stopped every instrumented process, any live numeric PID is stale or reused and blocks release.
+4. Treat every dead-PID canonical `.spool` regular file with `nlink === 1` as a candidate, including zero-byte, partial, invalid, and oversized files. Unsafe entries are retained and recorded as rejected; they are never opened through a followed link.
+5. Stream each candidate to compute SHA-256, then prove unchanged `dev`, `ino`, `nlink`, `size`, and `mtimeMs` with descriptor and pathname checks.
+6. Classify the bytes as `lawful_empty`, `lawful_envelopes`, or `retained_invalid_bytes`. A lawful spool is an empty file or a file whose complete newline-delimited records all satisfy the frozen durable-envelope contract. Invalid and partial candidates are still indexed and retained so they are visible to the bounded runtime reader; they are not silently discarded.
+7. Create or append self-delimiting index records for every candidate not already covered. Before an append, reject an unterminated canonical index tail that names a rejected source, because the leading delimiter would frame it. It must not delete, rename, truncate, or overwrite a spool.
+8. Verify the index is a regular single-link file, verify every lawful spool is covered, and verify that no complete member or canonical unterminated tail names a rejected source. Verify the index's final exact bytes by SHA-256.
+9. Repeat the sorted source-entry snapshot. Source-entry snapshots exclude the two reserved index/cursor basenames, which are verified separately. Any source-entry difference is `FAIL_CHANGED`.
+10. Re-read the index after the second source snapshot and immediately before manifest construction. Its descriptor/path identity, size, modification time, and exact SHA-256 must equal the evidence returned by repair, and no member or canonical unterminated tail may name any source rejected by the repeated snapshot. Any change is `FAIL_CHANGED`; rejected membership is `FAIL_UNSAFE_INDEX_MEMBER`.
 
 The manifest is canonical JSON and contains at least:
 
@@ -164,6 +165,8 @@ The implementation must defend against all of the following at rest or before th
 
 Safe rejection means no SQL for an unverified candidate, no mutation of an unrelated inode, no deletion of the source, and no fabricated completion.
 
+Offline admission is stricter than runtime PID skipping: V has already stopped every instrumented process, so a canonical candidate whose PID probe does not return `ESRCH` blocks admission before index repair. After that unrelated process exits and the probe returns `ESRCH`, the same unchanged candidate may be admitted and becomes eligible for bounded drain.
+
 ### FIX-01-V3-R05 — out of scope
 
 An active malicious same-UID actor that mutates the namespace after the final pathname check is outside the portable Node guarantee. This actor can already plant filenames, rename sources, kill the process, or modify the process and its files. Portable Node exposes no descriptor-relative transaction that makes all pathname publication steps race-free.
@@ -200,7 +203,9 @@ For `.obs-spool-index-v1` and `.obs-spool-cursor-v1`, verify `nlink === 1` on bo
 
 At release admission, each candidate spool must be a regular single-link file and must remain the same descriptor/path identity through both source snapshots. Indexed installers exclusively create their spool and perform the final regular-file, same-inode pathname check before arming; the post-check actor excluded by R05 is not converted into an in-scope promise.
 
-Completion markers follow different link-count semantics because publication itself is a hardlink. A newly created stage begins as a single-link file; after stage-to-completion publication, the verified stage and completion paths normally reference the same inode with `nlink === 2`. Therefore `nlink === 2` on that exact verified pair is not by itself a conflict. An existing stage or completion object is never overwritten or truncated and never proves database persistence: byte-different objects are retained as conflicts; byte-identical objects are only status hints after the R06 database transaction. Every unrelated victim inode remains byte-identical.
+Runtime drain independently requires the indexed source pathname and held descriptor to be the same regular inode with `nlink === 1` at open and again after the exact-byte read immediately before the first database transaction. A hardlinked source produces no SQL and no completion.
+
+Completion markers follow different link-count semantics because publication itself is a hardlink. Immediately before publication, the held stage descriptor and stage pathname must be the same regular inode with `nlink === 1`. After publication, the held descriptor, stage pathname, and completion pathname must be the same regular inode with `nlink === 2`. Therefore `nlink === 2` on that exact verified pair is not by itself a conflict. An existing stage or completion object is never overwritten or truncated and never proves database persistence: byte-different objects are retained as conflicts; byte-identical objects are only status hints after the R06 database transaction. Every unrelated victim inode remains byte-identical.
 
 ## 6. C5 scheduler lifecycle contract
 
@@ -415,6 +420,9 @@ No C5 edit is authorized in API or runner installers.
 10. False marker: pre-create a byte-identical completion before SQL. Assert the database transaction still executes and database idempotence decides the duplicate.
 11. Runtime bound: static and runtime probes prove no product `readdir`, walk, or glob and preserve 8,192-byte, 64-record, and 128-transaction limits.
 12. Boundary probe: a replacement before the final check must be rejected. A malicious replacement injected after the final check is documented as the R05 excluded actor and is not a release-gating promise of race-free publication.
+13. Rejected EOF tail: put a rejected canonical hardlink basename at the index EOF without LF and add a missing lawful candidate. Admission must fail with no PASS manifest before the repair append can frame the rejected name; the index remains byte-identical. Real bounded drain makes zero SQL calls, and victim bytes and link count remain unchanged.
+14. Runtime hardlinks: directly index a valid-envelope source hardlink and plant both exact-byte and byte-different stage hardlinks. The source hardlink makes zero SQL calls. Neither stage is published or changes its victim link count. A normal stage still publishes only as the verified two-link stage/completion pair.
+15. Live PID: use a canonical candidate whose PID is a real unrelated live child. Admission fails before index or manifest creation. After the child exits and the PID probe returns `ESRCH`, admission and bounded drain succeed for the unchanged source.
 
 Required C4 mutants:
 
@@ -423,8 +431,12 @@ Required C4 mutants:
 - overwrite, truncate, or trust a stage/completion hardlink as database proof: marker/database-authority test fails;
 - reopen a missing cursor with nonexclusive `O_CREAT` before truncate: cursor-creation test fails;
 - omit one lawful legacy basename from the index: admission coverage fails;
+- admit a rejected complete member or canonical unterminated tail in the final index: rejected EOF-tail admission fails;
 - allow a changed second snapshot: stable-snapshot test fails;
 - call the offline verifier or enumerate the directory from runtime: architecture test fails;
+- accept an indexed source whose descriptor or pathname has `nlink > 1`, or omit the immediate pre-transaction recheck: source-hardlink test fails;
+- accept a stage with `nlink > 1` before publication or a published stage/completion set whose link count is not exactly two: stage-hardlink and normal-publication tests fail;
+- treat a successful or non-`ESRCH` PID probe as dead, or repair the index before the probe: live-PID admission test fails;
 - skip SQL because a completion name exists: false-marker test fails; and
 - delete or rename a source after completion: source-retention test fails.
 

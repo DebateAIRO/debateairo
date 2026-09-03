@@ -27,6 +27,7 @@ import {
 const VERIFIER_VERSION = "fix01-release-admission-v1";
 const IMMUTABLE_BUILD_REF = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const SPOOL_RUNTIME = /^(api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-/u;
+const SPOOL_PID = /^(?:api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-([1-9][0-9]*)-/u;
 const INDEX_LINE_MAX_BYTES = 127;
 const IO_CHUNK_BYTES = 64 * 1024;
 
@@ -65,6 +66,7 @@ interface ReadFileResult {
 
 interface IndexState extends ReadFileResult {
   readonly basenames: ReadonlySet<string>;
+  readonly unterminatedBasename: string | undefined;
 }
 
 interface Arguments {
@@ -313,6 +315,21 @@ function runtimeFromBasename(name: string): SafeRuntimeName {
   return runtime as SafeRuntimeName;
 }
 
+function pidFromBasename(name: string): number {
+  const pid = Number(SPOOL_PID.exec(name)?.[1]);
+  if (!Number.isSafeInteger(pid) || pid <= 0) fail("FAIL_UNSAFE_PID");
+  return pid;
+}
+
+function ownerMayBeAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return errorCode(error) !== "ESRCH";
+  }
+}
+
 async function readCandidate(
   filePath: string,
   name: string,
@@ -426,6 +443,7 @@ async function sourceSnapshot(directory: string): Promise<SourceSnapshot> {
       && pathStat.isFile()
       && pathStat.nlink === 1n
     ) {
+      if (ownerMayBeAlive(pidFromBasename(name))) fail("FAIL_LIVE_OWNER");
       entries.push(await readCandidate(filePath, name, pathStat));
       continue;
     }
@@ -483,7 +501,11 @@ async function readIndex(directory: string): Promise<IndexState | undefined> {
       }
     }
   });
-  return { ...result, basenames };
+  const unterminatedBasename = !overlong && line.length > 0
+    && isIndexedSpoolBasename(line.toString("utf8"))
+    ? line.toString("utf8")
+    : undefined;
+  return { ...result, basenames, unterminatedBasename };
 }
 
 async function readReserved(
@@ -545,15 +567,7 @@ async function repairIndex(
   initialIndex: IndexState | undefined,
 ): Promise<IndexState> {
   const candidates = source.entries.filter((entry) => entry.kind === "candidate");
-  const rejectedCanonical = source.entries.filter((entry) =>
-    entry.kind === "rejected_unsafe_path"
-    && isIndexedSpoolBasename(entry.basename)
-  );
-  for (const rejected of rejectedCanonical) {
-    if (initialIndex?.basenames.has(rejected.basename)) {
-      fail("FAIL_UNSAFE_INDEX_MEMBER");
-    }
-  }
+  assertNoRejectedIndexMembers(source, initialIndex);
   let indexed = initialIndex?.basenames ?? new Set<string>();
   for (const candidate of candidates) {
     if (indexed.has(candidate.basename)) continue;
@@ -574,7 +588,29 @@ async function repairIndex(
   for (const candidate of candidates) {
     if (!finalIndex.basenames.has(candidate.basename)) fail("FAIL_INDEX_COVERAGE");
   }
+  assertNoRejectedIndexMembers(source, finalIndex);
   return finalIndex;
+}
+
+function assertNoRejectedIndexMembers(
+  source: SourceSnapshot,
+  index: IndexState | undefined,
+): void {
+  if (index === undefined) return;
+  const rejectedCanonical = new Set(source.entries
+    .filter((entry) =>
+      entry.kind === "rejected_unsafe_path"
+      && isIndexedSpoolBasename(entry.basename)
+    )
+    .map((entry) => entry.basename));
+  for (const rejected of rejectedCanonical) {
+    if (
+      index.basenames.has(rejected)
+      || index.unterminatedBasename === rejected
+    ) {
+      fail("FAIL_UNSAFE_INDEX_MEMBER");
+    }
+  }
 }
 
 async function revalidateIndex(
@@ -730,6 +766,7 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   if (candidateCount !== indexedCandidateCount) fail("FAIL_INDEX_COVERAGE");
 
   finalIndex = await revalidateIndex(options.spoolDirectory, finalIndex);
+  assertNoRejectedIndexMembers(second, finalIndex);
 
   const reservedEntries: ManifestEntry[] = [];
   if (finalIndex !== undefined) {

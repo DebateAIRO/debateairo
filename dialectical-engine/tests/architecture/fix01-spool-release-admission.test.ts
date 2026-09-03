@@ -15,6 +15,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -180,8 +181,8 @@ function parseManifest(path: string): AdmissionManifest {
   return JSON.parse(readFileSync(path, "utf8")) as AdmissionManifest;
 }
 
-function spoolName(sequence: number): string {
-  return `scheduler-${DEAD_PID}-00000000-0000-4000-8000-${sequence
+function spoolName(sequence: number, pid = DEAD_PID): string {
+  return `scheduler-${pid}-00000000-0000-4000-8000-${sequence
     .toString(16)
     .padStart(12, "0")}.spool`;
 }
@@ -415,6 +416,51 @@ describe("FIX-01 offline spool release admission", () => {
     expect(await readIndexedSpoolPage(spoolDirectory)).toEqual([]);
   });
 
+  it("rejects a canonical hardlink hidden in an unterminated index tail before repair can frame it", async () => {
+    const root = scratch("unsafe-index-tail");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    const rejectedName = spoolName(14);
+    const lawfulName = spoolName(15);
+    const victimPath = join(root, "hardlink-victim");
+    const sourcePath = join(spoolDirectory, rejectedName);
+    const victimBytes = Buffer.from(
+      `${JSON.stringify(envelope("00000000-0000-4000-8000-000000000114"))}\n`,
+      "utf8",
+    );
+    writeFileSync(victimPath, victimBytes, { mode: 0o600 });
+    linkSync(victimPath, sourcePath);
+    writeFileSync(join(spoolDirectory, lawfulName), "", { mode: 0o600 });
+    const originalIndex = Buffer.from(rejectedName, "utf8");
+    writeFileSync(join(spoolDirectory, INDEX_NAME), originalIndex, { mode: 0o600 });
+    const victimNlink = statSync(victimPath).nlink;
+
+    const result = runAdmission(spoolDirectory, manifestPath);
+    const sink = {
+      calls: [] as PostRedactionEnvelope[],
+      value: {
+        async writeOccurrences(): Promise<void> {},
+        async writeCaptureGap(): Promise<void> {},
+        async ingestSpooledOccurrence(value: PostRedactionEnvelope): Promise<void> {
+          sink.calls.push(value);
+        },
+        async close(): Promise<void> {},
+      } satisfies PostgresCaptureSink,
+    };
+    await drainDeadSpoolFiles({ spoolDirectory, databaseSink: sink.value });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("FAIL_UNSAFE_INDEX_MEMBER");
+    expect(result.stdout).not.toContain("PASS_");
+    expect(existsSync(manifestPath)).toBe(false);
+    expect(readFileSync(join(spoolDirectory, INDEX_NAME))).toEqual(originalIndex);
+    expect(sink.calls).toHaveLength(0);
+    expect(readFileSync(victimPath)).toEqual(victimBytes);
+    expect(readFileSync(sourcePath)).toEqual(victimBytes);
+    expect(statSync(victimPath).nlink).toBe(victimNlink);
+    expect(existsSync(`${sourcePath}.ingested`)).toBe(false);
+  });
+
   it("uses an opaque reference for a planted secret in a noncanonical filename", () => {
     const root = scratch("private-name");
     const spoolDirectory = realpathSync(join(root, "spool"));
@@ -569,6 +615,57 @@ describe("FIX-01 offline spool release admission", () => {
     expect(relative.status).not.toBe(0);
     expect(existsSync(join(root, "relative.json"))).toBe(false);
   });
+
+  it("blocks a live candidate PID before index repair and admits it after that unrelated process exits", async () => {
+    const root = scratch("live-owner");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const firstManifestPath = join(root, "live-manifest.json");
+    const finalManifestPath = join(root, "dead-manifest.json");
+    const child = spawn(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { stdio: "ignore" },
+    );
+    await new Promise<void>((settle, reject) => {
+      child.once("spawn", settle);
+      child.once("error", reject);
+    });
+    expect(child.pid).toBeDefined();
+    const name = spoolName(31, child.pid!);
+    const sourcePath = join(spoolDirectory, name);
+    const source = envelope("00000000-0000-4000-8000-000000000131");
+    writeFileSync(sourcePath, `${JSON.stringify(source)}\n`, { mode: 0o600 });
+
+    try {
+      const live = runAdmission(spoolDirectory, firstManifestPath);
+      expect(live.status).not.toBe(0);
+      expect(live.stderr).toContain("FAIL_LIVE_OWNER");
+      expect(live.stdout).not.toContain("PASS_");
+      expect(existsSync(firstManifestPath)).toBe(false);
+      expect(existsSync(join(spoolDirectory, INDEX_NAME))).toBe(false);
+      expect(readdirSync(spoolDirectory)).toEqual([name]);
+    } finally {
+      const closed = new Promise<void>((settle) => child.once("close", () => settle()));
+      child.kill("SIGTERM");
+      await closed;
+    }
+
+    const admitted = runAdmission(spoolDirectory, finalManifestPath);
+    expect(admitted.status, admitted.stderr).toBe(0);
+    expect(parseManifest(finalManifestPath).verdict).toBe("PASS_INDEXED");
+    const ingested: string[] = [];
+    const databaseSink: PostgresCaptureSink = {
+      async writeOccurrences(): Promise<void> {},
+      async writeCaptureGap(): Promise<void> {},
+      async ingestSpooledOccurrence(value: PostRedactionEnvelope): Promise<void> {
+        ingested.push(value.source_event_ref);
+      },
+      async close(): Promise<void> {},
+    };
+    await drainDeadSpoolFiles({ spoolDirectory, databaseSink });
+    expect(ingested).toEqual([source.source_event_ref]);
+    expect(readFileSync(`${sourcePath}.ingested`)).toEqual(readFileSync(sourcePath));
+  }, 30_000);
 
   it("is unreachable from product runtime and installer import graphs", async () => {
     const sources = [
