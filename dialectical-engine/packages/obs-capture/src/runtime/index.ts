@@ -17,6 +17,7 @@ import { createPreopenedSpool, type SpoolWriter } from "../spool.js";
 import { readObsBounds, type ObsBounds } from "./config.js";
 import {
   createPostgresCaptureSink,
+  createTierOneExitSink,
   type PostgresCaptureSink,
 } from "./sink.js";
 
@@ -67,6 +68,12 @@ const ALLOWLIST_SET_ID_SEED = "g0-empty-parameters"; // seed — V ratifies at F
 
 let runtimeState: ActiveRuntimeState | undefined;
 
+const UNAVAILABLE_SPOOL: Pick<SpoolWriter, "append"> = Object.freeze({
+  append(): void {
+    throw new Error("OBS_SPOOL_UNAVAILABLE");
+  },
+});
+
 function configValue(name: string, fallback: string): string {
   const value = process.env[name];
   return value === undefined || value.length === 0 ? fallback : value;
@@ -84,14 +91,8 @@ function envelopeMaxBytes(): number {
     : ENVELOPE_MAX_BYTES_SEED;
 }
 
-function createSpool(spoolFd: number | undefined): Pick<SpoolWriter, "append"> {
-  if (spoolFd === undefined) {
-    return Object.freeze({
-      append(): void {
-        throw new Error("OBS_SPOOL_UNAVAILABLE");
-      },
-    });
-  }
+function createSpool(spoolFd: number | undefined): SpoolWriter | undefined {
+  if (spoolFd === undefined) return undefined;
   return createPreopenedSpool({
     fd: spoolFd,
     envelopeMaxBytes: envelopeMaxBytes(),
@@ -111,33 +112,35 @@ function createStartingState(
   const databaseSink = createPostgresCaptureSink({
     connectionString: bounds.writerDatabaseUrl,
   });
+  const redactor = createSharedRedactor({
+    environment: configValue("OBS_ENVIRONMENT", ENVIRONMENT_SEED),
+    build_ref: configValue("OBS_BUILD_REF", BUILD_REF_SEED),
+    build_dirty: configBooleanValue("OBS_BUILD_DIRTY", BUILD_DIRTY_SEED),
+    runtime: options.runtime,
+    component: Object.freeze({
+      process: options.runtime,
+      package: `@debateai/${options.runtime}`,
+    }),
+    writer_identity: configValue("OBS_WRITER_IDENTITY", options.runtime),
+    redaction_policy_version: configValue(
+      "OBS_REDACTION_POLICY_VERSION",
+      REDACTION_POLICY_VERSION_SEED,
+    ),
+    allowlist_set_id: configValue(
+      "OBS_ALLOWLIST_SET_ID",
+      ALLOWLIST_SET_ID_SEED,
+    ),
+  });
+  const spool = createSpool(options.spoolFd);
   const flusher = createCaptureFlusher({
     queue,
-    redactor: createSharedRedactor({
-      environment: configValue("OBS_ENVIRONMENT", ENVIRONMENT_SEED),
-      build_ref: configValue("OBS_BUILD_REF", BUILD_REF_SEED),
-      build_dirty: configBooleanValue("OBS_BUILD_DIRTY", BUILD_DIRTY_SEED),
-      runtime: options.runtime,
-      component: Object.freeze({
-        process: options.runtime,
-        package: `@debateai/${options.runtime}`,
-      }),
-      writer_identity: configValue("OBS_WRITER_IDENTITY", options.runtime),
-      redaction_policy_version: configValue(
-        "OBS_REDACTION_POLICY_VERSION",
-        REDACTION_POLICY_VERSION_SEED,
-      ),
-      allowlist_set_id: configValue(
-        "OBS_ALLOWLIST_SET_ID",
-        ALLOWLIST_SET_ID_SEED,
-      ),
-    }),
+    redactor,
     databaseSink,
-    spool: createSpool(options.spoolFd),
+    spool: spool ?? UNAVAILABLE_SPOOL,
     health,
     gaps,
   });
-  return {
+  const state: ActiveRuntimeState = {
     phase: "ARMING",
     bounds,
     emitter,
@@ -148,6 +151,26 @@ function createStartingState(
     timer: undefined,
     flushInFlight: undefined,
   };
+  if (spool !== undefined) {
+    try {
+      const envelope = redactor.redact({
+        kind: "envelope",
+        payload_ref: Object.freeze({
+          code: "OBS_CAPTURE_SELF",
+          taxonomy_class: "CAPTURE_SELF",
+          capture_point: "self",
+          disposition: "SELF",
+          source: "first_party",
+        }),
+        ambient_context_ref: undefined,
+      });
+      const exitSink = createTierOneExitSink({ spool, envelope });
+      options.installExitSink(exitSink);
+    } catch {
+      // Tier 0 remains installed when Tier-1 preparation is unavailable.
+    }
+  }
+  return state;
 }
 
 async function flushRuntimeOnce(state: ActiveRuntimeState): Promise<void> {

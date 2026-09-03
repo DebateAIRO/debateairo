@@ -3,6 +3,7 @@ import pg from "pg";
 import type { CaptureDatabaseSink } from "../flusher.js";
 import type { CaptureGapRow } from "../health.js";
 import type { PostRedactionEnvelope } from "../redactor.js";
+import type { SpoolWriter } from "../spool.js";
 
 const WRITER_POOL_MAX_SEED = 2; // seed — V ratifies at FIX-01 acceptance
 
@@ -46,6 +47,20 @@ const OCCURRENCE_COLUMNS = Object.freeze([
 
 export interface PostgresCaptureSink extends CaptureDatabaseSink {
   close(): Promise<void>;
+}
+
+export function createTierOneExitSink(options: {
+  readonly spool: Pick<SpoolWriter, "prepare" | "appendOnExit">;
+  readonly envelope: PostRedactionEnvelope;
+}): () => void {
+  const prepared = options.spool.prepare(options.envelope);
+  let attempted = false;
+
+  return (): void => {
+    if (attempted) return;
+    attempted = true;
+    options.spool.appendOnExit(prepared);
+  };
 }
 
 function occurrenceValues(
