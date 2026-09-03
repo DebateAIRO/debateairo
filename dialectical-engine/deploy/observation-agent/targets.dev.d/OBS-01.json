@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "component": "docker",
+      "kind": "docker"
+    },
+    {
+      "component": "hatchet",
+      "kind": "hatchet",
+      "live_url": "http://127.0.0.1:8888/api/live",
+      "ready_url": "http://127.0.0.1:8888/api/ready",
+      "container": "debateai-v3-hatchet-lite-1"
+    },
+    {
+      "component": "observation_agent",
+      "kind": "self"
+    },
+    {
+      "component": "postgres",
+      "kind": "postgres",
+      "host": "127.0.0.1",
+      "port": 55432,
+      "container": "debateai-v3-postgres-1"
+    }
+  ]
+}

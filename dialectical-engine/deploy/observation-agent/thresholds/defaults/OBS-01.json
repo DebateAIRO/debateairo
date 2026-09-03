@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "liveness": {
+    "probe_interval_ms": 5000,
+    "probe_timeout_ms": 2000,
+    "open_after_failures": 2,
+    "clear_after_successes": 2
+  },
+  "notification": {
+    "rate_limit_ms": 600000,
+    "degraded_after_ms": 900000,
+    "timeout_ms": 2000
+  },
+  "resources": {
+    "cpu_percent_max": 2,
+    "rss_mb_max": 150,
+    "max_database_sessions": 2,
+    "statement_timeout_ms": 2000
+  },
+  "routing": {
+    "INFRA_DOWN": "FATAL",
+    "INFRA_NOT_READY": "DEGRADED",
+    "INFRA_UNKNOWN": "SEVERE",
+    "AGENT_SELF": "SEVERE"
+  }
+}
