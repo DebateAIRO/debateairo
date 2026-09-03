@@ -304,7 +304,40 @@ export function deriveBandCeiling(input: {
     if (!Number.isInteger(count) || count < 0) throw new TypedDomainError("BAND_CEILING_BASIS_INVALID", way);
     return sum + count;
   }, 0);
-  if (total === 0) throw new TypedDomainError("BAND_CEILING_BASIS_EMPTY", "No load-bearing node contributes to the ceiling");
+  if (total === 0) {
+    /**
+     * NO VERIFIED EVIDENCE -> THE ROW'S FLOOR BAND (V ruling 2026-09-03).
+     *
+     * This used to throw. It is reached when the served statement's cited set is
+     * empty because the evaluator's citation-tracing criterion failed, and V
+     * ruled that a consumer must see a VALUE rather than an absence: the floor
+     * is the band you are entitled to on no verified evidence, and reporting it
+     * says so where a null said nothing.
+     *
+     * The floor is `bandOrder[0]` — the ROW's own weakest band, never a literal
+     * in this package (DECISIONS J1: a consumer carries no band value of its
+     * own). The record carries the row's provenance and the empty basis it was
+     * derived from, so a reader sees exactly what it was computed over.
+     *
+     * `kind` follows `validateBandCeilingDecision`'s invariant rather than being
+     * asserted: CAPPED only when the floor actually moves the candidate, so a
+     * candidate already at the floor reports NOT_CAPPED and stays there.
+     */
+    const floorBand = bandOrder[0]!;
+    const floor = input.row.value.defaultCeiling;
+    return Object.freeze({
+      kind: floorBand === input.candidateConfidenceBand ? "NOT_CAPPED" as const : "CAPPED" as const,
+      confidenceBand: floorBand,
+      ceiling: Object.freeze({
+        label: requiredText(floor.label, "BAND_CEILING_LABEL_INVALID"),
+        basis: input.basis,
+        registerRowKey: input.row.rowKey,
+        registerVersion: input.row.registerVersion,
+        sourceRef: input.row.sourceRef,
+        liftPath: requiredText(floor.liftPath, "BAND_CEILING_LIFT_PATH_INVALID")
+      })
+    });
+  }
 
   const selected = input.row.value.cuts.find((cut) => {
     const entries = Object.entries(cut.minimumShares) as Array<[WayOfKnowing, number]>;
@@ -401,10 +434,6 @@ export type LiveGateTrace =
   | "GATE4_Q51_DOWNGRADE"
   | "BAND_CEILING_PASS"
   | "BAND_CEILING_CAPPED"
-  // F-T9B-1: the basis was empty because citation tracing failed, so no ceiling
-  // was derived and the served answer claims NO band. Additive to this live
-  // vocabulary; nothing pins it as a closed set.
-  | "BAND_CEILING_UNBANDED"
   | "ENVELOPE_ENRICHMENT_SKIPPED"
   | "PROTECTED_CORE_REFUSED_SKIP"
   | "PROTECTED_CORE_GUARD_RETIRED"
@@ -857,7 +886,29 @@ export async function runServeGateChain(
   // a WAY-OF-KNOWING-DOWNGRADED mark before serve is entered). The Q51
   // DOWNGRADE limb below is untouched and now reads S08's CITED set, which is
   // what T9's header already assigned to T13.
-  if (citedNodes.every((node) => node.wayOfKnowing === "REASONING")) {
+  /**
+   * THE TWO CAUSES OF AN EMPTY CITED SET ARE SEPARATED HERE (V ruling
+   * 2026-09-03). Before this they collapsed onto one path, because
+   * `[].every(...)` is `true`: "no verified cited node, because tracing failed"
+   * fell into T13's REASONING-only limb, which is right about the terminal and
+   * wrong about the FORM. That limb requires a hypothesis AND a research plan,
+   * so a one-segment candidate crashed with COMPOSITION_CONTRACT_ERROR before
+   * any served result carrying the mark existed — and one segment is squarely
+   * within the production contract, since the synthesizer is asked for two only
+   * when the cited nodes rest on reasoning alone.
+   *
+   * Serving after the round bound must not depend on how many segments the
+   * synthesizer produced, so this arm serves WHATEVER WAS COMPOSED, at any
+   * count. It is DOWNGRADED and carries the standing-objection mark and the
+   * floor band; those three together say the answer is weak and why. Splitting
+   * one segment into a hypothesis and a plan it does not contain would be
+   * fabrication, so the form is the composed statement itself.
+   */
+  if (citationTracingFailed) {
+    trace.push("GATE4_Q51_DOWNGRADE");
+    terminal = "DOWNGRADED";
+    answerForm = { kind: "VERDICT", text: segments.map((segment) => segment.text).join("\n") };
+  } else if (citedNodes.every((node) => node.wayOfKnowing === "REASONING")) {
     if (segments.length < 2 || segments[0] === undefined || segments[1] === undefined) {
       throw new TypedDomainError(
         "COMPOSITION_CONTRACT_ERROR",
@@ -894,33 +945,22 @@ export async function runServeGateChain(
     REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length
   };
   /**
-   * NOTHING IS BANDED ON REJECTED EVIDENCE (V ruling 2026-09-03, F-T9B-1).
+   * The ceiling is ALWAYS derived — there is no "unbanded" path. When citation
+   * tracing failed the basis above is empty, and `deriveBandCeiling` answers
+   * that with the register row's FLOOR band rather than refusing: V ruled a
+   * consumer must see a value, not an absence.
    *
-   * When citation tracing failed, no segment is verified, so the basis above is
-   * empty. `deriveBandCeiling` refuses an empty basis by design — "No
-   * load-bearing node contributes to the ceiling" — so there is no ceiling to
-   * derive and no band to claim, and the answer says so by carrying neither.
-   * Calling the dependency anyway would be worse than useless: the production
-   * implementation throws, and a permissive test double would return a band
-   * derived from nothing.
-   *
-   * This does NOT touch the LABEL. Confirm-item 3 rules that a standing round-3
-   * objection does not move the served label, which is code-derived from the
-   * propagated numbers before synthesis runs; an objection reaching back to
-   * change it is exactly the cycle that clause forbids.
+   * This does NOT touch the LABEL. Confirm-item 3 and the frozen S06 spec rule
+   * that a standing round-3 objection does not move the served label, which is
+   * code-derived from the propagated numbers BEFORE synthesis runs; an
+   * objection reaching back into it is exactly the cycle that clause forbids.
    */
-  const basisIsEmpty = WAYS_OF_KNOWING.every((way) => basis[way] === 0);
-  let ceilingDecision: BandCeilingDecision | null = null;
-  if (basisIsEmpty) {
-    trace.push("BAND_CEILING_UNBANDED", "SERVE");
-  } else {
-    ceilingDecision = dependencies.applyBandCeiling({
-      basis,
-      candidateConfidenceBand: input.candidateConfidenceBand
-    });
-    validateBandCeilingDecision(ceilingDecision, input.candidateConfidenceBand, basis);
-    trace.push(ceilingDecision.kind === "CAPPED" ? "BAND_CEILING_CAPPED" : "BAND_CEILING_PASS", "SERVE");
-  }
+  const ceilingDecision = dependencies.applyBandCeiling({
+    basis,
+    candidateConfidenceBand: input.candidateConfidenceBand
+  });
+  validateBandCeilingDecision(ceilingDecision, input.candidateConfidenceBand, basis);
+  trace.push(ceilingDecision.kind === "CAPPED" ? "BAND_CEILING_CAPPED" : "BAND_CEILING_PASS", "SERVE");
 
   const conditionMarks = [...input.factBundle.conditionMarks];
   for (const mark of [...digestOutcome.marks, ...loop.marks]) {
@@ -936,8 +976,8 @@ export async function runServeGateChain(
     coverageMode,
     segments,
     compositionBudget: input.compositionBudget,
-    confidenceBand: ceilingDecision?.confidenceBand ?? null,
-    bandCeiling: ceilingDecision?.ceiling ?? null,
+    confidenceBand: ceilingDecision.confidenceBand,
+    bandCeiling: ceilingDecision.ceiling,
     digest,
     loopRounds: loop.rounds,
     standingObjection: loop.standingObjection,

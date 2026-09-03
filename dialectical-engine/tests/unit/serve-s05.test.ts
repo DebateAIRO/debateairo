@@ -150,7 +150,13 @@ function dependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGate
       candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
     }),
     evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" }),
-    applyBandCeiling: () => passCeiling,
+    // F-T9B-1: the ceiling is derived on EVERY served path now, including the
+    // empty basis a tracing-failed run produces, so this double must PRINT the
+    // basis it was handed. `passCeiling`'s fixed basis was never read before —
+    // the chain skipped the call whenever the basis was empty — and
+    // `validateBandCeilingDecision` rightly refuses a decision that reports a
+    // basis it was not derived from.
+    applyBandCeiling: ({ basis }) => ({ ...passCeiling, ceiling: { ...passCeiling.ceiling, basis } }),
     ...overrides
   };
 }
@@ -198,19 +204,6 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
       factBundle: buildFactBundle({ ...factBundle(), residualObjections: ["test-layer objection"] })
     }, dependencies());
     const servedDespiteUntracedCitation = await runServeGateChain(input(), dependencies({
-      // F-T9B-1 (V ruling 2026-09-03): an exhausted citation-tracing objection
-      // SERVES, marked, at the terminal ladder's floor — T13's honest
-      // downgrade. That form is hypothesis + research plan, so this candidate
-      // supplies both; the file's default single-segment candidate cannot take
-      // the downgrade form. The ONLY change from the landed arm is the shape of
-      // the candidate and the terminal it now reaches; the subject is untouched.
-      synthesize: async () => ({
-        candidate: [
-          segment("segment:hypothesis", "The provisional answer.", true),
-          segment("segment:plan", "The research plan that would lift it.", false)
-        ],
-        candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
-      }),
       evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
 
@@ -219,10 +212,12 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     });
     expect(servedDespiteFailedRestatement.terminal).toBe("SERVED");
     expect(servedDespiteObjections.terminal).toBe("SERVED");
-    // Serves — it is NOT refused — at the downgrade floor, with its mark.
+    // F-T9B-1 (V ruling 2026-09-03): an exhausted citation-tracing objection
+    // SERVES — it is not refused and it is not a crash class — at the DOWNGRADED
+    // terminal, carrying its mark and the band's FLOOR. The candidate is the
+    // file's landed single-segment one: serving must not depend on segment count.
     expect(servedDespiteUntracedCitation.terminal).toBe("DOWNGRADED");
     expect(servedDespiteUntracedCitation.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
-    expect(servedDespiteUntracedCitation.confidenceBand).toBeNull();
     expect(compositionEvidenceRequired(preSynthesisTerminal)).toBe(false);
     expect(compositionEvidenceRequired(servedDespiteFailedRestatement)).toBe(true);
     expect(compositionEvidenceRequired(servedDespiteObjections)).toBe(true);
@@ -330,27 +325,12 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     expect(recovered.loopRounds).toHaveLength(2);
 
     const exhausted = await runServeGateChain(input(), dependencies({
-      // F-T9B-1 (V ruling 2026-09-03): an exhausted citation-tracing objection
-      // SERVES, marked, at the terminal ladder's floor — T13's honest
-      // downgrade. That form is hypothesis + research plan, so this candidate
-      // supplies both; the file's default single-segment candidate cannot take
-      // the downgrade form. The ONLY change from the landed arm is the shape of
-      // the candidate and the terminal it now reaches; the subject is untouched.
-      synthesize: async () => ({
-        candidate: [
-          segment("segment:hypothesis", "The provisional answer.", true),
-          segment("segment:plan", "The research plan that would lift it.", false)
-        ],
-        candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
-      }),
       evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
     expect(exhausted.terminal).toBe("DOWNGRADED");
+    expect(exhausted.answerForm).not.toBeNull();
     expect(exhausted.standingObjection).toBe("A claim traces to no digest node.");
     expect(exhausted.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
-    // Nothing banded on rejected evidence, and the answer is still served.
-    expect(exhausted.confidenceBand).toBeNull();
-    expect(exhausted.answerForm).not.toBeNull();
 
     const provenance = input();
     provenance.nodes[0]!.locator = null;

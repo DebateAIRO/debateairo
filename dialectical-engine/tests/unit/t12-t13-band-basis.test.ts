@@ -349,7 +349,26 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
    * that run's basis is asserted to contain both citations. One arm shows the
    * exclusion, the other shows there was something to exclude.
    */
-  it("serves an exhausted citation-tracing objection DOWNGRADED and marked, banding nothing", async () => {
+  /**
+   * V ruling 2026-09-03, RATIFIED OUTCOME. When the evaluator's citation-tracing
+   * criterion fails: the run SERVES, emits its standing-objection mark, reports
+   * the confidence band at its FLOOR, and takes the DOWNGRADED terminal. The
+   * verdict LABEL is untouched — confirm-item 3 and the frozen S06 spec forbid a
+   * post-synthesis objection reaching back into a label that is code-derived
+   * from the propagated numbers before synthesis runs.
+   *
+   * A FLOOR, NOT AN ABSENCE. An earlier pass reported no band at all; V declined
+   * that, because a consumer should see a value rather than a hole. The floor is
+   * read from the REGISTER ROW's own `bandOrder`, never from a literal in this
+   * package (DECISIONS J1: a consumer carries no band value of its own), so
+   * `deriveBandCeiling` returns the row's weakest band with the row's own
+   * provenance and the empty basis it was derived from.
+   *
+   * The band is empty because `conforms` is a live axis of the cited-set filter:
+   * no untraced citation reaches the basis. That is what makes the floor honest
+   * rather than arbitrary — it is the band you get from no verified evidence.
+   */
+  it("serves an exhausted citation-tracing objection DOWNGRADED, marked, at the band FLOOR", async () => {
     const recorded = recorder();
     const nodes = [
       node("node:reasoned", "REASONING", true),
@@ -359,42 +378,39 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       segment("segment:hypothesis", "The provisional answer, as composed.", ["node:reasoned", "node:looked-up"], ["number:final-strength"]),
       segment("segment:plan", "The research plan that would lift it, as composed.", ["node:reasoned"])
     ];
-    // The REAL ceiling derivation, not a permissive double: a test double that
-    // returns NOT_CAPPED would accept an empty basis that production refuses.
+    // The REAL derivation, not a permissive double: a double returning NOT_CAPPED
+    // would invent a band for an empty basis instead of deriving the floor.
     const realCeiling: ServeGateDependencies["applyBandCeiling"] = ({ basis, candidateConfidenceBand }) => {
       recorded.bases.push(basis);
       return deriveBandCeiling({ basis, candidateConfidenceBand, row: ceilingRow() });
     };
 
-    // `.resolves` rather than `await` then assert (D43): the whole property is
-    // that this run does NOT end the answer, so a regression makes the chain
-    // THROW. Awaiting first would surface that as an unhandled rejection with no
-    // assertion frame — the mutant would die of the system being loud instead of
-    // of the assertion that owns the invariant. This way the refusal IS the
-    // assertion failure.
+    // `.resolves` rather than `await` then assert (D43): the property is that
+    // this run does NOT end the answer, so a regression makes the chain THROW.
+    // Awaiting first would surface that as an unhandled rejection with no
+    // assertion frame, and the mutant would die of the system being loud rather
+    // than of the assertion that owns the invariant.
     await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
       verdict: CITATION_TRACING_FAILED, segments, applyBandCeiling: realCeiling
     }))).resolves.toMatchObject({
-      // SERVES, and says why it is weaker — never withheld, never a crash class.
       terminal: "DOWNGRADED",
       standingObjection: "Claim 2 traces to no digest node.",
       crashClass: null,
-      answerForm: { kind: "HYPOTHESIS_WITH_RESEARCH_PLAN" },
-      // NOTHING is banded on rejected evidence: no ceiling was derived at all.
-      confidenceBand: null,
-      bandCeiling: null
+      // A VALUE at the floor, and a real ceiling record behind it.
+      confidenceBand: CEILING_BAND,
+      bandCeiling: { basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 } }
     });
-    expect(recorded.bases).toEqual([]);
+    // The ceiling WAS derived, over a basis holding no untraced citation.
+    expect(recorded.bases).toEqual([{ LOOKED_UP: 0, RAN: 0, REASONING: 0 }]);
 
-    // The visible mark, asserted on its own so the matcher above stays readable.
     const marked = recorder();
     const markedResult = await runServeGateChain(gateInput(nodes), dependencies(marked, {
       verdict: CITATION_TRACING_FAILED, segments, applyBandCeiling: realCeiling
     }));
     expect(markedResult.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
 
-    // ...and the contrast that stops the line above from being vacuous: the same
-    // citations DO reach the basis when the evaluator traced them.
+    // ...and the contrast that stops "no untraced citation" from being vacuous:
+    // the same citations DO reach the basis when the evaluator traced them.
     const traced = recorder();
     const servedResult = await runServeGateChain(gateInput(nodes), dependencies(traced, {
       segments, applyBandCeiling: ({ basis, candidateConfidenceBand }) => {
@@ -404,6 +420,57 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
     }));
     expect(servedResult.terminal).toBe("SERVED");
     expect(traced.bases).toEqual([{ LOOKED_UP: 1, RAN: 0, REASONING: 1 }]);
+  });
+
+  /**
+   * SERVING AFTER THE ROUND BOUND MUST NOT DEPEND ON SEGMENT COUNT (V ruling,
+   * 2026-09-03). The previous pass routed the tracing-failed case through T13's
+   * REASONING-only limb, which is right about the terminal and wrong about the
+   * form: that limb requires a hypothesis AND a research plan, so a one-segment
+   * candidate crashed with COMPOSITION_CONTRACT_ERROR before any served result
+   * carrying the mark existed. One segment is squarely within the production
+   * contract — the synthesizer is asked for two only when the cited nodes rest
+   * on reasoning alone, and this fixture cites a LOOKED_UP node.
+   *
+   * The two causes are separated now: "no verified cited node because tracing
+   * failed" and "every cited node is reasoning" no longer collapse onto one
+   * path through `[].every(...)`, which is the vacuous-empty-set shape S08's
+   * empty-basis stop already guards against elsewhere.
+   */
+  it("serves a tracing-failed run at ANY segment count — one segment is enough", async () => {
+    const recorded = recorder();
+    const nodes = [node("node:looked-up", "LOOKED_UP", true, "https://example.invalid/test-fixture")];
+    await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
+      verdict: CITATION_TRACING_FAILED,
+      segments: () => [
+        segment("segment:only", "A single composed statement.", ["node:looked-up"], ["number:final-strength"])
+      ],
+      applyBandCeiling: ({ basis, candidateConfidenceBand }) => {
+        recorded.bases.push(basis);
+        return deriveBandCeiling({ basis, candidateConfidenceBand, row: ceilingRow() });
+      }
+    }))).resolves.toMatchObject({
+      terminal: "DOWNGRADED",
+      crashClass: null,
+      confidenceBand: CEILING_BAND,
+      answerForm: { kind: "VERDICT", text: "A single composed statement." }
+    });
+    expect(recorded.bases).toEqual([{ LOOKED_UP: 0, RAN: 0, REASONING: 0 }]);
+  });
+
+  /**
+   * THE REGRESSION for the case that legitimately needs two segments. Separating
+   * the tracing-failed cause must not weaken T13's own contract: a statement
+   * whose VERIFIED cited set really is reasoning-only is served as a hypothesis
+   * plus the research plan that would lift it, and a one-segment candidate for
+   * that form is still a composition-contract error.
+   */
+  it("still refuses a one-segment candidate when the VERIFIED cited set is reasoning-only", async () => {
+    const recorded = recorder();
+    const nodes = [node("node:reasoned", "REASONING", true)];
+    await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
+      segments: () => [segment("segment:only", "A reasoned statement.", ["node:reasoned"])]
+    }))).rejects.toMatchObject({ code: "COMPOSITION_CONTRACT_ERROR" });
   });
 
   it("keeps the RAN bucket in the basis vocabulary (F5 do-not-tidy)", async () => {
