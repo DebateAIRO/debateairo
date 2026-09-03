@@ -1032,3 +1032,14 @@ the test command's pinned `process.cwd()` with `node:path`; this cost one failed
   0 (a crashed or filtered run looks identical). Wrap gates as
   `{ echo "\$ cmd"; cmd 2>&1; echo "EXIT STATUS: $?"; } > log`. A static reviewer correctly
   downgraded T6 r3's typecheck evidence to testimony-grade for exactly this. (T6 r4)
+
+- **zsh's no-word-splitting trap has a SILENT second form: a list of FILE ARGUMENTS.** The
+  recorded entry covers `K="cmd with args"; $K more`. The same rule ruins
+  `FILES=$(tr '\n' ' ' < list.txt); vitest run $FILES` — vitest receives ONE argument, the whole
+  space-joined string, matches nothing, and prints **`No test files found, exiting with code 1`**.
+  That is not an obvious quoting error: it reads like the files are missing, and I checked the
+  files existed (they did) before suspecting the shell. Two wasted gate runs. `vitest run <one
+  file>` and `<two files>` both work, which makes the many-file case look like a vitest limit
+  rather than a shell one. Fix: build a real array in **bash** — `while IFS= read -r l; do
+  F+=("$l"); done < list.txt; cmd "${F[@]}"` — and note macOS bash 3.2 has **no `mapfile`**.
+  (algorithm-live-loop, W5 dev-sync)
