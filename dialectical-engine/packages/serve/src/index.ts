@@ -308,33 +308,66 @@ export function deriveBandCeiling(input: {
     /**
      * NO VERIFIED EVIDENCE -> THE ROW'S FLOOR BAND (V ruling 2026-09-03).
      *
-     * This used to throw. It is reached when the served statement's cited set is
-     * empty because the evaluator's citation-tracing criterion failed, and V
-     * ruled that a consumer must see a VALUE rather than an absence: the floor
-     * is the band you are entitled to on no verified evidence, and reporting it
-     * says so where a null said nothing.
+     * Reached when the served statement's cited set is empty because the
+     * evaluator's citation-tracing criterion failed. V ruled a consumer must see
+     * a VALUE rather than an absence: the floor is the band you are entitled to
+     * on no verified evidence.
      *
-     * The floor is `bandOrder[0]` — the ROW's own weakest band, never a literal
-     * in this package (DECISIONS J1: a consumer carries no band value of its
-     * own). The record carries the row's provenance and the empty basis it was
-     * derived from, so a reader sees exactly what it was computed over.
+     * THE RECORD MUST NAME THE DECISION THAT PRODUCED THE BAND (codex r3). A
+     * first pass took the band from `bandOrder[0]` but copied `defaultCeiling`'s
+     * label and lift path, which on the shipped row describe a DIFFERENT
+     * decision — `DEFAULT_CEILING`, band `FULL`, lift `retain-band` — so a
+     * floored answer carried a record claiming its band had been retained. It
+     * had not: it went from the candidate down to the floor.
      *
-     * `kind` follows `validateBandCeilingDecision`'s invariant rather than being
-     * asserted: CAPPED only when the floor actually moves the candidate, so a
-     * candidate already at the floor reports NOT_CAPPED and stays there.
+     * So the entry is SELECTED from the row by the band it actually names, cuts
+     * first and `defaultCeiling` last, and the record is built from THAT entry.
+     * ROW MEMBERSHIP IS ENFORCED ON THIS ROUTE, both halves. The label is
+     * checked against `ceilingLabels` explicitly, as the ordinary derivation
+     * does; skipping it here alone would accept an inconsistent sealed row that
+     * every other route rejects, since the deployment schema checks only that
+     * these strings are non-empty. The band half needs no separate check and
+     * deliberately has none: the entry is SELECTED by `ceilingBand === bandOrder[0]`,
+     * so its membership in `bandOrder` is a property of how it was found. An
+     * `includes` call after that could never fail, and a check that cannot fail
+     * for the reason it exists is not a check (D56).
+     *
+     * FAILS CLOSED. A row with no entry naming its own floor band cannot
+     * describe this decision, and this refuses rather than inventing a label.
+     *
+     * KNOWN RESIDUE, filed as F-T9B-3 and NOT fixed here: on the shipped row the
+     * only entry naming the floor is `REASONING_CEILING`, whose band and lift
+     * path are both right for this case but whose NAME describes a
+     * reasoning-share trigger that did not fire — the basis is empty, not
+     * reasoning-heavy. The row conflates an entry's trigger with its outcome, so
+     * no selection over the existing entries can be truthful about the reason.
+     * Curing that needs an explicit empty-basis entry in the sealed row, and the
+     * mission's slice map makes S01/T16 the sole owner of every new sealed row
+     * and schema. It is not T9's to take.
      */
     const floorBand = bandOrder[0]!;
-    const floor = input.row.value.defaultCeiling;
+    const floorEntry = [...input.row.value.cuts, input.row.value.defaultCeiling]
+      .find((entry) => entry.ceilingBand === floorBand);
+    if (floorEntry === undefined) {
+      throw new TypedDomainError(
+        "BAND_CEILING_FLOOR_UNDESCRIBED",
+        `No ceiling entry names the floor band ${floorBand}, so an empty basis cannot be described`
+      );
+    }
+    const floorLabel = requiredText(floorEntry.label, "BAND_CEILING_LABEL_INVALID");
+    if (!labels.includes(floorLabel)) throw new TypedDomainError("BAND_CEILING_LABEL_UNKNOWN", floorLabel);
     return Object.freeze({
+      // Follows validateBandCeilingDecision's invariant rather than asserting a
+      // kind: a candidate already at the floor is NOT_CAPPED and stays there.
       kind: floorBand === input.candidateConfidenceBand ? "NOT_CAPPED" as const : "CAPPED" as const,
       confidenceBand: floorBand,
       ceiling: Object.freeze({
-        label: requiredText(floor.label, "BAND_CEILING_LABEL_INVALID"),
+        label: floorLabel,
         basis: input.basis,
         registerRowKey: input.row.rowKey,
         registerVersion: input.row.registerVersion,
         sourceRef: input.row.sourceRef,
-        liftPath: requiredText(floor.liftPath, "BAND_CEILING_LIFT_PATH_INVALID")
+        liftPath: requiredText(floorEntry.liftPath, "BAND_CEILING_LIFT_PATH_INVALID")
       })
     });
   }
@@ -945,10 +978,10 @@ export async function runServeGateChain(
     REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length
   };
   /**
-   * The ceiling is ALWAYS derived — there is no "unbanded" path. When citation
-   * tracing failed the basis above is empty, and `deriveBandCeiling` answers
-   * that with the register row's FLOOR band rather than refusing: V ruled a
-   * consumer must see a value, not an absence.
+   * The ceiling is ALWAYS derived. When citation tracing failed the basis above
+   * is empty, and `deriveBandCeiling` answers that with the register row's FLOOR
+   * band — a value, which V chose over an absence — built from the row entry
+   * that names that band.
    *
    * This does NOT touch the LABEL. Confirm-item 3 and the frozen S06 spec rule
    * that a standing round-3 objection does not move the served label, which is

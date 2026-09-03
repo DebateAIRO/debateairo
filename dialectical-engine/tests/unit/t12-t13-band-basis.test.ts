@@ -336,15 +336,18 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
    *
    * What the band does. `conforms` is a live axis of the cited-set filter, so a
    * failed citation-tracing criterion leaves NO verified segment and the basis
-   * is empty. `deriveBandCeiling` refuses an empty basis by design ("No
-   * load-bearing node contributes to the ceiling"), so no ceiling is derived and
-   * NO BAND IS CLAIMED. Nothing is banded on rejected evidence — which is the
-   * point — and the label is untouched: confirm-item 3 rules that a standing
-   * round-3 objection does not move it, and the label is code-derived from the
-   * propagated numbers before synthesis, acyclically.
+   * is empty. The band is then reported at its FLOOR — a VALUE, which V chose
+   * over the absence an earlier pass reported — derived from the register row's
+   * own `bandOrder`, and the ceiling record is built from the row entry that
+   * NAMES that floor band. Nothing is banded on rejected evidence: the basis the
+   * record prints is empty.
+   *
+   * The verdict LABEL is untouched. Confirm-item 3 and the frozen S06 spec rule
+   * that a standing round-3 objection does not move it, and it is code-derived
+   * from the propagated numbers before synthesis runs, acyclically.
    *
    * The pair below is deliberate. Asserting "the basis contains no untraced
-   * citation" against a basis that was never computed would be vacuous, so the
+   * citation" against a basis holding nothing proves little on its own, so the
    * SAME nodes and the SAME segments are run with the evaluator satisfied, and
    * that run's basis is asserted to contain both citations. One arm shows the
    * exclusion, the other shows there was something to exclude.
@@ -396,9 +399,23 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       terminal: "DOWNGRADED",
       standingObjection: "Claim 2 traces to no digest node.",
       crashClass: null,
-      // A VALUE at the floor, and a real ceiling record behind it.
+      // A VALUE at the floor, and the WHOLE ceiling record behind it — not just
+      // the band. codex r3: pinning the band alone let a record through that
+      // named a DIFFERENT decision (label DEFAULT_CEILING, liftPath
+      // "retain-band") beside a band that had been LOWERED. Every field is
+      // pinned here, so a record that misdescribes its own decision fails.
       confidenceBand: CEILING_BAND,
-      bandCeiling: { basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 } }
+      bandCeiling: {
+        // The row entry that actually names the floor band — never the default
+        // entry, whose band is the TOP one and whose lift path claims the band
+        // was retained.
+        label: "TEST_REASONING_CEILING",
+        liftPath: "test-layer:gather-evidence-to-lift",
+        basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 },
+        registerRowKey: "test-layer:wayOfKnowingCeiling",
+        registerVersion: 1,
+        sourceRef: "test-layer:DR-082-086"
+      }
     });
     // The ceiling WAS derived, over a basis holding no untraced citation.
     expect(recorded.bases).toEqual([{ LOOKED_UP: 0, RAN: 0, REASONING: 0 }]);
@@ -465,6 +482,46 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
    * plus the research plan that would lift it, and a one-segment candidate for
    * that form is still a composition-contract error.
    */
+  /**
+   * THE TWO REFUSALS ON THE FLOOR ROUTE, exercised (D56 — a check nobody has
+   * seen refuse is not known to be a check). codex r3 found that the floor route
+   * skipped the label-membership validation the ordinary derivation performs,
+   * and that the deployment schema only checks these strings are non-empty, so
+   * an inconsistent sealed row would have been accepted on this route alone.
+   */
+  it("refuses a floor entry whose label is not in the row's ceilingLabels", () => {
+    const row = ceilingRow();
+    const broken: BandCeilingRegisterRow = {
+      ...row,
+      value: {
+        ...row.value,
+        cuts: [{ ...row.value.cuts[0]!, label: "TEST_LABEL_NOT_IN_THE_VOCABULARY" }]
+      }
+    };
+    expect(() => deriveBandCeiling({
+      basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 },
+      candidateConfidenceBand: TOP_BAND,
+      row: broken
+    })).toThrowError(expect.objectContaining({ code: "BAND_CEILING_LABEL_UNKNOWN" }));
+  });
+
+  it("refuses when NO ceiling entry names the row's own floor band", () => {
+    const row = ceilingRow();
+    // Every entry now names the TOP band, so nothing describes the floor.
+    const broken: BandCeilingRegisterRow = {
+      ...row,
+      value: {
+        ...row.value,
+        cuts: [{ ...row.value.cuts[0]!, ceilingBand: TOP_BAND }]
+      }
+    };
+    expect(() => deriveBandCeiling({
+      basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 },
+      candidateConfidenceBand: TOP_BAND,
+      row: broken
+    })).toThrowError(expect.objectContaining({ code: "BAND_CEILING_FLOOR_UNDESCRIBED" }));
+  });
+
   it("still refuses a one-segment candidate when the VERIFIED cited set is reasoning-only", async () => {
     const recorded = recorder();
     const nodes = [node("node:reasoned", "REASONING", true)];
