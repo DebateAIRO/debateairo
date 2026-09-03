@@ -401,6 +401,10 @@ export type LiveGateTrace =
   | "GATE4_Q51_DOWNGRADE"
   | "BAND_CEILING_PASS"
   | "BAND_CEILING_CAPPED"
+  // F-T9B-1: the basis was empty because citation tracing failed, so no ceiling
+  // was derived and the served answer claims NO band. Additive to this live
+  // vocabulary; nothing pins it as a closed set.
+  | "BAND_CEILING_UNBANDED"
   | "ENVELOPE_ENRICHMENT_SKIPPED"
   | "PROTECTED_CORE_REFUSED_SKIP"
   | "PROTECTED_CORE_GUARD_RETIRED"
@@ -822,7 +826,18 @@ export async function runServeGateChain(
       .flatMap((segment) => [...segment.assertedNodeRefs])
   );
   const citedNodes = input.nodes.filter((node) => citedNodeIds.has(node.nodeId));
-  if (citedNodes.length === 0) {
+  /**
+   * V ruling 2026-09-03 (F-T9B-1): an exhausted CITATION-TRACING objection does
+   * not end the answer — goal-v4 says a run that reaches its round bound with
+   * the evaluator still objecting SERVES REGARDLESS, with the objection riding
+   * it as a visible mark. So this case is separated from S08's empty-basis
+   * guard below, which exists for a different input: a statement that cites
+   * nothing at all, where `[].every(...)` would otherwise downgrade on a
+   * vacuous truth. Here the cited set is empty for a KNOWN reason and the
+   * downgrade is the honest answer rather than an accident.
+   */
+  const citationTracingFailed = !finalCriteria.citationTracing;
+  if (citedNodes.length === 0 && !citationTracingFailed) {
     // Banding on an empty basis is the silent degradation this gate exists to
     // refuse: `deriveBandCeiling` would reject it downstream anyway, but the
     // FORM decision happens first, and `[].every(...)` is `true` — an uncited
@@ -878,12 +893,34 @@ export async function runServeGateChain(
     RAN: citedNodes.filter((node) => node.wayOfKnowing === "RAN").length,
     REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length
   };
-  const ceilingDecision = dependencies.applyBandCeiling({
-    basis,
-    candidateConfidenceBand: input.candidateConfidenceBand
-  });
-  validateBandCeilingDecision(ceilingDecision, input.candidateConfidenceBand, basis);
-  trace.push(ceilingDecision.kind === "CAPPED" ? "BAND_CEILING_CAPPED" : "BAND_CEILING_PASS", "SERVE");
+  /**
+   * NOTHING IS BANDED ON REJECTED EVIDENCE (V ruling 2026-09-03, F-T9B-1).
+   *
+   * When citation tracing failed, no segment is verified, so the basis above is
+   * empty. `deriveBandCeiling` refuses an empty basis by design — "No
+   * load-bearing node contributes to the ceiling" — so there is no ceiling to
+   * derive and no band to claim, and the answer says so by carrying neither.
+   * Calling the dependency anyway would be worse than useless: the production
+   * implementation throws, and a permissive test double would return a band
+   * derived from nothing.
+   *
+   * This does NOT touch the LABEL. Confirm-item 3 rules that a standing round-3
+   * objection does not move the served label, which is code-derived from the
+   * propagated numbers before synthesis runs; an objection reaching back to
+   * change it is exactly the cycle that clause forbids.
+   */
+  const basisIsEmpty = WAYS_OF_KNOWING.every((way) => basis[way] === 0);
+  let ceilingDecision: BandCeilingDecision | null = null;
+  if (basisIsEmpty) {
+    trace.push("BAND_CEILING_UNBANDED", "SERVE");
+  } else {
+    ceilingDecision = dependencies.applyBandCeiling({
+      basis,
+      candidateConfidenceBand: input.candidateConfidenceBand
+    });
+    validateBandCeilingDecision(ceilingDecision, input.candidateConfidenceBand, basis);
+    trace.push(ceilingDecision.kind === "CAPPED" ? "BAND_CEILING_CAPPED" : "BAND_CEILING_PASS", "SERVE");
+  }
 
   const conditionMarks = [...input.factBundle.conditionMarks];
   for (const mark of [...digestOutcome.marks, ...loop.marks]) {
@@ -899,8 +936,8 @@ export async function runServeGateChain(
     coverageMode,
     segments,
     compositionBudget: input.compositionBudget,
-    confidenceBand: ceilingDecision.confidenceBand,
-    bandCeiling: ceilingDecision.ceiling,
+    confidenceBand: ceilingDecision?.confidenceBand ?? null,
+    bandCeiling: ceilingDecision?.ceiling ?? null,
     digest,
     loopRounds: loop.rounds,
     standingObjection: loop.standingObjection,

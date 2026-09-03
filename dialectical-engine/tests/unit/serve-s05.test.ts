@@ -103,23 +103,10 @@ const SATISFIED: EvaluatorVerdict = {
   }
 };
 
-/**
- * An unsatisfied evaluator, PARAMETERISED on the failing criterion (V ruling
- * 2026-09-03, F-T9B-1). It used to hardcode `citationTracing: false` and was
- * used throughout as a generic "the loop is objecting" fixture. That criterion
- * is no longer generic: a failed citation tracing empties the served
- * statement's cited set and the empty-basis guard refuses the answer, so an arm
- * whose subject is composition-evidence staging or loop exhaustion must object
- * on a criterion that still SERVES. The default is `noOverstatement`; the
- * untraced case is now requested explicitly, and asserted on its own terms.
- */
-const unsatisfied = (
-  objection: string,
-  failing: keyof EvaluatorVerdict["criteria"] = "noOverstatement"
-): EvaluatorVerdict => ({
+const unsatisfied = (objection: string): EvaluatorVerdict => ({
   satisfied: false,
   objection,
-  criteria: { ...SATISFIED.criteria, [failing]: false }
+  criteria: { ...SATISFIED.criteria, citationTracing: false }
 });
 
 const passCeiling: BandCeilingDecision = {
@@ -210,28 +197,36 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
       ...input(),
       factBundle: buildFactBundle({ ...factBundle(), residualObjections: ["test-layer objection"] })
     }, dependencies());
-    // Subject: composition evidence is required from the composition stage on.
-    // The objection is deliberately NOT citation tracing — that one now refuses
-    // the answer outright (F-T9B-1), which would test something else entirely.
-    const servedDespiteStandingObjection = await runServeGateChain(input(), dependencies({
-      evaluate: async () => ({ verdict: unsatisfied("The statement overstates the losing position."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
+    const servedDespiteUntracedCitation = await runServeGateChain(input(), dependencies({
+      // F-T9B-1 (V ruling 2026-09-03): an exhausted citation-tracing objection
+      // SERVES, marked, at the terminal ladder's floor — T13's honest
+      // downgrade. That form is hypothesis + research plan, so this candidate
+      // supplies both; the file's default single-segment candidate cannot take
+      // the downgrade form. The ONLY change from the landed arm is the shape of
+      // the candidate and the terminal it now reaches; the subject is untouched.
+      synthesize: async () => ({
+        candidate: [
+          segment("segment:hypothesis", "The provisional answer.", true),
+          segment("segment:plan", "The research plan that would lift it.", false)
+        ],
+        candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+      }),
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
-    // The untraced-citation case, re-pinned rather than dropped: it used to be
-    // asserted here as SERVED, and under F-T9B-1 it is a loud refusal.
-    await expect(runServeGateChain(input(), dependencies({
-      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node.", "citationTracing"), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
-    }))).rejects.toMatchObject({ code: "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE" });
 
     expect(preSynthesisTerminal).toMatchObject({
       terminal: "COMPONENTS_ONLY", coverageMode: "NOT_RUN", crashClass: "DIGEST_CANNOT_EXIST"
     });
     expect(servedDespiteFailedRestatement.terminal).toBe("SERVED");
     expect(servedDespiteObjections.terminal).toBe("SERVED");
-    expect(servedDespiteStandingObjection.terminal).toBe("SERVED");
+    // Serves — it is NOT refused — at the downgrade floor, with its mark.
+    expect(servedDespiteUntracedCitation.terminal).toBe("DOWNGRADED");
+    expect(servedDespiteUntracedCitation.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(servedDespiteUntracedCitation.confidenceBand).toBeNull();
     expect(compositionEvidenceRequired(preSynthesisTerminal)).toBe(false);
     expect(compositionEvidenceRequired(servedDespiteFailedRestatement)).toBe(true);
     expect(compositionEvidenceRequired(servedDespiteObjections)).toBe(true);
-    expect(compositionEvidenceRequired(servedDespiteStandingObjection)).toBe(true);
+    expect(compositionEvidenceRequired(servedDespiteUntracedCitation)).toBe(true);
   });
 
   it("distinguishes the independent composition budget from the cost envelope", async () => {
@@ -334,16 +329,28 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     expect(recovered.gateTrace).toContain("RECOMPOSED_ONCE");
     expect(recovered.loopRounds).toHaveLength(2);
 
-    // Subject: the EXHAUSTED loop serves with its objection standing. Objecting
-    // on citation tracing would refuse the answer instead (F-T9B-1), so this
-    // uses a criterion that still serves — which is what the goal's
-    // "evaluator-unsatisfied-3-rounds serves WITH the objection mark" needs.
     const exhausted = await runServeGateChain(input(), dependencies({
-      evaluate: async () => ({ verdict: unsatisfied("The statement overstates the losing position."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
+      // F-T9B-1 (V ruling 2026-09-03): an exhausted citation-tracing objection
+      // SERVES, marked, at the terminal ladder's floor — T13's honest
+      // downgrade. That form is hypothesis + research plan, so this candidate
+      // supplies both; the file's default single-segment candidate cannot take
+      // the downgrade form. The ONLY change from the landed arm is the shape of
+      // the candidate and the terminal it now reaches; the subject is untouched.
+      synthesize: async () => ({
+        candidate: [
+          segment("segment:hypothesis", "The provisional answer.", true),
+          segment("segment:plan", "The research plan that would lift it.", false)
+        ],
+        candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+      }),
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
-    expect(exhausted.terminal).toBe("SERVED");
-    expect(exhausted.standingObjection).toBe("The statement overstates the losing position.");
+    expect(exhausted.terminal).toBe("DOWNGRADED");
+    expect(exhausted.standingObjection).toBe("A claim traces to no digest node.");
     expect(exhausted.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    // Nothing banded on rejected evidence, and the answer is still served.
+    expect(exhausted.confidenceBand).toBeNull();
+    expect(exhausted.answerForm).not.toBeNull();
 
     const provenance = input();
     provenance.nodes[0]!.locator = null;

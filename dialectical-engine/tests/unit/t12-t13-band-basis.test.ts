@@ -325,37 +325,74 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
   });
 
   /**
-   * V ruling 2026-09-03 (F-T9B-1), implemented as its PURPOSE rather than as a
-   * new terminal: "a run whose citation tracing failed must not have its
-   * citations counted into the confidence band".
+   * V ruling 2026-09-03 (F-T9B-1), THIRD mechanism — the ruled one.
    *
-   * `conforms` is a REAL axis of the cited-set filter now, not just `state`.
-   * Under T9's chain every judgement carries the same
-   * `finalCriteria.citationTracing`, so when the evaluator's tracing criterion
-   * failed NO segment is verified, the cited set is empty, and S08's existing
-   * empty-basis guard refuses loudly — which is exactly the case S08 wrote it
-   * for. Nothing is banded on citations nobody could trace.
+   * The first two both invented a way to END the answer: a fifth COMPONENTS_ONLY
+   * crash class, then a hard refusal through S08's empty-basis guard. Both broke
+   * goal-v4, which says a run that reaches its round bound with the evaluator
+   * still objecting SERVES REGARDLESS, carrying the objection as a visible mark.
+   * This one uses the ladder the engine already has: the run serves, the mark is
+   * emitted, and the terminal is DOWNGRADED — T13's own honest downgrade.
    *
-   * This deliberately does NOT add a fifth COMPONENTS_ONLY crash class: goal-v4
-   * re-routes the conformance gate to an objection criterion and closes the
-   * terminal at four crash classes ("no non-crash path returns
-   * COMPONENTS_ONLY"), and the sibling arm in t09-synthesis.test.ts still pins
-   * that a citation-tracing objection is not a terminal.
+   * What the band does. `conforms` is a live axis of the cited-set filter, so a
+   * failed citation-tracing criterion leaves NO verified segment and the basis
+   * is empty. `deriveBandCeiling` refuses an empty basis by design ("No
+   * load-bearing node contributes to the ceiling"), so no ceiling is derived and
+   * NO BAND IS CLAIMED. Nothing is banded on rejected evidence — which is the
+   * point — and the label is untouched: confirm-item 3 rules that a standing
+   * round-3 objection does not move it, and the label is code-derived from the
+   * propagated numbers before synthesis, acyclically.
+   *
+   * The pair below is deliberate. Asserting "the basis contains no untraced
+   * citation" against a basis that was never computed would be vacuous, so the
+   * SAME nodes and the SAME segments are run with the evaluator satisfied, and
+   * that run's basis is asserted to contain both citations. One arm shows the
+   * exclusion, the other shows there was something to exclude.
    */
-  it("refuses to band a statement whose citation tracing FAILED", async () => {
+  it("serves an exhausted citation-tracing objection DOWNGRADED and marked, banding nothing", async () => {
     const recorded = recorder();
-    const nodes = [node("node:reasoned", "REASONING", true)];
-    await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
-      verdict: CITATION_TRACING_FAILED,
-      segments: () => [
-        segment("segment:1", "A statement whose citations were never traced.", ["node:reasoned"], ["number:final-strength"]),
-        segment("segment:2", "The research plan that would lift it.", ["node:reasoned"])
-      ]
-    }))).rejects.toMatchObject({ code: "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE" });
+    const nodes = [
+      node("node:reasoned", "REASONING", true),
+      node("node:looked-up", "LOOKED_UP", false, "https://example.invalid/test-fixture")
+    ];
+    const segments = () => [
+      segment("segment:hypothesis", "The provisional answer, as composed.", ["node:reasoned", "node:looked-up"], ["number:final-strength"]),
+      segment("segment:plan", "The research plan that would lift it, as composed.", ["node:reasoned"])
+    ];
+    // The REAL ceiling derivation, not a permissive double: a test double that
+    // returns NOT_CAPPED would accept an empty basis that production refuses.
+    const realCeiling: ServeGateDependencies["applyBandCeiling"] = ({ basis, candidateConfidenceBand }) => {
+      recorded.bases.push(basis);
+      return deriveBandCeiling({ basis, candidateConfidenceBand, row: ceilingRow() });
+    };
 
-    // The band was never computed at all — the refusal happens BEFORE the
-    // ceiling is consulted, so no untraced citation ever reached a basis.
+    const result = await runServeGateChain(gateInput(nodes), dependencies(recorded, {
+      verdict: CITATION_TRACING_FAILED, segments, applyBandCeiling: realCeiling
+    }));
+
+    // SERVES, and says why it is weaker — never withheld, never a crash class.
+    expect(result.terminal).toBe("DOWNGRADED");
+    expect(result.standingObjection).toBe("Claim 2 traces to no digest node.");
+    expect(result.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(result.crashClass).toBeNull();
+    expect(result.answerForm).toMatchObject({ kind: "HYPOTHESIS_WITH_RESEARCH_PLAN" });
+
+    // NOTHING is banded on rejected evidence: no ceiling was derived at all.
+    expect(result.confidenceBand).toBeNull();
+    expect(result.bandCeiling).toBeNull();
     expect(recorded.bases).toEqual([]);
+
+    // ...and the contrast that stops the line above from being vacuous: the same
+    // citations DO reach the basis when the evaluator traced them.
+    const traced = recorder();
+    const servedResult = await runServeGateChain(gateInput(nodes), dependencies(traced, {
+      segments, applyBandCeiling: ({ basis, candidateConfidenceBand }) => {
+        traced.bases.push(basis);
+        return deriveBandCeiling({ basis, candidateConfidenceBand, row: ceilingRow() });
+      }
+    }));
+    expect(servedResult.terminal).toBe("SERVED");
+    expect(traced.bases).toEqual([{ LOOKED_UP: 1, RAN: 0, REASONING: 1 }]);
   });
 
   it("keeps the RAN bucket in the basis vocabulary (F5 do-not-tidy)", async () => {
