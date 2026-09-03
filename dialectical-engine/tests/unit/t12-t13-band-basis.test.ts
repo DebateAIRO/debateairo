@@ -366,21 +366,32 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       return deriveBandCeiling({ basis, candidateConfidenceBand, row: ceilingRow() });
     };
 
-    const result = await runServeGateChain(gateInput(nodes), dependencies(recorded, {
+    // `.resolves` rather than `await` then assert (D43): the whole property is
+    // that this run does NOT end the answer, so a regression makes the chain
+    // THROW. Awaiting first would surface that as an unhandled rejection with no
+    // assertion frame — the mutant would die of the system being loud instead of
+    // of the assertion that owns the invariant. This way the refusal IS the
+    // assertion failure.
+    await expect(runServeGateChain(gateInput(nodes), dependencies(recorded, {
+      verdict: CITATION_TRACING_FAILED, segments, applyBandCeiling: realCeiling
+    }))).resolves.toMatchObject({
+      // SERVES, and says why it is weaker — never withheld, never a crash class.
+      terminal: "DOWNGRADED",
+      standingObjection: "Claim 2 traces to no digest node.",
+      crashClass: null,
+      answerForm: { kind: "HYPOTHESIS_WITH_RESEARCH_PLAN" },
+      // NOTHING is banded on rejected evidence: no ceiling was derived at all.
+      confidenceBand: null,
+      bandCeiling: null
+    });
+    expect(recorded.bases).toEqual([]);
+
+    // The visible mark, asserted on its own so the matcher above stays readable.
+    const marked = recorder();
+    const markedResult = await runServeGateChain(gateInput(nodes), dependencies(marked, {
       verdict: CITATION_TRACING_FAILED, segments, applyBandCeiling: realCeiling
     }));
-
-    // SERVES, and says why it is weaker — never withheld, never a crash class.
-    expect(result.terminal).toBe("DOWNGRADED");
-    expect(result.standingObjection).toBe("Claim 2 traces to no digest node.");
-    expect(result.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
-    expect(result.crashClass).toBeNull();
-    expect(result.answerForm).toMatchObject({ kind: "HYPOTHESIS_WITH_RESEARCH_PLAN" });
-
-    // NOTHING is banded on rejected evidence: no ceiling was derived at all.
-    expect(result.confidenceBand).toBeNull();
-    expect(result.bandCeiling).toBeNull();
-    expect(recorded.bases).toEqual([]);
+    expect(markedResult.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
 
     // ...and the contrast that stops the line above from being vacuous: the same
     // citations DO reach the basis when the evaluator traced them.
