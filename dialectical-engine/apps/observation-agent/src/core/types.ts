@@ -9,6 +9,72 @@ export const OBSERVATION_COMPONENTS = Object.freeze([
 
 export type ObservationComponent = typeof OBSERVATION_COMPONENTS[number];
 
+export const STATUS_STATES = Object.freeze([
+  "UNKNOWN", "UP", "SUSPECT", "DOWN", "RECOVERING",
+  "NOT_RUNNING", "RUNNING", "PARTIAL", "EXITED", "UNBOUND",
+  "FRESH", "STALE", "INELIGIBLE", "HEALTHY", "PENDING", "OPEN", "CLEARED", "ABSENT",
+  "NOT_WIRED", "WIRED_CURRENT", "WIRED_SILENT", "NONE", "CLOSED", "CURRENT",
+  "STRANDED", "RECEIPTED_OR_ABSENT", "NORMAL", "DEGRADED", "SEVERE", "FATAL",
+  "NOT_OBSERVABLE", "VALID", "EXPIRING_14D", "EXPIRING_3D", "EXPIRED",
+  "COLLECTING", "INSUFFICIENT_SAMPLE", "QUALIFIED_NORMAL", "REST_ONLY",
+  "REST_AND_PROMETHEUS_MATCH", "SOURCE_MISMATCH", "MATCH", "DELIVERED", "FAILED",
+  "MUTED", "RATE_LIMITED", "OPEN_UNACKED", "ACKED", "QUIET", "STORM_SUMMARY_SENT"
+] as const);
+
+export type StatusState = typeof STATUS_STATES[number];
+
+export const STATUS_UNITS = Object.freeze([
+  "COUNT", "MILLISECONDS", "SECONDS", "MINUTES", "PERCENT", "BYTES", "RATIO", "VERSION"
+] as const);
+
+export type StatusUnit = typeof STATUS_UNITS[number];
+
+export const STATUS_TEMPLATES = Object.freeze([
+  "EVALUATOR_UNBOUND_BY_REGISTER", "NO_SCHEDULE_RULED", "CAPTURE_NOT_WIRED",
+  "SLOW_QUERIES_NOT_OBSERVABLE", "PROVIDER_LATENCY_NOT_OBSERVABLE"
+] as const);
+
+export type StatusTemplate = typeof STATUS_TEMPLATES[number];
+
+export type ModuleStatusProjection =
+  | Readonly<{
+      kind: "state";
+      key: string;
+      state: StatusState;
+      observedAt?: Date;
+    }>
+  | Readonly<{
+      kind: "metric";
+      key: string;
+      value: number;
+      unit: StatusUnit;
+      observedAt?: Date;
+    }>
+  | Readonly<{
+      kind: "timestamp";
+      key: string;
+      value: Date | null;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: StatusTemplate;
+      count?: number;
+    }>;
+
+export interface ModuleConfigurationObject {
+  readonly [key: string]: ModuleConfigurationValue;
+}
+
+export type ModuleConfigurationValue = string | number | boolean
+  | readonly ModuleConfigurationValue[] | ModuleConfigurationObject;
+
+export type ModuleTargetFragment = Readonly<{
+  basename: string;
+  targets: readonly unknown[];
+  configuration: ModuleConfigurationObject;
+}>;
+
 export const SIGNAL_CLASSES = Object.freeze([
   "INFRA_DOWN", "INFRA_NOT_READY", "INFRA_UNKNOWN", "WORKER_LOST", "STALL",
   "QUEUE_NOT_DRAINING", "NO_PROGRESS", "SUSPICIOUS_SUCCESS", "BLIND_PERIOD",
@@ -32,6 +98,9 @@ export type ProbeObservation = Readonly<{
   restartPolicy?: string;
   exitCode?: number;
   observedAt?: Date;
+  management?: "core" | "module";
+  statusState?: StatusState;
+  status?: readonly ModuleStatusProjection[];
 }>;
 
 export type SampleIntent = Readonly<{
@@ -62,10 +131,19 @@ export type ProbeContext = Readonly<{
   databaseUrl: string;
   stateDir: string;
   targets: readonly unknown[];
+  targetFragment: ModuleTargetFragment | null;
+  configuration: ModuleConfigurationObject;
+  thresholds: ModuleConfigurationObject;
 }>;
 
 export type SampleContext = Readonly<{ now: Date }>;
-export type SignalContext = Readonly<{ now: Date; thresholdVersion: number }>;
+export type SignalContext = Readonly<{
+  now: Date;
+  thresholdVersion: number;
+  targetFragment: ModuleTargetFragment | null;
+  configuration: ModuleConfigurationObject;
+  thresholds: ModuleConfigurationObject;
+}>;
 
 export type OactlVerbContribution = Readonly<{
   verb: string;

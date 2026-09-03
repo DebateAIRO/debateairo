@@ -6,8 +6,13 @@ import { ObservationError, normalizeObservationError } from "./core/errors.js";
 import { discoverObservationModules } from "./core/modules.js";
 import { ObservationModuleRuntime } from "./core/runtime.js";
 import { signalSchema, type ObservationSignal, type Severity } from "./core/signals.js";
-import { loadObservationTargets } from "./core/targets.js";
-import type { ComponentState, ProbeObservation } from "./core/types.js";
+import { loadObservationTargetCatalog } from "./core/targets.js";
+import {
+  OBSERVATION_COMPONENTS,
+  type ModuleStatusProjection,
+  type ProbeObservation,
+  type StatusState
+} from "./core/types.js";
 import { ObservationJournal } from "./journal/journal.js";
 import { createLivenessTracker, inactiveClassRecoveries } from "./modules/core-liveness/state.js";
 import { deliverJournalFailureDirect } from "./modules/self/direct-notify.js";
@@ -30,7 +35,7 @@ const VERSION = "0.1.0";
 
 type OpenSignal = Readonly<{ signal: ObservationSignal; openedAt: Date }>;
 type MutableComponentStatus = {
-  state: ComponentState;
+  state: StatusState;
   lastProbeAt: Date | null;
   lastOkAt: Date | null;
   openSignalIds: Set<string>;
@@ -121,8 +126,13 @@ async function boot(): Promise<void> {
   } catch (error) {
     throw new ObservationError("OBSERVATION_ENV_INVALID", error);
   }
-  const targets = await loadObservationTargets(environment.OBSERVATION_TARGETS_PATH);
   const moduleCatalog = await discoverObservationModules(join(import.meta.dirname, "modules"));
+  const targetCatalog = await loadObservationTargetCatalog(environment.OBSERVATION_TARGETS_PATH);
+  const ownedTargetFragments = new Set(moduleCatalog.targetFragments);
+  if (targetCatalog.fragments.some((fragment) => !ownedTargetFragments.has(fragment.basename))) {
+    throw new ObservationError("OBSERVATION_TARGETS_INVALID");
+  }
+  const targets = targetCatalog.targets;
 
   const bootstrapPool = new pg.Pool({
     connectionString: environment.OBSERVATION_DATABASE_URL,
@@ -152,7 +162,9 @@ async function boot(): Promise<void> {
   });
   const openSignals = new Map<string, OpenSignal>();
   const status = new Map<string, MutableComponentStatus>();
+  const moduleStatus = new Map<string, readonly Readonly<Record<string, unknown>>[]>();
   for (const target of targets) {
+    if (!OBSERVATION_COMPONENTS.includes(target.component as never)) continue;
     status.set(target.component, {
       state: "UNKNOWN", lastProbeAt: null, lastOkAt: null, openSignalIds: new Set()
     });
@@ -169,6 +181,15 @@ async function boot(): Promise<void> {
         .catch(() => undefined);
       return;
     }
+    const componentStatus = status.get(signal.component) ?? {
+      state: "UNKNOWN" as const,
+      lastProbeAt: null,
+      lastOkAt: null,
+      openSignalIds: new Set<string>()
+    };
+    status.set(signal.component, componentStatus);
+    if (signal.state === "OPEN") componentStatus.openSignalIds.add(signal.signal_id);
+    else if (signal.clears_signal_id !== null) componentStatus.openSignalIds.delete(signal.clears_signal_id);
     const mute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
     await notifier.deliver(signal, {
       now,
@@ -186,7 +207,59 @@ async function boot(): Promise<void> {
     nextSequence: sequence,
     nextSignalId: randomUUID,
     sampleStore: new SampleRingStore(pool),
-    emitSignal: emit
+    emitSignal: emit,
+    updateModuleStatus(moduleName, update) {
+      for (const observation of update.observations) {
+        const componentStatus = status.get(observation.component) ?? {
+          state: "UNKNOWN" as const,
+          lastProbeAt: null,
+          lastOkAt: null,
+          openSignalIds: new Set<string>()
+        };
+        status.set(observation.component, componentStatus);
+        componentStatus.state = observation.statusState ?? (observation.ok ? "UP" : "DOWN");
+        componentStatus.lastProbeAt = observation.observedAt ?? new Date();
+        if (observation.ok) componentStatus.lastOkAt = observation.observedAt ?? new Date();
+      }
+      const projections = update.projections.map((projection: ModuleStatusProjection) => {
+        if (projection.kind === "state") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            state: projection.state,
+            ...(projection.observedAt === undefined ? {} : {
+              observed_at: projection.observedAt.toISOString()
+            })
+          });
+        }
+        if (projection.kind === "metric") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            value: projection.value,
+            unit: projection.unit,
+            ...(projection.observedAt === undefined ? {} : {
+              observed_at: projection.observedAt.toISOString()
+            })
+          });
+        }
+        if (projection.kind === "timestamp") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            value: projection.value?.toISOString() ?? null
+          });
+        }
+        return Object.freeze({
+          kind: projection.kind,
+          key: projection.key,
+          template: projection.template,
+          ...(projection.count === undefined ? {} : { count: projection.count })
+        });
+      });
+      if (projections.length === 0) moduleStatus.delete(moduleName);
+      else moduleStatus.set(moduleName, Object.freeze(projections));
+    }
   });
 
   const startAt = new Date();
@@ -253,6 +326,8 @@ async function boot(): Promise<void> {
       databaseUrl: environment.OBSERVATION_DATABASE_URL,
       stateDir: environment.OBSERVATION_STATE_DIR,
       targets,
+      targetFragments: targetCatalog.fragments,
+      ...(policy.value.modules === undefined ? {} : { moduleThresholds: policy.value.modules }),
       thresholdVersion: policy.version
     });
   }
@@ -318,7 +393,10 @@ async function boot(): Promise<void> {
           last_probe_at: value.lastProbeAt?.toISOString() ?? null,
           last_ok_at: value.lastOkAt?.toISOString() ?? null,
           open_signal_ids: [...value.openSignalIds]
-        }]))
+        }])),
+        ...(moduleStatus.size === 0 ? {} : {
+          modules: Object.fromEntries(moduleStatus.entries())
+        })
       });
     } finally {
       cycling = false;

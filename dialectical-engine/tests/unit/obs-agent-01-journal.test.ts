@@ -59,6 +59,196 @@ describe("OBS-01 typed durable journal", () => {
     expect(() => signalSchema.parse({ ...openSignal(), free_text: "private debate text" })).toThrow();
   });
 
+  it("accepts each frozen Q2 evidence family and rejects wrong class/impact evidence", async () => {
+    const { renderImpact, signalSchema } = await import(
+      "../../apps/observation-agent/src/core/signals.js"
+    );
+    const timestamp = "2026-09-03T07:00:00.000Z";
+    const fixtures: ReadonlyArray<Readonly<{
+      class: string;
+      impact_code: string;
+      evidence: Readonly<Record<string, unknown>>;
+    }>> = [
+      {
+        class: "INFRA_DOWN", impact_code: "IMPACT_DEV_STACK_EXITED",
+        evidence: {
+          probe: "expected_set", members: ["api", "ui", "tls_front_door", "runner"],
+          consecutive_failures: 2, threshold: 2, last_status: "FAILED"
+        }
+      },
+      {
+        class: "RESTART_WITNESSED", impact_code: "IMPACT_RESTART",
+        evidence: { old_started_at: timestamp, new_started_at: "2026-09-03T07:01:00.000Z" }
+      },
+      {
+        class: "EXPECTED_ABSENT", impact_code: "IMPACT_EXPECTED_ABSENT",
+        evidence: { expected: "always", absent_for_s: 60 }
+      },
+      {
+        class: "THROUGHPUT_ANOMALY", impact_code: "IMPACT_SLOW",
+        evidence: { p95_ms: 501, threshold_ms: 500 }
+      },
+      {
+        class: "SCHEDULE_MISSED", impact_code: "IMPACT_SCHEDULE_MISSED",
+        evidence: { job: "replay-self-test", cadence_s: 3_600, grace_s: 60 }
+      },
+      {
+        class: "WORKER_LOST", impact_code: "IMPACT_WORKER_LOST",
+        evidence: {
+          worker_ref: "debateai-dev-runner", heartbeat_age_s: 31,
+          heartbeat_threshold_s: 30, health: "STALE"
+        }
+      },
+      {
+        class: "STALL", impact_code: "IMPACT_STALL",
+        evidence: {
+          count: 1, state: "CLAIMED", claim_deadline: timestamp, grace_s: 15,
+          health: "HEALTHY"
+        }
+      },
+      {
+        class: "QUEUE_NOT_DRAINING", impact_code: "IMPACT_QUEUE",
+        evidence: {
+          state: "READY", ready_age_s: 121, ready_threshold_s: 120,
+          health: "HEALTHY"
+        }
+      },
+      {
+        class: "NO_PROGRESS", impact_code: "IMPACT_NO_PROGRESS",
+        evidence: {
+          count: 1, last_progress_seq: 42, silence_s: 301,
+          silence_threshold_s: 300, health: "HEALTHY"
+        }
+      },
+      {
+        class: "SUSPICIOUS_SUCCESS", impact_code: "IMPACT_SUSPICIOUS_SUCCESS",
+        evidence: { count: 1, state: "DONE", artifact_present: false, health: "HEALTHY" }
+      },
+      {
+        class: "BLIND_PERIOD", impact_code: "IMPACT_BLIND",
+        evidence: {
+          runtime: "runner", last_flush_ok_at: timestamp, silence_s: 121,
+          threshold_s: 120, health: "WIRED_SILENT"
+        }
+      },
+      {
+        class: "CAPTURE_GAP", impact_code: "IMPACT_CAPTURE_GAP",
+        evidence: {
+          source: "runner", gap_class: "QUEUE_FULL", lost_count: 7,
+          opened_at: timestamp, closed_at: null
+        }
+      },
+      {
+        class: "CAPTURE_NOT_WIRED", impact_code: "IMPACT_CAPTURE_NOT_WIRED",
+        evidence: { runtime: "runner", flush_ok_count: 0, health: "NOT_WIRED" }
+      },
+      {
+        class: "SPOOL_STRANDED", impact_code: "IMPACT_SPOOL_STRANDED",
+        evidence: {
+          runtime: "runner", spool_ref: "runner-42-20000000-0000-4000-8000-000000000042.spool",
+          spool_age_s: 601, threshold_s: 600, receipt_present: false
+        }
+      },
+      {
+        class: "CAPACITY", impact_code: "IMPACT_PG_CAPACITY",
+        evidence: { count: 81, limit: 100, percent: 81, threshold_percent: 80, unit: "connections" }
+      },
+      {
+        class: "CAPACITY", impact_code: "IMPACT_PG_LOCKS",
+        evidence: { count: 1, duration_seconds: 61, threshold_seconds: 60, unit: "sessions" }
+      },
+      {
+        class: "CAPACITY", impact_code: "IMPACT_PG_LONG_XACT",
+        evidence: { duration_seconds: 301, threshold_seconds: 300, unit: "seconds" }
+      },
+      {
+        class: "CAPACITY", impact_code: "IMPACT_DISK",
+        evidence: { percent: 14.5, threshold_percent: 15, free_bytes: 1_000, total_bytes: 10_000, unit: "bytes" }
+      },
+      {
+        class: "CAPACITY", impact_code: "IMPACT_MEMORY",
+        evidence: { percent: 9.5, threshold_percent: 10, available_bytes: 1_000, total_bytes: 10_000, unit: "bytes" }
+      },
+      {
+        class: "THROUGHPUT_ANOMALY", impact_code: "IMPACT_HATCHET_QUEUE",
+        evidence: { count: 10, duration_seconds: 300 }
+      },
+      {
+        class: "THROUGHPUT_ANOMALY", impact_code: "IMPACT_HATCHET_FAILED_TASKS",
+        evidence: { failed: 3, window_minutes: 15 }
+      },
+      {
+        class: "THROUGHPUT_ANOMALY", impact_code: "IMPACT_HATCHET_DISPATCH_SLOW",
+        evidence: { p95_seconds: 31, window_minutes: 5 }
+      },
+      {
+        class: "THROUGHPUT_ANOMALY", impact_code: "IMPACT_RUN_FAILURE",
+        evidence: { failed: 3, total: 4, ratio: 0.75, threshold_ratio: 0.5, window_minutes: 60 }
+      },
+      {
+        class: "PROVIDER_DEGRADED", impact_code: "IMPACT_PROVIDER",
+        evidence: {
+          provider_ref: "openai", failed: 5, total: 10, ratio: 0.5, window_started_at: timestamp,
+          window_ended_at: "2026-09-03T07:05:00.000Z"
+        }
+      },
+      {
+        class: "CERT_EXPIRY", impact_code: "IMPACT_CERT",
+        evidence: { days: 3, threshold_days: 3, not_after: timestamp, unit: "days" }
+      }
+    ];
+
+    for (const [index, fixture] of fixtures.entries()) {
+      expect(() => signalSchema.parse({
+        ...openSignal(index + 100),
+        class: fixture.class,
+        impact_code: fixture.impact_code,
+        component: fixture.class === "CERT_EXPIRY" ? "tls_front_door" : "hatchet",
+        evidence: fixture.evidence,
+        suspected_defect: ["STALL", "QUEUE_NOT_DRAINING", "NO_PROGRESS", "SUSPICIOUS_SUCCESS"]
+          .includes(fixture.class),
+        defect_kind: fixture.class === "NO_PROGRESS" ? "SILENT_NOOP"
+          : fixture.class === "SUSPICIOUS_SUCCESS" ? "SUSPICIOUS_SUCCESS"
+            : ["STALL", "QUEUE_NOT_DRAINING"].includes(fixture.class) ? "STALL_DETECTED" : null
+      })).not.toThrow();
+    }
+
+    expect(renderImpact({
+      ...openSignal(199),
+      class: "PROVIDER_DEGRADED",
+      impact_code: "IMPACT_PROVIDER",
+      evidence: {
+        provider_ref: "openai", failed: 5, total: 10, ratio: 0.5,
+        window_started_at: timestamp, window_ended_at: "2026-09-03T07:05:00.000Z"
+      }
+    })).toBe("Provider openai failed 50% of its last 10 calls: debates stall or die on it.");
+
+    expect(() => signalSchema.parse({
+      ...openSignal(200),
+      class: "CAPACITY",
+      impact_code: "IMPACT_PROVIDER",
+      evidence: fixtures.at(-1)?.evidence
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...openSignal(201),
+      class: "THROUGHPUT_ANOMALY",
+      impact_code: "IMPACT_SLOW",
+      evidence: {
+        metric_key: "probe.api.latency_ms", p95_ms: Number.NaN, threshold_ms: 500,
+        window_minutes: 5, observed_at: timestamp
+      }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...openSignal(202),
+      class: "THROUGHPUT_ANOMALY",
+      impact_code: "IMPACT_SLOW",
+      evidence: {
+        metric_key: "probe.api.latency_ms", p95_ms: 501, threshold_ms: 500,
+        window_minutes: 5, observed_at: timestamp, product_text: "private debate text"
+      }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+  });
+
   it("fsyncs one JSON line before a mirror can observe the signal", async () => {
     const stateDir = await scratch();
     const { ObservationJournal } = await import(
@@ -164,5 +354,63 @@ describe("OBS-01 typed durable journal", () => {
     await writeStatusSnapshot(stateDir, snapshot);
     expect(JSON.parse(await readFile(join(stateDir, "status.json"), "utf8"))).toEqual(snapshot);
     expect((await readdir(stateDir)).filter((name) => name.includes("status.json."))).toEqual([]);
+  });
+
+  it("stores bounded module status projections without weakening component status", async () => {
+    const stateDir = await scratch();
+    const { writeStatusSnapshot } = await import(
+      "../../apps/observation-agent/src/store/status.js"
+    );
+    const snapshot = {
+      pid: 4321,
+      version: "0.1.0",
+      thresholds_version: 2,
+      mute: null,
+      components: {
+        dev_stack: {
+          state: "NOT_RUNNING",
+          last_probe_at: "2026-09-03T07:00:05.000Z",
+          last_ok_at: null,
+          open_signal_ids: []
+        }
+      },
+      modules: {
+        "product-liveness": [
+          {
+            kind: "template",
+            key: "evaluator_worker",
+            template: "EVALUATOR_UNBOUND_BY_REGISTER"
+          },
+          {
+            kind: "metric",
+            key: "probe.api.latency_ms",
+            value: 501,
+            unit: "MILLISECONDS",
+            observed_at: "2026-09-03T07:00:05.000Z"
+          }
+        ]
+      }
+    } as const;
+    await writeStatusSnapshot(stateDir, snapshot);
+    expect(JSON.parse(await readFile(join(stateDir, "status.json"), "utf8"))).toEqual(snapshot);
+
+    await expect(writeStatusSnapshot(stateDir, {
+      ...snapshot,
+      modules: {
+        "product-liveness": [{
+          kind: "metric", key: "probe.api.latency_ms", value: Number.NaN,
+          unit: "MILLISECONDS", observed_at: null
+        }]
+      }
+    })).rejects.toThrow();
+    await expect(writeStatusSnapshot(stateDir, {
+      ...snapshot,
+      modules: {
+        "product-liveness": [{
+          kind: "template", key: "evaluator_worker",
+          template: "EVALUATOR_UNBOUND_BY_REGISTER", text: "private debate text"
+        }]
+      }
+    })).rejects.toThrow();
   });
 });

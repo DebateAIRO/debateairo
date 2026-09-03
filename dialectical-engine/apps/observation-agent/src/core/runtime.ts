@@ -9,7 +9,13 @@ import {
 import {
   OBSERVATION_COMPONENTS,
   SIGNAL_CLASSES,
+  STATUS_STATES,
+  STATUS_TEMPLATES,
+  STATUS_UNITS,
+  type ModuleConfigurationObject,
   type Module,
+  type ModuleStatusProjection,
+  type ModuleTargetFragment,
   type ProbeObservation,
   type SampleIntent,
   type SignalIntent
@@ -31,8 +37,41 @@ const probeObservationSchema = z.object({
   containerStatus: z.string().max(128).optional(),
   restartPolicy: z.string().max(128).optional(),
   exitCode: z.number().int().optional(),
-  observedAt: z.date().optional()
-}).strict();
+  observedAt: z.date().optional(),
+  management: z.enum(["core", "module"]).optional(),
+  statusState: z.enum(STATUS_STATES).optional(),
+  status: z.array(z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("state"),
+      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
+      state: z.enum(STATUS_STATES),
+      observedAt: z.date().optional()
+    }).strict(),
+    z.object({
+      kind: z.literal("metric"),
+      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
+      value: z.number().finite(),
+      unit: z.enum(STATUS_UNITS),
+      observedAt: z.date().optional()
+    }).strict(),
+    z.object({
+      kind: z.literal("timestamp"),
+      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
+      value: z.date().nullable()
+    }).strict(),
+    z.object({
+      kind: z.literal("template"),
+      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
+      template: z.enum(STATUS_TEMPLATES),
+      count: z.number().int().nonnegative().optional()
+    }).strict()
+  ])).max(128).optional()
+}).strict().superRefine((observation, context) => {
+  if (observation.management !== "module"
+    && (observation.statusState !== undefined || observation.status !== undefined)) {
+    context.addIssue({ code: "custom", message: "OBSERVATION_MODULE_STATUS_INVALID" });
+  }
+});
 
 function parseProbeObservation(input: unknown): ProbeObservation {
   const parsed = probeObservationSchema.parse(input);
@@ -46,7 +85,37 @@ function parseProbeObservation(input: unknown): ProbeObservation {
     ...(parsed.containerStatus === undefined ? {} : { containerStatus: parsed.containerStatus }),
     ...(parsed.restartPolicy === undefined ? {} : { restartPolicy: parsed.restartPolicy }),
     ...(parsed.exitCode === undefined ? {} : { exitCode: parsed.exitCode }),
-    ...(parsed.observedAt === undefined ? {} : { observedAt: parsed.observedAt })
+    ...(parsed.observedAt === undefined ? {} : { observedAt: parsed.observedAt }),
+    ...(parsed.management === undefined ? {} : { management: parsed.management }),
+    ...(parsed.statusState === undefined ? {} : { statusState: parsed.statusState }),
+    ...(parsed.status === undefined ? {} : {
+      status: Object.freeze(parsed.status.map((projection): ModuleStatusProjection => {
+        if (projection.kind === "state") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            state: projection.state,
+            ...(projection.observedAt === undefined ? {} : { observedAt: projection.observedAt })
+          });
+        }
+        if (projection.kind === "metric") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            value: projection.value,
+            unit: projection.unit,
+            ...(projection.observedAt === undefined ? {} : { observedAt: projection.observedAt })
+          });
+        }
+        if (projection.kind === "timestamp") return Object.freeze(projection);
+        return Object.freeze({
+          kind: projection.kind,
+          key: projection.key,
+          template: projection.template,
+          ...(projection.count === undefined ? {} : { count: projection.count })
+        });
+      }))
+    })
   });
 }
 
@@ -70,11 +139,20 @@ type SampleStore = Readonly<{
   write(sample: SampleIntent, cadenceMs: number): Promise<void>;
 }>;
 
+export type ModuleStatusUpdate = Readonly<{
+  observations: readonly ProbeObservation[];
+  projections: readonly ModuleStatusProjection[];
+}>;
+
 export class ObservationModuleRuntime {
   private readonly nextSequence: () => number;
   private readonly nextSignalId: () => string;
   private readonly sampleStore: SampleStore;
   private readonly emitSignal: (signal: ObservationSignal, now: Date) => Promise<void>;
+  private readonly updateModuleStatus: ((
+    moduleName: string,
+    update: ModuleStatusUpdate
+  ) => Promise<void> | void) | undefined;
   private readonly lastRun = new Map<string, number>();
   private readonly openSignals = new Map<string, ObservationSignal>();
 
@@ -83,11 +161,16 @@ export class ObservationModuleRuntime {
     nextSignalId: () => string;
     sampleStore: SampleStore;
     emitSignal: (signal: ObservationSignal, now: Date) => Promise<void>;
+    updateModuleStatus?: (
+      moduleName: string,
+      update: ModuleStatusUpdate
+    ) => Promise<void> | void;
   }>) {
     this.nextSequence = input.nextSequence;
     this.nextSignalId = input.nextSignalId;
     this.sampleStore = input.sampleStore;
     this.emitSignal = input.emitSignal;
+    this.updateModuleStatus = input.updateModuleStatus;
   }
 
   async run(input: Readonly<{
@@ -97,6 +180,8 @@ export class ObservationModuleRuntime {
     databaseUrl: string;
     stateDir: string;
     targets: readonly unknown[];
+    targetFragments?: readonly ModuleTargetFragment[];
+    moduleThresholds?: Readonly<Record<string, ModuleConfigurationObject>>;
     thresholdVersion: number;
   }>): Promise<readonly ProbeObservation[]> {
     const observations: ProbeObservation[] = [];
@@ -104,6 +189,24 @@ export class ObservationModuleRuntime {
       const last = this.lastRun.get(module.name);
       if (last !== undefined && input.now.getTime() - last < module.cadence.intervalMs) continue;
       this.lastRun.set(module.name, input.now.getTime());
+      const configuredFragment = module.targetFragmentBasename === undefined
+        ? null
+        : input.targetFragments?.find((fragment) =>
+          fragment.basename === module.targetFragmentBasename) ?? null;
+      if (module.targetFragmentBasename !== undefined
+        && input.targetFragments !== undefined
+        && configuredFragment === null) {
+        throw new ObservationError("OBSERVATION_TARGETS_INVALID");
+      }
+      const targetFragment = configuredFragment ?? (module.targetFragmentBasename === undefined
+        ? null
+        : Object.freeze({
+            basename: module.targetFragmentBasename,
+            targets: input.targets,
+            configuration: Object.freeze({})
+          }));
+      const configuration = targetFragment?.configuration ?? Object.freeze({});
+      const thresholds = Object.freeze(input.moduleThresholds?.[module.name] ?? {});
       let moduleObservations: readonly ProbeObservation[];
       try {
         const output = await module.probe({
@@ -111,13 +214,26 @@ export class ObservationModuleRuntime {
           timeoutMs: Math.min(input.timeoutMs, module.cadence.timeoutMs),
           databaseUrl: input.databaseUrl,
           stateDir: input.stateDir,
-          targets: input.targets
+          targets: targetFragment?.targets ?? [],
+          targetFragment,
+          configuration,
+          thresholds
         });
         moduleObservations = Object.freeze(output.map(parseProbeObservation));
       } catch (error) {
         throw new ObservationError("OBSERVATION_MODULE_PROBE_INVALID", error);
       }
-      observations.push(...moduleObservations);
+      observations.push(...moduleObservations.filter((observation) =>
+        observation.management !== "module"));
+
+      const managedObservations = Object.freeze(moduleObservations.filter((observation) =>
+        observation.management === "module"));
+      const projections = Object.freeze(managedObservations.flatMap((observation) =>
+        observation.status ?? []));
+      await this.updateModuleStatus?.(module.name, Object.freeze({
+        observations: managedObservations,
+        projections
+      }));
 
       let samples: readonly SampleIntent[];
       try {
@@ -132,7 +248,10 @@ export class ObservationModuleRuntime {
       try {
         signalIntents = Object.freeze(module.signals(moduleObservations, {
           now: input.now,
-          thresholdVersion: input.thresholdVersion
+          thresholdVersion: input.thresholdVersion,
+          targetFragment,
+          configuration,
+          thresholds
         }).map((intent) => Object.freeze(signalIntentSchema.parse(intent))));
       } catch (error) {
         throw new ObservationError("OBSERVATION_MODULE_SIGNAL_INVALID", error);

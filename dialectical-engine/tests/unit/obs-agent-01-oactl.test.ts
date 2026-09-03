@@ -79,7 +79,17 @@ describe("OBS-01 core oactl controls", () => {
       mute: null,
       components: {
         postgres: { state: "UP", last_probe_at: null, last_ok_at: null, open_signal_ids: [] },
-        hatchet: { state: "DOWN", last_probe_at: null, last_ok_at: null, open_signal_ids: [] }
+        hatchet: { state: "DOWN", last_probe_at: null, last_ok_at: null, open_signal_ids: [] },
+        dev_stack: {
+          state: "NOT_RUNNING", last_probe_at: null, last_ok_at: null, open_signal_ids: []
+        }
+      },
+      modules: {
+        "product-liveness": [{
+          kind: "template",
+          key: "evaluator_worker",
+          template: "EVALUATOR_UNBOUND_BY_REGISTER"
+        }]
       }
     }));
     const { renderStatus } = await import(
@@ -89,6 +99,8 @@ describe("OBS-01 core oactl controls", () => {
     expect(output).toContain(`state_dir ${stateDir}`);
     expect(output).toMatch(/^postgres\s+UP$/m);
     expect(output).toMatch(/^hatchet\s+DOWN$/m);
+    expect(output).toMatch(/^dev_stack\s+NOT_RUNNING$/m);
+    expect(output).toMatch(/^evaluator_worker\s+UNBOUND by register$/m);
   });
 
   it("provisions one repo-root 0600 credential file without returning the secret", async () => {
