@@ -111,41 +111,89 @@ function requireMatch(source: string, expression: RegExp, label: string): string
 }
 
 /**
+ * The object body a `{` opens, found by BALANCING braces rather than by a lazy
+ * regex. `[\s\S]*?\}\)` stops at the first `}}` it meets, which inside a
+ * nested zod declaration is the wrong one; counting is the only way to know
+ * where a declaration actually ends.
+ */
+function balancedObjectBody(source: string, openBraceIndex: number): string | undefined {
+  let depth = 0;
+  for (let index = openBraceIndex; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "{") depth += 1;
+    else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(openBraceIndex + 1, index);
+    }
+  }
+  return undefined;
+}
+
+/**
  * F-SEALEDROWS-A · V RULING 2026-09-04 — the conformance fingerprint covers the
  * EVALUATOR prompt ALONE. The writer's prompt already carries its own slot
  * (`composerContractHash`), so the checker's slot fingerprints the checker's
  * prompt and nothing else: one slot, one prompt, one fingerprint, so a later
  * edit to either wording says WHICH one moved.
  *
- * WHY THIS LOCATOR IS SHAPED THIS WAY. The retired one quoted the prompt's own
- * words — `Return only JSON {conforms,findings}` and `{pass}` — and required
- * exactly two matches. `c1d8e09d` replaced both prompts with one combined
- * evaluator prompt, the pattern matched ZERO, and BOTH deployment seeders threw
- * before writing a single register row. A fingerprint slot cannot tell "the
- * text changed" from "I can no longer find the text", so a locator built out of
- * the volatile thing it is locating fails silently until something runs it.
+ * TWO DEFECTS SHAPED THIS, and both were the same disease — a locator that
+ * SUCCEEDS ON THE WRONG THING rather than failing loudly.
  *
- * So the search key is derived from the evaluator's OWN response parser in the
- * same source: the evaluator prompt is the system message naming EVERY
- * criterion that parser declares. Rewording the prompt is now free; letting the
- * prompt and the parser disagree is loud, which is the bug worth being loud
- * about. Exported so a test can drive it over synthetic sources and prove it
- * refuses, without editing the shipped runner.
+ * The first: the original quoted the prompt's own words (`{conforms,findings}`,
+ * `{pass}`) and required two matches. `c1d8e09d` rewrote the prompt, it matched
+ * ZERO, and both deployment seeders died. A fingerprint slot cannot tell "the
+ * text changed" from "I can no longer find the text".
+ *
+ * The second (codex r1, B1): deriving the criteria from the FIRST object in the
+ * file carrying a `criteria` member is UNANCHORED. An unrelated schema declared
+ * EARLIER captured it — the reviewer drove a synthetic source with
+ * `criteria: z.object({ alpha: z.boolean() })` ahead of the real one and got
+ * back `Unrelated system prompt naming alpha.` WITH EXIT 0, silently
+ * fingerprinting a non-evaluator prompt and breaching V's ruling while looking
+ * healthy.
+ *
+ * So the search is ANCHORED to the evaluator's own verdict parser, by name and
+ * uniquely: exactly one `evaluatorVerdictSchema` declaration, its body found by
+ * brace balancing, the criteria read from inside THAT body, and then exactly
+ * one system prompt naming every criterion it declares. Every earlier refusal
+ * is kept — zero matches, duplicates, and prompt/parser drift. If the parser is
+ * renamed the anchor vanishes and this REFUSES; it can no longer quietly pick
+ * something else. Exported so a test can drive it over synthetic sources,
+ * including a decoy placed FIRST, without editing the shipped runner.
  */
 export function extractEvaluatorContractText(runnerSource: string, code: string): string {
-  const declared = runnerSource.match(/criteria: z\.object\(\{([\s\S]*?)\}\)/);
-  const criteria = declared === null ? [] : [...declared[1]!.matchAll(
-    /([A-Za-z_][A-Za-z0-9_]*): z\.boolean\(\)/g
-  )].map((match) => match[1]!);
-  if (criteria.length === 0) {
-    throw new Error(`${code}:conformance — the evaluator response parser declares no criteria`);
+  const refuse = (why: string): never => {
+    throw new Error(`${code}:conformance — ${why}`);
+  };
+  const declarations = [...runnerSource.matchAll(/\bconst\s+evaluatorVerdictSchema\s*=\s*z\.object\(\s*\{/g)];
+  if (declarations.length !== 1) {
+    return refuse(
+      `expected exactly 1 \`evaluatorVerdictSchema\` declaration to anchor on, found ${declarations.length}`
+    );
   }
+  const declaration = declarations[0]!;
+  const declarationBody = balancedObjectBody(
+    runnerSource, declaration.index! + declaration[0].length - 1
+  );
+  if (declarationBody === undefined) return refuse("the `evaluatorVerdictSchema` declaration is unbalanced");
+  const criteriaBlocks = [...declarationBody.matchAll(/\bcriteria\s*:\s*z\.object\(\s*\{/g)];
+  if (criteriaBlocks.length !== 1) {
+    return refuse(`expected exactly 1 \`criteria\` member inside the evaluator verdict schema, found ${criteriaBlocks.length}`);
+  }
+  const criteriaBlock = criteriaBlocks[0]!;
+  const criteriaBody = balancedObjectBody(
+    declarationBody, criteriaBlock.index! + criteriaBlock[0].length - 1
+  );
+  if (criteriaBody === undefined) return refuse("the evaluator `criteria` member is unbalanced");
+  const criteria = [...criteriaBody.matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*:\s*z\.boolean\(\)/g)]
+    .map((match) => match[1]!);
+  if (criteria.length === 0) return refuse("the evaluator response parser declares no boolean criteria");
   const naming = [...runnerSource.matchAll(/content: "([^"]+)"/g)]
     .map((match) => match[1]!)
     .filter((text) => criteria.every((criterion) => text.includes(criterion)));
   if (naming.length !== 1) {
-    throw new Error(
-      `${code}:conformance — expected exactly 1 system prompt naming every declared criterion `
+    return refuse(
+      `expected exactly 1 system prompt naming every declared criterion `
       + `(${criteria.join(",")}), found ${naming.length}`
     );
   }

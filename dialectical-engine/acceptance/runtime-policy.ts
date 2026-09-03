@@ -8,7 +8,7 @@ import {
   type CompositionMapRegisterRow,
   type EnvelopeFormulaInputs
 } from "@debateai/register";
-import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
+import type { CompositionBudgetResolution, SealedBandCeilingRegisterRow } from "@debateai/serve";
 import {
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
   ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
@@ -67,12 +67,15 @@ const runtimeRowsSchema = z.object({
       minimumShares: minimumSharesSchema,
       label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
     }).strict()),
-    // F-T9B-3: the entry whose trigger is the EMPTY BASIS itself. Optional so a
-    // row that predates it still parses and then FAILS CLOSED at derivation,
-    // rather than being rejected at read time.
+    // F-T9B-3 / codex r1 B2: the entry whose trigger is the EMPTY BASIS itself.
+    // REQUIRED. It was optional, and the reviewer showed a strict parser then
+    // admitted an incomplete sealed row and deferred the refusal to whenever an
+    // empty basis happened to occur — `acceptance-parser-accepts-missing-floor
+    // true`. A sealed row that cannot describe its own floor is refused HERE,
+    // at read time.
     emptyBasisFloor: z.object({
       label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
-    }).strict().optional()
+    }).strict()
   }).strict(),
   // FAIR-02 (DR-140): both real makers, in seeded order. The floor stays 1
   // (DR-137 mono-model admission); the honest 2-maker report comes from the
@@ -102,7 +105,7 @@ export interface AcceptanceRuntimePolicy {
   readonly compositionRow: CompositionMapRegisterRow;
   readonly bounds: z.infer<typeof runtimeRowsSchema>["acceptanceOrganCostBounds"]["organs"];
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
-  readonly bandCeiling: BandCeilingRegisterRow;
+  readonly bandCeiling: SealedBandCeilingRegisterRow;
   readonly panelDiscoveryPolicy: {
     readonly probeFreshnessMs: 600_000;
     readonly probeMaxAttempts: 1;

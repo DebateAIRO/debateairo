@@ -278,15 +278,47 @@ export interface BandCeilingRegisterRow {
      * F-T9B-3: the entry describing NO VERIFIED EVIDENCE. Its trigger is the
      * empty basis itself, which is why it sits beside `cuts` instead of in it:
      * every `cuts` entry is selected by a SHARE threshold, and on an empty
-     * basis no share exists to threshold. OPTIONAL, because a row that does not
-     * describe its floor must FAIL CLOSED at derivation rather than fail to
-     * compile — older sealed rows and test-layer rows predate this entry.
+     * basis no share exists to threshold.
+     *
+     * OPTIONAL **ON THIS TYPE ONLY**, and this type is now the LEGACY carrier.
+     * codex r1/B2 is right that optional-on-a-shared-settings-object is how
+     * this mission's last three defects hid from the compiler, and that a
+     * read-only fixture is not a product semantic. The sealed shape is
+     * `SealedBandCeilingRegisterRow` below, which REQUIRES it and is what both
+     * deployment policies now publish. This one stays permissive solely because
+     * `apps/runner/src/index.ts` names it at its settings boundary and at the
+     * `deriveBandCeiling` call, and that file — with the two integration
+     * fixtures that build rows for it — is outside this lane's contract.
+     * Measured, not assumed: requiring it here fails `tsc` in
+     * `tests/integration/database.test.ts` and
+     * `tests/integration/t17-envelope-ledger.test.ts`. Filed as F-SEALEDROWS-D;
+     * when those three files are granted this member becomes required here and
+     * `SealedBandCeilingRegisterRow` collapses back into it.
      */
     readonly emptyBasisFloor?: {
       readonly label: string;
       readonly ceilingBand: string;
       readonly liftPath: string;
     } | undefined;
+  };
+}
+
+/**
+ * F-T9B-3 / codex r1 B2 · the SEALED shape a deployment publishes: the
+ * empty-basis floor is REQUIRED, so a deployment policy that omits it cannot be
+ * constructed at all rather than being caught later by a runtime refusal. Both
+ * deployment policies (`acceptance/runtime-policy.ts`,
+ * `apps/runner/src/dev-runner-policy.ts`) expose this type, and both strict zod
+ * schemas require the member, so an incomplete sealed row is refused at READ
+ * time instead of at the first empty basis that happens to occur.
+ */
+export interface SealedBandCeilingRegisterRow extends BandCeilingRegisterRow {
+  readonly value: BandCeilingRegisterRow["value"] & {
+    readonly emptyBasisFloor: {
+      readonly label: string;
+      readonly ceilingBand: string;
+      readonly liftPath: string;
+    };
   };
 }
 

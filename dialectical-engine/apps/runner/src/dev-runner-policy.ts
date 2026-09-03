@@ -10,7 +10,7 @@ import {
   type CompositionMapRegisterRow
 } from "@debateai/register";
 import type { JudgementSelectionRule } from "@debateai/judgement";
-import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
+import type { CompositionBudgetResolution, SealedBandCeilingRegisterRow } from "@debateai/serve";
 import type {
   RunDeathPolicy,
   RunnerPanelPolicy,
@@ -70,14 +70,15 @@ const runnerRowsSchema = z.object({
       ceilingBand: z.string().trim().min(1),
       liftPath: z.string().trim().min(1)
     }).strict()),
-    // F-T9B-3: the entry whose trigger is the EMPTY BASIS itself. Optional for
-    // the same reason as the acceptance twin — a row without it parses and
-    // then fails closed at derivation.
+    // F-T9B-3 / codex r1 B2: the entry whose trigger is the EMPTY BASIS itself.
+    // REQUIRED, for the same reason as the ceremony twin — a strict schema that
+    // admits an incomplete sealed row defers its refusal to runtime, which is
+    // the defect class this mission has now produced three times.
     emptyBasisFloor: z.object({
       label: z.string().trim().min(1),
       ceilingBand: z.string().trim().min(1),
       liftPath: z.string().trim().min(1)
-    }).strict().optional()
+    }).strict()
   }).strict(),
   judgementSelectionPolicy: z.object({
     kind: z.literal("MAXIMIZE_WEIGHTED_TAU"),
@@ -98,7 +99,7 @@ export interface DevelopmentRunnerPolicy {
   readonly bounds: z.infer<typeof runnerRowsSchema>["acceptanceOrganCostBounds"]["organs"];
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
   readonly candidateConfidenceBand: string;
-  readonly bandCeiling: BandCeilingRegisterRow;
+  readonly bandCeiling: SealedBandCeilingRegisterRow;
   readonly judgementPolicy: {
     readonly selectionRule: JudgementSelectionRule;
     readonly earnedWeight: number;

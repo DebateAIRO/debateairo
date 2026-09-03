@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { ENGINE_BAND_ORDER } from "@debateai/register";
 import { deriveBandCeiling, type BandCeilingRegisterRow } from "@debateai/serve";
 import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
-import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
+import { buildDevelopmentRunnerRegisterRows, DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
+import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import { parseAcceptanceRuntimeRows } from "../../acceptance/runtime-policy.js";
 
 const FLOOR_BAND = ENGINE_BAND_ORDER[0]!;   // CAPPED
@@ -59,9 +60,17 @@ describe("F-T9B-3 · a floored band states its OWN reason", () => {
     expect(decision.ceiling.label).not.toBe("TEST_REASONING_CEILING");
   });
 
+  /**
+   * The defensive unit, kept alive per codex r1 B2 by constructing an
+   * INTENTIONALLY INVALID row through `unknown`. The schemas now refuse such a
+   * row at read time (below), so this shape can only arrive from a hand-built
+   * object — which is exactly the caller this guard exists for.
+   */
   it("FAILS CLOSED when the row describes no floor at all", () => {
-    const undescribed = row();
-    delete (undescribed.value as { emptyBasisFloor?: unknown }).emptyBasisFloor;
+    const { emptyBasisFloor: _absent, ...valueWithoutFloor } = row().value;
+    const undescribed = {
+      ...row(), value: valueWithoutFloor
+    } as unknown as BandCeilingRegisterRow;
     expect(() => deriveBandCeiling({ candidateConfidenceBand: TOP_BAND, basis: EMPTY, row: undescribed }))
       .toThrowError(expect.objectContaining({ code: "BAND_CEILING_FLOOR_UNDESCRIBED" }));
   });
@@ -184,6 +193,56 @@ describe("F-T9B-3 · a floored band states its OWN reason", () => {
         serveContractHash: rows.serveContractHash
       });
       expect(parsed.wayOfKnowingCeiling.emptyBasisFloor?.ceilingBand).toBe(FLOOR_BAND);
+    });
+
+    /**
+     * codex r1 B2, the finding itself. The member was OPTIONAL in both strict
+     * schemas, so a sealed row missing it PARSED — the reviewer's probe printed
+     * `acceptance-parser-accepts-missing-floor true` — and the refusal was
+     * deferred to whenever an empty basis happened to occur. A deployment whose
+     * sealed row cannot describe its own floor is now refused at READ time.
+     */
+    const RUNTIME_ROW_KEYS = [
+      "riskTier", "acceptanceOrganCostBounds", "panelDiscoveryPolicy", "runDeathPolicy",
+      "hiddenNodeScoreThreshold", "compositionBundleBudget", "wayOfKnowingCeiling",
+      "configuredProviderSet", "judgeContractHash", "composerContractHash",
+      "conformanceContractHash", "propagationContractHash", "serveContractHash"
+    ] as const;
+
+    it("the ACCEPTANCE schema REFUSES a sealed row missing its empty-basis floor", async () => {
+      const all = Object.fromEntries(
+        (await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value])
+      ) as Record<string, unknown>;
+      const input: Record<string, unknown> = {};
+      for (const key of RUNTIME_ROW_KEYS) input[key] = all[key];
+      // sanity: the complete row parses, so the refusal below is about the
+      // missing member and not about the fixture being malformed.
+      expect(() => parseAcceptanceRuntimeRows(input)).not.toThrow();
+
+      const { emptyBasisFloor: _absent, ...ceilingWithoutFloor } =
+        input.wayOfKnowingCeiling as Record<string, unknown>;
+      expect(() => parseAcceptanceRuntimeRows({ ...input, wayOfKnowingCeiling: ceilingWithoutFloor }))
+        .toThrow();
+    });
+
+    it("the DEVELOPMENT schema REFUSES a sealed row missing its empty-basis floor", async () => {
+      const rows = await buildDevelopmentRunnerRegisterRows();
+      const stub = (supply: ReadonlyArray<{ rowKey: string; value: unknown; sourceRef: string }>) => ({
+        query: async (_sql: string, params: unknown[]) => {
+          const wanted = new Set(params[1] as string[]);
+          return { rows: supply.filter((r) => wanted.has(r.rowKey)).map((r) => ({
+            row_key: r.rowKey, value_json: r.value, source_ref: r.sourceRef
+          })) };
+        }
+      });
+      const stripped = rows.map((r) => {
+        if (r.rowKey !== "wayOfKnowingCeiling") return r;
+        const { emptyBasisFloor: _absent, ...value } = r.value as Record<string, unknown>;
+        return { ...r, value };
+      });
+      await expect(readDevelopmentRunnerPolicy(
+        stub(stripped) as never, DEVELOPMENT_REGISTER_VERSION
+      )).rejects.toThrow();
     });
 
     it("the sealed row DERIVES a truthful floored record end to end", async () => {

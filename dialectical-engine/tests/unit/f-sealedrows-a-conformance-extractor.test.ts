@@ -101,5 +101,55 @@ describe("F-SEALEDROWS-A · the conformance fingerprint and the extractor that l
       const source = `{ role: "system", content: "Return only JSON naming alpha." },\n`;
       expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
     });
+
+    /**
+     * B1, found by codex r1 and reproduced before this test was written. The
+     * first locator took the FIRST object in the file carrying a `criteria`
+     * member, so an unrelated schema declared EARLIER captured it: the
+     * extractor returned `Unrelated system prompt naming alpha.` and exited 0,
+     * fingerprinting a non-evaluator prompt while looking healthy. That is the
+     * same shape as the defect this whole ticket repairs — succeeding on the
+     * wrong thing is worse than failing loudly.
+     *
+     * ORDER IS THE WHOLE TEST. The decoy must come FIRST; placed after the real
+     * schema it proves nothing, because the unanchored locator would have
+     * returned the right answer by accident.
+     */
+    const decoyFirst = (): string =>
+      `const unrelatedSchema = z.object({\n`
+      + `  criteria: z.object({ alpha: z.boolean() }).strict()\n`
+      + `}).strict();\n`
+      + `{ role: "system", content: "Unrelated system prompt naming alpha." },\n`
+      + schema("fairness", "tracing")
+      + `{ role: "system", content: "Return only JSON naming fairness and tracing." },\n`;
+
+    it("is NOT redirected by an unrelated criteria schema declared BEFORE the evaluator's", () => {
+      expect(extractEvaluatorContractText(decoyFirst(), "TEST"))
+        .toBe("Return only JSON naming fairness and tracing.");
+      expect(extractEvaluatorContractTextDev(decoyFirst(), "TEST"))
+        .toBe("Return only JSON naming fairness and tracing.");
+    });
+
+    it("REFUSES when no evaluator verdict schema exists to anchor on", () => {
+      const source = `const unrelatedSchema = z.object({\n`
+        + `  criteria: z.object({ alpha: z.boolean() }).strict()\n`
+        + `}).strict();\n`
+        + `{ role: "system", content: "Unrelated system prompt naming alpha." },\n`;
+      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
+    });
+
+    it("REFUSES when the anchor is ambiguous — two evaluator verdict schemas", () => {
+      const source = schema("alpha") + schema("alpha")
+        + `{ role: "system", content: "Return only JSON naming alpha." },\n`;
+      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
+    });
+
+    it("REFUSES when the anchored schema declares no boolean criteria", () => {
+      const source = `const evaluatorVerdictSchema = z.object({\n`
+        + `  criteria: z.object({ note: z.string() }).strict()\n`
+        + `}).strict();\n`
+        + `{ role: "system", content: "Return only JSON naming note." },\n`;
+      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
+    });
   });
 });
