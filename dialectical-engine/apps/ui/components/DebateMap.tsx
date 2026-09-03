@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import type { DebateNode } from "@/lib/types";
-import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
-import { ModelMetaLine } from "@/components/ModelPresentation";
+import { ROLE_PALETTES, renderStateOf, roleOf } from "@/lib/debatePresentation";
 
 type DebateMapProps = {
   root: DebateNode;
@@ -16,15 +15,16 @@ type Arc = {
   d: string;
   fill: string;
   depth: number;
+  opacity: number;
 };
 
 const CX = 300;
 const CY = 300;
-const HUB_R = 44;
-const GAP = 8;
+const HUB_R = 46;
+const GAP = 10;
 const MAX_R = 286;
-const RING_GAP = 4;
-const START = -Math.PI / 2;
+const RING_GAP = 5;
+const START = -Math.PI / 2 + 0.012;
 
 function leafCount(node: DebateNode): number {
   const kids = node.children || [];
@@ -74,7 +74,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
         node,
         d: arcPath(innerR(depth), innerR(depth) + ringW, a0, a1),
         fill: fillFor(node),
-        depth
+        depth,
+        opacity: Math.max(0.3, 0.9 - (depth - 1) * 0.22)
       });
     }
     const kids = node.children || [];
@@ -89,7 +90,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
       cur += slice;
     });
   };
-  place(root, 0, START, START + Math.PI * 2);
+  place(root, 0, START, START + Math.PI * 2 - 0.024);
 
   const readoutNode = hoverId ? arcs.find((a) => a.id === hoverId)?.node ?? root : root;
   const readoutRole = roleOf(readoutNode);
@@ -107,7 +108,11 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             <span className="mapLegendSwatch" style={{ background: "var(--con-line)" }} />
             Opposes
           </span>
-          <span className="mapLegendHint">Ring = depth · width = debate below it</span>
+          <span className="mapLegendItem">
+            <span className="mapLegendSwatch" style={{ background: "var(--reasoning-line)" }} />
+            Reasoning
+          </span>
+          <span className="mapLegendHint">Ring = depth · width = the amount of debate below it</span>
         </div>
 
         <div className="mapStage" onMouseLeave={() => setHoverId(null)}>
@@ -119,7 +124,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
                 fill={arc.fill}
                 stroke="var(--core)"
                 strokeWidth={2}
-                opacity={hoverId && hoverId !== arc.id ? 0.55 : 1}
+                opacity={(hoverId && hoverId !== arc.id ? 0.55 : 1) * arc.opacity}
                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
                 onClick={() => onOpenSplit(arc.id)}
                 onMouseEnter={() => setHoverId(arc.id)}
@@ -131,8 +136,8 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
               cx={CX}
               cy={CY}
               r={HUB_R}
-              fill="var(--reasoning-line)"
-              stroke="var(--core)"
+              fill="var(--ink)"
+              stroke="var(--bg)"
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
               onClick={() => {
@@ -142,35 +147,24 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             >
               <title>{root.claim}</title>
             </circle>
-            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--core)" strokeWidth={2.5} />
-            <circle cx={CX} cy={CY} r={2.4} fill="var(--core)" />
+            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--bg)" strokeWidth={2.5} />
+            <circle cx={CX} cy={CY} r={2.4} fill="var(--bg)" />
           </svg>
         </div>
 
-        <div
-          className="mapReadout"
-          style={{ borderColor: readoutPal.border, borderLeftColor: readoutPal.text }}
-        >
-          <div className="mapReadoutHead">
-            <span
-              className="roleBadge"
-              style={{ color: readoutPal.text, background: readoutPal.bg, borderColor: readoutPal.border }}
-            >
-              {readoutRole === "root" ? "● Root claim" : `${readoutPal.arrow} ${roleLabel(readoutNode)}`}
-            </span>
-            {readoutNode.active_generation || readoutNode.maker !== undefined ? (
-              <ModelMetaLine
-                modelId={readoutNode.active_generation?.model_id ?? null}
-                maker={readoutNode.maker}
-              />
-            ) : null}
-            <span style={{ flex: 1 }} />
-            <button type="button" className="nodeCtrl link" onClick={() => onOpenSplit(readoutNode.id)}>
-              Open in Split ▸
-            </button>
+        <div className="mapReadoutShell">
+          <div className="mapReadout" data-reference-map-readout>
+            <span className="referenceStanceTab" style={{ background: readoutRole === "root" ? "var(--ink)" : readoutPal.line }} aria-hidden />
+            <div className="nodeEyebrow">{readoutRole === "root" ? "Root claim" : readoutRole}</div>
+            <div className="mapReadoutClaim">{readoutNode.claim}</div>
+            <div className="mapReadoutFooter">
+              <span>Hover a wedge to inspect · click to focus</span>
+              <span style={{ flex: 1 }} />
+              <button type="button" className="nodeCtrl link" onClick={() => onOpenSplit(readoutNode.id)}>
+                Open in Split ▸
+              </button>
+            </div>
           </div>
-          <div className="mapReadoutClaim">{readoutNode.claim}</div>
-          <div className="mapReadoutHint">Hover a wedge to inspect · click to focus · center resets to root</div>
         </div>
       </div>
     </div>

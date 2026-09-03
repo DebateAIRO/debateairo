@@ -34,6 +34,7 @@ export function ModelMetaLine({ modelId, maker, className = "metaLine" }: ModelI
   return (
     <span
       className={className}
+      style={label.absence ? undefined : ({ "--model-color": dot } as CSSProperties)}
       data-maker={maker ?? undefined}
       data-maker-absence={label.absence ? "true" : undefined}
       title={label.absence ? "No recorded house is available for this argument." : undefined}

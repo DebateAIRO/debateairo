@@ -42,7 +42,7 @@ import {
   wayOfKnowingLabel
 } from "../../apps/ui/lib/v3/adapter.js";
 import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel } from "../../apps/ui/lib/v3/labels.js";
-import { getDebateServer } from "../../apps/ui/lib/serverApi.js";
+import { getDebateServer, listDebatesPageServer } from "../../apps/ui/lib/serverApi.js";
 import { statusLabel } from "../../apps/ui/lib/format.js";
 
 const sessionFixture: Session = {
@@ -258,6 +258,66 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
       created_at_sequence: 1,
       terminal_reason: null
     });
+  });
+
+  it("hydrates private library model dots from the owned served answer", async () => {
+    const answer = buildFairShapedAnswer();
+    const client = {
+      readAnswerIndex: async () => ({
+        items: [{
+          answer_id: answer.answer_id,
+          run_ref: answer.run_ref,
+          answer_version: answer.answer_version,
+          question_line: answer.question_line,
+          verdict_state: answer.verdict_state,
+          abstention: answer.abstention,
+          serve_state: answer.serve_state,
+          staleness_state: answer.staleness_state,
+          builds_on_previous: answer.builds_on_previous.value,
+          created_at_sequence: 1
+        }],
+        open_runs: [],
+        limit: 50,
+        offset: 0,
+        total: 1
+      }),
+      readAnswer: async () => answer
+    } as unknown as ContractClient;
+
+    const page = await listDebatesPageServer("session", client);
+
+    expect(page.summaries[0]?.models).toEqual(["gpt-5"]);
+  });
+
+  it("hydrates private model dots without overlapping reads on the shared contract client", async () => {
+    const answer = buildFairShapedAnswer();
+    let readActive = false;
+    const items = ["answer:first", "answer:second"].map((answerId, index) => ({
+      answer_id: answerId,
+      run_ref: `run:${index + 1}`,
+      answer_version: answer.answer_version,
+      question_line: `Question ${index + 1}`,
+      verdict_state: answer.verdict_state,
+      abstention: answer.abstention,
+      serve_state: answer.serve_state,
+      staleness_state: answer.staleness_state,
+      builds_on_previous: answer.builds_on_previous.value,
+      created_at_sequence: index + 1
+    }));
+    const client = {
+      readAnswerIndex: async () => ({ items, open_runs: [], limit: 50, offset: 0, total: 2 }),
+      readAnswer: async (answerId: string) => {
+        if (readActive) throw new Error("OVERLAPPING_READ");
+        readActive = true;
+        await Promise.resolve();
+        readActive = false;
+        return { ...answer, answer_id: answerId };
+      }
+    } as unknown as ContractClient;
+
+    const page = await listDebatesPageServer("session", client);
+
+    expect(page.summaries.map((summary) => summary.models)).toEqual([["gpt-5"], ["gpt-5"]]);
   });
 
   it("labels ways of knowing without inventing lens names", () => {

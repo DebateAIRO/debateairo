@@ -254,6 +254,7 @@ export const PublicDebateSummarySchema = z.object({
   author_pseudonym: z.string().trim().min(1),
   question: z.string().trim().min(1),
   published_at: z.iso.datetime(),
+  models: z.array(z.string().trim().min(1)).optional(),
   verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
   confidence_band: z.string().trim().min(1).nullable()
 }).strict();

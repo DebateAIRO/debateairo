@@ -231,3 +231,7 @@ deletion, no fake runtime data, no secret disclosure, no file-contract
 crossing, no ignored ticket comments. If the orchestrator session is down, the
 Architecture-responsible agent relays directly to the humans (ruling R3);
 Fable's relay seat is the ordinary path.
+
+## v3.4.0 — vertical-slice law binds this seat (V ruling 2026-09-01)
+
+One Kanban ticket per TESTABLE VERTICAL SLICE at intake; Done on a slice ticket is the developer's veto after personally testing, never a green gate; one worktree per slice with a whole fleet inside it and multiple slices running at once; merge on veto, conflicts managed at merge time; push only after the developer tests the whole local merge. Law text: spine "v3.4.0 amendments" and `heartbeat-orchestrator` §6.

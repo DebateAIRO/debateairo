@@ -1,7 +1,7 @@
 ---
 name: debateai-graph-spine
 title: DebateAI Graph Spine v2
-version: 3.3.0
+version: 3.4.0
 supersedes: debateai-heartbeat-protocol (pre-3.0.0), heartbeat-protocol-lite, debateai-kanban-heartbeat-review-loop
 ---
 
@@ -1744,6 +1744,38 @@ parser (Hermes) was consumed locally and killed the seat for 3h20m.
    lane/ticket orchestrator with `/goal`; that orchestrator may launch only its
    authorized descendants, each also via its goal mechanism. A handoff parks an
    unfinished worker; it does not terminate it.
+
+## v3.4.0 amendments — V-ordered vertical-slice law (ui-overhaul fidelity failure, 2026-09-01)
+
+Ruled by V on 2026-09-01 and first encoded in `heartbeat-orchestrator` §6; mirrored here so the
+spine and the installed skill carry the same rule set (version-skew law, v3.3.0 item 15). Born
+from the ui-overhaul fidelity failure: the harness shipped green-on-acceptance work that failed
+the developer's actual bar. Root cause named by V: **"done" was never defined well enough, and it
+is not the harness's to define.** Where older text in this spine conflicts with the items below
+(board shape, Done authority, worktree isolation, merge order), the items below win.
+
+1. **Board shape at intake:** one Kanban ticket per TESTABLE VERTICAL SLICE — a beginning and an
+   end (e.g. 8 overhauled pages = 8 slice tickets). Nothing else exists on the board until a slice
+   opens. Seat tickets for intake seats (requirements, audits) are permitted as sub-tickets.
+2. **Done = developer veto, nothing less.** A slice ticket closes ONLY when V (or the developer
+   using the harness) has personally tested the slice and vetoed it done. Green gates, PASS
+   verdicts, and merged-ready states are internal milestones — never Done. The orchestrator still
+   closes SUB-tickets on consumed verdicts; the SLICE ticket is the developer's alone.
+3. **Open one slice → decompose into sub-tickets that run in PARALLEL.** The accent falls on
+   parallelism: serialize only what measurably cannot overlap, and prefer isolation over
+   serialization when files are shared.
+4. **One worktree (local branch) per vertical slice.** The slice's whole fleet works inside that
+   worktree; seats may pull the current state of `dev` into their folder as needed. The main tree
+   is nobody's default workspace once slices are open.
+5. **Fleets, not single files of seats:** per slice the orchestrator dispatches a fleet (workers +
+   reviewers per the roster) INSIDE that slice's worktree, and MULTIPLE SLICES RUN AT ONCE, each
+   in its own worktree.
+6. **Merge discipline:** slice vetoed done → merged locally (`dev`). Merge conflicts are an
+   accepted, managed cost at merge time — shared-file fear does not serialize slices. When all
+   slices are vetoed: merge everything locally → developer tests the whole → only then push.
+   Pushes remain V-gated as always.
+7. **Developer test points are load-bearing:** after each slice (pre-merge) and after the final
+   local merge (pre-push). Schedule them; do not batch surprises.
 
 ## v3.3.0 amendments — V-ordered, from the 100-report post-mortem ("The Round Two Problem", 2026-08-28)
 
