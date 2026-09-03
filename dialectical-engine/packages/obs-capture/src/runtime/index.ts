@@ -11,10 +11,12 @@ import {
   type CaptureGapCounter,
   type CaptureHealth,
 } from "../health.js";
+import { clampSpoolRecordLimit } from "../safe-metadata.js";
 import { BoundedReferenceQueue } from "../queue.js";
 import { createSharedRedactor } from "../redactor.js";
 import { createPreopenedSpool, type SpoolWriter } from "../spool.js";
 import { readObsBounds, type ObsBounds } from "./config.js";
+import { drainDeadSpoolFiles } from "./drain.js";
 import {
   createPostgresCaptureSink,
   createTierOneExitSink,
@@ -57,6 +59,7 @@ interface ActiveRuntimeState {
   readonly flusher: CaptureFlusher;
   timer: NodeJS.Timeout | undefined;
   flushInFlight: Promise<void> | undefined;
+  drainInFlight: Promise<void> | undefined;
 }
 
 const ENVELOPE_MAX_BYTES_SEED = 16_384; // seed — V ratifies at FIX-01 acceptance
@@ -86,9 +89,9 @@ function configBooleanValue(name: string, fallback: boolean): boolean {
 
 function envelopeMaxBytes(): number {
   const configured = Number(process.env.OBS_ENVELOPE_MAX_BYTES);
-  return Number.isSafeInteger(configured) && configured > 0
+  return clampSpoolRecordLimit(Number.isSafeInteger(configured) && configured > 0
     ? configured
-    : ENVELOPE_MAX_BYTES_SEED;
+    : ENVELOPE_MAX_BYTES_SEED);
 }
 
 function createSpool(spoolFd: number | undefined): SpoolWriter | undefined {
@@ -150,6 +153,7 @@ function createStartingState(
     flusher,
     timer: undefined,
     flushInFlight: undefined,
+    drainInFlight: undefined,
   };
   if (spool !== undefined) {
     try {
@@ -212,6 +216,15 @@ export async function startCaptureRuntime(
   if (state.phase === "STOPPED" || runtimeState !== state) return;
   state.phase = "ARMED";
   startFlushTimer(state);
+  const drain = drainDeadSpoolFiles({
+    spoolDirectory: state.bounds.spoolDir,
+    databaseSink: state.databaseSink,
+  })
+    .catch(() => undefined)
+    .finally(() => {
+      if (state.drainInFlight === drain) state.drainInFlight = undefined;
+    });
+  state.drainInFlight = drain;
 }
 
 export async function stopCaptureRuntime(
@@ -225,6 +238,7 @@ export async function stopCaptureRuntime(
 
   const finish = async (): Promise<void> => {
     await state.flushInFlight;
+    await state.drainInFlight;
     await flushRuntimeOnce(state);
   };
   let timeout: NodeJS.Timeout | undefined;

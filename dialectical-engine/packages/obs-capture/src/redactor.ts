@@ -2,6 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { CaptureQueueEntry } from "./emit.js";
 import {
+  normalizeSafeEnvelopeMetadata,
+  normalizeSourceEventRef,
+  UNKNOWN_DECLARED_KIND,
+} from "./safe-metadata.js";
+import {
   resolveSafeTemplate,
   resolveTaxonomyClass,
   severity,
@@ -10,7 +15,6 @@ import {
 } from "./registry/index.js";
 
 const POST_REDACTION_BRAND: unique symbol = Symbol("POST_REDACTION_ENVELOPE");
-const UNKNOWN_DECLARED_KIND = "UNKNOWN:DECLARED_KIND_REQUIRED";
 
 const CAPTURE_POINTS = Object.freeze([
   "process",
@@ -151,10 +155,16 @@ export function isPostRedactionEnvelope(
 export function createSharedRedactor(
   config: SharedRedactorConfig,
 ): SharedRedactor {
-  const component = Object.freeze({
-    process: config.component.process,
-    package: config.component.package,
+  const metadata = normalizeSafeEnvelopeMetadata({
+    environment: config.environment,
+    build_ref: config.build_ref,
+    runtime: config.runtime,
+    component: config.component,
+    writer_identity: config.writer_identity,
+    redaction_policy_version: config.redaction_policy_version,
+    allowlist_set_id: config.allowlist_set_id,
   });
+  const component = metadata.component;
   const now = config.now ?? (() => new Date());
   const sourceEventRef = config.sourceEventRef ?? randomUUID;
 
@@ -167,14 +177,14 @@ export function createSharedRedactor(
     }
   }
 
-  function safeSourceEventRef(): string {
+  function safeSourceEventRef(): Readonly<{
+    readonly value: string;
+    readonly minimized: boolean;
+  }> {
     try {
-      const value = sourceEventRef();
-      return typeof value === "string" && value.length > 0
-        ? value
-        : "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE";
+      return normalizeSourceEventRef(sourceEventRef());
     } catch {
-      return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE";
+      return normalizeSourceEventRef(undefined);
     }
   }
 
@@ -199,16 +209,17 @@ export function createSharedRedactor(
     }
     const safeCode = safeTemplate.code;
     const safeTaxonomy = template === undefined ? "CAPTURE_SELF" : options.taxonomyClass;
+    const sourceRef = safeSourceEventRef();
     const fingerprint = createHash("sha256")
-      .update(`v1\u0000${safeCode}\u0000${safeTaxonomy}\u0000${config.runtime}\u0000${component.package}`)
+      .update(`v1\u0000${safeCode}\u0000${safeTaxonomy}\u0000${metadata.runtime}\u0000${component.package}`)
       .digest("hex");
     return Object.freeze({
       [POST_REDACTION_BRAND]: true as const,
       occurred_at: safeNow().toISOString(),
-      environment: config.environment,
-      build_ref: config.build_ref,
+      environment: metadata.environment,
+      build_ref: metadata.build_ref,
       build_dirty: config.build_dirty,
-      runtime: config.runtime,
+      runtime: metadata.runtime,
       component,
       capture_point: template === undefined ? "self" : options.capturePoint,
       code: safeCode,
@@ -218,9 +229,12 @@ export function createSharedRedactor(
       disposition: template === undefined ? "SELF" : options.disposition,
       fingerprint,
       fingerprint_version: 1 as const,
-      redaction_policy_version: config.redaction_policy_version,
-      allowlist_set_id: config.allowlist_set_id,
-      fallback_minimized: options.fallbackMinimized || template === undefined,
+      redaction_policy_version: metadata.redaction_policy_version,
+      allowlist_set_id: metadata.allowlist_set_id,
+      fallback_minimized: options.fallbackMinimized
+        || template === undefined
+        || metadata.fallback_minimized
+        || sourceRef.minimized,
       run_ref: UNKNOWN_DECLARED_KIND,
       work_item_ref: UNKNOWN_DECLARED_KIND,
       node_ref: UNKNOWN_DECLARED_KIND,
@@ -233,10 +247,10 @@ export function createSharedRedactor(
       safe_template_id: safeTemplate.id,
       template_parameters: Object.freeze({}) as Readonly<Record<string, never>>,
       source: template === undefined ? "first_party" : options.source,
-      source_event_ref: safeSourceEventRef(),
+      source_event_ref: sourceRef.value,
       zone_context: template === undefined ? false : options.zoneContext,
       attempt_index: template === undefined ? null : options.attemptIndex,
-      writer_identity: config.writer_identity,
+      writer_identity: metadata.writer_identity,
     });
   }
 

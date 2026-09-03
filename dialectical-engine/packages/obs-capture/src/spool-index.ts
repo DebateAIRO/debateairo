@@ -1,0 +1,460 @@
+import { createHash } from "node:crypto";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  writeSync,
+} from "node:fs";
+import { lstat, open } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
+import { join } from "node:path";
+
+export const SPOOL_INDEX_NAME = ".obs-spool-index-v1";
+export const SPOOL_CURSOR_NAME = ".obs-spool-cursor-v1";
+
+const INDEX_PAGE_MAX_BYTES = 8_192;
+const INDEX_PAGE_MAX_RECORDS = 64;
+const INDEX_RECORD_MAX_BYTES = 128;
+const INDEX_APPEND_MAX_BYTES = INDEX_RECORD_MAX_BYTES + 1;
+const CURSOR_SLOT_BYTES = 512;
+const CURSOR_FILE_BYTES = CURSOR_SLOT_BYTES * 2;
+const CURSOR_VERSION = 1;
+const CURSOR_SEQUENCE_RESET_AT = 1_000_000_000;
+const SPOOL_BASENAME = /^(api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-[1-9][0-9]*-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.spool$/u;
+
+interface FileIdentity {
+  readonly dev: bigint;
+  readonly ino: bigint;
+}
+
+interface CursorRecord {
+  readonly version: typeof CURSOR_VERSION;
+  readonly sequence: number;
+  readonly index_dev: string;
+  readonly index_ino: string;
+  readonly offset: number;
+  readonly checksum: string;
+}
+
+interface SelectedCursor {
+  readonly record: CursorRecord;
+  readonly slot: 0 | 1;
+}
+
+function sameIdentity(
+  actual: Readonly<FileIdentity>,
+  expected: Readonly<FileIdentity>,
+): boolean {
+  return actual.dev === expected.dev && actual.ino === expected.ino;
+}
+
+function cursorChecksum(value: Omit<CursorRecord, "checksum">): string {
+  return createHash("sha256")
+    .update([
+      String(value.version),
+      String(value.sequence),
+      value.index_dev,
+      value.index_ino,
+      String(value.offset),
+    ].join("\n"))
+    .digest("hex");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseCursorSlot(
+  bytes: Buffer,
+  indexIdentity: Readonly<FileIdentity>,
+  indexSize: number,
+): CursorRecord | undefined {
+  const end = bytes.indexOf(0);
+  const encoded = bytes.subarray(0, end < 0 ? bytes.length : end).toString("utf8");
+  if (encoded.length === 0) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(encoded);
+  } catch {
+    return undefined;
+  }
+  if (
+    !isRecord(value)
+    || value.version !== CURSOR_VERSION
+    || !Number.isSafeInteger(value.sequence)
+    || (value.sequence as number) < 0
+    || (value.sequence as number) > CURSOR_SEQUENCE_RESET_AT
+    || value.index_dev !== indexIdentity.dev.toString()
+    || value.index_ino !== indexIdentity.ino.toString()
+    || !Number.isSafeInteger(value.offset)
+    || (value.offset as number) < 0
+    || (value.offset as number) > indexSize
+    || typeof value.checksum !== "string"
+    || !/^[0-9a-f]{64}$/u.test(value.checksum)
+  ) {
+    return undefined;
+  }
+  const record: CursorRecord = {
+    version: CURSOR_VERSION,
+    sequence: value.sequence as number,
+    index_dev: value.index_dev,
+    index_ino: value.index_ino,
+    offset: value.offset as number,
+    checksum: value.checksum,
+  };
+  return cursorChecksum(record) === record.checksum ? record : undefined;
+}
+
+async function readFixedBytes(
+  handle: FileHandle,
+  byteLength: number,
+  position: number,
+): Promise<Buffer | undefined> {
+  const bytes = Buffer.alloc(byteLength);
+  let filled = 0;
+  while (filled < byteLength) {
+    const result = await handle.read(
+      bytes,
+      filled,
+      byteLength - filled,
+      position + filled,
+    );
+    if (result.bytesRead <= 0) return undefined;
+    filled += result.bytesRead;
+  }
+  return bytes;
+}
+
+async function verifiedRegularHandle(
+  handle: FileHandle,
+  path: string,
+): Promise<FileIdentity | undefined> {
+  // These checks reject planted hardlinks and detect namespace changes between
+  // observations. Portable Node cannot make a pathname check atomic with the
+  // later descriptor mutation; active same-UID changes after the last check
+  // are outside the controller-ratified R4-03 threat boundary.
+  const descriptor = await handle.stat({ bigint: true });
+  if (!descriptor.isFile() || descriptor.nlink !== 1n) return undefined;
+  const pathStat = await lstat(path, { bigint: true });
+  if (
+    !pathStat.isFile()
+    || pathStat.nlink !== 1n
+    || !sameIdentity(pathStat, descriptor)
+  ) {
+    return undefined;
+  }
+  return { dev: descriptor.dev, ino: descriptor.ino };
+}
+
+async function stillVerifiedRegularHandle(
+  handle: FileHandle,
+  path: string,
+  expected: Readonly<FileIdentity>,
+): Promise<boolean> {
+  const current = await verifiedRegularHandle(handle, path);
+  return current !== undefined && sameIdentity(current, expected);
+}
+
+async function openCursor(
+  directory: string,
+): Promise<Readonly<{ handle: FileHandle; identity: FileIdentity }> | undefined> {
+  const path = join(directory, SPOOL_CURSOR_NAME);
+  let handle: FileHandle | undefined;
+  try {
+    try {
+      handle = await open(
+        path,
+        constants.O_CREAT
+          | constants.O_EXCL
+          | constants.O_NOFOLLOW
+          | constants.O_NONBLOCK
+          | constants.O_RDWR,
+        0o600,
+      );
+    } catch (error) {
+      if (!isRecord(error) || error.code !== "EEXIST") throw error;
+      handle = await open(
+        path,
+        constants.O_NOFOLLOW | constants.O_NONBLOCK | constants.O_RDWR,
+      );
+    }
+    const identity = await verifiedRegularHandle(handle, path);
+    if (identity === undefined) throw new Error("SPOOL_CURSOR_NOT_REGULAR");
+    const stat = await handle.stat({ bigint: true });
+    if (stat.size !== BigInt(CURSOR_FILE_BYTES)) {
+      if (!(await stillVerifiedRegularHandle(handle, path, identity))) {
+        throw new Error("SPOOL_CURSOR_IDENTITY_CHANGED");
+      }
+      await handle.truncate(CURSOR_FILE_BYTES);
+      await handle.sync();
+      if (!(await stillVerifiedRegularHandle(handle, path, identity))) {
+        throw new Error("SPOOL_CURSOR_IDENTITY_CHANGED");
+      }
+    }
+    return { handle, identity };
+  } catch {
+    await handle?.close().catch(() => undefined);
+    return undefined;
+  }
+}
+
+async function selectCursor(
+  handle: FileHandle,
+  indexIdentity: Readonly<FileIdentity>,
+  indexSize: number,
+): Promise<SelectedCursor | undefined> {
+  const bytes = await readFixedBytes(handle, CURSOR_FILE_BYTES, 0);
+  if (bytes === undefined) return undefined;
+  const candidates: SelectedCursor[] = [];
+  for (const slot of [0, 1] as const) {
+    const record = parseCursorSlot(
+      bytes.subarray(slot * CURSOR_SLOT_BYTES, (slot + 1) * CURSOR_SLOT_BYTES),
+      indexIdentity,
+      indexSize,
+    );
+    if (record !== undefined) candidates.push({ record, slot });
+  }
+  return candidates.sort((left, right) =>
+    right.record.sequence - left.record.sequence
+  )[0];
+}
+
+function encodeCursor(record: CursorRecord): Buffer {
+  const encoded = Buffer.from(JSON.stringify(record), "utf8");
+  if (encoded.length >= CURSOR_SLOT_BYTES) {
+    throw new Error("SPOOL_CURSOR_RECORD_TOO_LARGE");
+  }
+  const slot = Buffer.alloc(CURSOR_SLOT_BYTES);
+  encoded.copy(slot);
+  return slot;
+}
+
+async function persistCursor(
+  handle: FileHandle,
+  cursorPath: string,
+  cursorIdentity: Readonly<FileIdentity>,
+  selected: SelectedCursor | undefined,
+  indexIdentity: Readonly<FileIdentity>,
+  nextOffset: number,
+): Promise<boolean> {
+  let current = selected;
+  if (
+    current !== undefined
+    && current.record.sequence >= CURSOR_SEQUENCE_RESET_AT - 1
+  ) {
+    if (!(await stillVerifiedRegularHandle(handle, cursorPath, cursorIdentity))) {
+      return false;
+    }
+    const cleared = Buffer.alloc(CURSOR_FILE_BYTES);
+    const reset = await handle.write(cleared, 0, cleared.length, 0);
+    await handle.sync();
+    if (!(await stillVerifiedRegularHandle(handle, cursorPath, cursorIdentity))) {
+      return false;
+    }
+    if (reset.bytesWritten !== cleared.length) return false;
+    current = undefined;
+  }
+  const sequence = (current?.record.sequence ?? -1) + 1;
+  if (!Number.isSafeInteger(sequence)) return false;
+  const incomplete = {
+    version: CURSOR_VERSION,
+    sequence,
+    index_dev: indexIdentity.dev.toString(),
+    index_ino: indexIdentity.ino.toString(),
+    offset: nextOffset,
+  } as const;
+  const record: CursorRecord = {
+    ...incomplete,
+    checksum: cursorChecksum(incomplete),
+  };
+  const slot: 0 | 1 = current?.slot === 0 ? 1 : 0;
+  const encoded = encodeCursor(record);
+  if (!(await stillVerifiedRegularHandle(handle, cursorPath, cursorIdentity))) {
+    return false;
+  }
+  const result = await handle.write(
+    encoded,
+    0,
+    encoded.length,
+    slot * CURSOR_SLOT_BYTES,
+  );
+  await handle.sync();
+  if (!(await stillVerifiedRegularHandle(handle, cursorPath, cursorIdentity))) {
+    return false;
+  }
+  if (result.bytesWritten !== encoded.length) return false;
+  const written = await readFixedBytes(
+    handle,
+    CURSOR_SLOT_BYTES,
+    slot * CURSOR_SLOT_BYTES,
+  );
+  return written !== undefined
+    && parseCursorSlot(written, indexIdentity, nextOffset)?.checksum === record.checksum;
+}
+
+export function isIndexedSpoolBasename(value: string): boolean {
+  return value.length <= INDEX_RECORD_MAX_BYTES - 1 && SPOOL_BASENAME.test(value);
+}
+
+export function appendSpoolIndexBasename(options: {
+  readonly directory: string;
+  readonly basename: string;
+}): void {
+  if (!isIndexedSpoolBasename(options.basename)) {
+    throw new TypeError("SPOOL_INDEX_BASENAME_INVALID");
+  }
+  const path = join(options.directory, SPOOL_INDEX_NAME);
+  // The leading delimiter makes the next successful atomic append recoverable
+  // after every possible retained prefix of an earlier failed append.
+  const record = Buffer.from(`\n${options.basename}\n`, "utf8");
+  if (record.byteLength > INDEX_APPEND_MAX_BYTES) {
+    throw new TypeError("SPOOL_INDEX_RECORD_TOO_LARGE");
+  }
+  let fd: number | undefined;
+  try {
+    fd = openSync(
+      path,
+      constants.O_APPEND
+        | constants.O_CREAT
+        | constants.O_NOFOLLOW
+        | constants.O_RDWR,
+      0o600,
+    );
+    const descriptor = fstatSync(fd, { bigint: true });
+    const pathStat = lstatSync(path, { bigint: true });
+    if (
+      !descriptor.isFile()
+      || !pathStat.isFile()
+      || !sameIdentity(descriptor, pathStat)
+    ) {
+      throw new Error("SPOOL_INDEX_NOT_REGULAR");
+    }
+    if (descriptor.nlink !== 1n || pathStat.nlink !== 1n) {
+      throw new Error("SPOOL_INDEX_NOT_UNIQUE");
+    }
+    const written = writeSync(fd, record, 0, record.length);
+    fsyncSync(fd);
+    const after = fstatSync(fd, { bigint: true });
+    const afterPath = lstatSync(path, { bigint: true });
+    if (
+      !after.isFile()
+      || !afterPath.isFile()
+      || after.nlink !== 1n
+      || afterPath.nlink !== 1n
+      || !sameIdentity(after, descriptor)
+      || !sameIdentity(afterPath, descriptor)
+    ) {
+      throw new Error("SPOOL_INDEX_IDENTITY_CHANGED");
+    }
+    if (written !== record.length) throw new Error("SPOOL_INDEX_WRITE_INCOMPLETE");
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+export async function readIndexedSpoolPage(
+  directory: string,
+): Promise<readonly string[]> {
+  const indexPath = join(directory, SPOOL_INDEX_NAME);
+  const cursorPath = join(directory, SPOOL_CURSOR_NAME);
+  let indexHandle: FileHandle | undefined;
+  let cursorHandle: FileHandle | undefined;
+  try {
+    indexHandle = await open(
+      indexPath,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    const indexIdentity = await verifiedRegularHandle(indexHandle, indexPath);
+    if (indexIdentity === undefined) return [];
+    const indexStat = await indexHandle.stat();
+    if (
+      !Number.isSafeInteger(indexStat.size)
+      || indexStat.size <= 0
+    ) {
+      return [];
+    }
+    const cursor = await openCursor(directory);
+    if (cursor === undefined) return [];
+    cursorHandle = cursor.handle;
+    const selected = await selectCursor(
+      cursorHandle,
+      indexIdentity,
+      indexStat.size,
+    );
+    const offset = selected === undefined || selected.record.offset >= indexStat.size
+      ? 0
+      : selected.record.offset;
+    let discardingContinuation = false;
+    if (offset > 0) {
+      const predecessor = Buffer.alloc(1);
+      const prior = await indexHandle.read(predecessor, 0, 1, offset - 1);
+      if (prior.bytesRead !== 1) return [];
+      discardingContinuation = predecessor[0] !== 0x0a;
+    }
+    const maximumRead = Math.min(INDEX_PAGE_MAX_BYTES, indexStat.size - offset);
+    const page = Buffer.alloc(maximumRead);
+    const result = await indexHandle.read(page, 0, maximumRead, offset);
+    if (result.bytesRead <= 0) return [];
+    const basenames: string[] = [];
+    let recordStart = 0;
+    let records = 0;
+    let consumed = 0;
+    for (let position = 0; position < result.bytesRead; position += 1) {
+      if (page[position] !== 0x0a) continue;
+      if (discardingContinuation) {
+        discardingContinuation = false;
+        records += 1;
+        consumed = position + 1;
+        recordStart = consumed;
+        if (records === INDEX_PAGE_MAX_RECORDS) break;
+        continue;
+      }
+      const recordBytes = position - recordStart;
+      const candidate = page.subarray(recordStart, position).toString("utf8");
+      if (
+        recordBytes > 0
+        && recordBytes + 1 <= INDEX_RECORD_MAX_BYTES
+        && isIndexedSpoolBasename(candidate)
+      ) {
+        basenames.push(candidate);
+      }
+      records += 1;
+      consumed = position + 1;
+      recordStart = consumed;
+      if (records === INDEX_PAGE_MAX_RECORDS) break;
+    }
+    if (
+      records < INDEX_PAGE_MAX_RECORDS
+      && (offset + result.bytesRead >= indexStat.size || consumed === 0)
+    ) {
+      // A current writer appends a complete bounded record in one syscall. Any
+      // remaining fragment at the observed EOF, or a full page with no newline,
+      // is a failed/hostile legacy append and must not pin the cursor. A partial
+      // record before EOF is retained for the next bounded page.
+      consumed = result.bytesRead;
+    }
+    const nextOffset = offset + consumed;
+    if (
+      consumed <= 0
+      || !(await persistCursor(
+        cursorHandle,
+        cursorPath,
+        cursor.identity,
+        selected,
+        indexIdentity,
+        nextOffset,
+      ))
+    ) {
+      return [];
+    }
+    return Object.freeze(basenames);
+  } catch {
+    return [];
+  } finally {
+    await cursorHandle?.close().catch(() => undefined);
+    await indexHandle?.close().catch(() => undefined);
+  }
+}

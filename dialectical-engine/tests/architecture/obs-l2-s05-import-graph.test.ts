@@ -4,12 +4,19 @@ import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 const ROOT = process.cwd();
 const PACKAGE_ROOT = resolve(ROOT, "packages/obs-capture");
 const INSTALL_ROOT = resolve(PACKAGE_ROOT, "install");
+const SAFE_METADATA_URL = pathToFileURL(
+  resolve(PACKAGE_ROOT, "src/safe-metadata.ts"),
+).href;
+const SPOOL_INDEX_URL = pathToFileURL(
+  resolve(PACKAGE_ROOT, "src/spool-index.ts"),
+).href;
 const INSTALL_ENTRIES = Object.freeze([
   "api.ts",
   "evaluator-lib.ts",
@@ -284,7 +291,16 @@ function importLightProbe(entry: string): ReturnType<typeof spawnSync> {
   const loaderSource = `
 export async function resolve(specifier, context, nextResolve) {
   if (context.parentURL?.includes("/packages/obs-capture/install/")) {
-    if (specifier !== "node:fs" && specifier !== "node:crypto") {
+    if (specifier === "../src/safe-metadata.js") {
+      return { url: ${JSON.stringify(SAFE_METADATA_URL)}, shortCircuit: true };
+    }
+    if (specifier === "../src/spool-index.js") {
+      return { url: ${JSON.stringify(SPOOL_INDEX_URL)}, shortCircuit: true };
+    }
+    if (
+      specifier !== "node:fs"
+      && specifier !== "node:crypto"
+    ) {
       throw new Error("IC1_MODULE_EVAL_IMPORT_FORBIDDEN:" + specifier);
     }
   }
@@ -331,7 +347,16 @@ import { appendFileSync, existsSync } from "node:fs";
 export function resolve(specifier, context, nextResolve) {
   appendFileSync(${JSON.stringify(tracePath)}, JSON.stringify({ specifier, parentURL: context.parentURL ?? null }) + "\\n");
   if (context.parentURL?.includes("/packages/obs-capture/install/")) {
-    if (specifier === "node:fs" || specifier === "node:crypto") return nextResolve(specifier, context);
+    if (specifier === "../src/safe-metadata.js") {
+      return { url: ${JSON.stringify(SAFE_METADATA_URL)}, shortCircuit: true };
+    }
+    if (specifier === "../src/spool-index.js") {
+      return { url: ${JSON.stringify(SPOOL_INDEX_URL)}, shortCircuit: true };
+    }
+    if (
+      specifier === "node:fs"
+      || specifier === "node:crypto"
+    ) return nextResolve(specifier, context);
     if (specifier === "@debateai/obs-capture/runtime") {
       if (!existsSync(${JSON.stringify(evaluatedMarker)})) {
         throw new Error("IC1_MODULE_EVAL_IMPORT_FORBIDDEN:" + specifier);
@@ -397,7 +422,7 @@ function normalizeProcessInstaller(source: string): string {
 }
 
 describe("S05 import-light installer graph", () => {
-  it("loads every public installer through the real resolver with only built-ins evaluation-reachable", async () => {
+  it("loads installers with only built-ins and the audited metadata/index contracts", async () => {
     const installFiles = (await listTypeScriptFiles(INSTALL_ROOT))
       .map((path) => relative(INSTALL_ROOT, path).split(sep).join("/"));
 

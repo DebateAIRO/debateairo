@@ -46,6 +46,7 @@ const OCCURRENCE_COLUMNS = Object.freeze([
 ] as const);
 
 export interface PostgresCaptureSink extends CaptureDatabaseSink {
+  ingestSpooledOccurrence(envelope: PostRedactionEnvelope): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -65,6 +66,7 @@ export function createTierOneExitSink(options: {
 
 function occurrenceValues(
   envelope: PostRedactionEnvelope,
+  captureStatus: "PERSISTED" | "SPOOLED",
 ): readonly unknown[] {
   return [
     null,
@@ -85,7 +87,7 @@ function occurrenceValues(
     envelope.redaction_policy_version,
     envelope.allowlist_set_id,
     envelope.fallback_minimized,
-    "PERSISTED",
+    captureStatus,
     envelope.run_ref,
     envelope.work_item_ref,
     envelope.node_ref,
@@ -127,7 +129,9 @@ export function createPostgresCaptureSink(options: {
       envelopes: readonly PostRedactionEnvelope[],
     ): Promise<void> {
       if (envelopes.length === 0) return;
-      const values = envelopes.flatMap((envelope) => occurrenceValues(envelope));
+      const values = envelopes.flatMap((envelope) =>
+        occurrenceValues(envelope, "PERSISTED")
+      );
       const rows = envelopes.map((_, rowIndex) => {
         const offset = rowIndex * OCCURRENCE_COLUMNS.length;
         const parameters = OCCURRENCE_COLUMNS.map(
@@ -141,6 +145,38 @@ export function createPostgresCaptureSink(options: {
          ON CONFLICT (source, source_event_ref) DO NOTHING`,
         values,
       );
+    },
+    async ingestSpooledOccurrence(
+      envelope: PostRedactionEnvelope,
+    ): Promise<void> {
+      const client = await requirePool().connect();
+      try {
+        await client.query("BEGIN");
+        const inserted = await client.query<{ occurrence_id: string }>(
+          `INSERT INTO obs.occurrence (${OCCURRENCE_COLUMNS.join(", ")})
+           VALUES (${OCCURRENCE_COLUMNS.map(
+             (_column, index) => `$${index + 1}`,
+           ).join(", ")})
+           ON CONFLICT (source, source_event_ref) DO NOTHING
+           RETURNING occurrence_id::text`,
+          [...occurrenceValues(envelope, "SPOOLED")],
+        );
+        const occurrenceId = inserted.rows[0]?.occurrence_id;
+        if (occurrenceId !== undefined) {
+          await client.query(
+            `INSERT INTO obs.spool_receipt
+               (source, spool_ref, occurrence_id)
+             VALUES ($1, $2, $3::uuid)`,
+            [envelope.source, envelope.source_event_ref, occurrenceId],
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
     async writeCaptureGap(row: CaptureGapRow): Promise<void> {
       await requirePool().query(

@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { closeSync, constants, fstatSync, openSync, realpathSync, writeSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, realpathSync, writeSync } from "node:fs";
+
+import {
+  clampSpoolRecordLimit,
+  normalizeSafeEnvelopeMetadata,
+  SPOOL_RECORD_MAX_BYTES,
+} from "../src/safe-metadata.js";
+import { appendSpoolIndexBasename } from "../src/spool-index.js";
 
 const RUNTIME = "scheduler" as const;
 const UNKNOWN_REF = "UNKNOWN:DECLARED_KIND_REQUIRED" as const;
-const SPOOL_ENVELOPE_MAX_BYTES_SEED = 16_384;
+const SPOOL_ENVELOPE_MAX_BYTES_SEED = SPOOL_RECORD_MAX_BYTES;
 const ENVIRONMENT_SEED = "unknown";
 const BUILD_REF_SEED = "UNTRACKED-DEV:UNKNOWN";
 const BUILD_DIRTY_SEED = true;
@@ -63,10 +70,10 @@ function normalizedSpoolDirectory(value: string | undefined): string | undefined
 }
 
 const configuredEnvelopeMaxBytes = Number(process.env.OBS_ENVELOPE_MAX_BYTES);
-const envelopeMaxBytes = Number.isSafeInteger(configuredEnvelopeMaxBytes)
+const envelopeMaxBytes = clampSpoolRecordLimit(Number.isSafeInteger(configuredEnvelopeMaxBytes)
     && configuredEnvelopeMaxBytes > 0
   ? configuredEnvelopeMaxBytes
-  : SPOOL_ENVELOPE_MAX_BYTES_SEED;
+  : SPOOL_ENVELOPE_MAX_BYTES_SEED);
 const bootId = randomUUID();
 let spoolFd: number | undefined;
 let spoolFileIdentity: SpoolFileIdentity | undefined;
@@ -74,12 +81,30 @@ const spoolDirectory = normalizedSpoolDirectory(process.env.OBS_SPOOL_DIR);
 if (spoolDirectory !== undefined) {
   let openedFd: number | undefined;
   try {
+    const spoolBasename = RUNTIME + "-" + process.pid + "-" + bootId + ".spool";
+    const spoolPath = spoolDirectory + "/" + spoolBasename;
     openedFd = openSync(
-      spoolDirectory + "/" + RUNTIME + "-" + process.pid + "-" + bootId + ".spool",
+      spoolPath,
       SPOOL_OPEN_FLAGS,
       0o600,
     );
     const openedFile = fstatSync(openedFd, { bigint: true });
+    appendSpoolIndexBasename({ directory: spoolDirectory, basename: spoolBasename });
+    const indexedFile = fstatSync(openedFd, { bigint: true });
+    // R4-03: this rejects observed replacement; portable Node cannot close an
+    // active same-UID pathname race after the final identity observation.
+    const indexedPath = lstatSync(spoolPath, { bigint: true });
+    if (
+      !indexedFile.isFile()
+      || !indexedPath.isFile()
+      || indexedFile.dev !== openedFile.dev
+      || indexedFile.ino !== openedFile.ino
+      || indexedPath.dev !== openedFile.dev
+      || indexedPath.ino !== openedFile.ino
+      || indexedFile.size !== 0n
+    ) {
+      throw new Error("SPOOL_FILE_CHANGED_BEFORE_INDEX");
+    }
     spoolFd = openedFd;
     spoolFileIdentity = { device: openedFile.dev, inode: openedFile.ino };
   } catch {
@@ -118,13 +143,22 @@ function writeTierZeroFatalBoundaryRecord(): void {
   if (currentFile.dev !== spoolFileIdentity.device || currentFile.ino !== spoolFileIdentity.inode) {
     throw new Error("SPOOL_FD_IDENTITY_CHANGED");
   }
-  const bytes = tierZeroWriteAttempt?.bytes ?? Buffer.from(JSON.stringify({
-    occurred_at: new Date().toISOString(),
+  const metadata = normalizeSafeEnvelopeMetadata({
     environment: configValue("OBS_ENVIRONMENT", ENVIRONMENT_SEED),
     build_ref: configValue("OBS_BUILD_REF", BUILD_REF_SEED),
-    build_dirty: configBooleanValue("OBS_BUILD_DIRTY", BUILD_DIRTY_SEED),
     runtime: RUNTIME,
     component: { process: RUNTIME, package: "@debateai/" + RUNTIME },
+    writer_identity: configValue("OBS_WRITER_IDENTITY", WRITER_IDENTITY_SEED),
+    redaction_policy_version: configValue("OBS_REDACTION_POLICY_VERSION", REDACTION_POLICY_VERSION_SEED),
+    allowlist_set_id: configValue("OBS_ALLOWLIST_SET_ID", ALLOWLIST_SET_ID_SEED),
+  });
+  const bytes = tierZeroWriteAttempt?.bytes ?? Buffer.from(JSON.stringify({
+    occurred_at: new Date().toISOString(),
+    environment: metadata.environment,
+    build_ref: metadata.build_ref,
+    build_dirty: configBooleanValue("OBS_BUILD_DIRTY", BUILD_DIRTY_SEED),
+    runtime: RUNTIME,
+    component: metadata.component,
     capture_point: "self",
     code: "OBS_CAPTURE_SELF",
     taxonomy_class: "CAPTURE_SELF",
@@ -133,8 +167,8 @@ function writeTierZeroFatalBoundaryRecord(): void {
     disposition: "SELF",
     fingerprint: FINGERPRINTS[RUNTIME],
     fingerprint_version: 1,
-    redaction_policy_version: configValue("OBS_REDACTION_POLICY_VERSION", REDACTION_POLICY_VERSION_SEED),
-    allowlist_set_id: configValue("OBS_ALLOWLIST_SET_ID", ALLOWLIST_SET_ID_SEED),
+    redaction_policy_version: metadata.redaction_policy_version,
+    allowlist_set_id: metadata.allowlist_set_id,
     fallback_minimized: true,
     run_ref: UNKNOWN_REF,
     work_item_ref: UNKNOWN_REF,
@@ -151,7 +185,7 @@ function writeTierZeroFatalBoundaryRecord(): void {
     source_event_ref: randomUUID(),
     zone_context: false,
     attempt_index: null,
-    writer_identity: configValue("OBS_WRITER_IDENTITY", WRITER_IDENTITY_SEED),
+    writer_identity: metadata.writer_identity,
   }) + "\n", "utf8");
   if (bytes.byteLength > envelopeMaxBytes) {
     throw new Error("SPOOL_WRITE_INCOMPLETE");
