@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PublicDebateSchema } from "@debateai/contract";
 import { PublicAnswerDisclosure as ApplicationDisclosure } from "../../apps/ui/components/PublicAnswerDisclosure.js";
-import { PublicAnswerDisclosure as WebDisclosure } from "../../web/components/PublicAnswerDisclosure.js";
 
 describe("S8 duplicated public readers", () => {
   it("renders downgraded limitations and the evidence time basis in both compositions", () => {
@@ -23,7 +22,7 @@ describe("S8 duplicated public readers", () => {
         as_of: "2026-08-23T12:34:56.000Z"
       }
     }).answer;
-    for (const Disclosure of [ApplicationDisclosure, WebDisclosure]) {
+    for (const Disclosure of [ApplicationDisclosure]) {
       const html = renderToStaticMarkup(<Disclosure answer={answer} />);
       expect(html).toContain("Answer status: COMPONENTS_ONLY");
       expect(html).toContain("Verdict unavailable in this published serving mode.");

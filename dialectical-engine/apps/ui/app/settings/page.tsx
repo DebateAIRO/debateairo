@@ -38,20 +38,45 @@ export default function SettingsPage() {
   return <AuthGate>{() => <AccountSettingsScreen />}</AuthGate>;
 }
 
+/* The document's identity panel. SCOPE and IDENTITY MODEL are ruled facts about
+   how sessions work here, so they are stated. ASKER has no source in this
+   browser — the session is an HttpOnly cookie and no endpoint returns the
+   pseudonym — so it carries typed absence (DR-115) rather than an invented
+   handle. */
+const IDENTITY_ROWS: readonly { k: string; v: string; absent?: boolean }[] = [
+  { k: "ASKER", v: "Not exposed to this browser", absent: true },
+  { k: "SCOPE", v: "personal" },
+  { k: "IDENTITY MODEL", v: "Server session · HttpOnly cookie · mandatory MFA" }
+];
+
 function AccountSettingsScreen() {
   return (
-    <div className="screen scroll">
-      <div className="screenInner medium">
-        <h1 className="display sm">Account settings</h1>
-        <p className="lede" style={{ marginTop: 6 }}>
-          Review and revoke your signed-in browser sessions. Deployment and model administration are operator-only.
-        </p>
-        <SessionControls />
-        <LegacyRunClaimControls />
-        <AccountErasureControls />
-        <div className="pill pillGen" style={{ marginTop: 24 }}>
-          <span className="dot" />
-          Deployment controls unavailable for user sessions
+    <div className="screen scroll setScreen">
+      <div className="setBody">
+        <div className="setInner">
+          <p className="setEyebrow">IDENTITY</p>
+          <h1 className="setTitle">Your asker scope</h1>
+          <p className="setLede">
+            Sessions use server-set HttpOnly cookies and mandatory MFA. Browser scripts never receive the session
+            credential.
+          </p>
+
+          <div className="setPanel">
+            <div className="setPanelCore">
+              {IDENTITY_ROWS.map((row) => (
+                <div className="setIdentityRow" key={row.k}>
+                  <span className="setIdentityKey">{row.k}</span>
+                  <span className="setIdentityValue" data-absent={row.absent ? "true" : undefined}>
+                    {row.v}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <SessionControls />
+          <LegacyRunClaimControls />
+          <AccountErasureControls />
         </div>
       </div>
     </div>

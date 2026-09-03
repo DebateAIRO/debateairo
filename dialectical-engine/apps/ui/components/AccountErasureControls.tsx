@@ -90,80 +90,87 @@ export function AccountErasureControls({
   const scheduled = status !== null && status.status !== "NONE" ? status : null;
 
   return (
-    <section className="card" aria-labelledby="account-deletion-heading" style={{ marginTop: 24 }}>
-      <h2 id="account-deletion-heading">Delete account</h2>
-      <p>
+    <section className="setCard setCardDanger" aria-labelledby="account-deletion-heading">
+      <h2 className="setCardTitle" id="account-deletion-heading">Delete account</h2>
+      <p className="setCardHint">
         Deletion begins after seven full days. You can cancel before it begins. Schedule, cancellation, and completion
         notices are sent to every bound email or recovery email; at least one verified channel is required.
       </p>
-      <p className="muted">
+      <p className="setCardNote">
         Encrypted private content becomes permanently unreadable when its keys are destroyed. Current public snapshots
         remain public under a retired pseudonym, and downloaded, quoted, cached, indexed, or provider-retained copies
         may persist. Claimed legacy plaintext is reported as a retained residual, not as fully cleaned content.
       </p>
-      {status === null ? <p>Checking account deletion status…</p> : null}
+      {status === null ? <p className="setStatus">Checking account deletion status…</p> : null}
       {scheduled !== null ? (
         <div>
-          <p role="status">
-            Status: <strong>{scheduled.status}</strong>. Scheduled deletion time: {new Date(scheduled.execute_at).toLocaleString()}.
+          <p className="setStatus" role="status">
+            Status: <strong>{scheduled.status}</strong>. Scheduled deletion time:{" "}
+            {new Date(scheduled.execute_at).toLocaleString()}.
           </p>
           {scheduled.status === "PROCESSING" ? (
-            <p className="muted">
+            <p className="setCardNote">
               Irreversible deletion is processing. Scheduling and cancellation are no longer available.
             </p>
           ) : (
-            <button type="button" className="btn" disabled={busy} onClick={() => { void cancel(); }}>
-              {busy ? "Cancelling…" : "Cancel account deletion"}
-            </button>
+            <div className="setCardRow">
+              <button type="button" className="setBtn" disabled={busy} onClick={() => { void cancel(); }}>
+                {busy ? "Cancelling…" : "Cancel account deletion"}
+              </button>
+            </div>
           )}
         </div>
       ) : status !== null ? (
         <form onSubmit={(event) => void schedule(event)}>
-          <div className="fieldGroup">
-            <label htmlFor="account-deletion-password">Account password</label>
-            <input
-              id="account-deletion-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
+          <div className="setCardRow">
+            <div className="setField">
+              <label htmlFor="account-deletion-password">Account password</label>
+              <input
+                id="account-deletion-password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
+            <div className="setField">
+              <label htmlFor="account-deletion-code">Authenticator code</label>
+              <input
+                id="account-deletion-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                placeholder="Authenticator code"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                required
+              />
+            </div>
+            <div className="setField setFieldDanger">
+              <label htmlFor="account-deletion-confirmation">Type {CONFIRMATION}</label>
+              <input
+                id="account-deletion-confirmation"
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={`Type ${CONFIRMATION}`}
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="setBtn setBtnDanger"
+              disabled={busy || confirmation !== CONFIRMATION}
+            >
+              {busy ? "Authorizing…" : "Schedule deletion"}
+            </button>
           </div>
-          <div className="fieldGroup">
-            <label htmlFor="account-deletion-code">Authenticator code</label>
-            <input
-              id="account-deletion-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              required
-            />
-          </div>
-          <div className="fieldGroup">
-            <label htmlFor="account-deletion-confirmation">Type {CONFIRMATION}</label>
-            <input
-              id="account-deletion-confirmation"
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="btn"
-            style={{ marginTop: 18 }}
-            disabled={busy || confirmation !== CONFIRMATION}
-          >
-            {busy ? "Authorizing…" : "Schedule account deletion"}
-          </button>
         </form>
       ) : null}
-      {message ? <p role="status">{message}</p> : null}
+      {message ? <p className="setStatus" role="status">{message}</p> : null}
     </section>
   );
 }

@@ -1,0 +1,11 @@
+#!/bin/zsh
+WT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-03/dialectical-engine
+PACKET=$WT/.hermes/reports/public-debate-access/packets/REV-03.md
+LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/public-debate-access/logs/REV-03-grok.log
+[ -f "$PACKET" ] || { echo "FATAL: packet missing at $PACKET"; exit 1; }
+[ -d "$WT" ]     || { echo "FATAL: worktree missing at $WT"; exit 1; }
+cd "$WT" || exit 1
+echo "REV-03 · ACCEPTANCE-COMMAND REPAIR REVIEW · Grok · ticket t_171387b4 · worktree $WT"
+~/.grok/bin/grok -p "You are the blind REVIEW seat on mission public-debate-access, board public-debate-access, ticket t_171387b4. Your complete goal packet is at $PACKET . Read that packet IN FULL before anything else, then follow it exactly. Your handoff must OPEN with the line 'SKILLS LOADED:' naming every skill you actually loaded - no seat reaches FULLY DONE without it, and naming a skill you did not load is a fabrication finding against you. Read .hermes/TOOLING-TRAPS.md early; it is in your worktree and it already contains the traps this mission has paid for. You are a BLIND lens in an isolated worktree: you did not write these PLANs and their author did not write the SPECs. DEFAULT POSTURE REFUTE - the packet lists the Router's own measurements as claims for you to BREAK, not to confirm. The single question that matters most: construct a case where the new capture-then-check idiom passes while the acceptance has verified nothing. If such a case exists it is a fourth variant of a family that has already cost this mission three rounds, and it is blocking. Reproduce before you report; a finding without a reproduction is a hypothesis. Say plainly what you could not do rather than inferring it. Do NOT condemn a regression-baseline or verification-only step for being legitimately green - that would condemn correct work. Write your self-report inside this worktree before finishing. Return control at your verdict, a genuine blocker, or an IMPORTANT OPERATION; otherwise keep working and keep the session alive and resumable." \
+  -m grok-4.5 --permission-mode bypassPermissions 2>&1 | tee "$LOG"
+echo "=== REV-03 seat exited. Log: $LOG ==="

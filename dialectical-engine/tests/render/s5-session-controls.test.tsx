@@ -5,7 +5,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContractClient, SessionList } from "@debateai/contract";
 import { SessionControls as UiSessionControls } from "../../apps/ui/components/SessionControls.js";
-import { SessionControls as WebSessionControls } from "../../web/components/SessionControls.js";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -31,8 +30,7 @@ const surfaces: ReadonlyArray<readonly [string, ComponentType<{
   client?: ControlClient;
   onSessionEnded?: () => void;
 }>]> = [
-  ["apps/ui", UiSessionControls],
-  ["web", WebSessionControls]
+  ["apps/ui", UiSessionControls]
 ];
 
 let root: Root | null = null;
@@ -47,7 +45,9 @@ async function settle(): Promise<void> {
 
 async function click(label: string): Promise<void> {
   const button = [...document.querySelectorAll("button")]
-    .find((candidate) => candidate.textContent?.trim() === label);
+    .find((candidate) =>
+      candidate.textContent?.trim() === label
+      || candidate.getAttribute("aria-label") === label);
   expect(button, `missing rendered button ${label}`).toBeDefined();
   await act(async () => { (button as HTMLButtonElement).click(); });
   await settle();
@@ -86,9 +86,13 @@ describe.each(surfaces)("S5 rendered session controls — %s", (_name, Controls)
   it("renders own active sessions and wires individual revoke, revoke-all, logout, and step-up", async () => {
     expect(document.body.textContent).toContain("Active sessions");
     expect(document.body.textContent).toContain("Current session");
-    expect(document.body.textContent).toContain(remoteId);
+    // Raw session ids are deliberately not shown: a uuid tells a person nothing
+    // about which device they are revoking.
+    expect(document.body.textContent).not.toContain(remoteId);
+    expect(document.body.textContent).toContain("Other session");
+    expect(document.body.textContent).toContain("Signed in");
 
-    await click(`Revoke ${remoteId}`);
+    await click(`Revoke session ${remoteId}`);
     expect(client.revokeSession).toHaveBeenCalledWith(remoteId);
 
     const password = document.querySelector<HTMLInputElement>('input[name="step-up-password"]');
@@ -116,11 +120,7 @@ describe.each(surfaces)("S5 rendered session controls — %s", (_name, Controls)
   });
 });
 
-it("mounts the rendered session-control component on both live settings pages", async () => {
-  const [ui, web] = await Promise.all([
-    readFile(resolve(process.cwd(), "apps/ui/app/settings/page.tsx"), "utf8"),
-    readFile(resolve(process.cwd(), "web/app/settings/page.tsx"), "utf8")
-  ]);
+it("mounts the rendered session-control component on the live settings page", async () => {
+  const ui = await readFile(resolve(process.cwd(), "apps/ui/app/settings/page.tsx"), "utf8");
   expect(ui).toContain("<SessionControls");
-  expect(web).toContain("<SessionControls");
 });

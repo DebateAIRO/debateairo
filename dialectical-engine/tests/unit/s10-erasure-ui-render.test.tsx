@@ -4,8 +4,6 @@ import { createRoot,type Root } from "react-dom/client";
 import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
 import { PublicationControl as AppPublicationControl } from "../../apps/ui/components/PublicationControl.js";
 import { AccountErasureControls as AppAccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
-import { PublicationControl as WebPublicationControl } from "../../web/components/PublicationControl.js";
-import { AccountErasureControls as WebAccountErasureControls } from "../../web/components/AccountErasureControls.js";
 
 const RUN_ID="11111111-1111-4111-8111-111111111111";
 const CANCELLATION_REF="55555555-5555-4555-8555-555555555555";
@@ -46,8 +44,7 @@ async function flush():Promise<void> {
 
 describe("S10 rendered erasure boundaries",()=>{
   for (const [name,Control] of [
-    ["apps/ui",AppPublicationControl],
-    ["web",WebPublicationControl]
+    ["apps/ui",AppPublicationControl]
   ] as const) {
     for (const outcome of ["PENDING","CLEANED"] as const) {
       it(`${name} purges every mounted private plaintext view on ${outcome}`,async ()=>{
@@ -116,8 +113,7 @@ describe("S10 rendered erasure boundaries",()=>{
   }
 
   for (const [name,Control] of [
-    ["apps/ui",AppAccountErasureControls],
-    ["web",WebAccountErasureControls]
+    ["apps/ui",AppAccountErasureControls]
   ] as const) {
     it(`${name} polls a scheduled request into irreversible PROCESSING`,async ()=>{
       vi.useFakeTimers();

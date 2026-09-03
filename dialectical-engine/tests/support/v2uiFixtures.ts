@@ -1,4 +1,4 @@
-import { AnswerSchema, type Answer } from "@debateai/contract";
+import { AnswerSchema, type Answer, type NodeReview } from "@debateai/contract";
 
 /**
  * UI-01 test fixture: a FAIR-01-shaped served answer — two nodes, one attack
@@ -15,7 +15,7 @@ export function buildFairShapedAnswer(overrides: Partial<Answer> = {}): Answer {
     provenance_ref: `prov:${source}`,
     replay_handle: `replay:${source}`
   });
-  const review = (outcome: "agree" | "dispute", reviewer: string) => ({
+  const review = (outcome: NodeReview["outcome"], reviewer: string) => ({
     outcome,
     reasons: [`${reviewer} recorded a cross-maker test-layer review.`],
     provenance_ref: `artifact:review:${reviewer}`,

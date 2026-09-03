@@ -39,7 +39,7 @@ export function DebateOutline({
           const inSelectedPath = selectedPathNodeIds?.has(node.id) ?? false;
           const rowStyle: CSSProperties = {
             marginLeft: depth * 26,
-            borderLeftColor: empty ? "oklch(0.85 0.006 80)" : pal.line,
+            borderLeftColor: empty ? "var(--line-2)" : pal.line,
             background: empty ? "var(--surface-sunken)" : pal.bg,
             boxShadow: selected
               ? `0 0 0 2px ${pal.text}, var(--shadow-card)`

@@ -58,6 +58,7 @@ async function click(label: string): Promise<void> {
 describe("rendered auth flow integration", () => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    window.history.replaceState({}, "", "/");
     setPathname("/");
     const container = document.createElement("div");
     document.body.append(container);
@@ -262,6 +263,56 @@ describe("rendered auth flow integration", () => {
     expect(onAuthenticated).toHaveBeenCalledTimes(1);
   });
 
+  it("reads the validated default return path at login completion time", async () => {
+    window.history.replaceState({}, "", "/login?next=%2Fsettings");
+    const client = {
+      beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge" }),
+      completeLogin: vi.fn().mockResolvedValue({
+        status: "authenticated" as const,
+        csrf_token: "c".repeat(43),
+        session: SESSION
+      })
+    };
+    await act(async () => root!.render(<LoginFlow client={client} />));
+    field("email").value = "person@example.test";
+    field("password").value = "password";
+    await submit();
+
+    const assign = vi.fn();
+    const completionWindow = Object.create(window) as Window;
+    Object.defineProperty(completionWindow, "location", {
+      configurable: true,
+      value: { search: "?next=%2Fnew", assign }
+    });
+    vi.stubGlobal("window", completionWindow);
+    field("code").value = "123456";
+    await submit();
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith("/new");
+  });
+
+  it("forwards sign-up next to login only when the parameter is present", async () => {
+    window.history.replaceState({}, "", "/sign-up?next=%2Fnew");
+    await act(async () => root!.render(
+      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+    ));
+    await settle();
+
+    expect(document.querySelector('.authPanelFooter a')?.getAttribute("href"))
+      .toBe("/login?next=%2Fnew");
+  });
+
+  it("keeps the sign-up login link query-free when next is absent", async () => {
+    window.history.replaceState({}, "", "/sign-up");
+    await act(async () => root!.render(
+      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+    ));
+    await settle();
+
+    expect(document.querySelector('.authPanelFooter a')?.getAttribute("href")).toBe("/login");
+  });
+
   it("renders the non-enumerating registration state and resends only to the submitted email", async () => {
     const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
     const resendVerification = vi.fn().mockResolvedValue({ message: RESEND_MESSAGE });
@@ -282,7 +333,7 @@ describe("rendered auth flow integration", () => {
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
     expect(document.body.textContent).toContain("No account status is revealed here.");
 
-    await click("Resend instructions");
+    await click("Verify email");
     expect(resendVerification).toHaveBeenCalledWith("person@example.test");
     expect(document.body.textContent).toContain(RESEND_MESSAGE);
     expect(document.body.textContent).not.toMatch(/Google|forgot|keep me signed|model API key/i);
@@ -416,7 +467,7 @@ describe("rendered auth flow integration", () => {
     await submit();
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
 
-    await click("Resend instructions");
+    await click("Verify email");
     expect(document.querySelector('[role="alert"]')?.textContent)
       .toBe("Verification instructions could not be resent.");
     expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);

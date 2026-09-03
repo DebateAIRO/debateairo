@@ -5,10 +5,6 @@ import {
   createBrowserContractClient as createAppClient,
   createSameOriginFetch as createAppFetch
 } from "../../apps/ui/lib/api.js";
-import {
-  createBrowserContractClient as createWebClient,
-  createSameOriginFetch as createWebFetch
-} from "../../web/lib/api.js";
 
 function uiSource(relativePath: string): string {
   return readFileSync(
@@ -17,16 +13,9 @@ function uiSource(relativePath: string): string {
   );
 }
 
-function webSource(relativePath: string): string {
-  return readFileSync(
-    fileURLToPath(new URL(`../../web/${relativePath}`, import.meta.url)),
-    "utf8"
-  );
-}
-
 describe("S10 self-service erasure UI", () => {
   it("keeps credentials and destructive grants on the same-origin proxy in both clients", async () => {
-    for (const createClient of [createAppClient,createWebClient]) {
+    for (const createClient of [createAppClient]) {
       for (const base of [
         "/\\attacker.example","//attacker.example","/api/../escape",
         "/api/%2e%2e/escape","/api/%5c%5cattacker.example","/api/%2f%2fattacker.example"
@@ -55,7 +44,7 @@ describe("S10 self-service erasure UI", () => {
       expect(calls[0]?.init?.credentials).toBe("same-origin");
       expect(String(calls[0]?.init?.body)).toContain("private-password");
     }
-    for (const createFetch of [createAppFetch,createWebFetch]) {
+    for (const createFetch of [createAppFetch]) {
       await expect(createFetch("/api",fetch)(new Request(
         "http://localhost/v1/auth/step-up",{ method:"POST",body:"secret" }
       ))).rejects.toThrow(/PROXY_FETCH_REQUEST_INPUT_UNSUPPORTED/);
@@ -64,8 +53,7 @@ describe("S10 self-service erasure UI", () => {
 
   it("requires an exact account-deletion confirmation and targetless DELETE_ACCOUNT step-up", () => {
     for (const [control, settings] of [
-      [uiSource("components/AccountErasureControls.tsx"), uiSource("app/settings/page.tsx")],
-      [webSource("components/AccountErasureControls.tsx"), webSource("app/settings/page.tsx")]
+      [uiSource("components/AccountErasureControls.tsx"), uiSource("app/settings/page.tsx")]
     ]) {
       expect(settings).toContain("<AccountErasureControls");
       expect(control).toContain('const CONFIRMATION = "DELETE MY ACCOUNT"');
@@ -86,8 +74,6 @@ describe("S10 self-service erasure UI", () => {
   it("offers deletion only for a private debate with an exact run-targeted grant", () => {
     const surfaces = [
       [uiSource("components/PublicationControl.tsx"), uiSource("app/debate/[id]/DebatePageClient.tsx"),
-        "onPrivateDeletion={purgePrivateDebate}"],
-      [webSource("components/PublicationControl.tsx"), webSource("app/debate/[id]/DebatePageClient.tsx"),
         "onPrivateDeletion={purgePrivateDebate}"]
     ] as const;
     for (const [control, debate, renderSite] of surfaces) {

@@ -54,7 +54,7 @@ function withoutSetAsidePaths(node: DebateNode): DebateNode {
 
 export type CanvasCallbacks = {
   onOpenNode: (nodeId: string) => void;
-  onChallengeNode: (node: DebateNode, anchor: HTMLElement) => void;
+  onChallengeNode?: (node: DebateNode, anchor: HTMLElement) => void;
   onToggleExpand: (nodeId: string) => void;
   onProseSelect?: (node: DebateNode, event: MouseEvent) => void;
 };
@@ -160,6 +160,7 @@ export function DebateCanvas({
         {layout.connectors.map((c) => (
           <path
             key={c.id}
+            data-connector-stance={c.stance}
             d={c.d}
             fill="none"
             stroke={c.color}
@@ -228,6 +229,22 @@ function CanvasCard({
 }: CanvasCardProps) {
   const { node, state, role } = placed;
   const pal = role === "root" ? null : ROLE_PALETTES[role];
+  const stance = role === "pov" ? "reasoning" : role;
+  let stanceLine: string;
+  switch (stance) {
+    case "pro":
+      stanceLine = "var(--pro-line)";
+      break;
+    case "con":
+      stanceLine = "var(--con-line)";
+      break;
+    case "reasoning":
+      stanceLine = "var(--reasoning-line)";
+      break;
+    case "root":
+      stanceLine = "var(--line-strong)";
+      break;
+  }
   const generation = node.active_generation;
   const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
   const setAside = isSetAsidePath(node);
@@ -241,6 +258,13 @@ function CanvasCard({
   const v3Scores =
     v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById));
   const v3Review = v3NodesById?.get(node.id)?.review ?? null;
+  const compactReview = v3Review?.outcome === "agree"
+    ? "agreed"
+    : v3Review?.outcome === "dispute"
+      ? "disputed"
+      : v3Review?.outcome === "cannot-assess"
+        ? "unassessed"
+        : "absent";
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -258,28 +282,41 @@ function CanvasCard({
     left: placed.x,
     top: placed.y,
     width: CARD_W,
-    opacity: (scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38) * lowStrengthDim
+    opacity: (scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38) * lowStrengthDim,
+    background: "var(--shell)",
+    borderRadius: "var(--r-card)",
+    boxShadow: "var(--shadow-card)",
+    boxSizing: "border-box",
+    padding: 4
   };
 
   const innerStyle: CSSProperties = scrutiny
     ? {
-        background: "var(--surface)",
+        background: "var(--core)",
+        borderRadius: "var(--r-card)",
+        position: "relative",
         borderColor: scrutiny.color,
-        boxShadow: `0 0 0 4px ${scrutiny.bg}, 0 4px 16px -8px oklch(0.5 0.08 70 / 0.3)`
+        boxShadow: `0 0 0 4px ${scrutiny.bg}, var(--shadow-card)`
       }
     : role === "root"
       ? {
-          background: "var(--surface)",
-          borderColor: "oklch(0.8 0.012 70)",
+          background: "var(--core)",
+          borderRadius: "var(--r-card)",
+          position: "relative",
+          borderColor: "var(--line-2)",
           boxShadow: "var(--shadow-card)"
         }
       : state === "empty" || state === "abandoned" || state === "failed"
         ? {
             background: "var(--surface-sunken)",
+            borderRadius: "var(--r-card)",
+            position: "relative",
             borderColor: "var(--line-2)"
           }
         : {
-            background: "var(--surface)",
+            background: "var(--core)",
+            borderRadius: "var(--r-card)",
+            position: "relative",
             borderColor: pal?.border
           };
 
@@ -292,18 +329,36 @@ function CanvasCard({
   return (
     <div
       className="nodeWrap"
+      ref={registerRef}
       style={cardStyle}
       data-node-id={node.id}
+      data-bezel="shell"
+      data-stance={stance}
       data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
       data-set-aside={setAside ? "true" : undefined}
     >
       <div
-        ref={registerRef}
         className={`node${selected ? " selected" : ""}${scoreFilterMatch ? "" : " scoreFilteredOut"}`}
         style={innerStyle}
+        data-bezel="core"
         data-score-filter-match={scoreFilterMatch ? "true" : "false"}
         onClick={openIfDone}
       >
+        <span
+          className="nodeStanceTab"
+          data-stance={stance}
+          aria-hidden="true"
+          style={{
+            display: "block",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: 3,
+            borderRadius: "var(--r-tab)",
+            background: stanceLine
+          }}
+        />
         {scrutiny ? (
           <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>
             <span className="scrutinyDot" style={{ background: scrutiny.color }} />
@@ -397,7 +452,26 @@ function CanvasCard({
                   <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} />
                 ) : null}
                 {v3NodesById !== undefined ? (
-                  <span className="nodeReviewBadges" data-node-review={v3Review?.outcome ?? "absent"}>
+                  <span
+                    className="nodeReviewBadges"
+                    data-node-review={v3Review?.outcome ?? "absent"}
+                    data-review={compactReview}
+                  >
+                    <span
+                      className="nodeReviewDot"
+                      aria-hidden="true"
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 6,
+                        borderRadius: "var(--r-dot)",
+                        background: compactReview === "agreed"
+                          ? "var(--agree-text)"
+                          : compactReview === "disputed"
+                            ? "var(--dispute-text)"
+                            : "var(--muted)"
+                      }}
+                    />
                     <ModelBadge
                       modelId={v3Review?.reviewer_lineage.model_id ?? null}
                       maker={v3Review?.reviewer_lineage.maker ?? null}
@@ -446,26 +520,50 @@ function CanvasCard({
                   </div>
                 ) : null}
                 <div className="nodeControls">
-                  <button
-                    type="button"
-                    className="nodeCtrl challenge"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onChallengeNode(node, event.currentTarget);
-                    }}
-                  >
-                    ⚐ Challenge
-                  </button>
+                  {onChallengeNode ? (
+                    <button
+                      type="button"
+                      className="nodeCtrl challenge"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onChallengeNode(node, event.currentTarget);
+                      }}
+                    >
+                      ⚐ Challenge
+                    </button>
+                  ) : (
+                    <span
+                      className="nodeCtrl challenge"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      style={{ opacity: 0.55 }}
+                    >
+                      🔒 Challenge
+                    </span>
+                  )}
+                  {onChallengeNode ? (
+                    <button
+                      type="button"
+                      className="nodeCtrl"
+                      disabled
+                      aria-disabled="true"
+                      title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                    >
+                      ↻ Regenerate
+                    </button>
+                  ) : null}
+                  <span style={{ flex: 1 }} />
                   <button
                     type="button"
                     className="nodeCtrl"
-                    disabled
-                    aria-disabled="true"
-                    title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                    aria-label="Details"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openNodeDetails();
+                    }}
                   >
-                    ↻ Regenerate
+                    Details <span aria-hidden="true">▸</span>
                   </button>
-                  <span style={{ flex: 1 }} />
                   <button
                     type="button"
                     className="nodeCtrl"

@@ -259,25 +259,6 @@ export const PublicDebateSummarySchema = z.object({
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 
-export const PublicDebateSchema = z.object({
-  public_ref: z.uuid(),
-  author_pseudonym: z.string().trim().min(1),
-  question: z.string().trim().min(1),
-  published_at: z.iso.datetime(),
-  answer: z.object({
-    terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
-    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
-    verdict_available: z.boolean(),
-    confidence_band: z.string().trim().min(1).nullable(),
-    summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
-    badges: z.array(z.string()),
-    residual_objections: z.array(z.string()),
-    reversal_point: z.string().min(1),
-    as_of: z.iso.datetime()
-  }).strict()
-}).strict();
-export type PublicDebate = z.infer<typeof PublicDebateSchema>;
-
 export const PublicDebateListSchema = z.object({
   items: z.array(PublicDebateSummarySchema),
   total: z.number().int().nonnegative()
@@ -449,7 +430,7 @@ export const NodeSchema = z.object({
   maker_lineage: MakerLineageSchema.nullable(),
   review: NodeReviewSchema.nullable(),
   locator: z.string().nullable(),
-  stranger_restatement: z.object({ check_status: CheckStatusSchema }).passthrough(),
+  stranger_restatement: z.object({ check_status: CheckStatusSchema }).strict(),
   defeater_refs: z.array(z.string().min(1)),
   defeater_exhaustion_marked: z.boolean(),
   disagreement: z.record(z.string(), z.unknown()).nullable(),
@@ -459,6 +440,11 @@ export const NodeSchema = z.object({
   relevant_as_of: z.iso.datetime()
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
+
+export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
+  disagreement: z.null()
+});
+export type PublicNode = z.infer<typeof PublicNodeSchema>;
 
 export const EdgeSchema = z.object({
   edge_id: z.string().min(1),
@@ -536,6 +522,28 @@ export const ConditionMarkRecordSchema = z.object({
     || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0
   )) context.addIssue({ code: "custom", message: "Class N requires halted-call provenance and a surviving parent" });
 });
+
+export const PublicDebateSchema = z.object({
+  public_ref: z.uuid(),
+  author_pseudonym: z.string().trim().min(1),
+  question: z.string().trim().min(1),
+  published_at: z.iso.datetime(),
+  answer: z.object({
+    terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
+    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+    verdict_available: z.boolean(),
+    confidence_band: z.string().trim().min(1).nullable(),
+    summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
+    badges: z.array(z.string()),
+    residual_objections: z.array(z.string()),
+    reversal_point: z.string().min(1),
+    as_of: z.iso.datetime(),
+    nodes: z.array(PublicNodeSchema).optional(),
+    edges: z.array(EdgeSchema).optional(),
+    tree_included: z.boolean().optional()
+  }).strict()
+}).strict();
+export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),

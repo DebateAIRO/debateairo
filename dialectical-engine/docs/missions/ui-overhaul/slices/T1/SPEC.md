@@ -1,0 +1,127 @@
+# SPEC — T1 Debate view — tree canvas
+
+**Version:** v2 (2026-08-31) · **Status:** FROZEN at v2. Supersedes v1
+(pre-handoff pin-bind + REVIEW line amendments recorded in DECISIONS).
+
+**Mission:** `ui-overhaul` · **Design source:** TURN 1 (1a Approved).
+
+## Intent
+
+Replace the owner debate tree canvas with TURN 1 approved direction:
+Terracotta ↔ Chamber, double-bezel cards, sprung connectors, Field Notes stance
+tab (small colored line at top of each card), card anatomy (type chip ·
+BASE/FINAL · author · reviewer + review verdict · regenerate/read), view
+toggles, show set-aside paths, and synthesis/verdict strip.
+
+## Screen inventory
+
+| ID | Region | Notes |
+|---|---|---|
+| T1-S1 | Chrome | Dialectical Engine / dezbatere.ro / debate title / `Scoring · n/m` / Thread·Split·Tree·Map / mode |
+| T1-S2 | Canvas controls | `Show set-aside paths` checkbox |
+| T1-S3 | Root claim card | ROOT CLAIM + question text; claims/depth meta |
+| T1-S4 | Argument cards | Stance tab color; type (REASONING / PRO / CON); model line; BASE%/FINAL%; short claim; `↻ Regenerate`; `Details ▸` |
+| T1-S5 | Connectors | Stance-colored connectors between cards |
+| T1-S6 | Synthesis strip | Strongest Pro / Strongest Con / Verdict / Leans |
+| T1-S7 | Scoring footer | `Scoring · n of m claims scored · DF-QuAD` (or current scorer label) |
+| T1-S8 | Mode + tokens | Terracotta light / Chamber dark; gold reserved for reasoning & verdict |
+
+## States
+
+1. Views: Thread / Split / Tree / Map (same four reading modes).
+2. Set-aside paths shown vs hidden.
+3. Generating vs complete cards (regenerate availability per existing rules).
+4. publicMode (from public route): same canvas READ language with mutate
+   controls locked (T3) — shared component path.
+
+## Copy / anatomy (binding)
+
+- View labels: `Thread`, `Split`, `Tree`, `Map`
+- `Show set-aside paths`
+- Card: `BASE` / `FINAL` percents; `↻ Regenerate`; `Details ▸`
+- Synthesis: `↑ STRONGEST PRO` / `↓ STRONGEST CON` / `VERDICT` / `Leans`
+- Token note from design: card = shell + core double bezel; top tab + connector
+  carry stance color; gold reserved for reasoning & verdict
+
+## Requirements
+
+### R1 — Four view modes remain
+
+Thread / Split / Tree / Map controls exist and switch the reading mode.
+
+### R2 — Double-bezel cards + stance tab
+
+Tree/canvas cards use double-bezel shell and a stance-colored top tab (Field
+Notes stance tab folded in).
+
+### R3 — Card anatomy fields
+
+Each argument card shows stance/type, author model line, BASE and FINAL, short
+text, Regenerate (owner), Details open.
+
+### R4 — Connectors stance-colored
+
+Visible connectors use stance color tokens (not neutral-only).
+
+### R5 — Set-aside toggle
+
+`Show set-aside paths` toggles set-aside path visibility.
+
+### R6 — Synthesis + scoring chrome
+
+Synthesis strip and scoring count chrome present when data exists.
+
+### R7 — Mode toggle
+
+Terracotta ↔ Chamber on debate chrome; gold reserved for reasoning & verdict
+treatments.
+
+### R8 — publicMode compatibility
+
+When mounted with publicMode, canvas text/surface pairs meet the contrast
+threshold ARCH pins; regenerate/challenge mutate paths locked per T3/T5.
+
+### R9 — Render pins move to NEW UI
+
+Existing `tests/render/**` pins that assert OLD debate-canvas / tree chrome for
+this surface must move to the NEW UI (**which exact pin files = ARCH** —
+examples include `ui02e-debate-canvas.test.tsx` and related load/scoring debate
+pins). OLD-UI-exact pins for the replaced canvas must not remain as the
+mission’s passing bar.
+
+## NON-goals
+
+- New scorer algorithm.
+- Removing view modes.
+- Designing TURN 2 (does not exist).
+
+## OPEN QUESTIONS
+
+1. **Reviewer line on card face (ARCH):** design TURN 1a abbreviated cards omit
+   full “REVIEW AGREED/DISPUTED BY” lines that appear on landing sample cards —
+   confirm whether tree cards require reviewer verdict on-face or only in
+   Details (T5). Requirements proposes **Details carries full reviewer line;
+   tree card may show compact verdict mark if already present in app**.
+2. ~~Vocab~~ — **CLOSED** V 2026-08-31: app vocabulary everywhere; keep
+   `claims` in `32 claims / depth 4` meta (see T9/DECISIONS mapping).
+
+## Acceptance — V manual (browser)
+
+1. Open an owner debate with a tree. **Expect:** four view toggles
+   (`Thread`/`Split`/`Tree`/`Map`); mode toggle; cards with `BASE`/`FINAL`;
+   `Details ▸` opens T5; `↻ Regenerate` visible.
+2. On a debate fixture that has ≥1 set-aside path (required precondition —
+   do not run on a tree with zero set-aside paths): toggle `Show set-aside
+   paths`. **Expect:** count of visible path/card nodes changes (before ≠
+   after).
+3. Confirm stance tab/connector color token/class differs across PRO vs CON
+   cards.
+4. Open same debate via public URL logged out. **Expect:** canvas meets
+   contrast threshold ARCH pins; `↻ Regenerate` not actionable.
+
+## Acceptance — automated
+
+- Canvas render tests assert view toggles, BASE/FINAL, bezel/stance markers
+  ARCH documents.
+- publicMode regenerate locked assert shared with T3/T5.
+- Pin migration; three-run law.

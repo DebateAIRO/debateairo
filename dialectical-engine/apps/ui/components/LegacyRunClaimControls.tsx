@@ -40,30 +40,31 @@ export function LegacyRunClaimControls({
   }
 
   return (
-    <section className="card" aria-labelledby="legacy-run-claim-heading" style={{ marginTop: 24 }}>
-      <h2 id="legacy-run-claim-heading">Claim legacy debates</h2>
-      <p>
+    <form className="setCard" aria-labelledby="legacy-run-claim-heading" onSubmit={(event) => void claim(event)}>
+      <h2 className="setCardTitle" id="legacy-run-claim-heading">Claim legacy debates</h2>
+      <p className="setCardHint">
         If you created debates before account sign-in was introduced, enter that old access token once to attach only
         its unclaimed debates to this account. The token is not saved by this browser or the server.
       </p>
-      <form onSubmit={(event) => void claim(event)}>
-        <div className="fieldGroup">
+      <div className="setCardRow">
+        <div className="setField setFieldMono">
           <label htmlFor="legacy-run-token">Old debate access token</label>
           <input
             id="legacy-run-token"
             type="password"
             autoComplete="off"
             spellCheck={false}
+            placeholder="Old debate access token"
             value={legacyToken}
             onChange={(event) => setLegacyToken(event.target.value)}
             required
           />
         </div>
-        <button type="submit" className="btn" disabled={busy || legacyToken.length === 0}>
+        <button type="submit" className="setBtn" disabled={busy || legacyToken.length === 0}>
           {busy ? "Claiming…" : "Claim legacy debates"}
         </button>
-      </form>
-      {message ? <p role="status">{message}</p> : null}
-    </section>
+      </div>
+      {message ? <p className="setStatus" role="status">{message}</p> : null}
+    </form>
   );
 }

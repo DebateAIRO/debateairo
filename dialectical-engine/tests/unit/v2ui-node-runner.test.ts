@@ -11,7 +11,8 @@ const manifest = JSON.parse(
 describe("HYG-01 v2-ui Node test gate", () => {
   it("keeps every active .test.mjs file in the explicit runner manifest", () => {
     const activeTests = readdirSync(v2UiDirectory, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".test.mjs"))
+      // both naming forms are active suites: foo.test.mjs and foo.source-test.mjs
+      .filter((entry) => entry.isFile() && /(?:^|[.-])test\.mjs$/.test(entry.name))
       .map((entry) => relative(v2UiDirectory, join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
       .sort();
 

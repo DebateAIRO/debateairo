@@ -1,0 +1,21 @@
+#!/bin/zsh
+WT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/s01-strict/dialectical-engine
+LOG=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/public-debate-access/logs/S01-STRICT-codex.log
+[ -d "$WT" ] || { echo "FATAL: worktree missing"; exit 1; }
+cd "$WT" || exit 1
+echo "S01-STRICT · Codex · V Row 9 · step S01-C1-6"
+codex exec -s danger-full-access "You are the S01-STRICT coding seat. Read your SKILLS first and open your handoff with SKILLS LOADED.
+
+WHAT YOU ARE DOING. V has ruled, DECISIONS Row 9: the public contract's lone .passthrough() becomes .strict(), chosen deliberately over silent stripping and over deferral. The decision is MADE. Implement it, do not re-argue it. Architecture has authored the step as S01-C1-6 in docs/missions/public-debate-access/slices/S01/PLAN.md - read that step IN FULL and follow it, rather than this summary.
+
+WHY IT MATTERS, briefly, so you understand what you are protecting. packages/contract/src/index.ts line 434, inside NodeSchema at 424, is the ONLY passthrough in the whole contract while every other object on the anonymous path is strict. PublicDebateSchema reaches NodeSchema through answer.nodes. An unknown key smuggled into stranger_restatement therefore SURVIVES validation into the parsed public envelope - reproduced independently by both the Router and Architecture, keys_that_survived showing check_status alongside a smuggled SMUGGLED_OWNER_SECRET whose value is ledger colon abc-123. And S02's buildPublicAnswerExport spreads that answer object WHOLESALE into a downloadable file for anonymous readers, so a surviving key becomes a file a stranger can save. There is no live leak today because the sole producer at apps/api/src/publications.ts line 53 explicitly builds only check_status - the hole is that the CONTRACT does not enforce what it appears to.
+
+YOUR FILE SURFACE, exactly and narrowly. packages/contract/src/index.ts line 434 only: the ONE token, passthrough to strict, with nothing else on that line or in that schema changing. Plus tests/unit/contract.test.ts for new assertions - that file is this mission's first claim on it and Architecture confirmed no collision. Nothing else. Do NOT touch apps/, packages/serve, or any other slice's surface.
+
+RED BEFORE GREEN, AND THIS IS THE PART TO GET RIGHT. Write the assertion that an unknown key under stranger_restatement is REJECTED, and watch it FAIL against the current contract BEFORE you change the token. Architecture's step points you at an already-proven-valid node fixture at tests/unit/contract.test.ts lines 113-171 - REUSE IT rather than building a fresh one. That advice is load-bearing: the Router needed three attempts to build a valid fixture from scratch, failing first on the way_of_knowing enum, then on LabeledNumberSchema needing value and kind and producer, then on NodeSchema needing relevant_as_of. Each of those failures LOOKED like a rejection and proved nothing, which is this mission's signature defect - an assertion that fails for a reason unrelated to what it claims. So confirm your RED is red for the RIGHT REASON: read the actual rejection issue and check it names an unrecognized key, not a malformed fixture.
+
+BLAST RADIUS. Architecture measured it at zero and traced every real NodeSchema and AnswerSchema parse call site, including one fixture in s8-publication.test.ts that looked risky and was ruled out rather than assumed safe. Re-run the full contract and publication suites after your change and confirm that zero holds in practice. If something DOES break, that is important information and not a failure on your part - report it, because strict turning a silent widening into a loud failure is exactly what V chose.
+
+Three-run law, worst run is the verdict. Rework rounds max 3. If an acceptance cannot discriminate, BLOCK and say so - three seats have done that on this mission and all three were right. No push, no merge, no commit. Write your self-report inside this worktree at .hermes/reports/public-debate-access/agent-reports/S01-STRICT-codex.md. Handoff opens with SKILLS LOADED, then READY FOR PEER REVIEW." \
+  < /dev/null 2>&1 | tee "$LOG"
+echo "=== S01-STRICT exited. Log: $LOG ==="

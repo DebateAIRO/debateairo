@@ -1,0 +1,20 @@
+# S02-CODE Codex self-report
+- The parallel public client reached owner READ parity without importing owner mutation flows.
+- Reusing the four shared debate leaves behind optional challenge callbacks kept owner behavior intact.
+- The public honesty drawer and export projection stayed typed to the redacted public envelope.
+- I did not reshape or weaken S01's recursive fixed-point redaction law.
+- RED-first render tests made the page, tree, honesty/export, scoring, and drift clusters concrete.
+- Hostile controls exposed three real acceptance defects before handoff: C5, C3-2, and the standing composition oracle.
+- The C5 block proved both rc=1/rc=2 conflation and a vacuous base-commit pass.
+- The C3-2 block proved page-level reversal text could hide a drawer that never opened.
+- The final block proved a single-file source proxy no longer described a legitimate server/client composition.
+- Architecture's narrow C1-6 correction strengthened forbidden-carrier coverage over the new client file.
+- The adapter's summary-segment shape mismatch fought the literal plan and required a factual no-fabrication correction.
+- Refutation also found public Split copy that still advertised a challenge action after its control was removed.
+- Moving the export assertion before all interaction closed an accidental click-dependent test gap.
+- Both C6 prose pins were independently made RED and restored, so neither count passes vacuously.
+- I would audit standing source-text tests for cross-file assumptions before starting the next component split.
+- I would write direct shared-leaf callback tests earlier, before assembling the top-level public client.
+- Three correct blocks consumed zero implementation rework rounds; no commit, push, merge, or stash was made.
+- Rework round 1 showed the dialog-scoped repair still lacked causation; absent-before and present-after now close F2.
+- The same round added initial Canvas mutation-absence proof; both exact reviewer mutants are RED with product restored unchanged.

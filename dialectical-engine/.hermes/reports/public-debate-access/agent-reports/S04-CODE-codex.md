@@ -1,0 +1,22 @@
+# S04-CODE case file — t_76050188
+
+- Seat/session: Codex GPT-5.6 Sol, `01a04fc8-13c4-7442-bd00-53b1872feb77`; detached worktree `f8b9d5f`; rework rounds used: 2 of 3.
+- Outcome: C1-1 remains the accepted recursive schema-name guard; C1-2 now exercises the real publish projection with hostile disagreement bags on both fixture nodes and checks every projected node.
+- Round-1 error: the original C1-2 hand-built its clean output and therefore never observed product behavior; replacing it with the real publish boundary closed that vacuity.
+- Round-2 residual reproduction: under `nodes.map((node, index) => index === 0 ? redactNodeForPublic(node) : node)`, the pre-repair test executed and stayed GREEN at 2/2.
+- Round-2 root cause: the fixture supplied hostile content only to node 0 and the assertion inspected only node 0, so one collection member stood in for the projection's all-node claim.
+- Round-2 price: one small rework cycle; the first capture script also exposed the zsh read-only `status` variable trap, corrected by using a task-specific name.
+- Repair: both nodes now receive the same ten-key hostile bag, the test requires exactly two projected nodes, and it asserts every projected `disagreement` is null.
+- Partial-map discrimination: keeping the exact reviewer mutant after the repair produced 1 failed / 1 passed, with node 1's complete hostile bag shown in the failure.
+- Existing discrimination preserved: `disagreement: node.disagreement` remained RED at 1 failed / 1 passed.
+- Existing discrimination preserved: `nodes: input.answer.nodes` (skip-redact) remained RED at 1 failed / 1 passed.
+- All three temporary product mutants were restored with `apply_patch`; `git diff --exit-code HEAD -- apps/api/src/publications.ts packages/contract/src/index.ts` is clean.
+- Three-run C1 verdict, worst run: GREEN, 2/2 each time; verbose output named both tests on every run and the anchored summaries showed no skips.
+- Regression-only clusters remain GREEN: C2 5/5 and C3 4/4 in the combined verbose run.
+- Type safety remains GREEN: `pnpm run typecheck` exits 0.
+- PLAN C1-2 now says the hostile bag is planted in every fixture node and every projected node is checked; it keeps the narrower open-record projection claim.
+- Accepted bound remains explicit: a key-name/open-bag guard does not classify identity-like values under allowed copied names such as `maker_lineage.provider_ref`.
+- The `NodeSchema.disagreement` `z.record(..., z.unknown())` contract question remains routed outside S04; no contract edit was made.
+- Checklist items 3/3b remain aligned to S01-C2-0B's settled producer traces and reserve only implementation sampling for QA.
+- Product-truth gap remains: the sole live publication is legacy and lacks `tree_included`, so the anonymous tree-bearing HTTP path still has no live sample.
+- Final dirt is limited to the authorized test, PLAN, and this self-report; no commit, push, merge, product change, or contract change was made. Comments read through `1788070645`.

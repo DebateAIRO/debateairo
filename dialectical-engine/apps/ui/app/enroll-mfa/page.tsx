@@ -14,6 +14,10 @@ import { totpQrMatrix } from "@/lib/totpQr";
 
 type Provisioning = Readonly<{ secret: string; otpauthUri: string }>;
 
+/* The document shows the Base32 seed in groups of four. Only the display is
+   grouped — Copy setup key still yields the unspaced secret. */
+const groupedSecret = (secret: string) => secret.replace(/(.{4})(?=.)/g, "$1 ");
+
 function friendlyError(error: unknown): string {
   if (!(error instanceof MfaEnrollmentHttpError)) return "The enrolment service is temporarily unavailable.";
   switch (error.code) {
@@ -43,15 +47,15 @@ function TotpQr({ uri }: { uri: string }) {
     dark ? [`M${x + quiet} ${y + quiet}h1v1h-1z`] : [])).join("");
   return (
     <svg
+      className="mfaQr"
       viewBox={`0 0 ${size} ${size}`}
-      width="260"
-      height="260"
+      width="170"
+      height="170"
       role="img"
       aria-label="QR code containing the one-time DebateAIRO authenticator setup key"
-      style={{ maxWidth: "100%", height: "auto", background: "white", border: "1px solid var(--line)" }}
     >
-      <rect width={size} height={size} fill="white" />
-      <path d={path} fill="black" />
+      <rect width={size} height={size} fill="var(--qr-paper)" />
+      <path d={path} fill="var(--qr-ink)" />
     </svg>
   );
 }
@@ -125,126 +129,168 @@ export default function EnrollMfaPage() {
 
   if (active) {
     return (
-      <main className="screen scroll">
-        <div className="screenInner medium">
-          <h1 className="display sm">Account protected</h1>
-          <p className="lede">Your authenticator and newest set of recovery codes are active.</p>
+      <main className="mfaScreen">
+        <div className="mfaCard">
+          <div className="mfaBody">
+            <p className="mfaEyebrow">MANDATORY MFA</p>
+            <h1 className="mfaTitle">Account protected</h1>
+            <p className="mfaLede">Your authenticator and newest set of recovery codes are active.</p>
+          </div>
         </div>
       </main>
     );
   }
 
+  const emailDone = !busy && token !== "";
+  const step2State = provisioning ? "active" : emailDone ? "done" : "pending";
+  const step3State = codes ? "active" : "pending";
+
   return (
-    <main className="screen scroll">
-      <div className="screenInner medium" style={{ maxWidth: 760 }}>
-        <h1 className="display sm">Protect your account</h1>
-        <p className="lede" style={{ marginTop: 6 }}>
-          An authenticator is required before this account can be used. No phone number or smartphone is required.
-        </p>
-
-        {error ? <div className="error" role="alert" style={{ marginTop: 24 }}>{error}</div> : null}
-
-        <section className="miniCard" aria-labelledby="enrolment-link" style={{ marginTop: 24 }}>
-          <h2 id="enrolment-link">1. Verify the mailed link</h2>
-          <p className="optionHint">
-            {busy
-              ? "Verifying your email and preparing authenticator setup…"
-              : token === ""
-                ? "Open the private link from your verification email to continue."
-                : "Email verified. The one-time token was removed from the address bar and is not saved in this browser."}
+    <main className="mfaScreen">
+      <div className="mfaCard">
+        <div className="mfaBody">
+          <p className="mfaEyebrow">MANDATORY MFA</p>
+          <h1 className="mfaTitle">Protect your account</h1>
+          <p className="mfaLede">
+            An authenticator is required before this account can be used. No phone number or smartphone is required.
           </p>
-        </section>
 
-        {provisioning ? (
-          <section className="miniCard" aria-labelledby="authenticator-setup" style={{ marginTop: 20 }}>
-            <h2 id="authenticator-setup">2. Add DebateAIRO to any authenticator</h2>
-            <p className="optionHint">Scan the QR code, or copy the setup key. This secret is shown only for this setup attempt.</p>
-            <div style={{ display: "grid", gap: 20, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", alignItems: "start" }}>
-              <TotpQr uri={provisioning.otpauthUri} />
-              <div>
-                <label className="fieldGroup" htmlFor="totp-secret">
-                  Copyable setup key
-                  <input id="totp-secret" value={provisioning.secret} readOnly spellCheck={false} />
-                </label>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => void navigator.clipboard.writeText(provisioning.secret).then(() => setCopied(true))}
-                >
-                  Copy setup key
-                </button>
-                <span role="status" className="optionHint" style={{ marginLeft: 10 }}>{copied ? "Copied" : ""}</span>
+          {error ? <div className="mfaAlert" role="alert">{error}</div> : null}
+
+          <section className="mfaStep" data-state="done" aria-labelledby="enrolment-link">
+            <span className="mfaStepNum" data-state={emailDone ? "done" : "active"} aria-hidden>1</span>
+            <div>
+              <h2 className="mfaStepTitle" id="enrolment-link">Verify the mailed link</h2>
+              <p className="mfaStepHint">
+                {busy && token === ""
+                  ? "Verifying your email and preparing authenticator setup…"
+                  : token === ""
+                    ? "Open the private link from your verification email to continue."
+                    : "Email verified. The one-time token was removed from the address bar and is not saved in this browser."}
+              </p>
+            </div>
+            <span className="mfaSpacer" />
+            {emailDone ? <p className="mfaStepDone">✓ Done</p> : null}
+          </section>
+
+          <section className="mfaStep" aria-labelledby="authenticator-setup">
+            <div className="mfaStepHead">
+              <span className="mfaStepNum" data-state={step2State} aria-hidden>2</span>
+              <h2 className="mfaStepTitle" id="authenticator-setup">Add DebateAIRO to any authenticator</h2>
+            </div>
+            {provisioning ? (
+              <div className="mfaSetup">
+                <TotpQr uri={provisioning.otpauthUri} />
+                <div className="mfaSetupBody">
+                  <p className="mfaSetupHint">
+                    Scan the QR code, or copy the setup key. This secret is shown only for this setup attempt.
+                  </p>
+                  <label className="srOnly" htmlFor="totp-secret">Copyable setup key</label>
+                  <input
+                    id="totp-secret"
+                    className="mfaSecret"
+                    value={groupedSecret(provisioning.secret)}
+                    readOnly
+                    spellCheck={false}
+                  />
+                  <div className="mfaGhostRow">
+                    <button
+                      type="button"
+                      className="mfaGhost"
+                      onClick={() => void navigator.clipboard.writeText(provisioning.secret).then(() => setCopied(true))}
+                    >
+                      Copy setup key
+                    </button>
+                    <span className="mfaCopied" role="status">{copied ? "Copied" : ""}</span>
+                  </div>
+                  <label className="mfaCodeLabel" htmlFor="totp-code">Current six-digit code</label>
+                  <div className="mfaCodeRow">
+                    <input
+                      id="totp-code"
+                      className="mfaCodeInput"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={totp}
+                      onChange={(event) => setTotp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    />
+                    <button
+                      type="button"
+                      className="mfaPrimary"
+                      disabled={busy || !/^\d{6}$/.test(totp)}
+                      onClick={() => void perform(async () => {
+                        await verifyMfaTotp(token.trim(), totp);
+                        setTotp("");
+                        setProvisioning(null);
+                        await generateCodes();
+                      })}
+                    >
+                      Verify and create recovery codes
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <label className="fieldGroup" htmlFor="totp-code">
-              Current six-digit code
-              <input
-                id="totp-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                value={totp}
-                onChange={(event) => setTotp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-              />
-            </label>
-            <button
-              type="button"
-              className="startBtn"
-              disabled={busy || !/^\d{6}$/.test(totp)}
-              onClick={() => void perform(async () => {
-                await verifyMfaTotp(token.trim(), totp);
-                setTotp("");
-                setProvisioning(null);
-                await generateCodes();
-              })}
-            >
-              Verify and create recovery codes
-            </button>
+            ) : (
+              <p className="mfaStepHint mfaStepBody">
+                {codes
+                  ? "Authenticator verified. The setup secret is not shown again."
+                  : "Waiting for the verified link before a setup secret can be issued."}
+              </p>
+            )}
           </section>
-        ) : null}
 
-        {codes ? (
-          <section className="miniCard" aria-labelledby="recovery-codes" style={{ marginTop: 20 }}>
-            <h2 id="recovery-codes">3. Save these ten recovery codes</h2>
-            <p className="optionHint">
-              Each code works once. Store them offline. Regenerating replaces this whole set; DebateAIRO cannot show it again.
-            </p>
-            <ol style={{ columns: "260px 2", paddingLeft: 30 }}>
-              {codes.map((code) => <li key={code} style={{ margin: "8px 0" }}><code>{code}</code></li>)}
-            </ol>
-            <div className="formActions" style={{ flexWrap: "wrap" }}>
-              <button type="button" className="btn" onClick={() => window.print()}>Print codes</button>
-              <button type="button" className="btn" disabled={busy} onClick={() => void generateCodes()}>
-                Replace with a new set
-              </button>
+          <section className="mfaStep" aria-labelledby="recovery-codes">
+            <div className="mfaStepHead">
+              <span className="mfaStepNum" data-state={step3State} aria-hidden>3</span>
+              <h2 className="mfaStepTitle" id="recovery-codes">Save these ten recovery codes</h2>
             </div>
-            <label className="fieldGroup" htmlFor="recovery-typeback">
-              Type one code from the newest set to confirm you saved it
-              <input
-                id="recovery-typeback"
-                value={typeback}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => setTypeback(event.target.value.toUpperCase())}
-              />
-            </label>
-            <button
-              type="button"
-              className="startBtn"
-              disabled={busy || typeback.trim() === ""}
-              onClick={() => void perform(async () => {
-                await confirmMfaRecoveryCode(token.trim(), typeback);
-                setCodes(null);
-                setToken("");
-                setTypeback("");
-                setActive(true);
-              })}
-            >
-              Activate account
-            </button>
+            <p className="mfaStepHint mfaStepBody">
+              Each code works once. Store them offline. Regenerating replaces this whole set; DebateAIRO cannot
+              show it again.
+            </p>
+            {codes ? (
+              <>
+                <ul className="mfaCodes">
+                  {codes.map((code) => <li key={code}>{code}</li>)}
+                </ul>
+                <div className="mfaCodeActions">
+                  <button type="button" className="mfaGhost" onClick={() => window.print()}>Print codes</button>
+                  <button type="button" className="mfaGhost" disabled={busy} onClick={() => void generateCodes()}>
+                    Replace with a new set
+                  </button>
+                  <label className="srOnly" htmlFor="recovery-typeback">
+                    Type one code from the newest set to confirm you saved it
+                  </label>
+                  <input
+                    id="recovery-typeback"
+                    className="mfaTypeback"
+                    placeholder="Type one code to confirm you saved it"
+                    value={typeback}
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(event) => setTypeback(event.target.value.toUpperCase())}
+                  />
+                  <button
+                    type="button"
+                    className="mfaActivate"
+                    disabled={busy || typeback.trim() === ""}
+                    onClick={() => void perform(async () => {
+                      await confirmMfaRecoveryCode(token.trim(), typeback);
+                      setCodes(null);
+                      setToken("");
+                      setTypeback("");
+                      setActive(true);
+                    })}
+                  >
+                    Activate account
+                  </button>
+                </div>
+              </>
+            ) : null}
           </section>
-        ) : null}
+        </div>
       </div>
     </main>
   );

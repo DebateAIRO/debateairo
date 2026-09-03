@@ -3,8 +3,6 @@ packages:
   - "packages/*"
   - "packages/battery/*"
   - "tools/*"
-  - "web"
-
 allowBuilds:
   '@embedded-postgres/darwin-arm64': true
   '@hatchet-dev/typescript-sdk': true

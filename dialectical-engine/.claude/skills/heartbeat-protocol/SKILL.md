@@ -70,7 +70,19 @@ mission `INSTRUCTIONS.md`, the board. On disagreement the higher wins — and yo
 output — this holds for code, plans, packets and verdicts alike. The reviewer seat also
 reviews the *packet* that dispatched the work (see `heartbeat-reviewer` §1).
 
-**2.2 A finding is a finding.** Blocking or not, every finding gets a ticket and a fix.
+**2.2 A finding is a finding — and you fix the CLASS, not the instance.** Blocking or not,
+every finding gets a ticket and a fix. **A reported finding is a SAMPLE of a class, never the
+whole class.** When one is handed to you, name the class it belongs to, then sweep every member
+of it and state per member whether it is affected — in the artifact, so a reviewer checks your
+sweep mechanically instead of re-deriving it. Measured 2026-08-29: a seat redacted the one
+leaking field a reviewer named and stopped; the same wholesale-copy decision was leaking two
+more, and a later sweep found two further fields no checklist had. Searching by NAMED LEAD
+instead of by RISK CLASS is how the second and third defects ship. And pick the remedy by the
+SHAPE, not by your confidence about the content: fixed key set → PROJECT to a named allow-list
+(build a new object, never spread the source); open key set with no semantic contract → REDACT
+wholesale; verified safe → copy with the producer trace recorded. "Flag it on a checklist" is
+not a remedy for an open shape — a checklist enumerates keys, and the defect is that the keys
+are not enumerable.
 Non-blocking changes *when* it is fixed, never *whether*. Nothing is filed as a residual
 and forgotten — a residual dropped on the floor came back as a blocker and cost a full round.
 
@@ -105,6 +117,23 @@ this instruction verbatim, and it is the question your report answers:
 wall-clock, rounds, retries. Say what you NEARLY got wrong. Name DEAD ENDS so nobody
 re-derives them. Say where the packet was unclear and exactly where. An anodyne self-report
 is worse than none: it makes an empty record look full.
+
+## 3b. SKILLS LOADED — binding, the first line of your handoff
+
+Your handoff OPENS with:
+
+> `SKILLS LOADED: <every skill you actually loaded, comma-separated>`
+
+No seat reaches FULLY DONE without it. Naming a skill you did not load is a fabrication
+finding (§2.6). Falling short of your role's floor (§1) is a finding against you — say so
+plainly instead, per §2.7; an honest shortfall costs a line, a hidden one costs a round.
+
+**Why this is a gate and not a reminder.** Measured 2026-08-29: all four seats DID load
+their floor — but nobody could tell without grepping session transcripts, because no handoff
+declared it. The orchestrator sampled a seat mid-run, saw two skills, and wrongly concluded
+it had skipped a mandated one; the seat had simply not reached it yet, and loaded it in the
+right order. **Unobservable compliance gets mis-judged in both directions** — skipped
+silently, or falsely charged. This line makes it observable at zero cost.
 
 ## 4. Markers
 

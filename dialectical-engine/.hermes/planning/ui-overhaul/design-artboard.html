@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Plus+Jakarta+Sans:wght@300..800&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; }
+  a { color:inherit; text-decoration:none; }
+  a:hover { opacity:.72; }
+</style>
+</helmet>
+
+<div style="width:1280px; position:relative; overflow:hidden; background:{{ t.canvasBg }}; color:{{ t.ink }}; font-family:'Plus Jakarta Sans',sans-serif; -webkit-font-smoothing:antialiased;">
+
+  <!-- floating glass nav, detached -->
+  <div style="position:absolute; top:34px; left:0; right:0; display:flex; justify-content:center; z-index:60;">
+    <div style="display:flex; align-items:center; gap:34px; padding:9px 9px 9px 26px; border-radius:{{ t.navR }}; background:{{ t.glass }}; border:1px solid {{ t.hair }}; box-shadow:{{ t.navShadow }}; backdrop-filter:blur(18px) saturate(150%); -webkit-backdrop-filter:blur(18px) saturate(150%);">
+      <span style="font-family:Fraunces,serif; font-weight:600; font-size:19px; letter-spacing:-.02em; font-style:{{ t.dispItal }}; font-variation-settings:'SOFT' 0,'WONK' 1;">DebateAI</span>
+      <div style="display:flex; align-items:center; gap:28px; font-size:13.5px; font-weight:500; color:{{ t.mute }};">
+        <a href="#method">Method</a>
+        <a href="#exchange">Transcripts</a>
+        <a href="#pricing">Pricing</a>
+      </div>
+      <a href="#start" style="display:flex; align-items:center; gap:10px; padding:8px 8px 8px 20px; border-radius:{{ t.rBtn }}; background:{{ t.btnBg }}; color:{{ t.btnText }}; font-size:13.5px; font-weight:600; transition:transform .5s cubic-bezier(.34,1.56,.64,1);" style-hover="transform:scale(1.04);">
+        Start a round
+        <span style="display:grid; place-items:center; width:26px; height:26px; border-radius:{{ t.rArrow }}; background:{{ t.arrowBg }}; border:1px solid {{ t.arrowBorder }}; font-size:12px; line-height:1;">&#8594;</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <section style="padding:250px 96px 150px;">
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:40px;">
+      <span style="width:26px; height:1px; background:{{ t.you }};"></span>
+      <span style="font-family:{{ t.labelFont }}; font-size:11.5px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:{{ t.mute }};">Practice, not performance</span>
+    </div>
+    <h1 style="margin:0; max-width:15ch; font-family:Fraunces,serif; font-style:{{ t.dispItal }}; font-weight:{{ t.dispWeight }}; text-transform:{{ t.dispCase }}; font-size:118px; line-height:.92; letter-spacing:{{ t.dispTrack }}; text-wrap:pretty; font-variation-settings:'SOFT' 0,'WONK' 1;">Find the weakest joint in your own argument.</h1>
+    <p style="margin:44px 0 0; max-width:56ch; font-size:19.5px; line-height:1.65; font-weight:400; color:{{ t.mute }}; text-wrap:pretty;">You argue. An opponent trained to locate the softest point in your reasoning presses on it until the joint holds or gives. Every turn is scored on evidence and on whether you actually answered the question &mdash; never on how well it was phrased.</p>
+    <div style="display:flex; align-items:center; gap:16px; margin-top:52px;">
+      <a href="#start" style="display:flex; align-items:center; gap:14px; padding:12px 12px 12px 30px; border-radius:{{ t.rBtn }}; background:{{ t.btnBg }}; color:{{ t.btnText }}; font-size:15.5px; font-weight:600; box-shadow:{{ t.btnShadow }}; transition:transform .55s cubic-bezier(.34,1.56,.64,1);" style-hover="transform:translateY(-3px) scale(1.03);">
+        Start a round
+        <span style="display:grid; place-items:center; width:34px; height:34px; border-radius:{{ t.rArrow }}; background:{{ t.arrowBg }}; border:1px solid {{ t.arrowBorder }}; font-size:14px; line-height:1;">&#8594;</span>
+      </a>
+      <a href="#exchange" style="display:flex; align-items:center; gap:12px; padding:12px 26px; border-radius:{{ t.rBtn }}; border:1px solid {{ t.hairStrong }}; font-size:15.5px; font-weight:500; color:{{ t.ink }}; transition:transform .55s cubic-bezier(.34,1.56,.64,1);" style-hover="transform:translateY(-3px);">Read a scored transcript</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:30px; margin-top:76px; padding-top:26px; border-top:{{ t.sectionRule }}; font-size:13px; color:{{ t.mute }};">
+      <span>Four turns per round</span>
+      <span style="width:1px; height:13px; background:{{ t.hairStrong }};"></span>
+      <span>[PLACEHOLDER] rounds argued this week</span>
+      <span style="width:1px; height:13px; background:{{ t.hairStrong }};"></span>
+      <span>No audience, no ranking board</span>
+    </div>
+  </section>
+
+  <!-- THE EXCHANGE: Z-axis cascade -->
+  <section id="exchange" style="padding:130px 96px 190px;">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:60px; margin-bottom:96px;">
+      <div>
+        <span style="font-family:{{ t.labelFont }}; font-size:11.5px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:{{ t.mute }};">One round, four turns</span>
+        <h2 style="margin:22px 0 0; max-width:22ch; font-family:Fraunces,serif; font-style:{{ t.dispItal }}; font-weight:{{ t.dispWeight }}; text-transform:{{ t.dispCase }}; font-size:62px; line-height:1.02; letter-spacing:{{ t.dispTrack }}; font-variation-settings:'SOFT' 0,'WONK' 1;">The pressure lands on the joint, not the wording.</h2>
+      </div>
+      <div style="flex:0 0 300px; padding-bottom:10px;">
+        <div style="font-family:{{ t.labelFont }}; font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:{{ t.mute }}; margin-bottom:10px;">Resolution</div>
+        <div style="font-family:Fraunces,serif; font-size:21px; line-height:1.35; letter-spacing:-.01em;">Should remote-first companies pay engineers the same salary regardless of where they live?</div>
+        <div style="display:flex; align-items:center; gap:16px; margin-top:20px; font-size:12.5px; color:{{ t.mute }};">
+          <span style="display:flex; align-items:center; gap:7px;"><span style="width:9px; height:9px; border-radius:2px; background:{{ t.you }};"></span>Pro</span>
+          <span style="display:flex; align-items:center; gap:7px;"><span style="width:9px; height:9px; border-radius:2px; background:{{ t.opp }};"></span>Con</span>
+          <span style="display:flex; align-items:center; gap:7px;"><span style="width:9px; height:9px; border-radius:2px; background:{{ reasoningC }};"></span>Reasoning</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width:880px; margin:0 auto; padding:40px 0;">
+      <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+        <div style="position:relative; z-index:{{ c.z }}; margin-top:{{ c.mt }}px; transform:{{ c.tf }}; transform-origin:{{ c.origin }}; transition:transform .72s cubic-bezier(.34,1.56,.64,1), box-shadow .72s cubic-bezier(.34,1.56,.64,1); will-change:transform;" style-hover="transform:rotate(0deg) translateX(0px) translateY(-14px) scale(1.022);">
+          <!-- outer shell -->
+          <div style="background:{{ t.raised }}; border:1px solid {{ c.shell }}; border-radius:{{ t.rShell }}; padding:11px; box-shadow:{{ t.cardShadow }};">
+            <!-- inner core -->
+            <div style="position:relative; overflow:hidden; background:{{ t.canvas }}; border:1px solid {{ t.hair }}; border-radius:{{ t.rCore }}; padding:34px 38px 30px; box-shadow:{{ t.coreInset }};">
+              <span style="position:absolute; top:0; left:0; width:64px; height:3px; background:{{ c.accent }};"></span>
+              <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:20px;">
+                <span style="flex:0 0 auto; white-space:nowrap; padding:5px 12px; border-radius:{{ t.rChip }}; background:{{ c.chipBg }}; border:1.5px solid {{ c.chipBorder }}; color:{{ c.chipText }}; font-family:{{ t.labelFont }}; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;">{{ c.arrow }} {{ c.role }}</span>
+                <span style="flex:0 0 auto; white-space:nowrap; padding:4px 11px; border-radius:{{ t.rChip }}; border:1px solid {{ c.baseBorder }}; background:{{ c.baseBg }}; color:{{ c.baseText }}; font-family:{{ t.labelFont }}; font-size:10.5px; font-weight:700;">BASE {{ c.base }}%</span>
+                <span style="flex:0 0 auto; white-space:nowrap; padding:4px 11px; border-radius:{{ t.rChip }}; border:1px solid {{ c.chipBorder }}; background:{{ c.chipBg }}; color:{{ c.chipText }}; font-family:{{ t.labelFont }}; font-size:10.5px; font-weight:700;">FINAL {{ c.final }}%</span>
+                <span style="flex:1;"></span>
+                <span style="white-space:nowrap; display:inline-flex; align-items:center; gap:7px; padding:4px 12px 4px 9px; border-radius:{{ t.rChip }}; background:{{ c.authorBg }}; border:1px solid {{ c.authorBorder }}; font-size:12px; font-weight:700; color:{{ t.ink }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ c.aDot }};"></span>{{ c.author }}</span>
+              </div>
+              <p style="margin:0; font-family:Fraunces,serif; font-weight:400; font-size:19px; line-height:1.5; letter-spacing:-.012em; text-wrap:pretty; color:{{ t.ink }};">{{ c.text }}</p>
+              <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:24px; padding-top:18px; border-top:1px solid {{ t.hair }};">
+                <span style="white-space:nowrap; padding:5px 11px; border-radius:{{ t.rChip }}; border:1px solid {{ c.revBorder }}; background:{{ c.revBg }}; color:{{ c.revC }}; font-family:{{ t.labelFont }}; font-size:10px; font-weight:700; letter-spacing:.06em;">{{ c.revLabel }}</span>
+                <span style="white-space:nowrap; display:inline-flex; align-items:center; gap:7px; padding:4px 12px 4px 9px; border-radius:{{ t.rChip }}; background:{{ t.raised }}; border:1px solid {{ t.hairStrong }}; font-size:11.5px; font-weight:700; color:{{ t.ink }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ c.rDot }}; box-shadow:0 0 0 2.5px {{ c.rHalo }};"></span>{{ c.reviewer }}</span>
+                <span style="flex:1;"></span>
+                <span style="font-family:{{ t.turnFont }}; font-size:13px; color:{{ t.mute }}; letter-spacing:.04em;">Turn {{ c.turn }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <p style="max-width:52ch; margin:80px auto 0; text-align:center; font-size:15px; line-height:1.7; color:{{ t.mute }};">The round ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the joint you conceded.</p>
+  </section>
+
+  <!-- METHOD: editorial split -->
+  <section id="method" style="padding:140px 96px; background:{{ t.raised }}; border-top:{{ t.sectionRule }}; border-bottom:{{ t.sectionRule }};">
+    <div style="display:flex; gap:110px; align-items:flex-start;">
+      <div style="flex:0 0 340px; position:sticky; top:60px;">
+        <span style="font-family:{{ t.labelFont }}; font-size:11.5px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:{{ t.mute }};">Method</span>
+        <h2 style="margin:22px 0 0; font-family:Fraunces,serif; font-style:{{ t.dispItal }}; font-weight:{{ t.dispWeight }}; text-transform:{{ t.dispCase }}; font-size:56px; line-height:1.02; letter-spacing:{{ t.dispTrack }}; font-variation-settings:'SOFT' 0,'WONK' 1;">Four steps, then you do it again tomorrow.</h2>
+        <p style="margin:26px 0 0; font-size:15.5px; line-height:1.7; color:{{ t.mute }};">The arena is built for repetition, not for a performance you prepare for once.</p>
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:10px; font-weight:700; letter-spacing:.18em; color:{{ t.mute }}; margin-bottom:12px;">THE METHOD</div>
+        <div style="border-top:1px solid {{ t.hairStrong }};">
+          <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+            <div style="display:flex; align-items:baseline; gap:26px; padding:19px 2px; border-bottom:1px solid {{ t.hair }};">
+              <span style="flex:0 0 38px; font-family:ui-monospace,Menlo,monospace; font-size:13px; font-weight:700; color:{{ s.c }};">{{ s.n }}</span>
+              <span style="flex:0 0 250px; font-family:Fraunces,serif; font-size:20px; font-weight:600; letter-spacing:-.015em;">{{ s.title }}</span>
+              <span style="font-size:13.5px; line-height:1.6; color:{{ t.mute }}; text-wrap:pretty;">{{ s.body }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLOSING CTA -->
+  <section id="start" style="padding:180px 96px 190px; text-align:center;">
+    <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:38px;">
+      <span style="width:9px; height:9px; border-radius:2px; background:{{ t.you }};"></span>
+      <span style="width:34px; height:1px; background:{{ t.hairStrong }};"></span>
+      <span style="width:9px; height:9px; border-radius:2px; background:{{ t.opp }};"></span>
+    </div>
+    <h2 style="margin:0 auto; max-width:20ch; font-family:Fraunces,serif; font-style:{{ t.dispItal }}; font-weight:{{ t.dispWeight }}; text-transform:{{ t.dispCase }}; font-size:80px; line-height:.98; letter-spacing:{{ t.dispTrack }}; text-wrap:pretty; font-variation-settings:'SOFT' 0,'WONK' 1;">Your argument is only as strong as its weakest joint.</h2>
+    <p style="margin:36px auto 0; max-width:46ch; font-size:18px; line-height:1.65; color:{{ t.mute }};">Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering.</p>
+    <div style="display:flex; justify-content:center; margin-top:52px;">
+      <a href="#start" style="display:flex; align-items:center; gap:14px; padding:14px 14px 14px 34px; border-radius:{{ t.rBtn }}; background:{{ t.btnBg }}; color:{{ t.btnText }}; font-size:16.5px; font-weight:600; box-shadow:{{ t.btnShadow }}; transition:transform .55s cubic-bezier(.34,1.56,.64,1);" style-hover="transform:translateY(-4px) scale(1.035);">
+        Start a round
+        <span style="display:grid; place-items:center; width:36px; height:36px; border-radius:{{ t.rArrow }}; background:{{ t.arrowBg }}; border:1px solid {{ t.arrowBorder }}; font-size:15px; line-height:1;">&#8594;</span>
+      </a>
+    </div>
+    <p id="pricing" style="margin:30px 0 0; font-size:13px; color:{{ t.mute }};">First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever.</p>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;editorial&quot;,&quot;options&quot;:[&quot;editorial&quot;,&quot;foolscap&quot;,&quot;broadsheet&quot;,&quot;vellum&quot;,&quot;orbital&quot;,&quot;chiaroscuro&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;canvas&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#FBF8F2&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;raised&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#F4EFE4&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;ink&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#1A1613&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mute&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#6B635A&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;you&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2F4739&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;opp&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#8C4A32&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  tokens() {
+    const p = this.props;
+    const canvas = p.canvas ?? '#FBF8F2';
+    const raised = p.raised ?? '#F4EFE4';
+    const ink = p.ink ?? '#1A1613';
+    const mute = p.mute ?? '#6B635A';
+    const you = p.you ?? '#2F4739';
+    const opp = p.opp ?? '#8C4A32';
+    const dark = !!p.dark;
+    const v = p.variant ?? 'editorial';
+    const hair = dark ? 'rgba(255,255,255,.08)' : 'rgba(26,22,19,.09)';
+    const hairStrong = dark ? 'rgba(255,255,255,.15)' : 'rgba(26,22,19,.16)';
+    const mono = "ui-monospace,'SF Mono',Menlo,Consolas,monospace";
+    const sans = "'Plus Jakarta Sans',sans-serif";
+    const t = {
+      canvas, raised, ink, mute, you, opp, hair, hairStrong,
+      canvasBg: canvas,
+      glass: dark ? 'rgba(29,25,21,.66)' : 'rgba(255,255,255,.60)',
+      coreInset: dark
+        ? 'inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.02)'
+        : 'inset 0 1px 0 rgba(255,255,255,.85), inset 0 0 0 1px rgba(255,255,255,.4)',
+      cardShadow: dark
+        ? '0 60px 110px -40px rgba(0,0,0,.9), 0 18px 44px -20px rgba(0,0,0,.7)'
+        : '0 40px 80px -34px rgba(26,22,19,.30), 0 10px 26px -14px rgba(26,22,19,.16)',
+      navShadow: dark ? '0 26px 60px -24px rgba(0,0,0,.85)' : '0 20px 46px -22px rgba(26,22,19,.26)',
+      btnShadow: dark ? '0 22px 46px -20px rgba(0,0,0,.8)' : '0 20px 40px -20px rgba(26,22,19,.42)',
+      arrowBg: dark ? 'rgba(0,0,0,.14)' : 'rgba(255,255,255,.14)',
+      arrowBorder: dark ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.26)',
+      rShell: '28px', rCore: '18px', rChip: '999px', rBtn: '999px', rArrow: '999px', navR: '999px',
+      btnBg: ink, btnText: canvas, dispCase: 'none',
+      dispItal: 'normal', dispWeight: 400, dispTrack: '-.045em',
+      labelFont: sans, turnFont: 'Fraunces,serif', numFont: 'Fraunces,serif', numWeight: 300,
+      sectionRule: `1px solid ${hair}`,
+      chipMode: 'tint',
+    };
+    if (v === 'foolscap') {
+      Object.assign(t, {
+        canvasBg: `repeating-linear-gradient(0deg, rgba(26,22,19,.022) 0 1px, transparent 1px 26px), ${canvas}`,
+        rShell: '10px', rCore: '5px', rChip: '3px', rBtn: '8px', rArrow: '6px', navR: '14px',
+        labelFont: mono, turnFont: mono, numFont: mono, numWeight: 500,
+        sectionRule: '1px dashed rgba(26,22,19,.24)',
+        chipMode: 'stamp',
+      });
+    } else if (v === 'broadsheet') {
+      Object.assign(t, {
+        rShell: '0px', rCore: '0px', rChip: '0px', rBtn: '0px', rArrow: '0px', navR: '0px',
+        dispWeight: 640, dispTrack: '-.052em',
+        numWeight: 600,
+        sectionRule: '3px double rgba(11,11,10,.45)',
+        chipMode: 'solid',
+        cardShadow: '0 34px 64px -34px rgba(11,11,10,.34), 0 8px 20px -12px rgba(11,11,10,.18)',
+      });
+    } else if (v === 'orbital') {
+      Object.assign(t, {
+        canvasBg: `radial-gradient(circle at 86% 5%, transparent 328px, rgba(193,81,31,.35) 329px 331px, transparent 332px), radial-gradient(circle at -5% 36%, transparent 252px, rgba(91,45,134,.3) 253px 255px, transparent 256px), ${canvas}`,
+        rShell: '40px', rCore: '28px',
+        dispWeight: 450, dispTrack: '-.02em',
+        cardShadow: '0 40px 90px -36px rgba(20,20,19,.26), 0 10px 26px -14px rgba(20,20,19,.13)',
+      });
+    } else if (v === 'chiaroscuro') {
+      Object.assign(t, {
+        canvasBg: `radial-gradient(1200px 780px at 50% 0%, rgba(245,241,232,.055), transparent 62%), ${canvas}`,
+        dispCase: 'uppercase', dispWeight: 540, dispTrack: '-.01em',
+        btnBg: '#A61B15', btnText: '#F5F1E8',
+      });
+    } else if (v === 'gradient') {
+      Object.assign(t, {
+        canvasBg: `linear-gradient(160deg, rgba(99,91,255,.09), rgba(14,116,144,.05) 42%, transparent 72%), ${canvas}`,
+        rShell: '24px', rCore: '16px',
+        dispWeight: 300, dispTrack: '-.03em',
+        cardShadow: '0 34px 70px -32px rgba(10,37,64,.24), 0 8px 22px -12px rgba(10,37,64,.12)',
+        navShadow: '0 18px 42px -20px rgba(10,37,64,.24)',
+      });
+    } else if (v === 'terracotta') {
+      Object.assign(t, {
+        rShell: '20px', rCore: '13px', rBtn: '12px', rArrow: '9px', navR: '16px',
+        dispWeight: 480, dispTrack: '-.035em',
+        cardShadow: '0 30px 62px -30px rgba(41,38,31,.24), 0 8px 20px -12px rgba(41,38,31,.12)',
+      });
+    } else if (v === 'workspace') {
+      Object.assign(t, {
+        rShell: '10px', rCore: '6px', rChip: '4px', rBtn: '6px', rArrow: '4px', navR: '10px',
+        dispWeight: 590, dispTrack: '-.03em',
+        hair: 'rgba(25,25,24,.1)', hairStrong: 'rgba(25,25,24,.18)',
+        cardShadow: '0 10px 24px -14px rgba(25,25,24,.16), 0 2px 6px -3px rgba(25,25,24,.1)',
+        navShadow: '0 10px 26px -16px rgba(25,25,24,.2)',
+        btnShadow: '0 8px 18px -10px rgba(25,25,24,.3)',
+      });
+    } else if (v === 'acid') {
+      Object.assign(t, {
+        rShell: '2px', rCore: '2px', rChip: '0px', rBtn: '0px', rArrow: '0px', navR: '0px',
+        dispWeight: 700, dispTrack: '-.04em',
+        hair: 'rgba(10,10,10,.16)', hairStrong: 'rgba(10,10,10,.8)',
+        sectionRule: '2px solid rgba(10,10,10,.9)',
+        cardShadow: '12px 12px 0 rgba(10,10,10,.92)',
+        navShadow: '7px 7px 0 rgba(10,10,10,.9)',
+        btnShadow: '6px 6px 0 rgba(10,10,10,.9)',
+        chipMode: 'solid',
+      });
+    } else if (v === 'aurora') {
+      Object.assign(t, {
+        canvasBg: `radial-gradient(900px 520px at 92% -6%, rgba(109,40,217,.16), transparent 62%), radial-gradient(820px 480px at 2% 22%, rgba(219,39,119,.11), transparent 62%), radial-gradient(760px 520px at 58% 112%, rgba(34,211,238,.1), transparent 62%), ${canvas}`,
+        rShell: '0px', rCore: '0px', rChip: '0px', rBtn: '0px', rArrow: '0px', navR: '0px',
+        dispWeight: 520, dispTrack: '-.04em',
+        cardShadow: '0 36px 74px -32px rgba(109,40,217,.3), 0 10px 24px -14px rgba(19,17,24,.14)',
+        chipMode: 'solid',
+      });
+    } else if (v === 'vellum') {
+      Object.assign(t, {
+        canvasBg: `radial-gradient(1100px 620px at 82% -8%, rgba(168,90,56,.075), transparent 70%), radial-gradient(900px 560px at -8% 34%, rgba(91,58,91,.07), transparent 70%), ${canvas}`,
+        rShell: '40px', rCore: '30px', rChip: '999px', rBtn: '999px', rArrow: '999px', navR: '999px',
+        dispItal: 'italic', dispWeight: 360,
+        cardShadow: '0 44px 90px -40px rgba(42,31,34,.26), 0 10px 28px -16px rgba(42,31,34,.13)',
+      });
+    }
+    return { t, dark };
+  }
+
+  chipFor(t, accent, dark) {
+    const tint = (hex, a) => {
+      const h = hex.replace('#', '');
+      return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;
+    };
+    if (t.chipMode === 'stamp') return { bg: 'transparent', border: tint(accent, .75), text: accent };
+    if (t.chipMode === 'solid') return { bg: accent, border: accent, text: t.canvas };
+    return { bg: tint(accent, dark ? .16 : .09), border: tint(accent, dark ? .38 : .26), text: accent };
+  }
+
+  renderVals() {
+    const { t, dark } = this.tokens();
+    const tint = (hex, a) => {
+      const h = hex.replace('#', '');
+      return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;
+    };
+    const gold = dark ? '#C8A055' : '#A8823E';
+    const reasoningC = dark ? '#C8A055' : '#3D5A80';
+    const mDots = { claude: '#8A63C9', gpt: '#B4552D', gemini: '#3D6FB4' };
+    const agreeC = dark ? '#86B58D' : '#3E7A4E';
+    const disputeC = dark ? '#D67F65' : '#B0432F';
+    const A_CLAUDE = 'Anthropic · Claude · claude-opus-5';
+    const A_GPT = 'OpenAI · GPT · gpt-5.6-sol';
+    const raw = [
+      { role: 'REASONING', arrow: '\u25C6', accent: reasoningC, base: 94, final: 94, turn: '01', rot: -1.7, dx: -26, mt: 0,
+        author: A_GPT, aDot: mDots.gpt, reviewer: A_CLAUDE, rDot: mDots.claude, review: 'AGREED',
+        text: 'Remote-first companies should generally use location-independent salary bands for engineers performing equivalent work, while allowing transparent adjustments for legally required costs, scarce skills, and role scope.' },
+      { role: 'PRO', arrow: '\u2191', accent: t.you, base: 95, final: 95, turn: '02', rot: 1.3, dx: 20, mt: -54,
+        author: A_CLAUDE, aDot: mDots.claude, reviewer: A_GPT, rDot: mDots.gpt, review: 'DISPUTED',
+        text: 'Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker\u2019s postal code: two engineers at the same level producing comparable value contribute equally to the firm\u2019s output.' },
+      { role: 'CON', arrow: '\u2193', accent: t.opp, base: 85, final: 85, turn: '03', rot: -1.1, dx: -14, mt: -48,
+        author: A_CLAUDE, aDot: mDots.claude, reviewer: A_GPT, rDot: mDots.gpt, review: 'AGREED',
+        text: 'Remote-first companies should generally set engineering pay against the local labor market an employee can actually access \u2014 geo-tiered bands with transparent, published multipliers \u2014 because wages are priced against a worker\u2019s realistic alternatives, not against a global abstraction.' },
+      { role: 'CON', arrow: '\u2193', accent: t.opp, base: 72, final: 68, turn: '04', rot: 1.6, dx: 24, mt: -50,
+        author: 'Google · Gemini · gemini-3-ultra', aDot: mDots.gemini, reviewer: A_GPT, rDot: mDots.gpt, review: 'AGREED',
+        text: 'A single global rate anchors to the lowest defensible number: when payroll cannot flex by market, firms quietly lower the level everywhere or slow hiring in expensive markets.' },
+    ];
+    const cards = raw.map((c, i) => {
+      const chip = this.chipFor(t, c.accent, dark);
+      const rc = c.review === 'DISPUTED' ? disputeC : agreeC;
+      return {
+        ...c, z: i + 1,
+        origin: i % 2 === 0 ? 'left center' : 'right center',
+        tf: `rotate(${c.rot}deg) translateX(${c.dx}px)`,
+        shell: tint(c.accent, dark ? 0.42 : 0.3),
+        chipBg: chip.bg, chipBorder: chip.border, chipText: chip.text,
+        baseText: gold, baseBg: tint(gold, dark ? .13 : .1), baseBorder: tint(gold, dark ? .5 : .45),
+        authorBg: tint(c.aDot, dark ? .16 : .12), authorBorder: tint(c.aDot, dark ? .5 : .42),
+        rHalo: tint(c.rDot, .22),
+        revC: rc, revBg: tint(rc, dark ? .13 : .08), revBorder: tint(rc, dark ? .5 : .4),
+        revLabel: `REVIEW ${c.review} BY:`,
+      };
+    });
+    const steps = [
+      { n: '01', title: 'Models argue', c: t.you, body: 'Five frontier models build the tree \u2014 pro, con, and the reasoning that binds them.' },
+      { n: '02', title: 'They review each other', c: reasoningC, body: 'Every claim is cross-reviewed by a rival model: agree or dispute, on the record.' },
+      { n: '03', title: 'You challenge', c: t.opp, body: 'Flag any sentence; the bench spawns a focused rebuttal where you pointed.' },
+      { n: '04', title: 'Verdict with receipts', c: gold, body: 'Scores, condition marks, and replay handles \u2014 every number traces to its source.' },
+    ];
+    return { t, cards, steps, reasoningC };
+  }
+}
+
+</script>
+</body>
+</html>

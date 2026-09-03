@@ -1,0 +1,21 @@
+YOUR REWORK PASSED. The blind lens re-probed everything and returned PASS: B1 CLOSED, B2 CLOSED, N1 CLOSED as an acknowledged bound, N2 CLOSED. It did not take your account on trust - it ran your RED mutant itself, plus two sharper ones (skip-redact, and a partial bag {panel:"kept"}), and confirmed both tests execute across three runs. Your replacement of the vacuous fixture with a real product-path test is accepted.
+
+ONE RESIDUAL, NON-BLOCKING, ticket t_b29234fe. Rework round 2 of 3, and it is small.
+
+THE FINDING. Your product-path test plants the forbidden keys only into the FIRST node's disagreement record. The lens went looking for a mutant that leaves your test GREEN and found one: redact only nodes[0] and leave the rest untouched, and your test still passes. It confirmed the diagnosis by planting the same payload on nodes[1] in a scratch copy under that same mutant, which turned it RED.
+
+So a partial regression - the product redacting the first node and missing the others - is invisible to this test today. Your test's own title says "real publish projection removes forbidden keys smuggled through node disagreement", which reads as a claim about the projection generally, not about node zero specifically.
+
+THE REMEDY, as the lens specified it, and either form is acceptable: plant the payload on at least two nodes, OR assert that EVERY node's disagreement is null rather than only the first. The second is stronger and probably shorter - your answer fixture already has two nodes.
+
+REPRODUCE FIRST, as before. Apply the lens's mutant (redact only nodes[0]) and confirm with your own eyes that the CURRENT test stays green. Do not fix what you have not seen fail to catch. Paste that green-under-mutant result in your handoff - it is the evidence that the finding is real.
+
+THEN prove the repaired test discriminates against that SAME mutant: it must now go RED. Restore the product and confirm GREEN. Three runs, worst run is the verdict, anchored idiom, and confirm by NAME that both tests execute with no skips.
+
+DO NOT WEAKEN ANYTHING ELSE. The existing mutants must still discriminate: disagreement: node.disagreement must still turn it RED, and the skip-redact mutant must still turn it RED. Re-run both after your change and say so. A fix that closes N4 while quietly breaking an existing catch is a net loss.
+
+DO NOT expand scope. The value-carrier gap (provider_ref: "owner:...") stays an acknowledged bound, not a target - the lens explicitly accepted your acknowledgement of it. The schema-level z.record hole at packages/contract/src/index.ts:437 is routed to the human for a ruling and is NOT yours. Do not touch the contract.
+
+SCOPE: tests/unit/pda-s04-node-carrier-audit.test.ts, and docs/missions/public-debate-access/slices/S04/PLAN.md only if the S04-C1-2 description needs to match your change. No product code. No contract. SPECs FROZEN. No push, no merge, no commit.
+
+Update your self-report. Handoff opens with SKILLS LOADED, then REWORK READY FOR REVIEW.

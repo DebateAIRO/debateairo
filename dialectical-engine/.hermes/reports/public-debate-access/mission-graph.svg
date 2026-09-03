@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 900" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="arrowGate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a33"/>
+    </marker>
+  </defs>
+
+  <style>
+    .box { stroke: #333; stroke-width: 1.5; rx: 8; }
+    .req { fill: #e8f0fe; }
+    .arch { fill: #fde8d8; }
+    .s01 { fill: #e6f4ea; }
+    .s02 { fill: #e6f4ea; }
+    .s03 { fill: #eef0ff; }
+    .s04 { fill: #fbe6e6; }
+    .qa { fill: #f3e6fb; }
+    .gate { fill: #fff3cd; stroke: #a33; stroke-width: 2; }
+    .title { font-size: 15px; font-weight: bold; }
+    .sub { font-size: 11px; fill: #444; }
+    .lane { font-size: 12px; font-weight: bold; fill: #666; }
+    .edge { stroke: #333; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+    .edgeGate { stroke: #a33; stroke-width: 2; fill: none; marker-end: url(#arrowGate); stroke-dasharray: 5,3; }
+    .edgeSoft { stroke: #888; stroke-width: 1.2; fill: none; marker-end: url(#arrow); stroke-dasharray: 3,3; }
+  </style>
+
+  <text x="20" y="28" font-size="19" font-weight="bold">public-debate-access — mission graph (nodes, lanes, worktrees, merge order)</text>
+  <text x="20" y="48" class="sub">ARCH-01 (Claude) · 2026-08-29 · V's yes on this image gates programming (packet §3)</text>
+
+  <!-- Lane labels -->
+  <text x="20" y="90" class="lane">REQUIREMENTS</text>
+  <text x="20" y="170" class="lane">ARCHITECTURE</text>
+  <text x="20" y="330" class="lane">PROGRAMMING</text>
+  <text x="20" y="640" class="lane">QA / REVIEW</text>
+  <text x="20" y="740" class="lane">MERGE</text>
+
+  <!-- REQ-01 -->
+  <rect class="box req" x="140" y="65" width="220" height="55"/>
+  <text x="150" y="87" class="title">REQ-01 (Grok)</text>
+  <text x="150" y="104" class="sub">4 frozen SPECs + skeleton PLANs</text>
+
+  <!-- ARCH-01 -->
+  <rect class="box arch" x="140" y="145" width="260" height="60"/>
+  <text x="150" y="168" class="title">ARCH-01 (Claude, this seat)</text>
+  <text x="150" y="185" class="sub">PLAN.md x4 + DECISIONS + this graph</text>
+
+  <!-- Gate box -->
+  <rect class="box gate" x="480" y="145" width="240" height="60"/>
+  <text x="490" y="168" class="title">V: yes on this image</text>
+  <text x="490" y="185" class="sub">GATE — programming may not start before this</text>
+
+  <!-- worktree lanes for programming -->
+  <text x="60" y="240" class="sub" font-style="italic">worktree A</text>
+  <rect class="box s01" x="60" y="250" width="220" height="55"/>
+  <text x="70" y="272" class="title">S01-CODE (Codex)</text>
+  <text x="70" y="289" class="sub">envelope + publish path</text>
+
+  <text x="330" y="240" class="sub" font-style="italic">worktree B</text>
+  <rect class="box s03" x="330" y="250" width="220" height="55"/>
+  <text x="340" y="272" class="title">S03-CODE (Codex)</text>
+  <text x="340" y="289" class="sub">Your/Public tabs — parallel, no dep</text>
+
+  <text x="60" y="340" class="sub" font-style="italic">worktree A, after S01 merges</text>
+  <rect class="box s02" x="60" y="350" width="220" height="55"/>
+  <text x="70" y="372" class="title">S02-CODE (Codex)</text>
+  <text x="70" y="389" class="sub">public read-parity UI</text>
+
+  <text x="330" y="340" class="sub" font-style="italic">worktree C, after S01 merges</text>
+  <rect class="box s04" x="330" y="350" width="220" height="55"/>
+  <text x="340" y="372" class="title">S04-AUDIT (QA + Codex remediation)</text>
+  <text x="340" y="389" class="sub">exposure review, R5 verdict</text>
+
+  <!-- Single-writer note -->
+  <rect class="box" x="600" y="250" width="540" height="155" fill="#fafafa" stroke-dasharray="4,3"/>
+  <text x="612" y="270" class="title" font-size="13">Single-writer file surfaces (verified disjoint)</text>
+  <text x="612" y="290" class="sub">S01: packages/contract/src/index.ts, apps/api/src/publications.ts,</text>
+  <text x="612" y="304" class="sub">     apps/api/src/index.ts (regression only), tests/unit/s8-publication*.test.ts</text>
+  <text x="612" y="322" class="sub">S02: apps/ui/app/public/debate/[id]/**, apps/ui/components/DebateThread|Split|Canvas|</text>
+  <text x="612" y="336" class="sub">     NodeDetailDrawer|PublicHonestyDrawer|PublicAnswerDisclosure.tsx, apps/ui/lib/v3/adapter.ts,</text>
+  <text x="612" y="350" class="sub">     apps/ui/lib/v3/publicAnswerExport.ts, DebatePageClient.tsx (export keyword only)</text>
+  <text x="612" y="368" class="sub">S03: apps/ui/app/page.tsx  (ONLY — no other slice ever touches this file)</text>
+  <text x="612" y="386" class="sub">S04: tests/unit/pda-s04-node-carrier-audit.test.ts (new) + QA verdict path</text>
+
+  <!-- QA lane -->
+  <rect class="box qa" x="60" y="560" width="220" height="50"/>
+  <text x="70" y="580" class="title" font-size="13">REV: S01 code review</text>
+  <text x="70" y="596" class="sub">Grok (holds QA this mission)</text>
+
+  <rect class="box qa" x="330" y="560" width="220" height="50"/>
+  <text x="340" y="580" class="title" font-size="13">REV: S03 code review</text>
+  <text x="340" y="596" class="sub">Grok — independent of S01/S02</text>
+
+  <rect class="box qa" x="60" y="625" width="220" height="50"/>
+  <text x="70" y="645" class="title" font-size="13">REV: S02 code review</text>
+  <text x="70" y="661" class="sub">Grok</text>
+
+  <rect class="box qa" x="330" y="625" width="220" height="50"/>
+  <text x="340" y="645" class="title" font-size="13">S04 R5 verdict filed</text>
+  <text x="340" y="661" class="sub">SAFE / RISK_ACCEPTED_BY_V / BLOCKED</text>
+
+  <!-- Merge / close row -->
+  <rect class="box" x="60" y="750" width="220" height="50" fill="#dff2e1"/>
+  <text x="70" y="770" class="title" font-size="13">merge S01 → main</text>
+  <text x="70" y="786" class="sub">unblocks S02, S04 worktrees</text>
+
+  <rect class="box" x="330" y="750" width="220" height="50" fill="#dff2e1"/>
+  <text x="340" y="770" class="title" font-size="13">merge S03 → main</text>
+  <text x="340" y="786" class="sub">independent — may land any time after gate</text>
+
+  <rect class="box" x="60" y="815" width="220" height="50" fill="#dff2e1"/>
+  <text x="70" y="835" class="title" font-size="13">merge S02 → main</text>
+  <text x="70" y="851" class="sub">after S01 merged + reviewed</text>
+
+  <rect class="box" x="330" y="815" width="220" height="50" fill="#dff2e1"/>
+  <text x="340" y="835" class="title" font-size="13">merge S04 → main</text>
+  <text x="340" y="851" class="sub">after S01 merged + R5 filed</text>
+
+  <rect class="box gate" x="620" y="780" width="500" height="60"/>
+  <text x="632" y="803" class="title">Mission close gate (SPEC S04 R6)</text>
+  <text x="632" y="822" class="sub">S01 + S02 are NOT mission-closed while S04 R1-R5 are unmet. S03 may close independently.</text>
+
+  <!-- Edges -->
+  <path class="edge" d="M250,120 L250,145"/>
+  <path class="edgeGate" d="M400,175 L480,175"/>
+  <path class="edge" d="M600,205 C600,220 170,220 170,250"/>
+  <path class="edge" d="M600,205 C600,225 440,225 440,250"/>
+  <path class="edge" d="M170,305 L170,350"/>
+  <path class="edge" d="M170,305 C170,330 440,330 440,350"/>
+
+  <path class="edgeSoft" d="M170,405 L170,560"/>
+  <path class="edgeSoft" d="M440,405 L440,560"/>
+  <path class="edgeSoft" d="M170,405 L170,625"/>
+  <path class="edgeSoft" d="M440,405 L440,625"/>
+
+  <path class="edge" d="M170,610 L170,750"/>
+  <path class="edge" d="M440,610 L440,750"/>
+  <path class="edge" d="M170,675 L170,815"/>
+  <path class="edge" d="M440,675 L440,815"/>
+
+  <path class="edge" d="M280,775 C500,775 500,800 620,805"/>
+  <path class="edge" d="M280,840 C500,840 500,810 620,812"/>
+  <path class="edge" d="M550,775 C560,775 560,795 620,798"/>
+  <path class="edge" d="M550,840 C580,840 590,820 620,818"/>
+
+  <!-- Legend -->
+  <rect class="box req" x="20" y="870" width="14" height="14"/>
+  <text x="40" y="882" class="sub">requirements</text>
+  <rect class="box arch" x="150" y="870" width="14" height="14"/>
+  <text x="170" y="882" class="sub">architecture</text>
+  <rect class="box s01" x="280" y="870" width="14" height="14"/>
+  <text x="300" y="882" class="sub">programming (S01/S02)</text>
+  <rect class="box s03" x="470" y="870" width="14" height="14"/>
+  <text x="490" y="882" class="sub">programming (S03, parallel lane)</text>
+  <rect class="box s04" x="720" y="870" width="14" height="14"/>
+  <text x="740" y="882" class="sub">S04 audit</text>
+  <rect class="box gate" x="850" y="870" width="14" height="14"/>
+  <text x="870" y="882" class="sub">V gate / mission-close gate</text>
+</svg>

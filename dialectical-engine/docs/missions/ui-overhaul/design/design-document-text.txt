@@ -1,0 +1,575 @@
+TURN 9
+Landing page — final
+☾ Chamber
+
+The chosen landing: the Editorial Luxury original on the approved Terracotta/Chamber tokens, with the approved cards and the numbered method ledger. The toggle flips it between modes.
+
+9e
+Original — Terracotta · Chamber
+the pre-decision Editorial Luxury landing, full page · follows the mode toggle
+DebateAI
+Method
+Transcripts
+Pricing
+Start a round
+→
+PRACTICE, NOT PERFORMANCE
+Find the weakest joint in your own argument.
+
+You argue. An opponent trained to locate the softest point in your reasoning presses on it until the joint holds or gives. Every turn is scored on evidence and on whether you actually answered the question — never on how well it was phrased.
+
+Start a round
+→
+Read a scored transcript
+Four turns per round
+[PLACEHOLDER] rounds argued this week
+No audience, no ranking board
+ONE ROUND, FOUR TURNS
+The pressure lands on the joint, not the wording.
+RESOLUTION
+Should remote-first companies pay engineers the same salary regardless of where they live?
+Pro
+Con
+Reasoning
+◆ REASONING
+BASE 94%
+FINAL 94%
+OpenAI · GPT · gpt-5.6-sol
+
+Remote-first companies should generally use location-independent salary bands for engineers performing equivalent work, while allowing transparent adjustments for legally required costs, scarce skills, and role scope.
+
+REVIEW AGREED BY:
+Anthropic · Claude · claude-opus-5
+Turn 01
+↑ PRO
+BASE 95%
+FINAL 95%
+Anthropic · Claude · claude-opus-5
+
+Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker’s postal code: two engineers at the same level producing comparable value contribute equally to the firm’s output.
+
+REVIEW DISPUTED BY:
+OpenAI · GPT · gpt-5.6-sol
+Turn 02
+↓ CON
+BASE 85%
+FINAL 85%
+Anthropic · Claude · claude-opus-5
+
+Remote-first companies should generally set engineering pay against the local labor market an employee can actually access — geo-tiered bands with transparent, published multipliers — because wages are priced against a worker’s realistic alternatives, not against a global abstraction.
+
+REVIEW AGREED BY:
+OpenAI · GPT · gpt-5.6-sol
+Turn 03
+↓ CON
+BASE 72%
+FINAL 68%
+Google · Gemini · gemini-3-ultra
+
+A single global rate anchors to the lowest defensible number: when payroll cannot flex by market, firms quietly lower the level everywhere or slow hiring in expensive markets.
+
+REVIEW AGREED BY:
+OpenAI · GPT · gpt-5.6-sol
+Turn 04
+
+The round ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the joint you conceded.
+
+METHOD
+Four steps, then you do it again tomorrow.
+
+The arena is built for repetition, not for a performance you prepare for once.
+
+THE METHOD
+01
+Models argue
+Five frontier models build the tree — pro, con, and the reasoning that binds them.
+02
+They review each other
+Every claim is cross-reviewed by a rival model: agree or dispute, on the record.
+03
+You challenge
+Flag any sentence; the bench spawns a focused rebuttal where you pointed.
+04
+Verdict with receipts
+Scores, condition marks, and replay handles — every number traces to its source.
+Your argument is only as strong as its weakest joint.
+
+Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering.
+
+Start a round
+→
+
+First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever.
+
+TURN 8
+Sign up, MFA enrolment & recovery
+☾ Chamber
+
+The last un-overhauled screens: SignUpFlow, the three-step mandatory MFA enrolment (verify-email lands here too), and the replacement recovery-code state from LoginFlow.
+
+Dialectical Engine
+CREATE AN ACCOUNT
+Put a claim to the bench.
+
+Email verification and authenticator enrolment are required before your account can be used.
+
+Email
+you@institution.edu
+Verify email
+✓ Valid address · verification link sent — awaiting confirmation
+Recovery email
+Use a different address reserved for account recovery.
+✗ Must differ from the primary email
+Password
+✓ At least eight characters
+✓ One capital letter
+✗ One number
+✗ One special character
+✓
+I affirm that I am at least 18 years old.
+Create account
+Already have one? Log in
+MANDATORY MFA
+Protect your account
+
+An authenticator is required before this account can be used. No phone number or smartphone is required.
+
+1
+Verify the mailed link
+Email verified. The one-time token was removed from the address bar and is not saved in this browser.
+✓ Done
+2
+Add DebateAIRO to any authenticator
+Scan the QR code, or copy the setup key. This secret is shown only for this setup attempt.
+JBSW Y3DP EHPK 3PXP QK7F 2MHD
+Copy setup key
+Current six-digit code
+471092
+Verify and create recovery codes
+3
+Save these ten recovery codes
+Each code works once. Store them offline. Regenerating replaces this whole set; DebateAIRO cannot show it again.
+K7QF-2MHD
+X3NV-9RTL
+B8WD-4KZP
+M2HS-7QXF
+T6RJ-1VNC
+P9LB-5DWK
+C4XZ-8MHT
+V1QN-3RSL
+H5KP-6TWB
+D7FM-2XJR
+Print codes
+Replace with a new set
+Type one code to confirm you saved it
+Activate account
+RECOVERY ACCESS
+Save your new recovery code.
+
+Your session is ready, but this replacement code must be recorded before you continue.
+
+SIGNED IN SECURELY
+Record your replacement recovery code
+Your used recovery code has been replaced. This is the only time this new code will be shown.
+Q2MF-8XKD-3RVN-7JPW
+I saved it — continue
+TURN 7
+Sign in, two-step & fleet
+☾ Chamber
+
+The auth shell from the local LoginFlow (copy verbatim) and the operator-only fleet stub.
+
+Dialectical Engine
+WELCOME BACK
+Back to the graph.
+
+Sessions follow a fixed security policy. Every sign-in continues with your authenticator or a recovery code.
+
+Email
+you@institution.edu
+✓ Valid address · email verified
+Password
+●●●●●●●●
+✓ Eight characters
+✓ One capital letter
+✓ One number
+✓ One special character
+Continue
+Dialectical Engine
+TWO-STEP VERIFICATION
+Enter your authentication code.
+
+Open Google Authenticator or another authenticator app and enter the current 6-digit code.
+
+6-digit authentication code
+4
+7
+1
+0
+9
+2
+Open Google Authenticator, 1Password, or your preferred authenticator.
+Continue
+Use a recovery code
+← Back to sign in
+FLEET
+Execution state
+Operator-only view
+
+Deployment state is unavailable in the ordinary asker interface. No privileged request is issued and no worker state is fabricated.
+
+TURN 6
+Settings — identity & account
+☾ Chamber
+
+From the local V3 settings page: asker scope, active sessions with step-up authentication, legacy debate claims, and scheduled account erasure.
+
+Dialectical Engine
+dezbatere.ro
+Settings
+C
+cobalt-falcon-0fa351
+☾
+IDENTITY
+Your asker scope
+
+Sessions use server-set HttpOnly cookies and mandatory MFA. Browser scripts never receive the session credential.
+
+ASKER
+cobalt-falcon-0fa351
+SCOPE
+personal
+IDENTITY MODEL
+Server session · HttpOnly cookie · mandatory MFA
+Active sessions
+Review devices, revoke a single session, or sign out everywhere.
+MacBook Pro · Safari
+Current session
+sess_8f3a…c2
+Last seen just now · Bucharest, RO · this device
+Revoke
+Pixel 9 · Chrome
+Other session
+sess_1b7e…9d
+Last seen 2 days ago · Cluj-Napoca, RO
+Revoke
+Windows PC · Firefox
+Other session
+sess_c44a…e1
+Last seen 26 minutes ago · Lagos, NG — unrecognized?
+Revoke
+Revoke all sessions
+Sign out
+Fresh authentication
+Sensitive actions require re-entering your password and an authenticator code.
+Password
+Authenticator code
+Verify
+Claim legacy debates
+If you created debates before account sign-in was introduced, enter that old access token once to attach only its unclaimed debates to this account. The token is not saved by this browser or the server.
+Old debate access token
+Claim legacy debates
+Delete account
+Deletion begins after seven full days. You can cancel before it begins. Notices are sent to every bound email; at least one verified channel is required.
+Encrypted private content becomes permanently unreadable when its keys are destroyed. Public snapshots remain public under a retired pseudonym; downloaded, cached, or indexed copies may persist.
+Password
+Authenticator code
+Type DELETE MY ACCOUNT
+Schedule deletion
+TURN 5
+Node detail drawer
+☾ Chamber
+
+Built from the local V3 NodeDetailDrawer contract: way of knowing, base score and final strength with sources, replay handle, stranger restatement, defeaters, judge disagreement, condition marks, and generation history.
+
+Should remote-first companies pay engineers the same salary…
+Scoring · 24/31
+☾
+ROOT CLAIM
+
+Should remote-first companies pay engineers the same salary regardless of where they live?
+
+Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker’s postal code: two engineers at the same level producing comparable value contribute equally to the firm’s output, so location-based pay cuts charge one of them for a private residential choice that does not diminish that contribution, and a uniform rate — adjusted only for legally unavoidable employer costs and currency conversion — yields a transparent, internally consistent, and manipulation-resistant pay structure.
+
+↓ CON
+Anthropic · Claude · claude-opus-5
+×
+WAY OF KNOWING · EMPIRICAL
+Price pay to the local market
+
+Remote-first companies should generally set engineering pay against the local labor market an employee can actually access — geo-tiered bands with transparent, published multipliers — rather than a single location-independent band, because wages are priced against a worker’s realistic alternatives and available capital, not against a global abstraction.
+
+REVIEW AGREED BY:
+OpenAI · GPT · gpt-5.6-sol
+BASE SCORE
+0.85 · judge-panel
+FINAL STRENGTH
+0.85 · replayed
+REPLAY
+replay:run-42/n-07
+RESTATEMENT
+Stranger restatement check passed
+DEFEATERS
+Obligation remains open
+JUDGE DISAGREEMENT
+No disagreement record
+Not falsified after model rotation
+Single model lineage
+Under-explored
+⚐ Challenge
+↻ Regenerate
+GENERATION HISTORY
+Compare versions
+Anthropic · Claude · claude-opus-5
+ACTIVE
+Remote-first companies should generally set engineering pay against the local labor market an employee can actually access — geo-tiered bands with transparent, published multipliers — rather than a single location-independent band, because wages are priced against a worker’s realistic alternatives and available capital, not against a global abstraction.
+OpenAI · GPT · gpt-5.6-sol
+ARCHIVED
+Local labor pricing reflects the real alternatives available to each employee; a single global band ignores both capital access and bargaining position.
+TURN 4
+New debate
+☾ Chamber
+
+Matches the current local form (NewQuestionForm): risk tier, composition budget tier, depth, and the two steering fields — tier provenance recorded automatically.
+
+Dialectical Engine
+dezbatere.ro
+New debate
+C
+cobalt-falcon-0fa351
+☾
+⚙
+NEW QUESTION
+What should we debate?
+Remote work should be the default for knowledge workers.
+Choose your risk tier, composition budget tier, and depth, then click Start.
+Risk tier
+How much is riding on the answer · explicit asker selection
+Casual
+Standard
+High stakes
+Composition budget tier
+How much work the composition may spend · provisional default, editable
+Low
+Medium
+High
+Tree depth
+How far the debate expands when cross-maker review is available
+3
+Steering menu selections
+One per line
+Prefer primary sources
+Surface the strongest counter-case early
+Steering annotations
+Free text · logged verbatim, one per line
+Add a note the run will carry…
+Tier source, provenance, and machine as-of are recorded automatically with the run contract.
+⚙ OPTIONS
+▲
+Depth mode, depth of scrutiny, branching width, concurrency, and max tokens are V2 controls the V3 run contract has no slot for — they are not sent.
+Depth mode
+Selection strategy
+Fixed
+▼
+Depth of scrutiny
+Site default expansion budget
+Standard
+▼
+Branching width
+Pro + con children per claim
+2
+Concurrency
+Models running in parallel
+3
+Max tokens
+Per generated argument
+800
+Role overrides are not user-editable — model role assignment lives in Settings →
+Start run →
+Cancel
+⌃↵ to start
+TURN 3
+Library & the public debate view
+☾ Chamber
+
+The approved bezel card, applied beyond the tree: the home library, and the debate page as a signed-out reader sees it — verdict first, strongest case on each side, actions locked.
+
+3a
+Home — Library
+Dialectical Engine
+dezbatere.ro
+Library
++ New debate
+C
+cobalt-falcon-0fa351
+☾
+⚙
+A REASONING INSTRUMENT
+What should we debate?
+
+Post a claim. Several different AI models argue it out against each other in a structured tree — so you can see how the strongest case for and against actually holds up.
+
+Type a debatable claim or question…
+Models argue · you judge
+Start debate →
+Your debates
+Public debates
+4 TOTAL
+Should remote-first companies pay engineers the same salary regardless of where they live?
+2 hours ago · 5 models
+Complete
+→
+Should the EU mandate open app stores on all mobile platforms?
+5 hours ago · 3 models
+Generating
+→
+Is nuclear power the fastest path to grid decarbonization?
+Yesterday · 4 models
+Complete
+→
+Should universities ban generative AI in take-home assessments?
+3 days ago · 2 models
+Complete
+→
+3b
+Public debate view
+signed-out reader · verdict first, actions locked
+Should remote-first companies pay engineers the same salary…
+🔒 Public view · actions locked
+Thread
+Split
+Tree
+Map
+☾
+CONTESTED
+verdict-thresholds v3
+Details ▾
+
+The claim is contested: the strongest surviving pro and con branches both retain unrebutted support under scrutiny.
+
+⚠ Caveat — evidence unverified: extracted evidence has no resolved external source.
+DIALECTICAL SUPPORT 0.54
+VERIFICATION UNVERIFIED
+JUDGE COVERAGE 0.77
+CONVERGENCE TRUE
+↑ THE CASE FOR · 3
+3 · THE CASE AGAINST ↓
+The strongest surviving argument on each side
+↑ PRO
+95 → 95
+Anthropic · Claude · claude-opus-5
+
+Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker’s postal code: two engineers at the same level producing comparable value contribute equally to the firm’s output, so location-based pay cuts charge one of them for a private residential choice that does not diminish that contribution, and a uniform rate — adjusted only for legally unavoidable employer costs and currency conversion — yields a transparent, internally consistent, and manipulation-resistant pay structure.
+
+🔒 Challenge
+Read ▾
+↓ CON
+85 → 85
+Anthropic · Claude · claude-opus-5
+
+Remote-first companies should generally set engineering pay against the local labor market an employee can actually access — geo-tiered bands with transparent, published multipliers — rather than a single location-independent band, because wages are priced against a worker’s realistic alternatives and available capital, not against a global abstraction.
+
+🔒 Challenge
+Read ▾
+🔒 Viewing publicly — sign in to challenge, regenerate, or flag claims.
+Unlock actions
+TURN 1
+Debate view — tree canvas
+
+Same debate, same card anatomy from the app (type chip · BASE/FINAL · author · reviewer + review verdict · regenerate/read). Approved direction: Terracotta ↔ Chamber, with the Field Notes stance tab (the small colored line at the top of each card) folded in. Home, New debate, Scoring, Settings follow as later turns.
+
+1a
+Approved — Terracotta · Chamber
+double-bezel cards, sprung connectors, stance tab
+☾ Chamber
+Dialectical Engine
+dezbatere.ro
+Should remote-first companies pay engineers the same salary…
+Scoring · 24/31
+Thread
+Split
+Tree
+Map
+☾
+☑ Show set-aside paths
+ROOT CLAIM
+
+Should remote-first companies pay engineers the same salary regardless of where they live?
+
+32 claims / depth 4
+◆ REASONING
+OpenAI · GPT · gpt-5.6-sol
+BASE 94%
+FINAL 94%
+
+Location-independent bands, transparently adjusted
+
+↻ Regenerate
+Details ▸
+↑ PRO
+Anthropic · Claude · claude-opus-5
+BASE 95%
+FINAL 95%
+
+One global rate for the work delivered
+
+↻ Regenerate
+Details ▸
+↓ CON
+Google · Gemini · gemini-3-ultra
+BASE 72%
+FINAL 68%
+
+Global rates anchor low
+
+↻ Regenerate
+Details ▸
+↑ PRO
+Qwen · local · qwen-3-coder
+BASE 66%
+FINAL 70%
+
+No relocation penalty
+
+↻ Regenerate
+Details ▸
+↓ CON
+Anthropic · Claude · claude-opus-5
+BASE 85%
+FINAL 85%
+
+Price pay to the local market
+
+↻ Regenerate
+Details ▸
+↑ PRO
+xAI · Grok · grok-4.5
+BASE 64%
+FINAL 61%
+
+Geo-tiers import housing distortions
+
+↻ Regenerate
+Details ▸
+↓ CON
+OpenAI · GPT · gpt-5.6-sol
+BASE 77%
+FINAL 74%
+
+Geo-pricing buys more headcount
+
+↻ Regenerate
+Details ▸
+Synthesis
+The strongest case on each side, plus a verdict.
+↑ STRONGEST PRO
+Compensation is owed for the work delivered, not the worker’s postal code.
+↓ STRONGEST CON
+Wages are priced against a worker’s realistic alternatives, not a global abstraction.
+VERDICT
+Contested
+Both sides retain unrebutted support at depth 3; the con case leads on evidence breadth.
+Leans
+Con 54
+Scoring · 24 of 31 claims scored · DF-QuAD
+Terracotta light / Chamber dark from one token set. Card = shell + core double bezel; the small top tab and the connector both carry the stance color; gold is reserved for reasoning & verdict.

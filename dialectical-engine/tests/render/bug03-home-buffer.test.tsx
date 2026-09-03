@@ -63,7 +63,7 @@ describe("BUG-03 home debates buffer", () => {
     const failedDebate = debates.find((debate) => debate.id === "run:failed");
     expect(failedDebate).toMatchObject({ status: "failed" });
     const failedCardHtml = renderToStaticMarkup(<DebatesBuffer debates={[failedDebate!]} />);
-    expect(failedCardHtml).toContain('class="pill pillBad"');
+    expect(failedCardHtml).toContain('class="libStatus" data-state="failed"');
     expect(failedCardHtml).toContain("Failed");
     expect(failedCardHtml).not.toContain("Generating");
     expect(html.match(/The served debate/g)).toHaveLength(1);

@@ -7,6 +7,9 @@ export function PublicAnswerDisclosure({ answer }: { answer: PublicDebate["answe
     {!answer.verdict_available
       ? <p>Verdict unavailable in this published serving mode.</p>
       : null}
+    {answer.tree_included !== true
+      ? <p>This publication predates argument-tree publishing; only the answer summary is available.</p>
+      : null}
     <p>Evidence as of {new Date(answer.as_of).toLocaleString()}.</p>
   </div>;
 }

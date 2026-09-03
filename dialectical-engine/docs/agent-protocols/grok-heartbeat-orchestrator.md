@@ -45,6 +45,13 @@ amendments". What binds every launch this seat makes:
   > better. What we must upgrade. what repeatedly costed us tokens. how we can
   > make the coding more efficient. How can we turn this into a one prompt machine
   > even better.
+- **Skills-loaded gate.** Every packet you write mandates a handoff OPENING with
+  `SKILLS LOADED: <list>`, and no descendant reaches FULLY DONE without it. You VERIFY the
+  line at seat exit rather than trusting it — a skill PATH in a transcript proves nothing
+  because packets quote paths and they echo back; only the skill BODY does. Measured
+  2026-08-29: all four seats did load their floor, but nobody could tell without grepping
+  transcripts, and sampling a seat mid-run produced a FALSE finding against a compliant seat.
+  Unobservable compliance gets mis-judged in both directions. The line makes it observable.
 - **Sub-delegation is explicit.** Your descendants may launch further agents only if
   their packet grants it, and must return their children's receipts.
 

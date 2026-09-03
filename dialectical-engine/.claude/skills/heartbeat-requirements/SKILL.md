@@ -84,7 +84,8 @@ Clusters are the review unit too: a reviewer probes a cluster, not a diff of a w
 
 ## 5. Handoff
 
-`READY FOR PEER REVIEW` with: INSTRUCTIONS.md line count (≤100 or you are not done) · the
+`READY FOR PEER REVIEW`, OPENING with `SKILLS LOADED: <list>` (`heartbeat-protocol` §3b),
+then: INSTRUCTIONS.md line count (≤100 or you are not done) · the
 slice/cluster table · the SPEC↔PLAN trace · unresolved contradictions (should be zero).
 The reviewer will try to find a PLAN step they cannot mechanically verify — leave none.
 File your self-report (`heartbeat-protocol` §3), then stop.
