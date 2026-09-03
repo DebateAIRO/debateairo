@@ -36,28 +36,47 @@ async function writeModule(
 }
 
 describe("OBS-01 lexical module, verb, and target discovery", () => {
-  it("discovers the real modules in lexical order with the frozen manifest shape", async () => {
+  it("discovers real modules lexically while freezing manifest and core contracts", async () => {
     const { discoverObservationModules } = await import(
       "../../apps/observation-agent/src/core/modules.js"
     );
     const catalog = await discoverObservationModules(resolve("apps/observation-agent/src/modules"));
-    expect(catalog.modules.map((module) => module.name)).toEqual(["core-liveness", "self"]);
-    expect(catalog.modules[0]).toMatchObject({
-      name: "core-liveness",
-      targetFragmentBasename: "OBS-01.json"
-    });
-    expect(Object.keys(catalog.modules[0]!).sort()).toEqual([
-      "cadence", "name", "probe", "samples", "signals", "targetFragmentBasename"
-    ]);
-    expect(Object.keys(catalog.modules[1]!).sort()).toEqual([
-      "cadence", "name", "probe", "samples", "signals"
+    const moduleNames = catalog.modules.map((module) => module.name);
+    expect(moduleNames).toEqual([...moduleNames].sort((left, right) => left.localeCompare(right)));
+    expect(new Set(moduleNames).size).toBe(moduleNames.length);
+
+    const requiredMembers = ["cadence", "name", "probe", "samples", "signals"];
+    const allowedMembers = new Set([
+      ...requiredMembers, "oactl", "targetFragmentBasename"
     ]);
     for (const module of catalog.modules) {
+      const members = Object.keys(module);
+      expect(members.filter((member) => !allowedMembers.has(member))).toEqual([]);
+      expect(members).toEqual(expect.arrayContaining(requiredMembers));
       expect(module.probe).toBeTypeOf("function");
       expect(module.samples).toBeTypeOf("function");
       expect(module.signals).toBeTypeOf("function");
-      expect(module.cadence).toEqual({ intervalMs: 5_000, timeoutMs: 2_000 });
+      expect(Number.isFinite(module.cadence.intervalMs)).toBe(true);
+      expect(Number.isFinite(module.cadence.timeoutMs)).toBe(true);
     }
+
+    const coreLiveness = catalog.modules.find((module) => module.name === "core-liveness");
+    expect(coreLiveness).toMatchObject({
+      name: "core-liveness",
+      cadence: { intervalMs: 5_000, timeoutMs: 2_000 },
+      targetFragmentBasename: "OBS-01.json"
+    });
+    expect(Object.keys(coreLiveness!).sort()).toEqual([
+      "cadence", "name", "probe", "samples", "signals", "targetFragmentBasename"
+    ]);
+    const self = catalog.modules.find((module) => module.name === "self");
+    expect(self).toMatchObject({
+      name: "self",
+      cadence: { intervalMs: 5_000, timeoutMs: 2_000 }
+    });
+    expect(Object.keys(self!).sort()).toEqual([
+      "cadence", "name", "probe", "samples", "signals"
+    ]);
   });
 
   it("fails deterministically on duplicate module names and target basenames", async () => {
