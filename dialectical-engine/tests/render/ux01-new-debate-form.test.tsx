@@ -105,6 +105,13 @@ function findElement(node: ReactNode, predicate: (element: ReactElement) => bool
   return findElement((node.props as { children?: ReactNode }).children, predicate);
 }
 
+function collectElements(node: ReactNode, predicate: (element: ReactElement) => boolean): ReactElement[] {
+  if (Array.isArray(node)) return node.flatMap((child) => collectElements(child, predicate));
+  if (!isValidElement(node)) return [];
+  const children = collectElements((node.props as { children?: ReactNode }).children, predicate);
+  return predicate(node) ? [node, ...children] : children;
+}
+
 async function renderRealNewDebatePageState(): Promise<{ html: string; tree: ReactNode }> {
   const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
   let html = "";
@@ -240,36 +247,67 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(openHtml).toContain('id="additionalRunOptions"');
   });
 
-  it("carries the two steering fields into the ask as trimmed non-empty lines", async () => {
+  /* S1-2 · V ruling 2026-09-03, applied during the W5 dev reconciliation.
+
+     PROPERTY: no asker-facing control on this form can put text into
+     `steering_presets` or `steering_annotations`. Both reach the ask as empty
+     arrays whatever the asker types, while the two contract fields stay PRESENT
+     so already-stored asks remain valid.
+
+     WHY THE CONTROL WAS REMOVED, TWICE. The steering inputs were collected and
+     DISCARDED. Nothing downstream reads either field — not propagation, not
+     judgement, not serve, not the runner; the API persists them and no consumer
+     ever looks. A control that appears to steer a debate it cannot steer is
+     worse than no control, because it invites the asker to spend care on it.
+     The mission removed it from the legacy web/ form under goal task T2; the UI
+     overhaul then rebuilt it here, on a form that survived while the legacy one
+     was deleted. V ruled it out a second time rather than let the merge ship it.
+
+     This assertion is written against EVERY text control the form renders, not
+     against the two ids that were removed, so a steering box re-added under a
+     different name fails here too.
+
+     If you are here because you want to add steering: it needs a design in which
+     the value actually reaches the debate — that is its own mission, and the
+     goal's non-goals exclude it. This test is the record of two removals, not an
+     obstacle to route around. */
+  it("offers no steering control, and sends empty steering lists whatever the asker types", async () => {
     const initial = await renderRealNewDebatePageState();
     chooseRiskTier(initial.tree, "standard");
-    const write = (id: string, value: string) => {
-      const field = findElement(initial.tree, (element) =>
-        element.type === "textarea" && (element.props as { id?: string }).id === id);
-      expect(field, `missing ${id} field`).not.toBeNull();
-      // The auto-growing fields read currentTarget, so the event has to carry a
-      // node-shaped target rather than a bare value bag.
-      const node = { value, style: { height: "" }, scrollHeight: 50 };
-      (field!.props as { onChange: (event: unknown) => void })
-        .onChange({ target: node, currentTarget: node });
-    };
-    write("steeringPresets", "Prefer primary sources\n\n  Surface the strongest counter-case early  ");
-    write("steeringAnnotations", "Add a note the run will carry\n   ");
+
+    expect(initial.html).not.toMatch(/steering/i);
+    expect(collectElements(initial.tree, (element) =>
+      /steer/i.test(String((element.props as { id?: string }).id ?? "")))).toEqual([]);
+
+    // Fill every free-text control the form still renders with one sentinel.
+    const SENTINEL = "asker-typed-steering-text";
+    const textControls = collectElements(initial.tree, (element) => element.type === "textarea");
+    for (const field of textControls) {
+      const node = { value: SENTINEL, style: { height: "" }, scrollHeight: 50 };
+      (field.props as { onChange?: (event: unknown) => void })
+        .onChange?.({ target: node, currentTarget: node });
+    }
+
     hooks.beginRender();
     const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
     const form = findElement(evaluateElementTree(<NewDebatePage />), (element) => element.type === "form");
     expect(form).not.toBeNull();
     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
       .onSubmit({ preventDefault: vi.fn() });
-    expect(pageMocks.createDebate.mock.calls.at(-1)![1]).toMatchObject({
-      steering_presets: ["Prefer primary sources", "Surface the strongest counter-case early"],
-      steering_annotations: ["Add a note the run will carry"]
-    });
-  });
 
-  it("sends empty steering lists when the asker steers nothing", async () => {
-    const config = await submitRenderedPage();
+    const config = pageMocks.createDebate.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(Object.keys(config)).toEqual(
+      expect.arrayContaining(["steering_presets", "steering_annotations"])
+    );
     expect(config).toMatchObject({ steering_presets: [], steering_annotations: [] });
+    // Generalised over naming rather than over the whole config: a steering box
+    // re-added under a new key is still caught, while an unrelated future text
+    // field that legitimately feeds the ask is not a failure of THIS property.
+    const steeringKeys = Object.keys(config).filter((key) => /steer/i.test(key)).sort();
+    expect(steeringKeys).toEqual(["steering_annotations", "steering_presets"]);
+    for (const key of steeringKeys) {
+      expect(JSON.stringify(config[key]), `${key} carried asker text`).not.toContain(SENTINEL);
+    }
   });
 
   it("renders depth 1..5 while keeping retired apparatus and all machine-owned fields out of the DOM", async () => {
