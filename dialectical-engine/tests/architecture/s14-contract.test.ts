@@ -65,9 +65,13 @@ describe("S14 / AC-59..61 / W19 — native UI contract", () => {
     // DEV-SYNC (D23 ADDENDUM-2): T2/S1-2 pinned the retired steering placebo with
     // `expect(askForm).not.toContain("logged verbatim")` against
     // web/app/new/NewQuestionForm.tsx. That file is deleted on this branch, so the
-    // assertion retires with its surface. It is NOT re-asserted here on purpose: the
-    // surviving ask form (apps/ui/app/new/page.tsx) presents both steering controls
-    // again, which is an open finding for V, not something this merge decides.
+    // assertion retires with its surface — but the property did NOT retire with it.
+    // The UI overhaul had rebuilt the same control on apps/ui; V ruled it out a
+    // second time on 2026-09-03 and it is now removed there too. The behavioural
+    // pin lives with the surviving form, in
+    // tests/render/ux01-new-debate-form.test.tsx, which is where to look before
+    // adding a steering box. The assertion above still holds W16's half: the API
+    // persists steering verbatim, because the CONTRACT FIELDS stay.
     expect(askDefaults).toContain("as_of: asOf.toISOString()");
   });
 });
