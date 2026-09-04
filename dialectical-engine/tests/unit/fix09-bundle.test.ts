@@ -10,12 +10,18 @@ import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { Expression, Node } from "typescript/unstable/ast";
+import {
+  SyntaxKind,
+  type Expression,
+  type Node,
+} from "typescript/unstable/ast";
 import {
   isAssignmentOperatorToken,
   isBinaryExpression,
   isCallExpression,
+  isClassDeclaration,
   isElementAccessExpression,
+  isExpressionStatement,
   isFunctionLikeDeclaration,
   isIdentifier,
   isNewExpression,
@@ -1750,6 +1756,378 @@ describe("FIX-09 C1 policy bundle", () => {
     },
   );
 
+  it("does not dispatch the exported refusal error superclass before custodian authentication", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const custodianUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+    ).href;
+    const canonicalUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+    ).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      const { RepinRefusedError, repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const getPrototypeOf = Object.getPrototypeOf;
+      const setPrototypeOf = Object.setPrototypeOf;
+      const originalSuper = getPrototypeOf(RepinRefusedError);
+      let callbackCalls = 0;
+      let outerError = null;
+      let reentrantError = null;
+      let repinned;
+      class HostileError extends originalSuper {
+        constructor(...args) {
+          callbackCalls += 1;
+          environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+          setPrototypeOf(RepinRefusedError, originalSuper);
+          try {
+            repinned = repin(bundle, {
+              token: "wrong",
+              next_bundle: armed,
+            }, environment);
+          } catch (error) {
+            reentrantError = error instanceof Error
+              ? { code: error.code ?? null, message: error.message, name: error.name }
+              : { code: null, message: String(error), name: typeof error };
+          }
+          super(...args);
+        }
+      }
+      try {
+        setPrototypeOf(RepinRefusedError, HostileError);
+      } catch {}
+      try {
+        repin(bundle, { token: "wrong", next_bundle: armed }, environment);
+      } catch (error) {
+        outerError = error instanceof Error
+          ? {
+              code: error.code ?? null,
+              isExpectedInstance: error instanceof RepinRefusedError,
+              message: error.message,
+              name: error.name,
+            }
+          : { code: null, isExpectedInstance: false, message: String(error), name: typeof error };
+      }
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        hash: bundleHash(bundle),
+        outerError,
+        quickArm: repinned?.quick_arm ?? null,
+        reentrantError,
+        superRestored: getPrototypeOf(RepinRefusedError) === originalSuper,
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({
+      callbackCalls: 0,
+      environment: "correct",
+      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      outerError: {
+        code: "REPIN_REFUSED",
+        isExpectedInstance: true,
+        message: "REPIN_REFUSED",
+        name: "RepinRefusedError",
+      },
+      quickArm: null,
+      reentrantError: null,
+      superRestored: true,
+    });
+  });
+
+  it("does not dispatch the recoverable schema error superclass before custodian authentication", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const custodianUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+    ).href;
+    const canonicalUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+    ).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      const { policyBundleSchema } = await import(${JSON.stringify(loaderUrl)});
+      const { RepinRefusedError, repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const failure = policyBundleSchema.safeParse({});
+      if (failure.success) throw new Error("SCHEMA_ERROR_UNAVAILABLE");
+      const PolicyBundleSchemaError = failure.error.constructor;
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const defineProperty = Object.defineProperty;
+      const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      const getPrototypeOf = Object.getPrototypeOf;
+      const setPrototypeOf = Object.setPrototypeOf;
+      const apply = Reflect.apply;
+      const originalSuper = getPrototypeOf(PolicyBundleSchemaError);
+      const someDescriptor = apply(getOwnPropertyDescriptor, Object, [
+        Array.prototype,
+        "some",
+      ]);
+      if (
+        !someDescriptor ||
+        !("value" in someDescriptor) ||
+        typeof someDescriptor.value !== "function"
+      ) {
+        throw new Error("ARRAY_SOME_DESCRIPTOR_MISSING");
+      }
+      const sameDescriptor = (left, right) => {
+        if (left === undefined || right === undefined) return left === right;
+        return left.configurable === right.configurable &&
+          left.enumerable === right.enumerable &&
+          left.get === right.get &&
+          left.set === right.set &&
+          left.value === right.value &&
+          left.writable === right.writable;
+      };
+      let callbackCalls = 0;
+      let escaped = null;
+      let outerError = null;
+      let reentrantError = null;
+      let repinned;
+      class HostileError extends originalSuper {
+        constructor(...args) {
+          callbackCalls += 1;
+          environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+          setPrototypeOf(PolicyBundleSchemaError, originalSuper);
+          defineProperty(Array.prototype, "some", someDescriptor);
+          try {
+            repinned = repin(bundle, {
+              token: "wrong",
+              next_bundle: armed,
+            }, environment);
+          } catch (error) {
+            reentrantError = error instanceof Error
+              ? { code: error.code ?? null, message: error.message, name: error.name }
+              : { code: null, message: String(error), name: typeof error };
+          }
+          super(...args);
+        }
+      }
+      try {
+        setPrototypeOf(PolicyBundleSchemaError, HostileError);
+      } catch {}
+      try {
+        defineProperty(Array.prototype, "some", {
+          ...someDescriptor,
+          value: function (...args) {
+            return apply(someDescriptor.value, this, args);
+          },
+        });
+        try {
+          repin(bundle, { token: "wrong", next_bundle: armed }, environment);
+        } catch (error) {
+          outerError = error instanceof Error
+            ? {
+                code: error.code ?? null,
+                isExpectedInstance: error instanceof RepinRefusedError,
+                message: error.message,
+                name: error.name,
+              }
+            : { code: null, isExpectedInstance: false, message: String(error), name: typeof error };
+        }
+      } catch (error) {
+        escaped = error instanceof Error ? error.message : String(error);
+      } finally {
+        defineProperty(Array.prototype, "some", someDescriptor);
+        try {
+          setPrototypeOf(PolicyBundleSchemaError, originalSuper);
+        } catch {}
+      }
+      const restoredSome = apply(getOwnPropertyDescriptor, Object, [
+        Array.prototype,
+        "some",
+      ]);
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        escaped,
+        hash: bundleHash(bundle),
+        outerError,
+        quickArm: repinned?.quick_arm ?? null,
+        reentrantError,
+        schemaSuperRestored: getPrototypeOf(PolicyBundleSchemaError) === originalSuper,
+        someRestored: sameDescriptor(restoredSome, someDescriptor),
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({
+      callbackCalls: 0,
+      environment: "correct",
+      escaped: null,
+      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      outerError: {
+        code: "REPIN_REFUSED",
+        isExpectedInstance: true,
+        message: "REPIN_REFUSED",
+        name: "RepinRefusedError",
+      },
+      quickArm: null,
+      reentrantError: null,
+      schemaSuperRestored: true,
+      someRestored: true,
+    });
+  });
+
+  it("does not dispatch the load error superclass outside its typed boundary", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const missingPath = resolve(
+      repositoryRoot,
+      ".fix09-round-16-missing-policy-bundle.json",
+    );
+    const script = `
+      const { PolicyBundleLoadError, loadBundle } = await import(${JSON.stringify(loaderUrl)});
+      const getPrototypeOf = Object.getPrototypeOf;
+      const setPrototypeOf = Object.setPrototypeOf;
+      const originalSuper = getPrototypeOf(PolicyBundleLoadError);
+      let callbackCalls = 0;
+      class HostileError extends originalSuper {
+        constructor(...args) {
+          callbackCalls += 1;
+          setPrototypeOf(PolicyBundleLoadError, originalSuper);
+          throw new SyntaxError("RAW_CONSTRUCTOR_CALLBACK");
+        }
+      }
+      try {
+        setPrototypeOf(PolicyBundleLoadError, HostileError);
+      } catch {}
+      let escaped = null;
+      try {
+        loadBundle(${JSON.stringify(missingPath)});
+      } catch (error) {
+        escaped = error instanceof Error
+          ? {
+              causeName: error.cause instanceof Error ? error.cause.name : null,
+              code: error.code ?? null,
+              isPolicyLoadError: error instanceof PolicyBundleLoadError,
+              message: error.message,
+              name: error.name,
+              stackIsString: typeof error.stack === "string",
+            }
+          : {
+              causeName: null,
+              code: null,
+              isPolicyLoadError: false,
+              message: String(error),
+              name: typeof error,
+              stackIsString: false,
+            };
+      } finally {
+        try {
+          setPrototypeOf(PolicyBundleLoadError, originalSuper);
+        } catch {}
+      }
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        escaped,
+        superRestored: getPrototypeOf(PolicyBundleLoadError) === originalSuper,
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({
+      callbackCalls: 0,
+      escaped: {
+        causeName: "Error",
+        code: "POLICY_BUNDLE_INVALID",
+        isPolicyLoadError: true,
+        message: "POLICY_BUNDLE_INVALID",
+        name: "PolicyBundleLoadError",
+        stackIsString: true,
+      },
+      superRestored: true,
+    });
+  });
+
+  it("pins only derived error constructors and preserves lawful error subclass behavior", () => {
+    const schemaResult = policyBundleSchema.safeParse({});
+    if (schemaResult.success) throw new Error("SCHEMA_ERROR_UNAVAILABLE");
+    const SchemaError = schemaResult.error.constructor as new (
+      cause: unknown,
+    ) => Error & { readonly code: string };
+    class SchemaChild extends SchemaError {}
+    class LoadChild extends PolicyBundleLoadError {}
+    class RefusalChild extends RepinRefusedError {}
+
+    const schemaCause = new TypeError("SCHEMA_CAUSE");
+    const loadCause = new SyntaxError("LOAD_CAUSE");
+    const schemaChild = new SchemaChild(schemaCause);
+    const loadChild = new LoadChild(loadCause);
+    const refusalChild = new RefusalChild();
+
+    expect(Object.isExtensible(Error)).toBe(true);
+    expect(Object.isExtensible(Error.prototype)).toBe(true);
+    for (const constructor of [
+      SchemaError,
+      PolicyBundleLoadError,
+      RepinRefusedError,
+    ]) {
+      expect(Object.getPrototypeOf(constructor)).toBe(Error);
+      expect(Object.isExtensible(constructor)).toBe(false);
+      expect(Object.isExtensible(constructor.prototype)).toBe(true);
+    }
+    expect(Object.isExtensible(SchemaChild)).toBe(true);
+    expect(Object.isExtensible(LoadChild)).toBe(true);
+    expect(Object.isExtensible(RefusalChild)).toBe(true);
+    expect(schemaChild).toBeInstanceOf(SchemaChild);
+    expect(schemaChild).toBeInstanceOf(SchemaError);
+    expect(schemaChild).toMatchObject({
+      cause: schemaCause,
+      code: "POLICY_BUNDLE_INVALID",
+      message: "POLICY_BUNDLE_INVALID",
+      name: "PolicyBundleSchemaError",
+    });
+    expect(typeof schemaChild.stack).toBe("string");
+    expect(loadChild).toBeInstanceOf(LoadChild);
+    expect(loadChild).toBeInstanceOf(PolicyBundleLoadError);
+    expect(loadChild).toMatchObject({
+      cause: loadCause,
+      code: "POLICY_BUNDLE_INVALID",
+      message: "POLICY_BUNDLE_INVALID",
+      name: "PolicyBundleLoadError",
+    });
+    expect(typeof loadChild.stack).toBe("string");
+    expect(refusalChild).toBeInstanceOf(RefusalChild);
+    expect(refusalChild).toBeInstanceOf(RepinRefusedError);
+    expect(refusalChild).toMatchObject({
+      code: "REPIN_REFUSED",
+      message: "REPIN_REFUSED",
+      name: "RepinRefusedError",
+    });
+    expect(Object.hasOwn(refusalChild, "cause")).toBe(false);
+    expect(typeof refusalChild.stack).toBe("string");
+  });
+
   it("retains no uncaptured ambient authority member or constructor", () => {
     const ambientCallableRoots = new Set([
       "Array",
@@ -1867,6 +2245,37 @@ describe("FIX-09 C1 policy bundle", () => {
           }
           return false;
         };
+        for (let index = 0; index < sourceFile.statements.length; index += 1) {
+          const statement = sourceFile.statements[index];
+          if (statement === undefined || !isClassDeclaration(statement)) {
+            continue;
+          }
+          const extendsClause = statement.heritageClauses?.find(
+            (clause) => clause.token === SyntaxKind.ExtendsKeyword,
+          );
+          if (extendsClause === undefined) continue;
+          const className = statement.name?.text;
+          const nextStatement = sourceFile.statements[index + 1];
+          if (
+            className === undefined ||
+            nextStatement === undefined ||
+            !isExpressionStatement(nextStatement) ||
+            !isCallExpression(nextStatement.expression) ||
+            !isIdentifier(nextStatement.expression.expression) ||
+            nextStatement.expression.expression.text !== "FREEZE_OBJECT" ||
+            nextStatement.expression.arguments.length !== 1 ||
+            nextStatement.expression.arguments[0] === undefined ||
+            !isIdentifier(nextStatement.expression.arguments[0]) ||
+            nextStatement.expression.arguments[0]?.text !== className
+          ) {
+            const location = sourceFile.getLineAndCharacterOfPosition(
+              statement.getStart(sourceFile),
+            );
+            violations.add(
+              `${sourcePath}:${location.line + 1}:mutable-derived-super`,
+            );
+          }
+        }
         const visit = (node: Node, functionDepth = 0): void => {
           if (
             functionDepth > 0 &&

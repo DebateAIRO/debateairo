@@ -17,6 +17,7 @@ const TO_STRING = String;
 const {
   create: CREATE_OBJECT,
   defineProperty: DEFINE_PROPERTY,
+  freeze: FREEZE_OBJECT,
   getOwnPropertyDescriptor: GET_OWN_PROPERTY_DESCRIPTOR,
   getPrototypeOf: GET_PROTOTYPE_OF,
   hasOwn: HAS_OWN,
@@ -55,6 +56,7 @@ export class RepinRefusedError extends Error {
     );
   }
 }
+FREEZE_OBJECT(RepinRefusedError);
 
 function tokenDigest(token: string): Buffer {
   return HASH("sha256", token, "buffer");

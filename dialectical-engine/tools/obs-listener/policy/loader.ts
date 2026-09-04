@@ -1168,6 +1168,7 @@ class PolicyBundleSchemaError extends Error {
     );
   }
 }
+FREEZE_OBJECT(PolicyBundleSchemaError);
 
 type PolicyBundleParseResult =
   | { readonly success: true; readonly data: PolicyBundleContents }
@@ -1325,6 +1326,7 @@ export class PolicyBundleLoadError extends Error {
     );
   }
 }
+FREEZE_OBJECT(PolicyBundleLoadError);
 
 export function loadBundle(path: string): PolicyBundle {
   try {
