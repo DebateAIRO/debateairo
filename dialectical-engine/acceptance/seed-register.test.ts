@@ -1,4 +1,4 @@
-import { EVALUATOR_CONTRACT_TEXT } from "../apps/runner/src/index.js";
+import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";

@@ -175,7 +175,13 @@ const compositionSchema = z.object({
 export const EVALUATOR_CONTRACT_TEXT =
   "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null.";
 
-const evaluatorVerdictSchema = z.object({
+// codex r3 B1 part 2: EXPORTED so the schema/prompt agreement check can read the
+// DECLARED criterion keys at runtime rather than scanning this file for them.
+// Adding or renaming a criterion here without editing EVALUATOR_CONTRACT_TEXT is a
+// real defect — providers follow the SENT prompt, so every response would omit a
+// member this parser requires and the content-repair path would exhaust on a prompt
+// that cannot satisfy its own schema. The test turns that red.
+export const evaluatorVerdictSchema = z.object({
   satisfied: z.boolean(),
   objection: z.string().nullable(),
   criteria: z.object({

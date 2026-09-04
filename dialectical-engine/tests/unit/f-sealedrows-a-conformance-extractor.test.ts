@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
-import { EVALUATOR_CONTRACT_TEXT } from "../../apps/runner/src/index.js";
+import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const sourceOf = (relative: string): Promise<string> =>
@@ -81,22 +81,39 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   });
 
   /**
-   * THE REGRESSION GUARD FOR THE WHOLE DEFECT CLASS. Every one of the three
-   * dead locators worked by SEARCHING the runner's source for the prompt. This
-   * fails if any seeder starts doing that again — which is the only way the
-   * lexical attacks (string, comment, regex, template literal,
-   * commented-anchor-plus-rename, decoy order) can come back, since none of them
-   * is expressible against an imported constant.
+   * THE POSITIVE STRUCTURAL FORM (codex r3 B1, part 1).
+   *
+   * What stood here was a DENY-LIST: it banned four spellings of a source
+   * search. Codex bypassed it in one line with a fifth spelling, and every test
+   * stayed green. A deny-list is the same mistake as a text search one level up
+   * — it enumerates the forms it knows.
+   *
+   * So this states what each site MUST BE, exactly, and anything else fails by
+   * default whether or not anyone predicted it. The dataflow itself is proven
+   * separately and behaviourally in `f-sealedrows-a-dataflow.test.ts`, which
+   * substitutes the constant and requires both fingerprints to follow it; this
+   * covers the half that cannot be observed at runtime — what the runner SENDS.
    */
-  it("NEITHER seeder searches the runner source for the evaluator prompt", async () => {
+  it("takes the fingerprint from the imported identifier, in exactly that form, in BOTH seeders", async () => {
     for (const relative of ["acceptance/seed-register.ts", "apps/runner/src/dev-deployment-register.ts"]) {
       const source = await sourceOf(relative);
-      expect(source).toContain("EVALUATOR_CONTRACT_TEXT");
-      expect(source).not.toMatch(/criteria\s*:\s*z\.object/);
-      expect(source).not.toContain("balancedObjectBody");
-      expect(source).not.toContain("evaluatorVerdictSchema");
-      expect(source).not.toMatch(/Return only JSON \\\{/);
+      // the ONE accepted initializer, verbatim
+      expect(source, relative).toContain("conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),");
+      // and the identifier is IMPORT-BOUND, not a local of any kind
+      expect(source, relative).toMatch(/import \{ EVALUATOR_CONTRACT_TEXT \} from "[^"]+";/);
+      // exactly one conformance initializer, so a second cannot hide beside it
+      expect([...source.matchAll(/conformanceContractHash:/g)], relative).toHaveLength(1);
     }
+  });
+
+  it("SENDS that identifier as the evaluator system message, in exactly that form", async () => {
+    const runner = await sourceOf("apps/runner/src/index.ts");
+    expect([...runner.matchAll(/\{ role: "system", content: EVALUATOR_CONTRACT_TEXT \},/g)]).toHaveLength(1);
+    // exactly one definition, and it is an exported string constant
+    expect([...runner.matchAll(/export const EVALUATOR_CONTRACT_TEXT =\n  "/g)]).toHaveLength(1);
+    // every OTHER system message must carry a literal; none may carry the
+    // evaluator prompt's opening, which is how a second copy would return
+    expect([...runner.matchAll(/content: "Return only JSON \{satisfied/g)]).toHaveLength(0);
   });
 
   it("keeps ONE definition — F-SEALEDROWS-C closed, not merely pinned by test", async () => {
