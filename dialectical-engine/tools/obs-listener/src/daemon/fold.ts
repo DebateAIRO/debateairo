@@ -1,7 +1,12 @@
 import type { PoolClient } from "pg";
+import { fileURLToPath } from "node:url";
 import { advanceContiguousCursor, FIXAGENT_CONSUMER, readCursor } from "./cursor.js";
 import { decodeOccurrence, type OccurrenceRecord, type OccurrenceSeverity, type OccurrenceSource } from "./intake.js";
 import { appendPoisonReceipt, appendSkipReceipt } from "./poison.js";
+import { loadBundle } from "../../policy/loader.js";
+import { evaluateTierGate, type TierGateInput } from "./tier-gate.js";
+
+const POLICY_BUNDLE = loadBundle(fileURLToPath(new URL("../../policy/bundle.json", import.meta.url)));
 
 export type WorkUnitKey =
   | readonly ["DECLARED_PAIR", string, string]
@@ -112,7 +117,7 @@ async function appendAcknowledgement(client: DeliveryClient, occurrenceId: strin
   ]);
 }
 
-async function upsertAggregate(client: DeliveryClient, current: OccurrenceRecord): Promise<void> {
+async function upsertAggregate(client: DeliveryClient, current: OccurrenceRecord): Promise<IncidentAggregate> {
   const rows = await client.query<Record<string, unknown>>(`
     SELECT occurrence.* FROM obs.occurrence AS occurrence
     WHERE occurrence.fingerprint=$1 AND occurrence.fingerprint_version=$2
@@ -142,6 +147,39 @@ async function upsertAggregate(client: DeliveryClient, current: OccurrenceRecord
     aggregate.lastSeenAt, aggregate.distinctWorkUnitCount.toString(), aggregate.maxSeverity,
     JSON.stringify(aggregate.sourceSet)
   ]);
+  return aggregate;
+}
+
+async function appendTierDecision(
+  client: DeliveryClient,
+  occurrenceId: string,
+  current: OccurrenceRecord,
+  aggregate: IncidentAggregate,
+  zoneContext: unknown,
+): Promise<void> {
+  const input: TierGateInput = {
+    schema: "fixagent-tier-input/v1",
+    incident: {
+      fingerprint: aggregate.fingerprint,
+      fingerprintVersion: aggregate.fingerprintVersion,
+      distinctWorkUnitCount: aggregate.distinctWorkUnitCount.toString(),
+      maxSeverity: aggregate.maxSeverity,
+      sourceSet: aggregate.sourceSet,
+      taxonomyClass: current.taxonomyClass,
+      zoneContext: typeof zoneContext === "boolean" ? zoneContext : true,
+    },
+    root: { verdict: "UNCONFIRMED" },
+    changeShape: null,
+  };
+  const decision = evaluateTierGate(input, POLICY_BUNDLE);
+  await client.query(`
+    INSERT INTO obs.policy_decision (occurrence_id,policy_ref,input_hash,decision)
+    SELECT $1,$2,$3,$4
+    WHERE NOT EXISTS (
+      SELECT 1 FROM obs.policy_decision
+      WHERE occurrence_id=$1 AND policy_ref=$2 AND input_hash=$3 AND decision=$4
+    )
+  `, [occurrenceId, decision.policyRef, decision.inputHash, decision.decision]);
 }
 
 export async function deliverOccurrence(
@@ -177,7 +215,14 @@ export async function deliverOccurrence(
     const intake = decodeOccurrence(row);
     let result: DeliveryOutcome["result"];
     if (intake.kind === "ACCEPT") {
-      await upsertAggregate(client, intake.occurrence);
+      const aggregate = await upsertAggregate(client, intake.occurrence);
+      await appendTierDecision(
+        client,
+        occurrenceId,
+        intake.occurrence,
+        aggregate,
+        row.zone_context,
+      );
       result = "FOLDED";
     } else if (intake.kind === "SKIP") {
       await appendSkipReceipt(client, { occurrenceId, occSeq }, intake.reason);
