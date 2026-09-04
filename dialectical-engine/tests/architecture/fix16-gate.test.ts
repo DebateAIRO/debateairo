@@ -50,7 +50,7 @@ describe("FIX-16 C1 inventory scanner", () => {
       "declare const pendingValue: Promise<void>;",
       "declare const pendingLike: PromiseLike<void>;",
       "declare const fakeThen: { readonly then: string };",
-      "declare function observe(error: unknown): void;",
+      "function observe(error: unknown): void { console.error(error); }",
       "void synchronous();",
       "void pendingCall();",
       "void pendingValue;",
@@ -71,7 +71,7 @@ describe("FIX-16 C1 inventory scanner", () => {
       "declare const pending: Promise<void>;",
       "declare const anyPending: any;",
       "declare function anyCall(): any;",
-      "declare function observe(error: unknown): void;",
+      "function observe(error: unknown): void { console.error(error); }",
       "declare function fulfilled(): void;",
       "function ignore(_error: unknown): void {}",
       "const ignoreAlias = ignore;",
@@ -106,7 +106,7 @@ describe("FIX-16 C1 inventory scanner", () => {
     const source = [
       "declare const pending: Promise<void>;",
       "declare const flag: boolean;",
-      "declare function consume(error: unknown): void;",
+      "function consume(error: unknown): void { console.error(error); }",
       "let callback = (error: unknown) => consume(error);",
       "callback = (_error: unknown) => undefined;",
       "void pending.catch(callback);",
@@ -571,7 +571,7 @@ describe("FIX-16 C1 inventory scanner", () => {
     const callbackSource = [
       "declare const pending: Promise<void>;",
       "declare const flag: boolean;",
-      "declare function consume(error: unknown): void;",
+      "function consume(error: unknown): void { console.error(error); }",
       "let handler = (_error: unknown) => undefined;",
       "while (flag) handler = (error: unknown) => consume(error);",
       "void pending.catch(handler);",
@@ -615,6 +615,346 @@ describe("FIX-16 C1 inventory scanner", () => {
       [{ path: "packages/obs-capture/src/require-loop.ts", line: 5, class: "zone_import" }],
       [{ path: "packages/obs-capture/src/manifest-loop.ts", line: 2, class: "zone_import" }],
     ]);
+  });
+
+  it("joins only reachable completions across fixed-point loops, switch fallthrough, exceptions, and abrupt exits", () => {
+    const callbackLoop = [
+      "declare const pending: Promise<void>;",
+      "function consume(error: unknown): void { console.error(error); }",
+      "let a = consume;",
+      "let b = consume;",
+      "let c = (_error: unknown) => undefined;",
+      "for (let i = 0; i < 2; i += 1) { a = b; b = c; }",
+      "void pending.catch(a);",
+    ].join("\n");
+    const causeLoop = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "try { task(); } catch (caught) {",
+      "  let a = caught;",
+      "  let b = caught;",
+      "  let c = unrelated;",
+      "  for (let i = 0; i < 2; i += 1) { a = b; b = c; }",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: a });',
+      "}",
+    ].join("\n");
+    const requireLoop = [
+      "declare const local: (path: string) => unknown;",
+      "let a = local;",
+      "let b = local;",
+      "let c = require;",
+      "for (let i = 0; i < 2; i += 1) { a = b; b = c; }",
+      'a("apps/api/src/registration.ts");',
+    ].join("\n");
+    const manifestLoop = [
+      'const safe = ["packages/kernel/src/error.ts"];',
+      "let a = safe;",
+      "let b = safe;",
+      'let c = ["apps/api/src/registration.ts"];',
+      "for (let i = 0; i < 2; i += 1) { a = b; b = c; }",
+      "export const LOOKALIKE = { zone_path_prefixes: a };",
+    ].join("\n");
+    const switchFallthrough = [
+      "declare const mode: number;",
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "switch (mode) {",
+      "  case 0: load = require;",
+      '  case 1: load("apps/api/src/registration.ts"); break;',
+      "}",
+    ].join("\n");
+    const exceptionalJoin = [
+      "declare function task(): void;",
+      "declare const local: (path: string) => unknown;",
+      "let load = require;",
+      "try { task(); load = local; } catch (caught) { void caught; }",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const returnNeighbour = [
+      "declare const flag: boolean;",
+      "declare const pending: Promise<void>;",
+      "function consume(error: unknown): void { console.error(error); }",
+      "function run(): void {",
+      "  let callback = consume;",
+      "  if (flag) { callback = (_error: unknown) => undefined; return; }",
+      "  void pending.catch(callback);",
+      "}",
+    ].join("\n");
+    const breakPath = [
+      "declare const mode: number;",
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "switch (mode) {",
+      "  case 0: load = require; break; load = local;",
+      "  default: break;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const continuePath = [
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "for (let i = 0; i < 1; i += 1) { load = require; continue; load = local; }",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const finallyNeighbour = [
+      "declare const local: (path: string) => unknown;",
+      "function run(): void {",
+      "  let load = local;",
+      "  try { return; } finally { load = require; }",
+      '  load("apps/api/src/registration.ts");',
+      "}",
+    ].join("\n");
+
+    expect([
+      scanSource(callbackLoop, "apps/example/src/callback-fixed-point.ts"),
+      scanSource(causeLoop, "packages/example/src/cause-fixed-point.ts"),
+      scanSource(requireLoop, "packages/obs-capture/src/require-fixed-point.ts"),
+      scanSource(manifestLoop, "packages/obs-capture/src/manifest-fixed-point.ts"),
+      scanSource(switchFallthrough, "packages/obs-capture/src/require-switch.ts"),
+      scanSource(exceptionalJoin, "packages/obs-capture/src/require-exception.ts"),
+      scanSource(returnNeighbour, "apps/example/src/callback-return.ts"),
+      scanSource(breakPath, "packages/obs-capture/src/require-break.ts"),
+      scanSource(continuePath, "packages/obs-capture/src/require-continue.ts"),
+      scanSource(finallyNeighbour, "packages/obs-capture/src/require-finally.ts"),
+    ]).toEqual([
+      [{ path: "apps/example/src/callback-fixed-point.ts", line: 7, class: "void_promise" }],
+      [{ path: "packages/example/src/cause-fixed-point.ts", line: 8, class: "wrapper_without_cause" }],
+      [{ path: "packages/obs-capture/src/require-fixed-point.ts", line: 6, class: "zone_import" }],
+      [{ path: "packages/obs-capture/src/manifest-fixed-point.ts", line: 4, class: "zone_import" }],
+      [{ path: "packages/obs-capture/src/require-switch.ts", line: 6, class: "zone_import" }],
+      [{ path: "packages/obs-capture/src/require-exception.ts", line: 5, class: "zone_import" }],
+      [],
+      [{ path: "packages/obs-capture/src/require-break.ts", line: 8, class: "zone_import" }],
+      [{ path: "packages/obs-capture/src/require-continue.ts", line: 4, class: "zone_import" }],
+      [],
+    ]);
+  });
+
+  it("proves rejection consumption from callback bodies and accepts computed catch and then", () => {
+    const source = [
+      'import { importedObserver } from "./handlers.js";',
+      "declare const pending: Promise<void>;",
+      "declare function fulfilled(): void;",
+      "function consume(error: unknown): void { console.error(error); }",
+      "void pending.catch(({ message }: { message: unknown }) => undefined);",
+      "void pending.catch(({ message }: { message: unknown }) => consume(message));",
+      "void pending.catch(importedObserver);",
+      'void pending["catch"](consume);',
+      'void pending["then"](fulfilled, consume);',
+    ].join("\n");
+
+    expect(scanSource(source, "apps/example/src/callback-bodies.ts")).toEqual([
+      { path: "apps/example/src/callback-bodies.ts", line: 5, class: "void_promise" },
+      { path: "apps/example/src/callback-bodies.ts", line: 7, class: "void_promise" },
+    ]);
+  });
+
+  it("requires rejection consumption on every reachable callback completion", () => {
+    const source = [
+      "declare const pending: Promise<void>;",
+      "declare const flag: boolean;",
+      "void pending.catch((error: unknown) => { if (flag) console.error(error); });",
+      "void pending.catch((error: unknown) => { if (flag) return; console.error(error); });",
+      "void pending.catch((error: unknown) => { if (flag) console.error(error); else console.warn(error); });",
+      "void pending.catch((error: unknown) => { if (flag) return console.error(error); console.warn(error); });",
+    ].join("\n");
+
+    expect(scanSource(source, "apps/example/src/callback-all-paths.ts")).toEqual([
+      { path: "apps/example/src/callback-all-paths.ts", line: 3, class: "void_promise" },
+      { path: "apps/example/src/callback-all-paths.ts", line: 4, class: "void_promise" },
+    ]);
+  });
+
+  it("keeps switch and zero-iteration callback paths in the rejection proof", () => {
+    const source = [
+      "declare const pending: Promise<void>;",
+      "declare const mode: number;",
+      "declare const values: readonly unknown[];",
+      "function consume(error: unknown): void { console.error(error); }",
+      "void pending.catch((error: unknown) => { switch (mode) { case 0: consume(error); break; default: break; } });",
+      "void pending.catch((error: unknown) => { switch (mode) { case 0: consume(error); break; default: consume(error); } });",
+      "void pending.catch((error: unknown) => { for (const value of values) { void value; consume(error); } });",
+      "void pending.catch((error: unknown) => { do { consume(error); } while (false); });",
+    ].join("\n");
+
+    expect(scanSource(source, "apps/example/src/callback-switch-paths.ts")).toEqual([
+      { path: "apps/example/src/callback-switch-paths.ts", line: 5, class: "void_promise" },
+      { path: "apps/example/src/callback-switch-paths.ts", line: 7, class: "void_promise" },
+    ]);
+  });
+
+  it("does not evaluate a later case expression along an earlier fallthrough path", () => {
+    const source = [
+      "declare const mode: number;",
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "switch (mode) {",
+      "  case 0: load = require;",
+      "  case (load = local, 1):",
+      '    load("apps/api/src/registration.ts"); break;',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/require-case-order.ts")).toEqual([
+      { path: "packages/obs-capture/src/require-case-order.ts", line: 7, class: "zone_import" },
+    ]);
+  });
+
+  it("keeps caught-root aliases visible through a shadowed catch name", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "try { task(); } catch (caught) {",
+      "  const root = caught;",
+      "  {",
+      "    const caught = unrelated;",
+      '    new DomainError("WRAP_FAILED", "fixed");',
+      "    void root;",
+      "  }",
+      "}",
+      "try { task(); } catch (caught) {",
+      "  {",
+      "    const caught = unrelated;",
+      '    new DomainError("LOCAL_ONLY", "fixed");',
+      "  }",
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/cause-shadow-alias.ts")).toEqual([
+      { path: "packages/example/src/cause-shadow-alias.ts", line: 7, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("applies delete and Object.assign writes to shared cause objects", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "try { task(); } catch (caught) {",
+      "  const deleted = { cause: caught };",
+      "  delete deleted.cause;",
+      '  new DomainError("WRAP_FAILED", "fixed", deleted);',
+      "  const overwritten = { cause: caught };",
+      "  Object.assign(overwritten, { cause: unrelated });",
+      '  new DomainError("WRAP_FAILED", "fixed", overwritten);',
+      "  const restored = { cause: unrelated };",
+      "  Object.assign(restored, { cause: caught });",
+      '  new DomainError("WRAP_FAILED", "fixed", restored);',
+      "  const deleteThenRestore = { cause: caught };",
+      "  delete deleteThenRestore.cause;",
+      "  Object.assign(deleteThenRestore, { cause: caught });",
+      '  new DomainError("WRAP_FAILED", "fixed", deleteThenRestore);',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/cause-mutations.ts")).toEqual([
+      { path: "packages/example/src/cause-mutations.ts", line: 6, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-mutations.ts", line: 9, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("uses current and joined coded-throw and DomainError constructor aliases", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "class LocalError { constructor(..._args: unknown[]) {} }",
+      'let harmfulThrow = new Error("DECLARED_CODE");',
+      'harmfulThrow = new Error("ordinary text");',
+      "throw harmfulThrow;",
+      'let safeThrow = new Error("ordinary text");',
+      'safeThrow = new Error("CURRENT_CODE");',
+      "throw safeThrow;",
+      "let CurrentWrapper = LocalError;",
+      "CurrentWrapper = DomainError;",
+      "try { task(); } catch (caught) {",
+      '  new CurrentWrapper("WRAP_FAILED", "fixed");',
+      "}",
+      "let ReplacedWrapper = DomainError;",
+      "ReplacedWrapper = LocalError;",
+      "try { task(); } catch (caught) {",
+      '  new ReplacedWrapper("LOCAL_ONLY", "fixed");',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/current-aliases.ts")).toEqual([
+      { path: "packages/example/src/current-aliases.ts", line: 5, class: "throw_without_code" },
+      { path: "packages/example/src/current-aliases.ts", line: 12, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("does not infer a domain wrapper from a same-spelled foreign import", () => {
+    const source = [
+      'import { TypedDomainError as ForeignError } from "./local.js";',
+      "try { task(); } catch (caught) {",
+      '  new ForeignError("LOCAL_ONLY", "fixed");',
+      "  void caught;",
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/foreign-wrapper.ts")).toEqual([]);
+  });
+
+  it("models nullish require assignment and comma-style indirect calls", () => {
+    const source = [
+      "declare const local: (path: string) => unknown;",
+      "let load = require;",
+      "load ??= local;",
+      'load("apps/api/src/registration.ts");',
+      '(0, require)("apps/api/src/mfa.ts");',
+      "let maybe: ((path: string) => unknown) | undefined;",
+      "maybe ??= require;",
+      'maybe("apps/api/src/mail-channel.ts");',
+      "function shadowed(require: (path: string) => unknown): void {",
+      '  (0, require)("apps/api/src/registration.ts");',
+      "}",
+      "let definitelyLocal = local;",
+      "definitelyLocal ??= require;",
+      'definitelyLocal("apps/api/src/registration.ts");',
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/require-expressions.ts")).toEqual([
+      { path: "packages/obs-capture/src/require-expressions.ts", line: 4, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-expressions.ts", line: 5, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-expressions.ts", line: 8, class: "zone_import" },
+    ]);
+  });
+
+  it("re-evaluates loop conditions at the back edge before forming the exit state", () => {
+    const source = [
+      "declare const local: (path: string) => unknown;",
+      "let first = local;",
+      "let firstIndex = 0;",
+      "while ((first = require, firstIndex++ < 1)) first = local;",
+      'first("apps/api/src/registration.ts");',
+      "let second = local;",
+      "let secondIndex = 0;",
+      "while ((second = local, secondIndex++ < 1)) second = require;",
+      'second("apps/api/src/mfa.ts");',
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/require-loop-condition.ts")).toEqual([
+      { path: "packages/obs-capture/src/require-loop-condition.ts", line: 5, class: "zone_import" },
+    ]);
+  });
+
+  it("tracks manifest-shaped property writes with exact computed keys", () => {
+    const source = [
+      'const CLASSIFIED = "zone_path_prefixes" as const;',
+      'const safe = ["packages/kernel/src/error.ts"];',
+      "const direct = { zone_path_prefixes: safe };",
+      'direct.zone_path_prefixes = ["apps/api/src/registration.ts"];',
+      "export { direct };",
+      "const computed = { [CLASSIFIED]: safe };",
+      'computed[CLASSIFIED] = ["apps/api/src/mfa.ts"];',
+      "export { computed };",
+      "const safeNeighbour = { zone_path_prefixes: safe };",
+      "safeNeighbour.zone_path_prefixes = safe;",
+      "export { safeNeighbour };",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/manifest-property-flow.ts")).toEqual([
+      { path: "packages/obs-capture/src/manifest-property-flow.ts", line: 4, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-property-flow.ts", line: 7, class: "zone_import" },
+    ]);
+    expect(scanSource(source, "packages/obs-capture/src/zone/manifest.ts")).toEqual([]);
   });
 
   it("fails closed when file bytes, AST nodes, candidates, or syntax exceed the scanner contract", () => {

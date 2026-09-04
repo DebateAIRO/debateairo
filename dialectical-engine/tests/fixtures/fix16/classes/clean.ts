@@ -4,7 +4,7 @@ import { TypedDomainError as DomainError } from "@debateai/kernel";
 const DECLARED_CODE = "DECLARED_CODE";
 declare const value: unknown;
 declare function send(): Promise<void>;
-declare function report(error: unknown): void;
+function report(error: unknown): void { console.error(error); }
 
 export async function clean(): Promise<void> {
   try {
