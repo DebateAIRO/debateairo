@@ -6,6 +6,10 @@ import type { FileHandle } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { isSerializedSafeEnvelope } from "../envelope-contract.js";
+import {
+  resolveSafeTemplate,
+  resolveTaxonomyClass,
+} from "../registry/index.js";
 import type { PostRedactionEnvelope } from "../redactor.js";
 import {
   SPOOL_FILE_MAX_BYTES,
@@ -421,7 +425,22 @@ async function drainFile(
       } catch {
         return false;
       }
-      if (!isSerializedSafeEnvelope(value, parsed.runtime)) return false;
+      if (!isRecord(value)) return false;
+      const taxonomy = typeof value.taxonomy_class === "string"
+        ? resolveTaxonomyClass(value.taxonomy_class)
+        : undefined;
+      const template = typeof value.code === "string"
+        ? resolveSafeTemplate(value.code)
+        : undefined;
+      if (
+        taxonomy === undefined
+        || template === undefined
+        || (template.binding !== undefined
+          && Object.entries(template.binding).some(
+            ([field, expected]) => value[field] !== expected,
+          ))
+        || !isSerializedSafeEnvelope(value, parsed.runtime)
+      ) return false;
       envelopes.push(value as unknown as PostRedactionEnvelope);
     }
     const finalSnapshot = await matchingSourceSnapshot(

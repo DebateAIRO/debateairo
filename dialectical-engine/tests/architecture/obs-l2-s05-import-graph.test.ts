@@ -415,7 +415,26 @@ await runtimeArmed;` : `import "@debateai/obs-capture/install/${entry}";`;
 }
 
 function normalizeProcessInstaller(source: string): string {
-  return source.replace(
+  const withoutSchedulerCancel = source
+    .replace("\nlet runtimeStartCancelled = false;", "")
+    .replace("  if (runtimeStartCancelled) return;\n", "")
+    .replace(
+      `    .then((module) => {
+      if (runtimeStartCancelled) return;
+      return module.startCaptureRuntime({ runtime: RUNTIME, spoolFd, installExitSink });
+    })`,
+      "    .then((module) => module.startCaptureRuntime({ runtime: RUNTIME, spoolFd, installExitSink }))",
+    )
+    .replace(
+      `
+export function cancelScheduledCaptureRuntimeStart(): void {
+  runtimeStartCancelled = true;
+  clearTimeout(runtimeArm);
+}
+`,
+      "",
+    );
+  return withoutSchedulerCancel.replace(
     /const RUNTIME = "(?:api|runner|scheduler)" as const;/u,
     'const RUNTIME = "<runtime>" as const;',
   );
@@ -456,7 +475,7 @@ describe("S05 import-light installer graph", () => {
     expect(registrations).toEqual([]);
   });
 
-  it("keeps process installers byte-identical apart from RUNTIME and free of crash overrides", async () => {
+  it("keeps process installers byte-identical apart from RUNTIME and the scheduler cancel seam", async () => {
     const sources = await Promise.all(PROCESS_ENTRIES.map(async (entry) =>
       readFile(resolve(INSTALL_ROOT, `${entry}.ts`), "utf8")));
     expect(new Set(sources.map(normalizeProcessInstaller)).size).toBe(1);

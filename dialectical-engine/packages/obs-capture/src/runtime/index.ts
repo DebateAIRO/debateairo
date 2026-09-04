@@ -49,7 +49,26 @@ export interface RuntimeCaptureModule {
 
 type RuntimePhase = "ARMING" | "ARMED" | "STOPPED";
 
+export type CaptureEmitterInstallOutcome =
+  | "installed"
+  | "start_failed"
+  | "stopped"
+  | "timed_out";
+
+type GenerationOutcome = Exclude<CaptureEmitterInstallOutcome, "timed_out">;
+
+interface InstallWaiter {
+  settle(outcome: CaptureEmitterInstallOutcome): void;
+}
+
+interface RuntimeGeneration {
+  readonly id: number;
+  readonly waiters: Set<InstallWaiter>;
+  outcome: GenerationOutcome | undefined;
+}
+
 interface ActiveRuntimeState {
+  readonly generation: RuntimeGeneration;
   phase: RuntimePhase;
   readonly bounds: ObsBounds;
   readonly emitter: CaptureEmitter;
@@ -70,6 +89,9 @@ const REDACTION_POLICY_VERSION_SEED = "g0"; // seed — V ratifies at FIX-01 acc
 const ALLOWLIST_SET_ID_SEED = "g0-empty-parameters"; // seed — V ratifies at FIX-01 acceptance
 
 let runtimeState: ActiveRuntimeState | undefined;
+let activeGeneration: RuntimeGeneration | undefined;
+let nextGenerationId = 1;
+let idleWaiters = new Set<InstallWaiter>();
 
 const UNAVAILABLE_SPOOL: Pick<SpoolWriter, "append"> = Object.freeze({
   append(): void {
@@ -104,6 +126,7 @@ function createSpool(spoolFd: number | undefined): SpoolWriter | undefined {
 
 function createStartingState(
   options: CaptureRuntimeStartOptions,
+  generation: RuntimeGeneration,
 ): ActiveRuntimeState {
   const bounds = readObsBounds();
   const queue = new BoundedReferenceQueue<CaptureQueueEntry>(
@@ -144,6 +167,7 @@ function createStartingState(
     gaps,
   });
   const state: ActiveRuntimeState = {
+    generation,
     phase: "ARMING",
     bounds,
     emitter,
@@ -177,6 +201,58 @@ function createStartingState(
   return state;
 }
 
+function settleGeneration(
+  generation: RuntimeGeneration,
+  outcome: GenerationOutcome,
+): void {
+  if (generation.outcome !== undefined) return;
+  generation.outcome = outcome;
+  for (const waiter of [...generation.waiters]) waiter.settle(outcome);
+  generation.waiters.clear();
+}
+
+function createGeneration(): RuntimeGeneration {
+  const generation = {
+    id: nextGenerationId,
+    waiters: idleWaiters,
+    outcome: undefined,
+  } satisfies RuntimeGeneration;
+  nextGenerationId += 1;
+  idleWaiters = new Set<InstallWaiter>();
+  return generation;
+}
+
+export function waitForCaptureEmitterInstalled(options: {
+  readonly deadlineMs: number;
+}): Promise<CaptureEmitterInstallOutcome> {
+  if (
+    !Number.isFinite(options.deadlineMs)
+    || options.deadlineMs < 0
+  ) {
+    return Promise.resolve("timed_out");
+  }
+  const generation = activeGeneration;
+  if (generation?.outcome !== undefined) {
+    return Promise.resolve(generation.outcome);
+  }
+  const target = generation?.waiters ?? idleWaiters;
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const waiter: InstallWaiter = Object.freeze({
+      settle(outcome: CaptureEmitterInstallOutcome): void {
+        if (settled) return;
+        settled = true;
+        target.delete(waiter);
+        if (timer !== undefined) clearTimeout(timer);
+        resolve(outcome);
+      },
+    });
+    target.add(waiter);
+    timer = setTimeout(() => waiter.settle("timed_out"), options.deadlineMs);
+  });
+}
+
 async function flushRuntimeOnce(state: ActiveRuntimeState): Promise<void> {
   await state.gaps.flushOne((row) => state.databaseSink.writeCaptureGap(row));
   await state.flusher.flushOnce();
@@ -199,41 +275,66 @@ function startFlushTimer(state: ActiveRuntimeState): void {
 export async function startCaptureRuntime(
   options: CaptureRuntimeStartOptions,
 ): Promise<void> {
-  if (runtimeState !== undefined && runtimeState.phase !== "STOPPED") return;
-  const state = createStartingState(options);
-  runtimeState = state;
-  const startup = (async (): Promise<void> => {
-    const transfer = installCaptureEmitter(state.emitter, state.gaps);
-    await transfer;
-    await flushRuntimeOnce(state);
-  })();
-  state.flushInFlight = startup;
+  if (
+    (runtimeState !== undefined && runtimeState.phase !== "STOPPED")
+    || (activeGeneration !== undefined && activeGeneration.outcome === undefined)
+  ) return;
+  const generation = createGeneration();
+  activeGeneration = generation;
+  let state: ActiveRuntimeState | undefined;
   try {
-    await startup;
-  } finally {
-    if (state.flushInFlight === startup) state.flushInFlight = undefined;
+    state = createStartingState(options, generation);
+    if (activeGeneration !== generation || generation.outcome === "stopped") return;
+    runtimeState = state;
+    const transfer = installCaptureEmitter(state.emitter, state.gaps);
+    settleGeneration(generation, "installed");
+    const startup = (async (): Promise<void> => {
+      await transfer;
+      await flushRuntimeOnce(state!);
+    })();
+    state.flushInFlight = startup;
+    try {
+      await startup;
+    } finally {
+      if (state.flushInFlight === startup) state.flushInFlight = undefined;
+    }
+    if (state.phase === "STOPPED" || runtimeState !== state) return;
+    state.phase = "ARMED";
+    startFlushTimer(state);
+    const drain = drainDeadSpoolFiles({
+      spoolDirectory: state.bounds.spoolDir,
+      admissionSeal: state.bounds.spoolAdmissionSeal,
+      databaseSink: state.databaseSink,
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        if (state?.drainInFlight === drain) state.drainInFlight = undefined;
+      });
+    state.drainInFlight = drain;
+  } catch (error) {
+    settleGeneration(generation, "start_failed");
+    if (activeGeneration === generation && generation.outcome === "start_failed") {
+      activeGeneration = undefined;
+    }
+    throw error;
   }
-  if (state.phase === "STOPPED" || runtimeState !== state) return;
-  state.phase = "ARMED";
-  startFlushTimer(state);
-  const drain = drainDeadSpoolFiles({
-    spoolDirectory: state.bounds.spoolDir,
-    admissionSeal: state.bounds.spoolAdmissionSeal,
-    databaseSink: state.databaseSink,
-  })
-    .catch(() => undefined)
-    .finally(() => {
-      if (state.drainInFlight === drain) state.drainInFlight = undefined;
-    });
-  state.drainInFlight = drain;
 }
 
 export async function stopCaptureRuntime(
   options: { readonly deadlineMs: number },
 ): Promise<void> {
+  const generation = activeGeneration;
   const state = runtimeState;
-  if (state === undefined || state.phase === "STOPPED") return;
+  if (state === undefined || state.phase === "STOPPED") {
+    if (generation !== undefined && generation.outcome === undefined) {
+      settleGeneration(generation, "stopped");
+      if (activeGeneration === generation) activeGeneration = undefined;
+    }
+    return;
+  }
   runtimeState = undefined;
+  if (activeGeneration === state.generation) activeGeneration = undefined;
+  settleGeneration(state.generation, "stopped");
   state.phase = "STOPPED";
   if (state.timer !== undefined) clearInterval(state.timer);
 

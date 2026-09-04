@@ -224,12 +224,22 @@ process.on("exit", (code) => {
 });
 
 const RUNTIME_CAPTURE_MODULE = "@debateai/obs-capture/runtime";
+let runtimeStartCancelled = false;
 const runtimeArm = setTimeout(() => {
+  if (runtimeStartCancelled) return;
   void (import(RUNTIME_CAPTURE_MODULE) as Promise<RuntimeCaptureModule>)
-    .then((module) => module.startCaptureRuntime({ runtime: RUNTIME, spoolFd, installExitSink }))
+    .then((module) => {
+      if (runtimeStartCancelled) return;
+      return module.startCaptureRuntime({ runtime: RUNTIME, spoolFd, installExitSink });
+    })
     .catch(() => undefined);
 }, 0);
 runtimeArm.unref?.();
+
+export function cancelScheduledCaptureRuntimeStart(): void {
+  runtimeStartCancelled = true;
+  clearTimeout(runtimeArm);
+}
 
 export const INSTALLER_RUNTIME = RUNTIME;
 export const PROCESS_HANDLERS_INSTALLED = true as const;

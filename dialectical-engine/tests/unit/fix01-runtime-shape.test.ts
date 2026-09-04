@@ -5,6 +5,8 @@ import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 import {
   startCaptureRuntime,
   stopCaptureRuntime,
+  waitForCaptureEmitterInstalled,
+  type CaptureEmitterInstallOutcome,
   type CaptureRuntimeStartOptions,
   type CaptureRuntimeName,
   type FatalExitSink,
@@ -78,6 +80,10 @@ describe("FIX-01 runtime module contract", () => {
     expectTypeOf<Parameters<typeof stopCaptureRuntime>>().toEqualTypeOf<[
       { readonly deadlineMs: number },
     ]>();
+    expectTypeOf<Parameters<typeof waitForCaptureEmitterInstalled>>()
+      .toEqualTypeOf<[{ readonly deadlineMs: number }]>();
+    expectTypeOf<ReturnType<typeof waitForCaptureEmitterInstalled>>()
+      .toEqualTypeOf<Promise<CaptureEmitterInstallOutcome>>();
 
     const installers = ["api", "runner", "scheduler"] as const;
     for (const name of installers) {

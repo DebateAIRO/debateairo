@@ -232,6 +232,46 @@ function safeEnvelope(
   });
 }
 
+function lifecycleEnvelope(sourceEventRef: string): PostRedactionEnvelope {
+  return createSharedRedactor({
+    environment: "test",
+    build_ref: "UNTRACKED-DEV:fix01-c5",
+    build_dirty: true,
+    runtime: "scheduler",
+    component: Object.freeze({
+      process: "scheduler",
+      package: "@debateai/scheduler",
+    }),
+    writer_identity: "scheduler",
+    redaction_policy_version: "g0",
+    allowlist_set_id: "g0-lifecycle",
+    now: () => new Date("2026-09-04T00:00:00.000Z"),
+    sourceEventRef: () => sourceEventRef,
+  }).redact({
+    kind: "envelope",
+    payload_ref: Object.freeze({
+      code: "OBS_SCHEDULER_JOB_NOOP",
+      template_parameters: Object.freeze({
+        job: "replay-self-test",
+        count: 3,
+      }),
+    }),
+    ambient_context_ref: Object.freeze({
+      run_ref: Object.freeze({ kind: "run", not_applicable: true }),
+      work_item_ref: Object.freeze({
+        kind: "work_item",
+        not_applicable: true,
+      }),
+      node_ref: Object.freeze({ kind: "node", not_applicable: true }),
+      attempt_ref: Object.freeze({ kind: "attempt", not_applicable: true }),
+      ledger_ref: Object.freeze({
+        kind: "ledger_entry",
+        not_applicable: true,
+      }),
+    }),
+  });
+}
+
 function serializedEnvelope(envelope: SafeEnvelope): string {
   return `${JSON.stringify(envelope)}\n`;
 }
@@ -710,6 +750,60 @@ afterAll(async () => {
 });
 
 describe.sequential("FIX-01 C4 public runtime spool drain", () => {
+  it("accepts JOB_LIFECYCLE through the shared registry taxonomy", async () => {
+    const directory = createScratchDirectory();
+    const path = join(directory, spoolName("scheduler", DEAD_PID));
+    const envelope = lifecycleEnvelope(
+      "00000000-0000-4000-8000-000000000061",
+    );
+    writeFileSync(path, `${JSON.stringify(envelope)}\n`, { mode: 0o600 });
+    const result = recordingSink();
+
+    await drainWithSink(directory, result.sink);
+
+    expect(result.calls).toHaveLength(1);
+    expect(result.calls[0]).toMatchObject({
+      code: "OBS_SCHEDULER_JOB_NOOP",
+      taxonomy_class: "JOB_LIFECYCLE",
+      template_parameters: { job: "replay-self-test", count: 3 },
+    });
+  });
+
+  it("rejects lifecycle spool rows whose registry binding was changed", async () => {
+    const directory = createScratchDirectory();
+    const base = lifecycleEnvelope(
+      "00000000-0000-4000-8000-000000000062",
+    );
+    const mutations = [
+      {
+        ...base,
+        taxonomy_class: "ORIGIN_UNKNOWN",
+        fingerprint: fingerprintFor(
+          "scheduler",
+          "ORIGIN_UNKNOWN",
+          "OBS_SCHEDULER_JOB_NOOP",
+        ),
+      },
+      { ...base, source_event_ref: randomUUID(), capture_point: "self" },
+      { ...base, source_event_ref: randomUUID(), disposition: "SELF" },
+      { ...base, source_event_ref: randomUUID(), source: "hatchet" },
+    ];
+    const paths = mutations.map((mutation) => {
+      const path = join(directory, spoolName("scheduler", DEAD_PID));
+      writeFileSync(path, `${JSON.stringify(mutation)}\n`, { mode: 0o600 });
+      return { path, bytes: readFileSync(path) };
+    });
+    const result = recordingSink();
+
+    await drainWithSink(directory, result.sink);
+
+    expect(result.calls).toHaveLength(0);
+    for (const entry of paths) {
+      expect(readFileSync(entry.path)).toEqual(entry.bytes);
+      expect(existsSync(`${entry.path}.ingested`)).toBe(false);
+    }
+  });
+
   it("drains lawful sentinel, declared-kind, and absent refs while preserving live, malformed, unsafe, and completed files", async () => {
     const directory = createScratchDirectory();
     const scheduler = safeEnvelope("scheduler");

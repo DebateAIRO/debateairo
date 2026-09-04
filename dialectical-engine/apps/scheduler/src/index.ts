@@ -3,6 +3,7 @@ import { evaluate, type OperatorResolution } from "@debateai/propagation";
 import { decideReplayEviction, ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import { readLivenessPolicy } from "@debateai/register";
+import { emit, notApplicable, runWithObsContext } from "@debateai/obs-capture";
 import {
   SettlementRepository,
   type SettlementOutcomeInput,
@@ -14,6 +15,18 @@ export interface ReplaySelfTestReport {
   readonly checked: number;
   readonly evicted: readonly string[];
 }
+
+export interface LivenessSweepReport {
+  readonly checked: number;
+  readonly archived: readonly string[];
+}
+
+export const SCHEDULER_JOB_NAMES = Object.freeze([
+  "replay-self-test",
+  "liveness-sweep",
+  "settlement-watch",
+] as const);
+export type SchedulerJobName = (typeof SCHEDULER_JOB_NAMES)[number];
 
 export async function runReplaySelfTest(pool: Pool): Promise<ReplaySelfTestReport> {
   const records = await pool.query<{
@@ -71,7 +84,10 @@ export async function runReplaySelfTest(pool: Pool): Promise<ReplaySelfTestRepor
   return { checked: records.rows.length, evicted };
 }
 
-export async function runLivenessSweep(pool: Pool, now = new Date()): Promise<readonly string[]> {
+export async function runLivenessSweep(
+  pool: Pool,
+  now = new Date(),
+): Promise<LivenessSweepReport> {
   const versions = await pool.query<{ register_version: string }>(
     `SELECT DISTINCT register_version::text FROM core.run ORDER BY register_version`
   );
@@ -81,7 +97,10 @@ export async function runLivenessSweep(pool: Pool, now = new Date()): Promise<re
     const policy = await readLivenessPolicy(pool, Number(row.register_version), "standard");
     archived.push(...await liveness.sweep(now, policy));
   }
-  return Object.freeze(archived);
+  return Object.freeze({
+    checked: versions.rows.length,
+    archived: Object.freeze(archived),
+  });
 }
 
 export async function runReaper(_pool: Pool): Promise<never> {
@@ -94,6 +113,69 @@ export interface SettlementWatchReport {
   readonly superseded: number;
   readonly incomplete: number;
   readonly results: readonly SettlementResult[];
+}
+
+export interface SchedulerJobReportMap {
+  readonly "replay-self-test": ReplaySelfTestReport;
+  readonly "liveness-sweep": LivenessSweepReport;
+  readonly "settlement-watch": SettlementWatchReport;
+}
+
+const LIFECYCLE_CONTEXT = Object.freeze({
+  run_ref: notApplicable("run"),
+  work_item_ref: notApplicable("work_item"),
+  node_ref: notApplicable("node"),
+  attempt_ref: notApplicable("attempt"),
+  ledger_ref: notApplicable("ledger_entry"),
+});
+
+function emitLifecycle(payload: Readonly<Record<string, unknown>>): void {
+  runWithObsContext(LIFECYCLE_CONTEXT, () => emit(payload));
+}
+
+function isPositiveReport<Name extends SchedulerJobName>(
+  name: Name,
+  report: SchedulerJobReportMap[Name],
+): boolean {
+  if (name === "replay-self-test") {
+    return (report as ReplaySelfTestReport).evicted.length > 0;
+  }
+  if (name === "liveness-sweep") {
+    return (report as LivenessSweepReport).archived.length > 0;
+  }
+  return (report as SettlementWatchReport).settled > 0;
+}
+
+export async function runJobWithLifecycle<Name extends SchedulerJobName>(
+  name: Name,
+  fn: () => Promise<SchedulerJobReportMap[Name]>,
+): Promise<SchedulerJobReportMap[Name]> {
+  emitLifecycle(Object.freeze({
+    code: "OBS_SCHEDULER_JOB_STARTED",
+    template_parameters: Object.freeze({ job: name }),
+  }));
+  try {
+    const report = await fn();
+    if (isPositiveReport(name, report)) {
+      emitLifecycle(Object.freeze({
+        code: "OBS_SCHEDULER_JOB_SUCCEEDED",
+        template_parameters: Object.freeze({ job: name }),
+      }));
+    } else {
+      emitLifecycle(Object.freeze({
+        code: "OBS_SCHEDULER_JOB_NOOP",
+        template_parameters: Object.freeze({ job: name, count: report.checked }),
+      }));
+    }
+    return report;
+  } catch (error) {
+    emitLifecycle(Object.freeze({
+      code: "OBS_SCHEDULER_JOB_FAILED",
+      template_parameters: Object.freeze({ job: name }),
+      error,
+    }));
+    throw error;
+  }
 }
 
 // The resolver adapter supplies immutable outcome envelopes. Keeping that seam

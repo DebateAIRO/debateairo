@@ -117,6 +117,235 @@ describe.sequential("FIX-01 C2 public runtime database path", () => {
     expect(proof).toEqual({ resolved: true, scheduled: 0, cleared: 0 });
   });
 
+  it("preserves writer grants and mutation triggers across migration 0061", async () => {
+    const snapshot = async () => ({
+      grants: (await database.pool.query(
+        `SELECT grantee, privilege_type, is_grantable
+           FROM information_schema.role_table_grants
+          WHERE table_schema = 'obs' AND table_name = 'occurrence'
+          ORDER BY grantee, privilege_type, is_grantable`,
+      )).rows,
+      triggers: (await database.pool.query(
+        `SELECT tgname, pg_get_triggerdef(oid) AS definition
+           FROM pg_trigger
+          WHERE tgrelid = 'obs.occurrence'::regclass AND NOT tgisinternal
+          ORDER BY tgname`,
+      )).rows,
+    });
+    await database.pool.query(`
+      ALTER TABLE obs.occurrence
+        DROP CONSTRAINT occurrence_taxonomy_class_check,
+        ADD CONSTRAINT occurrence_taxonomy_class_check CHECK (taxonomy_class IN (
+          'PROCESS_DEATH', 'HTTP_FAILURE', 'JOB_FAILURE', 'PROVIDER_EXHAUSTED', 'DB_FAILURE',
+          'PARSE_SCHEMA_FAILURE', 'STALL_DETECTED', 'SILENT_NOOP', 'SUSPICIOUS_SUCCESS',
+          'CLIENT_FAILURE', 'CAPTURE_SELF', 'ORIGIN_UNKNOWN'
+        ))
+    `);
+    const before = await snapshot();
+    const migration = readFileSync(
+      new URL("../../migrations/0061_obs_job_lifecycle_taxonomy.sql", import.meta.url),
+      "utf8",
+    );
+
+    await database.pool.query(migration);
+
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("persists ordered scheduler lifecycle pairs with stable failure identity", async () => {
+    const before = await database.pool.query<{ max_seq: string }>(
+      "SELECT coalesce(max(occ_seq), 0)::text AS max_seq FROM obs.occurrence",
+    );
+    const beforeSequence = before.rows[0]?.max_seq ?? "0";
+
+    const proof = runPublicRuntimeProbe<{ readonly sameError: boolean }>([
+      'import { runJobWithLifecycle } from "./apps/scheduler/src/index.ts";',
+      'import { emit } from "@debateai/obs-capture";',
+      'import { startCaptureRuntime, stopCaptureRuntime } from "@debateai/obs-capture/runtime";',
+      "await startCaptureRuntime({ runtime: 'scheduler', spoolFd: undefined, installExitSink() {} });",
+      "const planted = Object.freeze({ message: 'PLANTED-C5-DB-ERROR', secret: 'postgres://secret' });",
+      "let sameError = true;",
+      "for (let index = 0; index < 2; index += 1) {",
+      "  try { await runJobWithLifecycle('replay-self-test', async () => { throw planted; }); }",
+      "  catch (error) { sameError = sameError && error === planted; }",
+      "}",
+      "emit({ code: 'OBS_CAPTURE_SELF', taxonomy_class: 'CAPTURE_SELF', capture_point: 'self', disposition: 'SELF', source: 'first_party' });",
+      "await stopCaptureRuntime({ deadlineMs: 5000 });",
+      "process.stdout.write(JSON.stringify({ sameError }));",
+    ].join("\n"));
+    expect(proof.sameError).toBe(true);
+
+    const rows = await database.pool.query<{
+      code: string;
+      taxonomy_class: string;
+      severity: string;
+      disposition: string;
+      fingerprint: string;
+      template_parameters: Readonly<Record<string, unknown>>;
+      run_ref: string;
+      work_item_ref: string;
+      node_ref: string;
+      attempt_ref: string;
+      ledger_ref: string;
+    }>(
+      `SELECT code, taxonomy_class, severity, disposition, fingerprint,
+              template_parameters, run_ref, work_item_ref, node_ref,
+              attempt_ref, ledger_ref
+        FROM obs.occurrence
+        WHERE occ_seq > $1::bigint
+          AND code = ANY($2::text[])
+        ORDER BY occ_seq`,
+      [
+        beforeSequence,
+        [
+          "OBS_SCHEDULER_JOB_STARTED",
+          "OBS_SCHEDULER_JOB_SUCCEEDED",
+          "OBS_SCHEDULER_JOB_FAILED",
+          "OBS_SCHEDULER_JOB_NOOP",
+        ],
+      ],
+    );
+
+    expect(rows.rows.map((row) => row.code)).toEqual([
+      "OBS_SCHEDULER_JOB_STARTED",
+      "OBS_SCHEDULER_JOB_FAILED",
+      "OBS_SCHEDULER_JOB_STARTED",
+      "OBS_SCHEDULER_JOB_FAILED",
+    ]);
+    const independent = await database.pool.query<{ code: string }>(
+      `SELECT code FROM obs.occurrence
+        WHERE occ_seq > $1::bigint AND code = 'OBS_CAPTURE_SELF'`,
+      [beforeSequence],
+    );
+    expect(independent.rows).toEqual([{ code: "OBS_CAPTURE_SELF" }]);
+    expect(rows.rows.filter((row) => row.code === "OBS_SCHEDULER_JOB_FAILED"))
+      .toHaveLength(2);
+    expect(new Set(rows.rows.map((row) => row.fingerprint)).size).toBe(2);
+    expect(new Set(rows.rows
+      .filter((row) => row.code === "OBS_SCHEDULER_JOB_FAILED")
+      .map((row) => row.fingerprint)).size).toBe(1);
+    for (const row of rows.rows) {
+      expect(row.template_parameters).toEqual({ job: "replay-self-test" });
+      expect([
+        row.run_ref,
+        row.work_item_ref,
+        row.node_ref,
+        row.attempt_ref,
+        row.ledger_ref,
+      ]).toEqual(Array.from({ length: 5 }, () => "NOT_APPLICABLE"));
+      expect(JSON.stringify(row)).not.toContain("PLANTED-C5-DB-ERROR");
+      expect(JSON.stringify(row)).not.toContain("postgres://secret");
+    }
+    expect(rows.rows[0]).toMatchObject({
+      taxonomy_class: "JOB_LIFECYCLE",
+      severity: "INFO",
+      disposition: "DETECTED",
+    });
+    expect(rows.rows[1]).toMatchObject({
+      taxonomy_class: "JOB_FAILURE",
+      severity: "SEVERE",
+      disposition: "THROWN",
+    });
+  });
+
+  it("spools only the two lifecycle rows when the writer database is unavailable", () => {
+    const directory = mkdtempSync(join(tmpdir(), "fix01-c5-lifecycle-spool-"));
+    const spoolPath = join(directory, "scheduler-lifecycle.spool");
+    const fd = openSync(spoolPath, "a+");
+    closeSync(fd);
+
+    try {
+      const proof = runPublicRuntimeProbe<{ readonly sameError: boolean }>([
+        'import { closeSync, openSync } from "node:fs";',
+        'import { runJobWithLifecycle } from "./apps/scheduler/src/index.ts";',
+        'import { startCaptureRuntime, stopCaptureRuntime } from "@debateai/obs-capture/runtime";',
+        "const fd = openSync(process.env.TEST_SPOOL_PATH, 'a+');",
+        "await startCaptureRuntime({ runtime: 'scheduler', spoolFd: fd, installExitSink() {} });",
+        "const planted = Object.freeze({ message: 'PLANTED-C5-SPOOL-ERROR', dsn: 'postgres://secret' });",
+        "let sameError = false;",
+        "try { await runJobWithLifecycle('liveness-sweep', async () => { throw planted; }); }",
+        "catch (error) { sameError = error === planted; }",
+        "await stopCaptureRuntime({ deadlineMs: 5000 });",
+        "closeSync(fd);",
+        "process.stdout.write(JSON.stringify({ sameError }));",
+      ].join("\n"), {
+        OBS_WRITER_DATABASE_URL: "",
+        TEST_SPOOL_PATH: spoolPath,
+      });
+      expect(proof.sameError).toBe(true);
+
+      const lines = readFileSync(spoolPath, "utf8")
+        .split("\n")
+        .filter((line) => line.length > 0);
+      expect(lines.map((line) => JSON.parse(line).code)).toEqual([
+        "OBS_SCHEDULER_JOB_STARTED",
+        "OBS_SCHEDULER_JOB_FAILED",
+      ]);
+      expect(lines.join("\n")).not.toContain("PLANTED-C5-SPOOL-ERROR");
+      expect(lines.join("\n")).not.toContain("postgres://secret");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the migrated taxonomy closed after adding JOB_LIFECYCLE", async () => {
+    const definition = await database.pool.query<{ definition: string }>(
+      `SELECT pg_get_constraintdef(oid) AS definition
+         FROM pg_constraint
+        WHERE conrelid = 'obs.occurrence'::regclass
+          AND conname = 'occurrence_taxonomy_class_check'`,
+    );
+    expect(definition.rows).toHaveLength(1);
+    expect(definition.rows[0]?.definition).toContain("JOB_LIFECYCLE");
+    expect(definition.rows[0]?.definition).not.toContain("UNKNOWN_TAXONOMY");
+
+    const inserted = await database.pool.query<{ taxonomy_class: string }>(
+      `INSERT INTO obs.occurrence (
+         occurred_at, environment, build_ref, build_dirty, runtime, component,
+         capture_point, code, taxonomy_class, severity, disposition, fingerprint,
+         fingerprint_version, redaction_policy_version, allowlist_set_id,
+         fallback_minimized, capture_status, run_ref, work_item_ref, node_ref,
+         attempt_ref, ledger_ref, parent_occurrence_ref, at_seq_watermark,
+         frames, safe_template_id, template_parameters, source, source_event_ref,
+         zone_context, writer_identity
+       )
+       SELECT occurred_at, environment, build_ref, build_dirty, runtime, component,
+              capture_point, code, 'JOB_LIFECYCLE', severity, disposition,
+              fingerprint, fingerprint_version, redaction_policy_version,
+              allowlist_set_id, fallback_minimized, capture_status, run_ref,
+              work_item_ref, node_ref, attempt_ref, ledger_ref,
+              parent_occurrence_ref, at_seq_watermark, frames, safe_template_id,
+              template_parameters, source, gen_random_uuid()::text,
+              zone_context, writer_identity
+         FROM obs.occurrence
+        LIMIT 1
+       RETURNING taxonomy_class`,
+    );
+    expect(inserted.rows).toEqual([{ taxonomy_class: "JOB_LIFECYCLE" }]);
+
+    await expect(database.pool.query(
+      `INSERT INTO obs.occurrence (
+         occurred_at, environment, build_ref, build_dirty, runtime, component,
+         capture_point, code, taxonomy_class, severity, disposition, fingerprint,
+         fingerprint_version, redaction_policy_version, allowlist_set_id,
+         fallback_minimized, capture_status, run_ref, work_item_ref, node_ref,
+         attempt_ref, ledger_ref, parent_occurrence_ref, at_seq_watermark,
+         frames, safe_template_id, template_parameters, source, source_event_ref,
+         zone_context, writer_identity
+       )
+       SELECT occurred_at, environment, build_ref, build_dirty, runtime, component,
+              capture_point, code, 'UNKNOWN_TAXONOMY', severity, disposition,
+              fingerprint, fingerprint_version, redaction_policy_version,
+              allowlist_set_id, fallback_minimized, capture_status, run_ref,
+              work_item_ref, node_ref, attempt_ref, ledger_ref,
+              parent_occurrence_ref, at_seq_watermark, frames, safe_template_id,
+              template_parameters, source, gen_random_uuid()::text,
+              zone_context, writer_identity
+         FROM obs.occurrence
+        LIMIT 1`,
+    )).rejects.toMatchObject({ code: "23514" });
+  });
+
   it("persists two occurrences with one fingerprint through the writer role and keeps that role append-only", async () => {
     const before = await database.pool.query<{ max_seq: string }>(
       "SELECT coalesce(max(occ_seq), 0)::text AS max_seq FROM obs.occurrence",
