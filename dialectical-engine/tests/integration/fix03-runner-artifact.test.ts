@@ -260,29 +260,41 @@ describe("FIX-03 C2 artifact", () => {
 
   it.each([
     ["an accessor", () => {
+      let reads = 0;
       const outer: Record<string, unknown> = {};
       Object.defineProperty(outer, "zone_context", {
-        get() { throw new Error("ZONE_GETTER_CALLED"); },
+        get() {
+          reads += 1;
+          throw new Error("ZONE_GETTER_CALLED");
+        },
         enumerable: true,
       });
-      return outer;
+      return { outer, readCount: () => reads };
     }],
-    ["a descriptor trap", () => new Proxy({}, {
-      getOwnPropertyDescriptor() { throw new Error("ZONE_DESCRIPTOR_TRAP"); },
+    ["a descriptor trap", () => ({
+      outer: new Proxy({}, {
+        getOwnPropertyDescriptor() { throw new Error("ZONE_DESCRIPTOR_TRAP"); },
+      }),
+      readCount: () => 0,
     })],
-    ["a non-boolean value", () => ({ zone_context: "true" })],
-  ] as const)("fails closed for %s on the outer zone field", async (_name, makeOuter) => {
+    ["a non-boolean value", () => ({
+      outer: { zone_context: "true" },
+      readCount: () => 0,
+    })],
+  ] as const)("fails closed for %s on the outer zone field", async (_name, makeCase) => {
     const failure = new Error("private hostile-zone task failure");
     const captured = installRecordingEmitter();
     const task = taskFor({
       executeWorkItem: vi.fn<() => Promise<RunnerExecutionResult>>().mockRejectedValue(failure),
     });
+    const { outer, readCount } = makeCase();
 
-    await expect(runWithObsContext(makeOuter(), () => task(
+    await expect(runWithObsContext(outer, () => task(
       { runId: RUN_ID, workItemId: WORK_ITEM_ID },
       { retryCount: () => 1 },
     ))).rejects.toBe(failure);
 
+    expect(readCount()).toBe(0);
     expect(captured).toHaveLength(1);
     expect(captured[0]?.ambient_context_ref).toEqual({
       run_ref: { kind: "run", value: RUN_ID },
