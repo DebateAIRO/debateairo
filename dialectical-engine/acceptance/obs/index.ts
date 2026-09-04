@@ -8,8 +8,14 @@ import { randomUUID } from "node:crypto";
 import { corpusCase } from "./cases/corpus.js";
 import { identityCanaryCase } from "./cases/identity-canary.js";
 import { schemaManifestCase } from "./cases/schema-manifest.js";
+import {
+  OBS_G1_READBACK_MAX_ROWS,
+  ObsReadbackFailure,
+  openObsReadbackFromEnvironment,
+  type ObsOccurrenceReadbackRow,
+  type ObsReadback,
+} from "./readback.js";
 
-export const OBS_G1_CHILD_RECEIPT_PREFIX = "OBS_G1_CHILD_RECEIPT " as const;
 export const OBS_G1_CHILD_OUTPUT_MAX_BYTES = 65_536 as const;
 export const OBS_G1_CHILD_KILL_GRACE_MS = 250 as const;
 
@@ -17,9 +23,39 @@ const SAFE_CASE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SAFE_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const SAFE_METRIC = /^[a-z][a-z0-9_]{0,31}$/;
 const FORBIDDEN_ZONE_ROOT = "packages/obs-capture/src/zone";
+const OBS_RUNTIMES = new Set([
+  "api",
+  "runner",
+  "scheduler",
+  "evaluator-lib",
+  "ui-client",
+  "listener",
+  "watchdog",
+  "ingest",
+]);
+const OBS_CAPTURE_POINTS = new Set([
+  "process",
+  "http",
+  "job",
+  "provider",
+  "db",
+  "client",
+  "detector",
+  "boundary",
+  "self",
+]);
+const OBS_READBACK_FAILURE_CODES: ReadonlySet<string> = new Set([
+  "ROW_VERIFIER_UNAVAILABLE",
+  "ROW_READBACK_INVALID",
+  "ROW_READBACK_QUERY_FAILED",
+  "ROW_READBACK_LIMIT",
+  "ROW_READBACK_CLOSE_TIMEOUT",
+  "ROW_READBACK_CLOSE_FAILED",
+]);
 
 const verdicts = new WeakSet<object>();
 const spawnReceipts = new WeakSet<object>();
+const rowProofs = new WeakMap<object, { readonly rows: number }>();
 
 class ObsHarnessFailure extends Error {
   constructor(readonly code: string) {
@@ -33,23 +69,20 @@ export interface SpawnSubjectOptions {
   readonly arguments?: readonly string[];
   readonly environment?: Readonly<Record<string, string>>;
   readonly timeoutMs: number;
+  readonly rowExpectation?: Readonly<{
+    readonly runtime: string;
+    readonly capturePoint: string;
+  }>;
 }
 
 export interface SpawnReceipt {
   readonly pid: number;
-  readonly sourceEventRef: string;
-  readonly occurrenceSequences: readonly number[];
+  readonly declaredRunRef?: string;
   readonly exitCode: number | null;
   readonly signal: NodeJS.Signals | null;
   readonly stdout: string;
   readonly stderr: string;
   readonly scratchDirectory: string;
-}
-
-export interface RowWrittenByPid {
-  readonly pid: number;
-  readonly sourceEventRef: string;
-  readonly occurrenceSequence: number;
 }
 
 export interface ObsVerdict {
@@ -62,8 +95,7 @@ export interface ObsCaseContext {
   spawn(options: SpawnSubjectOptions): Promise<SpawnReceipt>;
   passRows(
     receipt: SpawnReceipt,
-    rows: readonly RowWrittenByPid[],
-    metrics: Readonly<Record<string, number>>,
+    metrics?: Readonly<Record<string, number>>,
   ): ObsVerdict;
   passProcess(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict;
   fail(code: string, metrics?: Readonly<Record<string, number>>): ObsVerdict;
@@ -86,12 +118,6 @@ export interface RunFamilyOptions {
 export interface FamilyResult {
   readonly exitCode: 0 | 1;
   readonly lines: readonly string[];
-}
-
-interface ChildReceiptJson {
-  readonly pid: number;
-  readonly source_event_ref: string;
-  readonly occ_seq: readonly number[];
 }
 
 function safeMetrics(metrics: Readonly<Record<string, number>>): Readonly<Record<string, number>> {
@@ -125,47 +151,8 @@ function failVerdict(code: string, metrics: Readonly<Record<string, number>> = {
   return mintVerdict("FAIL", metrics, code);
 }
 
-function parseChildReceipt(
-  stdout: string,
-  observedPid: number,
-  expectedSourceEventRef: string,
-  details: Omit<SpawnReceipt, "pid" | "sourceEventRef" | "occurrenceSequences">,
-): SpawnReceipt {
-  const receiptLines = stdout
-    .split(/\r?\n/u)
-    .filter((line) => line.startsWith(OBS_G1_CHILD_RECEIPT_PREFIX));
-  if (receiptLines.length !== 1) throw new ObsHarnessFailure("CHILD_RECEIPT_INVALID");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(receiptLines[0]!.slice(OBS_G1_CHILD_RECEIPT_PREFIX.length));
-  } catch {
-    throw new ObsHarnessFailure("CHILD_RECEIPT_INVALID");
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new ObsHarnessFailure("CHILD_RECEIPT_INVALID");
-  }
-  const candidate = parsed as Partial<ChildReceiptJson>;
-  if (
-    candidate.pid !== observedPid
-    || candidate.source_event_ref !== expectedSourceEventRef
-    || !Array.isArray(candidate.occ_seq)
-    || candidate.occ_seq.some((value) => !Number.isSafeInteger(value) || value <= 0)
-    || new Set(candidate.occ_seq).size !== candidate.occ_seq.length
-  ) {
-    throw new ObsHarnessFailure("CHILD_RECEIPT_INVALID");
-  }
-  const receipt = Object.freeze({
-    pid: observedPid,
-    sourceEventRef: expectedSourceEventRef,
-    occurrenceSequences: Object.freeze([...candidate.occ_seq]),
-    ...details,
-  });
-  spawnReceipts.add(receipt);
-  return receipt;
-}
-
 function childEnvironment(
-  sourceEventRef: string,
+  declaredRunRef: string | undefined,
   scratchDirectory: string,
   supplied: Readonly<Record<string, string>> | undefined,
 ): NodeJS.ProcessEnv {
@@ -174,14 +161,64 @@ function childEnvironment(
     if (process.env[name] !== undefined) output[name] = process.env[name];
   }
   for (const [name, value] of Object.entries(supplied ?? {})) {
-    if (!name.startsWith("OBS_") && name !== "NODE_ENV") {
+    if (
+      (!name.startsWith("OBS_") && name !== "NODE_ENV")
+      || name === "OBS_LISTENER_DATABASE_URL"
+      || name === "OBS_G1_DECLARED_RUN_REF"
+      || name === "OBS_G1_SCRATCH_DIR"
+    ) {
       throw new ObsHarnessFailure("CHILD_ENVIRONMENT_KEY_FORBIDDEN");
     }
     output[name] = value;
   }
-  output.OBS_G1_SOURCE_EVENT_REF = sourceEventRef;
+  if (declaredRunRef !== undefined) output.OBS_G1_DECLARED_RUN_REF = declaredRunRef;
   output.OBS_G1_SCRATCH_DIR = scratchDirectory;
   return output;
+}
+
+function validateRowExpectation(
+  expectation: SpawnSubjectOptions["rowExpectation"],
+): NonNullable<SpawnSubjectOptions["rowExpectation"]> | undefined {
+  if (expectation === undefined) return undefined;
+  if (!OBS_RUNTIMES.has(expectation.runtime) || !OBS_CAPTURE_POINTS.has(expectation.capturePoint)) {
+    throw new ObsHarnessFailure("ROW_EXPECTATION_INVALID");
+  }
+  return expectation;
+}
+
+function readbackFailure(error: unknown, fallback: string): ObsHarnessFailure {
+  return new ObsHarnessFailure(
+    error instanceof ObsReadbackFailure && OBS_READBACK_FAILURE_CODES.has(error.code)
+      ? error.code
+      : fallback,
+  );
+}
+
+function verifyReadbackRows(
+  rows: readonly ObsOccurrenceReadbackRow[],
+  baseline: bigint,
+  runRef: string,
+  runtime: string,
+  capturePoint: string,
+): number {
+  if (rows.length === 0) throw new ObsHarnessFailure("ROW_READBACK_EMPTY");
+  if (rows.length > OBS_G1_READBACK_MAX_ROWS) {
+    throw new ObsHarnessFailure("ROW_READBACK_LIMIT");
+  }
+  const sequences = new Set<bigint>();
+  for (const row of rows) {
+    if (
+      row.occurrenceSequence <= baseline
+      || row.runRef !== runRef
+      || row.runtime !== runtime
+      || row.capturePoint !== capturePoint
+      || sequences.has(row.occurrenceSequence)
+    ) {
+      throw new ObsHarnessFailure("ROW_READBACK_MISMATCH");
+    }
+    sequences.add(row.occurrenceSequence);
+  }
+  return rows.length;
 }
 
 async function spawnSubject(
@@ -192,15 +229,35 @@ async function spawnSubject(
   if (options.command.trim() === "" || !Number.isInteger(options.timeoutMs) || options.timeoutMs < 1) {
     throw new ObsHarnessFailure("CHILD_OPTIONS_INVALID");
   }
-  const scratchDirectory = await mkdtemp(join(await realpath(scratchRoot), "obs-g1-"));
-  const sourceEventRef = randomUUID();
+  const rowExpectation = validateRowExpectation(options.rowExpectation);
+  let readback: ObsReadback | undefined;
+  let baseline: bigint | undefined;
+  let declaredRunRef: string | undefined;
+  let scratchDirectory: string | undefined;
   try {
+    if (rowExpectation !== undefined) {
+      try {
+        readback = await openObsReadbackFromEnvironment();
+      } catch (error) {
+        throw readbackFailure(error, "ROW_VERIFIER_UNAVAILABLE");
+      }
+      if (readback === undefined) throw new ObsHarnessFailure("ROW_VERIFIER_UNAVAILABLE");
+      try {
+        baseline = await readback.readBaseline();
+      } catch (error) {
+        throw readbackFailure(error, "ROW_READBACK_QUERY_FAILED");
+      }
+      declaredRunRef = `run:obs-g1:${randomUUID()}`;
+    }
+
+    scratchDirectory = await mkdtemp(join(await realpath(scratchRoot), "obs-g1-"));
     const child = spawn(options.command, [...(options.arguments ?? [])], {
       cwd: repoRoot,
-      env: childEnvironment(sourceEventRef, scratchDirectory, options.environment),
+      env: childEnvironment(declaredRunRef, scratchDirectory, options.environment),
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    const observedPid = child.pid;
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
     let outputBytes = 0;
@@ -237,18 +294,62 @@ async function spawnSubject(
     const stdout = Buffer.concat(stdoutChunks).toString("utf8");
     const stderr = Buffer.concat(stderrChunks).toString("utf8");
     if (failureCode !== undefined) throw new ObsHarnessFailure(failureCode);
-    if (child.pid === undefined || !Number.isSafeInteger(child.pid) || child.pid < 1) {
+    if (observedPid === undefined || !Number.isSafeInteger(observedPid) || observedPid < 1) {
       throw new ObsHarnessFailure("CHILD_PID_INVALID");
     }
-    return parseChildReceipt(stdout, child.pid, sourceEventRef, {
+    const receipt: SpawnReceipt = Object.freeze({
+      pid: observedPid,
+      ...(declaredRunRef === undefined ? {} : { declaredRunRef }),
       exitCode,
       signal,
       stdout,
       stderr,
       scratchDirectory,
     });
+    spawnReceipts.add(receipt);
+
+    if (
+      rowExpectation !== undefined
+      && readback !== undefined
+      && baseline !== undefined
+      && declaredRunRef !== undefined
+    ) {
+      let rows: readonly ObsOccurrenceReadbackRow[];
+      try {
+        rows = await readback.readRows({
+          baseline,
+          runRef: declaredRunRef,
+          runtime: rowExpectation.runtime,
+          capturePoint: rowExpectation.capturePoint,
+        });
+      } catch (error) {
+        throw readbackFailure(error, "ROW_READBACK_QUERY_FAILED");
+      }
+      rowProofs.set(receipt, Object.freeze({
+        rows: verifyReadbackRows(
+          rows,
+          baseline,
+          declaredRunRef,
+          rowExpectation.runtime,
+          rowExpectation.capturePoint,
+        ),
+      }));
+    }
+    return receipt;
   } finally {
-    await rm(scratchDirectory, { recursive: true, force: true });
+    try {
+      if (scratchDirectory !== undefined) {
+        await rm(scratchDirectory, { recursive: true, force: true });
+      }
+    } finally {
+      if (readback !== undefined) {
+        try {
+          await readback.close();
+        } catch (error) {
+          throw readbackFailure(error, "ROW_READBACK_CLOSE_FAILED");
+        }
+      }
+    }
   }
 }
 
@@ -260,42 +361,18 @@ function createContext(repoRoot: string, scratchRoot: string): ObsCaseContext {
     spawn: (options: SpawnSubjectOptions) => spawnSubject(repoRoot, scratchRoot, options),
     passRows(
       receipt: SpawnReceipt,
-      rows: readonly RowWrittenByPid[],
-      metrics: Readonly<Record<string, number>>,
+      metrics: Readonly<Record<string, number>> = {},
     ): ObsVerdict {
       requireReceipt(receipt);
-      if (receipt.occurrenceSequences.length === 0 || rows.length === 0) {
-        throw new ObsHarnessFailure("ROW_RECEIPT_REQUIRED");
-      }
-      for (const row of rows) {
-        if (row.pid !== receipt.pid) {
-          throw new ObsHarnessFailure("ROW_RECEIPT_PID_MISMATCH");
-        }
-        if (row.sourceEventRef !== receipt.sourceEventRef) {
-          throw new ObsHarnessFailure("ROW_RECEIPT_SOURCE_REF_MISMATCH");
-        }
-      }
-      const childSequences = [...receipt.occurrenceSequences].sort((left, right) => left - right);
-      const readBackSequences = rows.map((row) => row.occurrenceSequence).sort((left, right) => left - right);
-      if (
-        readBackSequences.some((value) => !Number.isSafeInteger(value) || value <= 0)
-        || new Set(readBackSequences).size !== readBackSequences.length
-        || childSequences.length !== readBackSequences.length
-        || childSequences.some((value, index) => value !== readBackSequences[index])
-      ) {
-        throw new ObsHarnessFailure("ROW_RECEIPT_SEQUENCE_MISMATCH");
-      }
-      const checked = safeMetrics(metrics);
-      if (checked.rows !== rows.length) {
-        throw new ObsHarnessFailure("ROW_RECEIPT_COUNT_MISMATCH");
-      }
-      return mintVerdict("PASS", checked);
+      const proof = rowProofs.get(receipt);
+      if (proof === undefined) throw new ObsHarnessFailure("ROW_READBACK_REQUIRED");
+      if (Array.isArray(metrics)) throw new ObsHarnessFailure("CASE_ROWS_FORBIDDEN");
+      if (Object.hasOwn(metrics, "rows")) throw new ObsHarnessFailure("METRIC_RESERVED");
+      return mintVerdict("PASS", { ...metrics, rows: proof.rows });
     },
     passProcess(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict {
       requireReceipt(receipt);
-      if (receipt.occurrenceSequences.length !== 0) {
-        throw new ObsHarnessFailure("PROCESS_RECEIPT_CONTAINS_ROWS");
-      }
+      if (rowProofs.has(receipt)) throw new ObsHarnessFailure("PROCESS_RECEIPT_CONTAINS_ROWS");
       return mintVerdict("PASS", metrics);
     },
     fail: failVerdict,

@@ -1,16 +1,33 @@
-import { access, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const readbackMock = vi.hoisted(() => ({
+  open: vi.fn(),
+}));
+
+vi.mock("../../acceptance/obs/readback.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../acceptance/obs/readback.js")>();
+  return {
+    ...actual,
+    openObsReadbackFromEnvironment: readbackMock.open,
+  };
+});
 
 import {
-  OBS_G1_CHILD_RECEIPT_PREFIX,
   OBS_G1_CHILD_OUTPUT_MAX_BYTES,
   runFamily,
   type ObsAcceptanceCase,
 } from "../../acceptance/obs/index.js";
+import {
+  ObsReadbackFailure,
+  type ObsOccurrenceReadbackQuery,
+  type ObsOccurrenceReadbackRow,
+  type ObsReadback,
+} from "../../acceptance/obs/readback.js";
 import {
   CORPUS_TOKENS,
   evaluateCorpusBytes,
@@ -36,16 +53,49 @@ async function presentSubject(repoRoot: string): Promise<string> {
   return path;
 }
 
-function receiptScript(occurrenceSequences: readonly number[]): string {
+function forgedReceiptScript(occurrenceSequences: readonly number[]): string {
   return [
     "const receipt = {",
     "  pid: process.pid,",
-    "  source_event_ref: process.env.OBS_G1_SOURCE_EVENT_REF,",
+    "  run_ref: process.env.OBS_G1_DECLARED_RUN_REF,",
     `  occ_seq: ${JSON.stringify(occurrenceSequences)},`,
     "};",
-    `process.stdout.write(${JSON.stringify(OBS_G1_CHILD_RECEIPT_PREFIX)} + JSON.stringify(receipt) + '\\n');`,
+    "process.stdout.write('OBS_G1_CHILD_RECEIPT ' + JSON.stringify(receipt) + '\\n');",
   ].join("\n");
 }
+
+function row(
+  query: ObsOccurrenceReadbackQuery,
+  occurrenceSequence = 17n,
+): ObsOccurrenceReadbackRow {
+  return Object.freeze({
+    occurrenceSequence,
+    runRef: query.runRef,
+    runtime: query.runtime,
+    capturePoint: query.capturePoint,
+  });
+}
+
+function installReadback(options: {
+  readonly baseline?: bigint;
+  readonly rows?: (query: ObsOccurrenceReadbackQuery) => readonly ObsOccurrenceReadbackRow[] | Promise<readonly ObsOccurrenceReadbackRow[]>;
+} = {}) {
+  const readBaseline = vi.fn(async () => options.baseline ?? 16n);
+  const readRows = vi.fn(async (query: ObsOccurrenceReadbackQuery) => options.rows?.(query) ?? [row(query)]);
+  const close = vi.fn(async () => undefined);
+  const verifier: ObsReadback = {
+    readBaseline,
+    readRows,
+    close,
+  };
+  readbackMock.open.mockResolvedValue(verifier);
+  return { readBaseline, readRows, close };
+}
+
+beforeEach(() => {
+  readbackMock.open.mockReset();
+  readbackMock.open.mockResolvedValue(undefined);
+});
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) =>
@@ -126,11 +176,110 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     ]);
   });
 
-  it("accepts PASS only from a real child receipt with pid and occ_seq", async () => {
+  it("rejects a stdout-only row forgery with an invented matching occ_seq", async () => {
+    const repoRoot = await temporaryDirectory("fix08-stdout-forgery-");
+    const subject = await presentSubject(repoRoot);
+    const forgedOutput = join(repoRoot, "forged-output.json");
+    const lines: string[] = [];
+    const verifier = installReadback({ rows: () => [] });
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "stdout-forgery",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", [
+              forgedReceiptScript([777]),
+              "require('node:fs').writeFileSync(process.argv[1], JSON.stringify(receipt));",
+            ].join("\n"), forgedOutput],
+            timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+          });
+          return context.passRows(receipt);
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual([
+      "obs-g1/stdout-forgery FAIL(code=ROW_READBACK_EMPTY)",
+    ]);
+    expect(lines.join("\n")).not.toContain(" PASS");
+    expect(verifier.readRows).toHaveBeenCalledOnce();
+    const forged = JSON.parse(await readFile(forgedOutput, "utf8")) as {
+      readonly pid: number;
+      readonly run_ref: string;
+      readonly occ_seq: readonly number[];
+    };
+    const query = verifier.readRows.mock.calls[0]?.[0];
+    expect(forged).toMatchObject({ run_ref: query?.runRef, occ_seq: [777] });
+    expect(forged.pid).toBeGreaterThan(0);
+  });
+
+  it("rejects the old case-supplied row-object call even when its values match stdout", async () => {
+    const repoRoot = await temporaryDirectory("fix08-case-rows-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+    installReadback();
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "case-rows",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", forgedReceiptScript([777])],
+            timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+          });
+          const oldPassRows = context.passRows as unknown as (
+            oldReceipt: typeof receipt,
+            suppliedRows: readonly Readonly<Record<string, unknown>>[],
+            suppliedMetrics: Readonly<Record<string, number>>,
+          ) => ReturnType<typeof context.passRows>;
+          return oldPassRows(receipt, [{
+            pid: receipt.pid,
+            runRef: receipt.declaredRunRef,
+            occurrenceSequence: 777,
+          }], { rows: 1 });
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual(["obs-g1/case-rows FAIL(code=CASE_ROWS_FORBIDDEN)"]);
+    expect(lines.join("\n")).not.toContain(" PASS");
+  });
+
+  it("mints row PASS only after parent read-back above the pre-spawn baseline", async () => {
     const repoRoot = await temporaryDirectory("fix08-real-pass-");
     const scratchRoot = await temporaryDirectory("fix08-real-pass-scratch-");
     const subject = await presentSubject(repoRoot);
     const lines: string[] = [];
+    const childMarker = join(repoRoot, "child-ran");
+    const baselineMarker = join(repoRoot, "baseline-ready");
+    let markerPresentAtReadback = false;
+    let childOutput: { readonly pid: number; readonly run_ref: string } | undefined;
+    let receiptPid: number | undefined;
+    let receiptExitCode: number | null | undefined;
+    const verifier = installReadback({
+      baseline: 16n,
+      async rows(query) {
+        markerPresentAtReadback = await access(childMarker).then(() => true, () => false);
+        return [row(query, 17n)];
+      },
+    });
+    verifier.readBaseline.mockImplementation(async () => {
+      await writeFile(baselineMarker, "ready", "utf8");
+      return 16n;
+    });
 
     const result = await runFamily("obs-g1", {
       cases: [{
@@ -139,14 +288,21 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
         async run(context) {
           const receipt = await context.spawn({
             command: process.execPath,
-            arguments: ["-e", receiptScript([17])],
+            arguments: ["-e", [
+              "if (!require('node:fs').existsSync(process.argv[2])) process.exit(91);",
+              "require('node:fs').writeFileSync(process.argv[1], 'ran');",
+              "process.stdout.write(JSON.stringify({",
+              "  pid: process.pid,",
+              "  run_ref: process.env.OBS_G1_DECLARED_RUN_REF,",
+              "}) + '\\n');",
+            ].join("\n"), childMarker, baselineMarker],
             timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
           });
-          return context.passRows(receipt, [{
-            pid: receipt.pid,
-            sourceEventRef: receipt.sourceEventRef,
-            occurrenceSequence: 17,
-          }], { rows: 1 });
+          receiptPid = receipt.pid;
+          receiptExitCode = receipt.exitCode;
+          childOutput = JSON.parse(receipt.stdout.trim()) as typeof childOutput;
+          return context.passRows(receipt, { children: 1 });
         },
       }],
       repoRoot,
@@ -155,42 +311,45 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(lines).toEqual(["obs-g1/real-pass PASS(rows=1)"]);
+    expect(lines).toEqual(["obs-g1/real-pass PASS(children=1 rows=1)"]);
+    expect(receiptExitCode).toBe(0);
+    expect(markerPresentAtReadback).toBe(true);
+    expect(verifier.readBaseline).toHaveBeenCalledOnce();
+    expect(verifier.readRows).toHaveBeenCalledOnce();
+    expect(verifier.close).toHaveBeenCalledOnce();
+    const query = verifier.readRows.mock.calls[0]?.[0];
+    expect(query).toMatchObject({
+      baseline: 16n,
+      runtime: "scheduler",
+      capturePoint: "job",
+    });
+    expect(query?.runRef).toMatch(/^run:obs-g1:[0-9a-f-]{36}$/u);
+    expect(childOutput).toEqual({ pid: receiptPid, run_ref: query?.runRef });
     expect(await readdir(scratchRoot)).toEqual([]);
   });
 
   it.each([
     {
-      label: "pid",
-      code: "ROW_RECEIPT_PID_MISMATCH",
-      row: (pid: number, sourceEventRef: string) => ({
-        pid: pid + 1,
-        sourceEventRef,
-        occurrenceSequence: 17,
-      }),
+      label: "baseline",
+      rows: (query: ObsOccurrenceReadbackQuery) => [row(query, query.baseline)],
     },
     {
-      label: "source event ref",
-      code: "ROW_RECEIPT_SOURCE_REF_MISMATCH",
-      row: (pid: number) => ({
-        pid,
-        sourceEventRef: "00000000-0000-4000-8000-000000000000",
-        occurrenceSequence: 17,
-      }),
+      label: "declared run",
+      rows: (query: ObsOccurrenceReadbackQuery) => [{ ...row(query), runRef: "run:other" }],
     },
     {
-      label: "occ_seq",
-      code: "ROW_RECEIPT_SEQUENCE_MISMATCH",
-      row: (pid: number, sourceEventRef: string) => ({
-        pid,
-        sourceEventRef,
-        occurrenceSequence: 18,
-      }),
+      label: "runtime",
+      rows: (query: ObsOccurrenceReadbackQuery) => [{ ...row(query), runtime: "runner" }],
     },
-  ])("rejects a read-back row whose $label does not match the child receipt", async ({ code, row }) => {
+    {
+      label: "capture point",
+      rows: (query: ObsOccurrenceReadbackQuery) => [{ ...row(query), capturePoint: "process" }],
+    },
+  ])("rejects a parent read-back row with the wrong $label", async ({ rows }) => {
     const repoRoot = await temporaryDirectory("fix08-row-mismatch-");
     const subject = await presentSubject(repoRoot);
     const lines: string[] = [];
+    installReadback({ rows });
 
     const result = await runFamily("obs-g1", {
       cases: [{
@@ -199,14 +358,11 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
         async run(context) {
           const receipt = await context.spawn({
             command: process.execPath,
-            arguments: ["-e", receiptScript([17])],
+            arguments: ["-e", ""],
             timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
           });
-          return context.passRows(
-            receipt,
-            [row(receipt.pid, receipt.sourceEventRef)],
-            { rows: 1 },
-          );
+          return context.passRows(receipt);
         },
       }],
       repoRoot,
@@ -214,7 +370,101 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     });
 
     expect(result.exitCode).toBe(1);
-    expect(lines).toEqual([`obs-g1/row-mismatch FAIL(code=${code})`]);
+    expect(lines).toEqual(["obs-g1/row-mismatch FAIL(code=ROW_READBACK_MISMATCH)"]);
+  });
+
+  it("fails before spawn when the parent read-only verifier is unavailable", async () => {
+    const repoRoot = await temporaryDirectory("fix08-no-verifier-");
+    const subject = await presentSubject(repoRoot);
+    const childMarker = join(repoRoot, "must-not-run");
+    const lines: string[] = [];
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "no-verifier",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", "require('node:fs').writeFileSync(process.argv[1], 'ran')", childMarker],
+            timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+          });
+          return context.passRows(receipt);
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual(["obs-g1/no-verifier FAIL(code=ROW_VERIFIER_UNAVAILABLE)"]);
+    await expect(access(childMarker)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("fails closed when parent read-back exceeds its row limit", async () => {
+    const repoRoot = await temporaryDirectory("fix08-row-limit-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+    installReadback({
+      rows: (query) => Array.from(
+        { length: 101 },
+        (_unused, index) => row(query, query.baseline + BigInt(index + 1)),
+      ),
+    });
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "row-limit",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", ""],
+            timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+          });
+          return context.passRows(receipt);
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual(["obs-g1/row-limit FAIL(code=ROW_READBACK_LIMIT)"]);
+  });
+
+  it("keeps database error text and credentials out of output", async () => {
+    const repoRoot = await temporaryDirectory("fix08-query-error-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+    const verifier = installReadback();
+    verifier.readBaseline.mockRejectedValue(
+      new ObsReadbackFailure("PASSWORD_PLANTED_SECRET_PRIVATE_DB"),
+    );
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "query-error",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", ""],
+            timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+          });
+          return context.passRows(receipt);
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual(["obs-g1/query-error FAIL(code=ROW_READBACK_QUERY_FAILED)"]);
+    expect(lines.join("\n")).not.toMatch(/planted-secret|private-db/iu);
   });
 
   it("permits a real spawned process to prove a process-only check", async () => {
@@ -229,7 +479,7 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
         async run(context) {
           const receipt = await context.spawn({
             command: process.execPath,
-            arguments: ["-e", receiptScript([])],
+            arguments: ["-e", ""],
             timeoutMs: 1_000,
           });
           return context.passProcess(receipt, { queries: 1 });
@@ -357,15 +607,16 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     const scratchRoot = await temporaryDirectory("fix08-cleanup-scratch-");
     const subject = await presentSubject(repoRoot);
     let scratchDirectory = "";
+    const lines: string[] = [];
 
-    await runFamily("obs-g1", {
+    const result = await runFamily("obs-g1", {
       cases: [{
         name: "cleanup",
         subjectPaths: [subject],
         async run(context) {
           const receipt = await context.spawn({
             command: process.execPath,
-            arguments: ["-e", receiptScript([])],
+            arguments: ["-e", ""],
             timeoutMs: 1_000,
           });
           scratchDirectory = receipt.scratchDirectory;
@@ -374,9 +625,11 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
       }],
       repoRoot,
       scratchRoot,
-      writeLine: () => undefined,
+      writeLine: (line) => lines.push(line),
     });
 
+    expect(result.exitCode).toBe(0);
+    expect(lines).toEqual(["obs-g1/cleanup PASS(children=1)"]);
     await expect(access(scratchDirectory)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
