@@ -7,6 +7,7 @@ import { createContext, runInContext, runInNewContext } from "node:vm";
 import { canonicalJson, canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
+const IS_PROXY = isProxy;
 const BASE_ARRAY_SOME = Object.getOwnPropertyDescriptor(
   Array.prototype,
   "some",
@@ -40,7 +41,7 @@ const BASE_ARRAY_PUSH_IS_TRUSTED =
   BASE_ARRAY_PUSH.configurable === true &&
   BASE_ARRAY_PUSH.enumerable === false &&
   BASE_ARRAY_PUSH.writable === true &&
-  !isProxy(BASE_ARRAY_PUSH.value) &&
+  !IS_PROXY(BASE_ARRAY_PUSH.value) &&
   isNativeArrayPush(BASE_ARRAY_PUSH.value);
 const BASE_OBJECT_SOME = Object.getOwnPropertyDescriptor(
   Object.prototype,
@@ -568,7 +569,7 @@ function exactSnapshotRecord(
   if (
     value === null ||
     typeof value !== "object" ||
-    isProxy(value) ||
+    IS_PROXY(value) ||
     Array.isArray(value) ||
     Object.getPrototypeOf(value) !== null
   ) {
@@ -600,7 +601,7 @@ function snapshotArrayOf(
   if (
     value === null ||
     typeof value !== "object" ||
-    isProxy(value) ||
+    IS_PROXY(value) ||
     !Array.isArray(value)
   ) {
     return false;
@@ -780,7 +781,7 @@ function severityMap(value: unknown): boolean {
     value.severe_threshold !== "SEVERE" ||
     value.overrides === null ||
     typeof value.overrides !== "object" ||
-    isProxy(value.overrides) ||
+    IS_PROXY(value.overrides) ||
     Array.isArray(value.overrides) ||
     Object.getPrototypeOf(value.overrides) !== null
   ) {
@@ -1192,7 +1193,7 @@ export class PolicyBundleLoadError extends Error {
 export function loadBundle(path: string): PolicyBundle {
   try {
     return policyBundleSchema.parse(
-      parseJsonWithUniqueKeys(readFileSync(path, "utf8")),
+      parseJsonWithUniqueKeys(READ_FILE_SYNC(path, "utf8")),
     );
   } catch (error) {
     throw new PolicyBundleLoadError(error);

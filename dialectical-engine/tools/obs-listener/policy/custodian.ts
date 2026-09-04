@@ -11,6 +11,7 @@ import {
 
 const HASH = nodeHash;
 const TIMING_SAFE_EQUAL = nodeTimingSafeEqual;
+const IS_PROXY = isProxy;
 
 export type TokenEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -34,7 +35,7 @@ function tokenDigest(token: string): Buffer {
 
 function ownStringProperty(value: unknown, key: string): string | undefined {
   if (value === null || typeof value !== "object") return undefined;
-  if (isProxy(value)) return undefined;
+  if (IS_PROXY(value)) return undefined;
   try {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) {
@@ -103,7 +104,7 @@ function ownOptionalDataProperty(
   if (value === null || typeof value !== "object") {
     return { kind: "INVALID" };
   }
-  if (isProxy(value)) return { kind: "INVALID" };
+  if (IS_PROXY(value)) return { kind: "INVALID" };
   try {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor !== undefined) {
@@ -115,7 +116,7 @@ function ownOptionalDataProperty(
     const visited: object[] = [];
     let prototype = Object.getPrototypeOf(value) as object | null;
     while (prototype !== null) {
-      if (isProxy(prototype)) return { kind: "INVALID" };
+      if (IS_PROXY(prototype)) return { kind: "INVALID" };
       if (arrayContainsIdentity(visited, prototype)) {
         return { kind: "INVALID" };
       }

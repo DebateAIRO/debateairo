@@ -33,6 +33,13 @@ was:
 - the review separately demonstrated that replacing live `Worker` could forge
   or disrupt the same authority path.
 
+A second fresh Sol review of committed head `9ca2b17c` found one remaining
+live-builtin cross-call. Replacing `node:util/types.isProxy`, synchronizing
+builtin exports, and passing a current-bundle proxy whose `ownKeys` trap changed
+the environment token from `correct` to `wrong` authorized the wrong-token
+armed repin. RED observed `quick_arm: ON`, two proxy traps, and 315 forged
+`isProxy` calls.
+
 The pre-initialization test compiles the three policy modules first and then
 loads emitted JavaScript under hostile state. Its zero-call assertion therefore
 covers product initialization rather than `tsx` loader-hook activity.
@@ -55,6 +62,10 @@ covers product initialization rather than `tsx` loader-hook activity.
   module files are captured at loader initialization. Candidate data crosses
   the boundary only as canonical JSON and the result crosses back only as an
   exact boolean.
+- All three C1 modules now retain their initialization-time `isProxy` target.
+  The loader also uses its initialization-time file-read target for bundle and
+  private-Zod reads. Later builtin export synchronization cannot redirect
+  proxy rejection or bundle input.
 - There is no worker, `SharedArrayBuffer`, typed-array signal, `Atomics`
   verdict, asynchronous bootstrap, timeout, or function-stringification path.
   Setup and validation errors are caught synchronously and map to schema
@@ -92,11 +103,19 @@ The canonical bundle remains
 - Direct replacement and synchronization of both live crypto exports executes
   zero forged calls, preserves the exact hash, and refuses the wrong-token
   armed repin.
+- Direct replacement and synchronization of live `isProxy` executes zero
+  forged calls and zero current-bundle or request traps. Both the cross-call
+  wrong-token armed repin and the forged request-descriptor repin return
+  `REPIN_REFUSED`, and the environment remains exactly `correct`. Replacing the
+  live file-read export likewise executes zero forged reads and the pinned file
+  still loads with `quick_arm: OFF`.
 - A main-realm schema-program mutant invoked hostile regex callbacks 23 times
   and failed both isolation regressions. A skip-Zod mutant accepted
   `Number.MAX_SAFE_INTEGER + 1` and failed the declared-schema authority test.
-  A live-crypto-import mutant reached the forged hash three times and failed
-  the capture test. Every mutant was restored.
+  A live-crypto-import mutant reached the forged hash three times. Live
+  custodian-`isProxy` and file-read mutants authorized the forged request and
+  read the armed replacement respectively. Every mutant failed its capture
+  regression and was restored.
 - Safe neighbours remain green: clean declared-schema validation, the
   unreachable `Object.prototype.push` case, exact frozen snapshot membership,
   top-level/nested/revoked proxy refusal, all frozen-floor samples, and lawful
@@ -105,8 +124,9 @@ The canonical bundle remains
 ## Verification
 
 - `pnpm exec vitest run tests/unit/fix09-bundle.test.ts --reporter=dot`:
-  55/55 passed in each of three consecutive fresh processes.
-- The focused floor/schema/proxy/token/neighbour selection passed 7/7.
+  58/58 passed in each of three consecutive fresh processes.
+- The focused authority/floor/schema/proxy/token/neighbour selection passed
+  11/11.
 - `node tests/unit/fixtures/fix09-independent-hash.mjs <
   tools/obs-listener/policy/bundle.json` emitted exact
   `aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd`.

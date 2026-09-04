@@ -1327,6 +1327,189 @@ describe("FIX-09 C1 policy bundle", () => {
     );
   });
 
+  it("keeps proxy rejection on the captured builtin after export synchronization", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" as const };
+    const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+    const require = createRequire(import.meta.url);
+    const utilTypes = require("node:util/types") as {
+      isProxy: (value: unknown) => boolean;
+    };
+    const isProxyDescriptor = Object.getOwnPropertyDescriptor(
+      utilTypes,
+      "isProxy",
+    );
+    if (
+      isProxyDescriptor === undefined ||
+      !Object.hasOwn(isProxyDescriptor, "value") ||
+      typeof isProxyDescriptor.value !== "function"
+    ) {
+      throw new Error("NATIVE_IS_PROXY_EXPORT_MISSING");
+    }
+    let trapCalls = 0;
+    let forgedIsProxyCalls = 0;
+    const hostileCurrent = new Proxy(bundle, {
+      ownKeys(target) {
+        trapCalls += 1;
+        environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+        return Reflect.ownKeys(target);
+      },
+    });
+    let repinError: unknown;
+    let repinned: PolicyBundle | undefined;
+    let escaped: unknown;
+
+    try {
+      Object.defineProperty(utilTypes, "isProxy", {
+        ...isProxyDescriptor,
+        value() {
+          forgedIsProxyCalls += 1;
+          return false;
+        },
+      });
+      syncBuiltinESMExports();
+      try {
+        repinned = repin(hostileCurrent, {
+          token: "wrong",
+          next_bundle: armed,
+        }, environment);
+      } catch (error) {
+        repinError = error;
+      }
+    } catch (error) {
+      escaped = error;
+    } finally {
+      Object.defineProperty(utilTypes, "isProxy", isProxyDescriptor);
+      syncBuiltinESMExports();
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(repinError).toBeInstanceOf(RepinRefusedError);
+    expect(repinned).toBeUndefined();
+    expect(trapCalls).toBe(0);
+    expect(forgedIsProxyCalls).toBe(0);
+    expect(environment.OBS_POLICY_CUSTODIAN_TOKEN).toBe("correct");
+    expect(Object.getOwnPropertyDescriptor(utilTypes, "isProxy")).toEqual(
+      isProxyDescriptor,
+    );
+    expect(bundleHash(bundle)).toBe(
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+    );
+  });
+
+  it("keeps custodian proxy checks on the captured builtin", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" as const };
+    const require = createRequire(import.meta.url);
+    const utilTypes = require("node:util/types") as {
+      isProxy: (value: unknown) => boolean;
+    };
+    const isProxyDescriptor = Object.getOwnPropertyDescriptor(
+      utilTypes,
+      "isProxy",
+    );
+    if (
+      isProxyDescriptor === undefined ||
+      !Object.hasOwn(isProxyDescriptor, "value") ||
+      typeof isProxyDescriptor.value !== "function"
+    ) {
+      throw new Error("NATIVE_IS_PROXY_EXPORT_MISSING");
+    }
+    let trapCalls = 0;
+    let forgedIsProxyCalls = 0;
+    const hostileRequest = new Proxy({
+      token: "wrong",
+      next_bundle: armed,
+    }, {
+      getOwnPropertyDescriptor(target, key) {
+        trapCalls += 1;
+        if (key === "token") {
+          return {
+            configurable: true,
+            enumerable: true,
+            value: "correct",
+            writable: true,
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    });
+    let repinError: unknown;
+    let repinned: PolicyBundle | undefined;
+
+    try {
+      Object.defineProperty(utilTypes, "isProxy", {
+        ...isProxyDescriptor,
+        value() {
+          forgedIsProxyCalls += 1;
+          return false;
+        },
+      });
+      syncBuiltinESMExports();
+      try {
+        repinned = repin(bundle, hostileRequest, {
+          OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+        });
+      } catch (error) {
+        repinError = error;
+      }
+    } finally {
+      Object.defineProperty(utilTypes, "isProxy", isProxyDescriptor);
+      syncBuiltinESMExports();
+    }
+
+    expect(repinError).toBeInstanceOf(RepinRefusedError);
+    expect(repinned).toBeUndefined();
+    expect(trapCalls).toBe(0);
+    expect(forgedIsProxyCalls).toBe(0);
+    expect(Object.getOwnPropertyDescriptor(utilTypes, "isProxy")).toEqual(
+      isProxyDescriptor,
+    );
+  });
+
+  it("keeps bundle reads on the captured builtin after export synchronization", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    raw.quick_arm = "ON";
+    const require = createRequire(import.meta.url);
+    const fs = require("node:fs") as {
+      readFileSync: (path: string, encoding: "utf8") => string;
+    };
+    const readDescriptor = Object.getOwnPropertyDescriptor(fs, "readFileSync");
+    if (
+      readDescriptor === undefined ||
+      !Object.hasOwn(readDescriptor, "value") ||
+      typeof readDescriptor.value !== "function"
+    ) {
+      throw new Error("NATIVE_READ_FILE_SYNC_EXPORT_MISSING");
+    }
+    let forgedReadCalls = 0;
+    let loaded: PolicyBundle | undefined;
+
+    try {
+      Object.defineProperty(fs, "readFileSync", {
+        ...readDescriptor,
+        value() {
+          forgedReadCalls += 1;
+          return JSON.stringify(raw);
+        },
+      });
+      syncBuiltinESMExports();
+      loaded = loadBundle(BUNDLE_PATH);
+    } finally {
+      Object.defineProperty(fs, "readFileSync", readDescriptor);
+      syncBuiltinESMExports();
+    }
+
+    expect(forgedReadCalls).toBe(0);
+    expect(loaded?.quick_arm).toBe("OFF");
+    expect(Object.getOwnPropertyDescriptor(fs, "readFileSync")).toEqual(
+      readDescriptor,
+    );
+  });
+
   it("does not overreach to an unreachable Object.prototype.push neighbour", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
     const previous = Object.getOwnPropertyDescriptor(Object.prototype, "push");

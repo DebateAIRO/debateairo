@@ -2,6 +2,7 @@ import { hash as nodeHash } from "node:crypto";
 import { isProxy } from "node:util/types";
 
 const HASH = nodeHash;
+const IS_PROXY = isProxy;
 
 export type CanonicalJsonValue =
   | null
@@ -121,7 +122,7 @@ function projectCanonical(
     (typeof value === "object" && value !== null) ||
     typeof value === "function"
   ) {
-    if (isProxy(value)) return nonPlainJsonData();
+    if (IS_PROXY(value)) return nonPlainJsonData();
   }
 
   if (typeof value === "object") {
