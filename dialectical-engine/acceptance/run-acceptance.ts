@@ -380,6 +380,7 @@ export async function runAcceptanceCeremony(
 }
 
 async function main(): Promise<void> {
+  if (await (await import("./obs/index.js")).tryRunObsG1(process.argv.slice(2))) return;
   const parsed = parseAcceptanceArguments(process.argv.slice(2));
   const ceremony = await runAcceptanceCeremony(parsed);
   if (!parsed.serve) {
