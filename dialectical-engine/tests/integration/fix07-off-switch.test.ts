@@ -6,6 +6,19 @@ import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readObsBounds } from "../../packages/obs-capture/src/runtime/config.js";
+import {
+  CAPTURE_GAP_CLASSES,
+  CAPTURE_HEALTH_CODES,
+  type CaptureGapCounter,
+  type CaptureGapRow,
+  type CaptureHealth,
+} from "../../packages/obs-capture/src/health.js";
+import type {
+  CaptureEmitter,
+  CaptureQueueEntry,
+} from "../../packages/obs-capture/src/emit.js";
+import type { FlushResult } from "../../packages/obs-capture/src/flusher.js";
+import type { ReferenceQueue } from "../../packages/obs-capture/src/queue.js";
 import { loadDevelopmentCommandEnvironment } from "../../packages/register/src/runtime-environment.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
@@ -197,9 +210,224 @@ async function importCaller(id: CallerId): Promise<unknown> {
   }
 }
 
+interface Deferred<T> {
+  readonly promise: Promise<T>;
+  resolve(value: T): void;
+  reject(error: unknown): void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+const EMPTY_FLUSH_RESULT = Object.freeze({
+  dequeued: 0,
+  persisted: 0,
+  spooled: 0,
+  lost: 0,
+}) satisfies FlushResult;
+
+interface RuntimeTestHarness {
+  controlValue: boolean;
+  readonly controlResponses: Promise<boolean>[];
+  controlReads: number;
+  controlActive: number;
+  maximumControlActive: number;
+  controlFailures: number;
+  transfer: Promise<void>;
+  drain: Promise<void>;
+  installCalls: number;
+  installedEmitter: CaptureEmitter | undefined;
+  queue: ReferenceQueue<CaptureQueueEntry> | undefined;
+  health: CaptureHealth | undefined;
+  gaps: CaptureGapCounter | undefined;
+  flushCalls: number;
+  readonly flushSteps: Array<() => Promise<FlushResult>>;
+  heartbeatFailures: number;
+  readonly heartbeats: Array<Readonly<{
+    component: string;
+    state: string;
+    detailCode: string;
+  }>>;
+  readonly gapFailures: string[];
+  readonly gapRows: CaptureGapRow[];
+  closeCalls: number;
+}
+
+function removeRuntimeMocks(): void {
+  vi.doUnmock("../../packages/obs-capture/src/runtime/config.js");
+  vi.doUnmock("../../packages/obs-capture/src/runtime/control.js");
+  vi.doUnmock("../../packages/obs-capture/src/runtime/sink.js");
+  vi.doUnmock("../../packages/obs-capture/src/runtime/drain.js");
+  vi.doUnmock("../../packages/obs-capture/src/flusher.js");
+  vi.doUnmock("../../packages/obs-capture/src/emit.js");
+}
+
+async function loadRuntimeHarness(): Promise<{
+  readonly harness: RuntimeTestHarness;
+  readonly runtime: typeof import("../../packages/obs-capture/src/runtime/index.js");
+  readonly capture: typeof import("../../packages/obs-capture/src/emit.js");
+}> {
+  removeRuntimeMocks();
+  vi.resetModules();
+  const harness: RuntimeTestHarness = {
+    controlValue: false,
+    controlResponses: [],
+    controlReads: 0,
+    controlActive: 0,
+    maximumControlActive: 0,
+    controlFailures: 0,
+    transfer: Promise.resolve(),
+    drain: Promise.resolve(),
+    installCalls: 0,
+    installedEmitter: undefined,
+    queue: undefined,
+    health: undefined,
+    gaps: undefined,
+    flushCalls: 0,
+    flushSteps: [],
+    heartbeatFailures: 0,
+    heartbeats: [],
+    gapFailures: [],
+    gapRows: [],
+    closeCalls: 0,
+  };
+
+  vi.doMock("../../packages/obs-capture/src/runtime/config.js", async () => ({
+    ...await vi.importActual<typeof import("../../packages/obs-capture/src/runtime/config.js")>(
+      "../../packages/obs-capture/src/runtime/config.js",
+    ),
+    readObsBounds: () => Object.freeze({
+      flushDeadlineMs: 25,
+      queueCapacity: 8,
+      spoolDir: undefined,
+      spoolAdmissionSeal: undefined,
+      writerDatabaseUrl: "postgresql://fix07.invalid/fix07",
+    }),
+    readObsControlDir: () => "/tmp/fix07-control",
+  }));
+  vi.doMock("../../packages/obs-capture/src/runtime/control.js", async () => ({
+    ...await vi.importActual<typeof import("../../packages/obs-capture/src/runtime/control.js")>(
+      "../../packages/obs-capture/src/runtime/control.js",
+    ),
+    async readCaptureOff(): Promise<boolean> {
+      harness.controlReads += 1;
+      harness.controlActive += 1;
+      harness.maximumControlActive = Math.max(
+        harness.maximumControlActive,
+        harness.controlActive,
+      );
+      try {
+        if (harness.controlFailures > 0) {
+          harness.controlFailures -= 1;
+          throw new Error("PLANTED_CONTROL_FAILURE");
+        }
+        return await (harness.controlResponses.shift()
+          ?? Promise.resolve(harness.controlValue));
+      } finally {
+        harness.controlActive -= 1;
+      }
+    },
+  }));
+  vi.doMock("../../packages/obs-capture/src/runtime/sink.js", async () => ({
+    ...await vi.importActual<typeof import("../../packages/obs-capture/src/runtime/sink.js")>(
+      "../../packages/obs-capture/src/runtime/sink.js",
+    ),
+    createPostgresCaptureSink: () => Object.freeze({
+      async writeOccurrences(): Promise<void> {},
+      async ingestSpooledOccurrence(): Promise<void> {},
+      async writeCaptureGap(row: CaptureGapRow): Promise<void> {
+        if (harness.gapFailures[0] === row.gap_class) {
+          harness.gapFailures.shift();
+          throw new Error(`PLANTED_GAP_FAILURE:${row.gap_class}`);
+        }
+        harness.gapRows.push(row);
+      },
+      async writeComponentHealth(row: Readonly<{
+        component: string;
+        state: string;
+        detailCode: string;
+      }>): Promise<void> {
+        if (harness.heartbeatFailures > 0) {
+          harness.heartbeatFailures -= 1;
+          throw new Error("PLANTED_HEARTBEAT_FAILURE");
+        }
+        harness.heartbeats.push(Object.freeze({ ...row }));
+      },
+      async close(): Promise<void> {
+        harness.closeCalls += 1;
+      },
+    }),
+  }));
+  vi.doMock("../../packages/obs-capture/src/runtime/drain.js", async () => ({
+    ...await vi.importActual<typeof import("../../packages/obs-capture/src/runtime/drain.js")>(
+      "../../packages/obs-capture/src/runtime/drain.js",
+    ),
+    drainDeadSpoolFiles: () => harness.drain,
+  }));
+  vi.doMock("../../packages/obs-capture/src/flusher.js", async () => ({
+    ...await vi.importActual<typeof import("../../packages/obs-capture/src/flusher.js")>(
+      "../../packages/obs-capture/src/flusher.js",
+    ),
+    createCaptureFlusher(options: Readonly<{
+      queue: ReferenceQueue<CaptureQueueEntry>;
+      health: CaptureHealth;
+      gaps: CaptureGapCounter;
+    }>) {
+      harness.queue = options.queue;
+      harness.health = options.health;
+      harness.gaps = options.gaps;
+      return Object.freeze({
+        async flushOnce(): Promise<FlushResult> {
+          harness.flushCalls += 1;
+          return harness.flushSteps.shift()?.() ?? EMPTY_FLUSH_RESULT;
+        },
+      });
+    },
+  }));
+  vi.doMock("../../packages/obs-capture/src/emit.js", async () => {
+    const actual = await vi.importActual<
+      typeof import("../../packages/obs-capture/src/emit.js")
+    >("../../packages/obs-capture/src/emit.js");
+    return {
+      ...actual,
+      installCaptureEmitter(
+        emitter: CaptureEmitter,
+        gaps?: Pick<CaptureGapCounter, "recordLoss">,
+      ): Promise<void> | void {
+        harness.installCalls += 1;
+        harness.installedEmitter = emitter;
+        const actualTransfer = gaps === undefined
+          ? actual.installCaptureEmitter(emitter)
+          : actual.installCaptureEmitter(emitter, gaps);
+        void actualTransfer?.catch(() => undefined);
+        return gaps === undefined ? undefined : harness.transfer;
+      },
+    };
+  });
+
+  const runtime = await import("../../packages/obs-capture/src/runtime/index.js");
+  const capture = await import("../../packages/obs-capture/src/emit.js");
+  return { harness, runtime, capture };
+}
+
+async function settleMicrotasks(): Promise<void> {
+  for (let turn = 0; turn < 8; turn += 1) {
+    await Promise.resolve();
+  }
+}
+
 afterEach(async () => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   removeCallerMocks();
+  removeRuntimeMocks();
   vi.resetModules();
   while (scratchDirectories.length > 0) {
     await rm(scratchDirectories.pop()!, { recursive: true, force: true });
@@ -465,5 +693,293 @@ describe.sequential("FIX-07 C2 capture control and launch cadence", () => {
     expect(body.match(/OBS_FLUSH_DEADLINE_MS/gu)).toHaveLength(1);
     expect(body).toContain("    OBS_FLUSH_DEADLINE_MS: z.string().optional(),");
     expect(body).not.toMatch(/OBS_FLUSH_DEADLINE_MS[^\n]*(regex|refine|coerce|transform|default)/u);
+  });
+});
+
+describe.sequential("FIX-07 C3 runtime control and heartbeat", () => {
+  it("settles the initial OFF sample before installing the emitter or its sole timer", async () => {
+    vi.useFakeTimers();
+    const initialControl = deferred<boolean>();
+    const transfer = deferred<void>();
+    const startupFlush = deferred<FlushResult>();
+    const { harness, runtime, capture } = await loadRuntimeHarness();
+    harness.controlResponses.push(initialControl.promise);
+    harness.transfer = transfer.promise;
+    harness.flushSteps.push(() => startupFlush.promise);
+    const interval = vi.spyOn(globalThis, "setInterval");
+    const readiness = runtime.waitForCaptureEmitterInstalled({ deadlineMs: 1_000 });
+    let readinessSettled = false;
+    void readiness.then(() => {
+      readinessSettled = true;
+    });
+    const starting = runtime.startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+
+    try {
+      await settleMicrotasks();
+      expect(harness.controlReads).toBe(1);
+      expect(harness.installCalls).toBe(0);
+      expect(readinessSettled).toBe(false);
+      expect(interval).toHaveBeenCalledTimes(0);
+      expect(harness.flushCalls).toBe(0);
+      expect(harness.heartbeats).toEqual([]);
+
+      initialControl.resolve(true);
+      await expect(readiness).resolves.toBe("installed");
+      expect(harness.installCalls).toBe(1);
+      capture.emit({ code: "FIRST_AFTER_INSTALL" });
+      capture.captureHandled(new Error("SECOND_AFTER_INSTALL"), { boundary: "test" });
+      expect(harness.queue?.size).toBe(0);
+      expect(harness.gaps?.pendingLossCount()).toBe(2);
+      expect(harness.health?.snapshot().counts.DISABLED).toBe(2);
+      expect(harness.heartbeats).toEqual([]);
+      expect(interval).toHaveBeenCalledTimes(0);
+
+      transfer.resolve();
+      await settleMicrotasks();
+      expect(interval).toHaveBeenCalledTimes(1);
+      expect(harness.flushCalls).toBe(1);
+      startupFlush.resolve(EMPTY_FLUSH_RESULT);
+      await starting;
+    } finally {
+      initialControl.resolve(true);
+      transfer.resolve();
+      startupFlush.resolve(EMPTY_FLUSH_RESULT);
+      await starting.catch(() => undefined);
+      harness.flushSteps.length = 0;
+      await runtime.stopCaptureRuntime({ deadlineMs: 20 });
+    }
+  });
+
+  it("lets stop win a held initial sample without a late install or timer", async () => {
+    vi.useFakeTimers();
+    const initialControl = deferred<boolean>();
+    const { harness, runtime } = await loadRuntimeHarness();
+    harness.controlResponses.push(initialControl.promise);
+    const interval = vi.spyOn(globalThis, "setInterval");
+    const readiness = runtime.waitForCaptureEmitterInstalled({ deadlineMs: 1_000 });
+    const starting = runtime.startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+    await settleMicrotasks();
+
+    const stopping = runtime.stopCaptureRuntime({ deadlineMs: 20 });
+    await vi.advanceTimersByTimeAsync(20);
+    await stopping;
+    expect(await readiness).toBe("stopped");
+    expect(harness.installCalls).toBe(0);
+    expect(interval).toHaveBeenCalledTimes(0);
+
+    initialControl.resolve(true);
+    await starting;
+    await settleMicrotasks();
+    expect(harness.installCalls).toBe(0);
+    expect(interval).toHaveBeenCalledTimes(0);
+    expect(harness.heartbeats).toEqual([]);
+  });
+
+  it("fails closed when the initial descriptor probe rejects", async () => {
+    vi.useFakeTimers();
+    const { harness, runtime, capture } = await loadRuntimeHarness();
+    harness.controlFailures = 1;
+    await runtime.startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+    try {
+      capture.emit({ code: "AFTER_FAILED_SAMPLE" });
+      expect(harness.queue?.size).toBe(0);
+      expect(harness.gaps?.pendingLossCount()).toBe(1);
+      expect(harness.health?.snapshot().counts.DISABLED).toBe(1);
+    } finally {
+      await runtime.stopCaptureRuntime({ deadlineMs: 20 });
+    }
+  });
+
+  it("samples OFF independently while startup and armed sinks remain unresolved", async () => {
+    vi.useFakeTimers();
+    const startupFlush = deferred<FlushResult>();
+    const { harness, runtime, capture } = await loadRuntimeHarness();
+    harness.flushSteps.push(() => startupFlush.promise);
+    const interval = vi.spyOn(globalThis, "setInterval");
+    const starting = runtime.startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+    await settleMicrotasks();
+    expect(interval).toHaveBeenCalledTimes(1);
+    expect(harness.flushCalls).toBe(1);
+
+    capture.emit({ queued: "startup" });
+    expect(harness.queue?.size).toBe(1);
+    const heldControl = deferred<boolean>();
+    harness.controlResponses.push(heldControl.promise);
+    await vi.advanceTimersByTimeAsync(75);
+    expect(harness.controlReads).toBe(2);
+    expect(harness.maximumControlActive).toBe(1);
+
+    heldControl.resolve(true);
+    await settleMicrotasks();
+    expect(harness.queue?.size).toBe(0);
+    capture.emit({ direct: "startup-off" });
+    capture.captureHandled(new Error("startup-off"), {});
+    expect(harness.gaps?.pendingLossCount()).toBe(3);
+
+    startupFlush.resolve(EMPTY_FLUSH_RESULT);
+    await starting;
+    harness.controlResponses.push(Promise.resolve(false));
+    const armedFlush = deferred<FlushResult>();
+    harness.flushSteps.push(() => armedFlush.promise);
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.flushCalls).toBe(2);
+    capture.emit({ queued: "armed" });
+    expect(harness.queue?.size).toBe(1);
+
+    harness.controlValue = true;
+    await vi.advanceTimersByTimeAsync(50);
+    await settleMicrotasks();
+    expect(harness.queue?.size).toBe(0);
+    capture.emit({ direct: "armed-off" });
+    expect(harness.gaps?.pendingLossCount()).toBe(2);
+    expect(harness.maximumControlActive).toBe(1);
+    expect(interval).toHaveBeenCalledTimes(1);
+
+    harness.controlValue = false;
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    armedFlush.resolve(EMPTY_FLUSH_RESULT);
+    await settleMicrotasks();
+    capture.emit({ queued: "re-enabled" });
+    expect(harness.queue?.size).toBe(1);
+    harness.flushSteps.length = 0;
+    await runtime.stopCaptureRuntime({ deadlineMs: 20 });
+  });
+
+  it("publishes current DRAINING, SPOOL_ONLY, OFF and ARMED state once per armed cycle", async () => {
+    vi.useFakeTimers();
+    const heldDrain = deferred<void>();
+    const { harness, runtime } = await loadRuntimeHarness();
+    harness.drain = heldDrain.promise;
+    await runtime.startCaptureRuntime({
+      runtime: "runner",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+    expect(harness.heartbeats).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.heartbeats.at(-1)).toEqual({
+      component: "capture:runner",
+      state: "DRAINING",
+      detailCode: "FLUSH_OK",
+    });
+
+    heldDrain.resolve();
+    await settleMicrotasks();
+    harness.flushSteps.push(async () => ({
+      dequeued: 1,
+      persisted: 0,
+      spooled: 1,
+      lost: 0,
+    }));
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.heartbeats.at(-1)?.state).toBe("SPOOL_ONLY");
+
+    harness.controlResponses.push(Promise.resolve(true));
+    const flushCallsBeforeOff = harness.flushCalls;
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.flushCalls).toBe(flushCallsBeforeOff);
+    expect(harness.heartbeats.at(-1)?.state).toBe("OFF");
+
+    harness.controlResponses.push(Promise.resolve(false));
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.heartbeats.at(-1)?.state).toBe("ARMED");
+
+    harness.heartbeatFailures = 1;
+    harness.flushSteps.push(async () => {
+      harness.health?.record(CAPTURE_HEALTH_CODES.FLUSH_OK);
+      return EMPTY_FLUSH_RESULT;
+    });
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    const successfulBeforeRecovery = harness.heartbeats.length;
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.heartbeats).toHaveLength(successfulBeforeRecovery + 1);
+    expect(harness.heartbeats.at(-1)?.detailCode).toBe("POSTGRES_FAILURE");
+
+    harness.flushSteps.push(async () => {
+      harness.health?.record(CAPTURE_HEALTH_CODES.FLUSH_OK);
+      return EMPTY_FLUSH_RESULT;
+    });
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.heartbeats.at(-1)?.detailCode).toBe("FLUSH_OK");
+
+    const beforeStop = harness.heartbeats.length;
+    await runtime.stopCaptureRuntime({ deadlineMs: 20 });
+    expect(harness.heartbeats).toHaveLength(beforeStop);
+  });
+
+  it("converts PostgreSQL and repeated gap-write failures into exact recoverable rows", async () => {
+    vi.useFakeTimers();
+    const { harness, runtime } = await loadRuntimeHarness();
+    await runtime.startCaptureRuntime({
+      runtime: "runner",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+    harness.flushSteps.push(async () => {
+      harness.health?.record(CAPTURE_HEALTH_CODES.POSTGRES_FAILURE);
+      return { dequeued: 1, persisted: 0, spooled: 1, lost: 0 };
+    });
+    await vi.advanceTimersByTimeAsync(25);
+    await vi.advanceTimersByTimeAsync(25);
+    await settleMicrotasks();
+    expect(harness.gapRows.map((row) => ({
+      source: row.source,
+      gap_class: row.gap_class,
+      lost_count: row.lost_count,
+    }))).toContainEqual({
+      source: "unclassified",
+      gap_class: "POSTGRES_FAILURE",
+      lost_count: 1,
+    });
+
+    harness.gaps?.recordLoss("first_party", CAPTURE_GAP_CLASSES.QUEUE_FULL, 3);
+    harness.gapFailures.push("QUEUE_FULL", "GAP_WRITE_FAILURE");
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      await vi.advanceTimersByTimeAsync(25);
+      await settleMicrotasks();
+    }
+    expect(harness.gapRows.map((row) => ({
+      source: row.source,
+      gap_class: row.gap_class,
+      lost_count: row.lost_count,
+    }))).toEqual(expect.arrayContaining([
+      {
+        source: "first_party",
+        gap_class: "QUEUE_FULL",
+        lost_count: 3,
+      },
+      {
+        source: "unclassified",
+        gap_class: "GAP_WRITE_FAILURE",
+        lost_count: 2,
+      },
+    ]));
+    await runtime.stopCaptureRuntime({ deadlineMs: 20 });
   });
 });

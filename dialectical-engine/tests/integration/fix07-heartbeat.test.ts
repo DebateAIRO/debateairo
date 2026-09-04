@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +10,10 @@ import {
   startTestDatabase,
   type TestDatabase,
 } from "../support/testDatabase.js";
+import type {
+  CaptureComponentHealthWrite,
+  CaptureRuntimeDatabaseSink,
+} from "../../packages/obs-capture/src/runtime/sink.js";
 
 vi.mock("@debateai/kernel", async () =>
   import("../../packages/kernel/src/index.js"),
@@ -45,6 +53,17 @@ async function connectedWriter(): Promise<pg.Client> {
   const client = new pg.Client({ connectionString: writerConnectionString() });
   await client.connect();
   return client;
+}
+
+async function waitUntil(
+  predicate: () => boolean,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error("FIX07_WAIT_TIMED_OUT");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 beforeAll(async () => {
@@ -177,4 +196,196 @@ describe.sequential("FIX-07 C1 replica-safe capture lease grants", () => {
       await writer.end();
     }
   });
+
+  it("writes the runtime lease without accepting client time or STOPPED state", async () => {
+    const { createPostgresCaptureSink } = await import(
+      "../../packages/obs-capture/src/runtime/sink.js"
+    );
+    const sink = createPostgresCaptureSink({
+      connectionString: writerConnectionString(),
+    });
+    const ownerBefore = await database.pool.query<{ server_time: Date }>(
+      "SELECT clock_timestamp() AS server_time",
+    );
+    try {
+      await sink.writeComponentHealth({
+        component: "capture:scheduler",
+        state: "ARMED",
+        detailCode: "FLUSH_OK",
+      });
+    } finally {
+      await sink.close();
+    }
+
+    const row = await database.pool.query<{
+      component: string;
+      state: string;
+      detail_code: string;
+      observed_at: Date;
+    }>(`
+      SELECT component, state, detail_code, observed_at
+        FROM obs.component_health
+       WHERE component = 'capture:scheduler'
+    `);
+    expect(row.rows).toEqual([{
+      component: "capture:scheduler",
+      state: "ARMED",
+      detail_code: "FLUSH_OK",
+      observed_at: expect.any(Date),
+    }]);
+    expect(row.rows[0]!.observed_at.getTime())
+      .toBeGreaterThanOrEqual(ownerBefore.rows[0]!.server_time.getTime());
+  });
+
+  it("keeps one shared lease live until both isolated runtime replicas stop", async () => {
+    const flushDeadlineMs = 100;
+    const controlDirectory = await mkdtemp(join(tmpdir(), "fix07-shared-control-"));
+    const replicas: Array<Readonly<{
+      runtime: typeof import("../../packages/obs-capture/src/runtime/index.js");
+      healthAttempts: CaptureComponentHealthWrite[];
+      pools: { created: number; closed: number };
+    }>> = [];
+
+    async function loadReplica(): Promise<(typeof replicas)[number]> {
+      vi.doUnmock("../../packages/obs-capture/src/runtime/config.js");
+      vi.doUnmock("../../packages/obs-capture/src/runtime/sink.js");
+      vi.resetModules();
+      const actualConfig = await vi.importActual<
+        typeof import("../../packages/obs-capture/src/runtime/config.js")
+      >("../../packages/obs-capture/src/runtime/config.js");
+      const actualSink = await vi.importActual<
+        typeof import("../../packages/obs-capture/src/runtime/sink.js")
+      >("../../packages/obs-capture/src/runtime/sink.js");
+      const healthAttempts: CaptureComponentHealthWrite[] = [];
+      const pools = { created: 0, closed: 0 };
+
+      vi.doMock("../../packages/obs-capture/src/runtime/config.js", () => ({
+        ...actualConfig,
+        readObsBounds: () => Object.freeze({
+          flushDeadlineMs,
+          queueCapacity: 8,
+          spoolDir: undefined,
+          spoolAdmissionSeal: undefined,
+          writerDatabaseUrl: writerConnectionString(),
+        }),
+        readObsControlDir: () => controlDirectory,
+      }));
+      vi.doMock("../../packages/obs-capture/src/runtime/sink.js", () => ({
+        ...actualSink,
+        createPostgresCaptureSink(options: Readonly<{
+          connectionString: string | undefined;
+        }>): CaptureRuntimeDatabaseSink {
+          pools.created += 1;
+          const sink = actualSink.createPostgresCaptureSink(options);
+          return Object.freeze({
+            writeOccurrences: sink.writeOccurrences,
+            ingestSpooledOccurrence: sink.ingestSpooledOccurrence,
+            writeCaptureGap: sink.writeCaptureGap,
+            async writeComponentHealth(
+              row: CaptureComponentHealthWrite,
+            ): Promise<void> {
+              healthAttempts.push(Object.freeze({ ...row }));
+              await sink.writeComponentHealth(row);
+            },
+            async close(): Promise<void> {
+              pools.closed += 1;
+              await sink.close();
+            },
+          });
+        },
+      }));
+      const runtime = await import(
+        "../../packages/obs-capture/src/runtime/index.js"
+      );
+      return { runtime, healthAttempts, pools };
+    }
+
+    try {
+      const replicaA = await loadReplica();
+      replicas.push(replicaA);
+      await replicaA.runtime.startCaptureRuntime({
+        runtime: "runner",
+        spoolFd: undefined,
+        installExitSink() {},
+      });
+      await waitUntil(() => replicaA.healthAttempts.length >= 1);
+
+      const replicaB = await loadReplica();
+      replicas.push(replicaB);
+      await replicaB.runtime.startCaptureRuntime({
+        runtime: "runner",
+        spoolFd: undefined,
+        installExitSink() {},
+      });
+      await waitUntil(() => replicaB.healthAttempts.length >= 1);
+
+      const shared = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+           FROM obs.component_health
+          WHERE component = 'capture:runner'`,
+      );
+      expect(shared.rows).toEqual([{ count: "1" }]);
+      expect(replicaA.pools).toEqual({ created: 1, closed: 0 });
+      expect(replicaB.pools).toEqual({ created: 1, closed: 0 });
+
+      const bAttemptsBeforeStop = replicaB.healthAttempts.length;
+      await replicaB.runtime.stopCaptureRuntime({ deadlineMs: 500 });
+      await new Promise((resolve) => setTimeout(resolve, flushDeadlineMs * 2));
+      expect(replicaB.healthAttempts).toHaveLength(bAttemptsBeforeStop);
+      expect(replicaB.pools.closed).toBe(1);
+
+      const aNextCycle = replicaA.healthAttempts.length + 1;
+      await waitUntil(() => replicaA.healthAttempts.length >= aNextCycle);
+      const whileAIsLive = await database.pool.query<{ period: string }>(
+        `SELECT CASE
+                  WHEN EXTRACT(EPOCH FROM
+                    (clock_timestamp() - observed_at)) * 1000 > $1
+                    THEN 'OFF'
+                  ELSE 'LIVE'
+                END AS period
+           FROM obs.component_health
+          WHERE component = 'capture:runner'`,
+        [flushDeadlineMs],
+      );
+      expect(whileAIsLive.rows).toEqual([{ period: "LIVE" }]);
+
+      const aAttemptsBeforeStop = replicaA.healthAttempts.length;
+      await replicaA.runtime.stopCaptureRuntime({ deadlineMs: 500 });
+      await new Promise((resolve) => setTimeout(resolve, flushDeadlineMs * 2));
+      expect(replicaA.healthAttempts).toHaveLength(aAttemptsBeforeStop);
+      expect(replicaA.pools.closed).toBe(1);
+
+      await database.pool.query(
+        `UPDATE obs.component_health
+            SET observed_at = clock_timestamp()
+              - ($1::double precision * interval '1 millisecond')
+          WHERE component = 'capture:runner'`,
+        [flushDeadlineMs + 0.001],
+      );
+      const afterBothStop = await database.pool.query<{ period: string }>(
+        `SELECT CASE
+                  WHEN EXTRACT(EPOCH FROM
+                    (clock_timestamp() - observed_at)) * 1000 > $1
+                    THEN 'OFF'
+                  ELSE 'LIVE'
+                END AS period
+           FROM obs.component_health
+          WHERE component = 'capture:runner'`,
+        [flushDeadlineMs],
+      );
+      expect(afterBothStop.rows).toEqual([{ period: "OFF" }]);
+      expect([
+        ...replicaA.healthAttempts,
+        ...replicaB.healthAttempts,
+      ].every((row) => row.state !== ("STOPPED" as typeof row.state))).toBe(true);
+    } finally {
+      for (const replica of replicas) {
+        await replica.runtime.stopCaptureRuntime({ deadlineMs: 500 });
+      }
+      vi.doUnmock("../../packages/obs-capture/src/runtime/config.js");
+      vi.doUnmock("../../packages/obs-capture/src/runtime/sink.js");
+      vi.resetModules();
+      await rm(controlDirectory, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
