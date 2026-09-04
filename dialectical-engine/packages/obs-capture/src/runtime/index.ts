@@ -4,23 +4,32 @@ import {
   type CaptureEmitter,
   type CaptureQueueEntry,
 } from "../emit.js";
-import { createCaptureFlusher, type CaptureFlusher } from "../flusher.js";
 import {
+  createCaptureFlusher,
+  type CaptureFlusher,
+  type FlushResult,
+} from "../flusher.js";
+import {
+  CAPTURE_GAP_CLASSES,
+  CAPTURE_HEALTH_CODES,
   createCaptureGapCounter,
   createCaptureHealth,
   type CaptureGapCounter,
   type CaptureHealth,
+  type CaptureHealthCode,
 } from "../health.js";
 import { clampSpoolRecordLimit } from "../safe-metadata.js";
 import { BoundedReferenceQueue } from "../queue.js";
 import { createSharedRedactor } from "../redactor.js";
 import { createPreopenedSpool, type SpoolWriter } from "../spool.js";
-import { readObsBounds, type ObsBounds } from "./config.js";
+import { readObsBounds, readObsControlDir, type ObsBounds } from "./config.js";
+import { captureOffMarkerPath, readCaptureOff } from "./control.js";
 import { drainDeadSpoolFiles } from "./drain.js";
 import {
   createPostgresCaptureSink,
   createTierOneExitSink,
-  type PostgresCaptureSink,
+  type CaptureHeartbeatState,
+  type CaptureRuntimeDatabaseSink,
 } from "./sink.js";
 
 export type CaptureRuntimeName =
@@ -71,11 +80,18 @@ interface ActiveRuntimeState {
   readonly generation: RuntimeGeneration;
   phase: RuntimePhase;
   readonly bounds: ObsBounds;
+  readonly runtime: CaptureRuntimeName;
+  readonly queue: BoundedReferenceQueue<CaptureQueueEntry>;
   readonly emitter: CaptureEmitter;
   readonly health: CaptureHealth;
   readonly gaps: CaptureGapCounter;
-  readonly databaseSink: PostgresCaptureSink;
+  readonly databaseSink: CaptureRuntimeDatabaseSink;
   readonly flusher: CaptureFlusher;
+  readonly markerPath: string | undefined;
+  captureOff: boolean;
+  controlInFlight: Promise<void> | undefined;
+  lastDetailCode: CaptureHealthCode;
+  unreportedDetailCode: CaptureHealthCode | undefined;
   timer: NodeJS.Timeout | undefined;
   flushInFlight: Promise<void> | undefined;
   drainInFlight: Promise<void> | undefined;
@@ -87,6 +103,13 @@ const BUILD_REF_SEED = "UNTRACKED-DEV:UNKNOWN"; // seed — V ratifies at FIX-01
 const BUILD_DIRTY_SEED = true; // seed — V ratifies at FIX-01 acceptance
 const REDACTION_POLICY_VERSION_SEED = "g0"; // seed — V ratifies at FIX-01 acceptance
 const ALLOWLIST_SET_ID_SEED = "g0-empty-parameters"; // seed — V ratifies at FIX-01 acceptance
+
+const EMPTY_FLUSH_RESULT = Object.freeze({
+  dequeued: 0,
+  persisted: 0,
+  spooled: 0,
+  lost: 0,
+}) satisfies FlushResult;
 
 let runtimeState: ActiveRuntimeState | undefined;
 let activeGeneration: RuntimeGeneration | undefined;
@@ -132,9 +155,60 @@ function createStartingState(
   const queue = new BoundedReferenceQueue<CaptureQueueEntry>(
     bounds.queueCapacity,
   );
-  const health = createCaptureHealth();
-  const gaps = createCaptureGapCounter({ health });
-  const emitter = createCaptureEmitter({ queue, health, gaps });
+  let gaps: CaptureGapCounter | undefined;
+  let state: ActiveRuntimeState | undefined;
+  let lastDetailCode: CaptureHealthCode = CAPTURE_HEALTH_CODES.FLUSH_OK;
+  const health = createCaptureHealth((code) => {
+    lastDetailCode = code;
+    if (state !== undefined) state.lastDetailCode = code;
+    if (code === CAPTURE_HEALTH_CODES.POSTGRES_FAILURE) {
+      gaps?.recordLoss(
+        "unclassified",
+        CAPTURE_GAP_CLASSES.POSTGRES_FAILURE,
+        1,
+      );
+    }
+    if (code === CAPTURE_HEALTH_CODES.GAP_WRITE_FAILURE) {
+      gaps?.recordLoss(
+        "unclassified",
+        CAPTURE_GAP_CLASSES.GAP_WRITE_FAILURE,
+        1,
+      );
+    }
+  });
+  gaps = createCaptureGapCounter({ health });
+  const captureGaps = gaps;
+  const delegateEmitter = createCaptureEmitter({
+    queue,
+    health,
+    gaps: captureGaps,
+  });
+  const emitter: CaptureEmitter = Object.freeze({
+    emit(envelope: unknown): void {
+      if (state?.captureOff !== true) {
+        delegateEmitter.emit(envelope);
+        return;
+      }
+      health.record(CAPTURE_HEALTH_CODES.DISABLED);
+      captureGaps.recordLoss(
+        "first_party",
+        CAPTURE_GAP_CLASSES.DISABLED,
+        1,
+      );
+    },
+    captureHandled(error: unknown, context: unknown): void {
+      if (state?.captureOff !== true) {
+        delegateEmitter.captureHandled(error, context);
+        return;
+      }
+      health.record(CAPTURE_HEALTH_CODES.DISABLED);
+      captureGaps.recordLoss(
+        "first_party",
+        CAPTURE_GAP_CLASSES.DISABLED,
+        1,
+      );
+    },
+  });
   const databaseSink = createPostgresCaptureSink({
     connectionString: bounds.writerDatabaseUrl,
   });
@@ -164,21 +238,29 @@ function createStartingState(
     databaseSink,
     spool: spool ?? UNAVAILABLE_SPOOL,
     health,
-    gaps,
+    gaps: captureGaps,
   });
-  const state: ActiveRuntimeState = {
+  const nextState: ActiveRuntimeState = {
     generation,
     phase: "ARMING",
     bounds,
+    runtime: options.runtime,
+    queue,
     emitter,
     health,
-    gaps,
+    gaps: captureGaps,
     databaseSink,
     flusher,
+    markerPath: captureOffMarkerPath(readObsControlDir()),
+    captureOff: false,
+    controlInFlight: undefined,
+    lastDetailCode,
+    unreportedDetailCode: undefined,
     timer: undefined,
     flushInFlight: undefined,
     drainInFlight: undefined,
   };
+  state = nextState;
   if (spool !== undefined) {
     try {
       const envelope = redactor.redact({
@@ -198,7 +280,7 @@ function createStartingState(
       // Tier 0 remains installed when Tier-1 preparation is unavailable.
     }
   }
-  return state;
+  return nextState;
 }
 
 function settleGeneration(
@@ -253,15 +335,95 @@ export function waitForCaptureEmitterInstalled(options: {
   });
 }
 
-async function flushRuntimeOnce(state: ActiveRuntimeState): Promise<void> {
+function isCurrentRuntimeState(state: ActiveRuntimeState): boolean {
+  return runtimeState === state
+    && activeGeneration === state.generation
+    && state.phase !== "STOPPED";
+}
+
+function beginControlSample(state: ActiveRuntimeState): Promise<void> {
+  if (state.controlInFlight !== undefined) return state.controlInFlight;
+  const attempt = (async (): Promise<void> => {
+    let sampledOff = true;
+    try {
+      sampledOff = await readCaptureOff(state.markerPath);
+    } catch {
+      sampledOff = true;
+    }
+    if (!isCurrentRuntimeState(state)) return;
+    if (sampledOff === state.captureOff) return;
+    state.captureOff = sampledOff;
+    if (sampledOff) {
+      const suppressed = state.queue.drain().length;
+      if (suppressed > 0) {
+        state.gaps.recordLoss(
+          "first_party",
+          CAPTURE_GAP_CLASSES.DISABLED,
+          suppressed,
+        );
+      }
+    }
+  })();
+  const control = attempt.finally(() => {
+    if (state.controlInFlight === control) {
+      state.controlInFlight = undefined;
+    }
+  });
+  state.controlInFlight = control;
+  return control;
+}
+
+async function flushRuntimeOnce(
+  state: ActiveRuntimeState,
+): Promise<FlushResult> {
   await state.gaps.flushOne((row) => state.databaseSink.writeCaptureGap(row));
-  await state.flusher.flushOnce();
+  return state.flusher.flushOnce();
+}
+
+async function flushArmedCycle(state: ActiveRuntimeState): Promise<void> {
+  await state.gaps.flushOne((row) => state.databaseSink.writeCaptureGap(row));
+  const result = state.captureOff
+    ? EMPTY_FLUSH_RESULT
+    : await state.flusher.flushOnce();
+  if (!isCurrentRuntimeState(state) || state.phase !== "ARMED") return;
+
+  const heartbeatState: CaptureHeartbeatState = state.captureOff
+    ? "OFF"
+    : state.drainInFlight !== undefined
+    ? "DRAINING"
+    : result.spooled > 0
+    ? "SPOOL_ONLY"
+    : "ARMED";
+  const unreportedDetailCode = state.unreportedDetailCode;
+  const detailCode = unreportedDetailCode ?? state.lastDetailCode;
+  try {
+    await state.databaseSink.writeComponentHealth({
+      component: `capture:${state.runtime}`,
+      state: heartbeatState,
+      detailCode,
+    });
+    if (
+      unreportedDetailCode !== undefined
+      && state.unreportedDetailCode === unreportedDetailCode
+    ) {
+      state.unreportedDetailCode = undefined;
+    }
+  } catch {
+    state.unreportedDetailCode ??= CAPTURE_HEALTH_CODES.POSTGRES_FAILURE;
+    state.health.record(CAPTURE_HEALTH_CODES.POSTGRES_FAILURE);
+  }
 }
 
 function startFlushTimer(state: ActiveRuntimeState): void {
   const timer = setInterval(() => {
+    if (!isCurrentRuntimeState(state)) return;
+    const control = beginControlSample(state);
     if (state.phase !== "ARMED" || state.flushInFlight !== undefined) return;
-    const flush = flushRuntimeOnce(state)
+    const flush = (async (): Promise<void> => {
+      await control;
+      if (!isCurrentRuntimeState(state) || state.phase !== "ARMED") return;
+      await flushArmedCycle(state);
+    })()
       .catch(() => undefined)
       .finally(() => {
         if (state.flushInFlight === flush) state.flushInFlight = undefined;
@@ -286,10 +448,18 @@ export async function startCaptureRuntime(
     state = createStartingState(options, generation);
     if (activeGeneration !== generation || generation.outcome === "stopped") return;
     runtimeState = state;
+    await beginControlSample(state);
+    if (
+      runtimeState !== state
+      || activeGeneration !== generation
+      || state.phase === "STOPPED"
+    ) return;
     const transfer = installCaptureEmitter(state.emitter, state.gaps);
     settleGeneration(generation, "installed");
     const startup = (async (): Promise<void> => {
       await transfer;
+      if (!isCurrentRuntimeState(state!)) return;
+      startFlushTimer(state!);
       await flushRuntimeOnce(state!);
     })();
     state.flushInFlight = startup;
@@ -298,9 +468,8 @@ export async function startCaptureRuntime(
     } finally {
       if (state.flushInFlight === startup) state.flushInFlight = undefined;
     }
-    if (state.phase === "STOPPED" || runtimeState !== state) return;
+    if (!isCurrentRuntimeState(state)) return;
     state.phase = "ARMED";
-    startFlushTimer(state);
     const drain = drainDeadSpoolFiles({
       spoolDirectory: state.bounds.spoolDir,
       admissionSeal: state.bounds.spoolAdmissionSeal,

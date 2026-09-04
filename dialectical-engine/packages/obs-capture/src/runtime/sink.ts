@@ -1,7 +1,7 @@
 import pg from "pg";
 
 import type { CaptureDatabaseSink } from "../flusher.js";
-import type { CaptureGapRow } from "../health.js";
+import type { CaptureGapRow, CaptureHealthCode } from "../health.js";
 import type { PostRedactionEnvelope } from "../redactor.js";
 import type { SpoolWriter } from "../spool.js";
 
@@ -48,6 +48,19 @@ const OCCURRENCE_COLUMNS = Object.freeze([
 export interface PostgresCaptureSink extends CaptureDatabaseSink {
   ingestSpooledOccurrence(envelope: PostRedactionEnvelope): Promise<void>;
   close(): Promise<void>;
+}
+
+export type CaptureHeartbeatState =
+  | "ARMED" | "SPOOL_ONLY" | "DRAINING" | "OFF";
+
+export interface CaptureComponentHealthWrite {
+  readonly component: `capture:${string}`;
+  readonly state: CaptureHeartbeatState;
+  readonly detailCode: CaptureHealthCode;
+}
+
+export interface CaptureRuntimeDatabaseSink extends PostgresCaptureSink {
+  writeComponentHealth(row: CaptureComponentHealthWrite): Promise<void>;
 }
 
 export function createTierOneExitSink(options: {
@@ -109,7 +122,7 @@ function occurrenceValues(
 
 export function createPostgresCaptureSink(options: {
   readonly connectionString: string | undefined;
-}): PostgresCaptureSink {
+}): CaptureRuntimeDatabaseSink {
   const pool = options.connectionString === undefined
     ? undefined
     : new pg.Pool({
@@ -190,6 +203,21 @@ export function createPostgresCaptureSink(options: {
           row.opened_at,
           row.closed_at,
         ],
+      );
+    },
+    async writeComponentHealth(
+      row: CaptureComponentHealthWrite,
+    ): Promise<void> {
+      await requirePool().query(
+        `INSERT INTO obs.component_health
+           (component, state, observed_at, detail_code)
+         VALUES ($1, $2, clock_timestamp(), $3)
+         ON CONFLICT (component) DO UPDATE SET
+           state = $2,
+           observed_at = clock_timestamp(),
+           detail_code = $3,
+           updated_at = clock_timestamp()`,
+        [row.component, row.state, row.detailCode],
       );
     },
     async close(): Promise<void> {
