@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path";
+
 import {
   parseSpoolAdmissionSeal,
   type SpoolAdmissionSeal,
@@ -23,6 +25,18 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 
 function nonEmpty(value: string | undefined): string | undefined {
   return value === undefined || value.length === 0 ? undefined : value;
+}
+
+export function readObsControlDir(
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const value = env.OBS_CONTROL_DIR;
+  return value !== undefined
+      && value.length > 0
+      && !value.includes("\0")
+      && isAbsolute(value)
+    ? value
+    : undefined;
 }
 
 export function readObsBounds(): ObsBounds {
