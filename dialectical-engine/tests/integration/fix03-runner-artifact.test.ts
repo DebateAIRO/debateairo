@@ -7,6 +7,7 @@ import {
   createCaptureHealth,
   createSharedRedactor,
   installCaptureEmitter,
+  runWithObsContext,
   type CaptureQueueEntry,
 } from "@debateai/obs-capture";
 import { TypedDomainError } from "@debateai/kernel";
@@ -17,6 +18,7 @@ import {
 
 const RUN_ID = "550e8400-e29b-41d4-a716-446655440000";
 const WORK_ITEM_ID = "550e8400-e29b-41d4-a716-446655440001";
+const OUTER_RUN_ID = "550e8400-e29b-41d4-a716-446655440002";
 const UNKNOWN = "UNKNOWN:DECLARED_KIND_REQUIRED";
 
 type TaskFn = (
@@ -24,13 +26,15 @@ type TaskFn = (
   context: { retryCount(): number },
 ) => Promise<unknown>;
 
+interface TerminalFailureInput {
+  readonly runId: string;
+  readonly workItemId: string;
+  readonly reason: string;
+}
+
 function taskFor(input: {
   readonly executeWorkItem: () => Promise<RunnerExecutionResult>;
-  readonly recordTerminalFailure?: (value: {
-    readonly runId: string;
-    readonly workItemId: string;
-    readonly reason: string;
-  }) => Promise<boolean>;
+  readonly recordTerminalFailure?: (value: TerminalFailureInput) => Promise<boolean>;
 }): TaskFn {
   let taskFn: TaskFn | undefined;
   declareHatchetWalkingSkeletonTask({
@@ -204,6 +208,146 @@ describe("FIX-03 C2 artifact", () => {
       attempt_index: 0,
     });
     expect(envelope).not.toHaveProperty("attempt_ref");
+  });
+
+  it("keeps a real outer zone veto without copying outer refs", async () => {
+    const failure = new Error("private zone task failure");
+    const captured = installRecordingEmitter();
+    const task = taskFor({
+      executeWorkItem: vi.fn<() => Promise<RunnerExecutionResult>>().mockRejectedValue(failure),
+    });
+
+    await expect(runWithObsContext(Object.freeze({
+      zone_context: true,
+      run_ref: Object.freeze({ kind: "run", value: OUTER_RUN_ID }),
+      node_ref: Object.freeze({ kind: "node", value: OUTER_RUN_ID }),
+    }), () => task(
+      { runId: RUN_ID, workItemId: WORK_ITEM_ID },
+      { retryCount: () => 1 },
+    ))).rejects.toBe(failure);
+
+    expect(captured).toHaveLength(1);
+    const entry = captured[0]!;
+    expect(entry.ambient_context_ref).toEqual({
+      run_ref: { kind: "run", value: RUN_ID },
+      work_item_ref: { kind: "work_item", value: WORK_ITEM_ID },
+      zone_context: true,
+    });
+    expect(Object.keys(entry.ambient_context_ref ?? {}).sort()).toEqual([
+      "run_ref",
+      "work_item_ref",
+      "zone_context",
+    ]);
+    expect(createSharedRedactor({
+      environment: "test",
+      build_ref: "UNTRACKED-DEV:fix03-c2-zone",
+      build_dirty: true,
+      runtime: "runner",
+      component: { process: "runner", package: "@debateai/runner" },
+      writer_identity: "fix03-c2-zone-test",
+      redaction_policy_version: "g0",
+      allowlist_set_id: "g0-empty-parameters",
+    }).redact(entry)).toMatchObject({
+      run_ref: UNKNOWN,
+      work_item_ref: UNKNOWN,
+      node_ref: UNKNOWN,
+      attempt_ref: UNKNOWN,
+      ledger_ref: UNKNOWN,
+      at_seq_watermark: UNKNOWN,
+      zone_context: true,
+    });
+  });
+
+  it.each([
+    ["an accessor", () => {
+      const outer: Record<string, unknown> = {};
+      Object.defineProperty(outer, "zone_context", {
+        get() { throw new Error("ZONE_GETTER_CALLED"); },
+        enumerable: true,
+      });
+      return outer;
+    }],
+    ["a descriptor trap", () => new Proxy({}, {
+      getOwnPropertyDescriptor() { throw new Error("ZONE_DESCRIPTOR_TRAP"); },
+    })],
+    ["a non-boolean value", () => ({ zone_context: "true" })],
+  ] as const)("fails closed for %s on the outer zone field", async (_name, makeOuter) => {
+    const failure = new Error("private hostile-zone task failure");
+    const captured = installRecordingEmitter();
+    const task = taskFor({
+      executeWorkItem: vi.fn<() => Promise<RunnerExecutionResult>>().mockRejectedValue(failure),
+    });
+
+    await expect(runWithObsContext(makeOuter(), () => task(
+      { runId: RUN_ID, workItemId: WORK_ITEM_ID },
+      { retryCount: () => 1 },
+    ))).rejects.toBe(failure);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.ambient_context_ref).toEqual({
+      run_ref: { kind: "run", value: RUN_ID },
+      work_item_ref: { kind: "work_item", value: WORK_ITEM_ID },
+      zone_context: true,
+    });
+  });
+
+  it.each([
+    ["an own false value", { zone_context: false, run_ref: { kind: "run", value: OUTER_RUN_ID } }],
+    ["no zone field", { node_ref: { kind: "node", value: OUTER_RUN_ID } }],
+    ["an inherited true value", Object.create({ zone_context: true }) as Record<string, unknown>],
+  ] as const)("keeps %s non-zone and discards outer refs", async (_name, outer) => {
+    const failure = new Error("private non-zone task failure");
+    const captured = installRecordingEmitter();
+    const task = taskFor({
+      executeWorkItem: vi.fn<() => Promise<RunnerExecutionResult>>().mockRejectedValue(failure),
+    });
+
+    await expect(runWithObsContext(outer, () => task(
+      { runId: RUN_ID, workItemId: WORK_ITEM_ID },
+      { retryCount: () => 1 },
+    ))).rejects.toBe(failure);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.ambient_context_ref).toEqual({
+      run_ref: { kind: "run", value: RUN_ID },
+      work_item_ref: { kind: "work_item", value: WORK_ITEM_ID },
+    });
+  });
+
+  it("freezes terminal input before a capture sink can mutate the error", async () => {
+    const productFailure = Object.assign(new Error("private mutable failure"), {
+      code: "ORIGINAL_CAPTURE_CODE",
+    });
+    installCaptureEmitter(Object.freeze({
+      emit(value: unknown) {
+        const payload = value as { error: { code: string } };
+        payload.error.code = "MUTATED_BY_CAPTURE";
+        throw new Error("CAPTURE_SINK_FAILED");
+      },
+      captureHandled() {},
+    }));
+    const recordTerminalFailure = vi.fn<
+      (value: TerminalFailureInput) => Promise<boolean>
+    >(async () => true);
+    const task = taskFor({
+      executeWorkItem: vi.fn<() => Promise<RunnerExecutionResult>>().mockRejectedValue(productFailure),
+      recordTerminalFailure,
+    });
+
+    await expect(task(
+      { runId: RUN_ID, workItemId: WORK_ITEM_ID },
+      { retryCount: () => 1 },
+    )).rejects.toBe(productFailure);
+
+    expect(productFailure.code).toBe("MUTATED_BY_CAPTURE");
+    expect(recordTerminalFailure).toHaveBeenCalledOnce();
+    const terminalInput = recordTerminalFailure.mock.calls[0]?.[0];
+    expect(Object.isFrozen(terminalInput)).toBe(true);
+    expect(terminalInput).toEqual({
+      runId: RUN_ID,
+      workItemId: WORK_ITEM_ID,
+      reason: "RUNNER_EXECUTION_FAILED:DEPENDENCY_ORIGINAL_CAPTURE_CODE",
+    });
   });
 
   it("keeps the terminal write and original error identity with capture off", async () => {
