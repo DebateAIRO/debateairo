@@ -1,6 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
+import {
+  declaredRef,
+  emit,
+  getObsContext,
+  runWithObsContext,
+} from "@debateai/obs-capture";
 
 export const MODEL_ROLES = ["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER"] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
@@ -298,6 +304,47 @@ function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
   }
 }
 
+const PROVIDER_INHERITED_CONTEXT_FIELDS = Object.freeze([
+  "run_ref",
+  "work_item_ref",
+  "zone_context",
+] as const);
+
+function emitProviderExhaustion(input: {
+  readonly code: "PROVIDER_CALL_FAILED" | "PROVIDER_CONTENT_UNACCEPTED";
+  readonly attemptId: string;
+  readonly ledgerEntryRef: string;
+  readonly attemptCount: number;
+}): void {
+  try {
+    const context: Record<string, unknown> = {
+      attempt_ref: declaredRef("attempt", input.attemptId),
+      ledger_ref: declaredRef("ledger_entry", input.ledgerEntryRef),
+    };
+    const ambient = getObsContext();
+    if (ambient !== undefined) {
+      for (const field of PROVIDER_INHERITED_CONTEXT_FIELDS) {
+        const descriptor = Object.getOwnPropertyDescriptor(ambient, field);
+        if (descriptor === undefined) continue;
+        if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+          throw new TypeError("PROVIDER_OBS_CONTEXT_ACCESSOR_FORBIDDEN");
+        }
+        context[field] = descriptor.value;
+      }
+    }
+    runWithObsContext(Object.freeze(context), () => emit(Object.freeze({
+      code: input.code,
+      taxonomy_class: "PROVIDER_EXHAUSTED",
+      capture_point: "provider",
+      disposition: "THROWN",
+      source: "first_party",
+      template_parameters: Object.freeze({ attempt_count: input.attemptCount }),
+    })));
+  } catch {
+    // Provider product semantics always win over observability.
+  }
+}
+
 export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
 
@@ -314,6 +361,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let lastError: unknown;
     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
+    let lastAttemptId = "PROVIDER_ATTEMPT_UNRESOLVED";
     let attemptPacket = request.packet;
     let lastContentRejection: {
       attempts: number;
@@ -326,6 +374,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
       const inputHash = digest(JSON.stringify(attemptPacket));
       const attemptId = randomUUID();
+      lastAttemptId = attemptId;
       const startedAt = new Date();
       let rawArtifactRef: string | null = null;
       let ledgerRecorded = false;
@@ -482,6 +531,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       }
     }
     if (lastContentRejection !== null) {
+      emitProviderExhaustion({
+        code: "PROVIDER_CONTENT_UNACCEPTED",
+        attemptId: lastAttemptId,
+        ledgerEntryRef: lastContentRejection.ledgerEntryRef,
+        attemptCount: lastContentRejection.attempts,
+      });
       throw new ProviderContentUnacceptedError(
         lastContentRejection.attempts,
         lastContentRejection.parseStatus,
@@ -490,6 +545,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         lastContentRejection.ledgerEntryRef
       );
     }
+    emitProviderExhaustion({
+      code: "PROVIDER_CALL_FAILED",
+      attemptId: lastAttemptId,
+      ledgerEntryRef: lastLedgerEntryRef,
+      attemptCount: request.bound.maxAttempts,
+    });
     throw new ProviderCallFailedError(
       lastError,
       request.bound.maxAttempts,
