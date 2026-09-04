@@ -957,6 +957,303 @@ describe("FIX-16 C1 inventory scanner", () => {
     expect(scanSource(source, "packages/obs-capture/src/zone/manifest.ts")).toEqual([]);
   });
 
+  it("routes labelled loop completions and exposes widened cap states at exits", () => {
+    const labeledHarmful = [
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "outer: for (let i = 0; i < 2; i += 1) {",
+      "  load = require;",
+      "  continue outer;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const labeledSafe = [
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "outer: for (let i = 0; i < 2; i += 1) {",
+      "  load = require;",
+      "  load = local;",
+      "  continue outer;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const chain = (prefix: string, first: string, last: string): string[] => Array.from(
+      { length: 65 },
+      (_, index) => `let ${prefix}${index} = ${index === 64 ? last : first};`,
+    );
+    const transfers = (prefix: string): string => Array.from(
+      { length: 64 },
+      (_, index) => `${prefix}${index} = ${prefix}${index + 1};`,
+    ).join(" ");
+    const requireCap = [
+      "declare const flag: boolean;",
+      "declare const local: (path: string) => unknown;",
+      ...chain("r", "local", "require"),
+      `while (flag) { ${transfers("r")} }`,
+      'r0("apps/api/src/mfa.ts");',
+    ].join("\n");
+    const callbackCap = [
+      "declare const flag: boolean;",
+      "declare const pending: Promise<void>;",
+      "function consume(error: unknown): void { console.error(error); }",
+      ...chain("c", "consume", "(_error: unknown) => undefined"),
+      `while (flag) { ${transfers("c")} }`,
+      "void pending.catch(c0);",
+    ].join("\n");
+    const throwCap = [
+      "declare const flag: boolean;",
+      ...chain("t", 'new Error("SAFE_CODE")', 'new Error("ordinary text")'),
+      `while (flag) { ${transfers("t")} }`,
+      "throw t0;",
+    ].join("\n");
+    const constructorCap = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const flag: boolean;",
+      "class LocalError { constructor(..._args: unknown[]) {} }",
+      ...chain("w", "LocalError", "DomainError"),
+      `while (flag) { ${transfers("w")} }`,
+      'try { task(); } catch (caught) { new w0("WRAP_FAILED", "fixed"); void caught; }',
+    ].join("\n");
+    const causeCap = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const flag: boolean;",
+      "declare const unrelated: unknown;",
+      "try { task(); } catch (caught) {",
+      ...chain("a", "caught", "unrelated").map((line) => `  ${line}`),
+      `  while (flag) { ${transfers("a")} }`,
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: a0 });',
+      "}",
+    ].join("\n");
+    const safeCap = [
+      "declare const flag: boolean;",
+      "declare const local: (path: string) => unknown;",
+      ...chain("s", "local", "local"),
+      `while (flag) { ${transfers("s")} }`,
+      's0("apps/api/src/registration.ts");',
+    ].join("\n");
+
+    expect([
+      scanSource(labeledHarmful, "packages/obs-capture/src/label-harmful.ts"),
+      scanSource(labeledSafe, "packages/obs-capture/src/label-safe.ts"),
+      scanSource(requireCap, "packages/obs-capture/src/cap-require.ts"),
+      scanSource(callbackCap, "apps/example/src/cap-callback.ts"),
+      scanSource(throwCap, "packages/example/src/cap-throw.ts"),
+      scanSource(constructorCap, "packages/example/src/cap-constructor.ts"),
+      scanSource(causeCap, "packages/example/src/cap-cause.ts"),
+      scanSource(safeCap, "packages/obs-capture/src/cap-safe.ts"),
+    ]).toEqual([
+      [{ path: "packages/obs-capture/src/label-harmful.ts", line: 7, class: "zone_import" }],
+      [],
+      [{ path: "packages/obs-capture/src/cap-require.ts", line: 69, class: "zone_import" }],
+      [{ path: "apps/example/src/cap-callback.ts", line: 70, class: "void_promise" }],
+      [{ path: "packages/example/src/cap-throw.ts", line: 68, class: "throw_without_code" }],
+      [{ path: "packages/example/src/cap-constructor.ts", line: 70, class: "wrapper_without_cause" }],
+      [{ path: "packages/example/src/cap-cause.ts", line: 71, class: "wrapper_without_cause" }],
+      [],
+    ]);
+  });
+
+  it("transfers for-of and array-destructuring values into every tracked domain", () => {
+    const requireForOf = [
+      "for (const load of [require]) {",
+      '  load("apps/api/src/registration.ts");',
+      "}",
+      "for (const load of [(path: string) => path]) {",
+      '  load("apps/api/src/registration.ts");',
+      "}",
+    ].join("\n");
+    const wrapperForOf = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "class LocalError { constructor(..._args: unknown[]) {} }",
+      "for (const Wrapper of [DomainError]) {",
+      '  try { task(); } catch (caught) { new Wrapper("WRAP_FAILED", "fixed"); void caught; }',
+      "}",
+      "for (const Wrapper of [LocalError]) {",
+      '  try { task(); } catch (caught) { new Wrapper("LOCAL_ONLY", "fixed"); void caught; }',
+      "}",
+    ].join("\n");
+    const safeCauseForOf = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "try { task(); } catch (caught) {",
+      "  for (const root of [caught]) {",
+      '    new DomainError("WRAP_FAILED", "fixed", { cause: root });',
+      "  }",
+      "}",
+    ].join("\n");
+    const destructuring = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "let load; [load] = [require];",
+      'load("apps/api/src/mfa.ts");',
+      "let Wrapper; [Wrapper] = [DomainError];",
+      'try { task(); } catch (caught) { new Wrapper("WRAP_FAILED", "fixed"); void caught; }',
+      "try { task(); } catch (caught) {",
+      "  const [root] = [caught];",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: root });',
+      "}",
+    ].join("\n");
+    const forInKeys = [
+      "for (const code in { SAFE_CODE: true }) { throw code; }",
+      "for (const code in { ordinary: true }) { throw code; }",
+    ].join("\n");
+
+    expect(scanSource(requireForOf, "packages/obs-capture/src/for-of-require.ts")).toEqual([
+      { path: "packages/obs-capture/src/for-of-require.ts", line: 2, class: "zone_import" },
+    ]);
+    expect(scanSource(wrapperForOf, "packages/example/src/for-of-wrapper.ts")).toEqual([
+      { path: "packages/example/src/for-of-wrapper.ts", line: 4, class: "wrapper_without_cause" },
+    ]);
+    expect(scanSource(safeCauseForOf, "packages/example/src/for-of-cause.ts")).toEqual([]);
+    expect(scanSource(destructuring, "packages/obs-capture/src/destructuring.ts")).toEqual([
+      { path: "packages/obs-capture/src/destructuring.ts", line: 3, class: "zone_import" },
+      { path: "packages/obs-capture/src/destructuring.ts", line: 5, class: "wrapper_without_cause" },
+    ]);
+    expect(scanSource(forInKeys, "packages/example/src/for-in-keys.ts")).toEqual([
+      { path: "packages/example/src/for-in-keys.ts", line: 2, class: "throw_without_code" },
+    ]);
+  });
+
+  it("uses truthy logical assignment and assignment-expression result values", () => {
+    const requires = [
+      "declare const local: (path: string) => unknown;",
+      "let retained = require; retained ||= local;",
+      'retained("apps/api/src/registration.ts");',
+      "let installed = local; installed &&= require;",
+      'installed("apps/api/src/mfa.ts");',
+      "let assigned = local;",
+      '(assigned = require)("apps/api/src/mail-channel.ts");',
+      "let replaced = require; replaced &&= local;",
+      'replaced("apps/api/src/registration.ts");',
+      "let fallback: ((path: string) => unknown) | undefined; fallback ||= local;",
+      'fallback("apps/api/src/registration.ts");',
+    ].join("\n");
+    const wrappers = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "class LocalError { constructor(..._args: unknown[]) {} }",
+      "let retained = DomainError; retained ||= LocalError;",
+      'try { task(); } catch (caught) { new retained("WRAP_FAILED", "fixed"); void caught; }',
+      "let installed = LocalError; installed &&= DomainError;",
+      'try { task(); } catch (caught) { new installed("WRAP_FAILED", "fixed"); void caught; }',
+      "let replaced = DomainError; replaced &&= LocalError;",
+      'try { task(); } catch (caught) { new replaced("LOCAL_ONLY", "fixed"); void caught; }',
+    ].join("\n");
+    const safeOtherDomains = [
+      "declare const pending: Promise<void>;",
+      "function consume(error: unknown): void { console.error(error); }",
+      "function ignore(_error: unknown): void {}",
+      "let callback = consume; callback ||= ignore; void pending.catch(callback);",
+      "callback = ignore; callback &&= consume; void pending.catch(callback);",
+      'let coded = new Error("SAFE_CODE"); coded ||= new Error("ordinary text"); throw coded;',
+    ].join("\n");
+    const safeManifest = [
+      'const safe = ["packages/kernel/src/error.ts"];',
+      'let paths = safe; paths ||= ["apps/api/src/registration.ts"];',
+      "export const LOOKALIKE = { zone_path_prefixes: paths };",
+    ].join("\n");
+
+    expect(scanSource(requires, "packages/obs-capture/src/logical-require.ts")).toEqual([
+      { path: "packages/obs-capture/src/logical-require.ts", line: 3, class: "zone_import" },
+      { path: "packages/obs-capture/src/logical-require.ts", line: 5, class: "zone_import" },
+      { path: "packages/obs-capture/src/logical-require.ts", line: 7, class: "zone_import" },
+    ]);
+    expect(scanSource(wrappers, "packages/example/src/logical-wrapper.ts")).toEqual([
+      { path: "packages/example/src/logical-wrapper.ts", line: 4, class: "wrapper_without_cause" },
+      { path: "packages/example/src/logical-wrapper.ts", line: 6, class: "wrapper_without_cause" },
+    ]);
+    expect(scanSource(safeOtherDomains, "apps/example/src/logical-safe.ts")).toEqual([]);
+    expect(scanSource(safeManifest, "packages/obs-capture/src/logical-manifest.ts")).toEqual([]);
+  });
+
+  it("interprets closures and rejection callbacks through the statement CFG", () => {
+    const declarationClosure = [
+      "const load = require;",
+      "function run(): void {",
+      '  load("apps/api/src/registration.ts");',
+      "}",
+      "run();",
+    ].join("\n");
+    const expressionClosure = [
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      'const run = () => load("apps/api/src/mfa.ts");',
+      "load = require;",
+      "run();",
+    ].join("\n");
+    const constructorClosure = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "class LocalError { constructor(..._args: unknown[]) {} }",
+      "let Wrapper = LocalError;",
+      'function run(): void { try { task(); } catch (caught) { new Wrapper("WRAP_FAILED", "fixed"); void caught; } }',
+      "Wrapper = DomainError;",
+      "run();",
+    ].join("\n");
+    const codedClosure = [
+      'let failure = new Error("ordinary text");',
+      "function run(): void { throw failure; }",
+      'failure = new Error("CURRENT_CODE");',
+      "run();",
+    ].join("\n");
+    const callbacks = [
+      "declare const pending: Promise<void>;",
+      "void pending.catch((error: unknown) => { done: { break done; console.error(error); } });",
+      "void pending.catch((error: unknown) => { try { console.error(error); } catch (caught) { void caught; return; } });",
+      "void pending.catch((error: unknown) => { switch (error) { case error: return; default: return; } });",
+    ].join("\n");
+
+    expect(scanSource(declarationClosure, "packages/obs-capture/src/declaration-closure.ts")).toEqual([
+      { path: "packages/obs-capture/src/declaration-closure.ts", line: 3, class: "zone_import" },
+    ]);
+    expect(scanSource(expressionClosure, "packages/obs-capture/src/expression-closure.ts")).toEqual([
+      { path: "packages/obs-capture/src/expression-closure.ts", line: 3, class: "zone_import" },
+    ]);
+    expect(scanSource(constructorClosure, "packages/example/src/constructor-closure.ts")).toEqual([
+      { path: "packages/example/src/constructor-closure.ts", line: 4, class: "wrapper_without_cause" },
+    ]);
+    expect(scanSource(codedClosure, "packages/example/src/coded-closure.ts")).toEqual([]);
+    expect(scanSource(callbacks, "apps/example/src/callback-shared-cfg.ts")).toEqual([
+      { path: "apps/example/src/callback-shared-cfg.ts", line: 2, class: "void_promise" },
+    ]);
+  });
+
+  it("tracks computed and returned Object.assign identities plus manifest array mutations", () => {
+    const causes = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "try { task(); } catch (caught) {",
+      "  const overwritten = { cause: caught };",
+      '  Object["assign"](overwritten, { cause: unrelated });',
+      '  new DomainError("WRAP_FAILED", "fixed", overwritten);',
+      "  const preserved = Object.assign({}, { cause: caught });",
+      '  new DomainError("WRAP_FAILED", "fixed", preserved);',
+      "  const restored = Object[\"assign\"]({}, { cause: unrelated }, { cause: caught });",
+      '  new DomainError("WRAP_FAILED", "fixed", restored);',
+      "}",
+    ].join("\n");
+    const manifest = [
+      'const paths = ["packages/kernel/src/error.ts"];',
+      'paths.push("apps/api/src/registration.ts");',
+      "export const FIRST = { zone_path_prefixes: paths };",
+      'const SECOND = { zone_path_prefixes: ["packages/kernel/src/error.ts"] };',
+      'SECOND.zone_path_prefixes.push("apps/api/src/mfa.ts");',
+      "export { SECOND };",
+      'const safe = ["packages/kernel/src/error.ts"];',
+      'safe.push("packages/kernel/src/error.ts");',
+      "export const SAFE = { zone_path_prefixes: safe };",
+    ].join("\n");
+    const manifestStaticImport = 'import "../../../../apps/api/src/registration.js";';
+
+    expect(scanSource(causes, "packages/example/src/assign-identities.ts")).toEqual([
+      { path: "packages/example/src/assign-identities.ts", line: 6, class: "wrapper_without_cause" },
+    ]);
+    expect(scanSource(manifest, "packages/obs-capture/src/manifest-array-mutation.ts")).toEqual([
+      { path: "packages/obs-capture/src/manifest-array-mutation.ts", line: 2, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-array-mutation.ts", line: 5, class: "zone_import" },
+    ]);
+    expect(scanSource(manifest, "packages/obs-capture/src/zone/manifest.ts")).toEqual([]);
+    expect(scanSource(manifestStaticImport, "packages/obs-capture/src/zone/manifest.ts")).toEqual([
+      { path: "packages/obs-capture/src/zone/manifest.ts", line: 1, class: "zone_import" },
+    ]);
+  });
+
   it("fails closed when file bytes, AST nodes, candidates, or syntax exceed the scanner contract", () => {
     expect(() => scanSource("const payload = 'too large';", "apps/example/src/large.ts", {
       limits: { ...DEFAULT_SCAN_LIMITS, maxFileBytes: 4 },
