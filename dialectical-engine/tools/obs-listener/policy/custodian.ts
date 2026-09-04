@@ -25,6 +25,20 @@ function tokenDigest(token: string): Buffer {
   return createHash("sha256").update(token, "utf8").digest();
 }
 
+function ownStringProperty(value: unknown, key: string): string | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor !== undefined &&
+      "value" in descriptor &&
+      typeof descriptor.value === "string"
+      ? descriptor.value
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function repin(
   currentBundle: PolicyBundle,
   request: RepinRequest,
@@ -34,12 +48,15 @@ export function repin(
   const custodian = current.custodians[0];
   const expectedToken = custodian === undefined
     ? undefined
-    : environment[custodian.token_env];
+    : ownStringProperty(environment, custodian.token_env);
+  const suppliedToken = ownStringProperty(request, "token");
 
   if (
     expectedToken === undefined ||
     expectedToken.length === 0 ||
-    !timingSafeEqual(tokenDigest(request.token), tokenDigest(expectedToken))
+    suppliedToken === undefined ||
+    suppliedToken.length === 0 ||
+    !timingSafeEqual(tokenDigest(suppliedToken), tokenDigest(expectedToken))
   ) {
     throw new RepinRefusedError();
   }

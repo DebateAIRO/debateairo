@@ -1,82 +1,5 @@
 {
-  "schema_version": 1,
-  "policy_ref": "fixagent-policy-v1",
-  "production_source_globs": [
-    "apps/*/src/**",
-    "packages/**/src/**",
-    "apps/ui/app/**",
-    "apps/ui/components/**",
-    "apps/ui/lib/**"
-  ],
-  "tier_rules": {
-    "QUICK": {
-      "authority": "LABEL_ONLY",
-      "route": "APPROVAL_FIRST",
-      "max_production_files": 1,
-      "max_test_files": 1,
-      "production_line_cap": 20,
-      "total_line_cap": 50,
-      "requires_red_green": true
-    },
-    "PR_FIX": {
-      "authority": "LABEL_ONLY",
-      "route": "APPROVAL_FIRST"
-    },
-    "ESCALATE": {
-      "authority": "LABEL_ONLY",
-      "route": "REPORT_ONLY"
-    }
-  },
-  "floor_deny_globs": [
-    "apps/api/src/registration.ts",
-    "apps/api/src/mail-channel.ts",
-    "apps/api/src/mfa.ts",
-    "apps/api/dist/mail-channel.js",
-    "apps/api/dist/mfa.js",
-    "apps/api/dist/registration.js",
-    "dist/apps/api/src/mail-channel.js",
-    "dist/apps/api/src/mfa.js",
-    "dist/apps/api/src/registration.js",
-    "dist/packages/db/src/identity.js",
-    "packages/db/dist/identity.js",
-    "packages/db/src/identity.ts",
-    "packages/db/src/obs-schema.ts",
-    "packages/obs-capture/**",
-    "migrations/**",
-    "packages/crypto/**",
-    "packages/published-arithmetic/**",
-    "packages/propagation/**",
-    "packages/judgement/**",
-    "packages/serve/**",
-    "packages/settlement/**",
-    "packages/valuation/**",
-    "packages/budget/**",
-    "package.json",
-    "**/package.json",
-    "pnpm-lock.yaml",
-    "**/pnpm-lock.yaml",
-    "pnpm-workspace.yaml",
-    "register.bootstrap.json",
-    "**/register.bootstrap.json",
-    "**/*register-seed*.json",
-    "compose*.yaml",
-    "compose*.yml",
-    "**/compose*.yaml",
-    "**/compose*.yml",
-    ".env",
-    ".env.*",
-    "**/.env",
-    "**/.env.*",
-    ".github/**",
-    "deploy/**",
-    "scripts/**",
-    "packages/register/src/compose-env.ts",
-    "packages/register/src/runtime-environment.ts",
-    "tools/**",
-    "docs/agent-protocols/**",
-    ".hermes/**"
-  ],
-  "allowlist": [],
+  "bundle_hash": "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
   "taxonomy_pin": {
     "classes": [
       "PROCESS_DEATH",
@@ -98,19 +21,6 @@
       "missing_artifact_chain"
     ]
   },
-  "severity_map": {
-    "ladder": ["INFO", "DEGRADED", "SEVERE", "FATAL"],
-    "default": "DEGRADED",
-    "overrides": {},
-    "severe_threshold": "SEVERE"
-  },
-  "routing_table": [
-    { "incident_class": "SECURITY_PRIVACY", "owner": "V" },
-    { "incident_class": "PERSISTENCE_MIGRATIONS", "owner": "V" },
-    { "incident_class": "SPEND", "owner": "V" },
-    { "incident_class": "SCORING_LIVE_DATA", "owner": "V" },
-    { "incident_class": "DEFAULT", "owner": "V" }
-  ],
   "code_registry_seed": {
     "base_commit": "29f370e0f1017245aa26443ad366e020e815c301",
     "recipe": "obs-code-seed.sh@v1",
@@ -160,14 +70,5 @@
     { "key": "obs.captureGapQuietWindowMs", "value": null, "status": "UNSET", "source_ref": "L2-ADDENDUM-2-5.5" },
     { "key": "obs.severeThreshold", "value": "SEVERE", "status": "SEED", "source_ref": "R-E6-09/RT-41" },
     { "key": "obs.daemonRestartMs", "value": 10000, "status": "SEED", "source_ref": "FIX-09-DECISIONS" }
-  ],
-  "slots": {
-    "zone_manifest_hash": { "value": null, "gate": "RP-1" },
-    "hatchet_ingest": { "value": null, "gate": "RP-2" },
-    "injection_corpus_hash": { "value": null, "gate": "RP-3" }
-  },
-  "quick_arm": "OFF",
-  "custodians": [
-    { "id": "V", "token_env": "OBS_POLICY_CUSTODIAN_TOKEN" }
   ]
 }

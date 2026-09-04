@@ -1,6 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
@@ -10,6 +16,7 @@ import {
 import {
   isFloorDenied,
   loadBundle,
+  PolicyBundleLoadError,
   policyBundleSchema,
 } from "../../tools/obs-listener/policy/loader.js";
 import {
@@ -30,6 +37,18 @@ const BUNDLE_PATH = resolve(
 const INDEPENDENT_HASH_PATH = resolve(
   import.meta.dirname,
   "fixtures/fix09-independent-hash.mjs",
+);
+const EXPECTED_PINS_PATH = resolve(
+  import.meta.dirname,
+  "fixtures/fix09-expected-pins.json",
+);
+const INTERFACE_TSCONFIG_PATH = resolve(
+  import.meta.dirname,
+  "fixtures/fix09-interface-tsconfig.json",
+);
+const TYPESCRIPT_COMPILER_PATH = resolve(
+  import.meta.dirname,
+  "../../node_modules/typescript/bin/tsc",
 );
 
 describe("FIX-09 C1 policy bundle", () => {
@@ -131,6 +150,29 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(bundleHash(loadBundle(BUNDLE_PATH))).toBe(independent.stdout);
   });
 
+  it("matches the independently recorded taxonomy and registry pins", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const expectedPins = JSON.parse(
+      readFileSync(EXPECTED_PINS_PATH, "utf8"),
+    ) as {
+      readonly bundle_hash: string;
+      readonly taxonomy_pin: unknown;
+      readonly code_registry_seed: unknown;
+      readonly register_seeds: unknown;
+    };
+
+    expect(bundleHash(bundle)).toBe(expectedPins.bundle_hash);
+    expect({
+      taxonomy_pin: bundle.taxonomy_pin,
+      code_registry_seed: bundle.code_registry_seed,
+      register_seeds: bundle.register_seeds,
+    }).toEqual({
+      taxonomy_pin: expectedPins.taxonomy_pin,
+      code_registry_seed: expectedPins.code_registry_seed,
+      register_seeds: expectedPins.register_seeds,
+    });
+  });
+
   it("hashes semantic JSON independently of object key order and whitespace", () => {
     const parsed = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
       string,
@@ -148,6 +190,7 @@ describe("FIX-09 C1 policy bundle", () => {
     const bundle = loadBundle(BUNDLE_PATH);
     const denied = [
       "packages/obs-capture/src/zone/manifest.ts",
+      "packages/obs-capture/src/index.ts",
       "migrations/0000_s00.sql",
       "packages/crypto/src/index.ts",
       "packages/published-arithmetic/src/index.ts",
@@ -155,6 +198,7 @@ describe("FIX-09 C1 policy bundle", () => {
       "packages/budget/src/index.ts",
       "package.json",
       "packages/kernel/package.json",
+      "apps/ui/pnpm-lock.yaml",
       "register.bootstrap.json",
       "compose.dev.yaml",
       "deploy/dev-auth/compose.yaml",
@@ -163,13 +207,37 @@ describe("FIX-09 C1 policy bundle", () => {
       "tools/obs-listener/policy/bundle.json",
       "docs/agent-protocols/debateai-heartbeat-protocol.md",
       ".hermes/x",
+      "apps/api/src/mfa.ts",
+      "apps/api/dist/mail-channel.js",
+      "apps/api/dist/mfa.js",
+      "apps/api/dist/registration.js",
+      "dist/apps/api/src/mail-channel.js",
+      "dist/apps/api/src/mfa.js",
+      "dist/apps/api/src/registration.js",
+      "dist/packages/db/src/identity.js",
+      "packages/db/dist/identity.js",
+      "packages/db/src/obs-schema.ts",
+      "packages/register/src/compose-env.ts",
+      "packages/register/src/runtime-environment.ts",
+      "././tools/obs-listener/policy/bundle.json",
     ];
 
     expect(denied.map((path) => isFloorDenied(bundle, path))).toEqual(
       denied.map(() => true),
     );
-    expect(isFloorDenied(bundle, "apps/api/src/public-health.ts")).toBe(false);
-    expect(isFloorDenied(bundle, "packages/cryptography/src/index.ts")).toBe(false);
+    const allowedNeighbours = [
+      "apps/api/src/public-health.ts",
+      "././apps/api/src/public-health.ts",
+      "apps/api/src/mfa-helper.ts",
+      "apps/ui/pnpm-lock.yml",
+      "packages/cryptography/src/index.ts",
+      "packages/db/src/obs-schema-helper.ts",
+      "packages/register/src/compose-environment.ts",
+      "packages/register/src/runtime-configuration.ts",
+    ];
+    expect(
+      allowedNeighbours.map((path) => isFloorDenied(bundle, path)),
+    ).toEqual(allowedNeighbours.map(() => false));
   });
 
   it("fails closed when a candidate path is not repo-relative", () => {
@@ -180,6 +248,66 @@ describe("FIX-09 C1 policy bundle", () => {
         (path) => isFloorDenied(bundle, path),
       ),
     ).toEqual([true, true, true, true, true]);
+  });
+
+  it("rejects duplicate JSON members before last-member-wins parsing", () => {
+    const directory = mkdtempSync(join(tmpdir(), "fix09-bundle-"));
+    const duplicatePath = join(directory, "duplicate.json");
+    const raw = readFileSync(BUNDLE_PATH, "utf8");
+    const duplicateRaw = raw.replace(
+      '"quick_arm": "OFF"',
+      '"quick_arm": "ON",\n  "quick_arm": "OFF"',
+    );
+    writeFileSync(duplicatePath, duplicateRaw, "utf8");
+
+    try {
+      let thrown: unknown;
+      try {
+        loadBundle(duplicatePath);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(PolicyBundleLoadError);
+      expect((thrown as Error).cause).toMatchObject({
+        message: "DUPLICATE_JSON_MEMBER",
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("requires every policy member to be own plain JSON data", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const inherited = Object.assign(
+      Object.create({ quick_arm: "OFF" }) as Record<string, unknown>,
+      raw,
+    );
+    delete inherited.quick_arm;
+
+    expect(Object.hasOwn(inherited, "quick_arm")).toBe(false);
+    expect(policyBundleSchema.safeParse(inherited).success).toBe(false);
+  });
+
+  it("rejects accessor-backed hash input without invoking the accessor", () => {
+    let accessorReads = 0;
+    const changing = Object.defineProperty({ stable: true }, "changing", {
+      enumerable: true,
+      get() {
+        accessorReads += 1;
+        return accessorReads;
+      },
+    });
+
+    expect(() => bundleHash(changing)).toThrowError(
+      "CANONICAL_JSON_NON_PLAIN_DATA",
+    );
+    expect(accessorReads).toBe(0);
+    expect(bundleHash({ stable: true, changing: 1 })).toBe(
+      bundleHash({ changing: 1, stable: true }),
+    );
   });
 
   it("refuses a repin unless the one recorded custodian token matches", () => {
@@ -205,6 +333,51 @@ describe("FIX-09 C1 policy bundle", () => {
     );
     expect(next.quick_arm).toBe("ON");
     expect(bundle.quick_arm).toBe("OFF");
+  });
+
+  it("maps every missing or malformed token to REPIN_REFUSED", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const environment = {
+      OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+    };
+    let accessorReads = 0;
+    const accessorRequest = Object.defineProperty({}, "token", {
+      enumerable: true,
+      get() {
+        accessorReads += 1;
+        return "fixture-custodian-token";
+      },
+    });
+    const cases: ReadonlyArray<{
+      readonly request: unknown;
+      readonly environment: unknown;
+    }> = [
+      { request: {}, environment },
+      { request: { token: undefined }, environment },
+      { request: { token: null }, environment },
+      { request: { token: 42 }, environment },
+      { request: accessorRequest, environment },
+      {
+        request: { token: "fixture-custodian-token" },
+        environment: { OBS_POLICY_CUSTODIAN_TOKEN: 42 },
+      },
+    ];
+
+    for (const malformed of cases) {
+      let thrown: unknown;
+      try {
+        repin(
+          bundle,
+          malformed.request as never,
+          malformed.environment as never,
+        );
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(RepinRefusedError);
+      expect(thrown).toMatchObject({ code: "REPIN_REFUSED" });
+    }
+    expect(accessorReads).toBe(0);
   });
 
   it("lets the custodian populate a deferred hash slot without changing its gate", () => {
@@ -254,6 +427,16 @@ describe("FIX-09 C1 policy bundle", () => {
   });
 
   it("freezes the tracer seam and leaves the dispatch arm memberless", () => {
+    const typecheck = spawnSync(
+      process.execPath,
+      [TYPESCRIPT_COMPILER_PATH, "--project", INTERFACE_TSCONFIG_PATH],
+      { encoding: "utf8" },
+    );
+
+    expect(
+      typecheck.status,
+      `${typecheck.stdout}${typecheck.stderr}`,
+    ).toBe(0);
     expectTypeOf<keyof DispatchArm>().toEqualTypeOf<never>();
     expectTypeOf<TracerHook["onIncidentNew"]>().parameters.toEqualTypeOf<
       [IncidentForTrace]

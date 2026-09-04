@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
+import { isOwnPlainJsonData } from "./canonical.js";
+import { parseJsonWithUniqueKeys } from "./unique-json.js";
+
 const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
 const relativeGlobSchema = z
@@ -105,7 +108,7 @@ const registerSeedSchema = z
     }
   });
 
-export const policyBundleSchema = z
+const policyBundleContentsSchema = z
   .object({
     schema_version: z.literal(1),
     policy_ref: z.literal("fixagent-policy-v1"),
@@ -197,6 +200,11 @@ export const policyBundleSchema = z
     }
   });
 
+export const policyBundleSchema = z
+  .unknown()
+  .refine(isOwnPlainJsonData, "POLICY_BUNDLE_NON_PLAIN_DATA")
+  .pipe(policyBundleContentsSchema);
+
 export type PolicyBundle = z.infer<typeof policyBundleSchema>;
 
 export class PolicyBundleLoadError extends Error {
@@ -210,7 +218,9 @@ export class PolicyBundleLoadError extends Error {
 
 export function loadBundle(path: string): PolicyBundle {
   try {
-    return policyBundleSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+    return policyBundleSchema.parse(
+      parseJsonWithUniqueKeys(readFileSync(path, "utf8")),
+    );
   } catch (error) {
     throw new PolicyBundleLoadError(error);
   }
@@ -243,17 +253,33 @@ function globPattern(glob: string): RegExp {
   return new RegExp(`${pattern}$`, "u");
 }
 
-export function isFloorDenied(bundle: PolicyBundle, repoRelativePath: string): boolean {
-  const normalized = repoRelativePath.replaceAll("\\", "/").replace(/^\.\//u, "");
+function normalizeRepoRelativePath(repoRelativePath: string): string | null {
   if (
     repoRelativePath.length === 0 ||
-    repoRelativePath === "." ||
     repoRelativePath.includes("\\") ||
-    normalized.startsWith("/") ||
-    /^[A-Za-z]:\//u.test(normalized) ||
-    normalized.split("/").includes("..")
+    repoRelativePath.includes("\0") ||
+    repoRelativePath.startsWith("/") ||
+    /^[A-Za-z]:\//u.test(repoRelativePath)
   ) {
-    return true;
+    return null;
   }
-  return bundle.floor_deny_globs.some((glob) => globPattern(glob).test(normalized));
+
+  const segments: string[] = [];
+  for (const segment of repoRelativePath.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") return null;
+    segments.push(segment);
+  }
+  return segments.length === 0 ? null : segments.join("/");
+}
+
+export function isFloorDenied(
+  bundle: PolicyBundle,
+  repoRelativePath: string,
+): boolean {
+  const normalized = normalizeRepoRelativePath(repoRelativePath);
+  if (normalized === null) return true;
+  return bundle.floor_deny_globs.some((glob) =>
+    globPattern(glob).test(normalized),
+  );
 }

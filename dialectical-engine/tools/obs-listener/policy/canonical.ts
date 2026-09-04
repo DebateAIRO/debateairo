@@ -8,6 +8,23 @@ export type CanonicalJsonValue =
   | readonly CanonicalJsonValue[]
   | { readonly [key: string]: CanonicalJsonValue };
 
+function nonPlainJsonData(): never {
+  throw new TypeError("CANONICAL_JSON_NON_PLAIN_DATA");
+}
+
+function dataPropertyValue(
+  descriptor: PropertyDescriptor | undefined,
+): unknown {
+  if (
+    descriptor === undefined ||
+    !("value" in descriptor) ||
+    descriptor.enumerable !== true
+  ) {
+    return nonPlainJsonData();
+  }
+  return descriptor.value;
+}
+
 export function canonicalProjection(value: unknown): CanonicalJsonValue {
   if (
     value === null ||
@@ -23,17 +40,57 @@ export function canonicalProjection(value: unknown): CanonicalJsonValue {
     return value;
   }
   if (Array.isArray(value)) {
-    return value.map((member) => canonicalProjection(member));
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+      return nonPlainJsonData();
+    }
+    if (Object.getOwnPropertySymbols(value).length !== 0) {
+      return nonPlainJsonData();
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const projection: CanonicalJsonValue[] = [];
+    for (let index = 0; index < value.length; index += 1) {
+      projection.push(
+        canonicalProjection(dataPropertyValue(descriptors[String(index)])),
+      );
+    }
+    const expectedKeys = new Set([
+      "length",
+      ...projection.map((_, index) => String(index)),
+    ]);
+    if (Object.keys(descriptors).some((key) => !expectedKeys.has(key))) {
+      return nonPlainJsonData();
+    }
+    return projection;
   }
   if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
+    if (Object.getPrototypeOf(value) !== Object.prototype) {
+      return nonPlainJsonData();
+    }
+    if (Object.getOwnPropertySymbols(value).length !== 0) {
+      return nonPlainJsonData();
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value);
     return Object.fromEntries(
-      Object.keys(record)
+      Object.keys(descriptors)
         .sort()
-        .map((key) => [key, canonicalProjection(record[key])]),
+        .map((key) => [
+          key,
+          canonicalProjection(dataPropertyValue(descriptors[key])),
+        ]),
     );
   }
   throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
+}
+
+export function isOwnPlainJsonData(
+  value: unknown,
+): value is CanonicalJsonValue {
+  try {
+    canonicalProjection(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function canonicalJson(value: unknown): string {
