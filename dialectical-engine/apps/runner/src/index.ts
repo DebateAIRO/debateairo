@@ -77,7 +77,7 @@ import {
 } from "@debateai/serve";
 import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
-import { declaredRef, emit, runWithObsContext } from "@debateai/obs-capture";
+import { declaredRef, emit, getObsContext, runWithObsContext } from "@debateai/obs-capture";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
 export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
@@ -2581,6 +2581,27 @@ export function declareHatchetWalkingSkeletonTask(input: {
     name: input.workflowName,
     retries: input.engineRetries,
     fn: async (dispatch: { runId: string; workItemId: string }, hatchetContext) => {
+      let outerZoneContext = false;
+      try {
+        const outerContext = getObsContext();
+        if (outerContext !== undefined) {
+          if (outerContext === null
+            || (typeof outerContext !== "object" && typeof outerContext !== "function")) {
+            outerZoneContext = true;
+          } else {
+            const zoneDescriptor = Object.getOwnPropertyDescriptor(outerContext, "zone_context");
+            outerZoneContext = zoneDescriptor === undefined
+              ? false
+              : Object.hasOwn(zoneDescriptor, "value")
+                && typeof zoneDescriptor.value === "boolean"
+                ? zoneDescriptor.value
+                : true;
+          }
+        }
+      } catch {
+        outerZoneContext = true;
+      }
+
       let attemptIndex = 0;
       try {
         const observedRetryCount = hatchetContext?.retryCount?.();
@@ -2600,6 +2621,11 @@ export function declareHatchetWalkingSkeletonTask(input: {
             ? { kind: result.kind, answerId: result.answerId }
             : { kind: result.kind };
         } catch (error) {
+          const terminalFailureInput = Object.freeze({
+            runId: dispatch.runId,
+            workItemId: dispatch.workItemId,
+            reason: runnerTerminalFailureReason(error)
+          });
           try {
             emit(Object.freeze({
               code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
@@ -2613,11 +2639,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
           } catch {
             // Product failure semantics always win over observability.
           }
-          const recorded = await input.failures.recordTerminalFailure({
-            runId: dispatch.runId,
-            workItemId: dispatch.workItemId,
-            reason: runnerTerminalFailureReason(error)
-          });
+          const recorded = await input.failures.recordTerminalFailure(terminalFailureInput);
           if (!recorded) {
             try {
               const recordingFailure = new TypedDomainError(
@@ -2648,10 +2670,17 @@ export function declareHatchetWalkingSkeletonTask(input: {
       };
 
       try {
-        return runWithObsContext(Object.freeze({
-          run_ref: declaredRef("run", dispatch.runId),
-          work_item_ref: declaredRef("work_item", dispatch.workItemId)
-        }), execute);
+        const taskContext = outerZoneContext
+          ? Object.freeze({
+              run_ref: declaredRef("run", dispatch.runId),
+              work_item_ref: declaredRef("work_item", dispatch.workItemId),
+              zone_context: true
+            })
+          : Object.freeze({
+              run_ref: declaredRef("run", dispatch.runId),
+              work_item_ref: declaredRef("work_item", dispatch.workItemId)
+            });
+        return runWithObsContext(taskContext, execute);
       } catch {
         return execute();
       }
