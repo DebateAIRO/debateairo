@@ -142,7 +142,11 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
             arguments: ["-e", receiptScript([17])],
             timeoutMs: 1_000,
           });
-          return context.passRows(receipt, { rows: 1 });
+          return context.passRows(receipt, [{
+            pid: receipt.pid,
+            sourceEventRef: receipt.sourceEventRef,
+            occurrenceSequence: 17,
+          }], { rows: 1 });
         },
       }],
       repoRoot,
@@ -153,6 +157,64 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     expect(result.exitCode).toBe(0);
     expect(lines).toEqual(["obs-g1/real-pass PASS(rows=1)"]);
     expect(await readdir(scratchRoot)).toEqual([]);
+  });
+
+  it.each([
+    {
+      label: "pid",
+      code: "ROW_RECEIPT_PID_MISMATCH",
+      row: (pid: number, sourceEventRef: string) => ({
+        pid: pid + 1,
+        sourceEventRef,
+        occurrenceSequence: 17,
+      }),
+    },
+    {
+      label: "source event ref",
+      code: "ROW_RECEIPT_SOURCE_REF_MISMATCH",
+      row: (pid: number) => ({
+        pid,
+        sourceEventRef: "00000000-0000-4000-8000-000000000000",
+        occurrenceSequence: 17,
+      }),
+    },
+    {
+      label: "occ_seq",
+      code: "ROW_RECEIPT_SEQUENCE_MISMATCH",
+      row: (pid: number, sourceEventRef: string) => ({
+        pid,
+        sourceEventRef,
+        occurrenceSequence: 18,
+      }),
+    },
+  ])("rejects a read-back row whose $label does not match the child receipt", async ({ code, row }) => {
+    const repoRoot = await temporaryDirectory("fix08-row-mismatch-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "row-mismatch",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", receiptScript([17])],
+            timeoutMs: 1_000,
+          });
+          return context.passRows(
+            receipt,
+            [row(receipt.pid, receipt.sourceEventRef)],
+            { rows: 1 },
+          );
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual([`obs-g1/row-mismatch FAIL(code=${code})`]);
   });
 
   it("permits a real spawned process to prove a process-only check", async () => {

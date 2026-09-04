@@ -46,6 +46,12 @@ export interface SpawnReceipt {
   readonly scratchDirectory: string;
 }
 
+export interface RowWrittenByPid {
+  readonly pid: number;
+  readonly sourceEventRef: string;
+  readonly occurrenceSequence: number;
+}
+
 export interface ObsVerdict {
   readonly kind: "PASS" | "FAIL";
   readonly code?: string;
@@ -54,7 +60,11 @@ export interface ObsVerdict {
 
 export interface ObsCaseContext {
   spawn(options: SpawnSubjectOptions): Promise<SpawnReceipt>;
-  passRows(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict;
+  passRows(
+    receipt: SpawnReceipt,
+    rows: readonly RowWrittenByPid[],
+    metrics: Readonly<Record<string, number>>,
+  ): ObsVerdict;
   passProcess(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict;
   fail(code: string, metrics?: Readonly<Record<string, number>>): ObsVerdict;
 }
@@ -248,13 +258,35 @@ function createContext(repoRoot: string, scratchRoot: string): ObsCaseContext {
   }
   return Object.freeze({
     spawn: (options: SpawnSubjectOptions) => spawnSubject(repoRoot, scratchRoot, options),
-    passRows(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict {
+    passRows(
+      receipt: SpawnReceipt,
+      rows: readonly RowWrittenByPid[],
+      metrics: Readonly<Record<string, number>>,
+    ): ObsVerdict {
       requireReceipt(receipt);
-      if (receipt.occurrenceSequences.length === 0) {
+      if (receipt.occurrenceSequences.length === 0 || rows.length === 0) {
         throw new ObsHarnessFailure("ROW_RECEIPT_REQUIRED");
       }
+      for (const row of rows) {
+        if (row.pid !== receipt.pid) {
+          throw new ObsHarnessFailure("ROW_RECEIPT_PID_MISMATCH");
+        }
+        if (row.sourceEventRef !== receipt.sourceEventRef) {
+          throw new ObsHarnessFailure("ROW_RECEIPT_SOURCE_REF_MISMATCH");
+        }
+      }
+      const childSequences = [...receipt.occurrenceSequences].sort((left, right) => left - right);
+      const readBackSequences = rows.map((row) => row.occurrenceSequence).sort((left, right) => left - right);
+      if (
+        readBackSequences.some((value) => !Number.isSafeInteger(value) || value <= 0)
+        || new Set(readBackSequences).size !== readBackSequences.length
+        || childSequences.length !== readBackSequences.length
+        || childSequences.some((value, index) => value !== readBackSequences[index])
+      ) {
+        throw new ObsHarnessFailure("ROW_RECEIPT_SEQUENCE_MISMATCH");
+      }
       const checked = safeMetrics(metrics);
-      if (checked.rows !== receipt.occurrenceSequences.length) {
+      if (checked.rows !== rows.length) {
         throw new ObsHarnessFailure("ROW_RECEIPT_COUNT_MISMATCH");
       }
       return mintVerdict("PASS", checked);
