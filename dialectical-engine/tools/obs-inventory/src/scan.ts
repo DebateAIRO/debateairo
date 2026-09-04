@@ -689,6 +689,24 @@ function widenCallableEntry(previous: FlowState, current: FlowState, joined: Flo
     const currentRequire = current.requires.get(binding) ?? REQUIRE_LOCAL;
     if (previousRequire === currentRequire) widened.requires.set(binding, previousRequire);
   }
+  for (const [binding, currentReferences] of current.objectReferences) {
+    const previousReferences = previous.objectReferences.get(binding);
+    if (
+      previousReferences === undefined
+      || previousReferences.unknown
+      || currentReferences.unknown
+      || !setEqual(previousReferences.ids, currentReferences.ids)
+    ) {
+      continue;
+    }
+    widened.objectReferences.set(binding, cloneReferences(currentReferences));
+    for (const identity of currentReferences.ids) {
+      const joinedObject = joined.objectValues.get(identity);
+      if (joinedObject !== undefined && !joinedObject.unknown) {
+        widened.objectValues.set(identity, cloneStoredObject(joinedObject));
+      }
+    }
+  }
   return widened;
 }
 
@@ -1614,6 +1632,18 @@ function scanParsedSource(
     return result;
   };
 
+  const storedObjectOf = (expression: ts.Expression, state: FlowState): StoredObject | null => {
+    const references = objectReferencesOf(expression, state);
+    if (references.unknown || references.ids.size === 0) return null;
+    let result: StoredObject | null = null;
+    for (const identity of references.ids) {
+      const value = state.objectValues.get(identity);
+      if (value === undefined || value.unknown) return null;
+      result = result === null ? cloneStoredObject(value) : unionStoredObject(result, value);
+    }
+    return result;
+  };
+
   const storedObjectKeysOf = (expression: ts.Expression, state: FlowState): StringPossibilities | null => {
     const references = objectReferencesOf(expression, state);
     if (references.unknown || references.ids.size === 0) return null;
@@ -1679,6 +1709,32 @@ function scanParsedSource(
           } else {
             bindUnknown(binding.name, state, absentNullish);
           }
+        }
+        return;
+      }
+    }
+    if (ts.isObjectBindingPattern(name) && expression !== undefined) {
+      const object = storedObjectOf(expression, state);
+      if (object !== null) {
+        for (const binding of name.elements) {
+          if (binding.name === undefined) continue;
+          if (binding.dotDotDotToken !== undefined || !ts.isIdentifier(binding.name)) {
+            bindUnknown(binding.name, state, absentNullish);
+            continue;
+          }
+          const names = binding.propertyName === undefined
+            ? { values: new Set([binding.name.text]), unknown: false }
+            : propertyNames(binding.propertyName, state);
+          if (names.unknown || names.values.size !== 1) {
+            bindUnknown(binding.name, state, absentNullish);
+            continue;
+          }
+          const property = [...names.values][0];
+          updateIdentifierWithStoredValue(
+            binding.name,
+            property === undefined ? undefined : object.values.get(property),
+            state,
+          );
         }
         return;
       }
