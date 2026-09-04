@@ -1254,6 +1254,170 @@ describe("FIX-16 C1 inventory scanner", () => {
     ]);
   });
 
+  it("routes continue through every label stacked directly on a loop", () => {
+    const harmful = [
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "outer: inner: for (let i = 0; i < 1; i += 1) {",
+      "  load = require;",
+      "  continue outer;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const safe = [
+      "declare const local: (path: string) => unknown;",
+      "let load = require;",
+      "outer: inner: for (let i = 0; i < 1; i += 1) {",
+      "  load = local;",
+      "  continue outer;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const incrementorHarmful = [
+      "declare const local: (path: string) => unknown;",
+      "let load = require;",
+      "outer: inner: for (let i = 0; i < 1; (i += 1, load = require)) {",
+      "  load = local;",
+      "  continue outer;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const incrementorSafe = [
+      "declare const local: (path: string) => unknown;",
+      "let load = local;",
+      "outer: inner: for (let i = 0; i < 1; (i += 1, load = local)) {",
+      "  load = require;",
+      "  continue outer;",
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+
+    expect(scanSource(harmful, "packages/obs-capture/src/stacked-label-harmful.ts")).toEqual([
+      { path: "packages/obs-capture/src/stacked-label-harmful.ts", line: 7, class: "zone_import" },
+    ]);
+    expect(scanSource(safe, "packages/obs-capture/src/stacked-label-safe.ts")).toEqual([]);
+    expect(scanSource(
+      incrementorHarmful,
+      "packages/obs-capture/src/stacked-label-incrementor-harmful.ts",
+    )).toEqual([
+      { path: "packages/obs-capture/src/stacked-label-incrementor-harmful.ts", line: 7, class: "zone_import" },
+    ]);
+    expect(scanSource(
+      incrementorSafe,
+      "packages/obs-capture/src/stacked-label-incrementor-safe.ts",
+    )).toEqual([]);
+  });
+
+  it("transfers aliased collections, destructuring values, and spread object keys", () => {
+    const source = [
+      "declare const local: (path: string) => unknown;",
+      "const loaders = [require];",
+      "for (const load of loaders) {",
+      '  load("apps/api/src/registration.ts");',
+      "}",
+      "const locals = [local];",
+      "for (const load of locals) {",
+      '  load("apps/api/src/registration.ts");',
+      "}",
+      "const [load] = loaders;",
+      'load("apps/api/src/mfa.ts");',
+      "const [localLoad] = locals;",
+      'localLoad("apps/api/src/mfa.ts");',
+      "const harmfulKeys = { ordinary: true };",
+      "for (const code in harmfulKeys) { throw code; }",
+      "const safeKeys = { SAFE_CODE: true };",
+      "for (const code in safeKeys) { throw code; }",
+      "const spreadHarmful = { ...{ ordinary: true } };",
+      "for (const code in spreadHarmful) { throw code; }",
+      "const spreadSafe = { ...{ SAFE_CODE: true } };",
+      "for (const code in spreadSafe) { throw code; }",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/aliased-collections.ts")).toEqual([
+      { path: "packages/obs-capture/src/aliased-collections.ts", line: 4, class: "zone_import" },
+      { path: "packages/obs-capture/src/aliased-collections.ts", line: 11, class: "zone_import" },
+      { path: "packages/obs-capture/src/aliased-collections.ts", line: 15, class: "throw_without_code" },
+      { path: "packages/obs-capture/src/aliased-collections.ts", line: 19, class: "throw_without_code" },
+    ]);
+  });
+
+  it("uses property assignment expression results in require callee position", () => {
+    const source = [
+      "declare const local: (path: string) => unknown;",
+      "const assigned = { load: local };",
+      '(assigned.load = require)("apps/api/src/registration.ts");',
+      "const retained = { load: require };",
+      '(retained.load ||= local)("apps/api/src/mfa.ts");',
+      "const installed = { load: local };",
+      '(installed.load &&= require)("apps/api/src/mail-channel.ts");',
+      "const safe = { load: require };",
+      '(safe.load = local)("apps/api/src/registration.ts");',
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/property-assignment-callee.ts")).toEqual([
+      { path: "packages/obs-capture/src/property-assignment-callee.ts", line: 3, class: "zone_import" },
+      { path: "packages/obs-capture/src/property-assignment-callee.ts", line: 5, class: "zone_import" },
+      { path: "packages/obs-capture/src/property-assignment-callee.ts", line: 7, class: "zone_import" },
+    ]);
+  });
+
+  it("executes nested closures with the state at each nested call", () => {
+    const harmful = [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  let load = local;",
+      '  const inner = () => load("apps/api/src/registration.ts");',
+      "  load = require;",
+      "  inner();",
+      "}",
+      "outer();",
+    ].join("\n");
+    const safe = [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  let load = require;",
+      '  const inner = () => load("apps/api/src/registration.ts");',
+      "  load = local;",
+      "  inner();",
+      "}",
+      "outer();",
+    ].join("\n");
+
+    expect(scanSource(harmful, "packages/obs-capture/src/nested-call-harmful.ts")).toEqual([
+      { path: "packages/obs-capture/src/nested-call-harmful.ts", line: 4, class: "zone_import" },
+    ]);
+    expect(scanSource(safe, "packages/obs-capture/src/nested-call-safe.ts")).toEqual([]);
+  });
+
+  it("updates exact manifest array indices, fill, and indirect native push", () => {
+    const source = [
+      'const indexHarmful = ["packages/kernel/src/error.ts"];',
+      'indexHarmful["0"] = "apps/api/src/registration.ts";',
+      "export const INDEX_HARMFUL = { zone_path_prefixes: indexHarmful };",
+      'const indexSafe = ["apps/api/src/registration.ts"];',
+      'indexSafe["0"] = "packages/kernel/src/error.ts";',
+      "export const INDEX_SAFE = { zone_path_prefixes: indexSafe };",
+      'const fillHarmful = ["packages/kernel/src/error.ts"];',
+      'fillHarmful.fill("apps/api/src/mfa.ts");',
+      "export const FILL_HARMFUL = { zone_path_prefixes: fillHarmful };",
+      'const fillSafe = ["apps/api/src/mfa.ts"];',
+      'fillSafe.fill("packages/kernel/src/error.ts");',
+      "export const FILL_SAFE = { zone_path_prefixes: fillSafe };",
+      'const callHarmful = ["packages/kernel/src/error.ts"];',
+      'Array.prototype.push.call(callHarmful, "apps/api/src/mail-channel.ts");',
+      "export const CALL_HARMFUL = { zone_path_prefixes: callHarmful };",
+      'const callSafe = ["packages/kernel/src/error.ts"];',
+      'Array.prototype.push.call(callSafe, "packages/kernel/src/error.ts");',
+      "export const CALL_SAFE = { zone_path_prefixes: callSafe };",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/manifest-array-standard-mutations.ts")).toEqual([
+      { path: "packages/obs-capture/src/manifest-array-standard-mutations.ts", line: 2, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-array-standard-mutations.ts", line: 8, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-array-standard-mutations.ts", line: 14, class: "zone_import" },
+    ]);
+  });
+
   it("fails closed when file bytes, AST nodes, candidates, or syntax exceed the scanner contract", () => {
     expect(() => scanSource("const payload = 'too large';", "apps/example/src/large.ts", {
       limits: { ...DEFAULT_SCAN_LIMITS, maxFileBytes: 4 },

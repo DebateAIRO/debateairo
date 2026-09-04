@@ -125,12 +125,31 @@ type CallablePossibilities = {
   readonly unknown: boolean;
 };
 
+type StoredValue = {
+  readonly requires: number;
+  readonly truthiness: number;
+  readonly data: DataPossibilities;
+};
+
+type StoredArray = {
+  readonly values: Map<number, StoredValue>;
+  length: number | null;
+  unknown: boolean;
+};
+
+type StoredObject = {
+  readonly values: Map<string, StoredValue>;
+  unknown: boolean;
+};
+
 type FlowState = {
   causes: Map<number, number>;
   causeNames: Map<number, string>;
   catchContexts: Map<number, string>;
   strings: Map<number, StringPossibilities>;
   objectReferences: Map<number, ObjectReferences>;
+  arrayValues: Map<number, StoredArray>;
+  objectValues: Map<number, StoredObject>;
   objectProperties: Map<number, number>;
   arrayData: Map<number, DataPossibilities>;
   manifestArrays: Map<number, ObjectReferences>;
@@ -216,6 +235,29 @@ function cloneCallables(value: CallablePossibilities): CallablePossibilities {
   return { definitions: new Map(value.definitions), unknown: value.unknown };
 }
 
+function cloneStoredValue(value: StoredValue): StoredValue {
+  return {
+    requires: value.requires,
+    truthiness: value.truthiness,
+    data: cloneData(value.data),
+  };
+}
+
+function cloneStoredArray(value: StoredArray): StoredArray {
+  return {
+    values: new Map([...value.values].map(([index, item]) => [index, cloneStoredValue(item)])),
+    length: value.length,
+    unknown: value.unknown,
+  };
+}
+
+function cloneStoredObject(value: StoredObject): StoredObject {
+  return {
+    values: new Map([...value.values].map(([key, item]) => [key, cloneStoredValue(item)])),
+    unknown: value.unknown,
+  };
+}
+
 function cloneState(state: FlowState): FlowState {
   return {
     causes: new Map(state.causes),
@@ -225,6 +267,8 @@ function cloneState(state: FlowState): FlowState {
     objectReferences: new Map(
       [...state.objectReferences].map(([binding, value]) => [binding, cloneReferences(value)]),
     ),
+    arrayValues: new Map([...state.arrayValues].map(([identity, value]) => [identity, cloneStoredArray(value)])),
+    objectValues: new Map([...state.objectValues].map(([identity, value]) => [identity, cloneStoredObject(value)])),
     objectProperties: new Map(state.objectProperties),
     arrayData: new Map([...state.arrayData].map(([identity, value]) => [identity, cloneData(value)])),
     manifestArrays: new Map(
@@ -250,6 +294,8 @@ function emptyState(): FlowState {
     catchContexts: new Map(),
     strings: new Map(),
     objectReferences: new Map(),
+    arrayValues: new Map(),
+    objectValues: new Map(),
     objectProperties: new Map(),
     arrayData: new Map(),
     manifestArrays: new Map(),
@@ -306,6 +352,56 @@ function unionCallables(left: CallablePossibilities, right: CallablePossibilitie
   };
 }
 
+function unionStoredValue(left: StoredValue, right: StoredValue): StoredValue {
+  return {
+    requires: left.requires | right.requires,
+    truthiness: left.truthiness | right.truthiness,
+    data: unionData(left.data, right.data),
+  };
+}
+
+function unionStoredArray(left: StoredArray, right: StoredArray): StoredArray {
+  const values = new Map<number, StoredValue>();
+  const indices = new Set([...left.values.keys(), ...right.values.keys()]);
+  for (const index of indices) {
+    const leftValue = left.values.get(index);
+    const rightValue = right.values.get(index);
+    if (leftValue === undefined || rightValue === undefined) {
+      values.set(index, {
+        requires: REQUIRE_GLOBAL | REQUIRE_LOCAL,
+        truthiness: VALUE_TRUTHY | VALUE_FALSY,
+        data: { literals: new Map(), unknown: true },
+      });
+    } else {
+      values.set(index, unionStoredValue(leftValue, rightValue));
+    }
+  }
+  return {
+    values,
+    length: left.length === right.length ? left.length : null,
+    unknown: left.unknown || right.unknown || left.length !== right.length,
+  };
+}
+
+function unionStoredObject(left: StoredObject, right: StoredObject): StoredObject {
+  const values = new Map<string, StoredValue>();
+  const keys = new Set([...left.values.keys(), ...right.values.keys()]);
+  for (const key of keys) {
+    const leftValue = left.values.get(key);
+    const rightValue = right.values.get(key);
+    if (leftValue === undefined || rightValue === undefined) {
+      values.set(key, {
+        requires: REQUIRE_LOCAL,
+        truthiness: VALUE_TRUTHY | VALUE_FALSY,
+        data: { literals: new Map(), unknown: true },
+      });
+    } else {
+      values.set(key, unionStoredValue(leftValue, rightValue));
+    }
+  }
+  return { values, unknown: left.unknown || right.unknown };
+}
+
 function joinNumberMaps(
   left: ReadonlyMap<number, number>,
   right: ReadonlyMap<number, number>,
@@ -353,6 +449,20 @@ function joinStates(left: FlowState, right: FlowState): FlowState {
       right.objectReferences.get(binding) ?? { ids: new Set(), unknown: true },
     ));
   }
+  for (const identity of new Set([...left.arrayValues.keys(), ...right.arrayValues.keys()])) {
+    const leftValue = left.arrayValues.get(identity);
+    const rightValue = right.arrayValues.get(identity);
+    joined.arrayValues.set(identity, leftValue === undefined
+      ? cloneStoredArray(rightValue ?? { values: new Map(), length: null, unknown: true })
+      : rightValue === undefined ? cloneStoredArray(leftValue) : unionStoredArray(leftValue, rightValue));
+  }
+  for (const identity of new Set([...left.objectValues.keys(), ...right.objectValues.keys()])) {
+    const leftValue = left.objectValues.get(identity);
+    const rightValue = right.objectValues.get(identity);
+    joined.objectValues.set(identity, leftValue === undefined
+      ? cloneStoredObject(rightValue ?? { values: new Map(), unknown: true })
+      : rightValue === undefined ? cloneStoredObject(leftValue) : unionStoredObject(leftValue, rightValue));
+  }
   for (const identity of new Set([...left.arrayData.keys(), ...right.arrayData.keys()])) {
     const leftData = left.arrayData.get(identity);
     const rightData = right.arrayData.get(identity);
@@ -391,6 +501,8 @@ function replaceState(target: FlowState, source: FlowState): void {
   target.catchContexts = replacement.catchContexts;
   target.strings = replacement.strings;
   target.objectReferences = replacement.objectReferences;
+  target.arrayValues = replacement.arrayValues;
+  target.objectValues = replacement.objectValues;
   target.objectProperties = replacement.objectProperties;
   target.arrayData = replacement.arrayData;
   target.manifestArrays = replacement.manifestArrays;
@@ -462,6 +574,46 @@ function callableMapEqual(
   });
 }
 
+function storedValueEqual(left: StoredValue, right: StoredValue): boolean {
+  return left.requires === right.requires
+    && left.truthiness === right.truthiness
+    && left.data.unknown === right.data.unknown
+    && setEqual(new Set(left.data.literals.keys()), new Set(right.data.literals.keys()));
+}
+
+function storedArrayMapEqual(
+  left: ReadonlyMap<number, StoredArray>,
+  right: ReadonlyMap<number, StoredArray>,
+): boolean {
+  return left.size === right.size && [...left].every(([identity, value]) => {
+    const other = right.get(identity);
+    return other !== undefined
+      && value.length === other.length
+      && value.unknown === other.unknown
+      && value.values.size === other.values.size
+      && [...value.values].every(([index, item]) => {
+        const otherItem = other.values.get(index);
+        return otherItem !== undefined && storedValueEqual(item, otherItem);
+      });
+  });
+}
+
+function storedObjectMapEqual(
+  left: ReadonlyMap<number, StoredObject>,
+  right: ReadonlyMap<number, StoredObject>,
+): boolean {
+  return left.size === right.size && [...left].every(([identity, value]) => {
+    const other = right.get(identity);
+    return other !== undefined
+      && value.unknown === other.unknown
+      && value.values.size === other.values.size
+      && [...value.values].every(([key, item]) => {
+        const otherItem = other.values.get(key);
+        return otherItem !== undefined && storedValueEqual(item, otherItem);
+      });
+  });
+}
+
 function statesEqual(left: FlowState, right: FlowState): boolean {
   return numberMapEqual(left.causes, right.causes)
     && numberMapEqual(left.objectProperties, right.objectProperties)
@@ -477,6 +629,8 @@ function statesEqual(left: FlowState, right: FlowState): boolean {
     && nameMapEqual(left.catchContexts, right.catchContexts)
     && stringMapEqual(left.strings, right.strings)
     && referenceMapEqual(left.objectReferences, right.objectReferences)
+    && storedArrayMapEqual(left.arrayValues, right.arrayValues)
+    && storedObjectMapEqual(left.objectValues, right.objectValues)
     && dataMapEqual(left.data, right.data)
     && callableMapEqual(left.callables, right.callables)
     && numberMapEqual(left.rejectionTaint, right.rejectionTaint)
@@ -508,6 +662,12 @@ function widenState(state: FlowState): FlowState {
   }
   for (const [binding, value] of widened.objectReferences) {
     widened.objectReferences.set(binding, { ids: new Set(value.ids), unknown: true });
+  }
+  for (const [identity, value] of widened.arrayValues) {
+    widened.arrayValues.set(identity, { ...cloneStoredArray(value), unknown: true, length: null });
+  }
+  for (const [identity, value] of widened.objectValues) {
+    widened.objectValues.set(identity, { ...cloneStoredObject(value), unknown: true });
   }
   for (const [binding, value] of widened.data) {
     widened.data.set(binding, { literals: new Map(value.literals), unknown: true });
@@ -705,11 +865,19 @@ function scanParsedSource(
       let result = cloneData(state.data.get(binding) ?? { literals: new Map(), unknown: true });
       const references = state.objectReferences.get(binding);
       if (references !== undefined && references.ids.size > 0) {
-        result = references.unknown ? unionData(result, { literals: new Map(), unknown: true }) : result;
+        let heapResult: DataPossibilities = {
+          literals: new Map(),
+          unknown: references.unknown,
+        };
+        let foundArray = false;
         for (const identity of references.ids) {
           const heap = state.arrayData.get(identity);
-          if (heap !== undefined) result = unionData(result, heap);
+          if (heap !== undefined) {
+            foundArray = true;
+            heapResult = unionData(heapResult, heap);
+          }
         }
+        if (foundArray) return references.unknown ? unionData(result, heapResult) : heapResult;
       }
       return result;
     }
@@ -798,6 +966,25 @@ function scanParsedSource(
     return result === 0 ? PROPERTY_UNKNOWN : result;
   };
 
+  let storedValueOf: (expression: ts.Expression, state: FlowState) => StoredValue;
+
+  const propertyNames = (name: ts.PropertyName, state: FlowState): StringPossibilities => {
+    if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) || ts.isNumericLiteral(name)) {
+      return { values: new Set([name.text]), unknown: false };
+    }
+    return ts.isComputedPropertyName(name)
+      ? stringsOf(name.expression, state)
+      : { values: new Set(), unknown: true };
+  };
+
+  const refreshArrayData = (identity: number, state: FlowState): void => {
+    const array = state.arrayValues.get(identity);
+    if (array === undefined) return;
+    let data: DataPossibilities = { literals: new Map(), unknown: array.unknown };
+    for (const value of array.values.values()) data = unionData(data, value.data);
+    state.arrayData.set(identity, data);
+  };
+
   const objectAssignTarget = (rawExpression: ts.Expression, state: FlowState): ts.Expression | null => {
     const expression = unwrapExpression(rawExpression);
     if (!ts.isCallExpression(expression)) return null;
@@ -868,7 +1055,45 @@ function scanParsedSource(
     if (assignedTarget !== null) return objectReferencesOf(assignedTarget, state);
     if (ts.isArrayLiteralExpression(expression)) {
       const identity = expression.pos;
-      if (!state.arrayData.has(identity)) state.arrayData.set(identity, dataOf(expression, state));
+      if (!state.arrayValues.has(identity)) {
+        const values = new Map<number, StoredValue>();
+        let unknown = false;
+        let index = 0;
+        for (const element of expression.elements) {
+          if (index >= MAX_FLOW_ALTERNATIVES) {
+            unknown = true;
+            break;
+          }
+          if (ts.isOmittedExpression(element)) {
+            unknown = true;
+            index += 1;
+          } else if (ts.isSpreadElement(element)) {
+            const spread = storedArrayOf(element.expression, state);
+            if (spread === null || spread.unknown || spread.length === null) {
+              unknown = true;
+            } else {
+              for (let spreadIndex = 0; spreadIndex < spread.length; spreadIndex += 1) {
+                const value = spread.values.get(spreadIndex);
+                if (value === undefined || index >= MAX_FLOW_ALTERNATIVES) {
+                  unknown = true;
+                  break;
+                }
+                values.set(index, cloneStoredValue(value));
+                index += 1;
+              }
+            }
+          } else {
+            values.set(index, storedValueOf(element, state));
+            index += 1;
+          }
+        }
+        state.arrayValues.set(identity, {
+          values,
+          length: unknown ? null : index,
+          unknown,
+        });
+        refreshArrayData(identity, state);
+      }
       return { ids: new Set([identity]), unknown: false };
     }
     if (!ts.isObjectLiteralExpression(expression)) return { ids: new Set(), unknown: true };
@@ -876,6 +1101,18 @@ function scanParsedSource(
     if (state.objectProperties.has(identity)) return { ids: new Set([identity]), unknown: false };
     let property = PROPERTY_ABSENT;
     let manifestArrays: ObjectReferences = { ids: new Set(), unknown: false };
+    const storedObject: StoredObject = { values: new Map(), unknown: false };
+    state.objectValues.set(identity, storedObject);
+    const writeStoredProperty = (names: StringPossibilities, value: StoredValue): void => {
+      if (names.unknown) storedObject.unknown = true;
+      for (const name of names.values) {
+        if (storedObject.values.size >= MAX_FLOW_ALTERNATIVES && !storedObject.values.has(name)) {
+          storedObject.unknown = true;
+          continue;
+        }
+        storedObject.values.set(name, cloneStoredValue(value));
+      }
+    };
     for (const member of expression.properties) {
       if (ts.isSpreadAssignment(member)) {
         const spread = objectReferencesOf(member.expression, state);
@@ -883,8 +1120,17 @@ function scanParsedSource(
         for (const spreadIdentity of spread.ids) {
           const references = state.manifestArrays.get(spreadIdentity);
           if (references !== undefined) manifestArrays = unionReferences(manifestArrays, references);
+          const spreadValues = state.objectValues.get(spreadIdentity);
+          if (spreadValues === undefined || spreadValues.unknown) storedObject.unknown = true;
+          for (const [name, value] of spreadValues?.values ?? []) writeStoredProperty(
+            { values: new Set([name]), unknown: false },
+            value,
+          );
         }
-        if (spread.unknown) manifestArrays = unionReferences(manifestArrays, { ids: new Set(), unknown: true });
+        if (spread.unknown) {
+          manifestArrays = unionReferences(manifestArrays, { ids: new Set(), unknown: true });
+          storedObject.unknown = true;
+        }
       } else if (ts.isPropertyAssignment(member)) {
         const keys = propertyKey(member.name, state);
         const assigned = causeProperty(causeOf(member.initializer, state));
@@ -896,11 +1142,16 @@ function scanParsedSource(
             ? unionReferences(manifestArrays, references)
             : references;
         }
+        writeStoredProperty(propertyNames(member.name, state), storedValueOf(member.initializer, state));
       } else if (ts.isShorthandPropertyAssignment(member)) {
         const keys = propertyKey(member.name, state);
         const binding = checker.getShorthandAssignmentValueSymbol(member)?.id;
         const assigned = causeProperty(binding === undefined ? CAUSE_OTHER : state.causes.get(binding) ?? CAUSE_OTHER);
         property = ((keys & KEY_CAUSE) !== 0 ? assigned : 0) | ((keys & KEY_OTHER) !== 0 ? property : 0);
+        writeStoredProperty(
+          propertyNames(member.name, state),
+          storedValueOf(member.name as ts.Identifier, state),
+        );
       } else if (
         ts.isMethodDeclaration(member)
         || ts.isGetAccessorDeclaration(member)
@@ -909,6 +1160,11 @@ function scanParsedSource(
         const keys = propertyKey(member.name, state);
         property = ((keys & KEY_CAUSE) !== 0 ? PROPERTY_OTHER : 0)
           | ((keys & KEY_OTHER) !== 0 ? property : 0);
+        writeStoredProperty(propertyNames(member.name, state), {
+          requires: REQUIRE_LOCAL,
+          truthiness: VALUE_TRUTHY,
+          data: { literals: new Map(), unknown: true },
+        });
       }
     }
     state.objectProperties.set(identity, property);
@@ -1094,15 +1350,17 @@ function scanParsedSource(
     }
     if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
       const target = unwrapExpression(expression.expression);
-      if (!ts.isIdentifier(target) || !isGlobalIdentifier(target, "module")) return REQUIRE_LOCAL;
-      if (ts.isPropertyAccessExpression(expression)) {
-        return expression.name.text === "require" ? REQUIRE_GLOBAL : REQUIRE_LOCAL;
+      if (ts.isIdentifier(target) && isGlobalIdentifier(target, "module")) {
+        if (ts.isPropertyAccessExpression(expression)) {
+          return expression.name.text === "require" ? REQUIRE_GLOBAL : REQUIRE_LOCAL;
+        }
+        if (expression.argumentExpression === undefined) return REQUIRE_GLOBAL | REQUIRE_LOCAL;
+        const keys = stringsOf(expression.argumentExpression, state);
+        let result = keys.unknown ? REQUIRE_GLOBAL | REQUIRE_LOCAL : 0;
+        for (const key of keys.values) result |= key === "require" ? REQUIRE_GLOBAL : REQUIRE_LOCAL;
+        return result === 0 ? REQUIRE_LOCAL : result;
       }
-      if (expression.argumentExpression === undefined) return REQUIRE_GLOBAL | REQUIRE_LOCAL;
-      const keys = stringsOf(expression.argumentExpression, state);
-      let result = keys.unknown ? REQUIRE_GLOBAL | REQUIRE_LOCAL : 0;
-      for (const key of keys.values) result |= key === "require" ? REQUIRE_GLOBAL : REQUIRE_LOCAL;
-      return result === 0 ? REQUIRE_LOCAL : result;
+      return storedPropertyOf(expression, state)?.requires ?? REQUIRE_LOCAL;
     }
     if (ts.isConditionalExpression(expression)) {
       return requireOf(expression.whenTrue, state) | requireOf(expression.whenFalse, state);
@@ -1115,7 +1373,9 @@ function scanParsedSource(
       if (expression.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
         && expression.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
         const target = unwrapExpression(expression.left);
-        return ts.isIdentifier(target) ? requireOf(target, state) : REQUIRE_LOCAL;
+        return ts.isIdentifier(target) || ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)
+          ? requireOf(target, state)
+          : REQUIRE_LOCAL;
       }
     }
     return REQUIRE_LOCAL;
@@ -1191,17 +1451,56 @@ function scanParsedSource(
     if (ts.isConditionalExpression(expression)) {
       return truthinessOf(expression.whenTrue, state) | truthinessOf(expression.whenFalse, state);
     }
+    if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+      return storedPropertyOf(expression, state)?.truthiness
+        ?? typeTruthinessPossibilities(checker.getTypeAtLocation(expression));
+    }
     if (ts.isBinaryExpression(expression)) {
       const operator = expression.operatorToken.kind;
       if (operator === ts.SyntaxKind.CommaToken) return truthinessOf(expression.right, state);
       if (operator >= ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment) {
         const target = unwrapExpression(expression.left);
-        return ts.isIdentifier(target)
+        return ts.isIdentifier(target) || ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)
           ? truthinessOf(target, state)
           : VALUE_TRUTHY | VALUE_FALSY;
       }
     }
     return typeTruthinessPossibilities(checker.getTypeAtLocation(expression));
+  };
+
+  storedValueOf = (expression: ts.Expression, state: FlowState): StoredValue => ({
+    requires: requireOf(expression, state),
+    truthiness: truthinessOf(expression, state),
+    data: dataOf(expression, state),
+  });
+
+  const accessNames = (
+    expression: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+    state: FlowState,
+  ): StringPossibilities => ts.isPropertyAccessExpression(expression)
+    ? { values: new Set([expression.name.text]), unknown: false }
+    : expression.argumentExpression === undefined
+      ? { values: new Set(), unknown: true }
+      : stringsOf(expression.argumentExpression, state);
+
+  const storedPropertyOf = (
+    expression: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+    state: FlowState,
+  ): StoredValue | null => {
+    const references = objectReferencesOf(expression.expression, state);
+    const names = accessNames(expression, state);
+    if (references.unknown || names.unknown || references.ids.size === 0 || names.values.size === 0) return null;
+    let result: StoredValue | null = null;
+    for (const identity of references.ids) {
+      const object = state.objectValues.get(identity);
+      if (object === undefined || object.unknown) return null;
+      for (const name of names.values) {
+        const value = object.values.get(name);
+        if (value === undefined) return null;
+        result = result === null ? cloneStoredValue(value) : unionStoredValue(result, value);
+      }
+    }
+    return result;
   };
 
   const hasVisibleCaughtRoot = (state: FlowState, location: ts.Node): boolean => {
@@ -1279,6 +1578,47 @@ function scanParsedSource(
     state.rejectionTaint.set(binding, REJECTION_UNTAINTED);
   };
 
+  const updateIdentifierWithStoredValue = (
+    name: ts.Identifier,
+    value: StoredValue | undefined,
+    state: FlowState,
+  ): void => {
+    updateIdentifier(name, undefined, state, VALUE_PRESENT | VALUE_NULLISH);
+    const binding = symbolId(checker, name);
+    if (binding === null || value === undefined) return;
+    state.requires.set(binding, value.requires);
+    state.truthiness.set(binding, value.truthiness);
+    state.data.set(binding, cloneData(value.data));
+    state.nullish.set(binding, VALUE_PRESENT);
+  };
+
+  const storedArrayOf = (expression: ts.Expression, state: FlowState): StoredArray | null => {
+    const references = objectReferencesOf(expression, state);
+    if (references.unknown || references.ids.size === 0) return null;
+    let result: StoredArray | null = null;
+    for (const identity of references.ids) {
+      const value = state.arrayValues.get(identity);
+      if (value === undefined || value.unknown) return null;
+      result = result === null ? cloneStoredArray(value) : unionStoredArray(result, value);
+    }
+    return result;
+  };
+
+  const storedObjectKeysOf = (expression: ts.Expression, state: FlowState): StringPossibilities | null => {
+    const references = objectReferencesOf(expression, state);
+    if (references.unknown || references.ids.size === 0) return null;
+    let result: StringPossibilities = { values: new Set(), unknown: false };
+    for (const identity of references.ids) {
+      const value = state.objectValues.get(identity);
+      if (value === undefined) return null;
+      result = unionStrings(result, {
+        values: new Set(value.values.keys()),
+        unknown: value.unknown,
+      });
+    }
+    return result;
+  };
+
   const bindUnknown = (name: ts.BindingName, state: FlowState, absentNullish: number): void => {
     if (ts.isIdentifier(name)) {
       updateIdentifier(name, undefined, state, absentNullish);
@@ -1318,6 +1658,21 @@ function scanParsedSource(
       }
       return;
     }
+    if (ts.isArrayBindingPattern(name) && expression !== undefined) {
+      const array = storedArrayOf(expression, state);
+      if (array !== null) {
+        for (let index = 0; index < name.elements.length; index += 1) {
+          const binding = name.elements[index];
+          if (binding === undefined || ts.isOmittedExpression(binding) || binding.name === undefined) continue;
+          if (ts.isIdentifier(binding.name)) {
+            updateIdentifierWithStoredValue(binding.name, array.values.get(index), state);
+          } else {
+            bindUnknown(binding.name, state, absentNullish);
+          }
+        }
+        return;
+      }
+    }
     bindUnknown(name, state, absentNullish);
     if (
       ts.isObjectBindingPattern(name)
@@ -1343,11 +1698,13 @@ function scanParsedSource(
   ): boolean => {
     const target = unwrapExpression(rawTarget);
     const value = unwrapExpression(rawValue);
-    if (!ts.isArrayLiteralExpression(target) || !ts.isArrayLiteralExpression(value)) return false;
+    if (!ts.isArrayLiteralExpression(target)) return false;
+    const stored = ts.isArrayLiteralExpression(value) ? null : storedArrayOf(value, state);
+    if (!ts.isArrayLiteralExpression(value) && stored === null) return false;
     for (let index = 0; index < target.elements.length; index += 1) {
       const assigned = target.elements[index];
       if (assigned === undefined || ts.isOmittedExpression(assigned) || ts.isSpreadElement(assigned)) continue;
-      const source = value.elements[index];
+      const source = ts.isArrayLiteralExpression(value) ? value.elements[index] : undefined;
       const initializer = source === undefined || ts.isOmittedExpression(source)
         ? undefined
         : ts.isSpreadElement(source) ? source.expression : source;
@@ -1356,7 +1713,11 @@ function scanParsedSource(
         ? assigned.left
         : assigned;
       if (ts.isIdentifier(assignmentTarget)) {
-        updateIdentifier(assignmentTarget, initializer, state, VALUE_NULLISH);
+        if (ts.isArrayLiteralExpression(value)) {
+          updateIdentifier(assignmentTarget, initializer, state, VALUE_NULLISH);
+        } else {
+          updateIdentifierWithStoredValue(assignmentTarget, stored?.values.get(index), state);
+        }
       } else if (initializer !== undefined && ts.isArrayLiteralExpression(assignmentTarget)) {
         assignExpressionPattern(assignmentTarget, initializer, state);
       }
@@ -1435,7 +1796,45 @@ function scanParsedSource(
     return false;
   };
 
-  let executeStatement: (node: ts.Statement, state: FlowState, loopLabel?: string) => Completion[];
+  const nodeIsInventoryCandidate = (node: ts.Node, state: FlowState): boolean => {
+    if (ts.isThrowStatement(node) || node.kind === ts.SyntaxKind.VoidExpression) return true;
+    if (ts.isNewExpression(node)) {
+      const constructor = unwrapExpression(node.expression);
+      const binding = ts.isIdentifier(constructor) ? checker.getSymbolAtLocation(constructor) : undefined;
+      const localAlias = (binding?.declarations ?? []).some(
+        (declaration) => String(declaration.path) === sourceFile.fileName
+          && declaration.kind === ts.SyntaxKind.VariableDeclaration,
+      );
+      if ((constructorOf(node.expression, state) & CONSTRUCTOR_DOMAIN) !== 0 || localAlias) return true;
+    }
+    return zone.governed && (ts.isCallExpression(node) || ts.isObjectLiteralExpression(node));
+  };
+
+  const functionHasCandidate = (
+    definition: ts.FunctionLikeDeclaration,
+    state: FlowState,
+    includeNested: boolean,
+  ): boolean => {
+    if (definition.body === undefined) return false;
+    let candidate = false;
+    const visit = (node: ts.Node): void => {
+      if (candidate) return;
+      if (!includeNested && node !== definition.body && ts.isFunctionLikeDeclaration(node)) return;
+      if (nodeIsInventoryCandidate(node, state)) {
+        candidate = true;
+        return;
+      }
+      node.forEachChild(visit);
+    };
+    visit(definition.body);
+    return candidate;
+  };
+
+  let executeStatement: (
+    node: ts.Statement,
+    state: FlowState,
+    loopLabels?: readonly string[],
+  ) => Completion[];
   let executeSequence: (
     statements: readonly ts.Statement[],
     state: FlowState,
@@ -1454,7 +1853,7 @@ function scanParsedSource(
   const activeCallables = new Set<number>();
   const analyzedCallables = new Set<number>();
   const callableExecutionCounts = new Map<number, number>();
-  let callableBodyDepth = 0;
+  let rejectionCallbackDepth = 0;
   const hasLexicallyNarrowedParent = (node: ts.Node): boolean => {
     let current = node.parent;
     while (current !== undefined && !ts.isSourceFile(current)) {
@@ -1485,6 +1884,73 @@ function scanParsedSource(
     return scanExpression(target, state);
   };
 
+  const updateStoredProperty = (
+    target: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+    right: ts.Expression,
+    operator: ts.SyntaxKind,
+    state: FlowState,
+  ): void => {
+    const references = objectReferencesOf(target.expression, state);
+    const names = accessNames(target, state);
+    if (references.unknown || names.unknown || references.ids.size !== 1 || names.values.size !== 1) return;
+    const identity = [...references.ids][0];
+    const name = [...names.values][0];
+    if (identity === undefined || name === undefined) return;
+    const object = state.objectValues.get(identity);
+    if (object === undefined || object.unknown) return;
+    const rightValue = storedValueOf(right, state);
+    if (operator === ts.SyntaxKind.EqualsToken) {
+      object.values.set(name, rightValue);
+      return;
+    }
+    const current = object.values.get(name);
+    if (current === undefined) return;
+    const skip = operator === ts.SyntaxKind.BarBarEqualsToken
+      ? VALUE_TRUTHY
+      : operator === ts.SyntaxKind.AmpersandAmpersandEqualsToken ? VALUE_FALSY : 0;
+    const assign = operator === ts.SyntaxKind.BarBarEqualsToken
+      ? VALUE_FALSY
+      : operator === ts.SyntaxKind.AmpersandAmpersandEqualsToken ? VALUE_TRUTHY : 0;
+    if (skip === 0 || assign === 0) return;
+    let next: StoredValue | null = null;
+    if ((current.truthiness & skip) !== 0) next = cloneStoredValue(current);
+    if ((current.truthiness & assign) !== 0) {
+      next = next === null ? rightValue : unionStoredValue(next, rightValue);
+    }
+    if (next !== null) object.values.set(name, next);
+  };
+
+  const arrayIndexOf = (expression: ts.Expression | undefined, state: FlowState): number | null => {
+    if (expression === undefined) return null;
+    const unwrapped = unwrapExpression(expression);
+    const names = ts.isNumericLiteral(unwrapped)
+      ? { values: new Set([unwrapped.text]), unknown: false }
+      : stringsOf(unwrapped, state);
+    if (names.unknown || names.values.size !== 1) return null;
+    const name = [...names.values][0];
+    if (name === undefined) return null;
+    const index = Number(name);
+    return Number.isSafeInteger(index) && index >= 0 && String(index) === name ? index : null;
+  };
+
+  const updateArrayIndex = (
+    target: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+    right: ts.Expression,
+    simple: boolean,
+    state: FlowState,
+  ): void => {
+    if (!simple || !ts.isElementAccessExpression(target)) return;
+    const index = arrayIndexOf(target.argumentExpression, state);
+    const references = objectReferencesOf(target.expression, state);
+    if (index === null || references.unknown || references.ids.size !== 1) return;
+    const identity = [...references.ids][0];
+    if (identity === undefined) return;
+    const array = state.arrayValues.get(identity);
+    if (array === undefined || array.unknown || array.length === null || index >= array.length) return;
+    array.values.set(index, storedValueOf(right, state));
+    refreshArrayData(identity, state);
+  };
+
   const assignBinary = (node: ts.BinaryExpression, state: FlowState): void => {
     const target = unwrapExpression(node.left);
     const simple = node.operatorToken.kind === ts.SyntaxKind.EqualsToken;
@@ -1494,6 +1960,8 @@ function scanParsedSource(
       return;
     }
     if (!ts.isPropertyAccessExpression(target) && !ts.isElementAccessExpression(target)) return;
+    updateStoredProperty(target, node.right, node.operatorToken.kind, state);
+    updateArrayIndex(target, node.right, simple, state);
     updateCauseProperty(target, simple ? causeProperty(causeOf(node.right, state)) : PROPERTY_OTHER, state);
     recordManifestData(node, manifestAssignmentKeys(target, state), simple
       ? dataOf(node.right, state)
@@ -1520,16 +1988,53 @@ function scanParsedSource(
     if (!ts.isPropertyAccessExpression(callee) && !ts.isElementAccessExpression(callee)) return;
     const names = methodNames(callee, state);
     if (names.unknown || names.values.size !== 1) return;
-    const name = [...names.values][0];
-    if (name !== "push" && name !== "unshift" && name !== "splice") return;
-    const added = name === "splice" ? node.arguments.slice(2) : node.arguments;
+    let name = [...names.values][0];
+    let receiver: ts.Expression = callee.expression;
+    let added: readonly ts.Expression[] = name === "splice" ? node.arguments.slice(2) : node.arguments;
+    if (name === "call") {
+      const member = unwrapExpression(callee.expression);
+      if (!ts.isPropertyAccessExpression(member) || member.name.text !== "push") return;
+      const prototype = unwrapExpression(member.expression);
+      if (!ts.isPropertyAccessExpression(prototype) || prototype.name.text !== "prototype") return;
+      const arrayName = unwrapExpression(prototype.expression);
+      if (!ts.isIdentifier(arrayName) || !isGlobalIdentifier(arrayName, "Array")) return;
+      const indirectReceiver = node.arguments[0];
+      if (indirectReceiver === undefined) return;
+      name = "push";
+      receiver = indirectReceiver;
+      added = node.arguments.slice(1);
+    }
+    if (name !== "push" && name !== "unshift" && name !== "splice" && name !== "fill") return;
+    if (name === "fill") added = node.arguments.slice(0, 1);
     let data: DataPossibilities = { literals: new Map(), unknown: false };
     for (const argument of added) data = unionData(data, dataOf(argument, state));
-    const receiver = callee.expression;
     const references = objectReferencesOf(receiver, state);
     for (const identity of references.ids) {
-      const current = state.arrayData.get(identity) ?? { literals: new Map(), unknown: true };
-      state.arrayData.set(identity, unionData(current, data));
+      const priorData = cloneData(state.arrayData.get(identity) ?? { literals: new Map(), unknown: true });
+      const array = state.arrayValues.get(identity);
+      if (array !== undefined && !array.unknown && array.length !== null) {
+        if (name === "fill") {
+          const value = added[0] === undefined
+            ? { requires: REQUIRE_LOCAL, truthiness: VALUE_FALSY, data: { literals: new Map(), unknown: true } }
+            : storedValueOf(added[0], state);
+          for (let index = 0; index < array.length; index += 1) array.values.set(index, cloneStoredValue(value));
+        } else if (name === "push" && array.length + added.length <= MAX_FLOW_ALTERNATIVES) {
+          for (let index = 0; index < added.length; index += 1) {
+            const value = added[index];
+            if (value !== undefined) array.values.set(array.length + index, storedValueOf(value, state));
+          }
+          array.length += added.length;
+        } else {
+          array.unknown = true;
+        }
+        refreshArrayData(identity, state);
+        if (name !== "fill" && (name !== "push" || array.unknown)) {
+          state.arrayData.set(identity, unionData(priorData, data));
+        }
+      } else {
+        const current = state.arrayData.get(identity) ?? { literals: new Map(), unknown: true };
+        state.arrayData.set(identity, name === "fill" ? data : unionData(current, data));
+      }
     }
     const target = unwrapExpression(receiver);
     if (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
@@ -1691,11 +2196,18 @@ function scanParsedSource(
       applyArrayMutation(node, state);
       const callables = callablesOf(node.expression, state);
       const returns: FlowState[] = callables.unknown ? [cloneState(state)] : [];
-      if (callableBodyDepth === 0) {
+      const nestedCall = activeCallables.size > 0;
+      if (rejectionCallbackDepth === 0) {
         for (const definition of callables.definitions.values()) {
+          if (
+            nestedCall
+            && (!hasLexicallyNarrowedParent(definition) || !functionHasCandidate(definition, state, false))
+          ) {
+            continue;
+          }
           for (const result of executeCallable(definition, node.arguments, cloneState(state))) {
-            if (result.kind === "normal" || result.kind === "return") returns.push(result.state);
-            else if (result.kind === "throw") throws.push(result.state);
+            if (!nestedCall && (result.kind === "normal" || result.kind === "return")) returns.push(result.state);
+            else if (!nestedCall && result.kind === "throw") throws.push(result.state);
           }
         }
       }
@@ -1878,7 +2390,7 @@ function scanParsedSource(
     if (!rejectionCallback) callableExecutionCounts.set(node.pos, executions + 1);
     analyzedCallables.add(node.pos);
     activeCallables.add(node.pos);
-    callableBodyDepth += 1;
+    if (rejectionCallback) rejectionCallbackDepth += 1;
     try {
       const functionState = cloneState(state);
       if (rejectionCallback) functionState.rejectionObservation = REJECTION_UNOBSERVED;
@@ -1901,7 +2413,7 @@ function scanParsedSource(
       const thrown = scanExpression(node.body, functionState).map((item) => completion("throw", item));
       return coalesceCompletions([completion("return", functionState), ...thrown]);
     } finally {
-      callableBodyDepth -= 1;
+      if (rejectionCallback) rejectionCallbackDepth -= 1;
       activeCallables.delete(node.pos);
     }
   };
@@ -1932,7 +2444,8 @@ function scanParsedSource(
     condition: ts.Expression | undefined,
     conditionAfterBody: boolean,
     hasNaturalExit: boolean,
-    loopLabel: string | undefined,
+    loopLabels: readonly string[] | undefined,
+    maySkipFirstIteration = true,
   ): Completion[] => {
     let header = cloneState(entry);
     let iteration = 0;
@@ -1946,13 +2459,13 @@ function scanParsedSource(
       if (!conditionAfterBody && condition !== undefined) {
         for (const thrown of scanExpression(condition, bodyEntry)) abrupt.push(completion("throw", thrown));
       }
-      if (!conditionAfterBody && hasNaturalExit) {
+      if (!conditionAfterBody && hasNaturalExit && (iteration > 1 || maySkipFirstIteration)) {
         exitState = exitState === null ? cloneState(bodyEntry) : joinStates(exitState, bodyEntry);
       }
       const bodyResults = executeStatement(body, bodyEntry);
       const backStates: FlowState[] = [];
       for (const result of bodyResults) {
-        const targetsLoop = result.label === null || result.label === loopLabel;
+        const targetsLoop = result.label === null || loopLabels?.includes(result.label) === true;
         if (result.kind === "normal" || (result.kind === "continue" && targetsLoop)) {
           const back = cloneState(result.state);
           if (incrementor !== undefined) {
@@ -1977,7 +2490,7 @@ function scanParsedSource(
       }
       const back = backStates.reduce(joinStates);
       if (firstBack === null) firstBack = cloneState(back);
-      const seed = conditionAfterBody ? firstBack : entry;
+      const seed = conditionAfterBody || !maySkipFirstIteration ? firstBack : entry;
       const next = joinStates(seed, back);
       if (statesEqual(next, header)) {
         header = next;
@@ -2118,7 +2631,61 @@ function scanParsedSource(
     return coalesceCompletions([...active, ...abrupt]);
   };
 
-  executeStatement = (node: ts.Statement, state: FlowState, loopLabel?: string): Completion[] => {
+  const numericLiteralValue = (rawExpression: ts.Expression | undefined): number | null => {
+    if (rawExpression === undefined) return null;
+    const expression = unwrapExpression(rawExpression);
+    if (ts.isNumericLiteral(expression)) return Number(expression.text);
+    if (
+      ts.isPrefixUnaryExpression(expression)
+      && expression.operator === ts.SyntaxKind.MinusToken
+      && ts.isNumericLiteral(expression.operand)
+    ) {
+      return -Number(expression.operand.text);
+    }
+    return null;
+  };
+
+  const maySkipFirstForIteration = (node: ts.ForStatement): boolean => {
+    if (node.condition === undefined) return false;
+    const condition = unwrapExpression(node.condition);
+    if (condition.kind === ts.SyntaxKind.TrueKeyword) return false;
+    if (!ts.isBinaryExpression(condition) || !ts.isIdentifier(condition.left)) return true;
+    if (
+      node.initializer === undefined
+      || !ts.isVariableDeclarationList(node.initializer)
+      || node.initializer.declarations.length !== 1
+    ) {
+      return true;
+    }
+    const declaration = node.initializer.declarations[0];
+    if (declaration === undefined || !ts.isIdentifier(declaration.name)) return true;
+    if (symbolId(checker, condition.left) !== symbolId(checker, declaration.name)) return true;
+    const left = numericLiteralValue(declaration.initializer);
+    const right = numericLiteralValue(condition.right);
+    if (left === null || right === null) return true;
+    const initiallyTrue = condition.operatorToken.kind === ts.SyntaxKind.LessThanToken
+      ? left < right
+      : condition.operatorToken.kind === ts.SyntaxKind.LessThanEqualsToken
+        ? left <= right
+        : condition.operatorToken.kind === ts.SyntaxKind.GreaterThanToken
+          ? left > right
+          : condition.operatorToken.kind === ts.SyntaxKind.GreaterThanEqualsToken
+            ? left >= right
+            : condition.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+              || condition.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+              ? left === right
+              : condition.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken
+                || condition.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+                ? left !== right
+                : false;
+    return !initiallyTrue;
+  };
+
+  executeStatement = (
+    node: ts.Statement,
+    state: FlowState,
+    loopLabels?: readonly string[],
+  ): Completion[] => {
     if (ts.isBlock(node)) return executeSequence(node.statements, state);
     if (ts.isVariableStatement(node)) return executeVariableList(node.declarationList, state);
     if (ts.isExpressionStatement(node)) {
@@ -2156,10 +2723,10 @@ function scanParsedSource(
       return coalesceCompletions(results);
     }
     if (ts.isWhileStatement(node)) {
-      return executeLoop(state, node.statement, undefined, node.expression, false, true, loopLabel);
+      return executeLoop(state, node.statement, undefined, node.expression, false, true, loopLabels);
     }
     if (ts.isDoStatement(node)) {
-      return executeLoop(state, node.statement, undefined, node.expression, true, true, loopLabel);
+      return executeLoop(state, node.statement, undefined, node.expression, true, true, loopLabels);
     }
     if (ts.isForStatement(node)) {
       let initialized: Completion[] = [completion("normal", state)];
@@ -2180,7 +2747,8 @@ function scanParsedSource(
           node.condition,
           false,
           node.condition !== undefined,
-          loopLabel,
+          loopLabels,
+          maySkipFirstForIteration(node),
         ));
       }
       return coalesceCompletions(results);
@@ -2188,21 +2756,39 @@ function scanParsedSource(
     if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
       const results = scanExpression(node.expression, state).map((item) => completion("throw", item));
       const iterable = unwrapExpression(node.expression);
-      const knownIterations: readonly (ts.Expression | string)[] | null = ts.isForOfStatement(node)
+      type KnownIteration =
+        | { readonly kind: "expression"; readonly value: ts.Expression }
+        | { readonly kind: "stored"; readonly value: StoredValue }
+        | { readonly kind: "string"; readonly value: string };
+      let knownIterations: readonly KnownIteration[] | null = null;
+      if (
+        ts.isForOfStatement(node)
         && ts.isArrayLiteralExpression(iterable)
         && iterable.elements.every((element) => !ts.isSpreadElement(element))
-        ? iterable.elements.filter((element): element is ts.Expression => !ts.isOmittedExpression(element))
-        : ts.isForInStatement(node) && ts.isObjectLiteralExpression(iterable)
-          ? iterable.properties.flatMap((property): string[] => {
-            if (ts.isSpreadAssignment(property)) return [];
-            const name = property.name;
-            if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) || ts.isNumericLiteral(name)) {
-              return [name.text];
+      ) {
+        knownIterations = iterable.elements
+          .filter((element): element is ts.Expression => !ts.isOmittedExpression(element))
+          .map((value) => ({ kind: "expression", value }));
+      } else if (ts.isForOfStatement(node)) {
+        const array = storedArrayOf(iterable, state);
+        if (array !== null && array.length !== null) {
+          const values: KnownIteration[] = [];
+          for (let index = 0; index < array.length; index += 1) {
+            const value = array.values.get(index);
+            if (value === undefined) {
+              knownIterations = null;
+              break;
             }
-            const keys = ts.isComputedPropertyName(name) ? stringsOf(name.expression, state) : null;
-            return keys !== null && !keys.unknown ? [...keys.values] : [];
-          })
-          : null;
+            values.push({ kind: "stored", value });
+          }
+          if (values.length === array.length) knownIterations = values;
+        }
+      } else {
+        const keys = storedObjectKeysOf(iterable, state);
+        if (keys !== null && !keys.unknown) {
+          knownIterations = [...keys.values].map((value) => ({ kind: "string", value }));
+        }
+      }
       if (knownIterations !== null) {
         let active: Completion[] = [completion("normal", cloneState(state))];
         const completed: Completion[] = [];
@@ -2213,10 +2799,12 @@ function scanParsedSource(
             if (ts.isVariableDeclarationList(node.initializer)) {
               const declaration = node.initializer.declarations[0];
               if (declaration !== undefined) {
-                if (typeof element === "string" && ts.isIdentifier(declaration.name)) {
-                  updateIdentifierWithKnownString(declaration.name, element, iterationState);
-                } else if (typeof element !== "string") {
-                  updatePattern(declaration.name, element, iterationState, VALUE_PRESENT);
+                if (element.kind === "string" && ts.isIdentifier(declaration.name)) {
+                  updateIdentifierWithKnownString(declaration.name, element.value, iterationState);
+                } else if (element.kind === "expression") {
+                  updatePattern(declaration.name, element.value, iterationState, VALUE_PRESENT);
+                } else if (element.kind === "stored" && ts.isIdentifier(declaration.name)) {
+                  updateIdentifierWithStoredValue(declaration.name, element.value, iterationState);
                 } else {
                   bindUnknown(declaration.name, iterationState, VALUE_PRESENT);
                 }
@@ -2224,12 +2812,15 @@ function scanParsedSource(
             } else if (ts.isExpression(node.initializer)) {
               const target = unwrapExpression(node.initializer);
               if (ts.isIdentifier(target)) {
-                if (typeof element === "string") updateIdentifierWithKnownString(target, element, iterationState);
-                else updateIdentifier(target, element, iterationState, VALUE_PRESENT);
-              } else if (typeof element !== "string") assignExpressionPattern(target, element, iterationState);
+                if (element.kind === "string") updateIdentifierWithKnownString(target, element.value, iterationState);
+                else if (element.kind === "expression") updateIdentifier(target, element.value, iterationState, VALUE_PRESENT);
+                else updateIdentifierWithStoredValue(target, element.value, iterationState);
+              } else if (element.kind === "expression") {
+                assignExpressionPattern(target, element.value, iterationState);
+              }
             }
             for (const outcome of executeStatement(node.statement, iterationState)) {
-              const targetsLoop = outcome.label === null || outcome.label === loopLabel;
+              const targetsLoop = outcome.label === null || loopLabels?.includes(outcome.label) === true;
               if (outcome.kind === "normal" || (outcome.kind === "continue" && targetsLoop)) {
                 next.push(completion("normal", outcome.state));
               } else if (outcome.kind === "break" && targetsLoop) {
@@ -2253,13 +2844,13 @@ function scanParsedSource(
       } else {
         if (ts.isExpression(node.initializer)) scanAssignmentTarget(node.initializer, loopState);
       }
-      results.push(...executeLoop(loopState, node.statement, undefined, undefined, false, true, loopLabel));
+      results.push(...executeLoop(loopState, node.statement, undefined, undefined, false, true, loopLabels));
       return coalesceCompletions(results);
     }
     if (ts.isSwitchStatement(node)) return executeSwitch(node, state);
     if (ts.isTryStatement(node)) return executeTry(node, state);
     if (ts.isLabeledStatement(node)) {
-      return executeStatement(node.statement, state, node.label.text).map((item) => (
+      return executeStatement(node.statement, state, [...(loopLabels ?? []), node.label.text]).map((item) => (
         item.kind === "break" && item.label === node.label.text
           ? completion("normal", item.state)
           : item
@@ -2332,45 +2923,6 @@ function scanParsedSource(
   const normalRootStates = rootResults.filter((result) => result.kind === "normal").map((result) => result.state);
   const rootStates = normalRootStates.length > 0 ? normalRootStates : rootResults.map((result) => result.state);
   const finalState = rootStates.length === 0 ? emptyState() : rootStates.reduce(joinStates);
-  const nodeIsInventoryCandidate = (node: ts.Node, state: FlowState): boolean => {
-    if (ts.isThrowStatement(node) || node.kind === ts.SyntaxKind.VoidExpression) {
-      return true;
-    }
-    if (ts.isNewExpression(node)) {
-      const constructor = unwrapExpression(node.expression);
-      const binding = ts.isIdentifier(constructor) ? checker.getSymbolAtLocation(constructor) : undefined;
-      const localAlias = (binding?.declarations ?? []).some(
-        (declaration) => String(declaration.path) === sourceFile.fileName
-          && declaration.kind === ts.SyntaxKind.VariableDeclaration,
-      );
-      if ((constructorOf(node.expression, state) & CONSTRUCTOR_DOMAIN) !== 0 || localAlias) {
-        return true;
-      }
-    }
-    if (zone.governed && (ts.isCallExpression(node) || ts.isObjectLiteralExpression(node))) {
-      return true;
-    }
-    return false;
-  };
-  const functionHasCandidate = (
-    definition: ts.FunctionLikeDeclaration,
-    state: FlowState,
-    includeNested: boolean,
-  ): boolean => {
-    if (definition.body === undefined) return false;
-    let candidate = false;
-    const visit = (node: ts.Node): void => {
-      if (candidate) return;
-      if (!includeNested && node !== definition.body && ts.isFunctionLikeDeclaration(node)) return;
-      if (nodeIsInventoryCandidate(node, state)) {
-        candidate = true;
-        return;
-      }
-      node.forEachChild(visit);
-    };
-    visit(definition.body);
-    return candidate;
-  };
   const deferDirectNestedFunctions = (definition: ts.FunctionLikeDeclaration): void => {
     if (definition.body === undefined) return;
     const visit = (node: ts.Node): void => {
