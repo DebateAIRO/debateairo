@@ -1,6 +1,6 @@
-export const FIX01_RELEASE_MANIFEST_VERSION = 3 as const;
+export const FIX01_RELEASE_MANIFEST_VERSION = 4 as const;
 export const FIX01_RELEASE_VERIFIER_VERSION =
-  "fix01-release-admission-v3" as const;
+  "fix01-release-admission-v4" as const;
 export const FIX01_RELEASE_MANIFEST_MAX_BYTES = 8 * 1024 * 1024;
 
 export const FIX01_RELEASE_MANIFEST_KEYS = [
@@ -61,7 +61,12 @@ export const FIX01_RELEASE_LOCK_KEYS = [
   "nlink",
   "size",
   "sha256",
-  "prefix_bytes",
+  "index_dev",
+  "index_ino",
+  "base_prefix_bytes",
+  "planned_append_bytes",
+  "planned_append_sha256",
+  "final_prefix_bytes",
 ] as const;
 
 export type Fix01ReleaseClassification =
@@ -102,19 +107,24 @@ export interface Fix01ReleaseManifestIndexV2 {
   readonly covered_lawful_count: number;
 }
 
-export interface Fix01ReleaseManifestLockV3 {
+export interface Fix01ReleaseManifestLockV4 {
   readonly basename: ".obs-spool-release-lock-v1";
-  readonly version: 1;
+  readonly version: 2;
   readonly admission_ref: string;
   readonly dev: string;
   readonly ino: string;
   readonly nlink: 1;
   readonly size: number;
   readonly sha256: string;
-  readonly prefix_bytes: number;
+  readonly index_dev: string;
+  readonly index_ino: string;
+  readonly base_prefix_bytes: number;
+  readonly planned_append_bytes: number;
+  readonly planned_append_sha256: string;
+  readonly final_prefix_bytes: number;
 }
 
-export interface Fix01ReleaseAdmissionManifestV3 {
+export interface Fix01ReleaseAdmissionManifestV4 {
   readonly version: typeof FIX01_RELEASE_MANIFEST_VERSION;
   readonly verdict: "PASS_EMPTY" | "PASS_INDEXED";
   readonly phase: "before_first_indexed_launch";
@@ -134,7 +144,7 @@ export interface Fix01ReleaseAdmissionManifestV3 {
   readonly requires_v_review: boolean;
   readonly entries: readonly Fix01ReleaseManifestEntryV2[];
   readonly index: Fix01ReleaseManifestIndexV2 | null;
-  readonly release_lock: Fix01ReleaseManifestLockV3 | null;
+  readonly release_lock: Fix01ReleaseManifestLockV4 | null;
 }
 
 export function canonicalFix01ReleaseJson(value: unknown): string {

@@ -25,9 +25,9 @@ import {
   FIX01_RELEASE_MANIFEST_KEYS as MANIFEST_KEYS,
   FIX01_RELEASE_MANIFEST_VERSION as MANIFEST_VERSION,
   FIX01_RELEASE_VERIFIER_VERSION as VERIFIER_VERSION,
-  type Fix01ReleaseAdmissionManifestV3,
+  type Fix01ReleaseAdmissionManifestV4,
   type Fix01ReleaseManifestIndexV2,
-  type Fix01ReleaseManifestLockV3,
+  type Fix01ReleaseManifestLockV4,
 } from "./obs-spool-release-contract.js";
 
 const IMMUTABLE_BUILD_REF = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
@@ -70,13 +70,13 @@ interface CandidateEntry {
 }
 
 type AdmissionManifest = Omit<
-  Fix01ReleaseAdmissionManifestV3,
+  Fix01ReleaseAdmissionManifestV4,
   "index" | "release_lock" | "verdict"
 >
   & Readonly<{
     verdict: "PASS_INDEXED";
     index: Fix01ReleaseManifestIndexV2;
-    release_lock: Fix01ReleaseManifestLockV3;
+    release_lock: Fix01ReleaseManifestLockV4;
   }>;
 
 class GateFailure extends Error {
@@ -416,7 +416,7 @@ function parseManifest(
   }
   if (
     releaseLock.basename !== SPOOL_RELEASE_LOCK_NAME
-    || releaseLock.version !== 1
+    || releaseLock.version !== 2
     || releaseLock.admission_ref !== value.admission_ref
     || !isCanonicalUint64(releaseLock.dev)
     || !isCanonicalUint64(releaseLock.ino)
@@ -425,9 +425,23 @@ function parseManifest(
     || releaseLock.size <= 0
     || typeof releaseLock.sha256 !== "string"
     || !LOWER_HEX_256.test(releaseLock.sha256)
-    || !isSafeNonnegativeInteger(releaseLock.prefix_bytes)
-    || releaseLock.prefix_bytes <= 0
-    || releaseLock.prefix_bytes !== index.size
+    || !isCanonicalUint64(releaseLock.index_dev)
+    || !isCanonicalUint64(releaseLock.index_ino)
+    || releaseLock.index_dev !== index.dev
+    || releaseLock.index_ino !== index.ino
+    || !isSafeNonnegativeInteger(releaseLock.base_prefix_bytes)
+    || !isSafeNonnegativeInteger(releaseLock.planned_append_bytes)
+    || releaseLock.planned_append_bytes <= 0
+    || typeof releaseLock.planned_append_sha256 !== "string"
+    || !LOWER_HEX_256.test(releaseLock.planned_append_sha256)
+    || !isSafeNonnegativeInteger(releaseLock.final_prefix_bytes)
+    || releaseLock.final_prefix_bytes <= 0
+    || !Number.isSafeInteger(
+      releaseLock.base_prefix_bytes + releaseLock.planned_append_bytes,
+    )
+    || releaseLock.base_prefix_bytes + releaseLock.planned_append_bytes
+      !== releaseLock.final_prefix_bytes
+    || releaseLock.final_prefix_bytes !== index.size
   ) {
     fail("FAIL_MANIFEST_SCHEMA");
   }
@@ -494,6 +508,8 @@ async function verifyIndexPrefix(
   const admissionCounts = new Map<string, number>();
   const writerBasenames = new Set<string>();
   const prefixDigest = createHash("sha256");
+  const plannedAppendDigest = createHash("sha256");
+  let plannedAppendBytes = 0;
   let lastPrefixByte: number | undefined;
   let line: number[] = [];
   let overlong = false;
@@ -533,6 +549,19 @@ async function verifyIndexPrefix(
       if (withinPrefix > 0) {
         prefixDigest.update(chunk.subarray(0, withinPrefix));
       }
+      const plannedStart = Math.max(
+        0,
+        manifest.release_lock.base_prefix_bytes - offset,
+      );
+      const plannedEnd = Math.max(
+        plannedStart,
+        Math.min(chunk.length, prefixBytes - offset),
+      );
+      if (plannedEnd > plannedStart) {
+        const plannedChunk = chunk.subarray(plannedStart, plannedEnd);
+        plannedAppendDigest.update(plannedChunk);
+        plannedAppendBytes += plannedChunk.length;
+      }
       for (let position = 0; position < withinPrefix; position += 1) {
         const byte = chunk[position]!;
         lastPrefixByte = byte;
@@ -561,6 +590,9 @@ async function verifyIndexPrefix(
     || line.length !== 0
     || overlong
     || prefixDigest.digest("hex") !== manifest.index.sha256
+    || plannedAppendBytes !== manifest.release_lock.planned_append_bytes
+    || plannedAppendDigest.digest("hex")
+      !== manifest.release_lock.planned_append_sha256
   ) {
     fail("FAIL_INDEX_PREFIX");
   }
@@ -591,7 +623,16 @@ async function verifyReleaseLock(
     || observed.lock.ino !== manifest.release_lock.ino
     || observed.lock.size !== manifest.release_lock.size
     || observed.lock.sha256 !== manifest.release_lock.sha256
-    || observed.lock.prefixBytes !== manifest.release_lock.prefix_bytes
+    || observed.lock.indexDev !== manifest.release_lock.index_dev
+    || observed.lock.indexIno !== manifest.release_lock.index_ino
+    || observed.lock.basePrefixBytes
+      !== manifest.release_lock.base_prefix_bytes
+    || observed.lock.plannedAppendBytes
+      !== manifest.release_lock.planned_append_bytes
+    || observed.lock.plannedAppendSha256
+      !== manifest.release_lock.planned_append_sha256
+    || observed.lock.finalPrefixBytes
+      !== manifest.release_lock.final_prefix_bytes
   ) {
     fail("FAIL_RELEASE_LOCK");
   }

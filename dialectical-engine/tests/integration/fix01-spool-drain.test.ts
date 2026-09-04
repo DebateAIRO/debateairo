@@ -382,18 +382,41 @@ function sealForIndex(
 function writeReleaseLock(
   directory: string,
   admissionRef: string,
-  prefixBytes: number,
+  finalPrefixBytes: number,
 ): string {
   const path = join(directory, SPOOL_RELEASE_LOCK_NAME);
-  const boundary = prefixBytes.toString(16).padStart(16, "0");
+  const indexPath = join(directory, SPOOL_INDEX_NAME);
+  const indexStat = statSync(indexPath, { bigint: true });
+  const indexBytes = readFileSync(indexPath).subarray(0, finalPrefixBytes);
+  const basePrefixBytes = 0;
+  const plannedAppendBytes = finalPrefixBytes;
+  const plannedAppendSha256 = createHash("sha256")
+    .update(indexBytes)
+    .digest("hex");
   const checksum = createHash("sha256").update([
-    "FIX01-RELEASE-LOCK-V1",
+    "FIX01-RELEASE-LOCK-V2",
     admissionRef,
-    String(prefixBytes),
+    indexStat.dev.toString(),
+    indexStat.ino.toString(),
+    String(basePrefixBytes),
+    String(plannedAppendBytes),
+    plannedAppendSha256,
+    String(finalPrefixBytes),
   ].join("\u0000")).digest("hex");
   writeFileSync(
     path,
-    `FIX01_RELEASE_LOCK_V1\n${admissionRef}\n${boundary}\n${checksum}\n`,
+    [
+      "FIX01_RELEASE_LOCK_V2",
+      admissionRef,
+      indexStat.dev.toString(16).padStart(16, "0"),
+      indexStat.ino.toString(16).padStart(16, "0"),
+      basePrefixBytes.toString(16).padStart(16, "0"),
+      plannedAppendBytes.toString(16).padStart(16, "0"),
+      plannedAppendSha256,
+      finalPrefixBytes.toString(16).padStart(16, "0"),
+      checksum,
+      "",
+    ].join("\n"),
     {
     mode: 0o600,
     },
@@ -1927,6 +1950,10 @@ describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
         ...fixture.seal,
         indexDev: String(BigInt(fixture.seal.indexDev) + 1n),
       })],
+      ["wrong index inode", (fixture) => ({
+        ...fixture.seal,
+        indexIno: String(BigInt(fixture.seal.indexIno) + 1n),
+      })],
       ["short sealed prefix", (fixture) => ({
         ...fixture.seal,
         prefixBytes: 1,
@@ -1959,6 +1986,8 @@ describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
       expect(existsSync(`${fixture.path}.ingested`), label).toBe(false);
       expect(readFileSync(fixture.path, "utf8"), label)
         .toBe(serializedEnvelope(changed));
+      expect(existsSync(join(fixture.directory, SPOOL_CURSOR_NAME)), label)
+        .toBe(false);
     }
   });
 

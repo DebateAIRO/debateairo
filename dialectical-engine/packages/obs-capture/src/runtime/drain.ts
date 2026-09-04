@@ -485,11 +485,22 @@ export async function drainDeadSpoolFiles(options: {
       && releaseLock.lock.dev === options.admissionSeal.lockDev
       && releaseLock.lock.ino === options.admissionSeal.lockIno
       && releaseLock.lock.sha256 === options.admissionSeal.lockSha256
-      && releaseLock.lock.prefixBytes === options.admissionSeal.prefixBytes
+      && releaseLock.lock.indexDev === options.admissionSeal.indexDev
+      && releaseLock.lock.indexIno === options.admissionSeal.indexIno
+      && releaseLock.lock.finalPrefixBytes === options.admissionSeal.prefixBytes
       ? options.admissionSeal
       : undefined;
     if (releaseLock.status === "valid" && activeSeal === undefined) return;
-    const page = await readTypedIndexedSpoolPage(options.spoolDirectory);
+    const page = await readTypedIndexedSpoolPage(
+      options.spoolDirectory,
+      activeSeal === undefined
+        ? undefined
+        : {
+          indexDev: activeSeal.indexDev,
+          indexIno: activeSeal.indexIno,
+          prefixBytes: activeSeal.prefixBytes,
+        },
+    );
     if (page === undefined) return;
     if (
       activeSeal !== undefined

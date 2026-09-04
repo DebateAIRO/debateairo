@@ -18,8 +18,7 @@ import {
   type SafeRuntimeName,
 } from "../packages/obs-capture/src/safe-metadata.js";
 import {
-  appendSpoolIndexAdmissionRecord,
-  appendSpoolIndexBasename,
+  appendSpoolIndexRecoveryBytes,
   createSpoolAdmissionProof,
   encodeSpoolAdmissionIndexRecord,
   encodeSpoolReleaseLock,
@@ -46,6 +45,7 @@ const SPOOL_PID = /^(?:api|runner|scheduler|evaluator-lib|ui-client|listener|wat
 const INDEX_LINE_MAX_BYTES = 174;
 const IO_CHUNK_BYTES = 64 * 1024;
 const PROSPECTIVE_STAT_DIGITS = "9".repeat(32);
+const PROSPECTIVE_UINT64 = "18446744073709551615";
 const PROSPECTIVE_SHA256 = "f".repeat(64);
 const PROSPECTIVE_VERIFIED_AT = "9999-12-31T23:59:59.999Z";
 
@@ -465,7 +465,13 @@ async function sourceSnapshot(
   };
 }
 
-async function readIndex(directory: string): Promise<IndexState | undefined> {
+async function readIndex(
+  directory: string,
+  options: Readonly<{
+    basePrefixBytes: number;
+    plannedAppend?: Buffer;
+  }> | undefined = undefined,
+): Promise<IndexState | undefined> {
   const filePath = join(directory, SPOOL_INDEX_NAME);
   let pathStat: BigIntStats;
   try {
@@ -479,8 +485,29 @@ async function readIndex(directory: string): Promise<IndexState | undefined> {
   const admissionRecords: Array<Readonly<{ basename: string; proof: string }>> = [];
   let line = Buffer.alloc(0);
   let overlong = false;
+  const fileSize = safeNumber(pathStat.size, "FAIL_UNREPRESENTABLE_SIZE");
+  const basePrefixBytes = options?.basePrefixBytes ?? fileSize;
+  if (
+    !Number.isSafeInteger(basePrefixBytes)
+    || basePrefixBytes < 0
+    || basePrefixBytes > fileSize
+    || (
+      options?.plannedAppend !== undefined
+      && fileSize - basePrefixBytes > options.plannedAppend.length
+    )
+  ) {
+    fail("FAIL_RELEASE_LOCK_PLAN");
+  }
+  let streamOffset = 0;
+  let suffixMatches = true;
   const result = await readStableFile(filePath, pathStat, (chunk) => {
-    for (let index = 0; index < chunk.length; index += 1) {
+    const chunkStart = streamOffset;
+    const chunkEnd = chunkStart + chunk.length;
+    const prefixEnd = Math.max(
+      0,
+      Math.min(chunk.length, basePrefixBytes - chunkStart),
+    );
+    for (let index = 0; index < prefixEnd; index += 1) {
       const byte = chunk[index];
       if (byte === 0x0a) {
         if (!overlong && line.length > 0) {
@@ -505,7 +532,19 @@ async function readIndex(directory: string): Promise<IndexState | undefined> {
         }
       }
     }
+    if (options?.plannedAppend !== undefined && chunkEnd > basePrefixBytes) {
+      const suffixStartInChunk = Math.max(0, basePrefixBytes - chunkStart);
+      const suffixStartInPlan = Math.max(0, chunkStart - basePrefixBytes);
+      const observed = chunk.subarray(suffixStartInChunk);
+      const expected = options.plannedAppend.subarray(
+        suffixStartInPlan,
+        suffixStartInPlan + observed.length,
+      );
+      if (!observed.equals(expected)) suffixMatches = false;
+    }
+    streamOffset = chunkEnd;
   });
+  if (!suffixMatches) fail("FAIL_RELEASE_LOCK_PLAN");
   const unterminatedBasename = !overlong && line.length > 0
     && isIndexedSpoolBasename(line.toString("utf8"))
     ? line.toString("utf8")
@@ -571,18 +610,16 @@ async function createEmptyIndex(directory: string): Promise<void> {
   }
 }
 
-function predictedFinalIndexSize(
+function plannedIndexAppend(
   source: SourceSnapshot,
   index: IndexState | undefined,
   admissionRef: string,
-): number {
-  let size = index === undefined
-    ? 0
-    : safeNumber(index.stat.size, "FAIL_UNREPRESENTABLE_SIZE");
+): Buffer {
+  const parts: Buffer[] = [];
   const candidates = source.entries.filter((entry) => entry.kind === "candidate");
   for (const candidate of candidates) {
     if (!index?.basenames.has(candidate.basename)) {
-      size += Buffer.byteLength(`\n${candidate.basename}\n`, "utf8");
+      parts.push(Buffer.from(`\n${candidate.basename}\n`, "utf8"));
     }
   }
   for (const candidate of candidates) {
@@ -596,19 +633,51 @@ function predictedFinalIndexSize(
         basename: candidate.basename,
         proof,
       });
-      size += Buffer.byteLength(`\n${record}\n`, "utf8");
+      parts.push(Buffer.from(`\n${record}\n`, "utf8"));
     }
   }
-  if (!Number.isSafeInteger(size) || size <= 0) {
-    fail("FAIL_UNREPRESENTABLE_SIZE");
+  return Buffer.concat(parts);
+}
+
+function releasePlan(
+  source: SourceSnapshot,
+  baseIndex: IndexState | undefined,
+  admissionRef: string,
+  basePrefixBytes: number,
+): Readonly<{
+  bytes: Buffer;
+  basePrefixBytes: number;
+  plannedAppendBytes: number;
+  plannedAppendSha256: string;
+  finalPrefixBytes: number;
+}> {
+  const bytes = plannedIndexAppend(source, baseIndex, admissionRef);
+  const finalPrefixBytes = basePrefixBytes + bytes.length;
+  if (
+    bytes.length <= 0
+    || !Number.isSafeInteger(finalPrefixBytes)
+    || finalPrefixBytes <= 0
+  ) {
+    fail("FAIL_RELEASE_LOCK_PLAN");
   }
-  return size;
+  return Object.freeze({
+    bytes,
+    basePrefixBytes,
+    plannedAppendBytes: bytes.length,
+    plannedAppendSha256: sha256(bytes),
+    finalPrefixBytes,
+  });
 }
 
 async function createReleaseLock(options: {
   readonly directory: string;
   readonly admissionRef: string;
-  readonly prefixBytes: number;
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly basePrefixBytes: number;
+  readonly plannedAppendBytes: number;
+  readonly plannedAppendSha256: string;
+  readonly finalPrefixBytes: number;
 }): Promise<SpoolReleaseLock> {
   const path = join(options.directory, SPOOL_RELEASE_LOCK_NAME);
   const bytes = encodeSpoolReleaseLock(options);
@@ -635,7 +704,12 @@ async function createReleaseLock(options: {
   if (
     observed.status !== "valid"
     || observed.lock.admissionRef !== options.admissionRef
-    || observed.lock.prefixBytes !== options.prefixBytes
+    || observed.lock.indexDev !== options.indexDev
+    || observed.lock.indexIno !== options.indexIno
+    || observed.lock.basePrefixBytes !== options.basePrefixBytes
+    || observed.lock.plannedAppendBytes !== options.plannedAppendBytes
+    || observed.lock.plannedAppendSha256 !== options.plannedAppendSha256
+    || observed.lock.finalPrefixBytes !== options.finalPrefixBytes
   ) {
     fail("FAIL_UNSAFE_RELEASE_LOCK");
   }
@@ -646,7 +720,12 @@ async function prepareReleaseLock(options: {
   readonly directory: string;
   readonly observed: Awaited<ReturnType<typeof readSpoolReleaseLock>>;
   readonly admissionRef: string;
-  readonly prefixBytes: number;
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly basePrefixBytes: number;
+  readonly plannedAppendBytes: number;
+  readonly plannedAppendSha256: string;
+  readonly finalPrefixBytes: number;
 }): Promise<SpoolReleaseLock> {
   if (options.observed.status === "invalid") {
     fail("FAIL_UNSAFE_RELEASE_LOCK");
@@ -654,44 +733,82 @@ async function prepareReleaseLock(options: {
   if (options.observed.status === "valid") {
     if (
       options.observed.lock.admissionRef !== options.admissionRef
-      || options.observed.lock.prefixBytes !== options.prefixBytes
+      || options.observed.lock.indexDev !== options.indexDev
+      || options.observed.lock.indexIno !== options.indexIno
+      || options.observed.lock.basePrefixBytes !== options.basePrefixBytes
+      || options.observed.lock.plannedAppendBytes !== options.plannedAppendBytes
+      || options.observed.lock.plannedAppendSha256 !== options.plannedAppendSha256
+      || options.observed.lock.finalPrefixBytes !== options.finalPrefixBytes
     ) {
-      fail("FAIL_RELEASE_LOCK_BOUNDARY");
+      fail("FAIL_RELEASE_LOCK_PLAN");
     }
     return options.observed.lock;
   }
   return createReleaseLock(options);
 }
 
-async function repairIndex(
+function sameReleaseLock(
+  left: SpoolReleaseLock,
+  right: SpoolReleaseLock,
+): boolean {
+  return left.admissionRef === right.admissionRef
+    && left.dev === right.dev
+    && left.ino === right.ino
+    && left.size === right.size
+    && left.sha256 === right.sha256
+    && left.indexDev === right.indexDev
+    && left.indexIno === right.indexIno
+    && left.basePrefixBytes === right.basePrefixBytes
+    && left.plannedAppendBytes === right.plannedAppendBytes
+    && left.plannedAppendSha256 === right.plannedAppendSha256
+    && left.finalPrefixBytes === right.finalPrefixBytes;
+}
+
+async function syncReleaseLockDirectory(
   directory: string,
-  source: SourceSnapshot,
-  initialIndex: IndexState | undefined,
-): Promise<IndexState> {
-  const candidates = source.entries.filter((entry) => entry.kind === "candidate");
-  assertNoRejectedIndexMembers(source, initialIndex);
-  let indexed = initialIndex?.basenames ?? new Set<string>();
-  for (const candidate of candidates) {
-    if (indexed.has(candidate.basename)) continue;
-    try {
-      appendSpoolIndexBasename({
-        directory,
-        basename: candidate.basename,
-      });
-    } catch {
-      fail("FAIL_INDEX_REPAIR");
+  expectedLock: SpoolReleaseLock,
+): Promise<void> {
+  let handle: FileHandle | undefined;
+  try {
+    const before = await lstat(directory, { bigint: true });
+    handle = await open(
+      directory,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_DIRECTORY,
+    );
+    const descriptor = await handle.stat({ bigint: true });
+    if (
+      !before.isDirectory()
+      || before.isSymbolicLink()
+      || !descriptor.isDirectory()
+      || !sameIdentity(before, descriptor)
+    ) {
+      fail("FAIL_RELEASE_LOCK_DIRECTORY_SYNC");
     }
-    indexed = (await readIndex(directory))?.basenames ?? new Set<string>();
-    if (!indexed.has(candidate.basename)) fail("FAIL_INDEX_REPAIR");
+    await handle.sync();
+    const afterDescriptor = await handle.stat({ bigint: true });
+    const afterPath = await lstat(directory, { bigint: true });
+    if (
+      !afterDescriptor.isDirectory()
+      || !afterPath.isDirectory()
+      || afterPath.isSymbolicLink()
+      || !sameIdentity(descriptor, afterDescriptor)
+      || !sameIdentity(descriptor, afterPath)
+    ) {
+      fail("FAIL_RELEASE_LOCK_DIRECTORY_SYNC");
+    }
+    const observedLock = await readSpoolReleaseLock(directory);
+    if (
+      observedLock.status !== "valid"
+      || !sameReleaseLock(expectedLock, observedLock.lock)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK");
+    }
+  } catch (error) {
+    if (error instanceof AdmissionFailure) throw error;
+    fail("FAIL_RELEASE_LOCK_DIRECTORY_SYNC");
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
-  if (await readIndex(directory) === undefined) await createEmptyIndex(directory);
-  const finalIndex = await readIndex(directory);
-  if (finalIndex === undefined) fail("FAIL_INDEX_REPAIR");
-  for (const candidate of candidates) {
-    if (!finalIndex.basenames.has(candidate.basename)) fail("FAIL_INDEX_COVERAGE");
-  }
-  assertNoRejectedIndexMembers(source, finalIndex);
-  return finalIndex;
 }
 
 function admissionProofForEntry(
@@ -744,41 +861,6 @@ function countCurrentAdmissionRecords(
     count += matches;
   }
   return count;
-}
-
-async function appendAdmissionRecords(
-  directory: string,
-  source: SourceSnapshot,
-  index: IndexState,
-  admissionRef: string,
-): Promise<IndexState> {
-  const candidates = source.entries.filter((entry) => entry.kind === "candidate");
-  for (const candidate of candidates) {
-    const proof = admissionProofForEntry(admissionRef, candidate);
-    const matches = index.admissionRecords.filter((record) =>
-      record.basename === candidate.basename && record.proof === proof
-    ).length;
-    if (matches > 1) fail("FAIL_ADMISSION_RECORD_DUPLICATE");
-    if (matches === 1) continue;
-    try {
-      appendSpoolIndexAdmissionRecord({
-        directory,
-        basename: candidate.basename,
-        proof,
-      });
-    } catch {
-      fail("FAIL_INDEX_REPAIR");
-    }
-  }
-  const finalIndex = await readIndex(directory);
-  if (finalIndex === undefined) fail("FAIL_INDEX_REPAIR");
-  if (
-    countCurrentAdmissionRecords(source, finalIndex, admissionRef)
-      !== candidates.length
-  ) {
-    fail("FAIL_ADMISSION_RECORD_COVERAGE");
-  }
-  return finalIndex;
 }
 
 function assertNoRejectedIndexMembers(
@@ -863,7 +945,12 @@ function assertProspectiveManifestWithinLimit(options: {
   readonly cursor: ReadFileResult | undefined;
   readonly physicallyEmpty: boolean;
   readonly admissionRef: string;
-  readonly prefixBytes: number | undefined;
+  readonly releasePlan: Readonly<{
+    basePrefixBytes: number;
+    plannedAppendBytes: number;
+    plannedAppendSha256: string;
+    finalPrefixBytes: number;
+  }> | undefined;
   readonly initialIndex: IndexState | undefined;
 }): void {
   const sourceEntries = options.source.entries.map((entry): ManifestEntry => ({
@@ -882,7 +969,7 @@ function assertProspectiveManifestWithinLimit(options: {
   ).length;
   const prospectiveIndexSize = options.physicallyEmpty
     ? undefined
-    : options.prefixBytes
+    : options.releasePlan?.finalPrefixBytes
       ?? (options.initialIndex === undefined
         ? 0
         : safeNumber(options.initialIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE"));
@@ -897,21 +984,31 @@ function assertProspectiveManifestWithinLimit(options: {
   ].sort((left, right) =>
     left.basename < right.basename ? -1 : left.basename > right.basename ? 1 : 0
   );
-  const prospectiveLock = options.prefixBytes === undefined
+  const prospectiveLock = options.releasePlan === undefined
     ? null
     : {
       basename: SPOOL_RELEASE_LOCK_NAME,
-      version: 1,
+      version: 2,
       admission_ref: options.admissionRef,
       dev: PROSPECTIVE_STAT_DIGITS,
       ino: PROSPECTIVE_STAT_DIGITS,
       nlink: 1,
       size: encodeSpoolReleaseLock({
         admissionRef: options.admissionRef,
-        prefixBytes: options.prefixBytes,
+        indexDev: PROSPECTIVE_UINT64,
+        indexIno: PROSPECTIVE_UINT64,
+        basePrefixBytes: options.releasePlan.basePrefixBytes,
+        plannedAppendBytes: options.releasePlan.plannedAppendBytes,
+        plannedAppendSha256: options.releasePlan.plannedAppendSha256,
+        finalPrefixBytes: options.releasePlan.finalPrefixBytes,
       }).length,
       sha256: PROSPECTIVE_SHA256,
-      prefix_bytes: options.prefixBytes,
+      index_dev: PROSPECTIVE_STAT_DIGITS,
+      index_ino: PROSPECTIVE_STAT_DIGITS,
+      base_prefix_bytes: options.releasePlan.basePrefixBytes,
+      planned_append_bytes: options.releasePlan.plannedAppendBytes,
+      planned_append_sha256: options.releasePlan.plannedAppendSha256,
+      final_prefix_bytes: options.releasePlan.finalPrefixBytes,
     } as const;
   const prospectiveManifest = {
     version: FIX01_RELEASE_MANIFEST_VERSION,
@@ -1023,7 +1120,12 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   const admissionRef = initialReleaseLock.status === "valid"
     ? initialReleaseLock.lock.admissionRef
     : randomBytes(32).toString("hex");
-  const initialIndex = await readIndex(options.spoolDirectory);
+  const initialIndex = await readIndex(
+    options.spoolDirectory,
+    initialReleaseLock.status === "valid"
+      ? { basePrefixBytes: initialReleaseLock.lock.basePrefixBytes }
+      : undefined,
+  );
   const initialCursor = await readReserved(options.spoolDirectory, SPOOL_CURSOR_NAME);
   const first = await sourceSnapshot(options.spoolDirectory, true);
   const physicallyEmpty = first.entries.length === 0
@@ -1042,44 +1144,141 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   if (firstCandidates.length === 0 && initialReleaseLock.status === "valid") {
     fail("FAIL_RELEASE_LOCK_ORPHANED");
   }
-  const prefixBytes = firstCandidates.length === 0
-    ? undefined
-    : predictedFinalIndexSize(first, initialIndex, admissionRef);
   assertNoRejectedIndexMembers(first, initialIndex);
+
+  let baseIndex = initialIndex;
+  let plan: ReturnType<typeof releasePlan> | undefined;
+  if (firstCandidates.length > 0) {
+    if (initialReleaseLock.status === "valid") {
+      if (
+        initialIndex === undefined
+        || initialIndex.stat.dev.toString() !== initialReleaseLock.lock.indexDev
+        || initialIndex.stat.ino.toString() !== initialReleaseLock.lock.indexIno
+      ) {
+        fail("FAIL_RELEASE_LOCK_PLAN");
+      }
+      baseIndex = initialIndex;
+      if (baseIndex === undefined) fail("FAIL_RELEASE_LOCK_PLAN");
+      assertNoRejectedIndexMembers(first, baseIndex);
+      plan = releasePlan(
+        first,
+        baseIndex,
+        admissionRef,
+        initialReleaseLock.lock.basePrefixBytes,
+      );
+      if (
+        initialReleaseLock.lock.plannedAppendBytes !== plan.plannedAppendBytes
+        || initialReleaseLock.lock.plannedAppendSha256
+          !== plan.plannedAppendSha256
+        || initialReleaseLock.lock.finalPrefixBytes !== plan.finalPrefixBytes
+        || safeNumber(initialIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE")
+          < plan.basePrefixBytes
+        || safeNumber(initialIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE")
+          > plan.finalPrefixBytes
+      ) {
+        fail("FAIL_RELEASE_LOCK_PLAN");
+      }
+      baseIndex = await readIndex(options.spoolDirectory, {
+        basePrefixBytes: plan.basePrefixBytes,
+        plannedAppend: plan.bytes,
+      });
+      if (baseIndex === undefined) fail("FAIL_RELEASE_LOCK_PLAN");
+    } else {
+      const basePrefixBytes = initialIndex === undefined
+        ? 0
+        : safeNumber(initialIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE");
+      plan = releasePlan(first, initialIndex, admissionRef, basePrefixBytes);
+    }
+  }
   assertProspectiveManifestWithinLimit({
     arguments: options,
     source: first,
     cursor: initialCursor,
     physicallyEmpty,
     admissionRef,
-    prefixBytes,
+    releasePlan: plan,
     initialIndex,
   });
   if (firstCandidates.length > 0) {
-    if (prefixBytes === undefined) fail("FAIL_RELEASE_LOCK_BOUNDARY");
+    if (plan === undefined) fail("FAIL_RELEASE_LOCK_PLAN");
+    if (initialReleaseLock.status === "absent" && baseIndex === undefined) {
+      await createEmptyIndex(options.spoolDirectory);
+      baseIndex = await readIndex(options.spoolDirectory);
+      if (baseIndex === undefined) fail("FAIL_INDEX_REPAIR");
+      const exactPlan = releasePlan(first, baseIndex, admissionRef, 0);
+      if (
+        exactPlan.plannedAppendBytes !== plan.plannedAppendBytes
+        || exactPlan.plannedAppendSha256 !== plan.plannedAppendSha256
+        || exactPlan.finalPrefixBytes !== plan.finalPrefixBytes
+      ) {
+        fail("FAIL_RELEASE_LOCK_PLAN");
+      }
+      plan = exactPlan;
+    }
+    if (baseIndex === undefined) fail("FAIL_INDEX_REPAIR");
     releaseLock = await prepareReleaseLock({
       directory: options.spoolDirectory,
       observed: initialReleaseLock,
       admissionRef,
-      prefixBytes,
+      indexDev: baseIndex.stat.dev.toString(),
+      indexIno: baseIndex.stat.ino.toString(),
+      basePrefixBytes: plan.basePrefixBytes,
+      plannedAppendBytes: plan.plannedAppendBytes,
+      plannedAppendSha256: plan.plannedAppendSha256,
+      finalPrefixBytes: plan.finalPrefixBytes,
     });
-  }
-  if (!physicallyEmpty) {
-    finalIndex = await repairIndex(options.spoolDirectory, first, initialIndex);
-    if (releaseLock !== undefined) {
-      finalIndex = await appendAdmissionRecords(
-        options.spoolDirectory,
-        first,
-        finalIndex,
-        admissionRef,
-      );
-      if (
-        safeNumber(finalIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE")
-          !== releaseLock.prefixBytes
-      ) {
-        fail("FAIL_RELEASE_LOCK_BOUNDARY");
+    await syncReleaseLockDirectory(options.spoolDirectory, releaseLock);
+    const currentIndexSize = safeNumber(
+      baseIndex.stat.size,
+      "FAIL_UNREPRESENTABLE_SIZE",
+    );
+    const retainedPlanBytes = currentIndexSize - plan.basePrefixBytes;
+    const missingTail = plan.bytes.subarray(retainedPlanBytes);
+    if (missingTail.length > 0) {
+      try {
+        appendSpoolIndexRecoveryBytes({
+          directory: options.spoolDirectory,
+          bytes: missingTail,
+          expectedIndexDev: releaseLock.indexDev,
+          expectedIndexIno: releaseLock.indexIno,
+          expectedIndexSize: currentIndexSize,
+        });
+      } catch {
+        fail("FAIL_INDEX_REPAIR");
       }
     }
+    const verifiedPlan = await readIndex(options.spoolDirectory, {
+      basePrefixBytes: plan.basePrefixBytes,
+      plannedAppend: plan.bytes,
+    });
+    if (
+      verifiedPlan === undefined
+      || safeNumber(verifiedPlan.stat.size, "FAIL_UNREPRESENTABLE_SIZE")
+        !== plan.finalPrefixBytes
+      || verifiedPlan.stat.dev.toString() !== releaseLock.indexDev
+      || verifiedPlan.stat.ino.toString() !== releaseLock.indexIno
+    ) {
+      fail("FAIL_RELEASE_LOCK_PLAN");
+    }
+    finalIndex = await readIndex(options.spoolDirectory);
+    if (finalIndex === undefined) fail("FAIL_INDEX_REPAIR");
+    for (const candidate of firstCandidates) {
+      if (!finalIndex.basenames.has(candidate.basename)) {
+        fail("FAIL_INDEX_COVERAGE");
+      }
+    }
+    assertNoRejectedIndexMembers(first, finalIndex);
+    if (
+      countCurrentAdmissionRecords(first, finalIndex, admissionRef)
+        !== firstCandidates.length
+    ) {
+      fail("FAIL_ADMISSION_RECORD_COVERAGE");
+    }
+  } else if (!physicallyEmpty) {
+    if (initialIndex === undefined) await createEmptyIndex(options.spoolDirectory);
+    finalIndex = await readIndex(options.spoolDirectory);
+    if (finalIndex === undefined) fail("FAIL_INDEX_REPAIR");
+    assertNoRejectedIndexMembers(first, finalIndex);
   }
   const second = await sourceSnapshot(options.spoolDirectory, false);
   if (first.sha256 !== second.sha256) fail("FAIL_CHANGED");
@@ -1129,12 +1328,7 @@ async function run(arguments_: Arguments): Promise<Readonly<{
     releaseLock === undefined
       ? finalReleaseLock.status !== "absent"
       : finalReleaseLock.status !== "valid"
-        || finalReleaseLock.lock.admissionRef !== releaseLock.admissionRef
-        || finalReleaseLock.lock.dev !== releaseLock.dev
-        || finalReleaseLock.lock.ino !== releaseLock.ino
-        || finalReleaseLock.lock.size !== releaseLock.size
-        || finalReleaseLock.lock.sha256 !== releaseLock.sha256
-        || finalReleaseLock.lock.prefixBytes !== releaseLock.prefixBytes
+        || !sameReleaseLock(releaseLock, finalReleaseLock.lock)
   ) {
     fail("FAIL_CHANGED");
   }
@@ -1196,14 +1390,19 @@ async function run(arguments_: Arguments): Promise<Readonly<{
       ? null
       : {
         basename: SPOOL_RELEASE_LOCK_NAME,
-        version: 1,
+        version: 2,
         admission_ref: releaseLock.admissionRef,
         dev: releaseLock.dev,
         ino: releaseLock.ino,
         nlink: 1,
         size: releaseLock.size,
         sha256: releaseLock.sha256,
-        prefix_bytes: releaseLock.prefixBytes,
+        index_dev: releaseLock.indexDev,
+        index_ino: releaseLock.indexIno,
+        base_prefix_bytes: releaseLock.basePrefixBytes,
+        planned_append_bytes: releaseLock.plannedAppendBytes,
+        planned_append_sha256: releaseLock.plannedAppendSha256,
+        final_prefix_bytes: releaseLock.finalPrefixBytes,
       },
   } as const;
   if (

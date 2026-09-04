@@ -34,10 +34,10 @@ const MAX_UINT64 = 18_446_744_073_709_551_615n;
 const ADMISSION_PROOF_DOMAIN = "FIX01-SPOOL-ADMISSION-PROOF-V1";
 const ADMISSION_RECORD_PREFIX = "A1\t";
 const ADMISSION_SEAL_MAX_BYTES = 512;
-const RELEASE_LOCK_VERSION_LINE = "FIX01_RELEASE_LOCK_V1";
-const RELEASE_LOCK_CHECKSUM_DOMAIN = "FIX01-RELEASE-LOCK-V1";
+const RELEASE_LOCK_VERSION_LINE = "FIX01_RELEASE_LOCK_V2";
+const RELEASE_LOCK_CHECKSUM_DOMAIN = "FIX01-RELEASE-LOCK-V2";
 const RELEASE_LOCK_BYTES = Buffer.byteLength(
-  `${RELEASE_LOCK_VERSION_LINE}\n${"0".repeat(64)}\n${"0".repeat(16)}\n${"0".repeat(64)}\n`,
+  `${RELEASE_LOCK_VERSION_LINE}\n${"0".repeat(64)}\n${"0".repeat(16)}\n${"0".repeat(16)}\n${"0".repeat(16)}\n${"0".repeat(16)}\n${"0".repeat(64)}\n${"0".repeat(16)}\n${"0".repeat(64)}\n`,
   "utf8",
 );
 
@@ -71,13 +71,18 @@ export interface SpoolAdmissionSeal {
 }
 
 export interface SpoolReleaseLock {
-  readonly version: 1;
+  readonly version: 2;
   readonly admissionRef: string;
   readonly dev: string;
   readonly ino: string;
   readonly size: number;
   readonly sha256: string;
-  readonly prefixBytes: number;
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly basePrefixBytes: number;
+  readonly plannedAppendBytes: number;
+  readonly plannedAppendSha256: string;
+  readonly finalPrefixBytes: number;
 }
 
 export type SpoolReleaseLockState =
@@ -107,6 +112,12 @@ export interface TypedSpoolIndexPage {
   readonly indexIno: string;
   readonly indexSize: number;
   readonly records: readonly SpoolIndexRecord[];
+}
+
+export interface TypedSpoolIndexExpectation {
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly prefixBytes: number;
 }
 
 interface CursorRecord {
@@ -327,23 +338,49 @@ export function encodeSpoolAdmissionSeal(seal: SpoolAdmissionSeal): string {
 
 export function encodeSpoolReleaseLock(options: {
   readonly admissionRef: string;
-  readonly prefixBytes: number;
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly basePrefixBytes: number;
+  readonly plannedAppendBytes: number;
+  readonly plannedAppendSha256: string;
+  readonly finalPrefixBytes: number;
 }): Buffer {
   if (
     !LOWER_HEX_256.test(options.admissionRef)
-    || !Number.isSafeInteger(options.prefixBytes)
-    || options.prefixBytes <= 0
+    || !isCanonicalDecimal(options.indexDev)
+    || !isCanonicalDecimal(options.indexIno)
+    || !Number.isSafeInteger(options.basePrefixBytes)
+    || options.basePrefixBytes < 0
+    || !Number.isSafeInteger(options.plannedAppendBytes)
+    || options.plannedAppendBytes <= 0
+    || !LOWER_HEX_256.test(options.plannedAppendSha256)
+    || !Number.isSafeInteger(options.finalPrefixBytes)
+    || options.finalPrefixBytes <= 0
+    || !Number.isSafeInteger(
+      options.basePrefixBytes + options.plannedAppendBytes,
+    )
+    || options.basePrefixBytes + options.plannedAppendBytes
+      !== options.finalPrefixBytes
   ) {
     throw new TypeError("SPOOL_RELEASE_LOCK_REF_INVALID");
   }
-  const boundary = options.prefixBytes.toString(16).padStart(16, "0");
+  const indexDev = BigInt(options.indexDev).toString(16).padStart(16, "0");
+  const indexIno = BigInt(options.indexIno).toString(16).padStart(16, "0");
+  const basePrefix = options.basePrefixBytes.toString(16).padStart(16, "0");
+  const plannedAppend = options.plannedAppendBytes.toString(16).padStart(16, "0");
+  const finalPrefix = options.finalPrefixBytes.toString(16).padStart(16, "0");
   const checksum = createHash("sha256").update([
     RELEASE_LOCK_CHECKSUM_DOMAIN,
     options.admissionRef,
-    String(options.prefixBytes),
+    options.indexDev,
+    options.indexIno,
+    String(options.basePrefixBytes),
+    String(options.plannedAppendBytes),
+    options.plannedAppendSha256,
+    String(options.finalPrefixBytes),
   ].join("\0")).digest("hex");
   return Buffer.from(
-    `${RELEASE_LOCK_VERSION_LINE}\n${options.admissionRef}\n${boundary}\n${checksum}\n`,
+    `${RELEASE_LOCK_VERSION_LINE}\n${options.admissionRef}\n${indexDev}\n${indexIno}\n${basePrefix}\n${plannedAppend}\n${options.plannedAppendSha256}\n${finalPrefix}\n${checksum}\n`,
     "utf8",
   );
 }
@@ -361,34 +398,77 @@ function sameStableFileSnapshot(
 
 function parseReleaseLock(bytes: Buffer): Readonly<{
   admissionRef: string;
-  prefixBytes: number;
+  indexDev: string;
+  indexIno: string;
+  basePrefixBytes: number;
+  plannedAppendBytes: number;
+  plannedAppendSha256: string;
+  finalPrefixBytes: number;
 }> | undefined {
   if (bytes.length !== RELEASE_LOCK_BYTES) return undefined;
-  const match = /^FIX01_RELEASE_LOCK_V1\n([0-9a-f]{64})\n([0-9a-f]{16})\n([0-9a-f]{64})\n$/u.exec(
+  const match = /^FIX01_RELEASE_LOCK_V2\n([0-9a-f]{64})\n([0-9a-f]{16})\n([0-9a-f]{16})\n([0-9a-f]{16})\n([0-9a-f]{16})\n([0-9a-f]{64})\n([0-9a-f]{16})\n([0-9a-f]{64})\n$/u.exec(
     bytes.toString("utf8"),
   );
   const admissionRef = match?.[1];
-  const boundary = match?.[2];
-  const checksum = match?.[3];
+  const indexDevHex = match?.[2];
+  const indexInoHex = match?.[3];
+  const basePrefixHex = match?.[4];
+  const plannedAppendHex = match?.[5];
+  const plannedAppendSha256 = match?.[6];
+  const finalPrefixHex = match?.[7];
+  const checksum = match?.[8];
   if (
     admissionRef === undefined
-    || boundary === undefined
+    || indexDevHex === undefined
+    || indexInoHex === undefined
+    || basePrefixHex === undefined
+    || plannedAppendHex === undefined
+    || plannedAppendSha256 === undefined
+    || finalPrefixHex === undefined
     || checksum === undefined
   ) {
     return undefined;
   }
-  const parsedBoundary = BigInt(`0x${boundary}`);
-  if (parsedBoundary <= 0n || parsedBoundary > BigInt(Number.MAX_SAFE_INTEGER)) {
+  const indexDevValue = BigInt(`0x${indexDevHex}`);
+  const indexInoValue = BigInt(`0x${indexInoHex}`);
+  const basePrefixValue = BigInt(`0x${basePrefixHex}`);
+  const plannedAppendValue = BigInt(`0x${plannedAppendHex}`);
+  const finalPrefixValue = BigInt(`0x${finalPrefixHex}`);
+  if (
+    basePrefixValue > BigInt(Number.MAX_SAFE_INTEGER)
+    || plannedAppendValue <= 0n
+    || plannedAppendValue > BigInt(Number.MAX_SAFE_INTEGER)
+    || finalPrefixValue <= 0n
+    || finalPrefixValue > BigInt(Number.MAX_SAFE_INTEGER)
+    || basePrefixValue + plannedAppendValue !== finalPrefixValue
+  ) {
     return undefined;
   }
-  const prefixBytes = Number(parsedBoundary);
+  const indexDev = indexDevValue.toString();
+  const indexIno = indexInoValue.toString();
+  const basePrefixBytes = Number(basePrefixValue);
+  const plannedAppendBytes = Number(plannedAppendValue);
+  const finalPrefixBytes = Number(finalPrefixValue);
   const expectedChecksum = createHash("sha256").update([
     RELEASE_LOCK_CHECKSUM_DOMAIN,
     admissionRef,
-    String(prefixBytes),
+    indexDev,
+    indexIno,
+    String(basePrefixBytes),
+    String(plannedAppendBytes),
+    plannedAppendSha256,
+    String(finalPrefixBytes),
   ].join("\0")).digest("hex");
   return checksum === expectedChecksum
-    ? Object.freeze({ admissionRef, prefixBytes })
+    ? Object.freeze({
+      admissionRef,
+      indexDev,
+      indexIno,
+      basePrefixBytes,
+      plannedAppendBytes,
+      plannedAppendSha256,
+      finalPrefixBytes,
+    })
     : undefined;
 }
 
@@ -452,13 +532,18 @@ export async function readSpoolReleaseLock(
     return Object.freeze({
       status: "valid",
       lock: Object.freeze({
-        version: 1,
+        version: 2,
         admissionRef: parsed.admissionRef,
         dev: descriptor.dev.toString(),
         ino: descriptor.ino.toString(),
         size: RELEASE_LOCK_BYTES,
         sha256: createHash("sha256").update(bytes).digest("hex"),
-        prefixBytes: parsed.prefixBytes,
+        indexDev: parsed.indexDev,
+        indexIno: parsed.indexIno,
+        basePrefixBytes: parsed.basePrefixBytes,
+        plannedAppendBytes: parsed.plannedAppendBytes,
+        plannedAppendSha256: parsed.plannedAppendSha256,
+        finalPrefixBytes: parsed.finalPrefixBytes,
       }),
     });
   } catch {
@@ -772,8 +857,71 @@ export function appendSpoolIndexAdmissionRecord(options: {
   );
 }
 
+export function appendSpoolIndexRecoveryBytes(options: {
+  readonly directory: string;
+  readonly bytes: Buffer;
+  readonly expectedIndexDev: string;
+  readonly expectedIndexIno: string;
+  readonly expectedIndexSize: number;
+}): void {
+  if (
+    options.bytes.length <= 0
+    || !isCanonicalDecimal(options.expectedIndexDev)
+    || !isCanonicalDecimal(options.expectedIndexIno)
+    || !Number.isSafeInteger(options.expectedIndexSize)
+    || options.expectedIndexSize < 0
+  ) {
+    throw new TypeError("SPOOL_INDEX_RECOVERY_APPEND_INVALID");
+  }
+  const path = join(options.directory, SPOOL_INDEX_NAME);
+  let fd: number | undefined;
+  try {
+    fd = openSync(
+      path,
+      constants.O_APPEND
+        | constants.O_NOFOLLOW
+        | constants.O_RDWR,
+    );
+    const descriptor = fstatSync(fd, { bigint: true });
+    const pathStat = lstatSync(path, { bigint: true });
+    if (
+      !descriptor.isFile()
+      || !pathStat.isFile()
+      || descriptor.nlink !== 1n
+      || pathStat.nlink !== 1n
+      || !sameIdentity(descriptor, pathStat)
+      || descriptor.dev.toString() !== options.expectedIndexDev
+      || descriptor.ino.toString() !== options.expectedIndexIno
+      || descriptor.size !== BigInt(options.expectedIndexSize)
+    ) {
+      throw new Error("SPOOL_INDEX_RECOVERY_BASE_CHANGED");
+    }
+    const written = writeSync(fd, options.bytes, 0, options.bytes.length);
+    fsyncSync(fd);
+    const after = fstatSync(fd, { bigint: true });
+    const afterPath = lstatSync(path, { bigint: true });
+    if (
+      !after.isFile()
+      || !afterPath.isFile()
+      || after.nlink !== 1n
+      || afterPath.nlink !== 1n
+      || !sameIdentity(after, descriptor)
+      || !sameIdentity(afterPath, descriptor)
+      || after.size !== descriptor.size + BigInt(written)
+    ) {
+      throw new Error("SPOOL_INDEX_RECOVERY_IDENTITY_CHANGED");
+    }
+    if (written !== options.bytes.length) {
+      throw new Error("SPOOL_INDEX_RECOVERY_WRITE_INCOMPLETE");
+    }
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
 export async function readTypedIndexedSpoolPage(
   directory: string,
+  expected?: TypedSpoolIndexExpectation,
 ): Promise<TypedSpoolIndexPage | undefined> {
   const indexPath = join(directory, SPOOL_INDEX_NAME);
   const cursorPath = join(directory, SPOOL_CURSOR_NAME);
@@ -791,6 +939,23 @@ export async function readTypedIndexedSpoolPage(
       !Number.isSafeInteger(indexStat.size)
       || indexStat.size <= 0
     ) {
+      return undefined;
+    }
+    if (
+      expected !== undefined
+      && (
+        !isCanonicalDecimal(expected.indexDev)
+        || !isCanonicalDecimal(expected.indexIno)
+        || !Number.isSafeInteger(expected.prefixBytes)
+        || expected.prefixBytes <= 0
+        || indexIdentity.dev.toString() !== expected.indexDev
+        || indexIdentity.ino.toString() !== expected.indexIno
+        || indexStat.size < expected.prefixBytes
+      )
+    ) {
+      return undefined;
+    }
+    if (!(await stillVerifiedRegularHandle(indexHandle, indexPath, indexIdentity))) {
       return undefined;
     }
     const cursor = await openCursor(directory);
@@ -872,6 +1037,7 @@ export async function readTypedIndexedSpoolPage(
     const nextOffset = offset + consumed;
     if (
       consumed <= 0
+      || !(await stillVerifiedRegularHandle(indexHandle, indexPath, indexIdentity))
       || !(await persistCursor(
         cursorHandle,
         cursorPath,

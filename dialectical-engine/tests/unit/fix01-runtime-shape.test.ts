@@ -11,6 +11,7 @@ import {
   type RuntimeCaptureModule,
 } from "@debateai/obs-capture/runtime";
 import { readObsBounds } from "../../packages/obs-capture/src/runtime/config.js";
+import { encodeSpoolReleaseLock } from "../../packages/obs-capture/src/spool-index.js";
 
 const installerModule: RuntimeCaptureModule = {
   startCaptureRuntime,
@@ -36,6 +37,31 @@ afterEach(() => {
 });
 
 describe("FIX-01 runtime module contract", () => {
+  it("fits release-lock index identity into exact unsigned 64-bit fields", () => {
+    const maximumUint64 = "18446744073709551615";
+    const options = {
+      admissionRef: "a".repeat(64),
+      indexDev: maximumUint64,
+      indexIno: maximumUint64,
+      basePrefixBytes: 0,
+      plannedAppendBytes: 1,
+      plannedAppendSha256: "b".repeat(64),
+      finalPrefixBytes: 1,
+    } as const;
+
+    const fields = encodeSpoolReleaseLock(options).toString("utf8").split("\n");
+    expect(fields[2]).toBe("f".repeat(16));
+    expect(fields[3]).toBe("f".repeat(16));
+    expect(() => encodeSpoolReleaseLock({
+      ...options,
+      indexDev: "18446744073709551616",
+    })).toThrow("SPOOL_RELEASE_LOCK_REF_INVALID");
+    expect(() => encodeSpoolReleaseLock({
+      ...options,
+      indexIno: "18446744073709551616",
+    })).toThrow("SPOOL_RELEASE_LOCK_REF_INVALID");
+  });
+
   it("keeps the named installer arguments and explicit stop deadline", () => {
     expect(installerModule.startCaptureRuntime).toBe(startCaptureRuntime);
     expectTypeOf<CaptureRuntimeStartOptions>().toEqualTypeOf<{

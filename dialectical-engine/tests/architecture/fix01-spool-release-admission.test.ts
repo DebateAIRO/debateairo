@@ -78,7 +78,7 @@ interface ManifestEntry {
 }
 
 interface AdmissionManifest {
-  readonly version: 3;
+  readonly version: 4;
   readonly verdict: "PASS_EMPTY" | "PASS_INDEXED";
   readonly phase: "before_first_indexed_launch";
   readonly spool_directory_realpath: string;
@@ -106,14 +106,19 @@ interface AdmissionManifest {
   }>;
   readonly release_lock: null | Readonly<{
     basename: typeof RELEASE_LOCK_NAME;
-    version: 1;
+    version: 2;
     admission_ref: string;
     dev: string;
     ino: string;
     nlink: 1;
     size: number;
     sha256: string;
-    prefix_bytes: number;
+    index_dev: string;
+    index_ino: string;
+    base_prefix_bytes: number;
+    planned_append_bytes: number;
+    planned_append_sha256: string;
+    final_prefix_bytes: number;
   }>;
 }
 
@@ -236,6 +241,166 @@ function runAdmissionCrashingBeforeFirstIndexWrite(
   };
 }
 
+function runAdmissionRetainingPlannedPrefix(
+  spoolDirectory: string,
+  manifestPath: string,
+  retainedBytes: number,
+): AdmissionResult {
+  const lockPath = join(spoolDirectory, RELEASE_LOCK_NAME);
+  const fsModule = [
+    'import * as fs from "node:fs";',
+    "export const closeSync = fs.closeSync;",
+    "export const constants = fs.constants;",
+    "export const fstatSync = fs.fstatSync;",
+    "export const fsyncSync = fs.fsyncSync;",
+    "export const lstatSync = fs.lstatSync;",
+    "export const openSync = fs.openSync;",
+    `let remaining = ${retainedBytes};`,
+    "let shortened = false;",
+    "export function writeSync(fd, buffer, offset, length, position) {",
+    `  if (!shortened && fs.existsSync(${JSON.stringify(lockPath)})) {`,
+    "    if (remaining >= length) {",
+    "      remaining -= length;",
+    "      return fs.writeSync(fd, buffer, offset, length, position);",
+    "    }",
+    "    const allowed = Math.max(0, remaining);",
+    "    shortened = true;",
+    "    remaining = 0;",
+    "    return allowed === 0",
+    "      ? 0",
+    "      : fs.writeSync(fd, buffer, offset, allowed, position);",
+    "  }",
+    "  return fs.writeSync(fd, buffer, offset, length, position);",
+    "}",
+  ].join("\n");
+  const fsUrl = `data:text/javascript,${encodeURIComponent(fsModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier === "node:fs" && context.parentURL?.includes("/packages/obs-capture/src/spool-index.ts")) {',
+    `    return { url: ${JSON.stringify(fsUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      manifestPath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
+function runAdmissionWithDirectorySyncProbe(options: {
+  readonly spoolDirectory: string;
+  readonly manifestPath: string;
+  readonly markerPath: string;
+  readonly failDirectorySync: boolean;
+}): AdmissionResult {
+  const lockPath = join(options.spoolDirectory, RELEASE_LOCK_NAME);
+  const promisesModule = [
+    'import { appendFileSync } from "node:fs";',
+    'import * as fs from "node:fs/promises";',
+    "export const lstat = fs.lstat;",
+    "export const readdir = fs.readdir;",
+    "export const realpath = fs.realpath;",
+    "export async function open(path, flags, mode) {",
+    "  const handle = await fs.open(path, flags, mode);",
+    "  return new Proxy(handle, {",
+    "    get(target, property) {",
+    "      if (property === 'sync') {",
+    "        return async () => {",
+    `          if (String(path) === ${JSON.stringify(lockPath)}) appendFileSync(${JSON.stringify(options.markerPath)}, "L");`,
+    `          if (String(path) === ${JSON.stringify(options.spoolDirectory)}) {`,
+    `            appendFileSync(${JSON.stringify(options.markerPath)}, "D");`,
+    ...(options.failDirectorySync
+      ? ["            throw new Error('MODELED_DIRECTORY_SYNC_FAILURE');"]
+      : []),
+    "          }",
+    "          return target.sync();",
+    "        };",
+    "      }",
+    "      const value = Reflect.get(target, property, target);",
+    "      return typeof value === 'function' ? value.bind(target) : value;",
+    "    },",
+    "  });",
+    "}",
+  ].join("\n");
+  const syncFsModule = [
+    'import * as fs from "node:fs";',
+    "export const closeSync = fs.closeSync;",
+    "export const constants = fs.constants;",
+    "export const fstatSync = fs.fstatSync;",
+    "export const fsyncSync = fs.fsyncSync;",
+    "export const lstatSync = fs.lstatSync;",
+    "export const openSync = fs.openSync;",
+    "export function writeSync(...arguments_) {",
+    `  if (fs.existsSync(${JSON.stringify(lockPath)})) fs.appendFileSync(${JSON.stringify(options.markerPath)}, "W");`,
+    "  return fs.writeSync(...arguments_);",
+    "}",
+  ].join("\n");
+  const promisesUrl = `data:text/javascript,${encodeURIComponent(promisesModule)}`;
+  const syncFsUrl = `data:text/javascript,${encodeURIComponent(syncFsModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier === "node:fs/promises" && context.parentURL?.includes("/tools/obs-spool-release-admission.ts")) {',
+    `    return { url: ${JSON.stringify(promisesUrl)}, shortCircuit: true };`,
+    "  }",
+    '  if (specifier === "node:fs" && context.parentURL?.includes("/packages/obs-capture/src/spool-index.ts")) {',
+    `    return { url: ${JSON.stringify(syncFsUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      options.spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      options.manifestPath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
 function runAdmissionWithProspectiveManifestBytes(
   spoolDirectory: string,
   manifestPath: string,
@@ -251,7 +416,7 @@ function runAdmissionWithProspectiveManifestBytes(
     "export const FIX01_RELEASE_MANIFEST_VERSION = actual.FIX01_RELEASE_MANIFEST_VERSION;",
     "export const FIX01_RELEASE_VERIFIER_VERSION = actual.FIX01_RELEASE_VERIFIER_VERSION;",
     "export function canonicalFix01ReleaseJson(value) {",
-    "  if (value?.version === 3 && value?.verified_at === '9999-12-31T23:59:59.999Z') {",
+    "  if (value?.version === 4 && value?.verified_at === '9999-12-31T23:59:59.999Z') {",
     `    return "x".repeat(${prospectiveBytes});`,
     "  }",
     "  return actual.canonicalFix01ReleaseJson(value);",
@@ -665,7 +830,7 @@ describe("FIX-01 offline spool release admission", () => {
     expect(bytes.toString("utf8")).toBe(canonicalJson(manifest));
     expect(manifestDigestFromOutput(result.stdout)).toBe(sha256(bytes));
     expect(manifest).toMatchObject({
-      version: 3,
+      version: 4,
       verdict: "PASS_EMPTY",
       phase: "before_first_indexed_launch",
       spool_directory_realpath: spoolDirectory,
@@ -701,23 +866,28 @@ describe("FIX-01 offline spool release admission", () => {
     const lockBytes = readFileSync(lockPath);
     const lockStat = statSync(lockPath, { bigint: true });
     expect(manifest).toMatchObject({
-      version: 3,
+      version: 4,
       admission_record_count: 1,
       release_lock: {
         basename: RELEASE_LOCK_NAME,
-        version: 1,
+        version: 2,
         admission_ref: manifest.admission_ref,
         dev: lockStat.dev.toString(),
         ino: lockStat.ino.toString(),
         nlink: 1,
         size: lockBytes.length,
         sha256: sha256(lockBytes),
-        prefix_bytes: manifest.index?.size,
+        index_dev: manifest.index?.dev,
+        index_ino: manifest.index?.ino,
+        base_prefix_bytes: 0,
+        planned_append_bytes: manifest.index?.size,
+        planned_append_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        final_prefix_bytes: manifest.index?.size,
       },
     });
     expect(lockBytes.toString("utf8")).toMatch(
       new RegExp(
-        `^FIX01_RELEASE_LOCK_V1\\n${manifest.admission_ref}\\n[0-9a-f]{16}\\n[0-9a-f]{64}\\n$`,
+        `^FIX01_RELEASE_LOCK_V2\\n${manifest.admission_ref}\\n(?:[0-9a-f]{16}\\n){4}[0-9a-f]{64}\\n[0-9a-f]{16}\\n[0-9a-f]{64}\\n$`,
         "u",
       ),
     );
@@ -735,6 +905,48 @@ describe("FIX-01 offline spool release admission", () => {
       lockIno: manifest.release_lock?.ino,
       lockSha256: manifest.release_lock?.sha256,
     });
+  });
+
+  it("rejects a lock plan hash that does not match the sealed index segment", () => {
+    const root = scratch("release-lock-plan-hash");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    writeFileSync(join(spoolDirectory, spoolName(905)), "", { mode: 0o600 });
+    const admitted = runAdmission(spoolDirectory, manifestPath);
+    expect(admitted.status, admitted.stderr).toBe(0);
+
+    const lockPath = join(spoolDirectory, RELEASE_LOCK_NAME);
+    const lockLines = readFileSync(lockPath, "utf8").split("\n");
+    const forgedPlanSha256 = "f".repeat(64);
+    lockLines[6] = forgedPlanSha256;
+    lockLines[8] = sha256([
+      "FIX01-RELEASE-LOCK-V2",
+      lockLines[1],
+      BigInt(`0x${lockLines[2]}`).toString(),
+      BigInt(`0x${lockLines[3]}`).toString(),
+      BigInt(`0x${lockLines[4]}`).toString(),
+      BigInt(`0x${lockLines[5]}`).toString(),
+      forgedPlanSha256,
+      BigInt(`0x${lockLines[7]}`).toString(),
+    ].join("\u0000"));
+    const forgedLockBytes = Buffer.from(lockLines.join("\n"), "utf8");
+    writeFileSync(lockPath, forgedLockBytes, { mode: 0o600 });
+
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.release_lock.planned_append_sha256 = forgedPlanSha256;
+    manifest.release_lock.sha256 = sha256(forgedLockBytes);
+    const forgedManifestBytes = Buffer.from(canonicalJson(manifest), "utf8");
+    writeFileSync(manifestPath, forgedManifestBytes, { mode: 0o600 });
+
+    const gated = runGate(
+      spoolDirectory,
+      manifestPath,
+      sha256(forgedManifestBytes),
+    );
+
+    expect(gated.status).not.toBe(0);
+    expect(gated.stdout).not.toContain("PASS");
+    expect(gated.stderr).toContain("FAIL_INDEX_PREFIX");
   });
 
   it("reuses the same release lock and admission ref after a pre-index crash", () => {
@@ -771,6 +983,150 @@ describe("FIX-01 offline spool release admission", () => {
       .split("\n")
       .filter((line) => line.startsWith(`A1\t${name}\t`)))
       .toHaveLength(1);
+  });
+
+  it("recovers every tested plain and A1 planned-prefix write on two reruns", async () => {
+    const prototypeName = spoolName(940);
+    const plainBytes = Buffer.from(`\n${prototypeName}\n`, "utf8");
+    const a1Bytes = Buffer.from(
+      `\nA1\t${prototypeName}\t${"A".repeat(43)}\n`,
+      "utf8",
+    );
+    const cases = [
+      ...[1, 5, Math.floor(plainBytes.length / 2), plainBytes.length - 1]
+        .map((offset) => ({ label: `plain-${offset}`, retainedBytes: offset })),
+      ...[1, 5, Math.floor(a1Bytes.length / 2), a1Bytes.length - 1]
+        .map((offset) => ({
+          label: `a1-${offset}`,
+          retainedBytes: plainBytes.length + offset,
+        })),
+    ];
+
+    for (const [caseIndex, testCase] of cases.entries()) {
+      const root = scratch(`monotone-${testCase.label}`);
+      const spoolDirectory = realpathSync(join(root, "spool"));
+      const name = spoolName(940 + caseIndex);
+      const path = join(spoolDirectory, name);
+      const source = envelope(
+        `00000000-0000-4000-8000-${(940 + caseIndex)
+          .toString(16)
+          .padStart(12, "0")}`,
+      );
+      writeFileSync(path, `${JSON.stringify(source)}\n`, { mode: 0o600 });
+      const crashedManifest = join(root, "crashed-manifest.json");
+
+      const crashed = runAdmissionRetainingPlannedPrefix(
+        spoolDirectory,
+        crashedManifest,
+        testCase.retainedBytes,
+      );
+
+      expect(crashed.status, testCase.label).not.toBe(0);
+      expect(crashed.stdout, testCase.label).not.toContain("PASS_");
+      expect(existsSync(crashedManifest), testCase.label).toBe(false);
+      const lockPath = join(spoolDirectory, RELEASE_LOCK_NAME);
+      const lockBytes = readFileSync(lockPath);
+      const lockStat = statSync(lockPath, { bigint: true });
+      const admissionRef = lockBytes.toString("utf8").split("\n")[1]!;
+      const sourceStat = statSync(path, { bigint: true });
+      const entry: ManifestEntry = {
+        basename: name,
+        kind: "candidate",
+        classification: "lawful_envelopes",
+        indexed: true,
+        reason: null,
+        sha256: sha256(readFileSync(path)),
+        dev: sourceStat.dev.toString(),
+        ino: sourceStat.ino.toString(),
+        nlink: Number(sourceStat.nlink),
+        size: Number(sourceStat.size),
+        mtime_ns: sourceStat.mtimeNs.toString(),
+        ctime_ns: sourceStat.ctimeNs.toString(),
+      };
+      const planned = Buffer.from(
+        `\n${name}\n\n${admissionRecord(admissionRef, entry)}\n`,
+        "utf8",
+      );
+      expect(
+        readFileSync(join(spoolDirectory, INDEX_NAME)),
+        testCase.label,
+      ).toEqual(planned.subarray(0, testCase.retainedBytes));
+
+      for (let rerun = 1; rerun <= 2; rerun += 1) {
+        const manifestPath = join(root, `manifest-${rerun}.json`);
+        const result = runAdmission(spoolDirectory, manifestPath);
+
+        expect(result.status, `${testCase.label}:rerun-${rerun}:${result.stderr}`)
+          .toBe(0);
+        const manifest = parseManifest(manifestPath);
+        expect(manifest.admission_ref, testCase.label).toBe(admissionRef);
+        expect(readFileSync(lockPath), testCase.label).toEqual(lockBytes);
+        expect(statSync(lockPath, { bigint: true }).ino, testCase.label)
+          .toBe(lockStat.ino);
+        const digest = manifestDigestFromOutput(result.stdout)!;
+        const gated = runGate(spoolDirectory, manifestPath, digest);
+        expect(gated.status, `${testCase.label}:gate-${rerun}:${gated.stderr}`)
+          .toBe(0);
+        const drained = recordingAdmissionSink();
+        await drainWithAdmissionSeal({
+          spoolDirectory,
+          databaseSink: drained.sink,
+          admissionSeal: gateSeal(gated.stdout),
+        });
+        expect(drained.calls, `${testCase.label}:drain-${rerun}`)
+          .toEqual([source.source_event_ref]);
+      }
+
+      const indexLines = readFileSync(join(spoolDirectory, INDEX_NAME), "utf8")
+        .split("\n");
+      expect(indexLines.filter((line) => line === name), testCase.label)
+        .toHaveLength(1);
+      expect(indexLines.filter((line) =>
+        line === admissionRecord(admissionRef, entry)
+      ), testCase.label).toHaveLength(1);
+      expect(readFileSync(join(spoolDirectory, INDEX_NAME)), testCase.label)
+        .toEqual(planned);
+    }
+  }, 120_000);
+
+  it("syncs the lock directory before index append and stops if it cannot", () => {
+    const orderedRoot = scratch("release-lock-directory-sync-order");
+    const orderedSpool = realpathSync(join(orderedRoot, "spool"));
+    const orderedManifest = join(orderedRoot, "manifest.json");
+    const orderedMarker = join(orderedRoot, "sync-order");
+    writeFileSync(join(orderedSpool, spoolName(950)), "", { mode: 0o600 });
+    writeFileSync(join(orderedSpool, INDEX_NAME), "\n", { mode: 0o600 });
+
+    const ordered = runAdmissionWithDirectorySyncProbe({
+      spoolDirectory: orderedSpool,
+      manifestPath: orderedManifest,
+      markerPath: orderedMarker,
+      failDirectorySync: false,
+    });
+
+    expect(ordered.status, ordered.stderr).toBe(0);
+    expect(readFileSync(orderedMarker, "utf8")).toBe("LDW");
+
+    const failedRoot = scratch("release-lock-directory-sync-failure");
+    const failedSpool = realpathSync(join(failedRoot, "spool"));
+    const failedManifest = join(failedRoot, "manifest.json");
+    const failedMarker = join(failedRoot, "sync-order");
+    const baseIndex = Buffer.from("\n", "utf8");
+    writeFileSync(join(failedSpool, spoolName(951)), "", { mode: 0o600 });
+    writeFileSync(join(failedSpool, INDEX_NAME), baseIndex, { mode: 0o600 });
+
+    const failed = runAdmissionWithDirectorySyncProbe({
+      spoolDirectory: failedSpool,
+      manifestPath: failedManifest,
+      markerPath: failedMarker,
+      failDirectorySync: true,
+    });
+
+    expect(failed.status).not.toBe(0);
+    expect(failed.stdout).not.toContain("PASS_");
+    expect(existsSync(failedManifest)).toBe(false);
+    expect(readFileSync(failedMarker, "utf8")).toBe("LD");
+    expect(readFileSync(join(failedSpool, INDEX_NAME))).toEqual(baseIndex);
   });
 
   it("rejects an over-cap manifest before creating lock or index authority", () => {
@@ -863,7 +1219,7 @@ describe("FIX-01 offline spool release admission", () => {
     expect(result.status, result.stderr).toBe(0);
     const manifest = parseManifest(manifestPath);
     expect(manifest).toMatchObject({
-      version: 3,
+      version: 4,
       verdict: "PASS_INDEXED",
       admission_ref: expect.stringMatching(/^[0-9a-f]{64}$/u),
       admission_record_count: 4,
@@ -1263,7 +1619,7 @@ describe("FIX-01 offline spool release admission", () => {
     expect(result.stdout).toContain("PASS_INDEXED");
     expect(readFileSync(markerPath, "utf8")).toBe("x");
     expect(parseManifest(manifestPath)).toMatchObject({
-      version: 3,
+      version: 4,
       admission_record_count: 1,
     });
     expect(readFileSync(join(spoolDirectory, INDEX_NAME), "utf8"))
