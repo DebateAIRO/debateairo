@@ -77,6 +77,7 @@ import {
 } from "@debateai/serve";
 import { TypedDomainError, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
+import { declaredRef, emit, runWithObsContext } from "@debateai/obs-capture";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
 export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
@@ -2579,22 +2580,80 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    fn: async (dispatch: { runId: string; workItemId: string }) => {
+    fn: async (dispatch: { runId: string; workItemId: string }, hatchetContext) => {
+      let attemptIndex = 0;
       try {
-        const result = await input.runner.executeWorkItem(dispatch.workItemId);
-        return result.kind === "COMPLETED"
-          ? { kind: result.kind, answerId: result.answerId }
-          : { kind: result.kind };
-      } catch (error) {
-        const recorded = await input.failures.recordTerminalFailure({
-          runId: dispatch.runId,
-          workItemId: dispatch.workItemId,
-          reason: runnerTerminalFailureReason(error)
-        });
-        if (!recorded) {
-          throw new TypedDomainError("RUNNER_FAILURE_STATE_NOT_RECORDED", dispatch.workItemId);
+        const observedRetryCount = hatchetContext?.retryCount?.();
+        if (typeof observedRetryCount === "number"
+          && Number.isSafeInteger(observedRetryCount)
+          && observedRetryCount >= 0) {
+          attemptIndex = observedRetryCount;
         }
-        throw error;
+      } catch {
+        // Retry metadata is capture data and cannot change task behavior.
+      }
+
+      const execute = async () => {
+        try {
+          const result = await input.runner.executeWorkItem(dispatch.workItemId);
+          return result.kind === "COMPLETED"
+            ? { kind: result.kind, answerId: result.answerId }
+            : { kind: result.kind };
+        } catch (error) {
+          try {
+            emit(Object.freeze({
+              code: error instanceof TypedDomainError ? error.code : "OBS_CAPTURE_SELF",
+              error,
+              taxonomy_class: "JOB_FAILURE",
+              capture_point: "job",
+              disposition: "THROWN",
+              source: "hatchet",
+              attempt_index: attemptIndex
+            }));
+          } catch {
+            // Product failure semantics always win over observability.
+          }
+          const recorded = await input.failures.recordTerminalFailure({
+            runId: dispatch.runId,
+            workItemId: dispatch.workItemId,
+            reason: runnerTerminalFailureReason(error)
+          });
+          if (!recorded) {
+            try {
+              const recordingFailure = new TypedDomainError(
+                "RUNNER_FAILURE_STATE_NOT_RECORDED",
+                dispatch.workItemId
+              );
+              Object.defineProperty(recordingFailure, "cause", {
+                value: error,
+                enumerable: false,
+                configurable: false,
+                writable: false
+              });
+              emit(Object.freeze({
+                code: recordingFailure.code,
+                error: recordingFailure,
+                taxonomy_class: "JOB_FAILURE",
+                capture_point: "job",
+                disposition: "HANDLED",
+                source: "hatchet",
+                attempt_index: attemptIndex
+              }));
+            } catch {
+              // Product failure semantics always win over observability.
+            }
+          }
+          throw error;
+        }
+      };
+
+      try {
+        return runWithObsContext(Object.freeze({
+          run_ref: declaredRef("run", dispatch.runId),
+          work_item_ref: declaredRef("work_item", dispatch.workItemId)
+        }), execute);
+      } catch {
+        return execute();
       }
     }
   });
