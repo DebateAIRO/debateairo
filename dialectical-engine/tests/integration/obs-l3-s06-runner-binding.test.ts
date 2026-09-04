@@ -369,8 +369,9 @@ console.log(JSON.stringify({
 export function configureContentEncryption() {}
 export function createPool() {}
 export class RunRepository {}
+const unhandled = process.listenerCount("unhandledRejection");
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
-if (uncaught < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
+if (unhandled !== 0 || uncaught < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
 throw new Error("DB_IMPORT_AFTER_RUNNER_INSTALL");`)} `;
     const loaderSource = `
 export async function resolve(specifier, context, nextResolve) {
@@ -404,6 +405,7 @@ try {
 } catch (error) {
   console.log(JSON.stringify({
     message: error?.message,
+    unhandled: process.listenerCount("unhandledRejection"),
     uncaught: process.listenerCount("uncaughtExceptionMonitor"),
   }));
 }`;
@@ -424,6 +426,7 @@ try {
     expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(0);
     expect(JSON.parse(result.stdout.trim())).toMatchObject({
       message: "DB_IMPORT_AFTER_RUNNER_INSTALL",
+      unhandled: 0,
       uncaught: 1,
     });
   });
