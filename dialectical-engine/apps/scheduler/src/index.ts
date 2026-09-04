@@ -3,7 +3,12 @@ import { evaluate, type OperatorResolution } from "@debateai/propagation";
 import { decideReplayEviction, ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import { readLivenessPolicy } from "@debateai/register";
-import { emit, notApplicable, runWithObsContext } from "@debateai/obs-capture";
+import {
+  emit,
+  getObsContext,
+  notApplicable,
+  runWithObsContext,
+} from "@debateai/obs-capture";
 import {
   SettlementRepository,
   type SettlementOutcomeInput,
@@ -128,9 +133,35 @@ const LIFECYCLE_CONTEXT = Object.freeze({
   attempt_ref: notApplicable("attempt"),
   ledger_ref: notApplicable("ledger_entry"),
 });
+const ZONED_LIFECYCLE_CONTEXT = Object.freeze({
+  ...LIFECYCLE_CONTEXT,
+  zone_context: true,
+});
+
+function lifecycleContext():
+  | typeof LIFECYCLE_CONTEXT
+  | typeof ZONED_LIFECYCLE_CONTEXT {
+  try {
+    const outerContext = getObsContext();
+    if (outerContext === undefined) return LIFECYCLE_CONTEXT;
+    const descriptor = Object.getOwnPropertyDescriptor(
+      outerContext,
+      "zone_context",
+    );
+    if (descriptor === undefined) return LIFECYCLE_CONTEXT;
+    if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+      return ZONED_LIFECYCLE_CONTEXT;
+    }
+    return descriptor.value === false
+      ? LIFECYCLE_CONTEXT
+      : ZONED_LIFECYCLE_CONTEXT;
+  } catch {
+    return ZONED_LIFECYCLE_CONTEXT;
+  }
+}
 
 function emitLifecycle(payload: Readonly<Record<string, unknown>>): void {
-  runWithObsContext(LIFECYCLE_CONTEXT, () => emit(payload));
+  runWithObsContext(lifecycleContext(), () => emit(payload));
 }
 
 function isPositiveReport<Name extends SchedulerJobName>(

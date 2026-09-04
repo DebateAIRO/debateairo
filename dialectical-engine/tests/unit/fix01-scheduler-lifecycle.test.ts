@@ -7,6 +7,7 @@ import {
   createCaptureHealth,
   createSharedRedactor,
   installCaptureEmitter,
+  runWithObsContext,
   type CaptureQueueEntry,
 } from "@debateai/obs-capture";
 import {
@@ -23,6 +24,10 @@ const LIFECYCLE_CONTEXT = Object.freeze({
   node_ref: Object.freeze({ kind: "node", not_applicable: true }),
   attempt_ref: Object.freeze({ kind: "attempt", not_applicable: true }),
   ledger_ref: Object.freeze({ kind: "ledger_entry", not_applicable: true }),
+});
+const ZONED_LIFECYCLE_CONTEXT = Object.freeze({
+  ...LIFECYCLE_CONTEXT,
+  zone_context: true,
 });
 const REDACTOR_CONFIG = Object.freeze({
   environment: "test",
@@ -50,6 +55,19 @@ function captureLifecycleEntries(): BoundedReferenceQueue<CaptureQueueEntry> {
 
 function payloads(queue: BoundedReferenceQueue<CaptureQueueEntry>): readonly unknown[] {
   return queue.drain().map((entry) => entry.payload_ref);
+}
+
+async function lifecycleEntriesInside(
+  outerContext: Readonly<Record<string, unknown>>,
+): Promise<readonly CaptureQueueEntry[]> {
+  const queue = captureLifecycleEntries();
+  await runWithObsContext(outerContext, () =>
+    runJobWithLifecycle("replay-self-test", async () => ({
+      checked: 3,
+      evicted: Object.freeze([]),
+    })),
+  );
+  return queue.drain();
 }
 
 describe("FIX-01 C5 scheduler lifecycle wrapper", () => {
@@ -172,6 +190,104 @@ describe("FIX-01 C5 scheduler lifecycle wrapper", () => {
         declaration.not_applicable === true)).toBe(true);
       expect(Object.keys(context)).toHaveLength(5);
       expect(NOT_APPLICABLE).toBe("NOT_APPLICABLE");
+    }
+  });
+
+  it("preserves an outer true zone veto without copying any outer reference", async () => {
+    const outerRun = Object.freeze({
+      kind: "run",
+      value: "00000000-0000-4000-8000-000000000099",
+    });
+    const entries = await lifecycleEntriesInside(Object.freeze({
+      zone_context: true,
+      run_ref: outerRun,
+    }));
+
+    expect(entries.map((entry) =>
+      (entry.payload_ref as Readonly<Record<string, unknown>>).code)).toEqual([
+      "OBS_SCHEDULER_JOB_STARTED",
+      "OBS_SCHEDULER_JOB_NOOP",
+    ]);
+    for (const entry of entries) {
+      expect(entry.ambient_context_ref).toEqual(ZONED_LIFECYCLE_CONTEXT);
+      expect(entry.ambient_context_ref).not.toHaveProperty("at_seq_watermark");
+      expect(entry.ambient_context_ref?.run_ref).not.toBe(outerRun);
+      const redacted = createSharedRedactor(REDACTOR_CONFIG).redact(entry);
+      expect(redacted).toMatchObject({
+        zone_context: true,
+        run_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+        work_item_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+        node_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+        attempt_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+        ledger_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+        at_seq_watermark: "UNKNOWN:DECLARED_KIND_REQUIRED",
+      });
+    }
+  });
+
+  it.each([
+    ["absent", Object.freeze({
+      run_ref: Object.freeze({
+        kind: "run",
+        value: "00000000-0000-4000-8000-000000000098",
+      }),
+    })],
+    ["own false", Object.freeze({
+      zone_context: false,
+      run_ref: Object.freeze({
+        kind: "run",
+        value: "00000000-0000-4000-8000-000000000097",
+      }),
+    })],
+  ] as const)("uses the normal safe lifecycle context when outer zone is %s", async (
+    _label,
+    outerContext,
+  ) => {
+    const entries = await lifecycleEntriesInside(outerContext);
+
+    for (const entry of entries) {
+      expect(entry.ambient_context_ref).toEqual(LIFECYCLE_CONTEXT);
+      expect(Object.keys(entry.ambient_context_ref ?? {})).toHaveLength(5);
+    }
+  });
+
+  it("fails closed for an outer zone accessor without calling it", async () => {
+    let reads = 0;
+    const outerContext = Object.freeze(Object.defineProperty({}, "zone_context", {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return false;
+      },
+    }));
+    const entries = await lifecycleEntriesInside(outerContext);
+
+    expect(reads).toBe(0);
+    for (const entry of entries) {
+      expect(entry.ambient_context_ref).toEqual(ZONED_LIFECYCLE_CONTEXT);
+    }
+  });
+
+  it("fails closed for a non-boolean outer zone value", async () => {
+    const entries = await lifecycleEntriesInside(Object.freeze({
+      zone_context: "false",
+    }));
+
+    for (const entry of entries) {
+      expect(entry.ambient_context_ref).toEqual(ZONED_LIFECYCLE_CONTEXT);
+    }
+  });
+
+  it("fails closed when the outer zone descriptor cannot be inspected", async () => {
+    const outerContext = new Proxy(Object.create(null) as Record<string, unknown>, {
+      getOwnPropertyDescriptor() {
+        throw new Error("PLANTED_ZONE_DESCRIPTOR_FAILURE");
+      },
+    });
+    const entries = await lifecycleEntriesInside(outerContext);
+
+    for (const entry of entries) {
+      expect(entry.ambient_context_ref).toEqual(ZONED_LIFECYCLE_CONTEXT);
     }
   });
 });
