@@ -1,6 +1,7 @@
-export const FIX01_RELEASE_MANIFEST_VERSION = 2 as const;
+export const FIX01_RELEASE_MANIFEST_VERSION = 3 as const;
 export const FIX01_RELEASE_VERIFIER_VERSION =
-  "fix01-release-admission-v2" as const;
+  "fix01-release-admission-v3" as const;
+export const FIX01_RELEASE_MANIFEST_MAX_BYTES = 8 * 1024 * 1024;
 
 export const FIX01_RELEASE_MANIFEST_KEYS = [
   "version",
@@ -22,6 +23,7 @@ export const FIX01_RELEASE_MANIFEST_KEYS = [
   "requires_v_review",
   "entries",
   "index",
+  "release_lock",
 ] as const;
 
 export const FIX01_RELEASE_ENTRY_KEYS = [
@@ -48,6 +50,18 @@ export const FIX01_RELEASE_INDEX_KEYS = [
   "size",
   "sha256",
   "covered_lawful_count",
+] as const;
+
+export const FIX01_RELEASE_LOCK_KEYS = [
+  "basename",
+  "version",
+  "admission_ref",
+  "dev",
+  "ino",
+  "nlink",
+  "size",
+  "sha256",
+  "prefix_bytes",
 ] as const;
 
 export type Fix01ReleaseClassification =
@@ -88,7 +102,19 @@ export interface Fix01ReleaseManifestIndexV2 {
   readonly covered_lawful_count: number;
 }
 
-export interface Fix01ReleaseAdmissionManifestV2 {
+export interface Fix01ReleaseManifestLockV3 {
+  readonly basename: ".obs-spool-release-lock-v1";
+  readonly version: 1;
+  readonly admission_ref: string;
+  readonly dev: string;
+  readonly ino: string;
+  readonly nlink: 1;
+  readonly size: number;
+  readonly sha256: string;
+  readonly prefix_bytes: number;
+}
+
+export interface Fix01ReleaseAdmissionManifestV3 {
   readonly version: typeof FIX01_RELEASE_MANIFEST_VERSION;
   readonly verdict: "PASS_EMPTY" | "PASS_INDEXED";
   readonly phase: "before_first_indexed_launch";
@@ -108,6 +134,7 @@ export interface Fix01ReleaseAdmissionManifestV2 {
   readonly requires_v_review: boolean;
   readonly entries: readonly Fix01ReleaseManifestEntryV2[];
   readonly index: Fix01ReleaseManifestIndexV2 | null;
+  readonly release_lock: Fix01ReleaseManifestLockV3 | null;
 }
 
 export function canonicalFix01ReleaseJson(value: unknown): string {

@@ -21,13 +21,19 @@ import {
   appendSpoolIndexAdmissionRecord,
   appendSpoolIndexBasename,
   createSpoolAdmissionProof,
+  encodeSpoolAdmissionIndexRecord,
+  encodeSpoolReleaseLock,
   isIndexedSpoolBasename,
   parseSpoolAdmissionIndexRecord,
+  readSpoolReleaseLock,
   SPOOL_CURSOR_NAME,
   SPOOL_INDEX_NAME,
+  SPOOL_RELEASE_LOCK_NAME,
+  type SpoolReleaseLock,
 } from "../packages/obs-capture/src/spool-index.js";
 import {
   canonicalFix01ReleaseJson as canonicalJson,
+  FIX01_RELEASE_MANIFEST_MAX_BYTES,
   FIX01_RELEASE_MANIFEST_VERSION,
   FIX01_RELEASE_VERIFIER_VERSION,
   type Fix01ReleaseClassification as Classification,
@@ -39,6 +45,9 @@ const SPOOL_RUNTIME = /^(api|runner|scheduler|evaluator-lib|ui-client|listener|w
 const SPOOL_PID = /^(?:api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-([1-9][0-9]*)-/u;
 const INDEX_LINE_MAX_BYTES = 174;
 const IO_CHUNK_BYTES = 64 * 1024;
+const PROSPECTIVE_STAT_DIGITS = "9".repeat(32);
+const PROSPECTIVE_SHA256 = "f".repeat(64);
+const PROSPECTIVE_VERIFIED_AT = "9999-12-31T23:59:59.999Z";
 
 interface SourceSnapshot {
   readonly entries: readonly ManifestEntry[];
@@ -414,7 +423,11 @@ async function sourceSnapshot(
   if (new Set(names).size !== names.length) fail("FAIL_DUPLICATE_NAME");
   const entries: ManifestEntry[] = [];
   for (const name of names) {
-    if (name === SPOOL_INDEX_NAME || name === SPOOL_CURSOR_NAME) continue;
+    if (
+      name === SPOOL_INDEX_NAME
+      || name === SPOOL_CURSOR_NAME
+      || name === SPOOL_RELEASE_LOCK_NAME
+    ) continue;
     const filePath = join(directory, name);
     let pathStat: BigIntStats;
     try {
@@ -558,6 +571,98 @@ async function createEmptyIndex(directory: string): Promise<void> {
   }
 }
 
+function predictedFinalIndexSize(
+  source: SourceSnapshot,
+  index: IndexState | undefined,
+  admissionRef: string,
+): number {
+  let size = index === undefined
+    ? 0
+    : safeNumber(index.stat.size, "FAIL_UNREPRESENTABLE_SIZE");
+  const candidates = source.entries.filter((entry) => entry.kind === "candidate");
+  for (const candidate of candidates) {
+    if (!index?.basenames.has(candidate.basename)) {
+      size += Buffer.byteLength(`\n${candidate.basename}\n`, "utf8");
+    }
+  }
+  for (const candidate of candidates) {
+    const proof = admissionProofForEntry(admissionRef, candidate);
+    const matches = index?.admissionRecords.filter((record) =>
+      record.basename === candidate.basename && record.proof === proof
+    ).length ?? 0;
+    if (matches > 1) fail("FAIL_ADMISSION_RECORD_DUPLICATE");
+    if (matches === 0) {
+      const record = encodeSpoolAdmissionIndexRecord({
+        basename: candidate.basename,
+        proof,
+      });
+      size += Buffer.byteLength(`\n${record}\n`, "utf8");
+    }
+  }
+  if (!Number.isSafeInteger(size) || size <= 0) {
+    fail("FAIL_UNREPRESENTABLE_SIZE");
+  }
+  return size;
+}
+
+async function createReleaseLock(options: {
+  readonly directory: string;
+  readonly admissionRef: string;
+  readonly prefixBytes: number;
+}): Promise<SpoolReleaseLock> {
+  const path = join(options.directory, SPOOL_RELEASE_LOCK_NAME);
+  const bytes = encodeSpoolReleaseLock(options);
+  let handle: FileHandle | undefined;
+  try {
+    handle = await open(
+      path,
+      constants.O_CREAT
+        | constants.O_EXCL
+        | constants.O_NOFOLLOW
+        | constants.O_RDWR,
+      0o600,
+    );
+    const written = await handle.write(bytes, 0, bytes.length, 0);
+    if (written.bytesWritten !== bytes.length) fail("FAIL_RELEASE_LOCK_WRITE");
+    await handle.sync();
+  } catch (error) {
+    if (error instanceof AdmissionFailure) throw error;
+    fail("FAIL_UNSAFE_RELEASE_LOCK");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+  const observed = await readSpoolReleaseLock(options.directory);
+  if (
+    observed.status !== "valid"
+    || observed.lock.admissionRef !== options.admissionRef
+    || observed.lock.prefixBytes !== options.prefixBytes
+  ) {
+    fail("FAIL_UNSAFE_RELEASE_LOCK");
+  }
+  return observed.lock;
+}
+
+async function prepareReleaseLock(options: {
+  readonly directory: string;
+  readonly observed: Awaited<ReturnType<typeof readSpoolReleaseLock>>;
+  readonly admissionRef: string;
+  readonly prefixBytes: number;
+}): Promise<SpoolReleaseLock> {
+  if (options.observed.status === "invalid") {
+    fail("FAIL_UNSAFE_RELEASE_LOCK");
+  }
+  if (options.observed.status === "valid") {
+    if (
+      options.observed.lock.admissionRef !== options.admissionRef
+      || options.observed.lock.prefixBytes !== options.prefixBytes
+    ) {
+      fail("FAIL_RELEASE_LOCK_BOUNDARY");
+    }
+    return options.observed.lock;
+  }
+  return createReleaseLock(options);
+}
+
 async function repairIndex(
   directory: string,
   source: SourceSnapshot,
@@ -647,16 +752,19 @@ async function appendAdmissionRecords(
   index: IndexState,
   admissionRef: string,
 ): Promise<IndexState> {
-  if (countCurrentAdmissionRecords(source, index, admissionRef) !== 0) {
-    fail("FAIL_ADMISSION_RECORD_PREEXISTING");
-  }
   const candidates = source.entries.filter((entry) => entry.kind === "candidate");
   for (const candidate of candidates) {
+    const proof = admissionProofForEntry(admissionRef, candidate);
+    const matches = index.admissionRecords.filter((record) =>
+      record.basename === candidate.basename && record.proof === proof
+    ).length;
+    if (matches > 1) fail("FAIL_ADMISSION_RECORD_DUPLICATE");
+    if (matches === 1) continue;
     try {
       appendSpoolIndexAdmissionRecord({
         directory,
         basename: candidate.basename,
-        proof: admissionProofForEntry(admissionRef, candidate),
+        proof,
       });
     } catch {
       fail("FAIL_INDEX_REPAIR");
@@ -728,6 +836,123 @@ function reservedManifestEntry(
   };
 }
 
+function prospectiveReservedEntry(
+  name: typeof SPOOL_INDEX_NAME,
+  size: number,
+): ManifestEntry {
+  return {
+    basename: name,
+    kind: "reserved",
+    dev: PROSPECTIVE_STAT_DIGITS,
+    ino: PROSPECTIVE_STAT_DIGITS,
+    nlink: 1,
+    size,
+    mtime_ms: Number.MAX_SAFE_INTEGER,
+    mtime_ns: PROSPECTIVE_STAT_DIGITS,
+    ctime_ns: PROSPECTIVE_STAT_DIGITS,
+    sha256: PROSPECTIVE_SHA256,
+    classification: "reserved_metadata",
+    indexed: false,
+    reason: null,
+  };
+}
+
+function assertProspectiveManifestWithinLimit(options: {
+  readonly arguments: Arguments;
+  readonly source: SourceSnapshot;
+  readonly cursor: ReadFileResult | undefined;
+  readonly physicallyEmpty: boolean;
+  readonly admissionRef: string;
+  readonly prefixBytes: number | undefined;
+  readonly initialIndex: IndexState | undefined;
+}): void {
+  const sourceEntries = options.source.entries.map((entry): ManifestEntry => ({
+    ...entry,
+    indexed: entry.kind === "candidate",
+  }));
+  const candidateCount = sourceEntries.filter((entry) =>
+    entry.kind === "candidate"
+  ).length;
+  const lawfulCount = sourceEntries.filter((entry) =>
+    entry.classification === "lawful_empty"
+    || entry.classification === "lawful_envelopes"
+  ).length;
+  const rejectedCount = sourceEntries.filter((entry) =>
+    entry.kind === "rejected_unsafe_path"
+  ).length;
+  const prospectiveIndexSize = options.physicallyEmpty
+    ? undefined
+    : options.prefixBytes
+      ?? (options.initialIndex === undefined
+        ? 0
+        : safeNumber(options.initialIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE"));
+  const entries = [
+    ...sourceEntries,
+    ...(prospectiveIndexSize === undefined
+      ? []
+      : [prospectiveReservedEntry(SPOOL_INDEX_NAME, prospectiveIndexSize)]),
+    ...(options.cursor === undefined
+      ? []
+      : [reservedManifestEntry(SPOOL_CURSOR_NAME, options.cursor)]),
+  ].sort((left, right) =>
+    left.basename < right.basename ? -1 : left.basename > right.basename ? 1 : 0
+  );
+  const prospectiveLock = options.prefixBytes === undefined
+    ? null
+    : {
+      basename: SPOOL_RELEASE_LOCK_NAME,
+      version: 1,
+      admission_ref: options.admissionRef,
+      dev: PROSPECTIVE_STAT_DIGITS,
+      ino: PROSPECTIVE_STAT_DIGITS,
+      nlink: 1,
+      size: encodeSpoolReleaseLock({
+        admissionRef: options.admissionRef,
+        prefixBytes: options.prefixBytes,
+      }).length,
+      sha256: PROSPECTIVE_SHA256,
+      prefix_bytes: options.prefixBytes,
+    } as const;
+  const prospectiveManifest = {
+    version: FIX01_RELEASE_MANIFEST_VERSION,
+    verdict: options.physicallyEmpty ? "PASS_EMPTY" : "PASS_INDEXED",
+    phase: "before_first_indexed_launch",
+    spool_directory_realpath: options.arguments.spoolDirectory,
+    target_build_ref: options.arguments.buildRef,
+    verified_at: PROSPECTIVE_VERIFIED_AT,
+    verifier_version: FIX01_RELEASE_VERIFIER_VERSION,
+    admission_ref: options.admissionRef,
+    admission_record_count: candidateCount,
+    first_snapshot_sha256: options.source.sha256,
+    second_snapshot_sha256: options.source.sha256,
+    source_entry_count: sourceEntries.length,
+    candidate_count: candidateCount,
+    lawful_count: lawfulCount,
+    indexed_candidate_count: candidateCount,
+    rejected_count: rejectedCount,
+    requires_v_review: rejectedCount > 0,
+    entries,
+    index: prospectiveIndexSize === undefined
+      ? null
+      : {
+        basename: SPOOL_INDEX_NAME,
+        dev: PROSPECTIVE_STAT_DIGITS,
+        ino: PROSPECTIVE_STAT_DIGITS,
+        nlink: 1,
+        size: prospectiveIndexSize,
+        sha256: PROSPECTIVE_SHA256,
+        covered_lawful_count: lawfulCount,
+      },
+    release_lock: prospectiveLock,
+  } as const;
+  if (
+    Buffer.byteLength(canonicalJson(prospectiveManifest), "utf8")
+      > FIX01_RELEASE_MANIFEST_MAX_BYTES
+  ) {
+    fail("FAIL_MANIFEST_TOO_LARGE");
+  }
+}
+
 async function writeManifest(path: string, bytes: Buffer): Promise<void> {
   let handle: FileHandle | undefined;
   try {
@@ -794,23 +1019,67 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   manifestSha256: string;
 }>> {
   const options = await validatePaths(arguments_);
-  const admissionRef = randomBytes(32).toString("hex");
+  const initialReleaseLock = await readSpoolReleaseLock(options.spoolDirectory);
+  const admissionRef = initialReleaseLock.status === "valid"
+    ? initialReleaseLock.lock.admissionRef
+    : randomBytes(32).toString("hex");
   const initialIndex = await readIndex(options.spoolDirectory);
   const initialCursor = await readReserved(options.spoolDirectory, SPOOL_CURSOR_NAME);
   const first = await sourceSnapshot(options.spoolDirectory, true);
   const physicallyEmpty = first.entries.length === 0
     && initialIndex === undefined
-    && initialCursor === undefined;
+    && initialCursor === undefined
+    && initialReleaseLock.status === "absent";
+  const firstCandidates = first.entries.filter((entry) =>
+    entry.kind === "candidate"
+  );
 
   let finalIndex: IndexState | undefined;
+  let releaseLock: SpoolReleaseLock | undefined;
+  if (initialReleaseLock.status === "invalid") {
+    fail("FAIL_UNSAFE_RELEASE_LOCK");
+  }
+  if (firstCandidates.length === 0 && initialReleaseLock.status === "valid") {
+    fail("FAIL_RELEASE_LOCK_ORPHANED");
+  }
+  const prefixBytes = firstCandidates.length === 0
+    ? undefined
+    : predictedFinalIndexSize(first, initialIndex, admissionRef);
+  assertNoRejectedIndexMembers(first, initialIndex);
+  assertProspectiveManifestWithinLimit({
+    arguments: options,
+    source: first,
+    cursor: initialCursor,
+    physicallyEmpty,
+    admissionRef,
+    prefixBytes,
+    initialIndex,
+  });
+  if (firstCandidates.length > 0) {
+    if (prefixBytes === undefined) fail("FAIL_RELEASE_LOCK_BOUNDARY");
+    releaseLock = await prepareReleaseLock({
+      directory: options.spoolDirectory,
+      observed: initialReleaseLock,
+      admissionRef,
+      prefixBytes,
+    });
+  }
   if (!physicallyEmpty) {
     finalIndex = await repairIndex(options.spoolDirectory, first, initialIndex);
-    finalIndex = await appendAdmissionRecords(
-      options.spoolDirectory,
-      first,
-      finalIndex,
-      admissionRef,
-    );
+    if (releaseLock !== undefined) {
+      finalIndex = await appendAdmissionRecords(
+        options.spoolDirectory,
+        first,
+        finalIndex,
+        admissionRef,
+      );
+      if (
+        safeNumber(finalIndex.stat.size, "FAIL_UNREPRESENTABLE_SIZE")
+          !== releaseLock.prefixBytes
+      ) {
+        fail("FAIL_RELEASE_LOCK_BOUNDARY");
+      }
+    }
   }
   const second = await sourceSnapshot(options.spoolDirectory, false);
   if (first.sha256 !== second.sha256) fail("FAIL_CHANGED");
@@ -855,6 +1124,20 @@ async function run(arguments_: Arguments): Promise<Readonly<{
 
   finalIndex = await revalidateIndex(options.spoolDirectory, finalIndex);
   assertNoRejectedIndexMembers(second, finalIndex);
+  const finalReleaseLock = await readSpoolReleaseLock(options.spoolDirectory);
+  if (
+    releaseLock === undefined
+      ? finalReleaseLock.status !== "absent"
+      : finalReleaseLock.status !== "valid"
+        || finalReleaseLock.lock.admissionRef !== releaseLock.admissionRef
+        || finalReleaseLock.lock.dev !== releaseLock.dev
+        || finalReleaseLock.lock.ino !== releaseLock.ino
+        || finalReleaseLock.lock.size !== releaseLock.size
+        || finalReleaseLock.lock.sha256 !== releaseLock.sha256
+        || finalReleaseLock.lock.prefixBytes !== releaseLock.prefixBytes
+  ) {
+    fail("FAIL_CHANGED");
+  }
   const admissionRecordCount = finalIndex === undefined
     ? 0
     : countCurrentAdmissionRecords(second, finalIndex, admissionRef);
@@ -909,6 +1192,19 @@ async function run(arguments_: Arguments): Promise<Readonly<{
           )
         ).length,
       },
+    release_lock: releaseLock === undefined
+      ? null
+      : {
+        basename: SPOOL_RELEASE_LOCK_NAME,
+        version: 1,
+        admission_ref: releaseLock.admissionRef,
+        dev: releaseLock.dev,
+        ino: releaseLock.ino,
+        nlink: 1,
+        size: releaseLock.size,
+        sha256: releaseLock.sha256,
+        prefix_bytes: releaseLock.prefixBytes,
+      },
   } as const;
   if (
     verdict === "PASS_EMPTY"
@@ -917,6 +1213,7 @@ async function run(arguments_: Arguments): Promise<Readonly<{
       || manifest.candidate_count !== 0
       || manifest.entries.length !== 0
       || manifest.index !== null
+      || manifest.release_lock !== null
     )
   ) {
     fail("FAIL_EMPTY_RELATION");
@@ -925,6 +1222,8 @@ async function run(arguments_: Arguments): Promise<Readonly<{
     verdict === "PASS_INDEXED"
     && (
       manifest.index === null
+      || (candidateCount > 0 && manifest.release_lock === null)
+      || (candidateCount === 0 && manifest.release_lock !== null)
       || manifest.index.nlink !== 1
       || lawfulCount > candidateCount
       || candidateCount !== indexedCandidateCount
@@ -934,6 +1233,9 @@ async function run(arguments_: Arguments): Promise<Readonly<{
     fail("FAIL_INDEX_RELATION");
   }
   const bytes = Buffer.from(canonicalJson(manifest), "utf8");
+  if (bytes.length > FIX01_RELEASE_MANIFEST_MAX_BYTES) {
+    fail("FAIL_MANIFEST_TOO_LARGE");
+  }
   const manifestSha256 = sha256(bytes);
   await writeManifest(options.manifestPath, bytes);
   return { verdict, manifestSha256 };

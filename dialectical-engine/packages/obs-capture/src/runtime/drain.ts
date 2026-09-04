@@ -13,6 +13,8 @@ import {
 } from "../safe-metadata.js";
 import {
   createSpoolAdmissionProof,
+  encodeSpoolAdmissionSeal,
+  readSpoolReleaseLock,
   readTypedIndexedSpoolPage,
   type AdmissionSpoolIndexRecord,
   type SpoolAdmissionSeal,
@@ -48,6 +50,15 @@ interface FileIdentity {
 interface DrainBudget {
   remainingFiles: number;
   remainingTransactions: number;
+}
+
+function isCanonicalAdmissionSeal(seal: SpoolAdmissionSeal): boolean {
+  try {
+    encodeSpoolAdmissionSeal(seal);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -208,6 +219,7 @@ async function materializeCompletion(
   destination: string,
   sourceIdentity: BigIntStats,
   bytes: Buffer,
+  requireExactSourceMetadata: boolean,
 ): Promise<boolean> {
   if (
     (await matchingSourceSnapshot(
@@ -215,7 +227,7 @@ async function materializeCompletion(
       sourcePath,
       sourceIdentity,
       bytes,
-      false,
+      requireExactSourceMetadata,
     )) === undefined
   ) {
     return false;
@@ -269,7 +281,7 @@ async function materializeCompletion(
         sourcePath,
         sourceIdentity,
         bytes,
-        false,
+        requireExactSourceMetadata,
       )) === undefined
     ) {
       return false;
@@ -394,6 +406,7 @@ async function drainFile(
         completionPath,
         fileStat,
         bytes,
+        record.kind === "admission",
       );
     }
     const lines = boundedLines(bytes);
@@ -445,6 +458,7 @@ async function drainFile(
       completionPath,
       fileStat,
       bytes,
+      record.kind === "admission",
     );
   } finally {
     await handle.close();
@@ -462,14 +476,32 @@ export async function drainDeadSpoolFiles(options: {
     remainingTransactions: MAX_TRANSACTIONS_PER_START,
   };
   try {
+    const releaseLock = await readSpoolReleaseLock(options.spoolDirectory);
+    if (releaseLock.status === "invalid") return;
+    const activeSeal = releaseLock.status === "valid"
+      && options.admissionSeal !== undefined
+      && isCanonicalAdmissionSeal(options.admissionSeal)
+      && releaseLock.lock.admissionRef === options.admissionSeal.admissionRef
+      && releaseLock.lock.dev === options.admissionSeal.lockDev
+      && releaseLock.lock.ino === options.admissionSeal.lockIno
+      && releaseLock.lock.sha256 === options.admissionSeal.lockSha256
+      && releaseLock.lock.prefixBytes === options.admissionSeal.prefixBytes
+      ? options.admissionSeal
+      : undefined;
+    if (releaseLock.status === "valid" && activeSeal === undefined) return;
     const page = await readTypedIndexedSpoolPage(options.spoolDirectory);
     if (page === undefined) return;
-    const sealedPrefixBytes = options.admissionSeal !== undefined
-      && page.indexDev === options.admissionSeal.indexDev
-      && page.indexIno === options.admissionSeal.indexIno
-      && options.admissionSeal.prefixBytes <= page.indexSize
-      ? options.admissionSeal.prefixBytes
-      : undefined;
+    if (
+      activeSeal !== undefined
+      && (
+        page.indexDev !== activeSeal.indexDev
+        || page.indexIno !== activeSeal.indexIno
+        || activeSeal.prefixBytes > page.indexSize
+      )
+    ) {
+      return;
+    }
+    const sealedPrefixBytes = activeSeal?.prefixBytes;
     for (const record of page.records) {
       if (budget.remainingFiles === 0 || budget.remainingTransactions === 0) {
         break;
@@ -485,10 +517,10 @@ export async function drainDeadSpoolFiles(options: {
         continue;
       }
       const admissionSeal = record.kind === "admission"
-        && options.admissionSeal !== undefined
+        && activeSeal !== undefined
         && sealedPrefixBytes !== undefined
         && record.recordEndOffset <= sealedPrefixBytes
-        ? options.admissionSeal
+        ? activeSeal
         : undefined;
       if (record.kind === "admission" && admissionSeal === undefined) continue;
       await drainFile(

@@ -74,6 +74,7 @@ const MAX_ELIGIBLE_FILES_PER_START = 64;
 const MAX_TRANSACTIONS_PER_START = 128;
 const SPOOL_INDEX_NAME = ".obs-spool-index-v1";
 const SPOOL_CURSOR_NAME = ".obs-spool-cursor-v1";
+const SPOOL_RELEASE_LOCK_NAME = ".obs-spool-release-lock-v1";
 const SPOOL_CURSOR_BYTES = 1_024;
 const INDEXED_SPOOL_NAME = /^(api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-[1-9][0-9]*-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.spool$/u;
 
@@ -130,12 +131,15 @@ interface SafeEnvelope extends CorrelationFields {
 }
 
 interface AdmissionSeal {
-  readonly version: 1;
+  readonly version: 2;
   readonly admissionRef: string;
   readonly manifestSha256: string;
   readonly indexDev: string;
   readonly indexIno: string;
   readonly prefixBytes: number;
+  readonly lockDev: string;
+  readonly lockIno: string;
+  readonly lockSha256: string;
 }
 
 let database: TestDatabase;
@@ -360,14 +364,41 @@ function sealForIndex(
   prefixBytes?: number,
 ): AdmissionSeal {
   const indexStat = statSync(join(directory, SPOOL_INDEX_NAME), { bigint: true });
+  const lockPath = join(directory, SPOOL_RELEASE_LOCK_NAME);
+  const lockStat = statSync(lockPath, { bigint: true });
   return {
-    version: 1,
+    version: 2,
     admissionRef,
     manifestSha256: "b".repeat(64),
     indexDev: indexStat.dev.toString(),
     indexIno: indexStat.ino.toString(),
     prefixBytes: prefixBytes ?? Number(indexStat.size),
+    lockDev: lockStat.dev.toString(),
+    lockIno: lockStat.ino.toString(),
+    lockSha256: createHash("sha256").update(readFileSync(lockPath)).digest("hex"),
   };
+}
+
+function writeReleaseLock(
+  directory: string,
+  admissionRef: string,
+  prefixBytes: number,
+): string {
+  const path = join(directory, SPOOL_RELEASE_LOCK_NAME);
+  const boundary = prefixBytes.toString(16).padStart(16, "0");
+  const checksum = createHash("sha256").update([
+    "FIX01-RELEASE-LOCK-V1",
+    admissionRef,
+    String(prefixBytes),
+  ].join("\u0000")).digest("hex");
+  writeFileSync(
+    path,
+    `FIX01_RELEASE_LOCK_V1\n${admissionRef}\n${boundary}\n${checksum}\n`,
+    {
+    mode: 0o600,
+    },
+  );
+  return path;
 }
 
 function createA1Fixture(label: string): Readonly<{
@@ -396,6 +427,11 @@ function createA1Fixture(label: string): Readonly<{
   writeFileSync(join(directory, SPOOL_INDEX_NAME), `\n${record}\n`, {
     mode: 0o600,
   });
+  writeReleaseLock(
+    directory,
+    admissionRef,
+    statSync(join(directory, SPOOL_INDEX_NAME)).size,
+  );
   return {
     directory,
     envelope,
@@ -1786,6 +1822,268 @@ describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
     expect(existsSync(fixture.path)).toBe(true);
   });
 
+  it("keeps an admitted empty source when its metadata changes before completion", () => {
+    const directory = createScratchDirectory();
+    const name = spoolName(
+      "scheduler",
+      DEAD_PID,
+      "10000000-0000-4000-8000-00000000e001",
+    );
+    const path = join(directory, name);
+    writeFileSync(path, "", { mode: 0o600 });
+    const admissionRef = createHash("sha256")
+      .update("admission:empty-metadata-race")
+      .digest("hex");
+    const record = a1Record(admissionRef, name, path);
+    writeFileSync(join(directory, SPOOL_INDEX_NAME), `\n${record}\n`, {
+      mode: 0o600,
+    });
+    writeReleaseLock(
+      directory,
+      admissionRef,
+      statSync(join(directory, SPOOL_INDEX_NAME)).size,
+    );
+    const seal = sealForIndex(directory, admissionRef);
+    const markerPath = join(directory, "metadata-changed");
+    const promisesModule = [
+      'import { appendFileSync, utimesSync } from "node:fs";',
+      'import * as fs from "node:fs/promises";',
+      "export const link = fs.link;",
+      "export const lstat = fs.lstat;",
+      "let changed = false;",
+      "export async function open(openPath, flags, mode) {",
+      "  if (!changed && String(openPath).includes('.completion-') && String(openPath).endsWith('.stage')) {",
+      "    changed = true;",
+      `    utimesSync(${JSON.stringify(path)}, new Date("2037-01-01T00:00:00.000Z"), new Date("2037-01-01T00:00:00.000Z"));`,
+      `    appendFileSync(${JSON.stringify(markerPath)}, "changed");`,
+      "  }",
+      "  return fs.open(openPath, flags, mode);",
+      "}",
+    ].join("\n");
+    const promisesUrl = `data:text/javascript,${encodeURIComponent(promisesModule)}`;
+    const loaderUrl = `data:text/javascript,${encodeURIComponent([
+      "export function resolve(specifier, context, nextResolve) {",
+      '  if (specifier === "node:fs/promises" && context.parentURL?.includes("/packages/obs-capture/src/runtime/drain.ts")) {',
+      `    return { url: ${JSON.stringify(promisesUrl)}, shortCircuit: true };`,
+      "  }",
+      "  return nextResolve(specifier, context);",
+      "}",
+    ].join("\n"))}`;
+    const drainUrl = pathToFileURL(resolve(
+      process.cwd(),
+      "packages/obs-capture/src/runtime/drain.ts",
+    )).href;
+    const program = [
+      `const { drainDeadSpoolFiles } = await import(${JSON.stringify(drainUrl)});`,
+      "const calls = [];",
+      "await drainDeadSpoolFiles({",
+      `  spoolDirectory: ${JSON.stringify(directory)},`,
+      `  admissionSeal: ${JSON.stringify(seal)},`,
+      "  databaseSink: {",
+      "    async writeOccurrences() {},",
+      "    async writeCaptureGap() {},",
+      "    async ingestSpooledOccurrence(value) { calls.push(value.source_event_ref); },",
+      "    async close() {},",
+      "  },",
+      "});",
+      "process.stdout.write(JSON.stringify(calls));",
+    ].join("\n");
+    const child = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--experimental-loader",
+        loaderUrl,
+        "--input-type=module",
+        "--eval",
+        program,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: { ...process.env, NODE_NO_WARNINGS: "1" },
+        timeout: 20_000,
+      },
+    );
+
+    expect(child.status, child.stderr).toBe(0);
+    expect(child.stdout).toBe("[]");
+    expect(existsSync(markerPath)).toBe(true);
+    expect(existsSync(`${path}.empty`)).toBe(false);
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it("blocks the whole page when a release lock has no exact launch seal", async () => {
+    type Mutator = (fixture: ReturnType<typeof createA1Fixture>) =>
+      AdmissionSeal | undefined;
+    const cases: ReadonlyArray<readonly [string, Mutator]> = [
+      ["missing seal", () => undefined],
+      ["wrong admission ref", (fixture) => ({
+        ...fixture.seal,
+        admissionRef: "f".repeat(64),
+      })],
+      ["wrong index device", (fixture) => ({
+        ...fixture.seal,
+        indexDev: String(BigInt(fixture.seal.indexDev) + 1n),
+      })],
+      ["short sealed prefix", (fixture) => ({
+        ...fixture.seal,
+        prefixBytes: 1,
+      })],
+    ];
+
+    for (const [label, mutate] of cases) {
+      const fixture = createA1Fixture(`locked-${label}`);
+      writeFileSync(
+        join(fixture.directory, SPOOL_INDEX_NAME),
+        `\n${fixture.name}\n\n${fixture.record}\n`,
+        { mode: 0o600 },
+      );
+      writeReleaseLock(
+        fixture.directory,
+        fixture.admissionRef,
+        statSync(join(fixture.directory, SPOOL_INDEX_NAME)).size,
+      );
+      const changed = safeEnvelope("scheduler");
+      writeEnvelope(fixture.path, changed);
+      const result = recordingSink();
+      const seal = mutate({
+        ...fixture,
+        seal: sealForIndex(fixture.directory, fixture.admissionRef),
+      });
+
+      await drainWithSeal(fixture.directory, result.sink, seal);
+
+      expect(result.calls, label).toHaveLength(0);
+      expect(existsSync(`${fixture.path}.ingested`), label).toBe(false);
+      expect(readFileSync(fixture.path, "utf8"), label)
+        .toBe(serializedEnvelope(changed));
+    }
+  });
+
+  it("blocks a locked page for a malformed in-memory seal", async () => {
+    const fixture = createA1Fixture("malformed-seal-version");
+    const malformed = {
+      ...fixture.seal,
+      version: 1,
+    } as unknown as AdmissionSeal;
+    const result = recordingSink();
+
+    await drainWithSeal(fixture.directory, result.sink, malformed);
+
+    expect(result.calls).toHaveLength(0);
+    expect(existsSync(`${fixture.path}.ingested`)).toBe(false);
+    expect(existsSync(fixture.path)).toBe(true);
+  });
+
+  it("blocks the whole page when the sealed release lock is unsafe or replaced", async () => {
+    const cases: ReadonlyArray<readonly [
+      string,
+      (fixture: ReturnType<typeof createA1Fixture>) => void,
+    ]> = [
+      ["tampered", (fixture) => {
+        const lockPath = join(fixture.directory, SPOOL_RELEASE_LOCK_NAME);
+        const bytes = readFileSync(lockPath);
+        bytes[0] = 0x58;
+        writeFileSync(lockPath, bytes, { mode: 0o600 });
+      }],
+      ["hardlinked", (fixture) => {
+        const lockPath = join(fixture.directory, SPOOL_RELEASE_LOCK_NAME);
+        linkSync(lockPath, `${lockPath}.extra-link`);
+      }],
+      ["symlinked", (fixture) => {
+        const lockPath = join(fixture.directory, SPOOL_RELEASE_LOCK_NAME);
+        const displaced = `${lockPath}.displaced`;
+        renameSync(lockPath, displaced);
+        symlinkSync(displaced, lockPath);
+      }],
+      ["replaced", (fixture) => {
+        const lockPath = join(fixture.directory, SPOOL_RELEASE_LOCK_NAME);
+        const bytes = readFileSync(lockPath);
+        renameSync(lockPath, `${lockPath}.displaced`);
+        writeFileSync(lockPath, bytes, { mode: 0o600 });
+      }],
+    ];
+
+    for (const [label, mutate] of cases) {
+      const fixture = createA1Fixture(`unsafe-lock-${label}`);
+      mutate(fixture);
+      const result = recordingSink();
+
+      await drainWithSeal(fixture.directory, result.sink, fixture.seal);
+
+      expect(result.calls, label).toHaveLength(0);
+      expect(existsSync(`${fixture.path}.ingested`), label).toBe(false);
+      expect(existsSync(fixture.path), label).toBe(true);
+    }
+  });
+
+  it("skips an A1 after the locked prefix and still drains a later plain record", async () => {
+    const fixture = createA1Fixture("outside-prefix-before-plain");
+    const plainEnvelope = safeEnvelope("scheduler");
+    const plainName = orderedSpoolName(7_486);
+    const plainPath = join(fixture.directory, plainName);
+    writeEnvelope(plainPath, plainEnvelope);
+    appendFileSync(
+      join(fixture.directory, SPOOL_INDEX_NAME),
+      `\n${fixture.record}\n\n${plainName}\n`,
+      { mode: 0o600 },
+    );
+    const pidProbe = vi.spyOn(process, "kill").mockImplementation(((pid: number) => {
+      if (pid === DEAD_PID) {
+        const error = new Error("modeled ESRCH") as Error & { code: string };
+        error.code = "ESRCH";
+        throw error;
+      }
+      return true;
+    }) as typeof process.kill);
+    const result = recordingSink();
+
+    await drainWithSeal(fixture.directory, result.sink, fixture.seal);
+
+    expect(result.calls.map((entry) => entry.source_event_ref)).toEqual([
+      fixture.envelope.source_event_ref,
+      plainEnvelope.source_event_ref,
+    ]);
+    expect(pidProbe).toHaveBeenCalledTimes(1);
+    expect(readFileSync(`${fixture.path}.ingested`)).toEqual(
+      readFileSync(fixture.path),
+    );
+    expect(readFileSync(`${plainPath}.ingested`)).toEqual(readFileSync(plainPath));
+  });
+
+  it("ignores a stale admission seal when no release lock exists", async () => {
+    const directory = createScratchDirectory();
+    const envelope = safeEnvelope("scheduler");
+    const name = orderedSpoolName(7_485);
+    const path = join(directory, name);
+    writeEnvelope(path, envelope);
+    appendIndexRecord(directory, name);
+    const indexStat = statSync(join(directory, SPOOL_INDEX_NAME), {
+      bigint: true,
+    });
+    const staleSeal: AdmissionSeal = {
+      version: 2,
+      admissionRef: "a".repeat(64),
+      manifestSha256: "b".repeat(64),
+      indexDev: indexStat.dev.toString(),
+      indexIno: indexStat.ino.toString(),
+      prefixBytes: Number(indexStat.size),
+      lockDev: "1",
+      lockIno: "1",
+      lockSha256: "c".repeat(64),
+    };
+    const result = recordingSink();
+
+    await drainWithSeal(directory, result.sink, staleSeal);
+
+    expect(result.calls.map((entry) => entry.source_event_ref)).toEqual([
+      envelope.source_event_ref,
+    ]);
+    expect(readFileSync(`${path}.ingested`)).toEqual(readFileSync(path));
+  });
+
   it("keeps unsealed, out-of-prefix, or source-mismatched A1 records inert", async () => {
     type Mutator = (fixture: ReturnType<typeof createA1Fixture>) =>
       AdmissionSeal | undefined;
@@ -1903,6 +2201,11 @@ describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
         mode: 0o600,
       });
       appendFileSync(indexPath, `\n${fixture.record}\n`);
+      writeReleaseLock(
+        fixture.directory,
+        fixture.admissionRef,
+        statSync(indexPath).size,
+      );
       const result = recordingSink();
 
       await drainWithSeal(

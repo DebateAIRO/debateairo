@@ -111,12 +111,15 @@ describe("FIX-01 runtime module contract", () => {
     process.env.OBS_QUEUE_CAPACITY = "31";
     process.env.OBS_SPOOL_DIR = "/tmp/fix01-spool";
     process.env.OBS_SPOOL_ADMISSION_SEAL_V1 = [
-      "1",
+      "2",
       "a".repeat(64),
       "b".repeat(64),
       "16777234",
       "9007199254740991",
       "8192",
+      "16777235",
+      "9007199254740990",
+      "c".repeat(64),
     ].join(".");
     process.env.OBS_WRITER_DATABASE_URL = "postgres://writer:secret@127.0.0.1:5432/db";
 
@@ -125,12 +128,15 @@ describe("FIX-01 runtime module contract", () => {
       queueCapacity: 31,
       spoolDir: "/tmp/fix01-spool",
       spoolAdmissionSeal: {
-        version: 1,
+        version: 2,
         admissionRef: "a".repeat(64),
         manifestSha256: "b".repeat(64),
         indexDev: "16777234",
         indexIno: "9007199254740991",
         prefixBytes: 8_192,
+        lockDev: "16777235",
+        lockIno: "9007199254740990",
+        lockSha256: "c".repeat(64),
       },
       writerDatabaseUrl: "postgres://writer:secret@127.0.0.1:5432/db",
     });
@@ -145,15 +151,18 @@ describe("FIX-01 runtime module contract", () => {
 
   it.each([
     "",
-    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3",
-    "1." + "A".repeat(64) + "." + "b".repeat(64) + ".1.2.3",
-    "1." + "a".repeat(64) + "." + "b".repeat(63) + ".1.2.3",
-    "1." + "a".repeat(64) + "." + "b".repeat(64) + ".01.2.3",
-    "1." + "a".repeat(64) + "." + "b".repeat(64) + ".1.02.3",
-    "1." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.0",
-    "1." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.9007199254740992",
-    "1." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3.extra",
-    "x".repeat(257),
+    "1." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3.4.5." + "c".repeat(64),
+    "2." + "A".repeat(64) + "." + "b".repeat(64) + ".1.2.3.4.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(63) + ".1.2.3.4.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".01.2.3.4.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.02.3.4.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.0.4.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3.04.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3.4.05." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3.4.5." + "c".repeat(63),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.9007199254740992.4.5." + "c".repeat(64),
+    "2." + "a".repeat(64) + "." + "b".repeat(64) + ".1.2.3.4.5." + "c".repeat(64) + ".extra",
+    "x".repeat(513),
   ])("rejects a noncanonical or unbounded admission seal: %s", (seal) => {
     process.env.OBS_SPOOL_ADMISSION_SEAL_V1 = seal;
     expect(readObsBounds().spoolAdmissionSeal).toBeUndefined();

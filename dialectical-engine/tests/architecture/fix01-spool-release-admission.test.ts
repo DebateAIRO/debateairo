@@ -45,6 +45,7 @@ const GATE_TOOL_PATH = resolve(
 );
 const INDEX_NAME = ".obs-spool-index-v1";
 const CURSOR_NAME = ".obs-spool-cursor-v1";
+const RELEASE_LOCK_NAME = ".obs-spool-release-lock-v1";
 const BUILD_REF = "597f68b869413a33adfbc1f835184d469d9161bd";
 const DEAD_PID = 2_147_483_647;
 const GATE_MANIFEST_MAX_BYTES = 8 * 1024 * 1024;
@@ -77,7 +78,7 @@ interface ManifestEntry {
 }
 
 interface AdmissionManifest {
-  readonly version: 2;
+  readonly version: 3;
   readonly verdict: "PASS_EMPTY" | "PASS_INDEXED";
   readonly phase: "before_first_indexed_launch";
   readonly spool_directory_realpath: string;
@@ -103,15 +104,29 @@ interface AdmissionManifest {
     sha256: string;
     covered_lawful_count: number;
   }>;
+  readonly release_lock: null | Readonly<{
+    basename: typeof RELEASE_LOCK_NAME;
+    version: 1;
+    admission_ref: string;
+    dev: string;
+    ino: string;
+    nlink: 1;
+    size: number;
+    sha256: string;
+    prefix_bytes: number;
+  }>;
 }
 
 interface AdmissionSeal {
-  readonly version: 1;
+  readonly version: 2;
   readonly admissionRef: string;
   readonly manifestSha256: string;
   readonly indexDev: string;
   readonly indexIno: string;
   readonly prefixBytes: number;
+  readonly lockDev: string;
+  readonly lockIno: string;
+  readonly lockSha256: string;
 }
 
 function scratch(label: string): string {
@@ -159,6 +174,127 @@ function runAdmission(
   };
 }
 
+function runAdmissionCrashingBeforeFirstIndexWrite(
+  spoolDirectory: string,
+  manifestPath: string,
+  markerPath: string,
+): AdmissionResult {
+  const lockPath = join(spoolDirectory, RELEASE_LOCK_NAME);
+  const fsModule = [
+    'import * as fs from "node:fs";',
+    "export const closeSync = fs.closeSync;",
+    "export const constants = fs.constants;",
+    "export const fstatSync = fs.fstatSync;",
+    "export const fsyncSync = fs.fsyncSync;",
+    "export const lstatSync = fs.lstatSync;",
+    "export const openSync = fs.openSync;",
+    "let crashed = false;",
+    "export function writeSync(...arguments_) {",
+    `  if (!crashed && fs.existsSync(${JSON.stringify(lockPath)})) {`,
+    "    crashed = true;",
+    `    fs.appendFileSync(${JSON.stringify(markerPath)}, "crash");`,
+    "    throw new Error('MODELED_INDEX_WRITE_CRASH');",
+    "  }",
+    "  return fs.writeSync(...arguments_);",
+    "}",
+  ].join("\n");
+  const fsUrl = `data:text/javascript,${encodeURIComponent(fsModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier === "node:fs" && context.parentURL?.includes("/packages/obs-capture/src/spool-index.ts")) {',
+    `    return { url: ${JSON.stringify(fsUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      manifestPath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
+function runAdmissionWithProspectiveManifestBytes(
+  spoolDirectory: string,
+  manifestPath: string,
+  prospectiveBytes: number,
+): AdmissionResult {
+  const contractUrl = pathToFileURL(resolve(
+    process.cwd(),
+    "tools/obs-spool-release-contract.ts",
+  )).href;
+  const contractModule = [
+    `import * as actual from ${JSON.stringify(contractUrl)};`,
+    "export const FIX01_RELEASE_MANIFEST_MAX_BYTES = actual.FIX01_RELEASE_MANIFEST_MAX_BYTES;",
+    "export const FIX01_RELEASE_MANIFEST_VERSION = actual.FIX01_RELEASE_MANIFEST_VERSION;",
+    "export const FIX01_RELEASE_VERIFIER_VERSION = actual.FIX01_RELEASE_VERIFIER_VERSION;",
+    "export function canonicalFix01ReleaseJson(value) {",
+    "  if (value?.version === 3 && value?.verified_at === '9999-12-31T23:59:59.999Z') {",
+    `    return "x".repeat(${prospectiveBytes});`,
+    "  }",
+    "  return actual.canonicalFix01ReleaseJson(value);",
+    "}",
+  ].join("\n");
+  const contractProxyUrl = `data:text/javascript,${encodeURIComponent(contractModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier.includes("obs-spool-release-contract") && context.parentURL?.includes("/tools/obs-spool-release-admission.ts")) {',
+    `    return { url: ${JSON.stringify(contractProxyUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      manifestPath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
 function gateArgs(
   spoolDirectory: string,
   manifestPath: string,
@@ -189,6 +325,56 @@ function runGate(
   const child = spawnSync(
     process.execPath,
     gateArgs(spoolDirectory, manifestPath, manifestSha256, buildRef),
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
+function runGateWithBoundedCandidateSet(
+  spoolDirectory: string,
+  manifestPath: string,
+  manifestSha256: string,
+): AdmissionResult {
+  const argv = [
+    process.execPath,
+    GATE_TOOL_PATH,
+    "--spool-dir",
+    spoolDirectory,
+    "--build-ref",
+    BUILD_REF,
+    "--manifest",
+    manifestPath,
+    "--manifest-sha256",
+    manifestSha256,
+  ];
+  const gateUrl = pathToFileURL(GATE_TOOL_PATH).href;
+  const program = [
+    "const NativeSet = globalThis.Set;",
+    "let candidateNameAdds = 0;",
+    "globalThis.Set = class BoundedCandidateSet extends NativeSet {",
+    "  add(value) {",
+    "    if (typeof value === 'string' && /^(?:api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-[1-9][0-9]*-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.spool$/u.test(value)) {",
+    "      candidateNameAdds += 1;",
+    "      if (candidateNameAdds > 1) throw new Error('UNBOUNDED_GATE_WRITER_SET');",
+    "    }",
+    "    return super.add(value);",
+    "  }",
+    "};",
+    `process.argv = ${JSON.stringify(argv)};`,
+    `await import(${JSON.stringify(gateUrl)});`,
+  ].join("\n");
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", program],
     {
       cwd: process.cwd(),
       encoding: "utf8",
@@ -325,26 +511,41 @@ function gateSeal(output: string): AdmissionSeal | undefined {
   const encoded = /(?:^|\n)FIX01_SPOOL_LAUNCH_GATE PASS seal=([^\n]+)\n?$/u
     .exec(output)?.[1];
   if (encoded === undefined) return undefined;
-  const [version, admissionRef, manifestSha256, indexDev, indexIno, prefix] =
-    encoded.split(".");
+  const [
+    version,
+    admissionRef,
+    manifestSha256,
+    indexDev,
+    indexIno,
+    prefix,
+    lockDev,
+    lockIno,
+    lockSha256,
+  ] = encoded.split(".");
   const prefixBytes = Number(prefix);
   if (
-    version !== "1"
+    version !== "2"
     || admissionRef === undefined
     || manifestSha256 === undefined
     || indexDev === undefined
     || indexIno === undefined
+    || lockDev === undefined
+    || lockIno === undefined
+    || lockSha256 === undefined
     || !Number.isSafeInteger(prefixBytes)
   ) {
     return undefined;
   }
   return {
-    version: 1,
+    version: 2,
     admissionRef,
     manifestSha256,
     indexDev,
     indexIno,
     prefixBytes,
+    lockDev,
+    lockIno,
+    lockSha256,
   };
 }
 
@@ -464,7 +665,7 @@ describe("FIX-01 offline spool release admission", () => {
     expect(bytes.toString("utf8")).toBe(canonicalJson(manifest));
     expect(manifestDigestFromOutput(result.stdout)).toBe(sha256(bytes));
     expect(manifest).toMatchObject({
-      version: 2,
+      version: 3,
       verdict: "PASS_EMPTY",
       phase: "before_first_indexed_launch",
       spool_directory_realpath: spoolDirectory,
@@ -480,8 +681,150 @@ describe("FIX-01 offline spool release admission", () => {
       requires_v_review: false,
       entries: [],
       index: null,
+      release_lock: null,
     });
     expect(readdirSync(spoolDirectory)).toEqual([]);
+  });
+
+  it("binds one canonical release lock into the manifest and launch seal", () => {
+    const root = scratch("release-lock");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    const name = spoolName(90);
+    writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
+
+    const admitted = runAdmission(spoolDirectory, manifestPath);
+
+    expect(admitted.status, admitted.stderr).toBe(0);
+    const manifest = parseManifest(manifestPath);
+    const lockPath = join(spoolDirectory, RELEASE_LOCK_NAME);
+    const lockBytes = readFileSync(lockPath);
+    const lockStat = statSync(lockPath, { bigint: true });
+    expect(manifest).toMatchObject({
+      version: 3,
+      admission_record_count: 1,
+      release_lock: {
+        basename: RELEASE_LOCK_NAME,
+        version: 1,
+        admission_ref: manifest.admission_ref,
+        dev: lockStat.dev.toString(),
+        ino: lockStat.ino.toString(),
+        nlink: 1,
+        size: lockBytes.length,
+        sha256: sha256(lockBytes),
+        prefix_bytes: manifest.index?.size,
+      },
+    });
+    expect(lockBytes.toString("utf8")).toMatch(
+      new RegExp(
+        `^FIX01_RELEASE_LOCK_V1\\n${manifest.admission_ref}\\n[0-9a-f]{16}\\n[0-9a-f]{64}\\n$`,
+        "u",
+      ),
+    );
+    const digest = manifestDigestFromOutput(admitted.stdout)!;
+    const gated = runGate(spoolDirectory, manifestPath, digest);
+    expect(gated.status, gated.stderr).toBe(0);
+    expect(gateSeal(gated.stdout)).toEqual({
+      version: 2,
+      admissionRef: manifest.admission_ref,
+      manifestSha256: digest,
+      indexDev: manifest.index?.dev,
+      indexIno: manifest.index?.ino,
+      prefixBytes: manifest.index?.size,
+      lockDev: manifest.release_lock?.dev,
+      lockIno: manifest.release_lock?.ino,
+      lockSha256: manifest.release_lock?.sha256,
+    });
+  });
+
+  it("reuses the same release lock and admission ref after a pre-index crash", () => {
+    const root = scratch("release-lock-rerun");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    const markerPath = join(root, "crash-marker");
+    const name = spoolName(91);
+    writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
+
+    const crashed = runAdmissionCrashingBeforeFirstIndexWrite(
+      spoolDirectory,
+      manifestPath,
+      markerPath,
+    );
+
+    expect(crashed.status).not.toBe(0);
+    expect(crashed.stdout).not.toContain("PASS_");
+    expect(existsSync(markerPath)).toBe(true);
+    expect(existsSync(manifestPath)).toBe(false);
+    const lockPath = join(spoolDirectory, RELEASE_LOCK_NAME);
+    const lockBytes = readFileSync(lockPath);
+    const lockStat = statSync(lockPath, { bigint: true });
+    const lockAdmissionRef = lockBytes.toString("utf8").split("\n")[1]!;
+
+    const rerun = runAdmission(spoolDirectory, manifestPath);
+
+    expect(rerun.status, rerun.stderr).toBe(0);
+    const manifest = parseManifest(manifestPath);
+    expect(manifest.admission_ref).toBe(lockAdmissionRef);
+    expect(readFileSync(lockPath)).toEqual(lockBytes);
+    expect(statSync(lockPath, { bigint: true }).ino).toBe(lockStat.ino);
+    expect(readFileSync(join(spoolDirectory, INDEX_NAME), "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith(`A1\t${name}\t`)))
+      .toHaveLength(1);
+  });
+
+  it("rejects an over-cap manifest before creating lock or index authority", () => {
+    const root = scratch("manifest-preflight-cap");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    for (let index = 0; index < 24_000; index += 1) {
+      mkdirSync(join(
+        spoolDirectory,
+        `retained-${index.toString().padStart(5, "0")}-${"x".repeat(180)}`,
+      ));
+    }
+
+    const result = runAdmission(spoolDirectory, manifestPath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).not.toContain("PASS_");
+    expect(result.stderr).toContain("FAIL_MANIFEST_TOO_LARGE");
+    expect(existsSync(manifestPath)).toBe(false);
+    expect(existsSync(join(spoolDirectory, INDEX_NAME))).toBe(false);
+    expect(existsSync(join(spoolDirectory, RELEASE_LOCK_NAME))).toBe(false);
+  }, 60_000);
+
+  it("accepts the exact prospective cap and rejects cap plus one before mutation", () => {
+    const exactRoot = scratch("manifest-preflight-exact-cap");
+    const exactSpool = realpathSync(join(exactRoot, "spool"));
+    const exactManifest = join(exactRoot, "manifest.json");
+    writeFileSync(join(exactSpool, spoolName(92)), "", { mode: 0o600 });
+
+    const exact = runAdmissionWithProspectiveManifestBytes(
+      exactSpool,
+      exactManifest,
+      GATE_MANIFEST_MAX_BYTES,
+    );
+
+    expect(exact.status, exact.stderr).toBe(0);
+    expect(existsSync(join(exactSpool, INDEX_NAME))).toBe(true);
+    expect(existsSync(join(exactSpool, RELEASE_LOCK_NAME))).toBe(true);
+
+    const overRoot = scratch("manifest-preflight-cap-plus-one");
+    const overSpool = realpathSync(join(overRoot, "spool"));
+    const overManifest = join(overRoot, "manifest.json");
+    writeFileSync(join(overSpool, spoolName(93)), "", { mode: 0o600 });
+    const over = runAdmissionWithProspectiveManifestBytes(
+      overSpool,
+      overManifest,
+      GATE_MANIFEST_MAX_BYTES + 1,
+    );
+
+    expect(over.status).not.toBe(0);
+    expect(over.stderr).toContain("FAIL_MANIFEST_TOO_LARGE");
+    expect(existsSync(overManifest)).toBe(false);
+    expect(existsSync(join(overSpool, INDEX_NAME))).toBe(false);
+    expect(existsSync(join(overSpool, RELEASE_LOCK_NAME))).toBe(false);
   });
 
   it("indexes every legacy candidate, preserves every byte, and repairs a partial framed index", async () => {
@@ -520,7 +863,7 @@ describe("FIX-01 offline spool release admission", () => {
     expect(result.status, result.stderr).toBe(0);
     const manifest = parseManifest(manifestPath);
     expect(manifest).toMatchObject({
-      version: 2,
+      version: 3,
       verdict: "PASS_INDEXED",
       admission_ref: expect.stringMatching(/^[0-9a-f]{64}$/u),
       admission_record_count: 4,
@@ -569,7 +912,14 @@ describe("FIX-01 offline spool release admission", () => {
       },
       async close(): Promise<void> {},
     };
-    await drainDeadSpoolFiles({ spoolDirectory, databaseSink });
+    const digest = manifestDigestFromOutput(result.stdout)!;
+    const gated = runGate(spoolDirectory, manifestPath, digest);
+    expect(gated.status, gated.stderr).toBe(0);
+    await drainWithAdmissionSeal({
+      spoolDirectory,
+      databaseSink,
+      admissionSeal: gateSeal(gated.stdout),
+    });
     expect(ingested).toEqual([
       "00000000-0000-4000-8000-000000000101",
       "00000000-0000-4000-8000-000000000102",
@@ -883,7 +1233,14 @@ describe("FIX-01 offline spool release admission", () => {
       },
       async close(): Promise<void> {},
     };
-    await drainDeadSpoolFiles({ spoolDirectory, databaseSink });
+    const digest = manifestDigestFromOutput(admitted.stdout)!;
+    const gated = runGate(spoolDirectory, finalManifestPath, digest);
+    expect(gated.status, gated.stderr).toBe(0);
+    await drainWithAdmissionSeal({
+      spoolDirectory,
+      databaseSink,
+      admissionSeal: gateSeal(gated.stdout),
+    });
     expect(ingested).toEqual([source.source_event_ref]);
     expect(readFileSync(`${sourcePath}.ingested`)).toEqual(readFileSync(sourcePath));
   }, 30_000);
@@ -906,7 +1263,7 @@ describe("FIX-01 offline spool release admission", () => {
     expect(result.stdout).toContain("PASS_INDEXED");
     expect(readFileSync(markerPath, "utf8")).toBe("x");
     expect(parseManifest(manifestPath)).toMatchObject({
-      version: 2,
+      version: 3,
       admission_record_count: 1,
     });
     expect(readFileSync(join(spoolDirectory, INDEX_NAME), "utf8"))
@@ -932,12 +1289,15 @@ describe("FIX-01 offline spool release admission", () => {
     const firstGate = runGate(spoolDirectory, manifestPath, digest!);
     expect(firstGate.status, firstGate.stderr).toBe(0);
     expect(gateSeal(firstGate.stdout)).toEqual({
-      version: 1,
+      version: 2,
       admissionRef: manifest.admission_ref,
       manifestSha256: digest,
       indexDev: manifest.index?.dev,
       indexIno: manifest.index?.ino,
       prefixBytes: manifest.index?.size,
+      lockDev: manifest.release_lock?.dev,
+      lockIno: manifest.release_lock?.ino,
+      lockSha256: manifest.release_lock?.sha256,
     });
 
     appendSpoolIndexBasename({
@@ -962,10 +1322,37 @@ describe("FIX-01 offline spool release admission", () => {
         Buffer.from(suffix, "utf8"),
       ]));
       const afterA1 = runGate(spoolDirectory, manifestPath, digest!);
-      expect(afterA1.status, suffix).not.toBe(0);
-      expect(afterA1.stderr, suffix).toContain("FAIL_A1_OUTSIDE_PREFIX");
-      expect(afterA1.stdout, suffix).not.toContain("PASS");
+      expect(afterA1.status, `${suffix}:${afterA1.stderr}`).toBe(0);
+      expect(gateSeal(afterA1.stdout), suffix).toEqual(gateSeal(firstGate.stdout));
     }
+  });
+
+  it("retains writer-name coverage only for manifest candidates while streaming the index", () => {
+    const root = scratch("gate-bounded-candidate-set");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    const unrelatedNames = Array.from(
+      { length: 12 },
+      (_, index) => spoolName(100 + index),
+    );
+    writeFileSync(
+      join(spoolDirectory, INDEX_NAME),
+      unrelatedNames.map((name) => `\n${name}\n`).join(""),
+      { mode: 0o600 },
+    );
+    writeFileSync(join(spoolDirectory, spoolName(220)), "", { mode: 0o600 });
+    const admitted = runAdmission(spoolDirectory, manifestPath);
+    expect(admitted.status, admitted.stderr).toBe(0);
+    const digest = manifestDigestFromOutput(admitted.stdout)!;
+
+    const gated = runGateWithBoundedCandidateSet(
+      spoolDirectory,
+      manifestPath,
+      digest,
+    );
+
+    expect(gated.status, gated.stderr).toBe(0);
+    expect(gateSeal(gated.stdout)).toBeDefined();
   });
 
   it("rejects wrong launch inputs and changed manifest or sealed-index identity and bytes", () => {
@@ -1027,6 +1414,17 @@ describe("FIX-01 offline spool release admission", () => {
     ).status).not.toBe(0);
 
     const oversizedManifest = admittedCase("gate-oversized-manifest");
+    const exactCapManifest = admittedCase("gate-exact-cap-manifest");
+    const exactCapBytes = Buffer.alloc(GATE_MANIFEST_MAX_BYTES, 0x20);
+    writeFileSync(exactCapManifest.manifestPath, exactCapBytes);
+    const exactCapGate = runGate(
+      exactCapManifest.spoolDirectory,
+      exactCapManifest.manifestPath,
+      sha256(exactCapBytes),
+    );
+    expect(exactCapGate.status).not.toBe(0);
+    expect(exactCapGate.stderr).not.toContain("FAIL_MANIFEST_TOO_LARGE");
+
     const oversizedBytes = Buffer.alloc(GATE_MANIFEST_MAX_BYTES + 1, 0x20);
     writeFileSync(oversizedManifest.manifestPath, oversizedBytes);
     const oversizedGate = runGate(
@@ -1103,6 +1501,53 @@ describe("FIX-01 offline spool release admission", () => {
       indexSymlink.spoolDirectory,
       indexSymlink.manifestPath,
       indexSymlink.digest,
+    ).status).not.toBe(0);
+
+    const lockTamper = admittedCase("gate-lock-tamper");
+    const lockTamperPath = join(lockTamper.spoolDirectory, RELEASE_LOCK_NAME);
+    const tamperedLockBytes = readFileSync(lockTamperPath);
+    tamperedLockBytes[0] = 0x58;
+    writeFileSync(lockTamperPath, tamperedLockBytes, { mode: 0o600 });
+    expect(runGate(
+      lockTamper.spoolDirectory,
+      lockTamper.manifestPath,
+      lockTamper.digest,
+    ).status).not.toBe(0);
+
+    const lockHardlink = admittedCase("gate-lock-hardlink");
+    linkSync(
+      join(lockHardlink.spoolDirectory, RELEASE_LOCK_NAME),
+      join(lockHardlink.root, "lock-link"),
+    );
+    expect(runGate(
+      lockHardlink.spoolDirectory,
+      lockHardlink.manifestPath,
+      lockHardlink.digest,
+    ).status).not.toBe(0);
+
+    const lockSymlink = admittedCase("gate-lock-symlink");
+    const lockSymlinkPath = join(lockSymlink.spoolDirectory, RELEASE_LOCK_NAME);
+    const realLock = join(lockSymlink.root, "real-lock");
+    renameSync(lockSymlinkPath, realLock);
+    symlinkSync(realLock, lockSymlinkPath);
+    expect(runGate(
+      lockSymlink.spoolDirectory,
+      lockSymlink.manifestPath,
+      lockSymlink.digest,
+    ).status).not.toBe(0);
+
+    const lockReplacement = admittedCase("gate-lock-replacement");
+    const lockReplacementPath = join(
+      lockReplacement.spoolDirectory,
+      RELEASE_LOCK_NAME,
+    );
+    const replacementLockBytes = readFileSync(lockReplacementPath);
+    renameSync(lockReplacementPath, `${lockReplacementPath}.old`);
+    writeFileSync(lockReplacementPath, replacementLockBytes, { mode: 0o600 });
+    expect(runGate(
+      lockReplacement.spoolDirectory,
+      lockReplacement.manifestPath,
+      lockReplacement.digest,
     ).status).not.toBe(0);
   }, 60_000);
 

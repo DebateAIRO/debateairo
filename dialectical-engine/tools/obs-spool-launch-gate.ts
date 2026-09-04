@@ -11,18 +11,23 @@ import {
   encodeSpoolAdmissionSeal,
   isIndexedSpoolBasename,
   parseSpoolAdmissionIndexRecord,
+  readSpoolReleaseLock,
   SPOOL_CURSOR_NAME,
   SPOOL_INDEX_NAME,
+  SPOOL_RELEASE_LOCK_NAME,
 } from "../packages/obs-capture/src/spool-index.js";
 import {
   canonicalFix01ReleaseJson as canonicalJson,
   FIX01_RELEASE_ENTRY_KEYS as ENTRY_KEYS,
   FIX01_RELEASE_INDEX_KEYS as INDEX_KEYS,
+  FIX01_RELEASE_LOCK_KEYS as LOCK_KEYS,
+  FIX01_RELEASE_MANIFEST_MAX_BYTES as MANIFEST_MAX_BYTES,
   FIX01_RELEASE_MANIFEST_KEYS as MANIFEST_KEYS,
   FIX01_RELEASE_MANIFEST_VERSION as MANIFEST_VERSION,
   FIX01_RELEASE_VERIFIER_VERSION as VERIFIER_VERSION,
-  type Fix01ReleaseAdmissionManifestV2,
+  type Fix01ReleaseAdmissionManifestV3,
   type Fix01ReleaseManifestIndexV2,
+  type Fix01ReleaseManifestLockV3,
 } from "./obs-spool-release-contract.js";
 
 const IMMUTABLE_BUILD_REF = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
@@ -32,7 +37,6 @@ const VERIFIED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 const IO_CHUNK_BYTES = 64 * 1024;
 const INDEX_LINE_MAX_BYTES = 174;
-const MANIFEST_MAX_BYTES = 8 * 1024 * 1024;
 
 interface Arguments {
   readonly spoolDirectory: string;
@@ -65,10 +69,14 @@ interface CandidateEntry {
   readonly reason: null;
 }
 
-type AdmissionManifest = Omit<Fix01ReleaseAdmissionManifestV2, "index" | "verdict">
+type AdmissionManifest = Omit<
+  Fix01ReleaseAdmissionManifestV3,
+  "index" | "release_lock" | "verdict"
+>
   & Readonly<{
     verdict: "PASS_INDEXED";
     index: Fix01ReleaseManifestIndexV2;
+    release_lock: Fix01ReleaseManifestLockV3;
   }>;
 
 class GateFailure extends Error {
@@ -356,6 +364,8 @@ function parseManifest(
     || !Array.isArray(value.entries)
     || !isRecord(value.index)
     || !exactKeys(value.index, INDEX_KEYS)
+    || !isRecord(value.release_lock)
+    || !exactKeys(value.release_lock, LOCK_KEYS)
   ) {
     fail("FAIL_MANIFEST_SCHEMA");
   }
@@ -384,6 +394,7 @@ function parseManifest(
   }
 
   const index = value.index;
+  const releaseLock = value.release_lock;
   if (
     index.basename !== SPOOL_INDEX_NAME
     || !isCanonicalUint64(index.dev)
@@ -400,6 +411,23 @@ function parseManifest(
     || reservedIndex.nlink !== index.nlink
     || reservedIndex.size !== index.size
     || reservedIndex.sha256 !== index.sha256
+  ) {
+    fail("FAIL_MANIFEST_SCHEMA");
+  }
+  if (
+    releaseLock.basename !== SPOOL_RELEASE_LOCK_NAME
+    || releaseLock.version !== 1
+    || releaseLock.admission_ref !== value.admission_ref
+    || !isCanonicalUint64(releaseLock.dev)
+    || !isCanonicalUint64(releaseLock.ino)
+    || releaseLock.nlink !== 1
+    || !isSafeNonnegativeInteger(releaseLock.size)
+    || releaseLock.size <= 0
+    || typeof releaseLock.sha256 !== "string"
+    || !LOWER_HEX_256.test(releaseLock.sha256)
+    || !isSafeNonnegativeInteger(releaseLock.prefix_bytes)
+    || releaseLock.prefix_bytes <= 0
+    || releaseLock.prefix_bytes !== index.size
   ) {
     fail("FAIL_MANIFEST_SCHEMA");
   }
@@ -469,12 +497,16 @@ async function verifyIndexPrefix(
   let lastPrefixByte: number | undefined;
   let line: number[] = [];
   let overlong = false;
-  let suffixLinePosition = 0;
 
   function finishPrefixLine(): void {
     if (!overlong && line.length > 0) {
       const rawLine = Buffer.from(line).toString("utf8");
-      if (isIndexedSpoolBasename(rawLine)) writerBasenames.add(rawLine);
+      if (
+        isIndexedSpoolBasename(rawLine)
+        && expectedAdmissions.has(rawLine)
+      ) {
+        writerBasenames.add(rawLine);
+      }
       const parsed = parseSpoolAdmissionIndexRecord(rawLine);
       if (
         parsed !== undefined
@@ -515,15 +547,6 @@ async function verifyIndexPrefix(
           }
         }
       }
-      for (let position = withinPrefix; position < chunk.length; position += 1) {
-        const byte = chunk[position]!;
-        if (suffixLinePosition === 0) {
-          if (byte === 0x41) fail("FAIL_A1_OUTSIDE_PREFIX");
-          suffixLinePosition = byte === 0x0a ? 0 : -1;
-        } else if (byte === 0x0a) {
-          suffixLinePosition = 0;
-        }
-      }
     },
   );
   if (
@@ -556,6 +579,24 @@ async function verifyIndexPrefix(
   }
 }
 
+async function verifyReleaseLock(
+  manifest: AdmissionManifest,
+  spoolDirectory: string,
+): Promise<void> {
+  const observed = await readSpoolReleaseLock(spoolDirectory);
+  if (
+    observed.status !== "valid"
+    || observed.lock.admissionRef !== manifest.release_lock.admission_ref
+    || observed.lock.dev !== manifest.release_lock.dev
+    || observed.lock.ino !== manifest.release_lock.ino
+    || observed.lock.size !== manifest.release_lock.size
+    || observed.lock.sha256 !== manifest.release_lock.sha256
+    || observed.lock.prefixBytes !== manifest.release_lock.prefix_bytes
+  ) {
+    fail("FAIL_RELEASE_LOCK");
+  }
+}
+
 async function run(arguments_: Arguments): Promise<string> {
   const spoolDirectory = await validateSpoolPath(arguments_.spoolDirectory);
   const manifestPath = resolve(arguments_.manifestPath);
@@ -569,14 +610,18 @@ async function run(arguments_: Arguments): Promise<string> {
   }
   const options = { ...arguments_, spoolDirectory };
   const manifest = parseManifest(manifestFile.bytes, options);
+  await verifyReleaseLock(manifest, spoolDirectory);
   await verifyIndexPrefix(manifest, join(spoolDirectory, SPOOL_INDEX_NAME));
   return encodeSpoolAdmissionSeal({
-    version: 1,
+    version: 2,
     admissionRef: manifest.admission_ref,
     manifestSha256: arguments_.manifestSha256,
     indexDev: manifest.index.dev,
     indexIno: manifest.index.ino,
     prefixBytes: manifest.index.size,
+    lockDev: manifest.release_lock.dev,
+    lockIno: manifest.release_lock.ino,
+    lockSha256: manifest.release_lock.sha256,
   });
 }
 

@@ -8,12 +8,14 @@ import {
   openSync,
   writeSync,
 } from "node:fs";
+import type { BigIntStats } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 
 export const SPOOL_INDEX_NAME = ".obs-spool-index-v1";
 export const SPOOL_CURSOR_NAME = ".obs-spool-cursor-v1";
+export const SPOOL_RELEASE_LOCK_NAME = ".obs-spool-release-lock-v1";
 
 const INDEX_PAGE_MAX_BYTES = 8_192;
 const INDEX_PAGE_MAX_RECORDS = 64;
@@ -31,7 +33,13 @@ const CANONICAL_DECIMAL = /^(?:0|[1-9][0-9]*)$/u;
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 const ADMISSION_PROOF_DOMAIN = "FIX01-SPOOL-ADMISSION-PROOF-V1";
 const ADMISSION_RECORD_PREFIX = "A1\t";
-const ADMISSION_SEAL_MAX_BYTES = 256;
+const ADMISSION_SEAL_MAX_BYTES = 512;
+const RELEASE_LOCK_VERSION_LINE = "FIX01_RELEASE_LOCK_V1";
+const RELEASE_LOCK_CHECKSUM_DOMAIN = "FIX01-RELEASE-LOCK-V1";
+const RELEASE_LOCK_BYTES = Buffer.byteLength(
+  `${RELEASE_LOCK_VERSION_LINE}\n${"0".repeat(64)}\n${"0".repeat(16)}\n${"0".repeat(64)}\n`,
+  "utf8",
+);
 
 interface FileIdentity {
   readonly dev: bigint;
@@ -51,13 +59,31 @@ export interface SpoolAdmissionProofEvidence {
 }
 
 export interface SpoolAdmissionSeal {
-  readonly version: 1;
+  readonly version: 2;
   readonly admissionRef: string;
   readonly manifestSha256: string;
   readonly indexDev: string;
   readonly indexIno: string;
   readonly prefixBytes: number;
+  readonly lockDev: string;
+  readonly lockIno: string;
+  readonly lockSha256: string;
 }
+
+export interface SpoolReleaseLock {
+  readonly version: 1;
+  readonly admissionRef: string;
+  readonly dev: string;
+  readonly ino: string;
+  readonly size: number;
+  readonly sha256: string;
+  readonly prefixBytes: number;
+}
+
+export type SpoolReleaseLockState =
+  | Readonly<{ status: "absent" }>
+  | Readonly<{ status: "invalid" }>
+  | Readonly<{ status: "valid"; lock: SpoolReleaseLock }>;
 
 export interface WriterSpoolIndexRecord {
   readonly kind: "writer";
@@ -222,10 +248,20 @@ export function parseSpoolAdmissionSeal(
     return undefined;
   }
   const fields = value.split(".");
-  if (fields.length !== 6) return undefined;
-  const [version, admissionRef, manifestSha256, indexDev, indexIno, prefix] = fields;
+  if (fields.length !== 9) return undefined;
+  const [
+    version,
+    admissionRef,
+    manifestSha256,
+    indexDev,
+    indexIno,
+    prefix,
+    lockDev,
+    lockIno,
+    lockSha256,
+  ] = fields;
   if (
-    version !== "1"
+    version !== "2"
     || admissionRef === undefined
     || !LOWER_HEX_256.test(admissionRef)
     || manifestSha256 === undefined
@@ -236,18 +272,27 @@ export function parseSpoolAdmissionSeal(
     || !isCanonicalDecimal(indexIno)
     || prefix === undefined
     || !CANONICAL_DECIMAL.test(prefix)
+    || lockDev === undefined
+    || !isCanonicalDecimal(lockDev)
+    || lockIno === undefined
+    || !isCanonicalDecimal(lockIno)
+    || lockSha256 === undefined
+    || !LOWER_HEX_256.test(lockSha256)
   ) {
     return undefined;
   }
   const prefixBytes = Number(prefix);
   if (!Number.isSafeInteger(prefixBytes) || prefixBytes <= 0) return undefined;
   return Object.freeze({
-    version: 1,
+    version: 2,
     admissionRef,
     manifestSha256,
     indexDev,
     indexIno,
     prefixBytes,
+    lockDev,
+    lockIno,
+    lockSha256,
   });
 }
 
@@ -259,6 +304,9 @@ export function encodeSpoolAdmissionSeal(seal: SpoolAdmissionSeal): string {
     seal.indexDev,
     seal.indexIno,
     String(seal.prefixBytes),
+    seal.lockDev,
+    seal.lockIno,
+    seal.lockSha256,
   ].join(".");
   const parsed = parseSpoolAdmissionSeal(value);
   if (
@@ -268,10 +316,156 @@ export function encodeSpoolAdmissionSeal(seal: SpoolAdmissionSeal): string {
     || parsed.indexDev !== seal.indexDev
     || parsed.indexIno !== seal.indexIno
     || parsed.prefixBytes !== seal.prefixBytes
+    || parsed.lockDev !== seal.lockDev
+    || parsed.lockIno !== seal.lockIno
+    || parsed.lockSha256 !== seal.lockSha256
   ) {
     throw new TypeError("SPOOL_ADMISSION_SEAL_INVALID");
   }
   return value;
+}
+
+export function encodeSpoolReleaseLock(options: {
+  readonly admissionRef: string;
+  readonly prefixBytes: number;
+}): Buffer {
+  if (
+    !LOWER_HEX_256.test(options.admissionRef)
+    || !Number.isSafeInteger(options.prefixBytes)
+    || options.prefixBytes <= 0
+  ) {
+    throw new TypeError("SPOOL_RELEASE_LOCK_REF_INVALID");
+  }
+  const boundary = options.prefixBytes.toString(16).padStart(16, "0");
+  const checksum = createHash("sha256").update([
+    RELEASE_LOCK_CHECKSUM_DOMAIN,
+    options.admissionRef,
+    String(options.prefixBytes),
+  ].join("\0")).digest("hex");
+  return Buffer.from(
+    `${RELEASE_LOCK_VERSION_LINE}\n${options.admissionRef}\n${boundary}\n${checksum}\n`,
+    "utf8",
+  );
+}
+
+function sameStableFileSnapshot(
+  left: BigIntStats,
+  right: BigIntStats,
+): boolean {
+  return sameIdentity(left, right)
+    && left.nlink === right.nlink
+    && left.size === right.size
+    && left.mtimeNs === right.mtimeNs
+    && left.ctimeNs === right.ctimeNs;
+}
+
+function parseReleaseLock(bytes: Buffer): Readonly<{
+  admissionRef: string;
+  prefixBytes: number;
+}> | undefined {
+  if (bytes.length !== RELEASE_LOCK_BYTES) return undefined;
+  const match = /^FIX01_RELEASE_LOCK_V1\n([0-9a-f]{64})\n([0-9a-f]{16})\n([0-9a-f]{64})\n$/u.exec(
+    bytes.toString("utf8"),
+  );
+  const admissionRef = match?.[1];
+  const boundary = match?.[2];
+  const checksum = match?.[3];
+  if (
+    admissionRef === undefined
+    || boundary === undefined
+    || checksum === undefined
+  ) {
+    return undefined;
+  }
+  const parsedBoundary = BigInt(`0x${boundary}`);
+  if (parsedBoundary <= 0n || parsedBoundary > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return undefined;
+  }
+  const prefixBytes = Number(parsedBoundary);
+  const expectedChecksum = createHash("sha256").update([
+    RELEASE_LOCK_CHECKSUM_DOMAIN,
+    admissionRef,
+    String(prefixBytes),
+  ].join("\0")).digest("hex");
+  return checksum === expectedChecksum
+    ? Object.freeze({ admissionRef, prefixBytes })
+    : undefined;
+}
+
+export async function readSpoolReleaseLock(
+  directory: string,
+): Promise<SpoolReleaseLockState> {
+  const path = join(directory, SPOOL_RELEASE_LOCK_NAME);
+  let before: BigIntStats;
+  try {
+    before = await lstat(path, { bigint: true });
+  } catch (error) {
+    return isRecord(error) && error.code === "ENOENT"
+      ? Object.freeze({ status: "absent" })
+      : Object.freeze({ status: "invalid" });
+  }
+  if (
+    !before.isFile()
+    || before.nlink !== 1n
+    || before.size !== BigInt(RELEASE_LOCK_BYTES)
+  ) {
+    return Object.freeze({ status: "invalid" });
+  }
+  let handle: FileHandle | undefined;
+  try {
+    handle = await open(
+      path,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    const descriptor = await handle.stat({ bigint: true });
+    if (
+      !descriptor.isFile()
+      || descriptor.nlink !== 1n
+      || !sameStableFileSnapshot(before, descriptor)
+    ) {
+      return Object.freeze({ status: "invalid" });
+    }
+    const bytes = await readFixedBytes(handle, RELEASE_LOCK_BYTES, 0);
+    if (bytes === undefined) return Object.freeze({ status: "invalid" });
+    const probe = Buffer.alloc(1);
+    if (
+      (await handle.read(probe, 0, 1, RELEASE_LOCK_BYTES)).bytesRead !== 0
+    ) {
+      return Object.freeze({ status: "invalid" });
+    }
+    const afterDescriptor = await handle.stat({ bigint: true });
+    const afterPath = await lstat(path, { bigint: true });
+    if (
+      !afterDescriptor.isFile()
+      || !afterPath.isFile()
+      || afterDescriptor.nlink !== 1n
+      || afterPath.nlink !== 1n
+      || !sameStableFileSnapshot(descriptor, afterDescriptor)
+      || !sameStableFileSnapshot(descriptor, afterPath)
+    ) {
+      return Object.freeze({ status: "invalid" });
+    }
+    const parsed = parseReleaseLock(bytes);
+    if (parsed === undefined) {
+      return Object.freeze({ status: "invalid" });
+    }
+    return Object.freeze({
+      status: "valid",
+      lock: Object.freeze({
+        version: 1,
+        admissionRef: parsed.admissionRef,
+        dev: descriptor.dev.toString(),
+        ino: descriptor.ino.toString(),
+        size: RELEASE_LOCK_BYTES,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        prefixBytes: parsed.prefixBytes,
+      }),
+    });
+  } catch {
+    return Object.freeze({ status: "invalid" });
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
 }
 
 function parseCursorSlot(
