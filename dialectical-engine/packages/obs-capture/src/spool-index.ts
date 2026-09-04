@@ -17,17 +17,70 @@ export const SPOOL_CURSOR_NAME = ".obs-spool-cursor-v1";
 
 const INDEX_PAGE_MAX_BYTES = 8_192;
 const INDEX_PAGE_MAX_RECORDS = 64;
-const INDEX_RECORD_MAX_BYTES = 128;
+const PLAIN_INDEX_RECORD_MAX_BYTES = 128;
+const INDEX_RECORD_MAX_BYTES = 175;
 const INDEX_APPEND_MAX_BYTES = INDEX_RECORD_MAX_BYTES + 1;
 const CURSOR_SLOT_BYTES = 512;
 const CURSOR_FILE_BYTES = CURSOR_SLOT_BYTES * 2;
 const CURSOR_VERSION = 1;
 const CURSOR_SEQUENCE_RESET_AT = 1_000_000_000;
 const SPOOL_BASENAME = /^(api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-[1-9][0-9]*-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.spool$/u;
+const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
+const BASE64URL_SHA256 = /^[A-Za-z0-9_-]{43}$/u;
+const CANONICAL_DECIMAL = /^(?:0|[1-9][0-9]*)$/u;
+const MAX_UINT64 = 18_446_744_073_709_551_615n;
+const ADMISSION_PROOF_DOMAIN = "FIX01-SPOOL-ADMISSION-PROOF-V1";
+const ADMISSION_RECORD_PREFIX = "A1\t";
+const ADMISSION_SEAL_MAX_BYTES = 256;
 
 interface FileIdentity {
   readonly dev: bigint;
   readonly ino: bigint;
+}
+
+export interface SpoolAdmissionProofEvidence {
+  readonly admissionRef: string;
+  readonly basename: string;
+  readonly dev: string;
+  readonly ino: string;
+  readonly nlink: "1";
+  readonly size: string;
+  readonly mtimeNs: string;
+  readonly ctimeNs: string;
+  readonly sourceSha256: string;
+}
+
+export interface SpoolAdmissionSeal {
+  readonly version: 1;
+  readonly admissionRef: string;
+  readonly manifestSha256: string;
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly prefixBytes: number;
+}
+
+export interface WriterSpoolIndexRecord {
+  readonly kind: "writer";
+  readonly basename: string;
+  readonly recordEndOffset: number;
+}
+
+export interface AdmissionSpoolIndexRecord {
+  readonly kind: "admission";
+  readonly basename: string;
+  readonly proof: string;
+  readonly recordEndOffset: number;
+}
+
+export type SpoolIndexRecord =
+  | WriterSpoolIndexRecord
+  | AdmissionSpoolIndexRecord;
+
+export interface TypedSpoolIndexPage {
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly indexSize: number;
+  readonly records: readonly SpoolIndexRecord[];
 }
 
 interface CursorRecord {
@@ -65,6 +118,160 @@ function cursorChecksum(value: Omit<CursorRecord, "checksum">): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isCanonicalDecimal(value: string): boolean {
+  if (!CANONICAL_DECIMAL.test(value)) return false;
+  try {
+    return BigInt(value) <= MAX_UINT64;
+  } catch {
+    return false;
+  }
+}
+
+function isCanonicalSha256Base64Url(value: string): boolean {
+  if (!BASE64URL_SHA256.test(value)) return false;
+  try {
+    const decoded = Buffer.from(value, "base64url");
+    return decoded.length === 32 && decoded.toString("base64url") === value;
+  } catch {
+    return false;
+  }
+}
+
+function isSpoolAdmissionProofEvidence(
+  value: SpoolAdmissionProofEvidence,
+): boolean {
+  return LOWER_HEX_256.test(value.admissionRef)
+    && isIndexedSpoolBasename(value.basename)
+    && isCanonicalDecimal(value.dev)
+    && isCanonicalDecimal(value.ino)
+    && value.nlink === "1"
+    && isCanonicalDecimal(value.size)
+    && isCanonicalDecimal(value.mtimeNs)
+    && isCanonicalDecimal(value.ctimeNs)
+    && LOWER_HEX_256.test(value.sourceSha256);
+}
+
+export function createSpoolAdmissionProof(
+  evidence: SpoolAdmissionProofEvidence,
+): string {
+  if (!isSpoolAdmissionProofEvidence(evidence)) {
+    throw new TypeError("SPOOL_ADMISSION_PROOF_EVIDENCE_INVALID");
+  }
+  return createHash("sha256")
+    .update([
+      ADMISSION_PROOF_DOMAIN,
+      evidence.admissionRef,
+      evidence.basename,
+      evidence.dev,
+      evidence.ino,
+      evidence.nlink,
+      evidence.size,
+      evidence.mtimeNs,
+      evidence.ctimeNs,
+      evidence.sourceSha256,
+    ].join("\0"))
+    .digest("base64url");
+}
+
+export function encodeSpoolAdmissionIndexRecord(options: {
+  readonly basename: string;
+  readonly proof: string;
+}): string {
+  if (
+    !isIndexedSpoolBasename(options.basename)
+    || !isCanonicalSha256Base64Url(options.proof)
+  ) {
+    throw new TypeError("SPOOL_ADMISSION_INDEX_RECORD_INVALID");
+  }
+  const record = `${ADMISSION_RECORD_PREFIX}${options.basename}\t${options.proof}`;
+  if (Buffer.byteLength(record, "utf8") + 1 > INDEX_RECORD_MAX_BYTES) {
+    throw new TypeError("SPOOL_INDEX_RECORD_TOO_LARGE");
+  }
+  return record;
+}
+
+export function parseSpoolAdmissionIndexRecord(
+  value: string,
+): Readonly<{ basename: string; proof: string }> | undefined {
+  const fields = value.split("\t");
+  if (fields.length !== 3 || fields[0] !== "A1") return undefined;
+  const basename = fields[1];
+  const proof = fields[2];
+  if (
+    basename === undefined
+    || proof === undefined
+    || !isIndexedSpoolBasename(basename)
+    || !isCanonicalSha256Base64Url(proof)
+    || Buffer.byteLength(value, "utf8") + 1 > INDEX_RECORD_MAX_BYTES
+  ) {
+    return undefined;
+  }
+  return Object.freeze({ basename, proof });
+}
+
+export function parseSpoolAdmissionSeal(
+  value: string | undefined,
+): SpoolAdmissionSeal | undefined {
+  if (
+    value === undefined
+    || value.length === 0
+    || Buffer.byteLength(value, "utf8") > ADMISSION_SEAL_MAX_BYTES
+  ) {
+    return undefined;
+  }
+  const fields = value.split(".");
+  if (fields.length !== 6) return undefined;
+  const [version, admissionRef, manifestSha256, indexDev, indexIno, prefix] = fields;
+  if (
+    version !== "1"
+    || admissionRef === undefined
+    || !LOWER_HEX_256.test(admissionRef)
+    || manifestSha256 === undefined
+    || !LOWER_HEX_256.test(manifestSha256)
+    || indexDev === undefined
+    || !isCanonicalDecimal(indexDev)
+    || indexIno === undefined
+    || !isCanonicalDecimal(indexIno)
+    || prefix === undefined
+    || !CANONICAL_DECIMAL.test(prefix)
+  ) {
+    return undefined;
+  }
+  const prefixBytes = Number(prefix);
+  if (!Number.isSafeInteger(prefixBytes) || prefixBytes <= 0) return undefined;
+  return Object.freeze({
+    version: 1,
+    admissionRef,
+    manifestSha256,
+    indexDev,
+    indexIno,
+    prefixBytes,
+  });
+}
+
+export function encodeSpoolAdmissionSeal(seal: SpoolAdmissionSeal): string {
+  const value = [
+    String(seal.version),
+    seal.admissionRef,
+    seal.manifestSha256,
+    seal.indexDev,
+    seal.indexIno,
+    String(seal.prefixBytes),
+  ].join(".");
+  const parsed = parseSpoolAdmissionSeal(value);
+  if (
+    parsed === undefined
+    || parsed.admissionRef !== seal.admissionRef
+    || parsed.manifestSha256 !== seal.manifestSha256
+    || parsed.indexDev !== seal.indexDev
+    || parsed.indexIno !== seal.indexIno
+    || parsed.prefixBytes !== seal.prefixBytes
+  ) {
+    throw new TypeError("SPOOL_ADMISSION_SEAL_INVALID");
+  }
+  return value;
 }
 
 function parseCursorSlot(
@@ -296,20 +503,15 @@ async function persistCursor(
 }
 
 export function isIndexedSpoolBasename(value: string): boolean {
-  return value.length <= INDEX_RECORD_MAX_BYTES - 1 && SPOOL_BASENAME.test(value);
+  return Buffer.byteLength(value, "utf8") <= PLAIN_INDEX_RECORD_MAX_BYTES - 1
+    && SPOOL_BASENAME.test(value);
 }
 
-export function appendSpoolIndexBasename(options: {
-  readonly directory: string;
-  readonly basename: string;
-}): void {
-  if (!isIndexedSpoolBasename(options.basename)) {
-    throw new TypeError("SPOOL_INDEX_BASENAME_INVALID");
-  }
-  const path = join(options.directory, SPOOL_INDEX_NAME);
+function appendSpoolIndexRecord(directory: string, recordText: string): void {
+  const path = join(directory, SPOOL_INDEX_NAME);
   // The leading delimiter makes the next successful atomic append recoverable
   // after every possible retained prefix of an earlier failed append.
-  const record = Buffer.from(`\n${options.basename}\n`, "utf8");
+  const record = Buffer.from(`\n${recordText}\n`, "utf8");
   if (record.byteLength > INDEX_APPEND_MAX_BYTES) {
     throw new TypeError("SPOOL_INDEX_RECORD_TOO_LARGE");
   }
@@ -355,9 +557,30 @@ export function appendSpoolIndexBasename(options: {
   }
 }
 
-export async function readIndexedSpoolPage(
+export function appendSpoolIndexBasename(options: {
+  readonly directory: string;
+  readonly basename: string;
+}): void {
+  if (!isIndexedSpoolBasename(options.basename)) {
+    throw new TypeError("SPOOL_INDEX_BASENAME_INVALID");
+  }
+  appendSpoolIndexRecord(options.directory, options.basename);
+}
+
+export function appendSpoolIndexAdmissionRecord(options: {
+  readonly directory: string;
+  readonly basename: string;
+  readonly proof: string;
+}): void {
+  appendSpoolIndexRecord(
+    options.directory,
+    encodeSpoolAdmissionIndexRecord(options),
+  );
+}
+
+export async function readTypedIndexedSpoolPage(
   directory: string,
-): Promise<readonly string[]> {
+): Promise<TypedSpoolIndexPage | undefined> {
   const indexPath = join(directory, SPOOL_INDEX_NAME);
   const cursorPath = join(directory, SPOOL_CURSOR_NAME);
   let indexHandle: FileHandle | undefined;
@@ -368,16 +591,16 @@ export async function readIndexedSpoolPage(
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
     );
     const indexIdentity = await verifiedRegularHandle(indexHandle, indexPath);
-    if (indexIdentity === undefined) return [];
+    if (indexIdentity === undefined) return undefined;
     const indexStat = await indexHandle.stat();
     if (
       !Number.isSafeInteger(indexStat.size)
       || indexStat.size <= 0
     ) {
-      return [];
+      return undefined;
     }
     const cursor = await openCursor(directory);
-    if (cursor === undefined) return [];
+    if (cursor === undefined) return undefined;
     cursorHandle = cursor.handle;
     const selected = await selectCursor(
       cursorHandle,
@@ -391,14 +614,14 @@ export async function readIndexedSpoolPage(
     if (offset > 0) {
       const predecessor = Buffer.alloc(1);
       const prior = await indexHandle.read(predecessor, 0, 1, offset - 1);
-      if (prior.bytesRead !== 1) return [];
+      if (prior.bytesRead !== 1) return undefined;
       discardingContinuation = predecessor[0] !== 0x0a;
     }
     const maximumRead = Math.min(INDEX_PAGE_MAX_BYTES, indexStat.size - offset);
     const page = Buffer.alloc(maximumRead);
     const result = await indexHandle.read(page, 0, maximumRead, offset);
-    if (result.bytesRead <= 0) return [];
-    const basenames: string[] = [];
+    if (result.bytesRead <= 0) return undefined;
+    const parsedRecords: SpoolIndexRecord[] = [];
     let recordStart = 0;
     let records = 0;
     let consumed = 0;
@@ -417,9 +640,25 @@ export async function readIndexedSpoolPage(
       if (
         recordBytes > 0
         && recordBytes + 1 <= INDEX_RECORD_MAX_BYTES
-        && isIndexedSpoolBasename(candidate)
       ) {
-        basenames.push(candidate);
+        const recordEndOffset = offset + position + 1;
+        if (isIndexedSpoolBasename(candidate)) {
+          parsedRecords.push(Object.freeze({
+            kind: "writer",
+            basename: candidate,
+            recordEndOffset,
+          }));
+        } else {
+          const admission = parseSpoolAdmissionIndexRecord(candidate);
+          if (admission !== undefined) {
+            parsedRecords.push(Object.freeze({
+              kind: "admission",
+              basename: admission.basename,
+              proof: admission.proof,
+              recordEndOffset,
+            }));
+          }
+        }
       }
       records += 1;
       consumed = position + 1;
@@ -448,13 +687,28 @@ export async function readIndexedSpoolPage(
         nextOffset,
       ))
     ) {
-      return [];
+      return undefined;
     }
-    return Object.freeze(basenames);
+    return Object.freeze({
+      indexDev: indexIdentity.dev.toString(),
+      indexIno: indexIdentity.ino.toString(),
+      indexSize: indexStat.size,
+      records: Object.freeze(parsedRecords),
+    });
   } catch {
-    return [];
+    return undefined;
   } finally {
     await cursorHandle?.close().catch(() => undefined);
     await indexHandle?.close().catch(() => undefined);
   }
+}
+
+export async function readIndexedSpoolPage(
+  directory: string,
+): Promise<readonly string[]> {
+  const page = await readTypedIndexedSpoolPage(directory);
+  if (page === undefined) return [];
+  return Object.freeze(page.records
+    .filter((record): record is WriterSpoolIndexRecord => record.kind === "writer")
+    .map((record) => record.basename));
 }

@@ -20,6 +20,8 @@ import {
   statSync,
   symlinkSync,
   truncateSync,
+  unlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:net";
@@ -125,6 +127,15 @@ interface SafeEnvelope extends CorrelationFields {
   readonly zone_context: boolean;
   readonly attempt_index: null;
   readonly writer_identity: string;
+}
+
+interface AdmissionSeal {
+  readonly version: 1;
+  readonly admissionRef: string;
+  readonly manifestSha256: string;
+  readonly indexDev: string;
+  readonly indexIno: string;
+  readonly prefixBytes: number;
 }
 
 let database: TestDatabase;
@@ -310,6 +321,102 @@ function appendIndexRecord(directory: string, record: string): void {
     encoding: "utf8",
     mode: 0o600,
   });
+}
+
+function admissionProofForPath(
+  admissionRef: string,
+  name: string,
+  path: string,
+): string {
+  const stat = statSync(path, { bigint: true });
+  const sourceSha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
+  return createHash("sha256")
+    .update([
+      "FIX01-SPOOL-ADMISSION-PROOF-V1",
+      admissionRef,
+      name,
+      stat.dev.toString(),
+      stat.ino.toString(),
+      stat.nlink.toString(),
+      stat.size.toString(),
+      stat.mtimeNs.toString(),
+      stat.ctimeNs.toString(),
+      sourceSha256,
+    ].join("\u0000"))
+    .digest("base64url");
+}
+
+function a1Record(
+  admissionRef: string,
+  name: string,
+  path: string,
+): string {
+  return `A1\t${name}\t${admissionProofForPath(admissionRef, name, path)}`;
+}
+
+function sealForIndex(
+  directory: string,
+  admissionRef: string,
+  prefixBytes?: number,
+): AdmissionSeal {
+  const indexStat = statSync(join(directory, SPOOL_INDEX_NAME), { bigint: true });
+  return {
+    version: 1,
+    admissionRef,
+    manifestSha256: "b".repeat(64),
+    indexDev: indexStat.dev.toString(),
+    indexIno: indexStat.ino.toString(),
+    prefixBytes: prefixBytes ?? Number(indexStat.size),
+  };
+}
+
+function createA1Fixture(label: string): Readonly<{
+  directory: string;
+  envelope: SafeEnvelope;
+  name: string;
+  path: string;
+  admissionRef: string;
+  record: string;
+  seal: AdmissionSeal;
+}> {
+  const directory = createScratchDirectory();
+  const envelope = safeEnvelope("scheduler");
+  const name = spoolName(
+    "scheduler",
+    DEAD_PID,
+    `10000000-0000-4000-8000-${createHash("sha256")
+      .update(label)
+      .digest("hex")
+      .slice(0, 12)}`,
+  );
+  const path = join(directory, name);
+  writeEnvelope(path, envelope);
+  const admissionRef = createHash("sha256").update(`admission:${label}`).digest("hex");
+  const record = a1Record(admissionRef, name, path);
+  writeFileSync(join(directory, SPOOL_INDEX_NAME), `\n${record}\n`, {
+    mode: 0o600,
+  });
+  return {
+    directory,
+    envelope,
+    name,
+    path,
+    admissionRef,
+    record,
+    seal: sealForIndex(directory, admissionRef),
+  };
+}
+
+async function drainWithSeal(
+  directory: string,
+  sink: PostgresCaptureSink,
+  admissionSeal: AdmissionSeal | undefined,
+): Promise<void> {
+  await drainDeadSpoolFiles({
+    spoolDirectory: directory,
+    databaseSink: sink,
+    admissionSeal,
+  } as Parameters<typeof drainDeadSpoolFiles>[0]);
 }
 
 function ensureCurrentSpoolsIndexed(directory: string): void {
@@ -530,6 +637,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterEach(() => {
+  vi.restoreAllMocks();
   while (scratchDirectories.length > 0) {
     const directory = scratchDirectories.pop();
     if (directory !== undefined) {
@@ -1660,6 +1768,155 @@ function expectedStagingPath(sourcePath: string): string {
 }
 
 describe.sequential("FIX-01 C4 indexed recovery protocol", () => {
+  it("drains a matching sealed A1 without probing its now-live numeric PID", async () => {
+    const fixture = createA1Fixture("matching-seal");
+    const result = recordingSink();
+    const pidProbe = vi.spyOn(process, "kill")
+      .mockImplementation((() => true) as typeof process.kill);
+
+    await drainWithSeal(fixture.directory, result.sink, fixture.seal);
+
+    expect(result.calls.map((entry) => entry.source_event_ref)).toEqual([
+      fixture.envelope.source_event_ref,
+    ]);
+    expect(pidProbe).not.toHaveBeenCalled();
+    expect(readFileSync(`${fixture.path}.ingested`)).toEqual(
+      readFileSync(fixture.path),
+    );
+    expect(existsSync(fixture.path)).toBe(true);
+  });
+
+  it("keeps unsealed, out-of-prefix, or source-mismatched A1 records inert", async () => {
+    type Mutator = (fixture: ReturnType<typeof createA1Fixture>) =>
+      AdmissionSeal | undefined;
+    const cases: ReadonlyArray<readonly [string, Mutator]> = [
+      ["missing seal", () => undefined],
+      ["wrong admission ref", (fixture) => ({
+        ...fixture.seal,
+        admissionRef: "f".repeat(64),
+      })],
+      ["wrong index device", (fixture) => ({
+        ...fixture.seal,
+        indexDev: String(BigInt(fixture.seal.indexDev) + 1n),
+      })],
+      ["wrong index inode", (fixture) => ({
+        ...fixture.seal,
+        indexIno: String(BigInt(fixture.seal.indexIno) + 1n),
+      })],
+      ["record ends after sealed prefix", (fixture) => ({
+        ...fixture.seal,
+        prefixBytes: fixture.seal.prefixBytes - 1,
+      })],
+      ["wrong proof", (fixture) => {
+        writeFileSync(
+          join(fixture.directory, SPOOL_INDEX_NAME),
+          `\nA1\t${fixture.name}\t${"A".repeat(43)}\n`,
+          { mode: 0o600 },
+        );
+        return fixture.seal;
+      }],
+      ["index replacement", (fixture) => {
+        const indexPath = join(fixture.directory, SPOOL_INDEX_NAME);
+        const bytes = readFileSync(indexPath);
+        renameSync(indexPath, `${indexPath}.displaced`);
+        writeFileSync(indexPath, bytes, { mode: 0o600 });
+        return fixture.seal;
+      }],
+      ["source inode replacement", (fixture) => {
+        const bytes = readFileSync(fixture.path);
+        renameSync(fixture.path, `${fixture.path}.displaced`);
+        writeFileSync(fixture.path, bytes, { mode: 0o600 });
+        return fixture.seal;
+      }],
+      ["source hardlink", (fixture) => {
+        linkSync(fixture.path, `${fixture.path}.extra-link`);
+        return fixture.seal;
+      }],
+      ["source size", (fixture) => {
+        appendFileSync(fixture.path, "x");
+        return fixture.seal;
+      }],
+      ["source mtime", (fixture) => {
+        utimesSync(fixture.path, new Date(1_000), new Date(2_000));
+        return fixture.seal;
+      }],
+      ["source ctime", (fixture) => {
+        const temporaryLink = `${fixture.path}.temporary-link`;
+        linkSync(fixture.path, temporaryLink);
+        unlinkSync(temporaryLink);
+        return fixture.seal;
+      }],
+      ["source content", (fixture) => {
+        const bytes = readFileSync(fixture.path);
+        const position = bytes.indexOf(Buffer.from("2026-09-03", "utf8"));
+        expect(position).toBeGreaterThanOrEqual(0);
+        bytes[position] = 0x33;
+        writeFileSync(fixture.path, bytes, { mode: 0o600 });
+        return fixture.seal;
+      }],
+    ];
+
+    vi.spyOn(process, "kill").mockImplementation((() => true) as typeof process.kill);
+    for (const [label, mutate] of cases) {
+      const fixture = createA1Fixture(label);
+      const result = recordingSink();
+      const seal = mutate(fixture);
+
+      await drainWithSeal(fixture.directory, result.sink, seal);
+
+      expect(result.calls, label).toHaveLength(0);
+      expect(existsSync(fixture.path), label).toBe(true);
+      expect(existsSync(`${fixture.path}.ingested`), label).toBe(false);
+    }
+
+    const suffix = createA1Fixture("outside-prefix");
+    const suffixIndex = join(suffix.directory, SPOOL_INDEX_NAME);
+    writeFileSync(
+      suffixIndex,
+      `\n\n${suffix.record}\n`,
+      { mode: 0o600 },
+    );
+    const suffixResult = recordingSink();
+    await drainWithSeal(
+      suffix.directory,
+      suffixResult.sink,
+      sealForIndex(suffix.directory, suffix.admissionRef, 1),
+    );
+    expect(suffixResult.calls).toHaveLength(0);
+    expect(existsSync(`${suffix.path}.ingested`)).toBe(false);
+  });
+
+  it("resynchronizes every bounded partial A1 append prefix before the next A1", async () => {
+    const pidProbe = vi.spyOn(process, "kill")
+      .mockImplementation((() => true) as typeof process.kill);
+    const prototype = createA1Fixture("a1-prefix-prototype");
+    const staleAttempt = Buffer.from(`\n${prototype.record}\n`, "utf8");
+
+    for (
+      let prefixLength = 0;
+      prefixLength < staleAttempt.length;
+      prefixLength += 1
+    ) {
+      const fixture = createA1Fixture(`a1-prefix-${prefixLength}`);
+      const indexPath = join(fixture.directory, SPOOL_INDEX_NAME);
+      writeFileSync(indexPath, staleAttempt.subarray(0, prefixLength), {
+        mode: 0o600,
+      });
+      appendFileSync(indexPath, `\n${fixture.record}\n`);
+      const result = recordingSink();
+
+      await drainWithSeal(
+        fixture.directory,
+        result.sink,
+        sealForIndex(fixture.directory, fixture.admissionRef),
+      );
+
+      expect(result.calls.map((entry) => entry.source_event_ref), String(prefixLength))
+        .toEqual([fixture.envelope.source_event_ref]);
+    }
+    expect(pidProbe).not.toHaveBeenCalled();
+  }, 60_000);
+
   it("resynchronizes every bounded partial append prefix before later successful producers", async () => {
     const failedName = orderedSpoolName(7_200);
     const failedRecord = Buffer.from(`\n${failedName}\n`, "utf8");

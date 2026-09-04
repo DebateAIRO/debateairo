@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import {
   lstat,
@@ -18,41 +18,27 @@ import {
   type SafeRuntimeName,
 } from "../packages/obs-capture/src/safe-metadata.js";
 import {
+  appendSpoolIndexAdmissionRecord,
   appendSpoolIndexBasename,
+  createSpoolAdmissionProof,
   isIndexedSpoolBasename,
+  parseSpoolAdmissionIndexRecord,
   SPOOL_CURSOR_NAME,
   SPOOL_INDEX_NAME,
 } from "../packages/obs-capture/src/spool-index.js";
+import {
+  canonicalFix01ReleaseJson as canonicalJson,
+  FIX01_RELEASE_MANIFEST_VERSION,
+  FIX01_RELEASE_VERIFIER_VERSION,
+  type Fix01ReleaseClassification as Classification,
+  type Fix01ReleaseManifestEntryV2 as ManifestEntry,
+} from "./obs-spool-release-contract.js";
 
-const VERIFIER_VERSION = "fix01-release-admission-v1";
 const IMMUTABLE_BUILD_REF = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const SPOOL_RUNTIME = /^(api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-/u;
 const SPOOL_PID = /^(?:api|runner|scheduler|evaluator-lib|ui-client|listener|watchdog|ingest)-([1-9][0-9]*)-/u;
-const INDEX_LINE_MAX_BYTES = 127;
+const INDEX_LINE_MAX_BYTES = 174;
 const IO_CHUNK_BYTES = 64 * 1024;
-
-type Classification =
-  | "lawful_empty"
-  | "lawful_envelopes"
-  | "retained_invalid_bytes"
-  | "reserved_metadata"
-  | "rejected_unsafe_path";
-
-type EntryKind = "candidate" | "reserved" | "rejected_unsafe_path";
-
-interface ManifestEntry {
-  readonly basename: string;
-  readonly kind: EntryKind;
-  readonly dev: string | null;
-  readonly ino: string | null;
-  readonly nlink: number | null;
-  readonly size: number | null;
-  readonly mtime_ms: number | null;
-  readonly sha256: string | null;
-  readonly classification: Classification;
-  readonly indexed: boolean;
-  readonly reason: string | null;
-}
 
 interface SourceSnapshot {
   readonly entries: readonly ManifestEntry[];
@@ -66,6 +52,10 @@ interface ReadFileResult {
 
 interface IndexState extends ReadFileResult {
   readonly basenames: ReadonlySet<string>;
+  readonly admissionRecords: readonly Readonly<{
+    basename: string;
+    proof: string;
+  }>[];
   readonly unterminatedBasename: string | undefined;
 }
 
@@ -96,21 +86,6 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
-  }
-  if (value !== null && typeof value === "object") {
-    const record = value as Readonly<Record<string, unknown>>;
-    return `{${Object.keys(record).sort().map((key) =>
-      `${JSON.stringify(key)}:${canonicalJson(record[key])}`
-    ).join(",")}}`;
-  }
-  const encoded = JSON.stringify(value);
-  if (encoded === undefined) fail("FAIL_MANIFEST_VALUE");
-  return encoded;
-}
-
 function sha256(bytes: Buffer | string): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -129,12 +104,14 @@ function sameSnapshot(left: BigIntStats, right: BigIntStats): boolean {
   return sameIdentity(left, right)
     && left.nlink === right.nlink
     && left.size === right.size
-    && left.mtimeMs === right.mtimeMs;
+    && left.mtimeNs === right.mtimeNs
+    && left.ctimeNs === right.ctimeNs;
 }
 
 function statFields(stat: BigIntStats): Pick<
   ManifestEntry,
   "dev" | "ino" | "nlink" | "size" | "mtime_ms"
+  | "mtime_ns" | "ctime_ns"
 > {
   return {
     dev: stat.dev.toString(),
@@ -142,6 +119,8 @@ function statFields(stat: BigIntStats): Pick<
     nlink: safeNumber(stat.nlink, "FAIL_UNREPRESENTABLE_NLINK"),
     size: safeNumber(stat.size, "FAIL_UNREPRESENTABLE_SIZE"),
     mtime_ms: safeNumber(stat.mtimeMs, "FAIL_UNREPRESENTABLE_MTIME"),
+    mtime_ns: stat.mtimeNs.toString(),
+    ctime_ns: stat.ctimeNs.toString(),
   };
 }
 
@@ -413,14 +392,19 @@ function snapshotEvidence(entries: readonly ManifestEntry[]): unknown {
     dev: entry.dev,
     ino: entry.ino,
     kind: entry.kind,
+    ctime_ns: entry.ctime_ns,
     mtime_ms: entry.mtime_ms,
+    mtime_ns: entry.mtime_ns,
     nlink: entry.nlink,
     sha256: entry.sha256,
     size: entry.size,
   }));
 }
 
-async function sourceSnapshot(directory: string): Promise<SourceSnapshot> {
+async function sourceSnapshot(
+  directory: string,
+  probeOwners: boolean,
+): Promise<SourceSnapshot> {
   let names: string[];
   try {
     names = (await readdir(directory)).sort();
@@ -443,7 +427,9 @@ async function sourceSnapshot(directory: string): Promise<SourceSnapshot> {
       && pathStat.isFile()
       && pathStat.nlink === 1n
     ) {
-      if (ownerMayBeAlive(pidFromBasename(name))) fail("FAIL_LIVE_OWNER");
+      if (probeOwners && ownerMayBeAlive(pidFromBasename(name))) {
+        fail("FAIL_LIVE_OWNER");
+      }
       entries.push(await readCandidate(filePath, name, pathStat));
       continue;
     }
@@ -477,6 +463,7 @@ async function readIndex(directory: string): Promise<IndexState | undefined> {
   }
   if (!pathStat.isFile() || pathStat.nlink !== 1n) fail("FAIL_UNSAFE_INDEX");
   const basenames = new Set<string>();
+  const admissionRecords: Array<Readonly<{ basename: string; proof: string }>> = [];
   let line = Buffer.alloc(0);
   let overlong = false;
   const result = await readStableFile(filePath, pathStat, (chunk) => {
@@ -485,7 +472,12 @@ async function readIndex(directory: string): Promise<IndexState | undefined> {
       if (byte === 0x0a) {
         if (!overlong && line.length > 0) {
           const candidate = line.toString("utf8");
-          if (isIndexedSpoolBasename(candidate)) basenames.add(candidate);
+          if (isIndexedSpoolBasename(candidate)) {
+            basenames.add(candidate);
+          } else {
+            const admission = parseSpoolAdmissionIndexRecord(candidate);
+            if (admission !== undefined) admissionRecords.push(admission);
+          }
         }
         line = Buffer.alloc(0);
         overlong = false;
@@ -505,7 +497,12 @@ async function readIndex(directory: string): Promise<IndexState | undefined> {
     && isIndexedSpoolBasename(line.toString("utf8"))
     ? line.toString("utf8")
     : undefined;
-  return { ...result, basenames, unterminatedBasename };
+  return {
+    ...result,
+    basenames,
+    admissionRecords: Object.freeze(admissionRecords),
+    unterminatedBasename,
+  };
 }
 
 async function readReserved(
@@ -589,6 +586,90 @@ async function repairIndex(
     if (!finalIndex.basenames.has(candidate.basename)) fail("FAIL_INDEX_COVERAGE");
   }
   assertNoRejectedIndexMembers(source, finalIndex);
+  return finalIndex;
+}
+
+function admissionProofForEntry(
+  admissionRef: string,
+  entry: ManifestEntry,
+): string {
+  if (
+    entry.kind !== "candidate"
+    || entry.dev === null
+    || entry.ino === null
+    || entry.nlink !== 1
+    || entry.size === null
+    || entry.mtime_ns === null
+    || entry.ctime_ns === null
+    || entry.sha256 === null
+  ) {
+    fail("FAIL_ADMISSION_PROOF");
+  }
+  try {
+    return createSpoolAdmissionProof({
+      admissionRef,
+      basename: entry.basename,
+      dev: entry.dev,
+      ino: entry.ino,
+      nlink: "1",
+      size: String(entry.size),
+      mtimeNs: entry.mtime_ns,
+      ctimeNs: entry.ctime_ns,
+      sourceSha256: entry.sha256,
+    });
+  } catch {
+    fail("FAIL_ADMISSION_PROOF");
+  }
+}
+
+function countCurrentAdmissionRecords(
+  source: SourceSnapshot,
+  index: IndexState,
+  admissionRef: string,
+): number {
+  let count = 0;
+  for (const candidate of source.entries.filter((entry) =>
+    entry.kind === "candidate"
+  )) {
+    const expectedProof = admissionProofForEntry(admissionRef, candidate);
+    const matches = index.admissionRecords.filter((record) =>
+      record.basename === candidate.basename && record.proof === expectedProof
+    ).length;
+    if (matches > 1) fail("FAIL_ADMISSION_RECORD_DUPLICATE");
+    count += matches;
+  }
+  return count;
+}
+
+async function appendAdmissionRecords(
+  directory: string,
+  source: SourceSnapshot,
+  index: IndexState,
+  admissionRef: string,
+): Promise<IndexState> {
+  if (countCurrentAdmissionRecords(source, index, admissionRef) !== 0) {
+    fail("FAIL_ADMISSION_RECORD_PREEXISTING");
+  }
+  const candidates = source.entries.filter((entry) => entry.kind === "candidate");
+  for (const candidate of candidates) {
+    try {
+      appendSpoolIndexAdmissionRecord({
+        directory,
+        basename: candidate.basename,
+        proof: admissionProofForEntry(admissionRef, candidate),
+      });
+    } catch {
+      fail("FAIL_INDEX_REPAIR");
+    }
+  }
+  const finalIndex = await readIndex(directory);
+  if (finalIndex === undefined) fail("FAIL_INDEX_REPAIR");
+  if (
+    countCurrentAdmissionRecords(source, finalIndex, admissionRef)
+      !== candidates.length
+  ) {
+    fail("FAIL_ADMISSION_RECORD_COVERAGE");
+  }
   return finalIndex;
 }
 
@@ -713,9 +794,10 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   manifestSha256: string;
 }>> {
   const options = await validatePaths(arguments_);
+  const admissionRef = randomBytes(32).toString("hex");
   const initialIndex = await readIndex(options.spoolDirectory);
   const initialCursor = await readReserved(options.spoolDirectory, SPOOL_CURSOR_NAME);
-  const first = await sourceSnapshot(options.spoolDirectory);
+  const first = await sourceSnapshot(options.spoolDirectory, true);
   const physicallyEmpty = first.entries.length === 0
     && initialIndex === undefined
     && initialCursor === undefined;
@@ -723,8 +805,14 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   let finalIndex: IndexState | undefined;
   if (!physicallyEmpty) {
     finalIndex = await repairIndex(options.spoolDirectory, first, initialIndex);
+    finalIndex = await appendAdmissionRecords(
+      options.spoolDirectory,
+      first,
+      finalIndex,
+      admissionRef,
+    );
   }
-  const second = await sourceSnapshot(options.spoolDirectory);
+  const second = await sourceSnapshot(options.spoolDirectory, false);
   if (first.sha256 !== second.sha256) fail("FAIL_CHANGED");
 
   const finalCursor = await readReserved(options.spoolDirectory, SPOOL_CURSOR_NAME);
@@ -767,6 +855,12 @@ async function run(arguments_: Arguments): Promise<Readonly<{
 
   finalIndex = await revalidateIndex(options.spoolDirectory, finalIndex);
   assertNoRejectedIndexMembers(second, finalIndex);
+  const admissionRecordCount = finalIndex === undefined
+    ? 0
+    : countCurrentAdmissionRecords(second, finalIndex, admissionRef);
+  if (admissionRecordCount !== candidateCount) {
+    fail("FAIL_ADMISSION_RECORD_COVERAGE");
+  }
 
   const reservedEntries: ManifestEntry[] = [];
   if (finalIndex !== undefined) {
@@ -780,13 +874,15 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   );
   const verdict = physicallyEmpty ? "PASS_EMPTY" : "PASS_INDEXED";
   const manifest = {
-    version: 1,
+    version: FIX01_RELEASE_MANIFEST_VERSION,
     verdict,
     phase: "before_first_indexed_launch",
     spool_directory_realpath: options.spoolDirectory,
     target_build_ref: options.buildRef,
     verified_at: new Date().toISOString(),
-    verifier_version: VERIFIER_VERSION,
+    verifier_version: FIX01_RELEASE_VERIFIER_VERSION,
+    admission_ref: admissionRef,
+    admission_record_count: admissionRecordCount,
     first_snapshot_sha256: first.sha256,
     second_snapshot_sha256: second.sha256,
     source_entry_count: second.entries.length,

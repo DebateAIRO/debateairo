@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { link, lstat, open } from "node:fs/promises";
+import type { BigIntStats } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
@@ -10,7 +11,13 @@ import {
   SPOOL_FILE_MAX_BYTES,
   SPOOL_RECORD_MAX_BYTES,
 } from "../safe-metadata.js";
-import { readIndexedSpoolPage } from "../spool-index.js";
+import {
+  createSpoolAdmissionProof,
+  readTypedIndexedSpoolPage,
+  type AdmissionSpoolIndexRecord,
+  type SpoolAdmissionSeal,
+  type SpoolIndexRecord,
+} from "../spool-index.js";
 import type { CaptureRuntimeName } from "./index.js";
 import type { PostgresCaptureSink } from "./sink.js";
 
@@ -34,8 +41,8 @@ interface ParsedSpoolName {
 }
 
 interface FileIdentity {
-  readonly dev: number;
-  readonly ino: number;
+  readonly dev: bigint;
+  readonly ino: bigint;
 }
 
 interface DrainBudget {
@@ -104,27 +111,68 @@ async function writeExactBytes(handle: FileHandle, bytes: Buffer): Promise<void>
   await handle.sync();
 }
 
-async function snapshotStillMatches(
+function sameExactSourceSnapshot(left: BigIntStats, right: BigIntStats): boolean {
+  return sameIdentity(left, right)
+    && left.nlink === right.nlink
+    && left.size === right.size
+    && left.mtimeNs === right.mtimeNs
+    && left.ctimeNs === right.ctimeNs;
+}
+
+async function matchingSourceSnapshot(
   handle: FileHandle,
   path: string,
-  expected: Readonly<FileIdentity>,
+  expected: BigIntStats,
   bytes: Buffer,
-): Promise<boolean> {
-  const descriptorStat = await handle.stat();
+  requireExactMetadata: boolean,
+): Promise<BigIntStats | undefined> {
+  const descriptorStat = await handle.stat({ bigint: true });
   if (
     !descriptorStat.isFile()
-    || descriptorStat.nlink !== 1
+    || descriptorStat.nlink !== 1n
     || !sameIdentity(descriptorStat, expected)
-    || descriptorStat.size !== bytes.length
+    || descriptorStat.size !== BigInt(bytes.length)
+    || (requireExactMetadata && !sameExactSourceSnapshot(descriptorStat, expected))
   ) {
-    return false;
+    return undefined;
   }
   const currentBytes = await readExactBytes(handle, bytes.length);
-  if (currentBytes === undefined || !currentBytes.equals(bytes)) return false;
-  const pathStat = await lstat(path);
-  return pathStat.isFile()
-    && pathStat.nlink === 1
-    && sameIdentity(pathStat, expected);
+  if (currentBytes === undefined || !currentBytes.equals(bytes)) return undefined;
+  const pathStat = await lstat(path, { bigint: true });
+  if (
+    !pathStat.isFile()
+    || pathStat.nlink !== 1n
+    || !sameIdentity(pathStat, expected)
+    || pathStat.size !== BigInt(bytes.length)
+    || (requireExactMetadata && !sameExactSourceSnapshot(pathStat, expected))
+  ) {
+    return undefined;
+  }
+  return descriptorStat;
+}
+
+function admissionProofMatches(
+  admissionRef: string,
+  record: AdmissionSpoolIndexRecord,
+  stat: BigIntStats,
+  bytes: Buffer,
+): boolean {
+  try {
+    const sourceSha256 = createHash("sha256").update(bytes).digest("hex");
+    return createSpoolAdmissionProof({
+      admissionRef,
+      basename: record.basename,
+      dev: stat.dev.toString(),
+      ino: stat.ino.toString(),
+      nlink: "1",
+      size: stat.size.toString(),
+      mtimeNs: stat.mtimeNs.toString(),
+      ctimeNs: stat.ctimeNs.toString(),
+      sourceSha256,
+    }) === record.proof;
+  } catch {
+    return false;
+  }
 }
 
 async function exactCompletionExists(
@@ -137,15 +185,15 @@ async function exactCompletionExists(
       destination,
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
     );
-    const descriptorStat = await handle.stat();
-    if (!descriptorStat.isFile() || descriptorStat.size !== bytes.length) {
+    const descriptorStat = await handle.stat({ bigint: true });
+    if (!descriptorStat.isFile() || descriptorStat.size !== BigInt(bytes.length)) {
       return false;
     }
     const completionBytes = await readExactBytes(handle, bytes.length);
     if (completionBytes === undefined || !completionBytes.equals(bytes)) {
       return false;
     }
-    const pathStat = await lstat(destination);
+    const pathStat = await lstat(destination, { bigint: true });
     return pathStat.isFile() && sameIdentity(pathStat, descriptorStat);
   } catch {
     return false;
@@ -158,16 +206,17 @@ async function materializeCompletion(
   sourceHandle: FileHandle,
   sourcePath: string,
   destination: string,
-  sourceIdentity: Readonly<FileIdentity>,
+  sourceIdentity: BigIntStats,
   bytes: Buffer,
 ): Promise<boolean> {
   if (
-    !(await snapshotStillMatches(
+    (await matchingSourceSnapshot(
       sourceHandle,
       sourcePath,
       sourceIdentity,
       bytes,
-    ))
+      false,
+    )) === undefined
   ) {
     return false;
   }
@@ -199,42 +248,43 @@ async function materializeCompletion(
     }
     if (created) await writeExactBytes(stageHandle, bytes);
     else await stageHandle.sync();
-    const stageStat = await stageHandle.stat();
+    const stageStat = await stageHandle.stat({ bigint: true });
     const staged = await readExactBytes(stageHandle, bytes.length);
-    const stagePathStat = await lstat(stagePath);
+    const stagePathStat = await lstat(stagePath, { bigint: true });
     if (
       !stageStat.isFile()
-      || stageStat.nlink !== 1
-      || stageStat.size !== bytes.length
+      || stageStat.nlink !== 1n
+      || stageStat.size !== BigInt(bytes.length)
       || staged === undefined
       || !staged.equals(bytes)
       || !stagePathStat.isFile()
-      || stagePathStat.nlink !== 1
+      || stagePathStat.nlink !== 1n
       || !sameIdentity(stagePathStat, stageStat)
     ) {
       return false;
     }
     if (
-      !(await snapshotStillMatches(
+      (await matchingSourceSnapshot(
         sourceHandle,
         sourcePath,
         sourceIdentity,
         bytes,
-      ))
+        false,
+      )) === undefined
     ) {
       return false;
     }
-    const finalStageStat = await stageHandle.stat();
+    const finalStageStat = await stageHandle.stat({ bigint: true });
     const finalStaged = await readExactBytes(stageHandle, bytes.length);
-    const finalStagePathStat = await lstat(stagePath);
+    const finalStagePathStat = await lstat(stagePath, { bigint: true });
     if (
       !finalStageStat.isFile()
-      || finalStageStat.nlink !== 1
-      || finalStageStat.size !== bytes.length
+      || finalStageStat.nlink !== 1n
+      || finalStageStat.size !== BigInt(bytes.length)
       || finalStaged === undefined
       || !finalStaged.equals(bytes)
       || !finalStagePathStat.isFile()
-      || finalStagePathStat.nlink !== 1
+      || finalStagePathStat.nlink !== 1n
       || !sameIdentity(finalStagePathStat, finalStageStat)
     ) {
       return false;
@@ -250,15 +300,15 @@ async function materializeCompletion(
         && error.code === "EEXIST"
         && await exactCompletionExists(destination, bytes);
     }
-    const destinationStat = await lstat(destination);
-    const currentStageStat = await lstat(stagePath);
-    const currentStageDescriptor = await stageHandle.stat();
+    const destinationStat = await lstat(destination, { bigint: true });
+    const currentStageStat = await lstat(stagePath, { bigint: true });
+    const currentStageDescriptor = await stageHandle.stat({ bigint: true });
     return currentStageDescriptor.isFile()
-      && currentStageDescriptor.nlink === 2
+      && currentStageDescriptor.nlink === 2n
       && destinationStat.isFile()
-      && destinationStat.nlink === 2
+      && destinationStat.nlink === 2n
       && currentStageStat.isFile()
-      && currentStageStat.nlink === 2
+      && currentStageStat.nlink === 2n
       && sameIdentity(currentStageDescriptor, stageStat)
       && sameIdentity(destinationStat, stageStat)
       && sameIdentity(currentStageStat, stageStat)
@@ -288,33 +338,54 @@ function boundedLines(bytes: Buffer): readonly string[] | undefined {
 
 async function drainFile(
   directory: string,
-  name: string,
+  record: SpoolIndexRecord,
   parsed: ParsedSpoolName,
   databaseSink: PostgresCaptureSink,
   budget: DrainBudget,
+  admissionSeal: SpoolAdmissionSeal | undefined,
 ): Promise<boolean> {
-  if (ownerMayBeAlive(parsed.pid)) return false;
-  const path = join(directory, name);
-  const pathStat = await lstat(path);
-  if (!pathStat.isFile() || pathStat.nlink !== 1) return false;
+  if (record.kind === "writer" && ownerMayBeAlive(parsed.pid)) return false;
+  if (record.kind === "admission" && admissionSeal === undefined) return false;
+  const path = join(directory, record.basename);
+  const pathStat = await lstat(path, { bigint: true });
+  if (!pathStat.isFile() || pathStat.nlink !== 1n) return false;
   const handle = await open(
     path,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
   );
   try {
-    const fileStat = await handle.stat();
+    const fileStat = await handle.stat({ bigint: true });
+    const fileSize = Number(fileStat.size);
     if (
       !fileStat.isFile()
-      || fileStat.nlink !== 1
+      || fileStat.nlink !== 1n
       || !sameIdentity(fileStat, pathStat)
-      || !Number.isSafeInteger(fileStat.size)
-      || fileStat.size < 0
-      || fileStat.size > SPOOL_FILE_MAX_BYTES
+      || !Number.isSafeInteger(fileSize)
+      || fileSize < 0
+      || fileSize > SPOOL_FILE_MAX_BYTES
+      || (
+        record.kind === "admission"
+        && !sameExactSourceSnapshot(fileStat, pathStat)
+      )
     ) {
       return false;
     }
-    const bytes = await readExactBytes(handle, fileStat.size);
+    const bytes = await readExactBytes(handle, fileSize);
     if (bytes === undefined) return false;
+    if (
+      record.kind === "admission"
+      && (
+        admissionSeal === undefined
+        || !admissionProofMatches(
+          admissionSeal.admissionRef,
+          record,
+          fileStat,
+          bytes,
+        )
+      )
+    ) {
+      return false;
+    }
     const completionPath = `${path}.${bytes.length === 0 ? "empty" : "ingested"}`;
     if (bytes.length === 0) {
       return await materializeCompletion(
@@ -340,7 +411,28 @@ async function drainFile(
       if (!isSerializedSafeEnvelope(value, parsed.runtime)) return false;
       envelopes.push(value as unknown as PostRedactionEnvelope);
     }
-    if (!(await snapshotStillMatches(handle, path, fileStat, bytes))) {
+    const finalSnapshot = await matchingSourceSnapshot(
+      handle,
+      path,
+      fileStat,
+      bytes,
+      record.kind === "admission",
+    );
+    if (
+      finalSnapshot === undefined
+      || (
+        record.kind === "admission"
+        && (
+          admissionSeal === undefined
+          || !admissionProofMatches(
+            admissionSeal.admissionRef,
+            record,
+            finalSnapshot,
+            bytes,
+          )
+        )
+      )
+    ) {
       return false;
     }
     for (const envelope of envelopes) {
@@ -361,6 +453,7 @@ async function drainFile(
 
 export async function drainDeadSpoolFiles(options: {
   readonly spoolDirectory: string | undefined;
+  readonly admissionSeal?: SpoolAdmissionSeal | undefined;
   readonly databaseSink: PostgresCaptureSink;
 }): Promise<void> {
   if (options.spoolDirectory === undefined) return;
@@ -369,20 +462,42 @@ export async function drainDeadSpoolFiles(options: {
     remainingTransactions: MAX_TRANSACTIONS_PER_START,
   };
   try {
-    const basenames = await readIndexedSpoolPage(options.spoolDirectory);
-    for (const name of basenames) {
+    const page = await readTypedIndexedSpoolPage(options.spoolDirectory);
+    if (page === undefined) return;
+    const sealedPrefixBytes = options.admissionSeal !== undefined
+      && page.indexDev === options.admissionSeal.indexDev
+      && page.indexIno === options.admissionSeal.indexIno
+      && options.admissionSeal.prefixBytes <= page.indexSize
+      ? options.admissionSeal.prefixBytes
+      : undefined;
+    for (const record of page.records) {
       if (budget.remainingFiles === 0 || budget.remainingTransactions === 0) {
         break;
       }
       budget.remainingFiles -= 1;
-      const parsed = parseSpoolName(name);
+      const parsed = parseSpoolName(record.basename);
       if (parsed === undefined) continue;
+      if (
+        record.kind === "writer"
+        && sealedPrefixBytes !== undefined
+        && record.recordEndOffset <= sealedPrefixBytes
+      ) {
+        continue;
+      }
+      const admissionSeal = record.kind === "admission"
+        && options.admissionSeal !== undefined
+        && sealedPrefixBytes !== undefined
+        && record.recordEndOffset <= sealedPrefixBytes
+        ? options.admissionSeal
+        : undefined;
+      if (record.kind === "admission" && admissionSeal === undefined) continue;
       await drainFile(
         options.spoolDirectory,
-        name,
+        record,
         parsed,
         options.databaseSink,
         budget,
+        admissionSeal,
       ).catch(() => false);
     }
   } catch {

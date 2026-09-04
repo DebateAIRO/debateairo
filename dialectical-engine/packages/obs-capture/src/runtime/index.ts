@@ -218,6 +218,7 @@ export async function startCaptureRuntime(
   startFlushTimer(state);
   const drain = drainDeadSpoolFiles({
     spoolDirectory: state.bounds.spoolDir,
+    admissionSeal: state.bounds.spoolAdmissionSeal,
     databaseSink: state.databaseSink,
   })
     .catch(() => undefined)
