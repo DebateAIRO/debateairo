@@ -2,12 +2,14 @@ import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ObservationError } from "./errors.js";
+import type { SignalRouterFactory } from "./routing.js";
 import type { Module, OactlVerbContribution } from "./types.js";
 
 export type ObservationModuleCatalog = Readonly<{
   modules: readonly Module[];
   verbs: readonly OactlVerbContribution[];
   targetFragments: readonly string[];
+  routerFactory: SignalRouterFactory | null;
 }>;
 
 function requireModule(candidate: unknown, directory: string): Module {
@@ -22,6 +24,10 @@ function requireModule(candidate: unknown, directory: string): Module {
     || typeof module.probe !== "function"
     || typeof module.samples !== "function"
     || typeof module.signals !== "function"
+    || (module.router !== undefined
+      && (module.router === null
+        || typeof module.router !== "object"
+        || typeof module.router.create !== "function"))
     || (module.targetFragmentBasename !== undefined
       && !/^OBS-[0-9]{2}\.json$/u.test(module.targetFragmentBasename))) {
     throw new ObservationError("OBSERVATION_MODULE_INVALID");
@@ -71,6 +77,7 @@ export async function discoverObservationModules(modulesRoot: string): Promise<O
   const moduleNames = new Set<string>();
   const verbNames = new Set<string>();
   const fragmentNames = new Set<string>();
+  let routerFactory: SignalRouterFactory | null = null;
 
   for (const directory of directories) {
     const moduleRoot = join(modulesRoot, directory);
@@ -87,6 +94,13 @@ export async function discoverObservationModules(modulesRoot: string): Promise<O
     }
     moduleNames.add(manifest.name);
     modules.push(manifest);
+
+    if (manifest.router !== undefined) {
+      if (routerFactory !== null) {
+        throw new ObservationError("OBSERVATION_DUPLICATE_ROUTER");
+      }
+      routerFactory = manifest.router;
+    }
 
     if (manifest.targetFragmentBasename !== undefined) {
       if (fragmentNames.has(manifest.targetFragmentBasename)) {
@@ -114,6 +128,7 @@ export async function discoverObservationModules(modulesRoot: string): Promise<O
   return Object.freeze({
     modules: Object.freeze(modules),
     verbs: Object.freeze(verbs),
-    targetFragments: Object.freeze(targetFragments)
+    targetFragments: Object.freeze(targetFragments),
+    routerFactory
   });
 }

@@ -1,4 +1,5 @@
 import type { ImpactCode, Severity } from "./signals.js";
+import type { SignalRouterFactory } from "./routing.js";
 
 export const OBSERVATION_COMPONENTS = Object.freeze([
   "postgres", "docker", "hatchet", "runner", "api", "ui", "tls_front_door",
@@ -161,6 +162,7 @@ export type ObservationModuleManifest = Readonly<{
   cadence: Readonly<{ intervalMs: number; timeoutMs: number }>;
   targetFragmentBasename?: string;
   oactl?: readonly OactlVerbContribution[];
+  router?: SignalRouterFactory;
   probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>;
   samples(observations: readonly ProbeObservation[], ctx: SampleContext): readonly SampleIntent[];
   signals(observations: readonly ProbeObservation[], ctx: SignalContext): readonly SignalIntent[];

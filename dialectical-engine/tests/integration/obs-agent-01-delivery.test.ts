@@ -139,11 +139,17 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     const { ObservationJournal } = await import(
       "../../apps/observation-agent/src/journal/journal.js"
     );
-    const { OsaScriptNotifier } = await import(
+    const { DeliveryCoordinator } = await import(
+      "../../apps/observation-agent/src/notify/delivery.js"
+    );
+    const { createOsaScriptDeliveryExecutor } = await import(
       "../../apps/observation-agent/src/notify/osascript.js"
     );
+    const { createLegacyOsaScriptRouter } = await import(
+      "../../apps/observation-agent/src/core/routing.js"
+    );
     const journal = new ObservationJournal(stateDir);
-    const notifier = new OsaScriptNotifier({
+    const delivery = new DeliveryCoordinator({
       journal,
       mirror: {
         async mirrorDelivery(delivery) {
@@ -153,8 +159,9 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
           expect(lines.at(-1)).toEqual({ kind: "RESULT", delivery });
           mirrorOutcomes.push(delivery.outcome);
         }
-      },
-      execute: async (file, args) => {
+      }
+    });
+    const osascript = createOsaScriptDeliveryExecutor(async (file, args) => {
         expect(file).toBe("/usr/bin/osascript");
         const lines = (await readFile(
           join(stateDir, "journal", "deliveries-2026-09-03.jsonl"), "utf8"
@@ -167,34 +174,34 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
         expect(lines.at(-1)).not.toHaveProperty("outcome");
         invocations.push(args);
         if (failExecution) throw new Error("notification rejected");
-      }
     });
+    const router = createLegacyOsaScriptRouter({ delivery, osascript });
     const open = signal({ seq: 1, id: "10000000-0000-4000-8000-000000000001" });
-    await expect(notifier.deliver(open, {
+    await router.onSignal({ signal: open as never,
       now: new Date("2026-09-03T07:00:06.000Z"),
-      muted: false,
-      rateLimitMs: 600_000,
-      timeoutMs: 2_000
-    })).resolves.toMatchObject({ outcome: "DELIVERED" });
+      mute: null,
+      policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
+    });
+    expect(mirrorOutcomes).toEqual(["DELIVERED"]);
     expect(invocations).toEqual([[
       "-e",
       "display notification \"Hatchet is down: asks are accepted but no debate work is dispatched or run.\" with title \"dialectical-engine: hatchet FATAL\" subtitle \"INFRA_DOWN\""
     ]]);
 
-    await expect(notifier.deliver(open, {
+    await router.onSignal({ signal: open as never,
       now: new Date("2026-09-03T07:01:00.000Z"),
-      muted: false,
-      rateLimitMs: 600_000,
-      timeoutMs: 2_000
-    })).resolves.toMatchObject({ outcome: "RATE_LIMITED" });
+      mute: null,
+      policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
+    });
+    expect(mirrorOutcomes).toEqual(["DELIVERED", "RATE_LIMITED"]);
     expect(invocations).toHaveLength(1);
     failExecution = true;
-    await expect(notifier.deliver(open, {
+    await router.onSignal({ signal: open as never,
       now: new Date("2026-09-03T07:11:00.000Z"),
-      muted: false,
-      rateLimitMs: 600_000,
-      timeoutMs: 2_000
-    })).resolves.toMatchObject({ outcome: "FAILED", delivered_at: null });
+      mute: null,
+      policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
+    });
+    expect(mirrorOutcomes).toEqual(["DELIVERED", "RATE_LIMITED", "FAILED"]);
     expect(invocations).toHaveLength(2);
     const journalSource = await readFile(
       join(stateDir, "journal", "deliveries-2026-09-03.jsonl"), "utf8"
@@ -220,8 +227,14 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     const { persistSignal } = await import(
       "../../apps/observation-agent/src/store/pipeline.js"
     );
-    const { OsaScriptNotifier } = await import(
+    const { DeliveryCoordinator } = await import(
+      "../../apps/observation-agent/src/notify/delivery.js"
+    );
+    const { createOsaScriptDeliveryExecutor } = await import(
       "../../apps/observation-agent/src/notify/osascript.js"
+    );
+    const { createLegacyOsaScriptRouter } = await import(
+      "../../apps/observation-agent/src/core/routing.js"
     );
     const journal = new ObservationJournal(stateDir);
     const mirror = new PostgresMirror(database.pool);
@@ -229,15 +242,14 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       seq: 2, id: "10000000-0000-4000-8000-000000000002", severity: "SEVERE"
     });
     await persistSignal({ signal: severe, journal, mirror });
-    const notifier = new OsaScriptNotifier({
-      journal,
-      mirror,
-      execute: async () => { invocationCount += 1; }
+    const router = createLegacyOsaScriptRouter({
+      delivery: new DeliveryCoordinator({ journal, mirror }),
+      osascript: createOsaScriptDeliveryExecutor(async () => { invocationCount += 1; })
     });
-    await expect(notifier.deliver(severe, {
-      now: new Date("2026-09-03T07:02:00.000Z"), muted: true,
-      rateLimitMs: 600_000, timeoutMs: 2_000
-    })).resolves.toMatchObject({ outcome: "MUTED" });
+    await router.onSignal({ signal: severe as never,
+      now: new Date("2026-09-03T07:02:00.000Z"), mute: {},
+      policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
+    });
     expect(invocationCount).toBe(0);
 
     const cleared = signal({
@@ -248,10 +260,10 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       severity: "SEVERE"
     });
     await persistSignal({ signal: cleared, journal, mirror });
-    await expect(notifier.deliver(cleared, {
-      now: new Date("2026-09-03T07:02:01.000Z"), muted: true,
-      rateLimitMs: 600_000, timeoutMs: 2_000
-    })).resolves.toMatchObject({ outcome: "DELIVERED" });
+    await router.onSignal({ signal: cleared as never,
+      now: new Date("2026-09-03T07:02:01.000Z"), mute: {},
+      policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
+    });
     expect(invocationCount).toBe(1);
   });
 
@@ -262,11 +274,29 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       const syntheticRoot = join(moduleRoot, "synthetic");
       await mkdir(syntheticRoot);
       await writeFile(join(syntheticRoot, "module.ts"), `
+        import { readFile } from "node:fs/promises";
         let cycle = 0;
         let firstFailedAt;
         export default {
           name: "synthetic",
           cadence: { intervalMs: 5000, timeoutMs: 2000 },
+          router: {
+            create({ stateDir }) {
+              return {
+                async onSignal({ signal }) {
+                  const rows = (await readFile(
+                    stateDir + "/journal/signals-" + signal.detected_at.slice(0, 10) + ".jsonl",
+                    "utf8"
+                  )).trim().split("\\n").map((line) => JSON.parse(line));
+                  globalThis.__obsPersistedRouterSignals.push({
+                    signalId: signal.signal_id,
+                    durableSignalId: rows.at(-1).signal_id
+                  });
+                },
+                async onTick() {}
+              };
+            }
+          },
           async probe() { cycle += 1; return []; },
           samples(_observations, ctx) {
             return [{ metricKey: "synthetic.health", value: cycle, observedAt: ctx.now }];
@@ -305,7 +335,10 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       const { ObservationJournal } = await import(
         "../../apps/observation-agent/src/journal/journal.js"
       );
-      const { OsaScriptNotifier } = await import(
+      const { DeliveryCoordinator } = await import(
+        "../../apps/observation-agent/src/notify/delivery.js"
+      );
+      const { createOsaScriptDeliveryExecutor } = await import(
         "../../apps/observation-agent/src/notify/osascript.js"
       );
       const { persistSignal } = await import(
@@ -322,10 +355,13 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       const journal = new ObservationJournal(moduleStateDir);
       const mirror = new PostgresMirror(database.pool);
       let notifications = 0;
-      const notifier = new OsaScriptNotifier({
-        journal,
-        mirror,
-        execute: async () => { notifications += 1; }
+      (globalThis as typeof globalThis & {
+        __obsPersistedRouterSignals: Array<{ signalId: string; durableSignalId: string }>;
+      }).__obsPersistedRouterSignals = [];
+      const router = await catalog.routerFactory!.create({
+        stateDir: moduleStateDir,
+        delivery: new DeliveryCoordinator({ journal, mirror }),
+        osascript: createOsaScriptDeliveryExecutor(async () => { notifications += 1; })
       });
       const ids = [
         "50000000-0000-4000-8000-000000000001",
@@ -338,8 +374,11 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
         sampleStore: new SampleRingStore(database.pool),
         emitSignal: async (emitted, now) => {
           await persistSignal({ signal: emitted, journal, mirror });
-          await notifier.deliver(emitted, {
-            now, muted: false, rateLimitMs: 600_000, timeoutMs: 2_000
+          await router.onSignal({
+            signal: emitted,
+            now,
+            policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 },
+            mute: null
           });
         }
       });
@@ -366,11 +405,17 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
           ["CLEARED", "50000000-0000-4000-8000-000000000002",
             "50000000-0000-4000-8000-000000000001"]
         ]);
-      expect(notifications).toBe(2);
+      expect((globalThis as typeof globalThis & {
+        __obsPersistedRouterSignals: Array<{ signalId: string; durableSignalId: string }>;
+      }).__obsPersistedRouterSignals).toEqual(durableSignals.map((row) => ({
+        signalId: row.signal_id,
+        durableSignalId: row.signal_id
+      })));
+      expect(notifications).toBe(0);
       expect((await database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM observation.delivery WHERE signal_id = ANY($1::uuid[])",
         [durableSignals.map((row) => row.signal_id)]
-      )).rows[0]?.count).toBe("2");
+      )).rows[0]?.count).toBe("0");
     } finally {
       await rm(moduleRoot, { recursive: true, force: true });
       await rm(moduleStateDir, { recursive: true, force: true });

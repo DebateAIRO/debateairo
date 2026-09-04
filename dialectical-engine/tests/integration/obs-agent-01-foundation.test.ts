@@ -177,6 +177,28 @@ describe("OBS-01 observation schema foundation", () => {
         detected_at,evidence,suspected_defect,defect_kind,run_ref,work_item_ref,
         threshold_version,clears_signal_id,recorded_at
       ) VALUES (
+        '00000000-0000-4000-8000-000000000057','OPEN','CAPACITY',
+        'host','DEGRADED','IMPACT_LOAD',now(),now(),'{}',false,null,null,null,1,null,now()
+      )
+    `)).resolves.toMatchObject({ rowCount: 1 });
+
+    await expect(pool().query(`
+      INSERT INTO observation.signal(
+        signal_id,state,class,component,severity,impact_code,first_failed_probe_at,
+        detected_at,evidence,suspected_defect,defect_kind,run_ref,work_item_ref,
+        threshold_version,clears_signal_id,recorded_at
+      ) VALUES (
+        '00000000-0000-4000-8000-000000000058','OPEN','CAPACITY',
+        'host','DEGRADED','IMPACT_UNKNOWN',now(),now(),'{}',false,null,null,null,1,null,now()
+      )
+    `)).rejects.toMatchObject({ code: "23514" });
+
+    await expect(pool().query(`
+      INSERT INTO observation.signal(
+        signal_id,state,class,component,severity,impact_code,first_failed_probe_at,
+        detected_at,evidence,suspected_defect,defect_kind,run_ref,work_item_ref,
+        threshold_version,clears_signal_id,recorded_at
+      ) VALUES (
         '00000000-0000-4000-8000-000000000001','OPEN','OPEN_ENUM_MUTANT',
         'hatchet','FATAL','IMPACT_HATCHET_DOWN',now(),now(),'{}',false,null,null,null,1,null,now()
       )

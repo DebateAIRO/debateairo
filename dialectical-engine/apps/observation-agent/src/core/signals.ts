@@ -14,7 +14,7 @@ export const IMPACT_CODES = Object.freeze([
   "IMPACT_SUSPICIOUS_SUCCESS", "IMPACT_API_DOWN", "IMPACT_UI_DOWN", "IMPACT_TLS_DOWN",
   "IMPACT_DEV_STACK_EXITED", "IMPACT_DEV_STACK_NOT_RUNNING", "IMPACT_RUNNER_GONE",
   "IMPACT_SLOW", "IMPACT_BLIND", "IMPACT_CAPTURE_GAP", "IMPACT_CAPTURE_NOT_WIRED",
-  "IMPACT_SPOOL_STRANDED", "IMPACT_DISK", "IMPACT_MEMORY", "IMPACT_PROVIDER",
+  "IMPACT_SPOOL_STRANDED", "IMPACT_DISK", "IMPACT_MEMORY", "IMPACT_LOAD", "IMPACT_PROVIDER",
   "IMPACT_RUN_FAILURE", "IMPACT_CERT", "IMPACT_SCHEDULE_MISSED", "IMPACT_RESTART",
   "IMPACT_EXPECTED_ABSENT", "IMPACT_THRESHOLDS", "IMPACT_AGENT_START",
   "IMPACT_AGENT_STOP", "IMPACT_AGENT_JOURNAL", "IMPACT_CLEARED"
@@ -207,6 +207,14 @@ const capacityPercentEvidenceSchema = z.object({
   observed_at: timestamp.optional()
 }).strict();
 
+const loadEvidenceSchema = z.object({
+  load_one_minute: finiteNonnegative,
+  logical_cores: positiveInteger,
+  threshold_multiplier: finitePositive,
+  sustained_seconds: finiteNonnegative,
+  observed_at: timestamp
+}).strict();
+
 const certificateEvidenceSchema = z.object({
   days: z.number().finite(),
   threshold_days: finiteNonnegative,
@@ -319,7 +327,8 @@ const clearedEvidenceByClass = {
   CAPACITY: oneOf(
     cleared(capacityCountEvidenceSchema),
     cleared(capacityDurationEvidenceSchema),
-    cleared(capacityPercentEvidenceSchema)
+    cleared(capacityPercentEvidenceSchema),
+    cleared(loadEvidenceSchema)
   ),
   THROUGHPUT_ANOMALY: oneOf(
     cleared(latencyEvidenceSchema),
@@ -366,6 +375,7 @@ const evidenceByImpact = {
   IMPACT_SPOOL_STRANDED: spoolEvidenceSchema,
   IMPACT_DISK: capacityPercentEvidenceSchema,
   IMPACT_MEMORY: capacityPercentEvidenceSchema,
+  IMPACT_LOAD: loadEvidenceSchema,
   IMPACT_PROVIDER: providerEvidenceSchema,
   IMPACT_RUN_FAILURE: runFailureEvidenceSchema,
   IMPACT_CERT: certificateEvidenceSchema,
@@ -398,7 +408,7 @@ const impactsByClass = {
   SPOOL_STRANDED: ["IMPACT_SPOOL_STRANDED", "IMPACT_CLEARED"],
   CAPACITY: [
     "IMPACT_PG_CAPACITY", "IMPACT_PG_LOCKS", "IMPACT_PG_LONG_XACT", "IMPACT_DISK",
-    "IMPACT_MEMORY", "IMPACT_CLEARED"
+    "IMPACT_MEMORY", "IMPACT_LOAD", "IMPACT_CLEARED"
   ],
   THROUGHPUT_ANOMALY: [
     "IMPACT_HATCHET_QUEUE", "IMPACT_HATCHET_FAILED_TASKS", "IMPACT_HATCHET_DISPATCH_SLOW",
@@ -542,6 +552,7 @@ const IMPACT_RENDERERS: Readonly<Record<ImpactCode, (signal: RenderableSignal) =
   IMPACT_SPOOL_STRANDED: (s) => `${firstNumberEvidence(s, "count") || 1} spooled error files are older than ${firstNumberEvidence(s, "duration_minutes") || numberEvidence(s, "threshold_s") / 60} minutes without re-ingestion.`,
   IMPACT_DISK: (s) => `Disk free is ${numberEvidence(s, "percent")}%: Postgres and the spool stop accepting writes at 0.`,
   IMPACT_MEMORY: () => "Host memory pressure is high: processes may be killed.",
+  IMPACT_LOAD: (s) => `Host load is ${numberEvidence(s, "load_one_minute")} across ${numberEvidence(s, "logical_cores")} logical cores for ${numberEvidence(s, "sustained_seconds")} seconds: processes are contending for CPU.`,
   IMPACT_PROVIDER: (s) => `Provider ${stringEvidence(s, "provider_ref")} failed ${providerPercentEvidence(s)}% of its last ${firstNumberEvidence(s, "count", "total")} calls: debates stall or die on it.`,
   IMPACT_RUN_FAILURE: (s) => `${numberEvidence(s, "failed") } of ${numberEvidence(s, "total")} terminal runs failed in the last ${numberEvidence(s, "window_minutes")} minutes: debate runs are failing more often than they finish.`,
   IMPACT_CERT: (s) => `The https certificate expires in ${numberEvidence(s, "days")} days: the front door refuses connections after that.`,

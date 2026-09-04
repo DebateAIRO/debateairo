@@ -15,11 +15,16 @@ async function scratch(): Promise<string> {
   return path;
 }
 
-function moduleSource(name: string, targetFragmentBasename?: string): string {
+function moduleSource(
+  name: string,
+  targetFragmentBasename?: string,
+  routerSource?: string
+): string {
   return `export default {
     name: ${JSON.stringify(name)},
     cadence: { intervalMs: 5000, timeoutMs: 2000 },
     ${targetFragmentBasename === undefined ? "" : `targetFragmentBasename: ${JSON.stringify(targetFragmentBasename)},`}
+    ${routerSource === undefined ? "" : `router: ${routerSource},`}
     async probe() { return []; }, samples() { return []; }, signals() { return []; }
   };\n`;
 }
@@ -28,11 +33,16 @@ async function writeModule(
   root: string,
   directory: string,
   name: string,
-  targetFragmentBasename?: string
+  targetFragmentBasename?: string,
+  routerSource?: string
 ): Promise<void> {
   const moduleRoot = join(root, directory);
   await mkdir(moduleRoot, { recursive: true });
-  await writeFile(join(moduleRoot, "module.ts"), moduleSource(name, targetFragmentBasename), "utf8");
+  await writeFile(
+    join(moduleRoot, "module.ts"),
+    moduleSource(name, targetFragmentBasename, routerSource),
+    "utf8"
+  );
 }
 
 describe("OBS-01 lexical module, verb, and target discovery", () => {
@@ -47,7 +57,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
 
     const requiredMembers = ["cadence", "name", "probe", "samples", "signals"];
     const allowedMembers = new Set([
-      ...requiredMembers, "oactl", "targetFragmentBasename"
+      ...requiredMembers, "oactl", "router", "targetFragmentBasename"
     ]);
     for (const module of catalog.modules) {
       const members = Object.keys(module);
@@ -96,6 +106,92 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     await expect(discoverObservationModules(duplicateTargetRoot)).rejects.toMatchObject({
       code: "OBSERVATION_DUPLICATE_TARGET"
     });
+  });
+
+  it("discovers at most one inert router factory before any lifecycle effect", async () => {
+    const { discoverObservationModules } = await import(
+      "../../apps/observation-agent/src/core/modules.js"
+    );
+    const root = await scratch();
+    const routerSource = `{
+      create() {
+        globalThis.__obsRouterCreates = (globalThis.__obsRouterCreates ?? 0) + 1;
+        return {
+          async onSignal(input) { globalThis.__obsRouterSignals.push(input.signal.severity); },
+          async onTick() {}
+        };
+      }
+    }`;
+    (globalThis as typeof globalThis & {
+      __obsRouterCreates?: number;
+      __obsRouterSignals: string[];
+    }).__obsRouterCreates = 0;
+    (globalThis as typeof globalThis & { __obsRouterSignals: string[] })
+      .__obsRouterSignals = [];
+    let osascriptActions = 0;
+    await writeModule(root, "a", "a", undefined, routerSource);
+    const catalog = await discoverObservationModules(root);
+    expect(catalog.routerFactory).not.toBeNull();
+    expect((globalThis as typeof globalThis & { __obsRouterCreates: number })
+      .__obsRouterCreates).toBe(0);
+    const router = await catalog.routerFactory!.create({
+      stateDir: await scratch(),
+      delivery: {} as never,
+      osascript: async () => {
+        osascriptActions += 1;
+        return { deliveredAt: new Date(), externalRef: null };
+      }
+    });
+    const { signalSchema } = await import(
+      "../../apps/observation-agent/src/core/signals.js"
+    );
+    const base = {
+      first_failed_probe_at: "2026-09-03T12:00:00.000Z",
+      evidence: { probe: "http_get", last_status: "FAILED" },
+      suspected_defect: false,
+      defect_kind: null,
+      run_ref: null,
+      work_item_ref: null,
+      threshold_version: 1,
+      clears_signal_id: null
+    } as const;
+    const info = signalSchema.parse({
+      ...base, seq: 1, signal_id: "10000000-0000-4000-8000-000000000101",
+      state: "OPEN", class: "INFRA_DOWN", component: "hatchet", severity: "INFO",
+      impact_code: "IMPACT_HATCHET_DOWN", detected_at: "2026-09-03T12:00:01.000Z",
+      recorded_at: "2026-09-03T12:00:01.000Z"
+    });
+    const degraded = signalSchema.parse({
+      ...base, seq: 2, signal_id: "10000000-0000-4000-8000-000000000102",
+      state: "OPEN", class: "INFRA_DOWN", component: "hatchet", severity: "DEGRADED",
+      impact_code: "IMPACT_HATCHET_DOWN", detected_at: "2026-09-03T12:00:02.000Z",
+      recorded_at: "2026-09-03T12:00:02.000Z"
+    });
+    const cleared = signalSchema.parse({
+      ...base, seq: 3, signal_id: "10000000-0000-4000-8000-000000000103",
+      state: "CLEARED", class: "INFRA_DOWN", component: "hatchet", severity: "DEGRADED",
+      impact_code: "IMPACT_CLEARED", evidence: { duration_seconds: 1 },
+      clears_signal_id: degraded.signal_id,
+      detected_at: "2026-09-03T12:00:03.000Z", recorded_at: "2026-09-03T12:00:03.000Z"
+    });
+    const policy = { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 };
+    for (const current of [info, degraded, cleared]) {
+      await router.onSignal({ signal: current, now: new Date(current.detected_at), policy, mute: null });
+    }
+    expect((globalThis as typeof globalThis & { __obsRouterSignals: string[] })
+      .__obsRouterSignals).toEqual(["INFO", "DEGRADED", "DEGRADED"]);
+    expect(osascriptActions).toBe(0);
+
+    const duplicateRoot = await scratch();
+    (globalThis as typeof globalThis & { __obsRouterCreates: number })
+      .__obsRouterCreates = 0;
+    await writeModule(duplicateRoot, "a", "a", undefined, routerSource);
+    await writeModule(duplicateRoot, "b", "b", undefined, routerSource);
+    await expect(discoverObservationModules(duplicateRoot)).rejects.toMatchObject({
+      code: "OBSERVATION_DUPLICATE_ROUTER"
+    });
+    expect((globalThis as typeof globalThis & { __obsRouterCreates: number })
+      .__obsRouterCreates).toBe(0);
   });
 
   it("loads module-owned oactl files lexically and rejects a duplicate verb", async () => {

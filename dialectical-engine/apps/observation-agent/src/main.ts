@@ -5,6 +5,7 @@ import { loadObservationAgentEnvironment } from "../../../packages/register/src/
 import { ObservationError, normalizeObservationError } from "./core/errors.js";
 import { discoverObservationModules } from "./core/modules.js";
 import { ObservationModuleRuntime } from "./core/runtime.js";
+import { createLegacyOsaScriptRouter } from "./core/routing.js";
 import { signalSchema, type ObservationSignal, type Severity } from "./core/signals.js";
 import { loadObservationTargetCatalog } from "./core/targets.js";
 import {
@@ -18,7 +19,8 @@ import { createLivenessTracker, inactiveClassRecoveries } from "./modules/core-l
 import { deliverJournalFailureDirect } from "./modules/self/direct-notify.js";
 import { HeartbeatWriter, writeHeartbeatFailOpen } from "./modules/self/heartbeat.js";
 import { makeSelfSignal, makeThresholdChangedSignal } from "./modules/self/signals.js";
-import { OsaScriptNotifier } from "./notify/osascript.js";
+import { DeliveryCoordinator } from "./notify/delivery.js";
+import { createOsaScriptDeliveryExecutor } from "./notify/osascript.js";
 import { readMute } from "./oactl/core/state.js";
 import {
   reloadThresholdPolicy,
@@ -152,7 +154,21 @@ async function boot(): Promise<void> {
   const repository = new ThresholdRepository(pool);
   const journal = new ObservationJournal(environment.OBSERVATION_STATE_DIR);
   const mirror = new PostgresMirror(pool);
-  const notifier = new OsaScriptNotifier({ journal, mirror });
+  const delivery = new DeliveryCoordinator({ journal, mirror });
+  const osascript = createOsaScriptDeliveryExecutor();
+  const router = moduleCatalog.routerFactory === null
+    ? createLegacyOsaScriptRouter({ delivery, osascript })
+    : await moduleCatalog.routerFactory.create({
+        stateDir: environment.OBSERVATION_STATE_DIR,
+        delivery,
+        osascript
+      });
+  if (router === null
+    || typeof router !== "object"
+    || typeof router.onSignal !== "function"
+    || typeof router.onTick !== "function") {
+    throw new ObservationError("OBSERVATION_MODULE_INVALID");
+  }
   const heartbeat = new HeartbeatWriter({ pool, stateDir: environment.OBSERVATION_STATE_DIR });
   let nextSequence = Date.now() * 1_000;
   const sequence = () => { nextSequence += 1; return nextSequence; };
@@ -190,12 +206,18 @@ async function boot(): Promise<void> {
     status.set(signal.component, componentStatus);
     if (signal.state === "OPEN") componentStatus.openSignalIds.add(signal.signal_id);
     else if (signal.clears_signal_id !== null) componentStatus.openSignalIds.delete(signal.clears_signal_id);
-    const mute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
-    await notifier.deliver(signal, {
+    const routingMute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
+    await router.onSignal({
+      signal,
       now,
-      muted: mute !== null && (mute.component === undefined || mute.component === signal.component),
-      rateLimitMs: policy.value.notification.rate_limit_ms,
-      timeoutMs: policy.value.notification.timeout_ms
+      policy: {
+        rateLimitMs: policy.value.notification.rate_limit_ms,
+        degradedAfterMs: policy.value.notification.degraded_after_ms,
+        timeoutMs: policy.value.notification.timeout_ms
+      },
+      mute: routingMute === null || routingMute.component === undefined
+        ? routingMute === null ? null : {}
+        : { component: routingMute.component }
     }).catch(async (error) => {
       await deliverJournalFailureDirect({ timeoutMs: policy.value.notification.timeout_ms })
         .catch(() => undefined);
@@ -370,18 +392,18 @@ async function boot(): Promise<void> {
         }
       }
 
-      for (const opened of openSignals.values()) {
-        if (opened.signal.severity !== "DEGRADED"
-          || now.getTime() - opened.openedAt.getTime() < policy.value.notification.degraded_after_ms) continue;
-        const mute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
-        await notifier.deliver(opened.signal, {
-          now,
-          muted: mute !== null && (mute.component === undefined || mute.component === opened.signal.component),
+      const routingMute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
+      await router.onTick({
+        now,
+        policy: {
           rateLimitMs: policy.value.notification.rate_limit_ms,
-          timeoutMs: policy.value.notification.timeout_ms,
-          allowDegraded: true
-        });
-      }
+          degradedAfterMs: policy.value.notification.degraded_after_ms,
+          timeoutMs: policy.value.notification.timeout_ms
+        },
+        mute: routingMute === null || routingMute.component === undefined
+          ? routingMute === null ? null : {}
+          : { component: routingMute.component }
+      });
 
       const mute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
       await writeStatusSnapshot(environment.OBSERVATION_STATE_DIR, {
