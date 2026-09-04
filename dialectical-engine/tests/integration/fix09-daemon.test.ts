@@ -259,16 +259,21 @@ describe("FIX-09 C2 listener migration on real PostgreSQL", () => {
       { table_name: "trace", privilege_type: "SELECT" },
       { table_name: "zone_daily", privilege_type: "SELECT" }
     ]);
-    const obsRoutineGrants = await database.pool.query<{
+    const publisherRoutineGrants = await database.pool.query<{
       grantee: string; routine_name: string; privilege_type: string;
     }>(`
-      SELECT grantee,routine_name,privilege_type
-      FROM information_schema.role_routine_grants
-      WHERE specific_schema='obs'
-        AND grantee IN ('PUBLIC','debateai_obs_listener','debateai_obs_writer')
+      SELECT CASE WHEN acl.grantee=0 THEN 'PUBLIC'
+             ELSE pg_catalog.pg_get_userbyid(acl.grantee) END AS grantee,
+        procedure.proname AS routine_name,acl.privilege_type
+      FROM pg_catalog.pg_proc AS procedure
+      CROSS JOIN LATERAL pg_catalog.aclexplode(coalesce(
+        procedure.proacl,pg_catalog.acldefault('f',procedure.proowner)
+      )) AS acl
+      WHERE procedure.oid='obs.occurrence_seq_nextval_notify()'::pg_catalog.regprocedure
+        AND acl.privilege_type='EXECUTE' AND acl.grantee<>procedure.proowner
       ORDER BY grantee,routine_name,privilege_type
     `);
-    expect(obsRoutineGrants.rows).toEqual([{
+    expect(publisherRoutineGrants.rows).toEqual([{
       grantee: "debateai_obs_writer",
       routine_name: "occurrence_seq_nextval_notify",
       privilege_type: "EXECUTE"
@@ -276,10 +281,12 @@ describe("FIX-09 C2 listener migration on real PostgreSQL", () => {
     const migrationSource = await readFile(
       new URL("../../migrations/0062_fix09_listener_fold.sql", import.meta.url), "utf8"
     );
-    expect(migrationSource.match(/^GRANT\b[\s\S]*?;/gm)?.map((statement) =>
-      statement.replace(/\s+/g, " ").trim()
-    )).toEqual([
-      "GRANT EXECUTE ON FUNCTION obs.occurrence_seq_nextval_notify() TO debateai_obs_writer;"
+    const normalizedGrantStatements = migrationSource.split(";")
+      .map((statement) => statement.replace(/\s+/g, " ").trim().toLowerCase())
+      .filter((statement) => /^grant\b/.test(statement))
+      .map((statement) => `${statement};`);
+    expect(normalizedGrantStatements).toEqual([
+      "grant execute on function obs.occurrence_seq_nextval_notify() to debateai_obs_writer;"
     ]);
 
     const writer = new pg.Client({ connectionString: roleUrl("debateai_obs_writer", WRITER_PASSWORD) });

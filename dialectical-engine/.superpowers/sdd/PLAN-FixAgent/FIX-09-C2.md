@@ -86,12 +86,27 @@ The exact former survivors now fail: removing the fingerprint-version predicate 
 the false-lock generation; granting listener SELECT on `occurrence_detail` changes the exact
 privilege projection; removing both terminal receipt guards creates duplicate actions.
 
+Round-two review found that the routine-grant query still filtered its observed grantees and
+the source inventory recognized only uppercase, column-zero `GRANT`. The real catalog proof
+now expands the exact no-argument publisher ACL, excludes only its owner, and requires the
+complete non-owner EXECUTE grantee set to be the singleton `debateai_obs_writer`. The source
+inventory splits statements and normalizes whitespace and case as defense in depth. The
+exact indented lowercase human-role grant and a mixed-case indented watchdog-role neighbor
+both fail the real-PostgreSQL case. Migration 0062 was restored byte-identically at SHA-256
+`4b600044eaeb628091a23206a3e266c6fe85b99f8bc0bc1478b4b2aee762ddec`.
+
 ## Commits
 
-- `95d0908b` — `feat(listener): FIX-09 C2.1 — composite incidents and transactional wake`
-- `4fdfa192` — `feat(listener): FIX-09 C2.2 — deterministic intake and fold`
-- `f4216415` — `feat(listener): FIX-09 C2.3 — atomic delivery, dead-letter, and cursor`
-- final implementation/report commit — `feat(listener): FIX-09 C2.4 — LISTEN leader reconciliation loop`
+- `95d0908be3334f01c7e175c7253306e77ff147fa` — C2.1 composite incidents and transactional wake
+- `4fdfa192356ec830c5a420d6469d94b80d3c8308` — C2.2 deterministic intake and fold
+- `f42164153c3694eedb2454e7d2ac0883e2f6b74a` — C2.3 atomic delivery, dead-letter, and cursor
+- `b8f63a84761fb4f3f0931bbc33fe0d730f1f1b64` — C2.4 LISTEN leader reconciliation loop
+- `480a148d658f5d535588f164bb40de181ffb4562` — first independent-review rework
+
+The final implementation HEAD reviewed in round two was
+`480a148d658f5d535588f164bb40de181ffb4562`. This round-two correction changes only the
+focused integration proof and this report; its resulting handoff HEAD is recorded with the
+separate correction commit and fresh-review request.
 
 ## Final verification
 
