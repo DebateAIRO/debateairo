@@ -118,7 +118,7 @@ describe("S03b deployment surface", () => {
 });
 
 describe("S03b calling-thread contract", () => {
-  it("stores only payload and context references without inspecting or serializing them", () => {
+  it("stores references plus a frozen bounded snapshot without property reads or serialization", () => {
     const queue = new BoundedReferenceQueue<CaptureQueueEntry>(2);
     const health = createCaptureHealth();
     const gaps = createCaptureGapCounter({ health });
@@ -167,6 +167,8 @@ describe("S03b calling-thread contract", () => {
     const [queued] = queue.drain();
     expect(queued?.payload_ref).toBe(payload);
     expect(queued?.ambient_context_ref).toBe(context);
+    expect(queued?.cause_chain_codes_ref).toEqual([]);
+    expect(Object.isFrozen(queued?.cause_chain_codes_ref)).toBe(true);
     expect(stackReads).toBe(0);
     expect(scheduled).toEqual([]);
   });

@@ -1,5 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  CAUSE_PARENT_NOT_CAPTURED,
+  CAUSE_RELATION_WRAPS,
+  causeChainWrapperCode,
+  EMPTY_CAUSE_CHAIN_CODES,
+  projectCauseChainCodes,
+} from "./cause-chain.js";
 import type { CaptureQueueEntry } from "./emit.js";
 import {
   projectDeclaredRefs,
@@ -104,8 +111,11 @@ export interface PostRedactionEnvelope {
   readonly node_ref: ProjectedDeclaredRefs["node_ref"];
   readonly attempt_ref: ProjectedDeclaredRefs["attempt_ref"];
   readonly ledger_ref: ProjectedDeclaredRefs["ledger_ref"];
-  readonly parent_occurrence_ref: "NO_CAUSE";
-  readonly cause_relation: null;
+  readonly parent_occurrence_ref:
+    | "NO_CAUSE"
+    | "CAUSE_NOT_CAPTURED:NOT_SEPARATELY_CAPTURED";
+  readonly cause_relation: null | "WRAPS";
+  readonly cause_chain_codes: readonly string[];
   readonly at_seq_watermark: ProjectedDeclaredRefs["at_seq_watermark"];
   readonly frames: readonly [];
   readonly safe_template_id: string;
@@ -239,6 +249,7 @@ export function createSharedRedactor(
     readonly fallbackMinimized: boolean;
     readonly ambientContext: CaptureQueueEntry["ambient_context_ref"];
     readonly templateParameters: Readonly<Record<string, string | number>>;
+    readonly causeChainCodes?: unknown;
   }): PostRedactionEnvelope {
     const template = resolveSafeTemplate(options.code);
     const fallbackTemplate = resolveSafeTemplate("OBS_CAPTURE_SELF");
@@ -262,6 +273,14 @@ export function createSharedRedactor(
       options.ambientContext,
       options.zoneContext,
     );
+    const fallbackMinimized = options.fallbackMinimized
+      || template === undefined
+      || metadata.fallback_minimized
+      || sourceRef.minimized;
+    const causeChainCodes = fallbackMinimized
+      ? EMPTY_CAUSE_CHAIN_CODES
+      : projectCauseChainCodes(options.causeChainCodes, safeCode);
+    const hasCauseChain = causeChainCodes.length >= 2;
     return Object.freeze({
       [POST_REDACTION_BRAND]: true as const,
       occurred_at: safeNow().toISOString(),
@@ -284,17 +303,17 @@ export function createSharedRedactor(
       fingerprint_version: 1 as const,
       redaction_policy_version: metadata.redaction_policy_version,
       allowlist_set_id: metadata.allowlist_set_id,
-      fallback_minimized: options.fallbackMinimized
-        || template === undefined
-        || metadata.fallback_minimized
-        || sourceRef.minimized,
+      fallback_minimized: fallbackMinimized,
       run_ref: declaredRefs.run_ref,
       work_item_ref: declaredRefs.work_item_ref,
       node_ref: declaredRefs.node_ref,
       attempt_ref: declaredRefs.attempt_ref,
       ledger_ref: declaredRefs.ledger_ref,
-      parent_occurrence_ref: "NO_CAUSE" as const,
-      cause_relation: null,
+      parent_occurrence_ref: hasCauseChain
+        ? CAUSE_PARENT_NOT_CAPTURED
+        : "NO_CAUSE" as const,
+      cause_relation: hasCauseChain ? CAUSE_RELATION_WRAPS : null,
+      cause_chain_codes: causeChainCodes,
       at_seq_watermark: declaredRefs.at_seq_watermark,
       frames: Object.freeze([]) as readonly [],
       safe_template_id: safeTemplate.id,
@@ -429,9 +448,7 @@ export function createSharedRedactor(
             codeValue = isRecord(errorValue) ? ownValue(errorValue, "code") : undefined;
           }
         } else {
-          codeValue = isRecord(entry.payload_ref)
-            ? ownValue(entry.payload_ref, "code")
-            : undefined;
+          codeValue = causeChainWrapperCode(entry.cause_chain_codes_ref);
         }
 
         if (typeof codeValue !== "string") {
@@ -523,6 +540,7 @@ export function createSharedRedactor(
           fallbackMinimized: false,
           ambientContext,
           templateParameters: validatedParameters.parameters,
+          causeChainCodes: entry.cause_chain_codes_ref,
         });
       } catch {
         return fallback(ambientContext, true);

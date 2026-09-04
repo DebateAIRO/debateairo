@@ -44,6 +44,57 @@ const OCCURRENCE_COLUMNS = Object.freeze([
   "attempt_index",
   "writer_identity",
 ] as const);
+const DETAIL_INPUT_COLUMNS = Object.freeze([
+  "detail_normalized_frames",
+  "detail_cause_chain_codes",
+  "detail_template_parameters",
+] as const);
+const INPUT_COLUMNS = Object.freeze([
+  "input_ordinal",
+  ...OCCURRENCE_COLUMNS,
+  ...DETAIL_INPUT_COLUMNS,
+] as const);
+const INPUT_CASTS = Object.freeze([
+  "bigint",
+  "bytea",
+  "timestamptz",
+  "text",
+  "text",
+  "boolean",
+  "text",
+  "jsonb",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "integer",
+  "text",
+  "text",
+  "boolean",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "text",
+  "jsonb",
+  "text",
+  "jsonb",
+  "text",
+  "text",
+  "boolean",
+  "integer",
+  "text",
+  "jsonb",
+  "jsonb",
+  "jsonb",
+] as const);
 
 export interface PostgresCaptureSink extends CaptureDatabaseSink {
   ingestSpooledOccurrence(envelope: PostRedactionEnvelope): Promise<void>;
@@ -107,6 +158,20 @@ function occurrenceValues(
   ];
 }
 
+function inputValues(
+  envelope: PostRedactionEnvelope,
+  captureStatus: "PERSISTED" | "SPOOLED",
+  inputOrdinal: number,
+): readonly unknown[] {
+  return [
+    inputOrdinal,
+    ...occurrenceValues(envelope, captureStatus),
+    JSON.stringify(envelope.frames),
+    JSON.stringify(envelope.cause_chain_codes),
+    JSON.stringify(envelope.template_parameters),
+  ];
+}
+
 export function createPostgresCaptureSink(options: {
   readonly connectionString: string | undefined;
 }): PostgresCaptureSink {
@@ -129,20 +194,47 @@ export function createPostgresCaptureSink(options: {
       envelopes: readonly PostRedactionEnvelope[],
     ): Promise<void> {
       if (envelopes.length === 0) return;
-      const values = envelopes.flatMap((envelope) =>
-        occurrenceValues(envelope, "PERSISTED")
+      const values = envelopes.flatMap((envelope, inputIndex) =>
+        inputValues(envelope, "PERSISTED", inputIndex + 1)
       );
       const rows = envelopes.map((_, rowIndex) => {
-        const offset = rowIndex * OCCURRENCE_COLUMNS.length;
-        const parameters = OCCURRENCE_COLUMNS.map(
-          (_column, columnIndex) => `$${offset + columnIndex + 1}`,
+        const offset = rowIndex * INPUT_COLUMNS.length;
+        const parameters = INPUT_COLUMNS.map(
+          (_column, columnIndex) =>
+            `$${offset + columnIndex + 1}::${INPUT_CASTS[columnIndex]}`,
         );
         return `(${parameters.join(", ")})`;
       });
       await requirePool().query(
-        `INSERT INTO obs.occurrence (${OCCURRENCE_COLUMNS.join(", ")})
-         VALUES ${rows.join(", ")}
-         ON CONFLICT (source, source_event_ref) DO NOTHING`,
+        `WITH input (${INPUT_COLUMNS.join(", ")}) AS (
+           VALUES ${rows.join(", ")}
+         ), ranked AS (
+           SELECT input.*,
+                  row_number() OVER (
+                    PARTITION BY source, source_event_ref
+                    ORDER BY input_ordinal
+                  ) AS candidate_rank
+             FROM input
+         ), candidate AS (
+           SELECT ${INPUT_COLUMNS.join(", ")}
+             FROM ranked
+            WHERE candidate_rank = 1
+         ), inserted AS (
+           INSERT INTO obs.occurrence (${OCCURRENCE_COLUMNS.join(", ")})
+           SELECT ${OCCURRENCE_COLUMNS.join(", ")} FROM candidate
+           ORDER BY input_ordinal
+           ON CONFLICT (source, source_event_ref) DO NOTHING
+           RETURNING occurrence_id, source, source_event_ref
+         )
+         INSERT INTO obs.occurrence_detail
+           (occurrence_id, normalized_frames, cause_chain_codes, template_parameters)
+         SELECT inserted.occurrence_id,
+                candidate.detail_normalized_frames,
+                candidate.detail_cause_chain_codes,
+                candidate.detail_template_parameters
+           FROM inserted
+           JOIN candidate USING (source, source_event_ref)
+          WHERE jsonb_array_length(candidate.detail_cause_chain_codes) > 0`,
         values,
       );
     },
@@ -163,6 +255,19 @@ export function createPostgresCaptureSink(options: {
         );
         const occurrenceId = inserted.rows[0]?.occurrence_id;
         if (occurrenceId !== undefined) {
+          if (envelope.cause_chain_codes.length > 0) {
+            await client.query(
+              `INSERT INTO obs.occurrence_detail
+               (occurrence_id, normalized_frames, cause_chain_codes, template_parameters)
+               VALUES ($1::uuid, $2::jsonb, $3::jsonb, $4::jsonb)`,
+              [
+                occurrenceId,
+                JSON.stringify(envelope.frames),
+                JSON.stringify(envelope.cause_chain_codes),
+                JSON.stringify(envelope.template_parameters),
+              ],
+            );
+          }
           await client.query(
             `INSERT INTO obs.spool_receipt
                (source, spool_ref, occurrence_id)
