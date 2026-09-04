@@ -150,6 +150,58 @@ describe("FIX-01 C5 capture-emitter readiness", () => {
     await starting;
   });
 
+  it("keeps an in-flight start bound to its state after stop clears the active runtime", async () => {
+    let releaseTransfer: (() => void) | undefined;
+    installControl.transfer = new Promise<void>((resolve) => {
+      releaseTransfer = resolve;
+    });
+    const starting = startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+
+    await expect(waitForCaptureEmitterInstalled({ deadlineMs: 1_000 })).resolves.toBe(
+      "installed",
+    );
+    await stopCaptureRuntime({ deadlineMs: 0 });
+
+    releaseTransfer?.();
+    await expect(starting).resolves.toBeUndefined();
+  });
+
+  it("keeps a stopped in-flight generation inert after a restart", async () => {
+    let releaseTransfer: (() => void) | undefined;
+    installControl.transfer = new Promise<void>((resolve) => {
+      releaseTransfer = resolve;
+    });
+    const starting = startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+
+    await expect(waitForCaptureEmitterInstalled({ deadlineMs: 1_000 })).resolves.toBe(
+      "installed",
+    );
+    await stopCaptureRuntime({ deadlineMs: 0 });
+
+    installControl.transfer = Promise.resolve();
+    const restartedReady = waitForCaptureEmitterInstalled({ deadlineMs: 1_000 });
+    const restarted = startCaptureRuntime({
+      runtime: "scheduler",
+      spoolFd: undefined,
+      installExitSink() {},
+    });
+    await expect(restartedReady).resolves.toBe("installed");
+    await restarted;
+    expect(installControl.drainCalls).toBe(1);
+
+    releaseTransfer?.();
+    await expect(starting).resolves.toBeUndefined();
+    expect(installControl.drainCalls).toBe(1);
+  });
+
   it("keeps installed settled while the initial drain is blocked", async () => {
     let releaseDrain: (() => void) | undefined;
     installControl.drain = new Promise((resolve) => {
