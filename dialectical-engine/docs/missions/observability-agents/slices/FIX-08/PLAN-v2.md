@@ -10,7 +10,9 @@
    plain `PASS`, a runner-minted child receipt, timeout, and scratch cleanup.
 2. Add `acceptance/obs/index.ts`. Use direct child spawn only. Cap output and
    time. Never use a shell.
-3. Add one dynamic dispatch line to `acceptance/run-acceptance.ts`. Its old
+3. Add one dynamic dispatch line to `acceptance/run-acceptance.ts`. It exits
+   with the awaited family code because the old static import graph installs
+   an exit hook that otherwise changes `process.exitCode = 1` to 0. Its old
    ceremony path must still pass its standing tests.
 4. Run the focused test three times. Mutate the receipt check and missing-path
    check one at a time; each mutation must make a focused test fail. Restore

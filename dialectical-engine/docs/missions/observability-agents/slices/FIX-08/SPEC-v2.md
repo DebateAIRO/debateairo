@@ -15,6 +15,10 @@ not proof that the harness spawned a process.
 
 - `acceptance/run-acceptance.ts` gets exactly one dynamic family-dispatch
   line. Its existing ceremony parser and behavior stay unchanged.
+- The old ceremony import graph loads `embedded-postgres`, whose exit hook
+  turns a later `process.exitCode = 1` back into exit 0. The one dispatch line
+  therefore exits with the family code after the awaited family run has
+  cleaned up. This keeps `FAIL` nonzero.
 - `runFamily("obs-g1", ...)` checks subject paths before it calls a case.
   The first absent subject prints exactly
   `obs-g1/<case> SKIP(missing: <path>)`.

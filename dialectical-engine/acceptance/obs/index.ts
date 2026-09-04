@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
+import { corpusCase } from "./cases/corpus.js";
+import { identityCanaryCase } from "./cases/identity-canary.js";
+import { schemaManifestCase } from "./cases/schema-manifest.js";
+
 export const OBS_G1_CHILD_RECEIPT_PREFIX = "OBS_G1_CHILD_RECEIPT " as const;
 export const OBS_G1_CHILD_OUTPUT_MAX_BYTES = 65_536 as const;
 export const OBS_G1_CHILD_KILL_GRACE_MS = 250 as const;
@@ -374,7 +378,11 @@ export async function runFamily(name: "obs-g1", options: RunFamilyOptions): Prom
   });
 }
 
-const DEFAULT_OBS_G1_CASES: readonly ObsAcceptanceCase[] = Object.freeze([]);
+const DEFAULT_OBS_G1_CASES: readonly ObsAcceptanceCase[] = Object.freeze([
+  corpusCase,
+  identityCanaryCase,
+  schemaManifestCase,
+]);
 
 function parseFamilyArguments(arguments_: readonly string[]): { readonly only?: readonly string[] } {
   const values = new Map<string, string>();
