@@ -14,12 +14,14 @@ import {
   SyntaxKind,
   type Expression,
   type Node,
+  type SourceFile,
 } from "typescript/unstable/ast";
 import {
   isAssignmentOperatorToken,
   isBinaryExpression,
   isCallExpression,
   isClassDeclaration,
+  isClassExpression,
   isElementAccessExpression,
   isExpressionStatement,
   isFunctionLikeDeclaration,
@@ -30,6 +32,7 @@ import {
   isTypeNode,
   isVariableDeclaration,
 } from "typescript/unstable/ast/is";
+import { createVirtualFileSystem } from "typescript/unstable/fs";
 import { API as TypeScriptApi } from "typescript/unstable/sync";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
@@ -81,6 +84,49 @@ const POLICY_AUTHORITY_SOURCE_PATHS = [
   resolve(import.meta.dirname, "../../tools/obs-listener/policy/canonical.ts"),
   resolve(import.meta.dirname, "../../tools/obs-listener/policy/custodian.ts"),
 ] as const;
+
+function mutableDerivedConstructorNodes(sourceFile: SourceFile): readonly Node[] {
+  const safelyFrozen = new Set<Node>();
+  const violations: Node[] = [];
+  for (let index = 0; index < sourceFile.statements.length; index += 1) {
+    const statement = sourceFile.statements[index];
+    if (statement === undefined || !isClassDeclaration(statement)) continue;
+    const extendsClause = statement.heritageClauses?.find(
+      (clause) => clause.token === SyntaxKind.ExtendsKeyword,
+    );
+    if (extendsClause === undefined) continue;
+    const className = statement.name?.text;
+    const nextStatement = sourceFile.statements[index + 1];
+    if (
+      className !== undefined &&
+      nextStatement !== undefined &&
+      isExpressionStatement(nextStatement) &&
+      isCallExpression(nextStatement.expression) &&
+      isIdentifier(nextStatement.expression.expression) &&
+      nextStatement.expression.expression.text === "FREEZE_OBJECT" &&
+      nextStatement.expression.arguments.length === 1 &&
+      nextStatement.expression.arguments[0] !== undefined &&
+      isIdentifier(nextStatement.expression.arguments[0]) &&
+      nextStatement.expression.arguments[0]?.text === className
+    ) {
+      safelyFrozen.add(statement);
+    }
+  }
+  const visit = (node: Node): void => {
+    if (
+      (isClassDeclaration(node) || isClassExpression(node)) &&
+      node.heritageClauses?.some(
+          (clause) => clause.token === SyntaxKind.ExtendsKeyword
+        ) === true &&
+      !safelyFrozen.has(node)
+    ) {
+      violations.push(node);
+    }
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
+  return violations;
+}
 
 function expectFrozenOwnDataSnapshot(actual: unknown, expected: unknown): void {
   if (Array.isArray(expected)) {
@@ -2128,6 +2174,65 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(typeof refusalChild.stack).toBe("string");
   });
 
+  it("statically rejects unfrozen nested and expression derived constructors", () => {
+    const virtualRoot = "/fix09-derived-super-static";
+    const samples = {
+      expression_unfrozen:
+        "const MAIN_ERROR = Error; const Expr = class extends MAIN_ERROR {};",
+      nested_unfrozen:
+        "const MAIN_ERROR = Error; function later() { class Nested extends MAIN_ERROR {} return Nested; }",
+      top_level_frozen:
+        "const MAIN_ERROR = Error; class Top extends MAIN_ERROR {}\nFREEZE_OBJECT(Top);",
+      top_level_unfrozen:
+        "const MAIN_ERROR = Error; class Top extends MAIN_ERROR {}",
+    } as const;
+    const files: Record<string, string> = {
+      [`${virtualRoot}/tsconfig.json`]: JSON.stringify({
+        compilerOptions: { noLib: true },
+        files: Object.keys(samples).map((name) => `${name}.ts`),
+      }),
+    };
+    for (const [name, source] of Object.entries(samples)) {
+      files[`${virtualRoot}/${name}.ts`] = source;
+    }
+    const api = new TypeScriptApi({
+      cwd: virtualRoot,
+      fs: createVirtualFileSystem(files),
+    });
+    const actual: Record<string, string[]> = {};
+
+    try {
+      const project = api.updateSnapshot({
+        openProjects: [`${virtualRoot}/tsconfig.json`],
+      }).getProjects()[0];
+      if (project === undefined) throw new Error("TYPESCRIPT_PROJECT_MISSING");
+
+      for (const name of Object.keys(samples)) {
+        const sourceFile = project.program.getSourceFile(
+          `${virtualRoot}/${name}.ts`,
+        );
+        if (sourceFile === undefined) {
+          throw new Error(`TYPESCRIPT_SOURCE_MISSING:${name}`);
+        }
+        actual[name] = mutableDerivedConstructorNodes(sourceFile).map(
+          (node) =>
+            isClassDeclaration(node) || isClassExpression(node)
+              ? node.name?.text ?? "<anonymous>"
+              : "<unexpected>",
+        );
+      }
+    } finally {
+      api.close();
+    }
+
+    expect(actual).toEqual({
+      expression_unfrozen: ["<anonymous>"],
+      nested_unfrozen: ["Nested"],
+      top_level_frozen: [],
+      top_level_unfrozen: ["Top"],
+    });
+  });
+
   it("retains no uncaptured ambient authority member or constructor", () => {
     const ambientCallableRoots = new Set([
       "Array",
@@ -2245,36 +2350,13 @@ describe("FIX-09 C1 policy bundle", () => {
           }
           return false;
         };
-        for (let index = 0; index < sourceFile.statements.length; index += 1) {
-          const statement = sourceFile.statements[index];
-          if (statement === undefined || !isClassDeclaration(statement)) {
-            continue;
-          }
-          const extendsClause = statement.heritageClauses?.find(
-            (clause) => clause.token === SyntaxKind.ExtendsKeyword,
+        for (const node of mutableDerivedConstructorNodes(sourceFile)) {
+          const location = sourceFile.getLineAndCharacterOfPosition(
+            node.getStart(sourceFile),
           );
-          if (extendsClause === undefined) continue;
-          const className = statement.name?.text;
-          const nextStatement = sourceFile.statements[index + 1];
-          if (
-            className === undefined ||
-            nextStatement === undefined ||
-            !isExpressionStatement(nextStatement) ||
-            !isCallExpression(nextStatement.expression) ||
-            !isIdentifier(nextStatement.expression.expression) ||
-            nextStatement.expression.expression.text !== "FREEZE_OBJECT" ||
-            nextStatement.expression.arguments.length !== 1 ||
-            nextStatement.expression.arguments[0] === undefined ||
-            !isIdentifier(nextStatement.expression.arguments[0]) ||
-            nextStatement.expression.arguments[0]?.text !== className
-          ) {
-            const location = sourceFile.getLineAndCharacterOfPosition(
-              statement.getStart(sourceFile),
-            );
-            violations.add(
-              `${sourcePath}:${location.line + 1}:mutable-derived-super`,
-            );
-          }
+          violations.add(
+            `${sourcePath}:${location.line + 1}:mutable-derived-super`,
+          );
         }
         const visit = (node: Node, functionDepth = 0): void => {
           if (
