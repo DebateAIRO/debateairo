@@ -46,6 +46,7 @@ const GATE_TOOL_PATH = resolve(
 const INDEX_NAME = ".obs-spool-index-v1";
 const CURSOR_NAME = ".obs-spool-cursor-v1";
 const RELEASE_LOCK_NAME = ".obs-spool-release-lock-v1";
+const RELEASE_LOCK_STAGE_PREFIX = ".obs-spool-release-lock-stage-v1-";
 const BUILD_REF = "597f68b869413a33adfbc1f835184d469d9161bd";
 const DEAD_PID = 2_147_483_647;
 const GATE_MANIFEST_MAX_BYTES = 8 * 1024 * 1024;
@@ -165,6 +166,167 @@ function runAdmission(
   const child = spawnSync(
     process.execPath,
     commandArgs(spoolDirectory, manifestPath),
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
+function runAdmissionRetainingLockPrefix(
+  spoolDirectory: string,
+  manifestPath: string,
+  retainedBytes: number,
+): AdmissionResult {
+  const promisesModule = [
+    'import * as fs from "node:fs/promises";',
+    "export const link = fs.link;",
+    "export const lstat = fs.lstat;",
+    "export const readdir = fs.readdir;",
+    "export const realpath = fs.realpath;",
+    "export const unlink = fs.unlink;",
+    `const finalPath = ${JSON.stringify(join(spoolDirectory, RELEASE_LOCK_NAME))};`,
+    `const stagePrefix = ${JSON.stringify(join(spoolDirectory, RELEASE_LOCK_STAGE_PREFIX))};`,
+    "let shortened = false;",
+    "export async function open(path, flags, mode) {",
+    "  const handle = await fs.open(path, flags, mode);",
+    "  const targeted = String(path) === finalPath || String(path).startsWith(stagePrefix);",
+    "  return new Proxy(handle, {",
+    "    get(target, property) {",
+    "      if (targeted && property === 'write') {",
+    "        return async (buffer, offset, length, position) => {",
+    "          if (shortened) return target.write(buffer, offset, length, position);",
+    "          shortened = true;",
+    `          const allowed = Math.min(length, ${retainedBytes});`,
+    "          if (allowed === 0) return { bytesWritten: 0, buffer };",
+    "          return target.write(buffer, offset, allowed, position);",
+    "        };",
+    "      }",
+    "      const value = Reflect.get(target, property, target);",
+    "      return typeof value === 'function' ? value.bind(target) : value;",
+    "    },",
+    "  });",
+    "}",
+  ].join("\n");
+  const promisesUrl = `data:text/javascript,${encodeURIComponent(promisesModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier === "node:fs/promises" && context.parentURL?.includes("/tools/obs-spool-release-admission.ts")) {',
+    `    return { url: ${JSON.stringify(promisesUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      manifestPath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+  };
+}
+
+function runAdmissionWithStageBoundaryCrash(options: {
+  readonly spoolDirectory: string;
+  readonly manifestPath: string;
+  readonly point:
+    | "after-stage-sync"
+    | "after-publish-directory-sync"
+    | "after-stage-remove-directory-sync";
+}): AdmissionResult {
+  const promisesModule = [
+    'import * as fs from "node:fs/promises";',
+    "export const link = fs.link;",
+    "export const lstat = fs.lstat;",
+    "export const readdir = fs.readdir;",
+    "export const realpath = fs.realpath;",
+    "export const unlink = fs.unlink;",
+    `const directory = ${JSON.stringify(options.spoolDirectory)};`,
+    `const stagePrefix = ${JSON.stringify(join(options.spoolDirectory, RELEASE_LOCK_STAGE_PREFIX))};`,
+    `const point = ${JSON.stringify(options.point)};`,
+    "let directorySyncs = 0;",
+    "let crashed = false;",
+    "export async function open(path, flags, mode) {",
+    "  const handle = await fs.open(path, flags, mode);",
+    "  return new Proxy(handle, {",
+    "    get(target, property) {",
+    "      if (property === 'sync') {",
+    "        return async () => {",
+    "          await target.sync();",
+    "          if (!crashed && point === 'after-stage-sync' && String(path).startsWith(stagePrefix)) {",
+    "            crashed = true;",
+    "            throw new Error('MODELED_AFTER_STAGE_SYNC_CRASH');",
+    "          }",
+    "          if (String(path) === directory) {",
+    "            directorySyncs += 1;",
+    "            if (!crashed && point === 'after-publish-directory-sync' && directorySyncs === 1) {",
+    "              crashed = true;",
+    "              throw new Error('MODELED_AFTER_PUBLISH_DIRECTORY_SYNC_CRASH');",
+    "            }",
+    "            if (!crashed && point === 'after-stage-remove-directory-sync' && directorySyncs === 2) {",
+    "              crashed = true;",
+    "              throw new Error('MODELED_AFTER_STAGE_REMOVE_DIRECTORY_SYNC_CRASH');",
+    "            }",
+    "          }",
+    "        };",
+    "      }",
+    "      const value = Reflect.get(target, property, target);",
+    "      return typeof value === 'function' ? value.bind(target) : value;",
+    "    },",
+    "  });",
+    "}",
+  ].join("\n");
+  const promisesUrl = `data:text/javascript,${encodeURIComponent(promisesModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier === "node:fs/promises" && context.parentURL?.includes("/tools/obs-spool-release-admission.ts")) {',
+    `    return { url: ${JSON.stringify(promisesUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      options.spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      options.manifestPath,
+    ],
     {
       cwd: process.cwd(),
       encoding: "utf8",
@@ -321,16 +483,18 @@ function runAdmissionWithDirectorySyncProbe(options: {
   const promisesModule = [
     'import { appendFileSync } from "node:fs";',
     'import * as fs from "node:fs/promises";',
+    "export const link = fs.link;",
     "export const lstat = fs.lstat;",
     "export const readdir = fs.readdir;",
     "export const realpath = fs.realpath;",
+    "export const unlink = fs.unlink;",
     "export async function open(path, flags, mode) {",
     "  const handle = await fs.open(path, flags, mode);",
     "  return new Proxy(handle, {",
     "    get(target, property) {",
     "      if (property === 'sync') {",
     "        return async () => {",
-    `          if (String(path) === ${JSON.stringify(lockPath)}) appendFileSync(${JSON.stringify(options.markerPath)}, "L");`,
+    `          if (String(path) === ${JSON.stringify(lockPath)} || String(path).startsWith(${JSON.stringify(join(options.spoolDirectory, RELEASE_LOCK_STAGE_PREFIX))})) appendFileSync(${JSON.stringify(options.markerPath)}, "L");`,
     `          if (String(path) === ${JSON.stringify(options.spoolDirectory)}) {`,
     `            appendFileSync(${JSON.stringify(options.markerPath)}, "D");`,
     ...(options.failDirectorySync
@@ -907,6 +1071,184 @@ describe("FIX-01 offline spool release admission", () => {
     });
   });
 
+  it("recovers every tested short staging-lock write without publishing authority early", () => {
+    for (const retainedBytes of [0, 1, 23, 64, 200]) {
+      const root = scratch(`release-lock-stage-short-${retainedBytes}`);
+      const spoolDirectory = realpathSync(join(root, "spool"));
+      const name = spoolName(910 + retainedBytes);
+      writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
+      const crashedManifest = join(root, "crashed-manifest.json");
+
+      const crashed = runAdmissionRetainingLockPrefix(
+        spoolDirectory,
+        crashedManifest,
+        retainedBytes,
+      );
+
+      expect(crashed.status, `${retainedBytes}:${crashed.stderr}`).not.toBe(0);
+      expect(crashed.stdout, String(retainedBytes)).not.toContain("PASS_");
+      expect(existsSync(crashedManifest), String(retainedBytes)).toBe(false);
+      expect(existsSync(join(spoolDirectory, RELEASE_LOCK_NAME)), String(retainedBytes))
+        .toBe(false);
+      const stageNames = readdirSync(spoolDirectory).filter((entry) =>
+        entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
+      );
+      expect(stageNames, String(retainedBytes)).toHaveLength(1);
+      expect(stageNames[0], String(retainedBytes)).toMatch(
+        /^\.obs-spool-release-lock-stage-v1-[0-9a-f]{64}$/u,
+      );
+      expect(readFileSync(join(spoolDirectory, stageNames[0]!)).length, String(retainedBytes))
+        .toBe(retainedBytes);
+      const admissionRef = stageNames[0]!.slice(RELEASE_LOCK_STAGE_PREFIX.length);
+
+      for (let rerun = 1; rerun <= 2; rerun += 1) {
+        const manifestPath = join(root, `manifest-${rerun}.json`);
+        const result = runAdmission(spoolDirectory, manifestPath);
+        expect(result.status, `${retainedBytes}:rerun-${rerun}:${result.stderr}`).toBe(0);
+        const manifest = parseManifest(manifestPath);
+        expect(manifest.admission_ref, String(retainedBytes)).toBe(admissionRef);
+        expect(readdirSync(spoolDirectory).filter((entry) =>
+          entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
+        ), String(retainedBytes)).toEqual([]);
+        const lockStat = statSync(join(spoolDirectory, RELEASE_LOCK_NAME), {
+          bigint: true,
+        });
+        expect(lockStat.isFile(), String(retainedBytes)).toBe(true);
+        expect(lockStat.nlink, String(retainedBytes)).toBe(1n);
+      }
+
+      const manifest = parseManifest(join(root, "manifest-2.json"));
+      const candidate = manifest.entries.find((entry) => entry.basename === name)!;
+      const lines = readFileSync(join(spoolDirectory, INDEX_NAME), "utf8").split("\n");
+      expect(lines.filter((line) => line === name), String(retainedBytes)).toHaveLength(1);
+      expect(lines.filter((line) =>
+        line === admissionRecord(admissionRef, candidate)
+      ), String(retainedBytes)).toHaveLength(1);
+    }
+  }, 60_000);
+
+  it("recovers crashes at each staging-lock publication barrier", () => {
+    const cases = [
+      {
+        point: "after-stage-sync" as const,
+        finalExists: false,
+        stageCount: 1,
+      },
+      {
+        point: "after-publish-directory-sync" as const,
+        finalExists: true,
+        stageCount: 1,
+      },
+      {
+        point: "after-stage-remove-directory-sync" as const,
+        finalExists: true,
+        stageCount: 0,
+      },
+    ];
+    for (const [index, testCase] of cases.entries()) {
+      const root = scratch(`release-lock-stage-${testCase.point}`);
+      const spoolDirectory = realpathSync(join(root, "spool"));
+      const name = spoolName(930 + index);
+      writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
+      const crashedManifest = join(root, "crashed-manifest.json");
+
+      const crashed = runAdmissionWithStageBoundaryCrash({
+        spoolDirectory,
+        manifestPath: crashedManifest,
+        point: testCase.point,
+      });
+
+      expect(crashed.status, `${testCase.point}:${crashed.stderr}`).not.toBe(0);
+      expect(crashed.stdout, testCase.point).not.toContain("PASS_");
+      expect(existsSync(crashedManifest), testCase.point).toBe(false);
+      expect(existsSync(join(spoolDirectory, RELEASE_LOCK_NAME)), testCase.point)
+        .toBe(testCase.finalExists);
+      expect(readdirSync(spoolDirectory).filter((entry) =>
+        entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
+      ), testCase.point).toHaveLength(testCase.stageCount);
+
+      let admissionRef: string | undefined;
+      for (let rerun = 1; rerun <= 2; rerun += 1) {
+        const manifestPath = join(root, `manifest-${rerun}.json`);
+        const result = runAdmission(spoolDirectory, manifestPath);
+        expect(result.status, `${testCase.point}:rerun-${rerun}:${result.stderr}`).toBe(0);
+        const manifest = parseManifest(manifestPath);
+        admissionRef ??= manifest.admission_ref;
+        expect(manifest.admission_ref, testCase.point).toBe(admissionRef);
+        expect(readdirSync(spoolDirectory).filter((entry) =>
+          entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
+        ), testCase.point).toEqual([]);
+        expect(statSync(join(spoolDirectory, RELEASE_LOCK_NAME), { bigint: true }).nlink)
+          .toBe(1n);
+      }
+    }
+  }, 60_000);
+
+  it("rejects malformed, multiple, symlinked, hardlinked, and foreign release-lock stages", () => {
+    const malformedRoot = scratch("release-lock-stage-malformed");
+    const malformedSpool = realpathSync(join(malformedRoot, "spool"));
+    writeFileSync(join(malformedSpool, spoolName(935)), "", { mode: 0o600 });
+    writeFileSync(join(malformedSpool, `${RELEASE_LOCK_STAGE_PREFIX}bad`), "", {
+      mode: 0o600,
+    });
+    const malformed = runAdmission(malformedSpool, join(malformedRoot, "manifest.json"));
+    expect(malformed.status).not.toBe(0);
+    expect(malformed.stdout).not.toContain("PASS_");
+
+    const multipleRoot = scratch("release-lock-stage-multiple");
+    const multipleSpool = realpathSync(join(multipleRoot, "spool"));
+    writeFileSync(join(multipleSpool, spoolName(936)), "", { mode: 0o600 });
+    for (const ref of ["a".repeat(64), "b".repeat(64)]) {
+      writeFileSync(join(multipleSpool, `${RELEASE_LOCK_STAGE_PREFIX}${ref}`), "", {
+        mode: 0o600,
+      });
+    }
+    const multiple = runAdmission(multipleSpool, join(multipleRoot, "manifest.json"));
+    expect(multiple.status).not.toBe(0);
+    expect(multiple.stdout).not.toContain("PASS_");
+
+    const symlinkRoot = scratch("release-lock-stage-symlink");
+    const symlinkSpool = realpathSync(join(symlinkRoot, "spool"));
+    writeFileSync(join(symlinkSpool, spoolName(937)), "", { mode: 0o600 });
+    const symlinkVictim = join(symlinkRoot, "victim");
+    writeFileSync(symlinkVictim, "", { mode: 0o600 });
+    symlinkSync(
+      symlinkVictim,
+      join(symlinkSpool, `${RELEASE_LOCK_STAGE_PREFIX}${"c".repeat(64)}`),
+    );
+    const symlinked = runAdmission(symlinkSpool, join(symlinkRoot, "manifest.json"));
+    expect(symlinked.status).not.toBe(0);
+    expect(symlinked.stdout).not.toContain("PASS_");
+
+    const linkedRoot = scratch("release-lock-stage-linked");
+    const linkedSpool = realpathSync(join(linkedRoot, "spool"));
+    writeFileSync(join(linkedSpool, spoolName(938)), "", { mode: 0o600 });
+    const victim = join(linkedRoot, "victim");
+    writeFileSync(victim, "", { mode: 0o600 });
+    linkSync(victim, join(linkedSpool, `${RELEASE_LOCK_STAGE_PREFIX}${"d".repeat(64)}`));
+    const linked = runAdmission(linkedSpool, join(linkedRoot, "manifest.json"));
+    expect(linked.status).not.toBe(0);
+    expect(linked.stdout).not.toContain("PASS_");
+    expect(existsSync(join(linkedSpool, INDEX_NAME))).toBe(false);
+
+    const foreignRoot = scratch("release-lock-stage-foreign");
+    const foreignSpool = realpathSync(join(foreignRoot, "spool"));
+    writeFileSync(join(foreignSpool, spoolName(939)), "", { mode: 0o600 });
+    const firstManifest = join(foreignRoot, "manifest-1.json");
+    const first = runAdmission(foreignSpool, firstManifest);
+    expect(first.status, first.stderr).toBe(0);
+    const firstRef = parseManifest(firstManifest).admission_ref;
+    const foreignRef = firstRef === "e".repeat(64) ? "f".repeat(64) : "e".repeat(64);
+    writeFileSync(
+      join(foreignSpool, `${RELEASE_LOCK_STAGE_PREFIX}${foreignRef}`),
+      "",
+      { mode: 0o600 },
+    );
+    const foreign = runAdmission(foreignSpool, join(foreignRoot, "manifest-2.json"));
+    expect(foreign.status).not.toBe(0);
+    expect(foreign.stdout).not.toContain("PASS_");
+  }, 60_000);
+
   it("rejects a lock plan hash that does not match the sealed index segment", () => {
     const root = scratch("release-lock-plan-hash");
     const spoolDirectory = realpathSync(join(root, "spool"));
@@ -1089,6 +1431,35 @@ describe("FIX-01 offline spool release admission", () => {
     }
   }, 120_000);
 
+  it("completes an exact unterminated candidate tail without adding a duplicate plain row", () => {
+    const root = scratch("unterminated-exact-candidate");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const name = spoolName(949);
+    writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
+    writeFileSync(join(spoolDirectory, INDEX_NAME), name, { mode: 0o600 });
+
+    let admissionRef: string | undefined;
+    for (let rerun = 1; rerun <= 2; rerun += 1) {
+      const manifestPath = join(root, `manifest-${rerun}.json`);
+      const result = runAdmission(spoolDirectory, manifestPath);
+      expect(result.status, `rerun-${rerun}:${result.stderr}`).toBe(0);
+      const manifest = parseManifest(manifestPath);
+      admissionRef ??= manifest.admission_ref;
+      expect(manifest.admission_ref).toBe(admissionRef);
+      const digest = manifestDigestFromOutput(result.stdout)!;
+      const gated = runGate(spoolDirectory, manifestPath, digest);
+      expect(gated.status, `gate-${rerun}:${gated.stderr}`).toBe(0);
+    }
+
+    const manifest = parseManifest(join(root, "manifest-2.json"));
+    const candidate = manifest.entries.find((entry) => entry.basename === name)!;
+    const lines = readFileSync(join(spoolDirectory, INDEX_NAME), "utf8").split("\n");
+    expect(lines.filter((line) => line === name)).toHaveLength(1);
+    expect(lines.filter((line) =>
+      line === admissionRecord(admissionRef!, candidate)
+    )).toHaveLength(1);
+  });
+
   it("syncs the lock directory before index append and stops if it cannot", () => {
     const orderedRoot = scratch("release-lock-directory-sync-order");
     const orderedSpool = realpathSync(join(orderedRoot, "spool"));
@@ -1105,7 +1476,7 @@ describe("FIX-01 offline spool release admission", () => {
     });
 
     expect(ordered.status, ordered.stderr).toBe(0);
-    expect(readFileSync(orderedMarker, "utf8")).toBe("LDW");
+    expect(readFileSync(orderedMarker, "utf8")).toBe("LDDDW");
 
     const failedRoot = scratch("release-lock-directory-sync-failure");
     const failedSpool = realpathSync(join(failedRoot, "spool"));

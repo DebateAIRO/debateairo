@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import {
+  link,
   lstat,
   open,
   readdir,
   realpath,
+  unlink,
 } from "node:fs/promises";
 import type { BigIntStats } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
@@ -48,6 +50,9 @@ const PROSPECTIVE_STAT_DIGITS = "9".repeat(32);
 const PROSPECTIVE_UINT64 = "18446744073709551615";
 const PROSPECTIVE_SHA256 = "f".repeat(64);
 const PROSPECTIVE_VERIFIED_AT = "9999-12-31T23:59:59.999Z";
+const RELEASE_LOCK_STAGE_PREFIX = ".obs-spool-release-lock-stage-v1-";
+const RELEASE_LOCK_STAGE_NAME =
+  /^\.obs-spool-release-lock-stage-v1-([0-9a-f]{64})$/u;
 
 interface SourceSnapshot {
   readonly entries: readonly ManifestEntry[];
@@ -66,6 +71,13 @@ interface IndexState extends ReadFileResult {
     proof: string;
   }>[];
   readonly unterminatedBasename: string | undefined;
+}
+
+interface ReleaseLockStage {
+  readonly basename: string;
+  readonly path: string;
+  readonly admissionRef: string;
+  readonly stat: BigIntStats;
 }
 
 interface Arguments {
@@ -410,9 +422,45 @@ function snapshotEvidence(entries: readonly ManifestEntry[]): unknown {
   }));
 }
 
+async function discoverReleaseLockStage(
+  directory: string,
+): Promise<ReleaseLockStage | undefined> {
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch {
+    fail("FAIL_UNREADABLE_DIRECTORY");
+  }
+  const reserved = names.filter((name) =>
+    name.startsWith(RELEASE_LOCK_STAGE_PREFIX)
+  );
+  if (reserved.length === 0) return undefined;
+  if (reserved.length !== 1) fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  const name = reserved[0]!;
+  const match = RELEASE_LOCK_STAGE_NAME.exec(name);
+  if (match === null) fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  const path = join(directory, name);
+  let stat: BigIntStats;
+  try {
+    stat = await lstat(path, { bigint: true });
+  } catch {
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  }
+  if (!stat.isFile() || (stat.nlink !== 1n && stat.nlink !== 2n)) {
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  }
+  return Object.freeze({
+    basename: name,
+    path,
+    admissionRef: match[1]!,
+    stat,
+  });
+}
+
 async function sourceSnapshot(
   directory: string,
   probeOwners: boolean,
+  releaseStageName: string | undefined,
 ): Promise<SourceSnapshot> {
   let names: string[];
   try {
@@ -423,6 +471,10 @@ async function sourceSnapshot(
   if (new Set(names).size !== names.length) fail("FAIL_DUPLICATE_NAME");
   const entries: ManifestEntry[] = [];
   for (const name of names) {
+    if (name.startsWith(RELEASE_LOCK_STAGE_PREFIX)) {
+      if (name !== releaseStageName) fail("FAIL_CHANGED");
+      continue;
+    }
     if (
       name === SPOOL_INDEX_NAME
       || name === SPOOL_CURSOR_NAME
@@ -617,8 +669,19 @@ function plannedIndexAppend(
 ): Buffer {
   const parts: Buffer[] = [];
   const candidates = source.entries.filter((entry) => entry.kind === "candidate");
+  const completedTail = index?.unterminatedBasename;
+  if (
+    completedTail !== undefined
+    && !index?.basenames.has(completedTail)
+    && candidates.some((candidate) => candidate.basename === completedTail)
+  ) {
+    parts.push(Buffer.from("\n", "utf8"));
+  }
   for (const candidate of candidates) {
-    if (!index?.basenames.has(candidate.basename)) {
+    if (
+      !index?.basenames.has(candidate.basename)
+      && candidate.basename !== completedTail
+    ) {
       parts.push(Buffer.from(`\n${candidate.basename}\n`, "utf8"));
     }
   }
@@ -669,7 +732,7 @@ function releasePlan(
   });
 }
 
-async function createReleaseLock(options: {
+type ReleaseLockOptions = Readonly<{
   readonly directory: string;
   readonly admissionRef: string;
   readonly indexDev: string;
@@ -678,9 +741,26 @@ async function createReleaseLock(options: {
   readonly plannedAppendBytes: number;
   readonly plannedAppendSha256: string;
   readonly finalPrefixBytes: number;
-}): Promise<SpoolReleaseLock> {
-  const path = join(options.directory, SPOOL_RELEASE_LOCK_NAME);
-  const bytes = encodeSpoolReleaseLock(options);
+}>;
+
+function releaseLockMatchesOptions(
+  lock: SpoolReleaseLock,
+  options: ReleaseLockOptions,
+): boolean {
+  return lock.admissionRef === options.admissionRef
+    && lock.indexDev === options.indexDev
+    && lock.indexIno === options.indexIno
+    && lock.basePrefixBytes === options.basePrefixBytes
+    && lock.plannedAppendBytes === options.plannedAppendBytes
+    && lock.plannedAppendSha256 === options.plannedAppendSha256
+    && lock.finalPrefixBytes === options.finalPrefixBytes;
+}
+
+async function createReleaseLockStage(
+  options: ReleaseLockOptions,
+): Promise<ReleaseLockStage> {
+  const basename = `${RELEASE_LOCK_STAGE_PREFIX}${options.admissionRef}`;
+  const path = join(options.directory, basename);
   let handle: FileHandle | undefined;
   try {
     handle = await open(
@@ -691,25 +771,236 @@ async function createReleaseLock(options: {
         | constants.O_RDWR,
       0o600,
     );
-    const written = await handle.write(bytes, 0, bytes.length, 0);
-    if (written.bytesWritten !== bytes.length) fail("FAIL_RELEASE_LOCK_WRITE");
-    await handle.sync();
+    const descriptor = await handle.stat({ bigint: true });
+    const pathStat = await lstat(path, { bigint: true });
+    if (
+      !descriptor.isFile()
+      || !pathStat.isFile()
+      || descriptor.nlink !== 1n
+      || pathStat.nlink !== 1n
+      || !sameSnapshot(descriptor, pathStat)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    return Object.freeze({
+      basename,
+      path,
+      admissionRef: options.admissionRef,
+      stat: descriptor,
+    });
   } catch (error) {
     if (error instanceof AdmissionFailure) throw error;
-    fail("FAIL_UNSAFE_RELEASE_LOCK");
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
   } finally {
     await handle?.close().catch(() => undefined);
   }
-  const observed = await readSpoolReleaseLock(options.directory);
+  fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+}
+
+async function completeReleaseLockStage(
+  stage: ReleaseLockStage,
+  expectedBytes: Buffer,
+): Promise<BigIntStats> {
+  let handle: FileHandle | undefined;
+  try {
+    const before = await lstat(stage.path, { bigint: true });
+    if (
+      !before.isFile()
+      || before.nlink !== 1n
+      || !sameSnapshot(stage.stat, before)
+      || before.size > BigInt(expectedBytes.length)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    handle = await open(
+      stage.path,
+      constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    const descriptor = await handle.stat({ bigint: true });
+    if (
+      !descriptor.isFile()
+      || descriptor.nlink !== 1n
+      || !sameSnapshot(before, descriptor)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    const retainedBytes = safeNumber(
+      descriptor.size,
+      "FAIL_UNSAFE_RELEASE_LOCK_STAGE",
+    );
+    const retained = Buffer.alloc(retainedBytes);
+    if (retainedBytes > 0) {
+      const read = await handle.read(retained, 0, retained.length, 0);
+      if (read.bytesRead !== retained.length) fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    if (!retained.equals(expectedBytes.subarray(0, retainedBytes))) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    const missing = expectedBytes.subarray(retainedBytes);
+    if (missing.length > 0) {
+      const written = await handle.write(missing, 0, missing.length, retainedBytes);
+      if (written.bytesWritten !== missing.length) fail("FAIL_RELEASE_LOCK_WRITE");
+    }
+    await handle.sync();
+    const finalDescriptor = await handle.stat({ bigint: true });
+    const finalPath = await lstat(stage.path, { bigint: true });
+    if (
+      !finalDescriptor.isFile()
+      || !finalPath.isFile()
+      || finalDescriptor.nlink !== 1n
+      || finalPath.nlink !== 1n
+      || finalDescriptor.size !== BigInt(expectedBytes.length)
+      || !sameSnapshot(finalDescriptor, finalPath)
+      || !sameIdentity(descriptor, finalDescriptor)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    const observed = Buffer.alloc(expectedBytes.length);
+    const read = await handle.read(observed, 0, observed.length, 0);
+    if (read.bytesRead !== observed.length || !observed.equals(expectedBytes)) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    return finalDescriptor;
+  } catch (error) {
+    if (error instanceof AdmissionFailure) throw error;
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+  fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+}
+
+async function verifyPublishedReleaseLockPair(options: {
+  readonly directory: string;
+  readonly stage: ReleaseLockStage;
+  readonly expectedStage: BigIntStats;
+  readonly expectedBytes: Buffer;
+}): Promise<void> {
+  const finalPath = join(options.directory, SPOOL_RELEASE_LOCK_NAME);
+  let handle: FileHandle | undefined;
+  try {
+    const stagePath = await lstat(options.stage.path, { bigint: true });
+    const authorityPath = await lstat(finalPath, { bigint: true });
+    if (
+      !stagePath.isFile()
+      || !authorityPath.isFile()
+      || stagePath.nlink !== 2n
+      || authorityPath.nlink !== 2n
+      || stagePath.size !== BigInt(options.expectedBytes.length)
+      || !sameIdentity(stagePath, authorityPath)
+      || !sameIdentity(stagePath, options.expectedStage)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    handle = await open(
+      options.stage.path,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    const descriptor = await handle.stat({ bigint: true });
+    if (
+      !descriptor.isFile()
+      || descriptor.nlink !== 2n
+      || !sameSnapshot(stagePath, descriptor)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    const observed = Buffer.alloc(options.expectedBytes.length);
+    const read = await handle.read(observed, 0, observed.length, 0);
+    const probe = Buffer.alloc(1);
+    const trailing = await handle.read(probe, 0, 1, observed.length);
+    if (
+      read.bytesRead !== observed.length
+      || trailing.bytesRead !== 0
+      || !observed.equals(options.expectedBytes)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+    const finalDescriptor = await handle.stat({ bigint: true });
+    const finalStagePath = await lstat(options.stage.path, { bigint: true });
+    const finalAuthorityPath = await lstat(finalPath, { bigint: true });
+    if (
+      !sameSnapshot(descriptor, finalDescriptor)
+      || !sameSnapshot(descriptor, finalStagePath)
+      || !sameSnapshot(descriptor, finalAuthorityPath)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    }
+  } catch (error) {
+    if (error instanceof AdmissionFailure) throw error;
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+async function syncDirectory(directory: string): Promise<void> {
+  let handle: FileHandle | undefined;
+  try {
+    const before = await lstat(directory, { bigint: true });
+    handle = await open(
+      directory,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_DIRECTORY,
+    );
+    const descriptor = await handle.stat({ bigint: true });
+    if (
+      !before.isDirectory()
+      || before.isSymbolicLink()
+      || !descriptor.isDirectory()
+      || !sameIdentity(before, descriptor)
+    ) {
+      fail("FAIL_RELEASE_LOCK_DIRECTORY_SYNC");
+    }
+    await handle.sync();
+    const afterDescriptor = await handle.stat({ bigint: true });
+    const afterPath = await lstat(directory, { bigint: true });
+    if (
+      !afterDescriptor.isDirectory()
+      || !afterPath.isDirectory()
+      || afterPath.isSymbolicLink()
+      || !sameIdentity(descriptor, afterDescriptor)
+      || !sameIdentity(descriptor, afterPath)
+    ) {
+      fail("FAIL_RELEASE_LOCK_DIRECTORY_SYNC");
+    }
+  } catch (error) {
+    if (error instanceof AdmissionFailure) throw error;
+    fail("FAIL_RELEASE_LOCK_DIRECTORY_SYNC");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+async function finishPublishedReleaseLock(options: {
+  readonly lockOptions: ReleaseLockOptions;
+  readonly stage: ReleaseLockStage;
+  readonly expectedStage: BigIntStats;
+  readonly expectedBytes: Buffer;
+}): Promise<SpoolReleaseLock> {
+  await verifyPublishedReleaseLockPair({
+    directory: options.lockOptions.directory,
+    stage: options.stage,
+    expectedStage: options.expectedStage,
+    expectedBytes: options.expectedBytes,
+  });
+  await syncDirectory(options.lockOptions.directory);
+  await verifyPublishedReleaseLockPair({
+    directory: options.lockOptions.directory,
+    stage: options.stage,
+    expectedStage: options.expectedStage,
+    expectedBytes: options.expectedBytes,
+  });
+  try {
+    await unlink(options.stage.path);
+  } catch {
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  }
+  await syncDirectory(options.lockOptions.directory);
+  const observed = await readSpoolReleaseLock(options.lockOptions.directory);
   if (
     observed.status !== "valid"
-    || observed.lock.admissionRef !== options.admissionRef
-    || observed.lock.indexDev !== options.indexDev
-    || observed.lock.indexIno !== options.indexIno
-    || observed.lock.basePrefixBytes !== options.basePrefixBytes
-    || observed.lock.plannedAppendBytes !== options.plannedAppendBytes
-    || observed.lock.plannedAppendSha256 !== options.plannedAppendSha256
-    || observed.lock.finalPrefixBytes !== options.finalPrefixBytes
+    || !releaseLockMatchesOptions(observed.lock, options.lockOptions)
+    || observed.lock.dev !== options.expectedStage.dev.toString()
+    || observed.lock.ino !== options.expectedStage.ino.toString()
   ) {
     fail("FAIL_UNSAFE_RELEASE_LOCK");
   }
@@ -719,6 +1010,7 @@ async function createReleaseLock(options: {
 async function prepareReleaseLock(options: {
   readonly directory: string;
   readonly observed: Awaited<ReturnType<typeof readSpoolReleaseLock>>;
+  readonly stage: ReleaseLockStage | undefined;
   readonly admissionRef: string;
   readonly indexDev: string;
   readonly indexIno: string;
@@ -727,24 +1019,52 @@ async function prepareReleaseLock(options: {
   readonly plannedAppendSha256: string;
   readonly finalPrefixBytes: number;
 }): Promise<SpoolReleaseLock> {
-  if (options.observed.status === "invalid") {
-    fail("FAIL_UNSAFE_RELEASE_LOCK");
-  }
   if (options.observed.status === "valid") {
-    if (
-      options.observed.lock.admissionRef !== options.admissionRef
-      || options.observed.lock.indexDev !== options.indexDev
-      || options.observed.lock.indexIno !== options.indexIno
-      || options.observed.lock.basePrefixBytes !== options.basePrefixBytes
-      || options.observed.lock.plannedAppendBytes !== options.plannedAppendBytes
-      || options.observed.lock.plannedAppendSha256 !== options.plannedAppendSha256
-      || options.observed.lock.finalPrefixBytes !== options.finalPrefixBytes
-    ) {
+    if (options.stage !== undefined) fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+    if (!releaseLockMatchesOptions(options.observed.lock, options)) {
       fail("FAIL_RELEASE_LOCK_PLAN");
     }
     return options.observed.lock;
   }
-  return createReleaseLock(options);
+  const expectedBytes = encodeSpoolReleaseLock(options);
+  if (options.observed.status === "invalid") {
+    if (
+      options.stage === undefined
+      || options.stage.admissionRef !== options.admissionRef
+      || options.stage.stat.nlink !== 2n
+      || options.stage.stat.size !== BigInt(expectedBytes.length)
+    ) {
+      fail("FAIL_UNSAFE_RELEASE_LOCK");
+    }
+    return finishPublishedReleaseLock({
+      lockOptions: options,
+      stage: options.stage,
+      expectedStage: options.stage.stat,
+      expectedBytes,
+    });
+  }
+  let stage = options.stage;
+  if (stage === undefined) {
+    stage = await createReleaseLockStage(options);
+  } else if (
+    stage.admissionRef !== options.admissionRef
+    || stage.stat.nlink !== 1n
+  ) {
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  }
+  const completeStage = await completeReleaseLockStage(stage, expectedBytes);
+  const finalPath = join(options.directory, SPOOL_RELEASE_LOCK_NAME);
+  try {
+    await link(stage.path, finalPath);
+  } catch {
+    fail("FAIL_UNSAFE_RELEASE_LOCK");
+  }
+  return finishPublishedReleaseLock({
+    lockOptions: options,
+    stage,
+    expectedStage: completeStage,
+    expectedBytes,
+  });
 }
 
 function sameReleaseLock(
@@ -1116,10 +1436,28 @@ async function run(arguments_: Arguments): Promise<Readonly<{
   manifestSha256: string;
 }>> {
   const options = await validatePaths(arguments_);
+  const initialReleaseStage = await discoverReleaseLockStage(options.spoolDirectory);
   const initialReleaseLock = await readSpoolReleaseLock(options.spoolDirectory);
+  if (
+    initialReleaseStage !== undefined
+    && (
+      initialReleaseLock.status === "valid"
+      || (
+        initialReleaseLock.status === "absent"
+        && initialReleaseStage.stat.nlink !== 1n
+      )
+      || (
+        initialReleaseLock.status === "invalid"
+        && initialReleaseStage.stat.nlink !== 2n
+      )
+    )
+  ) {
+    fail("FAIL_UNSAFE_RELEASE_LOCK_STAGE");
+  }
   const admissionRef = initialReleaseLock.status === "valid"
     ? initialReleaseLock.lock.admissionRef
-    : randomBytes(32).toString("hex");
+    : initialReleaseStage?.admissionRef
+      ?? randomBytes(32).toString("hex");
   const initialIndex = await readIndex(
     options.spoolDirectory,
     initialReleaseLock.status === "valid"
@@ -1127,21 +1465,35 @@ async function run(arguments_: Arguments): Promise<Readonly<{
       : undefined,
   );
   const initialCursor = await readReserved(options.spoolDirectory, SPOOL_CURSOR_NAME);
-  const first = await sourceSnapshot(options.spoolDirectory, true);
+  const first = await sourceSnapshot(
+    options.spoolDirectory,
+    true,
+    initialReleaseStage?.basename,
+  );
   const physicallyEmpty = first.entries.length === 0
     && initialIndex === undefined
     && initialCursor === undefined
-    && initialReleaseLock.status === "absent";
+    && initialReleaseLock.status === "absent"
+    && initialReleaseStage === undefined;
   const firstCandidates = first.entries.filter((entry) =>
     entry.kind === "candidate"
   );
 
   let finalIndex: IndexState | undefined;
   let releaseLock: SpoolReleaseLock | undefined;
-  if (initialReleaseLock.status === "invalid") {
+  if (
+    initialReleaseLock.status === "invalid"
+    && initialReleaseStage === undefined
+  ) {
     fail("FAIL_UNSAFE_RELEASE_LOCK");
   }
-  if (firstCandidates.length === 0 && initialReleaseLock.status === "valid") {
+  if (
+    firstCandidates.length === 0
+    && (
+      initialReleaseLock.status !== "absent"
+      || initialReleaseStage !== undefined
+    )
+  ) {
     fail("FAIL_RELEASE_LOCK_ORPHANED");
   }
   assertNoRejectedIndexMembers(first, initialIndex);
@@ -1219,6 +1571,7 @@ async function run(arguments_: Arguments): Promise<Readonly<{
     releaseLock = await prepareReleaseLock({
       directory: options.spoolDirectory,
       observed: initialReleaseLock,
+      stage: initialReleaseStage,
       admissionRef,
       indexDev: baseIndex.stat.dev.toString(),
       indexIno: baseIndex.stat.ino.toString(),
@@ -1280,7 +1633,11 @@ async function run(arguments_: Arguments): Promise<Readonly<{
     if (finalIndex === undefined) fail("FAIL_INDEX_REPAIR");
     assertNoRejectedIndexMembers(first, finalIndex);
   }
-  const second = await sourceSnapshot(options.spoolDirectory, false);
+  const second = await sourceSnapshot(
+    options.spoolDirectory,
+    false,
+    initialReleaseStage?.basename,
+  );
   if (first.sha256 !== second.sha256) fail("FAIL_CHANGED");
 
   const finalCursor = await readReserved(options.spoolDirectory, SPOOL_CURSOR_NAME);
