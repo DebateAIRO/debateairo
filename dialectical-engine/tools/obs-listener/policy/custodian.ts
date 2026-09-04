@@ -1,10 +1,16 @@
-import { hash, timingSafeEqual } from "node:crypto";
+import {
+  hash as nodeHash,
+  timingSafeEqual as nodeTimingSafeEqual,
+} from "node:crypto";
 import { isProxy } from "node:util/types";
 
 import {
   policyBundleSchema,
   type PolicyBundle,
 } from "./loader.js";
+
+const HASH = nodeHash;
+const TIMING_SAFE_EQUAL = nodeTimingSafeEqual;
 
 export type TokenEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -23,7 +29,7 @@ export class RepinRefusedError extends Error {
 }
 
 function tokenDigest(token: string): Buffer {
-  return hash("sha256", token, "buffer");
+  return HASH("sha256", token, "buffer");
 }
 
 function ownStringProperty(value: unknown, key: string): string | undefined {
@@ -157,7 +163,7 @@ export function repin(
     expectedToken.length === 0 ||
     suppliedToken === undefined ||
     suppliedToken.length === 0 ||
-    !timingSafeEqual(tokenDigest(suppliedToken), tokenDigest(expectedToken))
+    !TIMING_SAFE_EQUAL(tokenDigest(suppliedToken), tokenDigest(expectedToken))
   ) {
     throw new RepinRefusedError();
   }

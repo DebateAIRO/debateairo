@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { isProxy } from "node:util/types";
 import { runInNewContext } from "node:vm";
-import { z } from "zod";
+import { Worker } from "node:worker_threads";
+import type { infer as ZodInfer } from "zod";
 
-import { canonicalProjection } from "./canonical.js";
+import { canonicalJson, canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
 const BASE_ARRAY_SOME = Object.getOwnPropertyDescriptor(
@@ -54,173 +55,320 @@ const BASE_OBJECT_ITERATOR = Object.getOwnPropertyDescriptor(
   Symbol.iterator,
 );
 
-const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
-const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
-const relativeGlobSchema = z
-  .string()
-  .min(1)
-  .refine(relativeGlob);
-const pinnedSetSchema = z
-  .object({ count: z.number().int().nonnegative(), sha256: sha256Schema })
-  .strict();
+type ZodApi = typeof import("zod").z;
 
-const taxonomyPinSchema = z
-  .object({
-    classes: z.tuple([
-      z.literal("PROCESS_DEATH"),
-      z.literal("HTTP_FAILURE"),
-      z.literal("JOB_FAILURE"),
-      z.literal("PROVIDER_EXHAUSTED"),
-      z.literal("DB_FAILURE"),
-      z.literal("PARSE_SCHEMA_FAILURE"),
-      z.literal("STALL_DETECTED"),
-      z.literal("SILENT_NOOP"),
-      z.literal("SUSPICIOUS_SUCCESS"),
-      z.literal("CLIENT_FAILURE"),
-      z.literal("CAPTURE_SELF"),
-      z.literal("ORIGIN_UNKNOWN"),
-    ]),
-    suspicious_success_subclasses: z.tuple([
-      z.literal("empty_output"),
-      z.literal("missing_required_fields"),
-      z.literal("missing_artifact_chain"),
-    ]),
-  })
-  .strict();
+function buildPolicyBundleContentsSchema(z: ZodApi) {
+  const stringContains = (value: string, sought: string): boolean => {
+    if (sought.length === 0) return true;
+    if (sought.length > value.length) return false;
+    for (let start = 0; start <= value.length - sought.length; start += 1) {
+      let matched = true;
+      for (let offset = 0; offset < sought.length; offset += 1) {
+        if (value[start + offset] !== sought[offset]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) return true;
+    }
+    return false;
+  };
+  const containsParentSegment = (value: string): boolean => {
+    let segment = "";
+    for (let index = 0; index <= value.length; index += 1) {
+      const character = index === value.length ? "/" : value[index];
+      if (character === "/") {
+        if (segment === "..") return true;
+        segment = "";
+      } else {
+        segment += character;
+      }
+    }
+    return false;
+  };
+  const relativeGlob = (value: string): boolean =>
+    value.length > 0 &&
+    value[0] !== "/" &&
+    !stringContains(value, "\\") &&
+    !containsParentSegment(value);
 
-const tierRulesSchema = z
-  .object({
-    QUICK: z
-      .object({
-        authority: z.literal("LABEL_ONLY"),
-        route: z.literal("APPROVAL_FIRST"),
-        max_production_files: z.literal(1),
-        max_test_files: z.literal(1),
-        production_line_cap: z.literal(20),
-        total_line_cap: z.literal(50),
-        requires_red_green: z.literal(true),
-      })
-      .strict(),
-    PR_FIX: z
-      .object({
-        authority: z.literal("LABEL_ONLY"),
-        route: z.literal("APPROVAL_FIRST"),
-      })
-      .strict(),
-    ESCALATE: z
-      .object({
-        authority: z.literal("LABEL_ONLY"),
-        route: z.literal("REPORT_ONLY"),
-      })
-      .strict(),
-  })
-  .strict();
+  const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
+  const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
+  const relativeGlobSchema = z
+    .string()
+    .min(1)
+    .refine(relativeGlob);
+  const pinnedSetSchema = z
+    .object({ count: z.number().int().nonnegative(), sha256: sha256Schema })
+    .strict();
 
-const codeRegistrySeedSchema = z
-  .object({
-    base_commit: z.string().regex(/^[a-f0-9]{40}$/u),
-    recipe: z.literal("obs-code-seed.sh@v1"),
-    canonicalization: z.literal(
-      "UTF-8; LF; LC_ALL=C sort -u; trailing LF; SHA-256",
-    ),
-    scope_file_list: pinnedSetSchema,
-    code_seed_direct: pinnedSetSchema,
-    forwarder_manifest: pinnedSetSchema,
-    code_seed_forwarded: pinnedSetSchema,
-    code_seed: pinnedSetSchema,
-    known_gap: pinnedSetSchema,
-    safe_template_rule: z.literal("tpl.<code>"),
-    seed_parameters: z.tuple([]),
-    parameter_types: z.tuple([
-      z.literal("id"),
-      z.literal("registry_code"),
-      z.literal("closed_enum"),
-      z.literal("bounded_int"),
-    ]),
-  })
-  .strict();
+  const taxonomyPinSchema = z
+    .object({
+      classes: z.tuple([
+        z.literal("PROCESS_DEATH"),
+        z.literal("HTTP_FAILURE"),
+        z.literal("JOB_FAILURE"),
+        z.literal("PROVIDER_EXHAUSTED"),
+        z.literal("DB_FAILURE"),
+        z.literal("PARSE_SCHEMA_FAILURE"),
+        z.literal("STALL_DETECTED"),
+        z.literal("SILENT_NOOP"),
+        z.literal("SUSPICIOUS_SUCCESS"),
+        z.literal("CLIENT_FAILURE"),
+        z.literal("CAPTURE_SELF"),
+        z.literal("ORIGIN_UNKNOWN"),
+      ]),
+      suspicious_success_subclasses: z.tuple([
+        z.literal("empty_output"),
+        z.literal("missing_required_fields"),
+        z.literal("missing_artifact_chain"),
+      ]),
+    })
+    .strict();
 
-const registerSeedSchema = z
-  .object({
-    key: z.string().regex(/^obs\.[A-Za-z][A-Za-z0-9]*$/u),
-    value: z.union([z.string(), z.number().finite(), z.null()]),
-    status: z.enum(["SEED", "UNSET"]),
-    source_ref: z.string().min(1),
-  })
-  .strict();
+  const tierRulesSchema = z
+    .object({
+      QUICK: z
+        .object({
+          authority: z.literal("LABEL_ONLY"),
+          route: z.literal("APPROVAL_FIRST"),
+          max_production_files: z.literal(1),
+          max_test_files: z.literal(1),
+          production_line_cap: z.literal(20),
+          total_line_cap: z.literal(50),
+          requires_red_green: z.literal(true),
+        })
+        .strict(),
+      PR_FIX: z
+        .object({
+          authority: z.literal("LABEL_ONLY"),
+          route: z.literal("APPROVAL_FIRST"),
+        })
+        .strict(),
+      ESCALATE: z
+        .object({
+          authority: z.literal("LABEL_ONLY"),
+          route: z.literal("REPORT_ONLY"),
+        })
+        .strict(),
+    })
+    .strict();
 
-const policyBundleContentsSchema = z
-  .object({
-    schema_version: z.literal(1),
-    policy_ref: z.literal("fixagent-policy-v1"),
-    production_source_globs: z.array(relativeGlobSchema).min(1),
-    tier_rules: tierRulesSchema,
-    floor_deny_globs: z.array(relativeGlobSchema).min(1),
-    allowlist: z.array(relativeGlobSchema),
-    taxonomy_pin: taxonomyPinSchema,
-    severity_map: z
-      .object({
-        ladder: z.tuple([
-          z.literal("INFO"),
-          z.literal("DEGRADED"),
-          z.literal("SEVERE"),
-          z.literal("FATAL"),
-        ]),
-        default: z.literal("DEGRADED"),
-        overrides: z.record(z.string(), severitySchema),
-        severe_threshold: z.literal("SEVERE"),
-      })
-      .strict(),
-    routing_table: z.tuple([
-      z.object({ incident_class: z.literal("SECURITY_PRIVACY"), owner: z.literal("V") }).strict(),
-      z.object({ incident_class: z.literal("PERSISTENCE_MIGRATIONS"), owner: z.literal("V") }).strict(),
-      z.object({ incident_class: z.literal("SPEND"), owner: z.literal("V") }).strict(),
-      z.object({ incident_class: z.literal("SCORING_LIVE_DATA"), owner: z.literal("V") }).strict(),
-      z.object({ incident_class: z.literal("DEFAULT"), owner: z.literal("V") }).strict(),
-    ]),
-    code_registry_seed: codeRegistrySeedSchema,
-    register_seeds: z.array(registerSeedSchema).min(1),
-    slots: z
-      .object({
-        zone_manifest_hash: z
-          .object({
-            value: z.union([z.null(), sha256Schema]),
-            gate: z.literal("RP-1"),
-          })
-          .strict(),
-        hatchet_ingest: z
-          .object({
-            value: z.union([
-              z.null(),
-              z.literal("ENABLED"),
-              z.literal("DEFERRED_TO_MISSION"),
-            ]),
-            gate: z.literal("RP-2"),
-          })
-          .strict(),
-        injection_corpus_hash: z
-          .object({
-            value: z.union([z.null(), sha256Schema]),
-            gate: z.literal("RP-3"),
-          })
-          .strict(),
-      })
-      .strict(),
-    quick_arm: z.enum(["OFF", "ON"]),
-    custodians: z
-      .array(
-        z
-          .object({
-            id: z.literal("V"),
-            token_env: z.literal("OBS_POLICY_CUSTODIAN_TOKEN"),
-          })
-          .strict(),
-      )
-      .length(1),
-  })
-  .strict();
+  const codeRegistrySeedSchema = z
+    .object({
+      base_commit: z.string().regex(/^[a-f0-9]{40}$/u),
+      recipe: z.literal("obs-code-seed.sh@v1"),
+      canonicalization: z.literal(
+        "UTF-8; LF; LC_ALL=C sort -u; trailing LF; SHA-256",
+      ),
+      scope_file_list: pinnedSetSchema,
+      code_seed_direct: pinnedSetSchema,
+      forwarder_manifest: pinnedSetSchema,
+      code_seed_forwarded: pinnedSetSchema,
+      code_seed: pinnedSetSchema,
+      known_gap: pinnedSetSchema,
+      safe_template_rule: z.literal("tpl.<code>"),
+      seed_parameters: z.tuple([]),
+      parameter_types: z.tuple([
+        z.literal("id"),
+        z.literal("registry_code"),
+        z.literal("closed_enum"),
+        z.literal("bounded_int"),
+      ]),
+    })
+    .strict();
 
-type PolicyBundleContents = z.infer<typeof policyBundleContentsSchema>;
+  const registerSeedSchema = z
+    .object({
+      key: z.string().regex(/^obs\.[A-Za-z][A-Za-z0-9]*$/u),
+      value: z.union([z.string(), z.number().finite(), z.null()]),
+      status: z.enum(["SEED", "UNSET"]),
+      source_ref: z.string().min(1),
+    })
+    .strict();
+
+  return z
+    .object({
+      schema_version: z.literal(1),
+      policy_ref: z.literal("fixagent-policy-v1"),
+      production_source_globs: z.array(relativeGlobSchema).min(1),
+      tier_rules: tierRulesSchema,
+      floor_deny_globs: z.array(relativeGlobSchema).min(1),
+      allowlist: z.array(relativeGlobSchema),
+      taxonomy_pin: taxonomyPinSchema,
+      severity_map: z
+        .object({
+          ladder: z.tuple([
+            z.literal("INFO"),
+            z.literal("DEGRADED"),
+            z.literal("SEVERE"),
+            z.literal("FATAL"),
+          ]),
+          default: z.literal("DEGRADED"),
+          overrides: z.record(z.string(), severitySchema),
+          severe_threshold: z.literal("SEVERE"),
+        })
+        .strict(),
+      routing_table: z.tuple([
+        z.object({ incident_class: z.literal("SECURITY_PRIVACY"), owner: z.literal("V") }).strict(),
+        z.object({ incident_class: z.literal("PERSISTENCE_MIGRATIONS"), owner: z.literal("V") }).strict(),
+        z.object({ incident_class: z.literal("SPEND"), owner: z.literal("V") }).strict(),
+        z.object({ incident_class: z.literal("SCORING_LIVE_DATA"), owner: z.literal("V") }).strict(),
+        z.object({ incident_class: z.literal("DEFAULT"), owner: z.literal("V") }).strict(),
+      ]),
+      code_registry_seed: codeRegistrySeedSchema,
+      register_seeds: z.array(registerSeedSchema).min(1),
+      slots: z
+        .object({
+          zone_manifest_hash: z
+            .object({
+              value: z.union([z.null(), sha256Schema]),
+              gate: z.literal("RP-1"),
+            })
+            .strict(),
+          hatchet_ingest: z
+            .object({
+              value: z.union([
+                z.null(),
+                z.literal("ENABLED"),
+                z.literal("DEFERRED_TO_MISSION"),
+              ]),
+              gate: z.literal("RP-2"),
+            })
+            .strict(),
+          injection_corpus_hash: z
+            .object({
+              value: z.union([z.null(), sha256Schema]),
+              gate: z.literal("RP-3"),
+            })
+            .strict(),
+        })
+        .strict(),
+      quick_arm: z.enum(["OFF", "ON"]),
+      custodians: z
+        .array(
+          z
+            .object({
+              id: z.literal("V"),
+              token_env: z.literal("OBS_POLICY_CUSTODIAN_TOKEN"),
+            })
+            .strict(),
+        )
+        .length(1),
+    })
+    .strict();
+}
+
+const ZOD_WORKER_IDLE = 0;
+const ZOD_WORKER_READY = 1;
+const ZOD_WORKER_VALID = 2;
+const ZOD_WORKER_INVALID = 3;
+const ZOD_WORKER_FAILED = 4;
+const ZOD_WORKER_TIMEOUT_MS = 10_000;
+
+interface ZodValidationWorker {
+  readonly signal: Int32Array;
+  readonly worker: Worker;
+}
+
+let zodValidationWorker: ZodValidationWorker | null | undefined;
+
+const functionSource = runInNewContext(`
+  (candidate) => Function.prototype.toString.call(candidate)
+`) as (candidate: (...args: never[]) => unknown) => string;
+
+function failZodWorker(worker: Worker): null {
+  void worker.terminate();
+  zodValidationWorker = null;
+  return null;
+}
+
+function getZodValidationWorker(): ZodValidationWorker | null {
+  if (zodValidationWorker !== undefined) return zodValidationWorker;
+
+  const signal = new Int32Array(new SharedArrayBuffer(4));
+  const builderSource = functionSource(buildPolicyBundleContentsSchema);
+  const worker = new Worker(`
+    void (async () => {
+      const { parentPort, workerData } = await import("node:worker_threads");
+      const signal = new Int32Array(workerData.signal);
+      const notify = (status) => {
+        Atomics.store(signal, 0, status);
+        Atomics.notify(signal, 0);
+      };
+      try {
+        if (parentPort === null) throw new Error("ZOD_WORKER_PORT_MISSING");
+        const { z } = await import("zod");
+        const buildSchema = (${builderSource});
+        const schema = buildSchema(z);
+        parentPort.on("message", (serialized) => {
+          let valid = false;
+          try {
+            valid = schema.safeParse(JSON.parse(serialized)).success;
+          } catch {
+            valid = false;
+          }
+          notify(valid ? ${ZOD_WORKER_VALID} : ${ZOD_WORKER_INVALID});
+        });
+        notify(${ZOD_WORKER_READY});
+      } catch {
+        notify(${ZOD_WORKER_FAILED});
+      }
+    })();
+  `, {
+    eval: true,
+    workerData: {
+      signal: signal.buffer,
+    },
+  });
+  worker.unref();
+
+  if (
+    Atomics.wait(
+      signal,
+      0,
+      ZOD_WORKER_IDLE,
+      ZOD_WORKER_TIMEOUT_MS,
+    ) !== "ok" ||
+    Atomics.load(signal, 0) !== ZOD_WORKER_READY
+  ) {
+    return failZodWorker(worker);
+  }
+  Atomics.store(signal, 0, ZOD_WORKER_IDLE);
+  zodValidationWorker = { signal, worker };
+  return zodValidationWorker;
+}
+
+function validateWithDeclaredSchema(serialized: string): boolean {
+  const state = getZodValidationWorker();
+  if (state === null) return false;
+
+  Atomics.store(state.signal, 0, ZOD_WORKER_IDLE);
+  try {
+    state.worker.postMessage(serialized);
+  } catch {
+    failZodWorker(state.worker);
+    return false;
+  }
+  if (
+    Atomics.wait(
+      state.signal,
+      0,
+      ZOD_WORKER_IDLE,
+      ZOD_WORKER_TIMEOUT_MS,
+    ) !== "ok"
+  ) {
+    failZodWorker(state.worker);
+    return false;
+  }
+  const status = Atomics.load(state.signal, 0);
+  if (status === ZOD_WORKER_FAILED) failZodWorker(state.worker);
+  return status === ZOD_WORKER_VALID;
+}
+
+type PolicyBundleContents = ZodInfer<
+  ReturnType<typeof buildPolicyBundleContentsSchema>
+>;
 
 type SnapshotRecord = Record<string, unknown>;
 const INVALID_ARRAY_ITEM = Symbol("INVALID_ARRAY_ITEM");
@@ -900,8 +1048,9 @@ function safeParsePolicyBundle(value: unknown): PolicyBundleParseResult {
       return schemaFailure("POLICY_BUNDLE_PROTOTYPE_MUTATION");
     }
 
-    const validated = policyBundleContentsSchema.safeParse(snapshot);
-    if (!validated.success) return schemaFailure(validated.error);
+    if (!validateWithDeclaredSchema(canonicalJson(snapshot))) {
+      return schemaFailure("POLICY_BUNDLE_ZOD_INVALID");
+    }
 
     if (hasPolicyPrototypeMutation()) {
       return schemaFailure("POLICY_BUNDLE_PROTOTYPE_MUTATION");

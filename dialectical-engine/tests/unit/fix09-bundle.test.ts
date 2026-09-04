@@ -6,6 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -711,53 +712,156 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(loadBundle(BUNDLE_PATH).quick_arm).toBe("OFF");
   });
 
-  it("never trusts a hostile Array.prototype.push present before loader initialization", () => {
-    const loaderUrl = pathToFileURL(resolve(
-      import.meta.dirname,
-      "../../tools/obs-listener/policy/loader.ts",
-    )).href;
-    const canonicalUrl = pathToFileURL(resolve(
-      import.meta.dirname,
-      "../../tools/obs-listener/policy/canonical.ts",
-    )).href;
-    const script = `
-      import { readFileSync } from "node:fs";
-      await import("zod");
-      await import(${JSON.stringify(canonicalUrl)});
-      const previous = Object.getOwnPropertyDescriptor(Array.prototype, "push");
-      if (!previous || !("value" in previous)) throw new Error("MISSING_PUSH");
-      const original = previous.value;
-      let calls = 0;
-      Object.defineProperty(Array.prototype, "push", {
-        configurable: true,
-        value: function hostilePush(...values) {
-          calls += 1;
-          return Reflect.apply(original, this, values);
-        },
-        writable: true,
-      });
-      try {
-        const { policyBundleSchema } = await import(
-          ${JSON.stringify(loaderUrl)} + "?hostile-preimport"
-        );
-        const raw = JSON.parse(readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8"));
-        const result = policyBundleSchema.safeParse(raw);
-        process.stdout.write(JSON.stringify({ success: result.success, calls }));
-      } finally {
-        Object.defineProperty(Array.prototype, "push", previous);
-      }
-    `;
-    const outcome = spawnSync(
-      process.execPath,
-      ["--import", "tsx", "--input-type=module", "--eval", script],
-      { encoding: "utf8" },
+  it("contains every hostile Array.prototype.push shape before loader initialization", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const outputDirectory = mkdtempSync(join(tmpdir(), "fix09-preinit-"));
+    writeFileSync(
+      join(outputDirectory, "package.json"),
+      '{"type":"module"}\n',
+      "utf8",
     );
+    const compileOutcome = spawnSync(process.execPath, [
+      TYPESCRIPT_COMPILER_PATH,
+      "--ignoreConfig",
+      "--module",
+      "NodeNext",
+      "--moduleResolution",
+      "NodeNext",
+      "--target",
+      "ES2022",
+      "--types",
+      "node",
+      "--skipLibCheck",
+      "--rootDir",
+      repositoryRoot,
+      "--outDir",
+      outputDirectory,
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+      resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+      resolve(repositoryRoot, "tools/obs-listener/policy/unique-json.ts"),
+    ], { cwd: repositoryRoot, encoding: "utf8" });
+    expect(
+      compileOutcome.status,
+      `${compileOutcome.stdout}${compileOutcome.stderr}`,
+    ).toBe(0);
+    const compiledPolicyDirectory = resolve(
+      outputDirectory,
+      "tools/obs-listener/policy",
+    );
+    const loaderUrl = pathToFileURL(
+      resolve(compiledPolicyDirectory, "loader.js"),
+    ).href;
+    const canonicalUrl = pathToFileURL(
+      resolve(compiledPolicyDirectory, "canonical.js"),
+    ).href;
+    const uniqueJsonUrl = pathToFileURL(
+      resolve(compiledPolicyDirectory, "unique-json.js"),
+    ).href;
+    const variants = [
+      "GETTER_FUNCTION",
+      "DATA_FUNCTION",
+      "THROWING_GETTER",
+      "NON_FUNCTION",
+    ] as const;
 
-    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
-    expect(JSON.parse(outcome.stdout)).toMatchObject({ success: false });
+    try {
+      for (const variant of variants) {
+        const script = `
+          import { readFileSync } from "node:fs";
+          await import("zod");
+          await import(${JSON.stringify(canonicalUrl)});
+          await import(${JSON.stringify(uniqueJsonUrl)});
+          const previous = Object.getOwnPropertyDescriptor(Array.prototype, "push");
+          if (!previous || !("value" in previous)) throw new Error("MISSING_PUSH");
+          const original = previous.value;
+          let getterCalls = 0;
+          let functionCalls = 0;
+          const hostileFunction = function (...values) {
+            functionCalls += 1;
+            return Reflect.apply(original, this, values);
+          };
+          const variant = ${JSON.stringify(variant)};
+          let descriptor;
+          if (variant === "GETTER_FUNCTION") {
+            descriptor = {
+              configurable: true,
+              get() {
+                getterCalls += 1;
+                return hostileFunction;
+              },
+            };
+          } else if (variant === "DATA_FUNCTION") {
+            descriptor = {
+              configurable: true,
+              value: hostileFunction,
+              writable: true,
+            };
+          } else if (variant === "THROWING_GETTER") {
+            descriptor = {
+              configurable: true,
+              get() {
+                getterCalls += 1;
+                throw new Error("RAW_PUSH_ESCAPE");
+              },
+            };
+          } else {
+            descriptor = {
+              configurable: true,
+              value: "NOT_CALLABLE",
+              writable: true,
+            };
+          }
+          let imported = false;
+          let success;
+          let rawError = null;
+          Object.defineProperty(Array.prototype, "push", descriptor);
+          try {
+            const { policyBundleSchema } = await import(
+              ${JSON.stringify(loaderUrl)} + "?hostile-preimport-${variant}"
+            );
+            imported = true;
+            const raw = JSON.parse(readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8"));
+            success = policyBundleSchema.safeParse(raw).success;
+          } catch (error) {
+            rawError = {
+              name: error instanceof Error ? error.name : typeof error,
+              message: error instanceof Error ? error.message : String(error),
+            };
+          } finally {
+            Object.defineProperty(Array.prototype, "push", previous);
+          }
+          process.stdout.write(JSON.stringify({
+            functionCalls,
+            getterCalls,
+            imported,
+            rawError,
+            success,
+          }));
+        `;
+        const outcome = spawnSync(
+          process.execPath,
+          ["--input-type=module", "--eval", script],
+          { cwd: repositoryRoot, encoding: "utf8" },
+        );
+        const label = `${variant}:${outcome.stdout}${outcome.stderr}`;
+
+        expect.soft(outcome.status, label).toBe(0);
+        if (outcome.status === 0) {
+          expect.soft(JSON.parse(outcome.stdout), variant).toEqual({
+            functionCalls: 0,
+            getterCalls: 0,
+            imported: true,
+            rawError: null,
+            success: false,
+          });
+        }
+      }
+    } finally {
+      rmSync(outputDirectory, { force: true, recursive: true });
+    }
   });
 
-  it("detects an exact push identity change introduced during Zod validation", () => {
+  it("keeps main-realm regex and push callbacks outside Zod validation", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
     const pushDescriptor = Object.getOwnPropertyDescriptor(
       Array.prototype,
@@ -817,10 +921,242 @@ describe("FIX-09 C1 policy bundle", () => {
     }
 
     expect(escaped).toBeUndefined();
-    expect(testCalls).toBeGreaterThan(0);
-    expect(changedPushCalls).toBeGreaterThan(0);
-    expect(result?.success).toBe(false);
+    expect(testCalls).toBe(0);
+    expect(changedPushCalls).toBe(0);
+    expect(result?.success).toBe(true);
     expect(policyBundleSchema.safeParse(raw).success).toBe(true);
+  });
+
+  it("isolates self-restoring Zod callbacks from hashing and token authority", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" as const };
+    const pushDescriptor = Object.getOwnPropertyDescriptor(
+      Array.prototype,
+      "push",
+    );
+    const testDescriptor = Object.getOwnPropertyDescriptor(
+      RegExp.prototype,
+      "test",
+    );
+    const require = createRequire(import.meta.url);
+    const crypto = require("node:crypto") as {
+      hash: (
+        algorithm: string,
+        data: string | NodeJS.ArrayBufferView,
+        outputEncoding?: "buffer" | "hex",
+      ) => Buffer | string;
+    };
+    const hashDescriptor = Object.getOwnPropertyDescriptor(crypto, "hash");
+    if (
+      pushDescriptor === undefined ||
+      !Object.hasOwn(pushDescriptor, "value") ||
+      typeof pushDescriptor.value !== "function" ||
+      testDescriptor === undefined ||
+      !Object.hasOwn(testDescriptor, "value") ||
+      typeof testDescriptor.value !== "function" ||
+      hashDescriptor === undefined ||
+      !Object.hasOwn(hashDescriptor, "value") ||
+      typeof hashDescriptor.value !== "function"
+    ) {
+      throw new Error("NATIVE_AUTHORITY_MEMBER_MISSING");
+    }
+    const nativePush = pushDescriptor.value as (...values: unknown[]) => number;
+    const nativeTest = testDescriptor.value as (
+      this: RegExp,
+      value: string,
+    ) => boolean;
+    let regexpCalls = 0;
+    let hostilePushCalls = 0;
+    let forgedHashCalls = 0;
+    let repinError: unknown;
+    let repinned: PolicyBundle | undefined;
+    let hash: string | undefined;
+    let escaped: unknown;
+    let pushDuringAttack: PropertyDescriptor | undefined;
+
+    try {
+      Object.defineProperty(RegExp.prototype, "test", {
+        configurable: true,
+        value(this: RegExp, value: string) {
+          regexpCalls += 1;
+          if (regexpCalls === 1) {
+            Object.defineProperty(Array.prototype, "push", {
+              configurable: true,
+              value(this: unknown[], ...values: unknown[]) {
+                hostilePushCalls += 1;
+                Object.defineProperty(crypto, "hash", {
+                  ...hashDescriptor,
+                  value(
+                    _algorithm: string,
+                    _data: string | NodeJS.ArrayBufferView,
+                    outputEncoding?: "buffer" | "hex",
+                  ) {
+                    forgedHashCalls += 1;
+                    return outputEncoding === "hex"
+                      ? "0".repeat(64)
+                      : Buffer.alloc(32);
+                  },
+                });
+                syncBuiltinESMExports();
+                Object.defineProperty(
+                  Array.prototype,
+                  "push",
+                  pushDescriptor,
+                );
+                return Reflect.apply(nativePush, this, values);
+              },
+              writable: true,
+            });
+          }
+          return Reflect.apply(nativeTest, this, [value]);
+        },
+        writable: true,
+      });
+      try {
+        repinned = repin(bundle, {
+          token: "wrong",
+          next_bundle: armed,
+        }, {
+          OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+        });
+      } catch (error) {
+        repinError = error;
+      }
+      hash = bundleHash(bundle);
+      pushDuringAttack = Object.getOwnPropertyDescriptor(
+        Array.prototype,
+        "push",
+      );
+    } catch (error) {
+      escaped = error;
+    } finally {
+      Object.defineProperty(RegExp.prototype, "test", testDescriptor);
+      Object.defineProperty(Array.prototype, "push", pushDescriptor);
+      Object.defineProperty(crypto, "hash", hashDescriptor);
+      syncBuiltinESMExports();
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(regexpCalls).toBe(0);
+    expect(hostilePushCalls).toBe(0);
+    expect(forgedHashCalls).toBe(0);
+    expect(repinError).toBeInstanceOf(RepinRefusedError);
+    expect(repinned).toBeUndefined();
+    expect(hash).toBe(
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+    );
+    expect(pushDuringAttack).toEqual(pushDescriptor);
+    expect(Object.getOwnPropertyDescriptor(Array.prototype, "push")).toEqual(
+      pushDescriptor,
+    );
+    expect(Object.getOwnPropertyDescriptor(RegExp.prototype, "test")).toEqual(
+      testDescriptor,
+    );
+    expect(Object.getOwnPropertyDescriptor(crypto, "hash")).toEqual(
+      hashDescriptor,
+    );
+    expect(bundleHash(bundle)).toBe(
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+    );
+    expect(
+      repin(bundle, { token: "correct" }, {
+        OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+      }).quick_arm,
+    ).toBe("OFF");
+  });
+
+  it("keeps authority on captured crypto calls after builtin export synchronization", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" as const };
+    const require = createRequire(import.meta.url);
+    const crypto = require("node:crypto") as {
+      hash: (
+        algorithm: string,
+        data: string | NodeJS.ArrayBufferView,
+        outputEncoding?: "buffer" | "hex",
+      ) => Buffer | string;
+      timingSafeEqual: (
+        left: NodeJS.ArrayBufferView,
+        right: NodeJS.ArrayBufferView,
+      ) => boolean;
+    };
+    const hashDescriptor = Object.getOwnPropertyDescriptor(crypto, "hash");
+    const equalDescriptor = Object.getOwnPropertyDescriptor(
+      crypto,
+      "timingSafeEqual",
+    );
+    if (
+      hashDescriptor === undefined ||
+      !Object.hasOwn(hashDescriptor, "value") ||
+      typeof hashDescriptor.value !== "function" ||
+      equalDescriptor === undefined ||
+      !Object.hasOwn(equalDescriptor, "value") ||
+      typeof equalDescriptor.value !== "function"
+    ) {
+      throw new Error("NATIVE_CRYPTO_EXPORT_MISSING");
+    }
+    let forgedHashCalls = 0;
+    let forgedEqualCalls = 0;
+    let hash: string | undefined;
+    let repinError: unknown;
+    let repinned: PolicyBundle | undefined;
+
+    try {
+      Object.defineProperty(crypto, "hash", {
+        ...hashDescriptor,
+        value(
+          _algorithm: string,
+          _data: string | NodeJS.ArrayBufferView,
+          outputEncoding?: "buffer" | "hex",
+        ) {
+          forgedHashCalls += 1;
+          return outputEncoding === "hex"
+            ? "0".repeat(64)
+            : Buffer.alloc(32);
+        },
+      });
+      Object.defineProperty(crypto, "timingSafeEqual", {
+        ...equalDescriptor,
+        value() {
+          forgedEqualCalls += 1;
+          return true;
+        },
+      });
+      syncBuiltinESMExports();
+
+      hash = bundleHash(bundle);
+      try {
+        repinned = repin(bundle, {
+          token: "wrong",
+          next_bundle: armed,
+        }, {
+          OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+        });
+      } catch (error) {
+        repinError = error;
+      }
+    } finally {
+      Object.defineProperty(crypto, "hash", hashDescriptor);
+      Object.defineProperty(crypto, "timingSafeEqual", equalDescriptor);
+      syncBuiltinESMExports();
+    }
+
+    expect(forgedHashCalls).toBe(0);
+    expect(forgedEqualCalls).toBe(0);
+    expect(hash).toBe(
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+    );
+    expect(repinError).toBeInstanceOf(RepinRefusedError);
+    expect(repinned).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(crypto, "hash")).toEqual(
+      hashDescriptor,
+    );
+    expect(
+      Object.getOwnPropertyDescriptor(crypto, "timingSafeEqual"),
+    ).toEqual(equalDescriptor);
+    expect(bundleHash(bundle)).toBe(
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+    );
   });
 
   it("does not overreach to an unreachable Object.prototype.push neighbour", () => {

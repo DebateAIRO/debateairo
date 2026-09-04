@@ -1,5 +1,7 @@
-import { hash } from "node:crypto";
+import { hash as nodeHash } from "node:crypto";
 import { isProxy } from "node:util/types";
+
+const HASH = nodeHash;
 
 export type CanonicalJsonValue =
   | null
@@ -352,5 +354,5 @@ export function canonicalJson(value: unknown): string {
 }
 
 export function bundleHash(value: unknown): string {
-  return hash("sha256", canonicalJson(value), "hex");
+  return HASH("sha256", canonicalJson(value), "hex");
 }
