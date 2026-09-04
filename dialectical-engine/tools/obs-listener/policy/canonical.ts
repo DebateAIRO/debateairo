@@ -17,24 +17,25 @@ function dataPropertyValue(
 ): unknown {
   if (
     descriptor === undefined ||
-    !("value" in descriptor) ||
+    !Object.hasOwn(descriptor, "value") ||
     descriptor.enumerable !== true
   ) {
     return nonPlainJsonData();
   }
-  return descriptor.value;
+  const value = descriptor.value;
+  return value;
 }
 
 function arrayLength(descriptor: PropertyDescriptor | undefined): number {
   if (
     descriptor === undefined ||
-    !("value" in descriptor) ||
-    !Number.isSafeInteger(descriptor.value) ||
-    descriptor.value < 0
+    !Object.hasOwn(descriptor, "value")
   ) {
     return nonPlainJsonData();
   }
-  return descriptor.value;
+  const value = descriptor.value;
+  if (!Number.isSafeInteger(value) || value < 0) return nonPlainJsonData();
+  return value;
 }
 
 export function canonicalProjection(value: unknown): CanonicalJsonValue {

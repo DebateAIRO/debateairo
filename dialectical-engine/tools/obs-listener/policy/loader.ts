@@ -525,19 +525,29 @@ function schemaFailure(cause: unknown): PolicyBundleParseResult {
   return { success: false, error: new PolicyBundleSchemaError(cause) };
 }
 
-function numericArrayPrototypePollution(): boolean {
-  let prototype: object | null = Array.prototype;
-  while (prototype !== null) {
-    if (Object.getOwnPropertyDescriptor(prototype, "0") !== undefined) {
-      return true;
+function isCanonicalArrayIndex(key: string): boolean {
+  const index = Number(key);
+  return Number.isInteger(index) &&
+    index >= 0 &&
+    index < 0xffff_ffff &&
+    String(index) === key;
+}
+
+function hasNumericArrayPrototypePollution(): boolean {
+  for (const prototype of [Array.prototype, Object.prototype]) {
+    for (const key of Object.getOwnPropertyNames(prototype)) {
+      if (isCanonicalArrayIndex(key)) return true;
     }
-    prototype = Object.getPrototypeOf(prototype) as object | null;
   }
   return false;
 }
 
 function safeParsePolicyBundle(value: unknown): PolicyBundleParseResult {
   try {
+    if (hasNumericArrayPrototypePollution()) {
+      return schemaFailure("POLICY_BUNDLE_NUMERIC_PROTOTYPE_POLLUTION");
+    }
+
     const snapshot = canonicalProjection(value);
     if (!policyBundleStructure(snapshot)) {
       return schemaFailure("POLICY_BUNDLE_CONTENT_INVALID");
@@ -546,10 +556,8 @@ function safeParsePolicyBundle(value: unknown): PolicyBundleParseResult {
     const crossFieldIssue = snapshotCrossFieldIssue(snapshot);
     if (crossFieldIssue !== undefined) return schemaFailure(crossFieldIssue);
 
-    if (!numericArrayPrototypePollution()) {
-      const validated = policyBundleContentsSchema.safeParse(snapshot);
-      if (!validated.success) return schemaFailure(validated.error);
-    }
+    const validated = policyBundleContentsSchema.safeParse(snapshot);
+    if (!validated.success) return schemaFailure(validated.error);
 
     return { success: true, data: snapshot };
   } catch (error) {

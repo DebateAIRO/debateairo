@@ -12,12 +12,14 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   bundleHash,
   canonicalJson,
+  canonicalProjection,
 } from "../../tools/obs-listener/policy/canonical.js";
 import {
   isFloorDenied,
   loadBundle,
   PolicyBundleLoadError,
   policyBundleSchema,
+  type PolicyBundle,
 } from "../../tools/obs-listener/policy/loader.js";
 import {
   RepinRefusedError,
@@ -61,7 +63,8 @@ function expectFrozenOwnDataSnapshot(actual: unknown, expected: unknown): void {
     for (let index = 0; index < expected.length; index += 1) {
       expect(Object.hasOwn(actual as object, String(index))).toBe(true);
       const descriptor = Object.getOwnPropertyDescriptor(actual, String(index));
-      expect(descriptor !== undefined && "value" in descriptor).toBe(true);
+      expect(descriptor !== undefined && Object.hasOwn(descriptor, "value"))
+        .toBe(true);
       expectFrozenOwnDataSnapshot(descriptor?.value, expected[index]);
     }
     return;
@@ -79,7 +82,8 @@ function expectFrozenOwnDataSnapshot(actual: unknown, expected: unknown): void {
       expect(Object.hasOwn(actual as object, key)).toBe(true);
       const descriptor = actualDescriptors[key];
       expect(descriptor).toMatchObject({ enumerable: true });
-      expect(descriptor !== undefined && "value" in descriptor).toBe(true);
+      expect(descriptor !== undefined && Object.hasOwn(descriptor, "value"))
+        .toBe(true);
       expectFrozenOwnDataSnapshot(
         descriptor?.value,
         (expected as Record<string, unknown>)[key],
@@ -118,6 +122,69 @@ function candidatesMissingRequiredValue(): Record<string, unknown>[] {
   }
   return candidates;
 }
+
+function candidatesWithAccessorBackedRequiredValue(onRead: () => void): {
+  readonly candidates: Record<string, unknown>[];
+  readonly descriptorValues: ReadonlyMap<() => unknown, unknown>;
+  readonly originalValues: readonly unknown[];
+} {
+  const candidates: Record<string, unknown>[] = [];
+  const descriptorValues = new Map<() => unknown, unknown>();
+  const originalValues: unknown[] = [];
+  const raw = readFileSync(BUNDLE_PATH, "utf8");
+  const replaceValue = (record: Record<string, unknown>) => {
+    const original = record.value;
+    const source = () => {
+      onRead();
+      throw new Error("SOURCE_VALUE_ACCESSOR_RAN");
+    };
+    descriptorValues.set(source, original);
+    originalValues.push(original);
+    Object.defineProperty(record, "value", {
+      configurable: true,
+      enumerable: true,
+      get: source,
+    });
+  };
+
+  for (let index = 0; index < 16; index += 1) {
+    const candidate = JSON.parse(raw) as Record<string, unknown>;
+    const seed = (
+      candidate.register_seeds as Array<Record<string, unknown>>
+    )[index];
+    if (seed === undefined) throw new Error("MISSING_REGISTER_SEED");
+    replaceValue(seed);
+    candidates.push(candidate);
+  }
+  for (const slot of [
+    "zone_manifest_hash",
+    "hatchet_ingest",
+    "injection_corpus_hash",
+  ] as const) {
+    const candidate = JSON.parse(raw) as Record<string, unknown>;
+    const slots = candidate.slots as Record<
+      string,
+      Record<string, unknown>
+    >;
+    replaceValue(slots[slot] as Record<string, unknown>);
+    candidates.push(candidate);
+  }
+
+  return { candidates, descriptorValues, originalValues };
+}
+
+const NUMERIC_PROTOTYPE_KEYS = [
+  "0",
+  "1",
+  "2",
+  "10",
+  "46",
+  // Fixed-seed bounded samples spanning and exceeding current policy lengths.
+  "7",
+  "23",
+  "113",
+  "251",
+] as const;
 
 describe("FIX-09 C1 policy bundle", () => {
   it("loads the complete fail-closed phase-one policy", () => {
@@ -461,129 +528,198 @@ describe("FIX-09 C1 policy bundle", () => {
     expectFrozenOwnDataSnapshot(loaded, raw);
   });
 
-  it("defines array indices without invoking an inherited numeric accessor", () => {
+  it("projects every numeric index safely and refuses polluted schema execution", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
       string,
       unknown
     >;
-    const invalidCrossField = JSON.parse(
-      readFileSync(BUNDLE_PATH, "utf8"),
-    ) as Record<string, unknown>;
-    const invalidStructure = JSON.parse(
-      readFileSync(BUNDLE_PATH, "utf8"),
-    ) as Record<string, unknown>;
-    invalidStructure.quick_arm = "ARMED";
-    const invalidSeed = (
-      invalidCrossField.register_seeds as Array<Record<string, unknown>>
-    )[1];
-    if (invalidSeed === undefined) throw new Error("MISSING_REGISTER_SEED");
-    invalidSeed.status = "UNSET";
-    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "0");
-    let getterReads = 0;
-    let setterCalls = 0;
-    let parsed: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
-    let invalidParsed:
-      | ReturnType<typeof policyBundleSchema.safeParse>
-      | undefined;
-    let invalidStructureParsed:
-      | ReturnType<typeof policyBundleSchema.safeParse>
-      | undefined;
-    let escaped: unknown;
-    let denied: boolean | undefined;
-    let hash: string | undefined;
+    const clean = policyBundleSchema.parse(raw);
+    const environment = {
+      OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+    };
 
-    try {
-      Object.defineProperty(Object.prototype, "0", {
-        configurable: true,
-        get() {
-          getterReads += 1;
-          return "public/**";
-        },
-        set(value: unknown) {
-          setterCalls += 1;
-          if (value === "apps/api/src/registration.ts") return;
-          Object.defineProperty(this, "0", {
+    for (const prototype of [Object.prototype, Array.prototype]) {
+      for (const key of NUMERIC_PROTOTYPE_KEYS) {
+        const prototypeName = prototype === Object.prototype
+          ? "Object"
+          : "Array";
+        const label = `${prototypeName}.${key}`;
+        const previous = Object.getOwnPropertyDescriptor(prototype, key);
+        let getterReads = 0;
+        let setterCalls = 0;
+        let projected: ReturnType<typeof canonicalProjection> | undefined;
+        let parsed:
+          | ReturnType<typeof policyBundleSchema.safeParse>
+          | undefined;
+        let repinError: unknown;
+        let escaped: unknown;
+
+        try {
+          Object.defineProperty(prototype, key, {
             configurable: true,
-            enumerable: true,
-            value,
-            writable: true,
+            get() {
+              getterReads += 1;
+              return "public/**";
+            },
+            set(value: unknown) {
+              setterCalls += 1;
+              Object.defineProperty(this, key, {
+                configurable: true,
+                enumerable: true,
+                value,
+                writable: true,
+              });
+            },
           });
-        },
-      });
-      try {
-        parsed = policyBundleSchema.safeParse(raw);
-        invalidParsed = policyBundleSchema.safeParse(invalidCrossField);
-        invalidStructureParsed = policyBundleSchema.safeParse(
-          invalidStructure,
-        );
-        if (parsed.success) {
-          denied = isFloorDenied(
-            parsed.data,
-            "apps/api/src/registration.ts",
-          );
-          hash = bundleHash(parsed.data);
+          try {
+            projected = canonicalProjection(raw);
+            parsed = policyBundleSchema.safeParse(raw);
+            repin(clean, { token: "fixture-custodian-token" }, environment);
+          } catch (error) {
+            if (error instanceof RepinRefusedError) {
+              repinError = error;
+            } else {
+              escaped = error;
+            }
+          }
+        } finally {
+          if (previous === undefined) {
+            Reflect.deleteProperty(prototype, key);
+          } else {
+            Object.defineProperty(prototype, key, previous);
+          }
         }
-      } catch (error) {
-        escaped = error;
-      }
-    } finally {
-      if (previous === undefined) {
-        Reflect.deleteProperty(Object.prototype, "0");
-      } else {
-        Object.defineProperty(Object.prototype, "0", previous);
-      }
-    }
 
-    expect(escaped).toBeUndefined();
-    expect(parsed?.success).toBe(true);
-    expect(invalidParsed?.success).toBe(false);
-    expect(invalidStructureParsed?.success).toBe(false);
-    expect(getterReads).toBe(0);
-    expect(setterCalls).toBe(0);
-    expect(denied).toBe(true);
-    expect(hash).toBe(
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
-    );
-    if (parsed?.success === true) {
-      expect(parsed.data.quick_arm).toBe("OFF");
-      expectFrozenOwnDataSnapshot(parsed.data, raw);
+        expect(escaped, label).toBeUndefined();
+        expect(parsed?.success, label).toBe(false);
+        expect(repinError, label).toBeInstanceOf(RepinRefusedError);
+        expect(getterReads, label).toBe(0);
+        expect(setterCalls, label).toBe(0);
+        expectFrozenOwnDataSnapshot(projected, raw);
+        expect(bundleHash(projected)).toBe(
+          "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        );
+        expect(
+          isFloorDenied(
+            projected as PolicyBundle,
+            "apps/api/src/registration.ts",
+          ),
+        ).toBe(true);
+      }
     }
   });
 
-  it("defines dense array indices over inherited non-writable data", () => {
+  it("refuses every inherited non-writable numeric index without weakening clean validation", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
       string,
       unknown
     >;
-    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "0");
-    let parsed: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
-    let escaped: unknown;
+    const unsafe = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const registry = unsafe.code_registry_seed as Record<string, unknown>;
+    const scope = registry.scope_file_list as Record<string, unknown>;
+    scope.count = Number.MAX_SAFE_INTEGER + 1;
+    const clean = policyBundleSchema.parse(raw);
+    const environment = {
+      OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+    };
 
-    try {
-      Object.defineProperty(Object.prototype, "0", {
-        configurable: true,
-        value: "public/**",
-      });
-      try {
-        parsed = policyBundleSchema.safeParse(raw);
-      } catch (error) {
-        escaped = error;
-      }
-    } finally {
-      if (previous === undefined) {
-        Reflect.deleteProperty(Object.prototype, "0");
-      } else {
-        Object.defineProperty(Object.prototype, "0", previous);
+    expect(policyBundleSchema.safeParse(unsafe).success).toBe(false);
+
+    for (const prototype of [Object.prototype, Array.prototype]) {
+      for (const key of NUMERIC_PROTOTYPE_KEYS) {
+        const prototypeName = prototype === Object.prototype
+          ? "Object"
+          : "Array";
+        const label = `${prototypeName}.${key}`;
+        const previous = Object.getOwnPropertyDescriptor(prototype, key);
+        let projected: ReturnType<typeof canonicalProjection> | undefined;
+        let validResult:
+          | ReturnType<typeof policyBundleSchema.safeParse>
+          | undefined;
+        let unsafeResult:
+          | ReturnType<typeof policyBundleSchema.safeParse>
+          | undefined;
+        let repinError: unknown;
+        let escaped: unknown;
+
+        try {
+          Object.defineProperty(prototype, key, {
+            configurable: true,
+            value: "public/**",
+          });
+          try {
+            projected = canonicalProjection(raw);
+            validResult = policyBundleSchema.safeParse(raw);
+            unsafeResult = policyBundleSchema.safeParse(unsafe);
+            try {
+              repin(clean, { token: "fixture-custodian-token" }, environment);
+            } catch (error) {
+              repinError = error;
+            }
+          } catch (error) {
+            escaped = error;
+          }
+        } finally {
+          if (previous === undefined) {
+            Reflect.deleteProperty(prototype, key);
+          } else {
+            Object.defineProperty(prototype, key, previous);
+          }
+        }
+
+        expect(escaped, label).toBeUndefined();
+        expect(validResult?.success, label).toBe(false);
+        expect(unsafeResult?.success, label).toBe(false);
+        expect(repinError, label).toBeInstanceOf(RepinRefusedError);
+        expectFrozenOwnDataSnapshot(projected, raw);
       }
     }
+  });
 
-    expect(escaped).toBeUndefined();
-    expect(parsed?.success).toBe(true);
-    if (parsed?.success === true) {
-      expectFrozenOwnDataSnapshot(parsed.data, raw);
-      expect(
-        isFloorDenied(parsed.data, "apps/api/src/registration.ts"),
-      ).toBe(true);
+  it("does not classify non-index numeric spellings as array pollution", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+
+    for (const prototype of [Object.prototype, Array.prototype]) {
+      for (const key of ["01", "-0", "1.0", "4294967295"] as const) {
+        const previous = Object.getOwnPropertyDescriptor(prototype, key);
+        let getterReads = 0;
+        let setterCalls = 0;
+        let success: boolean | undefined;
+        let escaped: unknown;
+        try {
+          Object.defineProperty(prototype, key, {
+            configurable: true,
+            get() {
+              getterReads += 1;
+              throw new Error("NON_INDEX_GETTER_RAN");
+            },
+            set() {
+              setterCalls += 1;
+              throw new Error("NON_INDEX_SETTER_RAN");
+            },
+          });
+          try {
+            success = policyBundleSchema.safeParse(raw).success;
+          } catch (error) {
+            escaped = error;
+          }
+        } finally {
+          if (previous === undefined) {
+            Reflect.deleteProperty(prototype, key);
+          } else {
+            Object.defineProperty(prototype, key, previous);
+          }
+        }
+
+        const label = `${prototype === Object.prototype ? "Object" : "Array"}.${key}`;
+        expect(escaped, label).toBeUndefined();
+        expect(success, label).toBe(true);
+        expect(getterReads, label).toBe(0);
+        expect(setterCalls, label).toBe(0);
+      }
     }
   });
 
@@ -753,6 +889,103 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(escaped).toBe(0);
   });
 
+  it("rejects all accessor-backed value fields without consulting a prototype getter", () => {
+    let sourceReads = 0;
+    const { candidates, descriptorValues } =
+      candidatesWithAccessorBackedRequiredValue(() => {
+        sourceReads += 1;
+      });
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let inheritedReads = 0;
+    let failures = 0;
+    let escaped = 0;
+
+    try {
+      Object.defineProperty(Object.prototype, "value", {
+        configurable: true,
+        get() {
+          inheritedReads += 1;
+          const getterDescriptor = Object.getOwnPropertyDescriptor(
+            this as object,
+            "get",
+          );
+          if (
+            getterDescriptor === undefined ||
+            !Object.hasOwn(getterDescriptor, "value")
+          ) {
+            throw new Error("MISSING_DESCRIPTOR_GETTER");
+          }
+          return descriptorValues.get(
+            getterDescriptor.value as () => unknown,
+          );
+        },
+      });
+      for (const candidate of candidates) {
+        try {
+          if (!policyBundleSchema.safeParse(candidate).success) failures += 1;
+        } catch {
+          escaped += 1;
+        }
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(candidates).toHaveLength(19);
+    expect(failures).toBe(19);
+    expect(escaped).toBe(0);
+    expect(inheritedReads).toBe(0);
+    expect(sourceReads).toBe(0);
+  });
+
+  it("rejects all accessor-backed value fields over matching inherited data", () => {
+    let sourceReads = 0;
+    const { candidates, originalValues } =
+      candidatesWithAccessorBackedRequiredValue(() => {
+        sourceReads += 1;
+      });
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let failures = 0;
+    let escaped = 0;
+
+    try {
+      for (let index = 0; index < candidates.length; index += 1) {
+        Object.defineProperty(Object.prototype, "value", {
+          configurable: true,
+          value: originalValues[index],
+        });
+        try {
+          if (!policyBundleSchema.safeParse(candidates[index]).success) {
+            failures += 1;
+          }
+        } catch {
+          escaped += 1;
+        }
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(candidates).toHaveLength(19);
+    expect(failures).toBe(19);
+    expect(escaped).toBe(0);
+    expect(sourceReads).toBe(0);
+  });
+
   it("rejects accessor-backed hash input without invoking the accessor", () => {
     let accessorReads = 0;
     const changing = Object.defineProperty({ stable: true }, "changing", {
@@ -832,6 +1065,129 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(thrown).toBeInstanceOf(RepinRefusedError);
     expect(thrown).toMatchObject({ code: "REPIN_REFUSED" });
     expect(accessorReads).toBe(0);
+  });
+
+  it("does not let descriptor prototypes authenticate a token or select a bundle", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" };
+    let sourceReads = 0;
+    let inheritedReads = 0;
+    const tokenAccessor = () => {
+      sourceReads += 1;
+      throw new Error("TOKEN_ACCESSOR_RAN");
+    };
+    const bundleAccessor = () => {
+      sourceReads += 1;
+      throw new Error("NEXT_BUNDLE_ACCESSOR_RAN");
+    };
+    const descriptorValues = new Map<() => unknown, unknown>([
+      [tokenAccessor, "fixture-custodian-token"],
+      [bundleAccessor, armed],
+    ]);
+    const accessorRequest = Object.defineProperties({}, {
+      token: { enumerable: true, get: tokenAccessor },
+      next_bundle: { enumerable: true, get: bundleAccessor },
+    });
+    const accessorEnvironment = Object.defineProperty(
+      {},
+      "OBS_POLICY_CUSTODIAN_TOKEN",
+      { enumerable: true, get: tokenAccessor },
+    );
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let getterRequestError: unknown;
+    let getterEnvironmentError: unknown;
+
+    try {
+      Object.defineProperty(Object.prototype, "value", {
+        configurable: true,
+        get() {
+          inheritedReads += 1;
+          const getterDescriptor = Object.getOwnPropertyDescriptor(
+            this as object,
+            "get",
+          );
+          if (
+            getterDescriptor === undefined ||
+            !Object.hasOwn(getterDescriptor, "value")
+          ) {
+            throw new Error("MISSING_DESCRIPTOR_GETTER");
+          }
+          return descriptorValues.get(
+            getterDescriptor.value as () => unknown,
+          );
+        },
+      });
+      try {
+        repin(bundle, accessorRequest as never, {
+          OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+        });
+      } catch (error) {
+        getterRequestError = error;
+      }
+      try {
+        repin(
+          bundle,
+          {
+            token: "fixture-custodian-token",
+            next_bundle: armed,
+          },
+          accessorEnvironment as never,
+        );
+      } catch (error) {
+        getterEnvironmentError = error;
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(getterRequestError).toBeInstanceOf(RepinRefusedError);
+    expect(getterEnvironmentError).toBeInstanceOf(RepinRefusedError);
+    expect(inheritedReads).toBe(0);
+    expect(sourceReads).toBe(0);
+
+    for (const [member, inherited] of [
+      ["token", "fixture-custodian-token"],
+      ["next_bundle", armed],
+    ] as const) {
+      const request = member === "token"
+        ? Object.defineProperty(
+          { next_bundle: armed },
+          "token",
+          { enumerable: true, get: tokenAccessor },
+        )
+        : Object.defineProperty(
+          { token: "fixture-custodian-token" },
+          "next_bundle",
+          { enumerable: true, get: bundleAccessor },
+        );
+      let error: unknown;
+      try {
+        Object.defineProperty(Object.prototype, "value", {
+          configurable: true,
+          value: inherited,
+        });
+        repin(bundle, request as never, {
+          OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+        });
+      } catch (caught) {
+        error = caught;
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(Object.prototype, "value");
+        } else {
+          Object.defineProperty(Object.prototype, "value", previous);
+        }
+      }
+      expect(error, member).toBeInstanceOf(RepinRefusedError);
+    }
+    expect(sourceReads).toBe(0);
   });
 
   it("refuses inherited or descriptor-trapping next_bundle data", () => {

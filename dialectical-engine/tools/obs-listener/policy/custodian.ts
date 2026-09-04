@@ -29,11 +29,11 @@ function ownStringProperty(value: unknown, key: string): string | undefined {
   if (value === null || typeof value !== "object") return undefined;
   try {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return descriptor !== undefined &&
-      "value" in descriptor &&
-      typeof descriptor.value === "string"
-      ? descriptor.value
-      : undefined;
+    if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) {
+      return undefined;
+    }
+    const descriptorValue = descriptor.value;
+    return typeof descriptorValue === "string" ? descriptorValue : undefined;
   } catch {
     return undefined;
   }
@@ -54,9 +54,9 @@ function ownOptionalDataProperty(
   try {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor !== undefined) {
-      return "value" in descriptor
-        ? { kind: "VALUE", value: descriptor.value }
-        : { kind: "INVALID" };
+      if (!Object.hasOwn(descriptor, "value")) return { kind: "INVALID" };
+      const descriptorValue = descriptor.value;
+      return { kind: "VALUE", value: descriptorValue };
     }
 
     const visited = new Set<object>();
