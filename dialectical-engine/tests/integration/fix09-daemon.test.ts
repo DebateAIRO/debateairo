@@ -1,10 +1,17 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import pg from "pg";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate, obsIncident, obsOccurrence } from "../../packages/db/src/index.js";
 import { deliverOccurrence } from "../../tools/obs-listener/src/daemon/fold.js";
+import {
+  createDaemon,
+  isValidNotificationPayload,
+  readDaemonConfig,
+  type ClientFactory
+} from "../../tools/obs-listener/src/daemon/main.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 vi.mock("@debateai/kernel", async () => import("../../packages/kernel/src/index.js"));
@@ -107,6 +114,38 @@ async function insertOccurrence(options: OccurrenceInsert = {}): Promise<{
   const row = result.rows[0];
   if (row === undefined) throw new Error("FIX09_INSERT_FAILED");
   return { occurrenceId: row.occurrence_id, occSeq: BigInt(row.occ_seq) };
+}
+
+async function ackCount(occurrenceId: string): Promise<number> {
+  const result = await database.pool.query<{ count: number }>(`
+    SELECT count(*)::int AS count FROM obs.delivery
+    WHERE occurrence_id=$1 AND consumer='fixagent-daemon' AND delivery_status='ACKED'
+  `, [occurrenceId]);
+  return result.rows[0]?.count ?? 0;
+}
+
+function realClientFactory(created: pg.Client[]): ClientFactory {
+  return (databaseUrl) => {
+    const client = new pg.Client({ connectionString: databaseUrl });
+    created.push(client);
+    return client;
+  };
+}
+
+function loggingClientFactory(created: pg.Client[], statementSets: string[][]): ClientFactory {
+  return (databaseUrl) => {
+    const client = new pg.Client({ connectionString: databaseUrl });
+    const statements: string[] = [];
+    const original = client.query.bind(client);
+    client.query = (async (statement: unknown, values?: readonly unknown[]) => {
+      const sql = typeof statement === "string" ? statement : "";
+      statements.push(sql);
+      return original(sql, values === undefined ? [] : [...values]);
+    }) as pg.Client["query"];
+    created.push(client);
+    statementSets.push(statements);
+    return client;
+  };
 }
 
 beforeAll(async () => {
@@ -429,6 +468,187 @@ describe("FIX-09 C2 atomic delivery on real PostgreSQL", () => {
       expect(await deliverOccurrence(retry, occurrence.occurrenceId)).toMatchObject({ result: "FOLDED" });
     } finally {
       await retry.end();
+    }
+  });
+
+  it("rolls poison action and health back when ACK insertion fails", async () => {
+    const occurrence = await insertOccurrence({ frames: [7] });
+    const beforeHealth = await database.pool.query(
+      "SELECT state,observed_at,detail_code FROM obs.component_health WHERE component='fixagent-daemon'"
+    );
+    await database.pool.query("REVOKE INSERT ON obs.delivery FROM debateai_obs_listener");
+    const listener = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
+    await listener.connect();
+    try {
+      await expect(deliverOccurrence(listener, occurrence.occurrenceId)).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await listener.end();
+      await database.pool.query("GRANT INSERT ON obs.delivery TO debateai_obs_listener");
+    }
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM obs.agent_action WHERE occurrence_id=$1",
+      [occurrence.occurrenceId]
+    )).rows).toEqual([{ count: 0 }]);
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM obs.delivery WHERE occurrence_id=$1",
+      [occurrence.occurrenceId]
+    )).rows).toEqual([{ count: 0 }]);
+    expect((await database.pool.query(
+      "SELECT state,observed_at,detail_code FROM obs.component_health WHERE component='fixagent-daemon'"
+    )).rows).toEqual(beforeHealth.rows);
+    const retry = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
+    await retry.connect();
+    try {
+      expect(await deliverOccurrence(retry, occurrence.occurrenceId)).toMatchObject({ result: "DEAD_LETTERED" });
+    } finally {
+      await retry.end();
+    }
+  });
+});
+
+describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
+  it("rejects incomplete configuration and distrusts malformed notification payloads", () => {
+    const invalidIntervals = [undefined, "", "0", "-1", "1.5", "01", " 1", "abc", "9007199254740992"];
+    expect(() => readDaemonConfig({ OBS_LISTENER_POLL_INTERVAL_MS: "1" })).toThrow("OBS_LISTENER_DATABASE_URL_REQUIRED");
+    for (const value of invalidIntervals) {
+      expect(() => readDaemonConfig({
+        OBS_LISTENER_DATABASE_URL: "postgresql://listener@localhost/db",
+        ...(value === undefined ? {} : { OBS_LISTENER_POLL_INTERVAL_MS: value })
+      })).toThrow("OBS_LISTENER_POLL_INTERVAL_MS_INVALID");
+    }
+    expect(readDaemonConfig({
+      OBS_LISTENER_DATABASE_URL: "postgresql://listener@localhost/db",
+      OBS_LISTENER_POLL_INTERVAL_MS: "25"
+    })).toEqual({
+      databaseUrl: "postgresql://listener@localhost/db",
+      pollIntervalMs: 25,
+      consumer: "fixagent-daemon"
+    });
+    for (const payload of [undefined, "", "-1", "0", "1.5", "abc", "01", "9007199254740992"]) {
+      expect(isValidNotificationPayload(payload)).toBe(false);
+    }
+    expect(isValidNotificationPayload("42")).toBe(true);
+  });
+
+  it("pins the cap-one selector, global lock, and hint-only dependency surface", async () => {
+    const source = await readFile(
+      new URL("../../tools/obs-listener/src/daemon/main.ts", import.meta.url), "utf8"
+    );
+    expect(source).toContain("SELECT pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0)) AS acquired");
+    expect(source).toMatch(/captured_at ASC, occurrence\.occ_seq ASC\s+LIMIT 1/);
+    expect(source).not.toMatch(/WHERE occurrence\.occ_seq\s*=\s*\$1/);
+    expect(source).not.toMatch(/deliverOccurrence\([^,]+,\s*message\.payload/);
+  });
+
+  it("LISTENs before leadership and notification wakes work before a long poll", async () => {
+    const created: pg.Client[] = [];
+    const statements: string[] = [];
+    const baseFactory = realClientFactory(created);
+    const factory: ClientFactory = (url) => {
+      const client = baseFactory(url);
+      const original = client.query.bind(client);
+      client.query = (async (statement: unknown, values?: readonly unknown[]) => {
+        const sql = typeof statement === "string" ? statement : "";
+        statements.push(sql);
+        return original(sql, values === undefined ? [] : [...values]);
+      }) as pg.Client["query"];
+      return client;
+    };
+    const daemon = createDaemon({
+      databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
+      pollIntervalMs: 5_000,
+      consumer: "fixagent-daemon"
+    }, factory);
+    await daemon.start();
+    try {
+      const occurrence = await insertOccurrence();
+      await vi.waitFor(async () => expect(await ackCount(occurrence.occurrenceId)).toBe(1), { timeout: 1_000 });
+      const listenIndex = statements.findIndex((sql) => sql.includes("LISTEN obs_occurrence_inserted"));
+      const leaderIndex = statements.findIndex((sql) => sql.includes("pg_try_advisory_lock"));
+      const pendingIndex = statements.findIndex((sql) => sql.includes("NOT EXISTS") && sql.includes("LIMIT 1"));
+      expect(listenIndex).toBeGreaterThanOrEqual(0);
+      expect(leaderIndex).toBeGreaterThan(listenIndex);
+      expect(pendingIndex).toBeGreaterThan(leaderIndex);
+    } finally {
+      await daemon.stop();
+    }
+  });
+
+  it("polls missed wakes and drains FATAL-first then captured-time/sequence order at cap one", async () => {
+    const created: pg.Client[] = [];
+    const daemon = createDaemon({
+      databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
+      pollIntervalMs: 40,
+      consumer: "fixagent-daemon"
+    }, realClientFactory(created));
+    await daemon.start();
+    try {
+      const live = created[0];
+      if (live === undefined) throw new Error("FIX09_DAEMON_CLIENT_MISSING");
+      await live.query("UNLISTEN obs_occurrence_inserted");
+      const base = new Date("2026-09-04T12:00:00Z");
+      const rows = [
+        await insertOccurrence({ severity: "INFO", capturedAt: new Date(base.getTime() + 4_000) }),
+        await insertOccurrence({ severity: "FATAL", capturedAt: new Date(base.getTime() + 2_000) }),
+        await insertOccurrence({ severity: "SEVERE", capturedAt: new Date(base.getTime() + 3_000) }),
+        await insertOccurrence({ severity: "FATAL", capturedAt: new Date(base.getTime() + 1_000) })
+      ];
+      await live.query("LISTEN obs_occurrence_inserted");
+      await vi.waitFor(async () => {
+        expect(await Promise.all(rows.map((row) => ackCount(row.occurrenceId)))).toEqual([1, 1, 1, 1]);
+      }, { timeout: 1_000 });
+      const order = await database.pool.query<{ occurrence_id: string }>(`
+        SELECT delivery.occurrence_id FROM obs.delivery AS delivery
+        WHERE delivery.consumer='fixagent-daemon' AND delivery.delivery_status='ACKED'
+          AND delivery.occurrence_id=ANY($1::uuid[])
+        ORDER BY delivery.occurred_at,delivery.delivery_id
+      `, [rows.map((row) => row.occurrenceId)]);
+      expect(order.rows.map((row) => row.occurrence_id)).toEqual([
+        rows[3]?.occurrenceId, rows[1]?.occurrenceId, rows[2]?.occurrenceId, rows[0]?.occurrenceId
+      ]);
+    } finally {
+      await daemon.stop();
+    }
+  });
+
+  it("keeps one leader, promotes a standby, and reconnects LISTEN-first after loss", async () => {
+    const madeA: pg.Client[] = [];
+    const madeB: pg.Client[] = [];
+    const statementsB: string[][] = [];
+    const daemonA = createDaemon({
+      databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
+      consumer: "fixagent-daemon"
+    }, realClientFactory(madeA));
+    const daemonB = createDaemon({
+      databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
+      consumer: "fixagent-daemon"
+    }, loggingClientFactory(madeB, statementsB));
+    await daemonA.start();
+    await daemonB.start();
+    try {
+      const first = await insertOccurrence();
+      await vi.waitFor(async () => expect(await ackCount(first.occurrenceId)).toBe(1), { timeout: 1_000 });
+      await daemonA.stop();
+      const second = await insertOccurrence();
+      await vi.waitFor(async () => expect(await ackCount(second.occurrenceId)).toBe(1), { timeout: 1_000 });
+      const activeB = madeB.at(-1);
+      if (activeB === undefined) throw new Error("FIX09_STANDBY_CLIENT_MISSING");
+      activeB.emit("error", new Error("FIX09_INJECTED_CONNECTION_LOSS"));
+      const third = await insertOccurrence();
+      await vi.waitFor(async () => {
+        expect(madeB.length).toBeGreaterThan(1);
+        expect(await ackCount(third.occurrenceId)).toBe(1);
+      }, { timeout: 1_000 });
+      const reconnectStatements = statementsB[1] ?? [];
+      const listenIndex = reconnectStatements.findIndex((sql) => sql.includes("LISTEN obs_occurrence_inserted"));
+      const leaderIndex = reconnectStatements.findIndex((sql) => sql.includes("pg_try_advisory_lock"));
+      const pendingIndex = reconnectStatements.findIndex((sql) => sql.includes("LIMIT 1"));
+      expect(listenIndex).toBeGreaterThanOrEqual(0);
+      expect(leaderIndex).toBeGreaterThan(listenIndex);
+      expect(pendingIndex).toBeGreaterThan(leaderIndex);
+    } finally {
+      await daemonA.stop();
+      await daemonB.stop();
     }
   });
 });
