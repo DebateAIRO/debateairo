@@ -58,6 +58,16 @@ interface AdmissionResult {
   readonly stderr: string;
 }
 
+interface StageWrite {
+  readonly position: number | null;
+  readonly bytesWritten: number;
+  readonly bytesHex: string;
+}
+
+interface AdmissionStageWriteResult extends AdmissionResult {
+  readonly stageWrites: readonly StageWrite[];
+}
+
 interface ManifestEntry {
   readonly basename: string;
   readonly kind: "candidate" | "reserved" | "rejected_unsafe_path";
@@ -177,6 +187,87 @@ function runAdmission(
     status: child.status,
     stdout: child.stdout,
     stderr: child.stderr,
+  };
+}
+
+function runAdmissionRecordingStageWrites(
+  spoolDirectory: string,
+  manifestPath: string,
+): AdmissionStageWriteResult {
+  const tracePath = `${manifestPath}.stage-writes.jsonl`;
+  const promisesModule = [
+    'import * as fs from "node:fs/promises";',
+    "export const link = fs.link;",
+    "export const lstat = fs.lstat;",
+    "export const readdir = fs.readdir;",
+    "export const realpath = fs.realpath;",
+    "export const unlink = fs.unlink;",
+    `const stagePrefix = ${JSON.stringify(join(spoolDirectory, RELEASE_LOCK_STAGE_PREFIX))};`,
+    `const tracePath = ${JSON.stringify(tracePath)};`,
+    "export async function open(path, flags, mode) {",
+    "  const handle = await fs.open(path, flags, mode);",
+    "  const targeted = String(path).startsWith(stagePrefix);",
+    "  return new Proxy(handle, {",
+    "    get(target, property) {",
+    "      if (targeted && property === 'write') {",
+    "        return async (buffer, offset, length, position) => {",
+    "          const result = await target.write(buffer, offset, length, position);",
+    "          const bytes = Buffer.from(buffer).subarray(offset, offset + result.bytesWritten);",
+    "          await fs.appendFile(tracePath, `${JSON.stringify({",
+    "            position,",
+    "            bytesWritten: result.bytesWritten,",
+    "            bytesHex: bytes.toString('hex'),",
+    "          })}\\n`);",
+    "          return result;",
+    "        };",
+    "      }",
+    "      const value = Reflect.get(target, property, target);",
+    "      return typeof value === 'function' ? value.bind(target) : value;",
+    "    },",
+    "  });",
+    "}",
+  ].join("\n");
+  const promisesUrl = `data:text/javascript,${encodeURIComponent(promisesModule)}`;
+  const loaderUrl = `data:text/javascript,${encodeURIComponent([
+    "export function resolve(specifier, context, nextResolve) {",
+    '  if (specifier === "node:fs/promises" && context.parentURL?.includes("/tools/obs-spool-release-admission.ts")) {',
+    `    return { url: ${JSON.stringify(promisesUrl)}, shortCircuit: true };`,
+    "  }",
+    "  return nextResolve(specifier, context);",
+    "}",
+  ].join("\n"))}`;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--experimental-loader",
+      loaderUrl,
+      TOOL_PATH,
+      "--spool-dir",
+      spoolDirectory,
+      "--build-ref",
+      BUILD_REF,
+      "--manifest",
+      manifestPath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      timeout: 20_000,
+    },
+  );
+  const trace = existsSync(tracePath)
+    ? readFileSync(tracePath, "utf8").trim()
+    : "";
+  return {
+    status: child.status,
+    stdout: child.stdout,
+    stderr: child.stderr,
+    stageWrites: trace === ""
+      ? []
+      : trace.split("\n").map((line) => JSON.parse(line) as StageWrite),
   };
 }
 
@@ -1072,58 +1163,82 @@ describe("FIX-01 offline spool release admission", () => {
   });
 
   it("recovers every tested short staging-lock write without publishing authority early", () => {
-    for (const retainedBytes of [0, 1, 23, 64, 200]) {
-      const root = scratch(`release-lock-stage-short-${retainedBytes}`);
+    for (const requestedRetainedBytes of [0, 1, 23, 64, 200, "full"] as const) {
+      const label = String(requestedRetainedBytes);
+      const root = scratch(`release-lock-stage-short-${label}`);
       const spoolDirectory = realpathSync(join(root, "spool"));
-      const name = spoolName(910 + retainedBytes);
+      const name = spoolName(
+        requestedRetainedBytes === "full" ? 1_212 : 910 + requestedRetainedBytes,
+      );
       writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
       const crashedManifest = join(root, "crashed-manifest.json");
 
-      const crashed = runAdmissionRetainingLockPrefix(
-        spoolDirectory,
-        crashedManifest,
-        retainedBytes,
-      );
+      const crashed = requestedRetainedBytes === "full"
+        ? runAdmissionWithStageBoundaryCrash({
+            spoolDirectory,
+            manifestPath: crashedManifest,
+            point: "after-stage-sync",
+          })
+        : runAdmissionRetainingLockPrefix(
+            spoolDirectory,
+            crashedManifest,
+            requestedRetainedBytes,
+          );
 
-      expect(crashed.status, `${retainedBytes}:${crashed.stderr}`).not.toBe(0);
-      expect(crashed.stdout, String(retainedBytes)).not.toContain("PASS_");
-      expect(existsSync(crashedManifest), String(retainedBytes)).toBe(false);
-      expect(existsSync(join(spoolDirectory, RELEASE_LOCK_NAME)), String(retainedBytes))
+      expect(crashed.status, `${label}:${crashed.stderr}`).not.toBe(0);
+      expect(crashed.stdout, label).not.toContain("PASS_");
+      expect(existsSync(crashedManifest), label).toBe(false);
+      expect(existsSync(join(spoolDirectory, RELEASE_LOCK_NAME)), label)
         .toBe(false);
       const stageNames = readdirSync(spoolDirectory).filter((entry) =>
         entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
       );
-      expect(stageNames, String(retainedBytes)).toHaveLength(1);
-      expect(stageNames[0], String(retainedBytes)).toMatch(
+      expect(stageNames, label).toHaveLength(1);
+      expect(stageNames[0], label).toMatch(
         /^\.obs-spool-release-lock-stage-v1-[0-9a-f]{64}$/u,
       );
-      expect(readFileSync(join(spoolDirectory, stageNames[0]!)).length, String(retainedBytes))
-        .toBe(retainedBytes);
+      const stageBytes = readFileSync(join(spoolDirectory, stageNames[0]!));
+      const retainedBytes = stageBytes.length;
+      if (requestedRetainedBytes !== "full") {
+        expect(retainedBytes, label).toBe(requestedRetainedBytes);
+      }
       const admissionRef = stageNames[0]!.slice(RELEASE_LOCK_STAGE_PREFIX.length);
 
       for (let rerun = 1; rerun <= 2; rerun += 1) {
         const manifestPath = join(root, `manifest-${rerun}.json`);
-        const result = runAdmission(spoolDirectory, manifestPath);
-        expect(result.status, `${retainedBytes}:rerun-${rerun}:${result.stderr}`).toBe(0);
+        const result = runAdmissionRecordingStageWrites(spoolDirectory, manifestPath);
+        expect(result.status, `${label}:rerun-${rerun}:${result.stderr}`).toBe(0);
         const manifest = parseManifest(manifestPath);
-        expect(manifest.admission_ref, String(retainedBytes)).toBe(admissionRef);
+        expect(manifest.admission_ref, label).toBe(admissionRef);
         expect(readdirSync(spoolDirectory).filter((entry) =>
           entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
-        ), String(retainedBytes)).toEqual([]);
+        ), label).toEqual([]);
+        if (rerun === 1) {
+          const lockBytes = readFileSync(join(spoolDirectory, RELEASE_LOCK_NAME));
+          expect(lockBytes.subarray(0, retainedBytes), label).toEqual(stageBytes);
+          const missing = lockBytes.subarray(retainedBytes);
+          expect(result.stageWrites, label).toEqual(missing.length === 0
+            ? []
+            : [{
+                position: retainedBytes,
+                bytesWritten: missing.length,
+                bytesHex: missing.toString("hex"),
+              }]);
+        }
         const lockStat = statSync(join(spoolDirectory, RELEASE_LOCK_NAME), {
           bigint: true,
         });
-        expect(lockStat.isFile(), String(retainedBytes)).toBe(true);
-        expect(lockStat.nlink, String(retainedBytes)).toBe(1n);
+        expect(lockStat.isFile(), label).toBe(true);
+        expect(lockStat.nlink, label).toBe(1n);
       }
 
       const manifest = parseManifest(join(root, "manifest-2.json"));
       const candidate = manifest.entries.find((entry) => entry.basename === name)!;
       const lines = readFileSync(join(spoolDirectory, INDEX_NAME), "utf8").split("\n");
-      expect(lines.filter((line) => line === name), String(retainedBytes)).toHaveLength(1);
+      expect(lines.filter((line) => line === name), label).toHaveLength(1);
       expect(lines.filter((line) =>
         line === admissionRecord(admissionRef, candidate)
-      ), String(retainedBytes)).toHaveLength(1);
+      ), label).toHaveLength(1);
     }
   }, 60_000);
 
