@@ -1490,6 +1490,38 @@ describe("FIX-16 C1 inventory scanner", () => {
     )).toEqual([]);
   });
 
+  it("binds stored require values through nested object-destructured call parameters", () => {
+    const source = (lastLoad: "local" | "require") => [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  const inner = ({ holder: { load } }: {",
+      "    holder: { load: (path: string) => unknown };",
+      '  }) => load("apps/api/src/registration.ts");',
+      "  inner({ holder: { load: local } });",
+      "  inner({ holder: { load: local } });",
+      "  inner({ holder: { load: local } });",
+      "  inner({ holder: { load: local } });",
+      `  inner({ holder: { load: ${lastLoad} } });`,
+      "}",
+      "outer();",
+    ].join("\n");
+
+    expect(scanSource(
+      source("require"),
+      "packages/obs-capture/src/nested-object-pattern-cap-harmful.ts",
+    )).toEqual([
+      {
+        path: "packages/obs-capture/src/nested-object-pattern-cap-harmful.ts",
+        line: 5,
+        class: "zone_import",
+      },
+    ]);
+    expect(scanSource(
+      source("local"),
+      "packages/obs-capture/src/nested-object-pattern-cap-safe.ts",
+    )).toEqual([]);
+  });
+
   it("saturates changing caller state without inventing a global require callee", () => {
     const source = (lastLoad: "local" | "require") => [
       "declare const local: (path: string) => unknown;",
@@ -1547,6 +1579,42 @@ describe("FIX-16 C1 inventory scanner", () => {
     expect(scanSource(
       source("local"),
       "packages/obs-capture/src/nested-property-saturation-safe.ts",
+    )).toEqual([]);
+  });
+
+  it("preserves stable computed keys used for captured object properties through callable saturation", () => {
+    const source = (lastLoad: "local" | "require") => [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  const holder = { load: local };",
+      '  const key = "load";',
+      '  let marker = "SAFE_A";',
+      "  const inner = () => {",
+      "    marker;",
+      '    holder[key]("apps/api/src/registration.ts");',
+      "  };",
+      "  inner();",
+      '  marker = "SAFE_B"; inner();',
+      '  marker = "SAFE_C"; inner();',
+      '  marker = "SAFE_D"; inner();',
+      `  marker = "SAFE_E"; holder.load = ${lastLoad}; inner();`,
+      "}",
+      "outer();",
+    ].join("\n");
+
+    expect(scanSource(
+      source("require"),
+      "packages/obs-capture/src/nested-computed-key-saturation-harmful.ts",
+    )).toEqual([
+      {
+        path: "packages/obs-capture/src/nested-computed-key-saturation-harmful.ts",
+        line: 8,
+        class: "zone_import",
+      },
+    ]);
+    expect(scanSource(
+      source("local"),
+      "packages/obs-capture/src/nested-computed-key-saturation-safe.ts",
     )).toEqual([]);
   });
 

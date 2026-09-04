@@ -129,6 +129,7 @@ type StoredValue = {
   readonly requires: number;
   readonly truthiness: number;
   readonly data: DataPossibilities;
+  readonly objectReferences: ObjectReferences;
 };
 
 type StoredArray = {
@@ -240,6 +241,7 @@ function cloneStoredValue(value: StoredValue): StoredValue {
     requires: value.requires,
     truthiness: value.truthiness,
     data: cloneData(value.data),
+    objectReferences: cloneReferences(value.objectReferences),
   };
 }
 
@@ -357,6 +359,7 @@ function unionStoredValue(left: StoredValue, right: StoredValue): StoredValue {
     requires: left.requires | right.requires,
     truthiness: left.truthiness | right.truthiness,
     data: unionData(left.data, right.data),
+    objectReferences: unionReferences(left.objectReferences, right.objectReferences),
   };
 }
 
@@ -371,6 +374,7 @@ function unionStoredArray(left: StoredArray, right: StoredArray): StoredArray {
         requires: REQUIRE_GLOBAL | REQUIRE_LOCAL,
         truthiness: VALUE_TRUTHY | VALUE_FALSY,
         data: { literals: new Map(), unknown: true },
+        objectReferences: { ids: new Set(), unknown: true },
       });
     } else {
       values.set(index, unionStoredValue(leftValue, rightValue));
@@ -394,6 +398,7 @@ function unionStoredObject(left: StoredObject, right: StoredObject): StoredObjec
         requires: REQUIRE_LOCAL,
         truthiness: VALUE_TRUTHY | VALUE_FALSY,
         data: { literals: new Map(), unknown: true },
+        objectReferences: { ids: new Set(), unknown: true },
       });
     } else {
       values.set(key, unionStoredValue(leftValue, rightValue));
@@ -578,7 +583,9 @@ function storedValueEqual(left: StoredValue, right: StoredValue): boolean {
   return left.requires === right.requires
     && left.truthiness === right.truthiness
     && left.data.unknown === right.data.unknown
-    && setEqual(new Set(left.data.literals.keys()), new Set(right.data.literals.keys()));
+    && setEqual(new Set(left.data.literals.keys()), new Set(right.data.literals.keys()))
+    && left.objectReferences.unknown === right.objectReferences.unknown
+    && setEqual(left.objectReferences.ids, right.objectReferences.ids);
 }
 
 function storedArrayMapEqual(
@@ -688,6 +695,17 @@ function widenCallableEntry(previous: FlowState, current: FlowState, joined: Flo
     const previousRequire = previous.requires.get(binding) ?? REQUIRE_LOCAL;
     const currentRequire = current.requires.get(binding) ?? REQUIRE_LOCAL;
     if (previousRequire === currentRequire) widened.requires.set(binding, previousRequire);
+  }
+  for (const [binding, currentStrings] of current.strings) {
+    const previousStrings = previous.strings.get(binding);
+    if (
+      previousStrings !== undefined
+      && !previousStrings.unknown
+      && !currentStrings.unknown
+      && setEqual(previousStrings.values, currentStrings.values)
+    ) {
+      widened.strings.set(binding, cloneStrings(currentStrings));
+    }
   }
   for (const [binding, currentReferences] of current.objectReferences) {
     const previousReferences = previous.objectReferences.get(binding);
@@ -1192,6 +1210,7 @@ function scanParsedSource(
           requires: REQUIRE_LOCAL,
           truthiness: VALUE_TRUTHY,
           data: { literals: new Map(), unknown: true },
+          objectReferences: { ids: new Set(), unknown: true },
         });
       }
     }
@@ -1500,6 +1519,7 @@ function scanParsedSource(
     requires: requireOf(expression, state),
     truthiness: truthinessOf(expression, state),
     data: dataOf(expression, state),
+    objectReferences: objectReferencesOf(expression, state),
   });
 
   const accessNames = (
@@ -1617,6 +1637,7 @@ function scanParsedSource(
     state.requires.set(binding, value.requires);
     state.truthiness.set(binding, value.truthiness);
     state.data.set(binding, cloneData(value.data));
+    state.objectReferences.set(binding, cloneReferences(value.objectReferences));
     state.nullish.set(binding, VALUE_PRESENT);
   };
 
@@ -1642,6 +1663,75 @@ function scanParsedSource(
       result = result === null ? cloneStoredObject(value) : unionStoredObject(result, value);
     }
     return result;
+  };
+
+  const updatePatternWithStoredValue = (
+    name: ts.BindingName,
+    value: StoredValue | undefined,
+    state: FlowState,
+    absentNullish: number,
+  ): void => {
+    if (ts.isIdentifier(name)) {
+      updateIdentifierWithStoredValue(name, value, state);
+      return;
+    }
+    if (value === undefined || value.objectReferences.unknown || value.objectReferences.ids.size === 0) {
+      bindUnknown(name, state, absentNullish);
+      return;
+    }
+    if (ts.isArrayBindingPattern(name)) {
+      let array: StoredArray | null = null;
+      for (const identity of value.objectReferences.ids) {
+        const current = state.arrayValues.get(identity);
+        if (current === undefined || current.unknown) {
+          bindUnknown(name, state, absentNullish);
+          return;
+        }
+        array = array === null ? cloneStoredArray(current) : unionStoredArray(array, current);
+      }
+      for (let index = 0; index < name.elements.length; index += 1) {
+        const binding = name.elements[index];
+        if (binding === undefined || ts.isOmittedExpression(binding) || binding.name === undefined) continue;
+        if (binding.dotDotDotToken !== undefined) {
+          bindUnknown(binding.name, state, absentNullish);
+          continue;
+        }
+        updatePatternWithStoredValue(binding.name, array?.values.get(index), state, absentNullish);
+      }
+      return;
+    }
+    let object: StoredObject | null = null;
+    for (const identity of value.objectReferences.ids) {
+      const current = state.objectValues.get(identity);
+      if (current === undefined || current.unknown) {
+        bindUnknown(name, state, absentNullish);
+        return;
+      }
+      object = object === null ? cloneStoredObject(current) : unionStoredObject(object, current);
+    }
+    for (const binding of name.elements) {
+      if (binding.name === undefined) continue;
+      if (binding.dotDotDotToken !== undefined) {
+        bindUnknown(binding.name, state, absentNullish);
+        continue;
+      }
+      const names = binding.propertyName === undefined && ts.isIdentifier(binding.name)
+        ? { values: new Set([binding.name.text]), unknown: false }
+        : binding.propertyName === undefined
+          ? { values: new Set<string>(), unknown: true }
+          : propertyNames(binding.propertyName, state);
+      if (names.unknown || names.values.size !== 1) {
+        bindUnknown(binding.name, state, absentNullish);
+        continue;
+      }
+      const property = [...names.values][0];
+      updatePatternWithStoredValue(
+        binding.name,
+        property === undefined ? undefined : object?.values.get(property),
+        state,
+        absentNullish,
+      );
+    }
   };
 
   const storedObjectKeysOf = (expression: ts.Expression, state: FlowState): StringPossibilities | null => {
@@ -1704,11 +1794,7 @@ function scanParsedSource(
         for (let index = 0; index < name.elements.length; index += 1) {
           const binding = name.elements[index];
           if (binding === undefined || ts.isOmittedExpression(binding) || binding.name === undefined) continue;
-          if (ts.isIdentifier(binding.name)) {
-            updateIdentifierWithStoredValue(binding.name, array.values.get(index), state);
-          } else {
-            bindUnknown(binding.name, state, absentNullish);
-          }
+          updatePatternWithStoredValue(binding.name, array.values.get(index), state, absentNullish);
         }
         return;
       }
@@ -1718,22 +1804,25 @@ function scanParsedSource(
       if (object !== null) {
         for (const binding of name.elements) {
           if (binding.name === undefined) continue;
-          if (binding.dotDotDotToken !== undefined || !ts.isIdentifier(binding.name)) {
+          if (binding.dotDotDotToken !== undefined) {
             bindUnknown(binding.name, state, absentNullish);
             continue;
           }
-          const names = binding.propertyName === undefined
+          const names = binding.propertyName === undefined && ts.isIdentifier(binding.name)
             ? { values: new Set([binding.name.text]), unknown: false }
-            : propertyNames(binding.propertyName, state);
+            : binding.propertyName === undefined
+              ? { values: new Set<string>(), unknown: true }
+              : propertyNames(binding.propertyName, state);
           if (names.unknown || names.values.size !== 1) {
             bindUnknown(binding.name, state, absentNullish);
             continue;
           }
           const property = [...names.values][0];
-          updateIdentifierWithStoredValue(
+          updatePatternWithStoredValue(
             binding.name,
             property === undefined ? undefined : object.values.get(property),
             state,
+            absentNullish,
           );
         }
         return;
@@ -2082,7 +2171,12 @@ function scanParsedSource(
       if (array !== undefined && !array.unknown && array.length !== null) {
         if (name === "fill") {
           const value = added[0] === undefined
-            ? { requires: REQUIRE_LOCAL, truthiness: VALUE_FALSY, data: { literals: new Map(), unknown: true } }
+            ? {
+              requires: REQUIRE_LOCAL,
+              truthiness: VALUE_FALSY,
+              data: { literals: new Map(), unknown: true },
+              objectReferences: { ids: new Set<number>(), unknown: true },
+            }
             : storedValueOf(added[0], state);
           for (let index = 0; index < array.length; index += 1) array.values.set(index, cloneStoredValue(value));
         } else if (name === "push" && array.length + added.length <= MAX_FLOW_ALTERNATIVES) {
