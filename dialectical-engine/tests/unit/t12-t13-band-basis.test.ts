@@ -528,7 +528,10 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
     // not its mutation mattered, because the fixture described no floor either
     // way.
     const { emptyBasisFloor: _removed, ...withoutFloor } = row.value;
-    const broken: BandCeilingRegisterRow = { ...row, value: withoutFloor };
+    // The member is REQUIRED now (F-SEALEDROWS-D), so an incomplete row is
+    // unconstructible in typed code and can only reach the guard through
+    // `unknown` — which is exactly the hand-built caller the guard exists for.
+    const broken = { ...row, value: withoutFloor } as unknown as BandCeilingRegisterRow;
     expect(() => deriveBandCeiling({
       basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 },
       candidateConfidenceBand: TOP_BAND,

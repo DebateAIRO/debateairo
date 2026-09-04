@@ -1,3 +1,4 @@
+import { EVALUATOR_CONTRACT_TEXT } from "../apps/runner/src/index.js";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
@@ -26,21 +27,22 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
   const judgeText = judge.match(/content: `([\s\S]*?)`/)?.[1];
   const composerText = runner.match(/content: "(Return only JSON with a segments array[^"]+)"/)?.[1];
   // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints the
-  // EVALUATOR prompt alone. Located here by its shipped opening, DELIBERATELY a
-  // different method from the seeder's (which derives its key from the
-  // evaluator's response parser) — two independent locators agreeing is the
-  // cross-check. The retired version of this line searched for the same retired
-  // wording as the seeder, so both went stale together and neither could catch
-  // the other.
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{satisfied,objection,criteria\}[^"]+)"/g)]
-    .map((match) => match[1]);
-  if (judgeText === undefined || composerText === undefined || conformanceTexts.length !== 1) {
+  // EVALUATOR prompt alone.
+  //
+  // This line used to locate that prompt independently of the seeder, so that
+  // two different locators had to agree. THERE IS NOTHING LEFT TO CROSS-CHECK:
+  // codex r2 showed every lexical locator has an input that defeats it, so the
+  // prompt is now an exported constant that the runner SENDS and the seeders
+  // digest. Cross-checking one constant against itself would be theatre. The
+  // real guard moved to `tests/unit/f-sealedrows-a-conformance-extractor.test.ts`,
+  // which pins the digest VALUE and fails if the prompt is edited at all.
+  if (judgeText === undefined || composerText === undefined) {
     throw new Error("TEST_CONTRACT_TEXT_EXTRACTION_FAILED");
   }
   return {
     judgeContractHash: sha256(judgeText),
     composerContractHash: sha256(composerText),
-    conformanceContractHash: sha256(conformanceTexts[0]!),
+    conformanceContractHash: sha256(EVALUATOR_CONTRACT_TEXT),
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };

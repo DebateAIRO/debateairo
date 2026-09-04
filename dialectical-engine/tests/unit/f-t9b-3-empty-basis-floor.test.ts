@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFile } from "node:fs/promises";
 import { ENGINE_BAND_ORDER } from "@debateai/register";
 import { deriveBandCeiling, type BandCeilingRegisterRow } from "@debateai/serve";
 import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
@@ -243,6 +244,24 @@ describe("F-T9B-3 · a floored band states its OWN reason", () => {
       await expect(readDevelopmentRunnerPolicy(
         stub(stripped) as never, DEVELOPMENT_REGISTER_VERSION
       )).rejects.toThrow();
+    });
+
+    /**
+     * F-SEALEDROWS-D, closed. codex r2 judged the previous arrangement — an
+     * optional base type plus a required structural subtype used by two readers
+     * — not to be versioning: with no discriminator and no historical adapter,
+     * the base type still described an incomplete row, and the live runner and
+     * `deriveBandCeiling` both still accepted it. The member is REQUIRED on the
+     * one remaining type. This guard exists because nothing else fails if a `?`
+     * is put back: the compiler simply stops asking.
+     */
+    it("declares the member REQUIRED on the one band-ceiling row type", async () => {
+      const serve = await readFile(
+        new URL("../../packages/serve/src/index.ts", import.meta.url), "utf8");
+      expect(serve).toContain("readonly emptyBasisFloor: {");
+      expect(serve).not.toContain("readonly emptyBasisFloor?:");
+      // and the versioned alias is gone, not merely unused
+      expect(serve).not.toContain("SealedBandCeilingRegisterRow");
     });
 
     it("the sealed row DERIVES a truthful floored record end to end", async () => {

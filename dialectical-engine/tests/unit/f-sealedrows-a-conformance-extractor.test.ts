@@ -1,155 +1,110 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import {
-  buildAcceptanceRegisterRows,
-  extractEvaluatorContractText
-} from "../../acceptance/seed-register.js";
-import {
-  buildDevelopmentRunnerRegisterRows,
-  extractEvaluatorContractText as extractEvaluatorContractTextDev
-} from "../../apps/runner/src/dev-deployment-register.js";
+import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
+import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
+import { EVALUATOR_CONTRACT_TEXT } from "../../apps/runner/src/index.js";
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
-
-const runnerSource = async (): Promise<string> =>
-  readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+const sourceOf = (relative: string): Promise<string> =>
+  readFile(new URL(`../../${relative}`, import.meta.url), "utf8");
 
 /**
- * F-SEALEDROWS-A. `c1d8e09d` retired the two-prompt conformance protocol
- * (`{conforms,findings}` + `{pass}`) for one combined evaluator prompt, and the
- * extractor that fingerprints it kept hunting for the retired wording. It
- * matched 0 where it required 2, so BOTH deployment seeders threw before
- * writing a single register row.
+ * F-SEALEDROWS-A. The conformance slot fingerprints the EVALUATOR prompt alone
+ * (V, 2026-09-04): the writer's prompt already carries `composerContractHash`,
+ * so one slot holds one prompt and a later edit says WHICH wording moved.
  *
- * V RULED 2026-09-04: the conformance fingerprint covers the EVALUATOR prompt
- * ALONE. The writer's prompt already carries `composerContractHash`, so the
- * checker's slot fingerprints the checker's prompt and nothing else — one slot,
- * one prompt, one fingerprint, so a later edit says WHICH wording moved.
+ * THREE LOCATORS DIED BEFORE THIS FILE LOOKED LIKE THIS, and all three failed
+ * the same way — each could resolve to something that was not the evaluator
+ * prompt:
+ *   1. quoting the prompt's own words matched ZERO after T9 reworded it (LOUD);
+ *   2. taking the first object carrying a `criteria` member let an unrelated
+ *      schema declared EARLIER win (QUIET, codex r1);
+ *   3. balancing braces over raw text miscounted a `}` inside a string, comment,
+ *      regex or template literal, and matched a COMMENTED-OUT declaration after
+ *      a real rename — returning an unrelated prompt with exit 0 (QUIET again,
+ *      codex r2).
+ *
+ * There is no locator now. `apps/runner/src/index.ts` exports the prompt and
+ * SENDS that same constant; the seeders import and digest it. The tests below
+ * therefore do not probe a search — they pin the two properties that make a
+ * search unnecessary, and one that makes reintroducing a search visible.
  */
-describe("F-SEALEDROWS-A · the conformance fingerprint and the extractor that locates it", () => {
-  it("builds BOTH deployment seeders — the acceptance and development registers", async () => {
-    const acceptance = await buildAcceptanceRegisterRows();
-    const development = await buildDevelopmentRunnerRegisterRows();
-    expect(acceptance.length).toBeGreaterThan(0);
-    expect(development.length).toBeGreaterThan(0);
+describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt, unsearched", () => {
+  it("builds BOTH deployment seeders", async () => {
+    expect((await buildAcceptanceRegisterRows()).length).toBeGreaterThan(0);
+    expect((await buildDevelopmentRunnerRegisterRows()).length).toBeGreaterThan(0);
   });
 
-  it("seals the EVALUATOR prompt alone as the conformance fingerprint (V 2026-09-04)", async () => {
-    const runner = await runnerSource();
-    const evaluatorText = extractEvaluatorContractText(runner, "TEST");
-    // Independently re-derived here, so the seeder and the test do not share a
-    // locator that could go stale in lockstep — which is how this defect hid.
-    expect(evaluatorText).toContain("satisfied");
-    expect(evaluatorText).toContain("citation_tracing");
-
-    const rows = await buildAcceptanceRegisterRows();
-    const byKey = Object.fromEntries(rows.map((row) => [row.rowKey, row.value]));
-    expect(byKey.conformanceContractHash).toBe(sha256(evaluatorText));
-
-    // The writer's prompt is a DIFFERENT slot and must not leak into this one.
-    expect(byKey.conformanceContractHash).not.toBe(byKey.composerContractHash);
-    const composerText = runner.match(/content: "(Return only JSON with a segments array[^"]+)"/)?.[1];
-    expect(composerText).toBeDefined();
-    expect(byKey.conformanceContractHash).not.toBe(sha256([composerText, evaluatorText].join("\n")));
-  });
-
-  it("agrees between the two deployments — one prompt, one fingerprint", async () => {
-    const runner = await runnerSource();
-    expect(extractEvaluatorContractTextDev(runner, "TEST")).toBe(extractEvaluatorContractText(runner, "TEST"));
-
+  it("fingerprints the exported evaluator constant in BOTH deployments", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
+    expect(acceptance.conformanceContractHash).toBe(sha256(EVALUATOR_CONTRACT_TEXT));
     expect(development.conformanceContractHash).toBe(acceptance.conformanceContractHash);
   });
 
   /**
-   * THE GUARD. The retired extractor located the prompt by quoting words that
-   * were themselves part of the volatile thing, so the prompt's wording could
-   * move out from under it silently. This locator derives its search key from
-   * the evaluator's OWN response parser in the same file: the prompt must name
-   * every criterion the parser declares. Prompt and parser can now only drift
-   * apart loudly.
+   * THE VALUE ITSELF, pinned. Moving the prompt into a constant was a mechanism
+   * change and must NOT have been a product change: this is the digest the
+   * sealed registers already carry, so no deployment needs re-seeding. It is
+   * also the guard V's ruling actually needs — editing the prompt changes a
+   * sealed register value, and this test is where that becomes visible instead
+   * of silent.
    */
-  describe("the locator is tied to the prompt it claims to describe", () => {
-    const schema = (...keys: readonly string[]): string =>
-      `const evaluatorVerdictSchema = z.object({\n  criteria: z.object({\n`
-      + keys.map((key) => `    ${key}: z.boolean()`).join(",\n")
-      + `\n  }).strict()\n}).strict();\n`;
+  it("has NOT moved the sealed value — the prompt is byte-identical to what shipped", async () => {
+    expect(EVALUATOR_CONTRACT_TEXT.length).toBe(339);
+    expect(sha256(EVALUATOR_CONTRACT_TEXT))
+      .toBe("2364b1b548c0e5a4f758ef325ed0234764aec9f88bc340a1f8c958bd3cc69b73");
+  });
 
-    it("finds the one prompt that names every criterion the parser declares", () => {
-      const source = schema("alpha", "beta")
-        + `{ role: "system", content: "Return only JSON naming alpha and beta." },\n`
-        + `{ role: "system", content: "Return only JSON with a segments array of things." },\n`;
-      expect(extractEvaluatorContractText(source, "TEST")).toBe("Return only JSON naming alpha and beta.");
-    });
+  it("keeps the writer's prompt in its own slot — evaluator ALONE (V 2026-09-04)", async () => {
+    const runner = await sourceOf("apps/runner/src/index.ts");
+    const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
+    const composer = runner.match(/content: "(Return only JSON with a segments array[^"]+)"/)?.[1];
+    expect(composer).toBeDefined();
+    expect(acceptance.conformanceContractHash).not.toBe(acceptance.composerContractHash);
+    expect(acceptance.conformanceContractHash).not.toBe(sha256(composer!));
+    expect(acceptance.conformanceContractHash).not.toBe(sha256([composer, EVALUATOR_CONTRACT_TEXT].join("\n")));
+  });
 
-    it("REFUSES when the prompt stops naming a criterion the parser still declares", () => {
-      const source = schema("alpha", "beta", "gamma")
-        + `{ role: "system", content: "Return only JSON naming alpha and beta." },\n`;
-      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
-    });
+  /**
+   * THE THING HASHED IS THE THING SENT. A fingerprint over a constant proves
+   * nothing if the wire still carries a literal, so the evaluator call site must
+   * reference the constant and no `Return only JSON {satisfied` literal may
+   * survive anywhere in the runner.
+   */
+  it("SENDS the constant it fingerprints — no literal survives at the call site", async () => {
+    const runner = await sourceOf("apps/runner/src/index.ts");
+    expect(runner).toContain('{ role: "system", content: EVALUATOR_CONTRACT_TEXT },');
+    const literals = [...runner.matchAll(/content: "Return only JSON \{satisfied/g)];
+    expect(literals).toHaveLength(0);
+  });
 
-    it("REFUSES when two prompts both name every criterion, rather than guessing", () => {
-      const source = schema("alpha")
-        + `{ role: "system", content: "First prompt naming alpha." },\n`
-        + `{ role: "system", content: "Second prompt naming alpha." },\n`;
-      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
-    });
+  /**
+   * THE REGRESSION GUARD FOR THE WHOLE DEFECT CLASS. Every one of the three
+   * dead locators worked by SEARCHING the runner's source for the prompt. This
+   * fails if any seeder starts doing that again — which is the only way the
+   * lexical attacks (string, comment, regex, template literal,
+   * commented-anchor-plus-rename, decoy order) can come back, since none of them
+   * is expressible against an imported constant.
+   */
+  it("NEITHER seeder searches the runner source for the evaluator prompt", async () => {
+    for (const relative of ["acceptance/seed-register.ts", "apps/runner/src/dev-deployment-register.ts"]) {
+      const source = await sourceOf(relative);
+      expect(source).toContain("EVALUATOR_CONTRACT_TEXT");
+      expect(source).not.toMatch(/criteria\s*:\s*z\.object/);
+      expect(source).not.toContain("balancedObjectBody");
+      expect(source).not.toContain("evaluatorVerdictSchema");
+      expect(source).not.toMatch(/Return only JSON \\\{/);
+    }
+  });
 
-    it("REFUSES when the parser declares no criteria at all", () => {
-      const source = `{ role: "system", content: "Return only JSON naming alpha." },\n`;
-      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
-    });
-
-    /**
-     * B1, found by codex r1 and reproduced before this test was written. The
-     * first locator took the FIRST object in the file carrying a `criteria`
-     * member, so an unrelated schema declared EARLIER captured it: the
-     * extractor returned `Unrelated system prompt naming alpha.` and exited 0,
-     * fingerprinting a non-evaluator prompt while looking healthy. That is the
-     * same shape as the defect this whole ticket repairs — succeeding on the
-     * wrong thing is worse than failing loudly.
-     *
-     * ORDER IS THE WHOLE TEST. The decoy must come FIRST; placed after the real
-     * schema it proves nothing, because the unanchored locator would have
-     * returned the right answer by accident.
-     */
-    const decoyFirst = (): string =>
-      `const unrelatedSchema = z.object({\n`
-      + `  criteria: z.object({ alpha: z.boolean() }).strict()\n`
-      + `}).strict();\n`
-      + `{ role: "system", content: "Unrelated system prompt naming alpha." },\n`
-      + schema("fairness", "tracing")
-      + `{ role: "system", content: "Return only JSON naming fairness and tracing." },\n`;
-
-    it("is NOT redirected by an unrelated criteria schema declared BEFORE the evaluator's", () => {
-      expect(extractEvaluatorContractText(decoyFirst(), "TEST"))
-        .toBe("Return only JSON naming fairness and tracing.");
-      expect(extractEvaluatorContractTextDev(decoyFirst(), "TEST"))
-        .toBe("Return only JSON naming fairness and tracing.");
-    });
-
-    it("REFUSES when no evaluator verdict schema exists to anchor on", () => {
-      const source = `const unrelatedSchema = z.object({\n`
-        + `  criteria: z.object({ alpha: z.boolean() }).strict()\n`
-        + `}).strict();\n`
-        + `{ role: "system", content: "Unrelated system prompt naming alpha." },\n`;
-      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
-    });
-
-    it("REFUSES when the anchor is ambiguous — two evaluator verdict schemas", () => {
-      const source = schema("alpha") + schema("alpha")
-        + `{ role: "system", content: "Return only JSON naming alpha." },\n`;
-      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
-    });
-
-    it("REFUSES when the anchored schema declares no boolean criteria", () => {
-      const source = `const evaluatorVerdictSchema = z.object({\n`
-        + `  criteria: z.object({ note: z.string() }).strict()\n`
-        + `}).strict();\n`
-        + `{ role: "system", content: "Return only JSON naming note." },\n`;
-      expect(() => extractEvaluatorContractText(source, "TEST")).toThrow(/TEST/);
-    });
+  it("keeps ONE definition — F-SEALEDROWS-C closed, not merely pinned by test", async () => {
+    const runner = await sourceOf("apps/runner/src/index.ts");
+    expect([...runner.matchAll(/export const EVALUATOR_CONTRACT_TEXT/g)]).toHaveLength(1);
+    for (const relative of ["acceptance/seed-register.ts", "apps/runner/src/dev-deployment-register.ts"]) {
+      const source = await sourceOf(relative);
+      expect(source).toMatch(/import \{ EVALUATOR_CONTRACT_TEXT \} from/);
+    }
   });
 });

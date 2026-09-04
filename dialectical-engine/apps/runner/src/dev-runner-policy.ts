@@ -10,7 +10,7 @@ import {
   type CompositionMapRegisterRow
 } from "@debateai/register";
 import type { JudgementSelectionRule } from "@debateai/judgement";
-import type { CompositionBudgetResolution, SealedBandCeilingRegisterRow } from "@debateai/serve";
+import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import type {
   RunDeathPolicy,
   RunnerPanelPolicy,
@@ -99,7 +99,7 @@ export interface DevelopmentRunnerPolicy {
   readonly bounds: z.infer<typeof runnerRowsSchema>["acceptanceOrganCostBounds"]["organs"];
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
   readonly candidateConfidenceBand: string;
-  readonly bandCeiling: SealedBandCeilingRegisterRow;
+  readonly bandCeiling: BandCeilingRegisterRow;
   readonly judgementPolicy: {
     readonly selectionRule: JudgementSelectionRule;
     readonly earnedWeight: number;

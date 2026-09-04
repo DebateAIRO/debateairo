@@ -8,7 +8,7 @@ import {
   type CompositionMapRegisterRow,
   type EnvelopeFormulaInputs
 } from "@debateai/register";
-import type { CompositionBudgetResolution, SealedBandCeilingRegisterRow } from "@debateai/serve";
+import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
   ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
@@ -105,7 +105,7 @@ export interface AcceptanceRuntimePolicy {
   readonly compositionRow: CompositionMapRegisterRow;
   readonly bounds: z.infer<typeof runtimeRowsSchema>["acceptanceOrganCostBounds"]["organs"];
   readonly compositionBudgets: Readonly<Record<"low" | "medium" | "high", CompositionBudgetResolution>>;
-  readonly bandCeiling: SealedBandCeilingRegisterRow;
+  readonly bandCeiling: BandCeilingRegisterRow;
   readonly panelDiscoveryPolicy: {
     readonly probeFreshnessMs: 600_000;
     readonly probeMaxAttempts: 1;
