@@ -10,6 +10,17 @@ import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import type { Expression, Node } from "typescript/unstable/ast";
+import {
+  isCallExpression,
+  isElementAccessExpression,
+  isFunctionLikeDeclaration,
+  isIdentifier,
+  isNewExpression,
+  isPropertyAccessExpression,
+  isTypeNode,
+} from "typescript/unstable/ast/is";
+import { API as TypeScriptApi } from "typescript/unstable/sync";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
@@ -55,6 +66,11 @@ const TYPESCRIPT_COMPILER_PATH = resolve(
   import.meta.dirname,
   "../../node_modules/typescript/bin/tsc",
 );
+const POLICY_AUTHORITY_SOURCE_PATHS = [
+  resolve(import.meta.dirname, "../../tools/obs-listener/policy/loader.ts"),
+  resolve(import.meta.dirname, "../../tools/obs-listener/policy/canonical.ts"),
+  resolve(import.meta.dirname, "../../tools/obs-listener/policy/custodian.ts"),
+] as const;
 
 function expectFrozenOwnDataSnapshot(actual: unknown, expected: unknown): void {
   if (Array.isArray(expected)) {
@@ -1205,6 +1221,269 @@ describe("FIX-09 C1 policy bundle", () => {
       });
     },
   );
+
+  it.each([
+    { ownerExpression: "Reflect", helperName: "deleteProperty" },
+    { ownerExpression: "Number", helperName: "isSafeInteger" },
+    { ownerExpression: "Array", helperName: "isArray" },
+    { ownerExpression: "JSON", helperName: "stringify" },
+  ] as const)(
+    "does not run a live $ownerExpression $helperName callback before custodian authentication",
+    ({ ownerExpression, helperName }) => {
+      const repositoryRoot = resolve(import.meta.dirname, "../..");
+      const loaderUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+      ).href;
+      const custodianUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+      ).href;
+      const canonicalUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+      ).href;
+      const script = `
+      import { readFileSync } from "node:fs";
+      await import(${JSON.stringify(loaderUrl)});
+      const { repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const owner = ${ownerExpression};
+      const helperName = ${JSON.stringify(helperName)};
+      const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      const defineProperty = Object.defineProperty;
+      const apply = Reflect.apply;
+      const descriptor = apply(getOwnPropertyDescriptor, Object, [
+        owner,
+        helperName,
+      ]);
+      if (
+        !descriptor ||
+        !("value" in descriptor) ||
+        typeof descriptor.value !== "function"
+      ) {
+        throw new Error("AMBIENT_AUTHORITY_HELPER_MISSING");
+      }
+      const original = descriptor.value;
+      let callbackCalls = 0;
+      let escaped = null;
+      let repinError = null;
+      let repinned;
+      let hash;
+      try {
+        defineProperty(owner, helperName, {
+          ...descriptor,
+          value: function (...args) {
+            callbackCalls += 1;
+            environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+            defineProperty(owner, helperName, descriptor);
+            return apply(original, this, args);
+          },
+        });
+        try {
+          repinned = repin(bundle, {
+            token: "wrong",
+            next_bundle: armed,
+          }, environment);
+        } catch (error) {
+          repinError = error instanceof Error
+            ? { code: error.code, message: error.message, name: error.name }
+            : { code: null, message: String(error), name: typeof error };
+        }
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error instanceof Error ? error.message : String(error);
+      } finally {
+        defineProperty(owner, helperName, descriptor);
+      }
+      const restored = apply(getOwnPropertyDescriptor, Object, [
+        owner,
+        helperName,
+      ]);
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        descriptorRestored:
+          restored?.configurable === descriptor.configurable &&
+          restored?.enumerable === descriptor.enumerable &&
+          restored?.value === descriptor.value &&
+          restored?.writable === descriptor.writable,
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        escaped,
+        hash,
+        quickArm: repinned?.quick_arm ?? null,
+        refused: repinError?.code === "REPIN_REFUSED",
+      }));
+    `;
+      const outcome = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", script],
+        { cwd: repositoryRoot, encoding: "utf8" },
+      );
+
+      expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toEqual({
+        callbackCalls: 0,
+        descriptorRestored: true,
+        environment: "correct",
+        escaped: null,
+        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        quickArm: null,
+        refused: true,
+      });
+    },
+  );
+
+  it("retains no uncaptured ambient authority member or constructor", () => {
+    const ambientCallableRoots = new Set([
+      "Array",
+      "ArrayBuffer",
+      "AbortController",
+      "AbortSignal",
+      "AggregateError",
+      "Atomics",
+      "BigInt",
+      "BigInt64Array",
+      "BigUint64Array",
+      "Boolean",
+      "Buffer",
+      "DataView",
+      "Date",
+      "DOMException",
+      "Error",
+      "EvalError",
+      "FinalizationRegistry",
+      "Float32Array",
+      "Float64Array",
+      "Function",
+      "Int8Array",
+      "Int16Array",
+      "Int32Array",
+      "Intl",
+      "JSON",
+      "Map",
+      "Math",
+      "Number",
+      "Object",
+      "Promise",
+      "Proxy",
+      "RangeError",
+      "ReferenceError",
+      "Reflect",
+      "RegExp",
+      "Set",
+      "SharedArrayBuffer",
+      "String",
+      "Symbol",
+      "SyntaxError",
+      "TypeError",
+      "URIError",
+      "Uint8Array",
+      "Uint8ClampedArray",
+      "Uint16Array",
+      "Uint32Array",
+      "WeakMap",
+      "WeakRef",
+      "WeakSet",
+      "WebAssembly",
+      "URL",
+      "URLSearchParams",
+      "TextDecoder",
+      "TextEncoder",
+      "clearImmediate",
+      "clearInterval",
+      "clearTimeout",
+      "decodeURI",
+      "decodeURIComponent",
+      "encodeURI",
+      "encodeURIComponent",
+      "eval",
+      "fetch",
+      "isFinite",
+      "isNaN",
+      "parseFloat",
+      "parseInt",
+      "queueMicrotask",
+      "setImmediate",
+      "setInterval",
+      "setTimeout",
+      "structuredClone",
+    ]);
+    const rootIdentifier = (expression: Expression): string | null => {
+      if (isIdentifier(expression)) return expression.text;
+      if (
+        isPropertyAccessExpression(expression) ||
+        isElementAccessExpression(expression)
+      ) {
+        return rootIdentifier(expression.expression);
+      }
+      return null;
+    };
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const api = new TypeScriptApi({ cwd: repositoryRoot });
+    const violations = new Set<string>();
+
+    try {
+      const snapshot = api.updateSnapshot({
+        openProjects: [resolve(repositoryRoot, "tsconfig.json")],
+      });
+      const project = snapshot.getProjects()[0];
+      if (project === undefined) throw new Error("TYPESCRIPT_PROJECT_MISSING");
+
+      for (const sourcePath of POLICY_AUTHORITY_SOURCE_PATHS) {
+        const sourceFile = project.program.getSourceFile(sourcePath);
+        if (sourceFile === undefined) {
+          throw new Error(`TYPESCRIPT_SOURCE_MISSING:${sourcePath}`);
+        }
+        const record = (node: Node, expression: Expression): void => {
+          const root = rootIdentifier(expression);
+          if (root === null || !ambientCallableRoots.has(root)) return;
+          const location = sourceFile.getLineAndCharacterOfPosition(
+            node.getStart(sourceFile),
+          );
+          violations.add(`${sourcePath}:${location.line + 1}:${root}`);
+        };
+        const isTypePosition = (node: Node): boolean => {
+          let current = node.parent;
+          while (current !== undefined && current !== sourceFile) {
+            if (isTypeNode(current)) return true;
+            current = current.parent;
+          }
+          return false;
+        };
+        const visit = (node: Node, functionDepth = 0): void => {
+          if (
+            isPropertyAccessExpression(node) ||
+            isElementAccessExpression(node)
+          ) {
+            record(node, node);
+          } else if (isCallExpression(node) || isNewExpression(node)) {
+            record(node, node.expression);
+          } else if (
+            functionDepth > 0 &&
+            isIdentifier(node) &&
+            ambientCallableRoots.has(node.text) &&
+            !isTypePosition(node) &&
+            !(
+              isPropertyAccessExpression(node.parent) &&
+              node.parent.name === node
+            )
+          ) {
+            record(node, node);
+          }
+          const childFunctionDepth = functionDepth +
+            (isFunctionLikeDeclaration(node) ? 1 : 0);
+          node.forEachChild((child) => visit(child, childFunctionDepth));
+        };
+        visit(sourceFile);
+      }
+    } finally {
+      api.close();
+    }
+
+    expect([...violations].sort()).toEqual([]);
+  });
 
   it("does not trust live Atomics results as declared-schema authority", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<

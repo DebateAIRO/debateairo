@@ -7,6 +7,21 @@ import { createContext, runInContext, runInNewContext } from "node:vm";
 import { canonicalJson, canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
+const ARRAY = Array;
+const MAIN_ERROR = Error;
+const NUMBER = Number;
+const TO_STRING = String;
+const SYMBOL = Symbol;
+const {
+  isArray: ARRAY_IS_ARRAY,
+  prototype: ARRAY_PROTOTYPE,
+} = ARRAY;
+const {
+  isFinite: NUMBER_IS_FINITE,
+  isInteger: NUMBER_IS_INTEGER,
+  isSafeInteger: NUMBER_IS_SAFE_INTEGER,
+} = NUMBER;
+const ARRAY_ITERATOR = SYMBOL.iterator;
 const {
   create: CREATE_OBJECT,
   defineProperty: DEFINE_PROPERTY,
@@ -20,19 +35,19 @@ const {
 } = Object;
 const IS_PROXY = isProxy;
 const BASE_ARRAY_SOME = GET_OWN_PROPERTY_DESCRIPTOR(
-  Array.prototype,
+  ARRAY_PROTOTYPE,
   "some",
 );
 const BASE_ARRAY_SORT = GET_OWN_PROPERTY_DESCRIPTOR(
-  Array.prototype,
+  ARRAY_PROTOTYPE,
   "sort",
 );
 const BASE_ARRAY_ITERATOR = GET_OWN_PROPERTY_DESCRIPTOR(
-  Array.prototype,
-  Symbol.iterator,
+  ARRAY_PROTOTYPE,
+  ARRAY_ITERATOR,
 );
 const BASE_ARRAY_PUSH = GET_OWN_PROPERTY_DESCRIPTOR(
-  Array.prototype,
+  ARRAY_PROTOTYPE,
   "push",
 );
 const isNativeArrayPush = runInNewContext(`
@@ -64,7 +79,7 @@ const BASE_OBJECT_SORT = GET_OWN_PROPERTY_DESCRIPTOR(
 );
 const BASE_OBJECT_ITERATOR = GET_OWN_PROPERTY_DESCRIPTOR(
   OBJECT_PROTOTYPE,
-  Symbol.iterator,
+  ARRAY_ITERATOR,
 );
 
 type Severity = "INFO" | "DEGRADED" | "SEVERE" | "FATAL";
@@ -410,7 +425,7 @@ function pathIsWithin(path: string, directory: string): boolean {
 
 function createPrivateZodValidator(): PrivateZodValidator {
   if (ZOD_DIRECTORY === null || ZOD_ENTRY === null) {
-    throw new Error("ZOD_PRIVATE_MODULE_UNAVAILABLE");
+    throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_UNAVAILABLE");
   }
   const context = CREATE_CONTEXT(CREATE_OBJECT(null), {
     codeGeneration: { strings: false, wasm: false },
@@ -422,7 +437,7 @@ function createPrivateZodValidator(): PrivateZodValidator {
 
   const loadPrivateCommonJs = (filename: string): unknown => {
     if (!pathIsWithin(filename, ZOD_DIRECTORY)) {
-      throw new Error("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
+      throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
     }
     if (HAS_OWN(moduleCache, filename)) {
       return moduleCache[filename]?.exports;
@@ -442,7 +457,7 @@ function createPrivateZodValidator(): PrivateZodValidator {
         specifier[0] !== "." ||
         (specifier[1] !== "/" && specifier[1] !== ".")
       ) {
-        throw new Error("ZOD_PRIVATE_MODULE_SPECIFIER_INVALID");
+        throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_SPECIFIER_INVALID");
       }
       return loadPrivateCommonJs(
         RESOLVE_PATH(DIRNAME(filename), specifier),
@@ -478,7 +493,7 @@ function createPrivateZodValidator(): PrivateZodValidator {
   ) as (z: unknown) => unknown;
   const validator = makeValidator(zodExports.z);
   if (typeof validator !== "function") {
-    throw new Error("ZOD_PRIVATE_VALIDATOR_INVALID");
+    throw new MAIN_ERROR("ZOD_PRIVATE_VALIDATOR_INVALID");
   }
   return validator as PrivateZodValidator;
 }
@@ -505,14 +520,14 @@ function validateWithDeclaredSchema(serialized: string): boolean {
 }
 
 type SnapshotRecord = Record<string, unknown>;
-const INVALID_ARRAY_ITEM = Symbol("INVALID_ARRAY_ITEM");
+const INVALID_ARRAY_ITEM = SYMBOL("INVALID_ARRAY_ITEM");
 
 function ownArrayLength(value: readonly unknown[]): number | null {
   const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, "length");
   if (
     descriptor === undefined ||
     !HAS_OWN(descriptor, "value") ||
-    !Number.isSafeInteger(descriptor.value) ||
+    !NUMBER_IS_SAFE_INTEGER(descriptor.value) ||
     descriptor.value < 0
   ) {
     return null;
@@ -524,7 +539,7 @@ function ownArrayItem(
   value: readonly unknown[],
   index: number,
 ): unknown | typeof INVALID_ARRAY_ITEM {
-  const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, String(index));
+  const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, TO_STRING(index));
   if (
     descriptor === undefined ||
     !HAS_OWN(descriptor, "value") ||
@@ -598,7 +613,7 @@ function exactSnapshotRecord(
     value === null ||
     typeof value !== "object" ||
     IS_PROXY(value) ||
-    Array.isArray(value) ||
+    ARRAY_IS_ARRAY(value) ||
     GET_PROTOTYPE_OF(value) !== null
   ) {
     return false;
@@ -630,7 +645,7 @@ function snapshotArrayOf(
     value === null ||
     typeof value !== "object" ||
     IS_PROXY(value) ||
-    !Array.isArray(value)
+    !ARRAY_IS_ARRAY(value)
   ) {
     return false;
   }
@@ -732,7 +747,7 @@ function registerKey(value: unknown): value is string {
 function pinnedSet(value: unknown): boolean {
   return exactSnapshotRecord(value, ["count", "sha256"]) &&
     typeof value.count === "number" &&
-    Number.isInteger(value.count) &&
+    NUMBER_IS_INTEGER(value.count) &&
     value.count >= 0 &&
     sha256(value.sha256);
 }
@@ -810,7 +825,7 @@ function severityMap(value: unknown): boolean {
     value.overrides === null ||
     typeof value.overrides !== "object" ||
     IS_PROXY(value.overrides) ||
-    Array.isArray(value.overrides) ||
+    ARRAY_IS_ARRAY(value.overrides) ||
     GET_PROTOTYPE_OF(value.overrides) !== null
   ) {
     return false;
@@ -908,7 +923,7 @@ function registerSeeds(value: unknown): boolean {
       registerKey(seed.key) &&
       (seed.value === null ||
         typeof seed.value === "string" ||
-        (typeof seed.value === "number" && Number.isFinite(seed.value))) &&
+        (typeof seed.value === "number" && NUMBER_IS_FINITE(seed.value))) &&
       (seed.status === "SEED" || seed.status === "UNSET") &&
       typeof seed.source_ref === "string" &&
       seed.source_ref.length > 0,
@@ -1075,11 +1090,11 @@ function schemaFailure(cause: unknown): PolicyBundleParseResult {
 }
 
 function isCanonicalArrayIndex(key: string): boolean {
-  const index = Number(key);
-  return Number.isInteger(index) &&
+  const index = NUMBER(key);
+  return NUMBER_IS_INTEGER(index) &&
     index >= 0 &&
     index < 0xffff_ffff &&
-    String(index) === key;
+    TO_STRING(index) === key;
 }
 
 function hasNumericArrayPrototypePollution(): boolean {
@@ -1093,7 +1108,7 @@ function hasNumericArrayPrototypePollution(): boolean {
     }
     return false;
   };
-  return prototypeHasNumericKey(Array.prototype) ||
+  return prototypeHasNumericKey(ARRAY_PROTOTYPE) ||
     prototypeHasNumericKey(OBJECT_PROTOTYPE);
 }
 
@@ -1130,19 +1145,19 @@ function sameDescriptor(
 function hasArrayAuthorityPrototypeMutation(): boolean {
   return !BASE_ARRAY_PUSH_IS_TRUSTED ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, "push"),
+      GET_OWN_PROPERTY_DESCRIPTOR(ARRAY_PROTOTYPE, "push"),
       BASE_ARRAY_PUSH,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, "some"),
+      GET_OWN_PROPERTY_DESCRIPTOR(ARRAY_PROTOTYPE, "some"),
       BASE_ARRAY_SOME,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, "sort"),
+      GET_OWN_PROPERTY_DESCRIPTOR(ARRAY_PROTOTYPE, "sort"),
       BASE_ARRAY_SORT,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, Symbol.iterator),
+      GET_OWN_PROPERTY_DESCRIPTOR(ARRAY_PROTOTYPE, ARRAY_ITERATOR),
       BASE_ARRAY_ITERATOR,
     ) ||
     !sameDescriptor(
@@ -1154,7 +1169,7 @@ function hasArrayAuthorityPrototypeMutation(): boolean {
       BASE_OBJECT_SORT,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(OBJECT_PROTOTYPE, Symbol.iterator),
+      GET_OWN_PROPERTY_DESCRIPTOR(OBJECT_PROTOTYPE, ARRAY_ITERATOR),
       BASE_OBJECT_ITERATOR,
     );
 }

@@ -3,6 +3,20 @@ import { isProxy } from "node:util/types";
 
 const HASH = nodeHash;
 const IS_PROXY = isProxy;
+const ARRAY = Array;
+const NUMBER = Number;
+const TO_STRING = String;
+const TYPE_ERROR = TypeError;
+const {
+  isArray: ARRAY_IS_ARRAY,
+  prototype: ARRAY_PROTOTYPE,
+} = ARRAY;
+const {
+  isFinite: NUMBER_IS_FINITE,
+  isSafeInteger: NUMBER_IS_SAFE_INTEGER,
+} = NUMBER;
+const { stringify: JSON_STRINGIFY } = JSON;
+const { deleteProperty: DELETE_PROPERTY } = Reflect;
 const {
   create: CREATE_OBJECT,
   defineProperty: DEFINE_PROPERTY,
@@ -26,7 +40,7 @@ export type CanonicalJsonValue =
   | { readonly [key: string]: CanonicalJsonValue };
 
 function nonPlainJsonData(): never {
-  throw new TypeError("CANONICAL_JSON_NON_PLAIN_DATA");
+  throw new TYPE_ERROR("CANONICAL_JSON_NON_PLAIN_DATA");
 }
 
 function dataPropertyValue(
@@ -67,7 +81,7 @@ function arrayLength(descriptor: PropertyDescriptor | undefined): number {
     return nonPlainJsonData();
   }
   const value = descriptor.value;
-  if (!Number.isSafeInteger(value) || value < 0) return nonPlainJsonData();
+  if (!NUMBER_IS_SAFE_INTEGER(value) || value < 0) return nonPlainJsonData();
   return value;
 }
 
@@ -83,7 +97,7 @@ function activeContains(active: readonly object[], candidate: object): boolean {
   const length = ownArrayLength(active);
   for (let index = 0; index < length; index += 1) {
     if (dataPropertyValue(
-      GET_OWN_PROPERTY_DESCRIPTOR(active, String(index)),
+      GET_OWN_PROPERTY_DESCRIPTOR(active, TO_STRING(index)),
     ) === candidate) {
       return true;
     }
@@ -92,7 +106,7 @@ function activeContains(active: readonly object[], candidate: object): boolean {
 }
 
 function activePush(active: object[], candidate: object): void {
-  DEFINE_PROPERTY(active, String(ownArrayLength(active)), {
+  DEFINE_PROPERTY(active, TO_STRING(ownArrayLength(active)), {
     configurable: true,
     enumerable: true,
     value: candidate,
@@ -103,13 +117,13 @@ function activePush(active: object[], candidate: object): void {
 function activePop(active: object[], candidate: object): void {
   const length = ownArrayLength(active);
   if (length === 0) return nonPlainJsonData();
-  const lastKey = String(length - 1);
+  const lastKey = TO_STRING(length - 1);
   if (dataPropertyValue(
     GET_OWN_PROPERTY_DESCRIPTOR(active, lastKey),
   ) !== candidate) {
     return nonPlainJsonData();
   }
-  if (!Reflect.deleteProperty(active, lastKey)) return nonPlainJsonData();
+  if (!DELETE_PROPERTY(active, lastKey)) return nonPlainJsonData();
   DEFINE_PROPERTY(active, "length", { value: length - 1 });
 }
 
@@ -126,8 +140,8 @@ function projectCanonical(
     return value;
   }
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      throw new TypeError("CANONICAL_JSON_NON_FINITE_NUMBER");
+    if (!NUMBER_IS_FINITE(value)) {
+      throw new TYPE_ERROR("CANONICAL_JSON_NON_FINITE_NUMBER");
     }
     return value;
   }
@@ -149,8 +163,8 @@ function projectCanonical(
     state.remainingNodes -= 1;
     activePush(state.active, value);
     try {
-      if (Array.isArray(value)) {
-        if (GET_PROTOTYPE_OF(value) !== Array.prototype) {
+      if (ARRAY_IS_ARRAY(value)) {
+        if (GET_PROTOTYPE_OF(value) !== ARRAY_PROTOTYPE) {
           return nonPlainJsonData();
         }
         if (ownArrayLength(GET_OWN_PROPERTY_SYMBOLS(value)) !== 0) {
@@ -163,7 +177,7 @@ function projectCanonical(
         const length = arrayLength(
           descriptorMapEntry(descriptors, "length"),
         );
-        const projection = new Array<CanonicalJsonValue>(length);
+        const projection = new ARRAY<CanonicalJsonValue>(length);
         if (
           ownArrayLength(GET_OWN_PROPERTY_NAMES(descriptors)) !==
             length + 1
@@ -171,7 +185,7 @@ function projectCanonical(
           return nonPlainJsonData();
         }
         for (let index = 0; index < length; index += 1) {
-          const key = String(index);
+          const key = TO_STRING(index);
           const item = projectCanonical(
             dataPropertyValue(
               descriptorMapEntry(descriptors, key),
@@ -221,7 +235,7 @@ function projectCanonical(
       activePop(state.active, value);
     }
   }
-  throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
+  throw new TYPE_ERROR("CANONICAL_JSON_UNSUPPORTED_VALUE");
 }
 
 export function canonicalProjection(value: unknown): CanonicalJsonValue {
@@ -252,19 +266,19 @@ function serializeJsonPrimitive(
   if (value === null) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      throw new TypeError("CANONICAL_JSON_NON_FINITE_NUMBER");
+    if (!NUMBER_IS_FINITE(value)) {
+      throw new TYPE_ERROR("CANONICAL_JSON_NON_FINITE_NUMBER");
     }
-    return OBJECT_IS(value, -0) ? "0" : String(value);
+    return OBJECT_IS(value, -0) ? "0" : TO_STRING(value);
   }
-  const encoded = JSON.stringify(value);
+  const encoded = JSON_STRINGIFY(value);
   if (encoded === undefined) return nonPlainJsonData();
   return encoded;
 }
 
 function ownStringAt(values: readonly string[], index: number): string {
   const value = dataPropertyValue(
-    GET_OWN_PROPERTY_DESCRIPTOR(values, String(index)),
+    GET_OWN_PROPERTY_DESCRIPTOR(values, TO_STRING(index)),
   );
   if (typeof value !== "string") return nonPlainJsonData();
   return value;
@@ -275,7 +289,7 @@ function defineOwnStringAt(
   index: number,
   value: string,
 ): void {
-  DEFINE_PROPERTY(values, String(index), {
+  DEFINE_PROPERTY(values, TO_STRING(index), {
     configurable: true,
     enumerable: true,
     value,
@@ -322,13 +336,13 @@ function serializeCanonical(value: unknown): string {
     return serializeJsonPrimitive(value);
   }
   if (typeof value !== "object") {
-    throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
+    throw new TYPE_ERROR("CANONICAL_JSON_UNSUPPORTED_VALUE");
   }
   if (ownArrayLength(GET_OWN_PROPERTY_SYMBOLS(value)) !== 0) {
     return nonPlainJsonData();
   }
 
-  if (Array.isArray(value)) {
+  if (ARRAY_IS_ARRAY(value)) {
     const length = arrayLength(
       GET_OWN_PROPERTY_DESCRIPTOR(value, "length"),
     );
@@ -339,7 +353,7 @@ function serializeCanonical(value: unknown): string {
     for (let index = 0; index < length; index += 1) {
       if (index !== 0) encoded += ",";
       encoded += serializeCanonical(dataPropertyValue(
-        GET_OWN_PROPERTY_DESCRIPTOR(value, String(index)),
+        GET_OWN_PROPERTY_DESCRIPTOR(value, TO_STRING(index)),
       ));
     }
     return `${encoded}]`;
@@ -351,7 +365,7 @@ function serializeCanonical(value: unknown): string {
   for (let index = 0; index < ownNameCount; index += 1) {
     const keyDescriptor = GET_OWN_PROPERTY_DESCRIPTOR(
       ownNames,
-      String(index),
+      TO_STRING(index),
     );
     const key = dataPropertyValue(keyDescriptor);
     if (typeof key !== "string") return nonPlainJsonData();

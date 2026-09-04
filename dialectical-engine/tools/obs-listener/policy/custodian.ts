@@ -12,6 +12,8 @@ import {
 const HASH = nodeHash;
 const TIMING_SAFE_EQUAL = nodeTimingSafeEqual;
 const IS_PROXY = isProxy;
+const { isSafeInteger: NUMBER_IS_SAFE_INTEGER } = Number;
+const TO_STRING = String;
 const {
   defineProperty: DEFINE_PROPERTY,
   getOwnPropertyDescriptor: GET_OWN_PROPERTY_DESCRIPTOR,
@@ -64,7 +66,7 @@ function ownArrayLength(value: readonly unknown[]): number | null {
   if (
     descriptor === undefined ||
     !HAS_OWN(descriptor, "value") ||
-    !Number.isSafeInteger(descriptor.value) ||
+    !NUMBER_IS_SAFE_INTEGER(descriptor.value) ||
     descriptor.value < 0
   ) {
     return null;
@@ -79,7 +81,7 @@ function arrayContainsIdentity(
   const length = ownArrayLength(values);
   if (length === null) return true;
   for (let index = 0; index < length; index += 1) {
-    const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(values, String(index));
+    const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(values, TO_STRING(index));
     if (
       descriptor === undefined ||
       !HAS_OWN(descriptor, "value") ||
@@ -94,7 +96,7 @@ function arrayContainsIdentity(
 function appendIdentity(values: object[], candidate: object): boolean {
   const length = ownArrayLength(values);
   if (length === null) return false;
-  DEFINE_PROPERTY(values, String(length), {
+  DEFINE_PROPERTY(values, TO_STRING(length), {
     configurable: true,
     enumerable: true,
     value: candidate,
