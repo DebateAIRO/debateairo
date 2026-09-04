@@ -886,11 +886,17 @@ function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): Co
     : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
 }
 
-function buildSchemaRepairPacket(packet: PromptPacket, parseError: string): PromptPacket {
+export function buildSchemaRepairPacket(packet: PromptPacket, _parseError: string): PromptPacket {
   return {
     messages: [...packet.messages, {
       role: "user",
-      content: `The previous response violated the declared JSON contract. Machine parse error: ${parseError}\nReturn a new response that follows the system schema exactly.`
+      content: [
+        "The prior provider response did not match the declared JSON contract.",
+        "code=PROVIDER_CONTENT_UNACCEPTED",
+        "safe_template_id=tpl.PROVIDER_CONTENT_UNACCEPTED",
+        "template_parameters={}",
+        "Return strict JSON that follows the system schema."
+      ].join("\n")
     }]
   };
 }
@@ -2700,6 +2706,69 @@ export function createPostgresProviderGateway(
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
     appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
   });
+  const canonicalUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+  const providerContext = (runId: string) => {
+    let zoneContext = false;
+    let workItemId: string | undefined;
+    let outerContext: unknown;
+    try {
+      outerContext = getObsContext();
+    } catch {
+      zoneContext = true;
+    }
+    if (outerContext !== undefined) {
+      if (outerContext === null || typeof outerContext !== "object") {
+        zoneContext = true;
+      } else {
+        try {
+          const zoneDescriptor = Object.getOwnPropertyDescriptor(outerContext, "zone_context");
+          zoneContext = zoneDescriptor === undefined
+            ? false
+            : Object.hasOwn(zoneDescriptor, "value")
+              && typeof zoneDescriptor.value === "boolean"
+              ? zoneDescriptor.value
+              : true;
+        } catch {
+          zoneContext = true;
+        }
+        try {
+          const workItemDescriptor = Object.getOwnPropertyDescriptor(outerContext, "work_item_ref");
+          if (workItemDescriptor !== undefined && Object.hasOwn(workItemDescriptor, "value")) {
+            const declaration = workItemDescriptor.value;
+            if (declaration !== null && typeof declaration === "object") {
+              const kindDescriptor = Object.getOwnPropertyDescriptor(declaration, "kind");
+              const valueDescriptor = Object.getOwnPropertyDescriptor(declaration, "value");
+              const absenceDescriptor = Object.getOwnPropertyDescriptor(declaration, "not_applicable");
+              if (kindDescriptor !== undefined
+                && Object.hasOwn(kindDescriptor, "value")
+                && kindDescriptor.value === "work_item"
+                && valueDescriptor !== undefined
+                && Object.hasOwn(valueDescriptor, "value")
+                && typeof valueDescriptor.value === "string"
+                && canonicalUuid.test(valueDescriptor.value)
+                && absenceDescriptor === undefined) {
+                workItemId = valueDescriptor.value;
+              }
+            }
+          }
+        } catch {
+          workItemId = undefined;
+        }
+      }
+    }
+
+    const runRef = declaredRef("run", runId);
+    if (workItemId !== undefined) {
+      const workItemRef = declaredRef("work_item", workItemId);
+      return zoneContext
+        ? Object.freeze({ run_ref: runRef, work_item_ref: workItemRef, zone_context: true })
+        : Object.freeze({ run_ref: runRef, work_item_ref: workItemRef });
+    }
+    return zoneContext
+      ? Object.freeze({ run_ref: runRef, zone_context: true })
+      : Object.freeze({ run_ref: runRef });
+  };
   return {
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
       if (request.runId === null) {
@@ -2708,6 +2777,7 @@ export function createPostgresProviderGateway(
           "Every provider content operation must be bound to one leased run"
         );
       }
+      const runId = request.runId;
       const claimsEvaluatorScope=request.lane==="evaluator"
         || request.callSiteKey.startsWith("evaluator.")
         || request.subjectItemId.startsWith("evaluator:");
@@ -2746,10 +2816,11 @@ export function createPostgresProviderGateway(
       if (remaining <= 0) {
         throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
       }
-      return http.call({
+      const providerRequest = {
         ...request,
         bound: { ...request.bound, maxAttempts: remaining }
-      });
+      };
+      return runWithObsContext(providerContext(runId), () => http.call(providerRequest));
       });
     }
   };

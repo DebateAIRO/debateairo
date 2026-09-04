@@ -8,6 +8,8 @@ import {
   createCaptureGapCounter,
   createCaptureHealth,
   createSharedRedactor,
+  declaredRef,
+  getObsContext,
   installCaptureEmitter,
   runWithObsContext,
   type CaptureQueueEntry,
@@ -211,13 +213,151 @@ describe("S06 runner task binding", () => {
 });
 
 describe("S06 provider gateway binding", () => {
-  it("captures one provider occurrence after the real gateway exhausts all attempts", async () => {
+  it.each([
+    ["a lawful inherited work item", () => {
+      let reads = 0;
+      const outer: Record<string, unknown> = {
+        run_ref: declaredRef("run", "550e8400-e29b-41d4-a716-446655440032"),
+        work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+        zone_context: false,
+      };
+      for (const field of ["asker_id", "session_id", "node_ref"] as const) {
+        Object.defineProperty(outer, field, {
+          get() {
+            reads += 1;
+            throw new Error(`GATEWAY_UNRELATED_GETTER_CALLED:${field}`);
+          },
+          enumerable: true,
+        });
+      }
+      return {
+        outer,
+        expected: {
+          run_ref: declaredRef("run", RUN_ID),
+          work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+        },
+        readCount: (): number => reads,
+      };
+    }],
+    ["a hostile work-item declaration accessor", () => {
+      let reads = 0;
+      const declaration: Record<string, unknown> = {
+        value: WORK_ITEM_ID,
+      };
+      Object.defineProperty(declaration, "kind", {
+        get() {
+          reads += 1;
+          throw new Error("GATEWAY_WORK_ITEM_KIND_GETTER_CALLED");
+        },
+        enumerable: true,
+      });
+      return {
+        outer: { work_item_ref: declaration },
+        expected: { run_ref: declaredRef("run", RUN_ID) },
+        readCount: (): number => reads,
+      };
+    }],
+    ["a noncanonical work-item value", () => ({
+      outer: {
+        work_item_ref: { kind: "work_item", value: WORK_ITEM_ID.toUpperCase() },
+      },
+      expected: { run_ref: declaredRef("run", RUN_ID) },
+      readCount: (): number => 0,
+    })],
+    ["no inherited work item", () => ({
+      outer: { node_ref: declaredRef("node", "550e8400-e29b-41d4-a716-446655440032") },
+      expected: { run_ref: declaredRef("run", RUN_ID) },
+      readCount: (): number => 0,
+    })],
+    ["an outer true zone", () => ({
+      outer: {
+        work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+        zone_context: true,
+      },
+      expected: {
+        run_ref: declaredRef("run", RUN_ID),
+        work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+        zone_context: true,
+      },
+      readCount: (): number => 0,
+    })],
+    ["a hostile zone accessor", () => {
+      let reads = 0;
+      const outer: Record<string, unknown> = {
+        work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+      };
+      Object.defineProperty(outer, "zone_context", {
+        get() {
+          reads += 1;
+          throw new Error("GATEWAY_ZONE_GETTER_CALLED");
+        },
+        enumerable: true,
+      });
+      return {
+        outer,
+        expected: {
+          run_ref: declaredRef("run", RUN_ID),
+          work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+          zone_context: true,
+        },
+        readCount: (): number => reads,
+      };
+    }],
+    ["a hostile zone descriptor trap", () => ({
+      outer: new Proxy({}, {
+        getOwnPropertyDescriptor() { throw new Error("GATEWAY_ZONE_DESCRIPTOR_TRAP"); },
+      }),
+      expected: {
+        run_ref: declaredRef("run", RUN_ID),
+        zone_context: true,
+      },
+      readCount: (): number => 0,
+    })],
+    ["a non-boolean zone value", () => ({
+      outer: {
+        work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+        zone_context: "true",
+      },
+      expected: {
+        run_ref: declaredRef("run", RUN_ID),
+        work_item_ref: declaredRef("work_item", WORK_ITEM_ID),
+        zone_context: true,
+      },
+      readCount: (): number => 0,
+    })],
+    ["a hostile work-item accessor", () => {
+      let reads = 0;
+      const outer: Record<string, unknown> = {};
+      Object.defineProperty(outer, "work_item_ref", {
+        get() {
+          reads += 1;
+          throw new Error("GATEWAY_WORK_ITEM_GETTER_CALLED");
+        },
+        enumerable: true,
+      });
+      return {
+        outer,
+        expected: { run_ref: declaredRef("run", RUN_ID) },
+        readCount: (): number => reads,
+      };
+    }],
+    ["an invalid work-item declaration", () => ({
+      outer: {
+        work_item_ref: declaredRef("run", WORK_ITEM_ID),
+        asker_id: "550e8400-e29b-41d4-a716-446655440032",
+        session_id: "550e8400-e29b-41d4-a716-446655440033",
+      },
+      expected: { run_ref: declaredRef("run", RUN_ID) },
+      readCount: (): number => 0,
+    })],
+  ] as const)("seeds a fresh provider context for %s", async (_name, makeCase) => {
+    const { outer, expected, readCount } = makeCase();
     let sequence = 0;
     const client = {
       async query(sql: string) {
         if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
         if (sql.includes("FROM core.run AS run") && sql.includes("run_id=ANY")) {
-          return { rows: [{ run_id: "run:provider-s06", live: true }] };
+          return { rows: [{ run_id: RUN_ID, live: true }] };
         }
         if (sql.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
         if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
@@ -266,10 +406,11 @@ describe("S06 provider gateway binding", () => {
       },
     } as unknown as Pool;
     const transportFailure = new Error("private provider transport detail");
+    const providerContexts: unknown[] = [];
     const fetchImplementation = vi.fn(async () => {
+      providerContexts.push(getObsContext());
       throw transportFailure;
     });
-    const captured = installRecordingEmitter();
     const gateway = createPostgresProviderGateway(pool, {
       endpoint: "http://127.0.0.1:1",
       model: "test/model",
@@ -279,11 +420,9 @@ describe("S06 provider gateway binding", () => {
 
     let observed: unknown;
     try {
-      await runWithObsContext({
-        work_item_ref: { kind: "work_item", value: "work:provider-s06" },
-      }, () => gateway.call({
-        runId: "run:provider-s06",
-        subjectItemId: "node:s06",
+      await runWithObsContext(outer, () => gateway.call({
+        runId: RUN_ID,
+        subjectItemId: "550e8400-e29b-41d4-a716-446655440034",
         callSiteKey: "JUDGE:s06",
         role: "JUDGE",
         lane: "served",
@@ -297,23 +436,44 @@ describe("S06 provider gateway binding", () => {
     }
 
     expect(observed).toMatchObject({ code: "PROVIDER_CALL_FAILED", attempts: 2 });
+    expect((observed as { cause?: unknown }).cause).toBe(transportFailure);
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
-    expect(captured).toHaveLength(1);
-    expect(captured[0]).toMatchObject({
-      kind: "envelope",
-      payload_ref: {
-        code: "PROVIDER_CALL_FAILED",
-        error: observed,
-        taxonomy_class: "PROVIDER_EXHAUSTED",
-        capture_point: "provider",
-        disposition: "THROWN",
-        source: "first_party",
-      },
-      ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:provider-s06" },
-        work_item_ref: { kind: "work_item", value: "work:provider-s06" },
-      },
-    });
+    expect(providerContexts).toHaveLength(2);
+    for (const context of providerContexts) {
+      expect(context === outer).toBe(false);
+      expect(context).toEqual(expected);
+      if ("zone_context" in expected) {
+        expect(createSharedRedactor({
+          environment: "test",
+          build_ref: "UNTRACKED-DEV:s06-gateway",
+          build_dirty: true,
+          runtime: "runner",
+          component: { process: "runner", package: "@debateai/runner" },
+          writer_identity: "s06-gateway-test",
+          redaction_policy_version: "g0",
+          allowlist_set_id: "g0-empty-parameters",
+        }).redact({
+          kind: "envelope",
+          payload_ref: {
+            code: "JUDGEMENT_POLICY_UNRESOLVED",
+            taxonomy_class: "JOB_FAILURE",
+            capture_point: "provider",
+            disposition: "THROWN",
+            source: "first_party",
+          },
+          ambient_context_ref: context as CaptureQueueEntry["ambient_context_ref"],
+        })).toMatchObject({
+          zone_context: true,
+          run_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+          work_item_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+          node_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+          attempt_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+          ledger_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+          at_seq_watermark: "UNKNOWN:DECLARED_KIND_REQUIRED",
+        });
+      }
+    }
+    expect(readCount()).toBe(0);
   });
 });
 
