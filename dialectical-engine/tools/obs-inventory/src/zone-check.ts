@@ -1,5 +1,6 @@
 import { posix } from "node:path";
 import * as ts from "typescript/unstable/ast";
+import type { Checker } from "typescript/unstable/sync";
 import { ZONE_MANIFEST } from "../../../packages/obs-capture/src/zone/manifest.js";
 
 export type ZoneImportSite = {
@@ -11,6 +12,9 @@ const GOVERNED_IMPORTER_PREFIXES = [
   "tools/obs-listener/",
   "acceptance/obs/",
 ] as const;
+
+const MANIFEST_PATH = "packages/obs-capture/src/zone/manifest.ts";
+const MANIFEST_LIST_PROPERTIES = new Set(["zone_path_prefixes", "compiled_alternate_prefixes"]);
 
 const ZONE_PREFIXES = [
   ...ZONE_MANIFEST.zone_path_prefixes,
@@ -109,8 +113,16 @@ function literalText(node: ts.Expression | undefined): string | null {
   return node !== undefined && ts.isStringLiteralLikeNode(node) ? node.text : null;
 }
 
-function collectRequireAliases(sourceFile: ts.SourceFile): ReadonlySet<string> {
-  const aliases = new Set(["require"]);
+function compilerSymbolId(checker: Checker, node: ts.Node): number | null {
+  return checker.getSymbolAtLocation(node)?.id ?? null;
+}
+
+function isUnshadowedRequire(identifier: ts.Identifier, checker: Checker): boolean {
+  return identifier.text === "require" && compilerSymbolId(checker, identifier) === null;
+}
+
+function collectRequireAliases(sourceFile: ts.SourceFile, checker: Checker): ReadonlySet<number> {
+  const aliases = new Set<number>();
   const declarations: ts.VariableDeclaration[] = [];
   const collect = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node)) declarations.push(node);
@@ -126,33 +138,77 @@ function collectRequireAliases(sourceFile: ts.SourceFile): ReadonlySet<string> {
         ts.isIdentifier(declaration.name)
         && declaration.initializer !== undefined
         && ts.isIdentifier(declaration.initializer)
-        && aliases.has(declaration.initializer.text)
-        && !aliases.has(declaration.name.text)
       ) {
-        aliases.add(declaration.name.text);
-        changed = true;
+        const initializer = declaration.initializer;
+        const initializerBinding = compilerSymbolId(checker, initializer);
+        const declaredBinding = compilerSymbolId(checker, declaration.name);
+        const aliasesRequire = isUnshadowedRequire(initializer, checker)
+          || (initializerBinding !== null && aliases.has(initializerBinding));
+        if (aliasesRequire && declaredBinding !== null && !aliases.has(declaredBinding)) {
+          aliases.add(declaredBinding);
+          changed = true;
+        }
       }
     }
   }
   return aliases;
 }
 
-function callSpecifier(node: ts.CallExpression, requireAliases: ReadonlySet<string>): string | null | undefined {
+function callSpecifier(
+  node: ts.CallExpression,
+  requireAliases: ReadonlySet<number>,
+  checker: Checker,
+): string | null | undefined {
   const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-  const isRequire = ts.isIdentifier(node.expression) && requireAliases.has(node.expression.text);
+  const isRequire = ts.isIdentifier(node.expression) && (
+    isUnshadowedRequire(node.expression, checker)
+    || (() => {
+      const binding = compilerSymbolId(checker, node.expression);
+      return binding !== null && requireAliases.has(binding);
+    })()
+  );
   if (!isDynamicImport && !isRequire) return undefined;
   return literalText(node.arguments[0]);
+}
+
+function propertyNameText(name: ts.PropertyName): string | null {
+  return ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) ? name.text : null;
+}
+
+function classificationLiterals(
+  node: ts.PropertyAssignment,
+): readonly (ts.StringLiteral | ts.NoSubstitutionTemplateLiteral)[] {
+  const property = propertyNameText(node.name);
+  if (property === null || !MANIFEST_LIST_PROPERTIES.has(property)) return [];
+  let initializer = node.initializer;
+  while (
+    ts.isParenthesizedExpression(initializer)
+    || ts.isAsExpression(initializer)
+    || ts.isTypeAssertion(initializer)
+    || ts.isSatisfiesExpression(initializer)
+  ) {
+    initializer = initializer.expression;
+  }
+  if (ts.isCallExpression(initializer) && initializer.arguments.length === 1) {
+    initializer = initializer.arguments[0] as ts.Expression;
+    while (ts.isAsExpression(initializer) || ts.isSatisfiesExpression(initializer)) {
+      initializer = initializer.expression;
+    }
+  }
+  if (!ts.isArrayLiteralExpression(initializer)) return [];
+  return initializer.elements.filter(ts.isStringLiteralLikeNode);
 }
 
 export function findZoneImports(
   sourceFile: ts.SourceFile,
   rawImporterPath: string,
+  checker: Checker,
   onCandidate: () => void = () => undefined,
 ): readonly ZoneImportSite[] {
   const importerPath = normalizeRepositoryPath(rawImporterPath);
   if (importerPath === null || !isGovernedImporter(importerPath)) return [];
 
-  const requireAliases = collectRequireAliases(sourceFile);
+  const requireAliases = collectRequireAliases(sourceFile, checker);
   const sites: ZoneImportSite[] = [];
   const record = (node: ts.Node, specifier: string | null): void => {
     onCandidate();
@@ -172,9 +228,16 @@ export function findZoneImports(
       && ts.isExternalModuleReference(node.moduleReference)
     ) {
       record(node, literalText(node.moduleReference.expression));
+    } else if (ts.isImportTypeNode(node)) {
+      const argument = node.argument;
+      record(node, ts.isLiteralTypeNode(argument) && ts.isStringLiteralLikeNode(argument.literal)
+        ? argument.literal.text
+        : null);
     } else if (ts.isCallExpression(node)) {
-      const specifier = callSpecifier(node, requireAliases);
+      const specifier = callSpecifier(node, requireAliases, checker);
       if (specifier !== undefined) record(node, specifier);
+    } else if (ts.isPropertyAssignment(node) && importerPath !== MANIFEST_PATH) {
+      for (const literal of classificationLiterals(node)) record(literal, literal.text);
     }
     node.forEachChild(visit);
   };

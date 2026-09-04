@@ -8,7 +8,7 @@ const load = require;
 const aliasedModule = load("../../../apps/api/src/mfa.js#legacy");
 import registrationModule = require("../../../apps/api/src/../src/registration.js");
 void registrationAlias;
-void dynamicModule;
+void dynamicModule.catch(() => undefined);
 void legacyModule;
 void aliasedModule;
 void registrationModule;

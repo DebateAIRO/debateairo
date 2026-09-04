@@ -1,4 +1,5 @@
-import { readFile, readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -42,6 +43,72 @@ describe("FIX-16 C1 inventory scanner", () => {
     ]);
   });
 
+  it("distinguishes discarded PromiseLike values from synchronous void calls", () => {
+    const source = [
+      "function synchronous(): void {}",
+      "async function pendingCall(): Promise<void> {}",
+      "declare const pendingValue: Promise<void>;",
+      "declare const pendingLike: PromiseLike<void>;",
+      "declare const fakeThen: { readonly then: string };",
+      "declare function observe(error: unknown): void;",
+      "void synchronous();",
+      "void pendingCall();",
+      "void pendingValue;",
+      "void pendingLike;",
+      "void fakeThen;",
+      "void pendingCall().catch(observe);",
+    ].join("\n");
+
+    expect(scanSource(source, "apps/example/src/promises.ts")).toEqual([
+      { path: "apps/example/src/promises.ts", line: 8, class: "void_promise" },
+      { path: "apps/example/src/promises.ts", line: 9, class: "void_promise" },
+      { path: "apps/example/src/promises.ts", line: 10, class: "void_promise" },
+    ]);
+  });
+
+  it("flags arbitrary identifier and property throws while preserving coded throws and caught rethrows", () => {
+    const source = [
+      'const message = "ordinary text";',
+      "const holder = { message };",
+      'const DECLARED_CODE = "DECLARED_CODE";',
+      "declare const registry: { readonly DOMAIN_FAILED: unknown };",
+      "const codedError = new Error(DECLARED_CODE);",
+      "try { task(); } catch (caught) { throw caught; }",
+      "throw message;",
+      "throw holder.message;",
+      "throw new Error(DECLARED_CODE);",
+      "throw registry.DOMAIN_FAILED;",
+      "throw codedError;",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/throws.ts")).toEqual([
+      { path: "packages/example/src/throws.ts", line: 7, class: "throw_without_code" },
+      { path: "packages/example/src/throws.ts", line: 8, class: "throw_without_code" },
+    ]);
+  });
+
+  it("does not treat transformed caught values or shadowed aliases as preserved causes", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "const Wrapper = DomainError;",
+      "try { task(); } catch (caught) {",
+      "  const root = caught;",
+      "  const booleanOnly = Boolean(caught);",
+      '  new Wrapper("WRAP_FAILED", "fixed", { cause: root });',
+      '  new Wrapper("WRAP_FAILED", "fixed", { cause: booleanOnly });',
+      "  {",
+      "    const root = unrelated;",
+      '    new Wrapper("WRAP_FAILED", "fixed", { cause: root });',
+      "  }",
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/cause-lineage.ts")).toEqual([
+      { path: "packages/example/src/cause-lineage.ts", line: 7, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-lineage.ts", line: 10, class: "wrapper_without_cause" },
+    ]);
+  });
+
   it("recognises static imports, re-exports, dynamic imports, require aliases and normalized paths", async () => {
     const findings = await scan(join(fixtureRoot, "zone"));
 
@@ -61,6 +128,14 @@ describe("FIX-16 C1 inventory scanner", () => {
 
     expect(scanSource(source, "packages\\obs-capture\\src\\deeper\\importer.ts")).toEqual([
       { path: "packages/obs-capture/src/deeper/importer.ts", line: 1, class: "zone_import" },
+    ]);
+  });
+
+  it("classifies TypeScript import-type nodes without reading the target", () => {
+    const source = 'type Registration = import("apps/api/src/registration.ts").Registration;';
+
+    expect(scanSource(source, "packages/obs-capture/src/types.ts")).toEqual([
+      { path: "packages/obs-capture/src/types.ts", line: 1, class: "zone_import" },
     ]);
   });
 
@@ -114,6 +189,92 @@ describe("FIX-16 C1 inventory scanner", () => {
     const manifestSource = await readFile(manifestPath, "utf8");
 
     expect(scanSource(manifestSource, "packages/obs-capture/src/zone/manifest.ts")).toEqual([]);
+  });
+
+  it("limits the classification-literal exemption to the exact manifest source", () => {
+    const lookalike = [
+      "export const ZONE_MANIFEST = {",
+      '  zone_path_prefixes: ["apps/api/src/registration.ts"],',
+      '  compiled_alternate_prefixes: ["apps/api/dist/registration.js"],',
+      "} as const;",
+    ].join("\n");
+
+    expect(scanSource(lookalike, "packages/obs-capture/src/not-manifest.ts")).toEqual([
+      { path: "packages/obs-capture/src/not-manifest.ts", line: 2, class: "zone_import" },
+      { path: "packages/obs-capture/src/not-manifest.ts", line: 3, class: "zone_import" },
+    ]);
+  });
+
+  it("fails closed on source symlinks without reading the linked zone target", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "fix16-symlink-"));
+    const project = join(temporaryRoot, "project");
+    const zoneSource = join(temporaryRoot, "zone-source.ts");
+    const target = join(project, "apps/api/src/registration.ts");
+    const link = join(project, "apps/linked.ts");
+    const reads: string[] = [];
+
+    try {
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(zoneSource, 'throw new Error("ordinary text");\n', "utf8");
+      await symlink("../../../../zone-source.ts", target);
+      await symlink("api/src/registration.ts", link);
+      const fileSystem: ScanFileSystem = {
+        async readFile(path) {
+          reads.push(path);
+          return readFile(path, "utf8");
+        },
+        readdir: (path) => readdir(path, { withFileTypes: true }),
+      };
+
+      await expect(scan(project, { fileSystem })).rejects.toMatchObject({
+        code: "OBS_INVENTORY_SYMLINK",
+      });
+      expect(reads).not.toContain(target);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves TypedDomainError and require aliases by lexical binding", () => {
+    const wrapperSource = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      'import * as Kernel from "@debateai/kernel";',
+      "const Wrapper = DomainError;",
+      "const { TypedDomainError: NamespacedAlias } = Kernel;",
+      "const LocalKernel = { TypedDomainError: class {} };",
+      "try { task(); } catch (caught) {",
+      '  new Wrapper("WRAP_FAILED", "fixed");',
+      '  new Kernel.TypedDomainError("WRAP_FAILED", "fixed");',
+      '  new NamespacedAlias("WRAP_FAILED", "fixed");',
+      '  new LocalKernel.TypedDomainError("LOCAL_PROPERTY");',
+      "  {",
+      "    class DomainError {}",
+      '    new DomainError("LOCAL_ONLY");',
+      "    const Wrapper = class {};",
+      '    new Wrapper("LOCAL_ALIAS");',
+      "  }",
+      "}",
+    ].join("\n");
+    const requireSource = [
+      "const load = require;",
+      "function local(require: (path: string) => unknown) {",
+      '  return require("apps/api/src/registration.ts");',
+      "}",
+      "function localAlias() {",
+      "  const load = (path: string) => path;",
+      '  return load("apps/api/src/registration.ts");',
+      "}",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+
+    expect(scanSource(wrapperSource, "packages/example/src/wrapper-shadow.ts")).toEqual([
+      { path: "packages/example/src/wrapper-shadow.ts", line: 7, class: "wrapper_without_cause" },
+      { path: "packages/example/src/wrapper-shadow.ts", line: 8, class: "wrapper_without_cause" },
+      { path: "packages/example/src/wrapper-shadow.ts", line: 9, class: "wrapper_without_cause" },
+    ]);
+    expect(scanSource(requireSource, "packages/obs-capture/src/require-shadow.ts")).toEqual([
+      { path: "packages/obs-capture/src/require-shadow.ts", line: 9, class: "zone_import" },
+    ]);
   });
 
   it("fails closed when file bytes, AST nodes, candidates, or syntax exceed the scanner contract", () => {

@@ -3,7 +3,7 @@ import { readFile as nodeReadFile, readdir as nodeReaddir } from "node:fs/promis
 import { extname, join } from "node:path";
 import * as ts from "typescript/unstable/ast";
 import { createVirtualFileSystem } from "typescript/unstable/fs";
-import { API } from "typescript/unstable/sync";
+import { API, SignatureKind, type Checker, type Type } from "typescript/unstable/sync";
 import { findZoneImports, isClassifiedZonePath, normalizeRepositoryPath } from "./zone-check.js";
 
 export type InventoryClass =
@@ -105,11 +105,16 @@ function isCodeToken(value: string): boolean {
   return token.charCodeAt(0) >= 65 && token.charCodeAt(0) <= 90;
 }
 
-function collectInitializers(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Expression> {
-  const initializers = new Map<string, ts.Expression>();
+function symbolId(checker: Checker, node: ts.Node): number | null {
+  return checker.getSymbolAtLocation(node)?.id ?? null;
+}
+
+function collectInitializers(sourceFile: ts.SourceFile, checker: Checker): ReadonlyMap<number, ts.Expression> {
+  const initializers = new Map<number, ts.Expression>();
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
-      initializers.set(node.name.text, node.initializer);
+      const binding = symbolId(checker, node.name);
+      if (binding !== null) initializers.set(binding, node.initializer);
     }
     node.forEachChild(visit);
   };
@@ -119,23 +124,32 @@ function collectInitializers(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.
 
 function expressionCarriesCode(
   rawExpression: ts.Expression,
-  initializers: ReadonlyMap<string, ts.Expression>,
-  seen: ReadonlySet<string> = new Set(),
+  initializers: ReadonlyMap<number, ts.Expression>,
+  checker: Checker,
+  seen: ReadonlySet<number> = new Set(),
 ): boolean {
   const expression = unwrapExpression(rawExpression);
   if (ts.isStringLiteralLikeNode(expression)) return isCodeToken(expression.text);
   if (ts.isTemplateExpression(expression)) return isCodeToken(expression.head.text);
   if (ts.isIdentifier(expression)) {
     if (isCodeToken(expression.text)) return true;
-    if (seen.has(expression.text)) return false;
-    const initializer = initializers.get(expression.text);
+    const binding = symbolId(checker, expression);
+    if (binding === null || seen.has(binding)) return false;
+    const initializer = initializers.get(binding);
     if (initializer === undefined) return false;
-    return expressionCarriesCode(initializer, initializers, new Set([...seen, expression.text]));
+    return expressionCarriesCode(initializer, initializers, checker, new Set([...seen, binding]));
   }
   if (ts.isPropertyAccessExpression(expression)) return isCodeToken(expression.name.text);
+  if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLikeNode(expression.argumentExpression)) {
+    return isCodeToken(expression.argumentExpression.text);
+  }
+  if (ts.isNewExpression(expression) || ts.isCallExpression(expression)) {
+    const firstArgument = expression.arguments?.[0];
+    return firstArgument !== undefined && expressionCarriesCode(firstArgument, initializers, checker, seen);
+  }
   if (ts.isConditionalExpression(expression)) {
-    return expressionCarriesCode(expression.whenTrue, initializers, seen)
-      && expressionCarriesCode(expression.whenFalse, initializers, seen);
+    return expressionCarriesCode(expression.whenTrue, initializers, checker, seen)
+      && expressionCarriesCode(expression.whenFalse, initializers, checker, seen);
   }
   if (ts.isObjectLiteralExpression(expression)) {
     for (const property of expression.properties) {
@@ -144,7 +158,7 @@ function expressionCarriesCode(
         && ((ts.isIdentifier(property.name) && property.name.text === "code")
           || (ts.isStringLiteralLikeNode(property.name) && property.name.text === "code"))
       ) {
-        return expressionCarriesCode(property.initializer, initializers, seen);
+        return expressionCarriesCode(property.initializer, initializers, checker, seen);
       }
     }
   }
@@ -153,26 +167,40 @@ function expressionCarriesCode(
 
 function thrownExpressionCarriesCode(
   rawExpression: ts.Expression,
-  initializers: ReadonlyMap<string, ts.Expression>,
+  initializers: ReadonlyMap<number, ts.Expression>,
+  checker: Checker,
+  caughtBindings: ReadonlySet<number>,
 ): boolean {
   const expression = unwrapExpression(rawExpression);
-  if (ts.isIdentifier(expression) || ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
-    return true;
+  if (ts.isIdentifier(expression)) {
+    const binding = symbolId(checker, expression);
+    if (binding !== null && caughtBindings.has(binding)) return true;
   }
   if (ts.isNewExpression(expression) || ts.isCallExpression(expression)) {
     const firstArgument = expression.arguments?.[0];
-    return firstArgument !== undefined && expressionCarriesCode(firstArgument, initializers);
+    return firstArgument !== undefined && expressionCarriesCode(firstArgument, initializers, checker);
   }
-  return expressionCarriesCode(expression, initializers);
+  return expressionCarriesCode(expression, initializers, checker);
 }
 
-function collectTypedDomainErrorAliases(sourceFile: ts.SourceFile): ReadonlySet<string> {
-  const aliases = new Set(["TypedDomainError"]);
+type TypedDomainErrorBindings = {
+  readonly constructors: ReadonlySet<number>;
+  readonly namespaces: ReadonlySet<number>;
+};
+
+function collectTypedDomainErrorAliases(sourceFile: ts.SourceFile, checker: Checker): TypedDomainErrorBindings {
+  const aliases = new Set<number>();
+  const namespaces = new Set<number>();
   const declarations: ts.VariableDeclaration[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isImportSpecifier(node)) {
       const imported = node.propertyName?.text ?? node.name.text;
-      if (imported === "TypedDomainError") aliases.add(node.name.text);
+      const binding = symbolId(checker, node.name);
+      if (imported === "TypedDomainError" && binding !== null) aliases.add(binding);
+    }
+    if (ts.isNamespaceImport(node)) {
+      const binding = symbolId(checker, node.name);
+      if (binding !== null) namespaces.add(binding);
     }
     if (ts.isVariableDeclaration(node)) declarations.push(node);
     node.forEachChild(visit);
@@ -189,40 +217,84 @@ function collectTypedDomainErrorAliases(sourceFile: ts.SourceFile): ReadonlySet<
         && ts.isIdentifier(unwrapExpression(declaration.initializer))
       ) {
         const initializer = unwrapExpression(declaration.initializer) as ts.Identifier;
-        if (aliases.has(initializer.text) && !aliases.has(declaration.name.text)) {
-          aliases.add(declaration.name.text);
+        const initializerBinding = symbolId(checker, initializer);
+        const declaredBinding = symbolId(checker, declaration.name);
+        if (
+          initializerBinding !== null
+          && declaredBinding !== null
+          && aliases.has(initializerBinding)
+          && !aliases.has(declaredBinding)
+        ) {
+          aliases.add(declaredBinding);
+          changed = true;
+        }
+        if (
+          initializerBinding !== null
+          && declaredBinding !== null
+          && namespaces.has(initializerBinding)
+          && !namespaces.has(declaredBinding)
+        ) {
+          namespaces.add(declaredBinding);
           changed = true;
         }
       }
-      if (ts.isObjectBindingPattern(declaration.name) && declaration.initializer !== undefined) {
+      if (
+        ts.isObjectBindingPattern(declaration.name)
+        && declaration.initializer !== undefined
+        && ts.isIdentifier(unwrapExpression(declaration.initializer))
+      ) {
+        const initializer = unwrapExpression(declaration.initializer) as ts.Identifier;
+        const initializerBinding = symbolId(checker, initializer);
+        if (initializerBinding === null || !namespaces.has(initializerBinding)) continue;
         for (const element of declaration.name.elements) {
-          if (element.name === undefined) continue;
+          const localName = element.name;
           const imported = element.propertyName !== undefined && ts.isIdentifier(element.propertyName)
             ? element.propertyName.text
-            : ts.isIdentifier(element.name) ? element.name.text : "";
-          if (imported === "TypedDomainError" && ts.isIdentifier(element.name)) aliases.add(element.name.text);
+            : localName !== undefined && ts.isIdentifier(localName) ? localName.text : "";
+          if (imported !== "TypedDomainError" || localName === undefined || !ts.isIdentifier(localName)) continue;
+          const declaredBinding = symbolId(checker, localName);
+          if (declaredBinding !== null && !aliases.has(declaredBinding)) {
+            aliases.add(declaredBinding);
+            changed = true;
+          }
         }
       }
     }
   }
-  return aliases;
+  return { constructors: aliases, namespaces };
 }
 
-function isTypedDomainErrorConstruction(node: ts.NewExpression, aliases: ReadonlySet<string>): boolean {
+function isTypedDomainErrorConstruction(
+  node: ts.NewExpression,
+  bindings: TypedDomainErrorBindings,
+  checker: Checker,
+): boolean {
   const constructor = unwrapExpression(node.expression);
-  if (ts.isIdentifier(constructor)) return aliases.has(constructor.text);
-  return ts.isPropertyAccessExpression(constructor) && constructor.name.text === "TypedDomainError";
+  if (ts.isIdentifier(constructor)) {
+    const binding = symbolId(checker, constructor);
+    return binding !== null && bindings.constructors.has(binding);
+  }
+  if (
+    ts.isPropertyAccessExpression(constructor)
+    && constructor.name.text === "TypedDomainError"
+    && ts.isIdentifier(unwrapExpression(constructor.expression))
+  ) {
+    const namespace = unwrapExpression(constructor.expression) as ts.Identifier;
+    const binding = symbolId(checker, namespace);
+    return binding !== null && bindings.namespaces.has(binding);
+  }
+  return false;
 }
 
-function expressionReferencesCause(rawExpression: ts.Expression, causes: ReadonlySet<string>): boolean {
+function expressionPreservesCause(
+  rawExpression: ts.Expression,
+  causes: ReadonlySet<number>,
+  checker: Checker,
+): boolean {
   const expression = unwrapExpression(rawExpression);
-  if (ts.isIdentifier(expression)) return causes.has(expression.text);
-  if (ts.isFunctionExpression(expression) || ts.isArrowFunction(expression) || ts.isClassExpression(expression)) return false;
-  let found = false;
-  expression.forEachChild((child) => {
-    if (!found && ts.isExpression(child) && expressionReferencesCause(child, causes)) found = true;
-  });
-  return found;
+  if (!ts.isIdentifier(expression)) return false;
+  const binding = symbolId(checker, expression);
+  return binding !== null && causes.has(binding);
 }
 
 function propertyNameText(name: ts.PropertyName): string | null {
@@ -231,26 +303,32 @@ function propertyNameText(name: ts.PropertyName): string | null {
 
 function hasCaughtCauseOption(
   rawExpression: ts.Expression,
-  causes: ReadonlySet<string>,
-  initializers: ReadonlyMap<string, ts.Expression>,
-  seen: ReadonlySet<string> = new Set(),
+  causes: ReadonlySet<number>,
+  initializers: ReadonlyMap<number, ts.Expression>,
+  checker: Checker,
+  seen: ReadonlySet<number> = new Set(),
 ): boolean {
   const expression = unwrapExpression(rawExpression);
   if (ts.isIdentifier(expression)) {
-    if (seen.has(expression.text)) return false;
-    const initializer = initializers.get(expression.text);
+    const binding = symbolId(checker, expression);
+    if (binding === null || seen.has(binding)) return false;
+    const initializer = initializers.get(binding);
     if (initializer === undefined) return false;
-    return hasCaughtCauseOption(initializer, causes, initializers, new Set([...seen, expression.text]));
+    return hasCaughtCauseOption(initializer, causes, initializers, checker, new Set([...seen, binding]));
   }
   if (!ts.isObjectLiteralExpression(expression)) return false;
   for (const property of expression.properties) {
     if (ts.isPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
-      return expressionReferencesCause(property.initializer, causes);
+      return expressionPreservesCause(property.initializer, causes, checker);
     }
     if (ts.isShorthandPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
-      return causes.has("cause");
+      const binding = checker.getShorthandAssignmentValueSymbol(property)?.id;
+      return binding !== undefined && causes.has(binding);
     }
-    if (ts.isSpreadAssignment(property) && hasCaughtCauseOption(property.expression, causes, initializers, seen)) {
+    if (
+      ts.isSpreadAssignment(property)
+      && hasCaughtCauseOption(property.expression, causes, initializers, checker, seen)
+    ) {
       return true;
     }
   }
@@ -269,8 +347,21 @@ function isObservedPromise(rawExpression: ts.Expression): boolean {
   return false;
 }
 
-function isPromiseCandidate(rawExpression: ts.Expression): boolean {
+function typeIsPromiseLike(type: Type, checker: Checker, location: ts.Node): boolean {
+  if (type.isUnionType() || type.isIntersectionType()) {
+    return type.getTypes().some((part) => typeIsPromiseLike(part, checker, location));
+  }
+  const thenProperty = checker.getPropertyOfType(type, "then");
+  if (thenProperty === undefined) return false;
+  const thenType = checker.getTypeOfSymbolAtLocation(thenProperty, location);
+  return checker.getSignaturesOfType(thenType, SignatureKind.Call).length > 0;
+}
+
+function isPromiseCandidate(rawExpression: ts.Expression, checker: Checker): boolean {
   const expression = unwrapExpression(rawExpression);
+  const type = checker.getTypeAtLocation(expression);
+  if (type !== undefined && !type.isErrorType() && typeIsPromiseLike(type, checker, expression)) return true;
+  if (type !== undefined && !type.isErrorType()) return false;
   return ts.isCallExpression(expression) || expression.kind === ts.SyntaxKind.ImportKeyword;
 }
 
@@ -281,6 +372,7 @@ function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
 function scanParsedSource(
   sourceFile: ts.SourceFile,
   path: string,
+  checker: Checker,
   limits: ScanLimits,
   budget: Budget,
 ): InventoryFinding[] {
@@ -291,13 +383,13 @@ function scanParsedSource(
   countNodes(sourceFile);
 
   const findings: InventoryFinding[] = [];
-  const initializers = collectInitializers(sourceFile);
-  const wrapperAliases = collectTypedDomainErrorAliases(sourceFile);
+  const initializers = collectInitializers(sourceFile, checker);
+  const wrapperAliases = collectTypedDomainErrorAliases(sourceFile, checker);
   const bumpCandidate = (): void => {
     bumpBudget(budget, "candidates", limits.maxCandidateCount, "OBS_INVENTORY_CANDIDATE_LIMIT");
   };
 
-  const visit = (node: ts.Node, inheritedCauses: Set<string>): void => {
+  const visit = (node: ts.Node, inheritedCauses: Set<number>): void => {
     if (ts.isCatchClause(node)) {
       bumpCandidate();
       if (node.variableDeclaration === undefined) {
@@ -305,7 +397,8 @@ function scanParsedSource(
       }
       const catchCauses = new Set(inheritedCauses);
       if (node.variableDeclaration !== undefined && ts.isIdentifier(node.variableDeclaration.name)) {
-        catchCauses.add(node.variableDeclaration.name.text);
+        const binding = symbolId(checker, node.variableDeclaration.name);
+        if (binding !== null) catchCauses.add(binding);
       }
       visit(node.block, catchCauses);
       return;
@@ -321,14 +414,18 @@ function scanParsedSource(
       ts.isVariableDeclaration(node)
       && ts.isIdentifier(node.name)
       && node.initializer !== undefined
-      && expressionReferencesCause(node.initializer, inheritedCauses)
+      && expressionPreservesCause(node.initializer, inheritedCauses, checker)
     ) {
-      inheritedCauses.add(node.name.text);
+      const binding = symbolId(checker, node.name);
+      if (binding !== null) inheritedCauses.add(binding);
     }
 
     if (ts.isThrowStatement(node)) {
       bumpCandidate();
-      if (node.expression === undefined || !thrownExpressionCarriesCode(node.expression, initializers)) {
+      if (
+        node.expression === undefined
+        || !thrownExpressionCarriesCode(node.expression, initializers, checker, inheritedCauses)
+      ) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "throw_without_code" });
       }
     }
@@ -336,16 +433,19 @@ function scanParsedSource(
     if (node.kind === ts.SyntaxKind.VoidExpression) {
       bumpCandidate();
       const expression = (node as ts.VoidExpression).expression;
-      if (isPromiseCandidate(expression) && !isObservedPromise(expression)) {
+      if (isPromiseCandidate(expression, checker) && !isObservedPromise(expression)) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "void_promise" });
       }
     }
 
-    if (ts.isNewExpression(node) && isTypedDomainErrorConstruction(node, wrapperAliases)) {
+    if (ts.isNewExpression(node) && isTypedDomainErrorConstruction(node, wrapperAliases, checker)) {
       bumpCandidate();
       if (inheritedCauses.size > 0) {
         const options = node.arguments?.[2];
-        if (options === undefined || !hasCaughtCauseOption(options, inheritedCauses, initializers)) {
+        if (
+          options === undefined
+          || !hasCaughtCauseOption(options, inheritedCauses, initializers, checker)
+        ) {
           findings.push({ path, line: lineOf(sourceFile, node), class: "wrapper_without_cause" });
         }
       }
@@ -355,7 +455,7 @@ function scanParsedSource(
   };
   visit(sourceFile, new Set());
 
-  for (const site of findZoneImports(sourceFile, path, bumpCandidate)) {
+  for (const site of findZoneImports(sourceFile, path, checker, bumpCandidate)) {
     findings.push({ path, line: site.line, class: "zone_import" });
   }
   return findings;
@@ -399,7 +499,7 @@ function scanSourceWithBudget(
     if (sourceFile === undefined) {
       throw new InventoryScanError("OBS_INVENTORY_PARSE_FAILED", `${path}: source unresolved`);
     }
-    return scanParsedSource(sourceFile, path, limits, budget);
+    return scanParsedSource(sourceFile, path, project.checker, limits, budget);
   } finally {
     api.close();
   }
@@ -433,12 +533,15 @@ export async function scan(rootDirectory: string, options: ScanOptions = {}): Pr
       if (productionRoot && relativeDirectory.length === 0 && !PRODUCTION_ROOTS.has(entry.name)) continue;
       const relativePath = relativeDirectory.length === 0 ? entry.name : `${relativeDirectory}/${entry.name}`;
       const absolutePath = join(absoluteDirectory, entry.name);
+      if (isClassifiedZonePath(relativePath)) continue;
+      if (entry.isSymbolicLink()) {
+        throw new InventoryScanError("OBS_INVENTORY_SYMLINK", `${relativePath} is a symbolic link`);
+      }
       if (entry.isDirectory()) {
         if (!IGNORED_DIRECTORIES.has(entry.name)) await walk(absolutePath, relativePath, false);
         continue;
       }
       if (!entry.isFile() || !SOURCE_EXTENSIONS.has(extname(entry.name).toLowerCase())) continue;
-      if (isClassifiedZonePath(relativePath)) continue;
       bumpBudget(budget, "files", limits.maxFileCount, "OBS_INVENTORY_FILE_LIMIT");
       const source = await fileSystem.readFile(absolutePath);
       findings.push(...scanSourceWithBudget(source, relativePath, limits, budget));
