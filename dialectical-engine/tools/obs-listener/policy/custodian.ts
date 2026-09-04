@@ -12,6 +12,7 @@ import {
 const HASH = nodeHash;
 const TIMING_SAFE_EQUAL = nodeTimingSafeEqual;
 const IS_PROXY = isProxy;
+const GET_OWN_PROPERTY_DESCRIPTOR = Object.getOwnPropertyDescriptor;
 
 export type TokenEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -37,7 +38,7 @@ function ownStringProperty(value: unknown, key: string): string | undefined {
   if (value === null || typeof value !== "object") return undefined;
   if (IS_PROXY(value)) return undefined;
   try {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, key);
     if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) {
       return undefined;
     }
@@ -54,7 +55,7 @@ type OwnOptionalDataProperty =
   | { readonly kind: "INVALID" };
 
 function ownArrayLength(value: readonly unknown[]): number | null {
-  const descriptor = Object.getOwnPropertyDescriptor(value, "length");
+  const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, "length");
   if (
     descriptor === undefined ||
     !Object.hasOwn(descriptor, "value") ||
@@ -73,7 +74,7 @@ function arrayContainsIdentity(
   const length = ownArrayLength(values);
   if (length === null) return true;
   for (let index = 0; index < length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(values, String(index));
+    const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(values, String(index));
     if (
       descriptor === undefined ||
       !Object.hasOwn(descriptor, "value") ||
@@ -106,7 +107,7 @@ function ownOptionalDataProperty(
   }
   if (IS_PROXY(value)) return { kind: "INVALID" };
   try {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, key);
     if (descriptor !== undefined) {
       if (!Object.hasOwn(descriptor, "value")) return { kind: "INVALID" };
       const descriptorValue = descriptor.value;
@@ -121,7 +122,7 @@ function ownOptionalDataProperty(
         return { kind: "INVALID" };
       }
       if (!appendIdentity(visited, prototype)) return { kind: "INVALID" };
-      if (Object.getOwnPropertyDescriptor(prototype, key) !== undefined) {
+      if (GET_OWN_PROPERTY_DESCRIPTOR(prototype, key) !== undefined) {
         return { kind: "INVALID" };
       }
       prototype = Object.getPrototypeOf(prototype) as object | null;
@@ -146,7 +147,7 @@ export function repin(
   environment: TokenEnvironment,
 ): PolicyBundle {
   const current = parsePolicyOrRefuse(currentBundle);
-  const custodianDescriptor = Object.getOwnPropertyDescriptor(
+  const custodianDescriptor = GET_OWN_PROPERTY_DESCRIPTOR(
     current.custodians,
     "0",
   );

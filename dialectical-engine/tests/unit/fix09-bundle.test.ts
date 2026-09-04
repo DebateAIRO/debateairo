@@ -1089,6 +1089,114 @@ describe("FIX-09 C1 policy bundle", () => {
     });
   });
 
+  it("does not run a live descriptor callback after policy initialization", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const custodianUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+    ).href;
+    const canonicalUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+    ).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      await import(${JSON.stringify(loaderUrl)});
+      const { repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const descriptor = Object.getOwnPropertyDescriptor(
+        Object,
+        "getOwnPropertyDescriptor",
+      );
+      if (
+        !descriptor ||
+        !("value" in descriptor) ||
+        typeof descriptor.value !== "function"
+      ) {
+        throw new Error("GET_OWN_PROPERTY_DESCRIPTOR_MISSING");
+      }
+      const original = descriptor.value;
+      let callbackCalls = 0;
+      let escaped = null;
+      let repinError = null;
+      let repinned;
+      let hash;
+      try {
+        Object.defineProperty(Object, "getOwnPropertyDescriptor", {
+          ...descriptor,
+          value: function (...args) {
+            callbackCalls += 1;
+            environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+            Object.defineProperty(
+              Object,
+              "getOwnPropertyDescriptor",
+              descriptor,
+            );
+            return Reflect.apply(original, this, args);
+          },
+        });
+        try {
+          repinned = repin(bundle, {
+            token: "wrong",
+            next_bundle: armed,
+          }, environment);
+        } catch (error) {
+          repinError = error instanceof Error
+            ? { code: error.code, message: error.message, name: error.name }
+            : { code: null, message: String(error), name: typeof error };
+        }
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error instanceof Error ? error.message : String(error);
+      } finally {
+        Object.defineProperty(
+          Object,
+          "getOwnPropertyDescriptor",
+          descriptor,
+        );
+      }
+      const restored = Reflect.apply(original, Object, [
+        Object,
+        "getOwnPropertyDescriptor",
+      ]);
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        descriptorRestored:
+          restored?.configurable === descriptor.configurable &&
+          restored?.enumerable === descriptor.enumerable &&
+          restored?.value === descriptor.value &&
+          restored?.writable === descriptor.writable,
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        escaped,
+        hash,
+        quickArm: repinned?.quick_arm ?? null,
+        refused: repinError?.code === "REPIN_REFUSED",
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({
+      callbackCalls: 0,
+      descriptorRestored: true,
+      environment: "correct",
+      escaped: null,
+      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      quickArm: null,
+      refused: true,
+    });
+  });
+
   it("does not trust live Atomics results as declared-schema authority", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
       string,

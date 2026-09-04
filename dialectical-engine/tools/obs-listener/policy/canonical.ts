@@ -3,6 +3,7 @@ import { isProxy } from "node:util/types";
 
 const HASH = nodeHash;
 const IS_PROXY = isProxy;
+const GET_OWN_PROPERTY_DESCRIPTOR = Object.getOwnPropertyDescriptor;
 
 export type CanonicalJsonValue =
   | null
@@ -34,7 +35,7 @@ function descriptorMapEntry(
   descriptors: object,
   key: string,
 ): PropertyDescriptor | undefined {
-  const entryDescriptor = Object.getOwnPropertyDescriptor(descriptors, key);
+  const entryDescriptor = GET_OWN_PROPERTY_DESCRIPTOR(descriptors, key);
   if (
     entryDescriptor === undefined ||
     !Object.hasOwn(entryDescriptor, "value") ||
@@ -70,7 +71,7 @@ function activeContains(active: readonly object[], candidate: object): boolean {
   const length = ownArrayLength(active);
   for (let index = 0; index < length; index += 1) {
     if (dataPropertyValue(
-      Object.getOwnPropertyDescriptor(active, String(index)),
+      GET_OWN_PROPERTY_DESCRIPTOR(active, String(index)),
     ) === candidate) {
       return true;
     }
@@ -92,7 +93,7 @@ function activePop(active: object[], candidate: object): void {
   if (length === 0) return nonPlainJsonData();
   const lastKey = String(length - 1);
   if (dataPropertyValue(
-    Object.getOwnPropertyDescriptor(active, lastKey),
+    GET_OWN_PROPERTY_DESCRIPTOR(active, lastKey),
   ) !== candidate) {
     return nonPlainJsonData();
   }
@@ -251,7 +252,7 @@ function serializeJsonPrimitive(
 
 function ownStringAt(values: readonly string[], index: number): string {
   const value = dataPropertyValue(
-    Object.getOwnPropertyDescriptor(values, String(index)),
+    GET_OWN_PROPERTY_DESCRIPTOR(values, String(index)),
   );
   if (typeof value !== "string") return nonPlainJsonData();
   return value;
@@ -271,7 +272,7 @@ function defineOwnStringAt(
 }
 
 function ownArrayLength(value: readonly unknown[]): number {
-  return arrayLength(Object.getOwnPropertyDescriptor(value, "length"));
+  return arrayLength(GET_OWN_PROPERTY_DESCRIPTOR(value, "length"));
 }
 
 function sortedOwnPropertyNames(value: object): string[] {
@@ -317,7 +318,7 @@ function serializeCanonical(value: unknown): string {
 
   if (Array.isArray(value)) {
     const length = arrayLength(
-      Object.getOwnPropertyDescriptor(value, "length"),
+      GET_OWN_PROPERTY_DESCRIPTOR(value, "length"),
     );
     const ownNames = Object.getOwnPropertyNames(value);
     if (ownArrayLength(ownNames) !== length + 1) return nonPlainJsonData();
@@ -326,7 +327,7 @@ function serializeCanonical(value: unknown): string {
     for (let index = 0; index < length; index += 1) {
       if (index !== 0) encoded += ",";
       encoded += serializeCanonical(dataPropertyValue(
-        Object.getOwnPropertyDescriptor(value, String(index)),
+        GET_OWN_PROPERTY_DESCRIPTOR(value, String(index)),
       ));
     }
     return `${encoded}]`;
@@ -336,7 +337,7 @@ function serializeCanonical(value: unknown): string {
   const ownNameCount = ownArrayLength(ownNames);
   let encoded = "{";
   for (let index = 0; index < ownNameCount; index += 1) {
-    const keyDescriptor = Object.getOwnPropertyDescriptor(
+    const keyDescriptor = GET_OWN_PROPERTY_DESCRIPTOR(
       ownNames,
       String(index),
     );
@@ -344,7 +345,7 @@ function serializeCanonical(value: unknown): string {
     if (typeof key !== "string") return nonPlainJsonData();
     if (index !== 0) encoded += ",";
     encoded += `${serializeJsonPrimitive(key)}:${serializeCanonical(
-      dataPropertyValue(Object.getOwnPropertyDescriptor(value, key)),
+      dataPropertyValue(GET_OWN_PROPERTY_DESCRIPTOR(value, key)),
     )}`;
   }
   return `${encoded}}`;

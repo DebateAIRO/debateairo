@@ -7,20 +7,21 @@ import { createContext, runInContext, runInNewContext } from "node:vm";
 import { canonicalJson, canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
+const GET_OWN_PROPERTY_DESCRIPTOR = Object.getOwnPropertyDescriptor;
 const IS_PROXY = isProxy;
-const BASE_ARRAY_SOME = Object.getOwnPropertyDescriptor(
+const BASE_ARRAY_SOME = GET_OWN_PROPERTY_DESCRIPTOR(
   Array.prototype,
   "some",
 );
-const BASE_ARRAY_SORT = Object.getOwnPropertyDescriptor(
+const BASE_ARRAY_SORT = GET_OWN_PROPERTY_DESCRIPTOR(
   Array.prototype,
   "sort",
 );
-const BASE_ARRAY_ITERATOR = Object.getOwnPropertyDescriptor(
+const BASE_ARRAY_ITERATOR = GET_OWN_PROPERTY_DESCRIPTOR(
   Array.prototype,
   Symbol.iterator,
 );
-const BASE_ARRAY_PUSH = Object.getOwnPropertyDescriptor(
+const BASE_ARRAY_PUSH = GET_OWN_PROPERTY_DESCRIPTOR(
   Array.prototype,
   "push",
 );
@@ -43,15 +44,15 @@ const BASE_ARRAY_PUSH_IS_TRUSTED =
   BASE_ARRAY_PUSH.writable === true &&
   !IS_PROXY(BASE_ARRAY_PUSH.value) &&
   isNativeArrayPush(BASE_ARRAY_PUSH.value);
-const BASE_OBJECT_SOME = Object.getOwnPropertyDescriptor(
+const BASE_OBJECT_SOME = GET_OWN_PROPERTY_DESCRIPTOR(
   Object.prototype,
   "some",
 );
-const BASE_OBJECT_SORT = Object.getOwnPropertyDescriptor(
+const BASE_OBJECT_SORT = GET_OWN_PROPERTY_DESCRIPTOR(
   Object.prototype,
   "sort",
 );
-const BASE_OBJECT_ITERATOR = Object.getOwnPropertyDescriptor(
+const BASE_OBJECT_ITERATOR = GET_OWN_PROPERTY_DESCRIPTOR(
   Object.prototype,
   Symbol.iterator,
 );
@@ -497,7 +498,7 @@ type SnapshotRecord = Record<string, unknown>;
 const INVALID_ARRAY_ITEM = Symbol("INVALID_ARRAY_ITEM");
 
 function ownArrayLength(value: readonly unknown[]): number | null {
-  const descriptor = Object.getOwnPropertyDescriptor(value, "length");
+  const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, "length");
   if (
     descriptor === undefined ||
     !Object.hasOwn(descriptor, "value") ||
@@ -513,7 +514,7 @@ function ownArrayItem(
   value: readonly unknown[],
   index: number,
 ): unknown | typeof INVALID_ARRAY_ITEM {
-  const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, String(index));
   if (
     descriptor === undefined ||
     !Object.hasOwn(descriptor, "value") ||
@@ -1002,7 +1003,7 @@ function snapshotCrossFieldIssue(
     if (seed === INVALID_ARRAY_ITEM || seed === null || typeof seed !== "object") {
       return "REGISTER_SEEDS_NOT_DENSE";
     }
-    const keyDescriptor = Object.getOwnPropertyDescriptor(seed, "key");
+    const keyDescriptor = GET_OWN_PROPERTY_DESCRIPTOR(seed, "key");
     if (
       keyDescriptor === undefined ||
       !Object.hasOwn(keyDescriptor, "value") ||
@@ -1091,8 +1092,8 @@ function sameDescriptorField(
   right: PropertyDescriptor,
   field: keyof PropertyDescriptor,
 ): boolean {
-  const leftField = Object.getOwnPropertyDescriptor(left, field);
-  const rightField = Object.getOwnPropertyDescriptor(right, field);
+  const leftField = GET_OWN_PROPERTY_DESCRIPTOR(left, field);
+  const rightField = GET_OWN_PROPERTY_DESCRIPTOR(right, field);
   if (leftField === undefined || rightField === undefined) {
     return leftField === rightField;
   }
@@ -1119,31 +1120,31 @@ function sameDescriptor(
 function hasArrayAuthorityPrototypeMutation(): boolean {
   return !BASE_ARRAY_PUSH_IS_TRUSTED ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Array.prototype, "push"),
+      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, "push"),
       BASE_ARRAY_PUSH,
     ) ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Array.prototype, "some"),
+      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, "some"),
       BASE_ARRAY_SOME,
     ) ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Array.prototype, "sort"),
+      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, "sort"),
       BASE_ARRAY_SORT,
     ) ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator),
+      GET_OWN_PROPERTY_DESCRIPTOR(Array.prototype, Symbol.iterator),
       BASE_ARRAY_ITERATOR,
     ) ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Object.prototype, "some"),
+      GET_OWN_PROPERTY_DESCRIPTOR(Object.prototype, "some"),
       BASE_OBJECT_SOME,
     ) ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Object.prototype, "sort"),
+      GET_OWN_PROPERTY_DESCRIPTOR(Object.prototype, "sort"),
       BASE_OBJECT_SORT,
     ) ||
     !sameDescriptor(
-      Object.getOwnPropertyDescriptor(Object.prototype, Symbol.iterator),
+      GET_OWN_PROPERTY_DESCRIPTOR(Object.prototype, Symbol.iterator),
       BASE_OBJECT_ITERATOR,
     );
 }
