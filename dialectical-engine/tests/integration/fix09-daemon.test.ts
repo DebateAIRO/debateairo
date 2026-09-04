@@ -132,15 +132,44 @@ function realClientFactory(created: pg.Client[]): ClientFactory {
   };
 }
 
-function loggingClientFactory(created: pg.Client[], statementSets: string[][]): ClientFactory {
+interface DaemonQueryProbe {
+  readonly leadershipResults: { readonly generation: number; readonly acquired: boolean }[];
+  readonly beginWithoutLeadership: number[];
+  activeDeliveries: number;
+  maxInFlight: number;
+  afterOwnedBegin?: () => Promise<void>;
+}
+
+function observingClientFactory(
+  created: pg.Client[],
+  statementSets: string[][],
+  probe: DaemonQueryProbe
+): ClientFactory {
   return (databaseUrl) => {
     const client = new pg.Client({ connectionString: databaseUrl });
     const statements: string[] = [];
+    const generation = statementSets.length;
+    let ownsLeadership = false;
+    let transactionOpen = false;
     const original = client.query.bind(client);
     client.query = (async (statement: unknown, values?: readonly unknown[]) => {
       const sql = typeof statement === "string" ? statement : "";
       statements.push(sql);
-      return original(sql, values === undefined ? [] : [...values]);
+      const result = await original(sql, values === undefined ? [] : [...values]);
+      if (sql.includes("pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0))")) {
+        ownsLeadership = (result.rows[0] as { acquired?: boolean } | undefined)?.acquired === true;
+        probe.leadershipResults.push({ generation, acquired: ownsLeadership });
+      } else if (sql.trim() === "BEGIN") {
+        transactionOpen = true;
+        probe.activeDeliveries += 1;
+        probe.maxInFlight = Math.max(probe.maxInFlight, probe.activeDeliveries);
+        if (!ownsLeadership) probe.beginWithoutLeadership.push(generation);
+        else await probe.afterOwnedBegin?.();
+      } else if (transactionOpen && (sql.trim() === "COMMIT" || sql.trim() === "ROLLBACK")) {
+        transactionOpen = false;
+        probe.activeDeliveries -= 1;
+      }
+      return result;
     }) as pg.Client["query"];
     created.push(client);
     statementSets.push(statements);
@@ -205,14 +234,53 @@ describe("FIX-09 C2 listener migration on real PostgreSQL", () => {
       WHERE grantee='debateai_obs_listener' AND table_schema='obs'
       ORDER BY table_name, privilege_type
     `);
-    expect(listenerGrants.rows).toEqual(expect.arrayContaining([
-      { table_name: "occurrence", privilege_type: "SELECT" },
-      { table_name: "delivery", privilege_type: "INSERT" },
+    expect(listenerGrants.rows).toEqual([
       { table_name: "agent_action", privilege_type: "INSERT" },
-      { table_name: "incident", privilege_type: "INSERT" },
+      { table_name: "agent_action", privilege_type: "SELECT" },
+      { table_name: "budget_usage", privilege_type: "INSERT" },
+      { table_name: "budget_usage", privilege_type: "SELECT" },
+      { table_name: "capture_gap", privilege_type: "SELECT" },
+      { table_name: "component_health", privilege_type: "INSERT" },
+      { table_name: "component_health", privilege_type: "SELECT" },
       { table_name: "consumer_cursor", privilege_type: "INSERT" },
-      { table_name: "component_health", privilege_type: "INSERT" }
-    ]));
+      { table_name: "consumer_cursor", privilege_type: "SELECT" },
+      { table_name: "delivery", privilege_type: "INSERT" },
+      { table_name: "delivery", privilege_type: "SELECT" },
+      { table_name: "incident", privilege_type: "INSERT" },
+      { table_name: "incident", privilege_type: "SELECT" },
+      { table_name: "occurrence", privilege_type: "SELECT" },
+      { table_name: "policy_decision", privilege_type: "INSERT" },
+      { table_name: "policy_decision", privilege_type: "SELECT" },
+      { table_name: "run_correlation_v", privilege_type: "SELECT" },
+      { table_name: "source_link", privilege_type: "INSERT" },
+      { table_name: "source_link", privilege_type: "SELECT" },
+      { table_name: "spool_receipt", privilege_type: "SELECT" },
+      { table_name: "trace", privilege_type: "INSERT" },
+      { table_name: "trace", privilege_type: "SELECT" },
+      { table_name: "zone_daily", privilege_type: "SELECT" }
+    ]);
+    const obsRoutineGrants = await database.pool.query<{
+      grantee: string; routine_name: string; privilege_type: string;
+    }>(`
+      SELECT grantee,routine_name,privilege_type
+      FROM information_schema.role_routine_grants
+      WHERE specific_schema='obs'
+        AND grantee IN ('PUBLIC','debateai_obs_listener','debateai_obs_writer')
+      ORDER BY grantee,routine_name,privilege_type
+    `);
+    expect(obsRoutineGrants.rows).toEqual([{
+      grantee: "debateai_obs_writer",
+      routine_name: "occurrence_seq_nextval_notify",
+      privilege_type: "EXECUTE"
+    }]);
+    const migrationSource = await readFile(
+      new URL("../../migrations/0062_fix09_listener_fold.sql", import.meta.url), "utf8"
+    );
+    expect(migrationSource.match(/^GRANT\b[\s\S]*?;/gm)?.map((statement) =>
+      statement.replace(/\s+/g, " ").trim()
+    )).toEqual([
+      "GRANT EXECUTE ON FUNCTION obs.occurrence_seq_nextval_notify() TO debateai_obs_writer;"
+    ]);
 
     const writer = new pg.Client({ connectionString: roleUrl("debateai_obs_writer", WRITER_PASSWORD) });
     const listener = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
@@ -504,6 +572,118 @@ describe("FIX-09 C2 atomic delivery on real PostgreSQL", () => {
       await retry.end();
     }
   });
+
+  it("isolates delivered aggregates by fingerprint version and keeps replay idempotent", async () => {
+    const fingerprint = `fix09:version-isolation:${randomUUID()}`;
+    const versionOne = await insertOccurrence({
+      fingerprint,
+      fingerprintVersion: 1,
+      severity: "INFO",
+      source: "first_party",
+      occurredAt: new Date("2026-09-04T07:00:00Z")
+    });
+    const versionTwo = await insertOccurrence({
+      fingerprint,
+      fingerprintVersion: 2,
+      severity: "FATAL",
+      source: "ui_client",
+      occurredAt: new Date("2026-09-04T11:00:00Z")
+    });
+    const listener = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
+    await listener.connect();
+    try {
+      expect(await deliverOccurrence(listener, versionOne.occurrenceId)).toMatchObject({ result: "FOLDED" });
+      expect(await deliverOccurrence(listener, versionTwo.occurrenceId)).toMatchObject({ result: "FOLDED" });
+      const beforeReplay = await database.pool.query(`
+        SELECT fingerprint_version,distinct_work_unit_count::text AS work_count,
+          max_severity,source_set
+        FROM obs.incident WHERE fingerprint=$1 ORDER BY fingerprint_version
+      `, [fingerprint]);
+      expect(beforeReplay.rows).toEqual([
+        { fingerprint_version: 1, work_count: "1", max_severity: "INFO", source_set: ["first_party"] },
+        { fingerprint_version: 2, work_count: "1", max_severity: "FATAL", source_set: ["ui_client"] }
+      ]);
+      expect(await deliverOccurrence(listener, versionOne.occurrenceId))
+        .toMatchObject({ result: "ALREADY_ACKED" });
+      expect(await deliverOccurrence(listener, versionTwo.occurrenceId))
+        .toMatchObject({ result: "ALREADY_ACKED" });
+      const afterReplay = await database.pool.query(`
+        SELECT fingerprint_version,distinct_work_unit_count::text AS work_count,
+          max_severity,source_set
+        FROM obs.incident WHERE fingerprint=$1 ORDER BY fingerprint_version
+      `, [fingerprint]);
+      expect(afterReplay.rows).toEqual(beforeReplay.rows);
+      expect(await Promise.all([
+        ackCount(versionOne.occurrenceId), ackCount(versionTwo.occurrenceId)
+      ])).toEqual([1, 1]);
+    } finally {
+      await listener.end();
+    }
+  });
+
+  it("reuses deterministic skip and poison receipts when ACK is absent", async () => {
+    const skipped = await insertOccurrence({ capturePoint: "detector", component: {} });
+    const poison = await insertOccurrence({ frames: [7] });
+    const receipts = [
+      {
+        occurrence: skipped,
+        kind: "FIXAGENT_SKIPPED",
+        ref: `fixagent-skip:${skipped.occurrenceId}`,
+        schema: "fixagent-skip/v1",
+        reason: "SKIP_DETECTOR_LOCATION_MISSING"
+      },
+      {
+        occurrence: poison,
+        kind: "FIXAGENT_DEAD_LETTER",
+        ref: `fixagent-dead-letter:${poison.occurrenceId}`,
+        schema: "fixagent-dead-letter/v1",
+        reason: "POISON_INVALID_FRAMES"
+      }
+    ] as const;
+    for (const receipt of receipts) {
+      await database.pool.query(`
+        INSERT INTO obs.agent_action (
+          writer_identity,actor,action_kind,occurrence_id,action_ref,action_payload
+        ) VALUES ('fixagent-daemon','fixagent-daemon',$1,$2,$3,$4::jsonb)
+      `, [
+        receipt.kind, receipt.occurrence.occurrenceId, receipt.ref,
+        JSON.stringify({
+          schema: receipt.schema,
+          reason: receipt.reason,
+          occ_seq: receipt.occurrence.occSeq.toString()
+        })
+      ]);
+    }
+    const listener = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
+    await listener.connect();
+    try {
+      expect(await deliverOccurrence(listener, skipped.occurrenceId)).toMatchObject({ result: "SKIPPED" });
+      expect(await deliverOccurrence(listener, poison.occurrenceId)).toMatchObject({
+        result: "DEAD_LETTERED",
+        cursor: poison.occSeq
+      });
+    } finally {
+      await listener.end();
+    }
+    for (const receipt of receipts) {
+      expect((await database.pool.query(`
+        SELECT action_kind,action_ref,action_payload FROM obs.agent_action
+        WHERE occurrence_id=$1 ORDER BY occurred_at,agent_action_id
+      `, [receipt.occurrence.occurrenceId])).rows).toEqual([{
+        action_kind: receipt.kind,
+        action_ref: receipt.ref,
+        action_payload: {
+          schema: receipt.schema,
+          reason: receipt.reason,
+          occ_seq: receipt.occurrence.occSeq.toString()
+        }
+      }]);
+      expect(await ackCount(receipt.occurrence.occurrenceId)).toBe(1);
+    }
+    expect((await database.pool.query(
+      "SELECT state,detail_code FROM obs.component_health WHERE component='fixagent-daemon'"
+    )).rows).toEqual([{ state: "POISON", detail_code: "POISON_INVALID_FRAMES" }]);
+  });
 });
 
 describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
@@ -535,7 +715,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
       new URL("../../tools/obs-listener/src/daemon/main.ts", import.meta.url), "utf8"
     );
     expect(source).toContain("SELECT pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0)) AS acquired");
-    expect(source).toMatch(/captured_at ASC, occurrence\.occ_seq ASC\s+LIMIT 1/);
+    expect(source).toMatch(/occurred_at ASC, occurrence\.occ_seq ASC\s+LIMIT 1/);
     expect(source).not.toMatch(/WHERE occurrence\.occ_seq\s*=\s*\$1/);
     expect(source).not.toMatch(/deliverOccurrence\([^,]+,\s*message\.payload/);
   });
@@ -574,7 +754,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
     }
   });
 
-  it("polls missed wakes and drains FATAL-first then captured-time/sequence order at cap one", async () => {
+  it("polls missed wakes and drains FATAL-first then occurrence-time/sequence order at cap one", async () => {
     const created: pg.Client[] = [];
     const daemon = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
@@ -588,10 +768,22 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
       await live.query("UNLISTEN obs_occurrence_inserted");
       const base = new Date("2026-09-04T12:00:00Z");
       const rows = [
-        await insertOccurrence({ severity: "INFO", capturedAt: new Date(base.getTime() + 4_000) }),
-        await insertOccurrence({ severity: "FATAL", capturedAt: new Date(base.getTime() + 2_000) }),
-        await insertOccurrence({ severity: "SEVERE", capturedAt: new Date(base.getTime() + 3_000) }),
-        await insertOccurrence({ severity: "FATAL", capturedAt: new Date(base.getTime() + 1_000) })
+        await insertOccurrence({
+          severity: "INFO", occurredAt: new Date(base.getTime() + 4_000),
+          capturedAt: new Date(base.getTime() + 1_000)
+        }),
+        await insertOccurrence({
+          severity: "FATAL", occurredAt: new Date(base.getTime() + 1_000),
+          capturedAt: new Date(base.getTime() + 4_000)
+        }),
+        await insertOccurrence({
+          severity: "SEVERE", occurredAt: new Date(base.getTime() + 3_000),
+          capturedAt: new Date(base.getTime() + 2_000)
+        }),
+        await insertOccurrence({
+          severity: "FATAL", occurredAt: new Date(base.getTime() + 2_000),
+          capturedAt: new Date(base.getTime())
+        })
       ];
       await live.query("LISTEN obs_occurrence_inserted");
       await vi.waitFor(async () => {
@@ -604,7 +796,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
         ORDER BY delivery.occurred_at,delivery.delivery_id
       `, [rows.map((row) => row.occurrenceId)]);
       expect(order.rows.map((row) => row.occurrence_id)).toEqual([
-        rows[3]?.occurrenceId, rows[1]?.occurrenceId, rows[2]?.occurrenceId, rows[0]?.occurrenceId
+        rows[1]?.occurrenceId, rows[3]?.occurrenceId, rows[2]?.occurrenceId, rows[0]?.occurrenceId
       ]);
     } finally {
       await daemon.stop();
@@ -614,19 +806,44 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
   it("keeps one leader, promotes a standby, and reconnects LISTEN-first after loss", async () => {
     const madeA: pg.Client[] = [];
     const madeB: pg.Client[] = [];
+    const statementsA: string[][] = [];
     const statementsB: string[][] = [];
+    let signalOwnedBegin!: () => void;
+    let releaseOwnedBegin!: () => void;
+    const firstOwnedBegin = new Promise<void>((resolve) => { signalOwnedBegin = resolve; });
+    const ownedBeginRelease = new Promise<void>((resolve) => { releaseOwnedBegin = resolve; });
+    let pausedOwnedBegin = false;
+    const probe: DaemonQueryProbe = {
+      leadershipResults: [],
+      beginWithoutLeadership: [],
+      activeDeliveries: 0,
+      maxInFlight: 0,
+      afterOwnedBegin: async () => {
+        if (pausedOwnedBegin) return;
+        pausedOwnedBegin = true;
+        signalOwnedBegin();
+        await ownedBeginRelease;
+      }
+    };
     const daemonA = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, realClientFactory(madeA));
+    }, observingClientFactory(madeA, statementsA, probe));
     const daemonB = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, loggingClientFactory(madeB, statementsB));
+    }, observingClientFactory(madeB, statementsB, probe));
     await daemonA.start();
     await daemonB.start();
     try {
+      expect(probe.leadershipResults.slice(0, 2).map((entry) => entry.acquired).sort())
+        .toEqual([false, true]);
       const first = await insertOccurrence();
+      await firstOwnedBegin;
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(probe.beginWithoutLeadership).toEqual([]);
+      expect(probe.maxInFlight).toBe(1);
+      releaseOwnedBegin();
       await vi.waitFor(async () => expect(await ackCount(first.occurrenceId)).toBe(1), { timeout: 1_000 });
       await daemonA.stop();
       const second = await insertOccurrence();
@@ -646,7 +863,10 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
       expect(listenIndex).toBeGreaterThanOrEqual(0);
       expect(leaderIndex).toBeGreaterThan(listenIndex);
       expect(pendingIndex).toBeGreaterThan(leaderIndex);
+      expect(probe.beginWithoutLeadership).toEqual([]);
+      expect(probe.maxInFlight).toBe(1);
     } finally {
+      releaseOwnedBegin();
       await daemonA.stop();
       await daemonB.stop();
     }

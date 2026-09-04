@@ -97,7 +97,7 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
       )
       ORDER BY CASE occurrence.severity
         WHEN 'FATAL' THEN 0 WHEN 'SEVERE' THEN 1 WHEN 'DEGRADED' THEN 2 ELSE 3
-      END, occurrence.captured_at ASC, occurrence.occ_seq ASC
+      END, occurrence.occurred_at ASC, occurrence.occ_seq ASC
       LIMIT 1
     `);
     return result.rows[0]?.occurrence_id;

@@ -1,8 +1,8 @@
 # FIX-09 C2 implementation report
 
-Date: 2026-09-04  
-Base C1 PASS: `daa8908d918da1ab137014f68c89e752bd406428`  
-Controller authority: `8ea0999de58edfa52b3b2066953299eaefc8b0c5`  
+Date: 2026-09-04
+Base C1 PASS: `daa8908d918da1ab137014f68c89e752bd406428`
+Controller authority: `8ea0999de58edfa52b3b2066953299eaefc8b0c5`
 Controller lock correction: `99fa48974fc2cd98b7e6e22a51624d9cf72c1f4f`
 
 ## Outcome
@@ -57,8 +57,34 @@ unrelated work; it cannot admit same-occurrence concurrency.
   rollback, and later progress without clearing POISON.
 - C2.4 RED: the daemon module was absent. GREEN proves strict required configuration,
   malformed-payload rejection, LISTEN before leadership/reconciliation, notification wake
-  before a long poll, missed-wake polling, FATAL/captured-at/occ-seq ordering, cap one,
+  before a long poll, missed-wake polling, FATAL/occurred-at/occ-seq ordering, cap one,
   single leadership, standby promotion, forced-error reconnect, and reconnect LISTEN-first.
+
+## Independent review rework
+
+The C2 review found that the pending selector used capture time instead of the binding event
+time. Opposed `occurred_at` and `captured_at` fixtures reproduced the defect: the two new
+ordering assertions failed while the other 12 integration cases passed. The selector now
+orders equal-severity rows by `occurred_at ASC`, then `occ_seq ASC`.
+
+Four proof gaps were closed with real-PostgreSQL cases while their already-correct product
+paths remained unchanged:
+
+- delivery of one fingerprint at versions 1 and 2 produces two isolated aggregates and
+  replaying either occurrence leaves both aggregates and ACK counts unchanged;
+- the successful global advisory-lock result dominates delivery, the false-lock generation
+  never reaches `BEGIN`, and a deliberately paused owned transaction observes maximum
+  in-flight delivery exactly one;
+- the listener's full sorted `obs` table privilege projection equals the 0034 inventory,
+  excludes `occurrence_detail`, and the only relevant routine grant is writer `EXECUTE` on
+  `occurrence_seq_nextval_notify`;
+- pre-seeded deterministic skip and dead-letter actions without ACK are reused exactly once,
+  then ACK/cursor work commits and poison health retains the closed reason.
+
+The exact former survivors now fail: removing the fingerprint-version predicate throws
+`INCIDENT_IDENTITY_MISMATCH`; ignoring the global leader result records a transaction from
+the false-lock generation; granting listener SELECT on `occurrence_detail` changes the exact
+privilege projection; removing both terminal receipt guards creates duplicate actions.
 
 ## Commits
 
@@ -69,7 +95,7 @@ unrelated work; it cannot admit same-occurrence concurrency.
 
 ## Final verification
 
-- Focused C2 pair, three fresh real-PostgreSQL runs: `2 passed`, `18 passed` each run.
+- Focused C2 pair, three fresh real-PostgreSQL runs: `2 passed`, `20 passed` each run.
 - Adjacent S01+C1: `2 passed`, `91 passed`.
 - C1 independent hash: exact canonical hash above; interface compile: exit 0.
 - Forbidden daemon authority/import scan: zero matches. Production imports resolve only to
