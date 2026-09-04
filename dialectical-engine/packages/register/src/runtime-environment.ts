@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  parseRegisterVersionText,
+  registerVersionToSafeLegacyNumber
+} from "./register-publication.js";
 
 function parseEnvironmentSource<T extends z.ZodRawShape>(
   shape: T,
@@ -66,6 +70,9 @@ export function loadSettlementEnvironment() {
 const positiveInteger = z.coerce.number().int().positive();
 const nonNegativeInteger = z.coerce.number().int().nonnegative();
 const boundedRate = z.coerce.number().min(0).max(1);
+const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((value) => (
+  registerVersionToSafeLegacyNumber(parseRegisterVersionText(value))
+));
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
@@ -94,7 +101,7 @@ const apiEnvironmentShape = {
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
     DATABASE_URL: z.string().url(), API_HOST: z.string().min(1), API_PORT: positiveInteger,
-    STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: positiveInteger,
+    STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: legacyRegisterVersion,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
     PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
@@ -174,7 +181,7 @@ export function loadApiEnvironment() {
 export function loadRunnerEnvironment() {
   const environment = parseEnvironment({
     KEK_PATH: kekPath, DATABASE_URL: z.string().url(), RUNNER_WORKER_ID: z.string().min(1),
-    REGISTER_VERSION: positiveInteger,
+    REGISTER_VERSION: legacyRegisterVersion,
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     USER_DEK_STORE_PATH: z.string().min(1).optional(),

@@ -618,3 +618,43 @@ export {
   type ProductRolePolicy,
   type ProductRolePolicyRegisterRow
 } from "./product-role-policy.js";
+
+export {
+  SUPPORT_CONFIGURATION_KEYS,
+  canonicalDecimal,
+  canonicalRegisterJson,
+  computeGeneralPublicationRequestSha256,
+  computeRegisterSnapshotSha256,
+  computeSupportPublicationRequestSha256,
+  createPostgresRegisterPublicationPort,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
+  registerVersionToSafeLegacyNumber,
+  validateSupportConfigurationValue,
+  type CanonicalDecimalText,
+  type CanonicalJsonAst,
+  type CanonicalRegisterJson,
+  type GeneralRegisterPublication,
+  type HistoricalRegisterImport,
+  type HistoricalRegisterImportReceipt,
+  type RegisterPublicationPort,
+  type RegisterPublicationReceipt,
+  type RegisterPublicationRow,
+  type RegisterVersionText,
+  type SupportConfigurationKey,
+  type SupportConfigurationPatchRow,
+  type SupportConfigurationPublication,
+  type SupportConfigurationStatus,
+  type SupportPublicationReceipt
+} from "./register-publication.js";
+
+export {
+  SUPPORT_CONFIG_CACHE_MAX_AGE_MS,
+  SUPPORT_CONFIG_REFRESH_DEADLINE_MS,
+  createSupportConfigurationPort,
+  type SupportConfigurationPort,
+  type SupportConfigurationPortOptions,
+  type SupportConfigurationSnapshot,
+  type SupportConfigurationState,
+  type SupportConfigurationValues
+} from "./support-config.js";
