@@ -17,12 +17,13 @@ describe("POL-03 pool failure policy", () => {
     const child = await runPoolFailureChild({ POL03_MODE: "emit" });
 
     expect(child.exitCode, child.stderr).toBe(0);
-    expect(child.stderr).toContain("[DATABASE_POOL_FAILED] PostgreSQL pool operation failed: POL03_SIMULATED_IDLE_BACKEND_RESET");
+    expect(child.stderr).toBe("");
     expect(readPoolFailureReceipt(child.stdout)).toMatchObject({
       survived: true,
       subsequentError: {
         name: "TypedDomainError",
-        code: "DATABASE_POOL_FAILED"
+        code: "DATABASE_POOL_FAILED",
+        message: "PostgreSQL pool operation failed"
       }
     });
   });

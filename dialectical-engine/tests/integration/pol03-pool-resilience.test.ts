@@ -25,16 +25,18 @@ describe("POL-03 real PostgreSQL backend reset", () => {
     });
 
     expect(child.exitCode, child.stderr).toBe(0);
-    expect(child.stderr).toContain("[DATABASE_POOL_FAILED] PostgreSQL pool operation failed: terminating connection due to administrator command");
+    expect(child.stderr).toBe("");
     expect(readPoolFailureReceipt(child.stdout)).toMatchObject({
       survived: true,
       inFlightError: {
         name: "TypedDomainError",
-        code: "DATABASE_POOL_FAILED"
+        code: "DATABASE_POOL_FAILED",
+        message: "PostgreSQL pool operation failed"
       },
       subsequentError: {
         name: "TypedDomainError",
-        code: "DATABASE_POOL_FAILED"
+        code: "DATABASE_POOL_FAILED",
+        message: "PostgreSQL pool operation failed"
       }
     });
   });
