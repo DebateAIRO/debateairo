@@ -39,6 +39,42 @@ function ownStringProperty(value: unknown, key: string): string | undefined {
   }
 }
 
+type OwnOptionalDataProperty =
+  | { readonly kind: "MISSING" }
+  | { readonly kind: "VALUE"; readonly value: unknown }
+  | { readonly kind: "INVALID" };
+
+function ownOptionalDataProperty(
+  value: unknown,
+  key: string,
+): OwnOptionalDataProperty {
+  if (value === null || typeof value !== "object") {
+    return { kind: "INVALID" };
+  }
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor !== undefined) {
+      return "value" in descriptor
+        ? { kind: "VALUE", value: descriptor.value }
+        : { kind: "INVALID" };
+    }
+
+    const visited = new Set<object>();
+    let prototype = Object.getPrototypeOf(value) as object | null;
+    while (prototype !== null) {
+      if (visited.has(prototype)) return { kind: "INVALID" };
+      visited.add(prototype);
+      if (Object.getOwnPropertyDescriptor(prototype, key) !== undefined) {
+        return { kind: "INVALID" };
+      }
+      prototype = Object.getPrototypeOf(prototype) as object | null;
+    }
+    return { kind: "MISSING" };
+  } catch {
+    return { kind: "INVALID" };
+  }
+}
+
 export function repin(
   currentBundle: PolicyBundle,
   request: RepinRequest,
@@ -61,5 +97,9 @@ export function repin(
     throw new RepinRefusedError();
   }
 
-  return policyBundleSchema.parse(request.next_bundle ?? current);
+  const nextBundle = ownOptionalDataProperty(request, "next_bundle");
+  if (nextBundle.kind === "INVALID") throw new RepinRefusedError();
+  return nextBundle.kind === "MISSING"
+    ? current
+    : policyBundleSchema.parse(nextBundle.value);
 }

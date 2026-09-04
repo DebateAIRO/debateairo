@@ -70,14 +70,16 @@ export function canonicalProjection(value: unknown): CanonicalJsonValue {
       return nonPlainJsonData();
     }
     const descriptors = Object.getOwnPropertyDescriptors(value);
-    return Object.fromEntries(
-      Object.keys(descriptors)
-        .sort()
-        .map((key) => [
-          key,
-          canonicalProjection(dataPropertyValue(descriptors[key])),
-        ]),
-    );
+    const projection = Object.create(null) as Record<
+      string,
+      CanonicalJsonValue
+    >;
+    for (const key of Object.keys(descriptors).sort()) {
+      projection[key] = canonicalProjection(
+        dataPropertyValue(descriptors[key]),
+      );
+    }
+    return projection;
   }
   throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
 }

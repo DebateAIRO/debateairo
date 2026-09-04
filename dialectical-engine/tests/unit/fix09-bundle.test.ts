@@ -291,6 +291,88 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(policyBundleSchema.safeParse(inherited).success).toBe(false);
   });
 
+  it("does not let Object.prototype supply a missing quick_arm", () => {
+    const raw = readFileSync(BUNDLE_PATH, "utf8");
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "quick_arm",
+    );
+    const outcomes: boolean[] = [];
+    const completeOutcomes: boolean[] = [];
+
+    try {
+      for (const inherited of ["OFF", "ON"] as const) {
+        Object.defineProperty(Object.prototype, "quick_arm", {
+          configurable: true,
+          value: inherited,
+        });
+        const candidate = JSON.parse(raw) as Record<string, unknown>;
+        completeOutcomes.push(policyBundleSchema.safeParse(candidate).success);
+        delete candidate.quick_arm;
+        outcomes.push(policyBundleSchema.safeParse(candidate).success);
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "quick_arm");
+      } else {
+        Object.defineProperty(Object.prototype, "quick_arm", previous);
+      }
+    }
+
+    expect(outcomes).toEqual([false, false]);
+    expect(completeOutcomes).toEqual([true, true]);
+  });
+
+  it("does not let Object.prototype supply missing nested members", () => {
+    const raw = readFileSync(BUNDLE_PATH, "utf8");
+    const scenarios = [
+      {
+        key: "default",
+        value: "DEGRADED",
+        remove(candidate: Record<string, unknown>) {
+          delete (candidate.severity_map as Record<string, unknown>).default;
+        },
+      },
+      {
+        key: "id",
+        value: "V",
+        remove(candidate: Record<string, unknown>) {
+          delete (
+            (candidate.custodians as Array<Record<string, unknown>>)[0] as Record<
+              string,
+              unknown
+            >
+          ).id;
+        },
+      },
+    ] as const;
+    const outcomes: boolean[] = [];
+
+    for (const scenario of scenarios) {
+      const previous = Object.getOwnPropertyDescriptor(
+        Object.prototype,
+        scenario.key,
+      );
+      try {
+        Object.defineProperty(Object.prototype, scenario.key, {
+          configurable: true,
+          value: scenario.value,
+        });
+        const candidate = JSON.parse(raw) as Record<string, unknown>;
+        scenario.remove(candidate);
+        outcomes.push(policyBundleSchema.safeParse(candidate).success);
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(Object.prototype, scenario.key);
+        } else {
+          Object.defineProperty(Object.prototype, scenario.key, previous);
+        }
+      }
+    }
+
+    expect(outcomes).toEqual([false, false]);
+  });
+
   it("rejects accessor-backed hash input without invoking the accessor", () => {
     let accessorReads = 0;
     const changing = Object.defineProperty({ stable: true }, "changing", {
@@ -333,6 +415,73 @@ describe("FIX-09 C1 policy bundle", () => {
     );
     expect(next.quick_arm).toBe("ON");
     expect(bundle.quick_arm).toBe("OFF");
+
+    expect(
+      repin(
+        bundle,
+        { token: "fixture-custodian-token" },
+        environment,
+      ),
+    ).toEqual(bundle);
+  });
+
+  it("refuses an authenticated next_bundle accessor without invoking it", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    let accessorReads = 0;
+    const request = Object.defineProperty(
+      { token: "fixture-custodian-token" },
+      "next_bundle",
+      {
+        enumerable: true,
+        get() {
+          accessorReads += 1;
+          throw new Error("NEXT_BUNDLE_GETTER_INVOKED");
+        },
+      },
+    );
+
+    let thrown: unknown;
+    try {
+      repin(bundle, request, {
+        OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(RepinRefusedError);
+    expect(thrown).toMatchObject({ code: "REPIN_REFUSED" });
+    expect(accessorReads).toBe(0);
+  });
+
+  it("refuses inherited or descriptor-trapping next_bundle data", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const environment = {
+      OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+    };
+    const inherited = Object.assign(
+      Object.create({ next_bundle: { ...bundle, quick_arm: "ON" } }) as Record<
+        string,
+        unknown
+      >,
+      { token: "fixture-custodian-token" },
+    );
+    const trapping = new Proxy(
+      { token: "fixture-custodian-token" },
+      {
+        getOwnPropertyDescriptor(target, key) {
+          if (key === "next_bundle") throw new Error("DESCRIPTOR_TRAP");
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+      },
+    );
+
+    expect(() => repin(bundle, inherited as never, environment)).toThrowError(
+      RepinRefusedError,
+    );
+    expect(() => repin(bundle, trapping, environment)).toThrowError(
+      RepinRefusedError,
+    );
   });
 
   it("maps every missing or malformed token to REPIN_REFUSED", () => {

@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
-import { isOwnPlainJsonData } from "./canonical.js";
+import {
+  canonicalProjection,
+  isOwnPlainJsonData,
+} from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
 const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
@@ -203,6 +206,7 @@ const policyBundleContentsSchema = z
 export const policyBundleSchema = z
   .unknown()
   .refine(isOwnPlainJsonData, "POLICY_BUNDLE_NON_PLAIN_DATA")
+  .transform((value) => canonicalProjection(value))
   .pipe(policyBundleContentsSchema);
 
 export type PolicyBundle = z.infer<typeof policyBundleSchema>;
