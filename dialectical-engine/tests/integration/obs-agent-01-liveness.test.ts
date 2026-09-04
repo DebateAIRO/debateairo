@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,9 +29,29 @@ describe("OBS-01 four liveness probes and state transitions", () => {
     const { loadObservationTargets } = await import(
       "../../apps/observation-agent/src/core/targets.js"
     );
-    const coreComponents = new Set(["docker", "hatchet", "observation_agent", "postgres"]);
-    const coreTargets = (await loadObservationTargets("deploy/observation-agent/targets.dev.d"))
-      .filter((target) => coreComponents.has(target.component))
+    const targetsDirectory = await mkdtemp(join(tmpdir(), "obs-01-targets-"));
+    scratchDirectories.push(targetsDirectory);
+    const obs01Fragment = await readFile("deploy/observation-agent/targets.dev.d/OBS-01.json");
+    await writeFile(join(targetsDirectory, "OBS-01.json"), obs01Fragment);
+    await writeFile(join(targetsDirectory, "OBS-99.json"), JSON.stringify({
+      schema_version: 1,
+      targets: [{
+        component: "hatchet",
+        kind: "hatchet_metrics",
+        rest_url: "http://127.0.0.1:8888/api/v1/tenants/local/queue-metrics"
+      }]
+    }));
+    const targets = await loadObservationTargets(targetsDirectory);
+    expect(targets).toContainEqual({
+      component: "hatchet",
+      kind: "hatchet_metrics",
+      rest_url: "http://127.0.0.1:8888/api/v1/tenants/local/queue-metrics"
+    });
+    const coreTargetIdentities = new Set([
+      "docker:docker", "hatchet:hatchet", "observation_agent:self", "postgres:postgres"
+    ]);
+    const coreTargets = targets
+      .filter((target) => coreTargetIdentities.has(`${target.component}:${target.kind}`))
       .sort((left, right) => left.component.localeCompare(right.component));
     expect(coreTargets).toEqual([
       { component: "docker", kind: "docker" },
