@@ -10,7 +10,6 @@ import {
   OBSERVATION_COMPONENTS,
   SIGNAL_CLASSES,
   STATUS_STATES,
-  STATUS_TEMPLATES,
   STATUS_UNITS,
   STATUS_VIEW_PATTERN,
   type ModuleConfigurationObject,
@@ -29,6 +28,87 @@ const sampleIntentSchema = z.object({
 }).strict();
 
 const statusViewSchema = z.string().regex(STATUS_VIEW_PATTERN);
+const statusKeySchema = z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u);
+
+const stateStatusProjectionSchema = z.object({
+  kind: z.literal("state"),
+  key: statusKeySchema,
+  state: z.enum(STATUS_STATES),
+  view: statusViewSchema.optional(),
+  observedAt: z.date().optional()
+}).strict();
+
+const metricStatusProjectionSchema = z.object({
+  kind: z.literal("metric"),
+  key: statusKeySchema,
+  value: z.number().finite(),
+  unit: z.enum(STATUS_UNITS),
+  view: statusViewSchema.optional(),
+  observedAt: z.date().optional()
+}).strict();
+
+const timestampStatusProjectionSchema = z.object({
+  kind: z.literal("timestamp"),
+  key: statusKeySchema,
+  value: z.date().nullable(),
+  view: statusViewSchema.optional()
+}).strict();
+
+const templateStatusProjectionSchemas = [
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("EVALUATOR_UNBOUND_BY_REGISTER"), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("NO_SCHEDULE_RULED"), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("CAPTURE_NOT_WIRED"), count: z.number().int().nonnegative(),
+    view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("SLOW_QUERIES_NOT_OBSERVABLE"), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("PROVIDER_LATENCY_NOT_OBSERVABLE"), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("COUNT_WINDOW_THRESHOLD"), count: z.number().int().positive(),
+    windowMinutes: z.number().finite().positive(), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("PERCENT_MINIMUM_THRESHOLD"),
+    percent: z.number().finite().min(0).max(100), minimum: z.number().int().positive(),
+    view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("RATIO_WINDOW_STATE"), numerator: z.number().int().nonnegative(),
+    denominator: z.number().int().positive(), windowMinutes: z.number().finite().positive(),
+    state: z.enum(STATUS_STATES), view: statusViewSchema.optional()
+  }).strict().refine((projection) => projection.numerator <= projection.denominator, {
+    message: "OBSERVATION_STATUS_RATIO_INVALID"
+  }),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("DURATION_WINDOW_STATE"), valueSeconds: z.number().finite().nonnegative(),
+    windowMinutes: z.number().finite().positive(), state: z.enum(STATUS_STATES),
+    view: statusViewSchema.optional()
+  }).strict()
+] as const;
+
+const moduleStatusProjectionSchema = z.union([
+  stateStatusProjectionSchema,
+  metricStatusProjectionSchema,
+  timestampStatusProjectionSchema,
+  ...templateStatusProjectionSchemas
+]);
 
 const probeObservationSchema = z.object({
   component: z.enum(OBSERVATION_COMPONENTS),
@@ -43,36 +123,7 @@ const probeObservationSchema = z.object({
   observedAt: z.date().optional(),
   management: z.enum(["core", "module"]).optional(),
   statusState: z.enum(STATUS_STATES).optional(),
-  status: z.array(z.discriminatedUnion("kind", [
-    z.object({
-      kind: z.literal("state"),
-      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
-      state: z.enum(STATUS_STATES),
-      view: statusViewSchema.optional(),
-      observedAt: z.date().optional()
-    }).strict(),
-    z.object({
-      kind: z.literal("metric"),
-      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
-      value: z.number().finite(),
-      unit: z.enum(STATUS_UNITS),
-      view: statusViewSchema.optional(),
-      observedAt: z.date().optional()
-    }).strict(),
-    z.object({
-      kind: z.literal("timestamp"),
-      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
-      value: z.date().nullable(),
-      view: statusViewSchema.optional()
-    }).strict(),
-    z.object({
-      kind: z.literal("template"),
-      key: z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u),
-      template: z.enum(STATUS_TEMPLATES),
-      count: z.number().int().nonnegative().optional(),
-      view: statusViewSchema.optional()
-    }).strict()
-  ])).max(128).optional()
+  status: z.array(moduleStatusProjectionSchema).max(128).optional()
 }).strict().superRefine((observation, context) => {
   if (observation.management !== "module"
     && (observation.statusState !== undefined || observation.status !== undefined)) {
@@ -124,11 +175,45 @@ function parseProbeObservation(input: unknown): ProbeObservation {
             ...(projection.view === undefined ? {} : { view: projection.view })
           });
         }
+        if (projection.template === "CAPTURE_NOT_WIRED") {
+          return Object.freeze({
+            kind: projection.kind, key: projection.key, template: projection.template,
+            count: projection.count,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.template === "COUNT_WINDOW_THRESHOLD") {
+          return Object.freeze({
+            kind: projection.kind, key: projection.key, template: projection.template,
+            count: projection.count, windowMinutes: projection.windowMinutes,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.template === "PERCENT_MINIMUM_THRESHOLD") {
+          return Object.freeze({
+            kind: projection.kind, key: projection.key, template: projection.template,
+            percent: projection.percent, minimum: projection.minimum,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.template === "RATIO_WINDOW_STATE") {
+          return Object.freeze({
+            kind: projection.kind, key: projection.key, template: projection.template,
+            numerator: projection.numerator, denominator: projection.denominator,
+            windowMinutes: projection.windowMinutes, state: projection.state,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.template === "DURATION_WINDOW_STATE") {
+          return Object.freeze({
+            kind: projection.kind, key: projection.key, template: projection.template,
+            valueSeconds: projection.valueSeconds, windowMinutes: projection.windowMinutes,
+            state: projection.state,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
         return Object.freeze({
-          kind: projection.kind,
-          key: projection.key,
-          template: projection.template,
-          ...(projection.count === undefined ? {} : { count: projection.count }),
+          kind: projection.kind, key: projection.key, template: projection.template,
           ...(projection.view === undefined ? {} : { view: projection.view })
         });
       }))

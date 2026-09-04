@@ -187,6 +187,57 @@ describe("OBS-01 core oactl controls", () => {
     }
   });
 
+  it("renders the five closed composite throughput status lines exactly", async () => {
+    const stateDir = await scratch("obs-01-composite-status-");
+    await writeFile(join(stateDir, "status.json"), JSON.stringify({
+      pid: 789,
+      version: "0.1.0",
+      thresholds_version: 9,
+      mute: null,
+      components: {},
+      modules: {
+        "throughput-fixture": [
+          {
+            kind: "template", key: "queue.threshold", template: "COUNT_WINDOW_THRESHOLD",
+            count: 10, window_minutes: 5, view: "throughput"
+          },
+          {
+            kind: "template", key: "provider.threshold", template: "PERCENT_MINIMUM_THRESHOLD",
+            percent: 50, minimum: 10, view: "throughput"
+          },
+          {
+            kind: "template", key: "run.failure.threshold", template: "PERCENT_MINIMUM_THRESHOLD",
+            percent: 50, minimum: 4, view: "throughput"
+          },
+          {
+            kind: "template", key: "run.failure", template: "RATIO_WINDOW_STATE",
+            numerator: 3, denominator: 4, window_minutes: 60, state: "SEVERE",
+            view: "throughput"
+          },
+          {
+            kind: "template", key: "dispatch.p95", template: "DURATION_WINDOW_STATE",
+            value_seconds: 31, window_minutes: 5, state: "DEGRADED", view: "throughput"
+          }
+        ]
+      }
+    }));
+    const { renderStatus } = await import(
+      "../../apps/observation-agent/src/oactl/core/status.js"
+    );
+
+    const output = await renderStatus(stateDir, "throughput");
+    expect(output).toBe([
+      `state_dir ${stateDir}`,
+      "pid 789",
+      "thresholds v9",
+      "dispatch p95: 31s over 5m (DEGRADED)",
+      "provider threshold 50%/10",
+      "queue threshold 10/5m",
+      "run failure: 3/4 over 60m (SEVERE)",
+      "run failure threshold 50%/4"
+    ].join("\n"));
+  });
+
   it("provisions one repo-root 0600 credential file without returning the secret", async () => {
     const repoRoot = await scratch("obs-01-provision-repo-");
     const home = await scratch("obs-01-provision-home-");

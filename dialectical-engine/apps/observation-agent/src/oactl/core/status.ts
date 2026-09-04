@@ -6,6 +6,10 @@ import { STATUS_VIEW_PATTERN } from "../../core/types.js";
 
 type StoredProjection = NonNullable<ReturnType<typeof statusSnapshotSchema.parse>["modules"]>[string][number];
 
+function projectionLabel(key: string): string {
+  return key.replace(/[._-]+/gu, " ");
+}
+
 function renderProjection(projection: StoredProjection): string {
   if (projection.kind === "state") return `${projection.key.padEnd(28)} ${projection.state}`;
   if (projection.kind === "metric") {
@@ -25,6 +29,18 @@ function renderProjection(projection: StoredProjection): string {
   }
   if (projection.template === "SLOW_QUERIES_NOT_OBSERVABLE") {
     return `${projection.key}: NOT OBSERVABLE (pg_stat_statements disabled)`;
+  }
+  if (projection.template === "COUNT_WINDOW_THRESHOLD") {
+    return `${projectionLabel(projection.key)} ${projection.count}/${projection.window_minutes}m`;
+  }
+  if (projection.template === "PERCENT_MINIMUM_THRESHOLD") {
+    return `${projectionLabel(projection.key)} ${projection.percent}%/${projection.minimum}`;
+  }
+  if (projection.template === "RATIO_WINDOW_STATE") {
+    return `${projectionLabel(projection.key)}: ${projection.numerator}/${projection.denominator} over ${projection.window_minutes}m (${projection.state})`;
+  }
+  if (projection.template === "DURATION_WINDOW_STATE") {
+    return `${projectionLabel(projection.key)}: ${projection.value_seconds}s over ${projection.window_minutes}m (${projection.state})`;
   }
   return `${projection.key}: NOT OBSERVABLE`;
 }

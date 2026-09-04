@@ -6,7 +6,8 @@ import {
   OBSERVATION_COMPONENTS,
   STATUS_STATES,
   STATUS_UNITS,
-  STATUS_VIEW_PATTERN
+  STATUS_VIEW_PATTERN,
+  type ModuleStatusProjection
 } from "../core/types.js";
 
 const componentStatusSchema = z.object({
@@ -60,6 +61,31 @@ const templateProjectionSchema = z.union([
   z.object({
     kind: z.literal("template"), key: statusKeySchema,
     template: z.literal("PROVIDER_LATENCY_NOT_OBSERVABLE"), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("COUNT_WINDOW_THRESHOLD"), count: z.number().int().positive(),
+    window_minutes: z.number().finite().positive(), view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("PERCENT_MINIMUM_THRESHOLD"),
+    percent: z.number().finite().min(0).max(100), minimum: z.number().int().positive(),
+    view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("RATIO_WINDOW_STATE"), numerator: z.number().int().nonnegative(),
+    denominator: z.number().int().positive(), window_minutes: z.number().finite().positive(),
+    state: z.enum(STATUS_STATES), view: statusViewSchema.optional()
+  }).strict().refine((projection) => projection.numerator <= projection.denominator, {
+    message: "OBSERVATION_STATUS_RATIO_INVALID"
+  }),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("DURATION_WINDOW_STATE"), value_seconds: z.number().finite().nonnegative(),
+    window_minutes: z.number().finite().positive(), state: z.enum(STATUS_STATES),
+    view: statusViewSchema.optional()
   }).strict()
 ]);
 
@@ -69,6 +95,79 @@ export const storedModuleStatusProjectionSchema = z.union([
   timestampProjectionSchema,
   templateProjectionSchema
 ]);
+
+export type StoredModuleStatusProjection = z.infer<typeof storedModuleStatusProjectionSchema>;
+
+export function toStoredModuleStatusProjection(
+  projection: ModuleStatusProjection
+): StoredModuleStatusProjection {
+  if (projection.kind === "state") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, state: projection.state,
+      ...(projection.view === undefined ? {} : { view: projection.view }),
+      ...(projection.observedAt === undefined ? {} : {
+        observed_at: projection.observedAt.toISOString()
+      })
+    });
+  }
+  if (projection.kind === "metric") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, value: projection.value, unit: projection.unit,
+      ...(projection.view === undefined ? {} : { view: projection.view }),
+      ...(projection.observedAt === undefined ? {} : {
+        observed_at: projection.observedAt.toISOString()
+      })
+    });
+  }
+  if (projection.kind === "timestamp") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key,
+      value: projection.value?.toISOString() ?? null,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.template === "CAPTURE_NOT_WIRED") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, template: projection.template,
+      count: projection.count,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.template === "COUNT_WINDOW_THRESHOLD") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, template: projection.template,
+      count: projection.count, window_minutes: projection.windowMinutes,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.template === "PERCENT_MINIMUM_THRESHOLD") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, template: projection.template,
+      percent: projection.percent, minimum: projection.minimum,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.template === "RATIO_WINDOW_STATE") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, template: projection.template,
+      numerator: projection.numerator, denominator: projection.denominator,
+      window_minutes: projection.windowMinutes, state: projection.state,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.template === "DURATION_WINDOW_STATE") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, template: projection.template,
+      value_seconds: projection.valueSeconds, window_minutes: projection.windowMinutes,
+      state: projection.state,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  return Object.freeze({
+    kind: projection.kind, key: projection.key, template: projection.template,
+    ...(projection.view === undefined ? {} : { view: projection.view })
+  });
+}
 
 const moduleStatusSchema = z.record(
   z.string().min(1).max(64).regex(/^[a-z][a-z0-9_-]*$/u),

@@ -32,7 +32,9 @@ export type StatusUnit = typeof STATUS_UNITS[number];
 
 export const STATUS_TEMPLATES = Object.freeze([
   "EVALUATOR_UNBOUND_BY_REGISTER", "NO_SCHEDULE_RULED", "CAPTURE_NOT_WIRED",
-  "SLOW_QUERIES_NOT_OBSERVABLE", "PROVIDER_LATENCY_NOT_OBSERVABLE"
+  "SLOW_QUERIES_NOT_OBSERVABLE", "PROVIDER_LATENCY_NOT_OBSERVABLE",
+  "COUNT_WINDOW_THRESHOLD", "PERCENT_MINIMUM_THRESHOLD", "RATIO_WINDOW_STATE",
+  "DURATION_WINDOW_STATE"
 ] as const);
 
 export type StatusTemplate = typeof STATUS_TEMPLATES[number];
@@ -64,8 +66,50 @@ export type ModuleStatusProjection =
   | Readonly<{
       kind: "template";
       key: string;
-      template: StatusTemplate;
-      count?: number;
+      template: "EVALUATOR_UNBOUND_BY_REGISTER" | "NO_SCHEDULE_RULED"
+        | "SLOW_QUERIES_NOT_OBSERVABLE" | "PROVIDER_LATENCY_NOT_OBSERVABLE";
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: "CAPTURE_NOT_WIRED";
+      count: number;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: "COUNT_WINDOW_THRESHOLD";
+      count: number;
+      windowMinutes: number;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: "PERCENT_MINIMUM_THRESHOLD";
+      percent: number;
+      minimum: number;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: "RATIO_WINDOW_STATE";
+      numerator: number;
+      denominator: number;
+      windowMinutes: number;
+      state: StatusState;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: "DURATION_WINDOW_STATE";
+      valueSeconds: number;
+      windowMinutes: number;
+      state: StatusState;
       view?: StatusView;
     }>;
 

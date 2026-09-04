@@ -10,7 +10,6 @@ import { signalSchema, type ObservationSignal, type Severity } from "./core/sign
 import { loadObservationTargetCatalog } from "./core/targets.js";
 import {
   OBSERVATION_COMPONENTS,
-  type ModuleStatusProjection,
   type ProbeObservation,
   type StatusState
 } from "./core/types.js";
@@ -31,7 +30,7 @@ import {
 import { persistSignal } from "./store/pipeline.js";
 import { PostgresMirror } from "./store/postgres.js";
 import { SampleRingStore } from "./store/samples.js";
-import { writeStatusSnapshot } from "./store/status.js";
+import { toStoredModuleStatusProjection, writeStatusSnapshot } from "./store/status.js";
 
 const VERSION = "0.1.0";
 
@@ -243,46 +242,7 @@ async function boot(): Promise<void> {
         componentStatus.lastProbeAt = observation.observedAt ?? new Date();
         if (observation.ok) componentStatus.lastOkAt = observation.observedAt ?? new Date();
       }
-      const projections = update.projections.map((projection: ModuleStatusProjection) => {
-        if (projection.kind === "state") {
-          return Object.freeze({
-            kind: projection.kind,
-            key: projection.key,
-            state: projection.state,
-            ...(projection.view === undefined ? {} : { view: projection.view }),
-            ...(projection.observedAt === undefined ? {} : {
-              observed_at: projection.observedAt.toISOString()
-            })
-          });
-        }
-        if (projection.kind === "metric") {
-          return Object.freeze({
-            kind: projection.kind,
-            key: projection.key,
-            value: projection.value,
-            unit: projection.unit,
-            ...(projection.view === undefined ? {} : { view: projection.view }),
-            ...(projection.observedAt === undefined ? {} : {
-              observed_at: projection.observedAt.toISOString()
-            })
-          });
-        }
-        if (projection.kind === "timestamp") {
-          return Object.freeze({
-            kind: projection.kind,
-            key: projection.key,
-            value: projection.value?.toISOString() ?? null,
-            ...(projection.view === undefined ? {} : { view: projection.view })
-          });
-        }
-        return Object.freeze({
-          kind: projection.kind,
-          key: projection.key,
-          template: projection.template,
-          ...(projection.count === undefined ? {} : { count: projection.count }),
-          ...(projection.view === undefined ? {} : { view: projection.view })
-        });
-      });
+      const projections = update.projections.map(toStoredModuleStatusProjection);
       if (projections.length === 0) moduleStatus.delete(moduleName);
       else moduleStatus.set(moduleName, Object.freeze(projections));
     }
