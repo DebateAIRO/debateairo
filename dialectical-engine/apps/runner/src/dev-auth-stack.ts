@@ -27,6 +27,7 @@ import {
   type DevelopmentCliProviderPanelHandle
 } from "./dev-cli-provider-panel.js";
 import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
 import {
   createDevTlsReadinessOperations,
   startAttestedDevTlsFrontDoor
@@ -34,7 +35,10 @@ import {
 
 type Stoppable = Readonly<{ stop(): Promise<void> }>;
 type DataPlaneHandle = Stoppable & Readonly<{
-  receipt: Readonly<{ mailCapture: "ATTESTED" }>;
+  receipt: Readonly<{
+    mailCapture: "ATTESTED";
+    register: DevelopmentDeploymentRegisterMachineReceiptV1;
+  }>;
 }>;
 type ApiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentApiChildExit> }>;
 type UiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentUiChildExit> }>;
@@ -45,7 +49,10 @@ export type DevelopmentAuthStackOperations = Readonly<{
   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
   startDataPlane(providerPanel: DevelopmentProviderPanel): Promise<DataPlaneHandle>;
   provisionHatchetToken(): Promise<void>;
-  assembleApiEnvironment(providerPanel: DevelopmentProviderPanel): Promise<void>;
+  assembleApiEnvironment(
+    providerPanel: DevelopmentProviderPanel,
+    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1
+  ): Promise<void>;
   startApi(): Promise<ApiHandle>;
   startRunner(): Promise<RunnerHandle>;
   startUi(): Promise<UiHandle>;
@@ -141,7 +148,7 @@ export async function startDevelopmentAuthStack(
     );
     await fixedStage(
       "DEV_AUTH_STACK_ENVIRONMENT_FAILED",
-      () => operations.assembleApiEnvironment(providerPanel.panel)
+      () => operations.assembleApiEnvironment(providerPanel.panel, dataPlane.receipt.register)
     );
     const api = await fixedStage("DEV_AUTH_STACK_API_FAILED", () => operations.startApi());
     owned.push(api);
@@ -228,8 +235,8 @@ export function createDevelopmentAuthStackOperations(
         operations: hatchetOperations
       });
     },
-    async assembleApiEnvironment(providerPanel) {
-      await assembleDevelopmentApiEnvironment({ repositoryRoot, providerPanel });
+    async assembleApiEnvironment(providerPanel, registerReceipt) {
+      await assembleDevelopmentApiEnvironment({ repositoryRoot, providerPanel, registerReceipt });
     },
     startApi: () => startDevelopmentApiProcess({
       repositoryRoot,

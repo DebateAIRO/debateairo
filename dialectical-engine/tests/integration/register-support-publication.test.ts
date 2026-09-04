@@ -211,6 +211,33 @@ afterEach(async () => {
 });
 
 describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
+  it("accepts legacy 755 and maximum 1024 source refs across SQL write/read and rejects 1025", async () => {
+    const legacy = "l".repeat(755);
+    const maximum = "m".repeat(1024);
+    const tooLong = "x".repeat(1025);
+    for (const sourceRef of [legacy, maximum]) {
+      await expect(database.pool.query(
+        "SELECT register._validate_source_ref($1::text)",
+        [sourceRef]
+      )).resolves.toBeDefined();
+    }
+    await expect(database.pool.query(
+      "SELECT register._validate_source_ref($1::text)",
+      [tooLong]
+    )).rejects.toThrow(/REGISTER_PUBLICATION_SEAL_INVALID: source ref/u);
+
+    const rows = baseRows(maximum);
+    await expect(importHistorical("4", rows)).resolves.toMatchObject({ outcome: "CREATED" });
+    const stored = await database.pool.query<{ source_ref: string }>(
+      "SELECT source_ref FROM register.register_row WHERE register_version=$1 ORDER BY row_key",
+      ["4"]
+    );
+    expect(stored.rows).toHaveLength(rows.length);
+    expect(stored.rows.every((row) => row.source_ref === maximum)).toBe(true);
+    await expect(importHistorical("3", baseRows(tooLong)))
+      .rejects.toThrow(/REGISTER_PUBLICATION_SEAL_INVALID: source ref/u);
+  });
+
   it("installs the exact schema objects, constraints, and roles", async () => {
     const columns = await database.pool.query<{ column_name: string; data_type: string; is_nullable: string }>(`
       SELECT column_name,data_type,is_nullable

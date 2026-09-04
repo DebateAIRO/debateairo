@@ -1,5 +1,28 @@
+import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
+import { extname } from "node:path";
+import { promisify } from "node:util";
+import ts from "../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/lib/typescript.js";
 import { describe, expect, it } from "vitest";
+import {
+  AUTH_POLICY_REGISTER_ROWS,
+  AUTH_POLICY_ROW_KEYS,
+  MFA_POLICY_REGISTER_ROW,
+  PRODUCT_ROLE_POLICY_REGISTER_ROW,
+  RECOVERY_POLICY_REGISTER_ROW,
+  SESSION_POLICY_REGISTER_ROW,
+  buildBootstrapRegisterPublicationRows,
+  canonicalRegisterJson,
+  computeRegisterSnapshotSha256,
+  loadBootstrapRegister
+} from "../../packages/register/src/index.js";
+import { buildDevelopmentDeploymentRegisterPublicationRows } from
+  "../../apps/runner/src/dev-deployment-register.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import {
+  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
+  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
+} from "../support/registerFixtures.js";
 
 const migrationPath = "migrations/0055_register_support_publication.sql";
 
@@ -7,7 +30,246 @@ async function migrationSource(): Promise<string> {
   return readFile(migrationPath, "utf8").catch(() => "");
 }
 
+const execFileAsync = promisify(execFile);
+const CENSUS_ROOTS = Object.freeze([
+  "apps", "packages", "acceptance", "tests", "tools", "scripts", "migrations"
+]);
+const CLOSED_WRITE_SURFACES = new Set([
+  "migrations/0055_register_support_publication.sql",
+  "packages/register/src/register-publication.ts",
+  "tests/architecture/register-support-publication.test.ts",
+  "tests/integration/register-support-publication.test.ts"
+]);
+
+type StaticSql = Readonly<{ file: string; text: string }>;
+
+function staticText(node: ts.Expression): string | undefined {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isParenthesizedExpression(node)) return staticText(node.expression);
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = staticText(node.left);
+    const right = staticText(node.right);
+    return left === undefined || right === undefined ? undefined : left + right;
+  }
+  if (ts.isTemplateExpression(node)) {
+    let text = node.head.text;
+    for (const span of node.templateSpans) {
+      const member = staticText(span.expression);
+      if (member === undefined) return undefined;
+      text += member + span.literal.text;
+    }
+    return text;
+  }
+  if (ts.isTaggedTemplateExpression(node)) return staticText(node.template);
+  return undefined;
+}
+
+function collectStaticSql(file: string, source: string): StaticSql[] {
+  if (extname(file) === ".sql") return [{ file, text: source }];
+  const scriptKind = extname(file) === ".js" || extname(file) === ".mjs"
+    ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+  const root = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
+  const statements: StaticSql[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isExpression(node)) {
+      const text = staticText(node);
+      if (text !== undefined && /\bregister[.](?:register_row|register_version(?:_id_seq)?)\b/iu.test(text)) {
+        statements.push({ file, text });
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(root);
+  return statements;
+}
+
+async function repositoryCensus(): Promise<Readonly<{
+  files: readonly string[];
+  sql: readonly StaticSql[];
+  sources: ReadonlyMap<string, string>;
+}>> {
+  const result = await execFileAsync("git", [
+    "ls-files", "--cached", "--others", "--exclude-standard", "--", ...CENSUS_ROOTS
+  ]);
+  const files = result.stdout.split("\n").filter((file) => /[.](?:[cm]?[jt]s|sql)$/u.test(file));
+  const entries = await Promise.all(files.map(async (file) => [file, await readFile(file, "utf8")] as const));
+  const sources = new Map(entries);
+  return Object.freeze({
+    files: Object.freeze(files),
+    sources,
+    sql: Object.freeze(entries.flatMap(([file, source]) => collectStaticSql(file, source)))
+  });
+}
+
 describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
+  it("pins the exact pre-migration legacy v1 and deterministic test-panel v4 snapshots", () => {
+    expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
+      .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");
+    expect(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256)
+      .toBe("120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96");
+  });
+
+  it("preserves the exact legacy hashes while the actual port input owns all 248 policy decimals", async () => {
+    const bootstrap = await loadBootstrapRegister();
+    const historicalRows = buildBootstrapRegisterPublicationRows(bootstrap);
+    const developmentRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap,
+      TEST_DEVELOPMENT_PROVIDER_PANEL
+    );
+    expect(historicalRows).toHaveLength(14);
+    expect(developmentRows).toHaveLength(32);
+    expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
+    expect(computeRegisterSnapshotSha256(developmentRows))
+      .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
+
+    const policyKeys = new Set([
+      ...AUTH_POLICY_ROW_KEYS,
+      "mfaPolicy", "sessionPolicy", "recoveryPolicy", "productRolePolicy"
+    ]);
+    const countNumbers = (value: unknown): number => {
+      if (typeof value === "number") return 1;
+      if (Array.isArray(value)) return value.reduce((sum, member) => sum + countNumbers(member), 0);
+      if (value !== null && typeof value === "object") {
+        return Object.values(value).reduce((sum, member) => sum + countNumbers(member), 0);
+      }
+      return 0;
+    };
+    const policyRows = historicalRows.filter((row) => policyKeys.has(row.rowKey));
+    expect(policyRows.reduce(
+      (sum, row) => sum + countNumbers(JSON.parse(row.valueJsonText)),
+      0
+    )).toBe(248);
+
+    const publicationPolicyRows = [
+      ...AUTH_POLICY_REGISTER_ROWS,
+      MFA_POLICY_REGISTER_ROW,
+      SESSION_POLICY_REGISTER_ROW,
+      RECOVERY_POLICY_REGISTER_ROW,
+      PRODUCT_ROLE_POLICY_REGISTER_ROW
+    ];
+    const inspectAst = (value: unknown): Readonly<{ decimals: number; numbers: number }> => {
+      if (typeof value === "number") return { decimals: 0, numbers: 1 };
+      if (Array.isArray(value)) return value.reduce(
+        (total, member) => {
+          const found = inspectAst(member);
+          return { decimals: total.decimals + found.decimals, numbers: total.numbers + found.numbers };
+        },
+        { decimals: 0, numbers: 0 }
+      );
+      if (value !== null && typeof value === "object") {
+        if ((value as { kind?: unknown }).kind === "DECIMAL") return { decimals: 1, numbers: 0 };
+        return Object.values(value).reduce(
+          (total, member) => {
+            const found = inspectAst(member);
+            return { decimals: total.decimals + found.decimals, numbers: total.numbers + found.numbers };
+          },
+          { decimals: 0, numbers: 0 }
+        );
+      }
+      return { decimals: 0, numbers: 0 };
+    };
+    const policyAstCensus = inspectAst(publicationPolicyRows.map((row) => row.valueAst));
+    expect(policyAstCensus).toEqual({ decimals: 248, numbers: 0 });
+
+    const readerObject = JSON.parse(policyRows[0]!.valueJsonText) as Record<string, unknown>;
+    expect(() => canonicalRegisterJson(readerObject as never))
+      .toThrowError("CANONICAL_REGISTER_JSON_AST_INVALID");
+  });
+
+  it("recognizes hostile static SQL concatenation, interpolation, and tagged builders", () => {
+    const source = [
+      "const a = 'INSERT INTO register.' + 'register_row VALUES (5,1,2,3)';",
+      "const b = `SELECT * FROM register.${'register_version'} ORDER BY register_version DESC LIMIT 1`;",
+      "const c = sql`SELECT nextval(${'register.register_version_id_seq'})`;"
+    ].join("\n");
+    const found = collectStaticSql("hostile.ts", source).map(({ text }) => text);
+    expect(found).toEqual(expect.arrayContaining([
+      "INSERT INTO register.register_row VALUES (5,1,2,3)",
+      "SELECT * FROM register.register_version ORDER BY register_version DESC LIMIT 1"
+    ]));
+    expect(found.some((text) => text.includes("register.register_version_id_seq"))).toBe(true);
+  });
+
+  it("classifies every register relation access and bans open writers, latest selection, and unsafe version coercion", async () => {
+    const census = await repositoryCensus();
+    expect(census.files).toContain("tests/support/registerFixtures.ts");
+    const directWrites = census.sql.filter(({ file, text }) =>
+      /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+register[.](?:register_row|register_version)\b/iu.test(text)
+      && !CLOSED_WRITE_SURFACES.has(file)
+      && !/^migrations\/(?:00(?:0[0-9]|[1-4][0-9]|5[0-4]))/u.test(file)
+    ).map(({ file }) => file);
+    expect([...new Set(directWrites)]).toEqual([]);
+
+    const relationAccesses = census.sql.flatMap(({ file, text }) => {
+      const kinds = [] as Array<"READ" | "WRITE">;
+      if (/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+register[.](?:register_row|register_version)\b/iu.test(text)) {
+        kinds.push("WRITE");
+      }
+      if (/\b(?:FROM|JOIN)\s+register[.](?:register_row|register_version)\b/iu.test(text)) {
+        kinds.push("READ");
+      }
+      return kinds.map((kind) => ({ file, text, kind }));
+    });
+    const unclassified = relationAccesses.filter(({ file, text, kind }) => {
+      if (/^migrations\//u.test(file)) return false;
+      if (kind === "WRITE") return !CLOSED_WRITE_SURFACES.has(file);
+      if (/^(?:tests|acceptance)\//u.test(file)) return false;
+      return !/\b(?:[a-z_]+[.])?register_version\s*=\s*\$[0-9]+/iu.test(text)
+        && !/\bregister_version\s*=\s*[1-4]\b/iu.test(text);
+    }).map(({ file, kind }) => `${kind}:${file}`);
+    expect([...new Set(unclassified)]).toEqual([]);
+
+    const latestReads = census.sql.filter(({ file, text }) =>
+      /(?:max\s*\(\s*register_version\s*\)|ORDER\s+BY\s+register_version\s+DESC\s+LIMIT\s+1)/iu.test(text)
+      && file !== migrationPath
+      && file !== "tests/architecture/register-support-publication.test.ts"
+      && file !== "tests/integration/register-support-publication.test.ts"
+    ).map(({ file }) => file);
+    expect([...new Set(latestReads)]).toEqual([]);
+
+    const sequenceUsers = census.sql.filter(({ file, text }) =>
+      /register_version_id_seq|nextval\s*\(/iu.test(text)
+      && file !== migrationPath
+      && file !== "tests/architecture/register-support-publication.test.ts"
+      && file !== "tests/integration/register-support-publication.test.ts"
+      && !/^migrations\/(?:00(?:0[0-9]|[1-4][0-9]|5[0-4]))/u.test(file)
+    ).map(({ file }) => file);
+    expect([...new Set(sequenceUsers)]).toEqual([]);
+
+    const futureLiteralVersions = census.sql.flatMap(({ file, text }) => {
+      if (/^migrations\//u.test(file)
+        || file === "tests/architecture/register-support-publication.test.ts"
+        || file === "tests/integration/register-support-publication.test.ts") return [];
+      return [...text.matchAll(/\bregister_version\s*=\s*([0-9]+)\b/giu)]
+        .filter((match) => Number(match[1]) > 4)
+        .map(() => file);
+    });
+    expect([...new Set(futureLiteralVersions)]).toEqual([]);
+
+    const unsafeConversions = [...census.sources].flatMap(([file, source]) => {
+      if (file === "packages/register/src/register-publication.ts") return [];
+      return /(?:\bNumber|\bparseInt|\bparseFloat)\s*\([^)]*(?:register_version|registerVersion)/u.test(source)
+        ? [file] : [];
+    });
+    expect([...new Set(unsafeConversions)]).toEqual([]);
+
+    const fixedFutureEnvironment = [...census.sources].flatMap(([file, source]) =>
+      /^(?:apps|packages|acceptance)\//u.test(file)
+        && /\b(?:REGISTER_VERSION|registerVersion)\s*[:=]\s*(?:["']5["']|5\b)/u.test(source)
+        ? [file] : []
+    );
+    expect([...new Set(fixedFutureEnvironment)]).toEqual([]);
+
+    const markerCapableGenericCalls = [...census.sources].flatMap(([file, source]) =>
+      /^(?:apps|packages|acceptance)\//u.test(file)
+        && file !== "packages/register/src/register-publication.ts"
+        && /publishGeneral/u.test(source)
+        && /supportActivation/u.test(source)
+        ? [file] : []
+    );
+    expect([...new Set(markerCapableGenericCalls)]).toEqual([]);
+  });
   it("defines the allocated replay-safe schema and closed SQL capabilities", async () => {
     const source = await migrationSource();
 

@@ -7,6 +7,14 @@ import {
   type DevelopmentAuthStackOperations
 } from "../../apps/runner/src/dev-auth-stack.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import { createDevelopmentDeploymentRegisterMachineReceipt } from "../../apps/runner/src/dev-deployment-register.js";
+import { parseRegisterVersionText } from "../../packages/register/src/index.js";
+
+const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
+  registerVersion: parseRegisterVersionText("424242"),
+  rowCount: 32,
+  snapshotSha256: "a".repeat(64)
+});
 
 type Exit = Readonly<{ code: number | null; signal: NodeJS.Signals | null }>;
 
@@ -54,7 +62,7 @@ function operations(input: Readonly<{
       calls.push("data:start");
       fail("data");
       return Object.freeze({
-        receipt: Object.freeze({ mailCapture: "ATTESTED" as const }),
+        receipt: Object.freeze({ mailCapture: "ATTESTED" as const, register: REGISTER_RECEIPT }),
         stop: vi.fn(async () => { calls.push("data:stop"); })
       });
     }),
@@ -126,7 +134,8 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       "api:start", "runner:start", "ui:start", "tls:start"
     ]);
     expect(runtime.startDataPlane).toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL);
-    expect(runtime.assembleApiEnvironment).toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL);
+    expect(runtime.assembleApiEnvironment)
+      .toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL, REGISTER_RECEIPT);
 
     await Promise.all([stack.stop(), stack.stop()]);
     await stack.stop();

@@ -23,10 +23,20 @@ import { ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
 import { BudgetRepository } from "@debateai/budget";
 import {
+  parseRegisterVersionText,
+  persistBootstrapRegister,
+  loadBootstrapRegister,
+  registerVersionToSafeLegacyNumber
+} from "@debateai/register";
+import {
   runAskTimeEvaluatorTag,
   runEvaluatorTagReconciliation,
   runEvaluatorTerminalHarvest
 } from "../../apps/evaluator-worker/src/index.js";
+import {
+  publishReplacementRegisterFixture,
+  registerFixtureRow
+} from "../support/registerFixtures.js";
 
 let database: TestDatabase;
 
@@ -1307,8 +1317,6 @@ async function insertStarterDomain(canonicalName: string, provenanceRef: string)
 }
 
 describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
-  const absentVersion = 201;
-  const healthyVersion = 202;
   const ask: AskRequest = {
     question_line: "Does evaluator configuration alter the debate panel?",
     risk_tier: "standard",
@@ -1332,20 +1340,6 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     { providerRef: "provider:product-a", adapterKind: "openai-compatible-http", maker: "maker:product-a" },
     { providerRef: "provider:product-b", adapterKind: "openai-compatible-http", maker: "maker:product-b" }
   ] as const;
-
-  async function seedConfiguredProviders(
-    registerVersion: number,
-    providers: readonly { readonly providerRef: string; readonly adapterKind: string; readonly maker: string }[]
-  ): Promise<void> {
-    await database.pool.query(`
-      INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-      VALUES ($1, 'configuredProviderSet', $2::jsonb, $3)
-    `, [registerVersion, JSON.stringify({
-      kind: "CONFIGURED_PROVIDER_SET",
-      requiredDistinctMakers: 2,
-      providers
-    }), `fixture:evaluator-panel:${registerVersion}`]);
-  }
 
   async function admitAndReadPersistedRun(registerVersion: number): Promise<{
     readonly panelBytes: string;
@@ -1413,21 +1407,35 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
   it("persists byte-identical product membership and agent_count with evaluator healthy versus absent", async () => {
     const probedAt = new Date();
     const probes = new ProviderProbeRepository(database.pool);
-    await seedConfiguredProviders(absentVersion, productProviders);
-    await seedConfiguredProviders(healthyVersion, productProviders);
-    await database.pool.query(`
-      INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-      VALUES ($1, 'evaluatorProviderFamily', $2::jsonb, 'fixture:evaluator-family:healthy')
-    `, [healthyVersion, JSON.stringify({
-      kind: "EVALUATOR_PROVIDER_FAMILY",
-      providerRef: EVALUATOR_PROVIDER_REF,
-      adapterKind: "vllm-openai-compatible-http",
-      maker: EVALUATOR_MAKER,
-      chatBaseUrl: "http://vllm:8000/v1",
-      modelsPath: "/models",
-      deadlineMs: 250,
-      source: "LOCAL_CONTAINER_NO_AUTH"
-    })]);
+    await persistBootstrapRegister(database.pool, await loadBootstrapRegister());
+    const configuredProviders = registerFixtureRow("configuredProviderSet", {
+      kind: "CONFIGURED_PROVIDER_SET",
+      requiredDistinctMakers: 2,
+      providers: productProviders
+    }, "fixture:evaluator-panel:publication");
+    const absentPublication = await publishReplacementRegisterFixture(
+      database.pool,
+      parseRegisterVersionText("1"),
+      [configuredProviders],
+      "fixture:evaluator-panel:absent"
+    );
+    const healthyPublication = await publishReplacementRegisterFixture(
+      database.pool,
+      absentPublication.registerVersion,
+      [configuredProviders, registerFixtureRow("evaluatorProviderFamily", {
+        kind: "EVALUATOR_PROVIDER_FAMILY",
+        providerRef: EVALUATOR_PROVIDER_REF,
+        adapterKind: "vllm-openai-compatible-http",
+        maker: EVALUATOR_MAKER,
+        chatBaseUrl: "http://vllm:8000/v1",
+        modelsPath: "/models",
+        deadlineMs: 250,
+        source: "LOCAL_CONTAINER_NO_AUTH"
+      }, "fixture:evaluator-family:healthy")],
+      "fixture:evaluator-panel:healthy"
+    );
+    const absentVersion = registerVersionToSafeLegacyNumber(absentPublication.registerVersion);
+    const healthyVersion = registerVersionToSafeLegacyNumber(healthyPublication.registerVersion);
     await database.pool.query(`
       INSERT INTO evaluator.vllm_probe (
         provider_ref, state, failure_code, started_at, finished_at, at_seq

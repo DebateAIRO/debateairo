@@ -1,5 +1,7 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
+import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
@@ -8,9 +10,17 @@ import {
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
+  canonicalDecimal,
+  canonicalRegisterJson,
+  createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
   persistBootstrapRegister,
-  type BootstrapRegister
+  type BootstrapRegister,
+  type CanonicalJsonAst,
+  type RegisterPublicationRow,
+  type RegisterVersionText
 } from "@debateai/register";
 import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
 
@@ -40,6 +50,244 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
   applies_to: "TRANSPORT_EXHAUSTION" as const
 });
 export const DEVELOPMENT_REGISTER_VERSION = 4 as const;
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA =
+  "debateai.dev-deployment-register-receipt.v1" as const;
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_RELATIVE_PATH =
+  ".local/dev-auth/deployment-register-receipt.v1.json" as const;
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX =
+  "DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=" as const;
+
+const PRIVATE_DIRECTORY_MODE = 0o700;
+const PRIVATE_FILE_MODE = 0o600;
+const MAX_RECEIPT_BYTES = 4_096;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
+
+export type DevelopmentDeploymentRegisterMachineReceiptV1 = Readonly<{
+  schema: typeof DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA;
+  registerVersion: RegisterVersionText;
+  rowCount: number;
+  snapshotSha256: string;
+  receiptSha256: string;
+}>;
+
+function lp(value: string): Buffer {
+  const bytes = Buffer.from(value, "utf8");
+  const length = Buffer.alloc(8);
+  length.writeBigUInt64BE(BigInt(bytes.byteLength));
+  return Buffer.concat([length, bytes]);
+}
+
+function receiptDigest(input: Readonly<{
+  registerVersion: RegisterVersionText;
+  rowCount: number;
+  snapshotSha256: string;
+}>): string {
+  const hash = createHash("sha256");
+  for (const value of [
+    DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA,
+    input.registerVersion,
+    String(input.rowCount),
+    input.snapshotSha256
+  ]) hash.update(lp(value));
+  return hash.digest("hex");
+}
+
+export function createDevelopmentDeploymentRegisterMachineReceipt(input: Readonly<{
+  registerVersion: RegisterVersionText;
+  rowCount: number;
+  snapshotSha256: string;
+}>): DevelopmentDeploymentRegisterMachineReceiptV1 {
+  const registerVersion = parseRegisterVersionText(input.registerVersion);
+  if (!Number.isSafeInteger(input.rowCount) || input.rowCount < 1
+    || !SHA256_PATTERN.test(input.snapshotSha256)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  return Object.freeze({
+    receiptSha256: receiptDigest({ registerVersion, rowCount: input.rowCount, snapshotSha256: input.snapshotSha256 }),
+    registerVersion,
+    rowCount: input.rowCount,
+    schema: DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA,
+    snapshotSha256: input.snapshotSha256,
+  });
+}
+
+export function serializeDevelopmentDeploymentRegisterReceipt(
+  receipt: DevelopmentDeploymentRegisterMachineReceiptV1
+): string {
+  const expected = createDevelopmentDeploymentRegisterMachineReceipt(receipt);
+  if (receipt.schema !== expected.schema || receipt.receiptSha256 !== expected.receiptSha256
+    || Object.keys(receipt).join("\0") !== "receiptSha256\0registerVersion\0rowCount\0schema\0snapshotSha256") {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  return JSON.stringify(receipt);
+}
+
+function currentUid(): number {
+  if (typeof process.getuid !== "function") {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_OWNER_UNVERIFIED");
+  }
+  return process.getuid();
+}
+
+function isFileSystemError(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === code;
+}
+
+async function assertReceiptDirectory(path: string): Promise<void> {
+  const metadata = await lstat(path).catch(() => null);
+  if (metadata === null || metadata.isSymbolicLink() || !metadata.isDirectory()
+    || metadata.uid !== currentUid() || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+  }
+}
+
+async function readReceiptBytes(path: string): Promise<string> {
+  let handle;
+  try {
+    handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch (error) {
+    if (isFileSystemError(error, "ENOENT")) {
+      throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_REQUIRED");
+    }
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+  }
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.uid !== currentUid() || metadata.nlink !== 1
+      || (metadata.mode & 0o777) !== PRIVATE_FILE_MODE
+      || metadata.size < 1 || metadata.size > MAX_RECEIPT_BYTES) {
+      throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+    }
+    return await handle.readFile("utf8");
+  } finally {
+    await handle.close();
+  }
+}
+
+export function developmentDeploymentRegisterReceiptPath(repositoryRoot: string): string {
+  if (!isAbsolute(repositoryRoot)) throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PATH_INVALID");
+  return join(resolve(repositoryRoot), DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_RELATIVE_PATH);
+}
+
+function parseReceiptJson(source: string): DevelopmentDeploymentRegisterMachineReceiptV1 {
+  if (!source.endsWith("\n") || source.includes("\r") || Buffer.byteLength(source) > MAX_RECEIPT_BYTES) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  const json = source.slice(0, -1);
+  let parsed: unknown;
+  try {
+    if (parseCanonicalRegisterJson(Buffer.from(json, "utf8")) !== json) {
+      throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+    }
+    parsed = JSON.parse(json);
+  } catch {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  const candidate = parsed as Record<string, unknown>;
+  if (Object.keys(candidate).join("\0") !== "receiptSha256\0registerVersion\0rowCount\0schema\0snapshotSha256"
+    || candidate.schema !== DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA
+    || typeof candidate.registerVersion !== "string"
+    || typeof candidate.rowCount !== "number"
+    || typeof candidate.snapshotSha256 !== "string"
+    || typeof candidate.receiptSha256 !== "string") {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  const expected = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: parseRegisterVersionText(candidate.registerVersion),
+    rowCount: candidate.rowCount,
+    snapshotSha256: candidate.snapshotSha256
+  });
+  if (candidate.receiptSha256 !== expected.receiptSha256
+    || serializeDevelopmentDeploymentRegisterReceipt(expected) !== json) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  return expected;
+}
+
+export async function readDevelopmentDeploymentRegisterReceipt(
+  repositoryRoot: string
+): Promise<DevelopmentDeploymentRegisterMachineReceiptV1> {
+  const path = developmentDeploymentRegisterReceiptPath(repositoryRoot);
+  await assertReceiptDirectory(dirname(path));
+  return parseReceiptJson(await readReceiptBytes(path));
+}
+
+export async function writeDevelopmentDeploymentRegisterReceipt(
+  repositoryRoot: string,
+  receipt: DevelopmentDeploymentRegisterMachineReceiptV1
+): Promise<string> {
+  const path = developmentDeploymentRegisterReceiptPath(repositoryRoot);
+  await assertReceiptDirectory(dirname(path));
+  const source = `${serializeDevelopmentDeploymentRegisterReceipt(receipt)}\n`;
+  if (Buffer.byteLength(source) > MAX_RECEIPT_BYTES) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  const existing = await lstat(path).catch(() => null);
+  if (existing !== null && (existing.isSymbolicLink() || !existing.isFile()
+    || existing.uid !== currentUid() || existing.nlink !== 1
+    || (existing.mode & 0o777) !== PRIVATE_FILE_MODE
+    || existing.size < 1 || existing.size > MAX_RECEIPT_BYTES)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+  }
+  const temporaryPath = `${path}.${randomUUID()}.tmp`;
+  let temporaryExists = false;
+  try {
+    const handle = await open(
+      temporaryPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0),
+      PRIVATE_FILE_MODE
+    );
+    temporaryExists = true;
+    try {
+      await handle.chmod(PRIVATE_FILE_MODE);
+      await handle.writeFile(source, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await rename(temporaryPath, path);
+    temporaryExists = false;
+  } finally {
+    if (temporaryExists) await unlink(temporaryPath);
+  }
+  const directory = await open(dirname(path), constants.O_RDONLY);
+  try {
+    await directory.sync();
+  } finally {
+    await directory.close();
+  }
+  const persisted = await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
+  if (persisted.receiptSha256 !== receipt.receiptSha256) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PUBLISH_FAILED");
+  }
+  return path;
+}
+
+export async function parseDevelopmentDeploymentRegisterCliOutput(
+  rawOutput: string,
+  repositoryRoot: string
+): Promise<DevelopmentDeploymentRegisterMachineReceiptV1> {
+  if (typeof rawOutput !== "string" || !rawOutput.endsWith("\n") || rawOutput.includes("\r")) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_OUTPUT_INVALID");
+  }
+  const line = rawOutput.slice(0, -1);
+  if (!line.startsWith(DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX)
+    || line.includes("\n")) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_OUTPUT_INVALID");
+  }
+  const fromOutput = parseReceiptJson(
+    `${line.slice(DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX.length)}\n`
+  );
+  const fromFile = await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
+  if (serializeDevelopmentDeploymentRegisterReceipt(fromOutput)
+    !== serializeDevelopmentDeploymentRegisterReceipt(fromFile)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_OUTPUT_MISMATCH");
+  }
+  return fromFile;
+}
 
 const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
   Object.freeze({
@@ -199,22 +447,23 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
 type SeedDevelopmentDeploymentRegisterInput = Readonly<{
   adminPool: Pool;
   providerPanel: DevelopmentProviderPanel;
+  repositoryRoot: string;
 }>;
 
-export type DevelopmentDeploymentRegisterReceipt = Readonly<{
-  registerVersion: number;
-  rowCount: number;
-}>;
+export type DevelopmentDeploymentRegisterReceipt =
+  DevelopmentDeploymentRegisterMachineReceiptV1;
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    return `{${Object.entries(value)
-      .sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
-      .map(([key, member]) => `${JSON.stringify(key)}:${canonicalJson(member)}`)
-      .join(",")}}`;
+function developmentValueAst(value: unknown): CanonicalJsonAst {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return canonicalDecimal(String(value));
+  if (Array.isArray(value)) return Object.freeze(value.map(developmentValueAst));
+  if (typeof value === "object"
+    && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
+    return Object.freeze(Object.fromEntries(
+      Object.entries(value).map(([key, member]) => [key, developmentValueAst(member)])
+    ));
   }
-  return JSON.stringify(value);
+  throw new TypeError("DEV_DEPLOYMENT_REGISTER_VALUE_INVALID");
 }
 
 function developmentRows(
@@ -254,26 +503,21 @@ async function expectedRunnerRows(
   return Object.freeze(rows.map((row) => Object.freeze(row)));
 }
 
-async function insertAndSeal(
-  client: PoolClient,
-  registerVersion: number,
-  rows: readonly DevelopmentDeploymentRegisterRow[]
-): Promise<void> {
-  for (const row of rows) {
-    await client.query(
-      `INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-       VALUES ($1,$2,$3::jsonb,$4)`,
-      [registerVersion, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-    );
-  }
-  await client.query(
-    `INSERT INTO register.register_version (register_version,row_count,sealed)
-     VALUES ($1,$2,true)`,
-    [registerVersion, rows.length]
-  );
-  if (await readExactState(client, registerVersion, rows) !== "EXACT") {
-    throw new TypeError("DEV_DEPLOYMENT_REGISTER_DRIFT");
-  }
+export async function buildDevelopmentDeploymentRegisterPublicationRows(
+  bootstrap: BootstrapRegister,
+  providerPanel: DevelopmentProviderPanel
+): Promise<readonly RegisterPublicationRow[]> {
+  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel)).map((row) =>
+    Object.freeze({
+      rowKey: row.rowKey,
+      valueJsonText: canonicalRegisterJson(
+        "valueAst" in row
+          ? (row.valueAst as CanonicalJsonAst)
+          : developmentValueAst(row.value)
+      ),
+      sourceRef: row.sourceRef
+    })
+  ));
 }
 
 async function assertAdmin(client: PoolClient): Promise<void> {
@@ -326,42 +570,12 @@ async function persistOrAcceptSealedHistoricalBootstrap(
   }
 }
 
-async function readExactState(
-  client: PoolClient,
-  registerVersion: number,
-  rows: readonly DevelopmentDeploymentRegisterRow[]
-): Promise<"EMPTY" | "EXACT"> {
-  const versionResult = await client.query<{ row_count: number; sealed: boolean }>(`
-    SELECT row_count,sealed FROM register.register_version WHERE register_version=$1
-  `,[registerVersion]);
-  const rowResult = await client.query<{
-    row_key: string;
-    value_json: unknown;
-    source_ref: string;
-  }>(`
-    SELECT row_key,value_json,source_ref FROM register.register_row
-    WHERE register_version=$1 ORDER BY row_key
-  `,[registerVersion]);
-  const version = versionResult.rows[0];
-  if (version === undefined && rowResult.rows.length === 0) return "EMPTY";
-  if (version === undefined || !version.sealed || Number(version.row_count) !== rows.length
-    || rowResult.rows.length !== rows.length) {
-    throw new TypeError("DEV_DEPLOYMENT_REGISTER_DRIFT");
-  }
-  const expected = new Map(rows.map((row) => [row.rowKey, row]));
-  for (const persisted of rowResult.rows) {
-    const wanted = expected.get(persisted.row_key);
-    if (wanted === undefined || persisted.source_ref !== wanted.sourceRef
-      || canonicalJson(persisted.value_json) !== canonicalJson(wanted.value)) {
-      throw new TypeError("DEV_DEPLOYMENT_REGISTER_DRIFT");
-    }
-  }
-  return "EXACT";
-}
-
 export async function seedDevelopmentDeploymentRegister(
   input: SeedDevelopmentDeploymentRegisterInput
 ): Promise<DevelopmentDeploymentRegisterReceipt> {
+  if (!isAbsolute(input.repositoryRoot)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PATH_INVALID");
+  }
   const bootstrap = await loadBootstrapRegister();
   const authorityClient = await input.adminPool.connect();
   try {
@@ -370,27 +584,22 @@ export async function seedDevelopmentDeploymentRegister(
     authorityClient.release();
   }
   await persistOrAcceptSealedHistoricalBootstrap(input.adminPool, bootstrap);
-  const rows = await expectedRunnerRows(bootstrap, input.providerPanel);
-  const registerVersion = DEVELOPMENT_REGISTER_VERSION;
-  if (registerVersion <= bootstrap.registerVersion) {
+  if (DEVELOPMENT_REGISTER_VERSION <= bootstrap.registerVersion) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_VERSION_INVALID");
   }
-  const client = await input.adminPool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('debateai:dev-deployment-register',0))"
-    );
-    await assertAdmin(client);
-    if (await readExactState(client, registerVersion, rows) === "EMPTY") {
-      await insertAndSeal(client, registerVersion, rows);
-    }
-    await client.query("COMMIT");
-    return Object.freeze({ registerVersion, rowCount: rows.length });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const publicationRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+    bootstrap,
+    input.providerPanel
+  );
+  const imported = await createPostgresRegisterPublicationPort(input.adminPool).importHistorical({
+    registerVersion: parseRegisterVersionText(String(DEVELOPMENT_REGISTER_VERSION)),
+    rows: publicationRows
+  });
+  const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: imported.registerVersion,
+    rowCount: imported.rowCount,
+    snapshotSha256: imported.snapshotSha256
+  });
+  await writeDevelopmentDeploymentRegisterReceipt(resolve(input.repositoryRoot), receipt);
+  return receipt;
 }

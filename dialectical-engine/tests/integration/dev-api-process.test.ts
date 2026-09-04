@@ -9,11 +9,20 @@ import {
   type DevelopmentApiProcessOperations
 } from "../../apps/runner/src/dev-api-process.js";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
+import {
+  createDevelopmentDeploymentRegisterMachineReceipt,
+  developmentDeploymentRegisterReceiptPath,
+  writeDevelopmentDeploymentRegisterReceipt
+} from "../../apps/runner/src/dev-deployment-register.js";
+import { parseRegisterVersionText } from "../../packages/register/src/index.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 const roots: string[] = [];
 
-function environment(root: string): Readonly<Record<string, string>> {
+function environment(
+  root: string,
+  receiptSha256: string
+): Readonly<Record<string, string>> {
   const custodyRoot = join(root, ".local", "dev-auth");
   return Object.freeze({
     KEK_PATH: join(custodyRoot, "secrets", "kek.bin"),
@@ -37,7 +46,9 @@ function environment(root: string): Readonly<Record<string, string>> {
     API_HOST: "127.0.0.1",
     API_PORT: "8790",
     STRANGER_SAMPLE_RATE: "0",
-    REGISTER_VERSION: "4",
+    REGISTER_VERSION: "424242",
+    REGISTER_DEPLOYMENT_RECEIPT_SHA256: receiptSha256,
+    REGISTER_DEPLOYMENT_RECEIPT_FILE: developmentDeploymentRegisterReceiptPath(root),
     BATTERY_VERSION: "dev-auth-v1",
     SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
@@ -60,8 +71,14 @@ async function fixture(): Promise<Readonly<{ root: string; envPath: string }>> {
   roots.push(root);
   await mkdir(join(root, ".local"), { mode: 0o700 });
   await mkdir(join(root, ".local", "dev-auth"), { mode: 0o700 });
+  const registerReceipt = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: parseRegisterVersionText("424242"),
+    rowCount: 32,
+    snapshotSha256: "a".repeat(64)
+  });
+  await writeDevelopmentDeploymentRegisterReceipt(root, registerReceipt);
   const envPath = join(root, ".local", "dev-auth", "api.env");
-  const values = environment(root);
+  const values = environment(root, registerReceipt.receiptSha256);
   await writeFile(
     envPath,
     `${DEVELOPMENT_API_ENVIRONMENT_KEYS.map((key) => `${key}=${values[key]}`).join("\n")}\n`,
@@ -174,6 +191,34 @@ describe("DEV-10B production API host process", () => {
       operations: aliasRuntime
     })).rejects.toThrow("DEV_API_PROCESS_CUSTODY_INVALID");
     expect(aliasRuntime.startApi).not.toHaveBeenCalled();
+  });
+
+  it("rejects a dropped or mismatched deployment receipt before process start", async () => {
+    const dropped = await fixture();
+    await rm(developmentDeploymentRegisterReceiptPath(dropped.root));
+    const droppedRuntime = operations([null]);
+    await expect(startDevelopmentApiProcess({
+      repositoryRoot: dropped.root,
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations: droppedRuntime
+    })).rejects.toThrow("DEV_DEPLOYMENT_REGISTER_RECEIPT_REQUIRED");
+    expect(droppedRuntime.startApi).not.toHaveBeenCalled();
+
+    const mismatched = await fixture();
+    const source = await readFile(mismatched.envPath, "utf8");
+    await writeFile(
+      mismatched.envPath,
+      source.replace(/REGISTER_DEPLOYMENT_RECEIPT_SHA256=[0-9a-f]{64}/u,
+        `REGISTER_DEPLOYMENT_RECEIPT_SHA256=${"0".repeat(64)}`),
+      { mode: 0o600 }
+    );
+    const mismatchRuntime = operations([null]);
+    await expect(startDevelopmentApiProcess({
+      repositoryRoot: mismatched.root,
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations: mismatchRuntime
+    })).rejects.toThrow("DEV_API_PROCESS_ENVIRONMENT_INVALID");
+    expect(mismatchRuntime.startApi).not.toHaveBeenCalled();
   });
 
   it("terminates only its child on wrong readiness or timeout", async () => {

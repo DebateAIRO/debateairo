@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
 import { TypedDomainError } from "@debateai/kernel";
 
 export const PRODUCT_ROLE_POLICY_ROW_KEY = "productRolePolicy" as const;
@@ -135,65 +136,99 @@ export type ProductRolePolicy = Readonly<{
   sourceRef: string;
 }>;
 
-export const PRODUCT_ROLE_POLICY_REGISTER_ROW = Object.freeze({
-  rowKey: PRODUCT_ROLE_POLICY_ROW_KEY,
-  value: Object.freeze({
-    kind: "PRODUCT_ROLE_POLICY" as const,
-    policy_version: 1 as const,
-    assignment_authority: "SERVER_DERIVED_ONLY" as const,
-    caller_supplied_role: "DENIED" as const,
-    roles: Object.freeze([
+const PRODUCT_ROLE_POLICY_PUBLICATION_ROW = Object.freeze({
+  "rowKey": "productRolePolicy",
+  "value": Object.freeze({
+    "kind": "PRODUCT_ROLE_POLICY",
+    "policy_version": canonicalDecimal("1"),
+    "assignment_authority": "SERVER_DERIVED_ONLY",
+    "caller_supplied_role": "DENIED",
+    "roles": Object.freeze([
       Object.freeze({
-        id: "anonymous" as const,
-        class: "LAUNCH" as const,
-        implementation: "ACTIVE" as const,
-        authentication: "NONE" as const,
-        grants: Object.freeze(["READ_PUBLISHED_DEBATE"] as const)
+        "id": "anonymous",
+        "class": "LAUNCH",
+        "implementation": "ACTIVE",
+        "authentication": "NONE",
+        "grants": Object.freeze([
+          "READ_PUBLISHED_DEBATE"
+        ])
       }),
       Object.freeze({
-        id: "user" as const,
-        class: "LAUNCH" as const,
-        implementation: "ACTIVE" as const,
-        authentication: "MFA_ENROLLED" as const,
-        grants: Object.freeze([
-          "CREATE_PRIVATE_DEBATE", "READ_OWN_DEBATE", "MANAGE_OWN_SESSIONS",
-          "PUBLISH_OWN_DEBATE", "UNPUBLISH_OWN_DEBATE",
-          "DELETE_OWN_PRIVATE_DEBATE", "MANAGE_OWN_ACCOUNT"
-        ] as const)
+        "id": "user",
+        "class": "LAUNCH",
+        "implementation": "ACTIVE",
+        "authentication": "MFA_ENROLLED",
+        "grants": Object.freeze([
+          "CREATE_PRIVATE_DEBATE",
+          "READ_OWN_DEBATE",
+          "MANAGE_OWN_SESSIONS",
+          "PUBLISH_OWN_DEBATE",
+          "UNPUBLISH_OWN_DEBATE",
+          "DELETE_OWN_PRIVATE_DEBATE",
+          "MANAGE_OWN_ACCOUNT"
+        ])
       }),
       Object.freeze({
-        id: "operator" as const,
-        class: "LAUNCH" as const,
-        implementation: "RESERVED_UNASSIGNABLE" as const,
-        authentication: "PASSKEY_REQUIRED" as const,
-        grants: Object.freeze([])
+        "id": "operator",
+        "class": "LAUNCH",
+        "implementation": "RESERVED_UNASSIGNABLE",
+        "authentication": "PASSKEY_REQUIRED",
+        "grants": Object.freeze([])
       }),
-      ...(["moderator", "support", "security_auditor", "db_operator"] as const).map((id) =>
-        Object.freeze({
-          id,
-          class: "GROWTH" as const,
-          implementation: "UNIMPLEMENTED" as const,
-          authentication: "UNRATIFIED" as const,
-          grants: Object.freeze([])
-        })
-      ),
       Object.freeze({
-        id: "worker_service" as const,
-        class: "SERVICE" as const,
-        implementation: "EXISTING_REUSED" as const,
-        authentication: "SERVICE_IDENTITY" as const,
-        grants: Object.freeze([])
+        "id": "moderator",
+        "class": "GROWTH",
+        "implementation": "UNIMPLEMENTED",
+        "authentication": "UNRATIFIED",
+        "grants": Object.freeze([])
+      }),
+      Object.freeze({
+        "id": "support",
+        "class": "GROWTH",
+        "implementation": "UNIMPLEMENTED",
+        "authentication": "UNRATIFIED",
+        "grants": Object.freeze([])
+      }),
+      Object.freeze({
+        "id": "security_auditor",
+        "class": "GROWTH",
+        "implementation": "UNIMPLEMENTED",
+        "authentication": "UNRATIFIED",
+        "grants": Object.freeze([])
+      }),
+      Object.freeze({
+        "id": "db_operator",
+        "class": "GROWTH",
+        "implementation": "UNIMPLEMENTED",
+        "authentication": "UNRATIFIED",
+        "grants": Object.freeze([])
+      }),
+      Object.freeze({
+        "id": "worker_service",
+        "class": "SERVICE",
+        "implementation": "EXISTING_REUSED",
+        "authentication": "SERVICE_IDENTITY",
+        "grants": Object.freeze([])
       })
     ]),
-    transitions: Object.freeze([Object.freeze({
-      from_role: "anonymous" as const,
-      to_role: "user" as const,
-      implementation: "ACTIVE" as const,
-      authority: "VERIFIED_REGISTRATION_AND_MFA" as const
-    })])
+    "transitions": Object.freeze([
+      Object.freeze({
+        "from_role": "anonymous",
+        "to_role": "user",
+        "implementation": "ACTIVE",
+        "authority": "VERIFIED_REGISTRATION_AND_MFA"
+      })
+    ])
   }),
-  sourceRef: "wave-2-target-architecture.md#11; wave-3-phase-1-plan.md#phase-2"
-} satisfies ProductRolePolicyRegisterRow);
+  "sourceRef": "wave-2-target-architecture.md#11; wave-3-phase-1-plan.md#phase-2"
+});
+
+export const PRODUCT_ROLE_POLICY_REGISTER_ROW = Object.freeze({
+  rowKey: PRODUCT_ROLE_POLICY_PUBLICATION_ROW.rowKey,
+  valueAst: PRODUCT_ROLE_POLICY_PUBLICATION_ROW.value,
+  value: JSON.parse(canonicalRegisterJson(PRODUCT_ROLE_POLICY_PUBLICATION_ROW.value)) as unknown,
+  sourceRef: PRODUCT_ROLE_POLICY_PUBLICATION_ROW.sourceRef
+});
 
 function immutableRole(role: ProductRoleValue): ProductRole {
   return Object.freeze({

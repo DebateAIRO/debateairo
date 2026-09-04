@@ -5,6 +5,16 @@ import {
   startDevelopmentAuthDataPlane,
   type DevelopmentAuthDataPlaneOperations
 } from "../../apps/runner/src/dev-auth-data-plane.js";
+import {
+  createDevelopmentDeploymentRegisterMachineReceipt
+} from "../../apps/runner/src/dev-deployment-register.js";
+import { parseRegisterVersionText } from "../../packages/register/src/index.js";
+
+const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
+  registerVersion: parseRegisterVersionText("424242"),
+  rowCount: 32,
+  snapshotSha256: "a".repeat(64)
+});
 
 function operations(overrides: Partial<DevelopmentAuthDataPlaneOperations> = {}) {
   const calls: string[] = [];
@@ -22,7 +32,7 @@ function operations(overrides: Partial<DevelopmentAuthDataPlaneOperations> = {})
     waitForPostgres: vi.fn(async () => { calls.push("postgres-ready"); }),
     migrate: vi.fn(async () => { calls.push("migrate"); }),
     provisionPrincipals: vi.fn(async () => { calls.push("principals"); }),
-    seedRegister: vi.fn(async () => { calls.push("register"); }),
+    seedRegister: vi.fn(async () => { calls.push("register"); return REGISTER_RECEIPT; }),
     generateSecrets: vi.fn(async () => { calls.push("secrets"); }),
     verifyMailCapture: vi.fn(async () => { calls.push("mail"); }),
     stopDependencies: vi.fn(async (_docker, services) => {
@@ -43,7 +53,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       hatchet: "READY",
       migrations: "APPLIED",
       principals: "ATTESTED",
-      register: "SEALED",
+      register: REGISTER_RECEIPT,
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     });
@@ -76,7 +86,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       hatchet: "READY",
       migrations: "APPLIED",
       principals: "ATTESTED",
-      register: "SEALED",
+      register: REGISTER_RECEIPT,
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     });

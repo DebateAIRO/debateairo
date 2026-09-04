@@ -1344,11 +1344,8 @@ export class PostgresAskApplication implements AskApplication {
   }
 
   async readDeployment(session: Session): Promise<Deployment> {
-    const version = await this.pool.query<{ register_version: string }>(
-      `SELECT register_version FROM register.register_version WHERE sealed ORDER BY register_version DESC LIMIT 1`
-    );
-    const registerVersion = Number(version.rows[0]?.register_version);
-    if (!Number.isInteger(registerVersion) || registerVersion < 1) {
+    const registerVersion = this.settings.registerVersion;
+    if (!Number.isSafeInteger(registerVersion) || registerVersion < 1) {
       throw new TypedDomainError("DEPLOYMENT_REGISTER_UNAVAILABLE", "No sealed V3 deployment register exists");
     }
     const [rows, scorecards, ledger] = await Promise.all([

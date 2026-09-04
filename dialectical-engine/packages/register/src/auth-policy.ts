@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
 import { TypedDomainError } from "@debateai/kernel";
 
 export const AUTH_POLICY_ROW_KEYS = [
@@ -378,353 +379,456 @@ export interface AuthPolicyRegisterRow {
   readonly sourceRef: string;
 }
 
-export const AUTH_POLICY_REGISTER_ROWS = Object.freeze([
+const AUTH_POLICY_PUBLICATION_ROWS = Object.freeze([
   Object.freeze({
-    rowKey: "passwordPolicy" as const,
-    value: Object.freeze({
-      kind: "PASSWORD_POLICY",
-      minimum_length: 8,
-      composition_rules: false,
-      forced_rotation: false,
-      argon2id: Object.freeze({
-        memory_cost_kib: 65_536,
-        time_cost: 3,
-        parallelism: 1,
-        hash_length: 32
+    "rowKey": "passwordPolicy",
+    "value": Object.freeze({
+      "kind": "PASSWORD_POLICY",
+      "minimum_length": canonicalDecimal("8"),
+      "composition_rules": false,
+      "forced_rotation": false,
+      "argon2id": Object.freeze({
+        "memory_cost_kib": canonicalDecimal("65536"),
+        "time_cost": canonicalDecimal("3"),
+        "parallelism": canonicalDecimal("1"),
+        "hash_length": canonicalDecimal("32")
       })
     }),
-    sourceRef: "wave-2-target-architecture.md#10.1 + VR-3/VR-4/VR-5 (2026-08-19)"
+    "sourceRef": "wave-2-target-architecture.md#10.1 + VR-3/VR-4/VR-5 (2026-08-19)"
   }),
   Object.freeze({
-    rowKey: "auditSourceIpKdfPolicy" as const,
-    value: Object.freeze({
-      kind: "AUDIT_SOURCE_IP_KDF_POLICY",
-      algorithm: "argon2id",
-      memory_cost_kib: 19_456,
-      iterations: 2,
-      parallelism: 1,
-      hash_length: 32
+    "rowKey": "auditSourceIpKdfPolicy",
+    "value": Object.freeze({
+      "kind": "AUDIT_SOURCE_IP_KDF_POLICY",
+      "algorithm": "argon2id",
+      "memory_cost_kib": canonicalDecimal("19456"),
+      "iterations": canonicalDecimal("2"),
+      "parallelism": canonicalDecimal("1"),
+      "hash_length": canonicalDecimal("32")
     }),
-    sourceRef: "AMENDMENTS.md#VR-7 memory-hard immutable audit source-IP hashing (2026-08-19)"
+    "sourceRef": "AMENDMENTS.md#VR-7 memory-hard immutable audit source-IP hashing (2026-08-19)"
   }),
   Object.freeze({
-    rowKey: "verificationPolicy" as const,
-    value: Object.freeze({
-      kind: "VERIFICATION_POLICY",
-      token_ttl_ms: 24 * 60 * 60 * 1_000,
-      resend_cooldown_ms: 20 * 60_000,
-      outbound_send_window_ms: 60 * 60_000,
-      outbound_send_max: 3,
-      outbound_send_enforcement: Object.freeze({
-        mechanism: "per_row_last_sent_timestamp_minimum_spacing",
-        minimum_spacing_ms: 20 * 60_000
+    "rowKey": "verificationPolicy",
+    "value": Object.freeze({
+      "kind": "VERIFICATION_POLICY",
+      "token_ttl_ms": canonicalDecimal("86400000"),
+      "resend_cooldown_ms": canonicalDecimal("1200000"),
+      "outbound_send_window_ms": canonicalDecimal("3600000"),
+      "outbound_send_max": canonicalDecimal("3"),
+      "outbound_send_enforcement": Object.freeze({
+        "mechanism": "per_row_last_sent_timestamp_minimum_spacing",
+        "minimum_spacing_ms": canonicalDecimal("1200000")
       }),
-      verification_credentials: Object.freeze({
-        storage: "HASH_ONLY_APPEND_ONLY_LEDGER",
-        validity: "EACH_MAILED_TOKEN_UNTIL_OWN_EXPIRY_OR_ACCOUNT_ACTIVATION",
-        maximum_live_hashes_per_account: 73,
-        pruning: "ON_RESEND_DELETE_EXPIRED",
-        leaked_token_tradeoff: "A token believed leaked cannot be selectively revoked by an unauthenticated resend; every mailed link instead expires at its own ruled 24-hour deadline or is consumed when the account activates. Selective revocation requires a separately authenticated recovery action."
+      "verification_credentials": Object.freeze({
+        "storage": "HASH_ONLY_APPEND_ONLY_LEDGER",
+        "validity": "EACH_MAILED_TOKEN_UNTIL_OWN_EXPIRY_OR_ACCOUNT_ACTIVATION",
+        "maximum_live_hashes_per_account": canonicalDecimal("73"),
+        "pruning": "ON_RESEND_DELETE_EXPIRED",
+        "leaked_token_tradeoff": "A token believed leaked cannot be selectively revoked by an unauthenticated resend; every mailed link instead expires at its own ruled 24-hour deadline or is consumed when the account activates. Selective revocation requires a separately authenticated recovery action."
       }),
-      enumeration_response_floor_ms: 500,
-      enumeration_tolerance_ms: 100
+      "enumeration_response_floor_ms": canonicalDecimal("500"),
+      "enumeration_tolerance_ms": canonicalDecimal("100")
     }),
-    sourceRef: "wave-2-target-architecture.md#10.7 + VR-5 + S3c rework1 B1 outbound cap + S3d D2 credential non-interference (2026-08-20)"
+    "sourceRef": "wave-2-target-architecture.md#10.7 + VR-5 + S3c rework1 B1 outbound cap + S3d D2 credential non-interference (2026-08-20)"
   }),
   Object.freeze({
-    rowKey: "rateLimitPolicy" as const,
-    value: Object.freeze({
-      kind: "AUTH_RATE_LIMIT_POLICY",
-      bucket_capacity: 524_288,
-      refusal_audit_interval_ms: 60_000,
-      legacy_limits_status: "RETIRED_NOT_ENFORCED",
-      sketch_design: Object.freeze({
-        kind: "KEYED_TWO_ROW_PER_ROUTE_FLAT_TYPED_ARRAY",
-        capacity_scope: "per_route",
-        slots_per_route: 524_288,
-        hash_rows: 2,
-        threat_sources_per_window: 20_000,
-        target_false_refusal_rate_ppm: 10_000,
-        minimum_row_width_for_target: 189_825,
-        selected_row_width: 262_144,
-        sizing_derivation: "Two independent rows need width 189,825 for 20,000 full-budget sources below 10,000 ppm; the smallest power-of-two row is 262,144, so 524,288 slots/route allocate 147 MiB of typed storage within the ruled 160 MiB budget.",
-        full_budget_source_load_per_row: 0.076294,
-        theoretical_full_budget_false_refusal_rate_ppm: 5_395.831171,
-        flat_storage: Object.freeze({
-          representation: "PREALLOCATED_TYPED_ARRAYS",
-          slots: 1_572_864,
-          expiry_timestamps: 17_301_504,
-          expiry_bytes: 138_412_032,
-          saturated_until_bytes: 12_582_912,
-          count_bytes: 1_572_864,
-          head_bytes: 1_572_864,
-          allocated_bytes: 154_140_672,
-          allocated_mib: 147,
-          budget_bytes: 167_772_160,
-          budget_mib: 160,
-          retained_objects_per_occupied_slot: 0
+    "rowKey": "rateLimitPolicy",
+    "value": Object.freeze({
+      "kind": "AUTH_RATE_LIMIT_POLICY",
+      "bucket_capacity": canonicalDecimal("524288"),
+      "refusal_audit_interval_ms": canonicalDecimal("60000"),
+      "legacy_limits_status": "RETIRED_NOT_ENFORCED",
+      "sketch_design": Object.freeze({
+        "kind": "KEYED_TWO_ROW_PER_ROUTE_FLAT_TYPED_ARRAY",
+        "capacity_scope": "per_route",
+        "slots_per_route": canonicalDecimal("524288"),
+        "hash_rows": canonicalDecimal("2"),
+        "threat_sources_per_window": canonicalDecimal("20000"),
+        "target_false_refusal_rate_ppm": canonicalDecimal("10000"),
+        "minimum_row_width_for_target": canonicalDecimal("189825"),
+        "selected_row_width": canonicalDecimal("262144"),
+        "sizing_derivation": "Two independent rows need width 189,825 for 20,000 full-budget sources below 10,000 ppm; the smallest power-of-two row is 262,144, so 524,288 slots/route allocate 147 MiB of typed storage within the ruled 160 MiB budget.",
+        "full_budget_source_load_per_row": canonicalDecimal("0.076294"),
+        "theoretical_full_budget_false_refusal_rate_ppm": canonicalDecimal("5395.831171"),
+        "flat_storage": Object.freeze({
+          "representation": "PREALLOCATED_TYPED_ARRAYS",
+          "slots": canonicalDecimal("1572864"),
+          "expiry_timestamps": canonicalDecimal("17301504"),
+          "expiry_bytes": canonicalDecimal("138412032"),
+          "saturated_until_bytes": canonicalDecimal("12582912"),
+          "count_bytes": canonicalDecimal("1572864"),
+          "head_bytes": canonicalDecimal("1572864"),
+          "allocated_bytes": canonicalDecimal("154140672"),
+          "allocated_mib": canonicalDecimal("147"),
+          "budget_bytes": canonicalDecimal("167772160"),
+          "budget_mib": canonicalDecimal("160"),
+          "retained_objects_per_occupied_slot": canonicalDecimal("0")
         }),
-        isolated_limiter_resident_measurement: Object.freeze({
-          measurement: "isolated_process_rss_at_100_percent_slot_occupancy",
-          runtime: "node_v22.23.1_darwin_arm64",
-          occupancy_percent: 100,
-          measured_100_percent_rss_mib: 248.6,
-          max_measured_curve_rss_mib: 250,
-          isolated_measurement_ceiling_mib: 256,
-          includes_isolated_harness_baseline: true,
-          includes_application_stack_baseline: false,
-          operator_provisioning_field: false,
-          operator_instruction: "Limiter capacity validation only; do not use this isolated-process figure to provision an API process.",
-          curve_rss_mib: Object.freeze({ "0": 93.7, "25": 249.5, "50": 250, "100": 248.6 })
-        }),
-        booted_process_resident_bound: Object.freeze({
-          measurement: "booted_registration_process_rss_at_100_percent_slot_occupancy",
-          runtime: "node_v22.23.1_darwin_arm64",
-          stack: "postgres_pool_argon2id_64mib_registration_service_file_dek_store",
-          occupancy_percent: 100,
-          worker_remeasurement_100_percent_rss_mib: 295,
-          independent_verification_100_percent_rss_mib: 368.7,
-          measured_100_percent_rss_mib: 368.7,
-          provisioning_rounding_increment_mib: 32,
-          published_provisioning_bound_mib: 384,
-          includes_application_stack_baseline: true,
-          per_process: true,
-          operator_provisioning_field: true,
-          operator_instruction: "Operators must provision at least published_provisioning_bound_mib per API process; isolated_limiter_resident_measurement is not a provisioning figure."
-        }),
-        reachable_occupancy: Object.freeze({
-          source_path: "one_request_per_distinct_ipv6_source_per_route",
-          ipv6_scope: "single_/64",
-          sources_per_route_for_99_8_percent: 1_600_000,
-          requests_across_three_routes: 4_800_000,
-          occupancy_percent: 99.8
-        }),
-        theoretical_collateral: Object.freeze({
-          model: "exact_binomial_two_independent_rows",
-          derivation: "For each row X~Binomial(20000,1/262144); threshold=ceil(route_limit/min(requests_per_source,route_limit)); false-refusal ppm=P(X>=threshold)^2*1e6.",
-          sources_per_cell: 20_000,
-          selected_row_width: 262_144,
-          refusal_rate_ppm: Object.freeze({
-            register: Object.freeze({ "1": 0, "5": 0.000002, "10": 7.652853, "20": 5_395.83117 }),
-            verify: Object.freeze({ "1": 0, "5": 7.652853, "10": 5_395.83117, "20": 5_395.83117 }),
-            resend: Object.freeze({ "1": 0.004886, "5": 5_395.83117, "10": 5_395.83117, "20": 5_395.83117 })
+        "isolated_limiter_resident_measurement": Object.freeze({
+          "measurement": "isolated_process_rss_at_100_percent_slot_occupancy",
+          "runtime": "node_v22.23.1_darwin_arm64",
+          "occupancy_percent": canonicalDecimal("100"),
+          "measured_100_percent_rss_mib": canonicalDecimal("248.6"),
+          "max_measured_curve_rss_mib": canonicalDecimal("250"),
+          "isolated_measurement_ceiling_mib": canonicalDecimal("256"),
+          "includes_isolated_harness_baseline": true,
+          "includes_application_stack_baseline": false,
+          "operator_provisioning_field": false,
+          "operator_instruction": "Limiter capacity validation only; do not use this isolated-process figure to provision an API process.",
+          "curve_rss_mib": Object.freeze({
+            "0": canonicalDecimal("93.7"),
+            "25": canonicalDecimal("249.5"),
+            "50": canonicalDecimal("250"),
+            "100": canonicalDecimal("248.6")
           })
         }),
-        beyond_threat_curve: Object.freeze({
-          model: "exact_binomial_two_independent_rows_full_budget",
-          derivation: "At full source budget each row slot refuses after one colliding source: X~Binomial(sources,1/262144); false-refusal ppm=P(X>=1)^2*1e6, rounded to the nearest ppm.",
-          selected_row_width: 262_144,
-          refusal_rate_ppm: Object.freeze({
-            "50000": 30_154,
-            "100000": 100_580,
-            "200000": 284_843,
-            "400000": 612_417,
-            "800000": 907_684
+        "booted_process_resident_bound": Object.freeze({
+          "measurement": "booted_registration_process_rss_at_100_percent_slot_occupancy",
+          "runtime": "node_v22.23.1_darwin_arm64",
+          "stack": "postgres_pool_argon2id_64mib_registration_service_file_dek_store",
+          "occupancy_percent": canonicalDecimal("100"),
+          "worker_remeasurement_100_percent_rss_mib": canonicalDecimal("295"),
+          "independent_verification_100_percent_rss_mib": canonicalDecimal("368.7"),
+          "measured_100_percent_rss_mib": canonicalDecimal("368.7"),
+          "provisioning_rounding_increment_mib": canonicalDecimal("32"),
+          "published_provisioning_bound_mib": canonicalDecimal("384"),
+          "includes_application_stack_baseline": true,
+          "per_process": true,
+          "operator_provisioning_field": true,
+          "operator_instruction": "Operators must provision at least published_provisioning_bound_mib per API process; isolated_limiter_resident_measurement is not a provisioning figure."
+        }),
+        "reachable_occupancy": Object.freeze({
+          "source_path": "one_request_per_distinct_ipv6_source_per_route",
+          "ipv6_scope": "single_/64",
+          "sources_per_route_for_99_8_percent": canonicalDecimal("1600000"),
+          "requests_across_three_routes": canonicalDecimal("4800000"),
+          "occupancy_percent": canonicalDecimal("99.8")
+        }),
+        "theoretical_collateral": Object.freeze({
+          "model": "exact_binomial_two_independent_rows",
+          "derivation": "For each row X~Binomial(20000,1/262144); threshold=ceil(route_limit/min(requests_per_source,route_limit)); false-refusal ppm=P(X>=threshold)^2*1e6.",
+          "sources_per_cell": canonicalDecimal("20000"),
+          "selected_row_width": canonicalDecimal("262144"),
+          "refusal_rate_ppm": Object.freeze({
+            "register": Object.freeze({
+              "1": canonicalDecimal("0"),
+              "5": canonicalDecimal("0.000002"),
+              "10": canonicalDecimal("7.652853"),
+              "20": canonicalDecimal("5395.83117")
+            }),
+            "verify": Object.freeze({
+              "1": canonicalDecimal("0"),
+              "5": canonicalDecimal("7.652853"),
+              "10": canonicalDecimal("5395.83117"),
+              "20": canonicalDecimal("5395.83117")
+            }),
+            "resend": Object.freeze({
+              "1": canonicalDecimal("0.004886"),
+              "5": canonicalDecimal("5395.83117"),
+              "10": canonicalDecimal("5395.83117"),
+              "20": canonicalDecimal("5395.83117")
+            })
           })
         }),
-        residual: "Beyond 20,000 full-budget sources per route per ruled window, exact-binomial innocent refusal rises from 3.0154% at 50,000 sources through 10.0580%, 28.4843%, and 61.2417% to 90.7684% at 800,000, approaching total refusal beyond that point; collision sharing only over-counts/refuses and never grants a fresh budget."
+        "beyond_threat_curve": Object.freeze({
+          "model": "exact_binomial_two_independent_rows_full_budget",
+          "derivation": "At full source budget each row slot refuses after one colliding source: X~Binomial(sources,1/262144); false-refusal ppm=P(X>=1)^2*1e6, rounded to the nearest ppm.",
+          "selected_row_width": canonicalDecimal("262144"),
+          "refusal_rate_ppm": Object.freeze({
+            "50000": canonicalDecimal("30154"),
+            "100000": canonicalDecimal("100580"),
+            "200000": canonicalDecimal("284843"),
+            "400000": canonicalDecimal("612417"),
+            "800000": canonicalDecimal("907684")
+          })
+        }),
+        "residual": "Beyond 20,000 full-budget sources per route per ruled window, exact-binomial innocent refusal rises from 3.0154% at 50,000 sources through 10.0580%, 28.4843%, and 61.2417% to 90.7684% at 800,000, approaching total refusal beyond that point; collision sharing only over-counts/refuses and never grants a fresh budget."
       }),
-      routes: Object.freeze({
-        register: Object.freeze({
-          window_ms: 15 * 60_000, admission_per_source: 20, per_ip: 20, per_address: 5
+      "routes": Object.freeze({
+        "register": Object.freeze({
+          "window_ms": canonicalDecimal("900000"),
+          "admission_per_source": canonicalDecimal("20"),
+          "per_ip": canonicalDecimal("20"),
+          "per_address": canonicalDecimal("5")
         }),
-        verify: Object.freeze({
-          window_ms: 15 * 60_000, admission_per_source: 10, per_ip: 30, per_address: 10
+        "verify": Object.freeze({
+          "window_ms": canonicalDecimal("900000"),
+          "admission_per_source": canonicalDecimal("10"),
+          "per_ip": canonicalDecimal("30"),
+          "per_address": canonicalDecimal("10")
         }),
-        resend: Object.freeze({
-          window_ms: 60 * 60_000, admission_per_source: 3, per_ip: 15, per_address: 3
+        "resend": Object.freeze({
+          "window_ms": canonicalDecimal("3600000"),
+          "admission_per_source": canonicalDecimal("3"),
+          "per_ip": canonicalDecimal("15"),
+          "per_address": canonicalDecimal("3")
         })
       })
     }),
-    sourceRef: "AMENDMENTS.md#A3-10 + S3c D2 source-owned admission + S3c rework3 C1/C2 process provisioning bound and modelled collateral (2026-08-20)"
+    "sourceRef": "AMENDMENTS.md#A3-10 + S3c D2 source-owned admission + S3c rework3 C1/C2 process provisioning bound and modelled collateral (2026-08-20)"
   }),
   Object.freeze({
-    rowKey: "channelPolicy" as const,
-    value: Object.freeze({
-      kind: "CHANNEL_POLICY",
-      transport: "own_sendmail",
-      sender_local_part: "noreply",
-      transport_timeout_ms: 5_000,
-      spam_notice: "Check your spam folder if the verification message does not arrive.",
-      verification_dispatch: Object.freeze({
-        maximum_concurrent: 32,
-        queue_capacity: 96,
-        at_capacity: "RETRYABLE_503_BEFORE_ACCOUNT_COMMIT_AFTER_BOUNDED_WAIT",
-        maximum_concurrent_registration_hashes: 32,
-        activation_spacing_ms: 60,
-        registration_activation_spacing_ms: 45,
-        pre_transport_work_budget_ms: 600,
-        no_send_equal_transport_work_ms: 5_000,
-        handoff_scheduler_tolerance_ms: 100,
-        registration_minimum_reservation_ms: 5_700,
-        minimum_reservation_ms: 5_700,
-        queue_wait_timeout_ms: 18_000,
-        release_semantics: "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_BEFORE_PROVISIONING_OR_60MS_RESEND;_HTTP_RESPONSE_FLOOR_600MS_FROM_REGISTRATION_ACTIVATION;_SATURATION_HANDOFF_ROUTE_DERIVED_5700MS_EVERY_ROUTE;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
-        retained_payload: "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REGISTRATION_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_28S_TIMEOUT;_SUSPENDED_RESEND_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
-        operator_signal: Object.freeze({
-          payload: "OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE",
-          aggregation_window_ms: 60_000,
-          count_cap: Number.MAX_SAFE_INTEGER,
-          maximum_retained_aggregates: 1
+    "rowKey": "channelPolicy",
+    "value": Object.freeze({
+      "kind": "CHANNEL_POLICY",
+      "transport": "own_sendmail",
+      "sender_local_part": "noreply",
+      "transport_timeout_ms": canonicalDecimal("5000"),
+      "spam_notice": "Check your spam folder if the verification message does not arrive.",
+      "verification_dispatch": Object.freeze({
+        "maximum_concurrent": canonicalDecimal("32"),
+        "queue_capacity": canonicalDecimal("96"),
+        "at_capacity": "RETRYABLE_503_BEFORE_ACCOUNT_COMMIT_AFTER_BOUNDED_WAIT",
+        "maximum_concurrent_registration_hashes": canonicalDecimal("32"),
+        "activation_spacing_ms": canonicalDecimal("60"),
+        "registration_activation_spacing_ms": canonicalDecimal("45"),
+        "pre_transport_work_budget_ms": canonicalDecimal("600"),
+        "no_send_equal_transport_work_ms": canonicalDecimal("5000"),
+        "handoff_scheduler_tolerance_ms": canonicalDecimal("100"),
+        "registration_minimum_reservation_ms": canonicalDecimal("5700"),
+        "minimum_reservation_ms": canonicalDecimal("5700"),
+        "queue_wait_timeout_ms": canonicalDecimal("18000"),
+        "release_semantics": "ARM_INDEPENDENT_ROUTE_DERIVED_GRANT_CADENCE_45MS_REGISTRATION_BEFORE_PROVISIONING_OR_60MS_RESEND;_HTTP_RESPONSE_FLOOR_600MS_FROM_REGISTRATION_ACTIVATION;_SATURATION_HANDOFF_ROUTE_DERIVED_5700MS_EVERY_ROUTE;_EQUAL_TRANSPORT_WORK_EVERY_ADDRESS_ARM;_DELIVERY_AUDIT_AFTER_HANDOFF",
+        "retained_payload": "ACTIVE_SEND_CREDENTIALS;_QUEUE_NODE_OPAQUE_CONTROL_ONLY;_SUSPENDED_REGISTRATION_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_28S_TIMEOUT;_SUSPENDED_RESEND_REQUEST_FRAME_VALIDATED_PLAINTEXT_UNTIL_GRANT_OR_18S_TIMEOUT",
+        "operator_signal": Object.freeze({
+          "payload": "OPAQUE_WINDOW_COUNT_AND_CORRELATION_NO_ADDRESS_OR_SOURCE",
+          "aggregation_window_ms": canonicalDecimal("60000"),
+          "count_cap": canonicalDecimal("9007199254740991"),
+          "maximum_retained_aggregates": canonicalDecimal("1")
         }),
-        registration_clamp_absorption: Object.freeze({
-          maximum_unsaturated_concurrency: 2,
-          measured_hash_and_provisioning_max_ms: 436,
-          measurement_safety_percent: 110,
-          ruled_hash_and_provisioning_upper_bound_ms: 480,
-          response_clamp_ms: 600,
-          binding_headroom_ms: 30,
-          first_measured_unabsorbed_concurrency: 3,
-          beyond_n_star_protection: "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION"
+        "registration_clamp_absorption": Object.freeze({
+          "maximum_unsaturated_concurrency": canonicalDecimal("2"),
+          "measured_hash_and_provisioning_max_ms": canonicalDecimal("436"),
+          "measurement_safety_percent": canonicalDecimal("110"),
+          "ruled_hash_and_provisioning_upper_bound_ms": canonicalDecimal("480"),
+          "response_clamp_ms": canonicalDecimal("600"),
+          "binding_headroom_ms": canonicalDecimal("30"),
+          "first_measured_unabsorbed_concurrency": canonicalDecimal("3"),
+          "beyond_n_star_protection": "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION"
         }),
-        current_registration_clamp_absorption: Object.freeze({
-          decision_version: 2,
-          // Rework7. The numbers below are retained byte-for-byte; only the
-          // status changed. Unchanged code re-measured the same 100-request
-          // burst at 98 and then 96, and the same n=3 arm at 1,264.7 ms and
-          // 973.0 ms against this row's own ruled 430 ms bound.
-          status: "SUPERSEDED_BY_DECISION_VERSION_3;_CAPACITY_CLAIM_CONTRADICTED_BY_UNCHANGED_CODE_EVIDENCE",
-          superseded_by_decision_version: 3,
-          capacity_status: "STRUCTURAL_ADMISSION_BUDGET_UNDER_DECISION_VERSION_3;_NOT_A_MEASURED_COMPLETION_RATE",
-          contradicting_observations: Object.freeze({
-            burst_100_accepted_on_unchanged_code: Object.freeze([98, 96]),
-            n3_hash_and_provisioning_maximum_ms_on_unchanged_code:
-              Object.freeze([1_264.7, 973.0]),
-            ruled_hash_and_provisioning_upper_bound_ms: 430
+        "current_registration_clamp_absorption": Object.freeze({
+          "decision_version": canonicalDecimal("2"),
+          "status": "SUPERSEDED_BY_DECISION_VERSION_3;_CAPACITY_CLAIM_CONTRADICTED_BY_UNCHANGED_CODE_EVIDENCE",
+          "superseded_by_decision_version": canonicalDecimal("3"),
+          "capacity_status": "STRUCTURAL_ADMISSION_BUDGET_UNDER_DECISION_VERSION_3;_NOT_A_MEASURED_COMPLETION_RATE",
+          "contradicting_observations": Object.freeze({
+            "burst_100_accepted_on_unchanged_code": Object.freeze([
+              canonicalDecimal("98"),
+              canonicalDecimal("96")
+            ]),
+            "n3_hash_and_provisioning_maximum_ms_on_unchanged_code": Object.freeze([
+              canonicalDecimal("1264.7"),
+              canonicalDecimal("973")
+            ]),
+            "ruled_hash_and_provisioning_upper_bound_ms": canonicalDecimal("430")
           }),
-          supersedes_decision_version: 1,
-          supersession: "PUBLISHED_BESIDE_THE_SEALED_DECISION;_HISTORICAL_ROW_RETAINED_UNALTERED_AND_NOT_A_MONOTONE_LOWER_BOUND",
-          registration_activation_spacing_ms: 45,
-          maximum_unsaturated_concurrency: 3,
-          measured_hash_and_provisioning_max_ms: 389.6,
-          measurement_safety_percent: 110,
-          ruled_hash_and_provisioning_upper_bound_ms: 430,
-          response_clamp_ms: 600,
-          binding_headroom_ms: 35,
-          first_measured_unabsorbed_concurrency: 4,
-          measured_accepted_request_capacity: 103,
-          beyond_n_star_protection: "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION",
-          evidence: Object.freeze({
-            measurement: "THREE_FRESH_ISOLATED_REPEATS_UNCHANGED_RUNTIME_CADENCE_CAPS_AND_QUEUE_BYTES",
-            repeats: 3,
-            // Tenths of a millisecond, so the disclosed measurements stay exact
-            // integers: +113.1, +111.2, +75.4 ms.
-            n3_clamp_headroom_tenths_ms: Object.freeze([1_131, 1_112, 754]),
-            // +7.0, +9.2, -6.5 ms. This straddles zero, which is precisely why
-            // N*=4 is not claimed.
-            n4_clamp_headroom_tenths_ms: Object.freeze([70, 92, -65]),
-            raw_maximum_absorbed_concurrency_per_repeat: Object.freeze([4, 4, 3]),
-            first_unabsorbed_concurrency_per_repeat: Object.freeze([8, 8, 4]),
-            burst_100_accepted_per_repeat: Object.freeze([100, 100, 100]),
-            burst_128_accepted_per_repeat: Object.freeze([103, 103, 103]),
-            burst_160_accepted_per_repeat: Object.freeze([103, 103, 103]),
-            n3_characterization: "N3_CLAMP_HEADROOM_POSITIVE_IN_EVERY_REPEAT",
-            n4_characterization: "N4_CLAMP_HEADROOM_STRADDLES_ZERO_ACROSS_REPEATS;_RAW_MAXIMUM_ABSORBED_UNSTABLE;_NOT_A_RATIFIABLE_ABSORPTION_LIMIT",
-            conclusion: "N3_RATIFIED_ON_THREE_POSITIVE_N3_REPEATS_AT_UNCHANGED_45MS_CADENCE;_N4_DELIBERATELY_NOT_CLAIMED"
+          "supersedes_decision_version": canonicalDecimal("1"),
+          "supersession": "PUBLISHED_BESIDE_THE_SEALED_DECISION;_HISTORICAL_ROW_RETAINED_UNALTERED_AND_NOT_A_MONOTONE_LOWER_BOUND",
+          "registration_activation_spacing_ms": canonicalDecimal("45"),
+          "maximum_unsaturated_concurrency": canonicalDecimal("3"),
+          "measured_hash_and_provisioning_max_ms": canonicalDecimal("389.6"),
+          "measurement_safety_percent": canonicalDecimal("110"),
+          "ruled_hash_and_provisioning_upper_bound_ms": canonicalDecimal("430"),
+          "response_clamp_ms": canonicalDecimal("600"),
+          "binding_headroom_ms": canonicalDecimal("35"),
+          "first_measured_unabsorbed_concurrency": canonicalDecimal("4"),
+          "measured_accepted_request_capacity": canonicalDecimal("103"),
+          "beyond_n_star_protection": "EQUAL_WORK_DISTRIBUTION_NOT_CLAMP_ABSORPTION",
+          "evidence": Object.freeze({
+            "measurement": "THREE_FRESH_ISOLATED_REPEATS_UNCHANGED_RUNTIME_CADENCE_CAPS_AND_QUEUE_BYTES",
+            "repeats": canonicalDecimal("3"),
+            "n3_clamp_headroom_tenths_ms": Object.freeze([
+              canonicalDecimal("1131"),
+              canonicalDecimal("1112"),
+              canonicalDecimal("754")
+            ]),
+            "n4_clamp_headroom_tenths_ms": Object.freeze([
+              canonicalDecimal("70"),
+              canonicalDecimal("92"),
+              canonicalDecimal("-65")
+            ]),
+            "raw_maximum_absorbed_concurrency_per_repeat": Object.freeze([
+              canonicalDecimal("4"),
+              canonicalDecimal("4"),
+              canonicalDecimal("3")
+            ]),
+            "first_unabsorbed_concurrency_per_repeat": Object.freeze([
+              canonicalDecimal("8"),
+              canonicalDecimal("8"),
+              canonicalDecimal("4")
+            ]),
+            "burst_100_accepted_per_repeat": Object.freeze([
+              canonicalDecimal("100"),
+              canonicalDecimal("100"),
+              canonicalDecimal("100")
+            ]),
+            "burst_128_accepted_per_repeat": Object.freeze([
+              canonicalDecimal("103"),
+              canonicalDecimal("103"),
+              canonicalDecimal("103")
+            ]),
+            "burst_160_accepted_per_repeat": Object.freeze([
+              canonicalDecimal("103"),
+              canonicalDecimal("103"),
+              canonicalDecimal("103")
+            ]),
+            "n3_characterization": "N3_CLAMP_HEADROOM_POSITIVE_IN_EVERY_REPEAT",
+            "n4_characterization": "N4_CLAMP_HEADROOM_STRADDLES_ZERO_ACROSS_REPEATS;_RAW_MAXIMUM_ABSORBED_UNSTABLE;_NOT_A_RATIFIABLE_ABSORPTION_LIMIT",
+            "conclusion": "N3_RATIFIED_ON_THREE_POSITIVE_N3_REPEATS_AT_UNCHANGED_45MS_CADENCE;_N4_DELIBERATELY_NOT_CLAIMED"
           })
         }),
-        registration_admission: Object.freeze({
-          decision_version: 4,
-          status: "CURRENT",
-          supersedes_decision_version: 3,
-          structural_maximum_concurrent_registrations: 103,
-          registration_mail_permit_wait_deadline_ms: 28_000,
-          shared_mail_permit_wait_deadline_ms: 18_000,
-          admission_semantics: "STRUCTURAL_PROCESS_OWNED_ADMISSION_BUDGET_WITH_NO_WAIT_QUEUE;_TAKEN_SYNCHRONOUSLY_BEFORE_THE_FIRST_REPOSITORY_AWAIT;_104TH_REFUSED_BEFORE_ANY_REPOSITORY_LIMITER_KDF_MAIL_TOKEN_OR_MUTATION_WORK;_NOT_A_MEASURED_COMPLETION_RATE",
-          registration_cadence_ms: 45,
-          registration_cadence_status: "PROVISIONAL;_RECALIBRATION_PENDING;_NOT_UNIQUELY_LOAD_BEARING",
-          current_positive_clamp_absorption_n_star: null,
-          historical_n_star_2_is_a_fallback: false,
-          scope: Object.freeze({
-            mail_transport: "HEALTHY_MTA",
-            host: "TARGET_HOST",
-            shared_dispatcher_at_entry: "INITIALLY_EMPTY",
-            burst: "REGISTER_ONLY_SIMULTANEOUS",
-            hard_availability_requests: 100,
-            mixed_register_and_resend_availability_guaranteed: false,
-            route_partitioning: "NOT_AUTHORIZED_IN_REWORK7",
-            privacy_pretransport_scope: "SEPARATE_HEALTHY_STORAGE_BOUND_NOT_MET_BY_CONCURRENT_AVAILABILITY_BURST"
+        "registration_admission": Object.freeze({
+          "decision_version": canonicalDecimal("4"),
+          "status": "CURRENT",
+          "supersedes_decision_version": canonicalDecimal("3"),
+          "structural_maximum_concurrent_registrations": canonicalDecimal("103"),
+          "registration_mail_permit_wait_deadline_ms": canonicalDecimal("28000"),
+          "shared_mail_permit_wait_deadline_ms": canonicalDecimal("18000"),
+          "admission_semantics": "STRUCTURAL_PROCESS_OWNED_ADMISSION_BUDGET_WITH_NO_WAIT_QUEUE;_TAKEN_SYNCHRONOUSLY_BEFORE_THE_FIRST_REPOSITORY_AWAIT;_104TH_REFUSED_BEFORE_ANY_REPOSITORY_LIMITER_KDF_MAIL_TOKEN_OR_MUTATION_WORK;_NOT_A_MEASURED_COMPLETION_RATE",
+          "registration_cadence_ms": canonicalDecimal("45"),
+          "registration_cadence_status": "PROVISIONAL;_RECALIBRATION_PENDING;_NOT_UNIQUELY_LOAD_BEARING",
+          "current_positive_clamp_absorption_n_star": null,
+          "historical_n_star_2_is_a_fallback": false,
+          "scope": Object.freeze({
+            "mail_transport": "HEALTHY_MTA",
+            "host": "TARGET_HOST",
+            "shared_dispatcher_at_entry": "INITIALLY_EMPTY",
+            "burst": "REGISTER_ONLY_SIMULTANEOUS",
+            "hard_availability_requests": canonicalDecimal("100"),
+            "mixed_register_and_resend_availability_guaranteed": false,
+            "route_partitioning": "NOT_AUTHORIZED_IN_REWORK7",
+            "privacy_pretransport_scope": "SEPARATE_HEALTHY_STORAGE_BOUND_NOT_MET_BY_CONCURRENT_AVAILABILITY_BURST"
           }),
-          evidence: Object.freeze({
-            measurement: "ONE_FRESH_FINAL_5700MS_HASH_FIRST_PRODUCTION_POLICY_REGISTER_ONLY_AVAILABILITY_RUN;_100_AND_103_COMPLETE;_104_128_160_CAP_AT_103;_HEALTHY_5MS_MTA;_NOT_PRIVACY_ENVELOPE_EVIDENCE",
-            repeats: 1,
-            successes_per_repeat: Object.freeze([103]),
-            commits_per_repeat: Object.freeze([103]),
-            sends_per_repeat: Object.freeze([103]),
-            busy_per_repeat: Object.freeze([0]),
-            unexpected_per_repeat: Object.freeze([0]),
-            // 5,942.1 ms across all accepted cells in the fresh final run.
-            reservation_wait_maximum_tenths_ms: Object.freeze([59_421]),
-            deadline_derivation: "retained 28000 ms exceeds fresh 5942.1 ms maximum by 22057.9 ms",
-            // 78.78% of the retained 28-second deadline remained.
-            margin_hundredths_percent_per_repeat: Object.freeze([7_878])
+          "evidence": Object.freeze({
+            "measurement": "ONE_FRESH_FINAL_5700MS_HASH_FIRST_PRODUCTION_POLICY_REGISTER_ONLY_AVAILABILITY_RUN;_100_AND_103_COMPLETE;_104_128_160_CAP_AT_103;_HEALTHY_5MS_MTA;_NOT_PRIVACY_ENVELOPE_EVIDENCE",
+            "repeats": canonicalDecimal("1"),
+            "successes_per_repeat": Object.freeze([
+              canonicalDecimal("103")
+            ]),
+            "commits_per_repeat": Object.freeze([
+              canonicalDecimal("103")
+            ]),
+            "sends_per_repeat": Object.freeze([
+              canonicalDecimal("103")
+            ]),
+            "busy_per_repeat": Object.freeze([
+              canonicalDecimal("0")
+            ]),
+            "unexpected_per_repeat": Object.freeze([
+              canonicalDecimal("0")
+            ]),
+            "reservation_wait_maximum_tenths_ms": Object.freeze([
+              canonicalDecimal("59421")
+            ]),
+            "deadline_derivation": "retained 28000 ms exceeds fresh 5942.1 ms maximum by 22057.9 ms",
+            "margin_hundredths_percent_per_repeat": Object.freeze([
+              canonicalDecimal("7878")
+            ])
           }),
-          superseded_decision: Object.freeze({
-            decision_version: 3,
-            status: "SUPERSEDED_BY_DECISION_VERSION_4",
-            supersedes_decision_version: 2,
-            registration_minimum_reservation_ms: 5_100,
-            evidence: Object.freeze({
-              measurement: "THREE_FRESH_DIAGNOSTIC_PROCESSES_WITH_ONLY_THE_TEST_LOCAL_REGISTRATION_WAIT_CEILING_WIDENED_TO_DIAGNOSTIC_60000MS",
-              repeats: 3,
-              successes_per_repeat: Object.freeze([103, 103, 103]),
-              commits_per_repeat: Object.freeze([103, 103, 103]),
-              sends_per_repeat: Object.freeze([103, 103, 103]),
-              busy_per_repeat: Object.freeze([0, 0, 0]),
-              unexpected_per_repeat: Object.freeze([0, 0, 0]),
-              reservation_wait_maximum_tenths_ms: Object.freeze([209_229, 219_022, 209_421]),
-              deadline_derivation: "ceil_to_whole_second(1.25 * 21902.2 ms) = 28000 ms",
-              margin_hundredths_percent_per_repeat: Object.freeze([2_528, 2_178, 2_521])
+          "superseded_decision": Object.freeze({
+            "decision_version": canonicalDecimal("3"),
+            "status": "SUPERSEDED_BY_DECISION_VERSION_4",
+            "supersedes_decision_version": canonicalDecimal("2"),
+            "registration_minimum_reservation_ms": canonicalDecimal("5100"),
+            "evidence": Object.freeze({
+              "measurement": "THREE_FRESH_DIAGNOSTIC_PROCESSES_WITH_ONLY_THE_TEST_LOCAL_REGISTRATION_WAIT_CEILING_WIDENED_TO_DIAGNOSTIC_60000MS",
+              "repeats": canonicalDecimal("3"),
+              "successes_per_repeat": Object.freeze([
+                canonicalDecimal("103"),
+                canonicalDecimal("103"),
+                canonicalDecimal("103")
+              ]),
+              "commits_per_repeat": Object.freeze([
+                canonicalDecimal("103"),
+                canonicalDecimal("103"),
+                canonicalDecimal("103")
+              ]),
+              "sends_per_repeat": Object.freeze([
+                canonicalDecimal("103"),
+                canonicalDecimal("103"),
+                canonicalDecimal("103")
+              ]),
+              "busy_per_repeat": Object.freeze([
+                canonicalDecimal("0"),
+                canonicalDecimal("0"),
+                canonicalDecimal("0")
+              ]),
+              "unexpected_per_repeat": Object.freeze([
+                canonicalDecimal("0"),
+                canonicalDecimal("0"),
+                canonicalDecimal("0")
+              ]),
+              "reservation_wait_maximum_tenths_ms": Object.freeze([
+                canonicalDecimal("209229"),
+                canonicalDecimal("219022"),
+                canonicalDecimal("209421")
+              ]),
+              "deadline_derivation": "ceil_to_whole_second(1.25 * 21902.2 ms) = 28000 ms",
+              "margin_hundredths_percent_per_repeat": Object.freeze([
+                canonicalDecimal("2528"),
+                canonicalDecimal("2178"),
+                canonicalDecimal("2521")
+              ])
             })
           }),
-          retention_disclosure: Object.freeze({
-            maximum_admitted_registration_frames: 103,
-            maximum_shared_mail_queue_waiters: 96,
-            queued_registration_frame_retention_ms: 28_000,
-            queued_registration_frame_contents: "VALIDATED_EMAIL;_RECOVERY_EMAIL;_PASSWORD;_SOURCE_CONTEXT",
-            raw_verification_token_minted_before_mail_grant: false
+          "retention_disclosure": Object.freeze({
+            "maximum_admitted_registration_frames": canonicalDecimal("103"),
+            "maximum_shared_mail_queue_waiters": canonicalDecimal("96"),
+            "queued_registration_frame_retention_ms": canonicalDecimal("28000"),
+            "queued_registration_frame_contents": "VALIDATED_EMAIL;_RECOVERY_EMAIL;_PASSWORD;_SOURCE_CONTEXT",
+            "raw_verification_token_minted_before_mail_grant": false
           })
         }),
-        cadence_sensitivity: Object.freeze({
-          minus_15_ms: Object.freeze({
-            cadence_ms: 30,
-            observation_count: 3,
-            red_count: 2,
-            green_count: 1,
-            n8_median_gap_tenths_ms_range: Object.freeze({
-              minimum: 596,
-              maximum: 1_158
+        "cadence_sensitivity": Object.freeze({
+          "minus_15_ms": Object.freeze({
+            "cadence_ms": canonicalDecimal("30"),
+            "observation_count": canonicalDecimal("3"),
+            "red_count": canonicalDecimal("2"),
+            "green_count": canonicalDecimal("1"),
+            "n8_median_gap_tenths_ms_range": Object.freeze({
+              "minimum": canonicalDecimal("596"),
+              "maximum": canonicalDecimal("1158")
             }),
-            n8_auc_ppm_range: Object.freeze({
-              minimum: 620_000,
-              maximum: 774_000
+            "n8_auc_ppm_range": Object.freeze({
+              "minimum": canonicalDecimal("620000"),
+              "maximum": canonicalDecimal("774000")
             }),
-            characterization: "NOISY_2_OF_3_RED_RATE_NOT_DETERMINISTIC_LOWER_BOUND"
+            "characterization": "NOISY_2_OF_3_RED_RATE_NOT_DETERMINISTIC_LOWER_BOUND"
           }),
-          plus_15_ms: Object.freeze({
-            cadence_ms: 60,
-            observation_count: 1,
-            red_count: 0,
-            green_count: 1,
-            n8_median_gap_tenths_ms: 121,
-            n8_auc_ppm: 529_000,
-            characterization: "SINGLE_GREEN_OBSERVATION_NOT_STABLE_BOUNDARY"
+          "plus_15_ms": Object.freeze({
+            "cadence_ms": canonicalDecimal("60"),
+            "observation_count": canonicalDecimal("1"),
+            "red_count": canonicalDecimal("0"),
+            "green_count": canonicalDecimal("1"),
+            "n8_median_gap_tenths_ms": canonicalDecimal("121"),
+            "n8_auc_ppm": canonicalDecimal("529000"),
+            "characterization": "SINGLE_GREEN_OBSERVATION_NOT_STABLE_BOUNDARY"
           }),
-          conclusion: "CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING",
-          recalibration_trigger: "TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS"
+          "conclusion": "CENTRAL_TENDENCY_ORDERS_SAFER_AS_CADENCE_RISES;_RUN_TO_RUN_NOISE_COMPARABLE_TO_OBSERVED_EFFECT;_45MS_CURRENT_VALUE_NOT_UNIQUELY_LOAD_BEARING",
+          "recalibration_trigger": "TARGET_HOST_OR_STORAGE_CLASS_CHANGE_OR_FIRST_UNCHANGED_CODE_RED_AT_45MS"
         }),
-        sizing_derivation: "The current 45 ms registration cadence has a measured clamp-absorption limit N*=2: the measured hash plus durable provisioning maximum is 436 ms; a ruled 110 percent safety factor rounded upward to 480 ms gives the binding inequality 480 ms + 2 * 45 ms = 570 ms < the 600 ms response clamp, leaving 30 ms ruled headroom. At N>=3 the clamp no longer absorbs the serialized work, so the frozen N=4/N=8 privacy result relies on measured equal-work distribution, not clamp absorption. Across three 30 ms observations the N=8 result was a noisy 2-of-3 RED rate, with median gaps from 59.6 to 115.8 ms and AUC from .620 to .774; the 60 ms result is one GREEN observation at 12.1 ms and .529. Central tendency orders in the safer direction as cadence rises, but run-to-run noise is comparable to the observed effect; 45 ms is the current value, is not claimed uniquely load-bearing, and has no ruled failure probability. Recalibrate on target-host or storage-class change, or the first unchanged-code RED at 45 ms. Resend retains the measured 60 ms cadence needed to keep its in-lease database work bounded. Registration first obtains one bounded logical capacity permit and completes password hashing before it requests a mail permit; that permit activates the granted mail lease immediately on fulfillment and before durable provisioning. Successful provisioning immediately registers equal send/no-send dispatch work, while HTTP completion remains gated to both the original response clamp and 600 ms after lease activation. A full-capacity refusal therefore remains pre-hash, and branch-specific provisioning runs inside a 5700 ms lease derived from the ruled 600 ms pre-transport budget plus 5000 ms transport-bound work plus 100 ms scheduler tolerance. At saturation, at most 32 accepted registration hashes run concurrently. Resend retains the same 5700 ms reservation: its ruled 600 ms enumeration/pre-transport budget plus 5000 ms transport-bound work plus the same 100 ms tolerance. Delivery-result audit work follows handoff; the following reservation receives the route-derived guard. The 96-entry pre-mint queue retains opaque control nodes only. Suspended request frames necessarily retain validated plaintext email, recovery email, password, and source context until grant or the 18-second timeout; no raw verification token is minted before grant. Availability at healthy-transport bursts is measured separately for V rather than inferred from this arithmetic. A NEW versioned decision (decision_version 2) is published beside that sealed row without altering it: at the unchanged 45 ms registration cadence the current clamp-absorption limit is N*=3. Three fresh isolated repeats, with runtime, cadence, caps and queue bytes all unchanged, measured a worst N=3 hash-plus-provisioning maximum of 389.6 ms; the same ruled 110 percent safety factor rounded upward gives 430 ms, and 430 ms + 3 * 45 ms = 565 ms < the 600 ms response clamp, leaving 35 ms ruled headroom. N=3 clamp headroom was positive in every repeat at +113.1, +111.2 and +75.4 ms. N=4 is deliberately NOT claimed: its headroom straddled zero at +7.0, +9.2 and -6.5 ms, raw maximum absorbed concurrency was [4,4,3] and first unabsorbed was [8,8,4], so N=4 is not a stable absorption limit. The sealed N*=2 decision is retained unaltered as history and is not a monotone lower bound. Measured accepted-request capacity is exactly 103: bursts of 128 and 160 accepted 103/103/103 in every repeat, and a burst of 100 was 100/100/100 in every repeat. A THIRD versioned decision (decision_version 3) now supersedes decision_version 2 and republishes 103 as a structural admission budget: at most 103 validated registration requests may hold that budget at once, it has no wait queue, it is taken synchronously before the first repository await, and the 104th is refused before any repository, limiter, KDF, mail reservation, token or mutation work, with the existing opaque retryable busy envelope and the unchanged 600 ms response clamp. That number is not a measured accepted-request capacity, and Rework7 does not re-claim it as one: on unchanged code the same 100-request burst later accepted 98, and then 96, and the n=3 hash-plus-provisioning maximum re-measured at 1264.7 ms and 973.0 ms against decision_version 2's ruled 430 ms, so decision_version 2 is retained as contradicted history with every array unaltered. The registration mail-permit wait deadline remains 28,000 ms while resend and every other route keep 18,000 ms. Historical decision_version 3 evidence used the superseded 5100 ms lease: it committed and sent exactly 103 per process at wait maxima 20,922.9, 21,902.2 and 20,942.1 ms; ceil_to_whole_second(1.25 * 21,902.2 ms) = 28,000 ms and the tightest margin was 21.78 percent. Those observations remain byte-exact historical evidence. A FOURTH versioned decision (decision_version 4) validates the final hash-first 5700 ms lease and retains the conservative 28-second registration deadline: a fresh production-policy run completed 100/100 at the hard availability point and 103/103 at the structural cap, refused only the expected excess at 104/128/160, and measured a 5,942.1 ms maximum accepted mail-permit wait, leaving 22,057.9 ms or 78.78 percent of the retained deadline. The 45 ms cadence is provisional and recalibration-pending, there is no positive current N* at all, and the sealed historical N*=2 is not a fallback. Decision v4 availability is bounded to a healthy MTA on the target host with an initially empty shared dispatcher and a register-only simultaneous burst; its concurrent DB/key-storage phase exceeded 600 ms and is explicitly not timing-opacity evidence. The timing-opacity claim is separately bounded to scored operations whose healthy DB/key storage completes the pre-transport phase within 600 ms. Mixed register and resend availability is NOT guaranteed, because both routes still share the one 32-active/96-waiter FIFO and route partitioning is not authorized in Rework7. Storage stalls beyond 600 ms and pre-COMMIT DEK failures remain explicitly out of the bounded timing-opacity claim and emit an operator signal; external-DEK/COMMIT ambiguity remains a reconciliation residual. A queued registration frame therefore retains validated email, recovery email, password and source context for at most 28 seconds rather than the 18 seconds disclosed above; at most 103 admitted registration frames and at most 96 shared mail-queue waiters exist at once, and no raw verification token is minted before mail grant."
+        "sizing_derivation": "The current 45 ms registration cadence has a measured clamp-absorption limit N*=2: the measured hash plus durable provisioning maximum is 436 ms; a ruled 110 percent safety factor rounded upward to 480 ms gives the binding inequality 480 ms + 2 * 45 ms = 570 ms < the 600 ms response clamp, leaving 30 ms ruled headroom. At N>=3 the clamp no longer absorbs the serialized work, so the frozen N=4/N=8 privacy result relies on measured equal-work distribution, not clamp absorption. Across three 30 ms observations the N=8 result was a noisy 2-of-3 RED rate, with median gaps from 59.6 to 115.8 ms and AUC from .620 to .774; the 60 ms result is one GREEN observation at 12.1 ms and .529. Central tendency orders in the safer direction as cadence rises, but run-to-run noise is comparable to the observed effect; 45 ms is the current value, is not claimed uniquely load-bearing, and has no ruled failure probability. Recalibrate on target-host or storage-class change, or the first unchanged-code RED at 45 ms. Resend retains the measured 60 ms cadence needed to keep its in-lease database work bounded. Registration first obtains one bounded logical capacity permit and completes password hashing before it requests a mail permit; that permit activates the granted mail lease immediately on fulfillment and before durable provisioning. Successful provisioning immediately registers equal send/no-send dispatch work, while HTTP completion remains gated to both the original response clamp and 600 ms after lease activation. A full-capacity refusal therefore remains pre-hash, and branch-specific provisioning runs inside a 5700 ms lease derived from the ruled 600 ms pre-transport budget plus 5000 ms transport-bound work plus 100 ms scheduler tolerance. At saturation, at most 32 accepted registration hashes run concurrently. Resend retains the same 5700 ms reservation: its ruled 600 ms enumeration/pre-transport budget plus 5000 ms transport-bound work plus the same 100 ms tolerance. Delivery-result audit work follows handoff; the following reservation receives the route-derived guard. The 96-entry pre-mint queue retains opaque control nodes only. Suspended request frames necessarily retain validated plaintext email, recovery email, password, and source context until grant or the 18-second timeout; no raw verification token is minted before grant. Availability at healthy-transport bursts is measured separately for V rather than inferred from this arithmetic. A NEW versioned decision (decision_version 2) is published beside that sealed row without altering it: at the unchanged 45 ms registration cadence the current clamp-absorption limit is N*=3. Three fresh isolated repeats, with runtime, cadence, caps and queue bytes all unchanged, measured a worst N=3 hash-plus-provisioning maximum of 389.6 ms; the same ruled 110 percent safety factor rounded upward gives 430 ms, and 430 ms + 3 * 45 ms = 565 ms < the 600 ms response clamp, leaving 35 ms ruled headroom. N=3 clamp headroom was positive in every repeat at +113.1, +111.2 and +75.4 ms. N=4 is deliberately NOT claimed: its headroom straddled zero at +7.0, +9.2 and -6.5 ms, raw maximum absorbed concurrency was [4,4,3] and first unabsorbed was [8,8,4], so N=4 is not a stable absorption limit. The sealed N*=2 decision is retained unaltered as history and is not a monotone lower bound. Measured accepted-request capacity is exactly 103: bursts of 128 and 160 accepted 103/103/103 in every repeat, and a burst of 100 was 100/100/100 in every repeat. A THIRD versioned decision (decision_version 3) now supersedes decision_version 2 and republishes 103 as a structural admission budget: at most 103 validated registration requests may hold that budget at once, it has no wait queue, it is taken synchronously before the first repository await, and the 104th is refused before any repository, limiter, KDF, mail reservation, token or mutation work, with the existing opaque retryable busy envelope and the unchanged 600 ms response clamp. That number is not a measured accepted-request capacity, and Rework7 does not re-claim it as one: on unchanged code the same 100-request burst later accepted 98, and then 96, and the n=3 hash-plus-provisioning maximum re-measured at 1264.7 ms and 973.0 ms against decision_version 2's ruled 430 ms, so decision_version 2 is retained as contradicted history with every array unaltered. The registration mail-permit wait deadline remains 28,000 ms while resend and every other route keep 18,000 ms. Historical decision_version 3 evidence used the superseded 5100 ms lease: it committed and sent exactly 103 per process at wait maxima 20,922.9, 21,902.2 and 20,942.1 ms; ceil_to_whole_second(1.25 * 21,902.2 ms) = 28,000 ms and the tightest margin was 21.78 percent. Those observations remain byte-exact historical evidence. A FOURTH versioned decision (decision_version 4) validates the final hash-first 5700 ms lease and retains the conservative 28-second registration deadline: a fresh production-policy run completed 100/100 at the hard availability point and 103/103 at the structural cap, refused only the expected excess at 104/128/160, and measured a 5,942.1 ms maximum accepted mail-permit wait, leaving 22,057.9 ms or 78.78 percent of the retained deadline. The 45 ms cadence is provisional and recalibration-pending, there is no positive current N* at all, and the sealed historical N*=2 is not a fallback. Decision v4 availability is bounded to a healthy MTA on the target host with an initially empty shared dispatcher and a register-only simultaneous burst; its concurrent DB/key-storage phase exceeded 600 ms and is explicitly not timing-opacity evidence. The timing-opacity claim is separately bounded to scored operations whose healthy DB/key storage completes the pre-transport phase within 600 ms. Mixed register and resend availability is NOT guaranteed, because both routes still share the one 32-active/96-waiter FIFO and route partitioning is not authorized in Rework7. Storage stalls beyond 600 ms and pre-COMMIT DEK failures remain explicitly out of the bounded timing-opacity claim and emit an operator signal; external-DEK/COMMIT ambiguity remains a reconciliation residual. A queued registration frame therefore retains validated email, recovery email, password and source context for at most 28 seconds rather than the 18 seconds disclosed above; at most 103 admitted registration frames and at most 96 shared mail-queue waiters exist at once, and no raw verification token is minted before mail grant."
       }),
-      delivery_audit: Object.freeze({
-        public_result: "ENUMERATION_SAFE_GENERIC_RESPONSE",
-        operator_result: "DURABLE_STATUS_AND_AUDIT_WITH_OPAQUE_CORRELATION",
-        duplicate_registration_rows: 2,
-        duplicate_counting_instruction: "A duplicate registration writes the registration DENY and equal-work postwork DENY; operators must correlate them and do not double-count them as two refusal attempts."
+      "delivery_audit": Object.freeze({
+        "public_result": "ENUMERATION_SAFE_GENERIC_RESPONSE",
+        "operator_result": "DURABLE_STATUS_AND_AUDIT_WITH_OPAQUE_CORRELATION",
+        "duplicate_registration_rows": canonicalDecimal("2"),
+        "duplicate_counting_instruction": "A duplicate registration writes the registration DENY and equal-work postwork DENY; operators must correlate them and do not double-count them as two refusal attempts."
       })
     }),
-    sourceRef: "AMENDMENTS.md#VR-5 own mail service, no relays + S3d D1/D4 delivery boundedness and honesty (2026-08-20) + T1 rework2 clamp-absorption decision_version 2 N*=3 at unchanged 45 ms from three fresh isolated repeats, sealed decision_version 1 N*=2 retained unaltered, N*=4 deliberately not claimed (2026-08-22) + T1 rework7-A decision_version 3 V-approved structural 103 admission budget and 28,000 ms registration mail-permit deadline with 18,000 ms retained for resend, decision_version 2 demoted to contradicted history and no positive current N* published (2026-08-22) + T1 decision_version 4 final hash-first 5700 ms lease availability remeasurement with decision_version 3 retained as superseded history and storage-overrun opacity residual (2026-08-25)"
+    "sourceRef": "AMENDMENTS.md#VR-5 own mail service, no relays + S3d D1/D4 delivery boundedness and honesty (2026-08-20) + T1 rework2 clamp-absorption decision_version 2 N*=3 at unchanged 45 ms from three fresh isolated repeats, sealed decision_version 1 N*=2 retained unaltered, N*=4 deliberately not claimed (2026-08-22) + T1 rework7-A decision_version 3 V-approved structural 103 admission budget and 28,000 ms registration mail-permit deadline with 18,000 ms retained for resend, decision_version 2 demoted to contradicted history and no positive current N* published (2026-08-22) + T1 decision_version 4 final hash-first 5700 ms lease availability remeasurement with decision_version 3 retained as superseded history and storage-overrun opacity residual (2026-08-25)"
   })
-] satisfies readonly AuthPolicyRegisterRow[]);
+]);
+
+export const AUTH_POLICY_REGISTER_ROWS = Object.freeze(AUTH_POLICY_PUBLICATION_ROWS.map((row) =>
+  Object.freeze({
+    rowKey: row.rowKey,
+    valueAst: row.value,
+    value: JSON.parse(canonicalRegisterJson(row.value)) as Readonly<Record<string, unknown>>,
+    sourceRef: row.sourceRef
+  })
+));
 
 export interface AuthRouteLimit {
   readonly windowMs: number;

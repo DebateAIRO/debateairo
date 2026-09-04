@@ -1,5 +1,6 @@
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
+import { parseRegisterVersionText, registerVersionToSafeLegacyNumber } from "@debateai/register";
 import {
   BATTERY_ROW_IDS,
   declaredPredicateInputNames,
@@ -1023,7 +1024,9 @@ export async function readTerminalRecordedFacts(pool: Pool, runId: string): Prom
   if (row === undefined) {
     throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
   }
-  const registerVersion = Number(row["register_version"]);
+  const registerVersion = registerVersionToSafeLegacyNumber(
+    parseRegisterVersionText(row["register_version"])
+  );
   const livenessValue = row["liveness_value"];
   const member = livenessValue === undefined || livenessValue === null
     ? null

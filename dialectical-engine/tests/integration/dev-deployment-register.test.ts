@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, link, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,18 +19,32 @@ import {
   readProductRolePolicy,
   readRecoveryPolicy,
   readSessionPolicy,
-  readStructuralCeilingPolicyInputs
+  readStructuralCeilingPolicyInputs,
+  registerVersionToSafeLegacyNumber
 } from "../../packages/register/src/index.js";
 import {
   buildDevelopmentDeploymentRegisterRows,
+  createDevelopmentDeploymentRegisterMachineReceipt,
+  DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
   DEVELOPMENT_REGISTER_VERSION,
-  seedDevelopmentDeploymentRegister
+  developmentDeploymentRegisterReceiptPath,
+  parseDevelopmentDeploymentRegisterCliOutput,
+  readDevelopmentDeploymentRegisterReceipt,
+  seedDevelopmentDeploymentRegister,
+  serializeDevelopmentDeploymentRegisterReceipt,
+  writeDevelopmentDeploymentRegisterReceipt
 } from "../../apps/runner/src/dev-deployment-register.js";
+import { parseRegisterVersionText } from "../../packages/register/src/register-publication.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import {
+  importHistoricalRegisterFixture,
+  registerFixtureRow
+} from "../support/registerFixtures.js";
 
 let database: TestDatabase;
+let repositoryRoot: string;
 const temporaryRoots: string[] = [];
 
 async function runCli(environment: NodeJS.ProcessEnv): Promise<Readonly<{
@@ -66,6 +80,9 @@ async function runCli(environment: NodeJS.ProcessEnv): Promise<Readonly<{
 beforeEach(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  repositoryRoot = await mkdtemp(join(tmpdir(), "debateai-dev-register-receipt-"));
+  temporaryRoots.push(repositoryRoot);
+  await mkdir(join(repositoryRoot, ".local", "dev-auth"), { recursive: true, mode: 0o700 });
 }, 120_000);
 
 afterEach(async () => {
@@ -76,23 +93,98 @@ afterEach(async () => {
 });
 
 describe("DEV-05 complete development deployment register", () => {
+  it.each([
+    { label: "zero bytes", size: 0 },
+    { label: "4097 bytes", size: 4_097 }
+  ])("refuses a current-owner 0600 existing receipt of $label without overwriting it", async ({ size }) => {
+    const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
+      registerVersion: parseRegisterVersionText("424242"),
+      rowCount: 32,
+      snapshotSha256: "a".repeat(64)
+    });
+    const path = developmentDeploymentRegisterReceiptPath(repositoryRoot);
+    const original = Buffer.alloc(size, "x");
+    await writeFile(path, original, { mode: 0o600 });
+    const before = await stat(path);
+    expect({
+      file: before.isFile(),
+      uid: before.uid,
+      nlink: before.nlink,
+      mode: before.mode & 0o777,
+      size: before.size
+    }).toEqual({
+      file: true,
+      uid: process.getuid?.(),
+      nlink: 1,
+      mode: 0o600,
+      size
+    });
+
+    await expect(writeDevelopmentDeploymentRegisterReceipt(repositoryRoot, receipt))
+      .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+    expect(await readFile(path)).toEqual(original);
+    expect((await stat(path)).size).toBe(size);
+  });
+
+  it.each([1, 4_096])("replaces a valid-custody existing receipt at the %i-byte neighbor", async (size) => {
+    const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
+      registerVersion: parseRegisterVersionText("424242"),
+      rowCount: 32,
+      snapshotSha256: "a".repeat(64)
+    });
+    const path = developmentDeploymentRegisterReceiptPath(repositoryRoot);
+    await writeFile(path, Buffer.alloc(size, "x"), { mode: 0o600 });
+
+    await expect(writeDevelopmentDeploymentRegisterReceipt(repositoryRoot, receipt))
+      .resolves.toBe(path);
+    expect(await readFile(path, "utf8"))
+      .toBe(`${serializeDevelopmentDeploymentRegisterReceipt(receipt)}\n`);
+  });
+
+  it("preserves a future receipt byte-for-byte and rejects malformed hash or custody", async () => {
+    const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
+      registerVersion: parseRegisterVersionText("424242"),
+      rowCount: 32,
+      snapshotSha256: "a".repeat(64)
+    });
+    const path = await writeDevelopmentDeploymentRegisterReceipt(repositoryRoot, receipt);
+    const serialized = serializeDevelopmentDeploymentRegisterReceipt(receipt);
+    expect(path).toBe(developmentDeploymentRegisterReceiptPath(repositoryRoot));
+    expect(await readFile(path, "utf8")).toBe(`${serialized}\n`);
+    expect(await readDevelopmentDeploymentRegisterReceipt(repositoryRoot)).toEqual(receipt);
+    await expect(parseDevelopmentDeploymentRegisterCliOutput(
+      `${DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX}${serialized}\n`,
+      repositoryRoot
+    )).resolves.toEqual(receipt);
+
+    await writeFile(path, `${serialized.replace(receipt.receiptSha256, "0".repeat(64))}\n`, {
+      mode: 0o600
+    });
+    await expect(readDevelopmentDeploymentRegisterReceipt(repositoryRoot))
+      .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+
+    await writeFile(path, `${serialized}\n`, { mode: 0o600 });
+    await chmod(path, 0o644);
+    await expect(readDevelopmentDeploymentRegisterReceipt(repositoryRoot))
+      .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+
+    await chmod(path, 0o600);
+    await link(path, `${path}.hardlink`);
+    await expect(readDevelopmentDeploymentRegisterReceipt(repositoryRoot))
+      .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_RECEIPT_CUSTODY_INVALID");
+  });
+
   it("preserves an internally consistent sealed historical bootstrap while publishing current v4", async () => {
     const bootstrap = await loadBootstrapRegister();
-    await database.pool.query(
-      `INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-       VALUES ($1,'riskTier','"casual"'::jsonb,'historical:dev-register-v1')`,
-      [bootstrap.registerVersion]
-    );
-    await database.pool.query(
-      `INSERT INTO register.register_version (register_version,row_count,sealed)
-       VALUES ($1,1,true)`,
-      [bootstrap.registerVersion]
-    );
+    await importHistoricalRegisterFixture(database.pool, 1, [
+      registerFixtureRow("riskTier", "casual", "historical:dev-register-v1")
+    ]);
 
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
-    })).resolves.toMatchObject({ registerVersion: DEVELOPMENT_REGISTER_VERSION });
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
+    })).resolves.toMatchObject({ registerVersion: String(DEVELOPMENT_REGISTER_VERSION) });
     expect((await database.pool.query(
       "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=$1",
       [bootstrap.registerVersion]
@@ -158,24 +250,26 @@ describe("DEV-05 complete development deployment register", () => {
     const bootstrap = await loadBootstrapRegister();
     const first = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     });
-    expect(first.registerVersion).toBe(DEVELOPMENT_REGISTER_VERSION);
+    expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
     expect(first.rowCount).toBeGreaterThan(
       buildDevelopmentDeploymentRegisterRows(TEST_DEVELOPMENT_PROVIDER_PANEL).length
     );
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
+    const registerVersion = registerVersionToSafeLegacyNumber(first.registerVersion);
     const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk] = await Promise.all([
-      readAuthPolicy(database.pool, first.registerVersion),
-      readMfaPolicy(database.pool, first.registerVersion),
-      readSessionPolicy(database.pool, first.registerVersion),
-      readRecoveryPolicy(database.pool, first.registerVersion),
-      readProductRolePolicy(database.pool, first.registerVersion),
-      readDeploymentMakerCapability(database.pool, first.registerVersion),
-      readPanelDiscoveryPolicy(database.pool, first.registerVersion),
-      readStructuralCeilingPolicyInputs(database.pool, first.registerVersion),
-      readDeploymentRiskTier(database.pool, first.registerVersion)
+      readAuthPolicy(database.pool, registerVersion),
+      readMfaPolicy(database.pool, registerVersion),
+      readSessionPolicy(database.pool, registerVersion),
+      readRecoveryPolicy(database.pool, registerVersion),
+      readProductRolePolicy(database.pool, registerVersion),
+      readDeploymentMakerCapability(database.pool, registerVersion),
+      readPanelDiscoveryPolicy(database.pool, registerVersion),
+      readStructuralCeilingPolicyInputs(database.pool, registerVersion),
+      readDeploymentRiskTier(database.pool, registerVersion)
     ]);
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(mfa.totp.algorithm).toBe("SHA1");
@@ -207,7 +301,7 @@ describe("DEV-05 complete development deployment register", () => {
       maxCooldownHoldsPerRun: 2
     });
     expect(risk.value).toBe("standard");
-    await expect(readLivenessPolicy(database.pool, first.registerVersion, "standard"))
+    await expect(readLivenessPolicy(database.pool, registerVersion, "standard"))
       .resolves.toMatchObject({ reviewAfterMs: 604_800_000, retireAfterMs: 15_552_000_000 });
 
     const sealed = (await database.pool.query<{
@@ -236,7 +330,8 @@ describe("DEV-05 complete development deployment register", () => {
     `,[first.registerVersion]);
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     }))
       .resolves.toEqual(first);
     const after = await database.pool.query<{
@@ -249,15 +344,15 @@ describe("DEV-05 complete development deployment register", () => {
     `,[first.registerVersion]);
     expect(after.rows).toEqual(before.rows);
 
-    const policy = await readDevelopmentRunnerPolicy(database.pool, first.registerVersion);
+    const policy = await readDevelopmentRunnerPolicy(database.pool, registerVersion);
     expect(Object.keys(policy.compositionRow.value.entries).sort()).toEqual([
       "causal", "comparative", "definitional", "empirical", "mixed", "normative",
       "prediction", "unknown"
     ]);
     expect(policy.compositionBudgets).toMatchObject({
-      low: { bound: 10_000, registerVersion: first.registerVersion },
-      medium: { bound: 20_000, registerVersion: first.registerVersion },
-      high: { bound: 30_000, registerVersion: first.registerVersion }
+      low: { bound: 10_000, registerVersion },
+      medium: { bound: 20_000, registerVersion },
+      high: { bound: 30_000, registerVersion }
     });
     expect(policy.bandCeiling.value).toMatchObject({
       bandOrder: ["CAPPED", "FULL"],
@@ -265,7 +360,7 @@ describe("DEV-05 complete development deployment register", () => {
     });
     expect(policy.judgementPolicy.selectionRule).toMatchObject({
       kind: "MAXIMIZE_WEIGHTED_TAU",
-      registerVersion: first.registerVersion
+      registerVersion
     });
     expect(policy.scoringOperator).toMatchObject({ deploymentRowValue: "accumulate" });
     expect(policy.runDeathPolicy).toEqual({
@@ -291,26 +386,28 @@ describe("DEV-05 complete development deployment register", () => {
     });
     expect(cli).toEqual({
       exitCode: 0,
-      stdout: `DEV_DEPLOYMENT_REGISTER_READY=${first.registerVersion}:${first.rowCount}\n`,
+      stdout: `${DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX}${
+        serializeDevelopmentDeploymentRegisterReceipt(first)
+      }\n`,
       stderr: ""
     });
     expect(cli.stdout).not.toContain(database.connectionString);
   }, 120_000);
 
   it("rejects partial or conflicting state instead of completing or resealing it", async () => {
-    await database.pool.query(`
-      INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-      VALUES ($1,'riskTier','"casual"'::jsonb,'fixture:partial')
-    `, [DEVELOPMENT_REGISTER_VERSION]);
+    await importHistoricalRegisterFixture(database.pool, 4, [
+      registerFixtureRow("riskTier", "casual", "fixture:partial")
+    ]);
     expect((await database.pool.query(
       "SELECT row_key FROM register.register_row WHERE register_version=$1",
       [DEVELOPMENT_REGISTER_VERSION]
     )).rows).toEqual([{ row_key: "riskTier" }]);
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     }))
-      .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_DRIFT");
+      .rejects.toThrow("REGISTER_PUBLICATION_SEAL_INVALID");
     expect((await database.pool.query(
       "SELECT row_key FROM register.register_row WHERE register_version=$1",
       [DEVELOPMENT_REGISTER_VERSION]
@@ -318,7 +415,7 @@ describe("DEV-05 complete development deployment register", () => {
     expect((await database.pool.query(
       "SELECT register_version FROM register.register_version WHERE register_version=$1",
       [DEVELOPMENT_REGISTER_VERSION]
-    )).rows).toEqual([]);
+    )).rows).toEqual([{ register_version: String(DEVELOPMENT_REGISTER_VERSION) }]);
   });
 
   it("serializes concurrent first invocation and refuses a service principal", async () => {
@@ -335,7 +432,8 @@ describe("DEV-05 complete development deployment register", () => {
     try {
       await expect(seedDevelopmentDeploymentRegister({
         adminPool: attackerPool,
-        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+        repositoryRoot
       }))
         .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
     } finally {
@@ -348,7 +446,8 @@ describe("DEV-05 complete development deployment register", () => {
     const receipts = await Promise.all(Array.from({ length: 12 }, () =>
       seedDevelopmentDeploymentRegister({
         adminPool: database.pool,
-        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+        repositoryRoot
       })
     ));
     expect(new Set(receipts.map((receipt) => JSON.stringify(receipt))).size).toBe(1);

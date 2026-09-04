@@ -297,6 +297,31 @@ describe("bigint-safe versions and separate publication hash domains", () => {
     ]);
     expect(three.size).toBe(3);
   });
+
+  it("accepts byte-exact legacy and 1024-character source refs but rejects 1025", () => {
+    const legacy = "l".repeat(755);
+    const maximum = "m".repeat(1024);
+    const tooLong = "x".repeat(1025);
+    for (const sourceRef of [legacy, maximum]) {
+      const rows = [{ rowKey: "riskTier", valueJsonText: text(`"standard"`), sourceRef }];
+      expect(computeRegisterSnapshotSha256(rows)).toMatch(/^[0-9a-f]{64}$/u);
+      expect(computeGeneralPublicationRequestSha256({
+        publicationId: "00000000-0000-4000-8000-000000000001",
+        baseRegisterVersion: parseRegisterVersionText("4"),
+        rows,
+        sourceRef
+      })).toMatch(/^[0-9a-f]{64}$/u);
+    }
+    expect(() => computeRegisterSnapshotSha256([
+      { rowKey: "riskTier", valueJsonText: text(`"standard"`), sourceRef: tooLong }
+    ])).toThrow("REGISTER_PUBLICATION_INPUT_INVALID");
+    expect(() => computeGeneralPublicationRequestSha256({
+      publicationId: "00000000-0000-4000-8000-000000000001",
+      baseRegisterVersion: parseRegisterVersionText("4"),
+      rows: [{ rowKey: "riskTier", valueJsonText: text(`"standard"`), sourceRef: "src:row" }],
+      sourceRef: tooLong
+    })).toThrow("REGISTER_PUBLICATION_INPUT_INVALID");
+  });
 });
 
 type DbRow = Record<string, unknown>;
@@ -356,6 +381,21 @@ describe("closed PostgreSQL publication port", () => {
     expect(fixture.events[1]?.values).toEqual([
       "4", JSON.stringify([{ row_key: "riskTier", value_json_text: `"standard"`, source_ref: "src:row" }]), snapshotSha256
     ]);
+  });
+
+  it("passes 755- and 1024-character row provenance through the historical port unchanged", async () => {
+    for (const sourceRef of ["l".repeat(755), "m".repeat(1024)]) {
+      const boundedRows = [{ rowKey: "riskTier", valueJsonText: text(`"standard"`), sourceRef }];
+      const snapshotSha256 = computeRegisterSnapshotSha256(boundedRows);
+      const fixture = fakePool([{
+        register_version: "4", row_count: 1, snapshot_sha256: snapshotSha256, outcome: "CREATED"
+      }]);
+      await expect(createPostgresRegisterPublicationPort(fixture.pool).importHistorical({
+        registerVersion: base,
+        rows: boundedRows
+      })).resolves.toMatchObject({ snapshotSha256 });
+      expect(fixture.events[1]?.values?.[1]).toContain(sourceRef);
+    }
   });
 
   it("publishes a complete GENERAL input through one function, verifies receipt, commits, then resolves", async () => {

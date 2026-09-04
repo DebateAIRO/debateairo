@@ -93,7 +93,7 @@ function decodeConfiguration(configurationText: string): readonly ConfigurationE
         || typeof candidate.row_key !== "string" || !SUPPORT_KEY_SET.has(candidate.row_key)
         || keys.has(candidate.row_key) || typeof candidate.value_json_text !== "string"
         || typeof candidate.source_ref !== "string" || candidate.source_ref.length < 1
-        || candidate.source_ref.length > 256 || candidate.source_ref.trim() !== candidate.source_ref
+        || candidate.source_ref.length > 1024 || candidate.source_ref.trim() !== candidate.source_ref
         || /[\u0000-\u001f\u007f]/u.test(candidate.source_ref)) {
       throw new TypeError("SUPPORT_CONFIG_SNAPSHOT_INVALID");
     }

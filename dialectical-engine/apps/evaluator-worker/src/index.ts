@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { createHash, randomUUID } from "node:crypto";
 import { decryptContentForRun, type CryptoEnvelope, withRunContentLease } from "@debateai/db";
 import type { CallBound, ProviderGateway } from "@debateai/providers";
+import { parseRegisterVersionText, registerVersionToSafeLegacyNumber } from "@debateai/register";
 import {
   assertEvaluatorProviderIsolation,
   DomainRegistryRepository,
@@ -217,13 +218,20 @@ export async function runEvaluatorJudgeGradingAddon(input: {
   if (input.observedAt !== undefined && !Number.isFinite(input.observedAt.getTime())) {
     throw new TypeError("EVALUATOR_ADDON_TIME_INVALID");
   }
-  const run = await input.pool.query<{ register_version: string | number }>(
+  const run = await input.pool.query<{ register_version: string }>(
     "SELECT register_version FROM core.run WHERE run_id=$1",
     [input.runId]
   );
   if (run.rows[0] === undefined) throw new TypeError("EVALUATOR_ADDON_RUN_UNRESOLVED");
   const repository = new PostgresEvaluatorAddonRepository(input.pool);
-  const registerVersion = Number(run.rows[0]?.register_version);
+  let registerVersion: number;
+  try {
+    registerVersion = registerVersionToSafeLegacyNumber(
+      parseRegisterVersionText(run.rows[0].register_version)
+    );
+  } catch {
+    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
+  }
   const recordPreflightReceipt = async (state: "FAILED" | "SKIPPED", reason: string): Promise<void> => {
     const attemptId = randomUUID();
     const inputHash = createHash("sha256").update(JSON.stringify({
@@ -238,10 +246,6 @@ export async function runEvaluatorJudgeGradingAddon(input: {
       // The worker remains best effort; a receipt-store outage must not affect the product run.
     }
   };
-  if (!Number.isInteger(registerVersion) || registerVersion < 1) {
-    await recordPreflightReceipt("FAILED", "ADDON_PREFLIGHT_FAILED");
-    return Object.freeze({ state: "FAILED", reason: "ADDON_PREFLIGHT_FAILED" });
-  }
   if (input.family.registerVersion !== registerVersion) {
     await recordPreflightReceipt("SKIPPED", "ADDON_FAMILY_REGISTER_VERSION_MISMATCH");
     return Object.freeze({ state: "SKIPPED", reason: "ADDON_FAMILY_REGISTER_VERSION_MISMATCH" });

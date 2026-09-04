@@ -504,7 +504,7 @@ function validateRows(rows: readonly RegisterPublicationRow[], allowSupport: boo
     requirePlainExact(row, ["rowKey", "valueJsonText", "sourceRef"], "REGISTER_PUBLICATION_INPUT_INVALID");
     if (!validBoundedText(row.rowKey, 256) || row.rowKey === "supportActivation"
         || (!allowSupport && SUPPORT_KEY_SET.has(row.rowKey)) || keys.has(row.rowKey)
-        || !validBoundedText(row.sourceRef, 256)) fail("REGISTER_PUBLICATION_INPUT_INVALID");
+        || !validBoundedText(row.sourceRef, 1024)) fail("REGISTER_PUBLICATION_INPUT_INVALID");
     validateCanonicalText(row.valueJsonText, "REGISTER_PUBLICATION_INPUT_INVALID");
     keys.add(row.rowKey);
   }
@@ -571,7 +571,7 @@ function validateSupportPublication(input: SupportConfigurationPublication): voi
     "publicationId", "baseRegisterVersion", "expectedSupportRegisterVersion", "schemaVersion", "patch", "sourceRef"
   ], "SUPPORT_CONFIG_PATCH_INVALID");
   if (!UUID_PATTERN.test(input.publicationId) || input.schemaVersion !== 1
-      || !validBoundedText(input.sourceRef, 256) || !Array.isArray(input.patch) || input.patch.length < 1) {
+      || !validBoundedText(input.sourceRef, 1024) || !Array.isArray(input.patch) || input.patch.length < 1) {
     fail("SUPPORT_CONFIG_PATCH_INVALID");
   }
   parseRegisterVersionText(input.baseRegisterVersion);
@@ -601,7 +601,7 @@ export function computeRegisterSnapshotSha256(rows: readonly RegisterPublication
 
 export function computeGeneralPublicationRequestSha256(input: GeneralRegisterPublication): string {
   validateRows(input.rows, true);
-  if (!UUID_PATTERN.test(input.publicationId) || !validBoundedText(input.sourceRef, 256)) {
+  if (!UUID_PATTERN.test(input.publicationId) || !validBoundedText(input.sourceRef, 1024)) {
     fail("REGISTER_PUBLICATION_INPUT_INVALID");
   }
   parseRegisterVersionText(input.baseRegisterVersion);
@@ -747,7 +747,7 @@ function statusRow(row: Record<string, unknown>): NonNullable<SupportConfigurati
       || !Array.isArray(changedKeys) || changedKeys.some((key) => typeof key !== "string" || !SUPPORT_KEY_SET.has(key))
       || new Set(changedKeys).size !== changedKeys.length
       || typeof schemaVersion !== "number" || !Number.isSafeInteger(schemaVersion) || schemaVersion < 1
-      || !validBoundedText(sourceRef, 256) || typeof configurationText !== "string") {
+      || !validBoundedText(sourceRef, 1024) || typeof configurationText !== "string") {
     fail("SUPPORT_CONFIG_SNAPSHOT_INVALID");
   }
   return Object.freeze({

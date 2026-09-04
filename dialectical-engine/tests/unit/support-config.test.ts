@@ -45,11 +45,14 @@ async function sha(rows: readonly { row_key: string; value_json_text: string; so
   return hash.digest("hex");
 }
 
-async function statusRow(replacements: Partial<Record<SupportConfigurationKey, string>> = {}) {
+async function statusRow(
+  replacements: Partial<Record<SupportConfigurationKey, string>> = {},
+  sourceRef = "src:support"
+) {
   const configuration = SUPPORT_CONFIGURATION_KEYS.map((row_key) => ({
     row_key,
     value_json_text: replacements[row_key] ?? VALUES[row_key],
-    source_ref: "src:support"
+    source_ref: sourceRef
   }));
   return {
     support_register_version: "9007199254740993",
@@ -60,7 +63,7 @@ async function statusRow(replacements: Partial<Record<SupportConfigurationKey, s
     snapshot_sha256: "b".repeat(64),
     support_snapshot_sha256: await sha(configuration),
     changed_keys: ["support_enabled"],
-    source_ref: "src:support",
+    source_ref: sourceRef,
     recorded_at: new Date("2026-09-04T00:00:00.000Z"),
     configuration_text: JSON.stringify(configuration)
   };
@@ -175,6 +178,16 @@ describe("bounded fail-closed support configuration reader", () => {
           supportRetentionRatifiedBy: null
         }
       }
+    });
+  });
+
+  it("accepts 1024-character source refs and fails closed at 1025", async () => {
+    const maximum = poolWith(async () => ({ rows: [await statusRow({}, "m".repeat(1024))] }));
+    await expect(createSupportConfigurationPort(maximum.pool).current())
+      .resolves.toMatchObject({ kind: "AVAILABLE" });
+    const tooLong = poolWith(async () => ({ rows: [await statusRow({}, "x".repeat(1025))] }));
+    await expect(createSupportConfigurationPort(tooLong.pool).current()).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_SNAPSHOT_INVALID"
     });
   });
 

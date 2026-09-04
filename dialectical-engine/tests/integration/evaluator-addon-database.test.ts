@@ -12,12 +12,23 @@ import {
 import { runEvaluatorJudgeGradingAddon } from "../../apps/evaluator-worker/src/index.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import {
+  loadBootstrapRegister,
+  parseRegisterVersionText,
+  persistBootstrapRegister,
+  registerVersionToSafeLegacyNumber
+} from "@debateai/register";
+import {
+  publishReplacementRegisterFixture,
+  registerFixtureRow
+} from "../support/registerFixtures.js";
 
 let database: TestDatabase;
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await persistBootstrapRegister(database.pool, await loadBootstrapRegister());
 }, 120_000);
 
 afterAll(async () => {
@@ -93,8 +104,19 @@ function evaluatorFamily(registerVersion: number): EvaluatorProviderFamilyRow {
 async function seedGradableRun(input: {
   readonly registerVersion: number;
   readonly policyValue?: unknown;
-}): Promise<Awaited<ReturnType<typeof seedRunAndArtifacts>>> {
-  const fixture = await seedRunAndArtifacts(input.registerVersion);
+}): Promise<Awaited<ReturnType<typeof seedRunAndArtifacts>> & { readonly registerVersion: number }> {
+  const publication = await publishReplacementRegisterFixture(
+    database.pool,
+    parseRegisterVersionText("1"),
+    [registerFixtureRow(
+      "evaluatorJudgeAddonPolicy",
+      input.policyValue ?? validPolicyValue,
+      `fixture:addon-policy:${input.registerVersion}`
+    )],
+    `fixture:addon-policy-publication:${input.registerVersion}:${randomUUID()}`
+  );
+  const registerVersion = registerVersionToSafeLegacyNumber(publication.registerVersion);
+  const fixture = await seedRunAndArtifacts(registerVersion);
   const node = await database.pool.query<{ node_id: string }>(`
     INSERT INTO core.node (
       run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
@@ -115,16 +137,7 @@ async function seedGradableRun(input: {
       run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
     ) VALUES ($1,'HARVEST',1,gen_random_uuid(),'SUCCEEDED','fixture',$2,ledger.allocate_sequence())
   `, [fixture.runId, "b".repeat(64)]);
-  await database.pool.query(`
-    INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-    VALUES ($1,'evaluatorJudgeAddonPolicy',$2::jsonb,$3)
-    ON CONFLICT DO NOTHING
-  `, [
-    input.registerVersion,
-    JSON.stringify(input.policyValue ?? validPolicyValue),
-    `fixture:addon-policy:${input.registerVersion}`
-  ]);
-  return fixture;
+  return Object.freeze({ ...fixture, registerVersion });
 }
 
 function successfulGateway(
@@ -231,40 +244,7 @@ describe("judge-grading add-on database maker guard", () => {
 
 describe("persisted judge-grading add-on", () => {
   it("runs only after harvest and persists one blind add-on observation", async () => {
-    const fixture = await seedRunAndArtifacts();
-    const node = await database.pool.query<{ node_id: string }>(`
-      INSERT INTO core.node (
-        run_id, claim_text, claim_type, parent_node_id, child_kind, depth, sibling_ordinal,
-        materialized_path, generation_status, path_status, exploration_decision,
-        way_of_knowing, provenance_ref, locator, value_laden, created_at_seq
-      ) VALUES ($1,'graded claim','unknown',NULL,NULL,0,0,'0','complete','active','continue',
-        'REASONING',$2,NULL,false,ledger.allocate_sequence()) RETURNING node_id
-    `, [fixture.runId, fixture.gradedArtifact]);
-    await database.pool.query(`
-      INSERT INTO ledger.reduced_judgement (
-        run_id,node_id,raw_artifact_ref,tau,number_kind,source_ref,producer,
-        replay_handle,way_of_knowing,at_seq
-      ) VALUES ($1,$2,$3,0.75,'PROBABILITY','judgement:addon','judge:addon',
-        'replay:addon','REASONING',ledger.allocate_sequence())
-    `, [fixture.runId, node.rows[0]!.node_id, fixture.gradedArtifact]);
-    await database.pool.query(`
-      INSERT INTO evaluator.pipeline_event (
-        run_id,pipeline,pipeline_version,attempt_id,state,reason,input_hash,at_seq
-      ) VALUES ($1,'HARVEST',1,gen_random_uuid(),'SUCCEEDED','fixture',$2,ledger.allocate_sequence())
-    `, [fixture.runId, "b".repeat(64)]);
-    await database.pool.query(`
-      INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-      VALUES (1,'evaluatorJudgeAddonPolicy',$1::jsonb,'fixture:addon-policy')
-      ON CONFLICT DO NOTHING
-    `, [JSON.stringify({
-      kind: "EVALUATOR_JUDGE_ADDON_POLICY",
-      collectionState: "COLLECT_ONLY",
-      everyNthRun: 1,
-      maxAttempts: 2,
-      tokenCeiling: 256,
-      deadlineMs: 250,
-      derivationVersion: 1
-    })]);
+    const fixture = await seedGradableRun({ registerVersion: 1 });
     const gateway: ProviderGateway & { readonly call: ReturnType<typeof vi.fn> } = {
       call: vi.fn(async () => ({
         rawArtifactRef: fixture.differentGraderArtifact,
@@ -282,7 +262,7 @@ describe("persisted judge-grading add-on", () => {
     };
     const family: EvaluatorProviderFamilyRow = {
       rowKey: "evaluatorProviderFamily",
-      registerVersion: 1,
+      registerVersion: fixture.registerVersion,
       sourceRef: "fixture:evaluator-family",
       value: {
         kind: "EVALUATOR_PROVIDER_FAMILY",
@@ -345,7 +325,7 @@ describe("persisted judge-grading add-on", () => {
     const input = {
       pool: database.pool,
       runId: fixture.runId,
-      family: evaluatorFamily(registerVersion),
+      family: evaluatorFamily(fixture.registerVersion),
       deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] },
       provider: gateway
     };
@@ -377,7 +357,7 @@ describe("persisted judge-grading add-on", () => {
     const base = {
       pool: database.pool,
       runId: fixture.runId,
-      family: evaluatorFamily(registerVersion),
+      family: evaluatorFamily(fixture.registerVersion),
       provider: gateway
     };
     for (let sweep = 0; sweep < 3; sweep += 1) {
@@ -415,7 +395,7 @@ describe("persisted judge-grading add-on", () => {
     await expect(runEvaluatorJudgeGradingAddon({
       pool: database.pool,
       runId: invalidPolicyRun.runId,
-      family: evaluatorFamily(invalidPolicyVersion),
+      family: evaluatorFamily(invalidPolicyRun.registerVersion),
       deployment: { configuredProviders: [] },
       provider: invalidGateway
     })).resolves.toEqual({ state: "SKIPPED", reason: "ADDON_POLICY_INVALID" });
@@ -432,7 +412,7 @@ describe("persisted judge-grading add-on", () => {
     await expect(runEvaluatorJudgeGradingAddon({
       pool: database.pool,
       runId: versionedRun.runId,
-      family: evaluatorFamily(runRegisterVersion + 1),
+      family: evaluatorFamily(versionedRun.registerVersion + 1),
       deployment: { configuredProviders: [] },
       provider: versionedGateway
     })).resolves.toEqual({
@@ -450,7 +430,7 @@ describe("persisted judge-grading add-on", () => {
     await expect(runEvaluatorJudgeGradingAddon({
       pool: database.pool,
       runId: versionedRun.runId,
-      family: evaluatorFamily(runRegisterVersion),
+      family: evaluatorFamily(versionedRun.registerVersion),
       deployment: { configuredProviders: [] },
       provider: versionedGateway
     })).resolves.toMatchObject({ state: "GRADED" });
@@ -466,7 +446,7 @@ describe("persisted judge-grading add-on", () => {
     const input = {
       pool,
       runId: fixture.runId,
-      family: evaluatorFamily(registerVersion),
+      family: evaluatorFamily(fixture.registerVersion),
       deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] },
       provider: gateway
     };
@@ -505,7 +485,7 @@ describe("persisted judge-grading add-on", () => {
         runEvaluatorJudgeGradingAddon({
           pool,
           runId: fixture.runId,
-          family: evaluatorFamily(registerVersion),
+          family: evaluatorFamily(fixture.registerVersion),
           deployment: {
             configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }]
           },

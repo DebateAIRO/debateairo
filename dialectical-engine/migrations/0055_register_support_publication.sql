@@ -303,7 +303,7 @@ BEGIN
     ('register._assert_register_base_integrity(bigint)', '9d330ac04a44738760f60dcae212038a17f0e77b81dca5b3e3bad29a4c5f4097', 'v'::char, true, true),
     ('register._support_keys()', '9f13abae35f7954b45d46be7270abe960c114cdca8f14582407a371ad28ec87a', 'i'::char, false, false),
     ('register._support_snapshot_sha256(bigint)', '542a0e1bb8a6e4e5c6e1924f9805552fab64825cd1480acf2760ed2467c27153', 's'::char, false, true),
-    ('register._validate_source_ref(text)', '51f1808fd39e4e3b00221f41f5978eef79691da0a71af36b2822c8ba37b1ba63', 'i'::char, false, true),
+    ('register._validate_source_ref(text)', 'edcf5a0284a04599442fc4d9c601e7778a8e5ca920cef1520ced9696759b10ef', 'i'::char, false, true),
     ('register._validate_support_value(text,text)', '3528adc999f1d3a52b805778bf8044df659c329288b12c2f66cc04d3569c0b0f', 'i'::char, false, true),
     ('register._assert_support_catalogue(bigint)', 'abf48183e583a554a23cfecaf0f5667227bf96dc1e5ba0faa172b9e65a0d6344', 's'::char, false, true),
     ('register._current_support_register_version()', 'bd72352f161e45f0476aab2d88d75504f40647da51bcf38e52a9f50ebb16093c', 's'::char, false, false),
@@ -774,7 +774,7 @@ AS $function$
 BEGIN
   IF p_source_ref <> pg_catalog.btrim(p_source_ref)
       OR pg_catalog.length(p_source_ref) < 1
-      OR pg_catalog.length(p_source_ref) > 256
+      OR pg_catalog.length(p_source_ref) > 1024
       OR p_source_ref ~ '[[:cntrl:]]' THEN
     RAISE EXCEPTION 'REGISTER_PUBLICATION_SEAL_INVALID: source ref';
   END IF;

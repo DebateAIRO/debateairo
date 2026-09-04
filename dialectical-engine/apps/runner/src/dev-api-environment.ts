@@ -8,9 +8,14 @@ import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets,
-  type DevelopmentProviderPanel,
-  REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON
+  type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
+import {
+  developmentDeploymentRegisterReceiptPath,
+  readDevelopmentDeploymentRegisterReceipt,
+  serializeDevelopmentDeploymentRegisterReceipt,
+  type DevelopmentDeploymentRegisterMachineReceiptV1
+} from "./dev-deployment-register.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -43,6 +48,8 @@ export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
   "API_PORT",
   "STRANGER_SAMPLE_RATE",
   "REGISTER_VERSION",
+  "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
+  "REGISTER_DEPLOYMENT_RECEIPT_FILE",
   "BATTERY_VERSION",
   "SETTLEMENT_WATCH_HANDLE",
   "PROVIDER_DISCOVERY_TARGETS_JSON",
@@ -67,6 +74,7 @@ export type DevelopmentApiEnvironmentReceipt = Readonly<{
 type AssembleDevelopmentApiEnvironmentInput = Readonly<{
   repositoryRoot: string;
   providerPanel: DevelopmentProviderPanel;
+  registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
 }>;
 
 function currentUid(): number {
@@ -347,6 +355,11 @@ export async function assembleDevelopmentApiEnvironment(
   const token = hatchet.get("HATCHET_CLIENT_TOKEN")!;
   const tenantId = tenantIdFromToken(token);
   const providerPanel = input.providerPanel;
+  const custodyRegisterReceipt = await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
+  if (serializeDevelopmentDeploymentRegisterReceipt(custodyRegisterReceipt)
+    !== serializeDevelopmentDeploymentRegisterReceipt(input.registerReceipt)) {
+    throw new TypeError("DEV_API_ENVIRONMENT_REGISTER_RECEIPT_MISMATCH");
+  }
   const values = new Map<string, string>([
     ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
     ["BLIND_INDEX_KEY_PATH", join(custodyRoot, "secrets", "blind-index-key.bin")],
@@ -369,7 +382,9 @@ export async function assembleDevelopmentApiEnvironment(
     ["API_HOST", "127.0.0.1"],
     ["API_PORT", "8790"],
     ["STRANGER_SAMPLE_RATE", "0"],
-    ["REGISTER_VERSION", "4"],
+    ["REGISTER_VERSION", custodyRegisterReceipt.registerVersion],
+    ["REGISTER_DEPLOYMENT_RECEIPT_SHA256", custodyRegisterReceipt.receiptSha256],
+    ["REGISTER_DEPLOYMENT_RECEIPT_FILE", developmentDeploymentRegisterReceiptPath(repositoryRoot)],
     ["BATTERY_VERSION", "dev-auth-v1"],
     ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
     ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
@@ -386,41 +401,10 @@ export async function assembleDevelopmentApiEnvironment(
     ["DEBATEAI_DEV_MAIL_CAPTURE_DIR", join(custodyRoot, "mail")]
   ]);
   const source = environmentSource(values);
-  const publicationDisabledSource = source
-    .replace("PUBLICATION_ENABLED=true\n", "PUBLICATION_ENABLED=false\n")
-    .split("\n")
-    .filter((row) => !row.startsWith("CORPUS_KEK_PATH=")
-      && !row.startsWith("PUBLICATION_KEY_STORE_PATH=")
-      && !row.startsWith("PUBLICATION_CLEANUP_DATABASE_URL="))
-    .join("\n");
-  const registerV3Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=3\n");
-  const registerV2Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=2\n");
-  const registerV1Source = source.replace("REGISTER_VERSION=4\n", "REGISTER_VERSION=1\n");
-  const preDiscoverySource = registerV1Source
-    .split("\n")
-    .filter((row) => !row.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
-      && !row.startsWith("PROVIDER_PROBE_TIMEOUT_MS="))
-    .join("\n");
-  const preEvaluatorPrincipalSource = source
-    .split("\n")
-    .filter((row) => !row.startsWith("EVALUATOR_DEV_MENU_DATABASE_URL="))
-    .join("\n");
-  const removedScaffoldSource = registerV3Source.replace(
-    `PROVIDER_DISCOVERY_TARGETS_JSON=${providerPanel.targetsJson}\n`,
-    `PROVIDER_DISCOVERY_TARGETS_JSON=${REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON}\n`
-  );
   const reused = await publishExactFile(
     join(custodyRoot, "api.env"),
     source,
-    [
-      publicationDisabledSource,
-      registerV3Source,
-      registerV2Source,
-      registerV1Source,
-      preDiscoverySource,
-      preEvaluatorPrincipalSource,
-      removedScaffoldSource
-    ],
+    [],
     (existing) => isExactProviderRuntimeRefresh(existing, source)
       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
   );

@@ -10,6 +10,11 @@ import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets
 } from "./dev-provider-panel.js";
+import {
+  developmentDeploymentRegisterReceiptPath,
+  readDevelopmentDeploymentRegisterReceipt,
+  type DevelopmentDeploymentRegisterMachineReceiptV1
+} from "./dev-deployment-register.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -67,7 +72,8 @@ export async function loadDevelopmentApiProcessEnvironment(
   const values = parseExactEnvironment(
     await readPrivateEnvironment(join(custodyRoot, "api.env"))
   );
-  validateExactEnvironment(values, root);
+  const registerReceipt = await readDevelopmentDeploymentRegisterReceipt(root);
+  validateExactEnvironment(values, root, registerReceipt);
   return values;
 }
 
@@ -151,7 +157,8 @@ function assertLocalDatabaseUrl(value: string, expectedUser: string): void {
 
 function validateExactEnvironment(
   values: Readonly<Record<string, string>>,
-  repositoryRoot: string
+  repositoryRoot: string,
+  registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1
 ): void {
   try {
     parseApiEnvironment(values);
@@ -177,7 +184,9 @@ function validateExactEnvironment(
       ["API_HOST", LOCAL_API_HOST],
       ["API_PORT", String(LOCAL_API_PORT)],
       ["STRANGER_SAMPLE_RATE", "0"],
-      ["REGISTER_VERSION", "4"],
+      ["REGISTER_VERSION", registerReceipt.registerVersion],
+      ["REGISTER_DEPLOYMENT_RECEIPT_SHA256", registerReceipt.receiptSha256],
+      ["REGISTER_DEPLOYMENT_RECEIPT_FILE", developmentDeploymentRegisterReceiptPath(repositoryRoot)],
       ["BATTERY_VERSION", "dev-auth-v1"],
       ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
       ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
