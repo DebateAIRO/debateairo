@@ -386,6 +386,193 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(bundleHash(reverseTopLevelOrder)).toBe(bundleHash(parsed));
   });
 
+  it("ignores inherited toJSON getters and returned functions on both prototypes", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const nested = {
+      z: [{ b: 2, a: 1 }],
+      a: ["line\n", true, null],
+    };
+    const expectedNested =
+      '{"a":["line\\n",true,null],"z":[{"a":1,"b":2}]}';
+
+    for (const [label, prototype] of [
+      ["Object.prototype", Object.prototype],
+      ["Array.prototype", Array.prototype],
+    ] as const) {
+      const previous = Object.getOwnPropertyDescriptor(prototype, "toJSON");
+      let getterCalls = 0;
+      let functionCalls = 0;
+      let hash: string | undefined;
+      let serialized: string | undefined;
+      let escaped: unknown;
+      try {
+        Object.defineProperty(prototype, "toJSON", {
+          configurable: true,
+          get() {
+            getterCalls += 1;
+            return () => {
+              functionCalls += 1;
+              return [];
+            };
+          },
+        });
+        hash = bundleHash(bundle);
+        serialized = canonicalJson(nested);
+      } catch (error) {
+        escaped = error;
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(prototype, "toJSON");
+        } else {
+          Object.defineProperty(prototype, "toJSON", previous);
+        }
+      }
+
+      expect(escaped, label).toBeUndefined();
+      expect(getterCalls, label).toBe(0);
+      expect(functionCalls, label).toBe(0);
+      expect(hash, label).toBe(
+        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      );
+      expect(serialized, label).toBe(expectedNested);
+    }
+  });
+
+  it("never invokes an inherited toJSON data function", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    for (const [label, prototype] of [
+      ["Object.prototype", Object.prototype],
+      ["Array.prototype", Array.prototype],
+    ] as const) {
+      const previous = Object.getOwnPropertyDescriptor(prototype, "toJSON");
+      let functionCalls = 0;
+      let hash: string | undefined;
+      let escaped: unknown;
+      try {
+        Object.defineProperty(prototype, "toJSON", {
+          configurable: true,
+          value() {
+            functionCalls += 1;
+            return [];
+          },
+        });
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error;
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(prototype, "toJSON");
+        } else {
+          Object.defineProperty(prototype, "toJSON", previous);
+        }
+      }
+
+      expect(escaped, label).toBeUndefined();
+      expect(functionCalls, label).toBe(0);
+      expect(hash, label).toBe(
+        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      );
+    }
+  });
+
+  it("contains throwing inherited toJSON getters across hash, load, and repin", () => {
+    const cleanBundle = loadBundle(BUNDLE_PATH);
+    for (const [label, prototype] of [
+      ["Object.prototype", Object.prototype],
+      ["Array.prototype", Array.prototype],
+    ] as const) {
+      const previous = Object.getOwnPropertyDescriptor(prototype, "toJSON");
+      let getterCalls = 0;
+      const escaped: unknown[] = [];
+      let hash: string | undefined;
+      let loaded: PolicyBundle | undefined;
+      let repinned: PolicyBundle | undefined;
+      try {
+        Object.defineProperty(prototype, "toJSON", {
+          configurable: true,
+          get() {
+            getterCalls += 1;
+            throw new Error("INHERITED_TOJSON_GETTER_RAN");
+          },
+        });
+        try {
+          hash = bundleHash(cleanBundle);
+        } catch (error) {
+          escaped.push(error);
+        }
+        try {
+          loaded = loadBundle(BUNDLE_PATH);
+        } catch (error) {
+          escaped.push(error);
+        }
+        try {
+          repinned = repin(cleanBundle, {
+            token: "fixture-custodian-token",
+          }, {
+            OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+          });
+        } catch (error) {
+          escaped.push(error);
+        }
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(prototype, "toJSON");
+        } else {
+          Object.defineProperty(prototype, "toJSON", previous);
+        }
+      }
+
+      expect(escaped, label).toEqual([]);
+      expect(getterCalls, label).toBe(0);
+      expect(hash, label).toBe(
+        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      );
+      expect(loaded?.quick_arm, label).toBe("OFF");
+      expect(repinned?.quick_arm, label).toBe("OFF");
+    }
+  });
+
+  it("keeps inherited non-function toJSON data as a lawful neighbor", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    for (const [label, prototype] of [
+      ["Object.prototype", Object.prototype],
+      ["Array.prototype", Array.prototype],
+    ] as const) {
+      const previous = Object.getOwnPropertyDescriptor(prototype, "toJSON");
+      let hash: string | undefined;
+      let escaped: unknown;
+      try {
+        Object.defineProperty(prototype, "toJSON", {
+          configurable: true,
+          value: "NOT_CALLABLE",
+        });
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error;
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(prototype, "toJSON");
+        } else {
+          Object.defineProperty(prototype, "toJSON", previous);
+        }
+      }
+
+      expect(escaped, label).toBeUndefined();
+      expect(hash, label).toBe(
+        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      );
+    }
+  });
+
+  it("encodes JSON primitives byte-identically without object serialization", () => {
+    expect(canonicalJson({
+      text: '"\b\f\n\r\t\\\u0000',
+      numbers: [-0, 1e30, 1e-7, 0.000001],
+    })).toBe(
+      '{"numbers":[0,1e+30,1e-7,0.000001],"text":"\\"\\b\\f\\n\\r\\t\\\\\\u0000"}',
+    );
+  });
+
   it("denies every enumerated floor sample without swallowing a neighbouring product path", () => {
     const bundle = loadBundle(BUNDLE_PATH);
     const denied = [

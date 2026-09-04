@@ -173,8 +173,125 @@ export function isOwnPlainJsonData(
   }
 }
 
+function serializeJsonPrimitive(
+  value: null | boolean | number | string,
+): string {
+  if (value === null) return "null";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new TypeError("CANONICAL_JSON_NON_FINITE_NUMBER");
+    }
+    return Object.is(value, -0) ? "0" : String(value);
+  }
+  const encoded = JSON.stringify(value);
+  if (encoded === undefined) return nonPlainJsonData();
+  return encoded;
+}
+
+function ownStringAt(values: readonly string[], index: number): string {
+  const value = dataPropertyValue(
+    Object.getOwnPropertyDescriptor(values, String(index)),
+  );
+  if (typeof value !== "string") return nonPlainJsonData();
+  return value;
+}
+
+function defineOwnStringAt(
+  values: string[],
+  index: number,
+  value: string,
+): void {
+  Object.defineProperty(values, String(index), {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+function ownArrayLength(value: readonly unknown[]): number {
+  return arrayLength(Object.getOwnPropertyDescriptor(value, "length"));
+}
+
+function sortedOwnPropertyNames(value: object): string[] {
+  const names = Object.getOwnPropertyNames(value);
+  const length = ownArrayLength(names);
+  for (let start = 0; start < length; start += 1) {
+    let leastIndex = start;
+    let least = ownStringAt(names, start);
+    for (
+      let candidateIndex = start + 1;
+      candidateIndex < length;
+      candidateIndex += 1
+    ) {
+      const candidate = ownStringAt(names, candidateIndex);
+      if (candidate < least) {
+        least = candidate;
+        leastIndex = candidateIndex;
+      }
+    }
+    if (leastIndex !== start) {
+      defineOwnStringAt(names, leastIndex, ownStringAt(names, start));
+      defineOwnStringAt(names, start, least);
+    }
+  }
+  return names;
+}
+
+function serializeCanonical(value: unknown): string {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "number" ||
+    typeof value === "string"
+  ) {
+    return serializeJsonPrimitive(value);
+  }
+  if (typeof value !== "object") {
+    throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
+  }
+  if (ownArrayLength(Object.getOwnPropertySymbols(value)) !== 0) {
+    return nonPlainJsonData();
+  }
+
+  if (Array.isArray(value)) {
+    const length = arrayLength(
+      Object.getOwnPropertyDescriptor(value, "length"),
+    );
+    const ownNames = Object.getOwnPropertyNames(value);
+    if (ownArrayLength(ownNames) !== length + 1) return nonPlainJsonData();
+
+    let encoded = "[";
+    for (let index = 0; index < length; index += 1) {
+      if (index !== 0) encoded += ",";
+      encoded += serializeCanonical(dataPropertyValue(
+        Object.getOwnPropertyDescriptor(value, String(index)),
+      ));
+    }
+    return `${encoded}]`;
+  }
+
+  const ownNames = sortedOwnPropertyNames(value);
+  const ownNameCount = ownArrayLength(ownNames);
+  let encoded = "{";
+  for (let index = 0; index < ownNameCount; index += 1) {
+    const keyDescriptor = Object.getOwnPropertyDescriptor(
+      ownNames,
+      String(index),
+    );
+    const key = dataPropertyValue(keyDescriptor);
+    if (typeof key !== "string") return nonPlainJsonData();
+    if (index !== 0) encoded += ",";
+    encoded += `${serializeJsonPrimitive(key)}:${serializeCanonical(
+      dataPropertyValue(Object.getOwnPropertyDescriptor(value, key)),
+    )}`;
+  }
+  return `${encoded}}`;
+}
+
 export function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonicalProjection(value));
+  return serializeCanonical(canonicalProjection(value));
 }
 
 export function bundleHash(value: unknown): string {
