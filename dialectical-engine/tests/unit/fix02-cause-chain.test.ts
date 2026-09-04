@@ -10,6 +10,18 @@ describe("FIX-02 C1 — TypedDomainError cause", () => {
     expect(error.cause).toBe(cause);
   });
 
+  it("keeps the error shape when a cause is present", () => {
+    const error = new TypedDomainError("WRAPPER_FAILED", "wrapper failed", {
+      cause: new Error("root failure")
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe("TypedDomainError");
+    expect(error.code).toBe("WRAPPER_FAILED");
+    expect(error.message).toBe("wrapper failed");
+    expect(error.stack?.split("\n", 1)[0]).toBe("TypedDomainError: wrapper failed");
+  });
+
   it("keeps a primitive cause by identity", () => {
     const cause = 17;
 
