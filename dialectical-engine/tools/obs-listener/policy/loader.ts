@@ -155,6 +155,21 @@ const DIRNAME = dirname;
 const RESOLVE_PATH = resolvePath;
 const FILE_URL_TO_PATH = fileURLToPath;
 const RESOLVE_IMPORT = import.meta.resolve;
+const ZOD_PACKAGE_JSON = (() => {
+  try {
+    return FILE_URL_TO_PATH(RESOLVE_IMPORT("zod/package.json"));
+  } catch {
+    // Resolution is initialization-only. An unavailable trusted dependency is
+    // retained as a fail-closed state rather than retried during validation.
+    return null;
+  }
+})();
+const ZOD_DIRECTORY = ZOD_PACKAGE_JSON === null
+  ? null
+  : DIRNAME(ZOD_PACKAGE_JSON);
+const ZOD_ENTRY = ZOD_DIRECTORY === null
+  ? null
+  : RESOLVE_PATH(ZOD_DIRECTORY, "index.cjs");
 
 // This static program is deliberately independent of transpiler output. It
 // constructs and executes the declared schema wholly inside the private realm,
@@ -383,10 +398,9 @@ function pathIsWithin(path: string, directory: string): boolean {
 }
 
 function createPrivateZodValidator(): PrivateZodValidator {
-  const zodDirectory = DIRNAME(
-    FILE_URL_TO_PATH(RESOLVE_IMPORT("zod/package.json")),
-  );
-  const zodEntry = RESOLVE_PATH(zodDirectory, "index.cjs");
+  if (ZOD_DIRECTORY === null || ZOD_ENTRY === null) {
+    throw new Error("ZOD_PRIVATE_MODULE_UNAVAILABLE");
+  }
   const context = CREATE_CONTEXT(Object.create(null), {
     codeGeneration: { strings: false, wasm: false },
   });
@@ -396,7 +410,7 @@ function createPrivateZodValidator(): PrivateZodValidator {
   >;
 
   const loadPrivateCommonJs = (filename: string): unknown => {
-    if (!pathIsWithin(filename, zodDirectory)) {
+    if (!pathIsWithin(filename, ZOD_DIRECTORY)) {
       throw new Error("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
     }
     if (Object.hasOwn(moduleCache, filename)) {
@@ -445,7 +459,7 @@ function createPrivateZodValidator(): PrivateZodValidator {
     return moduleRecord.exports;
   };
 
-  const zodExports = loadPrivateCommonJs(zodEntry) as { readonly z?: unknown };
+  const zodExports = loadPrivateCommonJs(ZOD_ENTRY) as { readonly z?: unknown };
   const makeValidator = RUN_IN_CONTEXT(
     PRIVATE_POLICY_BUNDLE_VALIDATOR_SOURCE,
     context,
