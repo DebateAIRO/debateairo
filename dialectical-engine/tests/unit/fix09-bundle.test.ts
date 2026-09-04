@@ -861,6 +861,174 @@ describe("FIX-09 C1 policy bundle", () => {
     }
   });
 
+  it("validates through the declared Zod schema under the supported tsx runtime", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      const { policyBundleSchema } = await import(
+        ${JSON.stringify(loaderUrl)} + "?tsx-zod-runtime"
+      );
+      const raw = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      process.stdout.write(JSON.stringify({
+        success: policyBundleSchema.safeParse(raw).success,
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({ success: true });
+  });
+
+  it("resolves private Zod validation independently of process cwd", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const unrelatedDirectory = mkdtempSync(join(tmpdir(), "fix09-cwd-"));
+    const script = `
+      import { readFileSync } from "node:fs";
+      const { policyBundleSchema } = await import(
+        ${JSON.stringify(loaderUrl)} + "?cwd-independent-zod"
+      );
+      process.chdir(${JSON.stringify(unrelatedDirectory)});
+      const raw = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      process.stdout.write(JSON.stringify({
+        success: policyBundleSchema.safeParse(raw).success,
+      }));
+    `;
+
+    try {
+      const outcome = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", script],
+        { cwd: repositoryRoot, encoding: "utf8", timeout: 15_000 },
+      );
+      expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toEqual({ success: true });
+    } finally {
+      rmSync(unrelatedDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("does not trust live Atomics results as declared-schema authority", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const codeRegistry = raw.code_registry_seed as Record<string, unknown>;
+    const scopePin = codeRegistry.scope_file_list as Record<string, unknown>;
+    scopePin.count = Number.MAX_SAFE_INTEGER + 1;
+    const waitDescriptor = Object.getOwnPropertyDescriptor(Atomics, "wait");
+    const loadDescriptor = Object.getOwnPropertyDescriptor(Atomics, "load");
+    if (waitDescriptor === undefined || loadDescriptor === undefined) {
+      throw new Error("ATOMICS_AUTHORITY_MEMBER_MISSING");
+    }
+    let waitCalls = 0;
+    let loadCalls = 0;
+    let result: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    let escaped: unknown;
+
+    try {
+      Object.defineProperty(Atomics, "wait", {
+        ...waitDescriptor,
+        value() {
+          waitCalls += 1;
+          return "ok";
+        },
+      });
+      Object.defineProperty(Atomics, "load", {
+        ...loadDescriptor,
+        value() {
+          loadCalls += 1;
+          return 2;
+        },
+      });
+      try {
+        result = policyBundleSchema.safeParse(raw);
+      } catch (error) {
+        escaped = error;
+      }
+    } finally {
+      Object.defineProperty(Atomics, "wait", waitDescriptor);
+      Object.defineProperty(Atomics, "load", loadDescriptor);
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(result?.success).toBe(false);
+    expect(waitCalls).toBe(0);
+    expect(loadCalls).toBe(0);
+  });
+
+  it("does not construct a live Worker for declared-schema authority", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      import { createRequire, syncBuiltinESMExports } from "node:module";
+      const require = createRequire(import.meta.url);
+      const workerThreads = require("node:worker_threads");
+      const descriptor = Object.getOwnPropertyDescriptor(workerThreads, "Worker");
+      if (!descriptor || !("value" in descriptor)) {
+        throw new Error("WORKER_AUTHORITY_MEMBER_MISSING");
+      }
+      let constructorCalls = 0;
+      let rawError = null;
+      let success;
+      Object.defineProperty(workerThreads, "Worker", {
+        ...descriptor,
+        value: function HostileWorker() {
+          constructorCalls += 1;
+          throw new Error("HOSTILE_WORKER_CONSTRUCTED");
+        },
+      });
+      syncBuiltinESMExports();
+      try {
+        const { policyBundleSchema } = await import(
+          ${JSON.stringify(loaderUrl)} + "?worker-independent-zod"
+        );
+        const raw = JSON.parse(
+          readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+        );
+        success = policyBundleSchema.safeParse(raw).success;
+      } catch (error) {
+        rawError = error instanceof Error ? error.message : String(error);
+      } finally {
+        Object.defineProperty(workerThreads, "Worker", descriptor);
+        syncBuiltinESMExports();
+      }
+      process.stdout.write(JSON.stringify({
+        constructorCalls,
+        rawError,
+        success,
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({
+      constructorCalls: 0,
+      rawError: null,
+      success: true,
+    });
+  });
+
   it("keeps main-realm regex and push callbacks outside Zod validation", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
     const pushDescriptor = Object.getOwnPropertyDescriptor(

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname } from "node:path";
 import { isProxy } from "node:util/types";
-import { runInNewContext } from "node:vm";
-import { Worker } from "node:worker_threads";
-import type { infer as ZodInfer } from "zod";
+import { createContext, runInContext, runInNewContext } from "node:vm";
 
 import { canonicalJson, canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
@@ -55,10 +55,110 @@ const BASE_OBJECT_ITERATOR = Object.getOwnPropertyDescriptor(
   Symbol.iterator,
 );
 
-type ZodApi = typeof import("zod").z;
+type Severity = "INFO" | "DEGRADED" | "SEVERE" | "FATAL";
+type PinnedSet = { count: number; sha256: string };
+type PolicyBundleContents = {
+  schema_version: 1;
+  policy_ref: "fixagent-policy-v1";
+  production_source_globs: string[];
+  tier_rules: {
+    QUICK: {
+      authority: "LABEL_ONLY";
+      route: "APPROVAL_FIRST";
+      max_production_files: 1;
+      max_test_files: 1;
+      production_line_cap: 20;
+      total_line_cap: 50;
+      requires_red_green: true;
+    };
+    PR_FIX: { authority: "LABEL_ONLY"; route: "APPROVAL_FIRST" };
+    ESCALATE: { authority: "LABEL_ONLY"; route: "REPORT_ONLY" };
+  };
+  floor_deny_globs: string[];
+  allowlist: string[];
+  taxonomy_pin: {
+    classes: [
+      "PROCESS_DEATH",
+      "HTTP_FAILURE",
+      "JOB_FAILURE",
+      "PROVIDER_EXHAUSTED",
+      "DB_FAILURE",
+      "PARSE_SCHEMA_FAILURE",
+      "STALL_DETECTED",
+      "SILENT_NOOP",
+      "SUSPICIOUS_SUCCESS",
+      "CLIENT_FAILURE",
+      "CAPTURE_SELF",
+      "ORIGIN_UNKNOWN",
+    ];
+    suspicious_success_subclasses: [
+      "empty_output",
+      "missing_required_fields",
+      "missing_artifact_chain",
+    ];
+  };
+  severity_map: {
+    ladder: ["INFO", "DEGRADED", "SEVERE", "FATAL"];
+    default: "DEGRADED";
+    overrides: Record<string, Severity>;
+    severe_threshold: "SEVERE";
+  };
+  routing_table: [
+    { incident_class: "SECURITY_PRIVACY"; owner: "V" },
+    { incident_class: "PERSISTENCE_MIGRATIONS"; owner: "V" },
+    { incident_class: "SPEND"; owner: "V" },
+    { incident_class: "SCORING_LIVE_DATA"; owner: "V" },
+    { incident_class: "DEFAULT"; owner: "V" },
+  ];
+  code_registry_seed: {
+    base_commit: string;
+    recipe: "obs-code-seed.sh@v1";
+    canonicalization: "UTF-8; LF; LC_ALL=C sort -u; trailing LF; SHA-256";
+    scope_file_list: PinnedSet;
+    code_seed_direct: PinnedSet;
+    forwarder_manifest: PinnedSet;
+    code_seed_forwarded: PinnedSet;
+    code_seed: PinnedSet;
+    known_gap: PinnedSet;
+    safe_template_rule: "tpl.<code>";
+    seed_parameters: [];
+    parameter_types: [
+      "id",
+      "registry_code",
+      "closed_enum",
+      "bounded_int",
+    ];
+  };
+  register_seeds: Array<{
+    key: string;
+    value: string | number | null;
+    status: "SEED" | "UNSET";
+    source_ref: string;
+  }>;
+  slots: {
+    zone_manifest_hash: { value: string | null; gate: "RP-1" };
+    hatchet_ingest: {
+      value: "ENABLED" | "DEFERRED_TO_MISSION" | null;
+      gate: "RP-2";
+    };
+    injection_corpus_hash: { value: string | null; gate: "RP-3" };
+  };
+  quick_arm: "OFF" | "ON";
+  custodians: [{ id: "V"; token_env: "OBS_POLICY_CUSTODIAN_TOKEN" }];
+};
 
-function buildPolicyBundleContentsSchema(z: ZodApi) {
-  const stringContains = (value: string, sought: string): boolean => {
+const CREATE_REQUIRE = createRequire;
+const CREATE_CONTEXT = createContext;
+const RUN_IN_CONTEXT = runInContext;
+const READ_FILE_SYNC = readFileSync;
+const DIRNAME = dirname;
+
+// This static program is deliberately independent of transpiler output. It
+// constructs and executes the declared schema wholly inside the private realm,
+// including its RegExp literals, refinement callbacks, JSON.parse, and Zod.
+const PRIVATE_POLICY_BUNDLE_VALIDATOR_SOURCE = `
+((z) => {
+  const stringContains = (value, sought) => {
     if (sought.length === 0) return true;
     if (sought.length > value.length) return false;
     for (let start = 0; start <= value.length - sought.length; start += 1) {
@@ -73,7 +173,7 @@ function buildPolicyBundleContentsSchema(z: ZodApi) {
     }
     return false;
   };
-  const containsParentSegment = (value: string): boolean => {
+  const containsParentSegment = (value) => {
     let segment = "";
     for (let index = 0; index <= value.length; index += 1) {
       const character = index === value.length ? "/" : value[index];
@@ -86,18 +186,15 @@ function buildPolicyBundleContentsSchema(z: ZodApi) {
     }
     return false;
   };
-  const relativeGlob = (value: string): boolean =>
+  const relativeGlob = (value) =>
     value.length > 0 &&
     value[0] !== "/" &&
-    !stringContains(value, "\\") &&
+    !stringContains(value, "\\\\") &&
     !containsParentSegment(value);
 
   const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
   const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
-  const relativeGlobSchema = z
-    .string()
-    .min(1)
-    .refine(relativeGlob);
+  const relativeGlobSchema = z.string().min(1).refine(relativeGlob);
   const pinnedSetSchema = z
     .object({ count: z.number().int().nonnegative(), sha256: sha256Schema })
     .strict();
@@ -180,14 +277,14 @@ function buildPolicyBundleContentsSchema(z: ZodApi) {
 
   const registerSeedSchema = z
     .object({
-      key: z.string().regex(/^obs\.[A-Za-z][A-Za-z0-9]*$/u),
+      key: z.string().regex(/^obs\\.[A-Za-z][A-Za-z0-9]*$/u),
       value: z.union([z.string(), z.number().finite(), z.null()]),
       status: z.enum(["SEED", "UNSET"]),
       source_ref: z.string().min(1),
     })
     .strict();
 
-  return z
+  const schema = z
     .object({
       schema_version: z.literal(1),
       policy_ref: z.literal("fixagent-policy-v1"),
@@ -257,118 +354,126 @@ function buildPolicyBundleContentsSchema(z: ZodApi) {
         .length(1),
     })
     .strict();
-}
 
-const ZOD_WORKER_IDLE = 0;
-const ZOD_WORKER_READY = 1;
-const ZOD_WORKER_VALID = 2;
-const ZOD_WORKER_INVALID = 3;
-const ZOD_WORKER_FAILED = 4;
-const ZOD_WORKER_TIMEOUT_MS = 10_000;
+  return (serialized) => {
+    try {
+      return schema.safeParse(JSON.parse(serialized)).success === true;
+    } catch {
+      return false;
+    }
+  };
+})
+`;
 
-interface ZodValidationWorker {
-  readonly signal: Int32Array;
-  readonly worker: Worker;
-}
+type PrivateZodValidator = (serialized: string) => boolean;
 
-let zodValidationWorker: ZodValidationWorker | null | undefined;
+let privateZodValidator: PrivateZodValidator | null | undefined;
 
-const functionSource = runInNewContext(`
-  (candidate) => Function.prototype.toString.call(candidate)
-`) as (candidate: (...args: never[]) => unknown) => string;
-
-function failZodWorker(worker: Worker): null {
-  void worker.terminate();
-  zodValidationWorker = null;
-  return null;
-}
-
-function getZodValidationWorker(): ZodValidationWorker | null {
-  if (zodValidationWorker !== undefined) return zodValidationWorker;
-
-  const signal = new Int32Array(new SharedArrayBuffer(4));
-  const builderSource = functionSource(buildPolicyBundleContentsSchema);
-  const worker = new Worker(`
-    void (async () => {
-      const { parentPort, workerData } = await import("node:worker_threads");
-      const signal = new Int32Array(workerData.signal);
-      const notify = (status) => {
-        Atomics.store(signal, 0, status);
-        Atomics.notify(signal, 0);
-      };
-      try {
-        if (parentPort === null) throw new Error("ZOD_WORKER_PORT_MISSING");
-        const { z } = await import("zod");
-        const buildSchema = (${builderSource});
-        const schema = buildSchema(z);
-        parentPort.on("message", (serialized) => {
-          let valid = false;
-          try {
-            valid = schema.safeParse(JSON.parse(serialized)).success;
-          } catch {
-            valid = false;
-          }
-          notify(valid ? ${ZOD_WORKER_VALID} : ${ZOD_WORKER_INVALID});
-        });
-        notify(${ZOD_WORKER_READY});
-      } catch {
-        notify(${ZOD_WORKER_FAILED});
-      }
-    })();
-  `, {
-    eval: true,
-    workerData: {
-      signal: signal.buffer,
-    },
-  });
-  worker.unref();
-
-  if (
-    Atomics.wait(
-      signal,
-      0,
-      ZOD_WORKER_IDLE,
-      ZOD_WORKER_TIMEOUT_MS,
-    ) !== "ok" ||
-    Atomics.load(signal, 0) !== ZOD_WORKER_READY
-  ) {
-    return failZodWorker(worker);
+function pathIsWithin(path: string, directory: string): boolean {
+  if (path.length <= directory.length || path[directory.length] !== "/") {
+    return false;
   }
-  Atomics.store(signal, 0, ZOD_WORKER_IDLE);
-  zodValidationWorker = { signal, worker };
-  return zodValidationWorker;
+  for (let index = 0; index < directory.length; index += 1) {
+    if (path[index] !== directory[index]) return false;
+  }
+  return true;
+}
+
+function createPrivateZodValidator(): PrivateZodValidator {
+  const policyRequire = CREATE_REQUIRE(import.meta.url);
+  const zodEntry = policyRequire.resolve("zod");
+  const zodDirectory = DIRNAME(policyRequire.resolve("zod/package.json"));
+  const context = CREATE_CONTEXT(Object.create(null), {
+    codeGeneration: { strings: false, wasm: false },
+  });
+  const moduleCache = Object.create(null) as Record<
+    string,
+    { exports: unknown }
+  >;
+
+  const loadPrivateCommonJs = (filename: string): unknown => {
+    if (!pathIsWithin(filename, zodDirectory)) {
+      throw new Error("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
+    }
+    if (Object.hasOwn(moduleCache, filename)) {
+      return moduleCache[filename]?.exports;
+    }
+
+    const moduleRecord = Object.create(null) as { exports: unknown };
+    moduleRecord.exports = Object.create(null);
+    Object.defineProperty(moduleCache, filename, {
+      configurable: false,
+      enumerable: true,
+      value: moduleRecord,
+      writable: false,
+    });
+    const moduleRequire = CREATE_REQUIRE(filename);
+    const resolveFromModule = moduleRequire.resolve;
+    const localRequire = (specifier: string): unknown => {
+      if (
+        specifier.length < 2 ||
+        specifier[0] !== "." ||
+        (specifier[1] !== "/" && specifier[1] !== ".")
+      ) {
+        throw new Error("ZOD_PRIVATE_MODULE_SPECIFIER_INVALID");
+      }
+      return loadPrivateCommonJs(resolveFromModule(specifier));
+    };
+    const source = READ_FILE_SYNC(filename, "utf8");
+    const wrapper = RUN_IN_CONTEXT(
+      `(function (exports, require, module, __filename, __dirname) {\n${source}\n})`,
+      context,
+      { filename },
+    ) as (
+      exports: unknown,
+      require: (specifier: string) => unknown,
+      module: { exports: unknown },
+      filename: string,
+      dirname: string,
+    ) => void;
+    wrapper(
+      moduleRecord.exports,
+      localRequire,
+      moduleRecord,
+      filename,
+      DIRNAME(filename),
+    );
+    return moduleRecord.exports;
+  };
+
+  const zodExports = loadPrivateCommonJs(zodEntry) as { readonly z?: unknown };
+  const makeValidator = RUN_IN_CONTEXT(
+    PRIVATE_POLICY_BUNDLE_VALIDATOR_SOURCE,
+    context,
+    { filename: "fix09-private-policy-schema.js" },
+  ) as (z: unknown) => unknown;
+  const validator = makeValidator(zodExports.z);
+  if (typeof validator !== "function") {
+    throw new Error("ZOD_PRIVATE_VALIDATOR_INVALID");
+  }
+  return validator as PrivateZodValidator;
+}
+
+function getPrivateZodValidator(): PrivateZodValidator | null {
+  if (privateZodValidator !== undefined) return privateZodValidator;
+  try {
+    privateZodValidator = createPrivateZodValidator();
+  } catch {
+    privateZodValidator = null;
+  }
+  return privateZodValidator;
 }
 
 function validateWithDeclaredSchema(serialized: string): boolean {
-  const state = getZodValidationWorker();
-  if (state === null) return false;
-
-  Atomics.store(state.signal, 0, ZOD_WORKER_IDLE);
+  const validator = getPrivateZodValidator();
+  if (validator === null) return false;
   try {
-    state.worker.postMessage(serialized);
+    return validator(serialized) === true;
   } catch {
-    failZodWorker(state.worker);
+    privateZodValidator = null;
     return false;
   }
-  if (
-    Atomics.wait(
-      state.signal,
-      0,
-      ZOD_WORKER_IDLE,
-      ZOD_WORKER_TIMEOUT_MS,
-    ) !== "ok"
-  ) {
-    failZodWorker(state.worker);
-    return false;
-  }
-  const status = Atomics.load(state.signal, 0);
-  if (status === ZOD_WORKER_FAILED) failZodWorker(state.worker);
-  return status === ZOD_WORKER_VALID;
 }
-
-type PolicyBundleContents = ZodInfer<
-  ReturnType<typeof buildPolicyBundleContentsSchema>
->;
 
 type SnapshotRecord = Record<string, unknown>;
 const INVALID_ARRAY_ITEM = Symbol("INVALID_ARRAY_ITEM");
