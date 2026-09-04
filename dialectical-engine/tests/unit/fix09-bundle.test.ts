@@ -173,6 +173,71 @@ function candidatesWithAccessorBackedRequiredValue(onRead: () => void): {
   return { candidates, descriptorValues, originalValues };
 }
 
+function candidatesWithProxyBackedRequiredValue(
+  onRead: () => void,
+  onDescriptorTrap: () => void,
+): {
+  readonly candidates: Record<string, unknown>[];
+  readonly descriptorValues: ReadonlyMap<() => unknown, unknown>;
+  readonly originalValues: readonly unknown[];
+} {
+  const candidates: Record<string, unknown>[] = [];
+  const descriptorValues = new Map<() => unknown, unknown>();
+  const originalValues: unknown[] = [];
+  const raw = readFileSync(BUNDLE_PATH, "utf8");
+  const proxyValue = (record: Record<string, unknown>) => {
+    const original = record.value;
+    const source = () => {
+      onRead();
+      throw new Error("SOURCE_VALUE_ACCESSOR_RAN");
+    };
+    descriptorValues.set(source, original);
+    originalValues.push(original);
+    Object.defineProperty(record, "value", {
+      configurable: true,
+      enumerable: true,
+      get: source,
+    });
+    return new Proxy(record, {
+      getOwnPropertyDescriptor(target, key) {
+        onDescriptorTrap();
+        if (key === "value") {
+          return {
+            configurable: true,
+            enumerable: true,
+            get: source,
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    });
+  };
+
+  for (let index = 0; index < 16; index += 1) {
+    const candidate = JSON.parse(raw) as Record<string, unknown>;
+    const seeds = candidate.register_seeds as Array<Record<string, unknown>>;
+    const seed = seeds[index];
+    if (seed === undefined) throw new Error("MISSING_REGISTER_SEED");
+    seeds[index] = proxyValue(seed);
+    candidates.push(candidate);
+  }
+  for (const slot of [
+    "zone_manifest_hash",
+    "hatchet_ingest",
+    "injection_corpus_hash",
+  ] as const) {
+    const candidate = JSON.parse(raw) as Record<string, unknown>;
+    const slots = candidate.slots as Record<
+      string,
+      Record<string, unknown>
+    >;
+    slots[slot] = proxyValue(slots[slot] as Record<string, unknown>);
+    candidates.push(candidate);
+  }
+
+  return { candidates, descriptorValues, originalValues };
+}
+
 const NUMERIC_PROTOTYPE_KEYS = [
   "0",
   "1",
@@ -424,6 +489,36 @@ describe("FIX-09 C1 policy bundle", () => {
 
     expect(Object.hasOwn(inherited, "quick_arm")).toBe(false);
     expect(policyBundleSchema.safeParse(inherited).success).toBe(false);
+  });
+
+  it("accepts lawful null-prototype records and returns the same safe shape", () => {
+    const ordinary = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+    const withNullPrototypeRecords = (value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.map(withNullPrototypeRecords);
+      }
+      if (value !== null && typeof value === "object") {
+        const result = Object.create(null) as Record<string, unknown>;
+        for (const [key, child] of Object.entries(value)) {
+          Object.defineProperty(result, key, {
+            configurable: true,
+            enumerable: true,
+            value: withNullPrototypeRecords(child),
+            writable: true,
+          });
+        }
+        return result;
+      }
+      return value;
+    };
+    const candidate = withNullPrototypeRecords(ordinary);
+
+    const result = policyBundleSchema.safeParse(candidate);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expectFrozenOwnDataSnapshot(result.data, ordinary);
+    }
   });
 
   it("does not let Object.prototype supply a missing quick_arm", () => {
@@ -723,6 +818,61 @@ describe("FIX-09 C1 policy bundle", () => {
     }
   });
 
+  it("rechecks numeric prototypes after projection and before Zod", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+    const originalDescriptors = Object.getOwnPropertyDescriptors;
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "1");
+    let projectionCalls = 0;
+    let getterReads = 0;
+    let setterCalls = 0;
+    let result: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    let escaped: unknown;
+
+    try {
+      Object.getOwnPropertyDescriptors = ((value: object) => {
+        const descriptors = originalDescriptors(value);
+        projectionCalls += 1;
+        if (projectionCalls === 1) {
+          Object.defineProperty(Object.prototype, "1", {
+            configurable: true,
+            get() {
+              getterReads += 1;
+              return undefined;
+            },
+            set(assigned: unknown) {
+              setterCalls += 1;
+              Object.defineProperty(this, "1", {
+                configurable: true,
+                enumerable: true,
+                value: assigned,
+                writable: true,
+              });
+            },
+          });
+        }
+        return descriptors;
+      }) as typeof Object.getOwnPropertyDescriptors;
+      try {
+        result = policyBundleSchema.safeParse(raw);
+      } catch (error) {
+        escaped = error;
+      }
+    } finally {
+      Object.getOwnPropertyDescriptors = originalDescriptors;
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "1");
+      } else {
+        Object.defineProperty(Object.prototype, "1", previous);
+      }
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(result?.success).toBe(false);
+    expect(projectionCalls).toBeGreaterThan(0);
+    expect(getterReads).toBe(0);
+    expect(setterCalls).toBe(0);
+  });
+
   it("does not let Object.prototype supply missing nested members", () => {
     const raw = readFileSync(BUNDLE_PATH, "utf8");
     const scenarios = [
@@ -986,6 +1136,270 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(sourceReads).toBe(0);
   });
 
+  it("rejects all proxy-normalized value descriptors before any trap or getter", () => {
+    let sourceReads = 0;
+    let descriptorTraps = 0;
+    const { candidates, descriptorValues } =
+      candidatesWithProxyBackedRequiredValue(
+        () => {
+          sourceReads += 1;
+        },
+        () => {
+          descriptorTraps += 1;
+        },
+      );
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let inheritedReads = 0;
+    let failures = 0;
+    let escaped = 0;
+
+    try {
+      Object.defineProperty(Object.prototype, "value", {
+        configurable: true,
+        get() {
+          inheritedReads += 1;
+          const getterDescriptor = Object.getOwnPropertyDescriptor(
+            this as object,
+            "get",
+          );
+          if (
+            getterDescriptor === undefined ||
+            !Object.hasOwn(getterDescriptor, "value")
+          ) {
+            throw new Error("MISSING_DESCRIPTOR_GETTER");
+          }
+          return descriptorValues.get(
+            getterDescriptor.value as () => unknown,
+          );
+        },
+      });
+      for (const candidate of candidates) {
+        try {
+          if (!policyBundleSchema.safeParse(candidate).success) failures += 1;
+        } catch {
+          escaped += 1;
+        }
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(candidates).toHaveLength(19);
+    expect(failures).toBe(19);
+    expect(escaped).toBe(0);
+    expect(descriptorTraps).toBe(0);
+    expect(inheritedReads).toBe(0);
+    expect(sourceReads).toBe(0);
+  });
+
+  it("rejects all proxy-normalized value descriptors over matching inherited data", () => {
+    let sourceReads = 0;
+    let descriptorTraps = 0;
+    const { candidates, originalValues } =
+      candidatesWithProxyBackedRequiredValue(
+        () => {
+          sourceReads += 1;
+        },
+        () => {
+          descriptorTraps += 1;
+        },
+      );
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let failures = 0;
+    let escaped = 0;
+
+    try {
+      for (let index = 0; index < candidates.length; index += 1) {
+        Object.defineProperty(Object.prototype, "value", {
+          configurable: true,
+          value: originalValues[index],
+        });
+        try {
+          if (!policyBundleSchema.safeParse(candidates[index]).success) {
+            failures += 1;
+          }
+        } catch {
+          escaped += 1;
+        }
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(candidates).toHaveLength(19);
+    expect(failures).toBe(19);
+    expect(escaped).toBe(0);
+    expect(descriptorTraps).toBe(0);
+    expect(sourceReads).toBe(0);
+  });
+
+  it("rejects top-level and nested proxies before reflective traps", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    let prototypeTraps = 0;
+    let ownKeyTraps = 0;
+    let descriptorTraps = 0;
+    const numericPrevious = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "113",
+    );
+    const introduceNumericPollution = () => {
+      Object.defineProperty(Object.prototype, "113", {
+        configurable: true,
+        value: "PROXY_TRAP_RAN",
+      });
+    };
+    const traps: ProxyHandler<object> = {
+      getPrototypeOf(target) {
+        prototypeTraps += 1;
+        introduceNumericPollution();
+        return Reflect.getPrototypeOf(target);
+      },
+      ownKeys(target) {
+        ownKeyTraps += 1;
+        introduceNumericPollution();
+        return Reflect.ownKeys(target);
+      },
+      getOwnPropertyDescriptor(target, key) {
+        descriptorTraps += 1;
+        introduceNumericPollution();
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    };
+    const topLevel = new Proxy(raw, traps);
+    const nested = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    nested.floor_deny_globs = new Proxy(
+      nested.floor_deny_globs as string[],
+      traps,
+    );
+    let topResult:
+      | ReturnType<typeof policyBundleSchema.safeParse>
+      | undefined;
+    let nestedResult:
+      | ReturnType<typeof policyBundleSchema.safeParse>
+      | undefined;
+    let escaped: unknown;
+    let pollutionIntroduced = false;
+
+    try {
+      topResult = policyBundleSchema.safeParse(topLevel);
+      nestedResult = policyBundleSchema.safeParse(nested);
+      pollutionIntroduced = Object.hasOwn(Object.prototype, "113");
+    } catch (error) {
+      escaped = error;
+    } finally {
+      if (numericPrevious === undefined) {
+        Reflect.deleteProperty(Object.prototype, "113");
+      } else {
+        Object.defineProperty(Object.prototype, "113", numericPrevious);
+      }
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(topResult?.success).toBe(false);
+    expect(nestedResult?.success).toBe(false);
+    expect(prototypeTraps).toBe(0);
+    expect(ownKeyTraps).toBe(0);
+    expect(descriptorTraps).toBe(0);
+    expect(pollutionIntroduced).toBe(false);
+  });
+
+  it("maps revoked policy, request, environment, and nested proxies to bounded refusal", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+    const bundle = loadBundle(BUNDLE_PATH);
+    const policy = Proxy.revocable(raw, {});
+    const request = Proxy.revocable(
+      { token: "fixture-custodian-token" },
+      {},
+    );
+    const environment = Proxy.revocable(
+      { OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token" },
+      {},
+    );
+    const nested = Proxy.revocable({ ...bundle, quick_arm: "ON" }, {});
+    policy.revoke();
+    request.revoke();
+    environment.revoke();
+    nested.revoke();
+
+    let policyResult:
+      | ReturnType<typeof policyBundleSchema.safeParse>
+      | undefined;
+    let policyEscape: unknown;
+    try {
+      policyResult = policyBundleSchema.safeParse(policy.proxy);
+    } catch (error) {
+      policyEscape = error;
+    }
+    expect(policyEscape).toBeUndefined();
+    expect(policyResult?.success).toBe(false);
+
+    for (const [candidateRequest, candidateEnvironment] of [
+      [
+        request.proxy,
+        { OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token" },
+      ],
+      [
+        { token: "fixture-custodian-token" },
+        environment.proxy,
+      ],
+      [
+        {
+          token: "fixture-custodian-token",
+          next_bundle: nested.proxy,
+        },
+        { OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token" },
+      ],
+    ] as const) {
+      let error: unknown;
+      try {
+        repin(bundle, candidateRequest as never, candidateEnvironment as never);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(RepinRefusedError);
+      expect(error).toMatchObject({ code: "REPIN_REFUSED" });
+    }
+  });
+
+  it("bounds cycles and over-cap graphs before recursive reflection", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const deep: Record<string, unknown> = {};
+    let cursor = deep;
+    for (let depth = 0; depth < 300; depth += 1) {
+      const next: Record<string, unknown> = {};
+      cursor.next = next;
+      cursor = next;
+    }
+
+    expect(() => canonicalProjection(cyclic)).toThrowError(
+      "CANONICAL_JSON_NON_PLAIN_DATA",
+    );
+    expect(() => canonicalProjection(deep)).toThrowError(
+      "CANONICAL_JSON_NON_PLAIN_DATA",
+    );
+  });
+
   it("rejects accessor-backed hash input without invoking the accessor", () => {
     let accessorReads = 0;
     const changing = Object.defineProperty({ stable: true }, "changing", {
@@ -1190,6 +1604,138 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(sourceReads).toBe(0);
   });
 
+  it("rejects proxy-normalized token and bundle descriptors before traps", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" };
+    let sourceReads = 0;
+    let descriptorTraps = 0;
+    let inheritedReads = 0;
+    const tokenAccessor = () => {
+      sourceReads += 1;
+      throw new Error("TOKEN_ACCESSOR_RAN");
+    };
+    const bundleAccessor = () => {
+      sourceReads += 1;
+      throw new Error("NEXT_BUNDLE_ACCESSOR_RAN");
+    };
+    const descriptorValues = new Map<() => unknown, unknown>([
+      [tokenAccessor, "fixture-custodian-token"],
+      [bundleAccessor, armed],
+    ]);
+    const proxyDescriptors = <T extends object>(target: T): T =>
+      new Proxy(target, {
+        getOwnPropertyDescriptor(proxyTarget, key) {
+          descriptorTraps += 1;
+          const descriptor = Reflect.getOwnPropertyDescriptor(
+            proxyTarget,
+            key,
+          );
+          if (descriptor === undefined || !Object.hasOwn(descriptor, "get")) {
+            return descriptor;
+          }
+          return {
+            configurable: true,
+            enumerable: true,
+            get: descriptor.get as () => unknown,
+          };
+        },
+      });
+    const request = proxyDescriptors(Object.defineProperties({}, {
+      token: { configurable: true, enumerable: true, get: tokenAccessor },
+      next_bundle: {
+        configurable: true,
+        enumerable: true,
+        get: bundleAccessor,
+      },
+    }));
+    const environment = proxyDescriptors(Object.defineProperty(
+      {},
+      "OBS_POLICY_CUSTODIAN_TOKEN",
+      { configurable: true, enumerable: true, get: tokenAccessor },
+    ));
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let error: unknown;
+
+    try {
+      Object.defineProperty(Object.prototype, "value", {
+        configurable: true,
+        get() {
+          inheritedReads += 1;
+          const getterDescriptor = Object.getOwnPropertyDescriptor(
+            this as object,
+            "get",
+          );
+          if (
+            getterDescriptor === undefined ||
+            !Object.hasOwn(getterDescriptor, "value")
+          ) {
+            throw new Error("MISSING_DESCRIPTOR_GETTER");
+          }
+          return descriptorValues.get(
+            getterDescriptor.value as () => unknown,
+          );
+        },
+      });
+      repin(bundle, request as never, environment as never);
+    } catch (caught) {
+      error = caught;
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(error).toBeInstanceOf(RepinRefusedError);
+    expect(descriptorTraps).toBe(0);
+    expect(inheritedReads).toBe(0);
+    expect(sourceReads).toBe(0);
+
+    for (const [candidate, inherited] of [
+      [
+        proxyDescriptors(Object.defineProperty(
+          { next_bundle: armed },
+          "token",
+          { configurable: true, enumerable: true, get: tokenAccessor },
+        )),
+        "fixture-custodian-token",
+      ],
+      [
+        proxyDescriptors(Object.defineProperty(
+          { token: "fixture-custodian-token" },
+          "next_bundle",
+          { configurable: true, enumerable: true, get: bundleAccessor },
+        )),
+        armed,
+      ],
+    ] as const) {
+      let dataError: unknown;
+      try {
+        Object.defineProperty(Object.prototype, "value", {
+          configurable: true,
+          value: inherited,
+        });
+        repin(bundle, candidate as never, {
+          OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+        });
+      } catch (caught) {
+        dataError = caught;
+      } finally {
+        if (previous === undefined) {
+          Reflect.deleteProperty(Object.prototype, "value");
+        } else {
+          Object.defineProperty(Object.prototype, "value", previous);
+        }
+      }
+      expect(dataError).toBeInstanceOf(RepinRefusedError);
+    }
+    expect(sourceReads).toBe(0);
+  });
+
   it("refuses inherited or descriptor-trapping next_bundle data", () => {
     const bundle = loadBundle(BUNDLE_PATH);
     const environment = {
@@ -1220,7 +1766,32 @@ describe("FIX-09 C1 policy bundle", () => {
     );
   });
 
-  it("snapshots a volatile candidate once and bounds a later repin refusal", () => {
+  it("rejects a proxy in the request prototype chain before its traps", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    let descriptorTraps = 0;
+    let prototypeTraps = 0;
+    const hostilePrototype = new Proxy({}, {
+      getOwnPropertyDescriptor(target, key) {
+        descriptorTraps += 1;
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+      getPrototypeOf(target) {
+        prototypeTraps += 1;
+        return Reflect.getPrototypeOf(target);
+      },
+    });
+    const request = Object.assign(Object.create(hostilePrototype) as object, {
+      token: "fixture-custodian-token",
+    });
+
+    expect(() => repin(bundle, request as never, {
+      OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+    })).toThrowError(RepinRefusedError);
+    expect(descriptorTraps).toBe(0);
+    expect(prototypeTraps).toBe(0);
+  });
+
+  it("rejects a proxy policy before its first prototype trap", () => {
     const bundle = loadBundle(BUNDLE_PATH);
     const candidateTarget = JSON.parse(
       readFileSync(BUNDLE_PATH, "utf8"),
@@ -1229,14 +1800,13 @@ describe("FIX-09 C1 policy bundle", () => {
     const candidate = new Proxy(candidateTarget, {
       getPrototypeOf(target) {
         prototypeReads += 1;
-        if (prototypeReads > 1) throw new Error("SECOND_TRAVERSAL");
         return Reflect.getPrototypeOf(target);
       },
     });
 
     const firstPass = policyBundleSchema.safeParse(candidate);
-    expect(firstPass.success).toBe(true);
-    expect(prototypeReads).toBe(1);
+    expect(firstPass.success).toBe(false);
+    expect(prototypeReads).toBe(0);
 
     let thrown: unknown;
     try {
@@ -1254,7 +1824,7 @@ describe("FIX-09 C1 policy bundle", () => {
 
     expect(thrown).toBeInstanceOf(RepinRefusedError);
     expect(thrown).toMatchObject({ code: "REPIN_REFUSED" });
-    expect(prototypeReads).toBe(2);
+    expect(prototypeReads).toBe(0);
   });
 
   it("maps every missing or malformed token to REPIN_REFUSED", () => {

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { isProxy } from "node:util/types";
 import { z } from "zod";
 
 import { canonicalProjection } from "./canonical.js";
@@ -182,6 +183,7 @@ function exactSnapshotRecord(
   if (
     value === null ||
     typeof value !== "object" ||
+    isProxy(value) ||
     Array.isArray(value) ||
     Object.getPrototypeOf(value) !== null
   ) {
@@ -200,7 +202,15 @@ function snapshotArrayOf(
   item: (candidate: unknown) => boolean,
   minimum = 0,
 ): value is unknown[] {
-  if (!Array.isArray(value) || value.length < minimum) return false;
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    isProxy(value) ||
+    !Array.isArray(value) ||
+    value.length < minimum
+  ) {
+    return false;
+  }
   for (let index = 0; index < value.length; index += 1) {
     if (!Object.hasOwn(value, String(index)) || !item(value[index])) {
       return false;
@@ -310,6 +320,7 @@ function severityMap(value: unknown): boolean {
     value.severe_threshold !== "SEVERE" ||
     value.overrides === null ||
     typeof value.overrides !== "object" ||
+    isProxy(value.overrides) ||
     Array.isArray(value.overrides) ||
     Object.getPrototypeOf(value.overrides) !== null
   ) {
@@ -556,8 +567,16 @@ function safeParsePolicyBundle(value: unknown): PolicyBundleParseResult {
     const crossFieldIssue = snapshotCrossFieldIssue(snapshot);
     if (crossFieldIssue !== undefined) return schemaFailure(crossFieldIssue);
 
+    if (hasNumericArrayPrototypePollution()) {
+      return schemaFailure("POLICY_BUNDLE_NUMERIC_PROTOTYPE_POLLUTION");
+    }
+
     const validated = policyBundleContentsSchema.safeParse(snapshot);
     if (!validated.success) return schemaFailure(validated.error);
+
+    if (hasNumericArrayPrototypePollution()) {
+      return schemaFailure("POLICY_BUNDLE_NUMERIC_PROTOTYPE_POLLUTION");
+    }
 
     return { success: true, data: snapshot };
   } catch (error) {

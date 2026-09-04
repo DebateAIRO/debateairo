@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { isProxy } from "node:util/types";
 
 import {
   policyBundleSchema,
@@ -27,6 +28,7 @@ function tokenDigest(token: string): Buffer {
 
 function ownStringProperty(value: unknown, key: string): string | undefined {
   if (value === null || typeof value !== "object") return undefined;
+  if (isProxy(value)) return undefined;
   try {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) {
@@ -51,6 +53,7 @@ function ownOptionalDataProperty(
   if (value === null || typeof value !== "object") {
     return { kind: "INVALID" };
   }
+  if (isProxy(value)) return { kind: "INVALID" };
   try {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor !== undefined) {
@@ -62,6 +65,7 @@ function ownOptionalDataProperty(
     const visited = new Set<object>();
     let prototype = Object.getPrototypeOf(value) as object | null;
     while (prototype !== null) {
+      if (isProxy(prototype)) return { kind: "INVALID" };
       if (visited.has(prototype)) return { kind: "INVALID" };
       visited.add(prototype);
       if (Object.getOwnPropertyDescriptor(prototype, key) !== undefined) {
