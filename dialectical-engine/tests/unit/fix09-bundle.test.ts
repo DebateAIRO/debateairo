@@ -12,13 +12,17 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Expression, Node } from "typescript/unstable/ast";
 import {
+  isAssignmentOperatorToken,
+  isBinaryExpression,
   isCallExpression,
   isElementAccessExpression,
   isFunctionLikeDeclaration,
   isIdentifier,
   isNewExpression,
   isPropertyAccessExpression,
+  isThisExpression,
   isTypeNode,
+  isVariableDeclaration,
 } from "typescript/unstable/ast/is";
 import { API as TypeScriptApi } from "typescript/unstable/sync";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -1335,6 +1339,417 @@ describe("FIX-09 C1 policy bundle", () => {
     },
   );
 
+  it.each([
+    { ownerExpression: "Error.prototype" },
+    { ownerExpression: "RepinRefusedError.prototype" },
+  ] as const)(
+    "does not dispatch an inherited $ownerExpression name setter before custodian authentication",
+    ({ ownerExpression }) => {
+      const repositoryRoot = resolve(import.meta.dirname, "../..");
+      const loaderUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+      ).href;
+      const custodianUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+      ).href;
+      const canonicalUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+      ).href;
+      const script = `
+      import { readFileSync } from "node:fs";
+      await import(${JSON.stringify(loaderUrl)});
+      const { RepinRefusedError, repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const nameOwner = ${ownerExpression};
+      const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      const defineProperty = Object.defineProperty;
+      const deleteProperty = Reflect.deleteProperty;
+      const apply = Reflect.apply;
+      const nameDescriptor = apply(getOwnPropertyDescriptor, Object, [
+        nameOwner,
+        "name",
+      ]);
+      const someDescriptor = apply(getOwnPropertyDescriptor, Object, [
+        Array.prototype,
+        "some",
+      ]);
+      if (
+        !someDescriptor ||
+        !("value" in someDescriptor) ||
+        typeof someDescriptor.value !== "function"
+      ) {
+        throw new Error("ARRAY_SOME_DESCRIPTOR_MISSING");
+      }
+      const sameDescriptor = (left, right) => {
+        if (left === undefined || right === undefined) return left === right;
+        return left.configurable === right.configurable &&
+          left.enumerable === right.enumerable &&
+          left.get === right.get &&
+          left.set === right.set &&
+          left.value === right.value &&
+          left.writable === right.writable;
+      };
+      const restoreName = () => {
+        if (nameDescriptor === undefined) {
+          apply(deleteProperty, Reflect, [nameOwner, "name"]);
+        } else {
+          apply(defineProperty, Object, [nameOwner, "name", nameDescriptor]);
+        }
+      };
+      let callbackCalls = 0;
+      let escaped = null;
+      let hash;
+      let outerRefused = false;
+      let reentrantError = null;
+      let repinned;
+      try {
+        defineProperty(Array.prototype, "some", {
+          ...someDescriptor,
+          value: function (...args) {
+            return apply(someDescriptor.value, this, args);
+          },
+        });
+        defineProperty(nameOwner, "name", {
+          configurable: true,
+          enumerable: nameDescriptor?.enumerable ?? false,
+          set() {
+            callbackCalls += 1;
+            environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+            restoreName();
+            defineProperty(Array.prototype, "some", someDescriptor);
+            try {
+              repinned = repin(bundle, {
+                token: "wrong",
+                next_bundle: armed,
+              }, environment);
+            } catch (error) {
+              reentrantError = error instanceof Error
+                ? { code: error.code, message: error.message, name: error.name }
+                : { code: null, message: String(error), name: typeof error };
+            }
+          },
+        });
+        try {
+          repin(bundle, { token: "wrong", next_bundle: armed }, environment);
+        } catch (error) {
+          outerRefused = error instanceof Error &&
+            error.code === "REPIN_REFUSED" &&
+            error.message === "REPIN_REFUSED";
+        }
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error instanceof Error ? error.message : String(error);
+      } finally {
+        restoreName();
+        defineProperty(Array.prototype, "some", someDescriptor);
+      }
+      const restoredName = apply(getOwnPropertyDescriptor, Object, [
+        nameOwner,
+        "name",
+      ]);
+      const restoredSome = apply(getOwnPropertyDescriptor, Object, [
+        Array.prototype,
+        "some",
+      ]);
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        escaped,
+        hash,
+        nameRestored: sameDescriptor(restoredName, nameDescriptor),
+        outerRefused,
+        quickArm: repinned?.quick_arm ?? null,
+        reentrantError,
+        someRestored: sameDescriptor(restoredSome, someDescriptor),
+      }));
+    `;
+      const outcome = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", script],
+        { cwd: repositoryRoot, encoding: "utf8" },
+      );
+
+      expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toEqual({
+        callbackCalls: 0,
+        environment: "correct",
+        escaped: null,
+        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        nameRestored: true,
+        outerRefused: true,
+        quickArm: null,
+        reentrantError: null,
+        someRestored: true,
+      });
+    },
+  );
+
+  it.each([{ member: "get" }, { member: "set" }] as const)(
+    "does not dispatch an inherited Object.prototype.$member descriptor getter before custodian authentication",
+    ({ member }) => {
+      const repositoryRoot = resolve(import.meta.dirname, "../..");
+      const loaderUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+      ).href;
+      const custodianUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+      ).href;
+      const canonicalUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+      ).href;
+      const script = `
+      import { readFileSync } from "node:fs";
+      await import(${JSON.stringify(loaderUrl)});
+      const { repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const member = ${JSON.stringify(member)};
+      const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      const defineProperty = Object.defineProperty;
+      const deleteProperty = Reflect.deleteProperty;
+      const apply = Reflect.apply;
+      const descriptor = apply(getOwnPropertyDescriptor, Object, [
+        Object.prototype,
+        member,
+      ]);
+      const sameDescriptor = (left, right) => {
+        if (left === undefined || right === undefined) return left === right;
+        return left.configurable === right.configurable &&
+          left.enumerable === right.enumerable &&
+          left.get === right.get &&
+          left.set === right.set &&
+          left.value === right.value &&
+          left.writable === right.writable;
+      };
+      const restore = () => {
+        if (descriptor === undefined) {
+          apply(deleteProperty, Reflect, [Object.prototype, member]);
+        } else {
+          apply(defineProperty, Object, [
+            Object.prototype,
+            member,
+            descriptor,
+          ]);
+        }
+      };
+      let callbackCalls = 0;
+      let escaped = null;
+      let hash;
+      let outerRefused = false;
+      let reentrantError = null;
+      let repinned;
+      try {
+        defineProperty(Object.prototype, member, {
+          configurable: true,
+          enumerable: false,
+          get() {
+            callbackCalls += 1;
+            environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+            restore();
+            try {
+              repinned = repin(bundle, {
+                token: "wrong",
+                next_bundle: armed,
+              }, environment);
+            } catch (error) {
+              reentrantError = error instanceof Error
+                ? { code: error.code, message: error.message, name: error.name }
+                : { code: null, message: String(error), name: typeof error };
+            }
+            return undefined;
+          },
+        });
+        try {
+          repin(bundle, { token: "wrong", next_bundle: armed }, environment);
+        } catch (error) {
+          outerRefused = error instanceof Error &&
+            error.code === "REPIN_REFUSED" &&
+            error.message === "REPIN_REFUSED";
+        }
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error instanceof Error ? error.message : String(error);
+      } finally {
+        restore();
+      }
+      const restored = apply(getOwnPropertyDescriptor, Object, [
+        Object.prototype,
+        member,
+      ]);
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        descriptorRestored: sameDescriptor(restored, descriptor),
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        escaped,
+        hash,
+        outerRefused,
+        quickArm: repinned?.quick_arm ?? null,
+        reentrantError,
+      }));
+    `;
+      const outcome = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", script],
+        { cwd: repositoryRoot, encoding: "utf8" },
+      );
+
+      expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toEqual({
+        callbackCalls: 0,
+        descriptorRestored: true,
+        environment: "correct",
+        escaped: null,
+        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        outerRefused: true,
+        quickArm: null,
+        reentrantError: null,
+      });
+    },
+  );
+
+  it.each([{ member: "name" }, { member: "displayErrors" }] as const)(
+    "does not dispatch an inherited Object.prototype.$member VM-option getter before custodian authentication",
+    ({ member }) => {
+      const repositoryRoot = resolve(import.meta.dirname, "../..");
+      const loaderUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+      ).href;
+      const custodianUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+      ).href;
+      const canonicalUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+      ).href;
+      const script = `
+      import { readFileSync } from "node:fs";
+      await import(${JSON.stringify(loaderUrl)});
+      const { repin } = await import(${JSON.stringify(custodianUrl)});
+      const { bundleHash } = await import(${JSON.stringify(canonicalUrl)});
+      const bundle = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const armed = { ...bundle, quick_arm: "ON" };
+      const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
+      const member = ${JSON.stringify(member)};
+      const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      const defineProperty = Object.defineProperty;
+      const deleteProperty = Reflect.deleteProperty;
+      const apply = Reflect.apply;
+      const descriptor = apply(getOwnPropertyDescriptor, Object, [
+        Object.prototype,
+        member,
+      ]);
+      const sameDescriptor = (left, right) => {
+        if (left === undefined || right === undefined) return left === right;
+        return left.configurable === right.configurable &&
+          left.enumerable === right.enumerable &&
+          left.get === right.get &&
+          left.set === right.set &&
+          left.value === right.value &&
+          left.writable === right.writable;
+      };
+      const restore = () => {
+        if (descriptor === undefined) {
+          apply(deleteProperty, Reflect, [Object.prototype, member]);
+        } else {
+          apply(defineProperty, Object, [
+            Object.prototype,
+            member,
+            descriptor,
+          ]);
+        }
+      };
+      let callbackCalls = 0;
+      let escaped = null;
+      let hash;
+      let outerError = null;
+      let outerRepinned;
+      let reentrantError = null;
+      let repinned;
+      try {
+        defineProperty(Object.prototype, member, {
+          configurable: true,
+          enumerable: false,
+          get() {
+            callbackCalls += 1;
+            environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
+            restore();
+            try {
+              repinned = repin(bundle, {
+                token: "wrong",
+                next_bundle: armed,
+              }, environment);
+            } catch (error) {
+              reentrantError = error instanceof Error
+                ? { code: error.code, message: error.message, name: error.name }
+                : { code: null, message: String(error), name: typeof error };
+            }
+            return undefined;
+          },
+        });
+        try {
+          outerRepinned = repin(
+            bundle,
+            { token: "wrong", next_bundle: armed },
+            environment,
+          );
+        } catch (error) {
+          outerError = error instanceof Error
+            ? { code: error.code, message: error.message, name: error.name }
+            : { code: null, message: String(error), name: typeof error };
+        }
+        hash = bundleHash(bundle);
+      } catch (error) {
+        escaped = error instanceof Error ? error.message : String(error);
+      } finally {
+        restore();
+      }
+      const restored = apply(getOwnPropertyDescriptor, Object, [
+        Object.prototype,
+        member,
+      ]);
+      process.stdout.write(JSON.stringify({
+        callbackCalls,
+        descriptorRestored: sameDescriptor(restored, descriptor),
+        environment: environment.OBS_POLICY_CUSTODIAN_TOKEN,
+        escaped,
+        hash,
+        outerQuickArm: outerRepinned?.quick_arm ?? null,
+        quickArm: repinned?.quick_arm ?? null,
+        reentrantError,
+        refused: outerError?.code === "REPIN_REFUSED",
+      }));
+    `;
+      const outcome = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", script],
+        { cwd: repositoryRoot, encoding: "utf8" },
+      );
+
+      expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toEqual({
+        callbackCalls: 0,
+        descriptorRestored: true,
+        environment: "correct",
+        escaped: null,
+        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        outerQuickArm: null,
+        quickArm: null,
+        reentrantError: null,
+        refused: true,
+      });
+    },
+  );
+
   it("retains no uncaptured ambient authority member or constructor", () => {
     const ambientCallableRoots = new Set([
       "Array",
@@ -1454,6 +1869,86 @@ describe("FIX-09 C1 policy bundle", () => {
         };
         const visit = (node: Node, functionDepth = 0): void => {
           if (
+            functionDepth > 0 &&
+            isBinaryExpression(node) &&
+            isAssignmentOperatorToken(node.operatorToken) &&
+            (
+              isPropertyAccessExpression(node.left) ||
+              isElementAccessExpression(node.left)
+            ) &&
+            isThisExpression(node.left.expression)
+          ) {
+            const location = sourceFile.getLineAndCharacterOfPosition(
+              node.getStart(sourceFile),
+            );
+            violations.add(
+              `${sourcePath}:${location.line + 1}:implicit-this-set`,
+            );
+          } else if (
+            functionDepth > 0 &&
+            isCallExpression(node) &&
+            isIdentifier(node.expression) &&
+            node.expression.text === "DEFINE_PROPERTY" &&
+            !(
+              node.arguments[2] !== undefined &&
+              isCallExpression(node.arguments[2]) &&
+              isIdentifier(node.arguments[2].expression) &&
+              node.arguments[2].expression.text ===
+                "ownDataPropertyDescriptor"
+            )
+          ) {
+            const location = sourceFile.getLineAndCharacterOfPosition(
+              node.getStart(sourceFile),
+            );
+            violations.add(
+              `${sourcePath}:${location.line + 1}:inherited-descriptor-read`,
+            );
+          } else if (
+            functionDepth > 0 &&
+            isFunctionLikeDeclaration(node) &&
+            isVariableDeclaration(node.parent) &&
+            node.parent.initializer === node
+          ) {
+            const location = sourceFile.getLineAndCharacterOfPosition(
+              node.getStart(sourceFile),
+            );
+            violations.add(
+              `${sourcePath}:${location.line + 1}:runtime-callable-name`,
+            );
+          } else if (
+            functionDepth > 0 &&
+            isCallExpression(node) &&
+            isIdentifier(node.expression) &&
+            (
+              (
+                node.expression.text === "CREATE_CONTEXT" &&
+                !(
+                  node.arguments[1] !== undefined &&
+                  isCallExpression(node.arguments[1]) &&
+                  isIdentifier(node.arguments[1].expression) &&
+                  node.arguments[1].expression.text ===
+                    "privateContextOptions"
+                )
+              ) ||
+              (
+                node.expression.text === "RUN_IN_CONTEXT" &&
+                !(
+                  node.arguments[2] !== undefined &&
+                  isCallExpression(node.arguments[2]) &&
+                  isIdentifier(node.arguments[2].expression) &&
+                  node.arguments[2].expression.text ===
+                    "privateScriptOptions"
+                )
+              )
+            )
+          ) {
+            const location = sourceFile.getLineAndCharacterOfPosition(
+              node.getStart(sourceFile),
+            );
+            violations.add(
+              `${sourcePath}:${location.line + 1}:inherited-vm-option-read`,
+            );
+          } else if (
             isPropertyAccessExpression(node) ||
             isElementAccessExpression(node)
           ) {

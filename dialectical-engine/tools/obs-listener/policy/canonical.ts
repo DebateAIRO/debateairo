@@ -39,6 +39,20 @@ export type CanonicalJsonValue =
   | readonly CanonicalJsonValue[]
   | { readonly [key: string]: CanonicalJsonValue };
 
+function ownDataPropertyDescriptor(
+  value: unknown,
+  configurable?: boolean,
+  enumerable?: boolean,
+  writable?: boolean,
+): PropertyDescriptor {
+  const descriptor = CREATE_OBJECT(null) as PropertyDescriptor;
+  descriptor.value = value;
+  if (configurable !== undefined) descriptor.configurable = configurable;
+  if (enumerable !== undefined) descriptor.enumerable = enumerable;
+  if (writable !== undefined) descriptor.writable = writable;
+  return descriptor;
+}
+
 function nonPlainJsonData(): never {
   throw new TYPE_ERROR("CANONICAL_JSON_NON_PLAIN_DATA");
 }
@@ -106,12 +120,11 @@ function activeContains(active: readonly object[], candidate: object): boolean {
 }
 
 function activePush(active: object[], candidate: object): void {
-  DEFINE_PROPERTY(active, TO_STRING(ownArrayLength(active)), {
-    configurable: true,
-    enumerable: true,
-    value: candidate,
-    writable: true,
-  });
+  DEFINE_PROPERTY(
+    active,
+    TO_STRING(ownArrayLength(active)),
+    ownDataPropertyDescriptor(candidate, true, true, true),
+  );
 }
 
 function activePop(active: object[], candidate: object): void {
@@ -124,7 +137,11 @@ function activePop(active: object[], candidate: object): void {
     return nonPlainJsonData();
   }
   if (!DELETE_PROPERTY(active, lastKey)) return nonPlainJsonData();
-  DEFINE_PROPERTY(active, "length", { value: length - 1 });
+  DEFINE_PROPERTY(
+    active,
+    "length",
+    ownDataPropertyDescriptor(length - 1),
+  );
 }
 
 function projectCanonical(
@@ -193,12 +210,11 @@ function projectCanonical(
             state,
             depth + 1,
           );
-          DEFINE_PROPERTY(projection, key, {
-            configurable: true,
-            enumerable: true,
-            value: item,
-            writable: true,
-          });
+          DEFINE_PROPERTY(
+            projection,
+            key,
+            ownDataPropertyDescriptor(item, true, true, true),
+          );
         }
         return FREEZE_OBJECT(projection);
       }
@@ -219,16 +235,20 @@ function projectCanonical(
       const keyCount = ownArrayLength(keys);
       for (let index = 0; index < keyCount; index += 1) {
         const key = ownStringAt(keys, index);
-        DEFINE_PROPERTY(projection, key, {
-          configurable: true,
-          enumerable: true,
-          value: projectCanonical(
-            dataPropertyValue(descriptorMapEntry(descriptors, key)),
-            state,
-            depth + 1,
+        DEFINE_PROPERTY(
+          projection,
+          key,
+          ownDataPropertyDescriptor(
+            projectCanonical(
+              dataPropertyValue(descriptorMapEntry(descriptors, key)),
+              state,
+              depth + 1,
+            ),
+            true,
+            true,
+            true,
           ),
-          writable: true,
-        });
+        );
       }
       return FREEZE_OBJECT(projection);
     } finally {
@@ -289,12 +309,11 @@ function defineOwnStringAt(
   index: number,
   value: string,
 ): void {
-  DEFINE_PROPERTY(values, TO_STRING(index), {
-    configurable: true,
-    enumerable: true,
-    value,
-    writable: true,
-  });
+  DEFINE_PROPERTY(
+    values,
+    TO_STRING(index),
+    ownDataPropertyDescriptor(value, true, true, true),
+  );
 }
 
 function ownArrayLength(value: readonly unknown[]): number {

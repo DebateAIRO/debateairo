@@ -82,6 +82,20 @@ const BASE_OBJECT_ITERATOR = GET_OWN_PROPERTY_DESCRIPTOR(
   ARRAY_ITERATOR,
 );
 
+function ownDataPropertyDescriptor(
+  value: unknown,
+  configurable?: boolean,
+  enumerable?: boolean,
+  writable?: boolean,
+): PropertyDescriptor {
+  const descriptor = CREATE_OBJECT(null) as PropertyDescriptor;
+  descriptor.value = value;
+  if (configurable !== undefined) descriptor.configurable = configurable;
+  if (enumerable !== undefined) descriptor.enumerable = enumerable;
+  if (writable !== undefined) descriptor.writable = writable;
+  return descriptor;
+}
+
 type Severity = "INFO" | "DEGRADED" | "SEVERE" | "FATAL";
 type PinnedSet = { count: number; sha256: string };
 type PolicyBundleContents = {
@@ -423,73 +437,145 @@ function pathIsWithin(path: string, directory: string): boolean {
   return true;
 }
 
+type PrivateVmContext = ReturnType<typeof CREATE_CONTEXT>;
+type PrivateModuleCache = Record<string, { exports: unknown }>;
+
+function privateContextOptions(): {
+  codeGeneration: { strings: boolean; wasm: boolean };
+  microtaskMode: undefined;
+  name: undefined;
+  origin: undefined;
+} {
+  const codeGeneration = CREATE_OBJECT(null) as {
+    strings: boolean;
+    wasm: boolean;
+  };
+  codeGeneration.strings = false;
+  codeGeneration.wasm = false;
+  const options = CREATE_OBJECT(null) as {
+    codeGeneration: { strings: boolean; wasm: boolean };
+    microtaskMode: undefined;
+    name: undefined;
+    origin: undefined;
+  };
+  options.codeGeneration = codeGeneration;
+  options.microtaskMode = undefined;
+  options.name = undefined;
+  options.origin = undefined;
+  return options;
+}
+
+function privateScriptOptions(filename: string): {
+  breakOnSigint: boolean;
+  cachedData: undefined;
+  columnOffset: number;
+  displayErrors: boolean;
+  filename: string;
+  importModuleDynamically: undefined;
+  lineOffset: number;
+  produceCachedData: undefined;
+  timeout: undefined;
+} {
+  const options = CREATE_OBJECT(null) as {
+    breakOnSigint: boolean;
+    cachedData: undefined;
+    columnOffset: number;
+    displayErrors: boolean;
+    filename: string;
+    importModuleDynamically: undefined;
+    lineOffset: number;
+    produceCachedData: undefined;
+    timeout: undefined;
+  };
+  options.breakOnSigint = false;
+  options.cachedData = undefined;
+  options.columnOffset = 0;
+  options.displayErrors = true;
+  options.filename = filename;
+  options.importModuleDynamically = undefined;
+  options.lineOffset = 0;
+  options.produceCachedData = undefined;
+  options.timeout = undefined;
+  return options;
+}
+
+function privateRequireFor(
+  parentFilename: string,
+  context: PrivateVmContext,
+  moduleCache: PrivateModuleCache,
+): (specifier: string) => unknown {
+  return function (specifier: string): unknown {
+    if (
+      specifier.length < 2 ||
+      specifier[0] !== "." ||
+      (specifier[1] !== "/" && specifier[1] !== ".")
+    ) {
+      throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_SPECIFIER_INVALID");
+    }
+    return loadPrivateCommonJs(
+      RESOLVE_PATH(DIRNAME(parentFilename), specifier),
+      context,
+      moduleCache,
+    );
+  };
+}
+
+function loadPrivateCommonJs(
+  filename: string,
+  context: PrivateVmContext,
+  moduleCache: PrivateModuleCache,
+): unknown {
+  if (ZOD_DIRECTORY === null || !pathIsWithin(filename, ZOD_DIRECTORY)) {
+    throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
+  }
+  if (HAS_OWN(moduleCache, filename)) {
+    return moduleCache[filename]?.exports;
+  }
+
+  const moduleRecord = CREATE_OBJECT(null) as { exports: unknown };
+  moduleRecord.exports = CREATE_OBJECT(null);
+  DEFINE_PROPERTY(
+    moduleCache,
+    filename,
+    ownDataPropertyDescriptor(moduleRecord, false, true, false),
+  );
+  const source = READ_FILE_SYNC(filename, "utf8");
+  const wrapper = RUN_IN_CONTEXT(
+    `(function (exports, require, module, __filename, __dirname) {\n${source}\n})`,
+    context,
+    privateScriptOptions(filename),
+  ) as (
+    exports: unknown,
+    require: (specifier: string) => unknown,
+    module: { exports: unknown },
+    filename: string,
+    dirname: string,
+  ) => void;
+  wrapper(
+    moduleRecord.exports,
+    privateRequireFor(filename, context, moduleCache),
+    moduleRecord,
+    filename,
+    DIRNAME(filename),
+  );
+  return moduleRecord.exports;
+}
+
 function createPrivateZodValidator(): PrivateZodValidator {
   if (ZOD_DIRECTORY === null || ZOD_ENTRY === null) {
     throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_UNAVAILABLE");
   }
-  const context = CREATE_CONTEXT(CREATE_OBJECT(null), {
-    codeGeneration: { strings: false, wasm: false },
-  });
-  const moduleCache = CREATE_OBJECT(null) as Record<
-    string,
-    { exports: unknown }
-  >;
-
-  const loadPrivateCommonJs = (filename: string): unknown => {
-    if (!pathIsWithin(filename, ZOD_DIRECTORY)) {
-      throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
-    }
-    if (HAS_OWN(moduleCache, filename)) {
-      return moduleCache[filename]?.exports;
-    }
-
-    const moduleRecord = CREATE_OBJECT(null) as { exports: unknown };
-    moduleRecord.exports = CREATE_OBJECT(null);
-    DEFINE_PROPERTY(moduleCache, filename, {
-      configurable: false,
-      enumerable: true,
-      value: moduleRecord,
-      writable: false,
-    });
-    const localRequire = (specifier: string): unknown => {
-      if (
-        specifier.length < 2 ||
-        specifier[0] !== "." ||
-        (specifier[1] !== "/" && specifier[1] !== ".")
-      ) {
-        throw new MAIN_ERROR("ZOD_PRIVATE_MODULE_SPECIFIER_INVALID");
-      }
-      return loadPrivateCommonJs(
-        RESOLVE_PATH(DIRNAME(filename), specifier),
-      );
-    };
-    const source = READ_FILE_SYNC(filename, "utf8");
-    const wrapper = RUN_IN_CONTEXT(
-      `(function (exports, require, module, __filename, __dirname) {\n${source}\n})`,
-      context,
-      { filename },
-    ) as (
-      exports: unknown,
-      require: (specifier: string) => unknown,
-      module: { exports: unknown },
-      filename: string,
-      dirname: string,
-    ) => void;
-    wrapper(
-      moduleRecord.exports,
-      localRequire,
-      moduleRecord,
-      filename,
-      DIRNAME(filename),
-    );
-    return moduleRecord.exports;
-  };
-
-  const zodExports = loadPrivateCommonJs(ZOD_ENTRY) as { readonly z?: unknown };
+  const context = CREATE_CONTEXT(CREATE_OBJECT(null), privateContextOptions());
+  const moduleCache = CREATE_OBJECT(null) as PrivateModuleCache;
+  const zodExports = loadPrivateCommonJs(
+    ZOD_ENTRY,
+    context,
+    moduleCache,
+  ) as { readonly z?: unknown };
   const makeValidator = RUN_IN_CONTEXT(
     PRIVATE_POLICY_BUNDLE_VALIDATOR_SOURCE,
     context,
-    { filename: "fix09-private-policy-schema.js" },
+    privateScriptOptions("fix09-private-policy-schema.js"),
   ) as (z: unknown) => unknown;
   const validator = makeValidator(zodExports.z);
   if (typeof validator !== "function") {
@@ -1003,6 +1089,22 @@ function policyBundleStructure(
     custodians(value.custodians);
 }
 
+function hasDuplicateString(values: readonly string[]): boolean {
+  const length = ownArrayLength(values);
+  if (length === null) return true;
+  const seen = CREATE_OBJECT(null) as Record<string, true>;
+  for (let index = 0; index < length; index += 1) {
+    const value = ownStringArrayItem(values, index);
+    if (value === null || HAS_OWN(seen, value)) return true;
+    DEFINE_PROPERTY(
+      seen,
+      value,
+      ownDataPropertyDescriptor(true, true, true, true),
+    );
+  }
+  return false;
+}
+
 function snapshotCrossFieldIssue(
   snapshot: PolicyBundleContents,
 ): string | undefined {
@@ -1038,37 +1140,19 @@ function snapshotCrossFieldIssue(
     }
     const key = keyDescriptor.value;
     if (HAS_OWN(seedKeys, key)) return "DUPLICATE_REGISTER_SEED";
-    DEFINE_PROPERTY(seedKeys, key, {
-      configurable: true,
-      enumerable: true,
-      value: true,
-      writable: true,
-    });
+    DEFINE_PROPERTY(
+      seedKeys,
+      key,
+      ownDataPropertyDescriptor(true, true, true, true),
+    );
   }
-
-  const duplicateString = (values: readonly string[]): boolean => {
-    const length = ownArrayLength(values);
-    if (length === null) return true;
-    const seen = CREATE_OBJECT(null) as Record<string, true>;
-    for (let index = 0; index < length; index += 1) {
-      const value = ownStringArrayItem(values, index);
-      if (value === null || HAS_OWN(seen, value)) return true;
-      DEFINE_PROPERTY(seen, value, {
-        configurable: true,
-        enumerable: true,
-        value: true,
-        writable: true,
-      });
-    }
-    return false;
-  };
-  if (duplicateString(snapshot.production_source_globs)) {
+  if (hasDuplicateString(snapshot.production_source_globs)) {
     return "DUPLICATE_PRODUCTION_SOURCE_GLOBS";
   }
-  if (duplicateString(snapshot.floor_deny_globs)) {
+  if (hasDuplicateString(snapshot.floor_deny_globs)) {
     return "DUPLICATE_FLOOR_DENY_GLOBS";
   }
-  if (duplicateString(snapshot.allowlist)) return "DUPLICATE_ALLOWLIST";
+  if (hasDuplicateString(snapshot.allowlist)) return "DUPLICATE_ALLOWLIST";
   return undefined;
 }
 
@@ -1077,7 +1161,11 @@ class PolicyBundleSchemaError extends Error {
 
   constructor(cause: unknown) {
     super("POLICY_BUNDLE_INVALID", { cause });
-    this.name = "PolicyBundleSchemaError";
+    DEFINE_PROPERTY(
+      this,
+      "name",
+      ownDataPropertyDescriptor("PolicyBundleSchemaError", true, true, true),
+    );
   }
 }
 
@@ -1097,17 +1185,18 @@ function isCanonicalArrayIndex(key: string): boolean {
     TO_STRING(index) === key;
 }
 
+function prototypeHasNumericKey(prototype: object): boolean {
+  const keys = GET_OWN_PROPERTY_NAMES(prototype);
+  const length = ownArrayLength(keys);
+  if (length === null) return true;
+  for (let index = 0; index < length; index += 1) {
+    const key = ownStringArrayItem(keys, index);
+    if (key === null || isCanonicalArrayIndex(key)) return true;
+  }
+  return false;
+}
+
 function hasNumericArrayPrototypePollution(): boolean {
-  const prototypeHasNumericKey = (prototype: object): boolean => {
-    const keys = GET_OWN_PROPERTY_NAMES(prototype);
-    const length = ownArrayLength(keys);
-    if (length === null) return true;
-    for (let index = 0; index < length; index += 1) {
-      const key = ownStringArrayItem(keys, index);
-      if (key === null || isCanonicalArrayIndex(key)) return true;
-    }
-    return false;
-  };
   return prototypeHasNumericKey(ARRAY_PROTOTYPE) ||
     prototypeHasNumericKey(OBJECT_PROTOTYPE);
 }
@@ -1229,7 +1318,11 @@ export class PolicyBundleLoadError extends Error {
 
   constructor(cause: unknown) {
     super("POLICY_BUNDLE_INVALID", { cause });
-    this.name = "PolicyBundleLoadError";
+    DEFINE_PROPERTY(
+      this,
+      "name",
+      ownDataPropertyDescriptor("PolicyBundleLoadError", true, true, true),
+    );
   }
 }
 
@@ -1243,58 +1336,70 @@ export function loadBundle(path: string): PolicyBundle {
   }
 }
 
-function globMatches(glob: string, path: string): boolean {
-  const memo = CREATE_OBJECT(null) as Record<string, boolean>;
-  const matchesAt = (globIndex: number, pathIndex: number): boolean => {
-    const memoKey = `${globIndex}:${pathIndex}`;
-    if (HAS_OWN(memo, memoKey)) return memo[memoKey] === true;
+function globMatchesAt(
+  glob: string,
+  path: string,
+  memo: Record<string, boolean>,
+  globIndex: number,
+  pathIndex: number,
+): boolean {
+  const memoKey = `${globIndex}:${pathIndex}`;
+  if (HAS_OWN(memo, memoKey)) return memo[memoKey] === true;
 
-    let matches = false;
-    if (globIndex === glob.length) {
-      matches = pathIndex === path.length;
-    } else if (glob[globIndex] === "*") {
-      if (glob[globIndex + 1] === "*") {
-        if (glob[globIndex + 2] === "/") {
-          matches = matchesAt(globIndex + 3, pathIndex);
-          for (
-            let end = pathIndex;
-            !matches && end < path.length;
-            end += 1
-          ) {
-            if (path[end] === "/") {
-              matches = matchesAt(globIndex + 3, end + 1);
-            }
+  let matches = false;
+  if (globIndex === glob.length) {
+    matches = pathIndex === path.length;
+  } else if (glob[globIndex] === "*") {
+    if (glob[globIndex + 1] === "*") {
+      if (glob[globIndex + 2] === "/") {
+        matches = globMatchesAt(glob, path, memo, globIndex + 3, pathIndex);
+        for (
+          let end = pathIndex;
+          !matches && end < path.length;
+          end += 1
+        ) {
+          if (path[end] === "/") {
+            matches = globMatchesAt(
+              glob,
+              path,
+              memo,
+              globIndex + 3,
+              end + 1,
+            );
           }
-        } else {
-          matches = matchesAt(globIndex + 2, pathIndex) ||
-            (pathIndex < path.length &&
-              matchesAt(globIndex, pathIndex + 1));
         }
       } else {
-        matches = matchesAt(globIndex + 1, pathIndex) ||
+        matches = globMatchesAt(glob, path, memo, globIndex + 2, pathIndex) ||
           (pathIndex < path.length &&
-            path[pathIndex] !== "/" &&
-            matchesAt(globIndex, pathIndex + 1));
+            globMatchesAt(glob, path, memo, globIndex, pathIndex + 1));
       }
-    } else if (glob[globIndex] === "?") {
-      matches = pathIndex < path.length &&
-        path[pathIndex] !== "/" &&
-        matchesAt(globIndex + 1, pathIndex + 1);
     } else {
-      matches = pathIndex < path.length &&
-        glob[globIndex] === path[pathIndex] &&
-        matchesAt(globIndex + 1, pathIndex + 1);
+      matches = globMatchesAt(glob, path, memo, globIndex + 1, pathIndex) ||
+        (pathIndex < path.length &&
+          path[pathIndex] !== "/" &&
+          globMatchesAt(glob, path, memo, globIndex, pathIndex + 1));
     }
+  } else if (glob[globIndex] === "?") {
+    matches = pathIndex < path.length &&
+      path[pathIndex] !== "/" &&
+      globMatchesAt(glob, path, memo, globIndex + 1, pathIndex + 1);
+  } else {
+    matches = pathIndex < path.length &&
+      glob[globIndex] === path[pathIndex] &&
+      globMatchesAt(glob, path, memo, globIndex + 1, pathIndex + 1);
+  }
 
-    DEFINE_PROPERTY(memo, memoKey, {
-      configurable: true,
-      enumerable: true,
-      value: matches,
-      writable: true,
-    });
-    return matches;
-  };
-  return matchesAt(0, 0);
+  DEFINE_PROPERTY(
+    memo,
+    memoKey,
+    ownDataPropertyDescriptor(matches, true, true, true),
+  );
+  return matches;
+}
+
+function globMatches(glob: string, path: string): boolean {
+  const memo = CREATE_OBJECT(null) as Record<string, boolean>;
+  return globMatchesAt(glob, path, memo, 0, 0);
 }
 
 function normalizeRepoRelativePath(repoRelativePath: string): string | null {

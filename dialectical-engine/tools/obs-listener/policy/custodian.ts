@@ -15,11 +15,26 @@ const IS_PROXY = isProxy;
 const { isSafeInteger: NUMBER_IS_SAFE_INTEGER } = Number;
 const TO_STRING = String;
 const {
+  create: CREATE_OBJECT,
   defineProperty: DEFINE_PROPERTY,
   getOwnPropertyDescriptor: GET_OWN_PROPERTY_DESCRIPTOR,
   getPrototypeOf: GET_PROTOTYPE_OF,
   hasOwn: HAS_OWN,
 } = Object;
+
+function ownDataPropertyDescriptor(
+  value: unknown,
+  configurable?: boolean,
+  enumerable?: boolean,
+  writable?: boolean,
+): PropertyDescriptor {
+  const descriptor = CREATE_OBJECT(null) as PropertyDescriptor;
+  descriptor.value = value;
+  if (configurable !== undefined) descriptor.configurable = configurable;
+  if (enumerable !== undefined) descriptor.enumerable = enumerable;
+  if (writable !== undefined) descriptor.writable = writable;
+  return descriptor;
+}
 
 export type TokenEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -33,7 +48,11 @@ export class RepinRefusedError extends Error {
 
   constructor() {
     super("REPIN_REFUSED");
-    this.name = "RepinRefusedError";
+    DEFINE_PROPERTY(
+      this,
+      "name",
+      ownDataPropertyDescriptor("RepinRefusedError", true, true, true),
+    );
   }
 }
 
@@ -96,12 +115,11 @@ function arrayContainsIdentity(
 function appendIdentity(values: object[], candidate: object): boolean {
   const length = ownArrayLength(values);
   if (length === null) return false;
-  DEFINE_PROPERTY(values, TO_STRING(length), {
-    configurable: true,
-    enumerable: true,
-    value: candidate,
-    writable: true,
-  });
+  DEFINE_PROPERTY(
+    values,
+    TO_STRING(length),
+    ownDataPropertyDescriptor(candidate, true, true, true),
+  );
   return true;
 }
 
