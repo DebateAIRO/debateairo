@@ -31,12 +31,14 @@ import {
   applySingleLineageBandCap,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
+  EVALUATOR_CONTRACT_TEXT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
+import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
@@ -587,6 +589,33 @@ async function executeResil01Scenario(input: {
     await secondary.stop();
     await primary.stop();
   }
+}
+
+/**
+ * codex r4 B1 · THE PROVIDER BOUNDARY, RETAINED.
+ *
+ * `ProviderGateway` is a one-method interface and the runner takes it in its
+ * constructor, so wrapping it observes the EXACT `ProviderCallRequest` the
+ * runner hands over — `packet.messages` before any encoding. Nothing here reads
+ * source text, which is the whole point: the four previous guards inspected the
+ * code that BUILDS the request instead of watching the request, and each one
+ * was satisfiable by code that sends something else.
+ */
+function recordingRunner(endpoint: string, settings = runnerSettings()): {
+  readonly runner: WalkingSkeletonRunner;
+  readonly evaluatorCalls: readonly ProviderCallRequest[];
+} {
+  const evaluatorCalls: ProviderCallRequest[] = [];
+  const inner = createPostgresProviderGateway(database.pool, {
+    endpoint, model: "test-layer/model", maker: "test-layer"
+  });
+  const gateway: ProviderGateway = {
+    call: async (request) => {
+      if (request.role === "EVALUATOR") evaluatorCalls.push(request);
+      return inner.call(request);
+    }
+  };
+  return { runner: new WalkingSkeletonRunner(database.pool, gateway, settings), evaluatorCalls };
 }
 
 function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): WalkingSkeletonRunner {
@@ -4067,6 +4096,61 @@ describe("apps/runner — legal command lifecycle", () => {
       await expect(new ServeRepository(database.pool).readInspectionProjection(
         result.answerId, "asker:not-owner", 1
       )).resolves.toBeNull();
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * F-SEALEDROWS-A · what the runner SENDS for the EVALUATOR role is the
+   * exported contract value — observed, not inferred from source.
+   *
+   * Four guards died here before this one. Each read the runner's source to
+   * decide whether the right thing would be sent: a text search that a comment
+   * could redirect, a first-`criteria` match an earlier schema could capture, a
+   * brace balancer a `}` in a string could miscount, and finally a whitelist of
+   * one spelling that codex defeated by putting the expected fragments in a
+   * COMMENT while pointing the real packet at another identifier — keeping the
+   * value pin, the schema agreement and both seeder dataflow tests green while
+   * the provider received different text.
+   *
+   * This one watches the wire instead. The gateway is the runner's own provider
+   * boundary, so the assertion is about the request that was actually made. A
+   * comment cannot enter it, an alias cannot disguise it, and reformatting or
+   * reordering the object literal cannot break it — only sending something else
+   * can, which is the single thing that must fail.
+   */
+  it("SENDS the exported evaluator contract to the provider, observed at the gateway boundary", async () => {
+    const provider = await startProviderDouble([
+      JSON.stringify({ statement: "A looked-up answer.", way_of_knowing: "LOOKED_UP",
+        locator: "https://example.invalid/test-layer", restatement_text: "A looked-up answer.", restatement_status: "PASS", value_laden: false,
+        steelman: { summary: "A looked-up answer.", fidelity: 0.72 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      evaluatorSatisfied()
+    ]);
+    try {
+      const { runner, evaluatorCalls } = recordingRunner(provider.endpoint);
+      // NB: the question line feeds the code-first claim classifier
+      // (packages/judgement/src/s04.ts). Words like "observed" resolve to
+      // `empirical`, which this file's composition row does not ratify, so the
+      // run would die at COMPOSITION_UNRESOLVED before reaching the evaluator.
+      const work = await createRunnerWork("evaluator-send-at-the-gateway");
+      const result = await runner.executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // the run really did reach the evaluator — otherwise this proves nothing
+      expect(evaluatorCalls).toHaveLength(1);
+      const messages = evaluatorCalls[0]!.packet.messages;
+      const system = messages.filter((message) => message.role === "system");
+      expect(system).toHaveLength(1);
+      expect(system[0]!.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // and it leads the packet, so no earlier instruction can displace it
+      expect(messages[0]?.role).toBe("system");
+      expect(messages[0]?.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // the fingerprinted contract and the sent contract are the same value
+      expect(evaluatorCalls[0]!.contractHash).toBe(runnerSettings().conformanceContractHash);
     } finally { await provider.stop(); }
   });
 

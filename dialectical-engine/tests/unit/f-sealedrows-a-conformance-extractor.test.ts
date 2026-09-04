@@ -68,60 +68,27 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   });
 
   /**
-   * THE THING HASHED IS THE THING SENT. A fingerprint over a constant proves
-   * nothing if the wire still carries a literal, so the evaluator call site must
-   * reference the constant and no `Return only JSON {satisfied` literal may
-   * survive anywhere in the runner.
-   */
-  it("SENDS the constant it fingerprints — no literal survives at the call site", async () => {
-    const runner = await sourceOf("apps/runner/src/index.ts");
-    expect(runner).toContain('{ role: "system", content: EVALUATOR_CONTRACT_TEXT },');
-    const literals = [...runner.matchAll(/content: "Return only JSON \{satisfied/g)];
-    expect(literals).toHaveLength(0);
-  });
-
-  /**
-   * THE POSITIVE STRUCTURAL FORM (codex r3 B1, part 1).
+   * WHAT USED TO STAND HERE, AND WHY IT IS GONE (codex r4 B1).
    *
-   * What stood here was a DENY-LIST: it banned four spellings of a source
-   * search. Codex bypassed it in one line with a fifth spelling, and every test
-   * stayed green. A deny-list is the same mistake as a text search one level up
-   * — it enumerates the forms it knows.
+   * Four source-reading predicates: the call site must contain an exact
+   * fragment, the seeders must contain an exact initializer, an exact import
+   * form, an exact single definition. Codex defeated all of them at once —
+   * keep the 339-byte prompt, re-export it under the same name from a
+   * differently named local, put the exact expected fragments in a COMMENT,
+   * and point the real evaluator packet at another identifier. Every predicate
+   * returned true and the provider received different text. They also REJECTED
+   * correct code: a multiline initializer, an aliased import, a reordered
+   * system-message literal and a one-line constant all failed them.
    *
-   * So this states what each site MUST BE, exactly, and anything else fails by
-   * default whether or not anyone predicted it. The dataflow itself is proven
-   * separately and behaviourally in `f-sealedrows-a-dataflow.test.ts`, which
-   * substitutes the constant and requires both fingerprints to follow it; this
-   * covers the half that cannot be observed at runtime — what the runner SENDS.
+   * That is the fifth form of one defect, and the lesson is the one this lane
+   *already learned twice: a check that reads the code which builds a request is a
+   * proxy for the request. The seeder half stopped being a proxy when it tested
+   * behaviour; this half now does the same. What the runner SENDS is asserted
+   * where it is sent — at the provider gateway, in
+   * `tests/integration/database.test.ts`, "SENDS the exported evaluator
+   * contract to the provider, observed at the gateway boundary". Formatting,
+   * aliases and field order cannot reach that assertion; sending different text
+   * is the only thing that can fail it.
    */
-  it("takes the fingerprint from the imported identifier, in exactly that form, in BOTH seeders", async () => {
-    for (const relative of ["acceptance/seed-register.ts", "apps/runner/src/dev-deployment-register.ts"]) {
-      const source = await sourceOf(relative);
-      // the ONE accepted initializer, verbatim
-      expect(source, relative).toContain("conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),");
-      // and the identifier is IMPORT-BOUND, not a local of any kind
-      expect(source, relative).toMatch(/import \{ EVALUATOR_CONTRACT_TEXT \} from "[^"]+";/);
-      // exactly one conformance initializer, so a second cannot hide beside it
-      expect([...source.matchAll(/conformanceContractHash:/g)], relative).toHaveLength(1);
-    }
-  });
 
-  it("SENDS that identifier as the evaluator system message, in exactly that form", async () => {
-    const runner = await sourceOf("apps/runner/src/index.ts");
-    expect([...runner.matchAll(/\{ role: "system", content: EVALUATOR_CONTRACT_TEXT \},/g)]).toHaveLength(1);
-    // exactly one definition, and it is an exported string constant
-    expect([...runner.matchAll(/export const EVALUATOR_CONTRACT_TEXT =\n  "/g)]).toHaveLength(1);
-    // every OTHER system message must carry a literal; none may carry the
-    // evaluator prompt's opening, which is how a second copy would return
-    expect([...runner.matchAll(/content: "Return only JSON \{satisfied/g)]).toHaveLength(0);
-  });
-
-  it("keeps ONE definition — F-SEALEDROWS-C closed, not merely pinned by test", async () => {
-    const runner = await sourceOf("apps/runner/src/index.ts");
-    expect([...runner.matchAll(/export const EVALUATOR_CONTRACT_TEXT/g)]).toHaveLength(1);
-    for (const relative of ["acceptance/seed-register.ts", "apps/runner/src/dev-deployment-register.ts"]) {
-      const source = await sourceOf(relative);
-      expect(source).toMatch(/import \{ EVALUATOR_CONTRACT_TEXT \} from/);
-    }
-  });
 });
