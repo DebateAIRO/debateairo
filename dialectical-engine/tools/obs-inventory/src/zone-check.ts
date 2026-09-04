@@ -117,41 +117,45 @@ function compilerSymbolId(checker: Checker, node: ts.Node): number | null {
   return checker.getSymbolAtLocation(node)?.id ?? null;
 }
 
+function unwrapZoneExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertion(current)
+    || ts.isNonNullExpression(current)
+    || ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 function isUnshadowedRequire(identifier: ts.Identifier, checker: Checker): boolean {
   return identifier.text === "require" && compilerSymbolId(checker, identifier) === null;
 }
 
-function collectRequireAliases(sourceFile: ts.SourceFile, checker: Checker): ReadonlySet<number> {
-  const aliases = new Set<number>();
-  const declarations: ts.VariableDeclaration[] = [];
-  const collect = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node)) declarations.push(node);
-    node.forEachChild(collect);
-  };
-  collect(sourceFile);
+function isUnshadowedModuleRequire(expression: ts.Expression, checker: Checker): boolean {
+  const callee = unwrapZoneExpression(expression);
+  if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== "require") return false;
+  const target = unwrapZoneExpression(callee.expression);
+  return ts.isIdentifier(target)
+    && target.text === "module"
+    && compilerSymbolId(checker, target) === null;
+}
 
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const declaration of declarations) {
-      if (
-        ts.isIdentifier(declaration.name)
-        && declaration.initializer !== undefined
-        && ts.isIdentifier(declaration.initializer)
-      ) {
-        const initializer = declaration.initializer;
-        const initializerBinding = compilerSymbolId(checker, initializer);
-        const declaredBinding = compilerSymbolId(checker, declaration.name);
-        const aliasesRequire = isUnshadowedRequire(initializer, checker)
-          || (initializerBinding !== null && aliases.has(initializerBinding));
-        if (aliasesRequire && declaredBinding !== null && !aliases.has(declaredBinding)) {
-          aliases.add(declaredBinding);
-          changed = true;
-        }
-      }
-    }
+function expressionIsRequire(
+  expression: ts.Expression,
+  aliases: ReadonlySet<number>,
+  checker: Checker,
+): boolean {
+  const candidate = unwrapZoneExpression(expression);
+  if (ts.isIdentifier(candidate)) {
+    if (isUnshadowedRequire(candidate, checker)) return true;
+    const binding = compilerSymbolId(checker, candidate);
+    return binding !== null && aliases.has(binding);
   }
-  return aliases;
+  return isUnshadowedModuleRequire(candidate, checker);
 }
 
 function callSpecifier(
@@ -160,43 +164,89 @@ function callSpecifier(
   checker: Checker,
 ): string | null | undefined {
   const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-  const isRequire = ts.isIdentifier(node.expression) && (
-    isUnshadowedRequire(node.expression, checker)
-    || (() => {
-      const binding = compilerSymbolId(checker, node.expression);
-      return binding !== null && requireAliases.has(binding);
-    })()
-  );
+  const isRequire = expressionIsRequire(node.expression, requireAliases, checker);
   if (!isDynamicImport && !isRequire) return undefined;
   return literalText(node.arguments[0]);
 }
 
-function propertyNameText(name: ts.PropertyName): string | null {
-  return ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) ? name.text : null;
+function collectExpressionInitializers(
+  sourceFile: ts.SourceFile,
+  checker: Checker,
+): ReadonlyMap<number, ts.Expression> {
+  const initializers = new Map<number, ts.Expression>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
+      const binding = compilerSymbolId(checker, node.name);
+      if (binding !== null) initializers.set(binding, node.initializer);
+    }
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
+  return initializers;
+}
+
+function constantString(
+  rawExpression: ts.Expression,
+  initializers: ReadonlyMap<number, ts.Expression>,
+  checker: Checker,
+  seen: ReadonlySet<number> = new Set(),
+): string | null {
+  const expression = unwrapZoneExpression(rawExpression);
+  if (ts.isStringLiteralLikeNode(expression)) return expression.text;
+  if (!ts.isIdentifier(expression)) return null;
+  const binding = compilerSymbolId(checker, expression);
+  if (binding === null || seen.has(binding)) return null;
+  const initializer = initializers.get(binding);
+  return initializer === undefined
+    ? null
+    : constantString(initializer, initializers, checker, new Set([...seen, binding]));
+}
+
+function propertyNameText(
+  name: ts.PropertyName,
+  initializers: ReadonlyMap<number, ts.Expression>,
+  checker: Checker,
+): string | null {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name)) return name.text;
+  return ts.isComputedPropertyName(name)
+    ? constantString(name.expression, initializers, checker)
+    : null;
 }
 
 function classificationLiterals(
-  node: ts.PropertyAssignment,
+  rawExpression: ts.Expression,
+  initializers: ReadonlyMap<number, ts.Expression>,
+  checker: Checker,
+  seen: ReadonlySet<number> = new Set(),
 ): readonly (ts.StringLiteral | ts.NoSubstitutionTemplateLiteral)[] {
-  const property = propertyNameText(node.name);
-  if (property === null || !MANIFEST_LIST_PROPERTIES.has(property)) return [];
-  let initializer = node.initializer;
-  while (
-    ts.isParenthesizedExpression(initializer)
-    || ts.isAsExpression(initializer)
-    || ts.isTypeAssertion(initializer)
-    || ts.isSatisfiesExpression(initializer)
-  ) {
-    initializer = initializer.expression;
+  const expression = unwrapZoneExpression(rawExpression);
+  if (ts.isStringLiteralLikeNode(expression)) return [expression];
+  if (ts.isIdentifier(expression)) {
+    const binding = compilerSymbolId(checker, expression);
+    if (binding === null || seen.has(binding)) return [];
+    const initializer = initializers.get(binding);
+    return initializer === undefined
+      ? []
+      : classificationLiterals(initializer, initializers, checker, new Set([...seen, binding]));
   }
-  if (ts.isCallExpression(initializer) && initializer.arguments.length === 1) {
-    initializer = initializer.arguments[0] as ts.Expression;
-    while (ts.isAsExpression(initializer) || ts.isSatisfiesExpression(initializer)) {
-      initializer = initializer.expression;
+  if (ts.isArrayLiteralExpression(expression)) {
+    const literals: Array<ts.StringLiteral | ts.NoSubstitutionTemplateLiteral> = [];
+    for (const element of expression.elements) {
+      const value = ts.isSpreadElement(element) ? element.expression : element;
+      literals.push(...classificationLiterals(value, initializers, checker, seen));
     }
+    return literals;
   }
-  if (!ts.isArrayLiteralExpression(initializer)) return [];
-  return initializer.elements.filter(ts.isStringLiteralLikeNode);
+  if (ts.isCallExpression(expression)) {
+    return expression.arguments.flatMap((argument) => classificationLiterals(argument, initializers, checker, seen));
+  }
+  if (ts.isConditionalExpression(expression)) {
+    return [
+      ...classificationLiterals(expression.whenTrue, initializers, checker, seen),
+      ...classificationLiterals(expression.whenFalse, initializers, checker, seen),
+    ];
+  }
+  return [];
 }
 
 export function findZoneImports(
@@ -208,17 +258,64 @@ export function findZoneImports(
   const importerPath = normalizeRepositoryPath(rawImporterPath);
   if (importerPath === null || !isGovernedImporter(importerPath)) return [];
 
-  const requireAliases = collectRequireAliases(sourceFile, checker);
+  const initializers = collectExpressionInitializers(sourceFile, checker);
   const sites: ZoneImportSite[] = [];
+  const recordedPositions = new Set<number>();
   const record = (node: ts.Node, specifier: string | null): void => {
     onCandidate();
     if (specifier === null) return;
     const resolved = resolveSpecifier(importerPath, specifier);
     if (resolved === null || !hasZonePrefix(resolved)) return;
+    if (recordedPositions.has(node.pos)) return;
+    recordedPositions.add(node.pos);
     sites.push({ line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1 });
   };
 
-  const visit = (node: ts.Node): void => {
+  const updateRequireAlias = (
+    name: ts.Identifier,
+    initializer: ts.Expression | undefined,
+    aliases: Set<number>,
+  ): void => {
+    const binding = compilerSymbolId(checker, name);
+    if (binding === null) return;
+    if (initializer !== undefined && expressionIsRequire(initializer, aliases, checker)) {
+      aliases.add(binding);
+    } else {
+      aliases.delete(binding);
+    }
+  };
+
+  const visit = (node: ts.Node, requireAliases: Set<number>): void => {
+    if (ts.isSourceFile(node) || ts.isBlock(node)) {
+      for (const statement of node.statements) visit(statement, requireAliases);
+      return;
+    }
+
+    if (ts.isFunctionLikeDeclaration(node) && node.body !== undefined) {
+      const functionAliases = new Set(requireAliases);
+      node.forEachChild((child) => visit(child, functionAliases));
+      return;
+    }
+
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      if (node.initializer !== undefined) visit(node.initializer, requireAliases);
+      updateRequireAlias(node.name, node.initializer, requireAliases);
+      return;
+    }
+
+    if (ts.isBinaryExpression(node)) {
+      visit(node.left, requireAliases);
+      visit(node.right, requireAliases);
+      if (ts.isIdentifier(unwrapZoneExpression(node.left))) {
+        updateRequireAlias(
+          unwrapZoneExpression(node.left) as ts.Identifier,
+          node.operatorToken.kind === ts.SyntaxKind.EqualsToken ? node.right : undefined,
+          requireAliases,
+        );
+      }
+      return;
+    }
+
     if (ts.isImportDeclaration(node)) {
       record(node, literalText(node.moduleSpecifier));
     } else if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined) {
@@ -237,11 +334,27 @@ export function findZoneImports(
       const specifier = callSpecifier(node, requireAliases, checker);
       if (specifier !== undefined) record(node, specifier);
     } else if (ts.isPropertyAssignment(node) && importerPath !== MANIFEST_PATH) {
-      for (const literal of classificationLiterals(node)) record(literal, literal.text);
+      const property = propertyNameText(node.name, initializers, checker);
+      if (property !== null && MANIFEST_LIST_PROPERTIES.has(property)) {
+        for (const literal of classificationLiterals(node.initializer, initializers, checker)) {
+          record(literal, literal.text);
+        }
+      }
+    } else if (ts.isShorthandPropertyAssignment(node) && importerPath !== MANIFEST_PATH) {
+      const property = propertyNameText(node.name, initializers, checker);
+      if (property !== null && MANIFEST_LIST_PROPERTIES.has(property)) {
+        const binding = checker.getShorthandAssignmentValueSymbol(node)?.id;
+        const initializer = binding === undefined ? undefined : initializers.get(binding);
+        if (initializer !== undefined) {
+          for (const literal of classificationLiterals(initializer, initializers, checker)) {
+            record(literal, literal.text);
+          }
+        }
+      }
     }
-    node.forEachChild(visit);
+    node.forEachChild((child) => visit(child, requireAliases));
   };
-  visit(sourceFile);
+  visit(sourceFile, new Set());
   return sites;
 }
 

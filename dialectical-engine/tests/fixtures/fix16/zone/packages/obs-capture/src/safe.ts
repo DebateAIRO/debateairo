@@ -6,4 +6,4 @@ const dynamicModule = import(requestedModule);
 // require("../../../apps/api/src/mail-channel.js");
 void prose;
 void pattern;
-void dynamicModule.catch(() => undefined);
+void dynamicModule.catch((error) => error);

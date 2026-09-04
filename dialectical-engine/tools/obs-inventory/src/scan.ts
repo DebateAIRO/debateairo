@@ -3,7 +3,7 @@ import { readFile as nodeReadFile, readdir as nodeReaddir } from "node:fs/promis
 import { extname, join } from "node:path";
 import * as ts from "typescript/unstable/ast";
 import { createVirtualFileSystem } from "typescript/unstable/fs";
-import { API, SignatureKind, type Checker, type Type } from "typescript/unstable/sync";
+import { API, SignatureKind, SymbolFlags, TypeFlags, type Checker, type Type } from "typescript/unstable/sync";
 import { findZoneImports, isClassifiedZonePath, normalizeRepositoryPath } from "./zone-check.js";
 
 export type InventoryClass =
@@ -286,9 +286,12 @@ function isTypedDomainErrorConstruction(
   return false;
 }
 
+type CauseBindings = Map<number, string>;
+type CausePropertyState = "absent" | "preserved" | "lost" | "unknown";
+
 function expressionPreservesCause(
   rawExpression: ts.Expression,
-  causes: ReadonlySet<number>,
+  causes: ReadonlyMap<number, string>,
   checker: Checker,
 ): boolean {
   const expression = unwrapExpression(rawExpression);
@@ -298,52 +301,150 @@ function expressionPreservesCause(
 }
 
 function propertyNameText(name: ts.PropertyName): string | null {
-  return ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) || ts.isNumericLiteral(name) ? name.text : null;
+  if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) || ts.isNumericLiteral(name)) return name.text;
+  if (ts.isComputedPropertyName(name)) {
+    const expression = unwrapExpression(name.expression);
+    return ts.isStringLiteralLikeNode(expression) ? expression.text : null;
+  }
+  return null;
 }
 
-function hasCaughtCauseOption(
+function evaluateCauseProperty(
   rawExpression: ts.Expression,
-  causes: ReadonlySet<number>,
-  initializers: ReadonlyMap<number, ts.Expression>,
+  causes: ReadonlyMap<number, string>,
+  objects: ReadonlyMap<number, CausePropertyState>,
   checker: Checker,
   seen: ReadonlySet<number> = new Set(),
-): boolean {
+): CausePropertyState {
   const expression = unwrapExpression(rawExpression);
   if (ts.isIdentifier(expression)) {
     const binding = symbolId(checker, expression);
-    if (binding === null || seen.has(binding)) return false;
-    const initializer = initializers.get(binding);
-    if (initializer === undefined) return false;
-    return hasCaughtCauseOption(initializer, causes, initializers, checker, new Set([...seen, binding]));
+    if (binding === null || seen.has(binding)) return "unknown";
+    return objects.get(binding) ?? "unknown";
   }
-  if (!ts.isObjectLiteralExpression(expression)) return false;
+  if (!ts.isObjectLiteralExpression(expression)) return "unknown";
+  let state: CausePropertyState = "absent";
   for (const property of expression.properties) {
     if (ts.isPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
-      return expressionPreservesCause(property.initializer, causes, checker);
-    }
-    if (ts.isShorthandPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
+      state = expressionPreservesCause(property.initializer, causes, checker) ? "preserved" : "lost";
+    } else if (ts.isShorthandPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
       const binding = checker.getShorthandAssignmentValueSymbol(property)?.id;
-      return binding !== undefined && causes.has(binding);
-    }
-    if (
+      state = binding !== undefined && causes.has(binding) ? "preserved" : "lost";
+    } else if (
       ts.isSpreadAssignment(property)
-      && hasCaughtCauseOption(property.expression, causes, initializers, checker, seen)
     ) {
-      return true;
+      const spreadState = evaluateCauseProperty(property.expression, causes, objects, checker, seen);
+      if (spreadState !== "absent") state = spreadState;
+    } else if (ts.isPropertyAssignment(property) && ts.isComputedPropertyName(property.name)) {
+      state = "unknown";
     }
   }
-  return false;
+  return state;
 }
 
-function isObservedPromise(rawExpression: ts.Expression): boolean {
+function visibleCauseBindings(
+  causes: ReadonlyMap<number, string>,
+  location: ts.Node,
+  checker: Checker,
+): CauseBindings {
+  const visible: CauseBindings = new Map();
+  for (const [binding, name] of causes) {
+    if (checker.resolveName(name, SymbolFlags.Value, location)?.id === binding) visible.set(binding, name);
+  }
+  return visible;
+}
+
+function collectRejectionHandlerDefinitions(
+  sourceFile: ts.SourceFile,
+  checker: Checker,
+): ReadonlyMap<number, ts.FunctionLikeDeclaration> {
+  const definitions = new Map<number, ts.FunctionLikeDeclaration>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionDeclaration(node) && node.name !== undefined && node.body !== undefined) {
+      const binding = symbolId(checker, node.name);
+      if (binding !== null) definitions.set(binding, node);
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.initializer !== undefined
+      && (ts.isArrowFunction(unwrapExpression(node.initializer))
+        || ts.isFunctionExpression(unwrapExpression(node.initializer)))
+    ) {
+      const binding = symbolId(checker, node.name);
+      if (binding !== null) definitions.set(binding, unwrapExpression(node.initializer) as ts.FunctionLikeDeclaration);
+    }
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
+  return definitions;
+}
+
+function functionObservesRejection(callback: ts.FunctionLikeDeclaration, checker: Checker): boolean {
+  const parameter = callback.parameters[0];
+  if (parameter === undefined || parameter.name === undefined) return false;
+  if (!ts.isIdentifier(parameter.name)) return true;
+  const parameterBinding = symbolId(checker, parameter.name);
+  if (parameterBinding === null || callback.body === undefined) return false;
+  let observed = false;
+  const visit = (node: ts.Node): void => {
+    if (observed) return;
+    if (ts.isIdentifier(node) && symbolId(checker, node) === parameterBinding) {
+      observed = true;
+      return;
+    }
+    node.forEachChild(visit);
+  };
+  visit(callback.body);
+  return observed;
+}
+
+function isRejectionObserver(
+  rawExpression: ts.Expression | undefined,
+  checker: Checker,
+  definitions: ReadonlyMap<number, ts.FunctionLikeDeclaration>,
+  initializers: ReadonlyMap<number, ts.Expression>,
+  seen: ReadonlySet<number> = new Set(),
+): boolean {
+  if (rawExpression === undefined) return false;
+  const expression = unwrapExpression(rawExpression);
+  if (ts.isIdentifier(expression)) {
+    if (expression.text === "undefined") return false;
+    const binding = symbolId(checker, expression);
+    const definition = binding === null ? undefined : definitions.get(binding);
+    if (definition !== undefined) return functionObservesRejection(definition, checker);
+    if (binding === null || seen.has(binding)) return true;
+    const initializer = initializers.get(binding);
+    return initializer === undefined
+      ? true
+      : isRejectionObserver(initializer, checker, definitions, initializers, new Set([...seen, binding]));
+  }
+  if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
+    return functionObservesRejection(expression, checker);
+  }
+  return ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression);
+}
+
+function isObservedPromise(
+  rawExpression: ts.Expression,
+  checker: Checker,
+  definitions: ReadonlyMap<number, ts.FunctionLikeDeclaration>,
+  initializers: ReadonlyMap<number, ts.Expression>,
+): boolean {
   const expression = unwrapExpression(rawExpression);
   if (ts.isAwaitExpression(expression)) return true;
   if (!ts.isCallExpression(expression)) return false;
   const callee = unwrapExpression(expression.expression);
   if (!ts.isPropertyAccessExpression(callee)) return false;
-  if (callee.name.text === "catch") return true;
-  if (callee.name.text === "then" && expression.arguments.length >= 2) return true;
-  if (callee.name.text === "finally") return isObservedPromise(callee.expression);
+  if (callee.name.text === "catch") {
+    return isRejectionObserver(expression.arguments[0], checker, definitions, initializers);
+  }
+  if (callee.name.text === "then") {
+    return isRejectionObserver(expression.arguments[1], checker, definitions, initializers);
+  }
+  if (callee.name.text === "finally") {
+    return isObservedPromise(callee.expression, checker, definitions, initializers);
+  }
   return false;
 }
 
@@ -360,9 +461,10 @@ function typeIsPromiseLike(type: Type, checker: Checker, location: ts.Node): boo
 function isPromiseCandidate(rawExpression: ts.Expression, checker: Checker): boolean {
   const expression = unwrapExpression(rawExpression);
   const type = checker.getTypeAtLocation(expression);
+  if (type !== undefined && (type.flags & TypeFlags.Any) !== 0) return true;
   if (type !== undefined && !type.isErrorType() && typeIsPromiseLike(type, checker, expression)) return true;
   if (type !== undefined && !type.isErrorType()) return false;
-  return ts.isCallExpression(expression) || expression.kind === ts.SyntaxKind.ImportKeyword;
+  return true;
 }
 
 function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
@@ -385,46 +487,109 @@ function scanParsedSource(
   const findings: InventoryFinding[] = [];
   const initializers = collectInitializers(sourceFile, checker);
   const wrapperAliases = collectTypedDomainErrorAliases(sourceFile, checker);
+  const rejectionHandlers = collectRejectionHandlerDefinitions(sourceFile, checker);
+  const objectCauses = new Map<number, CausePropertyState>();
   const bumpCandidate = (): void => {
     bumpBudget(budget, "candidates", limits.maxCandidateCount, "OBS_INVENTORY_CANDIDATE_LIMIT");
   };
 
-  const visit = (node: ts.Node, inheritedCauses: Set<number>): void => {
+  const updateVariableState = (
+    name: ts.Identifier,
+    initializer: ts.Expression | undefined,
+    causes: CauseBindings,
+  ): void => {
+    const binding = symbolId(checker, name);
+    if (binding === null) return;
+    if (initializer !== undefined && expressionPreservesCause(initializer, causes, checker)) {
+      causes.set(binding, name.text);
+    } else {
+      causes.delete(binding);
+    }
+    if (initializer === undefined) {
+      objectCauses.set(binding, "unknown");
+    } else {
+      objectCauses.set(binding, evaluateCauseProperty(initializer, causes, objectCauses, checker));
+    }
+  };
+
+  const updateAssignedState = (
+    node: ts.BinaryExpression,
+    causes: CauseBindings,
+  ): void => {
+    const assigned = unwrapExpression(node.left);
+    const simpleAssignment = node.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+    if (ts.isIdentifier(assigned)) {
+      updateVariableState(assigned, simpleAssignment ? node.right : undefined, causes);
+      return;
+    }
+    if (
+      (ts.isPropertyAccessExpression(assigned) || ts.isElementAccessExpression(assigned))
+      && ts.isIdentifier(unwrapExpression(assigned.expression))
+    ) {
+      const target = unwrapExpression(assigned.expression) as ts.Identifier;
+      const binding = symbolId(checker, target);
+      const name = ts.isPropertyAccessExpression(assigned)
+        ? assigned.name.text
+        : assigned.argumentExpression !== undefined && ts.isStringLiteralLikeNode(unwrapExpression(assigned.argumentExpression))
+          ? (unwrapExpression(assigned.argumentExpression) as ts.StringLiteral).text
+          : null;
+      if (binding !== null && name === "cause") {
+        objectCauses.set(binding, simpleAssignment && expressionPreservesCause(node.right, causes, checker)
+          ? "preserved"
+          : "lost");
+      }
+    }
+  };
+
+  const visit = (node: ts.Node, inheritedCauses: CauseBindings): void => {
     if (ts.isCatchClause(node)) {
       bumpCandidate();
       if (node.variableDeclaration === undefined) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "bare_catch" });
       }
-      const catchCauses = new Set(inheritedCauses);
+      const catchCauses = new Map(inheritedCauses);
       if (node.variableDeclaration !== undefined && ts.isIdentifier(node.variableDeclaration.name)) {
         const binding = symbolId(checker, node.variableDeclaration.name);
-        if (binding !== null) catchCauses.add(binding);
+        if (binding !== null) catchCauses.set(binding, node.variableDeclaration.name.text);
       }
       visit(node.block, catchCauses);
       return;
     }
 
     if (ts.isBlock(node)) {
-      const blockCauses = new Set(inheritedCauses);
-      for (const statement of node.statements) visit(statement, blockCauses);
+      for (const statement of node.statements) visit(statement, inheritedCauses);
       return;
     }
 
-    if (
-      ts.isVariableDeclaration(node)
-      && ts.isIdentifier(node.name)
-      && node.initializer !== undefined
-      && expressionPreservesCause(node.initializer, inheritedCauses, checker)
-    ) {
-      const binding = symbolId(checker, node.name);
-      if (binding !== null) inheritedCauses.add(binding);
+    if (ts.isFunctionLikeDeclaration(node) && node.body !== undefined) {
+      const functionCauses = new Map(inheritedCauses);
+      node.forEachChild((child) => visit(child, functionCauses));
+      return;
+    }
+
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      if (node.initializer !== undefined) visit(node.initializer, inheritedCauses);
+      updateVariableState(node.name, node.initializer, inheritedCauses);
+      return;
+    }
+
+    if (ts.isBinaryExpression(node)) {
+      visit(node.left, inheritedCauses);
+      visit(node.right, inheritedCauses);
+      updateAssignedState(node, inheritedCauses);
+      return;
     }
 
     if (ts.isThrowStatement(node)) {
       bumpCandidate();
       if (
         node.expression === undefined
-        || !thrownExpressionCarriesCode(node.expression, initializers, checker, inheritedCauses)
+        || !thrownExpressionCarriesCode(
+          node.expression,
+          initializers,
+          checker,
+          new Set(inheritedCauses.keys()),
+        )
       ) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "throw_without_code" });
       }
@@ -433,18 +598,22 @@ function scanParsedSource(
     if (node.kind === ts.SyntaxKind.VoidExpression) {
       bumpCandidate();
       const expression = (node as ts.VoidExpression).expression;
-      if (isPromiseCandidate(expression, checker) && !isObservedPromise(expression)) {
+      if (
+        isPromiseCandidate(expression, checker)
+        && !isObservedPromise(expression, checker, rejectionHandlers, initializers)
+      ) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "void_promise" });
       }
     }
 
     if (ts.isNewExpression(node) && isTypedDomainErrorConstruction(node, wrapperAliases, checker)) {
       bumpCandidate();
-      if (inheritedCauses.size > 0) {
+      const visibleCauses = visibleCauseBindings(inheritedCauses, node, checker);
+      if (visibleCauses.size > 0) {
         const options = node.arguments?.[2];
         if (
           options === undefined
-          || !hasCaughtCauseOption(options, inheritedCauses, initializers, checker)
+          || evaluateCauseProperty(options, visibleCauses, objectCauses, checker) !== "preserved"
         ) {
           findings.push({ path, line: lineOf(sourceFile, node), class: "wrapper_without_cause" });
         }
@@ -453,7 +622,7 @@ function scanParsedSource(
 
     node.forEachChild((child) => visit(child, inheritedCauses));
   };
-  visit(sourceFile, new Set());
+  visit(sourceFile, new Map());
 
   for (const site of findZoneImports(sourceFile, path, checker, bumpCandidate)) {
     findings.push({ path, line: site.line, class: "zone_import" });

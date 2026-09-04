@@ -66,6 +66,42 @@ describe("FIX-16 C1 inventory scanner", () => {
     ]);
   });
 
+  it("requires a rejection observer and treats explicit any values as fail-closed Promise candidates", () => {
+    const source = [
+      "declare const pending: Promise<void>;",
+      "declare const anyPending: any;",
+      "declare function anyCall(): any;",
+      "declare function observe(error: unknown): void;",
+      "declare function fulfilled(): void;",
+      "function ignore(_error: unknown): void {}",
+      "const ignoreAlias = ignore;",
+      "void pending.catch();",
+      "void pending.catch(() => undefined);",
+      "void pending.catch((_error) => undefined);",
+      "void pending.then(fulfilled, undefined);",
+      "void pending.then(fulfilled, () => undefined);",
+      "void anyPending;",
+      "void anyCall();",
+      "void pending.catch(ignore);",
+      "void pending.catch(ignoreAlias);",
+      "void pending.catch((error) => observe(error));",
+      "void pending.then(fulfilled, (error) => observe(error));",
+      "void pending.catch(observe);",
+    ].join("\n");
+
+    expect(scanSource(source, "apps/example/src/rejection-observation.ts")).toEqual([
+      { path: "apps/example/src/rejection-observation.ts", line: 8, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 9, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 10, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 11, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 12, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 13, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 14, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 15, class: "void_promise" },
+      { path: "apps/example/src/rejection-observation.ts", line: 16, class: "void_promise" },
+    ]);
+  });
+
   it("flags arbitrary identifier and property throws while preserving coded throws and caught rethrows", () => {
     const source = [
       'const message = "ordinary text";',
@@ -106,6 +142,58 @@ describe("FIX-16 C1 inventory scanner", () => {
     expect(scanSource(source, "packages/example/src/cause-lineage.ts")).toEqual([
       { path: "packages/example/src/cause-lineage.ts", line: 7, class: "wrapper_without_cause" },
       { path: "packages/example/src/cause-lineage.ts", line: 10, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("tracks mutable cause aliases and applies object cause writes in evaluation order", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "try { task(); } catch (caught) {",
+      "  let alias = caught;",
+      "  alias = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: alias });',
+      "  alias = caught;",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: alias });',
+      "  let options = { cause: caught };",
+      "  options = { cause: unrelated };",
+      '  new DomainError("WRAP_FAILED", "fixed", options);',
+      "  options = { cause: caught };",
+      '  new DomainError("WRAP_FAILED", "fixed", options);',
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: caught, ...{ cause: unrelated } });',
+      '  new DomainError("WRAP_FAILED", "fixed", { ...{ cause: unrelated }, cause: caught });',
+      "  const preserved = { cause: caught };",
+      '  new DomainError("WRAP_FAILED", "fixed", { ...preserved });',
+      "  const overwritten = { cause: caught };",
+      "  overwritten.cause = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed", overwritten);',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/cause-flow.ts")).toEqual([
+      { path: "packages/example/src/cause-flow.ts", line: 5, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-flow.ts", line: 10, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-flow.ts", line: 13, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-flow.ts", line: 19, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("accepts exact computed cause properties and excludes shadowed outer catch bindings", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "try { task(); } catch (caught) {",
+      '  new DomainError("WRAP_FAILED", "fixed", { ["cause"]: caught });',
+      "  function shadowed(caught: unknown) {",
+      '    new DomainError("LOCAL_ONLY", "fixed");',
+      "  }",
+      "  function closesOver(other: unknown) {",
+      '    new DomainError("WRAP_FAILED", "fixed", { ["cause"]: caught });',
+      "  }",
+      '  new DomainError("WRAP_FAILED", "fixed", { ["not_cause"]: caught });',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/computed-cause.ts")).toEqual([
+      { path: "packages/example/src/computed-cause.ts", line: 10, class: "wrapper_without_cause" },
     ]);
   });
 
@@ -274,6 +362,58 @@ describe("FIX-16 C1 inventory scanner", () => {
     ]);
     expect(scanSource(requireSource, "packages/obs-capture/src/require-shadow.ts")).toEqual([
       { path: "packages/obs-capture/src/require-shadow.ts", line: 9, class: "zone_import" },
+    ]);
+  });
+
+  it("tracks module.require and assignment aliases without retaining reassigned loaders", () => {
+    const source = [
+      "declare const local: (path: string) => unknown;",
+      'module.require("apps/api/src/registration.ts");',
+      "function shadowed(module: { require(path: string): unknown }) {",
+      '  return module.require("apps/api/src/registration.ts");',
+      "}",
+      "let load;",
+      "load = require;",
+      'load("apps/api/src/registration.ts");',
+      "load = local;",
+      'load("apps/api/src/registration.ts");',
+      "load = require;",
+      'load("apps/api/src/registration.ts");',
+      "let assigned = require;",
+      'assigned("apps/api/src/registration.ts");',
+      "assigned = local;",
+      'assigned("apps/api/src/registration.ts");',
+      "const fakeModule = { require: local };",
+      'fakeModule.require("apps/api/src/registration.ts");',
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/require-flow.ts")).toEqual([
+      { path: "packages/obs-capture/src/require-flow.ts", line: 2, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-flow.ts", line: 8, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-flow.ts", line: 12, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-flow.ts", line: 14, class: "zone_import" },
+    ]);
+  });
+
+  it("resolves computed, spread, and aliased manifest classification data", () => {
+    const source = [
+      'const sourcePrefix = "apps/api/src/registration.ts";',
+      'const compiledPrefix = "apps/api/dist/registration.js";',
+      'const harmless = ["apps/api/src/mfa.ts"];',
+      "const sourcePrefixes = [sourcePrefix];",
+      "const compiledPrefixes = [...[compiledPrefix]];",
+      'const base = { ["zone_path_prefixes"]: sourcePrefixes };',
+      "const alternates = { compiled_alternate_prefixes: compiledPrefixes };",
+      "export const ZONE_MANIFEST = { ...base, ...alternates };",
+      "function shadowed(require: (path: string) => unknown, module: { require(path: string): unknown }) {",
+      '  return [require("apps/api/src/registration.ts"), module.require("apps/api/src/mfa.ts")];',
+      "}",
+      "void harmless;",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/manifest-lookalike.ts")).toEqual([
+      { path: "packages/obs-capture/src/manifest-lookalike.ts", line: 1, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-lookalike.ts", line: 2, class: "zone_import" },
     ]);
   });
 
