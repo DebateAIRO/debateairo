@@ -12,7 +12,12 @@ import {
 const HASH = nodeHash;
 const TIMING_SAFE_EQUAL = nodeTimingSafeEqual;
 const IS_PROXY = isProxy;
-const GET_OWN_PROPERTY_DESCRIPTOR = Object.getOwnPropertyDescriptor;
+const {
+  defineProperty: DEFINE_PROPERTY,
+  getOwnPropertyDescriptor: GET_OWN_PROPERTY_DESCRIPTOR,
+  getPrototypeOf: GET_PROTOTYPE_OF,
+  hasOwn: HAS_OWN,
+} = Object;
 
 export type TokenEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -39,7 +44,7 @@ function ownStringProperty(value: unknown, key: string): string | undefined {
   if (IS_PROXY(value)) return undefined;
   try {
     const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, key);
-    if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) {
+    if (descriptor === undefined || !HAS_OWN(descriptor, "value")) {
       return undefined;
     }
     const descriptorValue = descriptor.value;
@@ -58,7 +63,7 @@ function ownArrayLength(value: readonly unknown[]): number | null {
   const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, "length");
   if (
     descriptor === undefined ||
-    !Object.hasOwn(descriptor, "value") ||
+    !HAS_OWN(descriptor, "value") ||
     !Number.isSafeInteger(descriptor.value) ||
     descriptor.value < 0
   ) {
@@ -77,7 +82,7 @@ function arrayContainsIdentity(
     const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(values, String(index));
     if (
       descriptor === undefined ||
-      !Object.hasOwn(descriptor, "value") ||
+      !HAS_OWN(descriptor, "value") ||
       descriptor.value === candidate
     ) {
       return true;
@@ -89,7 +94,7 @@ function arrayContainsIdentity(
 function appendIdentity(values: object[], candidate: object): boolean {
   const length = ownArrayLength(values);
   if (length === null) return false;
-  Object.defineProperty(values, String(length), {
+  DEFINE_PROPERTY(values, String(length), {
     configurable: true,
     enumerable: true,
     value: candidate,
@@ -109,13 +114,13 @@ function ownOptionalDataProperty(
   try {
     const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, key);
     if (descriptor !== undefined) {
-      if (!Object.hasOwn(descriptor, "value")) return { kind: "INVALID" };
+      if (!HAS_OWN(descriptor, "value")) return { kind: "INVALID" };
       const descriptorValue = descriptor.value;
       return { kind: "VALUE", value: descriptorValue };
     }
 
     const visited: object[] = [];
-    let prototype = Object.getPrototypeOf(value) as object | null;
+    let prototype = GET_PROTOTYPE_OF(value) as object | null;
     while (prototype !== null) {
       if (IS_PROXY(prototype)) return { kind: "INVALID" };
       if (arrayContainsIdentity(visited, prototype)) {
@@ -125,7 +130,7 @@ function ownOptionalDataProperty(
       if (GET_OWN_PROPERTY_DESCRIPTOR(prototype, key) !== undefined) {
         return { kind: "INVALID" };
       }
-      prototype = Object.getPrototypeOf(prototype) as object | null;
+      prototype = GET_PROTOTYPE_OF(prototype) as object | null;
     }
     return { kind: "MISSING" };
   } catch {
@@ -152,7 +157,7 @@ export function repin(
     "0",
   );
   const custodian = custodianDescriptor !== undefined &&
-      Object.hasOwn(custodianDescriptor, "value")
+      HAS_OWN(custodianDescriptor, "value")
     ? custodianDescriptor.value as PolicyBundle["custodians"][number]
     : undefined;
   const expectedToken = custodian === undefined

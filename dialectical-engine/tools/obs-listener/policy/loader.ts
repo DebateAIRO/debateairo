@@ -7,7 +7,17 @@ import { createContext, runInContext, runInNewContext } from "node:vm";
 import { canonicalJson, canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
-const GET_OWN_PROPERTY_DESCRIPTOR = Object.getOwnPropertyDescriptor;
+const {
+  create: CREATE_OBJECT,
+  defineProperty: DEFINE_PROPERTY,
+  freeze: FREEZE_OBJECT,
+  getOwnPropertyDescriptor: GET_OWN_PROPERTY_DESCRIPTOR,
+  getOwnPropertyNames: GET_OWN_PROPERTY_NAMES,
+  getPrototypeOf: GET_PROTOTYPE_OF,
+  hasOwn: HAS_OWN,
+  keys: OBJECT_KEYS,
+  prototype: OBJECT_PROTOTYPE,
+} = Object;
 const IS_PROXY = isProxy;
 const BASE_ARRAY_SOME = GET_OWN_PROPERTY_DESCRIPTOR(
   Array.prototype,
@@ -38,22 +48,22 @@ const isNativeArrayPush = runInNewContext(`
 `) as (candidate: unknown) => boolean;
 const BASE_ARRAY_PUSH_IS_TRUSTED =
   BASE_ARRAY_PUSH !== undefined &&
-  Object.hasOwn(BASE_ARRAY_PUSH, "value") &&
+  HAS_OWN(BASE_ARRAY_PUSH, "value") &&
   BASE_ARRAY_PUSH.configurable === true &&
   BASE_ARRAY_PUSH.enumerable === false &&
   BASE_ARRAY_PUSH.writable === true &&
   !IS_PROXY(BASE_ARRAY_PUSH.value) &&
   isNativeArrayPush(BASE_ARRAY_PUSH.value);
 const BASE_OBJECT_SOME = GET_OWN_PROPERTY_DESCRIPTOR(
-  Object.prototype,
+  OBJECT_PROTOTYPE,
   "some",
 );
 const BASE_OBJECT_SORT = GET_OWN_PROPERTY_DESCRIPTOR(
-  Object.prototype,
+  OBJECT_PROTOTYPE,
   "sort",
 );
 const BASE_OBJECT_ITERATOR = GET_OWN_PROPERTY_DESCRIPTOR(
-  Object.prototype,
+  OBJECT_PROTOTYPE,
   Symbol.iterator,
 );
 
@@ -402,10 +412,10 @@ function createPrivateZodValidator(): PrivateZodValidator {
   if (ZOD_DIRECTORY === null || ZOD_ENTRY === null) {
     throw new Error("ZOD_PRIVATE_MODULE_UNAVAILABLE");
   }
-  const context = CREATE_CONTEXT(Object.create(null), {
+  const context = CREATE_CONTEXT(CREATE_OBJECT(null), {
     codeGeneration: { strings: false, wasm: false },
   });
-  const moduleCache = Object.create(null) as Record<
+  const moduleCache = CREATE_OBJECT(null) as Record<
     string,
     { exports: unknown }
   >;
@@ -414,13 +424,13 @@ function createPrivateZodValidator(): PrivateZodValidator {
     if (!pathIsWithin(filename, ZOD_DIRECTORY)) {
       throw new Error("ZOD_PRIVATE_MODULE_OUTSIDE_PACKAGE");
     }
-    if (Object.hasOwn(moduleCache, filename)) {
+    if (HAS_OWN(moduleCache, filename)) {
       return moduleCache[filename]?.exports;
     }
 
-    const moduleRecord = Object.create(null) as { exports: unknown };
-    moduleRecord.exports = Object.create(null);
-    Object.defineProperty(moduleCache, filename, {
+    const moduleRecord = CREATE_OBJECT(null) as { exports: unknown };
+    moduleRecord.exports = CREATE_OBJECT(null);
+    DEFINE_PROPERTY(moduleCache, filename, {
       configurable: false,
       enumerable: true,
       value: moduleRecord,
@@ -501,7 +511,7 @@ function ownArrayLength(value: readonly unknown[]): number | null {
   const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, "length");
   if (
     descriptor === undefined ||
-    !Object.hasOwn(descriptor, "value") ||
+    !HAS_OWN(descriptor, "value") ||
     !Number.isSafeInteger(descriptor.value) ||
     descriptor.value < 0
   ) {
@@ -517,7 +527,7 @@ function ownArrayItem(
   const descriptor = GET_OWN_PROPERTY_DESCRIPTOR(value, String(index));
   if (
     descriptor === undefined ||
-    !Object.hasOwn(descriptor, "value") ||
+    !HAS_OWN(descriptor, "value") ||
     descriptor.enumerable !== true
   ) {
     return INVALID_ARRAY_ITEM;
@@ -589,11 +599,11 @@ function exactSnapshotRecord(
     typeof value !== "object" ||
     IS_PROXY(value) ||
     Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== null
+    GET_PROTOTYPE_OF(value) !== null
   ) {
     return false;
   }
-  const ownKeys = Object.keys(value);
+  const ownKeys = OBJECT_KEYS(value);
   const ownKeyCount = ownArrayLength(ownKeys);
   const keyCount = ownArrayLength(keys);
   if (
@@ -606,7 +616,7 @@ function exactSnapshotRecord(
   for (let index = 0; index < keyCount; index += 1) {
     const key = ownStringArrayItem(keys, index);
     if (key === null) return false;
-    if (!Object.hasOwn(value, key)) return false;
+    if (!HAS_OWN(value, key)) return false;
   }
   return true;
 }
@@ -801,12 +811,12 @@ function severityMap(value: unknown): boolean {
     typeof value.overrides !== "object" ||
     IS_PROXY(value.overrides) ||
     Array.isArray(value.overrides) ||
-    Object.getPrototypeOf(value.overrides) !== null
+    GET_PROTOTYPE_OF(value.overrides) !== null
   ) {
     return false;
   }
   const overrides = value.overrides as SnapshotRecord;
-  const overrideKeys = Object.keys(overrides);
+  const overrideKeys = OBJECT_KEYS(overrides);
   const overrideCount = ownArrayLength(overrideKeys);
   if (overrideCount === null) return false;
   for (let index = 0; index < overrideCount; index += 1) {
@@ -997,7 +1007,7 @@ function snapshotCrossFieldIssue(
     }
   }
 
-  const seedKeys = Object.create(null) as Record<string, true>;
+  const seedKeys = CREATE_OBJECT(null) as Record<string, true>;
   for (let index = 0; index < seedCount; index += 1) {
     const seed = ownArrayItem(snapshot.register_seeds, index);
     if (seed === INVALID_ARRAY_ITEM || seed === null || typeof seed !== "object") {
@@ -1006,14 +1016,14 @@ function snapshotCrossFieldIssue(
     const keyDescriptor = GET_OWN_PROPERTY_DESCRIPTOR(seed, "key");
     if (
       keyDescriptor === undefined ||
-      !Object.hasOwn(keyDescriptor, "value") ||
+      !HAS_OWN(keyDescriptor, "value") ||
       typeof keyDescriptor.value !== "string"
     ) {
       return "REGISTER_SEEDS_NOT_DENSE";
     }
     const key = keyDescriptor.value;
-    if (Object.hasOwn(seedKeys, key)) return "DUPLICATE_REGISTER_SEED";
-    Object.defineProperty(seedKeys, key, {
+    if (HAS_OWN(seedKeys, key)) return "DUPLICATE_REGISTER_SEED";
+    DEFINE_PROPERTY(seedKeys, key, {
       configurable: true,
       enumerable: true,
       value: true,
@@ -1024,11 +1034,11 @@ function snapshotCrossFieldIssue(
   const duplicateString = (values: readonly string[]): boolean => {
     const length = ownArrayLength(values);
     if (length === null) return true;
-    const seen = Object.create(null) as Record<string, true>;
+    const seen = CREATE_OBJECT(null) as Record<string, true>;
     for (let index = 0; index < length; index += 1) {
       const value = ownStringArrayItem(values, index);
-      if (value === null || Object.hasOwn(seen, value)) return true;
-      Object.defineProperty(seen, value, {
+      if (value === null || HAS_OWN(seen, value)) return true;
+      DEFINE_PROPERTY(seen, value, {
         configurable: true,
         enumerable: true,
         value: true,
@@ -1074,7 +1084,7 @@ function isCanonicalArrayIndex(key: string): boolean {
 
 function hasNumericArrayPrototypePollution(): boolean {
   const prototypeHasNumericKey = (prototype: object): boolean => {
-    const keys = Object.getOwnPropertyNames(prototype);
+    const keys = GET_OWN_PROPERTY_NAMES(prototype);
     const length = ownArrayLength(keys);
     if (length === null) return true;
     for (let index = 0; index < length; index += 1) {
@@ -1084,7 +1094,7 @@ function hasNumericArrayPrototypePollution(): boolean {
     return false;
   };
   return prototypeHasNumericKey(Array.prototype) ||
-    prototypeHasNumericKey(Object.prototype);
+    prototypeHasNumericKey(OBJECT_PROTOTYPE);
 }
 
 function sameDescriptorField(
@@ -1097,8 +1107,8 @@ function sameDescriptorField(
   if (leftField === undefined || rightField === undefined) {
     return leftField === rightField;
   }
-  return Object.hasOwn(leftField, "value") &&
-    Object.hasOwn(rightField, "value") &&
+  return HAS_OWN(leftField, "value") &&
+    HAS_OWN(rightField, "value") &&
     leftField.value === rightField.value;
 }
 
@@ -1136,15 +1146,15 @@ function hasArrayAuthorityPrototypeMutation(): boolean {
       BASE_ARRAY_ITERATOR,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Object.prototype, "some"),
+      GET_OWN_PROPERTY_DESCRIPTOR(OBJECT_PROTOTYPE, "some"),
       BASE_OBJECT_SOME,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Object.prototype, "sort"),
+      GET_OWN_PROPERTY_DESCRIPTOR(OBJECT_PROTOTYPE, "sort"),
       BASE_OBJECT_SORT,
     ) ||
     !sameDescriptor(
-      GET_OWN_PROPERTY_DESCRIPTOR(Object.prototype, Symbol.iterator),
+      GET_OWN_PROPERTY_DESCRIPTOR(OBJECT_PROTOTYPE, Symbol.iterator),
       BASE_OBJECT_ITERATOR,
     );
 }
@@ -1192,7 +1202,7 @@ function parsePolicyBundle(value: unknown): PolicyBundleContents {
   return result.data;
 }
 
-export const policyBundleSchema = Object.freeze({
+export const policyBundleSchema = FREEZE_OBJECT({
   parse: parsePolicyBundle,
   safeParse: safeParsePolicyBundle,
 });
@@ -1219,10 +1229,10 @@ export function loadBundle(path: string): PolicyBundle {
 }
 
 function globMatches(glob: string, path: string): boolean {
-  const memo = Object.create(null) as Record<string, boolean>;
+  const memo = CREATE_OBJECT(null) as Record<string, boolean>;
   const matchesAt = (globIndex: number, pathIndex: number): boolean => {
     const memoKey = `${globIndex}:${pathIndex}`;
-    if (Object.hasOwn(memo, memoKey)) return memo[memoKey] === true;
+    if (HAS_OWN(memo, memoKey)) return memo[memoKey] === true;
 
     let matches = false;
     if (globIndex === glob.length) {
@@ -1261,7 +1271,7 @@ function globMatches(glob: string, path: string): boolean {
         matchesAt(globIndex + 1, pathIndex + 1);
     }
 
-    Object.defineProperty(memo, memoKey, {
+    DEFINE_PROPERTY(memo, memoKey, {
       configurable: true,
       enumerable: true,
       value: matches,

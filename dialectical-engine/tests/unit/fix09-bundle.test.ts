@@ -1089,18 +1089,24 @@ describe("FIX-09 C1 policy bundle", () => {
     });
   });
 
-  it("does not run a live descriptor callback after policy initialization", () => {
-    const repositoryRoot = resolve(import.meta.dirname, "../..");
-    const loaderUrl = pathToFileURL(
-      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
-    ).href;
-    const custodianUrl = pathToFileURL(
-      resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
-    ).href;
-    const canonicalUrl = pathToFileURL(
-      resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
-    ).href;
-    const script = `
+  it.each([
+    "getOwnPropertyDescriptor",
+    "getOwnPropertyNames",
+    "getOwnPropertyDescriptors",
+  ] as const)(
+    "does not run a live Object.%s callback after policy initialization",
+    (helperName) => {
+      const repositoryRoot = resolve(import.meta.dirname, "../..");
+      const loaderUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+      ).href;
+      const custodianUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/custodian.ts"),
+      ).href;
+      const canonicalUrl = pathToFileURL(
+        resolve(repositoryRoot, "tools/obs-listener/policy/canonical.ts"),
+      ).href;
+      const script = `
       import { readFileSync } from "node:fs";
       await import(${JSON.stringify(loaderUrl)});
       const { repin } = await import(${JSON.stringify(custodianUrl)});
@@ -1110,16 +1116,18 @@ describe("FIX-09 C1 policy bundle", () => {
       );
       const armed = { ...bundle, quick_arm: "ON" };
       const environment = { OBS_POLICY_CUSTODIAN_TOKEN: "correct" };
-      const descriptor = Object.getOwnPropertyDescriptor(
+      const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      const helperName = ${JSON.stringify(helperName)};
+      const descriptor = Reflect.apply(getOwnPropertyDescriptor, Object, [
         Object,
-        "getOwnPropertyDescriptor",
-      );
+        helperName,
+      ]);
       if (
         !descriptor ||
         !("value" in descriptor) ||
         typeof descriptor.value !== "function"
       ) {
-        throw new Error("GET_OWN_PROPERTY_DESCRIPTOR_MISSING");
+        throw new Error("OBJECT_REFLECTION_HELPER_MISSING");
       }
       const original = descriptor.value;
       let callbackCalls = 0;
@@ -1128,14 +1136,14 @@ describe("FIX-09 C1 policy bundle", () => {
       let repinned;
       let hash;
       try {
-        Object.defineProperty(Object, "getOwnPropertyDescriptor", {
+        Object.defineProperty(Object, helperName, {
           ...descriptor,
           value: function (...args) {
             callbackCalls += 1;
             environment.OBS_POLICY_CUSTODIAN_TOKEN = "wrong";
             Object.defineProperty(
               Object,
-              "getOwnPropertyDescriptor",
+              helperName,
               descriptor,
             );
             return Reflect.apply(original, this, args);
@@ -1157,13 +1165,13 @@ describe("FIX-09 C1 policy bundle", () => {
       } finally {
         Object.defineProperty(
           Object,
-          "getOwnPropertyDescriptor",
+          helperName,
           descriptor,
         );
       }
-      const restored = Reflect.apply(original, Object, [
+      const restored = Reflect.apply(getOwnPropertyDescriptor, Object, [
         Object,
-        "getOwnPropertyDescriptor",
+        helperName,
       ]);
       process.stdout.write(JSON.stringify({
         callbackCalls,
@@ -1179,23 +1187,24 @@ describe("FIX-09 C1 policy bundle", () => {
         refused: repinError?.code === "REPIN_REFUSED",
       }));
     `;
-    const outcome = spawnSync(
-      process.execPath,
-      ["--import", "tsx", "--input-type=module", "--eval", script],
-      { cwd: repositoryRoot, encoding: "utf8" },
-    );
+      const outcome = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", script],
+        { cwd: repositoryRoot, encoding: "utf8" },
+      );
 
-    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
-    expect(JSON.parse(outcome.stdout)).toEqual({
-      callbackCalls: 0,
-      descriptorRestored: true,
-      environment: "correct",
-      escaped: null,
-      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
-      quickArm: null,
-      refused: true,
-    });
-  });
+      expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toEqual({
+        callbackCalls: 0,
+        descriptorRestored: true,
+        environment: "correct",
+        escaped: null,
+        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        quickArm: null,
+        refused: true,
+      });
+    },
+  );
 
   it("does not trust live Atomics results as declared-schema authority", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
@@ -2563,11 +2572,11 @@ describe("FIX-09 C1 policy bundle", () => {
     }
   });
 
-  it("rechecks numeric prototypes after projection and before Zod", () => {
+  it("does not expose numeric-prototype mutation through a live descriptor replacement", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
     const originalDescriptors = Object.getOwnPropertyDescriptors;
     const previous = Object.getOwnPropertyDescriptor(Object.prototype, "1");
-    let projectionCalls = 0;
+    let callbackCalls = 0;
     let getterReads = 0;
     let setterCalls = 0;
     let result: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
@@ -2576,8 +2585,8 @@ describe("FIX-09 C1 policy bundle", () => {
     try {
       Object.getOwnPropertyDescriptors = ((value: object) => {
         const descriptors = originalDescriptors(value);
-        projectionCalls += 1;
-        if (projectionCalls === 1) {
+        callbackCalls += 1;
+        if (callbackCalls === 1) {
           Object.defineProperty(Object.prototype, "1", {
             configurable: true,
             get() {
@@ -2612,8 +2621,8 @@ describe("FIX-09 C1 policy bundle", () => {
     }
 
     expect(escaped).toBeUndefined();
-    expect(result?.success).toBe(false);
-    expect(projectionCalls).toBeGreaterThan(0);
+    expect(result?.success).toBe(true);
+    expect(callbackCalls).toBe(0);
     expect(getterReads).toBe(0);
     expect(setterCalls).toBe(0);
   });
