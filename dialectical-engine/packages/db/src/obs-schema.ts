@@ -23,7 +23,7 @@ export const obs = pgSchema("obs");
 export const obsOccurrence = obs.table("occurrence", {
   occurrenceId: uuid("occurrence_id").primaryKey().defaultRandom(),
   occSeq: bigint("occ_seq", { mode: "bigint" }).notNull()
-    .default(sql`nextval('obs.occurrence_seq'::regclass)`).unique(),
+    .default(sql`obs.occurrence_seq_nextval_notify()`).unique(),
   prevLink: bytea("prev_link"),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
@@ -66,7 +66,7 @@ export const obsOccurrence = obs.table("occurrence", {
 
 export const obsIncident = obs.table("incident", {
   incidentId: uuid("incident_id").primaryKey().defaultRandom(),
-  fingerprint: text("fingerprint").notNull().unique(),
+  fingerprint: text("fingerprint").notNull(),
   fingerprintVersion: integer("fingerprint_version").notNull(),
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
@@ -78,7 +78,10 @@ export const obsIncident = obs.table("incident", {
   attributedLandingRef: text("attributed_landing_ref"),
   lineageDepth: integer("lineage_depth").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
-});
+}, (table) => [
+  unique("incident_fingerprint_fingerprint_version_key")
+    .on(table.fingerprint, table.fingerprintVersion)
+]);
 
 export const obsOccurrenceDetail = obs.table("occurrence_detail", {
   occurrenceDetailId: uuid("occurrence_detail_id").primaryKey().defaultRandom(),
