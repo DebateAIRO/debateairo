@@ -75,12 +75,20 @@ function ownOptionalDataProperty(
   }
 }
 
+function parsePolicyOrRefuse(candidate: unknown): PolicyBundle {
+  try {
+    return policyBundleSchema.parse(candidate);
+  } catch {
+    throw new RepinRefusedError();
+  }
+}
+
 export function repin(
   currentBundle: PolicyBundle,
   request: RepinRequest,
   environment: TokenEnvironment,
 ): PolicyBundle {
-  const current = policyBundleSchema.parse(currentBundle);
+  const current = parsePolicyOrRefuse(currentBundle);
   const custodian = current.custodians[0];
   const expectedToken = custodian === undefined
     ? undefined
@@ -101,5 +109,5 @@ export function repin(
   if (nextBundle.kind === "INVALID") throw new RepinRefusedError();
   return nextBundle.kind === "MISSING"
     ? current
-    : policyBundleSchema.parse(nextBundle.value);
+    : parsePolicyOrRefuse(nextBundle.value);
 }

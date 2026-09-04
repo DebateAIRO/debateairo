@@ -60,10 +60,11 @@ export function canonicalProjection(value: unknown): CanonicalJsonValue {
     if (Object.keys(descriptors).some((key) => !expectedKeys.has(key))) {
       return nonPlainJsonData();
     }
-    return projection;
+    return Object.freeze(projection);
   }
   if (typeof value === "object") {
-    if (Object.getPrototypeOf(value) !== Object.prototype) {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
       return nonPlainJsonData();
     }
     if (Object.getOwnPropertySymbols(value).length !== 0) {
@@ -79,7 +80,7 @@ export function canonicalProjection(value: unknown): CanonicalJsonValue {
         dataPropertyValue(descriptors[key]),
       );
     }
-    return projection;
+    return Object.freeze(projection);
   }
   throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
 }

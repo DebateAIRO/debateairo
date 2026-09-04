@@ -51,6 +51,46 @@ const TYPESCRIPT_COMPILER_PATH = resolve(
   "../../node_modules/typescript/bin/tsc",
 );
 
+function expectFrozenOwnDataSnapshot(actual: unknown, expected: unknown): void {
+  if (Array.isArray(expected)) {
+    expect(Array.isArray(actual)).toBe(true);
+    expect(Object.isFrozen(actual)).toBe(true);
+    expect(Object.getPrototypeOf(actual)).toBe(Array.prototype);
+    expect(Object.hasOwn(actual as object, "length")).toBe(true);
+    expect((actual as unknown[]).length).toBe(expected.length);
+    for (let index = 0; index < expected.length; index += 1) {
+      expect(Object.hasOwn(actual as object, String(index))).toBe(true);
+      const descriptor = Object.getOwnPropertyDescriptor(actual, String(index));
+      expect(descriptor !== undefined && "value" in descriptor).toBe(true);
+      expectFrozenOwnDataSnapshot(descriptor?.value, expected[index]);
+    }
+    return;
+  }
+
+  if (expected !== null && typeof expected === "object") {
+    expect(actual !== null && typeof actual === "object").toBe(true);
+    expect(Object.getPrototypeOf(actual)).toBeNull();
+    expect(Object.isFrozen(actual)).toBe(true);
+    const actualDescriptors = Object.getOwnPropertyDescriptors(actual);
+    expect(Object.keys(actualDescriptors).sort()).toEqual(
+      Object.keys(expected).sort(),
+    );
+    for (const key of Object.keys(expected)) {
+      expect(Object.hasOwn(actual as object, key)).toBe(true);
+      const descriptor = actualDescriptors[key];
+      expect(descriptor).toMatchObject({ enumerable: true });
+      expect(descriptor !== undefined && "value" in descriptor).toBe(true);
+      expectFrozenOwnDataSnapshot(
+        descriptor?.value,
+        (expected as Record<string, unknown>)[key],
+      );
+    }
+    return;
+  }
+
+  expect(actual).toBe(expected);
+}
+
 describe("FIX-09 C1 policy bundle", () => {
   it("loads the complete fail-closed phase-one policy", () => {
     const bundle = loadBundle(BUNDLE_PATH);
@@ -323,6 +363,76 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(completeOutcomes).toEqual([true, true]);
   });
 
+  it("returns the frozen own snapshot under non-writable prototype pollution", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const quickArmPrevious = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "quick_arm",
+    );
+    const floorPrevious = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "floor_deny_globs",
+    );
+    let floorGetterReads = 0;
+    let loaded: ReturnType<typeof loadBundle> | undefined;
+    let quickArmDescriptor: PropertyDescriptor | undefined;
+    let floorDescriptor: PropertyDescriptor | undefined;
+    let denied: boolean | undefined;
+
+    try {
+      Object.defineProperty(Object.prototype, "quick_arm", {
+        configurable: true,
+        value: "ON",
+      });
+      Object.defineProperty(Object.prototype, "floor_deny_globs", {
+        configurable: true,
+        get() {
+          floorGetterReads += 1;
+          return [];
+        },
+      });
+
+      loaded = loadBundle(BUNDLE_PATH);
+      quickArmDescriptor = Object.getOwnPropertyDescriptor(loaded, "quick_arm");
+      floorDescriptor = Object.getOwnPropertyDescriptor(
+        loaded,
+        "floor_deny_globs",
+      );
+      denied = isFloorDenied(
+        loaded,
+        "tools/obs-listener/policy/bundle.json",
+      );
+    } finally {
+      if (quickArmPrevious === undefined) {
+        Reflect.deleteProperty(Object.prototype, "quick_arm");
+      } else {
+        Object.defineProperty(
+          Object.prototype,
+          "quick_arm",
+          quickArmPrevious,
+        );
+      }
+      if (floorPrevious === undefined) {
+        Reflect.deleteProperty(Object.prototype, "floor_deny_globs");
+      } else {
+        Object.defineProperty(
+          Object.prototype,
+          "floor_deny_globs",
+          floorPrevious,
+        );
+      }
+    }
+
+    expect(quickArmDescriptor?.value).toBe("OFF");
+    expect(floorDescriptor?.value).toEqual(raw.floor_deny_globs);
+    expect(denied).toBe(true);
+    expect(floorGetterReads).toBe(0);
+    expectFrozenOwnDataSnapshot(loaded, raw);
+  });
+
   it("does not let Object.prototype supply missing nested members", () => {
     const raw = readFileSync(BUNDLE_PATH, "utf8");
     const scenarios = [
@@ -371,6 +481,51 @@ describe("FIX-09 C1 policy bundle", () => {
     }
 
     expect(outcomes).toEqual([false, false]);
+  });
+
+  it("runs cross-field checks against the own snapshot", () => {
+    const valid = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const invalid = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const invalidSeed = (
+      invalid.register_seeds as Array<Record<string, unknown>>
+    )[1];
+    if (invalidSeed === undefined) throw new Error("MISSING_REGISTER_SEED");
+    invalidSeed.status = "UNSET";
+
+    const statusPrevious = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "status",
+    );
+    let invalidAccepted: boolean | undefined;
+    let validResult: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    try {
+      invalidAccepted = policyBundleSchema.safeParse(invalid).success;
+      Object.defineProperty(Object.prototype, "status", {
+        configurable: true,
+        value: "UNSET",
+      });
+      validResult = policyBundleSchema.safeParse(valid);
+    } finally {
+      if (statusPrevious === undefined) {
+        Reflect.deleteProperty(Object.prototype, "status");
+      } else {
+        Object.defineProperty(Object.prototype, "status", statusPrevious);
+      }
+    }
+
+    expect(invalidAccepted).toBe(false);
+    expect(validResult?.success).toBe(true);
+    if (validResult?.success === true) {
+      const seed = validResult.data.register_seeds[1];
+      expect(Object.hasOwn(seed as object, "status")).toBe(true);
+      expect(seed?.status).toBe("SEED");
+    }
   });
 
   it("rejects accessor-backed hash input without invoking the accessor", () => {
@@ -482,6 +637,43 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(() => repin(bundle, trapping, environment)).toThrowError(
       RepinRefusedError,
     );
+  });
+
+  it("snapshots a volatile candidate once and bounds a later repin refusal", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const candidateTarget = JSON.parse(
+      readFileSync(BUNDLE_PATH, "utf8"),
+    ) as Record<string, unknown>;
+    let prototypeReads = 0;
+    const candidate = new Proxy(candidateTarget, {
+      getPrototypeOf(target) {
+        prototypeReads += 1;
+        if (prototypeReads > 1) throw new Error("SECOND_TRAVERSAL");
+        return Reflect.getPrototypeOf(target);
+      },
+    });
+
+    const firstPass = policyBundleSchema.safeParse(candidate);
+    expect(firstPass.success).toBe(true);
+    expect(prototypeReads).toBe(1);
+
+    let thrown: unknown;
+    try {
+      repin(
+        bundle,
+        {
+          token: "fixture-custodian-token",
+          next_bundle: candidate,
+        },
+        { OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token" },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(RepinRefusedError);
+    expect(thrown).toMatchObject({ code: "REPIN_REFUSED" });
+    expect(prototypeReads).toBe(2);
   });
 
   it("maps every missing or malformed token to REPIN_REFUSED", () => {

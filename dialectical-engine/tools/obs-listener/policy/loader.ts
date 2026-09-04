@@ -1,10 +1,7 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
-import {
-  canonicalProjection,
-  isOwnPlainJsonData,
-} from "./canonical.js";
+import { canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
 const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
@@ -101,15 +98,7 @@ const registerSeedSchema = z
     status: z.enum(["SEED", "UNSET"]),
     source_ref: z.string().min(1),
   })
-  .strict()
-  .superRefine((seed, context) => {
-    if ((seed.status === "UNSET") !== (seed.value === null)) {
-      context.addIssue({
-        code: "custom",
-        message: "REGISTER_SEED_STATUS_VALUE_MISMATCH",
-      });
-    }
-  });
+  .strict();
 
 const policyBundleContentsSchema = z
   .object({
@@ -141,14 +130,7 @@ const policyBundleContentsSchema = z
       z.object({ incident_class: z.literal("DEFAULT"), owner: z.literal("V") }).strict(),
     ]),
     code_registry_seed: codeRegistrySeedSchema,
-    register_seeds: z
-      .array(registerSeedSchema)
-      .min(1)
-      .superRefine((seeds, context) => {
-        if (new Set(seeds.map((seed) => seed.key)).size !== seeds.length) {
-          context.addIssue({ code: "custom", message: "DUPLICATE_REGISTER_SEED" });
-        }
-      }),
+    register_seeds: z.array(registerSeedSchema).min(1),
     slots: z
       .object({
         zone_manifest_hash: z
@@ -187,27 +169,73 @@ const policyBundleContentsSchema = z
       )
       .length(1),
   })
-  .strict()
-  .superRefine((bundle, context) => {
-    for (const [field, values] of [
-      ["production_source_globs", bundle.production_source_globs],
-      ["floor_deny_globs", bundle.floor_deny_globs],
-      ["allowlist", bundle.allowlist],
-    ] as const) {
-      if (new Set(values).size !== values.length) {
-        context.addIssue({
-          code: "custom",
-          message: `DUPLICATE_${field.toUpperCase()}`,
-        });
-      }
-    }
-  });
+  .strict();
 
-export const policyBundleSchema = z
-  .unknown()
-  .refine(isOwnPlainJsonData, "POLICY_BUNDLE_NON_PLAIN_DATA")
-  .transform((value) => canonicalProjection(value))
-  .pipe(policyBundleContentsSchema);
+type PolicyBundleContents = z.infer<typeof policyBundleContentsSchema>;
+
+function snapshotCrossFieldIssues(snapshot: PolicyBundleContents): string[] {
+  const issues: string[] = [];
+  for (let index = 0; index < snapshot.register_seeds.length; index += 1) {
+    const seed = snapshot.register_seeds[index];
+    if (
+      seed !== undefined &&
+      ((seed.status === "UNSET") !== (seed.value === null))
+    ) {
+      issues.push("REGISTER_SEED_STATUS_VALUE_MISMATCH");
+    }
+  }
+
+  const seedKeys = new Set<string>();
+  for (let index = 0; index < snapshot.register_seeds.length; index += 1) {
+    const key = snapshot.register_seeds[index]?.key;
+    if (key !== undefined) seedKeys.add(key);
+  }
+  if (seedKeys.size !== snapshot.register_seeds.length) {
+    issues.push("DUPLICATE_REGISTER_SEED");
+  }
+
+  for (const [field, values] of [
+    ["production_source_globs", snapshot.production_source_globs],
+    ["floor_deny_globs", snapshot.floor_deny_globs],
+    ["allowlist", snapshot.allowlist],
+  ] as const) {
+    if (new Set(values).size !== values.length) {
+      issues.push(`DUPLICATE_${field.toUpperCase()}`);
+    }
+  }
+  return issues;
+}
+
+export const policyBundleSchema = z.unknown().transform((value, context) => {
+  let snapshot: ReturnType<typeof canonicalProjection>;
+  try {
+    snapshot = canonicalProjection(value);
+  } catch {
+    context.addIssue({
+      code: "custom",
+      message: "POLICY_BUNDLE_NON_PLAIN_DATA",
+    });
+    return z.NEVER;
+  }
+
+  const validated = policyBundleContentsSchema.safeParse(snapshot);
+  if (!validated.success) {
+    for (const issue of validated.error.issues) {
+      context.addIssue({
+        code: "custom",
+        message: issue.message,
+        path: issue.path,
+      });
+    }
+    return z.NEVER;
+  }
+  for (const message of snapshotCrossFieldIssues(
+    snapshot as PolicyBundleContents,
+  )) {
+    context.addIssue({ code: "custom", message });
+  }
+  return snapshot as PolicyBundleContents;
+});
 
 export type PolicyBundle = z.infer<typeof policyBundleSchema>;
 
