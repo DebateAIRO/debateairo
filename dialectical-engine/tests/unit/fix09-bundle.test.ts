@@ -91,6 +91,34 @@ function expectFrozenOwnDataSnapshot(actual: unknown, expected: unknown): void {
   expect(actual).toBe(expected);
 }
 
+function candidatesMissingRequiredValue(): Record<string, unknown>[] {
+  const candidates: Record<string, unknown>[] = [];
+  const raw = readFileSync(BUNDLE_PATH, "utf8");
+  for (let index = 0; index < 16; index += 1) {
+    const candidate = JSON.parse(raw) as Record<string, unknown>;
+    const seed = (
+      candidate.register_seeds as Array<Record<string, unknown>>
+    )[index];
+    if (seed === undefined) throw new Error("MISSING_REGISTER_SEED");
+    Reflect.deleteProperty(seed, "value");
+    candidates.push(candidate);
+  }
+  for (const slot of [
+    "zone_manifest_hash",
+    "hatchet_ingest",
+    "injection_corpus_hash",
+  ] as const) {
+    const candidate = JSON.parse(raw) as Record<string, unknown>;
+    const slots = candidate.slots as Record<
+      string,
+      Record<string, unknown>
+    >;
+    Reflect.deleteProperty(slots[slot] as object, "value");
+    candidates.push(candidate);
+  }
+  return candidates;
+}
+
 describe("FIX-09 C1 policy bundle", () => {
   it("loads the complete fail-closed phase-one policy", () => {
     const bundle = loadBundle(BUNDLE_PATH);
@@ -433,6 +461,132 @@ describe("FIX-09 C1 policy bundle", () => {
     expectFrozenOwnDataSnapshot(loaded, raw);
   });
 
+  it("defines array indices without invoking an inherited numeric accessor", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const invalidCrossField = JSON.parse(
+      readFileSync(BUNDLE_PATH, "utf8"),
+    ) as Record<string, unknown>;
+    const invalidStructure = JSON.parse(
+      readFileSync(BUNDLE_PATH, "utf8"),
+    ) as Record<string, unknown>;
+    invalidStructure.quick_arm = "ARMED";
+    const invalidSeed = (
+      invalidCrossField.register_seeds as Array<Record<string, unknown>>
+    )[1];
+    if (invalidSeed === undefined) throw new Error("MISSING_REGISTER_SEED");
+    invalidSeed.status = "UNSET";
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "0");
+    let getterReads = 0;
+    let setterCalls = 0;
+    let parsed: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    let invalidParsed:
+      | ReturnType<typeof policyBundleSchema.safeParse>
+      | undefined;
+    let invalidStructureParsed:
+      | ReturnType<typeof policyBundleSchema.safeParse>
+      | undefined;
+    let escaped: unknown;
+    let denied: boolean | undefined;
+    let hash: string | undefined;
+
+    try {
+      Object.defineProperty(Object.prototype, "0", {
+        configurable: true,
+        get() {
+          getterReads += 1;
+          return "public/**";
+        },
+        set(value: unknown) {
+          setterCalls += 1;
+          if (value === "apps/api/src/registration.ts") return;
+          Object.defineProperty(this, "0", {
+            configurable: true,
+            enumerable: true,
+            value,
+            writable: true,
+          });
+        },
+      });
+      try {
+        parsed = policyBundleSchema.safeParse(raw);
+        invalidParsed = policyBundleSchema.safeParse(invalidCrossField);
+        invalidStructureParsed = policyBundleSchema.safeParse(
+          invalidStructure,
+        );
+        if (parsed.success) {
+          denied = isFloorDenied(
+            parsed.data,
+            "apps/api/src/registration.ts",
+          );
+          hash = bundleHash(parsed.data);
+        }
+      } catch (error) {
+        escaped = error;
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "0");
+      } else {
+        Object.defineProperty(Object.prototype, "0", previous);
+      }
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(parsed?.success).toBe(true);
+    expect(invalidParsed?.success).toBe(false);
+    expect(invalidStructureParsed?.success).toBe(false);
+    expect(getterReads).toBe(0);
+    expect(setterCalls).toBe(0);
+    expect(denied).toBe(true);
+    expect(hash).toBe(
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+    );
+    if (parsed?.success === true) {
+      expect(parsed.data.quick_arm).toBe("OFF");
+      expectFrozenOwnDataSnapshot(parsed.data, raw);
+    }
+  });
+
+  it("defines dense array indices over inherited non-writable data", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "0");
+    let parsed: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    let escaped: unknown;
+
+    try {
+      Object.defineProperty(Object.prototype, "0", {
+        configurable: true,
+        value: "public/**",
+      });
+      try {
+        parsed = policyBundleSchema.safeParse(raw);
+      } catch (error) {
+        escaped = error;
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "0");
+      } else {
+        Object.defineProperty(Object.prototype, "0", previous);
+      }
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(parsed?.success).toBe(true);
+    if (parsed?.success === true) {
+      expectFrozenOwnDataSnapshot(parsed.data, raw);
+      expect(
+        isFloorDenied(parsed.data, "apps/api/src/registration.ts"),
+      ).toBe(true);
+    }
+  });
+
   it("does not let Object.prototype supply missing nested members", () => {
     const raw = readFileSync(BUNDLE_PATH, "utf8");
     const scenarios = [
@@ -526,6 +680,77 @@ describe("FIX-09 C1 policy bundle", () => {
       expect(Object.hasOwn(seed as object, "status")).toBe(true);
       expect(seed?.status).toBe("SEED");
     }
+  });
+
+  it("returns failure for all missing value fields without invoking a prototype getter", () => {
+    const candidates = candidatesMissingRequiredValue();
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let getterReads = 0;
+    let failures = 0;
+    let escaped = 0;
+    try {
+      Object.defineProperty(Object.prototype, "value", {
+        configurable: true,
+        get() {
+          getterReads += 1;
+          throw new Error("OBJECT_PROTOTYPE_VALUE_GETTER_RAN");
+        },
+      });
+      for (const candidate of candidates) {
+        try {
+          if (!policyBundleSchema.safeParse(candidate).success) failures += 1;
+        } catch {
+          escaped += 1;
+        }
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(candidates).toHaveLength(19);
+    expect(failures).toBe(19);
+    expect(escaped).toBe(0);
+    expect(getterReads).toBe(0);
+  });
+
+  it("returns failure for all missing value fields over non-writable prototype data", () => {
+    const candidates = candidatesMissingRequiredValue();
+    const previous = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      "value",
+    );
+    let failures = 0;
+    let escaped = 0;
+    try {
+      Object.defineProperty(Object.prototype, "value", {
+        configurable: true,
+        value: "INHERITED_VALUE",
+      });
+      for (const candidate of candidates) {
+        try {
+          if (!policyBundleSchema.safeParse(candidate).success) failures += 1;
+        } catch {
+          escaped += 1;
+        }
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "value");
+      } else {
+        Object.defineProperty(Object.prototype, "value", previous);
+      }
+    }
+
+    expect(candidates).toHaveLength(19);
+    expect(failures).toBe(19);
+    expect(escaped).toBe(0);
   });
 
   it("rejects accessor-backed hash input without invoking the accessor", () => {

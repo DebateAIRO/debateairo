@@ -25,6 +25,18 @@ function dataPropertyValue(
   return descriptor.value;
 }
 
+function arrayLength(descriptor: PropertyDescriptor | undefined): number {
+  if (
+    descriptor === undefined ||
+    !("value" in descriptor) ||
+    !Number.isSafeInteger(descriptor.value) ||
+    descriptor.value < 0
+  ) {
+    return nonPlainJsonData();
+  }
+  return descriptor.value;
+}
+
 export function canonicalProjection(value: unknown): CanonicalJsonValue {
   if (
     value === null ||
@@ -46,17 +58,30 @@ export function canonicalProjection(value: unknown): CanonicalJsonValue {
     if (Object.getOwnPropertySymbols(value).length !== 0) {
       return nonPlainJsonData();
     }
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    const projection: CanonicalJsonValue[] = [];
-    for (let index = 0; index < value.length; index += 1) {
-      projection.push(
-        canonicalProjection(dataPropertyValue(descriptors[String(index)])),
+    const descriptors = Object.getOwnPropertyDescriptors(value) as Record<
+      string,
+      PropertyDescriptor
+    >;
+    const length = arrayLength(
+      Object.hasOwn(descriptors, "length") ? descriptors["length"] : undefined,
+    );
+    const projection = new Array<CanonicalJsonValue>(length);
+    const expectedKeys = new Set(["length"]);
+    for (let index = 0; index < length; index += 1) {
+      const key = String(index);
+      const item = canonicalProjection(
+        dataPropertyValue(
+          Object.hasOwn(descriptors, key) ? descriptors[key] : undefined,
+        ),
       );
+      Object.defineProperty(projection, key, {
+        configurable: true,
+        enumerable: true,
+        value: item,
+        writable: true,
+      });
+      expectedKeys.add(key);
     }
-    const expectedKeys = new Set([
-      "length",
-      ...projection.map((_, index) => String(index)),
-    ]);
     if (Object.keys(descriptors).some((key) => !expectedKeys.has(key))) {
       return nonPlainJsonData();
     }
