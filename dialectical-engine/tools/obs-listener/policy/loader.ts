@@ -5,13 +5,37 @@ import { z } from "zod";
 import { canonicalProjection } from "./canonical.js";
 import { parseJsonWithUniqueKeys } from "./unique-json.js";
 
+const BASE_ARRAY_SOME = Object.getOwnPropertyDescriptor(
+  Array.prototype,
+  "some",
+);
+const BASE_ARRAY_SORT = Object.getOwnPropertyDescriptor(
+  Array.prototype,
+  "sort",
+);
+const BASE_ARRAY_ITERATOR = Object.getOwnPropertyDescriptor(
+  Array.prototype,
+  Symbol.iterator,
+);
+const BASE_OBJECT_SOME = Object.getOwnPropertyDescriptor(
+  Object.prototype,
+  "some",
+);
+const BASE_OBJECT_SORT = Object.getOwnPropertyDescriptor(
+  Object.prototype,
+  "sort",
+);
+const BASE_OBJECT_ITERATOR = Object.getOwnPropertyDescriptor(
+  Object.prototype,
+  Symbol.iterator,
+);
+
 const severitySchema = z.enum(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
 const relativeGlobSchema = z
   .string()
   .min(1)
-  .refine((value) => !value.startsWith("/") && !value.includes("\\"))
-  .refine((value) => !value.split("/").includes(".."));
+  .refine(relativeGlob);
 const pinnedSetSchema = z
   .object({ count: z.number().int().nonnegative(), sha256: sha256Schema })
   .strict();
@@ -175,6 +199,90 @@ const policyBundleContentsSchema = z
 type PolicyBundleContents = z.infer<typeof policyBundleContentsSchema>;
 
 type SnapshotRecord = Record<string, unknown>;
+const INVALID_ARRAY_ITEM = Symbol("INVALID_ARRAY_ITEM");
+
+function ownArrayLength(value: readonly unknown[]): number | null {
+  const descriptor = Object.getOwnPropertyDescriptor(value, "length");
+  if (
+    descriptor === undefined ||
+    !Object.hasOwn(descriptor, "value") ||
+    !Number.isSafeInteger(descriptor.value) ||
+    descriptor.value < 0
+  ) {
+    return null;
+  }
+  return descriptor.value as number;
+}
+
+function ownArrayItem(
+  value: readonly unknown[],
+  index: number,
+): unknown | typeof INVALID_ARRAY_ITEM {
+  const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  if (
+    descriptor === undefined ||
+    !Object.hasOwn(descriptor, "value") ||
+    descriptor.enumerable !== true
+  ) {
+    return INVALID_ARRAY_ITEM;
+  }
+  return descriptor.value;
+}
+
+function ownStringArrayItem(
+  value: readonly string[],
+  index: number,
+): string | null {
+  const item = ownArrayItem(value, index);
+  return typeof item === "string" ? item : null;
+}
+
+function stringContains(value: string, sought: string): boolean {
+  if (sought.length === 0) return true;
+  if (sought.length > value.length) return false;
+  for (let start = 0; start <= value.length - sought.length; start += 1) {
+    let matched = true;
+    for (let offset = 0; offset < sought.length; offset += 1) {
+      if (value[start + offset] !== sought[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return true;
+  }
+  return false;
+}
+
+function containsParentSegment(value: string): boolean {
+  let segment = "";
+  for (let index = 0; index <= value.length; index += 1) {
+    const character = index === value.length ? "/" : value[index];
+    if (character === "/") {
+      if (segment === "..") return true;
+      segment = "";
+    } else {
+      segment += character;
+    }
+  }
+  return false;
+}
+
+function fixedLowerHex(value: unknown, length: number): value is string {
+  if (typeof value !== "string" || value.length !== length) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (
+      character === undefined ||
+      !(
+        (character >= "0" && character <= "9") ||
+        (character >= "a" && character <= "f")
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 function exactSnapshotRecord(
   value: unknown,
@@ -190,8 +298,18 @@ function exactSnapshotRecord(
     return false;
   }
   const ownKeys = Object.keys(value);
-  if (ownKeys.length !== keys.length) return false;
-  for (const key of keys) {
+  const ownKeyCount = ownArrayLength(ownKeys);
+  const keyCount = ownArrayLength(keys);
+  if (
+    ownKeyCount === null ||
+    keyCount === null ||
+    ownKeyCount !== keyCount
+  ) {
+    return false;
+  }
+  for (let index = 0; index < keyCount; index += 1) {
+    const key = ownStringArrayItem(keys, index);
+    if (key === null) return false;
     if (!Object.hasOwn(value, key)) return false;
   }
   return true;
@@ -206,13 +324,15 @@ function snapshotArrayOf(
     value === null ||
     typeof value !== "object" ||
     isProxy(value) ||
-    !Array.isArray(value) ||
-    value.length < minimum
+    !Array.isArray(value)
   ) {
     return false;
   }
-  for (let index = 0; index < value.length; index += 1) {
-    if (!Object.hasOwn(value, String(index)) || !item(value[index])) {
+  const length = ownArrayLength(value);
+  if (length === null || length < minimum) return false;
+  for (let index = 0; index < length; index += 1) {
+    const candidate = ownArrayItem(value, index);
+    if (candidate === INVALID_ARRAY_ITEM || !item(candidate)) {
       return false;
     }
   }
@@ -223,21 +343,84 @@ function literalTuple(
   value: unknown,
   expected: readonly unknown[],
 ): boolean {
-  return snapshotArrayOf(value, () => true) &&
-    value.length === expected.length &&
-    expected.every((item, index) => value[index] === item);
+  if (!snapshotArrayOf(value, () => true)) return false;
+  const length = ownArrayLength(value);
+  const expectedLength = ownArrayLength(expected);
+  if (
+    length === null ||
+    expectedLength === null ||
+    length !== expectedLength
+  ) {
+    return false;
+  }
+  for (let index = 0; index < length; index += 1) {
+    const actual = ownArrayItem(value, index);
+    const wanted = ownArrayItem(expected, index);
+    if (
+      actual === INVALID_ARRAY_ITEM ||
+      wanted === INVALID_ARRAY_ITEM ||
+      actual !== wanted
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function relativeGlob(value: unknown): value is string {
   return typeof value === "string" &&
     value.length > 0 &&
-    !value.startsWith("/") &&
-    !value.includes("\\") &&
-    !value.split("/").includes("..");
+    value[0] !== "/" &&
+    !stringContains(value, "\\") &&
+    !containsParentSegment(value);
 }
 
 function sha256(value: unknown): value is string {
-  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+  return fixedLowerHex(value, 64);
+}
+
+function severity(value: unknown): boolean {
+  return value === "INFO" ||
+    value === "DEGRADED" ||
+    value === "SEVERE" ||
+    value === "FATAL";
+}
+
+function registerKey(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    value.length < 5 ||
+    value[0] !== "o" ||
+    value[1] !== "b" ||
+    value[2] !== "s" ||
+    value[3] !== "."
+  ) {
+    return false;
+  }
+  const first = value[4];
+  if (
+    first === undefined ||
+    !(
+      (first >= "A" && first <= "Z") ||
+      (first >= "a" && first <= "z")
+    )
+  ) {
+    return false;
+  }
+  for (let index = 5; index < value.length; index += 1) {
+    const character = value[index];
+    if (
+      character === undefined ||
+      !(
+        (character >= "A" && character <= "Z") ||
+        (character >= "a" && character <= "z") ||
+        (character >= "0" && character <= "9")
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function pinnedSet(value: unknown): boolean {
@@ -327,12 +510,12 @@ function severityMap(value: unknown): boolean {
     return false;
   }
   const overrides = value.overrides as SnapshotRecord;
-  for (const key of Object.keys(overrides)) {
-    if (!["INFO", "DEGRADED", "SEVERE", "FATAL"].includes(
-      overrides[key] as string,
-    )) {
-      return false;
-    }
+  const overrideKeys = Object.keys(overrides);
+  const overrideCount = ownArrayLength(overrideKeys);
+  if (overrideCount === null) return false;
+  for (let index = 0; index < overrideCount; index += 1) {
+    const key = ownStringArrayItem(overrideKeys, index);
+    if (key === null || !severity(overrides[key])) return false;
   }
   return true;
 }
@@ -345,14 +528,26 @@ function routingTable(value: unknown): boolean {
     "SCORING_LIVE_DATA",
     "DEFAULT",
   ] as const;
-  if (!snapshotArrayOf(value, () => true) || value.length !== expected.length) {
+  if (!snapshotArrayOf(value, () => true)) {
     return false;
   }
-  for (let index = 0; index < expected.length; index += 1) {
-    const route = value[index];
+  const length = ownArrayLength(value);
+  const expectedLength = ownArrayLength(expected);
+  if (
+    length === null ||
+    expectedLength === null ||
+    length !== expectedLength
+  ) {
+    return false;
+  }
+  for (let index = 0; index < expectedLength; index += 1) {
+    const route = ownArrayItem(value, index);
+    const incidentClass = ownArrayItem(expected, index);
     if (
+      route === INVALID_ARRAY_ITEM ||
+      incidentClass === INVALID_ARRAY_ITEM ||
       !exactSnapshotRecord(route, ["incident_class", "owner"]) ||
-      route.incident_class !== expected[index] ||
+      route.incident_class !== incidentClass ||
       route.owner !== "V"
     ) {
       return false;
@@ -379,7 +574,7 @@ function codeRegistrySeed(value: unknown): boolean {
     return false;
   }
   return typeof value.base_commit === "string" &&
-    /^[a-f0-9]{40}$/u.test(value.base_commit) &&
+    fixedLowerHex(value.base_commit, 40) &&
     value.recipe === "obs-code-seed.sh@v1" &&
     value.canonicalization ===
       "UTF-8; LF; LC_ALL=C sort -u; trailing LF; SHA-256" &&
@@ -404,8 +599,7 @@ function registerSeeds(value: unknown): boolean {
     value,
     (seed) =>
       exactSnapshotRecord(seed, ["key", "value", "status", "source_ref"]) &&
-      typeof seed.key === "string" &&
-      /^obs\.[A-Za-z][A-Za-z0-9]*$/u.test(seed.key) &&
+      registerKey(seed.key) &&
       (seed.value === null ||
         typeof seed.value === "string" ||
         (typeof seed.value === "number" && Number.isFinite(seed.value))) &&
@@ -441,11 +635,14 @@ function slots(value: unknown): boolean {
 }
 
 function custodians(value: unknown): boolean {
-  return snapshotArrayOf(value, () => true) &&
-    value.length === 1 &&
-    exactSnapshotRecord(value[0], ["id", "token_env"]) &&
-    value[0].id === "V" &&
-    value[0].token_env === "OBS_POLICY_CUSTODIAN_TOKEN";
+  if (!snapshotArrayOf(value, () => true) || ownArrayLength(value) !== 1) {
+    return false;
+  }
+  const custodian = ownArrayItem(value, 0);
+  return custodian !== INVALID_ARRAY_ITEM &&
+    exactSnapshotRecord(custodian, ["id", "token_env"]) &&
+    custodian.id === "V" &&
+    custodian.token_env === "OBS_POLICY_CUSTODIAN_TOKEN";
 }
 
 function policyBundleStructure(
@@ -488,34 +685,69 @@ function policyBundleStructure(
 function snapshotCrossFieldIssue(
   snapshot: PolicyBundleContents,
 ): string | undefined {
-  for (let index = 0; index < snapshot.register_seeds.length; index += 1) {
-    const seed = snapshot.register_seeds[index];
+  const seedCount = ownArrayLength(snapshot.register_seeds);
+  if (seedCount === null) return "REGISTER_SEEDS_NOT_DENSE";
+  for (let index = 0; index < seedCount; index += 1) {
+    const seed = ownArrayItem(snapshot.register_seeds, index);
     if (
+      seed !== INVALID_ARRAY_ITEM &&
+      typeof seed === "object" &&
+      seed !== null &&
       seed !== undefined &&
-      ((seed.status === "UNSET") !== (seed.value === null))
+      (((seed as { readonly status?: unknown }).status === "UNSET") !==
+        ((seed as { readonly value?: unknown }).value === null))
     ) {
       return "REGISTER_SEED_STATUS_VALUE_MISMATCH";
     }
   }
 
-  const seedKeys = new Set<string>();
-  for (let index = 0; index < snapshot.register_seeds.length; index += 1) {
-    const key = snapshot.register_seeds[index]?.key;
-    if (key !== undefined) seedKeys.add(key);
-  }
-  if (seedKeys.size !== snapshot.register_seeds.length) {
-    return "DUPLICATE_REGISTER_SEED";
+  const seedKeys = Object.create(null) as Record<string, true>;
+  for (let index = 0; index < seedCount; index += 1) {
+    const seed = ownArrayItem(snapshot.register_seeds, index);
+    if (seed === INVALID_ARRAY_ITEM || seed === null || typeof seed !== "object") {
+      return "REGISTER_SEEDS_NOT_DENSE";
+    }
+    const keyDescriptor = Object.getOwnPropertyDescriptor(seed, "key");
+    if (
+      keyDescriptor === undefined ||
+      !Object.hasOwn(keyDescriptor, "value") ||
+      typeof keyDescriptor.value !== "string"
+    ) {
+      return "REGISTER_SEEDS_NOT_DENSE";
+    }
+    const key = keyDescriptor.value;
+    if (Object.hasOwn(seedKeys, key)) return "DUPLICATE_REGISTER_SEED";
+    Object.defineProperty(seedKeys, key, {
+      configurable: true,
+      enumerable: true,
+      value: true,
+      writable: true,
+    });
   }
 
-  for (const [field, values] of [
-    ["production_source_globs", snapshot.production_source_globs],
-    ["floor_deny_globs", snapshot.floor_deny_globs],
-    ["allowlist", snapshot.allowlist],
-  ] as const) {
-    if (new Set(values).size !== values.length) {
-      return `DUPLICATE_${field.toUpperCase()}`;
+  const duplicateString = (values: readonly string[]): boolean => {
+    const length = ownArrayLength(values);
+    if (length === null) return true;
+    const seen = Object.create(null) as Record<string, true>;
+    for (let index = 0; index < length; index += 1) {
+      const value = ownStringArrayItem(values, index);
+      if (value === null || Object.hasOwn(seen, value)) return true;
+      Object.defineProperty(seen, value, {
+        configurable: true,
+        enumerable: true,
+        value: true,
+        writable: true,
+      });
     }
+    return false;
+  };
+  if (duplicateString(snapshot.production_source_globs)) {
+    return "DUPLICATE_PRODUCTION_SOURCE_GLOBS";
   }
+  if (duplicateString(snapshot.floor_deny_globs)) {
+    return "DUPLICATE_FLOOR_DENY_GLOBS";
+  }
+  if (duplicateString(snapshot.allowlist)) return "DUPLICATE_ALLOWLIST";
   return undefined;
 }
 
@@ -545,18 +777,86 @@ function isCanonicalArrayIndex(key: string): boolean {
 }
 
 function hasNumericArrayPrototypePollution(): boolean {
-  for (const prototype of [Array.prototype, Object.prototype]) {
-    for (const key of Object.getOwnPropertyNames(prototype)) {
-      if (isCanonicalArrayIndex(key)) return true;
+  const prototypeHasNumericKey = (prototype: object): boolean => {
+    const keys = Object.getOwnPropertyNames(prototype);
+    const length = ownArrayLength(keys);
+    if (length === null) return true;
+    for (let index = 0; index < length; index += 1) {
+      const key = ownStringArrayItem(keys, index);
+      if (key === null || isCanonicalArrayIndex(key)) return true;
     }
+    return false;
+  };
+  return prototypeHasNumericKey(Array.prototype) ||
+    prototypeHasNumericKey(Object.prototype);
+}
+
+function sameDescriptorField(
+  left: PropertyDescriptor,
+  right: PropertyDescriptor,
+  field: keyof PropertyDescriptor,
+): boolean {
+  const leftField = Object.getOwnPropertyDescriptor(left, field);
+  const rightField = Object.getOwnPropertyDescriptor(right, field);
+  if (leftField === undefined || rightField === undefined) {
+    return leftField === rightField;
   }
-  return false;
+  return Object.hasOwn(leftField, "value") &&
+    Object.hasOwn(rightField, "value") &&
+    leftField.value === rightField.value;
+}
+
+function sameDescriptor(
+  current: PropertyDescriptor | undefined,
+  baseline: PropertyDescriptor | undefined,
+): boolean {
+  if (current === undefined || baseline === undefined) {
+    return current === baseline;
+  }
+  return sameDescriptorField(current, baseline, "configurable") &&
+    sameDescriptorField(current, baseline, "enumerable") &&
+    sameDescriptorField(current, baseline, "writable") &&
+    sameDescriptorField(current, baseline, "value") &&
+    sameDescriptorField(current, baseline, "get") &&
+    sameDescriptorField(current, baseline, "set");
+}
+
+function hasArrayAuthorityPrototypeMutation(): boolean {
+  return !sameDescriptor(
+    Object.getOwnPropertyDescriptor(Array.prototype, "some"),
+    BASE_ARRAY_SOME,
+  ) ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Array.prototype, "sort"),
+      BASE_ARRAY_SORT,
+    ) ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator),
+      BASE_ARRAY_ITERATOR,
+    ) ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Object.prototype, "some"),
+      BASE_OBJECT_SOME,
+    ) ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Object.prototype, "sort"),
+      BASE_OBJECT_SORT,
+    ) ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Object.prototype, Symbol.iterator),
+      BASE_OBJECT_ITERATOR,
+    );
+}
+
+function hasPolicyPrototypeMutation(): boolean {
+  return hasNumericArrayPrototypePollution() ||
+    hasArrayAuthorityPrototypeMutation();
 }
 
 function safeParsePolicyBundle(value: unknown): PolicyBundleParseResult {
   try {
-    if (hasNumericArrayPrototypePollution()) {
-      return schemaFailure("POLICY_BUNDLE_NUMERIC_PROTOTYPE_POLLUTION");
+    if (hasPolicyPrototypeMutation()) {
+      return schemaFailure("POLICY_BUNDLE_PROTOTYPE_MUTATION");
     }
 
     const snapshot = canonicalProjection(value);
@@ -567,15 +867,15 @@ function safeParsePolicyBundle(value: unknown): PolicyBundleParseResult {
     const crossFieldIssue = snapshotCrossFieldIssue(snapshot);
     if (crossFieldIssue !== undefined) return schemaFailure(crossFieldIssue);
 
-    if (hasNumericArrayPrototypePollution()) {
-      return schemaFailure("POLICY_BUNDLE_NUMERIC_PROTOTYPE_POLLUTION");
+    if (hasPolicyPrototypeMutation()) {
+      return schemaFailure("POLICY_BUNDLE_PROTOTYPE_MUTATION");
     }
 
     const validated = policyBundleContentsSchema.safeParse(snapshot);
     if (!validated.success) return schemaFailure(validated.error);
 
-    if (hasNumericArrayPrototypePollution()) {
-      return schemaFailure("POLICY_BUNDLE_NUMERIC_PROTOTYPE_POLLUTION");
+    if (hasPolicyPrototypeMutation()) {
+      return schemaFailure("POLICY_BUNDLE_PROTOTYPE_MUTATION");
     }
 
     return { success: true, data: snapshot };
@@ -616,49 +916,96 @@ export function loadBundle(path: string): PolicyBundle {
   }
 }
 
-function globPattern(glob: string): RegExp {
-  let pattern = "^";
-  for (let index = 0; index < glob.length; index += 1) {
-    const character = glob[index];
-    if (character === "*") {
-      if (glob[index + 1] === "*") {
-        if (glob[index + 2] === "/") {
-          pattern += "(?:.*/)?";
-          index += 2;
+function globMatches(glob: string, path: string): boolean {
+  const memo = Object.create(null) as Record<string, boolean>;
+  const matchesAt = (globIndex: number, pathIndex: number): boolean => {
+    const memoKey = `${globIndex}:${pathIndex}`;
+    if (Object.hasOwn(memo, memoKey)) return memo[memoKey] === true;
+
+    let matches = false;
+    if (globIndex === glob.length) {
+      matches = pathIndex === path.length;
+    } else if (glob[globIndex] === "*") {
+      if (glob[globIndex + 1] === "*") {
+        if (glob[globIndex + 2] === "/") {
+          matches = matchesAt(globIndex + 3, pathIndex);
+          for (
+            let end = pathIndex;
+            !matches && end < path.length;
+            end += 1
+          ) {
+            if (path[end] === "/") {
+              matches = matchesAt(globIndex + 3, end + 1);
+            }
+          }
         } else {
-          pattern += ".*";
-          index += 1;
+          matches = matchesAt(globIndex + 2, pathIndex) ||
+            (pathIndex < path.length &&
+              matchesAt(globIndex, pathIndex + 1));
         }
       } else {
-        pattern += "[^/]*";
+        matches = matchesAt(globIndex + 1, pathIndex) ||
+          (pathIndex < path.length &&
+            path[pathIndex] !== "/" &&
+            matchesAt(globIndex, pathIndex + 1));
       }
-      continue;
+    } else if (glob[globIndex] === "?") {
+      matches = pathIndex < path.length &&
+        path[pathIndex] !== "/" &&
+        matchesAt(globIndex + 1, pathIndex + 1);
+    } else {
+      matches = pathIndex < path.length &&
+        glob[globIndex] === path[pathIndex] &&
+        matchesAt(globIndex + 1, pathIndex + 1);
     }
-    if (character === "?") {
-      pattern += "[^/]";
-      continue;
-    }
-    pattern += character?.replace(/[|\\{}()[\]^$+?.]/gu, "\\$&") ?? "";
-  }
-  return new RegExp(`${pattern}$`, "u");
+
+    Object.defineProperty(memo, memoKey, {
+      configurable: true,
+      enumerable: true,
+      value: matches,
+      writable: true,
+    });
+    return matches;
+  };
+  return matchesAt(0, 0);
 }
 
 function normalizeRepoRelativePath(repoRelativePath: string): string | null {
+  const first = repoRelativePath[0];
+  const drive = repoRelativePath[0];
   if (
     repoRelativePath.length === 0 ||
-    repoRelativePath.includes("\\") ||
-    repoRelativePath.includes("\0") ||
-    repoRelativePath.startsWith("/") ||
-    /^[A-Za-z]:\//u.test(repoRelativePath)
+    stringContains(repoRelativePath, "\\") ||
+    stringContains(repoRelativePath, "\0") ||
+    first === "/" ||
+    (
+      drive !== undefined &&
+      ((drive >= "A" && drive <= "Z") ||
+        (drive >= "a" && drive <= "z")) &&
+      repoRelativePath[1] === ":" &&
+      repoRelativePath[2] === "/"
+    )
   ) {
     return null;
   }
 
   let normalized = "";
-  for (const segment of repoRelativePath.split("/")) {
-    if (segment === "" || segment === ".") continue;
+  let segment = "";
+  for (let index = 0; index <= repoRelativePath.length; index += 1) {
+    const character = index === repoRelativePath.length
+      ? "/"
+      : repoRelativePath[index];
+    if (character !== "/") {
+      segment += character;
+      continue;
+    }
     if (segment === "..") return null;
-    normalized = normalized.length === 0 ? segment : `${normalized}/${segment}`;
+    if (segment !== "" && segment !== ".") {
+      normalized = normalized.length === 0
+        ? segment
+        : `${normalized}/${segment}`;
+    }
+    segment = "";
   }
   return normalized.length === 0 ? null : normalized;
 }
@@ -669,7 +1016,12 @@ export function isFloorDenied(
 ): boolean {
   const normalized = normalizeRepoRelativePath(repoRelativePath);
   if (normalized === null) return true;
-  return bundle.floor_deny_globs.some((glob) =>
-    globPattern(glob).test(normalized),
-  );
+  const globs = bundle.floor_deny_globs;
+  const length = ownArrayLength(globs);
+  if (length === null) return true;
+  for (let index = 0; index < length; index += 1) {
+    const glob = ownStringArrayItem(globs, index);
+    if (glob === null || globMatches(glob, normalized)) return true;
+  }
+  return false;
 }

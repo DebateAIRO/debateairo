@@ -1,4 +1,6 @@
-const JSON_NUMBER = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/uy;
+function isDigit(character: string | undefined): boolean {
+  return character !== undefined && character >= "0" && character <= "9";
+}
 
 class UniqueKeyScanner {
   private index = 0;
@@ -26,7 +28,7 @@ class UniqueKeyScanner {
     if (character === "n") return this.scanLiteral("null");
     if (
       character === "-" ||
-      (character !== undefined && /\d/u.test(character))
+      isDigit(character)
     ) {
       this.scanNumber();
       return;
@@ -39,13 +41,20 @@ class UniqueKeyScanner {
     this.skipWhitespace();
     if (this.consume("}")) return;
 
-    const keys = new Set<string>();
+    const keys = Object.create(null) as Record<string, true>;
     while (true) {
       this.skipWhitespace();
       if (this.source[this.index] !== '"') this.invalidJson();
       const key = this.scanString();
-      if (keys.has(key)) throw new SyntaxError("DUPLICATE_JSON_MEMBER");
-      keys.add(key);
+      if (Object.hasOwn(keys, key)) {
+        throw new SyntaxError("DUPLICATE_JSON_MEMBER");
+      }
+      Object.defineProperty(keys, key, {
+        configurable: true,
+        enumerable: true,
+        value: true,
+        writable: true,
+      });
 
       this.skipWhitespace();
       if (!this.consume(":")) this.invalidJson();
@@ -76,7 +85,11 @@ class UniqueKeyScanner {
       const character = this.source[this.index];
       this.index += 1;
       if (character === '"') {
-        return JSON.parse(this.source.slice(start, this.index)) as string;
+        let encoded = "";
+        for (let index = start; index < this.index; index += 1) {
+          encoded += this.source[index];
+        }
+        return JSON.parse(encoded) as string;
       }
       if (character === "\\") this.index += 1;
     }
@@ -84,15 +97,44 @@ class UniqueKeyScanner {
   }
 
   private scanLiteral(literal: "true" | "false" | "null"): void {
-    if (!this.source.startsWith(literal, this.index)) this.invalidJson();
+    for (let offset = 0; offset < literal.length; offset += 1) {
+      if (this.source[this.index + offset] !== literal[offset]) {
+        this.invalidJson();
+      }
+    }
     this.index += literal.length;
   }
 
   private scanNumber(): void {
-    JSON_NUMBER.lastIndex = this.index;
-    const match = JSON_NUMBER.exec(this.source);
-    if (match === null) this.invalidJson();
-    this.index = JSON_NUMBER.lastIndex;
+    let index = this.index;
+    if (this.source[index] === "-") index += 1;
+
+    if (this.source[index] === "0") {
+      index += 1;
+    } else {
+      const first = this.source[index];
+      if (first === undefined || first < "1" || first > "9") {
+        this.invalidJson();
+      }
+      index += 1;
+      while (isDigit(this.source[index])) index += 1;
+    }
+
+    if (this.source[index] === ".") {
+      index += 1;
+      if (!isDigit(this.source[index])) this.invalidJson();
+      while (isDigit(this.source[index])) index += 1;
+    }
+
+    if (this.source[index] === "e" || this.source[index] === "E") {
+      index += 1;
+      if (this.source[index] === "+" || this.source[index] === "-") {
+        index += 1;
+      }
+      if (!isDigit(this.source[index])) this.invalidJson();
+      while (isDigit(this.source[index])) index += 1;
+    }
+    this.index = index;
   }
 
   private skipWhitespace(): void {

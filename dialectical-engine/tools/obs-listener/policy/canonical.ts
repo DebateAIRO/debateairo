@@ -27,6 +27,22 @@ function dataPropertyValue(
   return value;
 }
 
+function descriptorMapEntry(
+  descriptors: object,
+  key: string,
+): PropertyDescriptor | undefined {
+  const entryDescriptor = Object.getOwnPropertyDescriptor(descriptors, key);
+  if (
+    entryDescriptor === undefined ||
+    !Object.hasOwn(entryDescriptor, "value") ||
+    entryDescriptor.value === null ||
+    typeof entryDescriptor.value !== "object"
+  ) {
+    return undefined;
+  }
+  return entryDescriptor.value as PropertyDescriptor;
+}
+
 function arrayLength(descriptor: PropertyDescriptor | undefined): number {
   if (
     descriptor === undefined ||
@@ -43,8 +59,42 @@ const MAX_CANONICAL_DEPTH = 256;
 const MAX_CANONICAL_NODES = 10_000;
 
 interface ProjectionState {
-  readonly active: WeakSet<object>;
+  readonly active: object[];
   remainingNodes: number;
+}
+
+function activeContains(active: readonly object[], candidate: object): boolean {
+  const length = ownArrayLength(active);
+  for (let index = 0; index < length; index += 1) {
+    if (dataPropertyValue(
+      Object.getOwnPropertyDescriptor(active, String(index)),
+    ) === candidate) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function activePush(active: object[], candidate: object): void {
+  Object.defineProperty(active, String(ownArrayLength(active)), {
+    configurable: true,
+    enumerable: true,
+    value: candidate,
+    writable: true,
+  });
+}
+
+function activePop(active: object[], candidate: object): void {
+  const length = ownArrayLength(active);
+  if (length === 0) return nonPlainJsonData();
+  const lastKey = String(length - 1);
+  if (dataPropertyValue(
+    Object.getOwnPropertyDescriptor(active, lastKey),
+  ) !== candidate) {
+    return nonPlainJsonData();
+  }
+  if (!Reflect.deleteProperty(active, lastKey)) return nonPlainJsonData();
+  Object.defineProperty(active, "length", { value: length - 1 });
 }
 
 function projectCanonical(
@@ -76,18 +126,18 @@ function projectCanonical(
     if (
       depth > MAX_CANONICAL_DEPTH ||
       state.remainingNodes <= 0 ||
-      state.active.has(value)
+      activeContains(state.active, value)
     ) {
       return nonPlainJsonData();
     }
     state.remainingNodes -= 1;
-    state.active.add(value);
+    activePush(state.active, value);
     try {
       if (Array.isArray(value)) {
         if (Object.getPrototypeOf(value) !== Array.prototype) {
           return nonPlainJsonData();
         }
-        if (Object.getOwnPropertySymbols(value).length !== 0) {
+        if (ownArrayLength(Object.getOwnPropertySymbols(value)) !== 0) {
           return nonPlainJsonData();
         }
         const descriptors = Object.getOwnPropertyDescriptors(value) as Record<
@@ -95,17 +145,20 @@ function projectCanonical(
           PropertyDescriptor
         >;
         const length = arrayLength(
-          Object.hasOwn(descriptors, "length")
-            ? descriptors["length"]
-            : undefined,
+          descriptorMapEntry(descriptors, "length"),
         );
         const projection = new Array<CanonicalJsonValue>(length);
-        const expectedKeys = new Set(["length"]);
+        if (
+          ownArrayLength(Object.getOwnPropertyNames(descriptors)) !==
+            length + 1
+        ) {
+          return nonPlainJsonData();
+        }
         for (let index = 0; index < length; index += 1) {
           const key = String(index);
           const item = projectCanonical(
             dataPropertyValue(
-              Object.hasOwn(descriptors, key) ? descriptors[key] : undefined,
+              descriptorMapEntry(descriptors, key),
             ),
             state,
             depth + 1,
@@ -116,10 +169,6 @@ function projectCanonical(
             value: item,
             writable: true,
           });
-          expectedKeys.add(key);
-        }
-        if (Object.keys(descriptors).some((key) => !expectedKeys.has(key))) {
-          return nonPlainJsonData();
         }
         return Object.freeze(projection);
       }
@@ -128,7 +177,7 @@ function projectCanonical(
       if (prototype !== Object.prototype && prototype !== null) {
         return nonPlainJsonData();
       }
-      if (Object.getOwnPropertySymbols(value).length !== 0) {
+      if (ownArrayLength(Object.getOwnPropertySymbols(value)) !== 0) {
         return nonPlainJsonData();
       }
       const descriptors = Object.getOwnPropertyDescriptors(value);
@@ -136,16 +185,24 @@ function projectCanonical(
         string,
         CanonicalJsonValue
       >;
-      for (const key of Object.keys(descriptors).sort()) {
-        projection[key] = projectCanonical(
-          dataPropertyValue(descriptors[key]),
-          state,
-          depth + 1,
-        );
+      const keys = sortedOwnPropertyNames(descriptors);
+      const keyCount = ownArrayLength(keys);
+      for (let index = 0; index < keyCount; index += 1) {
+        const key = ownStringAt(keys, index);
+        Object.defineProperty(projection, key, {
+          configurable: true,
+          enumerable: true,
+          value: projectCanonical(
+            dataPropertyValue(descriptorMapEntry(descriptors, key)),
+            state,
+            depth + 1,
+          ),
+          writable: true,
+        });
       }
       return Object.freeze(projection);
     } finally {
-      state.active.delete(value);
+      activePop(state.active, value);
     }
   }
   throw new TypeError("CANONICAL_JSON_UNSUPPORTED_VALUE");
@@ -155,7 +212,7 @@ export function canonicalProjection(value: unknown): CanonicalJsonValue {
   return projectCanonical(
     value,
     {
-      active: new WeakSet<object>(),
+      active: [],
       remainingNodes: MAX_CANONICAL_NODES,
     },
     0,

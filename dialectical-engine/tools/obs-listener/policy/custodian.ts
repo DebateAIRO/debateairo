@@ -46,6 +46,50 @@ type OwnOptionalDataProperty =
   | { readonly kind: "VALUE"; readonly value: unknown }
   | { readonly kind: "INVALID" };
 
+function ownArrayLength(value: readonly unknown[]): number | null {
+  const descriptor = Object.getOwnPropertyDescriptor(value, "length");
+  if (
+    descriptor === undefined ||
+    !Object.hasOwn(descriptor, "value") ||
+    !Number.isSafeInteger(descriptor.value) ||
+    descriptor.value < 0
+  ) {
+    return null;
+  }
+  return descriptor.value as number;
+}
+
+function arrayContainsIdentity(
+  values: readonly object[],
+  candidate: object,
+): boolean {
+  const length = ownArrayLength(values);
+  if (length === null) return true;
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(values, String(index));
+    if (
+      descriptor === undefined ||
+      !Object.hasOwn(descriptor, "value") ||
+      descriptor.value === candidate
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function appendIdentity(values: object[], candidate: object): boolean {
+  const length = ownArrayLength(values);
+  if (length === null) return false;
+  Object.defineProperty(values, String(length), {
+    configurable: true,
+    enumerable: true,
+    value: candidate,
+    writable: true,
+  });
+  return true;
+}
+
 function ownOptionalDataProperty(
   value: unknown,
   key: string,
@@ -62,12 +106,14 @@ function ownOptionalDataProperty(
       return { kind: "VALUE", value: descriptorValue };
     }
 
-    const visited = new Set<object>();
+    const visited: object[] = [];
     let prototype = Object.getPrototypeOf(value) as object | null;
     while (prototype !== null) {
       if (isProxy(prototype)) return { kind: "INVALID" };
-      if (visited.has(prototype)) return { kind: "INVALID" };
-      visited.add(prototype);
+      if (arrayContainsIdentity(visited, prototype)) {
+        return { kind: "INVALID" };
+      }
+      if (!appendIdentity(visited, prototype)) return { kind: "INVALID" };
       if (Object.getOwnPropertyDescriptor(prototype, key) !== undefined) {
         return { kind: "INVALID" };
       }
@@ -93,7 +139,14 @@ export function repin(
   environment: TokenEnvironment,
 ): PolicyBundle {
   const current = parsePolicyOrRefuse(currentBundle);
-  const custodian = current.custodians[0];
+  const custodianDescriptor = Object.getOwnPropertyDescriptor(
+    current.custodians,
+    "0",
+  );
+  const custodian = custodianDescriptor !== undefined &&
+      Object.hasOwn(custodianDescriptor, "value")
+    ? custodianDescriptor.value as PolicyBundle["custodians"][number]
+    : undefined;
   const expectedToken = custodian === undefined
     ? undefined
     : ownStringProperty(environment, custodian.token_env);

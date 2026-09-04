@@ -251,6 +251,92 @@ const NUMERIC_PROTOTYPE_KEYS = [
   "251",
 ] as const;
 
+const FROZEN_FLOOR_SAMPLES = [
+  "packages/obs-capture/src/zone/manifest.ts",
+  "packages/obs-capture/src/index.ts",
+  "migrations/0000_s00.sql",
+  "packages/crypto/src/index.ts",
+  "packages/published-arithmetic/src/index.ts",
+  "packages/serve/src/index.ts",
+  "packages/budget/src/index.ts",
+  "package.json",
+  "packages/kernel/package.json",
+  "apps/ui/pnpm-lock.yaml",
+  "register.bootstrap.json",
+  "compose.dev.yaml",
+  "deploy/dev-auth/compose.yaml",
+  ".github/workflows/ci.yml",
+  "scripts/check-source.ts",
+  "tools/obs-listener/policy/bundle.json",
+  "docs/agent-protocols/debateai-heartbeat-protocol.md",
+  ".hermes/x",
+  "apps/api/src/mfa.ts",
+  "apps/api/dist/mail-channel.js",
+  "apps/api/dist/mfa.js",
+  "apps/api/dist/registration.js",
+  "dist/apps/api/src/mail-channel.js",
+  "dist/apps/api/src/mfa.js",
+  "dist/apps/api/src/registration.js",
+  "dist/packages/db/src/identity.js",
+  "packages/db/dist/identity.js",
+  "packages/db/src/obs-schema.ts",
+  "packages/register/src/compose-env.ts",
+  "packages/register/src/runtime-environment.ts",
+  "././tools/obs-listener/policy/bundle.json",
+] as const;
+
+const FLOOR_SAFE_NEIGHBORS = [
+  "apps/api/src/public-health.ts",
+  "././apps/api/src/public-health.ts",
+  "apps/api/src/mfa-helper.ts",
+  "apps/ui/pnpm-lock.yml",
+  "packages/cryptography/src/index.ts",
+  "packages/db/src/obs-schema-helper.ts",
+  "packages/register/src/compose-environment.ts",
+  "packages/register/src/runtime-configuration.ts",
+] as const;
+
+type CapturedOperation<T> =
+  | { readonly success: true; readonly value: T }
+  | { readonly success: false; readonly error: unknown };
+
+function withInheritedArrayMember<T>(
+  owner: "OBJECT" | "ARRAY",
+  key: PropertyKey,
+  descriptor: PropertyDescriptor,
+  operation: () => T,
+): CapturedOperation<T> {
+  const host = owner === "OBJECT" ? Object.prototype : Array.prototype;
+  const hostPrevious = Object.getOwnPropertyDescriptor(host, key);
+  const arrayPrevious = owner === "OBJECT"
+    ? Object.getOwnPropertyDescriptor(Array.prototype, key)
+    : undefined;
+  let outcome: CapturedOperation<T>;
+
+  try {
+    if (owner === "OBJECT" && !Reflect.deleteProperty(Array.prototype, key)) {
+      throw new Error("ARRAY_PROTOTYPE_MEMBER_NOT_CONFIGURABLE");
+    }
+    Object.defineProperty(host, key, descriptor);
+    try {
+      outcome = { success: true, value: operation() };
+    } catch (error) {
+      outcome = { success: false, error };
+    }
+  } finally {
+    if (hostPrevious === undefined) {
+      Reflect.deleteProperty(host, key);
+    } else {
+      Object.defineProperty(host, key, hostPrevious);
+    }
+    if (owner === "OBJECT" && arrayPrevious !== undefined) {
+      Object.defineProperty(Array.prototype, key, arrayPrevious);
+    }
+  }
+
+  return outcome!;
+}
+
 describe("FIX-09 C1 policy bundle", () => {
   it("loads the complete fail-closed phase-one policy", () => {
     const bundle = loadBundle(BUNDLE_PATH);
@@ -573,58 +659,166 @@ describe("FIX-09 C1 policy bundle", () => {
     );
   });
 
+  it("never dispatches inherited array helpers or iterators across C1 authority", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const owners = ["OBJECT", "ARRAY"] as const;
+    const members = ["some", "sort", Symbol.iterator] as const;
+    const variants = [
+      "GETTER_FUNCTION",
+      "DATA_FUNCTION",
+      "THROWING_GETTER",
+      "NON_FUNCTION",
+    ] as const;
+    const expectedDenied = FROZEN_FLOOR_SAMPLES.map(() => true);
+    const expectedAllowed = FLOOR_SAFE_NEIGHBORS.map(() => false);
+
+    for (let ownerIndex = 0; ownerIndex < owners.length; ownerIndex += 1) {
+      const owner = owners[ownerIndex];
+      if (owner === undefined) throw new Error("MISSING_OWNER");
+      for (let memberIndex = 0; memberIndex < members.length; memberIndex += 1) {
+        const member = members[memberIndex];
+        if (member === undefined) throw new Error("MISSING_MEMBER");
+        for (
+          let variantIndex = 0;
+          variantIndex < variants.length;
+          variantIndex += 1
+        ) {
+          const variant = variants[variantIndex];
+          if (variant === undefined) throw new Error("MISSING_VARIANT");
+          let getterCalls = 0;
+          let functionCalls = 0;
+          const hostileFunction = () => {
+            functionCalls += 1;
+            if (member === "some") return false;
+            if (member === "sort") return [];
+            return { next: () => ({ done: true }) };
+          };
+          let descriptor: PropertyDescriptor;
+          if (variant === "GETTER_FUNCTION") {
+            descriptor = {
+              configurable: true,
+              get() {
+                getterCalls += 1;
+                return hostileFunction;
+              },
+            };
+          } else if (variant === "DATA_FUNCTION") {
+            descriptor = {
+              configurable: true,
+              value: hostileFunction,
+              writable: true,
+            };
+          } else if (variant === "THROWING_GETTER") {
+            descriptor = {
+              configurable: true,
+              get() {
+                getterCalls += 1;
+                throw new Error("INHERITED_ARRAY_MEMBER_RAN");
+              },
+            };
+          } else {
+            descriptor = {
+              configurable: true,
+              value: "NOT_CALLABLE",
+              writable: true,
+            };
+          }
+          const label = `${owner}:${String(member)}:${variant}`;
+          const outcome = withInheritedArrayMember(
+            owner,
+            member,
+            descriptor,
+            () => {
+              const hash = bundleHash(bundle);
+              let loadError: unknown;
+              let repinError: unknown;
+              try {
+                loadBundle(BUNDLE_PATH);
+              } catch (error) {
+                loadError = error;
+              }
+              try {
+                repin(bundle, {
+                  token: "fixture-custodian-token",
+                }, {
+                  OBS_POLICY_CUSTODIAN_TOKEN: "fixture-custodian-token",
+                });
+              } catch (error) {
+                repinError = error;
+              }
+              const denied = new Array<boolean>(FROZEN_FLOOR_SAMPLES.length);
+              for (
+                let index = 0;
+                index < FROZEN_FLOOR_SAMPLES.length;
+                index += 1
+              ) {
+                Object.defineProperty(denied, String(index), {
+                  configurable: true,
+                  enumerable: true,
+                  value: isFloorDenied(
+                    bundle,
+                    FROZEN_FLOOR_SAMPLES[index] as string,
+                  ),
+                  writable: true,
+                });
+              }
+              const allowed = new Array<boolean>(FLOOR_SAFE_NEIGHBORS.length);
+              for (
+                let index = 0;
+                index < FLOOR_SAFE_NEIGHBORS.length;
+                index += 1
+              ) {
+                Object.defineProperty(allowed, String(index), {
+                  configurable: true,
+                  enumerable: true,
+                  value: isFloorDenied(
+                    bundle,
+                    FLOOR_SAFE_NEIGHBORS[index] as string,
+                  ),
+                  writable: true,
+                });
+              }
+              return {
+                allowed,
+                denied,
+                hash,
+                loadError,
+                repinError,
+              };
+            },
+          );
+
+          expect.soft(outcome.success, label).toBe(true);
+          expect.soft(getterCalls, label).toBe(0);
+          expect.soft(functionCalls, label).toBe(0);
+          if (outcome.success) {
+            expect.soft(outcome.value.hash, label).toBe(
+              "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+            );
+            expect.soft(outcome.value.loadError, label).toBeInstanceOf(
+              PolicyBundleLoadError,
+            );
+            expect.soft(outcome.value.repinError, label).toBeInstanceOf(
+              RepinRefusedError,
+            );
+            expect.soft(outcome.value.denied, label).toEqual(expectedDenied);
+            expect.soft(outcome.value.allowed, label).toEqual(expectedAllowed);
+          }
+        }
+      }
+    }
+  });
+
   it("denies every enumerated floor sample without swallowing a neighbouring product path", () => {
     const bundle = loadBundle(BUNDLE_PATH);
-    const denied = [
-      "packages/obs-capture/src/zone/manifest.ts",
-      "packages/obs-capture/src/index.ts",
-      "migrations/0000_s00.sql",
-      "packages/crypto/src/index.ts",
-      "packages/published-arithmetic/src/index.ts",
-      "packages/serve/src/index.ts",
-      "packages/budget/src/index.ts",
-      "package.json",
-      "packages/kernel/package.json",
-      "apps/ui/pnpm-lock.yaml",
-      "register.bootstrap.json",
-      "compose.dev.yaml",
-      "deploy/dev-auth/compose.yaml",
-      ".github/workflows/ci.yml",
-      "scripts/check-source.ts",
-      "tools/obs-listener/policy/bundle.json",
-      "docs/agent-protocols/debateai-heartbeat-protocol.md",
-      ".hermes/x",
-      "apps/api/src/mfa.ts",
-      "apps/api/dist/mail-channel.js",
-      "apps/api/dist/mfa.js",
-      "apps/api/dist/registration.js",
-      "dist/apps/api/src/mail-channel.js",
-      "dist/apps/api/src/mfa.js",
-      "dist/apps/api/src/registration.js",
-      "dist/packages/db/src/identity.js",
-      "packages/db/dist/identity.js",
-      "packages/db/src/obs-schema.ts",
-      "packages/register/src/compose-env.ts",
-      "packages/register/src/runtime-environment.ts",
-      "././tools/obs-listener/policy/bundle.json",
-    ];
-
-    expect(denied.map((path) => isFloorDenied(bundle, path))).toEqual(
-      denied.map(() => true),
-    );
-    const allowedNeighbours = [
-      "apps/api/src/public-health.ts",
-      "././apps/api/src/public-health.ts",
-      "apps/api/src/mfa-helper.ts",
-      "apps/ui/pnpm-lock.yml",
-      "packages/cryptography/src/index.ts",
-      "packages/db/src/obs-schema-helper.ts",
-      "packages/register/src/compose-environment.ts",
-      "packages/register/src/runtime-configuration.ts",
-    ];
     expect(
-      allowedNeighbours.map((path) => isFloorDenied(bundle, path)),
-    ).toEqual(allowedNeighbours.map(() => false));
+      FROZEN_FLOOR_SAMPLES.map((path) => isFloorDenied(bundle, path)),
+    ).toEqual(
+      FROZEN_FLOOR_SAMPLES.map(() => true),
+    );
+    expect(
+      FLOOR_SAFE_NEIGHBORS.map((path) => isFloorDenied(bundle, path)),
+    ).toEqual(FLOOR_SAFE_NEIGHBORS.map(() => false));
   });
 
   it("fails closed when a candidate path is not repo-relative", () => {
