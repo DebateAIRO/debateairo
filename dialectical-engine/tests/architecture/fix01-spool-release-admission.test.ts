@@ -1460,6 +1460,59 @@ describe("FIX-01 offline spool release admission", () => {
     )).toHaveLength(1);
   });
 
+  it("rejects an exact unterminated candidate tail that already has a framed row", () => {
+    const root = scratch("unterminated-duplicate-candidate");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    const name = spoolName(952);
+    writeFileSync(join(spoolDirectory, name), "", { mode: 0o600 });
+    const originalIndex = Buffer.from(`${name}\n${name}`, "utf8");
+    writeFileSync(join(spoolDirectory, INDEX_NAME), originalIndex, { mode: 0o600 });
+
+    const result = runAdmission(spoolDirectory, manifestPath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).not.toContain("PASS_");
+    expect(existsSync(manifestPath)).toBe(false);
+    expect(readFileSync(join(spoolDirectory, INDEX_NAME))).toEqual(originalIndex);
+    expect(existsSync(join(spoolDirectory, RELEASE_LOCK_NAME))).toBe(false);
+    expect(readdirSync(spoolDirectory).filter((entry) =>
+      entry.startsWith(RELEASE_LOCK_STAGE_PREFIX)
+    )).toEqual([]);
+  });
+
+  it("completes a candidate tail after a different framed candidate", () => {
+    const root = scratch("unterminated-after-neighbor");
+    const spoolDirectory = realpathSync(join(root, "spool"));
+    const manifestPath = join(root, "manifest.json");
+    const firstName = spoolName(953);
+    const tailName = spoolName(954);
+    writeFileSync(join(spoolDirectory, firstName), "", { mode: 0o600 });
+    writeFileSync(join(spoolDirectory, tailName), "", { mode: 0o600 });
+    writeFileSync(
+      join(spoolDirectory, INDEX_NAME),
+      `${firstName}\n${tailName}`,
+      { mode: 0o600 },
+    );
+
+    const result = runAdmission(spoolDirectory, manifestPath);
+
+    expect(result.status, result.stderr).toBe(0);
+    const manifest = parseManifest(manifestPath);
+    const digest = manifestDigestFromOutput(result.stdout)!;
+    const gated = runGate(spoolDirectory, manifestPath, digest);
+    expect(gated.status, gated.stderr).toBe(0);
+    const lines = readFileSync(join(spoolDirectory, INDEX_NAME), "utf8").split("\n");
+    expect(lines.filter((line) => line === firstName)).toHaveLength(1);
+    expect(lines.filter((line) => line === tailName)).toHaveLength(1);
+    for (const name of [firstName, tailName]) {
+      const candidate = manifest.entries.find((entry) => entry.basename === name)!;
+      expect(lines.filter((line) =>
+        line === admissionRecord(manifest.admission_ref, candidate)
+      )).toHaveLength(1);
+    }
+  });
+
   it("syncs the lock directory before index append and stops if it cannot", () => {
     const orderedRoot = scratch("release-lock-directory-sync-order");
     const orderedSpool = realpathSync(join(orderedRoot, "spool"));

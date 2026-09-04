@@ -672,6 +672,13 @@ function plannedIndexAppend(
   const completedTail = index?.unterminatedBasename;
   if (
     completedTail !== undefined
+    && index?.basenames.has(completedTail)
+    && candidates.some((candidate) => candidate.basename === completedTail)
+  ) {
+    fail("FAIL_INDEX_RECORD_DUPLICATE");
+  }
+  if (
+    completedTail !== undefined
     && !index?.basenames.has(completedTail)
     && candidates.some((candidate) => candidate.basename === completedTail)
   ) {
