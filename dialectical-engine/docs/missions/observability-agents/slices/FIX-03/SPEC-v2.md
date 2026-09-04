@@ -17,6 +17,15 @@ and pass the same local to every fallback and success `build()` call. These exac
 expressions supersede the addendum §4.3 byte freeze. No other redactor expression is
 opened by this correction.
 
+The round-2 correction may replace that captured object with one stable snapshot of
+the six declared-ref fields and `zone_context`. Only own data descriptors may enter
+the snapshot. An accessor or descriptor trap produces a zone-true minimized fallback
+with six sentinels. C1 may pass the saved zone decision through the fallback signature
+and may read a payload zone flag before later payload validation. Once a payload zone
+value is true, later fallback cannot clear it. `kinds.ts` may use descriptor-only reads
+for the same seven fields and declaration members. These exact expressions supersede
+the earlier same-object plumbing; no other redactor code is opened.
+
 Allowed tests:
 
 - `tests/unit/fix03-kinds.test.ts`
@@ -35,6 +44,8 @@ No architecture test is part of C1. Runtime import shape is proved by a command 
 7. `kinds.ts` has one type-only import from `./context.js` and no runtime import.
 8. C1 does not seed runner context. Later seams must use `runWithObsContext` with declared `run_ref` and `work_item_ref` objects. A Hatchet retry ordinal belongs only in `attempt_index`; it is never an `attempt_ref`.
 9. A nullish entry or a throwing `ambient_context_ref` getter returns the minimized fallback. The ambient property is read at most once. A captured lawful declaration still projects on every later fallback path.
+10. Ambient and declaration accessors are not declaration data. A trap or accessor at the ambient snapshot boundary yields a zone-true minimized fallback with six sentinels. The original ambient object is never read after the snapshot.
+11. A payload `zone_context: true` remains true through every later fallback. Later invalid data cannot expose an ambient ref or clear the zone mark.
 
 ## C1 milestone
 
