@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { hash } from "node:crypto";
 import { isProxy } from "node:util/types";
 
 export type CanonicalJsonValue =
@@ -352,7 +352,5 @@ export function canonicalJson(value: unknown): string {
 }
 
 export function bundleHash(value: unknown): string {
-  return createHash("sha256")
-    .update(canonicalJson(value), "utf8")
-    .digest("hex");
+  return hash("sha256", canonicalJson(value), "hex");
 }

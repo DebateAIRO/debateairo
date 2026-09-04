@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { isProxy } from "node:util/types";
+import { runInNewContext } from "node:vm";
 import { z } from "zod";
 
 import { canonicalProjection } from "./canonical.js";
@@ -17,6 +18,29 @@ const BASE_ARRAY_ITERATOR = Object.getOwnPropertyDescriptor(
   Array.prototype,
   Symbol.iterator,
 );
+const BASE_ARRAY_PUSH = Object.getOwnPropertyDescriptor(
+  Array.prototype,
+  "push",
+);
+const isNativeArrayPush = runInNewContext(`
+  (candidate) => {
+    const nativePush = Object.getOwnPropertyDescriptor(
+      Array.prototype,
+      "push",
+    ).value;
+    return typeof candidate === "function" &&
+      Function.prototype.toString.call(candidate) ===
+        Function.prototype.toString.call(nativePush);
+  }
+`) as (candidate: unknown) => boolean;
+const BASE_ARRAY_PUSH_IS_TRUSTED =
+  BASE_ARRAY_PUSH !== undefined &&
+  Object.hasOwn(BASE_ARRAY_PUSH, "value") &&
+  BASE_ARRAY_PUSH.configurable === true &&
+  BASE_ARRAY_PUSH.enumerable === false &&
+  BASE_ARRAY_PUSH.writable === true &&
+  !isProxy(BASE_ARRAY_PUSH.value) &&
+  isNativeArrayPush(BASE_ARRAY_PUSH.value);
 const BASE_OBJECT_SOME = Object.getOwnPropertyDescriptor(
   Object.prototype,
   "some",
@@ -822,10 +846,15 @@ function sameDescriptor(
 }
 
 function hasArrayAuthorityPrototypeMutation(): boolean {
-  return !sameDescriptor(
-    Object.getOwnPropertyDescriptor(Array.prototype, "some"),
-    BASE_ARRAY_SOME,
-  ) ||
+  return !BASE_ARRAY_PUSH_IS_TRUSTED ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Array.prototype, "push"),
+      BASE_ARRAY_PUSH,
+    ) ||
+    !sameDescriptor(
+      Object.getOwnPropertyDescriptor(Array.prototype, "some"),
+      BASE_ARRAY_SOME,
+    ) ||
     !sameDescriptor(
       Object.getOwnPropertyDescriptor(Array.prototype, "sort"),
       BASE_ARRAY_SORT,

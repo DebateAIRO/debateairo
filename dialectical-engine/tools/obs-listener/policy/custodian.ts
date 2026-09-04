@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { hash, timingSafeEqual } from "node:crypto";
 import { isProxy } from "node:util/types";
 
 import {
@@ -23,7 +23,7 @@ export class RepinRefusedError extends Error {
 }
 
 function tokenDigest(token: string): Buffer {
-  return createHash("sha256").update(token, "utf8").digest();
+  return hash("sha256", token, "buffer");
 }
 
 function ownStringProperty(value: unknown, key: string): string | undefined {

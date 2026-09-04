@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   mkdtempSync,
   readFileSync,
@@ -7,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
@@ -337,6 +339,30 @@ function withInheritedArrayMember<T>(
   return outcome!;
 }
 
+function withHashMember<T>(
+  key: "update" | "digest",
+  descriptor: PropertyDescriptor,
+  operation: () => T,
+): CapturedOperation<T> {
+  const prototype = Object.getPrototypeOf(createHash("sha256")) as object;
+  const previous = Object.getOwnPropertyDescriptor(prototype, key);
+  if (previous === undefined) throw new Error("HASH_MEMBER_MISSING");
+  let outcome: CapturedOperation<T>;
+
+  try {
+    Object.defineProperty(prototype, key, descriptor);
+    try {
+      outcome = { success: true, value: operation() };
+    } catch (error) {
+      outcome = { success: false, error };
+    }
+  } finally {
+    Object.defineProperty(prototype, key, previous);
+  }
+
+  return outcome!;
+}
+
 describe("FIX-09 C1 policy bundle", () => {
   it("loads the complete fail-closed phase-one policy", () => {
     const bundle = loadBundle(BUNDLE_PATH);
@@ -457,6 +483,381 @@ describe("FIX-09 C1 policy bundle", () => {
       code_registry_seed: expectedPins.code_registry_seed,
       register_seeds: expectedPins.register_seeds,
     });
+  });
+
+  it("never dispatches inherited Hash update or digest during authority decisions", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const armed = { ...bundle, quick_arm: "ON" as const };
+    const expectedHash =
+      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd";
+    const members = ["update", "digest"] as const;
+    const variants = [
+      "GETTER_FUNCTION",
+      "DATA_FUNCTION",
+      "THROWING_GETTER",
+      "NON_FUNCTION",
+    ] as const;
+
+    for (const member of members) {
+      for (const variant of variants) {
+        let getterCalls = 0;
+        let functionCalls = 0;
+        const hostileFunction = function (
+          this: unknown,
+          argument?: unknown,
+        ): unknown {
+          functionCalls += 1;
+          if (member === "update") return this;
+          return argument === "hex" ? "0".repeat(64) : Buffer.alloc(32);
+        };
+        let descriptor: PropertyDescriptor;
+        if (variant === "GETTER_FUNCTION") {
+          descriptor = {
+            configurable: true,
+            get() {
+              getterCalls += 1;
+              return hostileFunction;
+            },
+          };
+        } else if (variant === "DATA_FUNCTION") {
+          descriptor = {
+            configurable: true,
+            value: hostileFunction,
+            writable: true,
+          };
+        } else if (variant === "THROWING_GETTER") {
+          descriptor = {
+            configurable: true,
+            get() {
+              getterCalls += 1;
+              throw new Error("HASH_MEMBER_RAN");
+            },
+          };
+        } else {
+          descriptor = {
+            configurable: true,
+            value: "NOT_CALLABLE",
+            writable: true,
+          };
+        }
+
+        const outcome = withHashMember(member, descriptor, () => {
+          let repinError: unknown;
+          let repinned: PolicyBundle | undefined;
+          try {
+            repinned = repin(bundle, {
+              token: "wrong",
+              next_bundle: armed,
+            }, {
+              OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+            });
+          } catch (error) {
+            repinError = error;
+          }
+          return { hash: bundleHash(bundle), repinError, repinned };
+        });
+        const label = `${member}:${variant}`;
+
+        expect.soft(outcome.success, label).toBe(true);
+        expect.soft(getterCalls, label).toBe(0);
+        expect.soft(functionCalls, label).toBe(0);
+        if (outcome.success) {
+          expect.soft(outcome.value.hash, label).toBe(expectedHash);
+          expect.soft(outcome.value.repinError, label).toBeInstanceOf(
+            RepinRefusedError,
+          );
+          expect.soft(outcome.value.repinned, label).toBeUndefined();
+        }
+        expect.soft(bundleHash(bundle), `${label}:restored`).toBe(expectedHash);
+      }
+    }
+
+    expect(
+      repin(bundle, { token: "correct" }, {
+        OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+      }).quick_arm,
+    ).toBe("OFF");
+  });
+
+  it("refuses every hostile Array.prototype.push shape before Zod can execute it", () => {
+    const bundle = loadBundle(BUNDLE_PATH);
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+    const armed = { ...bundle, quick_arm: "ON" as const };
+    const pushDescriptor = Object.getOwnPropertyDescriptor(
+      Array.prototype,
+      "push",
+    );
+    const hashPrototype = Object.getPrototypeOf(createHash("sha256")) as object;
+    const updateDescriptor = Object.getOwnPropertyDescriptor(
+      hashPrototype,
+      "update",
+    );
+    if (
+      pushDescriptor === undefined ||
+      !Object.hasOwn(pushDescriptor, "value") ||
+      typeof pushDescriptor.value !== "function" ||
+      updateDescriptor === undefined
+    ) {
+      throw new Error("NATIVE_AUTHORITY_MEMBER_MISSING");
+    }
+    const nativePush = pushDescriptor.value as (...values: unknown[]) => number;
+    const variants = [
+      "GETTER_NOOP",
+      "DATA_NOOP",
+      "THROWING_GETTER",
+      "NON_FUNCTION",
+      "WRAPPER_CROSS_CALL_POISON",
+    ] as const;
+
+    for (const variant of variants) {
+      let getterCalls = 0;
+      let functionCalls = 0;
+      const hostileFunction = function (
+        this: unknown[],
+        ...values: unknown[]
+      ): number {
+        functionCalls += 1;
+        if (variant === "WRAPPER_CROSS_CALL_POISON") {
+          Object.defineProperty(hashPrototype, "update", {
+            configurable: true,
+            value(this: unknown) {
+              return this;
+            },
+            writable: true,
+          });
+          return Reflect.apply(nativePush, this, values);
+        }
+        return 0;
+      };
+      let descriptor: PropertyDescriptor;
+      if (variant === "GETTER_NOOP") {
+        descriptor = {
+          configurable: true,
+          get() {
+            getterCalls += 1;
+            return hostileFunction;
+          },
+        };
+      } else if (variant === "THROWING_GETTER") {
+        descriptor = {
+          configurable: true,
+          get() {
+            getterCalls += 1;
+            throw new Error("ARRAY_PUSH_RAN");
+          },
+        };
+      } else if (variant === "NON_FUNCTION") {
+        descriptor = {
+          configurable: true,
+          value: "NOT_CALLABLE",
+          writable: true,
+        };
+      } else {
+        descriptor = {
+          configurable: true,
+          value: hostileFunction,
+          writable: true,
+        };
+      }
+
+      let safeResult: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+      let loadError: unknown;
+      let repinError: unknown;
+      let repinned: PolicyBundle | undefined;
+      let hash: string | undefined;
+      let escaped: unknown;
+      try {
+        Object.defineProperty(Array.prototype, "push", descriptor);
+        try {
+          safeResult = policyBundleSchema.safeParse(raw);
+          try {
+            loadBundle(BUNDLE_PATH);
+          } catch (error) {
+            loadError = error;
+          }
+          try {
+            repinned = repin(bundle, {
+              token: "wrong",
+              next_bundle: armed,
+            }, {
+              OBS_POLICY_CUSTODIAN_TOKEN: "correct",
+            });
+          } catch (error) {
+            repinError = error;
+          }
+          hash = bundleHash(bundle);
+        } catch (error) {
+          escaped = error;
+        }
+      } finally {
+        Object.defineProperty(Array.prototype, "push", pushDescriptor);
+        Object.defineProperty(hashPrototype, "update", updateDescriptor);
+      }
+      const label = variant;
+
+      expect.soft(escaped, label).toBeUndefined();
+      expect.soft(safeResult?.success, label).toBe(false);
+      expect.soft(loadError, label).toBeInstanceOf(PolicyBundleLoadError);
+      expect.soft(repinError, label).toBeInstanceOf(RepinRefusedError);
+      expect.soft(repinned, label).toBeUndefined();
+      expect.soft(getterCalls, label).toBe(0);
+      expect.soft(functionCalls, label).toBe(0);
+      expect.soft(hash, label).toBe(
+        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      );
+    }
+
+    expect(policyBundleSchema.safeParse(raw).success).toBe(true);
+    expect(loadBundle(BUNDLE_PATH).quick_arm).toBe("OFF");
+  });
+
+  it("never trusts a hostile Array.prototype.push present before loader initialization", () => {
+    const loaderUrl = pathToFileURL(resolve(
+      import.meta.dirname,
+      "../../tools/obs-listener/policy/loader.ts",
+    )).href;
+    const canonicalUrl = pathToFileURL(resolve(
+      import.meta.dirname,
+      "../../tools/obs-listener/policy/canonical.ts",
+    )).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      await import("zod");
+      await import(${JSON.stringify(canonicalUrl)});
+      const previous = Object.getOwnPropertyDescriptor(Array.prototype, "push");
+      if (!previous || !("value" in previous)) throw new Error("MISSING_PUSH");
+      const original = previous.value;
+      let calls = 0;
+      Object.defineProperty(Array.prototype, "push", {
+        configurable: true,
+        value: function hostilePush(...values) {
+          calls += 1;
+          return Reflect.apply(original, this, values);
+        },
+        writable: true,
+      });
+      try {
+        const { policyBundleSchema } = await import(
+          ${JSON.stringify(loaderUrl)} + "?hostile-preimport"
+        );
+        const raw = JSON.parse(readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8"));
+        const result = policyBundleSchema.safeParse(raw);
+        process.stdout.write(JSON.stringify({ success: result.success, calls }));
+      } finally {
+        Object.defineProperty(Array.prototype, "push", previous);
+      }
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toMatchObject({ success: false });
+  });
+
+  it("detects an exact push identity change introduced during Zod validation", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+    const pushDescriptor = Object.getOwnPropertyDescriptor(
+      Array.prototype,
+      "push",
+    );
+    const testDescriptor = Object.getOwnPropertyDescriptor(
+      RegExp.prototype,
+      "test",
+    );
+    if (
+      pushDescriptor === undefined ||
+      !Object.hasOwn(pushDescriptor, "value") ||
+      typeof pushDescriptor.value !== "function" ||
+      testDescriptor === undefined ||
+      !Object.hasOwn(testDescriptor, "value") ||
+      typeof testDescriptor.value !== "function"
+    ) {
+      throw new Error("NATIVE_VALIDATION_MEMBER_MISSING");
+    }
+    const nativePush = pushDescriptor.value as (...values: unknown[]) => number;
+    const nativeTest = testDescriptor.value as (
+      this: RegExp,
+      value: string,
+    ) => boolean;
+    let testCalls = 0;
+    let changedPushCalls = 0;
+    let result: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    let escaped: unknown;
+
+    try {
+      Object.defineProperty(RegExp.prototype, "test", {
+        configurable: true,
+        value(this: RegExp, value: string) {
+          testCalls += 1;
+          if (testCalls === 1) {
+            Object.defineProperty(Array.prototype, "push", {
+              configurable: true,
+              value(this: unknown[], ...values: unknown[]) {
+                changedPushCalls += 1;
+                return Reflect.apply(nativePush, this, values);
+              },
+              writable: true,
+            });
+          }
+          return Reflect.apply(nativeTest, this, [value]);
+        },
+        writable: true,
+      });
+      try {
+        result = policyBundleSchema.safeParse(raw);
+      } catch (error) {
+        escaped = error;
+      }
+    } finally {
+      Object.defineProperty(RegExp.prototype, "test", testDescriptor);
+      Object.defineProperty(Array.prototype, "push", pushDescriptor);
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(testCalls).toBeGreaterThan(0);
+    expect(changedPushCalls).toBeGreaterThan(0);
+    expect(result?.success).toBe(false);
+    expect(policyBundleSchema.safeParse(raw).success).toBe(true);
+  });
+
+  it("does not overreach to an unreachable Object.prototype.push neighbour", () => {
+    const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8"));
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "push");
+    let getterCalls = 0;
+    let functionCalls = 0;
+    let result: ReturnType<typeof policyBundleSchema.safeParse> | undefined;
+    let escaped: unknown;
+    try {
+      Object.defineProperty(Object.prototype, "push", {
+        configurable: true,
+        get() {
+          getterCalls += 1;
+          return () => {
+            functionCalls += 1;
+            return 0;
+          };
+        },
+      });
+      try {
+        result = policyBundleSchema.safeParse(raw);
+      } catch (error) {
+        escaped = error;
+      }
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(Object.prototype, "push");
+      } else {
+        Object.defineProperty(Object.prototype, "push", previous);
+      }
+    }
+
+    expect(escaped).toBeUndefined();
+    expect(result?.success).toBe(true);
+    expect(getterCalls).toBe(0);
+    expect(functionCalls).toBe(0);
   });
 
   it("hashes semantic JSON independently of object key order and whitespace", () => {
