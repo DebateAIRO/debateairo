@@ -269,16 +269,23 @@ export function createSharedRedactor(
 
   return Object.freeze({
     redact(entry: CaptureQueueEntry): PostRedactionEnvelope {
+      let ambientContext: CaptureQueueEntry["ambient_context_ref"];
+      try {
+        ambientContext = entry?.ambient_context_ref;
+      } catch {
+        return fallback(undefined);
+      }
+
       try {
         let payload: Readonly<Record<string, unknown>> | undefined;
         let codeValue: unknown;
         if (entry.kind === "envelope") {
           if (!isRecord(entry.payload_ref)) {
-            return fallback(entry.ambient_context_ref);
+            return fallback(ambientContext);
           }
           payload = entry.payload_ref;
           if (Object.keys(payload).some((key) => !INPUT_ALLOWLIST.has(key))) {
-            return fallback(entry.ambient_context_ref);
+            return fallback(ambientContext);
           }
           codeValue = ownValue(payload, "code");
           if (codeValue === undefined) {
@@ -292,7 +299,7 @@ export function createSharedRedactor(
         }
 
         if (typeof codeValue !== "string" || resolveSafeTemplate(codeValue) === undefined) {
-          return fallback(entry.ambient_context_ref);
+          return fallback(ambientContext);
         }
         const taxonomyValue = payload === undefined
           ? "ORIGIN_UNKNOWN"
@@ -301,7 +308,7 @@ export function createSharedRedactor(
           ? resolveTaxonomyClass(taxonomyValue)?.taxonomy_class
           : undefined;
         if (taxonomy === undefined) {
-          return fallback(entry.ambient_context_ref);
+          return fallback(ambientContext);
         }
         const capturePoint = stringMember<CapturePoint>(
           payload === undefined ? undefined : ownValue(payload, "capture_point"),
@@ -319,15 +326,15 @@ export function createSharedRedactor(
           "first_party",
         );
         if (capturePoint === undefined || disposition === undefined || source === undefined) {
-          return fallback(entry.ambient_context_ref);
+          return fallback(ambientContext);
         }
         const zoneValue = payload === undefined
           ? undefined
           : ownValue(payload, "zone_context");
         if (zoneValue !== undefined && typeof zoneValue !== "boolean") {
-          return fallback(entry.ambient_context_ref);
+          return fallback(ambientContext);
         }
-        const contextZone = entry.ambient_context_ref?.zone_context;
+        const contextZone = ambientContext?.zone_context;
         const zoneContext = zoneValue ?? (typeof contextZone === "boolean" && contextZone);
         const attemptValue = payload === undefined
           ? undefined
@@ -336,7 +343,7 @@ export function createSharedRedactor(
           attemptValue !== undefined &&
           (!Number.isSafeInteger(attemptValue) || (attemptValue as number) < 0)
         ) {
-          return fallback(entry.ambient_context_ref);
+          return fallback(ambientContext);
         }
         return build({
           code: codeValue,
@@ -347,10 +354,10 @@ export function createSharedRedactor(
           zoneContext,
           attemptIndex: attemptValue === undefined ? null : (attemptValue as number),
           fallbackMinimized: false,
-          ambientContext: entry.ambient_context_ref,
+          ambientContext,
         });
       } catch {
-        return fallback(entry.ambient_context_ref);
+        return fallback(ambientContext);
       }
     },
   });

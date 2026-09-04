@@ -132,19 +132,45 @@ describe("FIX-03 declared-kind projection", () => {
     expect(envelope.fallback_minimized).toBe(false);
   });
 
-  it("ignores inherited field and declaration properties", () => {
+  it("ignores inherited context fields", () => {
     const inheritedField = Object.create({
       run_ref: { kind: "run", value: randomUUID() },
     }) as ObsContext;
-    const inheritedDeclaration = Object.create({
-      kind: "run",
-      value: randomUUID(),
-    });
 
     expect(redact(inheritedField).run_ref).toBe(UNKNOWN);
-    expect(redact(Object.freeze({ run_ref: inheritedDeclaration })).run_ref).toBe(
-      UNKNOWN,
+  });
+
+  it("rejects an inherited declaration kind with an own value", () => {
+    const declaration = Object.assign(
+      Object.create({ kind: "run" }) as Record<string, unknown>,
+      { value: randomUUID() },
     );
+
+    expect(redact(Object.freeze({ run_ref: declaration })).run_ref).toBe(UNKNOWN);
+  });
+
+  it("rejects an own declaration kind with an inherited value", () => {
+    const declaration = Object.assign(
+      Object.create({ value: randomUUID() }) as Record<string, unknown>,
+      { kind: "run" },
+    );
+
+    expect(redact(Object.freeze({ run_ref: declaration })).run_ref).toBe(UNKNOWN);
+  });
+
+  it("rejects an own declaration kind with inherited positive absence", () => {
+    const declaration = Object.assign(
+      Object.create({ not_applicable: true }) as Record<string, unknown>,
+      { kind: "run" },
+    );
+
+    expect(redact(Object.freeze({ run_ref: declaration })).run_ref).toBe(UNKNOWN);
+  });
+
+  it("rejects own not_applicable false", () => {
+    expect(redact(Object.freeze({
+      run_ref: Object.freeze({ kind: "run", not_applicable: false }),
+    })).run_ref).toBe(UNKNOWN);
   });
 
   it("forces all six fields to the sentinel in zone context", () => {
@@ -174,6 +200,25 @@ describe("FIX-03 declared-kind projection", () => {
     }
   });
 
+  it("lets a direct payload zone flag veto a non-zone ambient declaration", () => {
+    const runRef = randomUUID();
+    const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(Object.freeze({
+      kind: "envelope" as const,
+      payload_ref: Object.freeze({
+        ...VALID_PAYLOAD,
+        zone_context: true,
+      }),
+      ambient_context_ref: Object.freeze({
+        run_ref: Object.freeze({ kind: "run", value: runRef }),
+      }),
+    }));
+
+    expect(refs(envelope)).toEqual(Object.fromEntries(
+      REF_FIELDS.map((field) => [field, UNKNOWN]),
+    ));
+    expect(JSON.stringify(envelope)).not.toContain(runRef);
+  });
+
   it("never treats handled context as a declaration channel", () => {
     const canary = randomUUID();
     const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(Object.freeze({
@@ -191,20 +236,46 @@ describe("FIX-03 declared-kind projection", () => {
 
   it("keeps a lawful ambient declaration on the minimized fallback path", () => {
     const runRef = randomUUID();
-    const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(Object.freeze({
+    let ambientReads = 0;
+    const fallbackEntry = Object.freeze({
       kind: "envelope" as const,
       payload_ref: Object.freeze({
         ...VALID_PAYLOAD,
         forbidden_extra_key: "forces-fallback",
       }),
-      ambient_context_ref: Object.freeze({
-        run_ref: Object.freeze({ kind: "run", value: runRef }),
-      }),
-    }));
+      get ambient_context_ref() {
+        ambientReads += 1;
+        return Object.freeze({
+          run_ref: Object.freeze({ kind: "run", value: runRef }),
+        });
+      },
+    });
+    const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(fallbackEntry);
 
     expect(envelope.code).toBe("OBS_CAPTURE_SELF");
     expect(envelope.fallback_minimized).toBe(true);
     expect(envelope.run_ref).toBe(runRef);
+    expect(ambientReads).toBe(1);
+  });
+
+  it("reads ambient context once on the successful path", () => {
+    const runRef = randomUUID();
+    let ambientReads = 0;
+    const successfulEntry = Object.freeze({
+      kind: "envelope" as const,
+      payload_ref: VALID_PAYLOAD,
+      get ambient_context_ref() {
+        ambientReads += 1;
+        return Object.freeze({
+          run_ref: Object.freeze({ kind: "run", value: runRef }),
+        });
+      },
+    });
+    const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(successfulEntry);
+
+    expect(envelope.fallback_minimized).toBe(false);
+    expect(envelope.run_ref).toBe(runRef);
+    expect(ambientReads).toBe(1);
   });
 
   it("still suppresses fallback refs when the ambient context is a zone", () => {
@@ -224,6 +295,51 @@ describe("FIX-03 declared-kind projection", () => {
     expect(envelope.fallback_minimized).toBe(true);
     expect(envelope.run_ref).toBe(UNKNOWN);
     expect(JSON.stringify(envelope)).not.toContain(runRef);
+  });
+
+  it.each([
+    ["undefined", undefined],
+    ["null", null],
+  ])("returns a minimized fallback for %s input", (_name, rawEntry) => {
+    const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(
+      rawEntry as unknown as CaptureQueueEntry,
+    );
+
+    expect(envelope.code).toBe("OBS_CAPTURE_SELF");
+    expect(envelope.fallback_minimized).toBe(true);
+    expect(refs(envelope)).toEqual(Object.fromEntries(
+      REF_FIELDS.map((field) => [field, UNKNOWN]),
+    ));
+  });
+
+  it("returns a minimized fallback when the entry ambient getter throws", () => {
+    let ambientReads = 0;
+    const hostileEntry = new Proxy(
+      {
+        kind: "envelope" as const,
+        payload_ref: VALID_PAYLOAD,
+      },
+      {
+        get(target, property, receiver) {
+          if (property === "ambient_context_ref") {
+            ambientReads += 1;
+            throw new Error("hostile ambient getter");
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    ) as CaptureQueueEntry;
+    let envelope: PostRedactionEnvelope | undefined;
+
+    expect(() => {
+      envelope = createSharedRedactor(REDACTOR_CONFIG).redact(hostileEntry);
+    }).not.toThrow();
+    expect(ambientReads).toBe(1);
+    expect(envelope?.code).toBe("OBS_CAPTURE_SELF");
+    expect(envelope?.fallback_minimized).toBe(true);
+    expect(envelope === undefined ? undefined : refs(envelope)).toEqual(
+      Object.fromEntries(REF_FIELDS.map((field) => [field, UNKNOWN])),
+    );
   });
 
   it("is total when hostile proxies throw during property access", async () => {
