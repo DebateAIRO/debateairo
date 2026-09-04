@@ -16,7 +16,7 @@ This plan replaces the empty C1 cells in `PLAN.md`. C2 and C3 remain deferred.
 ## C1 steps
 
 1. **C1.1 — RED.** Create the two allowed unit tests. Type the expected list directly from the declared-kind addendum. Prove that the list API is absent and that lawful declarations still land on the sentinel. Record the failing output.
-2. **C1.2 — GREEN.** Add `kinds.ts`. Edit only the `correlation-projection` region of `redactor.ts`. Run the two tests until green.
+2. **C1.2 — GREEN.** Add `kinds.ts`. Edit only the `correlation-projection` region of `redactor.ts`. The allowed edit includes one guarded read of `entry.ambient_context_ref`, the `fallback(ambientContext)` signature, and use of that same local by every fallback and success `build()` call. Add nullish-entry and throwing-getter tests. Run the two test files until green.
 3. **C1.3 — falsify and verify.** Run the focused pair three times. Mutate, one at a time: add a seventh kind; admit a bare UUID; accept a wrong-field kind; allow a zone ref. Each mutant must make a named test fail. Restore after each run. Run type, runtime-import, static, and scope checks.
 4. **C1.4 — commit.** Commit only the two product files and two unit files with subject `feat(obs): FIX-03 C1 — frozen declared kinds, projection veto`.
 

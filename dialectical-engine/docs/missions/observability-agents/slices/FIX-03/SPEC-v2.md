@@ -11,6 +11,12 @@ Allowed product files:
 - `packages/obs-capture/src/kinds.ts`
 - `packages/obs-capture/src/redactor.ts`, region `correlation-projection` only, as defined by the addendum §4.3 R1–R5
 
+Within that redactor region, C1 may capture `entry.ambient_context_ref` once through a
+non-throwing guard, add the captured value to the `fallback(ambientContext)` signature,
+and pass the same local to every fallback and success `build()` call. These exact
+expressions supersede the addendum §4.3 byte freeze. No other redactor expression is
+opened by this correction.
+
 Allowed tests:
 
 - `tests/unit/fix03-kinds.test.ts`
@@ -28,6 +34,7 @@ No architecture test is part of C1. Runtime import shape is proved by a command 
 6. UUID kinds accept only canonical lowercase RFC-4122 UUID text. `at_seq` accepts only a positive canonical decimal integer string no larger than `Number.MAX_SAFE_INTEGER`. Accepted values are copied byte-for-byte.
 7. `kinds.ts` has one type-only import from `./context.js` and no runtime import.
 8. C1 does not seed runner context. Later seams must use `runWithObsContext` with declared `run_ref` and `work_item_ref` objects. A Hatchet retry ordinal belongs only in `attempt_index`; it is never an `attempt_ref`.
+9. A nullish entry or a throwing `ambient_context_ref` getter returns the minimized fallback. The ambient property is read at most once. A captured lawful declaration still projects on every later fallback path.
 
 ## C1 milestone
 
