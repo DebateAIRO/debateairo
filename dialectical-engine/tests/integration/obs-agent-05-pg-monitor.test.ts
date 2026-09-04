@@ -45,7 +45,10 @@ describe("OBS-05 pg_monitor migration and numeric query", () => {
 
   it("returns only finite numeric statistics and both fixed database sizes", async () => {
     const observedAt = new Date("2026-09-03T08:00:00.000Z");
-    const result = await readPostgresCapacity(fixture().connectionString, observedAt);
+    const result = await readPostgresCapacity(fixture().connectionString, observedAt, {
+      lockWaitSeconds: 60,
+      idleInTransactionSeconds: 120
+    });
     expect(result.observedAt).toEqual(observedAt);
     for (const [key, value] of Object.entries(result)) {
       if (key === "observedAt") continue;

@@ -16,7 +16,7 @@ type Condition = Readonly<{
   key: string;
   failing: boolean;
   severity: Severity;
-  impactCode: "IMPACT_DISK" | "IMPACT_MEMORY";
+  impactCode: "IMPACT_DISK" | "IMPACT_MEMORY" | "IMPACT_LOAD";
   evidence: Readonly<Record<string, unknown>>;
 }>;
 
@@ -54,7 +54,6 @@ export function createHostCapacityTracker() {
       highLoadSamples = loadHigh ? highLoadSamples + 1 : 0;
       const diskBand = snapshot.diskFreePercent < thresholds.diskFatalFreePercent ? "FATAL"
         : snapshot.diskFreePercent < thresholds.diskDegradedFreePercent ? "DEGRADED" : "NORMAL";
-      const loadPercent = snapshot.loadOneMinute / (thresholds.loadPerCoreMultiplier * snapshot.logicalCores) * 100;
       const conditions: readonly Condition[] = Object.freeze([
         Object.freeze({
           key: "host-disk",
@@ -88,12 +87,12 @@ export function createHostCapacityTracker() {
           key: "host-load",
           failing: loadHigh && (highLoadSamples >= thresholds.loadSustainedSamples || open.has("host-load")),
           severity: "DEGRADED",
-          impactCode: "IMPACT_MEMORY",
+          impactCode: "IMPACT_LOAD",
           evidence: Object.freeze({
-            percent: loadPercent,
-            threshold_percent: 100,
-            total_bytes: snapshot.logicalCores,
-            unit: "bytes",
+            load_one_minute: snapshot.loadOneMinute,
+            logical_cores: snapshot.logicalCores,
+            threshold_multiplier: thresholds.loadPerCoreMultiplier,
+            sustained_seconds: thresholds.loadSustainedSamples * 30,
             observed_at: snapshot.observedAt.toISOString()
           })
         })

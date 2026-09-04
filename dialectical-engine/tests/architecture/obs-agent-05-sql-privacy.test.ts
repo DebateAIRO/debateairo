@@ -25,6 +25,15 @@ describe("OBS-05 SQL privacy and resource boundary", () => {
     expect(source).not.toMatch(/25\s*\/\s*100/u);
   });
 
+  it("binds both policy ages without embedding stale defaults in SQL", async () => {
+    const source = await productionSource();
+    expect(source.match(/\$1::double precision \* interval '1 second'/gu) ?? []).toHaveLength(2);
+    expect(source.match(/\$2::double precision \* interval '1 second'/gu) ?? []).toHaveLength(2);
+    expect(source).toContain("const parameters = postgresCapacityParameters(thresholds)");
+    expect(source).toContain("client.query<CapacityRow>(POSTGRES_CAPACITY_SQL, parameters)");
+    expect(source).not.toMatch(/interval '(?:60|120) seconds'/u);
+  });
+
   it("contains read-only SELECTs and no product or infrastructure mutation", async () => {
     const source = await productionSource();
     expect(source).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/u);

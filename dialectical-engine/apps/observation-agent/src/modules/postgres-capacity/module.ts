@@ -6,14 +6,22 @@ import type {
   SampleIntent,
   SignalIntent
 } from "../../core/types.js";
-import { readPostgresCapacity, type PostgresCapacitySnapshot } from "./query.js";
+import {
+  readPostgresCapacity,
+  type PostgresCapacityQueryThresholds,
+  type PostgresCapacitySnapshot
+} from "./query.js";
 import {
   createPostgresCapacityTracker,
   type PostgresCapacityThresholds
 } from "./tracker.js";
 
 export type PostgresCapacityDependencies = Readonly<{
-  readSnapshot(databaseUrl: string, observedAt: Date): Promise<PostgresCapacitySnapshot>;
+  readSnapshot(
+    databaseUrl: string,
+    observedAt: Date,
+    thresholds: PostgresCapacityQueryThresholds
+  ): Promise<PostgresCapacitySnapshot>;
 }>;
 
 const productionDependencies: PostgresCapacityDependencies = Object.freeze({
@@ -95,8 +103,12 @@ export function createPostgresCapacityModule(
     name: "postgres-capacity",
     cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
-      const snapshot = await resolved.readSnapshot(ctx.databaseUrl, ctx.now);
-      const cycle = tracker.observe({ snapshot, thresholds: thresholds(ctx.thresholds) });
+      const capacityThresholds = thresholds(ctx.thresholds);
+      const snapshot = await resolved.readSnapshot(ctx.databaseUrl, ctx.now, Object.freeze({
+        lockWaitSeconds: capacityThresholds.lockWaitSeconds,
+        idleInTransactionSeconds: capacityThresholds.idleInTransactionSeconds
+      }));
+      const cycle = tracker.observe({ snapshot, thresholds: capacityThresholds });
       pendingSamples = samples(snapshot);
       pendingSignals = cycle.intents;
       return Object.freeze([Object.freeze({

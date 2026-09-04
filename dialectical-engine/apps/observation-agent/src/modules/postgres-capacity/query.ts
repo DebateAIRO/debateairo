@@ -14,6 +14,11 @@ export type PostgresCapacitySnapshot = Readonly<{
   observedAt: Date;
 }>;
 
+export type PostgresCapacityQueryThresholds = Readonly<{
+  lockWaitSeconds: number;
+  idleInTransactionSeconds: number;
+}>;
+
 type CapacityRow = Readonly<{
   used_connections: number;
   max_connections: number;
@@ -38,11 +43,11 @@ SELECT
   current_setting('max_connections')::double precision AS max_connections,
   count(*) FILTER (
     WHERE wait_event_type='Lock'
-      AND state_change <= clock_timestamp() - interval '60 seconds'
+      AND state_change <= clock_timestamp() - $1::double precision * interval '1 second'
   )::double precision AS lock_waiters,
   coalesce(max(extract(epoch FROM clock_timestamp() - state_change)) FILTER (
     WHERE wait_event_type='Lock'
-      AND state_change <= clock_timestamp() - interval '60 seconds'
+      AND state_change <= clock_timestamp() - $1::double precision * interval '1 second'
   ),0)::double precision AS longest_lock_wait_seconds,
   coalesce(max(extract(epoch FROM clock_timestamp() - xact_start)) FILTER (
     WHERE xact_start IS NOT NULL
@@ -52,11 +57,11 @@ SELECT
   ),0)::double precision AS active_query_age_seconds,
   count(*) FILTER (
     WHERE state='idle in transaction'
-      AND state_change <= clock_timestamp() - interval '120 seconds'
+      AND state_change <= clock_timestamp() - $2::double precision * interval '1 second'
   )::double precision AS idle_in_transaction_count,
   coalesce(max(extract(epoch FROM clock_timestamp() - state_change)) FILTER (
     WHERE state='idle in transaction'
-      AND state_change <= clock_timestamp() - interval '120 seconds'
+      AND state_change <= clock_timestamp() - $2::double precision * interval '1 second'
   ),0)::double precision AS idle_in_transaction_age_seconds,
   coalesce(pg_database_size('debateai'),0)::double precision AS debateai_database_bytes,
   coalesce(pg_database_size('hatchet'),0)::double precision AS hatchet_database_bytes
@@ -69,17 +74,30 @@ function finite(value: unknown, key: string): number {
   return number;
 }
 
+export function postgresCapacityParameters(
+  thresholds: PostgresCapacityQueryThresholds
+): readonly [number, number] {
+  const lockWaitSeconds = finite(thresholds.lockWaitSeconds, "lockWaitSeconds");
+  const idleInTransactionSeconds = finite(
+    thresholds.idleInTransactionSeconds,
+    "idleInTransactionSeconds"
+  );
+  return Object.freeze([lockWaitSeconds, idleInTransactionSeconds]);
+}
+
 export async function readPostgresCapacity(
   databaseUrl: string,
-  observedAt = new Date()
+  observedAt: Date,
+  thresholds: PostgresCapacityQueryThresholds
 ): Promise<PostgresCapacitySnapshot> {
+  const parameters = postgresCapacityParameters(thresholds) as [number, number];
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL statement_timeout = 2000");
     await client.query("SET LOCAL ROLE pg_monitor");
-    const result = await client.query<CapacityRow>(POSTGRES_CAPACITY_SQL);
+    const result = await client.query<CapacityRow>(POSTGRES_CAPACITY_SQL, parameters);
     await client.query("COMMIT");
     const row = result.rows[0];
     if (row === undefined) throw new Error("OBSERVATION_POSTGRES_CAPACITY_EMPTY");

@@ -85,8 +85,21 @@ describe("OBS-05 host capacity", () => {
       snapshot: snapshot({ loadOneMinute: 20.1, observedAt: new Date(at.getTime() + 270_000) }),
       thresholds
     });
-    expect(opened.intents).toMatchObject([
-      { state: "OPEN", severity: "DEGRADED", impactCode: "IMPACT_MEMORY" }
-    ]);
+    expect(opened.intents).toEqual([expect.objectContaining({
+      state: "OPEN",
+      component: "host",
+      class: "CAPACITY",
+      severity: "DEGRADED",
+      impactCode: "IMPACT_LOAD",
+      evidence: {
+        load_one_minute: 20.1,
+        logical_cores: 10,
+        threshold_multiplier: 2,
+        sustained_seconds: 300,
+        observed_at: new Date(at.getTime() + 270_000).toISOString()
+      },
+      suspectedDefect: false,
+      defectKind: null
+    })]);
   });
 });

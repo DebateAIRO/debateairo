@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPostgresCapacityModule } from "../../apps/observation-agent/src/modules/postgres-capacity/module.js";
-import type { PostgresCapacitySnapshot } from "../../apps/observation-agent/src/modules/postgres-capacity/query.js";
+import {
+  readPostgresCapacity,
+  type PostgresCapacitySnapshot
+} from "../../apps/observation-agent/src/modules/postgres-capacity/query.js";
 
 const at = (seconds: number) => new Date(1_800_500_000_000 + seconds * 1_000);
 
@@ -52,6 +55,40 @@ async function observe(value: PostgresCapacitySnapshot, thresholds = {}) {
 }
 
 describe("OBS-05 Postgres capacity", () => {
+  it("passes the active lock and idle ages to the query boundary on every probe", async () => {
+    const contextNow = at(0);
+    const readSnapshot = vi.fn(async () => snapshot({ observedAt: contextNow }));
+    const module = createPostgresCapacityModule({ readSnapshot });
+
+    await module.probe(context(contextNow, { lock_wait_s: 7, idle_in_transaction_s: 11 }));
+
+    expect(readSnapshot).toHaveBeenCalledWith(
+      "postgresql://fixture.invalid/debateai",
+      contextNow,
+      { lockWaitSeconds: 7, idleInTransactionSeconds: 11 }
+    );
+  });
+
+  it("builds the two ordered age parameters and rejects invalid policy before opening Postgres", async () => {
+    const queryModule = await import(
+      "../../apps/observation-agent/src/modules/postgres-capacity/query.js"
+    );
+    const parameters = Reflect.get(queryModule, "postgresCapacityParameters") as unknown;
+    expect(parameters).toBeTypeOf("function");
+    if (typeof parameters !== "function") return;
+
+    expect(parameters({ lockWaitSeconds: 7, idleInTransactionSeconds: 11 })).toEqual([7, 11]);
+    expect(() => parameters({ lockWaitSeconds: Number.NaN, idleInTransactionSeconds: 11 }))
+      .toThrow("OBSERVATION_POSTGRES_CAPACITY_INVALID:lockWaitSeconds");
+    expect(() => parameters({ lockWaitSeconds: 7, idleInTransactionSeconds: -1 }))
+      .toThrow("OBSERVATION_POSTGRES_CAPACITY_INVALID:idleInTransactionSeconds");
+    await expect(readPostgresCapacity(
+      "postgresql://[invalid",
+      at(0),
+      { lockWaitSeconds: -1, idleInTransactionSeconds: 11 }
+    )).rejects.toThrow("OBSERVATION_POSTGRES_CAPACITY_INVALID:lockWaitSeconds");
+  });
+
   it("runs every 30 seconds and opens measured SEVERE/FATAL connection bands", async () => {
     const severe = await observe(snapshot({ usedConnections: 80 }));
     expect(severe.module.cadence).toEqual({ intervalMs: 30_000, timeoutMs: 2_000 });
