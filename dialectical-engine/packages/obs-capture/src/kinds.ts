@@ -61,8 +61,20 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null;
 }
 
-function hasOwn(record: Readonly<Record<string, unknown>>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record, key);
+const MISSING_OWN_DATA = Symbol("MISSING_OWN_DATA");
+const ACCESSOR_PROPERTY = Symbol("ACCESSOR_PROPERTY");
+
+function ownDataValue(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+): unknown | typeof MISSING_OWN_DATA | typeof ACCESSOR_PROPERTY {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  if (descriptor === undefined) {
+    return MISSING_OWN_DATA;
+  }
+  return Object.prototype.hasOwnProperty.call(descriptor, "value")
+    ? descriptor.value
+    : ACCESSOR_PROPERTY;
 }
 
 function hasValidShape(kind: LawfulKind, value: string): boolean {
@@ -81,14 +93,18 @@ function projectField(
   field: DeclaredRefField,
   expectedKind: LawfulKind,
 ): string {
-  if (!hasOwn(context, field)) {
+  const declaration = ownDataValue(context, field);
+  if (
+    declaration === MISSING_OWN_DATA ||
+    declaration === ACCESSOR_PROPERTY ||
+    !isRecord(declaration)
+  ) {
     return UNKNOWN_DECLARED_KIND;
   }
-  const declaration = context[field];
-  if (!isRecord(declaration) || !hasOwn(declaration, "kind")) {
+  const kind = ownDataValue(declaration, "kind");
+  if (kind === MISSING_OWN_DATA || kind === ACCESSOR_PROPERTY) {
     return UNKNOWN_DECLARED_KIND;
   }
-  const kind = declaration.kind;
   if (
     typeof kind !== "string" ||
     !DECLARED_KIND_SET.has(kind) ||
@@ -97,18 +113,22 @@ function projectField(
     return UNKNOWN_DECLARED_KIND;
   }
 
-  const hasValue = hasOwn(declaration, "value");
-  const hasPositiveAbsence = hasOwn(declaration, "not_applicable");
+  const value = ownDataValue(declaration, "value");
+  const positiveAbsence = ownDataValue(declaration, "not_applicable");
+  if (value === ACCESSOR_PROPERTY || positiveAbsence === ACCESSOR_PROPERTY) {
+    return UNKNOWN_DECLARED_KIND;
+  }
+  const hasValue = value !== MISSING_OWN_DATA;
+  const hasPositiveAbsence = positiveAbsence !== MISSING_OWN_DATA;
   if (hasValue === hasPositiveAbsence) {
     return UNKNOWN_DECLARED_KIND;
   }
   if (hasPositiveAbsence) {
-    return declaration.not_applicable === true
+    return positiveAbsence === true
       ? NOT_APPLICABLE
       : UNKNOWN_DECLARED_KIND;
   }
 
-  const value = declaration.value;
   return typeof value === "string" && hasValidShape(expectedKind, value)
     ? value
     : UNKNOWN_DECLARED_KIND;
@@ -135,10 +155,17 @@ export function projectDeclaredRefs(
     if (!isRecord(context)) {
       return UNKNOWN_REFS;
     }
+    const ambientZone = ownDataValue(context, "zone_context");
+    if (ambientZone === ACCESSOR_PROPERTY) {
+      return UNKNOWN_REFS;
+    }
     if (
-      zoneContext ||
-      (hasOwn(context, "zone_context") && context.zone_context === true)
+      ambientZone !== MISSING_OWN_DATA &&
+      typeof ambientZone !== "boolean"
     ) {
+      return UNKNOWN_REFS;
+    }
+    if (zoneContext || ambientZone === true) {
       return UNKNOWN_REFS;
     }
     return Object.freeze({

@@ -1,8 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { LawfulKind } from "@debateai/obs-capture";
+import {
+  declaredRef,
+  notApplicable,
+  type DeclaredRef,
+  type LawfulKind,
+  type NotApplicableRef,
+  type ObsContext,
+} from "@debateai/obs-capture";
 
 const EXPECTED_KINDS = Object.freeze([
   "run",
@@ -26,8 +33,6 @@ interface KindsSurface {
   readonly DECLARED_KINDS?: readonly string[];
   readonly DECLARED_KIND_FIELDS?: Readonly<Record<string, string>>;
   readonly UNKNOWN_DECLARED_KIND?: string;
-  readonly declaredRef?: (kind: string, value: string) => unknown;
-  readonly notApplicable?: (kind: string) => unknown;
 }
 
 async function loadKindsSurface(): Promise<KindsSurface> {
@@ -48,6 +53,43 @@ function compileTimeKindCheck(kind: LawfulKind): LawfulKind {
 }
 void compileTimeKindCheck;
 
+type DeclaredRefConstructor = <K extends LawfulKind>(
+  kind: K,
+  value: string,
+) => Readonly<DeclaredRef<K>>;
+
+type NotApplicableConstructor = <K extends LawfulKind>(
+  kind: K,
+) => Readonly<NotApplicableRef<K>>;
+
+// This function is never called. `pnpm typecheck` pins the public constructors.
+function compileTimeConstructorCheck(): void {
+  expectTypeOf(declaredRef).toEqualTypeOf<DeclaredRefConstructor>();
+  expectTypeOf(notApplicable).toEqualTypeOf<NotApplicableConstructor>();
+
+  const present = declaredRef("run", "550e8400-e29b-41d4-a716-446655440000");
+  const absent = notApplicable("work_item");
+  expectTypeOf(present).toEqualTypeOf<Readonly<DeclaredRef<"run">>>();
+  expectTypeOf(absent).toEqualTypeOf<Readonly<NotApplicableRef<"work_item">>>();
+
+  // @ts-expect-error An unlawful literal is rejected by the real constructor.
+  declaredRef("session", "550e8400-e29b-41d4-a716-446655440000");
+  // @ts-expect-error An unlawful literal is rejected by the real constructor.
+  notApplicable("asker");
+
+  const widenedKind: string = "run";
+  // @ts-expect-error A widened string is not a closed lawful kind.
+  declaredRef(widenedKind, "550e8400-e29b-41d4-a716-446655440000");
+  // @ts-expect-error A widened string is not a closed lawful kind.
+  notApplicable(widenedKind);
+
+  const handBuiltAmbient: ObsContext = {
+    run_ref: { kind: "session", value: "opaque" },
+  };
+  void handBuiltAmbient;
+}
+void compileTimeConstructorCheck;
+
 describe("FIX-03 frozen declared kinds", () => {
   it("exports the six ratified kinds in their fixed order", async () => {
     const surface = await loadKindsSurface();
@@ -65,14 +107,10 @@ describe("FIX-03 frozen declared kinds", () => {
     expect(surface.DECLARED_KINDS).not.toContain("asker_id");
   });
 
-  it("builds frozen present and positive-absence declarations", async () => {
-    const surface = await loadKindsSurface();
-    expect(surface.declaredRef).toBeTypeOf("function");
-    expect(surface.notApplicable).toBeTypeOf("function");
-
+  it("builds frozen present and positive-absence declarations", () => {
     const value = randomUUID();
-    const present = surface.declaredRef?.("run", value);
-    const absent = surface.notApplicable?.("work_item");
+    const present = declaredRef("run", value);
+    const absent = notApplicable("work_item");
 
     expect(present).toEqual({ kind: "run", value });
     expect(absent).toEqual({ kind: "work_item", not_applicable: true });

@@ -163,6 +163,15 @@ export function createSharedRedactor(
   });
   const now = config.now ?? (() => new Date());
   const sourceEventRef = config.sourceEventRef ?? randomUUID;
+  const ambientProjectionFields = Object.freeze([
+    "run_ref",
+    "work_item_ref",
+    "node_ref",
+    "attempt_ref",
+    "ledger_ref",
+    "at_seq_watermark",
+    "zone_context",
+  ] as const);
 
   function safeNow(): Date {
     try {
@@ -253,6 +262,7 @@ export function createSharedRedactor(
 
   function fallback(
     ambientContext: CaptureQueueEntry["ambient_context_ref"],
+    zoneContext: boolean,
   ): PostRedactionEnvelope {
     return build({
       code: "OBS_CAPTURE_SELF",
@@ -260,32 +270,106 @@ export function createSharedRedactor(
       capturePoint: "self",
       disposition: "SELF",
       source: "first_party",
-      zoneContext: false,
+      zoneContext,
       attemptIndex: null,
       fallbackMinimized: true,
       ambientContext,
     });
   }
 
+  function snapshotAmbientContext(
+    ambientContext: CaptureQueueEntry["ambient_context_ref"],
+  ): Readonly<{
+    ambientContext: CaptureQueueEntry["ambient_context_ref"];
+    zoneContext: boolean;
+    safe: boolean;
+  }> {
+    if (!isRecord(ambientContext)) {
+      return Object.freeze({
+        ambientContext: undefined,
+        zoneContext: false,
+        safe: true,
+      });
+    }
+    try {
+      const snapshot: Record<string, unknown> = Object.create(null) as Record<
+        string,
+        unknown
+      >;
+      let zoneContext = false;
+      for (const field of ambientProjectionFields) {
+        const descriptor = Object.getOwnPropertyDescriptor(ambientContext, field);
+        if (descriptor === undefined) {
+          continue;
+        }
+        if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+          return Object.freeze({
+            ambientContext: undefined,
+            zoneContext: true,
+            safe: false,
+          });
+        }
+        if (field === "zone_context") {
+          if (typeof descriptor.value !== "boolean") {
+            return Object.freeze({
+              ambientContext: undefined,
+              zoneContext: true,
+              safe: false,
+            });
+          }
+          zoneContext = descriptor.value;
+        }
+        snapshot[field] = descriptor.value;
+      }
+      return Object.freeze({
+        ambientContext: Object.freeze(
+          snapshot,
+        ) as CaptureQueueEntry["ambient_context_ref"],
+        zoneContext,
+        safe: true,
+      });
+    } catch {
+      return Object.freeze({
+        ambientContext: undefined,
+        zoneContext: true,
+        safe: false,
+      });
+    }
+  }
+
   return Object.freeze({
     redact(entry: CaptureQueueEntry): PostRedactionEnvelope {
-      let ambientContext: CaptureQueueEntry["ambient_context_ref"];
+      let rawAmbientContext: CaptureQueueEntry["ambient_context_ref"];
       try {
-        ambientContext = entry?.ambient_context_ref;
+        rawAmbientContext = entry?.ambient_context_ref;
       } catch {
-        return fallback(undefined);
+        return fallback(undefined, true);
       }
+      const ambientSnapshot = snapshotAmbientContext(rawAmbientContext);
+      if (!ambientSnapshot.safe) {
+        return fallback(undefined, true);
+      }
+      const ambientContext = ambientSnapshot.ambientContext;
+      let zoneContext = ambientSnapshot.zoneContext;
 
       try {
         let payload: Readonly<Record<string, unknown>> | undefined;
         let codeValue: unknown;
         if (entry.kind === "envelope") {
           if (!isRecord(entry.payload_ref)) {
-            return fallback(ambientContext);
+            return fallback(ambientContext, zoneContext);
           }
           payload = entry.payload_ref;
+          const payloadZoneValue = ownValue(payload, "zone_context");
+          if (
+            payloadZoneValue !== undefined &&
+            typeof payloadZoneValue !== "boolean"
+          ) {
+            return fallback(ambientContext, true);
+          }
+          zoneContext = zoneContext || payloadZoneValue === true;
           if (Object.keys(payload).some((key) => !INPUT_ALLOWLIST.has(key))) {
-            return fallback(ambientContext);
+            return fallback(ambientContext, zoneContext);
           }
           codeValue = ownValue(payload, "code");
           if (codeValue === undefined) {
@@ -299,7 +383,7 @@ export function createSharedRedactor(
         }
 
         if (typeof codeValue !== "string" || resolveSafeTemplate(codeValue) === undefined) {
-          return fallback(ambientContext);
+          return fallback(ambientContext, zoneContext);
         }
         const taxonomyValue = payload === undefined
           ? "ORIGIN_UNKNOWN"
@@ -308,7 +392,7 @@ export function createSharedRedactor(
           ? resolveTaxonomyClass(taxonomyValue)?.taxonomy_class
           : undefined;
         if (taxonomy === undefined) {
-          return fallback(ambientContext);
+          return fallback(ambientContext, zoneContext);
         }
         const capturePoint = stringMember<CapturePoint>(
           payload === undefined ? undefined : ownValue(payload, "capture_point"),
@@ -326,16 +410,8 @@ export function createSharedRedactor(
           "first_party",
         );
         if (capturePoint === undefined || disposition === undefined || source === undefined) {
-          return fallback(ambientContext);
+          return fallback(ambientContext, zoneContext);
         }
-        const zoneValue = payload === undefined
-          ? undefined
-          : ownValue(payload, "zone_context");
-        if (zoneValue !== undefined && typeof zoneValue !== "boolean") {
-          return fallback(ambientContext);
-        }
-        const contextZone = ambientContext?.zone_context;
-        const zoneContext = zoneValue ?? (typeof contextZone === "boolean" && contextZone);
         const attemptValue = payload === undefined
           ? undefined
           : ownValue(payload, "attempt_index");
@@ -343,7 +419,7 @@ export function createSharedRedactor(
           attemptValue !== undefined &&
           (!Number.isSafeInteger(attemptValue) || (attemptValue as number) < 0)
         ) {
-          return fallback(ambientContext);
+          return fallback(ambientContext, zoneContext);
         }
         return build({
           code: codeValue,
@@ -357,7 +433,7 @@ export function createSharedRedactor(
           ambientContext,
         });
       } catch {
-        return fallback(ambientContext);
+        return fallback(ambientContext, true);
       }
     },
   });

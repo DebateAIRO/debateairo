@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createSharedRedactor,
+  projectDeclaredRefs,
   type CaptureQueueEntry,
   type ObsContext,
   type PostRedactionEnvelope,
@@ -217,6 +218,98 @@ describe("FIX-03 declared-kind projection", () => {
       REF_FIELDS.map((field) => [field, UNKNOWN]),
     ));
     expect(JSON.stringify(envelope)).not.toContain(runRef);
+  });
+
+  it("keeps a payload zone veto on a later minimized fallback", () => {
+    const runRef = randomUUID();
+    const envelope = createSharedRedactor(REDACTOR_CONFIG).redact(Object.freeze({
+      kind: "envelope" as const,
+      payload_ref: Object.freeze({
+        ...VALID_PAYLOAD,
+        zone_context: true,
+        attempt_index: -1,
+      }),
+      ambient_context_ref: Object.freeze({
+        run_ref: Object.freeze({ kind: "run", value: runRef }),
+      }),
+    }));
+
+    expect(envelope.fallback_minimized).toBe(true);
+    expect(envelope.zone_context).toBe(true);
+    expect(refs(envelope)).toEqual(Object.fromEntries(
+      REF_FIELDS.map((field) => [field, UNKNOWN]),
+    ));
+    expect(JSON.stringify(envelope)).not.toContain(runRef);
+  });
+
+  it("fails closed without trusting an ambient zone getter", () => {
+    const runRef = randomUUID();
+    let zoneReads = 0;
+    const ambientContext = Object.freeze({
+      run_ref: Object.freeze({ kind: "run", value: runRef }),
+      get zone_context() {
+        zoneReads += 1;
+        if (zoneReads === 1) {
+          throw new Error("hostile ambient zone getter");
+        }
+        return false;
+      },
+    });
+    const envelope = redact(ambientContext);
+
+    expect(envelope.fallback_minimized).toBe(true);
+    expect(envelope.zone_context).toBe(true);
+    expect(refs(envelope)).toEqual(Object.fromEntries(
+      REF_FIELDS.map((field) => [field, UNKNOWN]),
+    ));
+    expect(JSON.stringify(envelope)).not.toContain(runRef);
+    expect(zoneReads).toBeLessThanOrEqual(1);
+  });
+
+  it("does not read accessor-backed declaration members", () => {
+    const runRef = randomUUID();
+    const workItemRef = randomUUID();
+    let getterReads = 0;
+    const projected = projectDeclaredRefs(Object.freeze({
+      run_ref: Object.freeze({
+        get kind() {
+          getterReads += 1;
+          return "run";
+        },
+        value: runRef,
+      }),
+      work_item_ref: Object.freeze({
+        kind: "work_item",
+        get value() {
+          getterReads += 1;
+          return workItemRef;
+        },
+      }),
+    }), false);
+
+    expect(projected.run_ref).toBe(UNKNOWN);
+    expect(projected.work_item_ref).toBe(UNKNOWN);
+    expect(JSON.stringify(projected)).not.toContain(runRef);
+    expect(JSON.stringify(projected)).not.toContain(workItemRef);
+    expect(getterReads).toBe(0);
+  });
+
+  it("does not read an accessor-backed zone flag", () => {
+    const runRef = randomUUID();
+    let zoneReads = 0;
+    const projected = projectDeclaredRefs(Object.freeze({
+      run_ref: Object.freeze({ kind: "run", value: runRef }),
+      get zone_context() {
+        zoneReads += 1;
+        return false;
+      },
+    }), false);
+
+    expect(projected).toEqual(Object.fromEntries(
+      REF_FIELDS.map((field) => [field, UNKNOWN]),
+    ));
+    expect(JSON.stringify(projected)).not.toContain(runRef);
+    expect(zoneReads).toBe(0);
   });
 
   it("never treats handled context as a declaration channel", () => {
