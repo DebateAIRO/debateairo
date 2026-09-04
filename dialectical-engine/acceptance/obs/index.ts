@@ -53,10 +53,6 @@ const OBS_READBACK_FAILURE_CODES: ReadonlySet<string> = new Set([
   "ROW_READBACK_CLOSE_FAILED",
 ]);
 
-const verdicts = new WeakSet<object>();
-const spawnReceipts = new WeakSet<object>();
-const rowProofs = new WeakMap<object, { readonly rows: number }>();
-
 class ObsHarnessFailure extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -120,6 +116,18 @@ export interface FamilyResult {
   readonly lines: readonly string[];
 }
 
+interface CaseAuthority {
+  readonly verdicts: WeakSet<object>;
+  readonly receipts: WeakSet<object>;
+  readonly consumedReceipts: WeakSet<object>;
+  readonly rowProofs: WeakMap<object, { readonly rows: number }>;
+}
+
+interface CaseExecution {
+  readonly context: ObsCaseContext;
+  consumeVerdict(verdict: ObsVerdict): boolean;
+}
+
 function safeMetrics(metrics: Readonly<Record<string, number>>): Readonly<Record<string, number>> {
   const entries = Object.entries(metrics);
   if (entries.length === 0) throw new ObsHarnessFailure("METRICS_REQUIRED");
@@ -133,6 +141,7 @@ function safeMetrics(metrics: Readonly<Record<string, number>>): Readonly<Record
 }
 
 function mintVerdict(
+  authority: CaseAuthority,
   kind: "PASS" | "FAIL",
   metrics: Readonly<Record<string, number>>,
   code?: string,
@@ -142,13 +151,17 @@ function mintVerdict(
     ...(code === undefined ? {} : { code }),
     metrics: safeMetrics(metrics),
   });
-  verdicts.add(verdict);
+  authority.verdicts.add(verdict);
   return verdict;
 }
 
-function failVerdict(code: string, metrics: Readonly<Record<string, number>> = { failures: 1 }): ObsVerdict {
+function failVerdict(
+  authority: CaseAuthority,
+  code: string,
+  metrics: Readonly<Record<string, number>> = { failures: 1 },
+): ObsVerdict {
   if (!SAFE_CODE.test(code)) throw new ObsHarnessFailure("FAIL_CODE_INVALID");
-  return mintVerdict("FAIL", metrics, code);
+  return mintVerdict(authority, "FAIL", metrics, code);
 }
 
 function childEnvironment(
@@ -225,6 +238,7 @@ async function spawnSubject(
   repoRoot: string,
   scratchRoot: string,
   options: SpawnSubjectOptions,
+  authority: CaseAuthority,
 ): Promise<SpawnReceipt> {
   if (options.command.trim() === "" || !Number.isInteger(options.timeoutMs) || options.timeoutMs < 1) {
     throw new ObsHarnessFailure("CHILD_OPTIONS_INVALID");
@@ -306,7 +320,7 @@ async function spawnSubject(
       stderr,
       scratchDirectory,
     });
-    spawnReceipts.add(receipt);
+    authority.receipts.add(receipt);
 
     if (
       rowExpectation !== undefined
@@ -325,7 +339,7 @@ async function spawnSubject(
       } catch (error) {
         throw readbackFailure(error, "ROW_READBACK_QUERY_FAILED");
       }
-      rowProofs.set(receipt, Object.freeze({
+      authority.rowProofs.set(receipt, Object.freeze({
         rows: verifyReadbackRows(
           rows,
           baseline,
@@ -353,29 +367,56 @@ async function spawnSubject(
   }
 }
 
-function createContext(repoRoot: string, scratchRoot: string): ObsCaseContext {
-  function requireReceipt(receipt: SpawnReceipt): void {
-    if (!spawnReceipts.has(receipt)) throw new ObsHarnessFailure("SPAWN_RECEIPT_INVALID");
+function createContext(repoRoot: string, scratchRoot: string): CaseExecution {
+  const authority: CaseAuthority = {
+    verdicts: new WeakSet<object>(),
+    receipts: new WeakSet<object>(),
+    consumedReceipts: new WeakSet<object>(),
+    rowProofs: new WeakMap<object, { readonly rows: number }>(),
+  };
+
+  function consumeReceipt(receipt: SpawnReceipt): void {
+    if (authority.consumedReceipts.has(receipt)) {
+      throw new ObsHarnessFailure("SPAWN_RECEIPT_ALREADY_USED");
+    }
+    if (!authority.receipts.has(receipt)) throw new ObsHarnessFailure("SPAWN_RECEIPT_INVALID");
+    authority.receipts.delete(receipt);
+    authority.consumedReceipts.add(receipt);
   }
-  return Object.freeze({
-    spawn: (options: SpawnSubjectOptions) => spawnSubject(repoRoot, scratchRoot, options),
+
+  const context: ObsCaseContext = Object.freeze({
+    spawn: (options: SpawnSubjectOptions) => spawnSubject(repoRoot, scratchRoot, options, authority),
     passRows(
       receipt: SpawnReceipt,
       metrics: Readonly<Record<string, number>> = {},
     ): ObsVerdict {
-      requireReceipt(receipt);
-      const proof = rowProofs.get(receipt);
+      consumeReceipt(receipt);
+      const proof = authority.rowProofs.get(receipt);
+      authority.rowProofs.delete(receipt);
       if (proof === undefined) throw new ObsHarnessFailure("ROW_READBACK_REQUIRED");
       if (Array.isArray(metrics)) throw new ObsHarnessFailure("CASE_ROWS_FORBIDDEN");
       if (Object.hasOwn(metrics, "rows")) throw new ObsHarnessFailure("METRIC_RESERVED");
-      return mintVerdict("PASS", { ...metrics, rows: proof.rows });
+      return mintVerdict(authority, "PASS", { ...metrics, rows: proof.rows });
     },
     passProcess(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict {
-      requireReceipt(receipt);
-      if (rowProofs.has(receipt)) throw new ObsHarnessFailure("PROCESS_RECEIPT_CONTAINS_ROWS");
-      return mintVerdict("PASS", metrics);
+      consumeReceipt(receipt);
+      const hasRowProof = authority.rowProofs.has(receipt);
+      authority.rowProofs.delete(receipt);
+      if (hasRowProof) throw new ObsHarnessFailure("PROCESS_RECEIPT_CONTAINS_ROWS");
+      return mintVerdict(authority, "PASS", metrics);
     },
-    fail: failVerdict,
+    fail: (
+      code: string,
+      metrics?: Readonly<Record<string, number>>,
+    ) => failVerdict(authority, code, metrics),
+  });
+  return Object.freeze({
+    context,
+    consumeVerdict(verdict: ObsVerdict): boolean {
+      if (!authority.verdicts.has(verdict)) return false;
+      authority.verdicts.delete(verdict);
+      return true;
+    },
   });
 }
 
@@ -462,8 +503,9 @@ export async function runFamily(name: "obs-g1", options: RunFamilyOptions): Prom
       if (missing !== undefined) {
         line = `${name}/${acceptanceCase.name} SKIP(missing: ${missing})`;
       } else {
-        const verdict = await acceptanceCase.run(createContext(options.repoRoot, scratchRoot));
-        if (!verdicts.has(verdict)) {
+        const execution = createContext(options.repoRoot, scratchRoot);
+        const verdict = await acceptanceCase.run(execution.context);
+        if (!execution.consumeVerdict(verdict)) {
           line = `${name}/${acceptanceCase.name} FAIL(code=FABRICATED_VERDICT)`;
           failed = true;
         } else if (verdict.kind === "PASS") {

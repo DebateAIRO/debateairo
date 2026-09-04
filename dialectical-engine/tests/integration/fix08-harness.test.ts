@@ -21,6 +21,8 @@ import {
   OBS_G1_CHILD_OUTPUT_MAX_BYTES,
   runFamily,
   type ObsAcceptanceCase,
+  type ObsVerdict,
+  type SpawnReceipt,
 } from "../../acceptance/obs/index.js";
 import {
   ObsReadbackFailure,
@@ -173,6 +175,172 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     expect(result.exitCode).toBe(1);
     expect(lines).toEqual([
       "obs-g1/fake-pass FAIL(code=FABRICATED_VERDICT)",
+    ]);
+  });
+
+  it("rejects row verdict and receipt replay by later cases", async () => {
+    const repoRoot = await temporaryDirectory("fix08-row-replay-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+    const verifier = installReadback();
+    let savedVerdict: ObsVerdict | undefined;
+    let savedReceipt: SpawnReceipt | undefined;
+
+    const result = await runFamily("obs-g1", {
+      cases: [
+        {
+          name: "row-owner",
+          subjectPaths: [subject],
+          async run(context) {
+            savedReceipt = await context.spawn({
+              command: process.execPath,
+              arguments: ["-e", ""],
+              timeoutMs: 1_000,
+              rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+            });
+            savedVerdict = context.passRows(savedReceipt);
+            return savedVerdict;
+          },
+        },
+        {
+          name: "row-verdict-replay",
+          subjectPaths: [subject],
+          async run() {
+            if (savedVerdict === undefined) throw new Error("OWNER_DID_NOT_RUN");
+            return savedVerdict;
+          },
+        },
+        {
+          name: "row-receipt-replay",
+          subjectPaths: [subject],
+          async run(context) {
+            if (savedReceipt === undefined) throw new Error("OWNER_DID_NOT_RUN");
+            return context.passRows(savedReceipt);
+          },
+        },
+      ],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual([
+      "obs-g1/row-owner PASS(rows=1)",
+      "obs-g1/row-verdict-replay FAIL(code=FABRICATED_VERDICT)",
+      "obs-g1/row-receipt-replay FAIL(code=SPAWN_RECEIPT_INVALID)",
+    ]);
+    expect(verifier.readBaseline).toHaveBeenCalledOnce();
+    expect(verifier.readRows).toHaveBeenCalledOnce();
+  });
+
+  it("rejects process verdict and receipt replay by later cases", async () => {
+    const repoRoot = await temporaryDirectory("fix08-process-replay-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+    let savedVerdict: ObsVerdict | undefined;
+    let savedReceipt: SpawnReceipt | undefined;
+
+    const result = await runFamily("obs-g1", {
+      cases: [
+        {
+          name: "process-owner",
+          subjectPaths: [subject],
+          async run(context) {
+            savedReceipt = await context.spawn({
+              command: process.execPath,
+              arguments: ["-e", ""],
+              timeoutMs: 1_000,
+            });
+            savedVerdict = context.passProcess(savedReceipt, { children: 1 });
+            return savedVerdict;
+          },
+        },
+        {
+          name: "process-verdict-replay",
+          subjectPaths: [subject],
+          async run() {
+            if (savedVerdict === undefined) throw new Error("OWNER_DID_NOT_RUN");
+            return savedVerdict;
+          },
+        },
+        {
+          name: "process-receipt-replay",
+          subjectPaths: [subject],
+          async run(context) {
+            if (savedReceipt === undefined) throw new Error("OWNER_DID_NOT_RUN");
+            return context.passProcess(savedReceipt, { children: 1 });
+          },
+        },
+      ],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual([
+      "obs-g1/process-owner PASS(children=1)",
+      "obs-g1/process-verdict-replay FAIL(code=FABRICATED_VERDICT)",
+      "obs-g1/process-receipt-replay FAIL(code=SPAWN_RECEIPT_INVALID)",
+    ]);
+  });
+
+  it("consumes a row receipt and proof on their first use", async () => {
+    const repoRoot = await temporaryDirectory("fix08-row-one-use-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+    installReadback();
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "row-one-use",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", ""],
+            timeoutMs: 1_000,
+            rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+          });
+          context.passRows(receipt);
+          return context.passRows(receipt);
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual([
+      "obs-g1/row-one-use FAIL(code=SPAWN_RECEIPT_ALREADY_USED)",
+    ]);
+  });
+
+  it("consumes a process receipt on its first use", async () => {
+    const repoRoot = await temporaryDirectory("fix08-process-one-use-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "process-one-use",
+        subjectPaths: [subject],
+        async run(context) {
+          const receipt = await context.spawn({
+            command: process.execPath,
+            arguments: ["-e", ""],
+            timeoutMs: 1_000,
+          });
+          context.passProcess(receipt, { children: 1 });
+          return context.passProcess(receipt, { children: 1 });
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual([
+      "obs-g1/process-one-use FAIL(code=SPAWN_RECEIPT_ALREADY_USED)",
     ]);
   });
 
