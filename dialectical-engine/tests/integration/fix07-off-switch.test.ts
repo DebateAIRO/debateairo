@@ -1,9 +1,18 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { PoolClient } from "pg";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { readObsBounds } from "../../packages/obs-capture/src/runtime/config.js";
 import {
@@ -19,8 +28,24 @@ import type {
 } from "../../packages/obs-capture/src/emit.js";
 import type { FlushResult } from "../../packages/obs-capture/src/flusher.js";
 import type { ReferenceQueue } from "../../packages/obs-capture/src/queue.js";
+import { migrate } from "../../packages/db/src/index.js";
 import { loadDevelopmentCommandEnvironment } from "../../packages/register/src/runtime-environment.js";
+import {
+  startDevelopmentApiProcess,
+  type DevelopmentApiChild,
+  type DevelopmentApiChildExit,
+} from "../../apps/runner/src/dev-api-process.js";
+import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
+import { DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
+import {
+  startDevelopmentRunnerProcess,
+  type DevelopmentRunnerChild,
+} from "../../apps/runner/src/dev-runner-process.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import {
+  startTestDatabase,
+  type TestDatabase,
+} from "../support/testDatabase.js";
 
 const CADENCE_KEY = "OBS_FLUSH_DEADLINE_MS";
 const PROVIDER_KEY = "DEBATEAI_DEV_PROVIDER_TARGETS_JSON";
@@ -421,6 +446,278 @@ async function settleMicrotasks(): Promise<void> {
   for (let turn = 0; turn < 8; turn += 1) {
     await Promise.resolve();
   }
+}
+
+const FIX07_PERIOD_QUERY = `
+WITH supplied AS (
+  SELECT $1::bigint AS flush_interval_ms,
+         transaction_timestamp() AS evaluated_at
+), params AS (
+  SELECT evaluated_at,
+         flush_interval_ms,
+         evaluated_at - interval '1 minute' AS period_cutoff
+  FROM supplied
+  WHERE flush_interval_ms BETWEEN 1 AND 9007199254740991
+), runtimes(runtime) AS (
+  VALUES ('api'), ('runner'), ('scheduler')
+), gap_window AS (
+  SELECT EXISTS (
+    SELECT 1
+    FROM obs.capture_gap AS cg
+    CROSS JOIN params AS p
+    WHERE cg.closed_at IS NULL
+       OR cg.closed_at >= p.period_cutoff
+  ) AS any_gap
+)
+SELECT r.runtime,
+       CASE
+         WHEN h.component IS NULL
+           OR h.state IN ('OFF', 'STOPPED')
+           OR EXTRACT(EPOCH FROM (p.evaluated_at - h.observed_at)) * 1000
+                > p.flush_interval_ms THEN 'OFF'
+         WHEN h.state = 'SPOOL_ONLY'
+           OR h.detail_code IN (
+             'QUEUE_FULL', 'EMIT_FAILURE', 'REDACTOR_FAILURE',
+             'POSTGRES_FAILURE', 'SPOOL_FAILURE', 'GAP_WRITE_FAILURE'
+           )
+           OR g.any_gap THEN 'BLIND'
+         WHEN EXISTS (
+           SELECT 1
+           FROM obs.occurrence AS o
+           WHERE o.runtime = r.runtime
+             AND o.captured_at >= p.period_cutoff
+         ) THEN 'ACTIVE'
+         ELSE 'QUIET'
+       END AS period
+FROM runtimes AS r
+CROSS JOIN params AS p
+CROSS JOIN gap_window AS g
+LEFT JOIN obs.component_health AS h
+  ON h.component = 'capture:' || r.runtime
+ORDER BY r.runtime;
+`;
+
+interface PeriodRow {
+  readonly runtime: string;
+  readonly period: string;
+}
+
+function requireExactCadenceEcho(
+  expected: string,
+  actual: string | undefined,
+): void {
+  if (actual !== expected) {
+    throw new TypeError("FIX07_CADENCE_ECHO_MISMATCH");
+  }
+}
+
+async function queryPeriods(
+  client: Pick<PoolClient, "query">,
+  expectedCadence: string,
+  queryBind: string | undefined = expectedCadence,
+): Promise<Readonly<{
+  bind: string;
+  rows: readonly PeriodRow[];
+}>> {
+  requireExactCadenceEcho(expectedCadence, queryBind);
+  const result = await client.query<PeriodRow>(FIX07_PERIOD_QUERY, [queryBind]);
+  return Object.freeze({ bind: queryBind, rows: result.rows });
+}
+
+async function withOwnerTransaction<T>(
+  database: TestDatabase,
+  callback: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    return await callback(client);
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+}
+
+async function seedHealth(
+  client: Pick<PoolClient, "query">,
+  input: Readonly<{
+    runtime: "api" | "runner" | "scheduler";
+    state: string;
+    detailCode: string;
+    ageMs: number;
+  }>,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO obs.component_health
+       (component, state, observed_at, detail_code)
+     VALUES (
+       'capture:' || $1,
+       $2,
+       transaction_timestamp()
+         - ($4::double precision * interval '1 millisecond'),
+       $3
+     )
+     ON CONFLICT (component) DO UPDATE SET
+       state = $2,
+       observed_at = transaction_timestamp()
+         - ($4::double precision * interval '1 millisecond'),
+       detail_code = $3,
+       updated_at = transaction_timestamp()`,
+    [input.runtime, input.state, input.detailCode, input.ageMs],
+  );
+}
+
+async function seedOccurrence(
+  client: Pick<PoolClient, "query">,
+  runtime: "api" | "runner" | "scheduler",
+  ageMs: number,
+  sourceEventRef: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO obs.occurrence (
+       occurred_at, captured_at, environment, build_ref, build_dirty,
+       runtime, component, capture_point, code, taxonomy_class, severity,
+       disposition, fingerprint, fingerprint_version,
+       redaction_policy_version, allowlist_set_id, capture_status, run_ref,
+       work_item_ref, node_ref, attempt_ref, ledger_ref,
+       parent_occurrence_ref, at_seq_watermark, safe_template_id, source,
+       source_event_ref, writer_identity
+     ) VALUES (
+       transaction_timestamp()
+         - ($2::double precision * interval '1 millisecond'),
+       transaction_timestamp()
+         - ($2::double precision * interval '1 millisecond'),
+       'fix07-test', 'fix07-test', false,
+       $1::text, jsonb_build_object('process', $1::text),
+       'self', 'FIX07_QUERY_PROBE',
+       'CAPTURE_SELF', 'INFO', 'RECORDED', 'fix07:' || $3::text, 1,
+       'fix07-test', 'fix07-test', 'PERSISTED', 'NOT_APPLICABLE',
+       'NOT_APPLICABLE', 'NOT_APPLICABLE', 'NOT_APPLICABLE',
+       'NOT_APPLICABLE', 'NO_CAUSE', 'NOT_APPLICABLE', 'fix07-test',
+       'first_party', $3::text, 'fix07-test'
+     )`,
+    [runtime, ageMs, sourceEventRef],
+  );
+}
+
+function apiCredentialEnvironment(
+  root: string,
+): Readonly<Record<string, string>> {
+  const custodyRoot = join(root, ".local", "dev-auth");
+  return Object.freeze({
+    KEK_PATH: join(custodyRoot, "secrets", "kek.bin"),
+    BLIND_INDEX_KEY_PATH: join(custodyRoot, "secrets", "blind-index-key.bin"),
+    AUDIT_KEY_STORE_PATH: join(custodyRoot, "audit-keys"),
+    AUDIT_SOURCE_IP_SALT_PATH: join(
+      custodyRoot,
+      "secrets",
+      "audit-source-ip-salt.bin",
+    ),
+    USER_DEK_STORE_PATH: join(custodyRoot, "user-deks"),
+    CORPUS_KEK_PATH: join(custodyRoot, "secrets", "corpus-kek.bin"),
+    PUBLICATION_KEY_STORE_PATH: join(custodyRoot, "publication-keys"),
+    CONTENT_ENCRYPTION_ENABLED: "true",
+    CONTENT_PROVISION_DATABASE_URL:
+      "postgresql://debateai_dev_content_provision:one@127.0.0.1:55432/debateai",
+    AUTHORIZATION_DATABASE_URL:
+      "postgresql://debateai_dev_authorization:auth@127.0.0.1:55432/debateai",
+    PUBLICATION_ENABLED: "true",
+    PUBLICATION_CLEANUP_DATABASE_URL:
+      "postgresql://debateai_dev_publication_cleanup:pub@127.0.0.1:55432/debateai",
+    ERASURE_DATABASE_URL:
+      "postgresql://debateai_dev_erasure:two@127.0.0.1:55432/debateai",
+    ACCOUNT_ERASURE_GRACE_MS: "604800000",
+    MAIL_SENDMAIL_PATH: join(root, "deploy", "dev-auth", "sendmail-capture.mjs"),
+    MAIL_FROM: "noreply@localhost.test",
+    PUBLIC_APP_URL: "https://localhost:3000",
+    DATABASE_URL:
+      "postgresql://debateai_dev_runtime:three@127.0.0.1:55432/debateai",
+    API_HOST: "127.0.0.1",
+    API_PORT: "8790",
+    STRANGER_SAMPLE_RATE: "0",
+    REGISTER_VERSION: "4",
+    BATTERY_VERSION: "dev-auth-v1",
+    SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
+    PROVIDER_DISCOVERY_TARGETS_JSON:
+      TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+    PROVIDER_PROBE_TIMEOUT_MS: "180000",
+    NODE_ENV: "development",
+    EVALUATOR_DEV_MENU_ENABLED: "false",
+    EVALUATOR_DEV_MENU_DATABASE_URL:
+      "postgresql://debateai_dev_evaluator_api:evaluator@127.0.0.1:55432/debateai",
+    HATCHET_CLIENT_TOKEN: "header.payload.signature",
+    HATCHET_HOST_PORT: "127.0.0.1:7077",
+    HATCHET_API_URL: "http://127.0.0.1:8888",
+    HATCHET_TENANT_ID: "11111111-1111-4111-8111-111111111111",
+    HATCHET_WORKFLOW_NAME: "debateai-dev",
+    HATCHET_TLS_STRATEGY: "none",
+    DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail"),
+  });
+}
+
+async function createApiCredentialFixture(): Promise<Readonly<{
+  root: string;
+  values: Readonly<Record<string, string>>;
+}>> {
+  const root = await mkdtemp(join(tmpdir(), "fix07-api-environment-"));
+  scratchDirectories.push(root);
+  await mkdir(join(root, ".local"), { mode: 0o700 });
+  await mkdir(join(root, ".local", "dev-auth"), { mode: 0o700 });
+  const values = apiCredentialEnvironment(root);
+  await writeFile(
+    join(root, ".local", "dev-auth", "api.env"),
+    `${DEVELOPMENT_API_ENVIRONMENT_KEYS.map((key) =>
+      `${key}=${values[key]}`).join("\n")}\n`,
+    { mode: 0o600 },
+  );
+  return Object.freeze({ root, values });
+}
+
+function createApiChild(): DevelopmentApiChild & Readonly<{
+  terminateCalls: { count: number };
+}> {
+  let resolveExit!: (value: DevelopmentApiChildExit) => void;
+  const exited = new Promise<DevelopmentApiChildExit>((resolve) => {
+    resolveExit = resolve;
+  });
+  const terminateCalls = { count: 0 };
+  return Object.freeze({
+    exited,
+    terminateCalls,
+    async terminate(): Promise<void> {
+      terminateCalls.count += 1;
+      resolveExit(Object.freeze({ code: 0, signal: "SIGTERM" }));
+    },
+  });
+}
+
+function createRunnerChild(): DevelopmentRunnerChild & Readonly<{
+  terminateCalls: { count: number };
+}> {
+  let resolveExit!: (value: Readonly<{
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  }>) => void;
+  const exited = new Promise<Readonly<{
+    code: number | null;
+    signal: NodeJS.Signals | null;
+  }>>((resolve) => {
+    resolveExit = resolve;
+  });
+  const terminateCalls = { count: 0 };
+  return Object.freeze({
+    exited,
+    ready: Promise.resolve(Object.freeze({
+      kind: "DEBATEAI_RUNNER_READY",
+      worker: "debateai-dev-runner",
+      registerVersion: DEVELOPMENT_REGISTER_VERSION,
+    })),
+    terminateCalls,
+    async terminate(): Promise<void> {
+      terminateCalls.count += 1;
+      resolveExit(Object.freeze({ code: 0, signal: "SIGTERM" }));
+    },
+  });
 }
 
 afterEach(async () => {
@@ -982,4 +1279,547 @@ describe.sequential("FIX-07 C3 runtime control and heartbeat", () => {
     ]));
     await runtime.stopCaptureRuntime({ deadlineMs: 20 });
   });
+});
+
+describe.sequential("FIX-07 C4 truthful periods and product invariance", () => {
+  const writerPassword = "writer-fix07-c4-only";
+  let database: TestDatabase;
+
+  function writerConnectionString(): string {
+    const url = new URL(database.connectionString);
+    url.username = "debateai_obs_writer";
+    url.password = writerPassword;
+    return url.toString();
+  }
+
+  beforeAll(async () => {
+    database = await startTestDatabase();
+    await database.pool.query(
+      "SELECT set_config('debateai.obs_writer_password', $1, false)",
+      [writerPassword],
+    );
+    await migrate(database.pool);
+  }, 120_000);
+
+  afterAll(async () => {
+    await database?.stop();
+  });
+
+  it("echoes one landed canonical cadence through command, child, scheduler and query inputs", async () => {
+    const credential = await createApiCredentialFixture();
+    expect(Object.prototype.hasOwnProperty.call(
+      credential.values,
+      CADENCE_KEY,
+    )).toBe(false);
+    const canonicalEchoes: string[] = [];
+
+    for (const [, raw, , expectedEffective] of cadenceCases) {
+      const effective = withObsFlushDeadline(
+        raw,
+        () => readObsBounds().flushDeadlineMs,
+      );
+      expect(effective).toBe(expectedEffective);
+      const expected = String(effective);
+      await withObsFlushDeadlineAsync(expected, async () => {
+        const commandEnvironment = loadDevelopmentCommandEnvironment();
+        requireExactCadenceEcho(
+          expected,
+          commandEnvironment.OBS_FLUSH_DEADLINE_MS,
+        );
+
+        const apiEnvironments: Readonly<Record<string, string>>[] = [];
+        const apiChild = createApiChild();
+        let probeCount = 0;
+        const api = await startDevelopmentApiProcess({
+          repositoryRoot: credential.root,
+          commandEnvironment,
+          operations: Object.freeze({
+            async probe() {
+              probeCount += 1;
+              return probeCount === 1
+                ? null
+                : Object.freeze({
+                    statusCode: 401,
+                    contentType: "application/json",
+                    body: '{"error":"SESSION_REQUIRED"}',
+                  });
+            },
+            startApi(environment: Readonly<Record<string, string>>) {
+              apiEnvironments.push(environment);
+              return apiChild;
+            },
+            async delay() {},
+          }),
+        });
+        expect(apiEnvironments).toHaveLength(1);
+        requireExactCadenceEcho(
+          expected,
+          apiEnvironments[0]!.OBS_FLUSH_DEADLINE_MS,
+        );
+        expect(withObsFlushDeadline(
+          apiEnvironments[0]!.OBS_FLUSH_DEADLINE_MS,
+          () => readObsBounds().flushDeadlineMs,
+        )).toBe(effective);
+        await api.stop();
+        expect(apiChild.terminateCalls.count).toBe(1);
+
+        const runnerEnvironments: Readonly<Record<string, string>>[] = [];
+        const runnerChild = createRunnerChild();
+        const runner = await startDevelopmentRunnerProcess({
+          repositoryRoot: credential.root,
+          commandEnvironment,
+          operations: Object.freeze({
+            async loadApiEnvironment() {
+              return credential.values;
+            },
+            startRunner(environment: Readonly<Record<string, string>>) {
+              runnerEnvironments.push(environment);
+              return runnerChild;
+            },
+          }),
+        });
+        expect(runnerEnvironments).toHaveLength(1);
+        requireExactCadenceEcho(
+          expected,
+          runnerEnvironments[0]!.OBS_FLUSH_DEADLINE_MS,
+        );
+        expect(withObsFlushDeadline(
+          runnerEnvironments[0]!.OBS_FLUSH_DEADLINE_MS,
+          () => readObsBounds().flushDeadlineMs,
+        )).toBe(effective);
+        await runner.stop();
+        expect(runnerChild.terminateCalls.count).toBe(1);
+
+        const schedulerEnvironment = Object.freeze({ ...process.env });
+        requireExactCadenceEcho(
+          expected,
+          schedulerEnvironment.OBS_FLUSH_DEADLINE_MS,
+        );
+        const queryBind = commandEnvironment.OBS_FLUSH_DEADLINE_MS;
+        requireExactCadenceEcho(expected, queryBind);
+        canonicalEchoes.push(
+          commandEnvironment.OBS_FLUSH_DEADLINE_MS!,
+          apiEnvironments[0]!.OBS_FLUSH_DEADLINE_MS!,
+          runnerEnvironments[0]!.OBS_FLUSH_DEADLINE_MS!,
+          schedulerEnvironment.OBS_FLUSH_DEADLINE_MS!,
+          queryBind!,
+        );
+      });
+    }
+
+    expect(canonicalEchoes.filter((_, index) => index % 5 === 0)).toEqual([
+      "5000",
+      "5000",
+      "5000",
+      "5000",
+      "5000",
+      "5000",
+      "250",
+      "5000",
+      "7250",
+      "9007199254740991",
+      "5000",
+    ]);
+    for (let index = 0; index < canonicalEchoes.length; index += 5) {
+      expect(new Set(canonicalEchoes.slice(index, index + 5)).size).toBe(1);
+    }
+  }, 30_000);
+
+  it("uses elapsed effective cadence boundaries and rejects mismatched or invalid evidence", async () => {
+    await withOwnerTransaction(database, async (client) => {
+      const boundaryCases = [
+        [undefined, 4_999, "QUIET"],
+        [undefined, 5_000, "QUIET"],
+        [undefined, 5_001, "OFF"],
+        [undefined, 30_000, "OFF"],
+        ["7250", 7_249, "QUIET"],
+        ["7250", 7_250, "QUIET"],
+        ["7250", 7_251, "OFF"],
+        ["9007199254740991", 30_000, "QUIET"],
+      ] as const;
+      for (const [raw, ageMs, expectedPeriod] of boundaryCases) {
+        const effective = withObsFlushDeadline(
+          raw,
+          () => readObsBounds().flushDeadlineMs,
+        );
+        await seedHealth(client, {
+          runtime: "runner",
+          state: "ARMED",
+          detailCode: "FLUSH_OK",
+          ageMs,
+        });
+        const result = await queryPeriods(
+          client,
+          String(effective),
+        );
+        expect(result.bind).toBe(String(effective));
+        expect(result.rows.map((row) => row.runtime)).toEqual([
+          "api",
+          "runner",
+          "scheduler",
+        ]);
+        expect(result.rows.find((row) => row.runtime === "runner")?.period)
+          .toBe(expectedPeriod);
+      }
+
+      await seedHealth(client, {
+        runtime: "runner",
+        state: "ARMED",
+        detailCode: "FLUSH_OK",
+        ageMs: 6_000,
+      });
+      expect((await queryPeriods(client, "5000")).rows
+        .find((row) => row.runtime === "runner")?.period).toBe("OFF");
+      expect((await queryPeriods(client, "7250")).rows
+        .find((row) => row.runtime === "runner")?.period).toBe("QUIET");
+    });
+
+    let acceptedMismatches = 0;
+    for (const actual of [
+      undefined,
+      "",
+      "malformed",
+      "0",
+      "1.5",
+      "9007199254740992",
+      "5000",
+    ] as const) {
+      expect(() => {
+        requireExactCadenceEcho("7250", actual);
+        acceptedMismatches += 1;
+      }).toThrow("FIX07_CADENCE_ECHO_MISMATCH");
+    }
+    expect(acceptedMismatches).toBe(0);
+
+    for (const invalid of [0, -1, "1.5", "9007199254740992", undefined]) {
+      let acceptedQuietEvidence = false;
+      try {
+        const result = await database.pool.query<PeriodRow>(
+          FIX07_PERIOD_QUERY,
+          [invalid],
+        );
+        acceptedQuietEvidence = result.rows.length === 3
+          && result.rows.some((row) => row.period === "QUIET");
+      } catch {
+        acceptedQuietEvidence = false;
+      }
+      expect(acceptedQuietEvidence).toBe(false);
+    }
+
+    expect(FIX07_PERIOD_QUERY).toContain(
+      "EXTRACT(EPOCH FROM (p.evaluated_at - h.observed_at)) * 1000",
+    );
+    expect(FIX07_PERIOD_QUERY).not.toMatch(
+      /h\.observed_at\s*[<>]=?\s*p\.period_cutoff/u,
+    );
+  });
+
+  it("classifies the exhaustive OFF BLIND ACTIVE QUIET matrix in lexical order", async () => {
+    const scenarios = [
+      { label: "missing health", expected: "OFF", setup: async () => {} },
+      {
+        label: "stale health",
+        expected: "OFF",
+        setup: (client: PoolClient) => seedHealth(client, {
+          runtime: "runner",
+          state: "ARMED",
+          detailCode: "FLUSH_OK",
+          ageMs: 5_001,
+        }),
+      },
+      {
+        label: "fresh OFF",
+        expected: "OFF",
+        setup: (client: PoolClient) => seedHealth(client, {
+          runtime: "runner",
+          state: "OFF",
+          detailCode: "DISABLED",
+          ageMs: 0,
+        }),
+      },
+      {
+        label: "fresh historical STOPPED",
+        expected: "OFF",
+        setup: (client: PoolClient) => seedHealth(client, {
+          runtime: "runner",
+          state: "STOPPED",
+          detailCode: "FLUSH_OK",
+          ageMs: 0,
+        }),
+      },
+      {
+        label: "fresh SPOOL_ONLY",
+        expected: "BLIND",
+        setup: (client: PoolClient) => seedHealth(client, {
+          runtime: "runner",
+          state: "SPOOL_ONLY",
+          detailCode: "FLUSH_OK",
+          ageMs: 0,
+        }),
+      },
+      {
+        label: "fresh failure detail",
+        expected: "BLIND",
+        setup: (client: PoolClient) => seedHealth(client, {
+          runtime: "runner",
+          state: "ARMED",
+          detailCode: "POSTGRES_FAILURE",
+          ageMs: 0,
+        }),
+      },
+      {
+        label: "open gap",
+        expected: "BLIND",
+        setup: async (client: PoolClient) => {
+          await seedHealth(client, {
+            runtime: "runner",
+            state: "ARMED",
+            detailCode: "FLUSH_OK",
+            ageMs: 0,
+          });
+          await client.query(
+            `INSERT INTO obs.capture_gap
+               (source, gap_class, lost_count, opened_at, closed_at)
+             VALUES (
+               'unclassified', 'POSTGRES_FAILURE', 1,
+               transaction_timestamp() - interval '2 minutes', NULL
+             )`,
+          );
+        },
+      },
+      {
+        label: "recent closed gap",
+        expected: "BLIND",
+        setup: async (client: PoolClient) => {
+          await seedHealth(client, {
+            runtime: "runner",
+            state: "ARMED",
+            detailCode: "FLUSH_OK",
+            ageMs: 0,
+          });
+          await client.query(
+            `INSERT INTO obs.capture_gap
+               (source, gap_class, lost_count, opened_at, closed_at)
+             VALUES (
+               'unclassified', 'GAP_WRITE_FAILURE', 1,
+               transaction_timestamp() - interval '2 seconds',
+               transaction_timestamp() - interval '1 second'
+             )`,
+          );
+        },
+      },
+      {
+        label: "recent occurrence",
+        expected: "ACTIVE",
+        setup: async (client: PoolClient) => {
+          await seedHealth(client, {
+            runtime: "runner",
+            state: "ARMED",
+            detailCode: "FLUSH_OK",
+            ageMs: 0,
+          });
+          await seedOccurrence(client, "runner", 1_000, "fix07-recent");
+        },
+      },
+      {
+        label: "zero occurrence",
+        expected: "QUIET",
+        setup: (client: PoolClient) => seedHealth(client, {
+          runtime: "runner",
+          state: "ARMED",
+          detailCode: "FLUSH_OK",
+          ageMs: 0,
+        }),
+      },
+      {
+        label: "old occurrence",
+        expected: "QUIET",
+        setup: async (client: PoolClient) => {
+          await seedHealth(client, {
+            runtime: "runner",
+            state: "ARMED",
+            detailCode: "FLUSH_OK",
+            ageMs: 0,
+          });
+          await seedOccurrence(client, "runner", 60_001, "fix07-old");
+        },
+      },
+    ] as const;
+
+    for (const scenario of scenarios) {
+      await withOwnerTransaction(database, async (client) => {
+        await scenario.setup(client);
+        const rows = (await queryPeriods(client, "5000")).rows;
+        expect(
+          rows,
+          scenario.label,
+        ).toEqual([
+          { runtime: "api", period: "OFF" },
+          { runtime: "runner", period: scenario.expected },
+          { runtime: "scheduler", period: "OFF" },
+        ]);
+        expect(rows.every((row) =>
+          ["OFF", "BLIND", "ACTIVE", "QUIET"].includes(row.period)))
+          .toBe(true);
+      });
+    }
+  });
+
+  it("lets either replica refresh one 7250ms lease and expires only after both stop", async () => {
+    const { createPostgresCaptureSink } = await import(
+      "../../packages/obs-capture/src/runtime/sink.js"
+    );
+    const replicaA = createPostgresCaptureSink({
+      connectionString: writerConnectionString(),
+    });
+    const replicaB = createPostgresCaptureSink({
+      connectionString: writerConnectionString(),
+    });
+    try {
+      await replicaA.writeComponentHealth({
+        component: "capture:runner",
+        state: "ARMED",
+        detailCode: "FLUSH_OK",
+      });
+      await replicaB.writeComponentHealth({
+        component: "capture:runner",
+        state: "ARMED",
+        detailCode: "FLUSH_OK",
+      });
+      await replicaB.close();
+      await replicaA.writeComponentHealth({
+        component: "capture:runner",
+        state: "ARMED",
+        detailCode: "FLUSH_OK",
+      });
+      expect((await queryPeriods(database.pool, "7250")).rows
+        .find((row) => row.runtime === "runner")?.period).not.toBe("OFF");
+    } finally {
+      await Promise.allSettled([replicaA.close(), replicaB.close()]);
+    }
+
+    await database.pool.query(
+      `UPDATE obs.component_health
+          SET observed_at = transaction_timestamp()
+            - (7250.001 * interval '1 millisecond')
+        WHERE component = 'capture:runner'`,
+    );
+    expect((await queryPeriods(database.pool, "7250")).rows
+      .find((row) => row.runtime === "runner")?.period).toBe("OFF");
+  });
+
+  it("keeps scheduler failure bytes identical across ON OFF absent and failed controls", async () => {
+    const onControlDirectory = await mkdtemp(join(tmpdir(), "fix07-product-on-"));
+    const offControlDirectory = await mkdtemp(join(tmpdir(), "fix07-product-off-"));
+    scratchDirectories.push(onControlDirectory, offControlDirectory);
+    await writeFile(join(offControlDirectory, "CAPTURE_OFF"), "off\n");
+    const before = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM obs.occurrence
+        WHERE runtime = 'scheduler'`,
+    );
+    const program = [
+      'import { setTimeout as delay } from "node:timers/promises";',
+      'import { runJobWithLifecycle } from "./apps/scheduler/src/index.ts";',
+      "const mode = process.env.FIX07_PRODUCT_MODE;",
+      "let runtime;",
+      "if (mode !== 'absent') {",
+      '  runtime = await import("@debateai/obs-capture/runtime");',
+      "  await runtime.startCaptureRuntime({ runtime: 'scheduler', spoolFd: undefined, installExitSink() {} });",
+      "  if (mode === 'failed-controls') await delay(40);",
+      "}",
+      "const planted = Object.freeze({ code: 'FIX07_PRODUCT_FAILURE' });",
+      "let sameError = false;",
+      "try { await runJobWithLifecycle('replay-self-test', async () => { throw planted; }); }",
+      "catch (error) { sameError = error === planted; }",
+      "if (runtime !== undefined) await runtime.stopCaptureRuntime({ deadlineMs: 1000 });",
+      "process.stdout.write(JSON.stringify({ sameError }));",
+      "process.exitCode = 37;",
+    ].join("\n");
+
+    function runProduct(mode: "absent" | "on" | "off" | "failed-controls") {
+      const environment: NodeJS.ProcessEnv = {
+        ...process.env,
+        NODE_NO_WARNINGS: "1",
+        FIX07_PRODUCT_MODE: mode,
+        OBS_FLUSH_DEADLINE_MS: mode === "failed-controls" ? "10" : "60000",
+        OBS_WRITER_DATABASE_URL: mode === "failed-controls"
+          ? "postgresql://127.0.0.1:1/fix07"
+          : writerConnectionString(),
+      };
+      if (mode === "on") environment.OBS_CONTROL_DIR = onControlDirectory;
+      else if (mode === "off") environment.OBS_CONTROL_DIR = offControlDirectory;
+      else if (mode === "failed-controls") {
+        environment.OBS_CONTROL_DIR = `/${"x".repeat(5_000)}`;
+      } else {
+        delete environment.OBS_CONTROL_DIR;
+      }
+      const child = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "-e", program],
+        {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          env: environment,
+        },
+      );
+      return Object.freeze({
+        status: child.status,
+        signal: child.signal,
+        stdout: child.stdout,
+        stderr: child.stderr,
+      });
+    }
+
+    const absent = runProduct("absent");
+    const afterAbsent = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM obs.occurrence
+        WHERE runtime = 'scheduler'`,
+    );
+    const on = runProduct("on");
+    const afterOn = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM obs.occurrence
+        WHERE runtime = 'scheduler'`,
+    );
+    const off = runProduct("off");
+    const afterOff = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM obs.occurrence
+        WHERE runtime = 'scheduler'`,
+    );
+    const failedControls = runProduct("failed-controls");
+
+    expect(absent).toEqual({
+      status: 37,
+      signal: null,
+      stdout: '{"sameError":true}',
+      stderr: "",
+    });
+    expect(on).toEqual(absent);
+    expect(off).toEqual(absent);
+    expect(failedControls).toEqual(absent);
+    expect(afterAbsent.rows).toEqual(before.rows);
+    expect(Number(afterOn.rows[0]!.count) - Number(before.rows[0]!.count))
+      .toBe(2);
+    expect(afterOff.rows).toEqual(afterOn.rows);
+
+    const disabled = await database.pool.query<{
+      source: string;
+      gap_class: string;
+      lost_count: string;
+    }>(
+      `SELECT source, gap_class, lost_count::text AS lost_count
+         FROM obs.capture_gap
+        WHERE source = 'first_party' AND gap_class = 'DISABLED'
+        ORDER BY opened_at DESC
+        LIMIT 1`,
+    );
+    expect(disabled.rows).toEqual([{
+      source: "first_party",
+      gap_class: "DISABLED",
+      lost_count: "2",
+    }]);
+  }, 30_000);
 });
