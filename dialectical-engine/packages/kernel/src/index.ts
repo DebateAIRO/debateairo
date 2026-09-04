@@ -281,8 +281,8 @@ export function exhaustive(value: never): never {
 }
 
 export class TypedDomainError extends Error {
-  constructor(readonly code: string, message: string) {
-    super(message);
+  constructor(readonly code: string, message: string, options?: { cause?: unknown }) {
+    super(message, options);
     this.name = "TypedDomainError";
   }
 }
