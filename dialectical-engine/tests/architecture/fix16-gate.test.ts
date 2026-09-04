@@ -1425,6 +1425,68 @@ describe("FIX-16 C1 inventory scanner", () => {
     expect(scanSource(safe, "packages/obs-capture/src/nested-call-cap-safe.ts")).toEqual([]);
   });
 
+  it("compares nested closure entry states after binding call arguments", () => {
+    const harmful = [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  const inner = (load: (path: string) => unknown) =>",
+      '    load("apps/api/src/registration.ts");',
+      "  inner(local);",
+      "  inner(local);",
+      "  inner(local);",
+      "  inner(local);",
+      "  inner(require);",
+      "}",
+      "outer();",
+    ].join("\n");
+    const safe = [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  const inner = (load: (path: string) => unknown) =>",
+      '    load("apps/api/src/registration.ts");',
+      "  inner(local);",
+      "  inner(local);",
+      "  inner(local);",
+      "  inner(local);",
+      "  inner(local);",
+      "}",
+      "outer();",
+    ].join("\n");
+
+    expect(scanSource(harmful, "packages/obs-capture/src/nested-argument-cap-harmful.ts")).toEqual([
+      { path: "packages/obs-capture/src/nested-argument-cap-harmful.ts", line: 4, class: "zone_import" },
+    ]);
+    expect(scanSource(safe, "packages/obs-capture/src/nested-argument-cap-safe.ts")).toEqual([]);
+  });
+
+  it("saturates changing caller state without inventing a global require callee", () => {
+    const source = (lastLoad: "local" | "require") => [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  let load = local;",
+      '  let marker = "SAFE_A";',
+      '  const inner = () => { marker; load("apps/api/src/registration.ts"); };',
+      "  inner();",
+      '  marker = "SAFE_B"; inner();',
+      '  marker = "SAFE_C"; inner();',
+      '  marker = "SAFE_D"; inner();',
+      `  marker = "SAFE_E"; load = ${lastLoad}; inner();`,
+      "}",
+      "outer();",
+    ].join("\n");
+
+    expect(scanSource(
+      source("require"),
+      "packages/obs-capture/src/nested-saturation-harmful.ts",
+    )).toEqual([
+      { path: "packages/obs-capture/src/nested-saturation-harmful.ts", line: 5, class: "zone_import" },
+    ]);
+    expect(scanSource(
+      source("local"),
+      "packages/obs-capture/src/nested-saturation-safe.ts",
+    )).toEqual([]);
+  });
+
   it("updates exact manifest array indices, fill, and indirect native push", () => {
     const source = [
       'const indexHarmful = ["packages/kernel/src/error.ts"];',

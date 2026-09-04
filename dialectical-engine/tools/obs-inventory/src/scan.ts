@@ -682,6 +682,16 @@ function widenState(state: FlowState): FlowState {
   return widened;
 }
 
+function widenCallableEntry(previous: FlowState, current: FlowState, joined: FlowState): FlowState {
+  const widened = widenState(joined);
+  for (const binding of joined.requires.keys()) {
+    const previousRequire = previous.requires.get(binding) ?? REQUIRE_LOCAL;
+    const currentRequire = current.requires.get(binding) ?? REQUIRE_LOCAL;
+    if (previousRequire === currentRequire) widened.requires.set(binding, previousRequire);
+  }
+  return widened;
+}
+
 function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
   return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 }
@@ -1854,7 +1864,6 @@ function scanParsedSource(
   const analyzedCallables = new Set<number>();
   const callableExecutionCounts = new Map<number, number>();
   const callableEntryStates = new Map<number, FlowState>();
-  const saturatedCallables = new Set<number>();
   let rejectionCallbackDepth = 0;
   const hasLexicallyNarrowedParent = (node: ts.Node): boolean => {
     let current = node.parent;
@@ -2374,6 +2383,32 @@ function scanParsedSource(
     }
   };
 
+  const bindCallableState = (
+    node: ts.FunctionLikeDeclaration,
+    arguments_: readonly ts.Expression[],
+    state: FlowState,
+    rejectionCallback: boolean,
+  ): FlowState => {
+    const functionState = cloneState(state);
+    if (rejectionCallback) functionState.rejectionObservation = REJECTION_UNOBSERVED;
+    for (let index = 0; index < node.parameters.length; index += 1) {
+      const parameter = node.parameters[index];
+      if (parameter === undefined) continue;
+      const argument = arguments_[index];
+      if (argument === undefined && parameter.initializer !== undefined) {
+        scanExpression(parameter.initializer, functionState);
+      }
+      updatePattern(
+        parameter.name,
+        argument ?? parameter.initializer,
+        functionState,
+        VALUE_PRESENT | VALUE_NULLISH,
+      );
+      if (rejectionCallback && index === 0) markRejectionBinding(parameter.name, functionState);
+    }
+    return functionState;
+  };
+
   executeCallable = (
     node: ts.FunctionLikeDeclaration,
     arguments_: readonly ts.Expression[],
@@ -2392,21 +2427,24 @@ function scanParsedSource(
       && activeCallables.size > 0
       && hasLexicallyNarrowedParent(node)
       && functionHasCandidate(node, state, false);
-    let executionState = state;
+    let functionState: FlowState | undefined;
     if (nestedCandidateCall) {
+      functionState = bindCallableState(node, arguments_, state, false);
       const previousEntry = callableEntryStates.get(node.pos);
-      const joinedEntry = previousEntry === undefined ? cloneState(state) : joinStates(previousEntry, state);
+      const joinedEntry = previousEntry === undefined
+        ? cloneState(functionState)
+        : joinStates(previousEntry, functionState);
       if (previousEntry !== undefined && statesEqual(previousEntry, joinedEntry)) {
         return [completion("normal", cloneState(state))];
       }
       if (executions >= MAX_CALLABLE_EXECUTIONS) {
-        if (saturatedCallables.has(node.pos)) return [completion("normal", widenState(state))];
-        executionState = widenState(joinedEntry);
-        saturatedCallables.add(node.pos);
+        functionState = previousEntry === undefined
+          ? widenState(joinedEntry)
+          : widenCallableEntry(previousEntry, functionState, joinedEntry);
       } else {
         callableExecutionCounts.set(node.pos, executions + 1);
       }
-      callableEntryStates.set(node.pos, cloneState(executionState));
+      callableEntryStates.set(node.pos, cloneState(functionState));
     } else if (!rejectionCallback) {
       if (executions >= MAX_CALLABLE_EXECUTIONS) return [completion("normal", widenState(state))];
       callableExecutionCounts.set(node.pos, executions + 1);
@@ -2415,23 +2453,7 @@ function scanParsedSource(
     activeCallables.add(node.pos);
     if (rejectionCallback) rejectionCallbackDepth += 1;
     try {
-      const functionState = cloneState(executionState);
-      if (rejectionCallback) functionState.rejectionObservation = REJECTION_UNOBSERVED;
-      for (let index = 0; index < node.parameters.length; index += 1) {
-        const parameter = node.parameters[index];
-        if (parameter === undefined) continue;
-        const argument = arguments_[index];
-        if (argument === undefined && parameter.initializer !== undefined) {
-          scanExpression(parameter.initializer, functionState);
-        }
-        updatePattern(
-          parameter.name,
-          argument ?? parameter.initializer,
-          functionState,
-          VALUE_PRESENT | VALUE_NULLISH,
-        );
-        if (rejectionCallback && index === 0) markRejectionBinding(parameter.name, functionState);
-      }
+      functionState ??= bindCallableState(node, arguments_, state, rejectionCallback);
       if (ts.isBlock(node.body)) return executeSequence(node.body.statements, functionState);
       const thrown = scanExpression(node.body, functionState).map((item) => completion("throw", item));
       return coalesceCompletions([completion("return", functionState), ...thrown]);
