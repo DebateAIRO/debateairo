@@ -286,75 +286,118 @@ function isTypedDomainErrorConstruction(
   return false;
 }
 
-type CauseBindings = Map<number, string>;
-type CausePropertyState = "absent" | "preserved" | "lost" | "unknown";
+const CALLBACK_OBSERVES = 1;
+const CALLBACK_IGNORES = 2;
+const CAUSE_CAUGHT = 1;
+const CAUSE_OTHER = 2;
+const PROPERTY_ABSENT = 1;
+const PROPERTY_CAUGHT = 2;
+const PROPERTY_OTHER = 4;
+const KEY_CAUSE = 1;
+const KEY_OTHER = 2;
+const MAX_FLOW_ALTERNATIVES = 32;
 
-function expressionPreservesCause(
-  rawExpression: ts.Expression,
-  causes: ReadonlyMap<number, string>,
-  checker: Checker,
-): boolean {
-  const expression = unwrapExpression(rawExpression);
-  if (!ts.isIdentifier(expression)) return false;
-  const binding = symbolId(checker, expression);
-  return binding !== null && causes.has(binding);
+type StringPossibilities = {
+  readonly values: Set<string>;
+  readonly unknown: boolean;
+};
+
+type ObjectReferences = {
+  readonly ids: Set<number>;
+  readonly unknown: boolean;
+};
+
+type ScanFlowState = {
+  callbacks: Map<number, number>;
+  causes: Map<number, number>;
+  causeNames: Map<number, string>;
+  catchContexts: Map<number, string>;
+  strings: Map<number, StringPossibilities>;
+  objectReferences: Map<number, ObjectReferences>;
+  objectProperties: Map<number, number>;
+};
+
+function cloneStrings(value: StringPossibilities): StringPossibilities {
+  return { values: new Set(value.values), unknown: value.unknown };
 }
 
-function propertyNameText(name: ts.PropertyName): string | null {
-  if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) || ts.isNumericLiteral(name)) return name.text;
-  if (ts.isComputedPropertyName(name)) {
-    const expression = unwrapExpression(name.expression);
-    return ts.isStringLiteralLikeNode(expression) ? expression.text : null;
-  }
-  return null;
+function cloneReferences(value: ObjectReferences): ObjectReferences {
+  return { ids: new Set(value.ids), unknown: value.unknown };
 }
 
-function evaluateCauseProperty(
-  rawExpression: ts.Expression,
-  causes: ReadonlyMap<number, string>,
-  objects: ReadonlyMap<number, CausePropertyState>,
-  checker: Checker,
-  seen: ReadonlySet<number> = new Set(),
-): CausePropertyState {
-  const expression = unwrapExpression(rawExpression);
-  if (ts.isIdentifier(expression)) {
-    const binding = symbolId(checker, expression);
-    if (binding === null || seen.has(binding)) return "unknown";
-    return objects.get(binding) ?? "unknown";
+function cloneScanFlow(state: ScanFlowState): ScanFlowState {
+  return {
+    callbacks: new Map(state.callbacks),
+    causes: new Map(state.causes),
+    causeNames: new Map(state.causeNames),
+    catchContexts: new Map(state.catchContexts),
+    strings: new Map([...state.strings].map(([binding, value]) => [binding, cloneStrings(value)])),
+    objectReferences: new Map(
+      [...state.objectReferences].map(([binding, value]) => [binding, cloneReferences(value)]),
+    ),
+    objectProperties: new Map(state.objectProperties),
+  };
+}
+
+function unionStrings(left: StringPossibilities, right: StringPossibilities): StringPossibilities {
+  const values = new Set([...left.values, ...right.values]);
+  return values.size > MAX_FLOW_ALTERNATIVES
+    ? { values: new Set(), unknown: true }
+    : { values, unknown: left.unknown || right.unknown };
+}
+
+function unionReferences(left: ObjectReferences, right: ObjectReferences): ObjectReferences {
+  const ids = new Set([...left.ids, ...right.ids]);
+  return ids.size > MAX_FLOW_ALTERNATIVES
+    ? { ids: new Set(), unknown: true }
+    : { ids, unknown: left.unknown || right.unknown };
+}
+
+function joinNumberMaps(
+  left: ReadonlyMap<number, number>,
+  right: ReadonlyMap<number, number>,
+  missing: number,
+): Map<number, number> {
+  const joined = new Map<number, number>();
+  for (const binding of new Set([...left.keys(), ...right.keys()])) {
+    joined.set(binding, (left.get(binding) ?? missing) | (right.get(binding) ?? missing));
   }
-  if (!ts.isObjectLiteralExpression(expression)) return "unknown";
-  let state: CausePropertyState = "absent";
-  for (const property of expression.properties) {
-    if (ts.isPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
-      state = expressionPreservesCause(property.initializer, causes, checker) ? "preserved" : "lost";
-    } else if (ts.isShorthandPropertyAssignment(property) && propertyNameText(property.name) === "cause") {
-      const binding = checker.getShorthandAssignmentValueSymbol(property)?.id;
-      state = binding !== undefined && causes.has(binding) ? "preserved" : "lost";
-    } else if (
-      ts.isSpreadAssignment(property)
-    ) {
-      const spreadState = evaluateCauseProperty(property.expression, causes, objects, checker, seen);
-      if (spreadState !== "absent") state = spreadState;
-    } else if (ts.isPropertyAssignment(property) && ts.isComputedPropertyName(property.name)) {
-      state = "unknown";
+  return joined;
+}
+
+function joinScanFlows(target: ScanFlowState, left: ScanFlowState, right: ScanFlowState): void {
+  target.callbacks = joinNumberMaps(left.callbacks, right.callbacks, CALLBACK_IGNORES);
+  target.causes = joinNumberMaps(left.causes, right.causes, CAUSE_OTHER);
+  target.catchContexts = new Map([...left.catchContexts, ...right.catchContexts]);
+  target.objectProperties = joinNumberMaps(
+    left.objectProperties,
+    right.objectProperties,
+    0,
+  );
+  target.causeNames = new Map();
+  for (const binding of target.causes.keys()) {
+    if ((target.causes.get(binding) ?? CAUSE_OTHER) & CAUSE_CAUGHT) {
+      const name = left.causeNames.get(binding) ?? right.causeNames.get(binding);
+      if (name !== undefined) target.causeNames.set(binding, name);
     }
   }
-  return state;
-}
-
-function visibleCauseBindings(
-  causes: ReadonlyMap<number, string>,
-  location: ts.Node,
-  checker: Checker,
-): CauseBindings {
-  const visible: CauseBindings = new Map();
-  for (const [binding, name] of causes) {
-    if (checker.resolveName(name, SymbolFlags.Value, location)?.id === binding) visible.set(binding, name);
+  target.strings = new Map();
+  for (const binding of new Set([...left.strings.keys(), ...right.strings.keys()])) {
+    target.strings.set(binding, unionStrings(
+      left.strings.get(binding) ?? { values: new Set(), unknown: true },
+      right.strings.get(binding) ?? { values: new Set(), unknown: true },
+    ));
   }
-  return visible;
+  target.objectReferences = new Map();
+  for (const binding of new Set([...left.objectReferences.keys(), ...right.objectReferences.keys()])) {
+    target.objectReferences.set(binding, unionReferences(
+      left.objectReferences.get(binding) ?? { ids: new Set(), unknown: true },
+      right.objectReferences.get(binding) ?? { ids: new Set(), unknown: true },
+    ));
+  }
 }
 
-function collectRejectionHandlerDefinitions(
+function collectHoistedRejectionHandlers(
   sourceFile: ts.SourceFile,
   checker: Checker,
 ): ReadonlyMap<number, ts.FunctionLikeDeclaration> {
@@ -363,16 +406,6 @@ function collectRejectionHandlerDefinitions(
     if (ts.isFunctionDeclaration(node) && node.name !== undefined && node.body !== undefined) {
       const binding = symbolId(checker, node.name);
       if (binding !== null) definitions.set(binding, node);
-    }
-    if (
-      ts.isVariableDeclaration(node)
-      && ts.isIdentifier(node.name)
-      && node.initializer !== undefined
-      && (ts.isArrowFunction(unwrapExpression(node.initializer))
-        || ts.isFunctionExpression(unwrapExpression(node.initializer)))
-    ) {
-      const binding = symbolId(checker, node.name);
-      if (binding !== null) definitions.set(binding, unwrapExpression(node.initializer) as ts.FunctionLikeDeclaration);
     }
     node.forEachChild(visit);
   };
@@ -383,7 +416,20 @@ function collectRejectionHandlerDefinitions(
 function functionObservesRejection(callback: ts.FunctionLikeDeclaration, checker: Checker): boolean {
   const parameter = callback.parameters[0];
   if (parameter === undefined || parameter.name === undefined) return false;
-  if (!ts.isIdentifier(parameter.name)) return true;
+  if (!ts.isIdentifier(parameter.name)) {
+    let bindingCount = 0;
+    const countBindings = (name: ts.BindingName): void => {
+      if (ts.isIdentifier(name)) {
+        bindingCount += 1;
+        return;
+      }
+      for (const element of name.elements) {
+        if (!ts.isOmittedExpression(element) && element.name !== undefined) countBindings(element.name);
+      }
+    };
+    countBindings(parameter.name);
+    return bindingCount > 0;
+  }
   const parameterBinding = symbolId(checker, parameter.name);
   if (parameterBinding === null || callback.body === undefined) return false;
   let observed = false;
@@ -399,37 +445,40 @@ function functionObservesRejection(callback: ts.FunctionLikeDeclaration, checker
   return observed;
 }
 
-function isRejectionObserver(
+function callbackPossibilities(
   rawExpression: ts.Expression | undefined,
+  state: ScanFlowState,
   checker: Checker,
   definitions: ReadonlyMap<number, ts.FunctionLikeDeclaration>,
-  initializers: ReadonlyMap<number, ts.Expression>,
-  seen: ReadonlySet<number> = new Set(),
-): boolean {
-  if (rawExpression === undefined) return false;
+): number {
+  if (rawExpression === undefined) return CALLBACK_IGNORES;
   const expression = unwrapExpression(rawExpression);
   if (ts.isIdentifier(expression)) {
-    if (expression.text === "undefined") return false;
+    if (expression.text === "undefined") return CALLBACK_IGNORES;
     const binding = symbolId(checker, expression);
+    if (binding !== null && state.callbacks.has(binding)) return state.callbacks.get(binding) ?? CALLBACK_IGNORES;
     const definition = binding === null ? undefined : definitions.get(binding);
-    if (definition !== undefined) return functionObservesRejection(definition, checker);
-    if (binding === null || seen.has(binding)) return true;
-    const initializer = initializers.get(binding);
-    return initializer === undefined
-      ? true
-      : isRejectionObserver(initializer, checker, definitions, initializers, new Set([...seen, binding]));
+    return definition === undefined || functionObservesRejection(definition, checker)
+      ? CALLBACK_OBSERVES
+      : CALLBACK_IGNORES;
   }
   if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
-    return functionObservesRejection(expression, checker);
+    return functionObservesRejection(expression, checker) ? CALLBACK_OBSERVES : CALLBACK_IGNORES;
   }
-  return ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression);
+  if (ts.isConditionalExpression(expression)) {
+    return callbackPossibilities(expression.whenTrue, state, checker, definitions)
+      | callbackPossibilities(expression.whenFalse, state, checker, definitions);
+  }
+  return ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)
+    ? CALLBACK_OBSERVES
+    : CALLBACK_IGNORES;
 }
 
 function isObservedPromise(
   rawExpression: ts.Expression,
+  state: ScanFlowState,
   checker: Checker,
   definitions: ReadonlyMap<number, ts.FunctionLikeDeclaration>,
-  initializers: ReadonlyMap<number, ts.Expression>,
 ): boolean {
   const expression = unwrapExpression(rawExpression);
   if (ts.isAwaitExpression(expression)) return true;
@@ -437,13 +486,13 @@ function isObservedPromise(
   const callee = unwrapExpression(expression.expression);
   if (!ts.isPropertyAccessExpression(callee)) return false;
   if (callee.name.text === "catch") {
-    return isRejectionObserver(expression.arguments[0], checker, definitions, initializers);
+    return callbackPossibilities(expression.arguments[0], state, checker, definitions) === CALLBACK_OBSERVES;
   }
   if (callee.name.text === "then") {
-    return isRejectionObserver(expression.arguments[1], checker, definitions, initializers);
+    return callbackPossibilities(expression.arguments[1], state, checker, definitions) === CALLBACK_OBSERVES;
   }
   if (callee.name.text === "finally") {
-    return isObservedPromise(callee.expression, checker, definitions, initializers);
+    return isObservedPromise(callee.expression, state, checker, definitions);
   }
   return false;
 }
@@ -487,96 +536,351 @@ function scanParsedSource(
   const findings: InventoryFinding[] = [];
   const initializers = collectInitializers(sourceFile, checker);
   const wrapperAliases = collectTypedDomainErrorAliases(sourceFile, checker);
-  const rejectionHandlers = collectRejectionHandlerDefinitions(sourceFile, checker);
-  const objectCauses = new Map<number, CausePropertyState>();
+  const rejectionHandlers = collectHoistedRejectionHandlers(sourceFile, checker);
+  let nextObjectIdentity = 1;
   const bumpCandidate = (): void => {
     bumpBudget(budget, "candidates", limits.maxCandidateCount, "OBS_INVENTORY_CANDIDATE_LIMIT");
   };
 
-  const updateVariableState = (
+  const stringPossibilities = (rawExpression: ts.Expression, state: ScanFlowState): StringPossibilities => {
+    const expression = unwrapExpression(rawExpression);
+    if (ts.isStringLiteralLikeNode(expression)) return { values: new Set([expression.text]), unknown: false };
+    if (ts.isIdentifier(expression)) {
+      const binding = symbolId(checker, expression);
+      return binding === null
+        ? { values: new Set(), unknown: true }
+        : cloneStrings(state.strings.get(binding) ?? { values: new Set(), unknown: true });
+    }
+    if (ts.isConditionalExpression(expression)) {
+      return unionStrings(
+        stringPossibilities(expression.whenTrue, state),
+        stringPossibilities(expression.whenFalse, state),
+      );
+    }
+    return { values: new Set(), unknown: true };
+  };
+
+  const keyPossibilities = (name: ts.PropertyName, state: ScanFlowState): number => {
+    if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name) || ts.isNumericLiteral(name)) {
+      return name.text === "cause" ? KEY_CAUSE : KEY_OTHER;
+    }
+    if (!ts.isComputedPropertyName(name)) return KEY_OTHER;
+    const strings = stringPossibilities(name.expression, state);
+    let possibilities = strings.unknown ? KEY_CAUSE | KEY_OTHER : 0;
+    for (const value of strings.values) possibilities |= value === "cause" ? KEY_CAUSE : KEY_OTHER;
+    return possibilities === 0 ? KEY_CAUSE | KEY_OTHER : possibilities;
+  };
+
+  const causePossibilities = (rawExpression: ts.Expression, state: ScanFlowState): number => {
+    const expression = unwrapExpression(rawExpression);
+    if (ts.isIdentifier(expression)) {
+      const binding = symbolId(checker, expression);
+      return binding === null ? CAUSE_OTHER : state.causes.get(binding) ?? CAUSE_OTHER;
+    }
+    if (ts.isConditionalExpression(expression)) {
+      return causePossibilities(expression.whenTrue, state) | causePossibilities(expression.whenFalse, state);
+    }
+    return CAUSE_OTHER;
+  };
+
+  const causeProperty = (cause: number): number => {
+    let property = 0;
+    if (cause & CAUSE_CAUGHT) property |= PROPERTY_CAUGHT;
+    if (cause & CAUSE_OTHER) property |= PROPERTY_OTHER;
+    return property === 0 ? PROPERTY_OTHER : property;
+  };
+
+  const spreadProperty = (current: number, spread: number): number => {
+    let next = 0;
+    if (spread & PROPERTY_ABSENT) next |= current;
+    if (spread & PROPERTY_CAUGHT) next |= PROPERTY_CAUGHT;
+    if (spread & PROPERTY_OTHER) next |= PROPERTY_OTHER;
+    return next === 0 ? PROPERTY_ABSENT | PROPERTY_CAUGHT | PROPERTY_OTHER : next;
+  };
+
+  const propertyForReferences = (references: ObjectReferences, state: ScanFlowState): number => {
+    let property = references.unknown ? PROPERTY_ABSENT | PROPERTY_CAUGHT | PROPERTY_OTHER : 0;
+    for (const identity of references.ids) {
+      property |= state.objectProperties.get(identity) ?? PROPERTY_ABSENT | PROPERTY_CAUGHT | PROPERTY_OTHER;
+    }
+    return property === 0 ? PROPERTY_ABSENT | PROPERTY_CAUGHT | PROPERTY_OTHER : property;
+  };
+
+  const objectReferences = (rawExpression: ts.Expression, state: ScanFlowState): ObjectReferences => {
+    const expression = unwrapExpression(rawExpression);
+    if (ts.isIdentifier(expression)) {
+      const binding = symbolId(checker, expression);
+      return binding === null
+        ? { ids: new Set(), unknown: true }
+        : cloneReferences(state.objectReferences.get(binding) ?? { ids: new Set(), unknown: true });
+    }
+    if (ts.isConditionalExpression(expression)) {
+      return unionReferences(
+        objectReferences(expression.whenTrue, state),
+        objectReferences(expression.whenFalse, state),
+      );
+    }
+    if (!ts.isObjectLiteralExpression(expression)) return { ids: new Set(), unknown: true };
+
+    let property = PROPERTY_ABSENT;
+    for (const member of expression.properties) {
+      if (ts.isSpreadAssignment(member)) {
+        property = spreadProperty(property, propertyForReferences(objectReferences(member.expression, state), state));
+        continue;
+      }
+      if (ts.isPropertyAssignment(member)) {
+        const keys = keyPossibilities(member.name, state);
+        const assigned = causeProperty(causePossibilities(member.initializer, state));
+        property = (keys & KEY_CAUSE ? assigned : 0) | (keys & KEY_OTHER ? property : 0);
+        continue;
+      }
+      if (ts.isShorthandPropertyAssignment(member)) {
+        const keys = keyPossibilities(member.name, state);
+        const binding = checker.getShorthandAssignmentValueSymbol(member)?.id;
+        const assigned = causeProperty(binding === undefined ? CAUSE_OTHER : state.causes.get(binding) ?? CAUSE_OTHER);
+        property = (keys & KEY_CAUSE ? assigned : 0) | (keys & KEY_OTHER ? property : 0);
+        continue;
+      }
+      if (ts.isMethodDeclaration(member) || ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
+        const keys = keyPossibilities(member.name, state);
+        property = (keys & KEY_CAUSE ? PROPERTY_OTHER : 0) | (keys & KEY_OTHER ? property : 0);
+      }
+    }
+    const identity = nextObjectIdentity;
+    nextObjectIdentity += 1;
+    state.objectProperties.set(identity, property);
+    return { ids: new Set([identity]), unknown: false };
+  };
+
+  const updateBinding = (
     name: ts.Identifier,
     initializer: ts.Expression | undefined,
-    causes: CauseBindings,
+    state: ScanFlowState,
   ): void => {
     const binding = symbolId(checker, name);
     if (binding === null) return;
-    if (initializer !== undefined && expressionPreservesCause(initializer, causes, checker)) {
-      causes.set(binding, name.text);
-    } else {
-      causes.delete(binding);
-    }
-    if (initializer === undefined) {
-      objectCauses.set(binding, "unknown");
-    } else {
-      objectCauses.set(binding, evaluateCauseProperty(initializer, causes, objectCauses, checker));
-    }
+    const callbacks = initializer === undefined
+      ? CALLBACK_IGNORES
+      : callbackPossibilities(initializer, state, checker, rejectionHandlers);
+    const causes = initializer === undefined ? CAUSE_OTHER : causePossibilities(initializer, state);
+    const strings = initializer === undefined
+      ? { values: new Set<string>(), unknown: true }
+      : stringPossibilities(initializer, state);
+    const references = initializer === undefined
+      ? { ids: new Set<number>(), unknown: true }
+      : objectReferences(initializer, state);
+    state.callbacks.set(binding, callbacks);
+    state.causes.set(binding, causes);
+    state.strings.set(binding, strings);
+    state.objectReferences.set(binding, references);
+    if (causes & CAUSE_CAUGHT) state.causeNames.set(binding, name.text);
+    else state.causeNames.delete(binding);
   };
 
-  const updateAssignedState = (
-    node: ts.BinaryExpression,
-    causes: CauseBindings,
-  ): void => {
+  const assignmentKeyPossibilities = (assigned: ts.PropertyAccessExpression | ts.ElementAccessExpression, state: ScanFlowState): number => {
+    if (ts.isPropertyAccessExpression(assigned)) return assigned.name.text === "cause" ? KEY_CAUSE : KEY_OTHER;
+    if (assigned.argumentExpression === undefined) return KEY_CAUSE | KEY_OTHER;
+    const strings = stringPossibilities(assigned.argumentExpression, state);
+    let possibilities = strings.unknown ? KEY_CAUSE | KEY_OTHER : 0;
+    for (const value of strings.values) possibilities |= value === "cause" ? KEY_CAUSE : KEY_OTHER;
+    return possibilities === 0 ? KEY_CAUSE | KEY_OTHER : possibilities;
+  };
+
+  const updateAssignment = (node: ts.BinaryExpression, state: ScanFlowState): void => {
     const assigned = unwrapExpression(node.left);
-    const simpleAssignment = node.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+    const simple = node.operatorToken.kind === ts.SyntaxKind.EqualsToken;
     if (ts.isIdentifier(assigned)) {
-      updateVariableState(assigned, simpleAssignment ? node.right : undefined, causes);
+      updateBinding(assigned, simple ? node.right : undefined, state);
       return;
     }
-    if (
-      (ts.isPropertyAccessExpression(assigned) || ts.isElementAccessExpression(assigned))
-      && ts.isIdentifier(unwrapExpression(assigned.expression))
-    ) {
-      const target = unwrapExpression(assigned.expression) as ts.Identifier;
-      const binding = symbolId(checker, target);
-      const name = ts.isPropertyAccessExpression(assigned)
-        ? assigned.name.text
-        : assigned.argumentExpression !== undefined && ts.isStringLiteralLikeNode(unwrapExpression(assigned.argumentExpression))
-          ? (unwrapExpression(assigned.argumentExpression) as ts.StringLiteral).text
-          : null;
-      if (binding !== null && name === "cause") {
-        objectCauses.set(binding, simpleAssignment && expressionPreservesCause(node.right, causes, checker)
-          ? "preserved"
-          : "lost");
-      }
+    if (!ts.isPropertyAccessExpression(assigned) && !ts.isElementAccessExpression(assigned)) return;
+    const references = objectReferences(assigned.expression, state);
+    const keys = assignmentKeyPossibilities(assigned, state);
+    if ((keys & KEY_CAUSE) === 0) return;
+    const assignedProperty = simple ? causeProperty(causePossibilities(node.right, state)) : PROPERTY_OTHER;
+    const uncertainTarget = references.unknown || references.ids.size !== 1;
+    for (const identity of references.ids) {
+      const current = state.objectProperties.get(identity) ?? PROPERTY_ABSENT | PROPERTY_CAUGHT | PROPERTY_OTHER;
+      const next = (keys & KEY_OTHER ? current : 0) | assignedProperty;
+      state.objectProperties.set(identity, uncertainTarget ? current | next : next);
     }
   };
 
-  const visit = (node: ts.Node, inheritedCauses: CauseBindings): void => {
+  const guaranteedCaughtBindings = (state: ScanFlowState, location: ts.Node): ReadonlySet<number> => {
+    const bindings = new Set<number>();
+    for (const [binding, name] of state.causeNames) {
+      if (
+        state.causes.get(binding) === CAUSE_CAUGHT
+        && checker.resolveName(name, SymbolFlags.Value, location)?.id === binding
+      ) {
+        bindings.add(binding);
+      }
+    }
+    return bindings;
+  };
+
+  const hasVisibleCatchContext = (state: ScanFlowState, location: ts.Node): boolean => {
+    for (const [binding, name] of state.catchContexts) {
+      if (
+        checker.resolveName(name, SymbolFlags.Value, location)?.id === binding
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const isAssignment = (node: ts.BinaryExpression): boolean => (
+    node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+    && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+  );
+
+  const initialState: ScanFlowState = {
+    callbacks: new Map(),
+    causes: new Map(),
+    causeNames: new Map(),
+    catchContexts: new Map(),
+    strings: new Map(),
+    objectReferences: new Map(),
+    objectProperties: new Map(),
+  };
+
+  const visit = (node: ts.Node, state: ScanFlowState): void => {
     if (ts.isCatchClause(node)) {
       bumpCandidate();
       if (node.variableDeclaration === undefined) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "bare_catch" });
       }
-      const catchCauses = new Map(inheritedCauses);
+      const catchState = cloneScanFlow(state);
       if (node.variableDeclaration !== undefined && ts.isIdentifier(node.variableDeclaration.name)) {
         const binding = symbolId(checker, node.variableDeclaration.name);
-        if (binding !== null) catchCauses.set(binding, node.variableDeclaration.name.text);
+        if (binding !== null) {
+          catchState.callbacks.set(binding, CALLBACK_IGNORES);
+          catchState.causes.set(binding, CAUSE_CAUGHT);
+          catchState.causeNames.set(binding, node.variableDeclaration.name.text);
+          catchState.catchContexts.set(binding, node.variableDeclaration.name.text);
+          catchState.strings.set(binding, { values: new Set(), unknown: true });
+          catchState.objectReferences.set(binding, { ids: new Set(), unknown: true });
+        }
       }
-      visit(node.block, catchCauses);
+      visit(node.block, catchState);
       return;
     }
 
-    if (ts.isBlock(node)) {
-      for (const statement of node.statements) visit(statement, inheritedCauses);
+    if (ts.isSourceFile(node) || ts.isBlock(node)) {
+      for (const statement of node.statements) visit(statement, state);
+      return;
+    }
+
+    if (ts.isIfStatement(node)) {
+      visit(node.expression, state);
+      const whenTrue = cloneScanFlow(state);
+      const whenFalse = cloneScanFlow(state);
+      visit(node.thenStatement, whenTrue);
+      if (node.elseStatement !== undefined) visit(node.elseStatement, whenFalse);
+      joinScanFlows(state, whenTrue, whenFalse);
+      return;
+    }
+
+    if (ts.isConditionalExpression(node)) {
+      visit(node.condition, state);
+      const whenTrue = cloneScanFlow(state);
+      const whenFalse = cloneScanFlow(state);
+      visit(node.whenTrue, whenTrue);
+      visit(node.whenFalse, whenFalse);
+      joinScanFlows(state, whenTrue, whenFalse);
+      return;
+    }
+
+    if (ts.isWhileStatement(node)) {
+      visit(node.expression, state);
+      const zeroIterations = cloneScanFlow(state);
+      const oneOrMoreIterations = cloneScanFlow(state);
+      visit(node.statement, oneOrMoreIterations);
+      joinScanFlows(state, zeroIterations, oneOrMoreIterations);
+      return;
+    }
+
+    if (ts.isDoStatement(node)) {
+      visit(node.statement, state);
+      visit(node.expression, state);
+      return;
+    }
+
+    if (ts.isForStatement(node)) {
+      if (node.initializer !== undefined) visit(node.initializer, state);
+      if (node.condition !== undefined) visit(node.condition, state);
+      const zeroIterations = cloneScanFlow(state);
+      const oneOrMoreIterations = cloneScanFlow(state);
+      visit(node.statement, oneOrMoreIterations);
+      if (node.incrementor !== undefined) visit(node.incrementor, oneOrMoreIterations);
+      joinScanFlows(state, zeroIterations, oneOrMoreIterations);
+      return;
+    }
+
+    if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+      visit(node.expression, state);
+      visit(node.initializer, state);
+      const zeroIterations = cloneScanFlow(state);
+      const oneOrMoreIterations = cloneScanFlow(state);
+      visit(node.statement, oneOrMoreIterations);
+      joinScanFlows(state, zeroIterations, oneOrMoreIterations);
+      return;
+    }
+
+    if (ts.isSwitchStatement(node)) {
+      visit(node.expression, state);
+      const entry = cloneScanFlow(state);
+      const exits: ScanFlowState[] = [];
+      let hasDefault = false;
+      for (const clause of node.caseBlock.clauses) {
+        const branch = cloneScanFlow(entry);
+        if (ts.isCaseClause(clause)) visit(clause.expression, branch);
+        else hasDefault = true;
+        for (const statement of clause.statements) visit(statement, branch);
+        exits.push(branch);
+      }
+      if (!hasDefault || exits.length === 0) exits.push(entry);
+      let joined = exits[0] as ScanFlowState;
+      for (const exit of exits.slice(1)) {
+        const next = cloneScanFlow(joined);
+        joinScanFlows(next, joined, exit);
+        joined = next;
+      }
+      joinScanFlows(state, joined, joined);
       return;
     }
 
     if (ts.isFunctionLikeDeclaration(node) && node.body !== undefined) {
-      const functionCauses = new Map(inheritedCauses);
-      node.forEachChild((child) => visit(child, functionCauses));
+      const functionState = cloneScanFlow(state);
+      for (const parameter of node.parameters) {
+        if (ts.isIdentifier(parameter.name)) updateBinding(parameter.name, undefined, functionState);
+      }
+      visit(node.body, functionState);
       return;
     }
 
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-      if (node.initializer !== undefined) visit(node.initializer, inheritedCauses);
-      updateVariableState(node.name, node.initializer, inheritedCauses);
+      if (node.initializer !== undefined) visit(node.initializer, state);
+      updateBinding(node.name, node.initializer, state);
       return;
     }
 
     if (ts.isBinaryExpression(node)) {
-      visit(node.left, inheritedCauses);
-      visit(node.right, inheritedCauses);
-      updateAssignedState(node, inheritedCauses);
+      visit(node.left, state);
+      if (
+        node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        || node.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        || node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      ) {
+        const skipped = cloneScanFlow(state);
+        const evaluated = cloneScanFlow(state);
+        visit(node.right, evaluated);
+        joinScanFlows(state, skipped, evaluated);
+        return;
+      }
+      visit(node.right, state);
+      if (isAssignment(node)) updateAssignment(node, state);
       return;
     }
 
@@ -588,7 +892,7 @@ function scanParsedSource(
           node.expression,
           initializers,
           checker,
-          new Set(inheritedCauses.keys()),
+          guaranteedCaughtBindings(state, node),
         )
       ) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "throw_without_code" });
@@ -600,7 +904,7 @@ function scanParsedSource(
       const expression = (node as ts.VoidExpression).expression;
       if (
         isPromiseCandidate(expression, checker)
-        && !isObservedPromise(expression, checker, rejectionHandlers, initializers)
+        && !isObservedPromise(expression, state, checker, rejectionHandlers)
       ) {
         findings.push({ path, line: lineOf(sourceFile, node), class: "void_promise" });
       }
@@ -608,21 +912,20 @@ function scanParsedSource(
 
     if (ts.isNewExpression(node) && isTypedDomainErrorConstruction(node, wrapperAliases, checker)) {
       bumpCandidate();
-      const visibleCauses = visibleCauseBindings(inheritedCauses, node, checker);
-      if (visibleCauses.size > 0) {
+      if (hasVisibleCatchContext(state, node)) {
         const options = node.arguments?.[2];
         if (
           options === undefined
-          || evaluateCauseProperty(options, visibleCauses, objectCauses, checker) !== "preserved"
+          || propertyForReferences(objectReferences(options, state), state) !== PROPERTY_CAUGHT
         ) {
           findings.push({ path, line: lineOf(sourceFile, node), class: "wrapper_without_cause" });
         }
       }
     }
 
-    node.forEachChild((child) => visit(child, inheritedCauses));
+    node.forEachChild((child) => visit(child, state));
   };
-  visit(sourceFile, new Map());
+  visit(sourceFile, initialState);
 
   for (const site of findZoneImports(sourceFile, path, checker, bumpCandidate)) {
     findings.push({ path, line: site.line, class: "zone_import" });

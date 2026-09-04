@@ -135,118 +135,150 @@ function isUnshadowedRequire(identifier: ts.Identifier, checker: Checker): boole
   return identifier.text === "require" && compilerSymbolId(checker, identifier) === null;
 }
 
-function isUnshadowedModuleRequire(expression: ts.Expression, checker: Checker): boolean {
-  const callee = unwrapZoneExpression(expression);
-  if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== "require") return false;
-  const target = unwrapZoneExpression(callee.expression);
-  return ts.isIdentifier(target)
-    && target.text === "module"
-    && compilerSymbolId(checker, target) === null;
+const REQUIRE_GLOBAL = 1;
+const REQUIRE_LOCAL = 2;
+const MANIFEST_KEY = 1;
+const OTHER_KEY = 2;
+const MAX_DATA_ALTERNATIVES = 32;
+
+type ClassificationLiteral = ts.StringLiteral | ts.NoSubstitutionTemplateLiteral;
+
+type DataPossibilities = {
+  readonly literals: Map<number, ClassificationLiteral>;
+  readonly unknown: boolean;
+};
+
+type ZoneFlowState = {
+  requires: Map<number, number>;
+  data: Map<number, DataPossibilities>;
+};
+
+function cloneData(value: DataPossibilities): DataPossibilities {
+  return { literals: new Map(value.literals), unknown: value.unknown };
 }
 
-function expressionIsRequire(
-  expression: ts.Expression,
-  aliases: ReadonlySet<number>,
-  checker: Checker,
-): boolean {
-  const candidate = unwrapZoneExpression(expression);
-  if (ts.isIdentifier(candidate)) {
-    if (isUnshadowedRequire(candidate, checker)) return true;
-    const binding = compilerSymbolId(checker, candidate);
-    return binding !== null && aliases.has(binding);
+function unionData(left: DataPossibilities, right: DataPossibilities): DataPossibilities {
+  const literals = new Map([...left.literals, ...right.literals]);
+  if (literals.size <= MAX_DATA_ALTERNATIVES) {
+    return { literals, unknown: left.unknown || right.unknown };
   }
-  return isUnshadowedModuleRequire(candidate, checker);
-}
-
-function callSpecifier(
-  node: ts.CallExpression,
-  requireAliases: ReadonlySet<number>,
-  checker: Checker,
-): string | null | undefined {
-  const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-  const isRequire = expressionIsRequire(node.expression, requireAliases, checker);
-  if (!isDynamicImport && !isRequire) return undefined;
-  return literalText(node.arguments[0]);
-}
-
-function collectExpressionInitializers(
-  sourceFile: ts.SourceFile,
-  checker: Checker,
-): ReadonlyMap<number, ts.Expression> {
-  const initializers = new Map<number, ts.Expression>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
-      const binding = compilerSymbolId(checker, node.name);
-      if (binding !== null) initializers.set(binding, node.initializer);
-    }
-    node.forEachChild(visit);
+  return {
+    literals: new Map([...literals.entries()].sort(([leftPosition], [rightPosition]) => leftPosition - rightPosition)
+      .slice(0, MAX_DATA_ALTERNATIVES)),
+    unknown: true,
   };
-  visit(sourceFile);
-  return initializers;
 }
 
-function constantString(
+function cloneZoneFlow(state: ZoneFlowState): ZoneFlowState {
+  return {
+    requires: new Map(state.requires),
+    data: new Map([...state.data].map(([binding, value]) => [binding, cloneData(value)])),
+  };
+}
+
+function joinZoneFlows(target: ZoneFlowState, left: ZoneFlowState, right: ZoneFlowState): void {
+  target.requires = new Map();
+  for (const binding of new Set([...left.requires.keys(), ...right.requires.keys()])) {
+    target.requires.set(
+      binding,
+      (left.requires.get(binding) ?? REQUIRE_LOCAL) | (right.requires.get(binding) ?? REQUIRE_LOCAL),
+    );
+  }
+  target.data = new Map();
+  for (const binding of new Set([...left.data.keys(), ...right.data.keys()])) {
+    target.data.set(binding, unionData(
+      left.data.get(binding) ?? { literals: new Map(), unknown: true },
+      right.data.get(binding) ?? { literals: new Map(), unknown: true },
+    ));
+  }
+}
+
+function dataPossibilities(
   rawExpression: ts.Expression,
-  initializers: ReadonlyMap<number, ts.Expression>,
+  state: ZoneFlowState,
   checker: Checker,
-  seen: ReadonlySet<number> = new Set(),
-): string | null {
+): DataPossibilities {
   const expression = unwrapZoneExpression(rawExpression);
-  if (ts.isStringLiteralLikeNode(expression)) return expression.text;
-  if (!ts.isIdentifier(expression)) return null;
-  const binding = compilerSymbolId(checker, expression);
-  if (binding === null || seen.has(binding)) return null;
-  const initializer = initializers.get(binding);
-  return initializer === undefined
-    ? null
-    : constantString(initializer, initializers, checker, new Set([...seen, binding]));
-}
-
-function propertyNameText(
-  name: ts.PropertyName,
-  initializers: ReadonlyMap<number, ts.Expression>,
-  checker: Checker,
-): string | null {
-  if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name)) return name.text;
-  return ts.isComputedPropertyName(name)
-    ? constantString(name.expression, initializers, checker)
-    : null;
-}
-
-function classificationLiterals(
-  rawExpression: ts.Expression,
-  initializers: ReadonlyMap<number, ts.Expression>,
-  checker: Checker,
-  seen: ReadonlySet<number> = new Set(),
-): readonly (ts.StringLiteral | ts.NoSubstitutionTemplateLiteral)[] {
-  const expression = unwrapZoneExpression(rawExpression);
-  if (ts.isStringLiteralLikeNode(expression)) return [expression];
+  if (ts.isStringLiteralLikeNode(expression)) {
+    return { literals: new Map([[expression.pos, expression]]), unknown: false };
+  }
   if (ts.isIdentifier(expression)) {
     const binding = compilerSymbolId(checker, expression);
-    if (binding === null || seen.has(binding)) return [];
-    const initializer = initializers.get(binding);
-    return initializer === undefined
-      ? []
-      : classificationLiterals(initializer, initializers, checker, new Set([...seen, binding]));
+    return binding === null
+      ? { literals: new Map(), unknown: true }
+      : cloneData(state.data.get(binding) ?? { literals: new Map(), unknown: true });
   }
   if (ts.isArrayLiteralExpression(expression)) {
-    const literals: Array<ts.StringLiteral | ts.NoSubstitutionTemplateLiteral> = [];
+    let result: DataPossibilities = { literals: new Map(), unknown: false };
     for (const element of expression.elements) {
       const value = ts.isSpreadElement(element) ? element.expression : element;
-      literals.push(...classificationLiterals(value, initializers, checker, seen));
+      result = unionData(result, dataPossibilities(value, state, checker));
     }
-    return literals;
+    return result;
   }
   if (ts.isCallExpression(expression)) {
-    return expression.arguments.flatMap((argument) => classificationLiterals(argument, initializers, checker, seen));
+    let result: DataPossibilities = { literals: new Map(), unknown: false };
+    for (const argument of expression.arguments) {
+      result = unionData(result, dataPossibilities(argument, state, checker));
+    }
+    return result;
   }
   if (ts.isConditionalExpression(expression)) {
-    return [
-      ...classificationLiterals(expression.whenTrue, initializers, checker, seen),
-      ...classificationLiterals(expression.whenFalse, initializers, checker, seen),
-    ];
+    return unionData(
+      dataPossibilities(expression.whenTrue, state, checker),
+      dataPossibilities(expression.whenFalse, state, checker),
+    );
   }
-  return [];
+  return { literals: new Map(), unknown: true };
+}
+
+function moduleRequirePossibilities(
+  expression: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+  state: ZoneFlowState,
+  checker: Checker,
+): number {
+  const target = unwrapZoneExpression(expression.expression);
+  if (!ts.isIdentifier(target) || target.text !== "module" || compilerSymbolId(checker, target) !== null) {
+    return REQUIRE_LOCAL;
+  }
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text === "require" ? REQUIRE_GLOBAL : REQUIRE_LOCAL;
+  if (expression.argumentExpression === undefined) return REQUIRE_GLOBAL | REQUIRE_LOCAL;
+  const properties = dataPossibilities(expression.argumentExpression, state, checker);
+  let possibilities = properties.unknown ? REQUIRE_GLOBAL | REQUIRE_LOCAL : 0;
+  for (const literal of properties.literals.values()) {
+    possibilities |= literal.text === "require" ? REQUIRE_GLOBAL : REQUIRE_LOCAL;
+  }
+  return possibilities === 0 ? REQUIRE_LOCAL : possibilities;
+}
+
+function requirePossibilities(expression: ts.Expression, state: ZoneFlowState, checker: Checker): number {
+  const candidate = unwrapZoneExpression(expression);
+  if (ts.isIdentifier(candidate)) {
+    if (isUnshadowedRequire(candidate, checker)) return REQUIRE_GLOBAL;
+    const binding = compilerSymbolId(checker, candidate);
+    return binding === null ? REQUIRE_LOCAL : state.requires.get(binding) ?? REQUIRE_LOCAL;
+  }
+  if (ts.isPropertyAccessExpression(candidate) || ts.isElementAccessExpression(candidate)) {
+    return moduleRequirePossibilities(candidate, state, checker);
+  }
+  if (ts.isConditionalExpression(candidate)) {
+    return requirePossibilities(candidate.whenTrue, state, checker)
+      | requirePossibilities(candidate.whenFalse, state, checker);
+  }
+  return REQUIRE_LOCAL;
+}
+
+function manifestKeyPossibilities(name: ts.PropertyName, state: ZoneFlowState, checker: Checker): number {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name)) {
+    return MANIFEST_LIST_PROPERTIES.has(name.text) ? MANIFEST_KEY : OTHER_KEY;
+  }
+  if (!ts.isComputedPropertyName(name)) return OTHER_KEY;
+  const values = dataPossibilities(name.expression, state, checker);
+  let possibilities = values.unknown ? MANIFEST_KEY | OTHER_KEY : 0;
+  for (const literal of values.literals.values()) {
+    possibilities |= MANIFEST_LIST_PROPERTIES.has(literal.text) ? MANIFEST_KEY : OTHER_KEY;
+  }
+  return possibilities === 0 ? MANIFEST_KEY | OTHER_KEY : possibilities;
 }
 
 export function findZoneImports(
@@ -258,7 +290,6 @@ export function findZoneImports(
   const importerPath = normalizeRepositoryPath(rawImporterPath);
   if (importerPath === null || !isGovernedImporter(importerPath)) return [];
 
-  const initializers = collectExpressionInitializers(sourceFile, checker);
   const sites: ZoneImportSite[] = [];
   const recordedPositions = new Set<number>();
   const record = (node: ts.Node, specifier: string | null): void => {
@@ -270,47 +301,152 @@ export function findZoneImports(
     recordedPositions.add(node.pos);
     sites.push({ line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1 });
   };
+  const recordUnknown = (node: ts.Node): void => {
+    onCandidate();
+    if (recordedPositions.has(node.pos)) return;
+    recordedPositions.add(node.pos);
+    sites.push({ line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1 });
+  };
 
-  const updateRequireAlias = (
+  const updateBinding = (
     name: ts.Identifier,
     initializer: ts.Expression | undefined,
-    aliases: Set<number>,
+    state: ZoneFlowState,
   ): void => {
     const binding = compilerSymbolId(checker, name);
     if (binding === null) return;
-    if (initializer !== undefined && expressionIsRequire(initializer, aliases, checker)) {
-      aliases.add(binding);
-    } else {
-      aliases.delete(binding);
-    }
+    state.requires.set(binding, initializer === undefined
+      ? REQUIRE_LOCAL
+      : requirePossibilities(initializer, state, checker));
+    state.data.set(binding, initializer === undefined
+      ? { literals: new Map(), unknown: true }
+      : dataPossibilities(initializer, state, checker));
   };
 
-  const visit = (node: ts.Node, requireAliases: Set<number>): void => {
+  const isAssignment = (node: ts.BinaryExpression): boolean => (
+    node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+    && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+  );
+
+  const visit = (node: ts.Node, state: ZoneFlowState): void => {
     if (ts.isSourceFile(node) || ts.isBlock(node)) {
-      for (const statement of node.statements) visit(statement, requireAliases);
+      for (const statement of node.statements) visit(statement, state);
+      return;
+    }
+
+    if (ts.isIfStatement(node)) {
+      visit(node.expression, state);
+      const whenTrue = cloneZoneFlow(state);
+      const whenFalse = cloneZoneFlow(state);
+      visit(node.thenStatement, whenTrue);
+      if (node.elseStatement !== undefined) visit(node.elseStatement, whenFalse);
+      joinZoneFlows(state, whenTrue, whenFalse);
+      return;
+    }
+
+    if (ts.isConditionalExpression(node)) {
+      visit(node.condition, state);
+      const whenTrue = cloneZoneFlow(state);
+      const whenFalse = cloneZoneFlow(state);
+      visit(node.whenTrue, whenTrue);
+      visit(node.whenFalse, whenFalse);
+      joinZoneFlows(state, whenTrue, whenFalse);
+      return;
+    }
+
+    if (ts.isWhileStatement(node)) {
+      visit(node.expression, state);
+      const zeroIterations = cloneZoneFlow(state);
+      const oneOrMoreIterations = cloneZoneFlow(state);
+      visit(node.statement, oneOrMoreIterations);
+      joinZoneFlows(state, zeroIterations, oneOrMoreIterations);
+      return;
+    }
+
+    if (ts.isDoStatement(node)) {
+      visit(node.statement, state);
+      visit(node.expression, state);
+      return;
+    }
+
+    if (ts.isForStatement(node)) {
+      if (node.initializer !== undefined) visit(node.initializer, state);
+      if (node.condition !== undefined) visit(node.condition, state);
+      const zeroIterations = cloneZoneFlow(state);
+      const oneOrMoreIterations = cloneZoneFlow(state);
+      visit(node.statement, oneOrMoreIterations);
+      if (node.incrementor !== undefined) visit(node.incrementor, oneOrMoreIterations);
+      joinZoneFlows(state, zeroIterations, oneOrMoreIterations);
+      return;
+    }
+
+    if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+      visit(node.expression, state);
+      visit(node.initializer, state);
+      const zeroIterations = cloneZoneFlow(state);
+      const oneOrMoreIterations = cloneZoneFlow(state);
+      visit(node.statement, oneOrMoreIterations);
+      joinZoneFlows(state, zeroIterations, oneOrMoreIterations);
+      return;
+    }
+
+    if (ts.isSwitchStatement(node)) {
+      visit(node.expression, state);
+      const entry = cloneZoneFlow(state);
+      const exits: ZoneFlowState[] = [];
+      let hasDefault = false;
+      for (const clause of node.caseBlock.clauses) {
+        const branch = cloneZoneFlow(entry);
+        if (ts.isCaseClause(clause)) visit(clause.expression, branch);
+        else hasDefault = true;
+        for (const statement of clause.statements) visit(statement, branch);
+        exits.push(branch);
+      }
+      if (!hasDefault || exits.length === 0) exits.push(entry);
+      let joined = exits[0] as ZoneFlowState;
+      for (const exit of exits.slice(1)) {
+        const next = cloneZoneFlow(joined);
+        joinZoneFlows(next, joined, exit);
+        joined = next;
+      }
+      joinZoneFlows(state, joined, joined);
       return;
     }
 
     if (ts.isFunctionLikeDeclaration(node) && node.body !== undefined) {
-      const functionAliases = new Set(requireAliases);
-      node.forEachChild((child) => visit(child, functionAliases));
+      const functionState = cloneZoneFlow(state);
+      for (const parameter of node.parameters) {
+        if (ts.isIdentifier(parameter.name)) updateBinding(parameter.name, undefined, functionState);
+      }
+      visit(node.body, functionState);
       return;
     }
 
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-      if (node.initializer !== undefined) visit(node.initializer, requireAliases);
-      updateRequireAlias(node.name, node.initializer, requireAliases);
+      if (node.initializer !== undefined) visit(node.initializer, state);
+      updateBinding(node.name, node.initializer, state);
       return;
     }
 
     if (ts.isBinaryExpression(node)) {
-      visit(node.left, requireAliases);
-      visit(node.right, requireAliases);
-      if (ts.isIdentifier(unwrapZoneExpression(node.left))) {
-        updateRequireAlias(
+      visit(node.left, state);
+      if (
+        node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        || node.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        || node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      ) {
+        const skipped = cloneZoneFlow(state);
+        const evaluated = cloneZoneFlow(state);
+        visit(node.right, evaluated);
+        joinZoneFlows(state, skipped, evaluated);
+        return;
+      }
+      visit(node.right, state);
+      if (isAssignment(node) && ts.isIdentifier(unwrapZoneExpression(node.left))) {
+        updateBinding(
           unwrapZoneExpression(node.left) as ts.Identifier,
           node.operatorToken.kind === ts.SyntaxKind.EqualsToken ? node.right : undefined,
-          requireAliases,
+          state,
         );
       }
       return;
@@ -331,30 +467,32 @@ export function findZoneImports(
         ? argument.literal.text
         : null);
     } else if (ts.isCallExpression(node)) {
-      const specifier = callSpecifier(node, requireAliases, checker);
-      if (specifier !== undefined) record(node, specifier);
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isPossibleRequire = (requirePossibilities(node.expression, state, checker) & REQUIRE_GLOBAL) !== 0;
+      if (isDynamicImport || isPossibleRequire) record(node, literalText(node.arguments[0]));
     } else if (ts.isPropertyAssignment(node) && importerPath !== MANIFEST_PATH) {
-      const property = propertyNameText(node.name, initializers, checker);
-      if (property !== null && MANIFEST_LIST_PROPERTIES.has(property)) {
-        for (const literal of classificationLiterals(node.initializer, initializers, checker)) {
+      if ((manifestKeyPossibilities(node.name, state, checker) & MANIFEST_KEY) !== 0) {
+        const data = dataPossibilities(node.initializer, state, checker);
+        for (const literal of data.literals.values()) {
           record(literal, literal.text);
         }
+        if (data.unknown) recordUnknown(node);
       }
     } else if (ts.isShorthandPropertyAssignment(node) && importerPath !== MANIFEST_PATH) {
-      const property = propertyNameText(node.name, initializers, checker);
-      if (property !== null && MANIFEST_LIST_PROPERTIES.has(property)) {
+      if ((manifestKeyPossibilities(node.name, state, checker) & MANIFEST_KEY) !== 0) {
         const binding = checker.getShorthandAssignmentValueSymbol(node)?.id;
-        const initializer = binding === undefined ? undefined : initializers.get(binding);
-        if (initializer !== undefined) {
-          for (const literal of classificationLiterals(initializer, initializers, checker)) {
-            record(literal, literal.text);
-          }
+        const data = binding === undefined
+          ? { literals: new Map<number, ClassificationLiteral>(), unknown: true }
+          : cloneData(state.data.get(binding) ?? { literals: new Map(), unknown: true });
+        for (const literal of data.literals.values()) {
+          record(literal, literal.text);
         }
+        if (data.unknown) recordUnknown(node);
       }
     }
-    node.forEachChild((child) => visit(child, requireAliases));
+    node.forEachChild((child) => visit(child, state));
   };
-  visit(sourceFile, new Set());
+  visit(sourceFile, { requires: new Map(), data: new Map() });
   return sites;
 }
 

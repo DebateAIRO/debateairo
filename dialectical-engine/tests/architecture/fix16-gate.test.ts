@@ -102,6 +102,35 @@ describe("FIX-16 C1 inventory scanner", () => {
     ]);
   });
 
+  it("uses current callback definitions and requires every joined path to consume rejection", () => {
+    const source = [
+      "declare const pending: Promise<void>;",
+      "declare const flag: boolean;",
+      "declare function consume(error: unknown): void;",
+      "let callback = (error: unknown) => consume(error);",
+      "callback = (_error: unknown) => undefined;",
+      "void pending.catch(callback);",
+      "callback = (error: unknown) => consume(error);",
+      "void pending.catch(callback);",
+      "callback = (_error: unknown) => undefined;",
+      "callback = (error: unknown) => consume(error);",
+      "void pending.catch(callback);",
+      "let joined = (error: unknown) => consume(error);",
+      "if (flag) joined = (_error: unknown) => undefined;",
+      "void pending.catch(joined);",
+      "if (flag) joined = (error: unknown) => consume(error); else joined = (error: unknown) => consume(error);",
+      "void pending.catch(joined);",
+      "void pending.catch(({}) => undefined);",
+      "void pending.catch(({ message }: { message: unknown }) => consume(message));",
+    ].join("\n");
+
+    expect(scanSource(source, "apps/example/src/callback-flow.ts")).toEqual([
+      { path: "apps/example/src/callback-flow.ts", line: 6, class: "void_promise" },
+      { path: "apps/example/src/callback-flow.ts", line: 14, class: "void_promise" },
+      { path: "apps/example/src/callback-flow.ts", line: 17, class: "void_promise" },
+    ]);
+  });
+
   it("flags arbitrary identifier and property throws while preserving coded throws and caught rethrows", () => {
     const source = [
       'const message = "ordinary text";',
@@ -194,6 +223,70 @@ describe("FIX-16 C1 inventory scanner", () => {
 
     expect(scanSource(source, "packages/example/src/computed-cause.ts")).toEqual([
       { path: "packages/example/src/computed-cause.ts", line: 10, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("retains catch-path context when the catch binding itself is reassigned", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "try { task(); } catch (caught) {",
+      "  caught = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed");',
+      "}",
+      "try { task(); } catch (caught) {",
+      "  const root = caught;",
+      "  caught = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: root });',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/catch-context.ts")).toEqual([
+      { path: "packages/example/src/catch-context.ts", line: 5, class: "wrapper_without_cause" },
+    ]);
+  });
+
+  it("joins cause paths and shares last writes across object aliases", () => {
+    const source = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "declare const flag: boolean;",
+      'const CAUSE = "cause" as const;',
+      'const NOT_CAUSE = "other" as const;',
+      "try { task(); } catch (caught) {",
+      "  const options = { cause: caught };",
+      "  const alias = options;",
+      "  alias.cause = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed", options);',
+      "  const restored = { cause: unrelated };",
+      "  const restoreAlias = restored;",
+      "  restoreAlias[CAUSE] = caught;",
+      '  new DomainError("WRAP_FAILED", "fixed", restored);',
+      "  let maybe = unrelated;",
+      "  if (flag) maybe = caught;",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: maybe });',
+      "  let always = unrelated;",
+      "  if (flag) always = caught; else always = caught;",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: always });',
+      '  new DomainError("WRAP_FAILED", "fixed", { [CAUSE]: caught });',
+      "  const uncertain = { cause: caught };",
+      "  let key = NOT_CAUSE;",
+      "  if (flag) key = CAUSE;",
+      "  uncertain[key] = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed", uncertain);',
+      "  const branchObject = { cause: caught };",
+      "  if (flag) branchObject.cause = unrelated;",
+      '  new DomainError("WRAP_FAILED", "fixed", branchObject);',
+      "  if (flag) branchObject.cause = caught; else branchObject.cause = caught;",
+      '  new DomainError("WRAP_FAILED", "fixed", branchObject);',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/example/src/cause-joins.ts")).toEqual([
+      { path: "packages/example/src/cause-joins.ts", line: 10, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-joins.ts", line: 17, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-joins.ts", line: 26, class: "wrapper_without_cause" },
+      { path: "packages/example/src/cause-joins.ts", line: 29, class: "wrapper_without_cause" },
     ]);
   });
 
@@ -395,6 +488,31 @@ describe("FIX-16 C1 inventory scanner", () => {
     ]);
   });
 
+  it("retains possible global require across joins and supports computed module require", () => {
+    const source = [
+      "declare const flag: boolean;",
+      "declare const local: (path: string) => unknown;",
+      "let load = require;",
+      "if (flag) load = local;",
+      'load("apps/api/src/registration.ts");',
+      "load = local;",
+      'load("apps/api/src/registration.ts");',
+      "let maybe = local;",
+      "if (flag) maybe = require;",
+      'maybe("apps/api/src/mfa.ts");',
+      'module["require"]("apps/api/src/mail-channel.ts");',
+      "function shadowed(module: { require(path: string): unknown }) {",
+      '  return module["require"]("apps/api/src/registration.ts");',
+      "}",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/require-joins.ts")).toEqual([
+      { path: "packages/obs-capture/src/require-joins.ts", line: 5, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-joins.ts", line: 10, class: "zone_import" },
+      { path: "packages/obs-capture/src/require-joins.ts", line: 11, class: "zone_import" },
+    ]);
+  });
+
   it("resolves computed, spread, and aliased manifest classification data", () => {
     const source = [
       'const sourcePrefix = "apps/api/src/registration.ts";',
@@ -414,6 +532,88 @@ describe("FIX-16 C1 inventory scanner", () => {
     expect(scanSource(source, "packages/obs-capture/src/manifest-lookalike.ts")).toEqual([
       { path: "packages/obs-capture/src/manifest-lookalike.ts", line: 1, class: "zone_import" },
       { path: "packages/obs-capture/src/manifest-lookalike.ts", line: 2, class: "zone_import" },
+    ]);
+  });
+
+  it("uses current and joined manifest key and array alias values", () => {
+    const source = [
+      "declare const flag: boolean;",
+      'let paths = ["apps/api/src/registration.ts"];',
+      'paths = ["packages/kernel/src/error.ts"];',
+      "export const SAFE_VALUE = { zone_path_prefixes: paths };",
+      'paths = ["apps/api/src/mfa.ts"];',
+      "export const CURRENT_VALUE = { zone_path_prefixes: paths };",
+      'let key = "zone_path_prefixes";',
+      'key = "unrelated";',
+      'const zoneForSafeKey = ["apps/api/src/mail-channel.ts"];',
+      "export const SAFE_KEY = { [key]: zoneForSafeKey };",
+      'key = "compiled_alternate_prefixes";',
+      'const currentKeyPaths = ["apps/api/dist/registration.js"];',
+      "export const CURRENT_KEY = { [key]: currentKeyPaths };",
+      'let joinedPaths = ["packages/kernel/src/error.ts"];',
+      'if (flag) joinedPaths = ["apps/api/src/registration.ts"];',
+      "export const POSSIBLE_VALUE = { zone_path_prefixes: joinedPaths };",
+      'let joinedKey = "unrelated";',
+      'if (flag) joinedKey = "zone_path_prefixes";',
+      'const possibleKeyPaths = ["apps/api/src/mfa.ts"];',
+      "export const POSSIBLE_KEY = { [joinedKey]: possibleKeyPaths };",
+    ].join("\n");
+
+    expect(scanSource(source, "packages/obs-capture/src/manifest-flow.ts")).toEqual([
+      { path: "packages/obs-capture/src/manifest-flow.ts", line: 5, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-flow.ts", line: 12, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-flow.ts", line: 15, class: "zone_import" },
+      { path: "packages/obs-capture/src/manifest-flow.ts", line: 19, class: "zone_import" },
+    ]);
+  });
+
+  it("retains zero-iteration loop paths across callback, cause, require, and manifest flow", () => {
+    const callbackSource = [
+      "declare const pending: Promise<void>;",
+      "declare const flag: boolean;",
+      "declare function consume(error: unknown): void;",
+      "let handler = (_error: unknown) => undefined;",
+      "while (flag) handler = (error: unknown) => consume(error);",
+      "void pending.catch(handler);",
+      "do { void pending; } while (flag);",
+    ].join("\n");
+    const causeSource = [
+      'import { TypedDomainError as DomainError } from "@debateai/kernel";',
+      "declare const unrelated: unknown;",
+      "declare const flag: boolean;",
+      "try { task(); } catch (caught) {",
+      "  let maybe = unrelated;",
+      "  while (flag) maybe = caught;",
+      '  new DomainError("WRAP_FAILED", "fixed", { cause: maybe });',
+      "}",
+    ].join("\n");
+    const requireSource = [
+      "declare const flag: boolean;",
+      "declare const local: (path: string) => unknown;",
+      "let load = require;",
+      "while (flag) load = local;",
+      'load("apps/api/src/registration.ts");',
+    ].join("\n");
+    const manifestSource = [
+      "declare const flag: boolean;",
+      'let paths = ["apps/api/src/registration.ts"];',
+      'while (flag) paths = ["packages/kernel/src/error.ts"];',
+      "export const LOOKALIKE = { zone_path_prefixes: paths };",
+    ].join("\n");
+
+    expect([
+      scanSource(callbackSource, "apps/example/src/callback-loop.ts"),
+      scanSource(causeSource, "packages/example/src/cause-loop.ts"),
+      scanSource(requireSource, "packages/obs-capture/src/require-loop.ts"),
+      scanSource(manifestSource, "packages/obs-capture/src/manifest-loop.ts"),
+    ]).toEqual([
+      [
+        { path: "apps/example/src/callback-loop.ts", line: 6, class: "void_promise" },
+        { path: "apps/example/src/callback-loop.ts", line: 7, class: "void_promise" },
+      ],
+      [{ path: "packages/example/src/cause-loop.ts", line: 7, class: "wrapper_without_cause" }],
+      [{ path: "packages/obs-capture/src/require-loop.ts", line: 5, class: "zone_import" }],
+      [{ path: "packages/obs-capture/src/manifest-loop.ts", line: 2, class: "zone_import" }],
     ]);
   });
 
