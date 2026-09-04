@@ -1853,6 +1853,8 @@ function scanParsedSource(
   const activeCallables = new Set<number>();
   const analyzedCallables = new Set<number>();
   const callableExecutionCounts = new Map<number, number>();
+  const callableEntryStates = new Map<number, FlowState>();
+  const saturatedCallables = new Set<number>();
   let rejectionCallbackDepth = 0;
   const hasLexicallyNarrowedParent = (node: ts.Node): boolean => {
     let current = node.parent;
@@ -2379,20 +2381,41 @@ function scanParsedSource(
     rejectionCallback = false,
   ): Completion[] => {
     if (node.body === undefined) return [completion("normal", widenState(state))];
-    const executions = callableExecutionCounts.get(node.pos) ?? 0;
     if (
       activeCallables.has(node.pos)
       || activeCallables.size >= MAX_FLOW_ALTERNATIVES
-      || (!rejectionCallback && executions >= MAX_CALLABLE_EXECUTIONS)
     ) {
       return [completion("normal", widenState(state))];
     }
-    if (!rejectionCallback) callableExecutionCounts.set(node.pos, executions + 1);
+    const executions = callableExecutionCounts.get(node.pos) ?? 0;
+    const nestedCandidateCall = !rejectionCallback
+      && activeCallables.size > 0
+      && hasLexicallyNarrowedParent(node)
+      && functionHasCandidate(node, state, false);
+    let executionState = state;
+    if (nestedCandidateCall) {
+      const previousEntry = callableEntryStates.get(node.pos);
+      const joinedEntry = previousEntry === undefined ? cloneState(state) : joinStates(previousEntry, state);
+      if (previousEntry !== undefined && statesEqual(previousEntry, joinedEntry)) {
+        return [completion("normal", cloneState(state))];
+      }
+      if (executions >= MAX_CALLABLE_EXECUTIONS) {
+        if (saturatedCallables.has(node.pos)) return [completion("normal", widenState(state))];
+        executionState = widenState(joinedEntry);
+        saturatedCallables.add(node.pos);
+      } else {
+        callableExecutionCounts.set(node.pos, executions + 1);
+      }
+      callableEntryStates.set(node.pos, cloneState(executionState));
+    } else if (!rejectionCallback) {
+      if (executions >= MAX_CALLABLE_EXECUTIONS) return [completion("normal", widenState(state))];
+      callableExecutionCounts.set(node.pos, executions + 1);
+    }
     analyzedCallables.add(node.pos);
     activeCallables.add(node.pos);
     if (rejectionCallback) rejectionCallbackDepth += 1;
     try {
-      const functionState = cloneState(state);
+      const functionState = cloneState(executionState);
       if (rejectionCallback) functionState.rejectionObservation = REJECTION_UNOBSERVED;
       for (let index = 0; index < node.parameters.length; index += 1) {
         const parameter = node.parameters[index];

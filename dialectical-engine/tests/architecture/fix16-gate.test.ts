@@ -1389,6 +1389,42 @@ describe("FIX-16 C1 inventory scanner", () => {
     expect(scanSource(safe, "packages/obs-capture/src/nested-call-safe.ts")).toEqual([]);
   });
 
+  it("does not drop the first harmful nested closure state at the execution cap", () => {
+    const harmful = [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  let load = local;",
+      '  const inner = () => load("apps/api/src/registration.ts");',
+      "  inner();",
+      "  inner();",
+      "  inner();",
+      "  inner();",
+      "  load = require;",
+      "  inner();",
+      "}",
+      "outer();",
+    ].join("\n");
+    const safe = [
+      "declare const local: (path: string) => unknown;",
+      "function outer(): void {",
+      "  let load = local;",
+      '  const inner = () => load("apps/api/src/registration.ts");',
+      "  inner();",
+      "  inner();",
+      "  inner();",
+      "  inner();",
+      "  load = local;",
+      "  inner();",
+      "}",
+      "outer();",
+    ].join("\n");
+
+    expect(scanSource(harmful, "packages/obs-capture/src/nested-call-cap-harmful.ts")).toEqual([
+      { path: "packages/obs-capture/src/nested-call-cap-harmful.ts", line: 4, class: "zone_import" },
+    ]);
+    expect(scanSource(safe, "packages/obs-capture/src/nested-call-cap-safe.ts")).toEqual([]);
+  });
+
   it("updates exact manifest array indices, fill, and indirect native push", () => {
     const source = [
       'const indexHarmful = ["packages/kernel/src/error.ts"];',
