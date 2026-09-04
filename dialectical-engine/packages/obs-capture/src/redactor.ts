@@ -2,6 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { CaptureQueueEntry } from "./emit.js";
 import {
+  projectDeclaredRefs,
+  type ProjectedDeclaredRefs,
+} from "./kinds.js";
+import {
   resolveSafeTemplate,
   resolveTaxonomyClass,
   severity,
@@ -9,8 +13,10 @@ import {
   type TaxonomyClass,
 } from "./registry/index.js";
 
+export * from "./kinds.js";
+
 const POST_REDACTION_BRAND: unique symbol = Symbol("POST_REDACTION_ENVELOPE");
-const UNKNOWN_DECLARED_KIND = "UNKNOWN:DECLARED_KIND_REQUIRED";
+export const UNKNOWN_DECLARED_KIND = "UNKNOWN:DECLARED_KIND_REQUIRED";
 
 const CAPTURE_POINTS = Object.freeze([
   "process",
@@ -77,14 +83,14 @@ export interface PostRedactionEnvelope {
   readonly redaction_policy_version: string;
   readonly allowlist_set_id: string;
   readonly fallback_minimized: boolean;
-  readonly run_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly work_item_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly node_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly attempt_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly ledger_ref: typeof UNKNOWN_DECLARED_KIND;
+  readonly run_ref: ProjectedDeclaredRefs["run_ref"];
+  readonly work_item_ref: ProjectedDeclaredRefs["work_item_ref"];
+  readonly node_ref: ProjectedDeclaredRefs["node_ref"];
+  readonly attempt_ref: ProjectedDeclaredRefs["attempt_ref"];
+  readonly ledger_ref: ProjectedDeclaredRefs["ledger_ref"];
   readonly parent_occurrence_ref: "NO_CAUSE";
   readonly cause_relation: null;
-  readonly at_seq_watermark: typeof UNKNOWN_DECLARED_KIND;
+  readonly at_seq_watermark: ProjectedDeclaredRefs["at_seq_watermark"];
   readonly frames: readonly [];
   readonly safe_template_id: string;
   readonly template_parameters: Readonly<Record<string, never>>;
@@ -187,6 +193,7 @@ export function createSharedRedactor(
     readonly zoneContext: boolean;
     readonly attemptIndex: number | null;
     readonly fallbackMinimized: boolean;
+    readonly ambientContext: CaptureQueueEntry["ambient_context_ref"];
   }): PostRedactionEnvelope {
     const template = resolveSafeTemplate(options.code);
     const fallbackTemplate = resolveSafeTemplate("OBS_CAPTURE_SELF");
@@ -202,6 +209,10 @@ export function createSharedRedactor(
     const fingerprint = createHash("sha256")
       .update(`v1\u0000${safeCode}\u0000${safeTaxonomy}\u0000${config.runtime}\u0000${component.package}`)
       .digest("hex");
+    const declaredRefs = projectDeclaredRefs(
+      options.ambientContext,
+      options.zoneContext,
+    );
     return Object.freeze({
       [POST_REDACTION_BRAND]: true as const,
       occurred_at: safeNow().toISOString(),
@@ -221,14 +232,14 @@ export function createSharedRedactor(
       redaction_policy_version: config.redaction_policy_version,
       allowlist_set_id: config.allowlist_set_id,
       fallback_minimized: options.fallbackMinimized || template === undefined,
-      run_ref: UNKNOWN_DECLARED_KIND,
-      work_item_ref: UNKNOWN_DECLARED_KIND,
-      node_ref: UNKNOWN_DECLARED_KIND,
-      attempt_ref: UNKNOWN_DECLARED_KIND,
-      ledger_ref: UNKNOWN_DECLARED_KIND,
+      run_ref: declaredRefs.run_ref,
+      work_item_ref: declaredRefs.work_item_ref,
+      node_ref: declaredRefs.node_ref,
+      attempt_ref: declaredRefs.attempt_ref,
+      ledger_ref: declaredRefs.ledger_ref,
       parent_occurrence_ref: "NO_CAUSE" as const,
       cause_relation: null,
-      at_seq_watermark: UNKNOWN_DECLARED_KIND,
+      at_seq_watermark: declaredRefs.at_seq_watermark,
       frames: Object.freeze([]) as readonly [],
       safe_template_id: safeTemplate.id,
       template_parameters: Object.freeze({}) as Readonly<Record<string, never>>,
@@ -240,7 +251,9 @@ export function createSharedRedactor(
     });
   }
 
-  function fallback(): PostRedactionEnvelope {
+  function fallback(
+    ambientContext: CaptureQueueEntry["ambient_context_ref"],
+  ): PostRedactionEnvelope {
     return build({
       code: "OBS_CAPTURE_SELF",
       taxonomyClass: "CAPTURE_SELF",
@@ -250,6 +263,7 @@ export function createSharedRedactor(
       zoneContext: false,
       attemptIndex: null,
       fallbackMinimized: true,
+      ambientContext,
     });
   }
 
@@ -260,11 +274,11 @@ export function createSharedRedactor(
         let codeValue: unknown;
         if (entry.kind === "envelope") {
           if (!isRecord(entry.payload_ref)) {
-            return fallback();
+            return fallback(entry.ambient_context_ref);
           }
           payload = entry.payload_ref;
           if (Object.keys(payload).some((key) => !INPUT_ALLOWLIST.has(key))) {
-            return fallback();
+            return fallback(entry.ambient_context_ref);
           }
           codeValue = ownValue(payload, "code");
           if (codeValue === undefined) {
@@ -278,7 +292,7 @@ export function createSharedRedactor(
         }
 
         if (typeof codeValue !== "string" || resolveSafeTemplate(codeValue) === undefined) {
-          return fallback();
+          return fallback(entry.ambient_context_ref);
         }
         const taxonomyValue = payload === undefined
           ? "ORIGIN_UNKNOWN"
@@ -287,7 +301,7 @@ export function createSharedRedactor(
           ? resolveTaxonomyClass(taxonomyValue)?.taxonomy_class
           : undefined;
         if (taxonomy === undefined) {
-          return fallback();
+          return fallback(entry.ambient_context_ref);
         }
         const capturePoint = stringMember<CapturePoint>(
           payload === undefined ? undefined : ownValue(payload, "capture_point"),
@@ -305,13 +319,13 @@ export function createSharedRedactor(
           "first_party",
         );
         if (capturePoint === undefined || disposition === undefined || source === undefined) {
-          return fallback();
+          return fallback(entry.ambient_context_ref);
         }
         const zoneValue = payload === undefined
           ? undefined
           : ownValue(payload, "zone_context");
         if (zoneValue !== undefined && typeof zoneValue !== "boolean") {
-          return fallback();
+          return fallback(entry.ambient_context_ref);
         }
         const contextZone = entry.ambient_context_ref?.zone_context;
         const zoneContext = zoneValue ?? (typeof contextZone === "boolean" && contextZone);
@@ -322,7 +336,7 @@ export function createSharedRedactor(
           attemptValue !== undefined &&
           (!Number.isSafeInteger(attemptValue) || (attemptValue as number) < 0)
         ) {
-          return fallback();
+          return fallback(entry.ambient_context_ref);
         }
         return build({
           code: codeValue,
@@ -333,9 +347,10 @@ export function createSharedRedactor(
           zoneContext,
           attemptIndex: attemptValue === undefined ? null : (attemptValue as number),
           fallbackMinimized: false,
+          ambientContext: entry.ambient_context_ref,
         });
       } catch {
-        return fallback();
+        return fallback(entry.ambient_context_ref);
       }
     },
   });
