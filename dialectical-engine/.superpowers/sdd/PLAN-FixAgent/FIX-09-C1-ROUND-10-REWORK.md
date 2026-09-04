@@ -40,6 +40,16 @@ the environment token from `correct` to `wrong` authorized the wrong-token
 armed repin. RED observed `quick_arm: ON`, two proxy traps, and 315 forged
 `isProxy` calls.
 
+A third fresh Sol review of committed head `b57b1e3f` found that lazy
+`createRequire().resolve` still consulted replaceable
+`Module._resolveFilename`. Its shadow package made the declared schema accept
+an unsafe integer after two forged resolver calls. Its stronger reproduction
+used the host `localRequire` callback to reach the main global, change the
+environment token from `correct` to `wrong` during validation, and authorize
+the wrong-token armed repin. The focused fresh-process RED observed one forged
+resolver call and bounded `{ "success": false }` when the forged resolver
+threw.
+
 The pre-initialization test compiles the three policy modules first and then
 loads emitted JavaScript under hostile state. Its zero-call assertion therefore
 covers product initialization rather than `tsx` loader-hook activity.
@@ -54,10 +64,12 @@ covers product initialization rather than `tsx` loader-hook activity.
   schema program, its regex literals and callbacks, `JSON.parse`, and a private
   Zod CommonJS module graph. String/wasm code generation is disabled in that
   context.
-- The local CommonJS loader resolves `zod` and `zod/package.json` relative to
-  `loader.ts`/its emitted module URL, not `process.cwd()`. It accepts only
-  relative dependencies whose resolved files remain inside that exact Zod
-  package directory.
+- The private loader obtains `zod/package.json` through its captured,
+  module-private ESM resolver relative to `loader.ts`/its emitted module URL,
+  not `process.cwd()` or CommonJS resolution. The exact pinned CommonJS entry
+  is `index.cjs`; every Zod dependency is an explicit relative `.cjs` path
+  normalized with captured path operations and confined to that package
+  directory.
 - Host capabilities used to create the private realm and load its trusted
   module files are captured at loader initialization. Candidate data crosses
   the boundary only as canonical JSON and the result crosses back only as an
@@ -100,6 +112,9 @@ The canonical bundle remains
   after changing to an unrelated current working directory. Replacing live
   worker and Atomics authority members executes zero hostile calls; the valid
   bundle remains valid and the Zod-invalid unsafe integer remains invalid.
+- Replacing `Module._resolveFilename` after loader initialization executes zero
+  forged resolver calls; private Zod validates the exact bundle successfully
+  through the module-private ESM resolution path.
 - Direct replacement and synchronization of both live crypto exports executes
   zero forged calls, preserves the exact hash, and refuses the wrong-token
   armed repin.
@@ -114,8 +129,9 @@ The canonical bundle remains
   `Number.MAX_SAFE_INTEGER + 1` and failed the declared-schema authority test.
   A live-crypto-import mutant reached the forged hash three times. Live
   custodian-`isProxy` and file-read mutants authorized the forged request and
-  read the armed replacement respectively. Every mutant failed its capture
-  regression and was restored.
+  read the armed replacement respectively. The committed CommonJS-resolution
+  path consulted its forged resolver and failed the new resolver-isolation
+  regression. Every mutant failed its capture regression and was restored.
 - Safe neighbours remain green: clean declared-schema validation, the
   unreachable `Object.prototype.push` case, exact frozen snapshot membership,
   top-level/nested/revoked proxy refusal, all frozen-floor samples, and lawful
@@ -124,9 +140,9 @@ The canonical bundle remains
 ## Verification
 
 - `pnpm exec vitest run tests/unit/fix09-bundle.test.ts --reporter=dot`:
-  58/58 passed in each of three consecutive fresh processes.
+  59/59 passed in each of three consecutive fresh processes.
 - The focused authority/floor/schema/proxy/token/neighbour selection passed
-  11/11.
+  12/12.
 - `node tests/unit/fixtures/fix09-independent-hash.mjs <
   tools/obs-listener/policy/bundle.json` emitted exact
   `aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd`.

@@ -921,6 +921,70 @@ describe("FIX-09 C1 policy bundle", () => {
     }
   });
 
+  it("does not consult the live CommonJS resolver for private Zod", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../..");
+    const loaderUrl = pathToFileURL(
+      resolve(repositoryRoot, "tools/obs-listener/policy/loader.ts"),
+    ).href;
+    const script = `
+      import { readFileSync } from "node:fs";
+      import { createRequire } from "node:module";
+      const { policyBundleSchema } = await import(
+        ${JSON.stringify(loaderUrl)} + "?captured-zod-resolution"
+      );
+      const raw = JSON.parse(
+        readFileSync(${JSON.stringify(BUNDLE_PATH)}, "utf8")
+      );
+      const require = createRequire(import.meta.url);
+      const moduleApi = require("node:module");
+      const descriptor = Object.getOwnPropertyDescriptor(
+        moduleApi,
+        "_resolveFilename",
+      );
+      if (!descriptor || !("value" in descriptor)) {
+        throw new Error("CJS_RESOLVER_MISSING");
+      }
+      const original = descriptor.value;
+      let forgedResolverCalls = 0;
+      let rawError = null;
+      let success;
+      Object.defineProperty(moduleApi, "_resolveFilename", {
+        ...descriptor,
+        value: function (request, ...args) {
+          if (request === "zod" || request === "zod/package.json") {
+            forgedResolverCalls += 1;
+            throw new Error("HOSTILE_CJS_RESOLVER_RAN");
+          }
+          return Reflect.apply(original, this, [request, ...args]);
+        },
+      });
+      try {
+        success = policyBundleSchema.safeParse(raw).success;
+      } catch (error) {
+        rawError = error instanceof Error ? error.message : String(error);
+      } finally {
+        Object.defineProperty(moduleApi, "_resolveFilename", descriptor);
+      }
+      process.stdout.write(JSON.stringify({
+        forgedResolverCalls,
+        rawError,
+        success,
+      }));
+    `;
+    const outcome = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+
+    expect(outcome.status, `${outcome.stdout}${outcome.stderr}`).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({
+      forgedResolverCalls: 0,
+      rawError: null,
+      success: true,
+    });
+  });
+
   it("does not trust live Atomics results as declared-schema authority", () => {
     const raw = JSON.parse(readFileSync(BUNDLE_PATH, "utf8")) as Record<
       string,

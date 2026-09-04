@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname } from "node:path";
+import { dirname, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isProxy } from "node:util/types";
 import { createContext, runInContext, runInNewContext } from "node:vm";
 
@@ -148,11 +148,13 @@ type PolicyBundleContents = {
   custodians: [{ id: "V"; token_env: "OBS_POLICY_CUSTODIAN_TOKEN" }];
 };
 
-const CREATE_REQUIRE = createRequire;
 const CREATE_CONTEXT = createContext;
 const RUN_IN_CONTEXT = runInContext;
 const READ_FILE_SYNC = readFileSync;
 const DIRNAME = dirname;
+const RESOLVE_PATH = resolvePath;
+const FILE_URL_TO_PATH = fileURLToPath;
+const RESOLVE_IMPORT = import.meta.resolve;
 
 // This static program is deliberately independent of transpiler output. It
 // constructs and executes the declared schema wholly inside the private realm,
@@ -381,9 +383,10 @@ function pathIsWithin(path: string, directory: string): boolean {
 }
 
 function createPrivateZodValidator(): PrivateZodValidator {
-  const policyRequire = CREATE_REQUIRE(import.meta.url);
-  const zodEntry = policyRequire.resolve("zod");
-  const zodDirectory = DIRNAME(policyRequire.resolve("zod/package.json"));
+  const zodDirectory = DIRNAME(
+    FILE_URL_TO_PATH(RESOLVE_IMPORT("zod/package.json")),
+  );
+  const zodEntry = RESOLVE_PATH(zodDirectory, "index.cjs");
   const context = CREATE_CONTEXT(Object.create(null), {
     codeGeneration: { strings: false, wasm: false },
   });
@@ -408,8 +411,6 @@ function createPrivateZodValidator(): PrivateZodValidator {
       value: moduleRecord,
       writable: false,
     });
-    const moduleRequire = CREATE_REQUIRE(filename);
-    const resolveFromModule = moduleRequire.resolve;
     const localRequire = (specifier: string): unknown => {
       if (
         specifier.length < 2 ||
@@ -418,7 +419,9 @@ function createPrivateZodValidator(): PrivateZodValidator {
       ) {
         throw new Error("ZOD_PRIVATE_MODULE_SPECIFIER_INVALID");
       }
-      return loadPrivateCommonJs(resolveFromModule(specifier));
+      return loadPrivateCommonJs(
+        RESOLVE_PATH(DIRNAME(filename), specifier),
+      );
     };
     const source = READ_FILE_SYNC(filename, "utf8");
     const wrapper = RUN_IN_CONTEXT(
