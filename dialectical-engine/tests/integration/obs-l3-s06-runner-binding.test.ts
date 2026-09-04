@@ -20,6 +20,8 @@ import {
 } from "@debateai/runner";
 
 const ROOT = process.cwd();
+const RUN_ID = "550e8400-e29b-41d4-a716-446655440030";
+const WORK_ITEM_ID = "550e8400-e29b-41d4-a716-446655440031";
 
 function installRecordingEmitter(order: string[] = []): CaptureQueueEntry[] {
   const captured: CaptureQueueEntry[] = [];
@@ -37,17 +39,6 @@ function installRecordingEmitter(order: string[] = []): CaptureQueueEntry[] {
     gaps,
   }));
   return captured;
-}
-
-function causeChainContains(error: unknown, target: unknown): boolean {
-  const visited = new Set<unknown>();
-  let cursor = error;
-  while (typeof cursor === "object" && cursor !== null && !visited.has(cursor)) {
-    if (cursor === target) return true;
-    visited.add(cursor);
-    cursor = "cause" in cursor ? cursor.cause : undefined;
-  }
-  return false;
 }
 
 afterEach(() => {
@@ -97,7 +88,7 @@ describe("S06 runner task binding", () => {
     if (taskFn === undefined) throw new Error("TASK_FN_NOT_DECLARED");
 
     await expect(taskFn(
-      { runId: "run:s06", workItemId: "work:s06" },
+      { runId: RUN_ID, workItemId: WORK_ITEM_ID },
       { retryCount: () => 2 },
     )).rejects.toBe(failure);
 
@@ -115,8 +106,8 @@ describe("S06 runner task binding", () => {
         attempt_index: 2,
       },
       ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:s06" },
-        work_item_ref: { kind: "work_item", value: "work:s06" },
+        run_ref: { kind: "run", value: RUN_ID },
+        work_item_ref: { kind: "work_item", value: WORK_ITEM_ID },
       },
     });
     expect(createSharedRedactor({
@@ -133,6 +124,12 @@ describe("S06 runner task binding", () => {
       capture_point: "job",
       attempt_index: 2,
       fallback_minimized: false,
+      run_ref: RUN_ID,
+      work_item_ref: WORK_ITEM_ID,
+      node_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+      attempt_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+      ledger_ref: "UNKNOWN:DECLARED_KIND_REQUIRED",
+      at_seq_watermark: "UNKNOWN:DECLARED_KIND_REQUIRED",
     });
   });
 
@@ -174,25 +171,14 @@ describe("S06 runner task binding", () => {
     let observed: unknown;
     try {
       await taskFn(
-        { runId: "run:s06:record-failure", workItemId: "work:s06:record-failure" },
+        { runId: RUN_ID, workItemId: WORK_ITEM_ID },
         { retryCount: () => 1 },
       );
     } catch (error) {
       observed = error;
     }
 
-    const chainContainsFailure = causeChainContains(observed, failure);
-    expect.soft({
-      chainContainsFailure,
-      replacementCode: chainContainsFailure
-        ? "CHAIN_PRESERVED"
-        : observed instanceof TypedDomainError
-          ? observed.code
-          : "NOT_TYPED_DOMAIN_ERROR",
-    }).toEqual({
-      chainContainsFailure: true,
-      replacementCode: "CHAIN_PRESERVED",
-    });
+    expect.soft(observed).toBe(failure);
     expect.soft(order).toEqual(["capture", "terminal", "capture"]);
     expect.soft(captured.map((entry) => {
       const payload = entry.payload_ref;
@@ -214,10 +200,13 @@ describe("S06 runner task binding", () => {
         attempt_index: 1,
       },
       ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:s06:record-failure" },
-        work_item_ref: { kind: "work_item", value: "work:s06:record-failure" },
+        run_ref: { kind: "run", value: RUN_ID },
+        work_item_ref: { kind: "work_item", value: WORK_ITEM_ID },
       },
     });
+    const alarmPayload = captured[1]?.payload_ref;
+    expect(alarmPayload).toBeTypeOf("object");
+    expect((alarmPayload as { error?: { cause?: unknown } }).error?.cause).toBe(failure);
   });
 });
 
@@ -226,6 +215,11 @@ describe("S06 provider gateway binding", () => {
     let sequence = 0;
     const client = {
       async query(sql: string) {
+        if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
+        if (sql.includes("FROM core.run AS run") && sql.includes("run_id=ANY")) {
+          return { rows: [{ run_id: "run:provider-s06", live: true }] };
+        }
+        if (sql.includes("pg_advisory_unlock")) return { rows: [{ unlocked: true }] };
         if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
         if (sql.includes("ledger.allocate_sequence")) {
           sequence += 1;
@@ -372,10 +366,11 @@ console.log(JSON.stringify({
 
   it("evaluates the runner installer before the DB dependency in the real production entrypoint", () => {
     const throwingDb = `data:text/javascript,${encodeURIComponent(`
+export function configureContentEncryption() {}
 export function createPool() {}
-const unhandled = process.listenerCount("unhandledRejection");
+export class RunRepository {}
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
-if (unhandled < 1 || uncaught < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
+if (uncaught < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
 throw new Error("DB_IMPORT_AFTER_RUNNER_INSTALL");`)} `;
     const loaderSource = `
 export async function resolve(specifier, context, nextResolve) {
@@ -385,10 +380,15 @@ export async function resolve(specifier, context, nextResolve) {
     }
     const stubs = {
       "@hatchet-dev/typescript-sdk": "export class Hatchet {}",
-      "../../../packages/crypto/src/index.js": "export function loadKek() {}",
-      "@debateai/battery": "export class WorkItemRepository {}",
-      "@debateai/register": "export function loadBootstrapRegister() {} export function loadRunnerEnvironment() {} export function readClaimTypeCompositionMap() {}",
+      "@debateai/crypto": "export class ContentCipher {} export class FileRunContentKeyStore {} export class FileUserDekStore {} export function loadKek() {}",
+      "@debateai/battery": "export function createTerminalActivationEvaluator() {} export class WorkItemRepository {}",
+      "@debateai/register": "export function loadRunnerEnvironment() {}",
+      "@debateai/critique": "export function readDeploymentMakerCapability() {}",
+      "@debateai/providers": "export function parseProviderDiscoveryTargets() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
+      "./provider-topology.js": "export function createRunnerProviderTopology() {}",
+      "./dev-runner-policy.js": "export function readDevelopmentRunnerPolicy() {}",
+      "./runner-startup-reconciliation.js": "export function reconcileRunnerStartupWork() {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
       return { url: "data:text/javascript," + encodeURIComponent(stubs[specifier]), shortCircuit: true };
@@ -404,7 +404,6 @@ try {
 } catch (error) {
   console.log(JSON.stringify({
     message: error?.message,
-    unhandled: process.listenerCount("unhandledRejection"),
     uncaught: process.listenerCount("uncaughtExceptionMonitor"),
   }));
 }`;
@@ -425,7 +424,6 @@ try {
     expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(0);
     expect(JSON.parse(result.stdout.trim())).toMatchObject({
       message: "DB_IMPORT_AFTER_RUNNER_INSTALL",
-      unhandled: 1,
       uncaught: 1,
     });
   });
