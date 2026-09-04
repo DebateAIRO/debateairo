@@ -5,7 +5,7 @@ import type { BigIntStats } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { isSerializedSafeEnvelope } from "../envelope-contract.js";
+import { normalizeSerializedSafeEnvelope } from "../envelope-contract.js";
 import {
   resolveSafeTemplate,
   resolveTaxonomyClass,
@@ -425,23 +425,24 @@ async function drainFile(
       } catch {
         return false;
       }
-      if (!isRecord(value)) return false;
-      const taxonomy = typeof value.taxonomy_class === "string"
-        ? resolveTaxonomyClass(value.taxonomy_class)
+      const envelope = normalizeSerializedSafeEnvelope(value, parsed.runtime);
+      if (envelope === undefined) return false;
+      const taxonomy = typeof envelope.taxonomy_class === "string"
+        ? resolveTaxonomyClass(envelope.taxonomy_class)
         : undefined;
-      const template = typeof value.code === "string"
-        ? resolveSafeTemplate(value.code)
+      const template = typeof envelope.code === "string"
+        ? resolveSafeTemplate(envelope.code)
         : undefined;
       if (
         taxonomy === undefined
         || template === undefined
         || (template.binding !== undefined
           && Object.entries(template.binding).some(
-            ([field, expected]) => value[field] !== expected,
+            ([field, expected]) =>
+              envelope[field as keyof PostRedactionEnvelope] !== expected,
           ))
-        || !isSerializedSafeEnvelope(value, parsed.runtime)
       ) return false;
-      envelopes.push(value as unknown as PostRedactionEnvelope);
+      envelopes.push(envelope);
     }
     const finalSnapshot = await matchingSourceSnapshot(
       handle,

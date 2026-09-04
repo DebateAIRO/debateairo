@@ -750,6 +750,71 @@ afterAll(async () => {
 });
 
 describe.sequential("FIX-01 C4 public runtime spool drain", () => {
+  it("rejects an accessor-backed parsed row without reading or sink admission", async () => {
+    const directory = createScratchDirectory();
+    const path = join(directory, spoolName("scheduler", DEAD_PID));
+    const source = safeEnvelope("scheduler");
+    writeEnvelope(path, source);
+    ensureCurrentSpoolsIndexed(directory);
+    const parsed = JSON.parse(JSON.stringify(source)) as Record<string, unknown>;
+    const codeGetter = vi.fn(() => "OBS_CAPTURE_SELF");
+    Object.defineProperty(parsed, "code", {
+      configurable: true,
+      enumerable: true,
+      get: codeGetter,
+    });
+    const originalParse = JSON.parse;
+    const serializedSource = JSON.stringify(source);
+    vi.spyOn(JSON, "parse").mockImplementation((text: string) =>
+      text === serializedSource ? parsed : originalParse(text)
+    );
+    const result = recordingSink();
+
+    await drainDeadSpoolFiles({
+      spoolDirectory: directory,
+      databaseSink: result.sink,
+    });
+
+    expect(codeGetter).not.toHaveBeenCalled();
+    expect(result.calls).toEqual([]);
+    expect(existsSync(`${path}.ingested`)).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(`${JSON.stringify(source)}\n`);
+  });
+
+  it("admits only the frozen normalized copy of a lawful parsed row", async () => {
+    const directory = createScratchDirectory();
+    const path = join(directory, spoolName("scheduler", DEAD_PID));
+    const source = safeEnvelope("scheduler");
+    writeEnvelope(path, source);
+    ensureCurrentSpoolsIndexed(directory);
+    const parsed = JSON.parse(JSON.stringify(source)) as Record<string, unknown>;
+    const originalParse = JSON.parse;
+    const serializedSource = JSON.stringify(source);
+    vi.spyOn(JSON, "parse").mockImplementation((text: string) =>
+      text === serializedSource ? parsed : originalParse(text)
+    );
+    const result = recordingSink();
+
+    await drainDeadSpoolFiles({
+      spoolDirectory: directory,
+      databaseSink: result.sink,
+    });
+
+    expect(result.calls).toHaveLength(1);
+    expect(result.calls[0]).not.toBe(parsed);
+    expect(Object.getPrototypeOf(result.calls[0]!)).toBeNull();
+    expect(Object.isFrozen(result.calls[0])).toBe(true);
+    expect(Object.isFrozen(result.calls[0]!.component)).toBe(true);
+    expect(Object.isFrozen(result.calls[0]!.template_parameters)).toBe(true);
+    expect(Object.isFrozen(result.calls[0]!.frames)).toBe(true);
+    expect(Object.isFrozen(result.calls[0]!.cause_chain_codes)).toBe(true);
+    expect(result.calls[0]!.cause_chain_codes).toEqual([]);
+    expect(Object.prototype.hasOwnProperty.call(
+      parsed,
+      "cause_chain_codes",
+    )).toBe(false);
+  });
+
   it("accepts JOB_LIFECYCLE through the shared registry taxonomy", async () => {
     const directory = createScratchDirectory();
     const path = join(directory, spoolName("scheduler", DEAD_PID));

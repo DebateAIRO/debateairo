@@ -4,6 +4,14 @@ import { fileURLToPath } from "node:url";
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createCaptureEmitter,
+  type CaptureQueueEntry,
+} from "../../packages/obs-capture/src/emit.js";
+import {
+  createCaptureGapCounter,
+  createCaptureHealth,
+} from "../../packages/obs-capture/src/health.js";
 import { createSharedRedactor } from "../../packages/obs-capture/src/redactor.js";
 
 type UntypedMethod = (...args: unknown[]) => unknown;
@@ -258,23 +266,31 @@ describe("FIX-02 C2 pool failure wrapping", () => {
   it("keeps raw cause text out of the durable redacted envelope", () => {
     const cause = connectionFailure("DURABLE_REDACTION_SECRET");
     const failure = new TypedDomainError(DATABASE_POOL_FAILED, FIXED_MESSAGE, { cause });
+    const entries: CaptureQueueEntry[] = [];
+    const health = createCaptureHealth();
+    const gaps = createCaptureGapCounter({ health });
+    createCaptureEmitter({
+      queue: Object.freeze({
+        offer(entry: CaptureQueueEntry): boolean {
+          entries.push(entry);
+          return true;
+        },
+      }),
+      health,
+      gaps,
+    }).captureHandled(failure, FIXED_CONTEXT);
     const redacted = createSharedRedactor({
       environment: "test",
       build_ref: "UNTRACKED-DEV:fix02:test",
       build_dirty: true,
       runtime: "runner",
-      component: Object.freeze({ process: "runner", package: "@debateai/db" }),
+      component: Object.freeze({ process: "runner", package: "@debateai/runner" }),
       writer_identity: "fix02-test",
       redaction_policy_version: "g0",
       allowlist_set_id: "g0-empty-parameters",
       now: () => new Date("2026-09-04T00:00:00.000Z"),
       sourceEventRef: () => "00000000-0000-4000-8000-000000000002",
-    }).redact({
-      kind: "handled_error",
-      payload_ref: failure,
-      ambient_context_ref: undefined,
-      handled_context_ref: FIXED_CONTEXT,
-    });
+    }).redact(entries[0]!);
 
     expect(failure.cause).toBe(cause);
     expect(redacted).toMatchObject({
@@ -282,6 +298,12 @@ describe("FIX-02 C2 pool failure wrapping", () => {
       capture_point: "boundary",
       disposition: "HANDLED",
       template_parameters: {},
+      parent_occurrence_ref: "CAUSE_NOT_CAPTURED:NOT_SEPARATELY_CAPTURED",
+      cause_relation: "WRAPS",
+      cause_chain_codes: [
+        "DATABASE_POOL_FAILED",
+        "CAUSE_CODE_UNAVAILABLE",
+      ],
     });
     const durableJson = JSON.stringify(redacted);
     expect(durableJson).not.toContain(cause.message);

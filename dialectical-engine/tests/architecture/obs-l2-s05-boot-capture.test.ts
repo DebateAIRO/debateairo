@@ -740,6 +740,7 @@ describe("S05 fatal-boundary installers", () => {
         disposition: "SELF",
         fallback_minimized: true,
       });
+      expect(envelope).not.toHaveProperty("cause_chain_codes");
 
       const { createSharedRedactor } = await import("@debateai/obs-capture");
       const expected = JSON.parse(JSON.stringify(createSharedRedactor(redactorConfig(runtime)).redact({
@@ -752,6 +753,7 @@ describe("S05 fatal-boundary installers", () => {
       delete envelope.source_event_ref;
       delete expected.occurred_at;
       delete expected.source_event_ref;
+      delete expected.cause_chain_codes;
       expect(envelope).toEqual(expected);
     },
   );

@@ -1,5 +1,9 @@
 import { getObsContext, type ObsContext } from "./context.js";
 import {
+  snapshotEmittedCause,
+  snapshotHandledCause,
+} from "./cause-chain.js";
+import {
   CAPTURE_GAP_CLASSES,
   CAPTURE_HEALTH_CODES,
   createCaptureGapCounter,
@@ -13,6 +17,7 @@ export interface CaptureQueueEntry {
   readonly payload_ref: unknown;
   readonly ambient_context_ref: ObsContext | undefined;
   readonly handled_context_ref?: unknown;
+  readonly cause_chain_codes_ref?: readonly string[];
 }
 
 export interface CaptureQueuePort {
@@ -71,6 +76,7 @@ export function createCaptureEmitter(options: {
           kind: "envelope",
           payload_ref: envelope,
           ambient_context_ref: getObsContext(),
+          cause_chain_codes_ref: snapshotEmittedCause(envelope),
         });
       } catch {
         deferLoss("EMIT_FAILURE");
@@ -83,6 +89,7 @@ export function createCaptureEmitter(options: {
           payload_ref: error,
           ambient_context_ref: getObsContext(),
           handled_context_ref: context,
+          cause_chain_codes_ref: snapshotHandledCause(error, context),
         });
       } catch {
         deferLoss("EMIT_FAILURE");
@@ -144,4 +151,3 @@ export function captureHandled(error: unknown, context: unknown): void {
     // Product failure semantics always win over observability.
   }
 }
-
