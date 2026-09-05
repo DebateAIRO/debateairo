@@ -306,14 +306,14 @@ BEGIN
     ('register._validate_source_ref(text)', 'edcf5a0284a04599442fc4d9c601e7778a8e5ca920cef1520ced9696759b10ef', 'i'::char, false, true),
     ('register._validate_support_value(text,text)', '3528adc999f1d3a52b805778bf8044df659c329288b12c2f66cc04d3569c0b0f', 'i'::char, false, true),
     ('register._assert_support_catalogue(bigint)', 'abf48183e583a554a23cfecaf0f5667227bf96dc1e5ba0faa172b9e65a0d6344', 's'::char, false, true),
-    ('register._current_support_register_version()', 'bd72352f161e45f0476aab2d88d75504f40647da51bcf38e52a9f50ebb16093c', 's'::char, false, false),
+    ('register._current_support_register_version()', 'd94a5d69d5e501613faf0e05fae51e87b0989ed4593c7787d144910f06f45f10', 's'::char, false, false),
     ('register._register_row_insert_guard()', 'a03423a31fa833a113eec3dd124dcaa6f13e7a76151920fb81a67a7d7fb41a0e', 'v'::char, true, false),
     ('register._register_version_seal_guard()', '9bdecbcea3bb4e61fade77914e9df5a26b56ead14b35e4aabbbea67e6f09ff60', 'v'::char, true, false),
     ('register.allocate_register_version()', 'c27fdb3961bfaf3463a9b0f9d8ec1161ff4593dded9b0905e9e45878cfd78b67', 'v'::char, true, false),
     ('register.import_historical_register_version(bigint,jsonb,character)', '7bc37a821f21647e6dff753f84d5182ef1a1027e46adaa4a94fec5d1755667b6', 'v'::char, true, false),
     ('register.publish_register_version(uuid,character,bigint,jsonb,text)', '3ebad566337544f16da402198db8d2f05e8f5c5fa5a7aae1b4b1efb0a878149f', 'v'::char, true, false),
     ('register.publish_support_configuration(uuid,character,bigint,bigint,integer,jsonb,text)', '4883dc5e35c1bf7a3288ce2b9ef7816744ac4b5e390de5d5eba86d5c9a9c60e5', 'v'::char, true, false),
-    ('register.read_support_configuration_status()', '3ceeb8bb4ad9cf5fcb8b6be6f6a68157b224dcc87e7970aeb2f9e02a05bfee54', 'v'::char, true, false)
+    ('register.read_support_configuration_status()', 'c8b4db3718c35f4a8edd4da9bdc0c41519e13a97c7f603b559bc21baa57c6314', 'v'::char, true, false)
   ) AS expected(signature,sha256,volatility,security_definer,is_strict)
   LEFT JOIN pg_catalog.pg_proc AS procedure
     ON procedure.oid = pg_catalog.to_regprocedure(expected.signature);
@@ -910,26 +910,8 @@ SET search_path = pg_catalog, register
 AS $function$
   SELECT version.register_version
   FROM register.register_version AS version
-  JOIN register.register_row AS marker
-    ON marker.register_version = version.register_version
-   AND marker.row_key = 'supportActivation'
   WHERE version.sealed
     AND version.publication_kind = 'SUPPORT_CONFIGURATION'
-    AND version.row_count = (
-      SELECT count(*)::integer FROM register.register_row AS counted
-      WHERE counted.register_version = version.register_version
-    )
-    AND version.snapshot_sha256::text = register._snapshot_sha256(version.register_version)
-    AND marker.value_json ->> 'kind' = 'SUPPORT_CONFIGURATION_ACTIVATION'
-    AND marker.value_json ->> 'schema_version' = '1'
-    AND marker.value_json ->> 'target_register_version' = version.register_version::text
-    AND marker.value_json ->> 'support_snapshot_sha256'
-      = register._support_snapshot_sha256(version.register_version)
-    AND (
-      SELECT count(*) FROM register.register_row AS support_row
-      WHERE support_row.register_version = version.register_version
-        AND support_row.row_key = ANY(register._support_keys())
-    ) = 16
   ORDER BY version.register_version DESC
   LIMIT 1
 $function$;
@@ -1878,6 +1860,8 @@ $function$;
 CREATE OR REPLACE FUNCTION register.read_support_configuration_status()
 RETURNS TABLE (
   support_register_version text,
+  schema_version integer,
+  integrity_valid boolean,
   base_register_version text,
   publication_id uuid,
   request_sha256 text,
@@ -1902,21 +1886,69 @@ AS $function$
     JOIN register.register_row AS marker
       ON marker.register_version = version.register_version
      AND marker.row_key = 'supportActivation'
+  ), annotated AS (
+    SELECT selected.*,
+      CASE
+        WHEN pg_catalog.jsonb_typeof(selected.marker_value -> 'schema_version') = 'number'
+          AND (selected.marker_value ->> 'schema_version')::numeric
+            = pg_catalog.trunc((selected.marker_value ->> 'schema_version')::numeric)
+          AND (selected.marker_value ->> 'schema_version')::numeric
+            BETWEEN 1 AND 2147483647
+        THEN (selected.marker_value ->> 'schema_version')::integer
+        ELSE NULL
+      END AS marker_schema_version
+    FROM selected
   )
-  SELECT selected.register_version::text,
-    selected.base_register_version::text,
-    selected.publication_id,
-    selected.request_sha256::text,
-    selected.snapshot_sha256::text,
-    selected.marker_value ->> 'support_snapshot_sha256',
-    ARRAY(
-      SELECT value
-      FROM pg_catalog.jsonb_array_elements_text(
-        selected.marker_value -> 'changed_keys'
-      ) AS changed(value)
+  SELECT annotated.register_version::text,
+    annotated.marker_schema_version,
+    (
+      annotated.marker_schema_version IS NOT NULL
+      AND annotated.row_count = (
+        SELECT count(*)::integer
+        FROM register.register_row AS counted
+        WHERE counted.register_version = annotated.register_version
+      )
+      AND annotated.snapshot_sha256::text
+        = register._snapshot_sha256(annotated.register_version)
+      AND pg_catalog.jsonb_typeof(annotated.marker_value) = 'object'
+      AND (
+        SELECT count(*) FROM pg_catalog.jsonb_object_keys(annotated.marker_value)
+      ) = 8
+      AND annotated.marker_value ?& ARRAY[
+        'kind','schema_version','target_register_version',
+        'previous_support_register_version','support_snapshot_sha256',
+        'changed_keys','source_ref','recorded_at'
+      ]
+      AND annotated.marker_value ->> 'kind' = 'SUPPORT_CONFIGURATION_ACTIVATION'
+      AND annotated.marker_value ->> 'target_register_version'
+        = annotated.register_version::text
+      AND annotated.marker_value ->> 'support_snapshot_sha256'
+        = register._support_snapshot_sha256(annotated.register_version)
+      AND annotated.marker_value ->> 'source_ref' = annotated.marker_source
+      AND annotated.marker_value -> 'recorded_at' = pg_catalog.to_jsonb(annotated.recorded_at)
+      AND (
+        SELECT count(*) FROM register.register_row AS support_row
+        WHERE support_row.register_version = annotated.register_version
+          AND support_row.row_key = ANY(register._support_keys())
+      ) = 16
     ),
-    selected.marker_source,
-    selected.recorded_at,
+    annotated.base_register_version::text,
+    annotated.publication_id,
+    annotated.request_sha256::text,
+    annotated.snapshot_sha256::text,
+    annotated.marker_value ->> 'support_snapshot_sha256',
+    CASE
+      WHEN pg_catalog.jsonb_typeof(annotated.marker_value -> 'changed_keys') = 'array'
+      THEN ARRAY(
+        SELECT value
+        FROM pg_catalog.jsonb_array_elements_text(
+          annotated.marker_value -> 'changed_keys'
+        ) AS changed(value)
+      )
+      ELSE NULL::text[]
+    END,
+    annotated.marker_source,
+    annotated.recorded_at,
     (
       SELECT pg_catalog.jsonb_agg(
         pg_catalog.jsonb_build_object(
@@ -1926,10 +1958,10 @@ AS $function$
         ) ORDER BY pg_catalog.convert_to(row.row_key, 'UTF8')
       )
       FROM register.register_row AS row
-      WHERE row.register_version = selected.register_version
+      WHERE row.register_version = annotated.register_version
         AND row.row_key = ANY(register._support_keys())
     )
-  FROM selected
+  FROM annotated
 $function$;
 
 ALTER SEQUENCE register.register_version_id_seq

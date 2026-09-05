@@ -714,6 +714,20 @@ export function createPool(connectionString: string): Pool {
   return pool;
 }
 
+export function createSupportControlPlanePool(connectionString: string): Pool {
+  const pool = new PgPool({
+    connectionString,
+    max: 2,
+    connectionTimeoutMillis: 200,
+    statement_timeout: 500,
+    query_timeout: 750
+  });
+  pool.on("error", (error: Error) => {
+    console.error(`[${DATABASE_POOL_FAILED}] ${typedPoolFailure(error).message}`);
+  });
+  return pool;
+}
+
 export async function migrate(pool: Pool): Promise<void> {
   const directory = new URL("../../../migrations/", import.meta.url);
   const migrations = (await readdir(directory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();

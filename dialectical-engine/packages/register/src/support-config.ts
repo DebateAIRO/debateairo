@@ -1,9 +1,9 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   SUPPORT_CONFIGURATION_KEYS,
   computeRegisterSnapshotSha256,
-  createPostgresRegisterPublicationPort,
   parseCanonicalRegisterJson,
+  parseRegisterVersionText,
   validateSupportConfigurationValue,
   type CanonicalRegisterJson,
   type RegisterPublicationRow,
@@ -68,6 +68,21 @@ type ConfigurationEnvelope = Readonly<{
 }>;
 
 const SUPPORT_KEY_SET = new Set<string>(SUPPORT_CONFIGURATION_KEYS);
+const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const SUPPORT_STATUS_COLUMNS = Object.freeze([
+  "support_register_version", "schema_version", "integrity_valid",
+  "base_register_version", "publication_id",
+  "request_sha256", "snapshot_sha256", "support_snapshot_sha256", "changed_keys",
+  "source_ref", "recorded_at", "configuration_text"
+] as const);
+const SUPPORT_STATUS_SQL = `
+  SELECT support_register_version,schema_version,integrity_valid,
+    base_register_version,publication_id,
+    request_sha256,snapshot_sha256,support_snapshot_sha256,changed_keys,
+    source_ref,recorded_at,configuration::text AS configuration_text
+  FROM register.read_support_configuration_status()
+`;
 
 function disabled(code: Extract<SupportConfigurationState, { kind: "DISABLED" }>["code"]): SupportConfigurationState {
   return Object.freeze({ kind: "DISABLED", code });
@@ -77,6 +92,58 @@ function exactObject(value: unknown, keys: readonly string[]): value is Record<s
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && Object.getPrototypeOf(value) === Object.prototype
     && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+}
+
+type ParsedSupportConfigurationStatus =
+  | (NonNullable<SupportConfigurationStatus> & Readonly<{ integrityValid: boolean }>)
+  | null;
+
+function parseSupportStatusRows(rows: unknown): ParsedSupportConfigurationStatus {
+  if (!Array.isArray(rows)) throw new TypeError("SUPPORT_CONFIG_SNAPSHOT_INVALID");
+  if (rows.length === 0) return null;
+  if (rows.length !== 1 || !exactObject(rows[0], SUPPORT_STATUS_COLUMNS)) {
+    throw new TypeError("SUPPORT_CONFIG_SNAPSHOT_INVALID");
+  }
+  const row = rows[0];
+  const publicationId = row.publication_id;
+  const requestSha256 = row.request_sha256;
+  const snapshotSha256 = row.snapshot_sha256;
+  const supportSnapshotSha256 = row.support_snapshot_sha256;
+  const changedKeys = row.changed_keys;
+  const schemaVersion = row.schema_version;
+  const integrityValid = row.integrity_valid;
+  const sourceRef = row.source_ref;
+  const recordedAt = row.recorded_at;
+  const configurationText = row.configuration_text;
+  if (typeof publicationId !== "string" || !UUID_PATTERN.test(publicationId)
+      || typeof requestSha256 !== "string" || !SHA256_PATTERN.test(requestSha256)
+      || typeof snapshotSha256 !== "string" || !SHA256_PATTERN.test(snapshotSha256)
+      || typeof supportSnapshotSha256 !== "string" || !SHA256_PATTERN.test(supportSnapshotSha256)
+      || !Array.isArray(changedKeys) || changedKeys.length < 1
+      || changedKeys.some((key) => typeof key !== "string" || !SUPPORT_KEY_SET.has(key))
+      || new Set(changedKeys).size !== changedKeys.length
+      || typeof schemaVersion !== "number" || !Number.isSafeInteger(schemaVersion) || schemaVersion < 1
+      || typeof integrityValid !== "boolean"
+      || typeof sourceRef !== "string" || sourceRef.length < 1 || sourceRef.length > 1024
+      || sourceRef.trim() !== sourceRef || /[\u0000-\u001f\u007f]/u.test(sourceRef)
+      || !(recordedAt instanceof Date) || !Number.isFinite(recordedAt.getTime())
+      || typeof configurationText !== "string") {
+    throw new TypeError("SUPPORT_CONFIG_SNAPSHOT_INVALID");
+  }
+  return Object.freeze({
+    supportRegisterVersion: parseRegisterVersionText(row.support_register_version),
+    schemaVersion,
+    integrityValid,
+    baseRegisterVersion: parseRegisterVersionText(row.base_register_version),
+    publicationId,
+    requestSha256,
+    snapshotSha256,
+    supportSnapshotSha256,
+    changedKeys: Object.freeze([...changedKeys]) as readonly SupportConfigurationKey[],
+    sourceRef,
+    recordedAt: new Date(recordedAt.getTime()),
+    configurationText
+  });
 }
 
 function decodeConfiguration(configurationText: string): readonly ConfigurationEnvelope[] {
@@ -158,9 +225,10 @@ function configurationValues(rows: readonly ConfigurationEnvelope[]): Readonly<S
   });
 }
 
-function validateStatus(status: SupportConfigurationStatus): SupportConfigurationState {
+function validateStatus(status: ParsedSupportConfigurationStatus): SupportConfigurationState {
   if (status === null) return disabled("SUPPORT_CONFIG_UNINITIALIZED");
   if (status.schemaVersion !== 1) return disabled("SUPPORT_CONFIG_SCHEMA_UNSUPPORTED");
+  if (!status.integrityValid) return disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID");
   try {
     const rows = decodeConfiguration(status.configurationText);
     const hashRows: RegisterPublicationRow[] = rows.map((row) => ({
@@ -194,19 +262,38 @@ export function createSupportConfigurationPort(
   pool: Pool,
   options: SupportConfigurationPortOptions = {}
 ): SupportConfigurationPort {
-  const register = createPostgresRegisterPublicationPort(pool);
   const now = options.monotonicNow ?? (() => performance.now());
   let cache: Readonly<{ installedAt: number; state: SupportConfigurationState }> | undefined;
-  let greatestAvailableGeneration: bigint | undefined;
+  let greatestObservedGeneration: bigint | undefined;
+  let lastObservedAt: number | undefined;
+  let clockFailed = false;
   let activeAttempt: Readonly<{
     result: Promise<SupportConfigurationState>;
-    completion: Promise<void>;
+    cancel(): void;
   }> | undefined;
+  const pendingCompletions = new Set<Promise<void>>();
   let closed = false;
   let closing: Promise<void> | undefined;
 
-  const startRefresh = (): Promise<SupportConfigurationState> => {
-    const startedAt = now();
+  const observeClock = (): number | undefined => {
+    if (clockFailed) return undefined;
+    let observedAt: number;
+    try {
+      observedAt = now();
+    } catch {
+      clockFailed = true;
+      return undefined;
+    }
+    if (!Number.isFinite(observedAt)
+        || (lastObservedAt !== undefined && observedAt < lastObservedAt)) {
+      clockFailed = true;
+      return undefined;
+    }
+    lastObservedAt = observedAt;
+    return observedAt;
+  };
+
+  const startRefresh = (startedAt: number): Promise<SupportConfigurationState> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let resultSettled = false;
     let resolveResult!: (state: SupportConfigurationState) => void;
@@ -217,78 +304,132 @@ export function createSupportConfigurationPort(
     const settle = (state: SupportConfigurationState, installedAt: number): void => {
       if (resultSettled) return;
       resultSettled = true;
+      if (timer !== undefined) clearTimeout(timer);
       cache = Object.freeze({ installedAt, state });
       resolveResult(state);
     };
-    const settleCompletedAcquisition = (
-      state: SupportConfigurationState,
-      installedAt: number
-    ): void => {
-      if (resultSettled) return;
-      if (activeAttempt?.result === result) activeAttempt = undefined;
-      settle(state, installedAt);
+    const deadlineReached = (observedAt: number | undefined): boolean =>
+      observedAt === undefined || observedAt - startedAt >= SUPPORT_CONFIG_REFRESH_DEADLINE_MS;
+    const settleDeadline = (observedAt: number | undefined): void => {
+      settle(disabled("SUPPORT_CONFIG_REFRESH_DEADLINE"), observedAt ?? lastObservedAt ?? startedAt);
     };
-    const settleDeadline = (observedAt: number): void => {
-      settle(disabled("SUPPORT_CONFIG_REFRESH_DEADLINE"), observedAt);
-    };
-    const settleCompletedAcquisitionDeadline = (observedAt: number): void => {
-      settleCompletedAcquisition(disabled("SUPPORT_CONFIG_REFRESH_DEADLINE"), observedAt);
-    };
-    const deadlineReached = (observedAt: number): boolean => (
-      observedAt < startedAt || observedAt - startedAt >= SUPPORT_CONFIG_REFRESH_DEADLINE_MS
-    );
 
     timer = setTimeout(() => {
-      settleDeadline(now());
+      settleDeadline(observeClock());
     }, SUPPORT_CONFIG_REFRESH_DEADLINE_MS);
 
-    const acquisition = register.readSupportStatus();
-    const completion = acquisition.then((status) => {
-      if (resultSettled) return;
-      const afterTransfer = now();
-      if (deadlineReached(afterTransfer)) {
-        settleCompletedAcquisitionDeadline(afterTransfer);
-        return;
-      }
-      const state = validateStatus(status);
-      const afterValidation = now();
-      if (deadlineReached(afterValidation)) {
-        settleCompletedAcquisitionDeadline(afterValidation);
-        return;
-      }
-      if (closed) {
-        settleCompletedAcquisition(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"), afterValidation);
-        return;
-      }
-      if (state.kind === "AVAILABLE") {
-        const generation = BigInt(state.snapshot.supportRegisterVersion);
-        if (greatestAvailableGeneration !== undefined && generation < greatestAvailableGeneration) {
-          settleCompletedAcquisition(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"), afterValidation);
+    let acquisition: Promise<PoolClient>;
+    try {
+      acquisition = pool.connect();
+    } catch (error) {
+      acquisition = Promise.reject(error);
+    }
+    let attempt!: Readonly<{
+      result: Promise<SupportConfigurationState>;
+      cancel(): void;
+    }>;
+    const completion = (async (): Promise<void> => {
+      let client: PoolClient | undefined;
+      let released = false;
+      const release = (destroy: boolean): void => {
+        if (client === undefined || released) return;
+        released = true;
+        if (destroy) client.release(true);
+        else client.release();
+      };
+      try {
+        client = await acquisition;
+        if (closed || resultSettled) {
+          release(true);
           return;
         }
-        const beforeInstall = now();
+        const queryResult = await client.query<Record<string, unknown>>(SUPPORT_STATUS_SQL);
+        if (closed || resultSettled) {
+          release(true);
+          return;
+        }
+        const afterTransfer = observeClock();
+        if (deadlineReached(afterTransfer)) {
+          release(false);
+          settleDeadline(afterTransfer);
+          return;
+        }
+        const status = parseSupportStatusRows(queryResult.rows);
+        const state = validateStatus(status);
+        const afterValidation = observeClock();
+        if (deadlineReached(afterValidation)) {
+          release(false);
+          settleDeadline(afterValidation);
+          return;
+        }
+        if (status !== null) {
+          const generation = BigInt(status.supportRegisterVersion);
+          if (greatestObservedGeneration !== undefined && generation < greatestObservedGeneration) {
+            release(false);
+            settle(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"), afterValidation!);
+            return;
+          }
+          if (greatestObservedGeneration === undefined || generation > greatestObservedGeneration) {
+            greatestObservedGeneration = generation;
+          }
+        }
+        const beforeInstall = observeClock();
+        if (closed) {
+          release(true);
+          settle(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"), beforeInstall ?? lastObservedAt ?? startedAt);
+          return;
+        }
         if (deadlineReached(beforeInstall)) {
-          settleCompletedAcquisitionDeadline(beforeInstall);
+          release(false);
+          settleDeadline(beforeInstall);
           return;
         }
-        if (greatestAvailableGeneration === undefined || generation > greatestAvailableGeneration) {
-          greatestAvailableGeneration = generation;
+        release(false);
+        const afterRelease = observeClock();
+        if (closed) {
+          settle(
+            disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"),
+            afterRelease ?? lastObservedAt ?? startedAt
+          );
+          return;
         }
-        settleCompletedAcquisition(state, beforeInstall);
-        return;
+        if (deadlineReached(afterRelease)) {
+          settleDeadline(afterRelease);
+          return;
+        }
+        settle(state, afterRelease!);
+      } catch {
+        try {
+          release(true);
+        } catch {
+          // A failed release is still one release attempt; the reader must fail closed.
+        }
+        if (!resultSettled) {
+          const observedAt = observeClock();
+          if (deadlineReached(observedAt)) settleDeadline(observedAt);
+          else settle(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"), observedAt!);
+        }
+      } finally {
+        if (!released) {
+          try {
+            release(true);
+          } catch {
+            // The client is already unusable and the public state is fail closed.
+          }
+        }
+        if (activeAttempt === attempt) activeAttempt = undefined;
       }
-      settleCompletedAcquisition(state, afterValidation);
-    }, () => {
-      if (resultSettled) return;
-      const observedAt = now();
-      if (deadlineReached(observedAt)) settleCompletedAcquisitionDeadline(observedAt);
-      else settleCompletedAcquisition(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"), observedAt);
-    }).finally(() => {
-      if (timer !== undefined) clearTimeout(timer);
-      if (activeAttempt?.completion === completion) activeAttempt = undefined;
+    })();
+    pendingCompletions.add(completion);
+    attempt = Object.freeze({
+      result,
+      cancel: () => settle(
+        disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"),
+        observeClock() ?? lastObservedAt ?? startedAt
+      )
     });
-
-    activeAttempt = Object.freeze({ result, completion });
+    activeAttempt = attempt;
+    void completion.then(() => pendingCompletions.delete(completion));
     return result;
   };
 
@@ -296,21 +437,27 @@ export function createSupportConfigurationPort(
     current() {
       if (closed) return Promise.resolve(disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID"));
       if (activeAttempt !== undefined) return activeAttempt.result;
-      const observedAt = now();
-      if (cache !== undefined && observedAt >= cache.installedAt
-          && observedAt - cache.installedAt < SUPPORT_CONFIG_CACHE_MAX_AGE_MS) {
+      const observedAt = observeClock();
+      if (observedAt === undefined) {
+        return Promise.resolve(disabled("SUPPORT_CONFIG_REFRESH_DEADLINE"));
+      }
+      if (cache !== undefined && observedAt - cache.installedAt < SUPPORT_CONFIG_CACHE_MAX_AGE_MS) {
         return Promise.resolve(cache.state);
       }
-      return startRefresh();
+      return startRefresh(observedAt);
     },
     close() {
       if (closing !== undefined) return closing;
       closed = true;
-      cache = Object.freeze({ installedAt: now(), state: disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID") });
-      const liveCompletion = activeAttempt?.completion ?? Promise.resolve();
+      activeAttempt?.cancel();
+      cache = Object.freeze({
+        installedAt: lastObservedAt ?? 0,
+        state: disabled("SUPPORT_CONFIG_SNAPSHOT_INVALID")
+      });
+      const liveCompletions = Promise.all([...pendingCompletions]);
       const poolEnd = Promise.resolve().then(() => pool.end());
       closing = Promise.all([
-        liveCompletion,
+        liveCompletions,
         poolEnd.then(
           () => Object.freeze({ ok: true as const }),
           (error: unknown) => Object.freeze({ ok: false as const, error })

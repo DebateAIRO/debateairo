@@ -103,6 +103,68 @@ async function repositoryCensus(): Promise<Readonly<{
 }
 
 describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
+  it("keeps the support reader on one bounded isolated control-plane statement and preserves ordinary pools", async () => {
+    const [databaseSource, supportSource, migration] = await Promise.all([
+      readFile("packages/db/src/index.ts", "utf8"),
+      readFile("packages/register/src/support-config.ts", "utf8"),
+      migrationSource()
+    ]);
+    const ordinaryStart = databaseSource.indexOf("export function createPool(");
+    const ordinaryEnd = databaseSource.indexOf("\n}\n", ordinaryStart) + 3;
+    const ordinaryPoolBody = databaseSource.slice(ordinaryStart, ordinaryEnd);
+
+    expect(databaseSource).toContain("export function createSupportControlPlanePool(");
+    for (const option of [
+      "max: 2", "connectionTimeoutMillis: 200",
+      "statement_timeout: 500", "query_timeout: 750"
+    ]) expect(databaseSource).toContain(option);
+    expect(ordinaryPoolBody).not.toMatch(/SUPPORT|statement_timeout|query_timeout/iu);
+    expect(supportSource).not.toContain("createPostgresRegisterPublicationPort");
+    expect(supportSource).toContain("FROM register.read_support_configuration_status()");
+    expect(supportSource.match(/client[.]query/gu)).toHaveLength(1);
+
+    const selectorStart = migration.indexOf("FUNCTION register._current_support_register_version");
+    const selectorEnd = migration.indexOf("$function$;", selectorStart);
+    const selector = migration.slice(selectorStart, selectorEnd);
+    const statusStart = migration.indexOf("FUNCTION register.read_support_configuration_status");
+    const statusEnd = migration.indexOf("$function$;", statusStart);
+    const status = migration.slice(statusStart, statusEnd);
+    for (const invariant of [
+      "WHERE version.sealed",
+      "version.publication_kind = 'SUPPORT_CONFIGURATION'",
+      "ORDER BY version.register_version DESC",
+      "LIMIT 1"
+    ]) expect(selector).toContain(invariant);
+    expect(selector).not.toContain("snapshot_sha256");
+    expect(selector).not.toContain("schema_version");
+    for (const invariant of [
+      "JOIN register.register_version AS version USING (register_version)",
+      "annotated.snapshot_sha256::text",
+      "register._snapshot_sha256(annotated.register_version)",
+      "annotated.marker_value ->> 'target_register_version'",
+      "annotated.marker_schema_version",
+      "register._support_snapshot_sha256(annotated.register_version)",
+      ") = 16",
+      "integrity_valid boolean"
+    ]) expect(status).toContain(invariant);
+    expect(supportSource).toContain("schema_version,integrity_valid");
+    expect(supportSource).not.toContain("1::integer AS schema_version");
+  });
+
+  it("keeps every future API support module behind the injected port boundary", async () => {
+    const result = await execFileAsync("git", [
+      "ls-files", "--cached", "--others", "--exclude-standard", "--", "apps/api/src/support"
+    ]);
+    const files = result.stdout.split("\n").filter((file) => /[.][cm]?[jt]s$/u.test(file));
+    const violations = (await Promise.all(files.map(async (file) => ({
+      file,
+      source: await readFile(file, "utf8")
+    })))).filter(({ source }) =>
+      /(?:from\s+["']pg["']|@debateai\/db|createPool|PoolClient|RegisterPublicationPort|createPostgresRegisterPublicationPort|publishSupport)/u.test(source)
+    ).map(({ file }) => file);
+    expect(violations).toEqual([]);
+  });
+
   it("pins the exact pre-migration legacy v1 and deterministic test-panel v4 snapshots", () => {
     expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
       .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");

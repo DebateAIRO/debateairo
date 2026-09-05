@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { PoolClient } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
+import { createSupportConfigurationPort } from "../../packages/register/src/support-config.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -722,6 +723,62 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     expect(snapshotHash(allRows.rows)).toBe(second.snapshot_sha256);
     expect(allRows.rows.filter((row) => row.row_key === "supportActivation")).toHaveLength(1);
     expect(allRows.rows.find((row) => row.row_key === "riskTier")?.source_ref).toBe("fixture:base");
+  });
+
+  it("fails closed on a corrupt newest support generation instead of falling back to an older enabled one", async () => {
+    await importHistorical("4");
+    const enabled = await publishSupport({
+      publicationId: randomUUID(), base: "4", expected: null,
+      patch: [{ key: "support_enabled", value_json_text: "true" }],
+      sourceRef: "fixture:selector-enabled"
+    });
+    const newest = await publishSupport({
+      publicationId: randomUUID(), base: enabled.register_version as string,
+      expected: enabled.register_version as string,
+      patch: [{ key: "support_queue_depth", value_json_text: "11" }],
+      sourceRef: "fixture:selector-newest"
+    });
+    await inTransaction(async (client) => {
+      await client.query("SET LOCAL session_replication_role=replica");
+      await client.query(`
+        UPDATE register.register_row
+        SET value_json='false'::jsonb
+        WHERE register_version=$1::bigint AND row_key='support_enabled'
+      `, [newest.register_version]);
+    });
+
+    const port = createSupportConfigurationPort(database.pool);
+    await expect(port.current()).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_SNAPSHOT_INVALID"
+    });
+  });
+
+  it("reports an unknown newest activation schema instead of falling back to schema 1", async () => {
+    await importHistorical("4");
+    const enabled = await publishSupport({
+      publicationId: randomUUID(), base: "4", expected: null,
+      patch: [{ key: "support_enabled", value_json_text: "true" }],
+      sourceRef: "fixture:schema-enabled"
+    });
+    const newest = await publishSupport({
+      publicationId: randomUUID(), base: enabled.register_version as string,
+      expected: enabled.register_version as string,
+      patch: [{ key: "support_queue_depth", value_json_text: "11" }],
+      sourceRef: "fixture:schema-newest"
+    });
+    await inTransaction(async (client) => {
+      await client.query("SET LOCAL session_replication_role=replica");
+      await client.query(`
+        UPDATE register.register_row
+        SET value_json=jsonb_set(value_json,'{schema_version}','2'::jsonb)
+        WHERE register_version=$1::bigint AND row_key='supportActivation'
+      `, [newest.register_version]);
+    });
+
+    const port = createSupportConfigurationPort(database.pool);
+    await expect(port.current()).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_SCHEMA_UNSUPPORTED"
+    });
   });
 
   it("separates request and snapshot digest domains and rejects stronger isolation", async () => {

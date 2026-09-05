@@ -1,4 +1,4 @@
-import type { Pool, QueryResult } from "pg";
+import type { Pool, PoolClient, QueryResult } from "pg";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SUPPORT_CONFIGURATION_KEYS,
@@ -57,6 +57,7 @@ async function statusRow(
   return {
     support_register_version: "9007199254740993",
     schema_version: 1,
+    integrity_valid: true,
     base_register_version: "4",
     publication_id: "00000000-0000-4000-8000-000000000001",
     request_sha256: "a".repeat(64),
@@ -73,8 +74,10 @@ function poolWith(query: () => Promise<{ rows: unknown[] }>) {
   let queryCount = 0;
   let endCount = 0;
   let releaseCount = 0;
+  const queries: string[] = [];
   const runQuery = async (sql: string) => {
     queryCount += 1;
+    queries.push(sql);
     expect(sql).toContain("register.read_support_configuration_status()");
     expect(sql).toContain("configuration::text AS configuration_text");
     return query() as Promise<QueryResult>;
@@ -92,7 +95,54 @@ function poolWith(query: () => Promise<{ rows: unknown[] }>) {
     pool,
     queryCount: () => queryCount,
     endCount: () => endCount,
-    releaseCount: () => releaseCount
+    releaseCount: () => releaseCount,
+    queries: () => [...queries]
+  };
+}
+
+function poolWithControlledAcquire(
+  acquire: () => Promise<PoolClient>,
+  onEnd: () => Promise<void> = async () => undefined
+) {
+  let acquireCount = 0;
+  let endCount = 0;
+  const pool = {
+    connect: async () => {
+      acquireCount += 1;
+      return acquire();
+    },
+    end: async () => {
+      endCount += 1;
+      await onEnd();
+    }
+  } as unknown as Pool;
+  return {
+    pool,
+    acquireCount: () => acquireCount,
+    endCount: () => endCount
+  };
+}
+
+function controlledClient(
+  query: () => Promise<{ rows: unknown[] }>,
+  onRelease: () => void = () => undefined
+) {
+  let queryCount = 0;
+  const releaseArguments: unknown[][] = [];
+  const client = {
+    query: async () => {
+      queryCount += 1;
+      return query() as Promise<QueryResult>;
+    },
+    release: (...args: unknown[]) => {
+      releaseArguments.push(args);
+      onRelease();
+    }
+  } as unknown as PoolClient;
+  return {
+    client,
+    queryCount: () => queryCount,
+    releaseArguments: () => releaseArguments
   };
 }
 
@@ -160,6 +210,16 @@ describe("closed schema-1 support catalogue", () => {
 });
 
 describe("bounded fail-closed support configuration reader", () => {
+  it("reads the activation marker schema instead of fabricating schema 1", async () => {
+    const fixture = poolWith(async () => ({ rows: [] }));
+
+    await createSupportConfigurationPort(fixture.pool).current();
+
+    expect(fixture.queries()).toHaveLength(1);
+    expect(fixture.queries()[0]).toContain("schema_version");
+    expect(fixture.queries()[0]).not.toContain("1::integer AS schema_version");
+  });
+
   it("validates a complete text-cast snapshot and preserves the bigint version", async () => {
     const fixture = poolWith(async () => ({ rows: [await statusRow()] }));
     const state = await createSupportConfigurationPort(fixture.pool).current();
@@ -194,7 +254,7 @@ describe("bounded fail-closed support configuration reader", () => {
   it("returns malformed cardinality, unsupported-schema, and invalid snapshots as named disabled states", async () => {
     const empty = poolWith(async () => ({ rows: [] }));
     await expect(createSupportConfigurationPort(empty.pool).current()).resolves.toEqual({
-      kind: "DISABLED", code: "SUPPORT_CONFIG_SNAPSHOT_INVALID"
+      kind: "DISABLED", code: "SUPPORT_CONFIG_UNINITIALIZED"
     });
     const future = poolWith(async () => ({ rows: [{ ...(await statusRow()), schema_version: 2 }] }));
     await expect(createSupportConfigurationPort(future.pool).current()).resolves.toEqual({
@@ -327,14 +387,129 @@ describe("bounded fail-closed support configuration reader", () => {
     });
   });
 
-  it("rework B3 retains a timed-out underlying flight through re-entry and clears it only after late settlement", async () => {
+  it.each([
+    [999, "AVAILABLE"],
+    [1000, "SUPPORT_CONFIG_REFRESH_DEADLINE"]
+  ] as const)("includes synchronous validation at the exact %ims outer boundary", async (elapsed, expected) => {
+    let now = 0;
+    const row = await statusRow();
+    const delayedRow = new Proxy(row, {
+      get(target, property, receiver) {
+        const value = Reflect.get(target, property, receiver);
+        if (property === "configuration_text") now = elapsed;
+        return value;
+      }
+    });
+    const fixture = poolWith(async () => ({ rows: [delayedRow] }));
+    const state = await createSupportConfigurationPort(fixture.pool, { monotonicNow: () => now }).current();
+
+    expect(state.kind === "AVAILABLE" ? state.kind : state.code).toBe(expected);
+  });
+
+  it("fails closed without a refresh when the injected monotonic clock moves backward", async () => {
+    let now = 100;
+    const fixture = poolWith(async () => ({ rows: [await statusRow()] }));
+    const port = createSupportConfigurationPort(fixture.pool, { monotonicNow: () => now });
+    await expect(port.current()).resolves.toMatchObject({ kind: "AVAILABLE" });
+
+    now = 99;
+    await expect(port.current()).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
+    });
+    now = 100;
+    await expect(port.current()).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
+    });
+    expect(fixture.queryCount()).toBe(1);
+  });
+
+  it("keeps one physical acquisition flight after its public deadline until the late client is destroyed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    let resolveFirstAcquire!: (client: PoolClient) => void;
+    const first = controlledClient(async () => ({
+      rows: [{ ...(await statusRow()), support_register_version: "10" }]
+    }));
+    const second = controlledClient(async () => ({
+      rows: [{
+        ...(await statusRow({ support_enabled: "false" })),
+        support_register_version: "11"
+      }]
+    }));
+    let acquisition = 0;
+    const fixture = poolWithControlledAcquire(async () => {
+      acquisition += 1;
+      if (acquisition === 1) {
+        return new Promise<PoolClient>((resolve) => { resolveFirstAcquire = resolve; });
+      }
+      return second.client;
+    });
+    const port = createSupportConfigurationPort(fixture.pool, { monotonicNow: () => Date.now() });
+
+    const timedOut = port.current();
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(timedOut).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
+    });
+    vi.advanceTimersByTime(999);
+    await expect(port.current()).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
+    });
+    vi.advanceTimersByTime(1);
+    const stillSame = port.current();
+    expect(stillSame).toBe(timedOut);
+    await expect(stillSame).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
+    });
+    expect(fixture.acquireCount()).toBe(1);
+
+    resolveFirstAcquire(first.client);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(first.queryCount()).toBe(0);
+    expect(first.releaseArguments()).toEqual([[true]]);
+    expect(second.releaseArguments()).toEqual([]);
+    await expect(port.current()).resolves.toMatchObject({
+      kind: "AVAILABLE",
+      snapshot: { supportRegisterVersion: "11", values: { supportEnabled: false } }
+    });
+    expect(fixture.acquireCount()).toBe(2);
+    expect(second.releaseArguments()).toEqual([[]]);
+  });
+
+  it("closes an acquisition waiter idempotently and destroys the client if it arrives late", async () => {
+    let resolveAcquire!: (client: PoolClient) => void;
+    const late = controlledClient(async () => ({ rows: [await statusRow()] }));
+    const fixture = poolWithControlledAcquire(() => new Promise<PoolClient>((resolve) => {
+      resolveAcquire = resolve;
+    }));
+    const port = createSupportConfigurationPort(fixture.pool);
+    const current = port.current();
+    const firstClose = port.close();
+    const secondClose = port.close();
+
+    expect(firstClose).toBe(secondClose);
+    resolveAcquire(late.client);
+    await expect(current).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_SNAPSHOT_INVALID"
+    });
+    await firstClose;
+    await secondClose;
+    expect(late.queryCount()).toBe(0);
+    expect(late.releaseArguments()).toEqual([[true]]);
+    expect(fixture.endCount()).toBe(1);
+  });
+
+  it("keeps one physical query flight after its public deadline and starts exactly one query after settlement", async () => {
     vi.useFakeTimers();
     let invocation = 0;
     let settleFirst!: (value: { rows: unknown[] }) => void;
     const fixture = poolWith(async () => {
       invocation += 1;
       if (invocation === 1) return new Promise((resolve) => { settleFirst = resolve; });
-      return { rows: [{ ...(await statusRow()), support_register_version: "11" }] };
+      return { rows: [{
+        ...(await statusRow({ support_enabled: "false" })),
+        support_register_version: "11"
+      }] };
     });
     const port = createSupportConfigurationPort(fixture.pool, { monotonicNow: () => Date.now() });
 
@@ -345,17 +520,81 @@ describe("bounded fail-closed support configuration reader", () => {
     await vi.advanceTimersByTimeAsync(1000);
     await expect(first).resolves.toEqual({ kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE" });
     vi.advanceTimersByTime(1000);
-    await expect(port.current()).resolves.toEqual({
+    const stillSame = port.current();
+    expect(stillSame).toBe(first);
+    await expect(stillSame).resolves.toEqual({
       kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
     });
     expect(fixture.queryCount()).toBe(1);
 
     settleFirst({ rows: [{ ...(await statusRow()), support_register_version: "10" }] });
     await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fixture.releaseCount()).toBe(1);
     await expect(port.current()).resolves.toMatchObject({
-      kind: "AVAILABLE", snapshot: { supportRegisterVersion: "11" }
+      kind: "AVAILABLE",
+      snapshot: { supportRegisterVersion: "11", values: { supportEnabled: false } }
     });
     expect(fixture.queryCount()).toBe(2);
+  });
+
+  it("closes a publicly timed-out physical query once and waits for its destroyed release", async () => {
+    vi.useFakeTimers();
+    let settleQuery!: (value: { rows: unknown[] }) => void;
+    const client = controlledClient(() => new Promise((resolve) => { settleQuery = resolve; }));
+    const fixture = poolWithControlledAcquire(async () => client.client);
+    const port = createSupportConfigurationPort(fixture.pool, { monotonicNow: () => Date.now() });
+    const current = port.current();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(current).resolves.toEqual({
+      kind: "DISABLED", code: "SUPPORT_CONFIG_REFRESH_DEADLINE"
+    });
+    const firstClose = port.close();
+    const secondClose = port.close();
+    let closeSettled = false;
+    void firstClose.then(() => { closeSettled = true; });
+    await Promise.resolve();
+    expect(closeSettled).toBe(false);
+    expect(fixture.acquireCount()).toBe(1);
+    expect(client.queryCount()).toBe(1);
+
+    settleQuery({ rows: [await statusRow()] });
+    await vi.advanceTimersByTimeAsync(0);
+    await firstClose;
+    await secondClose;
+    expect(client.releaseArguments()).toEqual([[true]]);
+    expect(fixture.endCount()).toBe(1);
+  });
+
+  it.each([
+    [998, 999, "AVAILABLE"],
+    [999, 1000, "SUPPORT_CONFIG_REFRESH_DEADLINE"]
+  ] as const)("rechecks the exact outer deadline after release moves %ims to %ims", async (
+    beforeRelease, afterRelease, expected
+  ) => {
+    let now = 0;
+    const row = await statusRow();
+    const delayedRow = new Proxy(row, {
+      get(target, property, receiver) {
+        const value = Reflect.get(target, property, receiver);
+        if (property === "configuration_text") now = beforeRelease;
+        return value;
+      }
+    });
+    const client = controlledClient(async () => ({ rows: [delayedRow] }), () => {
+      now = afterRelease;
+    });
+    const fixture = poolWithControlledAcquire(async () => client.client);
+    const state = await createSupportConfigurationPort(fixture.pool, {
+      monotonicNow: () => now
+    }).current();
+
+    expect(state.kind === "AVAILABLE" ? state.kind : state.code).toBe(expected);
+    expect(client.releaseArguments()).toEqual([[]]);
   });
 
   it("rework B3 coordinates close with the live attempt and ends the pool exactly once", async () => {
@@ -363,13 +602,15 @@ describe("bounded fail-closed support configuration reader", () => {
     const fixture = poolWith(() => new Promise((resolve) => { settle = resolve; }));
     const port = createSupportConfigurationPort(fixture.pool);
     const current = port.current();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fixture.queryCount()).toBe(1);
     const firstClose = port.close();
     const secondClose = port.close();
     let closeSettled = false;
     void firstClose.then(() => { closeSettled = true; });
 
     expect(firstClose).toBe(secondClose);
-    await Promise.resolve();
     await Promise.resolve();
     expect(closeSettled).toBe(false);
     expect(fixture.endCount()).toBe(1);
