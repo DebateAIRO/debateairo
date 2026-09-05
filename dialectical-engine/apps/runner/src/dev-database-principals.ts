@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { chmod, lstat, mkdir, open, readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { chmod, lstat, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
 
@@ -54,6 +55,11 @@ export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
     roleName: "debateai_dev_evaluator_api",
     capabilityRole: "debateai_evaluator_api",
     environmentKey: "EVALUATOR_DEV_MENU_DATABASE_URL"
+  }),
+  Object.freeze({
+    roleName: "debateai_dev_support_config_operator",
+    capabilityRole: "debateai_support_config_operator",
+    environmentKey: "SUPPORT_CONFIG_OPERATOR_DATABASE_URL"
   })
 ] satisfies readonly DevelopmentDatabasePrincipal[]);
 
@@ -69,9 +75,9 @@ export type DevelopmentDatabasePrincipalReceipt = Readonly<{
 }>;
 
 const ROLE_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
-const PRE_EVALUATOR_DATABASE_ENVIRONMENT_KEYS = Object.freeze(
+const LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEYS = Object.freeze(
   DEVELOPMENT_DATABASE_PRINCIPALS
-    .filter(({ environmentKey }) => environmentKey !== "EVALUATOR_DEV_MENU_DATABASE_URL")
+    .filter(({ environmentKey }) => environmentKey !== "SUPPORT_CONFIG_OPERATOR_DATABASE_URL")
     .map(({ environmentKey }) => environmentKey)
 );
 
@@ -109,33 +115,37 @@ function readCredentials(
   requireComplete = true
 ): ReadonlyMap<string, URL> {
   const expectedLocation = databaseLocation(new URL(adminDatabaseUrl));
-  const rows = source.endsWith("\n") ? source.slice(0, -1).split("\n") : source.split("\n");
-  const expected = new Map<string, DevelopmentDatabasePrincipal>(
-    DEVELOPMENT_DATABASE_PRINCIPALS.map((principal) => [
-    principal.environmentKey,
-    principal
-    ])
-  );
-  if (rows.length < 1 || rows.length > expected.size) {
+  if (!source.endsWith("\n") || source.includes("\r") || source.includes("\0")) {
+    throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+  }
+  const rows = source.slice(0, -1).split("\n");
+  if (rows.length < 1 || rows.length > DEVELOPMENT_DATABASE_PRINCIPALS.length) {
     throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
   }
   const parsed = new Map<string, URL>();
-  for (const row of rows) {
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index]!;
     const separator = row.indexOf("=");
     if (separator < 1) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     const environmentKey = row.slice(0, separator);
-    const principal = expected.get(environmentKey);
-    if (principal === undefined || parsed.has(environmentKey)) {
+    const principal = DEVELOPMENT_DATABASE_PRINCIPALS[index];
+    if (principal === undefined || environmentKey !== principal.environmentKey
+      || parsed.has(environmentKey)) {
       throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     }
-    const value = new URL(row.slice(separator + 1));
+    let value: URL;
+    try {
+      value = new URL(row.slice(separator + 1));
+    } catch {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
     if (value.username !== principal.roleName || value.password.length < 32
       || databaseLocation(value) !== expectedLocation) {
       throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     }
     parsed.set(environmentKey, value);
   }
-  if (requireComplete && parsed.size !== expected.size) {
+  if (requireComplete && parsed.size !== DEVELOPMENT_DATABASE_PRINCIPALS.length) {
     throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
   }
   return parsed;
@@ -183,26 +193,36 @@ async function ensureCredentialFile(
     ({ environmentKey }) => !existing.has(environmentKey)
   );
   if (missing.length > 0) {
-    const isExactPreEvaluatorFile = existing.size === PRE_EVALUATOR_DATABASE_ENVIRONMENT_KEYS.length
-      && PRE_EVALUATOR_DATABASE_ENVIRONMENT_KEYS.every((environmentKey) =>
+    const isExactLegacyFile = existing.size === LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEYS.length
+      && LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEYS.every((environmentKey) =>
         existing.has(environmentKey)
       )
       && missing.length === 1
-      && missing[0]?.environmentKey === "EVALUATOR_DEV_MENU_DATABASE_URL";
-    if (!isExactPreEvaluatorFile) {
+      && missing[0]?.environmentKey === "SUPPORT_CONFIG_OPERATOR_DATABASE_URL";
+    if (!isExactLegacyFile) {
       throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     }
-    if (!existingSource.endsWith("\n")) {
-      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
-    }
-    const handle = await open(resolvedPath, "a", 0o600);
+    const replacementPath = `${resolvedPath}.${randomBytes(16).toString("hex")}.tmp`;
+    const handle = await open(
+      replacementPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0),
+      0o600
+    );
     try {
-      const status = await handle.stat();
-      if (!status.isFile()) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
-      await handle.writeFile(credentialSource(adminDatabaseUrl, missing), { encoding: "utf8" });
-      await handle.sync();
+      try {
+        await handle.writeFile(
+          existingSource + credentialSource(adminDatabaseUrl, missing),
+          { encoding: "utf8" }
+        );
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await rename(replacementPath, resolvedPath);
     } finally {
-      await handle.close();
+      await unlink(replacementPath).catch((error: unknown) => {
+        if (!isMissingFileError(error)) throw error;
+      });
     }
   }
   return readCredentials(await readFile(resolvedPath, "utf8"), adminDatabaseUrl);
@@ -356,6 +376,18 @@ async function assertExistingPrincipalState(client: PoolClient): Promise<void> {
   }
 }
 
+async function assertNoPrincipalMembers(client: PoolClient): Promise<void> {
+  const roleNames = DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName);
+  const hasMembers = (await client.query<{ has_members: boolean }>(`
+    SELECT EXISTS(
+      SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+      JOIN pg_catalog.pg_roles AS target ON target.oid=membership.roleid
+      WHERE target.rolname=ANY($1::text[])
+    ) AS has_members
+  `,[roleNames])).rows[0]?.has_members;
+  if (hasMembers !== false) throw new TypeError("DEV_DATABASE_PRINCIPAL_MEMBERS_INVALID");
+}
+
 async function assertNoOwnership(client: PoolClient): Promise<void> {
   const roleNames = DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName);
   const ownership = (await client.query<{ owned: boolean }>(`
@@ -393,6 +425,7 @@ export async function provisionDevelopmentDatabasePrincipals(
         "SELECT pg_advisory_xact_lock(hashtextextended('debateai:dev-database-principals',0))"
       );
       await assertCapabilityRoles(client);
+      await assertNoPrincipalMembers(client);
       await assertExistingPrincipalState(client);
       await assertNoOwnership(client);
       const credentials = await ensureCredentialFile(
@@ -402,6 +435,8 @@ export async function provisionDevelopmentDatabasePrincipals(
       for (const principal of DEVELOPMENT_DATABASE_PRINCIPALS) {
         await provisionPrincipal(client, principal, credentials.get(principal.environmentKey)!);
       }
+      await assertNoPrincipalMembers(client);
+      await assertExistingPrincipalState(client);
       await assertNoOwnership(client);
       await client.query("COMMIT");
     } catch (error) {

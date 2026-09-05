@@ -165,6 +165,29 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps support operator credentials on the bounded dedicated file loader", async () => {
+    const [loader, apiEnvironment] = await Promise.all([
+      readFile("apps/runner/src/support-config-cli-credentials.ts", "utf8"),
+      readFile("apps/runner/src/dev-api-environment.ts", "utf8")
+    ]);
+    expect(loader).toContain("O_NOFOLLOW");
+    expect(loader).toContain("metadata.uid !== currentUid()");
+    expect(loader).toContain("metadata.nlink !== 1");
+    expect(loader).toContain("PRIVATE_FILE_MODE");
+    expect(loader).toContain("PRIVATE_DIRECTORY_MODE");
+    expect(loader).toContain("MAX_DEVELOPMENT_CREDENTIAL_FILE_BYTES");
+    expect(loader).toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(loader).toContain("debateai_dev_support_config_operator");
+    expect(loader).not.toMatch(/process[.]env|MIGRATION_DATABASE_URL/u);
+
+    const keyList = apiEnvironment.slice(
+      apiEnvironment.indexOf("DEVELOPMENT_API_ENVIRONMENT_KEYS"),
+      apiEnvironment.indexOf("] as const", apiEnvironment.indexOf("DEVELOPMENT_API_ENVIRONMENT_KEYS"))
+    );
+    expect(keyList).not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(apiEnvironment).not.toContain('databases.get("SUPPORT_CONFIG_OPERATOR_DATABASE_URL")');
+  });
+
   it("pins the exact pre-migration legacy v1 and deterministic test-panel v4 snapshots", () => {
     expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
       .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");

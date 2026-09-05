@@ -69,7 +69,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     await rm(secretRoot, { recursive: true, force: true });
   });
 
-  it("creates nine distinct SCRAM LOGINs with only their ruled direct memberships", async () => {
+  it("creates ten distinct SCRAM LOGINs with only their ruled direct memberships", async () => {
     await provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
@@ -101,12 +101,12 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       WHERE rolname=ANY($1::text[])
       ORDER BY rolname
     `,[DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName)]);
-    expect(roles.rows).toHaveLength(9);
+    expect(roles.rows).toHaveLength(10);
     expect(roles.rows.every((role) => role.rolcanlogin && role.rolinherit
       && !role.rolsuper && !role.rolcreatedb && !role.rolcreaterole
       && !role.rolreplication && !role.rolbypassrls
       && role.rolpassword?.startsWith("SCRAM-SHA-256$") === true)).toBe(true);
-    expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).size).toBe(9);
+    expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).size).toBe(10);
 
     const memberships = await database.pool.query<{
       member_name: string;
@@ -364,7 +364,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 9 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 10 });
     const repaired = (await database.pool.query<{
       rolinherit: boolean;
       rolcreatedb: boolean;
@@ -417,7 +417,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     expect(outcome).toEqual({
       exitCode: 0,
-      stdout: `DEV_DATABASE_PRINCIPALS_READY=9:${cliCredentialPath}\n`,
+      stdout: `DEV_DATABASE_PRINCIPALS_READY=10:${cliCredentialPath}\n`,
       stderr: ""
     });
     const credentialSource = await readFile(cliCredentialPath, "utf8");
@@ -437,7 +437,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       })
     ));
     expect(outcomes.every((outcome) => outcome.status === "fulfilled")).toBe(true);
-    expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size).toBe(9);
+    expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size).toBe(10);
   }, 120_000);
 
   it("adds a newly ruled principal without rotating existing development credentials", async () => {
@@ -448,10 +448,10 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     const currentSource = await readFile(credentialFilePath, "utf8");
     const legacySource = currentSource.split("\n")
-      .filter((row) => row.length > 0 && !row.startsWith("EVALUATOR_DEV_MENU_DATABASE_URL="))
+      .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_CONFIG_OPERATOR_DATABASE_URL="))
       .join("\n") + "\n";
     const legacyCredentials = parseCredentialFile(legacySource);
-    expect(legacyCredentials.size).toBe(8);
+    expect(legacyCredentials.size).toBe(9);
     const upgradedPath = join(secretRoot, "legacy-database-principals.env");
     await writeFile(upgradedPath, legacySource, { encoding: "utf8", mode: 0o600 });
 
@@ -459,15 +459,15 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath: upgradedPath
-    })).resolves.toEqual({ credentialFilePath: upgradedPath, principalCount: 9 });
+    })).resolves.toEqual({ credentialFilePath: upgradedPath, principalCount: 10 });
 
     const upgraded = parseCredentialFile(await readFile(upgradedPath, "utf8"));
-    expect(upgraded.size).toBe(9);
+    expect(upgraded.size).toBe(10);
     for (const [environmentKey, databaseUrl] of legacyCredentials) {
       expect(upgraded.get(environmentKey)).toBe(databaseUrl);
     }
-    expect(upgraded.get("EVALUATOR_DEV_MENU_DATABASE_URL")).toMatch(
-      /^postgresql?:\/\/debateai_dev_evaluator_api:/
+    expect(upgraded.get("SUPPORT_CONFIG_OPERATOR_DATABASE_URL")).toMatch(
+      /^postgresql?:\/\/debateai_dev_support_config_operator:/
     );
 
     const truncatedPath = join(secretRoot, "truncated-database-principals.env");

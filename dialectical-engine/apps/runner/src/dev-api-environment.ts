@@ -195,7 +195,9 @@ function readDatabaseCredentials(source: string): Map<string, string> {
     identities.add(url.username);
     passwords.add(url.password);
   }
-  return parsed;
+  const apiCredentials = new Map(parsed);
+  apiCredentials.delete("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+  return apiCredentials;
 }
 
 function tenantIdFromToken(token: string): string {

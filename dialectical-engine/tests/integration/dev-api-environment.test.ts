@@ -106,6 +106,10 @@ afterEach(async () => {
 describe("DEV-09 private local API environment", () => {
   it("atomically assembles the exact environment without returning credential values", async () => {
     const test = await fixture();
+    const masterCredentials = parseEnvironment(
+      await readFile(test.databaseCredentialFilePath, "utf8")
+    );
+    const supportOperatorUrl = masterCredentials.get("SUPPORT_CONFIG_OPERATOR_DATABASE_URL")!;
     const receipt = await assemble(test.repositoryRoot);
     expect(receipt).toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     expect(JSON.stringify(receipt)).not.toMatch(/password|token|postgresql|11111111/i);
@@ -117,6 +121,12 @@ describe("DEV-09 private local API environment", () => {
     expect(metadata.mode & 0o777).toBe(0o600);
     const environment = parseEnvironment(await readFile(test.outputFilePath, "utf8"));
     expect([...environment.keys()]).toEqual(DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    expect(DEVELOPMENT_API_ENVIRONMENT_KEYS).not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(JSON.stringify(receipt)).not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(JSON.stringify(receipt)).not.toContain(supportOperatorUrl);
+    expect(await readFile(test.outputFilePath, "utf8"))
+      .not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(await readFile(test.outputFilePath, "utf8")).not.toContain(supportOperatorUrl);
     expect(environment.get("DATABASE_URL")).toContain("debateai_dev_runtime");
     expect(environment.get("CONTENT_PROVISION_DATABASE_URL"))
       .toContain("debateai_dev_content_provision");

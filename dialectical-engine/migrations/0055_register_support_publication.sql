@@ -2012,6 +2012,8 @@ GRANT SELECT,INSERT ON TABLE register.register_row,register.register_version
   TO debateai_register_publication_owner;
 GRANT USAGE,SELECT,UPDATE ON SEQUENCE register.register_version_id_seq
   TO debateai_register_publication_owner;
+GRANT EXECUTE ON FUNCTION register.claim_type_composition_map_is_valid(jsonb)
+  TO debateai_register_publication_owner;
 
 REVOKE INSERT ON TABLE register.register_row,register.register_version FROM PUBLIC;
 REVOKE INSERT ON TABLE register.register_row,register.register_version FROM debateai_runtime;
@@ -2026,6 +2028,7 @@ REVOKE ALL ON FUNCTION register._lp(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION register._canonical_decimal(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION register._canonical_json_value(text,integer,integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION register.canonical_json_text(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION register.claim_type_composition_map_is_valid(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION register._snapshot_sha256(bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION register._assert_register_base_integrity(bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION register._support_keys() FROM PUBLIC;
