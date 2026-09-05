@@ -19,12 +19,67 @@ import {
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   registerVersionToSafeLegacyNumber,
+  SUPPORT_CONFIGURATION_KEYS,
   type CanonicalJsonAst,
   type CanonicalRegisterJson,
   type RegisterPublicationRow
 } from "../../packages/register/src/register-publication.js";
 
 const text = (value: string): CanonicalRegisterJson => parseCanonicalRegisterJson(Buffer.from(value));
+
+const INITIAL_SUPPORT_VALUE_TEXT = Object.freeze<Record<string, string>>({
+  support_enabled: "false",
+  support_model_ref: '"development:claude-cli"',
+  support_relay_concurrency: "2",
+  support_daily_call_cap: "500",
+  support_limit_anon_msgs_10m: "20",
+  support_limit_anon_msgs_24h: "100",
+  support_limit_anon_sessions_1h: "5",
+  support_limit_session_msgs: "40",
+  support_limit_msg_chars: "2000",
+  support_limit_account_msgs_10m: "60",
+  support_limit_account_msgs_24h: "300",
+  support_queue_depth: "10",
+  support_lock_after_injections: "3",
+  support_ip_cooldown_minutes: "60",
+  support_retention_policy: '"keep"',
+  support_retention_ratified_by: "null"
+});
+
+function completeSupportInitializationPatch() {
+  return SUPPORT_CONFIGURATION_KEYS.map((key) => ({
+    key,
+    valueJsonText: text(INITIAL_SUPPORT_VALUE_TEXT[key]!)
+  }));
+}
+
+function independentlyComputeInitialSupportRequestSha256(input: Readonly<{
+  publicationId: string;
+  baseRegisterVersion: string;
+  patch: ReturnType<typeof completeSupportInitializationPatch>;
+  sourceRef: string;
+}>): string {
+  const hash = createHash("sha256");
+  for (const value of [
+    input.publicationId,
+    "SUPPORT_CONFIGURATION",
+    input.baseRegisterVersion,
+    "",
+    "1",
+    JSON.stringify(input.patch.map((row) => ({
+      key: row.key,
+      value_json_text: row.valueJsonText
+    }))),
+    input.sourceRef
+  ]) {
+    const bytes = Buffer.from(value, "utf8");
+    const length = Buffer.alloc(8);
+    length.writeBigUInt64BE(BigInt(bytes.byteLength));
+    hash.update(length);
+    hash.update(bytes);
+  }
+  return hash.digest("hex");
+}
 
 function digest(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -345,6 +400,7 @@ function malformedResultRows(
 
 function fakePool(responses: readonly DbResponse[]) {
   const events: Array<Readonly<{ sql: string; values?: readonly unknown[] }>> = [];
+  const counts = { connects: 0 };
   let responseIndex = 0;
   const query = async (sql: string, values?: readonly unknown[]) => {
     events.push(values === undefined ? { sql } : { sql, values });
@@ -358,8 +414,14 @@ function fakePool(responses: readonly DbResponse[]) {
     query,
     release: () => events.push({ sql: "RELEASE" })
   } as unknown as PoolClient;
-  const pool = { connect: async () => client, query } as unknown as Pool;
-  return { pool, events };
+  const pool = {
+    connect: async () => {
+      counts.connects += 1;
+      return client;
+    },
+    query
+  } as unknown as Pool;
+  return { pool, events, counts };
 }
 
 describe("closed PostgreSQL publication port", () => {
@@ -420,9 +482,9 @@ describe("closed PostgreSQL publication port", () => {
     ]);
   });
 
-  it("publishes SUPPORT with the same id/digest input, exact closed patch, and verified separate hashes", async () => {
+  it("publishes a later one-key SUPPORT patch with verified separate hashes", async () => {
     const input = {
-      publicationId: id, baseRegisterVersion: base, expectedSupportRegisterVersion: null,
+      publicationId: id, baseRegisterVersion: base, expectedSupportRegisterVersion: base,
       schemaVersion: 1 as const,
       patch: [{ key: "support_enabled" as const, valueJsonText: text("false") }],
       sourceRef: "src:support"
@@ -432,12 +494,12 @@ describe("closed PostgreSQL publication port", () => {
       register_version: "5", base_register_version: "4", publication_id: id,
       publication_kind: "SUPPORT_CONFIGURATION", request_sha256: requestSha256,
       snapshot_sha256: "a".repeat(64), row_count: 18,
-      recorded_at: new Date("2026-09-04T00:00:00.000Z"), previous_support_register_version: null,
+      recorded_at: new Date("2026-09-04T00:00:00.000Z"), previous_support_register_version: "4",
       support_snapshot_sha256: "b".repeat(64), changed_keys: ["support_enabled"]
     }]);
     const receipt = await createPostgresRegisterPublicationPort(fixture.pool).publishSupport(input);
     expect(receipt).toMatchObject({
-      registerVersion: "5", previousSupportRegisterVersion: null,
+      registerVersion: "5", previousSupportRegisterVersion: "4",
       requestSha256, supportSnapshotSha256: "b".repeat(64), changedKeys: ["support_enabled"]
     });
     expect(receipt.requestSha256).not.toBe(receipt.snapshotSha256);
@@ -445,6 +507,80 @@ describe("closed PostgreSQL publication port", () => {
     expect(fixture.events.map((event) => event.sql)).toEqual([
       "BEGIN ISOLATION LEVEL READ COMMITTED", expect.stringContaining("register.publish_support_configuration"), "COMMIT", "RELEASE"
     ]);
+  });
+
+  it("publishes the exact complete schema-1 initializer through the public port", async () => {
+    const input = {
+      publicationId: id,
+      baseRegisterVersion: base,
+      expectedSupportRegisterVersion: null,
+      schemaVersion: 1 as const,
+      patch: completeSupportInitializationPatch(),
+      sourceRef: "deployment:production-initial-off"
+    };
+    const requestSha256 = independentlyComputeInitialSupportRequestSha256(input);
+    const fixture = fakePool([{
+      register_version: "5", base_register_version: "4", publication_id: id,
+      publication_kind: "SUPPORT_CONFIGURATION", request_sha256: requestSha256,
+      snapshot_sha256: "a".repeat(64), row_count: 49,
+      recorded_at: new Date("2026-09-04T00:00:00.000Z"), previous_support_register_version: null,
+      support_snapshot_sha256: "b".repeat(64), changed_keys: [...SUPPORT_CONFIGURATION_KEYS].sort()
+    }]);
+
+    const outcome = await createPostgresRegisterPublicationPort(fixture.pool).publishSupport(input)
+      .then((receipt) => ({ kind: "COMMITTED", changedKeys: receipt.changedKeys.length }))
+      .catch((error: unknown) => ({
+        kind: error instanceof Error ? error.message : String(error),
+        changedKeys: 0
+      }));
+
+    expect({ outcome, connects: fixture.counts.connects }).toEqual({
+      outcome: { kind: "COMMITTED", changedKeys: 16 },
+      connects: 1
+    });
+    expect(fixture.events.map((event) => event.sql)).toEqual([
+      "BEGIN ISOLATION LEVEL READ COMMITTED",
+      expect.stringContaining("register.publish_support_configuration"),
+      "COMMIT",
+      "RELEASE"
+    ]);
+  });
+
+  it("rejects incomplete, unknown, duplicate, later-combined, and malformed initial patches before checkout", async () => {
+    const complete = completeSupportInitializationPatch();
+    const cases = [
+      {
+        label: "15-key initializer",
+        input: { patch: complete.filter(({ key }) => key !== "support_enabled") }
+      },
+      { label: "17th unknown key", input: { patch: [...complete, { key: "support_unknown", valueJsonText: text("false") }] } },
+      { label: "duplicate key", input: { patch: [...complete, complete[0]!] } },
+      {
+        label: "later combined retention",
+        input: { expectedSupportRegisterVersion: base, patch: complete }
+      },
+      { label: "malformed initial value", input: {
+        patch: complete.map((row) => row.key === "support_relay_concurrency"
+          ? { ...row, valueJsonText: text("0") }
+          : row)
+      } }
+    ];
+
+    for (const { label, input: change } of cases) {
+      const fixture = fakePool([]);
+      await expect(createPostgresRegisterPublicationPort(fixture.pool).publishSupport({
+        publicationId: id,
+        baseRegisterVersion: base,
+        expectedSupportRegisterVersion: "expectedSupportRegisterVersion" in change
+          ? change.expectedSupportRegisterVersion
+          : null,
+        schemaVersion: 1,
+        patch: change.patch,
+        sourceRef: "deployment:invalid-initializer",
+      } as never), label).rejects.toThrow(/SUPPORT_CONFIG_PATCH_INVALID/u);
+      expect(fixture.counts.connects, label).toBe(0);
+      expect(fixture.events, label).toEqual([]);
+    }
   });
 
   it.each([
@@ -525,7 +661,7 @@ describe("closed PostgreSQL publication port", () => {
     const input = {
       publicationId: id, baseRegisterVersion: base, expectedSupportRegisterVersion: null,
       schemaVersion: 1 as const,
-      patch: [{ key: "support_enabled" as const, valueJsonText: text("false") }],
+      patch: completeSupportInitializationPatch(),
       sourceRef: "src:support"
     };
     const valid = {
@@ -533,7 +669,7 @@ describe("closed PostgreSQL publication port", () => {
       publication_kind: "SUPPORT_CONFIGURATION", request_sha256: computeSupportPublicationRequestSha256(input),
       snapshot_sha256: "a".repeat(64), row_count: 18,
       recorded_at: new Date("2026-09-04T00:00:00.000Z"), previous_support_register_version: null,
-      support_snapshot_sha256: "b".repeat(64), changed_keys: ["support_enabled"]
+      support_snapshot_sha256: "b".repeat(64), changed_keys: [...SUPPORT_CONFIGURATION_KEYS].sort()
     };
     const fixture = fakePool([malformedResultRows(kind, valid, {
       missing: "support_snapshot_sha256", wrongType: "row_count", conflict: "register_version"
@@ -615,5 +751,58 @@ describe("closed PostgreSQL publication port", () => {
       ]
     })).rejects.toThrow(/SUPPORT_CONFIG_PATCH_INVALID/u);
     expect(combined.events).toEqual([]);
+  });
+
+  it("allows a later null reset and the following policy change as two public-port commits", async () => {
+    const reset = {
+      publicationId: id,
+      baseRegisterVersion: base,
+      expectedSupportRegisterVersion: base,
+      schemaVersion: 1 as const,
+      patch: [{
+        key: "support_retention_ratified_by" as const,
+        valueJsonText: text("null")
+      }],
+      sourceRef: "src:retention-reset"
+    };
+    const policyVersion = parseRegisterVersionText("5");
+    const policy = {
+      publicationId: "00000000-0000-4000-8000-000000000002",
+      baseRegisterVersion: policyVersion,
+      expectedSupportRegisterVersion: policyVersion,
+      schemaVersion: 1 as const,
+      patch: [{
+        key: "support_retention_policy" as const,
+        valueJsonText: text(`"shred-after-days:30"`)
+      }],
+      sourceRef: "src:retention-policy"
+    };
+    const fixture = fakePool([{
+      register_version: "5", base_register_version: "4", publication_id: reset.publicationId,
+      publication_kind: "SUPPORT_CONFIGURATION",
+      request_sha256: computeSupportPublicationRequestSha256(reset),
+      snapshot_sha256: "a".repeat(64), row_count: 49,
+      recorded_at: new Date("2026-09-04T00:00:00.000Z"), previous_support_register_version: "4",
+      support_snapshot_sha256: "b".repeat(64), changed_keys: ["support_retention_ratified_by"]
+    }, {
+      register_version: "6", base_register_version: "5", publication_id: policy.publicationId,
+      publication_kind: "SUPPORT_CONFIGURATION",
+      request_sha256: computeSupportPublicationRequestSha256(policy),
+      snapshot_sha256: "c".repeat(64), row_count: 49,
+      recorded_at: new Date("2026-09-04T00:00:01.000Z"), previous_support_register_version: "5",
+      support_snapshot_sha256: "d".repeat(64), changed_keys: ["support_retention_policy"]
+    }]);
+    const port = createPostgresRegisterPublicationPort(fixture.pool);
+
+    await expect(port.publishSupport(reset)).resolves.toMatchObject({
+      registerVersion: "5",
+      changedKeys: ["support_retention_ratified_by"]
+    });
+    await expect(port.publishSupport(policy)).resolves.toMatchObject({
+      registerVersion: "6",
+      changedKeys: ["support_retention_policy"]
+    });
+    expect(fixture.counts.connects).toBe(2);
+    expect(fixture.events.filter(({ sql }) => sql === "COMMIT")).toHaveLength(2);
   });
 });

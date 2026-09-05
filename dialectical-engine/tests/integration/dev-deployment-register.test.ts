@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, link, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -9,7 +9,9 @@ import { readDeploymentMakerCapability } from "../../packages/critique/src/index
 import { createPool, migrate, type Pool } from "../../packages/db/src/index.js";
 import {
   assertBootstrapEquality,
+  createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
+  parseCanonicalRegisterJson,
   persistBootstrapRegister,
   readAuthPolicy,
   readDeploymentRiskTier,
@@ -20,6 +22,7 @@ import {
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
+  SUPPORT_CONFIGURATION_KEYS,
   registerVersionToSafeLegacyNumber
 } from "../../packages/register/src/index.js";
 import {
@@ -34,6 +37,8 @@ import {
   serializeDevelopmentDeploymentRegisterReceipt,
   writeDevelopmentDeploymentRegisterReceipt
 } from "../../apps/runner/src/dev-deployment-register.js";
+import { provisionDevelopmentDatabasePrincipals } from
+  "../../apps/runner/src/dev-database-principals.js";
 import { parseRegisterVersionText } from "../../packages/register/src/register-publication.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -46,6 +51,38 @@ import {
 let database: TestDatabase;
 let repositoryRoot: string;
 const temporaryRoots: string[] = [];
+
+const DEVELOPMENT_SUPPORT_VALUE_TEXT = Object.freeze<Record<string, string>>({
+  support_enabled: "true",
+  support_model_ref: '"development:claude-cli"',
+  support_relay_concurrency: "2",
+  support_daily_call_cap: "500",
+  support_limit_anon_msgs_10m: "20",
+  support_limit_anon_msgs_24h: "100",
+  support_limit_anon_sessions_1h: "5",
+  support_limit_session_msgs: "40",
+  support_limit_msg_chars: "2000",
+  support_limit_account_msgs_10m: "60",
+  support_limit_account_msgs_24h: "300",
+  support_queue_depth: "10",
+  support_lock_after_injections: "3",
+  support_ip_cooldown_minutes: "60",
+  support_retention_policy: '"keep"',
+  support_retention_ratified_by: "null"
+});
+
+function developmentOperatorUrl(credentialSource: string): string {
+  const rows = new Map(credentialSource.trim().split("\n").map((line) => {
+    const separator = line.indexOf("=");
+    if (separator < 1) throw new TypeError("TEST_CREDENTIAL_LINE_INVALID");
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
+  const credential = new URL(rows.get("SUPPORT_CONFIG_OPERATOR_DATABASE_URL")!);
+  const fixtureUrl = new URL(database.connectionString);
+  fixtureUrl.username = credential.username;
+  fixtureUrl.password = credential.password;
+  return fixtureUrl.toString();
+}
 
 async function runCli(environment: NodeJS.ProcessEnv): Promise<Readonly<{
   exitCode: number | null;
@@ -93,6 +130,88 @@ afterEach(async () => {
 });
 
 describe("DEV-05 complete development deployment register", () => {
+  it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
+    const deployed = await seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
+    });
+    const publicationId = randomUUID();
+    const sourceRef = "deployment:development-initial-on";
+    const patch = SUPPORT_CONFIGURATION_KEYS.map((key) => ({
+      key,
+      valueJsonText: parseCanonicalRegisterJson(
+        Buffer.from(DEVELOPMENT_SUPPORT_VALUE_TEXT[key]!)
+      )
+    }));
+    const credentialFilePath = join(
+      repositoryRoot, ".local", "dev-auth", "database-principals.env"
+    );
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const operatorPool = createPool(developmentOperatorUrl(
+      await readFile(credentialFilePath, "utf8")
+    ));
+    try {
+      const port = createPostgresRegisterPublicationPort(operatorPool);
+      const receipt = await port.publishSupport({
+        publicationId,
+        baseRegisterVersion: deployed.registerVersion,
+        expectedSupportRegisterVersion: null,
+        schemaVersion: 1,
+        patch,
+        sourceRef
+      });
+      const commitAcknowledgedAt = new Date();
+
+      expect(deployed.registerVersion).toBe("4");
+      expect(receipt.baseRegisterVersion).toBe(deployed.registerVersion);
+      expect(receipt.previousSupportRegisterVersion).toBeNull();
+      expect(receipt.publicationId).toBe(publicationId);
+      expect(receipt.changedKeys).toEqual([...SUPPORT_CONFIGURATION_KEYS].sort());
+      expect(typeof receipt.registerVersion).toBe("string");
+      expect(receipt.recordedAt.getTime()).toBeLessThanOrEqual(commitAcknowledgedAt.getTime());
+      const status = await port.readSupportStatus();
+      expect(status).toMatchObject({
+        supportRegisterVersion: receipt.registerVersion,
+        baseRegisterVersion: deployed.registerVersion,
+        schemaVersion: 1,
+        publicationId,
+        changedKeys: [...SUPPORT_CONFIGURATION_KEYS].sort(),
+        sourceRef
+      });
+      const configuration = JSON.parse(status!.configurationText) as readonly Readonly<{
+        row_key: string;
+        value_json_text: string;
+      }>[];
+      expect(configuration).toHaveLength(16);
+      expect(configuration.map((row) => row.row_key).sort())
+        .toEqual([...SUPPORT_CONFIGURATION_KEYS].sort());
+      expect(configuration.find((row) => row.row_key === "support_enabled"))
+        .toMatchObject({ value_json_text: "true" });
+
+      await expect(operatorPool.query(`
+        INSERT INTO register.register_row(register_version,row_key,value_json,source_ref)
+        VALUES(4,'operator-direct-dml','true'::jsonb,'deployment:forbidden')
+      `)).rejects.toMatchObject({ code: "42501" });
+      await expect(port.publishGeneral({
+        publicationId: randomUUID(),
+        baseRegisterVersion: deployed.registerVersion,
+        rows: [{
+          rowKey: "operatorGeneralWrite",
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
+          sourceRef: "deployment:forbidden-general"
+        }],
+        sourceRef: "deployment:forbidden-general"
+      })).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await operatorPool.end();
+    }
+  }, 120_000);
+
   it.each([
     { label: "zero bytes", size: 0 },
     { label: "4097 bytes", size: 4_097 }

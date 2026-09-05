@@ -1,10 +1,27 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { migrate } from "../../packages/db/src/index.js";
+import { createPool, migrate } from "../../packages/db/src/index.js";
+import {
+  buildBootstrapRegisterPublicationRows,
+  computeRegisterSnapshotSha256,
+  createPostgresRegisterPublicationPort,
+  loadBootstrapRegister,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
+  type RegisterPublicationRow,
+  type SupportConfigurationKey
+} from "../../packages/register/src/index.js";
 import { createSupportConfigurationPort } from "../../packages/register/src/support-config.js";
+import { buildDevelopmentDeploymentRegisterPublicationRows } from
+  "../../apps/runner/src/dev-deployment-register.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import {
+  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
+  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
+} from "../support/registerFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -45,6 +62,83 @@ const baseRows = (sourceRef = "fixture:base"): RegisterRowInput[] => [
   })),
   { row_key: "riskTier", value_json_text: '"standard"', source_ref: sourceRef }
 ];
+
+const completeSupportPatch = (enabled: boolean): SupportPatch[] =>
+  Object.entries(SUPPORT_VALUES).map(([key, value]) => ({
+    key,
+    value_json_text: key === "support_enabled" ? String(enabled) : value
+  }));
+
+async function applyMigrationsBeforeSupportPublication(pool: Pool): Promise<void> {
+  const names = (await readdir("migrations"))
+    .filter((name) => /^\d+.*[.]sql$/u.test(name) && name < "0055_register_support_publication.sql")
+    .sort();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai:schema-migrations', 0))");
+    await client.query(`
+      CREATE TABLE public.debateai_schema_migration (
+        name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
+        applied_at timestamptz NOT NULL
+      )
+    `);
+    for (const name of names) {
+      await client.query(await readFile(`migrations/${name}`, "utf8"));
+      await client.query(
+        "INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())",
+        [name]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function insertPre0055History(
+  pool: Pool,
+  version: "1" | "4",
+  rows: readonly RegisterPublicationRow[]
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "INSERT INTO register.register_version(register_version,row_count,sealed) VALUES($1,$2,true)",
+      [version, rows.length]
+    );
+    for (const row of rows) {
+      await client.query(
+        "INSERT INTO register.register_row(register_version,row_key,value_json,source_ref) VALUES($1,$2,$3::jsonb,$4)",
+        [version, row.rowKey, row.valueJsonText, row.sourceRef]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function readHistoricalBytes(pool: Pool): Promise<readonly Record<string, unknown>[]> {
+  const result = await pool.query(`
+    SELECT version.register_version::text AS register_version,
+      version.row_count,version.sealed,row.row_key,
+      encode(convert_to(row.value_json::text,'UTF8'),'hex') AS value_json_hex,
+      encode(convert_to(row.source_ref,'UTF8'),'hex') AS source_ref_hex
+    FROM register.register_version AS version
+    JOIN register.register_row AS row USING(register_version)
+    WHERE version.register_version IN (1,4)
+    ORDER BY version.register_version,row.row_key
+  `);
+  return result.rows as readonly Record<string, unknown>[];
+}
 
 function lp(value: string): Buffer {
   const bytes = Buffer.from(value, "utf8");
@@ -212,6 +306,196 @@ afterEach(async () => {
 });
 
 describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
+  it("upgrades exact historical v1/v4 bytes, initializes production off, ignores generic versions, and rolls back forward", async () => {
+    await database.stop();
+    database = await startTestDatabase();
+    await applyMigrationsBeforeSupportPublication(database.pool);
+
+    const bootstrap = await loadBootstrapRegister();
+    const v1Rows = buildBootstrapRegisterPublicationRows(bootstrap);
+    const v4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap,
+      TEST_DEVELOPMENT_PROVIDER_PANEL
+    );
+    expect(computeRegisterSnapshotSha256(v1Rows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
+    expect(computeRegisterSnapshotSha256(v4Rows))
+      .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
+    await insertPre0055History(database.pool, "1", v1Rows);
+    await insertPre0055History(database.pool, "4", v4Rows);
+    const historicalBefore = await readHistoricalBytes(database.pool);
+
+    await migrate(database.pool);
+
+    expect(await readHistoricalBytes(database.pool)).toEqual(historicalBefore);
+    expect((await database.pool.query(`
+      SELECT register_version::text,
+        register._snapshot_sha256(register_version) AS snapshot_sha256
+      FROM register.register_version WHERE register_version IN (1,4)
+      ORDER BY register_version
+    `)).rows).toEqual([
+      { register_version: "1", snapshot_sha256: LEGACY_REGISTER_V1_SNAPSHOT_SHA256 },
+      { register_version: "4", snapshot_sha256: DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 }
+    ]);
+    expect((await database.pool.query(`
+      SELECT register_version::text,base_register_version,publication_id,
+        request_sha256,snapshot_sha256,publication_kind,recorded_at
+      FROM register.register_version WHERE register_version IN (1,4)
+      ORDER BY register_version
+    `)).rows).toEqual([
+      { register_version: "1", base_register_version: null, publication_id: null,
+        request_sha256: null, snapshot_sha256: null, publication_kind: null, recorded_at: null },
+      { register_version: "4", base_register_version: null, publication_id: null,
+        request_sha256: null, snapshot_sha256: null, publication_kind: null, recorded_at: null }
+    ]);
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM register.register_version WHERE publication_kind='SUPPORT_CONFIGURATION'"
+    )).rows).toEqual([{ count: 0 }]);
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM register.register_row WHERE row_key='supportActivation'"
+    )).rows).toEqual([{ count: 0 }]);
+    expect((await database.pool.query(
+      "SELECT * FROM register.read_support_configuration_status()"
+    )).rows).toEqual([]);
+
+    const deployedRegisterVersion = "4";
+    await database.pool.query(
+      "SELECT pg_catalog.setval('register.register_version_id_seq'::regclass,9007199254740993,false)"
+    );
+    const operatorRole = "debateai_test_rollout_support_operator";
+    const operatorPassword = "rollout-test-only-abcdefghijklmnopqrstuvwxyz-123456";
+    await database.pool.query(`
+      CREATE ROLE ${operatorRole} LOGIN INHERIT
+        NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+        PASSWORD '${operatorPassword}'
+    `);
+    await database.pool.query(`GRANT debateai_support_config_operator TO ${operatorRole}`);
+    const operatorUrl = new URL(database.connectionString);
+    operatorUrl.username = operatorRole;
+    operatorUrl.password = operatorPassword;
+    const operatorPool = createPool(operatorUrl.toString());
+    const operatorPort = createPostgresRegisterPublicationPort(operatorPool);
+    const adminPort = createPostgresRegisterPublicationPort(database.pool);
+    try {
+      const incomplete = completeSupportPatch(false)
+        .filter(({ key }) => key !== "support_enabled");
+      await expect(operatorPort.publishSupport({
+        publicationId: randomUUID(),
+        baseRegisterVersion: parseRegisterVersionText(deployedRegisterVersion),
+        expectedSupportRegisterVersion: null,
+        schemaVersion: 1,
+        patch: incomplete.map(({ key, value_json_text }) => ({
+          key: key as SupportConfigurationKey,
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from(value_json_text))
+        })),
+        sourceRef: "deployment:production-initial-off-incomplete"
+      } as never)).rejects.toThrow(/SUPPORT_CONFIG_PATCH_INVALID/u);
+      expect((await database.pool.query(
+        "SELECT * FROM register.read_support_configuration_status()"
+      )).rows).toEqual([]);
+
+      const initialInput = {
+        publicationId: randomUUID(),
+        baseRegisterVersion: parseRegisterVersionText(deployedRegisterVersion),
+        expectedSupportRegisterVersion: null,
+        schemaVersion: 1 as const,
+        patch: completeSupportPatch(false).map(({ key, value_json_text }) => ({
+          key: key as SupportConfigurationKey,
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from(value_json_text))
+        })),
+        sourceRef: "deployment:production-initial-off"
+      };
+      const initial = await operatorPort.publishSupport(initialInput);
+      expect(initial).toMatchObject({
+        registerVersion: "9007199254740993",
+        baseRegisterVersion: deployedRegisterVersion,
+        publicationId: initialInput.publicationId,
+        previousSupportRegisterVersion: null,
+        changedKeys: Object.keys(SUPPORT_VALUES).sort()
+      });
+      expect(typeof initial.registerVersion).toBe("string");
+      const initialStatus = await operatorPort.readSupportStatus();
+      expect(initialStatus).toMatchObject({
+        supportRegisterVersion: "9007199254740993",
+        baseRegisterVersion: deployedRegisterVersion,
+        schemaVersion: 1
+      });
+      const initialConfiguration = JSON.parse(initialStatus!.configurationText) as readonly Readonly<{
+        row_key: string;
+        value_json_text: string;
+      }>[];
+      expect(initialConfiguration).toHaveLength(16);
+      expect(initialConfiguration.find((row) => row.row_key === "support_enabled"))
+        .toMatchObject({ value_json_text: "false" });
+
+      const generic = await adminPort.publishGeneral({
+        publicationId: randomUUID(),
+        baseRegisterVersion: parseRegisterVersionText(deployedRegisterVersion),
+        rows: [{
+          rowKey: "unrelatedDeploymentFlag",
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
+          sourceRef: "deployment:general-later"
+        }],
+        sourceRef: "deployment:general-later"
+      });
+      expect(generic.registerVersion).toBe("9007199254740994");
+      expect(deployedRegisterVersion).toBe("4");
+      const afterGeneric = await operatorPort.readSupportStatus();
+      expect(afterGeneric!.supportRegisterVersion).toBe(initial.registerVersion);
+      expect(afterGeneric!.baseRegisterVersion).toBe(deployedRegisterVersion);
+
+      const enabled = await operatorPort.publishSupport({
+        publicationId: randomUUID(),
+        baseRegisterVersion: initial.registerVersion,
+        expectedSupportRegisterVersion: initial.registerVersion,
+        schemaVersion: 1,
+        patch: [{
+          key: "support_enabled",
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from("true"))
+        }],
+        sourceRef: "deployment:production-enable"
+      });
+    const preservedBeforeRollback = (await database.pool.query(`
+      SELECT register_version::text,row_key,
+        encode(convert_to(value_json::text,'UTF8'),'hex') AS value_json_hex,
+        encode(convert_to(source_ref,'UTF8'),'hex') AS source_ref_hex
+      FROM register.register_row
+      WHERE register_version <= $1::bigint
+      ORDER BY register_version,row_key
+    `, [enabled.registerVersion])).rows;
+      const rollback = await operatorPort.publishSupport({
+        publicationId: randomUUID(),
+        baseRegisterVersion: enabled.registerVersion,
+        expectedSupportRegisterVersion: enabled.registerVersion,
+        schemaVersion: 1,
+        patch: [{
+          key: "support_enabled",
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from("false"))
+        }],
+        sourceRef: "deployment:production-forward-rollback"
+      });
+      expect(BigInt(rollback.registerVersion)).toBeGreaterThan(BigInt(enabled.registerVersion));
+    expect((await database.pool.query(`
+      SELECT register_version::text,row_key,
+        encode(convert_to(value_json::text,'UTF8'),'hex') AS value_json_hex,
+        encode(convert_to(source_ref,'UTF8'),'hex') AS source_ref_hex
+      FROM register.register_row
+      WHERE register_version <= $1::bigint
+      ORDER BY register_version,row_key
+    `, [enabled.registerVersion])).rows).toEqual(preservedBeforeRollback);
+      const rolledBackStatus = await operatorPort.readSupportStatus();
+      expect(rolledBackStatus!.supportRegisterVersion).toBe(rollback.registerVersion);
+      expect((JSON.parse(rolledBackStatus!.configurationText) as readonly Readonly<{
+        row_key: string;
+        value_json_text: string;
+      }>[]).find((row) => row.row_key === "support_enabled"))
+        .toMatchObject({ value_json_text: "false" });
+      expect(deployedRegisterVersion).toBe("4");
+      expect(await readHistoricalBytes(database.pool)).toEqual(historicalBefore);
+    } finally {
+      await operatorPool.end();
+    }
+  }, 120_000);
+
   it("accepts legacy 755 and maximum 1024 source refs across SQL write/read and rejects 1025", async () => {
     const legacy = "l".repeat(755);
     const maximum = "m".repeat(1024);

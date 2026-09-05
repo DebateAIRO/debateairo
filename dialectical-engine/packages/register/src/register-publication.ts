@@ -585,7 +585,11 @@ function validateSupportPublication(input: SupportConfigurationPublication): voi
     parseSupportValue(row.key, row.valueJsonText);
     keys.add(row.key);
   }
-  if (keys.has("support_retention_policy") && keys.has("support_retention_ratified_by")) {
+  const isCompleteInitializer = input.expectedSupportRegisterVersion === null
+    && keys.size === SUPPORT_CONFIGURATION_KEYS.length
+    && SUPPORT_CONFIGURATION_KEYS.every((key) => keys.has(key));
+  if (keys.has("support_retention_policy") && keys.has("support_retention_ratified_by")
+      && !isCompleteInitializer) {
     fail("SUPPORT_CONFIG_PATCH_INVALID");
   }
 }

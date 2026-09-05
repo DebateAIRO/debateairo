@@ -25,6 +25,8 @@ import {
 } from "../support/registerFixtures.js";
 
 const migrationPath = "migrations/0055_register_support_publication.sql";
+const productionRunbookPath =
+  "docs/missions/2026-08-17-accounts-privacy-security/P3-02-production-database-principal-provisioning.md";
 
 async function migrationSource(): Promise<string> {
   return readFile(migrationPath, "utf8").catch(() => "");
@@ -40,8 +42,24 @@ const CLOSED_WRITE_SURFACES = new Set([
   "tests/architecture/register-support-publication.test.ts",
   "tests/integration/register-support-publication.test.ts"
 ]);
+const EXPECTED_DENIED_REGISTER_WRITE =
+  "INSERT INTO register.register_row(register_version,row_key,value_json,source_ref) "
+  + "VALUES(4,'operator-direct-dml','true'::jsonb,'deployment:forbidden')";
+const DENIED_REGISTER_WRITE_CALLERS: ReadonlyMap<string, string> = new Map([
+  ["tests/integration/dev-deployment-register.test.ts", "operatorPool"],
+  ["tests/integration/production-database-principals.test.ts", "heldPool"]
+] as const);
 
 type StaticSql = Readonly<{ file: string; text: string }>;
+
+function normalizedSql(text: string): string {
+  return text.replace(/\s+/gu, " ").trim();
+}
+
+function isExpectedDeniedRegisterWrite(statement: StaticSql): boolean {
+  return DENIED_REGISTER_WRITE_CALLERS.has(statement.file)
+    && normalizedSql(statement.text) === EXPECTED_DENIED_REGISTER_WRITE;
+}
 
 function staticText(node: ts.Expression): string | undefined {
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
@@ -103,6 +121,142 @@ async function repositoryCensus(): Promise<Readonly<{
 }
 
 describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
+  it("pins the reader-first rollout, explicit old-binary version, and forward-only containment recipe", async () => {
+    const [runbook, runtimeEnvironment, apiMain, runnerMain, compatibilityTest,
+      developmentTest, productionTest] = await Promise.all([
+      readFile(productionRunbookPath, "utf8"),
+      readFile("packages/register/src/runtime-environment.ts", "utf8"),
+      readFile("apps/api/src/main.ts", "utf8"),
+      readFile("apps/runner/src/main.ts", "utf8"),
+      readFile("tests/integration/register-support-publication.test.ts", "utf8"),
+      readFile("tests/integration/dev-deployment-register.test.ts", "utf8"),
+      readFile("tests/integration/production-database-principals.test.ts", "utf8")
+    ]);
+    const rolloutStart = runbook.indexOf("## Support configuration rollout and forward-only rollback");
+    expect(rolloutStart).toBeGreaterThanOrEqual(0);
+    const rollout = runbook.slice(rolloutStart);
+    const compactRollout = rollout.replace(/\s+/gu, " ");
+
+    const orderedSteps = [
+      "1. Apply `migrations/0055_register_support_publication.sql`",
+      "2. Validate immutable v1/v4 history and the allocator",
+      "3. Deploy schema-1 support readers",
+      "4. Provision and test the support-configuration operator",
+      "5. Publish the complete 16-key production snapshot disabled",
+      "6. Capture the publication receipt and post-COMMIT acknowledgement"
+    ];
+    let cursor = -1;
+    for (const step of orderedSteps) {
+      const next = compactRollout.indexOf(step);
+      expect(next, `missing rollout step: ${step}`).toBeGreaterThan(cursor);
+      cursor = next;
+    }
+
+    expect(compactRollout).toContain("explicit deployed `REGISTER_VERSION`");
+    expect(compactRollout).toContain("old binary must receive an explicit immutable `REGISTER_VERSION`");
+    expect(compactRollout).toContain("publish OFF first");
+    expect(compactRollout).toContain("NOLOGIN");
+    expect(compactRollout).toContain("terminate established support-operator sessions");
+    expect(compactRollout).toContain("remove the credential file");
+    expect(compactRollout).toContain("Only after containment");
+    expect(compactRollout).toContain("recorded time, not commit time");
+    expect(rollout).not.toMatch(/(?:DELETE\s+FROM|DROP\s+(?:TABLE|FUNCTION|SCHEMA)|reverse\s+migration)/iu);
+
+    const initializer = /<!-- SUPPORT-CONFIG-INITIALIZER-BEGIN -->([\s\S]*?)<!-- SUPPORT-CONFIG-INITIALIZER-END -->/u
+      .exec(rollout)?.[1] ?? "";
+    for (const binding of [
+      "node --import tsx --input-type=module -",
+      "/run/debateai/support-config/operator.json",
+      "018e51cd-6ba7-4f42-8cb6-6b8292f2e031",
+      "deployment:production-initial-off:change-2026-09-06",
+      "withProductionSupportConfigCliConnection",
+      "createPostgresRegisterPublicationPort(boundedOperatorPool).publishSupport",
+      "parseRegisterVersionText(deployedBaseText)",
+      "expectedSupportRegisterVersion: null",
+      "schemaVersion: 1",
+      "patch: SUPPORT_CONFIGURATION_KEYS.map",
+      "support_enabled: \"false\"",
+      "support_retention_policy: '\"keep\"'",
+      "support_retention_ratified_by: \"null\"",
+      "const receipt: SupportPublicationReceipt",
+      "const commitAcknowledgedAt = new Date()",
+      "SUPPORT_CONFIGURATION_INITIALIZED=",
+      "supportSnapshotSha256: receipt.supportSnapshotSha256",
+      "snapshotSha256: receipt.snapshotSha256",
+      "recordedAt: receipt.recordedAt.toISOString()"
+    ]) expect(initializer, `missing executable initializer binding: ${binding}`).toContain(binding);
+    expect(initializer.match(/^  support_[a-z0-9_]+:/gmu)).toHaveLength(16);
+    expect(initializer).not.toMatch(
+      /(?:process[.]env|\bcurrent\b|\blatest\b|MIGRATION_DATABASE_URL|databaseUrl|password|token|publishGeneral|publish_support_configuration|[.]query\s*\()/iu
+    );
+    expect(initializer.indexOf("await withProductionSupportConfigCliConnection"))
+      .toBeLessThan(initializer.indexOf("const commitAcknowledgedAt = new Date()"));
+
+    const compatibilitySchedule = compatibilityTest.slice(
+      compatibilityTest.indexOf('it("upgrades exact historical v1/v4 bytes'),
+      compatibilityTest.indexOf('it("accepts legacy 755')
+    );
+    const developmentSchedule = developmentTest.slice(
+      developmentTest.indexOf('it("initializes the complete 16-key development'),
+      developmentTest.indexOf("it.each([", developmentTest.indexOf(
+        'it("initializes the complete 16-key development'
+      ))
+    );
+    const productionSchedule = productionTest.slice(
+      productionTest.indexOf('it("publishes emergency off before cleanup'),
+      productionTest.indexOf('it("makes NOLOGIN visible', productionTest.indexOf(
+        'it("publishes emergency off before cleanup'
+      ))
+    );
+    for (const binding of [
+      "CREATE ROLE ${operatorRole} LOGIN INHERIT",
+      "createPostgresRegisterPublicationPort(operatorPool)",
+      "operatorPort.publishSupport",
+      "completeSupportPatch(false)",
+      "operatorPort.readSupportStatus"
+    ]) expect(compatibilitySchedule, `compatibility schedule bypass: ${binding}`).toContain(binding);
+    expect(compatibilitySchedule).not.toMatch(/const initial = await publishSupport[(]/u);
+    for (const binding of [
+      "provisionDevelopmentDatabasePrincipals",
+      "createPool(developmentOperatorUrl(",
+      "createPostgresRegisterPublicationPort(operatorPool)",
+      "port.publishSupport",
+      "SUPPORT_CONFIGURATION_KEYS.map",
+      "operatorPool.query",
+      "port.publishGeneral"
+    ]) expect(developmentSchedule, `development initializer bypass: ${binding}`).toContain(binding);
+    expect(developmentSchedule).not.toMatch(/register[.]publish_support_configuration|database[.]pool[.]connect/u);
+    for (const binding of [
+      "buildDevelopmentDeploymentRegisterPublicationRows",
+      "DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256",
+      "rows: deterministicV4Rows",
+      "createPostgresRegisterPublicationPort(heldPool)",
+      "SUPPORT_CONFIGURATION_KEYS.map",
+      "operatorRegister.publishSupport",
+      "heldPool.query",
+      "operatorRegister.publishGeneral"
+    ]) expect(productionSchedule, `production initializer bypass: ${binding}`).toContain(binding);
+    expect(productionSchedule).not.toMatch(/register[.]publish_support_configuration/u);
+
+    const statusBlock = /```text\n([\s\S]*?)\n```/u.exec(rollout)?.[1] ?? "";
+    for (const field of [
+      "deployed_register_version", "active_support_register_version",
+      "support_schema_version", "marker_recorded_at", "base_register_version",
+      "publication_uuid", "changed_keys", "source_ref", "request_sha256",
+      "support_snapshot_sha256", "snapshot_sha256", "support_rows",
+      "refresh_deadline_ms", "calls_today", "kb_status", "relay_state",
+      "retention_state"
+    ]) expect(statusBlock).toContain(`${field}:`);
+    expect(statusBlock).not.toMatch(/(?:password|connection[_ ]?url|token|transcript|ip_address|identity|raw_response)/iu);
+
+    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(2);
+    expect(runtimeEnvironment).not.toMatch(
+      /REGISTER_VERSION:\s*legacyRegisterVersion\s*[.]\s*(?:default|optional|catch)/u
+    );
+    expect(apiMain).toContain("environment.REGISTER_VERSION");
+    expect(runnerMain.match(/environment[.]REGISTER_VERSION/gu)?.length).toBeGreaterThanOrEqual(3);
+  });
+
   it("keeps the support reader on one bounded isolated control-plane statement and preserves ordinary pools", async () => {
     const [databaseSource, supportSource, migration] = await Promise.all([
       readFile("packages/db/src/index.ts", "utf8"),
@@ -287,8 +441,24 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
   it("classifies every register relation access and bans open writers, latest selection, and unsafe version coercion", async () => {
     const census = await repositoryCensus();
     expect(census.files).toContain("tests/support/registerFixtures.ts");
+    const deniedRegisterWrites = census.sql.filter(isExpectedDeniedRegisterWrite);
+    expect(deniedRegisterWrites.map(({ file }) => file).sort())
+      .toEqual([...DENIED_REGISTER_WRITE_CALLERS.keys()].sort());
+    for (const [file, caller] of DENIED_REGISTER_WRITE_CALLERS) {
+      const source = census.sources.get(file) ?? "";
+      const marker = source.indexOf("'operator-direct-dml'");
+      const proofStart = source.lastIndexOf("await expect(", marker);
+      const proofEnd = source.indexOf(";", marker);
+      const proof = source.slice(proofStart, proofEnd + 1);
+      expect(marker, `missing denied register DML marker: ${file}`).toBeGreaterThanOrEqual(0);
+      expect(proofStart, `denied register DML is not awaited: ${file}`).toBeGreaterThanOrEqual(0);
+      expect(proof, `wrong denied register DML caller: ${file}`).toContain(`${caller}.query`);
+      expect(proof, `denied register DML lacks SQLSTATE 42501 binding: ${file}`)
+        .toMatch(/[.]rejects[.]toMatchObject\(\{\s*code:\s*"42501"\s*\}\)/u);
+    }
     const directWrites = census.sql.filter(({ file, text }) =>
       /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+register[.](?:register_row|register_version)\b/iu.test(text)
+      && !isExpectedDeniedRegisterWrite({ file, text })
       && !CLOSED_WRITE_SURFACES.has(file)
       && !/^migrations\/(?:00(?:0[0-9]|[1-4][0-9]|5[0-4]))/u.test(file)
     ).map(({ file }) => file);
@@ -306,7 +476,9 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     });
     const unclassified = relationAccesses.filter(({ file, text, kind }) => {
       if (/^migrations\//u.test(file)) return false;
-      if (kind === "WRITE") return !CLOSED_WRITE_SURFACES.has(file);
+      if (kind === "WRITE") {
+        return !CLOSED_WRITE_SURFACES.has(file) && !isExpectedDeniedRegisterWrite({ file, text });
+      }
       if (/^(?:tests|acceptance)\//u.test(file)) return false;
       return !/\b(?:[a-z_]+[.])?register_version\s*=\s*\$[0-9]+/iu.test(text)
         && !/\bregister_version\s*=\s*[1-4]\b/iu.test(text);

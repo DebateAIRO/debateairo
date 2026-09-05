@@ -134,6 +134,191 @@ single-connection pool whose connect, statement, and query deadlines are
 strictly shorter than the remaining credential validity, and closes both the
 client and pool.
 
+## Support configuration rollout and forward-only rollback
+
+The deployed application register and the active support register are separate
+decimal-text identifiers. The deployment receipt is the sole source of the
+explicit deployed `REGISTER_VERSION`; neither the support selector nor a later
+GENERAL publication changes it. An old binary must receive an explicit immutable
+`REGISTER_VERSION` from its own deployment receipt. It may not discover a
+current or latest version and may not obtain a mutable substitute from another
+environment value.
+
+Use this reader-first production order. Each numbered step is a stop point; do
+not continue when its validation fails.
+
+1. Apply `migrations/0055_register_support_publication.sql` with the governed
+   migrator. This additive migration creates the allocator, closed publication
+   functions, marker validation, and grants. Applying it alone creates no
+   support configuration and selects no support register.
+2. Validate immutable v1/v4 history and the allocator. Confirm the exact v1
+   snapshot SHA-256
+   `8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b`
+   and deterministic development v4 snapshot SHA-256
+   `120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96`,
+   unchanged row/value/source bytes, null future metadata on both historical
+   versions, and an allocator next value strictly above every stored version.
+3. Deploy schema-1 support readers while support remains uninitialized. Verify
+   they fail closed and that all other consumers still use the explicit
+   deployed `REGISTER_VERSION`.
+4. Provision and test the support-configuration operator using the bounded
+   private credential procedure above. Prove it can execute only the support
+   publisher and status reader, and that the API and support service never
+   receive its credential.
+5. Publish the complete 16-key production snapshot disabled from the explicit
+   deployed base. The corresponding disposable-development initialization uses
+   the same 16 keys with only `support_enabled` set to `true`; production sets
+   it to `false`. A publication with 15 keys is invalid. Record a non-secret
+   source reference and a fresh publication UUID before starting the
+   transaction.
+
+   Run the existing bounded credential loader and shipped public publication
+   port directly. Replace the four explicit arguments with the governed private
+   file, deployed receipt version, freshly generated UUID, and non-secret
+   change reference. The example deliberately has no implicit version source:
+
+<!-- SUPPORT-CONFIG-INITIALIZER-BEGIN -->
+```sh
+node --import tsx --input-type=module - \
+  /run/debateai/support-config/operator.json \
+  4 \
+  018e51cd-6ba7-4f42-8cb6-6b8292f2e031 \
+  deployment:production-initial-off:change-2026-09-06 <<'TS'
+import type { Pool, PoolClient } from "pg";
+import {
+  createPostgresRegisterPublicationPort,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
+  SUPPORT_CONFIGURATION_KEYS,
+  type SupportPublicationReceipt
+} from "./packages/register/src/index.ts";
+import { withProductionSupportConfigCliConnection } from
+  "./apps/runner/src/support-config-cli-credentials.ts";
+
+const [credentialFilePath, deployedBaseText, publicationId, sourceRef] =
+  process.argv.slice(2);
+if (!credentialFilePath || !deployedBaseText || !publicationId || !sourceRef) {
+  throw new TypeError("SUPPORT_CONFIG_INITIALIZER_ARGUMENT_INVALID");
+}
+const values = Object.freeze<Record<string, string>>({
+  support_enabled: "false",
+  support_model_ref: '"development:claude-cli"',
+  support_relay_concurrency: "2",
+  support_daily_call_cap: "500",
+  support_limit_anon_msgs_10m: "20",
+  support_limit_anon_msgs_24h: "100",
+  support_limit_anon_sessions_1h: "5",
+  support_limit_session_msgs: "40",
+  support_limit_msg_chars: "2000",
+  support_limit_account_msgs_10m: "60",
+  support_limit_account_msgs_24h: "300",
+  support_queue_depth: "10",
+  support_lock_after_injections: "3",
+  support_ip_cooldown_minutes: "60",
+  support_retention_policy: '"keep"',
+  support_retention_ratified_by: "null"
+});
+const baseRegisterVersion = parseRegisterVersionText(deployedBaseText);
+const receipt: SupportPublicationReceipt =
+  await withProductionSupportConfigCliConnection(credentialFilePath, async (client) => {
+    const boundedClient = {
+      query: client.query.bind(client),
+      release() {}
+    } as unknown as PoolClient;
+    const boundedOperatorPool = {
+      connect: async () => boundedClient
+    } as unknown as Pool;
+    return createPostgresRegisterPublicationPort(boundedOperatorPool).publishSupport({
+      publicationId,
+      baseRegisterVersion,
+      expectedSupportRegisterVersion: null,
+      schemaVersion: 1,
+      patch: SUPPORT_CONFIGURATION_KEYS.map((key) => ({
+        key,
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from(values[key]!))
+      })),
+      sourceRef
+    });
+  });
+const commitAcknowledgedAt = new Date();
+const safeReceipt = {
+  registerVersion: receipt.registerVersion,
+  baseRegisterVersion: receipt.baseRegisterVersion,
+  publicationId: receipt.publicationId,
+  publicationKind: receipt.publicationKind,
+  requestSha256: receipt.requestSha256,
+  snapshotSha256: receipt.snapshotSha256,
+  rowCount: receipt.rowCount,
+  recordedAt: receipt.recordedAt.toISOString(),
+  previousSupportRegisterVersion: receipt.previousSupportRegisterVersion,
+  supportSnapshotSha256: receipt.supportSnapshotSha256,
+  changedKeys: receipt.changedKeys,
+  sourceRef,
+  commitAcknowledgedAt: commitAcknowledgedAt.toISOString()
+} satisfies Record<string, unknown>;
+process.stdout.write(`SUPPORT_CONFIGURATION_INITIALIZED=${JSON.stringify(safeReceipt)}\n`);
+TS
+```
+<!-- SUPPORT-CONFIG-INITIALIZER-END -->
+
+   The bounded wrapper validates the dedicated private credential, creates one
+   fresh single-connection pool with connect/statement/query deadlines shorter
+   than its validity, and closes it. `publishSupport()` owns the explicit READ
+   COMMITTED transaction and resolves only after `COMMIT`; therefore the
+   separately captured acknowledgement follows the commit promise. The output
+   contains only the typed receipt, source reference, and acknowledgement time.
+   C1 will later wrap this same public port in the user-facing support CLI; it is
+   not required for this initialization.
+6. Capture the publication receipt and post-COMMIT acknowledgement only after
+   the commit promise resolves. Keep the UUID, source reference, request hash,
+   full snapshot hash, support-subset hash, database `recorded_at`, and
+   post-COMMIT acknowledgement as distinct values. `recorded_at` is recorded
+   time, not commit time. Verify the active support version against the receipt;
+   verify the deployed version is still the explicit deployment value.
+
+A later unrelated GENERAL publication has no `supportActivation` marker. It is
+therefore ineligible for support selection and changes neither the active
+support version nor the deployed version. Normal rollback is forward-only:
+publish a new SUPPORT_CONFIGURATION version, higher than the active version,
+containing the prior desired values and a new self-binding marker. Recheck every
+older row/value/source byte after publication. Never alter prior rows, seals, or
+markers, and never remove the additive schema.
+
+For emergency containment, publish OFF first and wait for the distinct
+post-COMMIT acknowledgement. Confirm status reports the new disabled active
+support version. Then set the operator `NOLOGIN`, terminate established
+support-operator sessions, and remove the credential file with the dedicated
+cleanup command below; unrelated sessions must survive. Only after containment
+is fully attested may a prior binary be deployed, and that binary still receives
+its own explicit `REGISTER_VERSION`.
+
+The status command renders these fields in this order; rows are sorted by UTF-8
+key and retain their individual source references:
+
+```text
+deployed_register_version: <decimal-text>
+active_support_register_version: <decimal-text>
+support_schema_version: 1
+marker_recorded_at: <database-timestamp> (recorded time, not commit time)
+base_register_version: <decimal-text>
+publication_uuid: <uuid>
+changed_keys: <sorted-keys>
+source_ref: <non-secret-reference>
+request_sha256: <lowercase-hex>
+support_snapshot_sha256: <lowercase-hex>
+snapshot_sha256: <lowercase-hex>
+support_rows: <16-sorted-key/value/source-ref-rows>
+refresh_deadline_ms: 1000
+calls_today: <count>
+kb_status: <state>
+relay_state: <state>
+retention_state: <state>
+```
+
+Status never emits a credential, secret, password, connection URL, token,
+transcript, IP address, identity, or raw relay response. It never labels marker
+time as a commit timestamp.
+
 ## Operator cleanup
 
 `VALID UNTIL` blocks new authentication but does not terminate an already

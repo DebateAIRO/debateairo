@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   chmod,
   lstat,
@@ -18,6 +19,16 @@ import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, type Pool } from "../../packages/db/src/index.js";
 import {
+  computeRegisterSnapshotSha256,
+  createPostgresRegisterPublicationPort,
+  loadBootstrapRegister,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
+  SUPPORT_CONFIGURATION_KEYS
+} from "../../packages/register/src/index.js";
+import { buildDevelopmentDeploymentRegisterPublicationRows } from
+  "../../apps/runner/src/dev-deployment-register.js";
+import {
   PRODUCTION_DATABASE_PRINCIPAL_CREDENTIAL_FORMAT,
   cleanupProductionSupportConfigOperator,
   provisionProductionDatabasePrincipals
@@ -27,6 +38,8 @@ import {
   withProductionSupportConfigCliConnection
 } from "../../apps/runner/src/support-config-cli-credentials.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import { DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 } from "../support/registerFixtures.js";
 
 const MANIFEST_PATH =
   "docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json";
@@ -45,6 +58,24 @@ const CAPABILITY_ROLES = [
   "debateai_settlement_watch",
   "debateai_support_config_operator"
 ] as const;
+const PRODUCTION_SUPPORT_VALUE_TEXT = Object.freeze<Record<string, string>>({
+  support_enabled: "false",
+  support_model_ref: '"development:claude-cli"',
+  support_relay_concurrency: "2",
+  support_daily_call_cap: "500",
+  support_limit_anon_msgs_10m: "20",
+  support_limit_anon_msgs_24h: "100",
+  support_limit_anon_sessions_1h: "5",
+  support_limit_session_msgs: "40",
+  support_limit_msg_chars: "2000",
+  support_limit_account_msgs_10m: "60",
+  support_limit_account_msgs_24h: "300",
+  support_queue_depth: "10",
+  support_lock_after_injections: "3",
+  support_ip_cooldown_minutes: "60",
+  support_retention_policy: '"keep"',
+  support_retention_ratified_by: "null"
+});
 
 type Manifest = Readonly<{
   provisioner: Readonly<{ managedPrincipalIds: readonly string[] }>;
@@ -2701,7 +2732,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     `)).resolves.toMatchObject({ rows: [{ count: "0" }] });
   }, 120_000);
 
-  it("kills every support session while unrelated sessions survive cleanup", async () => {
+  it("publishes emergency off before cleanup kills every established support session while unrelated sessions survive", async () => {
     const envelope = credentialEnvelope();
     await provisionProductionDatabasePrincipals({
       adminPool,
@@ -2713,7 +2744,74 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     const supportUrl = envelope.credentials.find(
       ({ principalId }) => principalId === "support-config-operator"
     )!.databaseUrl;
+    const adminRegister = createPostgresRegisterPublicationPort(adminPool);
+    const deterministicV4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      await loadBootstrapRegister(),
+      TEST_DEVELOPMENT_PROVIDER_PANEL
+    );
+    expect(computeRegisterSnapshotSha256(deterministicV4Rows))
+      .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
+    await adminRegister.importHistorical({
+      registerVersion: parseRegisterVersionText("4"),
+      rows: deterministicV4Rows
+    });
     const heldPool = createPool(supportUrl);
+    const operatorRegister = createPostgresRegisterPublicationPort(heldPool);
+    const initialOff = await operatorRegister.publishSupport({
+      publicationId: randomUUID(),
+      baseRegisterVersion: parseRegisterVersionText("4"),
+      expectedSupportRegisterVersion: null,
+      schemaVersion: 1,
+      patch: SUPPORT_CONFIGURATION_KEYS.map((key) => ({
+        key,
+        valueJsonText: parseCanonicalRegisterJson(
+          Buffer.from(PRODUCTION_SUPPORT_VALUE_TEXT[key]!)
+        )
+      })),
+      sourceRef: "deployment:production-initial-off"
+    });
+    const initialCommitAcknowledgedAt = new Date();
+    expect(initialOff.previousSupportRegisterVersion).toBeNull();
+    expect(initialOff.baseRegisterVersion).toBe("4");
+    expect(initialOff.changedKeys).toEqual([...SUPPORT_CONFIGURATION_KEYS].sort());
+    expect(initialOff.recordedAt.getTime())
+      .toBeLessThanOrEqual(initialCommitAcknowledgedAt.getTime());
+    const initialStatus = await operatorRegister.readSupportStatus();
+    expect(initialStatus).toMatchObject({
+      supportRegisterVersion: initialOff.registerVersion,
+      baseRegisterVersion: "4",
+      schemaVersion: 1,
+      sourceRef: "deployment:production-initial-off"
+    });
+    expect(JSON.parse(initialStatus!.configurationText)).toHaveLength(16);
+    expect(JSON.parse(initialStatus!.configurationText)).toContainEqual(
+      expect.objectContaining({ row_key: "support_enabled", value_json_text: "false" })
+    );
+    await expect(heldPool.query(`
+      INSERT INTO register.register_row(register_version,row_key,value_json,source_ref)
+      VALUES(4,'operator-direct-dml','true'::jsonb,'deployment:forbidden')
+    `)).rejects.toMatchObject({ code: "42501" });
+    await expect(operatorRegister.publishGeneral({
+      publicationId: randomUUID(),
+      baseRegisterVersion: parseRegisterVersionText("4"),
+      rows: [{
+        rowKey: "operatorGeneralWrite",
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
+        sourceRef: "deployment:forbidden-general"
+      }],
+      sourceRef: "deployment:forbidden-general"
+    })).rejects.toMatchObject({ code: "42501" });
+    const enabled = await operatorRegister.publishSupport({
+      publicationId: randomUUID(),
+      baseRegisterVersion: initialOff.registerVersion,
+      expectedSupportRegisterVersion: initialOff.registerVersion,
+      schemaVersion: 1,
+      patch: [{
+        key: "support_enabled",
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from("true"))
+      }],
+      sourceRef: "deployment:production-enabled-before-containment"
+    });
     const heldClients = await Promise.all([heldPool.connect(), heldPool.connect()]);
     for (const client of heldClients) client.on("error", () => undefined);
     const unrelatedClient = await adminPool.connect();
@@ -2724,21 +2822,46 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       SELECT pg_backend_pid() AS "backendPid",current_user AS principal
     `)).rows[0]!;
     try {
-      await adminPool.query(
-        "ALTER ROLE debateai_prod_support_config_operator VALID UNTIL '2000-01-01T00:00:00.000Z'"
-      );
       for (const client of heldClients) {
         await expect(client.query("SELECT current_user AS principal"))
           .resolves.toMatchObject({
             rows: [{ principal: "debateai_prod_support_config_operator" }]
           });
       }
+      const disabled = await operatorRegister.publishSupport({
+        publicationId: randomUUID(),
+        baseRegisterVersion: enabled.registerVersion,
+        expectedSupportRegisterVersion: enabled.registerVersion,
+        schemaVersion: 1,
+        patch: [{
+          key: "support_enabled",
+          valueJsonText: parseCanonicalRegisterJson(Buffer.from("false"))
+        }],
+        sourceRef: "deployment:production-emergency-off"
+      });
+      const commitAcknowledgedAt = new Date();
+      const statusBeforeCleanup = await adminRegister.readSupportStatus();
+      expect(statusBeforeCleanup).toMatchObject({
+        supportRegisterVersion: disabled.registerVersion,
+        baseRegisterVersion: enabled.registerVersion,
+        sourceRef: "deployment:production-emergency-off"
+      });
+      expect(statusBeforeCleanup!.recordedAt.getTime())
+        .toBeLessThanOrEqual(commitAcknowledgedAt.getTime());
+      expect(JSON.parse(statusBeforeCleanup!.configurationText)).toContainEqual(
+        expect.objectContaining({ row_key: "support_enabled", value_json_text: "false" })
+      );
+      expect(await productionSupportState()).toEqual({
+        canLogin: true,
+        sessionCount: 3,
+        credentialFileExists: true
+      });
       await expect(cleanupProductionSupportConfigOperator({
         adminPool,
         supportConfigCredentialFilePath
       })).resolves.toMatchObject({
         supportConfigCredentialFilePath,
-        terminatedSessionCount: 2
+        terminatedSessionCount: 3
       });
       for (const client of heldClients) {
         await expect(client.query("SELECT 1")).rejects.toBeDefined();
