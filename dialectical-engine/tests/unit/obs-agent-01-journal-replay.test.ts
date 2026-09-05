@@ -101,7 +101,7 @@ describe("OBS-01 signal and delivery journal replay", () => {
       component: "observation_agent",
       severity: "DEGRADED",
       impact_code: "IMPACT_AGENT_DELIVERY",
-      first_failed_probe_at: null,
+      first_failed_probe_at: "2026-09-02T07:00:05.000Z",
       detected_at: "2026-09-02T07:00:05.000Z",
       evidence: { reason: "DELIVERY_FAILURE", channel: "sendmail" },
       suspected_defect: false,
@@ -113,7 +113,7 @@ describe("OBS-01 signal and delivery journal replay", () => {
       recorded_at: "2026-09-02T07:00:05.000Z"
     };
     await journal.appendSignal(statefulOpen, {
-      owner: "routing", correlationKey: "sendmail"
+      owner: "channels-sendmail", correlationKey: "sendmail-failure"
     });
     await journal.appendSignal(makeSelfSignal({
       seq: 10,
@@ -157,13 +157,57 @@ describe("OBS-01 signal and delivery journal replay", () => {
     const { replayObservationJournals } = await import(
       "../../apps/observation-agent/src/journal/records.js"
     );
-    await expect(replayObservationJournals(stateDir, new Set(["core-liveness", "routing"])))
+    await expect(replayObservationJournals(
+      stateDir,
+      new Set(["core-liveness", "channels-sendmail"])
+    ))
       .resolves.toEqual({
         openSignals: [{
           signal: statefulOpen,
-          lifecycle: { owner: "routing", correlationKey: "sendmail" }
+          lifecycle: { owner: "channels-sendmail", correlationKey: "sendmail-failure" }
         }],
         deliveryResults: []
+      });
+  });
+
+  it("rejects a versioned row owned by a discovered module without lifecycle authority", async () => {
+    const stateDir = await scratch();
+    const { ObservationJournal } = await import(
+      "../../apps/observation-agent/src/journal/journal.js"
+    );
+    const journal = new ObservationJournal(stateDir);
+    await journal.appendSignal(signal({ seq: 2, id: V2_ID }), {
+      owner: "routing",
+      correlationKey: "discovered-but-stateless"
+    });
+    const { replayObservationJournals } = await import(
+      "../../apps/observation-agent/src/journal/records.js"
+    );
+
+    await expect(replayObservationJournals(
+      stateDir,
+      new Set(["core-liveness", "channels-sendmail"])
+    )).rejects.toThrow("OBSERVATION_JOURNAL_INVALID");
+  });
+
+  it("rejects a stateful version-2 lifecycle-null row while preserving raw legacy adoption", async () => {
+    const stateDir = await scratch();
+    const stateful = signal({ seq: 2, id: V2_ID, component: "docker" });
+    const { createSignalJournalRecordV2, replayObservationJournals } = await import(
+      "../../apps/observation-agent/src/journal/records.js"
+    );
+
+    expect(() => createSignalJournalRecordV2(stateful, null))
+      .toThrow("OBSERVATION_JOURNAL_INVALID");
+    await writeRows(stateDir, "signals-2026-09-03.jsonl", [v2(stateful, null)]);
+    await expect(replayObservationJournals(stateDir, new Set(["core-liveness"])))
+      .rejects.toThrow("OBSERVATION_JOURNAL_INVALID");
+
+    const legacyStateDir = await scratch();
+    await writeRows(legacyStateDir, "signals-2026-09-03.jsonl", [stateful]);
+    await expect(replayObservationJournals(legacyStateDir, new Set(["core-liveness"])))
+      .resolves.toEqual({
+        openSignals: [{ signal: stateful, lifecycle: null }], deliveryResults: []
       });
   });
 
@@ -284,7 +328,7 @@ describe("OBS-01 signal and delivery journal replay", () => {
       .rejects.toThrow("OBSERVATION_JOURNAL_INVALID");
   });
 
-  it("rejects duplicate live lifecycle and component/class identities", async () => {
+  it("rejects duplicate native lifecycle identity and permits distinct same-class correlations", async () => {
     const stateDir = await scratch();
     const first = v2(signal({ seq: 1, id: LEGACY_ID, component: "hatchet" }), {
       owner: "core-liveness", correlation_key: "shared"
@@ -305,7 +349,10 @@ describe("OBS-01 signal and delivery journal replay", () => {
     });
     await writeRows(otherStateDir, "signals-2026-09-03.jsonl", [first, duplicateOpenIdentity]);
     await expect(replayObservationJournals(otherStateDir, new Set(["core-liveness"])))
-      .rejects.toThrow("OBSERVATION_JOURNAL_INVALID");
+      .resolves.toMatchObject({ openSignals: [
+        { lifecycle: { owner: "core-liveness", correlationKey: "shared" } },
+        { lifecycle: { owner: "core-liveness", correlationKey: "other" } }
+      ] });
   });
 
   it("rejects a clear that names a different UUID even when component and class match", async () => {

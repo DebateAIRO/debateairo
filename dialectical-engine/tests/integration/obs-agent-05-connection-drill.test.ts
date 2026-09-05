@@ -27,6 +27,7 @@ describe("OBS-05 measured connection drill", () => {
         unit: "connections", observed_at: observedAt.toISOString()
       });
     const runtime = new ObservationModuleRuntime({
+      modules: Object.freeze([module]),
       nextSequence: () => 1,
       nextSignalId: () => "50000000-0000-4000-8000-000000000001",
       sampleStore: { async write(sample) { samples.push(sample); } },

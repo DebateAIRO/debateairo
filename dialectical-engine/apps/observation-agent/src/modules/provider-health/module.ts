@@ -62,6 +62,10 @@ export function createProviderHealthModule(
   return Object.freeze({
     name: "provider-health",
     cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const calls = await dependencies.readCalls(ctx.databaseUrl);
       for (const call of calls) {

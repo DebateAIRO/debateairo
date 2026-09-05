@@ -130,9 +130,9 @@ Before the initial `AGENT_SELF/IMPACT_AGENT_START` signal and before any probe, 
 3. applies CLEARED rows only to their exact `clears_signal_id`;
 4. constructs the current durable OPEN set;
 5. constructs `(owner,correlation_key) -> OPEN signal` for version-2 rows;
-6. indexes legacy opens by the already-frozen one-OPEN identity `(component,class)`.
+6. retains legacy opens for native owner adoption without imposing a global component/class cardinality.
 
-The one-OPEN identity is a guard in addition to correlation identity: no module may create a second OPEN for the same `(component,class)` merely by changing its correlation key. Legacy adoption succeeds only when a stateful owner can uniquely derive its native correlation from the closed signal fields and evidence schema. Ambiguity fails closed: no replacement OPEN is emitted and the affected module reports UNKNOWN until the journal is repaired under V authority.
+Durable lifecycle identity is `(owner,correlation_key)`. Multiple independently ruled native subjects may coexist under the same `(component,class)`; capacity conditions, throughput metrics, providers, spool files, capture gaps, runs, work items, and similar subjects remain distinct. Component and class are validated owner metadata, not a global uniqueness key. Notification/ticket coalescing remains a separate routing concern. Legacy adoption succeeds only when exactly one stateful owner can derive exactly one native correlation from the owner's canonical closed OPEN shape. A duplicate `(owner,correlation_key)`, invalid native metadata, or genuine owner ambiguity fails closed before probes or routing.
 
 Replay does not require PostgreSQL. Postgres catch-up remains idempotent by `signal_id` and runs after local lifecycle state is safe.
 
@@ -147,7 +147,7 @@ The same mechanism restores core liveness before its first observation. A restor
 - a recovery that is already present on the first post-restart probe does not strand the old OPEN;
 - routing sees the original signal identity and does not create a new ticket or escalation lineage.
 
-Every stateful owner must have a restart test covering `OPEN -> process reconstruction -> continuing fault -> recovery -> CLEARED(original UUID)`. At minimum this includes core liveness, capture health, stall defect lifecycle, worker heartbeat, product expectations/latency, capacity, throughput/provider, witness, and schedule trackers.
+Every stateful owner must have a restart test covering `OPEN -> process reconstruction -> continuing fault -> recovery -> CLEARED(original UUID)`. At minimum this includes core liveness, channel delivery health, capture health, stall defect lifecycle, worker heartbeat, product expectations/latency, capacity, throughput/provider, witness, and schedule trackers. Composite owners must exercise every distinct native sub-lifecycle, including simultaneous correlations that share component/class.
 
 ## 7. Bounded detector clocks in `sample_ring`
 
@@ -355,7 +355,7 @@ Each cluster begins with a focused failing regression against the frozen candida
 - use cwd-relative certificate/sendmail input after validation;
 - accept an invalid cached threshold policy or prefer it over a valid reachable database policy;
 - restore an OPEN without its original UUID;
-- permit a second OPEN for the same `(component,class)` after restart;
+- reject a legitimate second native `(owner,correlation_key)` because it shares `(component,class)` after restart;
 - clear a legacy or restored OPEN using a different UUID;
 - convert a UUID clock through JavaScript `number`;
 - reset READY or progress time during reconstruction;

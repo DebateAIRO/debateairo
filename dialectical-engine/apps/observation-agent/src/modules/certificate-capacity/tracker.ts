@@ -1,5 +1,7 @@
-import type { Severity } from "../../core/signals.js";
-import type { ModuleStatusProjection, SignalIntent, StatusState } from "../../core/types.js";
+import type { ObservationSignal, Severity } from "../../core/signals.js";
+import type {
+  ModuleStatusProjection, RestoredOpenSignal, SignalIntent, StatusState
+} from "../../core/types.js";
 import type { CertificateCapacitySnapshot } from "./reader.js";
 
 export type CertificateCapacityThresholds = Readonly<{
@@ -54,9 +56,53 @@ function clearSignal(snapshot: CertificateCapacitySnapshot, active: OpenCertific
   });
 }
 
+function restoredCertificateKey(signal: ObservationSignal): string | null {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const days = evidence.days;
+  const thresholdDays = evidence.threshold_days;
+  const severityMatches = typeof days === "number"
+    && Number.isFinite(days)
+    && typeof thresholdDays === "number"
+    && Number.isFinite(thresholdDays)
+    && thresholdDays >= 0
+    && (days < 0
+      ? signal.severity === "FATAL" && thresholdDays === 0
+      : days <= thresholdDays
+        && (signal.severity === "DEGRADED" || signal.severity === "SEVERE"));
+  return signal.state === "OPEN"
+    && signal.component === "tls_front_door"
+    && signal.class === "CERT_EXPIRY"
+    && severityMatches
+    && signal.impact_code === "IMPACT_CERT"
+    && signal.first_failed_probe_at !== null
+    && signal.suspected_defect === false
+    && signal.defect_kind === null
+    && signal.run_ref === null
+    && signal.work_item_ref === null
+    && Object.keys(evidence).sort().join(":") === "days:not_after:threshold_days:unit"
+    && typeof evidence.not_after === "string"
+    && Number.isFinite(new Date(evidence.not_after).getTime())
+    && evidence.unit === "days"
+    ? "tls-certificate-expiry"
+    : null;
+}
+
 export function createCertificateCapacityTracker() {
   let active: OpenCertificate | undefined;
   return Object.freeze({
+    legacyCorrelationKey: restoredCertificateKey,
+    restore(openSignals: readonly RestoredOpenSignal[]): void {
+      if (openSignals.length > 1) throw new TypeError("OBSERVATION_CERTIFICATE_RESTORE_INVALID");
+      const restored = openSignals[0];
+      if (restored === undefined) return;
+      if (restoredCertificateKey(restored.signal) !== restored.correlationKey) {
+        throw new TypeError("OBSERVATION_CERTIFICATE_RESTORE_INVALID");
+      }
+      active = {
+        openedAt: new Date(restored.signal.detected_at),
+        severity: restored.signal.severity
+      };
+    },
     observe(input: Readonly<{
       snapshot: CertificateCapacitySnapshot;
       thresholds: CertificateCapacityThresholds;

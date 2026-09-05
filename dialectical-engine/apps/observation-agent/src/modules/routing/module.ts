@@ -4,7 +4,7 @@ import { observationRepoRoot } from "../../core/paths.js";
 import type { RouterBootstrapInput } from "../../core/routing.js";
 import type { ObservationModuleManifest } from "../../core/types.js";
 import { createKanbanDeliveryExecutor } from "../channels-kanban/kanban.js";
-import { recordSendmailFailure } from "../channels-sendmail/failures.js";
+import { recordSendmailResult } from "../channels-sendmail/failures.js";
 import { createSendmailDeliveryExecutor } from "../channels-sendmail/sendmail.js";
 import { createObservationSignalRouter } from "./router.js";
 import { createStormSummaryExecutor } from "./storm.js";
@@ -37,8 +37,8 @@ const manifest: ObservationModuleManifest = Object.freeze({
         stormSummary: createStormSummaryExecutor(undefined, input.thresholds.summary_timeout_ms === undefined
           ? 2_000
           : Number(input.thresholds.summary_timeout_ms)),
-        onChannelFailure(channel, at) {
-          if (channel === "sendmail") recordSendmailFailure(at);
+        onChannelResult(channel, outcome, at) {
+          if (channel === "sendmail") recordSendmailResult(outcome, at);
         }
       });
     }

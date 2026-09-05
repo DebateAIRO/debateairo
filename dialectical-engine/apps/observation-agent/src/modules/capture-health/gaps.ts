@@ -1,4 +1,5 @@
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 import type { CaptureGapFact, CaptureSnapshot } from "./queries.js";
 
 type GapCandidate = Readonly<Omit<SignalIntent, "state">>;
@@ -63,7 +64,43 @@ function clear(opened: OpenGap, now: Date): SignalIntent {
   });
 }
 
+function restoredGapKey(signal: ObservationSignal): string | null {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const runtime = evidence.runtime;
+  const source = evidence.source;
+  const gapClass = evidence.gap_class;
+  return signal.state === "OPEN"
+    && signal.component === "obs_capture"
+    && signal.class === "CAPTURE_GAP"
+    && (signal.severity === "DEGRADED" || signal.severity === "SEVERE")
+    && signal.impact_code === "IMPACT_CAPTURE_GAP"
+    && signal.first_failed_probe_at !== null
+    && signal.suspected_defect === false
+    && signal.defect_kind === null
+    && signal.run_ref === null
+    && signal.work_item_ref === null
+    && Object.keys(evidence).sort().join(":")
+      === "closed_at:gap_class:lost_count:opened_at:runtime:source"
+    && typeof runtime === "string"
+    && runtime === source
+    && /^[A-Za-z0-9_.-]{1,64}$/u.test(runtime)
+    && typeof gapClass === "string"
+    && /^[A-Za-z0-9_.-]{1,64}$/u.test(gapClass)
+    && Number.isInteger(evidence.lost_count)
+    && (evidence.lost_count as number) >= 0
+    && typeof evidence.opened_at === "string"
+    && Number.isFinite(new Date(evidence.opened_at).getTime())
+    && (evidence.closed_at === null
+      || (typeof evidence.closed_at === "string"
+        && Number.isFinite(new Date(evidence.closed_at).getTime())
+        && new Date(evidence.closed_at).getTime() >= new Date(evidence.opened_at).getTime()))
+    ? `gap:${source}:${source}:${gapClass}`
+    : null;
+}
+
 export function createCaptureGapTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(input: Readonly<{
     snapshot: CaptureSnapshot;
     now: Date;
@@ -74,6 +111,40 @@ export function createCaptureGapTracker(): Readonly<{
   const seenRows = new Set<string>();
   const opened = new Map<string, OpenGap>();
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      return restoredGapKey(signal);
+    },
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const signal = restored.signal;
+        const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+        const correlationKey = restoredGapKey(signal);
+        const nativeKey = correlationKey?.slice("gap:".length);
+        if (correlationKey === null || nativeKey === undefined
+          || restored.correlationKey !== correlationKey || opened.has(nativeKey)) {
+          throw new TypeError("OBSERVATION_CAPTURE_GAP_RESTORE_INVALID");
+        }
+        const candidate: GapCandidate = Object.freeze({
+          correlationKey,
+          component: "obs_capture",
+          class: "CAPTURE_GAP",
+          severity: signal.severity,
+          impactCode: "IMPACT_CAPTURE_GAP",
+          firstFailedProbeAt: signal.first_failed_probe_at === null
+            ? null : new Date(signal.first_failed_probe_at),
+          detectedAt: new Date(signal.detected_at),
+          evidence,
+          suspectedDefect: false,
+          defectKind: null,
+          runRef: null,
+          workItemRef: null
+        });
+        opened.set(nativeKey, Object.freeze({
+          candidate,
+          openedAt: new Date(signal.detected_at)
+        }));
+      }
+    },
     observe(input) {
       if (input.snapshot.state === "UNKNOWN") {
         return Object.freeze({ intents: Object.freeze([]), projections: Object.freeze([

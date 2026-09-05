@@ -414,6 +414,7 @@ describe("OBS-01 typed durable journal", () => {
     );
     const result = await persistSignal({
       signal: openSignal(),
+      lifecycle: { owner: "core-liveness", correlationKey: "hatchet:INFRA_DOWN" },
       journal: new ObservationJournal(stateDir),
       mirror: { async mirrorSignal() { throw new Error("postgres down"); } }
     });
@@ -424,7 +425,7 @@ describe("OBS-01 typed durable journal", () => {
       record_version: 2,
       kind: "signal",
       signal: openSignal(),
-      lifecycle: null
+      lifecycle: { owner: "core-liveness", correlation_key: "hatchet:INFRA_DOWN" }
     }));
   });
 
@@ -445,7 +446,9 @@ describe("OBS-01 typed durable journal", () => {
       thresholdVersion: 1,
       event: "START"
     }));
-    await journal.appendSignal(openSignal(11));
+    await journal.appendSignal(openSignal(11), {
+      owner: "core-liveness", correlationKey: "hatchet:INFRA_DOWN"
+    });
     expect(await journal.previousRunExitReason()).toBe("UNCLEAN");
     await journal.appendSignal(makeSelfSignal({
       seq: 12,

@@ -1,4 +1,5 @@
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 
 export type HatchetThroughputSnapshot = Readonly<{
   queueDepth: number;
@@ -36,6 +37,8 @@ function openIntent(input: Readonly<{
 }
 
 export function createHatchetThroughputTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(snapshot: HatchetThroughputSnapshot, thresholds: HatchetThroughputThresholds): Readonly<{
     intents: readonly SignalIntent[]; projections: readonly ModuleStatusProjection[];
   }>;
@@ -44,6 +47,72 @@ export function createHatchetThroughputTracker(): Readonly<{
   const open = new Map<string, OpenMetric>();
   let queueCrossedAt: Date | null = null;
   let baseline: Readonly<{ failed: number; created: number; at: Date }> | null = null;
+
+  function restoredKey(signal: ObservationSignal): string | null {
+    if (signal.state !== "OPEN"
+      || signal.component !== "hatchet"
+      || signal.class !== "THROUGHPUT_ANOMALY"
+      || signal.first_failed_probe_at === null
+      || signal.suspected_defect
+      || signal.defect_kind !== null
+      || signal.run_ref !== null
+      || signal.work_item_ref !== null) return null;
+    const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+    const exactKeys = (keys: readonly string[]) => {
+      const actual = Object.keys(evidence).sort();
+      const expected = [...keys].sort();
+      return actual.length === expected.length
+        && actual.every((key, index) => key === expected[index]);
+    };
+    const sourceAndObserved = (observedKey: "observed_at" | "window_ended_at") =>
+      (evidence.source === "REST" || evidence.source === "PROMETHEUS")
+      && typeof evidence[observedKey] === "string"
+      && Number.isFinite(new Date(evidence[observedKey] as string).getTime());
+    if (signal.impact_code === "IMPACT_HATCHET_QUEUE"
+      && signal.severity === "SEVERE"
+      && exactKeys([
+        "metric_key", "count", "threshold", "duration_seconds", "window_minutes", "source", "observed_at"
+      ])
+      && evidence.metric_key === "hatchet.queue"
+      && Number.isInteger(evidence.count) && (evidence.count as number) >= 0
+      && typeof evidence.threshold === "number" && Number.isFinite(evidence.threshold)
+      && evidence.threshold > 0 && (evidence.count as number) >= evidence.threshold
+      && typeof evidence.duration_seconds === "number" && Number.isFinite(evidence.duration_seconds)
+      && typeof evidence.window_minutes === "number" && Number.isFinite(evidence.window_minutes)
+      && evidence.window_minutes > 0
+      && evidence.duration_seconds >= evidence.window_minutes * 60
+      && sourceAndObserved("observed_at")) return "hatchet-queue";
+    if (signal.impact_code === "IMPACT_HATCHET_DISPATCH_SLOW"
+      && signal.severity === "DEGRADED"
+      && exactKeys([
+        "metric_key", "p95_seconds", "threshold_seconds", "quantile", "window_minutes", "source", "observed_at"
+      ])
+      && evidence.metric_key === "hatchet.dispatch.p95"
+      && typeof evidence.p95_seconds === "number" && Number.isFinite(evidence.p95_seconds)
+      && typeof evidence.threshold_seconds === "number" && Number.isFinite(evidence.threshold_seconds)
+      && evidence.threshold_seconds > 0 && evidence.p95_seconds >= evidence.threshold_seconds
+      && evidence.quantile === 0.95 && evidence.window_minutes === 5
+      && sourceAndObserved("observed_at")) return "hatchet-dispatch-p95";
+    if (signal.impact_code === "IMPACT_HATCHET_FAILED_TASKS"
+      && signal.severity === "SEVERE"
+      && exactKeys([
+        "metric_key", "failed", "total", "threshold", "window_minutes", "source",
+        "window_started_at", "window_ended_at"
+      ])
+      && evidence.metric_key === "hatchet.failed"
+      && Number.isInteger(evidence.failed) && (evidence.failed as number) >= 0
+      && Number.isInteger(evidence.total) && (evidence.total as number) >= 0
+      && typeof evidence.threshold === "number" && Number.isFinite(evidence.threshold)
+      && evidence.threshold > 0 && (evidence.failed as number) >= evidence.threshold
+      && typeof evidence.window_minutes === "number" && Number.isFinite(evidence.window_minutes)
+      && evidence.window_minutes > 0
+      && typeof evidence.window_started_at === "string"
+      && Number.isFinite(new Date(evidence.window_started_at).getTime())
+      && sourceAndObserved("window_ended_at")
+      && new Date(evidence.window_ended_at as string).getTime()
+        >= new Date(evidence.window_started_at).getTime()) return "hatchet-failed-tasks";
+    return null;
+  }
 
   function clear(key: string, now: Date, intents: SignalIntent[]): void {
     const active = open.get(key);
@@ -59,6 +128,20 @@ export function createHatchetThroughputTracker(): Readonly<{
   }
 
   return Object.freeze({
+    legacyCorrelationKey: restoredKey,
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const key = restoredKey(restored.signal);
+        if (key === null || key !== restored.correlationKey || open.has(key)) {
+          throw new TypeError("OBSERVATION_HATCHET_THROUGHPUT_RESTORE_INVALID");
+        }
+        const openedAt = restored.signal.first_failed_probe_at === null
+          ? new Date(restored.signal.detected_at)
+          : new Date(restored.signal.first_failed_probe_at);
+        open.set(key, Object.freeze({ openedAt }));
+        if (key === "hatchet-queue") queueCrossedAt = openedAt;
+      }
+    },
     observe(snapshot, thresholds) {
       const values = [snapshot.queueDepth, snapshot.dispatchP95Seconds,
         snapshot.failedTasksTotal, snapshot.createdTasksTotal];

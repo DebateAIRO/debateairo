@@ -74,9 +74,14 @@ describe("OBS-01 launchd custody and runtime bounds", () => {
 
   it("keeps durable routing and status collection in their required runtime order", async () => {
     const main = await readFile(resolve(root, "apps/observation-agent/src/main.ts"), "utf8");
-    const routerInitialization = main.indexOf("router = routerOwner");
+    const replay = main.indexOf("const replayed = await replayObservationJournals(");
+    const restore = main.indexOf("const moduleRuntime = new ObservationModuleRuntime(");
+    const routerInitialization = main.indexOf("const initializedRouter = routerOwner");
     const startSignal = main.indexOf("await emit(makeSelfSignal(");
+    expect(replay).toBeGreaterThanOrEqual(0);
+    expect(restore).toBeGreaterThan(replay);
     expect(routerInitialization).toBeGreaterThanOrEqual(0);
+    expect(routerInitialization).toBeGreaterThan(restore);
     expect(startSignal).toBeGreaterThan(routerInitialization);
     const emitStart = main.indexOf("async function emit(");
     const emitEnd = main.indexOf("const moduleRuntime", emitStart);
@@ -90,10 +95,12 @@ describe("OBS-01 launchd custody and runtime bounds", () => {
     const cycleStart = main.indexOf("async function cycle(");
     const cycleEnd = main.indexOf("async function shutdown(", cycleStart);
     const cycle = main.slice(cycleStart, cycleEnd);
-    expect(cycle.indexOf("await router.onTick(")).toBeGreaterThanOrEqual(0);
-    expect(cycle.indexOf("router.status()")).toBeGreaterThan(cycle.indexOf("await router.onTick("));
+    expect(cycle.indexOf("await initializedRouter.onTick(")).toBeGreaterThanOrEqual(0);
+    expect(cycle.indexOf("initializedRouter.status()")).toBeGreaterThan(
+      cycle.indexOf("await initializedRouter.onTick(")
+    );
     expect(cycle.indexOf("await writeStatusSnapshot(")).toBeGreaterThan(
-      cycle.indexOf("router.status()")
+      cycle.indexOf("initializedRouter.status()")
     );
   });
 });

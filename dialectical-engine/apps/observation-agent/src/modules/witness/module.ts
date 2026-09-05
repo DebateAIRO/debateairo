@@ -9,6 +9,10 @@ let pendingIntents: readonly SignalIntent[] = Object.freeze([]);
 const witnessModule: Module = Object.freeze({
   name: "witness",
   cadence: Object.freeze({ intervalMs: 5_000, timeoutMs: 2_000 }),
+  lifecycle: Object.freeze({
+    legacyCorrelationKey: witness.legacyCorrelationKey,
+    restore: witness.restore
+  }),
   async probe(ctx) {
     const configured = ctx.thresholds.never_started_ms;
     witness.updatePolicy({

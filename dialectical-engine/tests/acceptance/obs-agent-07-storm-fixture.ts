@@ -134,6 +134,20 @@ const moduleContext = Object.freeze({
   })
 });
 
+function lifecycleFor(signal: ObservationSignal) {
+  if (signal.component === "api" || signal.component === "ui"
+    || signal.component === "tls_front_door") {
+    return Object.freeze({
+      owner: "product-liveness",
+      correlationKey: `member:${signal.component}:infra_down`
+    });
+  }
+  return Object.freeze({
+    owner: "core-liveness",
+    correlationKey: `${signal.component}:${signal.class}`
+  });
+}
+
 async function fixtureRouter(pool: Pool, stateDir: string) {
   const journal = new ObservationJournal(stateDir);
   const mirror = new PostgresMirror(pool);
@@ -197,7 +211,12 @@ export async function runStormSequence(input: Readonly<{
   const signals = createStormInputs(input);
   const runtime = await fixtureRouter(input.pool, input.stateDir);
   for (const signal of signals) {
-    await persistSignal({ signal, journal: runtime.journal, mirror: runtime.mirror });
+    await persistSignal({
+      signal,
+      lifecycle: lifecycleFor(signal),
+      journal: runtime.journal,
+      mirror: runtime.mirror
+    });
     await runtime.router.onSignal({
       signal,
       now: new Date(signal.detected_at),
@@ -249,7 +268,12 @@ export async function recoverStormSequence(input: Readonly<{
       clears_signal_id: openSignal.signal_id,
       recorded_at: at.toISOString()
     });
-    await persistSignal({ signal: cleared, journal: runtime.journal, mirror: runtime.mirror });
+    await persistSignal({
+      signal: cleared,
+      lifecycle: lifecycleFor(openSignal),
+      journal: runtime.journal,
+      mirror: runtime.mirror
+    });
     await runtime.router.onSignal({
       signal: cleared,
       now: at,

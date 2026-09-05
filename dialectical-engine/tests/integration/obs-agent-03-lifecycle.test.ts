@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { signalSchema } from "../../apps/observation-agent/src/core/signals.js";
 import { createDefectLifecycle } from "../../apps/observation-agent/src/modules/stall-detectors/lifecycle.js";
 
 const runRef = "33000000-0000-4000-8000-000000000001";
@@ -64,5 +65,37 @@ describe("OBS-03 immutable defect lifecycle", () => {
       ...candidate("STALL"), class: "WORKER_LOST", suspectedDefect: false, defectKind: null
     } as never;
     expect(() => tracker.reconcile([invalid], healthy, at(15))).toThrow("OBSERVATION_DEFECT_CANDIDATE_INVALID");
+  });
+
+  it("restores a defect without replacement and clears its native correlation", () => {
+    const current = candidate("STALL");
+    const open = createDefectLifecycle().reconcile([current], healthy, at(15))[0]!;
+    const restored = createDefectLifecycle();
+    restored.restore([Object.freeze({
+      correlationKey: open.correlationKey,
+      signal: signalSchema.parse({
+        seq: 1,
+        signal_id: "33000000-0000-4000-8000-000000000003",
+        state: "OPEN",
+        class: open.class,
+        component: open.component,
+        severity: open.severity,
+        impact_code: open.impactCode,
+        first_failed_probe_at: open.firstFailedProbeAt?.toISOString() ?? null,
+        detected_at: open.detectedAt.toISOString(),
+        evidence: open.evidence,
+        suspected_defect: open.suspectedDefect,
+        defect_kind: open.defectKind,
+        run_ref: open.runRef,
+        work_item_ref: open.workItemRef,
+        threshold_version: 4,
+        clears_signal_id: null,
+        recorded_at: open.detectedAt.toISOString()
+      })
+    })]);
+    expect(restored.reconcile([current], healthy, at(30))).toEqual([]);
+    expect(restored.reconcile([], healthy, at(45))).toEqual([
+      expect.objectContaining({ correlationKey: current.correlationKey, state: "CLEARED" })
+    ]);
   });
 });

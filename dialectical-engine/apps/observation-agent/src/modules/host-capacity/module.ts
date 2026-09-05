@@ -68,6 +68,10 @@ export function createHostCapacityModule(dependencies: Partial<HostCapacityModul
   return Object.freeze({
     name: "host-capacity",
     cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx) {
       const snapshot = await resolved.readSnapshot(ctx.now, ctx.timeoutMs);
       const cycle = tracker.observe({ snapshot, thresholds: thresholds(ctx.thresholds) });

@@ -53,6 +53,10 @@ export function createSpoolHealthModule(
     name: "spool-health",
     cadence: Object.freeze({ intervalMs: 15_000, timeoutMs: 2_000 }),
     targetFragmentBasename: "OBS-04.json",
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const thresholdSeconds = typeof ctx.thresholds.spool_age_s === "number"
         ? ctx.thresholds.spool_age_s : 600;

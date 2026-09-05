@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
-import type { ModuleStatusProjection, ProbeObservation, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type {
+  ModuleStatusProjection,
+  ProbeObservation,
+  RestoredOpenSignal,
+  SignalIntent
+} from "../../core/types.js";
 
 const workerSchema = z.object({
   name: z.string().min(1).max(128),
@@ -137,11 +143,52 @@ export function projectWorkerHeartbeat(snapshot: WorkerHeartbeatSnapshot): Probe
 }
 
 export function createWorkerHeartbeatTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(snapshot: WorkerHeartbeatSnapshot): readonly SignalIntent[];
 }> {
   let openedAt: Date | null = null;
   let firstFailedAt: Date | null = null;
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+      const workerRef = evidence.worker_ref;
+      return signal.component === "runner"
+        && signal.state === "OPEN"
+        && signal.class === "WORKER_LOST"
+        && signal.severity === "SEVERE"
+        && signal.impact_code === "IMPACT_WORKER_LOST"
+        && signal.first_failed_probe_at !== null
+        && signal.suspected_defect === false
+        && signal.defect_kind === null
+        && signal.run_ref === null
+        && signal.work_item_ref === null
+        && typeof workerRef === "string"
+        && workerRef.length > 0
+        && Object.keys(evidence).sort().join(":")
+          === "health:heartbeat_age_s:heartbeat_threshold_s:worker_ref"
+        && typeof evidence.heartbeat_age_s === "number"
+        && Number.isFinite(evidence.heartbeat_age_s)
+        && typeof evidence.heartbeat_threshold_s === "number"
+        && Number.isFinite(evidence.heartbeat_threshold_s)
+        && evidence.heartbeat_threshold_s > 0
+        && evidence.heartbeat_age_s >= evidence.heartbeat_threshold_s
+        && evidence.health === "STALE"
+        ? `worker:${workerRef}`
+        : null;
+    },
+    restore(openSignals): void {
+      if (openSignals.length > 1) throw new TypeError("OBSERVATION_HEARTBEAT_RESTORE_INVALID");
+      const restored = openSignals[0];
+      if (restored === undefined) return;
+      if (this.legacyCorrelationKey(restored.signal) !== restored.correlationKey) {
+        throw new TypeError("OBSERVATION_HEARTBEAT_RESTORE_INVALID");
+      }
+      openedAt = new Date(restored.signal.detected_at);
+      firstFailedAt = restored.signal.first_failed_probe_at === null
+        ? null
+        : new Date(restored.signal.first_failed_probe_at);
+    },
     observe(snapshot) {
       if (snapshot.state === "UNKNOWN") return Object.freeze([]);
       if (snapshot.state === "STALE") {

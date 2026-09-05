@@ -2,8 +2,10 @@ import type {
   Module,
   ModuleConfigurationObject,
   ProbeObservation,
+  RestoredOpenSignal,
   SignalIntent
 } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
 import { appendDailyNotWiredImpact } from "./daily.js";
 import { createCaptureGapTracker } from "./gaps.js";
 import {
@@ -53,6 +55,17 @@ export function createCaptureHealthModule(
   return Object.freeze({
     name: "capture-health",
     cadence: Object.freeze({ intervalMs: 15_000, timeoutMs: 2_000 }),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey(signal: ObservationSignal) {
+        return tracker.legacyCorrelationKey(signal) ?? gapTracker.legacyCorrelationKey(signal);
+      },
+      restore(openSignals: readonly RestoredOpenSignal[]) {
+        tracker.restore(openSignals.filter((open) =>
+          tracker.legacyCorrelationKey(open.signal) === open.correlationKey));
+        gapTracker.restore(openSignals.filter((open) =>
+          gapTracker.legacyCorrelationKey(open.signal) === open.correlationKey));
+      }
+    }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const runtimes = expectedRuntimes(ctx.thresholds);
       const [snapshot, liveness] = await Promise.all([

@@ -33,6 +33,10 @@ export function createCertificateCapacityModule(
     name: "certificate-capacity",
     cadence: Object.freeze({ intervalMs: 86_400_000, timeoutMs: 2_000 }),
     targetFragmentBasename: "OBS-05.json",
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx) {
       const snapshot = await resolved.readSnapshot(ctx.targetFragment, ctx.now, ctx.repoRoot);
       const cycle = tracker.observe({

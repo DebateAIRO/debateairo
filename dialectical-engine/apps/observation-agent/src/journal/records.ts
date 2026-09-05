@@ -36,6 +36,7 @@ export function createSignalJournalRecordV2(
 ): SignalJournalRecordV2 {
   const signal = signalSchema.parse(input);
   const parsedLifecycle = lifecycle === null ? null : signalLifecycleIdentitySchema.parse(lifecycle);
+  if (parsedLifecycle === null && !isOneShotSignal(signal)) invalid();
   return signalJournalRecordV2Schema.parse({
     record_version: 2,
     kind: "signal",
@@ -96,10 +97,6 @@ function isOneShotSignal(signal: ObservationSignal): boolean {
     || (signal.severity === "SEVERE" && signal.impact_code === "IMPACT_AGENT_JOURNAL");
 }
 
-function identityKey(signal: ObservationSignal): string {
-  return `${signal.component}\0${signal.class}`;
-}
-
 function lifecycleKey(lifecycle: SignalLifecycleIdentity): string {
   return `${lifecycle.owner}\0${lifecycle.correlationKey}`;
 }
@@ -151,7 +148,6 @@ export async function replayObservationJournals(
   const names = await journalFiles(stateDir);
   const openById = new Map<string, ReplayedOpenSignal>();
   const openByLifecycle = new Map<string, string>();
-  const openByIdentity = new Map<string, string>();
   const seenSignalIds = new Set<string>();
   const deliveryResults: ReplayedJournals["deliveryResults"][number][] = [];
 
@@ -167,19 +163,19 @@ export async function replayObservationJournals(
         if (seenSignalIds.has(signal.signal_id)) invalid();
         seenSignalIds.add(signal.signal_id);
 
-        if (isOneShotSignal(signal)) {
+        const oneShot = isOneShotSignal(signal);
+        if (decoded.versioned && lifecycle === null && !oneShot) invalid();
+        if (oneShot) {
           if (decoded.versioned && lifecycle !== null) invalid();
           continue;
         }
 
         if (signal.state === "OPEN") {
-          const currentIdentity = openByIdentity.get(identityKey(signal));
           const currentLifecycle = lifecycle === null
             ? undefined
             : openByLifecycle.get(lifecycleKey(lifecycle));
-          if (currentIdentity !== undefined || currentLifecycle !== undefined) invalid();
+          if (currentLifecycle !== undefined) invalid();
           openById.set(signal.signal_id, decoded.replayed);
-          openByIdentity.set(identityKey(signal), signal.signal_id);
           if (lifecycle !== null) openByLifecycle.set(lifecycleKey(lifecycle), signal.signal_id);
           continue;
         }
@@ -197,7 +193,6 @@ export async function replayObservationJournals(
           if (lifecycleOpenId !== undefined && lifecycleOpenId !== clearsId) invalid();
         }
         openById.delete(clearsId!);
-        openByIdentity.delete(identityKey(opened.signal));
         if (opened.lifecycle !== null) openByLifecycle.delete(lifecycleKey(opened.lifecycle));
       }
     }

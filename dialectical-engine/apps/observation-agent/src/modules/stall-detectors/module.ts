@@ -3,8 +3,10 @@ import type {
   Module,
   ModuleConfigurationObject,
   ProbeObservation,
+  RestoredOpenSignal,
   SignalIntent
 } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
 import {
   readDefectInputs,
   type DefectQueryInputs
@@ -74,6 +76,18 @@ export function createStallDetectorsModule(
     name: "stall-detectors",
     cadence: Object.freeze({ intervalMs: 10_000, timeoutMs: 2_000 }),
     targetFragmentBasename: "OBS-03.json",
+    lifecycle: Object.freeze({
+      legacyCorrelationKey(signal: ObservationSignal) {
+        return heartbeatTracker.legacyCorrelationKey(signal)
+          ?? defectLifecycle.legacyCorrelationKey(signal);
+      },
+      restore(openSignals: readonly RestoredOpenSignal[]) {
+        heartbeatTracker.restore(openSignals.filter((open) =>
+          heartbeatTracker.legacyCorrelationKey(open.signal) === open.correlationKey));
+        defectLifecycle.restore(openSignals.filter((open) =>
+          defectLifecycle.legacyCorrelationKey(open.signal) === open.correlationKey));
+      }
+    }),
     async probe(ctx) {
       const heartbeatThresholdSeconds = positiveNumber(ctx.thresholds, "heartbeat_age_s", 30);
       const snapshot = await dependencies.readHeartbeat({

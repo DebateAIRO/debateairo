@@ -1,25 +1,32 @@
 import type { ObservationModuleManifest } from "../../core/types.js";
 import {
-  consumeSendmailFailure,
-  sendmailFailureObservation,
-  sendmailFailureSignal
+  consumeSendmailResult,
+  createSendmailFailureTracker,
+  sendmailDeliveryObservation
 } from "./failures.js";
 
-const manifest: ObservationModuleManifest = Object.freeze({
-  name: "channels-sendmail",
-  cadence: Object.freeze({ intervalMs: 5_000, timeoutMs: 2_000 }),
-  async probe() {
-    const failure = consumeSendmailFailure();
-    return failure === null
-      ? Object.freeze([])
-      : Object.freeze([sendmailFailureObservation(failure)]);
-  },
-  samples() { return Object.freeze([]); },
-  signals(observations) {
-    return Object.freeze(observations
-      .filter((observation) => observation.probe === "sendmail_delivery" && !observation.ok)
-      .map(sendmailFailureSignal));
-  }
-});
+export function createChannelsSendmailModule(): ObservationModuleManifest {
+  const tracker = createSendmailFailureTracker();
+  return Object.freeze({
+    name: "channels-sendmail",
+    cadence: Object.freeze({ intervalMs: 5_000, timeoutMs: 2_000 }),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
+    async probe() {
+      const result = consumeSendmailResult();
+      return result === null
+        ? Object.freeze([])
+        : Object.freeze([sendmailDeliveryObservation(result.outcome, result.at)]);
+    },
+    samples() { return Object.freeze([]); },
+    signals(observations) {
+      return Object.freeze(observations.flatMap((observation) => tracker.observe(observation)));
+    }
+  });
+}
+
+const manifest = createChannelsSendmailModule();
 
 export default manifest;

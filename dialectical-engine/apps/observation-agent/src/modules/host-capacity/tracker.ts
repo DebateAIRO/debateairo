@@ -1,5 +1,5 @@
-import type { Severity } from "../../core/signals.js";
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal, Severity } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 import type { HostCapacitySnapshot } from "./commands.js";
 
 export type HostCapacityThresholds = Readonly<{
@@ -40,10 +40,94 @@ function signal(condition: Condition, state: "OPEN" | "CLEARED", now: Date, open
   });
 }
 
-export function createHostCapacityTracker() {
+function restoredHostKey(signal: ObservationSignal): string | null {
+  if (signal.state !== "OPEN"
+    || signal.component !== "host"
+    || signal.class !== "CAPACITY"
+    || signal.first_failed_probe_at === null
+    || signal.suspected_defect
+    || signal.defect_kind !== null
+    || signal.run_ref !== null
+    || signal.work_item_ref !== null) return null;
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const exactKeys = (keys: readonly string[]) => {
+    const actual = Object.keys(evidence).sort();
+    const expected = [...keys].sort();
+    return actual.length === expected.length
+      && actual.every((key, index) => key === expected[index]);
+  };
+  const percentFailure = typeof evidence.percent === "number"
+    && Number.isFinite(evidence.percent)
+    && typeof evidence.threshold_percent === "number"
+    && Number.isFinite(evidence.threshold_percent)
+    && evidence.percent < evidence.threshold_percent
+    && typeof evidence.total_bytes === "number"
+    && Number.isFinite(evidence.total_bytes)
+    && evidence.total_bytes > 0
+    && evidence.unit === "bytes"
+    && typeof evidence.observed_at === "string"
+    && Number.isFinite(new Date(evidence.observed_at).getTime());
+  if (signal.impact_code === "IMPACT_DISK"
+    && (signal.severity === "DEGRADED" || signal.severity === "FATAL")
+    && exactKeys(["percent", "threshold_percent", "free_bytes", "total_bytes", "unit", "observed_at"])
+    && percentFailure
+    && typeof evidence.free_bytes === "number"
+    && Number.isFinite(evidence.free_bytes)
+    && evidence.free_bytes >= 0) return "host-disk";
+  if (signal.impact_code === "IMPACT_MEMORY"
+    && signal.severity === "SEVERE"
+    && exactKeys(["percent", "threshold_percent", "available_bytes", "total_bytes", "unit", "observed_at"])
+    && percentFailure
+    && typeof evidence.available_bytes === "number"
+    && Number.isFinite(evidence.available_bytes)
+    && evidence.available_bytes >= 0) return "host-memory";
+  if (signal.impact_code === "IMPACT_LOAD"
+    && signal.severity === "DEGRADED"
+    && exactKeys(["load_one_minute", "logical_cores", "threshold_multiplier", "sustained_seconds", "observed_at"])
+    && typeof evidence.load_one_minute === "number"
+    && Number.isFinite(evidence.load_one_minute)
+    && Number.isInteger(evidence.logical_cores)
+    && (evidence.logical_cores as number) > 0
+    && typeof evidence.threshold_multiplier === "number"
+    && Number.isFinite(evidence.threshold_multiplier)
+    && evidence.threshold_multiplier > 0
+    && evidence.load_one_minute
+      > evidence.threshold_multiplier * (evidence.logical_cores as number)
+    && typeof evidence.sustained_seconds === "number"
+    && Number.isFinite(evidence.sustained_seconds)
+    && evidence.sustained_seconds >= 0
+    && typeof evidence.observed_at === "string"
+    && Number.isFinite(new Date(evidence.observed_at).getTime())) return "host-load";
+  return null;
+}
+
+export function createHostCapacityTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
+  observe(input: Readonly<{ snapshot: HostCapacitySnapshot; thresholds: HostCapacityThresholds }>): Readonly<{
+    band: "NORMAL" | "DEGRADED" | "SEVERE" | "FATAL";
+    intents: readonly SignalIntent[];
+    projections: readonly ModuleStatusProjection[];
+  }>;
+}> {
   const open = new Map<string, OpenCondition>();
   let highLoadSamples = 0;
   return Object.freeze({
+    legacyCorrelationKey: restoredHostKey,
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const key = restoredHostKey(restored.signal);
+        if (key === null || key !== restored.correlationKey || open.has(key)) {
+          throw new TypeError("OBSERVATION_HOST_CAPACITY_RESTORE_INVALID");
+        }
+        open.set(key, {
+          openedAt: new Date(restored.signal.detected_at),
+          severity: restored.signal.severity,
+          recoverySamples: 0
+        });
+        if (key === "host-load") highLoadSamples = 1;
+      }
+    },
     observe(input: Readonly<{ snapshot: HostCapacitySnapshot; thresholds: HostCapacityThresholds }>): Readonly<{
       band: "NORMAL" | "DEGRADED" | "SEVERE" | "FATAL";
       intents: readonly SignalIntent[];

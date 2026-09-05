@@ -1,4 +1,5 @@
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 import { classifyRunFailureWindow } from "./anomalies.js";
 
 export type RunFailureWindow = Readonly<{
@@ -15,6 +16,8 @@ export type RunFailureThreshold = Readonly<{
 }>;
 
 export function createRunFailureTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(window: RunFailureWindow, threshold: RunFailureThreshold): Readonly<{
     intents: readonly SignalIntent[];
     projections: readonly ModuleStatusProjection[];
@@ -22,6 +25,47 @@ export function createRunFailureTracker(): Readonly<{
 }> {
   let openedAt: Date | null = null;
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+      const startedAt = typeof evidence.window_started_at === "string"
+        ? new Date(evidence.window_started_at).getTime() : Number.NaN;
+      const endedAt = typeof evidence.window_ended_at === "string"
+        ? new Date(evidence.window_ended_at).getTime() : Number.NaN;
+      return signal.state === "OPEN"
+        && signal.component === "runner"
+        && signal.class === "THROUGHPUT_ANOMALY"
+        && signal.severity === "SEVERE"
+        && signal.impact_code === "IMPACT_RUN_FAILURE"
+        && signal.first_failed_probe_at !== null
+        && signal.suspected_defect === false
+        && signal.defect_kind === null
+        && signal.run_ref === null
+        && signal.work_item_ref === null
+        && Object.keys(evidence).sort().join(":")
+          === "failed:ratio:threshold_ratio:total:window_ended_at:window_minutes:window_started_at"
+        && Number.isInteger(evidence.failed) && (evidence.failed as number) >= 0
+        && Number.isInteger(evidence.total) && (evidence.total as number) > 0
+        && (evidence.failed as number) <= (evidence.total as number)
+        && typeof evidence.ratio === "number" && Number.isFinite(evidence.ratio)
+        && Math.abs(evidence.ratio - (evidence.failed as number) / (evidence.total as number)) < 1e-9
+        && typeof evidence.threshold_ratio === "number" && Number.isFinite(evidence.threshold_ratio)
+        && evidence.ratio >= evidence.threshold_ratio
+        && typeof evidence.window_minutes === "number" && Number.isFinite(evidence.window_minutes)
+        && evidence.window_minutes > 0
+        && Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt >= startedAt
+        ? "run-failure"
+        : null;
+    },
+    restore(openSignals): void {
+      if (openSignals.length > 1) throw new TypeError("OBSERVATION_THROUGHPUT_RESTORE_INVALID");
+      const restored = openSignals[0];
+      if (restored === undefined) return;
+      if (this.legacyCorrelationKey(restored.signal) !== restored.correlationKey
+        || restored.correlationKey !== "run-failure") {
+        throw new TypeError("OBSERVATION_THROUGHPUT_RESTORE_INVALID");
+      }
+      openedAt = new Date(restored.signal.detected_at);
+    },
     observe(window, threshold) {
       const band = classifyRunFailureWindow(window, threshold);
       const intents: SignalIntent[] = [];

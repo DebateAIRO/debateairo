@@ -4,10 +4,11 @@ import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import pg from "pg";
 import { ObservationError } from "../../core/errors.js";
+import type { ObservationSignal } from "../../core/signals.js";
 import type {
   ModuleConfigurationObject,
   ModuleConfigurationValue,
-  ModuleStatusProjection,
+  ModuleStatusProjection, RestoredOpenSignal,
   SignalIntent
 } from "../../core/types.js";
 
@@ -202,6 +203,8 @@ export function projectJobWitnessStatus(
 }
 
 export function createScheduleTracker(agentStartedAt: Date): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(
     completions: readonly LastJobCompletion[],
     thresholds: ModuleConfigurationObject,
@@ -210,6 +213,49 @@ export function createScheduleTracker(agentStartedAt: Date): Readonly<{
 }> {
   const opened = new Map<SchedulerJob, Date>();
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+      const job = evidence.job;
+      return signal.state === "OPEN"
+        && signal.class === "SCHEDULE_MISSED"
+        && signal.severity === "SEVERE"
+        && signal.impact_code === "IMPACT_SCHEDULE_MISSED"
+        && signal.first_failed_probe_at !== null
+        && signal.suspected_defect === false
+        && signal.defect_kind === null
+        && signal.run_ref === null
+        && signal.work_item_ref === null
+        && typeof job === "string"
+        && validJob(job)
+        && signal.component === `scheduler.${job}`
+        && Object.keys(evidence).sort().join(":")
+          === "cadence_s:grace_s:job:last_completed_at"
+        && typeof evidence.cadence_s === "number" && Number.isFinite(evidence.cadence_s)
+        && evidence.cadence_s > 0
+        && typeof evidence.grace_s === "number" && Number.isFinite(evidence.grace_s)
+        && evidence.grace_s >= 0
+        && (evidence.last_completed_at === null
+          || (typeof evidence.last_completed_at === "string"
+            && Number.isFinite(new Date(evidence.last_completed_at).getTime())))
+        && new Date(signal.detected_at).getTime()
+          >= new Date(signal.first_failed_probe_at).getTime()
+        ? `schedule:${job}`
+        : null;
+    },
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const job = (restored.signal.evidence as Readonly<Record<string, unknown>>).job;
+        if (typeof job !== "string"
+          || !validJob(job)
+          || this.legacyCorrelationKey(restored.signal) !== restored.correlationKey
+          || restored.signal.component !== `scheduler.${job}`
+          || restored.correlationKey !== `schedule:${job}`
+          || opened.has(job)) {
+          throw new TypeError("OBSERVATION_SCHEDULE_RESTORE_INVALID");
+        }
+        opened.set(job, new Date(restored.signal.detected_at));
+      }
+    },
     observe(completions, thresholds, at) {
       const configured = schedules(thresholds);
       const byJob = new Map(completions.map((completion) => [completion.job, completion]));
@@ -219,7 +265,8 @@ export function createScheduleTracker(agentStartedAt: Date): Readonly<{
         if (schedule === undefined) continue;
         const completion = byJob.get(job);
         const reference = completion?.completedAt ?? agentStartedAt;
-        const late = at.getTime() - reference.getTime() >= (schedule.cadenceS + schedule.graceS) * 1_000;
+        const late = (opened.has(job) && completion === undefined)
+          || at.getTime() - reference.getTime() >= (schedule.cadenceS + schedule.graceS) * 1_000;
         const evidence = Object.freeze({
           job,
           cadence_s: schedule.cadenceS,

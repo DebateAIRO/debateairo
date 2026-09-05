@@ -348,7 +348,7 @@ const clearedEvidenceByClass = {
   CERT_EXPIRY: cleared(certificateEvidenceSchema),
   SCHEDULE_MISSED: cleared(scheduleEvidenceSchema),
   THRESHOLD_CHANGED: z.never(),
-  AGENT_SELF: z.never()
+  AGENT_SELF: clearedEvidenceSchema
 } satisfies Readonly<Record<SignalClass, EvidenceValidator>>;
 
 const evidenceByImpact = {
@@ -428,7 +428,7 @@ const impactsByClass = {
   THRESHOLD_CHANGED: ["IMPACT_THRESHOLDS"],
   AGENT_SELF: [
     "IMPACT_AGENT_START", "IMPACT_AGENT_STOP", "IMPACT_AGENT_JOURNAL",
-    "IMPACT_AGENT_DELIVERY"
+    "IMPACT_AGENT_DELIVERY", "IMPACT_CLEARED"
   ]
 } as const satisfies Readonly<Record<SignalClass, readonly ImpactCode[]>>;
 

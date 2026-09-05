@@ -12,12 +12,6 @@ describe("OBS-05 capacity lifecycle", () => {
     const signals: ObservationSignal[] = [];
     const samples: Array<{ metricKey: string; value: number }> = [];
     let sequence = 0;
-    const runtime = new ObservationModuleRuntime({
-      nextSequence: () => ++sequence,
-      nextSignalId: () => `50000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
-      sampleStore: { async write(sample) { samples.push(sample); } },
-      async emitSignal(signal) { signals.push(signal); }
-    });
     const postgres = createPostgresCapacityModule({
       readSnapshot: async (_url, at) => Object.freeze({
         usedConnections: at < new Date(start.getTime() + 60_000) ? 96 : 10,
@@ -56,6 +50,13 @@ describe("OBS-05 capacity lifecycle", () => {
           ? new Date("2026-09-02T12:00:00.000Z") : new Date("2027-09-03T12:00:00.000Z"),
         observedAt: at
       })
+    });
+    const runtime = new ObservationModuleRuntime({
+      modules: Object.freeze([postgres, host, certificate]),
+      nextSequence: () => ++sequence,
+      nextSignalId: () => `50000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
+      sampleStore: { async write(sample) { samples.push(sample); } },
+      async emitSignal(signal) { signals.push(signal); }
     });
     const input = (now: Date) => ({
       modules: [postgres, host, certificate], now, timeoutMs: 2_000,

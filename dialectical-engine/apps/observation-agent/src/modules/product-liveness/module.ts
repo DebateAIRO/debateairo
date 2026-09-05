@@ -1,10 +1,11 @@
 import type {
   Module,
   ModuleConfigurationObject,
-  ProbeObservation,
+  ProbeObservation, RestoredOpenSignal,
   SignalIntent,
   StatusState
 } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
 import { createAlwaysExpectedTracker } from "../expectations/always.js";
 import { createExpectedSetTracker, DEV_STACK_MEMBERS } from "../expectations/state.js";
 import { createProbeLatencyTracker } from "./latency.js";
@@ -59,6 +60,21 @@ const productLivenessModule: Module = Object.freeze({
   name: "product-liveness",
   cadence: Object.freeze({ intervalMs: 5_000, timeoutMs: 2_000 }),
   targetFragmentBasename: "OBS-02.json",
+  lifecycle: Object.freeze({
+    legacyCorrelationKey(signal: ObservationSignal) {
+      return expectedSet.legacyCorrelationKey(signal)
+        ?? kanbanExpectation.legacyCorrelationKey(signal)
+        ?? latency.legacyCorrelationKey(signal);
+    },
+    restore(openSignals: readonly RestoredOpenSignal[]) {
+      expectedSet.restore(openSignals.filter((open) =>
+        expectedSet.legacyCorrelationKey(open.signal) === open.correlationKey));
+      kanbanExpectation.restore(openSignals.filter((open) =>
+        kanbanExpectation.legacyCorrelationKey(open.signal) === open.correlationKey));
+      latency.restore(openSignals.filter((open) =>
+        latency.legacyCorrelationKey(open.signal) === open.correlationKey));
+    }
+  }),
   async probe(ctx) {
     const openAfterFailures = numberValue(ctx.thresholds, "open_after_failures", defaults.openAfterFailures);
     const clearAfterSuccesses = numberValue(ctx.thresholds, "clear_after_successes", defaults.clearAfterSuccesses);

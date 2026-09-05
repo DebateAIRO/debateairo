@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { ObservationError } from "./errors.js";
 import {
+  signalLifecycleIdentitySchema,
+  type ReplayedOpenSignal,
+  type SignalLifecycleIdentity
+} from "./lifecycle.js";
+import {
   IMPACT_CODES,
   SEVERITIES,
   signalSchema,
@@ -14,10 +19,12 @@ import {
   STATUS_UNITS,
   STATUS_VIEW_PATTERN,
   type ModuleConfigurationObject,
+  type ModuleLifecycle,
   type Module,
   type ModuleStatusProjection,
   type ModuleTargetFragment,
   type ProbeObservation,
+  type RestoredOpenSignal,
   type SampleIntent,
   type SignalIntent
 } from "./types.js";
@@ -379,19 +386,32 @@ export class ObservationModuleRuntime {
   private readonly nextSequence: () => number;
   private readonly nextSignalId: () => string;
   private readonly sampleStore: SampleStore;
-  private readonly emitSignal: (signal: ObservationSignal, now: Date) => Promise<void>;
+  private readonly emitSignal: (
+    signal: ObservationSignal,
+    now: Date,
+    lifecycle: SignalLifecycleIdentity
+  ) => Promise<void>;
   private readonly updateModuleStatus: ((
     moduleName: string,
     update: ModuleStatusUpdate
   ) => Promise<void> | void) | undefined;
   private readonly lastRun = new Map<string, number>();
   private readonly openSignals = new Map<string, ObservationSignal>();
+  private readonly restoredByOwner = new Map<string, readonly RestoredOpenSignal[]>();
+  private readonly lifecycleOwners = new Map<string, ModuleLifecycle>();
 
   constructor(input: Readonly<{
     nextSequence: () => number;
     nextSignalId: () => string;
     sampleStore: SampleStore;
-    emitSignal: (signal: ObservationSignal, now: Date) => Promise<void>;
+    emitSignal: (
+      signal: ObservationSignal,
+      now: Date,
+      lifecycle: SignalLifecycleIdentity
+    ) => Promise<void>;
+    modules?: readonly Module[];
+    replayedOpenSignals?: readonly ReplayedOpenSignal[];
+    lifecycleOwners?: readonly Readonly<{ owner: string; lifecycle: ModuleLifecycle }>[];
     updateModuleStatus?: (
       moduleName: string,
       update: ModuleStatusUpdate
@@ -402,6 +422,15 @@ export class ObservationModuleRuntime {
     this.sampleStore = input.sampleStore;
     this.emitSignal = input.emitSignal;
     this.updateModuleStatus = input.updateModuleStatus;
+    this.restoreOpenSignals(
+      input.modules ?? Object.freeze([]),
+      input.lifecycleOwners ?? Object.freeze([]),
+      input.replayedOpenSignals ?? Object.freeze([])
+    );
+  }
+
+  restoredOpenSignals(owner: string): readonly RestoredOpenSignal[] {
+    return this.restoredByOwner.get(owner) ?? Object.freeze([]);
   }
 
   async run(input: Readonly<{
@@ -499,40 +528,142 @@ export class ObservationModuleRuntime {
     intent: SignalIntent,
     context: Readonly<{ now: Date; thresholdVersion: number }>
   ): Promise<void> {
+    const ownerLifecycle = this.lifecycleOwners.get(moduleName);
+    if (ownerLifecycle === undefined) {
+      throw new ObservationError("OBSERVATION_MODULE_SIGNAL_INVALID");
+    }
     const correlationKey = `${moduleName}:${intent.correlationKey}`;
     const opened = this.openSignals.get(correlationKey);
-    if (intent.state === "OPEN" && opened !== undefined) return;
-    if (intent.state === "CLEARED" && opened === undefined) return;
+    const signalInput = (seq: number, signalId: string, clearsSignalId: string | null) => ({
+      seq,
+      signal_id: signalId,
+      state: intent.state,
+      class: intent.class,
+      component: intent.component,
+      severity: intent.severity,
+      impact_code: intent.impactCode,
+      first_failed_probe_at: intent.firstFailedProbeAt?.toISOString() ?? null,
+      detected_at: intent.detectedAt.toISOString(),
+      evidence: intent.evidence,
+      suspected_defect: intent.suspectedDefect,
+      defect_kind: intent.defectKind,
+      run_ref: intent.runRef,
+      work_item_ref: intent.workItemRef,
+      threshold_version: context.thresholdVersion,
+      clears_signal_id: clearsSignalId,
+      recorded_at: context.now.toISOString()
+    });
+    try {
+      if (intent.state === "OPEN") {
+        const candidate = signalSchema.parse(signalInput(
+          1,
+          "00000000-0000-4000-8000-000000000001",
+          null
+        ));
+        const derivedKey = ownerLifecycle.legacyCorrelationKey(candidate);
+        if (derivedKey === null || derivedKey !== intent.correlationKey) {
+          throw new TypeError("lifecycle identity mismatch");
+        }
+      }
+    } catch (error) {
+      throw new ObservationError("OBSERVATION_MODULE_SIGNAL_INVALID", error);
+    }
     if (opened !== undefined
       && (opened.component !== intent.component || opened.class !== intent.class)) {
       throw new ObservationError("OBSERVATION_MODULE_SIGNAL_INVALID");
     }
+    if (intent.state === "OPEN" && opened !== undefined) return;
+    if (intent.state === "CLEARED" && opened === undefined) return;
     let signal: ObservationSignal;
     try {
-      signal = signalSchema.parse({
-        seq: this.nextSequence(),
-        signal_id: this.nextSignalId(),
-        state: intent.state,
-        class: intent.class,
-        component: intent.component,
-        severity: intent.severity,
-        impact_code: intent.impactCode,
-        first_failed_probe_at: intent.firstFailedProbeAt?.toISOString() ?? null,
-        detected_at: intent.detectedAt.toISOString(),
-        evidence: intent.evidence,
-        suspected_defect: intent.suspectedDefect,
-        defect_kind: intent.defectKind,
-        run_ref: intent.runRef,
-        work_item_ref: intent.workItemRef,
-        threshold_version: context.thresholdVersion,
-        clears_signal_id: opened?.signal_id ?? null,
-        recorded_at: context.now.toISOString()
-      });
+      signal = signalSchema.parse(signalInput(
+        this.nextSequence(),
+        this.nextSignalId(),
+        opened?.signal_id ?? null
+      ));
     } catch (error) {
       throw new ObservationError("OBSERVATION_MODULE_SIGNAL_INVALID", error);
     }
-    await this.emitSignal(signal, context.now);
-    if (intent.state === "OPEN") this.openSignals.set(correlationKey, signal);
-    else this.openSignals.delete(correlationKey);
+    const lifecycle = Object.freeze({ owner: moduleName, correlationKey: intent.correlationKey });
+    await this.emitSignal(signal, context.now, lifecycle);
+    if (intent.state === "OPEN") {
+      this.openSignals.set(correlationKey, signal);
+    } else {
+      this.openSignals.delete(correlationKey);
+    }
+  }
+
+  private restoreOpenSignals(
+    modules: readonly Module[],
+    additionalOwners: readonly Readonly<{ owner: string; lifecycle: ModuleLifecycle }>[],
+    replayed: readonly ReplayedOpenSignal[]
+  ): void {
+    const owners = new Map<string, ModuleLifecycle>();
+    try {
+      for (const module of modules) {
+        if (module.lifecycle === undefined) continue;
+        if (owners.has(module.name)) throw new TypeError("duplicate lifecycle owner");
+        owners.set(module.name, module.lifecycle);
+      }
+      for (const entry of additionalOwners) {
+        if (owners.has(entry.owner)
+          || !/^[a-z][a-z0-9-]*$/u.test(entry.owner)
+          || typeof entry.lifecycle.legacyCorrelationKey !== "function"
+          || typeof entry.lifecycle.restore !== "function") {
+          throw new TypeError("invalid lifecycle owner");
+        }
+        owners.set(entry.owner, entry.lifecycle);
+      }
+      for (const [owner, lifecycle] of owners) this.lifecycleOwners.set(owner, lifecycle);
+
+      const mutableByOwner = new Map<string, RestoredOpenSignal[]>();
+      for (const owner of owners.keys()) mutableByOwner.set(owner, []);
+      const restoredComposites = new Set<string>();
+      for (const replayedOpen of replayed) {
+        if (replayedOpen.signal.state !== "OPEN") throw new TypeError("not open");
+        let owner: string;
+        let correlationKey: string;
+        if (replayedOpen.lifecycle === null) {
+          const matches = [...owners].flatMap(([candidateOwner, lifecycle]) => {
+            const candidateKey = lifecycle.legacyCorrelationKey(replayedOpen.signal);
+            return candidateKey === null ? [] : [{ owner: candidateOwner, correlationKey: candidateKey }];
+          });
+          if (matches.length !== 1) throw new TypeError("ambiguous legacy owner");
+          ({ owner, correlationKey } = matches[0]!);
+        } else {
+          const parsed = signalLifecycleIdentitySchema.parse(replayedOpen.lifecycle);
+          const lifecycle = owners.get(parsed.owner);
+          if (lifecycle === undefined) throw new TypeError("unknown lifecycle owner");
+          const derivedKey = lifecycle.legacyCorrelationKey(replayedOpen.signal);
+          if (derivedKey === null || derivedKey !== parsed.correlationKey) {
+            throw new TypeError("lifecycle identity mismatch");
+          }
+          owner = parsed.owner;
+          correlationKey = parsed.correlationKey;
+        }
+        const parsedIdentity = signalLifecycleIdentitySchema.parse({ owner, correlationKey });
+        const composite = `${parsedIdentity.owner}:${parsedIdentity.correlationKey}`;
+        if (restoredComposites.has(composite)) {
+          throw new TypeError("duplicate restored identity");
+        }
+        restoredComposites.add(composite);
+        const restored = Object.freeze({
+          correlationKey: parsedIdentity.correlationKey,
+          signal: replayedOpen.signal
+        });
+        mutableByOwner.get(parsedIdentity.owner)!.push(restored);
+        this.openSignals.set(composite, replayedOpen.signal);
+      }
+      for (const [owner, lifecycle] of owners) {
+        const restored = Object.freeze([...(mutableByOwner.get(owner) ?? [])]);
+        this.restoredByOwner.set(owner, restored);
+        lifecycle.restore(restored);
+      }
+    } catch (error) {
+      this.openSignals.clear();
+      this.restoredByOwner.clear();
+      this.lifecycleOwners.clear();
+      throw new ObservationError("OBSERVATION_LIFECYCLE_RESTORE_INVALID", error);
+    }
   }
 }

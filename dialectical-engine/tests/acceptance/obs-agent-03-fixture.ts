@@ -286,7 +286,15 @@ async function persistSignals(input: Readonly<{
         input.firstSeq + index,
         input.clearsByCorrelation?.[intent.correlationKey] ?? null
       );
-      await persistSignal({ signal, journal, mirror });
+      await persistSignal({
+        signal,
+        lifecycle: Object.freeze({
+          owner: "stall-detectors",
+          correlationKey: intent.correlationKey
+        }),
+        journal,
+        mirror
+      });
       signals.push(signal);
     }
     return Object.freeze(signals);

@@ -169,7 +169,9 @@ export async function runOpenAnomalyFixture(input: Readonly<{
     nextSequence: () => ++sequence,
     nextSignalId: randomUUID,
     sampleStore: new SampleRingStore(input.pool),
-    emitSignal: async (signal) => persistSignal({ signal, journal, mirror }).then(() => undefined),
+    emitSignal: async (signal, _now, lifecycle) =>
+      persistSignal({ signal, lifecycle, journal, mirror }).then(() => undefined),
+    modules,
     updateModuleStatus(moduleName, update) {
       projections.set(moduleName, update.projections);
     }

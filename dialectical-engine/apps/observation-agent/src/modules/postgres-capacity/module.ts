@@ -102,6 +102,10 @@ export function createPostgresCapacityModule(
   return Object.freeze({
     name: "postgres-capacity",
     cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const capacityThresholds = thresholds(ctx.thresholds);
       const snapshot = await resolved.readSnapshot(ctx.databaseUrl, ctx.now, Object.freeze({

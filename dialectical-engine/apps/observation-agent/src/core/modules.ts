@@ -34,6 +34,11 @@ function requireModule(candidate: unknown, directory: string): Module {
     || typeof module.probe !== "function"
     || typeof module.samples !== "function"
     || typeof module.signals !== "function"
+    || (module.lifecycle !== undefined
+      && (module.lifecycle === null
+        || typeof module.lifecycle !== "object"
+        || typeof module.lifecycle.legacyCorrelationKey !== "function"
+        || typeof module.lifecycle.restore !== "function"))
     || (module.router !== undefined
       && (module.router === null
         || typeof module.router !== "object"

@@ -57,7 +57,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
 
     const requiredMembers = ["cadence", "name", "probe", "samples", "signals"];
     const allowedMembers = new Set([
-      ...requiredMembers, "oactl", "router", "targetFragmentBasename"
+      ...requiredMembers, "lifecycle", "oactl", "router", "targetFragmentBasename"
     ]);
     for (const module of catalog.modules) {
       const members = Object.keys(module);
@@ -66,6 +66,10 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       expect(module.probe).toBeTypeOf("function");
       expect(module.samples).toBeTypeOf("function");
       expect(module.signals).toBeTypeOf("function");
+      if (module.lifecycle !== undefined) {
+        expect(module.lifecycle.legacyCorrelationKey).toBeTypeOf("function");
+        expect(module.lifecycle.restore).toBeTypeOf("function");
+      }
       expect(Number.isFinite(module.cadence.intervalMs)).toBe(true);
       expect(Number.isFinite(module.cadence.timeoutMs)).toBe(true);
     }

@@ -3,11 +3,12 @@ import { join } from "node:path";
 import pg from "pg";
 import { loadObservationAgentEnvironment } from "../../../packages/register/src/runtime-environment.js";
 import { ObservationError, normalizeObservationError } from "./core/errors.js";
+import type { SignalLifecycleIdentity } from "./core/lifecycle.js";
 import { createOwnedSignalRouter, discoverObservationModules } from "./core/modules.js";
 import { observationRepoRoot } from "./core/paths.js";
 import { ObservationModuleRuntime, parseModuleStatusProjection } from "./core/runtime.js";
-import { createLegacyOsaScriptRouter } from "./core/routing.js";
-import { signalSchema, type ObservationSignal, type Severity } from "./core/signals.js";
+import { createLegacyOsaScriptRouter, type SignalRouter } from "./core/routing.js";
+import type { ObservationSignal } from "./core/signals.js";
 import { readBootThresholdPolicy, ThresholdPolicyCache } from "./core/threshold-cache.js";
 import { loadObservationTargetCatalog } from "./core/targets.js";
 import {
@@ -17,6 +18,11 @@ import {
   type StatusState
 } from "./core/types.js";
 import { ObservationJournal } from "./journal/journal.js";
+import { replayObservationJournals } from "./journal/records.js";
+import {
+  createCoreLivenessObservationCoordinator,
+  type CoreLivenessOpenSignal
+} from "./modules/core-liveness/coordinator.js";
 import { createLivenessTracker, inactiveClassRecoveries } from "./modules/core-liveness/state.js";
 import { deliverJournalFailureDirect } from "./modules/self/direct-notify.js";
 import { HeartbeatWriter, writeHeartbeatFailOpen } from "./modules/self/heartbeat.js";
@@ -42,91 +48,12 @@ import {
 
 const VERSION = "0.1.0";
 
-type OpenSignal = Readonly<{ signal: ObservationSignal; openedAt: Date }>;
 type MutableComponentStatus = {
   state: StatusState;
   lastProbeAt: Date | null;
   lastOkAt: Date | null;
   openSignalIds: Set<string>;
 };
-
-function impactFor(observation: ProbeObservation): ObservationSignal["impact_code"] {
-  if (observation.class === "INFRA_NOT_READY") return "IMPACT_HATCHET_NOT_READY";
-  if (observation.class === "INFRA_UNKNOWN" || observation.component === "docker") {
-    return "IMPACT_DOCKER_DOWN";
-  }
-  if (observation.component === "postgres") return "IMPACT_PG_DOWN";
-  return "IMPACT_HATCHET_DOWN";
-}
-
-function safeLastStatus(observation: ProbeObservation): number | "READY" | "FAILED" | "UNKNOWN" | "WRITTEN" {
-  if (typeof observation.lastStatus === "number") return observation.lastStatus;
-  if (["READY", "FAILED", "UNKNOWN", "WRITTEN"].includes(observation.lastStatus)) {
-    return observation.lastStatus as "READY" | "FAILED" | "UNKNOWN" | "WRITTEN";
-  }
-  return observation.ok ? "READY" : "FAILED";
-}
-
-function livenessSignal(input: Readonly<{
-  seq: number;
-  signalId: string;
-  observation: ProbeObservation;
-  kind: "OPEN" | "CLEARED";
-  at: Date;
-  firstFailedAt?: Date;
-  thresholdVersion: number;
-  threshold: number;
-  severity: Severity;
-  clearsSignalId?: string;
-  openedAt?: Date;
-}>): ObservationSignal {
-  const commonEvidence = {
-    probe: input.observation.probe,
-    ...(input.observation.target === undefined ? {} : { target: input.observation.target }),
-    last_status: safeLastStatus(input.observation)
-  };
-  const evidence = input.kind === "CLEARED"
-    ? {
-        ...commonEvidence,
-        consecutive_failures: 0,
-        threshold: input.threshold,
-        ...(input.openedAt === undefined ? {} : {
-          duration_seconds: Math.max(0, (input.at.getTime() - input.openedAt.getTime()) / 1_000)
-        })
-      }
-    : {
-        ...commonEvidence,
-        consecutive_failures: input.threshold,
-        threshold: input.threshold,
-        ...(input.observation.containerStatus === undefined ? {} : {
-          container_status: input.observation.containerStatus
-        }),
-        ...(input.observation.restartPolicy === undefined ? {} : {
-          restart_policy: input.observation.restartPolicy
-        }),
-        ...(input.observation.exitCode === undefined ? {} : { exit_code: input.observation.exitCode })
-      };
-  const timestamp = input.at.toISOString();
-  return Object.freeze(signalSchema.parse({
-    seq: input.seq,
-    signal_id: input.signalId,
-    state: input.kind,
-    class: input.observation.class,
-    component: input.observation.component,
-    severity: input.severity,
-    impact_code: input.kind === "CLEARED" ? "IMPACT_CLEARED" : impactFor(input.observation),
-    first_failed_probe_at: input.firstFailedAt?.toISOString() ?? null,
-    detected_at: timestamp,
-    evidence,
-    suspected_defect: false,
-    defect_kind: null,
-    run_ref: null,
-    work_item_ref: null,
-    threshold_version: input.thresholdVersion,
-    clears_signal_id: input.clearsSignalId ?? null,
-    recorded_at: timestamp
-  }));
-}
 
 async function boot(): Promise<void> {
   const repoRoot = observationRepoRoot();
@@ -143,6 +70,17 @@ async function boot(): Promise<void> {
     throw new ObservationError("OBSERVATION_TARGETS_INVALID");
   }
   const targets = targetCatalog.targets;
+  const journal = new ObservationJournal(environment.OBSERVATION_STATE_DIR);
+  const lifecycleOwners = new Set([
+    "core-liveness",
+    ...moduleCatalog.modules
+      .filter((module) => module.lifecycle !== undefined)
+      .map((module) => module.name)
+  ]);
+  const replayed = await replayObservationJournals(
+    environment.OBSERVATION_STATE_DIR,
+    lifecycleOwners
+  );
 
   const bootstrapPool = new pg.Pool({
     connectionString: environment.OBSERVATION_DATABASE_URL,
@@ -164,7 +102,6 @@ async function boot(): Promise<void> {
     max: policy.value.resources.max_database_sessions
   });
   const repository = new ThresholdRepository(pool);
-  const journal = new ObservationJournal(environment.OBSERVATION_STATE_DIR);
   const mirror = new PostgresMirror(pool);
   const delivery = new DeliveryCoordinator({ journal, mirror });
   const osascript = createOsaScriptDeliveryExecutor();
@@ -181,20 +118,6 @@ async function boot(): Promise<void> {
       ...(routerOwner === null ? {} : policy.value.modules?.[routerOwner.moduleName] ?? {})
     }) as ModuleConfigurationObject
   });
-  const initialRouterModule = currentRouterModule();
-  const router = routerOwner === null
-    ? createLegacyOsaScriptRouter({ delivery, osascript })
-    : await createOwnedSignalRouter(routerOwner, {
-        stateDir: environment.OBSERVATION_STATE_DIR,
-        repoRoot,
-        delivery,
-        osascript,
-        moduleName: routerOwner.moduleName,
-        targetFragment: routerTargetFragments[0]!,
-        configuration: routerTargetFragments[0]!.configuration,
-        thresholds: initialRouterModule.thresholds,
-        thresholdVersion: initialRouterModule.thresholdVersion
-      });
   const heartbeat = new HeartbeatWriter({ pool, stateDir: environment.OBSERVATION_STATE_DIR });
   let nextSequence = Date.now() * 1_000;
   const sequence = () => { nextSequence += 1; return nextSequence; };
@@ -202,7 +125,7 @@ async function boot(): Promise<void> {
     openAfterFailures: policy.value.liveness.open_after_failures,
     clearAfterSuccesses: policy.value.liveness.clear_after_successes
   });
-  const openSignals = new Map<string, OpenSignal>();
+  const openSignals = new Map<string, CoreLivenessOpenSignal>();
   const status = new Map<string, MutableComponentStatus>();
   const moduleStatus = new Map<string, readonly StoredModuleStatusProjection[]>();
   for (const target of targets) {
@@ -214,10 +137,15 @@ async function boot(): Promise<void> {
   let shuttingDown = false;
   let cycling = false;
   let timer: NodeJS.Timeout;
+  let router: SignalRouter | null = null;
 
-  async function emit(signal: ObservationSignal, now: Date): Promise<void> {
+  async function emit(
+    signal: ObservationSignal,
+    now: Date,
+    lifecycle: SignalLifecycleIdentity | null = null
+  ): Promise<void> {
     try {
-      await persistSignal({ signal, journal, mirror });
+      await persistSignal({ signal, lifecycle, journal, mirror });
     } catch {
       await deliverJournalFailureDirect({ timeoutMs: policy.value.notification.timeout_ms })
         .catch(() => undefined);
@@ -232,6 +160,7 @@ async function boot(): Promise<void> {
     status.set(signal.component, componentStatus);
     if (signal.state === "OPEN") componentStatus.openSignalIds.add(signal.signal_id);
     else if (signal.clears_signal_id !== null) componentStatus.openSignalIds.delete(signal.clears_signal_id);
+    if (router === null) throw new ObservationError("OBSERVATION_LIFECYCLE_RESTORE_INVALID");
     const routingMute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
     await router.onSignal({
       signal,
@@ -253,6 +182,15 @@ async function boot(): Promise<void> {
   }
 
   const moduleRuntime = new ObservationModuleRuntime({
+    modules: moduleCatalog.modules,
+    replayedOpenSignals: replayed.openSignals,
+    lifecycleOwners: Object.freeze([Object.freeze({
+      owner: "core-liveness",
+      lifecycle: Object.freeze({
+        legacyCorrelationKey: tracker.legacyCorrelationKey,
+        restore: tracker.restore
+      })
+    })]),
     nextSequence: sequence,
     nextSignalId: randomUUID,
     sampleStore: new SampleRingStore(pool),
@@ -276,6 +214,50 @@ async function boot(): Promise<void> {
     }
   });
 
+  for (const owner of lifecycleOwners) {
+    for (const restored of moduleRuntime.restoredOpenSignals(owner)) {
+      const componentStatus = status.get(restored.signal.component) ?? {
+        state: "UNKNOWN" as const,
+        lastProbeAt: null,
+        lastOkAt: null,
+        openSignalIds: new Set<string>()
+      };
+      componentStatus.openSignalIds.add(restored.signal.signal_id);
+      if (owner === "core-liveness") componentStatus.state = "DOWN";
+      status.set(restored.signal.component, componentStatus);
+      if (owner === "core-liveness") {
+        openSignals.set(restored.correlationKey, Object.freeze({
+          signal: restored.signal,
+          openedAt: new Date(restored.signal.detected_at)
+        }));
+      }
+    }
+  }
+
+  const initialRouterModule = currentRouterModule();
+  const initializedRouter = routerOwner === null
+    ? createLegacyOsaScriptRouter({ delivery, osascript })
+    : await createOwnedSignalRouter(routerOwner, {
+        stateDir: environment.OBSERVATION_STATE_DIR,
+        repoRoot,
+        delivery,
+        osascript,
+        moduleName: routerOwner.moduleName,
+        targetFragment: routerTargetFragments[0]!,
+        configuration: routerTargetFragments[0]!.configuration,
+        thresholds: initialRouterModule.thresholds,
+        thresholdVersion: initialRouterModule.thresholdVersion
+      });
+  router = initializedRouter;
+
+  const livenessCoordinator = createCoreLivenessObservationCoordinator({
+    tracker,
+    openSignals,
+    nextSequence: sequence,
+    nextSignalId: randomUUID,
+    emit
+  });
+
   const startAt = new Date();
   const previousExitReason = await journal.previousRunExitReason();
   await emit(makeSelfSignal({
@@ -288,48 +270,28 @@ async function boot(): Promise<void> {
     now: Date,
     updateComponentStatus = true
   ): Promise<void> {
-    const key = `${observation.component}:${observation.class}`;
-    const transition = tracker.observe({
-      component: observation.component, class: observation.class, ok: observation.ok, at: now
-    });
     const componentStatus = status.get(observation.component);
-    if (componentStatus !== undefined && updateComponentStatus) {
-      componentStatus.state = transition.state;
-      componentStatus.lastProbeAt = now;
-      if (observation.ok) componentStatus.lastOkAt = now;
-    }
-    if (transition.event?.kind === "OPEN") {
-      const signal = livenessSignal({
-        seq: sequence(), signalId: randomUUID(), observation, kind: "OPEN", at: now,
-        ...(transition.event.firstFailedProbeAt === undefined ? {} : {
-          firstFailedAt: transition.event.firstFailedProbeAt
-        }),
-        thresholdVersion: policy.version,
-        threshold: policy.value.liveness.open_after_failures,
-        severity: routeSeverity(policy.value, observation.class, observation.component)
-      });
-      openSignals.set(key, Object.freeze({ signal, openedAt: now }));
-      componentStatus?.openSignalIds.add(signal.signal_id);
-      await emit(signal, now);
-    } else if (transition.event?.kind === "CLEARED") {
-      const opened = openSignals.get(key);
-      if (opened !== undefined) {
-        const signal = livenessSignal({
-          seq: sequence(), signalId: randomUUID(), observation, kind: "CLEARED", at: now,
-          thresholdVersion: policy.version,
-          threshold: policy.value.liveness.clear_after_successes,
-          severity: routeSeverity(policy.value, observation.class, observation.component),
-          clearsSignalId: opened.signal.signal_id,
-          ...(opened.signal.first_failed_probe_at === null ? {} : {
-            firstFailedAt: new Date(opened.signal.first_failed_probe_at)
-          }),
-          openedAt: opened.openedAt
-        });
-        openSignals.delete(key);
-        componentStatus?.openSignalIds.delete(opened.signal.signal_id);
-        await emit(signal, now);
+    await livenessCoordinator.observe({
+      observation,
+      now,
+      thresholdVersion: policy.version,
+      openAfterFailures: policy.value.liveness.open_after_failures,
+      clearAfterSuccesses: policy.value.liveness.clear_after_successes,
+      severity: routeSeverity(policy.value, observation.class, observation.component),
+      onTransition(state) {
+        if (componentStatus !== undefined && updateComponentStatus) {
+          componentStatus.state = state;
+          componentStatus.lastProbeAt = now;
+          if (observation.ok) componentStatus.lastOkAt = now;
+        }
+      },
+      onOpened(signal) {
+        componentStatus?.openSignalIds.add(signal.signal_id);
+      },
+      onCleared(signalId) {
+        componentStatus?.openSignalIds.delete(signalId);
       }
-    }
+    });
   }
 
   async function probeTargets(now: Date): Promise<readonly ProbeObservation[]> {
@@ -386,7 +348,7 @@ async function boot(): Promise<void> {
       }
 
       const routingMute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
-      await router.onTick({
+      await initializedRouter.onTick({
         now,
         policy: {
           rateLimitMs: policy.value.notification.rate_limit_ms,
@@ -399,7 +361,7 @@ async function boot(): Promise<void> {
         module: currentRouterModule()
       });
 
-      const routerStatus = router.status().map((projection) =>
+      const routerStatus = initializedRouter.status().map((projection) =>
         toStoredModuleStatusProjection(parseModuleStatusProjection(projection)));
       const mergedModuleStatus = mergeModuleStatus(
         moduleStatus, routerOwner?.moduleName ?? null, routerStatus

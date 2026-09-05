@@ -1,5 +1,5 @@
-import type { Severity } from "../../core/signals.js";
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal, Severity } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 import type { PostgresCapacitySnapshot } from "./query.js";
 
 export type PostgresCapacityThresholds = Readonly<{
@@ -78,7 +78,68 @@ function stateForConnectionPercent(value: number, thresholds: PostgresCapacityTh
   return "NORMAL" as const;
 }
 
+function restoredPostgresKey(signal: ObservationSignal): string | null {
+  if (signal.state !== "OPEN"
+    || signal.component !== "postgres"
+    || signal.class !== "CAPACITY"
+    || signal.first_failed_probe_at === null
+    || signal.suspected_defect
+    || signal.defect_kind !== null
+    || signal.run_ref !== null
+    || signal.work_item_ref !== null) return null;
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const exactKeys = (keys: readonly string[]) => {
+    const actual = Object.keys(evidence).sort();
+    const expected = [...keys].sort();
+    return actual.length === expected.length
+      && actual.every((key, index) => key === expected[index]);
+  };
+  const observedAt = typeof evidence.observed_at === "string"
+    && Number.isFinite(new Date(evidence.observed_at).getTime());
+  if (signal.impact_code === "IMPACT_PG_CAPACITY"
+    && (signal.severity === "SEVERE" || signal.severity === "FATAL")
+    && exactKeys(["used", "max", "percent", "threshold_percent", "unit", "observed_at"])
+    && typeof evidence.used === "number" && Number.isFinite(evidence.used) && evidence.used >= 0
+    && typeof evidence.max === "number" && Number.isFinite(evidence.max) && evidence.max > 0
+    && typeof evidence.percent === "number" && Number.isFinite(evidence.percent)
+    && Math.abs(evidence.percent - evidence.used / evidence.max * 100) < 1e-9
+    && typeof evidence.threshold_percent === "number"
+    && Number.isFinite(evidence.threshold_percent)
+    && evidence.percent >= evidence.threshold_percent
+    && evidence.unit === "connections" && observedAt) return "postgres-connections";
+  if (signal.impact_code === "IMPACT_PG_LOCKS"
+    && signal.severity === "SEVERE"
+    && exactKeys(["count", "duration_seconds", "threshold_seconds", "unit", "observed_at"])
+    && Number.isInteger(evidence.count) && (evidence.count as number) > 0
+    && typeof evidence.duration_seconds === "number" && Number.isFinite(evidence.duration_seconds)
+    && typeof evidence.threshold_seconds === "number" && Number.isFinite(evidence.threshold_seconds)
+    && evidence.threshold_seconds > 0 && evidence.duration_seconds >= evidence.threshold_seconds
+    && evidence.unit === "seconds" && observedAt) return "postgres-lock-waiters";
+  if (signal.impact_code === "IMPACT_PG_LONG_XACT"
+    && signal.severity === "SEVERE"
+    && exactKeys(["duration_seconds", "threshold_seconds", "unit", "observed_at"])
+    && typeof evidence.duration_seconds === "number" && Number.isFinite(evidence.duration_seconds)
+    && typeof evidence.threshold_seconds === "number" && Number.isFinite(evidence.threshold_seconds)
+    && evidence.threshold_seconds > 0 && evidence.duration_seconds >= evidence.threshold_seconds
+    && evidence.unit === "seconds" && observedAt) {
+    return "postgres-long-transaction";
+  }
+  if (signal.impact_code === "IMPACT_PG_LONG_XACT"
+    && signal.severity === "DEGRADED"
+    && exactKeys(["count", "duration_seconds", "threshold_seconds", "unit", "observed_at"])
+    && Number.isInteger(evidence.count) && (evidence.count as number) > 0
+    && typeof evidence.duration_seconds === "number" && Number.isFinite(evidence.duration_seconds)
+    && typeof evidence.threshold_seconds === "number" && Number.isFinite(evidence.threshold_seconds)
+    && evidence.threshold_seconds > 0 && evidence.duration_seconds >= evidence.threshold_seconds
+    && evidence.unit === "sessions" && observedAt) {
+    return "postgres-idle-transaction";
+  }
+  return null;
+}
+
 export function createPostgresCapacityTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(input: Readonly<{
     snapshot: PostgresCapacitySnapshot;
     thresholds: PostgresCapacityThresholds;
@@ -90,6 +151,20 @@ export function createPostgresCapacityTracker(): Readonly<{
 }> {
   const open = new Map<string, OpenCondition>();
   return Object.freeze({
+    legacyCorrelationKey: restoredPostgresKey,
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const key = restoredPostgresKey(restored.signal);
+        if (key === null || key !== restored.correlationKey || open.has(key)) {
+          throw new TypeError("OBSERVATION_POSTGRES_CAPACITY_RESTORE_INVALID");
+        }
+        open.set(key, {
+          openedAt: new Date(restored.signal.detected_at),
+          severity: restored.signal.severity,
+          recoverySamples: 0
+        });
+      }
+    },
     observe({ snapshot, thresholds }) {
       const connectionPercent = percent(snapshot.usedConnections, snapshot.maxConnections);
       const connectionBand = stateForConnectionPercent(connectionPercent, thresholds);

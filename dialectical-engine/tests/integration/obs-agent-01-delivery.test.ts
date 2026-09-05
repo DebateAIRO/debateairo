@@ -75,8 +75,11 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     const journal = new ObservationJournal(stateDir);
     const mirror = new PostgresMirror(database.pool);
     const open = signal({ seq: 1, id: "10000000-0000-4000-8000-000000000001" });
-    await expect(persistSignal({ signal: open, journal, mirror })).resolves.toEqual({ mirrored: true });
-    await expect(persistSignal({ signal: open, journal, mirror })).resolves.toEqual({ mirrored: true });
+    const lifecycle = { owner: "core-liveness", correlationKey: "hatchet:INFRA_DOWN" } as const;
+    await expect(persistSignal({ signal: open, lifecycle, journal, mirror }))
+      .resolves.toEqual({ mirrored: true });
+    await expect(persistSignal({ signal: open, lifecycle, journal, mirror }))
+      .resolves.toEqual({ mirrored: true });
     expect((await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM observation.signal WHERE signal_id=$1",
       [open.signal_id]
@@ -261,7 +264,8 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     const severe = signal({
       seq: 2, id: "10000000-0000-4000-8000-000000000002", severity: "SEVERE"
     });
-    await persistSignal({ signal: severe, journal, mirror });
+    const lifecycle = { owner: "core-liveness", correlationKey: "hatchet:INFRA_DOWN" } as const;
+    await persistSignal({ signal: severe, lifecycle, journal, mirror });
     const router = createLegacyOsaScriptRouter({
       delivery: new DeliveryCoordinator({ journal, mirror }),
       osascript: createOsaScriptDeliveryExecutor(async () => { invocationCount += 1; })
@@ -280,7 +284,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       clears: severe.signal_id as string,
       severity: "SEVERE"
     });
-    await persistSignal({ signal: cleared, journal, mirror });
+    await persistSignal({ signal: cleared, lifecycle, journal, mirror });
     await router.onSignal({ signal: cleared as never,
       now: new Date("2026-09-03T07:02:01.000Z"), mute: {},
       module: EMPTY_ROUTER_MODULE,
@@ -327,6 +331,28 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
                 },
                 status() { return []; }
               };
+            }
+          },
+          lifecycle: {
+            legacyCorrelationKey(signal) {
+              return signal.state === "OPEN"
+                && signal.component === "hatchet"
+                && signal.class === "INFRA_DOWN"
+                && signal.severity === "SEVERE"
+                && signal.impact_code === "IMPACT_HATCHET_DOWN"
+                && signal.first_failed_probe_at !== null
+                && signal.suspected_defect === false
+                && signal.defect_kind === null
+                && signal.run_ref === null
+                && signal.work_item_ref === null
+                ? "health"
+                : null;
+            },
+            restore(opens) {
+              if (opens.length > 1 || opens.some((open) => open.correlationKey !== "health")) {
+                throw new TypeError("SYNTHETIC_RESTORE_INVALID");
+              }
+              if (opens[0]) firstFailedAt = new Date(opens[0].signal.first_failed_probe_at);
             }
           },
           async probe() { cycle += 1; return []; },
@@ -437,9 +463,10 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       });
       const route = async (
         emitted: Parameters<typeof router.onSignal>[0]["signal"],
-        now: Date
+        now: Date,
+        lifecycle: Readonly<{ owner: string; correlationKey: string }> | null
       ) => {
-        await persistSignal({ signal: emitted, journal, mirror });
+        await persistSignal({ signal: emitted, lifecycle, journal, mirror });
         await router.onSignal({ signal: emitted, now, policy: routingPolicy, mute: null,
           module: currentModule });
       };
@@ -450,14 +477,15 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       await route(makeSelfSignal({
         seq: 500, signalId: "50000000-0000-4000-8000-000000000000",
         now: startAt, thresholdVersion: 7, event: "START"
-      }), startAt);
+      }), startAt, null);
       expect((globalThis as typeof globalThis & { __obsRouterEvents: string[] })
         .__obsRouterEvents.slice(0, 2)).toEqual(["create", "signal:AGENT_SELF"]);
       const runtime = new ObservationModuleRuntime({
         nextSequence: () => { sequence += 1; return sequence; },
         nextSignalId: () => ids.shift() ?? "50000000-0000-4000-8000-000000000099",
         sampleStore: new SampleRingStore(database.pool),
-        emitSignal: route
+        emitSignal: route,
+        modules: catalog.modules
       });
       for (const second of [0, 5, 10]) {
         await runtime.run({

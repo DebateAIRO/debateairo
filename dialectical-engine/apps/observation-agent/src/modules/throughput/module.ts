@@ -113,6 +113,10 @@ export function createThroughputModule(dependencies: ThroughputDependencies = pr
   return Object.freeze({
     name: "throughput",
     cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const throughputWindowMinutes = positive(ctx.thresholds.window_minutes, 5);
       const windowMinutes = positive(ctx.thresholds.run_failure_window_minutes, 60);

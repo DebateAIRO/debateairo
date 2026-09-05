@@ -1,4 +1,5 @@
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 import type { SpoolReceiptSnapshot } from "./queries.js";
 import type { SpoolFileMetadata, SpoolScan } from "./scan.js";
 
@@ -49,7 +50,45 @@ function clearIntent(open: OpenSpool, now: Date): SignalIntent {
   });
 }
 
+function restoredSpoolKey(signal: ObservationSignal): string | null {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const runtime = evidence.runtime;
+  const spoolRef = evidence.spool_ref;
+  const spoolMatch = typeof spoolRef === "string"
+    ? /^([A-Za-z0-9_.-]+)-[0-9]+-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.spool$/u.exec(spoolRef)
+    : null;
+  return signal.state === "OPEN"
+    && signal.component === "spool"
+    && signal.class === "SPOOL_STRANDED"
+    && signal.severity === "DEGRADED"
+    && signal.impact_code === "IMPACT_SPOOL_STRANDED"
+    && signal.first_failed_probe_at !== null
+    && signal.suspected_defect === false
+    && signal.defect_kind === null
+    && signal.run_ref === null
+    && signal.work_item_ref === null
+    && Object.keys(evidence).sort().join(":")
+      === "count:receipt_present:runtime:spool_age_s:spool_ref:threshold_s"
+    && typeof runtime === "string"
+    && /^[A-Za-z0-9_.-]{1,64}$/u.test(runtime)
+    && typeof spoolRef === "string"
+    && spoolMatch?.[1] === runtime
+    && typeof evidence.spool_age_s === "number"
+    && Number.isFinite(evidence.spool_age_s)
+    && evidence.spool_age_s >= 0
+    && typeof evidence.threshold_s === "number"
+    && Number.isFinite(evidence.threshold_s)
+    && evidence.threshold_s > 0
+    && evidence.spool_age_s >= evidence.threshold_s
+    && evidence.receipt_present === false
+    && evidence.count === 1
+    ? `spool:${runtime}:${spoolRef}`
+    : null;
+}
+
 export function createSpoolHealthTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(input: Readonly<{
     scan: SpoolScan;
     receipts: SpoolReceiptSnapshot;
@@ -63,6 +102,36 @@ export function createSpoolHealthTracker(): Readonly<{
 }> {
   const opened = new Map<string, OpenSpool>();
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      return restoredSpoolKey(signal);
+    },
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const signal = restored.signal;
+        const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+        const runtime = evidence.runtime;
+        const spoolRef = evidence.spool_ref;
+        const correlationKey = restoredSpoolKey(signal);
+        if (correlationKey === null || correlationKey !== restored.correlationKey
+          || opened.has(spoolRef as string)) {
+          throw new TypeError("OBSERVATION_SPOOL_RESTORE_INVALID");
+        }
+        const firstFailedProbeAt = signal.first_failed_probe_at === null
+          ? new Date(signal.detected_at)
+          : new Date(signal.first_failed_probe_at);
+        opened.set(spoolRef as string, Object.freeze({
+          file: Object.freeze({
+            runtime: runtime as string,
+            spoolRef: spoolRef as string,
+            mtime: firstFailedProbeAt,
+            ageSeconds: typeof evidence.spool_age_s === "number"
+              ? evidence.spool_age_s : 0
+          }),
+          openedAt: new Date(signal.detected_at),
+          firstFailedProbeAt
+        }));
+      }
+    },
     observe(input) {
       if (input.scan.state === "UNKNOWN" || input.receipts.state === "UNKNOWN") {
         return Object.freeze({

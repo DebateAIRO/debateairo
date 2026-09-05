@@ -1,5 +1,15 @@
-import type { ImpactCode, Severity } from "./signals.js";
+import type { ImpactCode, ObservationSignal, Severity } from "./signals.js";
 import type { SignalRouterFactory } from "./routing.js";
+
+export type RestoredOpenSignal = Readonly<{
+  correlationKey: string;
+  signal: ObservationSignal;
+}>;
+
+export type ModuleLifecycle = Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
+}>;
 
 export const OBSERVATION_COMPONENTS = Object.freeze([
   "postgres", "docker", "hatchet", "runner", "api", "ui", "tls_front_door",
@@ -256,6 +266,7 @@ export type OactlVerbContribution = Readonly<{
 export type ObservationModuleManifest = Readonly<{
   name: string;
   cadence: Readonly<{ intervalMs: number; timeoutMs: number }>;
+  lifecycle?: ModuleLifecycle;
   targetFragmentBasename?: string;
   oactl?: readonly OactlVerbContribution[];
   router?: SignalRouterFactory;

@@ -22,6 +22,11 @@ export type ProbeDependencies = Readonly<{
   timeoutMs: number;
   inspectContainer?: (container: string, timeoutMs: number) => Promise<ContainerState>;
   runDocker?: (command: "info", operands: readonly string[], timeoutMs: number) => Promise<DockerResult>;
+  queryPostgres?: (
+    target: PostgresTarget,
+    databaseUrl: string,
+    timeoutMs: number
+  ) => Promise<void>;
 }>;
 
 async function tcpProbe(host: string, port: number, timeoutMs: number): Promise<void> {
@@ -57,22 +62,31 @@ async function inspectContainer(container: string, timeoutMs: number): Promise<C
   }
 }
 
+async function queryPostgres(
+  target: PostgresTarget,
+  databaseUrl: string,
+  timeoutMs: number
+): Promise<void> {
+  await tcpProbe(target.host, target.port, timeoutMs);
+  const client = new pg.Client({ connectionString: databaseUrl });
+  try {
+    await client.connect();
+    await client.query(`SET statement_timeout = ${Math.trunc(timeoutMs)}`);
+    await client.query("SELECT 1");
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
 export async function probePostgres(
   target: PostgresTarget,
   databaseUrl: string,
   dependencies: ProbeDependencies
 ): Promise<ProbeObservation> {
   const inspect = dependencies.inspectContainer ?? inspectContainer;
+  const query = dependencies.queryPostgres ?? queryPostgres;
   try {
-    await tcpProbe(target.host, target.port, dependencies.timeoutMs);
-    const client = new pg.Client({ connectionString: databaseUrl });
-    try {
-      await client.connect();
-      await client.query(`SET statement_timeout = ${Math.trunc(dependencies.timeoutMs)}`);
-      await client.query("SELECT 1");
-    } finally {
-      await client.end().catch(() => undefined);
-    }
+    await query(target, databaseUrl, dependencies.timeoutMs);
     const container = await inspect(target.container, dependencies.timeoutMs);
     return Object.freeze({
       component: "postgres", ok: container.status === "running", class: "INFRA_DOWN",

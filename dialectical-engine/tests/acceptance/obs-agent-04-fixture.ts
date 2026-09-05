@@ -196,7 +196,8 @@ async function runOpenFixture(plan: ReturnType<typeof planAcceptanceFixture>): P
         return identifier;
       },
       sampleStore: { write: async () => undefined },
-      emitSignal: async (signal) => persistSignal({ signal, journal, mirror }).then(() => undefined),
+      emitSignal: async (signal, _now, lifecycle) =>
+        persistSignal({ signal, lifecycle, journal, mirror }).then(() => undefined),
       updateModuleStatus(_moduleName, update) {
         projections = update.projections;
       }
@@ -263,10 +264,10 @@ async function runCloseFixture(): Promise<void> {
         return identifier;
       },
       sampleStore: { write: async () => undefined },
-      emitSignal: async (signal) => {
+      emitSignal: async (signal, _now, lifecycle) => {
         emittedCycles += 1;
         if (emittedCycles > 1) {
-          await persistSignal({ signal, journal, mirror });
+          await persistSignal({ signal, lifecycle, journal, mirror });
         }
       }
     });

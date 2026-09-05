@@ -11,6 +11,10 @@ let pendingIntents: readonly SignalIntent[] = Object.freeze([]);
 const jobWitnessModule: Module = Object.freeze({
   name: "job-witness",
   cadence: Object.freeze({ intervalMs: 15_000, timeoutMs: 2_000 }),
+  lifecycle: Object.freeze({
+    legacyCorrelationKey: tracker.legacyCorrelationKey,
+    restore: tracker.restore
+  }),
   async probe(ctx) {
     const completions = await readLastJobCompletions(ctx.databaseUrl).catch(() => Object.freeze([]));
     const projected = projectJobWitnessStatus(completions, ctx.thresholds);

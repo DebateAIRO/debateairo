@@ -1,10 +1,11 @@
 import type {
   ComponentState,
   ObservationComponent,
-  ProbeObservation,
+  ProbeObservation, RestoredOpenSignal,
   SignalIntent,
   StatusState
 } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
 
 export const DEV_STACK_MEMBERS = Object.freeze([
   "api", "ui", "tls_front_door", "runner"
@@ -68,6 +69,42 @@ function safeStatus(observation: ProbeObservation): number | "READY" | "FAILED" 
   return observation.ok ? "READY" : "FAILED";
 }
 
+function exactKeys(evidence: Readonly<Record<string, unknown>>, expected: readonly string[]): boolean {
+  const actual = Object.keys(evidence).sort();
+  const keys = [...expected].sort();
+  return actual.length === keys.length && actual.every((key, index) => key === keys[index]);
+}
+
+function exactOpenEvidence(signal: ObservationSignal): boolean {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  if (signal.component === "dev_stack") {
+    return exactKeys(evidence, ["probe", "members", "last_status"])
+      && evidence.probe === "expected_set"
+      && Array.isArray(evidence.members)
+      && evidence.members.length === DEV_STACK_MEMBERS.length
+      && evidence.members.every((member, index) => member === DEV_STACK_MEMBERS[index])
+      && evidence.last_status === (signal.impact_code === "IMPACT_DEV_STACK_NOT_RUNNING"
+        ? "NOT_RUNNING" : "ABSENT");
+  }
+  if (!DEV_STACK_MEMBERS.includes(signal.component as DevStackMember)
+    || !exactKeys(evidence, [
+      "probe", "target", "last_status", "consecutive_failures", "threshold"
+    ])
+    || !Number.isInteger(evidence.consecutive_failures)
+    || (evidence.consecutive_failures as number) < 1
+    || evidence.threshold !== evidence.consecutive_failures
+    || typeof evidence.target !== "string") return false;
+  if (signal.component === "runner") {
+    return evidence.probe === "process_presence" && evidence.last_status === "ABSENT";
+  }
+  if (signal.component === "tls_front_door") {
+    return evidence.probe === "http_get"
+      && ((Number.isInteger(evidence.last_status) && evidence.last_status !== 200)
+        || evidence.last_status === "TLS_TRUST");
+  }
+  return evidence.probe === "http_get" && Number.isInteger(evidence.last_status);
+}
+
 function baseIntent(input: Readonly<{
   correlationKey: string;
   component: ObservationComponent;
@@ -96,6 +133,8 @@ function baseIntent(input: Readonly<{
 }
 
 export function createExpectedSetTracker(initialPolicy: ExpectedSetPolicy): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   updatePolicy(policy: ExpectedSetPolicy): void;
   observe(observations: readonly ProbeObservation[], at: Date): ExpectedSetEvaluation;
 }> {
@@ -204,6 +243,78 @@ export function createExpectedSetTracker(initialPolicy: ExpectedSetPolicy): Read
   }
 
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      if (signal.state !== "OPEN"
+        || signal.class !== "INFRA_DOWN"
+        || signal.first_failed_probe_at === null
+        || signal.suspected_defect
+        || signal.defect_kind !== null
+        || signal.run_ref !== null
+        || signal.work_item_ref !== null
+        || !exactOpenEvidence(signal)) return null;
+      if (signal.component === "dev_stack"
+        && (signal.impact_code === "IMPACT_DEV_STACK_NOT_RUNNING"
+          || signal.impact_code === "IMPACT_DEV_STACK_EXITED")
+        && signal.severity === (signal.impact_code === "IMPACT_DEV_STACK_NOT_RUNNING"
+          ? "INFO" : "SEVERE")
+        ) {
+        return "dev_stack:infra_down";
+      }
+      if (DEV_STACK_MEMBERS.includes(signal.component as DevStackMember)
+        && signal.impact_code === impact(signal.component as DevStackMember)
+        && signal.severity === "SEVERE") {
+        return `member:${signal.component}:infra_down`;
+      }
+      return null;
+    },
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const signal = restored.signal;
+        const canonicalKey = this.legacyCorrelationKey(signal);
+        if (canonicalKey === null || canonicalKey !== restored.correlationKey) {
+          throw new TypeError("OBSERVATION_EXPECTED_SET_RESTORE_INVALID");
+        }
+        const openedAt = new Date(signal.detected_at);
+        const firstFailedAt = signal.first_failed_probe_at === null
+          ? openedAt
+          : new Date(signal.first_failed_probe_at);
+        if (signal.component === "dev_stack") {
+          const kind = signal.impact_code === "IMPACT_DEV_STACK_NOT_RUNNING"
+            ? "not_running"
+            : signal.impact_code === "IMPACT_DEV_STACK_EXITED" ? "exited" : null;
+          if (kind === null || restored.correlationKey !== "dev_stack:infra_down"
+            || groupOpen !== null) {
+            throw new TypeError("OBSERVATION_EXPECTED_SET_RESTORE_INVALID");
+          }
+          groupOpen = kind;
+          groupOpenedAt = openedAt;
+          groupRecoverySuccesses = 0;
+          if (kind === "exited") lastMemberUpAt = openedAt;
+          for (const member of DEV_STACK_MEMBERS) {
+            states[member].state = "DOWN";
+            states[member].failures = policy.openAfterFailures;
+            states[member].successes = 0;
+            states[member].firstFailedAt = firstFailedAt;
+          }
+          continue;
+        }
+        if (!DEV_STACK_MEMBERS.includes(signal.component as DevStackMember)) {
+          throw new TypeError("OBSERVATION_EXPECTED_SET_RESTORE_INVALID");
+        }
+        const member = signal.component as DevStackMember;
+        const current = states[member];
+        if (restored.correlationKey !== `member:${member}:infra_down`
+          || current.open) {
+          throw new TypeError("OBSERVATION_EXPECTED_SET_RESTORE_INVALID");
+        }
+        current.state = "DOWN";
+        current.failures = policy.openAfterFailures;
+        current.successes = 0;
+        current.firstFailedAt = firstFailedAt;
+        current.open = true;
+        current.openedAt = openedAt;
+      }
+    },
     updatePolicy(input): void { policy = validatePolicy(input); },
     observe(observations, at) {
       const byComponent = new Map(observations.map((observation) => [observation.component, observation]));

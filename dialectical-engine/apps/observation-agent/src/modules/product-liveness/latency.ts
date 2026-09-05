@@ -1,4 +1,5 @@
-import type { ObservationComponent, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type { ObservationComponent, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 
 type ThresholdComponent = Extract<ObservationComponent, "api" | "ui" | "tls_front_door">;
 type LatencyComponent = Extract<ObservationComponent, ThresholdComponent | "runner" | "kanban">;
@@ -9,6 +10,23 @@ export type ProbeLatencyPolicy = Readonly<{
 }>;
 
 type Sample = Readonly<{ at: Date; value: number }>;
+
+function exactLatencyEvidence(signal: ObservationSignal): boolean {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const keys = Object.keys(evidence).sort().join(":");
+  return keys === "metric_key:observed_at:p95_ms:threshold_ms:window_minutes"
+    && evidence.metric_key === `probe.${signal.component}.latency_ms`
+    && typeof evidence.p95_ms === "number"
+    && Number.isFinite(evidence.p95_ms)
+    && typeof evidence.threshold_ms === "number"
+    && Number.isFinite(evidence.threshold_ms)
+    && evidence.threshold_ms > 0
+    && evidence.p95_ms > evidence.threshold_ms
+    && typeof evidence.window_minutes === "number"
+    && Number.isFinite(evidence.window_minutes)
+    && evidence.window_minutes > 0
+    && evidence.observed_at === signal.detected_at;
+}
 
 function validatePolicy(policy: ProbeLatencyPolicy): ProbeLatencyPolicy {
   if (!Number.isFinite(policy.windowMs) || policy.windowMs <= 0
@@ -25,6 +43,8 @@ function percentile95(samples: readonly Sample[]): number {
 }
 
 export function createProbeLatencyTracker(initialPolicy: ProbeLatencyPolicy): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   updatePolicy(policy: ProbeLatencyPolicy): void;
   observe(component: LatencyComponent, latencyMs: number, at: Date): readonly SignalIntent[];
 }> {
@@ -34,6 +54,36 @@ export function createProbeLatencyTracker(initialPolicy: ProbeLatencyPolicy): Re
   const openedAt = new Map<ThresholdComponent, Date>();
 
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      return (signal.component === "api"
+          || signal.component === "ui"
+          || signal.component === "tls_front_door")
+        && signal.state === "OPEN"
+        && signal.class === "THROUGHPUT_ANOMALY"
+        && signal.severity === "DEGRADED"
+        && signal.impact_code === "IMPACT_SLOW"
+        && signal.first_failed_probe_at !== null
+        && signal.suspected_defect === false
+        && signal.defect_kind === null
+        && signal.run_ref === null
+        && signal.work_item_ref === null
+        && exactLatencyEvidence(signal)
+        ? `latency:${signal.component}`
+        : null;
+    },
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const component = restored.signal.component;
+        if (!(component === "api" || component === "ui" || component === "tls_front_door")
+          || this.legacyCorrelationKey(restored.signal) !== restored.correlationKey
+          || restored.correlationKey !== `latency:${component}`
+          || opened.has(component)) {
+          throw new TypeError("OBSERVATION_LATENCY_RESTORE_INVALID");
+        }
+        opened.add(component);
+        openedAt.set(component, new Date(restored.signal.detected_at));
+      }
+    },
     updatePolicy(input): void { policy = validatePolicy(input); },
     observe(component, latencyMs, at) {
       if (!Number.isFinite(latencyMs) || latencyMs < 0) {

@@ -33,6 +33,10 @@ export function createHatchetThroughputModule(
     name: "hatchet-throughput",
     cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
     targetFragmentBasename: "OBS-06.json",
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: tracker.legacyCorrelationKey,
+      restore: tracker.restore
+    }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const target = ctx.targets.map((value) => observationTargetSchema.parse(value))
         .find((value) => value.kind === "hatchet_metrics");

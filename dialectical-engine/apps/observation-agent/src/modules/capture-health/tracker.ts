@@ -1,4 +1,5 @@
-import type { ModuleStatusProjection, SignalIntent } from "../../core/types.js";
+import type { ObservationSignal } from "../../core/signals.js";
+import type { ModuleStatusProjection, RestoredOpenSignal, SignalIntent } from "../../core/types.js";
 import type { CaptureSnapshot } from "./queries.js";
 import type { RuntimeLiveness } from "./liveness.js";
 
@@ -18,6 +19,50 @@ export type CaptureTrackerCycle = Readonly<{
 }>;
 
 const POSITIVE_STATES = new Set(["UP", "HEALTHY", "FRESH", "OK", "WIRED_CURRENT"]);
+
+function exactKeys(evidence: Readonly<Record<string, unknown>>, keys: readonly string[]): boolean {
+  const actual = Object.keys(evidence).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length
+    && actual.every((key, index) => key === expected[index]);
+}
+
+function restoredCaptureKey(signal: ObservationSignal): string | null {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  const runtime = evidence.runtime;
+  if (signal.state !== "OPEN"
+    || signal.component !== "obs_capture"
+    || signal.first_failed_probe_at === null
+    || signal.suspected_defect
+    || signal.defect_kind !== null
+    || signal.run_ref !== null
+    || signal.work_item_ref !== null
+    || typeof runtime !== "string"
+    || !/^[A-Za-z0-9_.-]{1,64}$/u.test(runtime)) return null;
+  if (signal.class === "CAPTURE_NOT_WIRED"
+    && signal.severity === "INFO"
+    && signal.impact_code === "IMPACT_CAPTURE_NOT_WIRED"
+    && exactKeys(evidence, ["runtime", "flush_ok_count", "health"])
+    && evidence.flush_ok_count === 0
+    && evidence.health === "NOT_WIRED") return `not-wired:${runtime}`;
+  if (signal.class === "BLIND_PERIOD"
+    && signal.severity === "DEGRADED"
+    && signal.impact_code === "IMPACT_BLIND"
+    && exactKeys(evidence, ["runtime", "last_flush_ok_at", "silence_s", "threshold_s", "health"])
+    && typeof evidence.last_flush_ok_at === "string"
+    && Number.isFinite(new Date(evidence.last_flush_ok_at).getTime())
+    && typeof evidence.silence_s === "number"
+    && Number.isFinite(evidence.silence_s)
+    && typeof evidence.threshold_s === "number"
+    && Number.isFinite(evidence.threshold_s)
+    && evidence.threshold_s > 0
+    && evidence.silence_s >= evidence.threshold_s
+    && Math.abs(evidence.silence_s - (
+      new Date(signal.detected_at).getTime() - new Date(evidence.last_flush_ok_at).getTime()
+    ) / 1_000) < 1e-9
+    && evidence.health === "WIRED_SILENT") return `blind:${runtime}`;
+  return null;
+}
 
 function positiveAuthority(snapshot: CaptureSnapshot, runtime: string) {
   return snapshot.health
@@ -91,6 +136,8 @@ function blindIntent(
 }
 
 export function createCaptureHealthTracker(): Readonly<{
+  legacyCorrelationKey(signal: ObservationSignal): string | null;
+  restore(openSignals: readonly RestoredOpenSignal[]): void;
   observe(input: Readonly<{
     snapshot: CaptureSnapshot;
     runtimeLiveness: Readonly<Record<string, RuntimeLiveness>>;
@@ -101,6 +148,43 @@ export function createCaptureHealthTracker(): Readonly<{
 }> {
   const states = new Map<string, RuntimeState>();
   return Object.freeze({
+    legacyCorrelationKey(signal): string | null {
+      return restoredCaptureKey(signal);
+    },
+    restore(openSignals): void {
+      for (const restored of openSignals) {
+        const runtime = (restored.signal.evidence as Readonly<Record<string, unknown>>).runtime;
+        if (typeof runtime !== "string"
+          || restoredCaptureKey(restored.signal) !== restored.correlationKey) {
+          throw new TypeError("OBSERVATION_CAPTURE_RESTORE_INVALID");
+        }
+        const state = states.get(runtime) ?? {
+          notWiredOpen: false, notWiredOpenedAt: null, lastDigestDay: null,
+          blindOpen: false, blindOpenedAt: null
+        };
+        states.set(runtime, state);
+        if (restored.signal.component === "obs_capture"
+          && restored.signal.class === "CAPTURE_NOT_WIRED"
+          && restored.signal.impact_code === "IMPACT_CAPTURE_NOT_WIRED"
+          && restored.correlationKey === `not-wired:${runtime}`
+          && !state.notWiredOpen) {
+          state.notWiredOpen = true;
+          state.notWiredOpenedAt = new Date(restored.signal.detected_at);
+          state.lastDigestDay = restored.signal.detected_at.slice(0, 10);
+        } else if (restored.signal.component === "obs_capture"
+          && restored.signal.class === "BLIND_PERIOD"
+          && restored.signal.impact_code === "IMPACT_BLIND"
+          && restored.correlationKey === `blind:${runtime}`
+          && !state.blindOpen) {
+          state.blindOpen = true;
+          state.blindOpenedAt = restored.signal.first_failed_probe_at === null
+            ? new Date(restored.signal.detected_at)
+            : new Date(restored.signal.first_failed_probe_at);
+        } else {
+          throw new TypeError("OBSERVATION_CAPTURE_RESTORE_INVALID");
+        }
+      }
+    },
     observe(input) {
       if (input.snapshot.state === "UNKNOWN") {
         return Object.freeze({

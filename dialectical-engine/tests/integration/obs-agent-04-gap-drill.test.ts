@@ -38,14 +38,15 @@ describe("OBS-04 isolated gap drill", () => {
     const mirror = new PostgresMirror(db().pool);
     let sequence = 50_000;
     let identifier = 0;
+    const module = createCaptureHealthModule({
+      readRuntimeLiveness: async () => ({ runner: "UP" })
+    });
     const runtime = new ObservationModuleRuntime({
+      modules: Object.freeze([module]),
       nextSequence: () => ++sequence,
       nextSignalId: () => `43000000-0000-4000-8000-${String(++identifier).padStart(12, "0")}`,
       sampleStore: { write: async () => undefined },
       emitSignal: async (signal) => mirror.mirrorSignal(signal)
-    });
-    const module = createCaptureHealthModule({
-      readRuntimeLiveness: async () => ({ runner: "UP" })
     });
     const run = (now: Date) => runtime.run({
       modules: [module], now, timeoutMs: 2_000,

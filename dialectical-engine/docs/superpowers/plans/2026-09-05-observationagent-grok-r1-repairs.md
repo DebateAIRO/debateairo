@@ -413,7 +413,7 @@ fault -> OPEN(id=A) -> reconstruct journal/runtime/module with database mirror t
       -> continuing fault -> recovery -> CLEARED(clears_signal_id=A)
 ```
 
-Assert exactly one OPEN for `(component,class)`, no external reroute for a new UUID, and restoration happens before the initial self-start routing callback.
+Assert exactly one OPEN for each native `(owner,correlationKey)`, allow independently ruled native correlations to share component/class, route no replacement UUID, and restore before the initial self-start routing callback.
 
 Add a legacy raw OPEN case. The owner resolver must derive a unique native correlation. An ambiguous legacy owner must stop probes and emit no replacement OPEN.
 
@@ -427,13 +427,13 @@ pnpm exec vitest run tests/integration/obs-agent-01-restart-lifecycle.test.ts \
 
 - [ ] **Step 3: Implement core restoration**
 
-Discovery validates the optional lifecycle pair as one unit. Before any `probe`, runtime resolves legacy opens by asking all lifecycle owners; exactly one match is required. It loads the runtime open map, then calls each owner's `restore()` once. Runtime retains a second `(component,class)` guard and rejects any attempt to open a different correlation while that identity remains open.
+Discovery validates the optional lifecycle pair as one unit. Before any `probe`, runtime resolves legacy opens by asking all lifecycle owners; exactly one owner/native-key match is required. It loads the runtime open map by `(owner,correlationKey)`, then calls each owner's `restore()` once. Runtime rejects only a duplicate live native lifecycle or metadata inconsistent with that lifecycle; independently ruled correlations may share component/class.
 
 Core liveness `restore()` initializes DOWN/open state with the original first-failed time so a healthy probe enters RECOVERING and the second success clears the original UUID.
 
 - [ ] **Step 4: Add exact restoration to every stateful owner**
 
-Each listed tracker receives a bounded `restore()` method that validates class/component/impact/ref fields and rebuilds only the state it already owns. Module `legacyCorrelationKey()` derives existing native keys from closed signal fields:
+Each listed tracker receives one canonical exact OPEN-shape validator, reused by `legacyCorrelationKey()` and `restore()`. It validates state, class, component, severity, open impact, suspected-defect/defect-kind pair, exact nullable/non-null refs, and identity evidence before rebuilding only the state it already owns. Module `legacyCorrelationKey()` derives existing native keys from closed signal fields:
 
 ```text
 STALL/QUEUE/SUSPICIOUS -> work_item_ref
@@ -447,11 +447,11 @@ An invalid owner/class pair throws `OBSERVATION_LIFECYCLE_RESTORE_INVALID`; it n
 
 - [ ] **Step 5: Add per-owner restart tests and run GREEN**
 
-Every stateful owner gets one continuing-fault/no-duplicate assertion and one immediate-recovery/clear-original assertion in its existing slice test. Run all OBS-01 through OBS-07 lifecycle/status tests three times.
+Every stateful owner and distinct sub-lifecycle gets an end-to-end runtime/journal/replay/reconstruction continuing-fault/no-replacement assertion and immediate-recovery/clear-original assertion in its owning slice test. Include simultaneous same-class correlations for capacity, Hatchet throughput, provider, spool, capture-gap, and defects. Run all OBS-01 through OBS-07 lifecycle/status tests three times.
 
 - [ ] **Step 6: Kill four mutants and commit**
 
-Mutate separately: restore after first probe, omit tracker restore, allocate a new clear target, and allow a second `(component,class)` OPEN. Prove the intended RED and exact restore.
+Mutate separately: reject a legitimate second same-class native correlation, serialize a non-lifecycle owner, bypass canonical owner metadata validation, and allocate a new clear target. Prove the intended RED and exact restore.
 
 ```bash
 git add apps/observation-agent/src tests
