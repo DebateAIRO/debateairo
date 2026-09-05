@@ -141,7 +141,15 @@ export class LivenessRepository {
       SELECT run_id,question_line,content_ciphertext,created_at_seq
       FROM core.run AS run
       WHERE core.run_is_owned_by(run.run_id,$1,$2)
-        AND core.run_private_content_is_live(run.run_id)
+        -- F-H-2: core.run_private_content_is_live is a V1-ENCRYPTED-run predicate, not a
+        -- general one: its body ends AND run.content_encryption_version=1 inside
+        -- COALESCE(...,false), so it answers FALSE for a run that has no private content.
+        -- Called bare here (2d1f86b8 replaced two explicit NOT EXISTS clauses with it) it made
+        -- every unencrypted run -- the default -- invisible to recordQuery, so no QUERY event
+        -- was recorded and no archived run was ever revived. Guarded the way the sibling WHERE
+        -- clause in core.lock_owned_live_runs guards it. Do not "simplify" this back.
+        AND (run.content_encryption_version IS DISTINCT FROM 1
+             OR core.run_private_content_is_live(run.run_id))
       ORDER BY run.created_at_seq,run.run_id
       LIMIT $3
     `, [access.ownerRef, access.legacyAskerId,MAX_OWNER_PRIVATE_HISTORY_SCAN+1]);
