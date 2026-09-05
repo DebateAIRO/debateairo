@@ -1343,3 +1343,28 @@ next to a report directory. The message names the flag, not the search, so it
 reads like a grep problem. Quote it: `--include='*.ts'`. Same shape as the
 already-recorded macOS `awk`/`rg` traps: the harness's shell is zsh, not bash.
 Cost: one wasted call per occurrence. (algorithm-live-loop, T17T9-3)
+
+## An induced experiment can produce the right SYMPTOM by the wrong PATH
+Found by T17T9-3's B1 evidence round (2026-09-05). A probe shortened one queue deadline to force a
+timeout; the run failed with the expected label and a clean tip/parent parity table, and the write-up
+called the mechanism proven. It was not: the override only moved the SHARED default (18 000 ms), while
+the reservations that mattered were registration calls carrying their own explicit 28 000 ms deadline
+(`apps/api/src/registration.ts:1073` reads `request.waitDeadlineMs ?? channel...`, and `:1394` supplies
+the registration value). The wrong population expired, an earlier gate became unsatisfiable, and the
+episode under investigation was never entered. **The tell was in the probe's own output — 28.1 s
+creation→rejection against a "1.5 s" override — and nobody read it because the summary line agreed
+with the hypothesis.** After any induced experiment, check that the mechanism you INTENDED is the one
+that fired: compare the observed latency against the deadline you think you set, and confirm the run
+REACHED the phase you are studying rather than failing before it. A parity table produced by the wrong
+path is more expensive than no experiment, because it looks like proof. Cost: one full review round.
+(algorithm-live-loop, T17T9-3 B1)
+
+## Load generators that spawn processes cannot be combined with a fixed burner count
+Found by T17T9-3's B1 evidence round (2026-09-05). Four concurrent vitest integration suites (each
+spawning workers plus an embedded PostgreSQL) sat at loadavg ~8. Adding 12 CPU burners took the same
+machine to **188**, and the subject test never started. The suites' own parallelism multiplies with
+the burners rather than adding to them, so "N burners" is not a dial you can turn while another
+process pool is running. Calibrate contention with ONE model, and measure a cheap latency-vs-load
+curve before spending full test runs bisecting blind. Related: a repo on OneDrive gets an uncontrolled
+third load source — `OneDrive`/`FileProvider` reindexing after test churn held a core at 100 % and
+drove loadavg past 100 on its own. (algorithm-live-loop, T17T9-3 B1)
