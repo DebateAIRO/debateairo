@@ -4138,12 +4138,21 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
       ] }),
       JSON.stringify({ satisfied: true }),
+      JSON.stringify({ satisfied: true }),
       evaluatorSatisfied()
     ]);
     try {
+      // codex r6 B1 · THE SEALED BOUND IS 3, NOT 2. Both deployments seal
+      // CONFORMANCE.maxAttempts: 3 (acceptance `acceptanceOrganCostBounds`,
+      // development DEVELOPMENT_ORGAN_COST_BOUNDS), so production permits TWO
+      // repairs — the second being the callback applied to an ALREADY-REPAIRED
+      // packet. The previous fixture capped attempts at 2, so that second
+      // callback and the third wire attempt did not exist, and a helper that
+      // preserved the contract on its first call but not its second passed.
+      // The bound is now the shipped one and the fixture drives all three.
       const settings = {
         ...runnerSettings(),
-        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 2 }
+        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 3 }
       };
       const { runner, evaluatorCalls } = recordingRunner(provider.endpoint, settings);
       // NB: the question line feeds the code-first claim classifier
@@ -4172,29 +4181,39 @@ describe("apps/runner — legal command lifecycle", () => {
        */
       const attempts = provider.bodies()
         .map((body) => JSON.parse(body) as { messages: { role: string; content: string }[] })
-        .filter((packet) => {
-          const user = packet.messages.find((message) => message.role === "user");
-          if (user === undefined) return false;
-          try { return (JSON.parse(user.content) as { role?: string }).role === "EVALUATOR"; }
+        .filter((packet) => packet.messages.some((message) => {
+          // EVERY user message is scanned, never just the first: a legitimate
+          // repair may place its user message before the serialised envelope,
+          // and assuming a position would drop that attempt out of the
+          // selection — which is a vacuous pass wearing a filter.
+          if (message.role !== "user") return false;
+          try { return (JSON.parse(message.content) as { role?: string }).role === "EVALUATOR"; }
           catch { return false; }
-        });
+        }));
 
-      // the repair path REALLY RAN: two attempts reached the wire, the second
-      // carrying one more message than the first — that extra message is the
-      // repair. Without this the assertion below would hold vacuously on a
-      // single attempt, which is exactly the gap codex found.
-      expect(attempts).toHaveLength(2);
-      expect(attempts[1]!.messages.length).toBe(attempts[0]!.messages.length + 1);
-      expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the two
+      /**
+       * THE COUNT IS THE VACUITY GUARD, and it is the only one (codex r6 B2).
+       * Three attempts are expected because the sealed bound permits three and
+       * the fixture fails the schema twice; a run that stopped early cannot
+       * satisfy this, so the loop below cannot pass over an empty or short set.
+       *
+       * NOTHING HERE PINS REPAIR SHAPE. The previous version required the
+       * second packet to carry exactly one more message than the first, which
+       * asserts the current helper's implementation rather than the invariant:
+       * a repair that appended two context messages, or reordered later ones,
+       * would keep the contract leading and still fail. AMENDMENT 6 said not to
+       * add shape constraints and that one slipped in anyway.
+       */
+      expect(attempts).toHaveLength(3);
+      expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the three
 
-      // THE INVARIANT: every attempt LEADS with the exported contract.
+      // THE INVARIANT, and the whole of it: every attempt LEADS with the
+      // exported contract. Role and exact content, nothing else.
       for (const [index, packet] of attempts.entries()) {
         expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
         expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
       }
 
-      // the run really did reach the evaluator — otherwise this proves nothing
-      expect(evaluatorCalls).toHaveLength(1);
       const messages = evaluatorCalls[0]!.packet.messages;
       const system = messages.filter((message) => message.role === "system");
       expect(system).toHaveLength(1);
