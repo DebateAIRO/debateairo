@@ -304,6 +304,7 @@ describe("OBS-01 shared impact and persisted signal routing", () => {
     });
     const router = createLegacyOsaScriptRouter({ delivery, osascript });
     const policy = { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 };
+    const module = Object.freeze({ thresholdVersion: 7, thresholds: Object.freeze({}) });
     const severe = signalSchema.parse(signal({
       seq: 10, id: "10000000-0000-4000-8000-000000000010",
       at: "2026-09-03T13:00:00.000Z", severity: "SEVERE"
@@ -326,20 +327,22 @@ describe("OBS-01 shared impact and persisted signal routing", () => {
       state: "CLEARED", clears: info.signal_id
     }));
 
-    await router.onSignal({ signal: severe, now: new Date(severe.detected_at), policy, mute: null });
-    await router.onSignal({ signal: fatal, now: new Date(fatal.detected_at), policy, mute: null });
-    await router.onSignal({ signal: degraded, now: new Date(degraded.detected_at), policy, mute: null });
-    await router.onSignal({ signal: info, now: new Date(info.detected_at), policy, mute: null });
+    await router.onSignal({ signal: severe, now: new Date(severe.detected_at), policy, mute: null, module });
+    await router.onSignal({ signal: fatal, now: new Date(fatal.detected_at), policy, mute: null, module });
+    await router.onSignal({ signal: degraded, now: new Date(degraded.detected_at), policy, mute: null, module });
+    await router.onSignal({ signal: info, now: new Date(info.detected_at), policy, mute: null, module });
     expect(invocations).toHaveLength(2);
     await router.onTick({
-      now: new Date("2026-09-03T13:15:02.000Z"), policy, mute: null
+      now: new Date("2026-09-03T13:15:02.000Z"), policy, mute: null, module
     });
     expect(invocations).toHaveLength(3);
-    await router.onSignal({ signal: cleared, now: new Date(cleared.detected_at), policy, mute: null });
+    await router.onSignal({ signal: cleared, now: new Date(cleared.detected_at), policy, mute: null, module });
     expect(invocations).toHaveLength(4);
     expect(invocations[0]).toEqual([
       "-e",
       "display notification \"Hatchet is down: asks are accepted but no debate work is dispatched or run.\" with title \"dialectical-engine: hatchet SEVERE\" subtitle \"INFRA_DOWN\""
     ]);
+    expect(router.status()).toEqual([]);
+    expect(Object.isFrozen(router.status())).toBe(true);
   });
 });

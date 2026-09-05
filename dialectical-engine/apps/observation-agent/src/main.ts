@@ -3,13 +3,14 @@ import { join } from "node:path";
 import pg from "pg";
 import { loadObservationAgentEnvironment } from "../../../packages/register/src/runtime-environment.js";
 import { ObservationError, normalizeObservationError } from "./core/errors.js";
-import { discoverObservationModules } from "./core/modules.js";
-import { ObservationModuleRuntime } from "./core/runtime.js";
+import { createOwnedSignalRouter, discoverObservationModules } from "./core/modules.js";
+import { ObservationModuleRuntime, parseModuleStatusProjection } from "./core/runtime.js";
 import { createLegacyOsaScriptRouter } from "./core/routing.js";
 import { signalSchema, type ObservationSignal, type Severity } from "./core/signals.js";
 import { loadObservationTargetCatalog } from "./core/targets.js";
 import {
   OBSERVATION_COMPONENTS,
+  type ModuleConfigurationObject,
   type ProbeObservation,
   type StatusState
 } from "./core/types.js";
@@ -30,7 +31,12 @@ import {
 import { persistSignal } from "./store/pipeline.js";
 import { PostgresMirror } from "./store/postgres.js";
 import { SampleRingStore } from "./store/samples.js";
-import { toStoredModuleStatusProjection, writeStatusSnapshot } from "./store/status.js";
+import {
+  mergeModuleStatus,
+  toStoredModuleStatusProjection,
+  writeStatusSnapshot,
+  type StoredModuleStatusProjection
+} from "./store/status.js";
 
 const VERSION = "0.1.0";
 
@@ -155,19 +161,32 @@ async function boot(): Promise<void> {
   const mirror = new PostgresMirror(pool);
   const delivery = new DeliveryCoordinator({ journal, mirror });
   const osascript = createOsaScriptDeliveryExecutor();
-  const router = moduleCatalog.routerFactory === null
-    ? createLegacyOsaScriptRouter({ delivery, osascript })
-    : await moduleCatalog.routerFactory.create({
-        stateDir: environment.OBSERVATION_STATE_DIR,
-        delivery,
-        osascript
-      });
-  if (router === null
-    || typeof router !== "object"
-    || typeof router.onSignal !== "function"
-    || typeof router.onTick !== "function") {
+  const routerOwner = moduleCatalog.routerContribution;
+  const routerTargetFragments = routerOwner === null ? [] : targetCatalog.fragments.filter(
+    (fragment) => fragment.basename === routerOwner.targetFragmentBasename
+  );
+  if (routerOwner !== null && routerTargetFragments.length !== 1) {
     throw new ObservationError("OBSERVATION_MODULE_INVALID");
   }
+  const currentRouterModule = () => Object.freeze({
+    thresholdVersion: policy.version,
+    thresholds: Object.freeze({
+      ...(routerOwner === null ? {} : policy.value.modules?.[routerOwner.moduleName] ?? {})
+    }) as ModuleConfigurationObject
+  });
+  const initialRouterModule = currentRouterModule();
+  const router = routerOwner === null
+    ? createLegacyOsaScriptRouter({ delivery, osascript })
+    : await createOwnedSignalRouter(routerOwner, {
+        stateDir: environment.OBSERVATION_STATE_DIR,
+        delivery,
+        osascript,
+        moduleName: routerOwner.moduleName,
+        targetFragment: routerTargetFragments[0]!,
+        configuration: routerTargetFragments[0]!.configuration,
+        thresholds: initialRouterModule.thresholds,
+        thresholdVersion: initialRouterModule.thresholdVersion
+      });
   const heartbeat = new HeartbeatWriter({ pool, stateDir: environment.OBSERVATION_STATE_DIR });
   let nextSequence = Date.now() * 1_000;
   const sequence = () => { nextSequence += 1; return nextSequence; };
@@ -177,7 +196,7 @@ async function boot(): Promise<void> {
   });
   const openSignals = new Map<string, OpenSignal>();
   const status = new Map<string, MutableComponentStatus>();
-  const moduleStatus = new Map<string, readonly Readonly<Record<string, unknown>>[]>();
+  const moduleStatus = new Map<string, readonly StoredModuleStatusProjection[]>();
   for (const target of targets) {
     if (!OBSERVATION_COMPONENTS.includes(target.component as never)) continue;
     status.set(target.component, {
@@ -216,7 +235,8 @@ async function boot(): Promise<void> {
       },
       mute: routingMute === null || routingMute.component === undefined
         ? routingMute === null ? null : {}
-        : { component: routingMute.component }
+        : { component: routingMute.component },
+      module: currentRouterModule()
     }).catch(async (error) => {
       await deliverJournalFailureDirect({ timeoutMs: policy.value.notification.timeout_ms })
         .catch(() => undefined);
@@ -362,9 +382,15 @@ async function boot(): Promise<void> {
         },
         mute: routingMute === null || routingMute.component === undefined
           ? routingMute === null ? null : {}
-          : { component: routingMute.component }
+          : { component: routingMute.component },
+        module: currentRouterModule()
       });
 
+      const routerStatus = router.status().map((projection) =>
+        toStoredModuleStatusProjection(parseModuleStatusProjection(projection)));
+      const mergedModuleStatus = mergeModuleStatus(
+        moduleStatus, routerOwner?.moduleName ?? null, routerStatus
+      );
       const mute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
       await writeStatusSnapshot(environment.OBSERVATION_STATE_DIR, {
         pid: process.pid,
@@ -380,8 +406,8 @@ async function boot(): Promise<void> {
           last_ok_at: value.lastOkAt?.toISOString() ?? null,
           open_signal_ids: [...value.openSignalIds]
         }])),
-        ...(moduleStatus.size === 0 ? {} : {
-          modules: Object.fromEntries(moduleStatus.entries())
+        ...(Object.keys(mergedModuleStatus).length === 0 ? {} : {
+          modules: mergedModuleStatus
         })
       });
     } finally {

@@ -70,4 +70,29 @@ describe("OBS-01 launchd custody and runtime bounds", () => {
     expect(combined).not.toMatch(/(apps\/api|apps\/runner|apps\/ui|dev:auth:down)/u);
     expect(combined.match(/com\.dialectical-engine\.observation-agent/gu)?.length).toBeGreaterThan(0);
   });
+
+  it("keeps durable routing and status collection in their required runtime order", async () => {
+    const main = await readFile(resolve(root, "apps/observation-agent/src/main.ts"), "utf8");
+    const routerInitialization = main.indexOf("router = routerOwner");
+    const startSignal = main.indexOf("await emit(makeSelfSignal(");
+    expect(routerInitialization).toBeGreaterThanOrEqual(0);
+    expect(startSignal).toBeGreaterThan(routerInitialization);
+    const emitStart = main.indexOf("async function emit(");
+    const emitEnd = main.indexOf("const moduleRuntime", emitStart);
+    const emit = main.slice(emitStart, emitEnd);
+    expect(emit.indexOf("await persistSignal(")).toBeGreaterThanOrEqual(0);
+    expect(emit.indexOf("await router.onSignal(")).toBeGreaterThan(
+      emit.indexOf("await persistSignal(")
+    );
+    expect(main.match(/module: currentRouterModule\(\)/gu)).toHaveLength(2);
+
+    const cycleStart = main.indexOf("async function cycle(");
+    const cycleEnd = main.indexOf("async function shutdown(", cycleStart);
+    const cycle = main.slice(cycleStart, cycleEnd);
+    expect(cycle.indexOf("await router.onTick(")).toBeGreaterThanOrEqual(0);
+    expect(cycle.indexOf("router.status()")).toBeGreaterThan(cycle.indexOf("await router.onTick("));
+    expect(cycle.indexOf("await writeStatusSnapshot(")).toBeGreaterThan(
+      cycle.indexOf("router.status()")
+    );
+  });
 });

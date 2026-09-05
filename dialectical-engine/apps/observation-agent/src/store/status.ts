@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir, open, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { ObservationError } from "../core/errors.js";
 import {
   OBSERVATION_COMPONENTS,
+  STATUS_CHANNELS,
   STATUS_STATES,
   STATUS_UNITS,
   STATUS_VIEW_PATTERN,
@@ -38,6 +40,46 @@ const timestampProjectionSchema = z.object({
   kind: z.literal("timestamp"),
   key: statusKeySchema,
   value: z.iso.datetime().nullable(),
+  view: statusViewSchema.optional()
+}).strict();
+const safeIdentifierSchema = z.string().min(1).max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u);
+const endpointPathSchema = z.string().min(2).max(128)
+  .regex(/^\/[a-z0-9][a-z0-9/_-]{0,127}$/u);
+const stateSegmentSchema = z.string().min(1).max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
+  .refine((value) => value !== "." && value !== "..");
+const channelsProjectionSchema = z.object({
+  kind: z.literal("channels"), key: statusKeySchema,
+  channels: z.array(z.enum(STATUS_CHANNELS)).min(1).max(STATUS_CHANNELS.length)
+    .superRefine((channels, context) => {
+      if (new Set(channels).size !== channels.length) {
+        context.addIssue({ code: "custom", message: "OBSERVATION_STATUS_CHANNEL_DUPLICATE" });
+      }
+    }).readonly(),
+  view: statusViewSchema.optional()
+}).strict();
+const componentProjectionSchema = z.object({
+  kind: z.literal("component"), key: statusKeySchema,
+  component: z.enum(OBSERVATION_COMPONENTS), view: statusViewSchema.optional()
+}).strict();
+const uuidProjectionSchema = z.object({
+  kind: z.literal("uuid"), key: statusKeySchema,
+  value: z.uuid().nullable(), view: statusViewSchema.optional()
+}).strict();
+const identifierProjectionSchema = z.object({
+  kind: z.literal("identifier"), key: statusKeySchema,
+  identifier_type: z.enum(["board", "external_ref"]), value: safeIdentifierSchema,
+  view: statusViewSchema.optional()
+}).strict();
+const loopbackEndpointProjectionSchema = z.object({
+  kind: z.literal("loopback_endpoint"), key: statusKeySchema,
+  port: z.number().int().min(1024).max(65_535), path: endpointPathSchema,
+  view: statusViewSchema.optional()
+}).strict();
+const stateChildPathProjectionSchema = z.object({
+  kind: z.literal("state_child_path"), key: statusKeySchema,
+  segments: z.array(stateSegmentSchema).min(1).max(8).readonly(),
   view: statusViewSchema.optional()
 }).strict();
 const templateProjectionSchema = z.union([
@@ -86,6 +128,11 @@ const templateProjectionSchema = z.union([
     template: z.literal("DURATION_WINDOW_STATE"), value_seconds: z.number().finite().nonnegative(),
     window_minutes: z.number().finite().positive(), state: z.enum(STATUS_STATES),
     view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("COUNT_SECONDS_THRESHOLD"), count: z.number().int().nonnegative(),
+    window_seconds: z.number().int().positive(), view: statusViewSchema.optional()
   }).strict()
 ]);
 
@@ -93,6 +140,12 @@ export const storedModuleStatusProjectionSchema = z.union([
   stateProjectionSchema,
   metricProjectionSchema,
   timestampProjectionSchema,
+  channelsProjectionSchema,
+  componentProjectionSchema,
+  uuidProjectionSchema,
+  identifierProjectionSchema,
+  loopbackEndpointProjectionSchema,
+  stateChildPathProjectionSchema,
   templateProjectionSchema
 ]);
 
@@ -123,6 +176,45 @@ export function toStoredModuleStatusProjection(
     return Object.freeze({
       kind: projection.kind, key: projection.key,
       value: projection.value?.toISOString() ?? null,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.kind === "channels") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key,
+      channels: Object.freeze([...projection.channels]),
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.kind === "component") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, component: projection.component,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.kind === "uuid") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, value: projection.value,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.kind === "identifier") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, identifier_type: projection.identifierType,
+      value: projection.value,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.kind === "loopback_endpoint") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, port: projection.port, path: projection.path,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
+  if (projection.kind === "state_child_path") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key,
+      segments: Object.freeze([...projection.segments]),
       ...(projection.view === undefined ? {} : { view: projection.view })
     });
   }
@@ -163,6 +255,13 @@ export function toStoredModuleStatusProjection(
       ...(projection.view === undefined ? {} : { view: projection.view })
     });
   }
+  if (projection.template === "COUNT_SECONDS_THRESHOLD") {
+    return Object.freeze({
+      kind: projection.kind, key: projection.key, template: projection.template,
+      count: projection.count, window_seconds: projection.windowSeconds,
+      ...(projection.view === undefined ? {} : { view: projection.view })
+    });
+  }
   return Object.freeze({
     kind: projection.kind, key: projection.key, template: projection.template,
     ...(projection.view === undefined ? {} : { view: projection.view })
@@ -174,10 +273,11 @@ const moduleStatusSchema = z.record(
   z.array(storedModuleStatusProjectionSchema).max(128).superRefine((projections, context) => {
     const keys = new Set<string>();
     for (const [index, projection] of projections.entries()) {
-      if (keys.has(projection.key)) {
+      const identity = `${projection.view ?? ""}\u0000${projection.key}`;
+      if (keys.has(identity)) {
         context.addIssue({ code: "custom", message: "OBSERVATION_STATUS_DUPLICATE_KEY", path: [index, "key"] });
       }
-      keys.add(projection.key);
+      keys.add(identity);
     }
   })
 ).superRefine((modules, context) => {
@@ -185,6 +285,39 @@ const moduleStatusSchema = z.record(
     context.addIssue({ code: "custom", message: "OBSERVATION_STATUS_TOO_MANY_MODULES" });
   }
 });
+
+export function mergeModuleStatus(
+  modules: ReadonlyMap<string, readonly StoredModuleStatusProjection[]>,
+  routerOwner: string | null,
+  routerStatus: readonly StoredModuleStatusProjection[]
+): Readonly<Record<string, readonly StoredModuleStatusProjection[]>> {
+  if (routerOwner === null && routerStatus.length > 0) {
+    throw new ObservationError("OBSERVATION_STATUS_INVALID");
+  }
+  const candidate = Object.fromEntries([...modules.entries()].map(([moduleName, projections]) => [
+    moduleName, [...projections]
+  ]));
+  if (routerOwner !== null && routerStatus.length > 0) {
+    candidate[routerOwner] = [...(candidate[routerOwner] ?? []), ...routerStatus];
+  }
+  let parsed: z.infer<typeof moduleStatusSchema>;
+  try {
+    parsed = moduleStatusSchema.parse(candidate);
+  } catch (error) {
+    if (error instanceof ObservationError) throw error;
+    throw new ObservationError(
+      error instanceof z.ZodError
+        && error.issues.some((issue) => issue.message === "OBSERVATION_STATUS_DUPLICATE_KEY")
+        ? "OBSERVATION_STATUS_DUPLICATE_KEY"
+        : "OBSERVATION_STATUS_INVALID",
+      error
+    );
+  }
+  return Object.freeze(Object.fromEntries(Object.entries(parsed).map(([moduleName, projections]) => [
+    moduleName,
+    Object.freeze(projections.map((projection) => Object.freeze(projection)))
+  ])));
+}
 
 export const statusSnapshotSchema = z.object({
   pid: z.number().int().positive(),

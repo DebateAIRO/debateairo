@@ -6,6 +6,9 @@ import {
 } from "./signals.js";
 import {
   OBSERVATION_COMPONENTS,
+  type ModuleConfigurationObject,
+  type ModuleStatusProjection,
+  type ModuleTargetFragment,
   type ObservationComponent
 } from "./types.js";
 import type { DeliveryCoordinator } from "../notify/delivery.js";
@@ -19,11 +22,28 @@ export type SignalRoutingPolicy = Readonly<{
 
 export type SignalRoutingMute = Readonly<{ component?: ObservationComponent }> | null;
 
+export type RouterCurrentContext = Readonly<{
+  thresholdVersion: number;
+  thresholds: ModuleConfigurationObject;
+}>;
+
+export type RouterBootstrapInput = Readonly<{
+  stateDir: string;
+  delivery: DeliveryCoordinator;
+  osascript: OsaScriptDeliveryExecutor;
+  moduleName: string;
+  targetFragment: ModuleTargetFragment;
+  configuration: ModuleConfigurationObject;
+  thresholds: ModuleConfigurationObject;
+  thresholdVersion: number;
+}>;
+
 export type PersistedSignalRoutingInput = Readonly<{
   signal: ObservationSignal;
   now: Date;
   policy: SignalRoutingPolicy;
   mute: SignalRoutingMute;
+  module: RouterCurrentContext;
 }>;
 
 export type SignalRouter = Readonly<{
@@ -32,15 +52,13 @@ export type SignalRouter = Readonly<{
     now: Date;
     policy: SignalRoutingPolicy;
     mute: SignalRoutingMute;
+    module: RouterCurrentContext;
   }>): Promise<void>;
+  status(): readonly ModuleStatusProjection[];
 }>;
 
 export type SignalRouterFactory = Readonly<{
-  create(input: Readonly<{
-    stateDir: string;
-    delivery: DeliveryCoordinator;
-    osascript: OsaScriptDeliveryExecutor;
-  }>): Promise<SignalRouter> | SignalRouter;
+  create(input: RouterBootstrapInput): Promise<SignalRouter> | SignalRouter;
 }>;
 
 const severityRank: Readonly<Record<Severity, number>> = Object.freeze({
@@ -139,6 +157,7 @@ export function createLegacyOsaScriptRouter(input: Readonly<{
           signal: opened.signal
         });
       }
-    }
+    },
+    status: () => Object.freeze([])
   });
 }

@@ -2,11 +2,16 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { RouterCurrentContext } from "../../apps/observation-agent/src/core/routing.js";
 import { migrate } from "../../packages/db/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
 let stateDir: string;
+const EMPTY_ROUTER_MODULE = Object.freeze({
+  thresholdVersion: 1,
+  thresholds: Object.freeze({})
+});
 
 function signal(input: Readonly<{
   seq: number;
@@ -180,6 +185,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     await router.onSignal({ signal: open as never,
       now: new Date("2026-09-03T07:00:06.000Z"),
       mute: null,
+      module: EMPTY_ROUTER_MODULE,
       policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
     });
     expect(mirrorOutcomes).toEqual(["DELIVERED"]);
@@ -191,6 +197,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     await router.onSignal({ signal: open as never,
       now: new Date("2026-09-03T07:01:00.000Z"),
       mute: null,
+      module: EMPTY_ROUTER_MODULE,
       policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
     });
     expect(mirrorOutcomes).toEqual(["DELIVERED", "RATE_LIMITED"]);
@@ -199,6 +206,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     await router.onSignal({ signal: open as never,
       now: new Date("2026-09-03T07:11:00.000Z"),
       mute: null,
+      module: EMPTY_ROUTER_MODULE,
       policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
     });
     expect(mirrorOutcomes).toEqual(["DELIVERED", "RATE_LIMITED", "FAILED"]);
@@ -248,6 +256,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     });
     await router.onSignal({ signal: severe as never,
       now: new Date("2026-09-03T07:02:00.000Z"), mute: {},
+      module: EMPTY_ROUTER_MODULE,
       policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
     });
     expect(invocationCount).toBe(0);
@@ -262,6 +271,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     await persistSignal({ signal: cleared, journal, mirror });
     await router.onSignal({ signal: cleared as never,
       now: new Date("2026-09-03T07:02:01.000Z"), mute: {},
+      module: EMPTY_ROUTER_MODULE,
       policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }
     });
     expect(invocationCount).toBe(1);
@@ -278,22 +288,32 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
         let cycle = 0;
         let firstFailedAt;
         export default {
-          name: "synthetic",
+          name: "routing",
           cadence: { intervalMs: 5000, timeoutMs: 2000 },
+          targetFragmentBasename: "OBS-07.json",
           router: {
-            create({ stateDir }) {
+            create(input) {
+              globalThis.__obsRouterCreateInput = input;
+              globalThis.__obsRouterEvents.push("create");
               return {
-                async onSignal({ signal }) {
+                async onSignal({ signal, module }) {
                   const rows = (await readFile(
-                    stateDir + "/journal/signals-" + signal.detected_at.slice(0, 10) + ".jsonl",
+                    input.stateDir + "/journal/signals-" + signal.detected_at.slice(0, 10) + ".jsonl",
                     "utf8"
                   )).trim().split("\\n").map((line) => JSON.parse(line));
+                  globalThis.__obsRouterEvents.push("signal:" + signal.class);
                   globalThis.__obsPersistedRouterSignals.push({
                     signalId: signal.signal_id,
-                    durableSignalId: rows.at(-1).signal_id
+                    durableSignalId: rows.at(-1).signal_id,
+                    thresholdVersion: module.thresholdVersion,
+                    thresholds: module.thresholds
                   });
                 },
-                async onTick() {}
+                async onTick({ module }) {
+                  globalThis.__obsRouterEvents.push("tick");
+                  globalThis.__obsRouterTicks.push(module);
+                },
+                status() { return []; }
               };
             }
           },
@@ -326,7 +346,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
           }
         };
       `, "utf8");
-      const { discoverObservationModules } = await import(
+      const { createOwnedSignalRouter, discoverObservationModules } = await import(
         "../../apps/observation-agent/src/core/modules.js"
       );
       const { ObservationModuleRuntime } = await import(
@@ -351,36 +371,81 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
         "../../apps/observation-agent/src/store/samples.js"
       );
       const catalog = await discoverObservationModules(moduleRoot);
-      expect(catalog.modules.map((module) => module.name)).toEqual(["synthetic"]);
+      expect(catalog.modules.map((module) => module.name)).toEqual(["routing"]);
       const journal = new ObservationJournal(moduleStateDir);
       const mirror = new PostgresMirror(database.pool);
       let notifications = 0;
       (globalThis as typeof globalThis & {
-        __obsPersistedRouterSignals: Array<{ signalId: string; durableSignalId: string }>;
+        __obsPersistedRouterSignals: Array<{
+          signalId: string; durableSignalId: string; thresholdVersion: number;
+          thresholds: Readonly<Record<string, unknown>>;
+        }>;
       }).__obsPersistedRouterSignals = [];
-      const router = await catalog.routerFactory!.create({
+      (globalThis as typeof globalThis & { __obsRouterEvents: string[] }).__obsRouterEvents = [];
+      (globalThis as typeof globalThis & {
+        __obsRouterTicks: Array<Readonly<Record<string, unknown>>>;
+      }).__obsRouterTicks = [];
+      const targetFragment = Object.freeze({
+        basename: "OBS-07.json",
+        targets: Object.freeze([]),
+        configuration: Object.freeze({ notify: Object.freeze({ board: "ops-alerts" }) })
+      });
+      const initialThresholds = Object.freeze({ storm_count: 5, storm_window_seconds: 60 });
+      const router = await createOwnedSignalRouter(catalog.routerContribution!, {
         stateDir: moduleStateDir,
         delivery: new DeliveryCoordinator({ journal, mirror }),
-        osascript: createOsaScriptDeliveryExecutor(async () => { notifications += 1; })
+        osascript: createOsaScriptDeliveryExecutor(async () => { notifications += 1; }),
+        moduleName: "routing",
+        targetFragment,
+        configuration: targetFragment.configuration,
+        thresholds: initialThresholds,
+        thresholdVersion: 7
       });
+      const createInput = (globalThis as typeof globalThis & {
+        __obsRouterCreateInput: Readonly<Record<string, unknown>>;
+      }).__obsRouterCreateInput;
+      expect(createInput).toMatchObject({
+        moduleName: "routing", targetFragment,
+        configuration: { notify: { board: "ops-alerts" } },
+        thresholds: { storm_count: 5, storm_window_seconds: 60 }, thresholdVersion: 7
+      });
+      expect(Object.isFrozen(createInput)).toBe(true);
+      expect(Object.isFrozen(createInput.configuration)).toBe(true);
+      expect(Object.isFrozen(createInput.thresholds)).toBe(true);
       const ids = [
         "50000000-0000-4000-8000-000000000001",
         "50000000-0000-4000-8000-000000000002"
       ];
       let sequence = 500;
+      let currentModule: RouterCurrentContext = Object.freeze({
+        thresholdVersion: 7, thresholds: initialThresholds
+      });
+      const routingPolicy = Object.freeze({
+        rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000
+      });
+      const route = async (
+        emitted: Parameters<typeof router.onSignal>[0]["signal"],
+        now: Date
+      ) => {
+        await persistSignal({ signal: emitted, journal, mirror });
+        await router.onSignal({ signal: emitted, now, policy: routingPolicy, mute: null,
+          module: currentModule });
+      };
+      const { makeSelfSignal } = await import(
+        "../../apps/observation-agent/src/modules/self/signals.js"
+      );
+      const startAt = new Date("2026-09-03T07:19:55.000Z");
+      await route(makeSelfSignal({
+        seq: 500, signalId: "50000000-0000-4000-8000-000000000000",
+        now: startAt, thresholdVersion: 7, event: "START"
+      }), startAt);
+      expect((globalThis as typeof globalThis & { __obsRouterEvents: string[] })
+        .__obsRouterEvents.slice(0, 2)).toEqual(["create", "signal:AGENT_SELF"]);
       const runtime = new ObservationModuleRuntime({
         nextSequence: () => { sequence += 1; return sequence; },
         nextSignalId: () => ids.shift() ?? "50000000-0000-4000-8000-000000000099",
         sampleStore: new SampleRingStore(database.pool),
-        emitSignal: async (emitted, now) => {
-          await persistSignal({ signal: emitted, journal, mirror });
-          await router.onSignal({
-            signal: emitted,
-            now,
-            policy: { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 },
-            mute: null
-          });
-        }
+        emitSignal: route
       });
       for (const second of [0, 5, 10]) {
         await runtime.run({
@@ -390,27 +455,52 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
           databaseUrl: database.connectionString,
           stateDir: moduleStateDir,
           targets: [],
-          thresholdVersion: 1
+          moduleThresholds: { routing: currentModule.thresholds },
+          thresholdVersion: currentModule.thresholdVersion
         });
+        if (second === 0) {
+          currentModule = Object.freeze({
+            thresholdVersion: 8,
+            thresholds: Object.freeze({ storm_count: 6, storm_window_seconds: 90 })
+          });
+        }
       }
+      await router.onTick({
+        now: new Date("2026-09-03T07:20:11.000Z"), policy: routingPolicy, mute: null,
+        module: currentModule
+      });
       expect((await database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM observation.sample_ring WHERE metric_key='synthetic.health'"
       )).rows[0]?.count).toBe("3");
       const durableSignals = (await readFile(
         join(moduleStateDir, "journal", "signals-2026-09-03.jsonl"), "utf8"
       )).trim().split("\n").map((line) => JSON.parse(line));
-      expect(durableSignals.map((row) => [row.state, row.signal_id, row.clears_signal_id]))
+      const moduleSignals = durableSignals.filter((row) => row.class !== "AGENT_SELF");
+      expect(moduleSignals.map((row) => [row.state, row.signal_id, row.clears_signal_id]))
         .toEqual([
           ["OPEN", "50000000-0000-4000-8000-000000000001", null],
           ["CLEARED", "50000000-0000-4000-8000-000000000002",
             "50000000-0000-4000-8000-000000000001"]
         ]);
       expect((globalThis as typeof globalThis & {
-        __obsPersistedRouterSignals: Array<{ signalId: string; durableSignalId: string }>;
-      }).__obsPersistedRouterSignals).toEqual(durableSignals.map((row) => ({
-        signalId: row.signal_id,
-        durableSignalId: row.signal_id
-      })));
+        __obsPersistedRouterSignals: Array<{
+          signalId: string; durableSignalId: string; thresholdVersion: number;
+          thresholds: Readonly<Record<string, unknown>>;
+        }>;
+      }).__obsPersistedRouterSignals.map(({ signalId, durableSignalId }) => ({
+        signalId, durableSignalId
+      }))).toEqual(durableSignals.map((row) => ({ signalId: row.signal_id,
+        durableSignalId: row.signal_id })));
+      const routedContexts = (globalThis as typeof globalThis & {
+        __obsPersistedRouterSignals: Array<{
+          thresholdVersion: number; thresholds: Readonly<Record<string, unknown>>;
+        }>;
+      }).__obsPersistedRouterSignals;
+      expect(routedContexts.map(({ thresholdVersion }) => thresholdVersion)).toEqual([7, 7, 8]);
+      expect(routedContexts.at(-1)?.thresholds).toEqual({ storm_count: 6, storm_window_seconds: 90 });
+      expect((globalThis as typeof globalThis & {
+        __obsRouterTicks: Array<Readonly<Record<string, unknown>>>;
+      }).__obsRouterTicks).toEqual([currentModule]);
       expect(notifications).toBe(0);
       expect((await database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM observation.delivery WHERE signal_id = ANY($1::uuid[])",

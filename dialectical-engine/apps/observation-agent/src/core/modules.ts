@@ -2,14 +2,24 @@ import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ObservationError } from "./errors.js";
-import type { SignalRouterFactory } from "./routing.js";
+import type {
+  RouterBootstrapInput,
+  SignalRouter,
+  SignalRouterFactory
+} from "./routing.js";
 import type { Module, OactlVerbContribution } from "./types.js";
+
+export type RouterContribution = Readonly<{
+  moduleName: string;
+  targetFragmentBasename: string;
+  factory: SignalRouterFactory;
+}>;
 
 export type ObservationModuleCatalog = Readonly<{
   modules: readonly Module[];
   verbs: readonly OactlVerbContribution[];
   targetFragments: readonly string[];
-  routerFactory: SignalRouterFactory | null;
+  routerContribution: RouterContribution | null;
 }>;
 
 function requireModule(candidate: unknown, directory: string): Module {
@@ -27,12 +37,37 @@ function requireModule(candidate: unknown, directory: string): Module {
     || (module.router !== undefined
       && (module.router === null
         || typeof module.router !== "object"
-        || typeof module.router.create !== "function"))
+        || typeof module.router.create !== "function"
+        || module.targetFragmentBasename === undefined))
     || (module.targetFragmentBasename !== undefined
       && !/^OBS-[0-9]{2}\.json$/u.test(module.targetFragmentBasename))) {
     throw new ObservationError("OBSERVATION_MODULE_INVALID");
   }
   return Object.freeze(module as Module);
+}
+
+export async function createOwnedSignalRouter(
+  contribution: RouterContribution,
+  input: RouterBootstrapInput
+): Promise<SignalRouter> {
+  if (contribution.moduleName !== input.moduleName
+    || contribution.targetFragmentBasename !== input.targetFragment.basename) {
+    throw new ObservationError("OBSERVATION_MODULE_INVALID");
+  }
+  const bootstrap = Object.freeze({
+    ...input,
+    configuration: Object.freeze({ ...input.configuration }),
+    thresholds: Object.freeze({ ...input.thresholds })
+  });
+  const router: unknown = await contribution.factory.create(bootstrap);
+  if (router === null
+    || typeof router !== "object"
+    || typeof (router as Partial<SignalRouter>).onSignal !== "function"
+    || typeof (router as Partial<SignalRouter>).onTick !== "function"
+    || typeof (router as Partial<SignalRouter>).status !== "function") {
+    throw new ObservationError("OBSERVATION_MODULE_INVALID");
+  }
+  return Object.freeze(router as SignalRouter);
 }
 
 function requireVerb(candidate: unknown): OactlVerbContribution {
@@ -77,7 +112,7 @@ export async function discoverObservationModules(modulesRoot: string): Promise<O
   const moduleNames = new Set<string>();
   const verbNames = new Set<string>();
   const fragmentNames = new Set<string>();
-  let routerFactory: SignalRouterFactory | null = null;
+  let routerContribution: RouterContribution | null = null;
 
   for (const directory of directories) {
     const moduleRoot = join(modulesRoot, directory);
@@ -96,10 +131,14 @@ export async function discoverObservationModules(modulesRoot: string): Promise<O
     modules.push(manifest);
 
     if (manifest.router !== undefined) {
-      if (routerFactory !== null) {
+      if (routerContribution !== null) {
         throw new ObservationError("OBSERVATION_DUPLICATE_ROUTER");
       }
-      routerFactory = manifest.router;
+      routerContribution = Object.freeze({
+        moduleName: manifest.name,
+        targetFragmentBasename: manifest.targetFragmentBasename!,
+        factory: manifest.router
+      });
     }
 
     if (manifest.targetFragmentBasename !== undefined) {
@@ -129,6 +168,6 @@ export async function discoverObservationModules(modulesRoot: string): Promise<O
     modules: Object.freeze(modules),
     verbs: Object.freeze(verbs),
     targetFragments: Object.freeze(targetFragments),
-    routerFactory
+    routerContribution
   });
 }

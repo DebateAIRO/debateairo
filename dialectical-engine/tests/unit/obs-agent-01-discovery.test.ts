@@ -108,40 +108,66 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     });
   });
 
-  it("discovers at most one inert router factory before any lifecycle effect", async () => {
-    const { discoverObservationModules } = await import(
+  it("discovers one owned inert router and validates its complete lifecycle before use", async () => {
+    const { createOwnedSignalRouter, discoverObservationModules } = await import(
       "../../apps/observation-agent/src/core/modules.js"
     );
     const root = await scratch();
     const routerSource = `{
-      create() {
+      create(input) {
         globalThis.__obsRouterCreates = (globalThis.__obsRouterCreates ?? 0) + 1;
+        globalThis.__obsRouterCreateInput = input;
         return {
           async onSignal(input) { globalThis.__obsRouterSignals.push(input.signal.severity); },
-          async onTick() {}
+          async onTick() {},
+          status() { return []; }
         };
       }
     }`;
     (globalThis as typeof globalThis & {
       __obsRouterCreates?: number;
+      __obsRouterCreateInput?: unknown;
       __obsRouterSignals: string[];
     }).__obsRouterCreates = 0;
     (globalThis as typeof globalThis & { __obsRouterSignals: string[] })
       .__obsRouterSignals = [];
     let osascriptActions = 0;
-    await writeModule(root, "a", "a", undefined, routerSource);
+    await writeModule(root, "routing", "routing", "OBS-07.json", routerSource);
     const catalog = await discoverObservationModules(root);
-    expect(catalog.routerFactory).not.toBeNull();
+    expect(catalog.routerContribution).toEqual({
+      moduleName: "routing",
+      targetFragmentBasename: "OBS-07.json",
+      factory: catalog.modules[0]?.router
+    });
+    expect(Object.isFrozen(catalog.routerContribution)).toBe(true);
     expect((globalThis as typeof globalThis & { __obsRouterCreates: number })
       .__obsRouterCreates).toBe(0);
-    const router = await catalog.routerFactory!.create({
+    const targetFragment = Object.freeze({
+      basename: "OBS-07.json",
+      targets: Object.freeze([]),
+      configuration: Object.freeze({ notify: Object.freeze({ board: "ops-alerts" }) })
+    });
+    const router = await createOwnedSignalRouter(catalog.routerContribution!, {
       stateDir: await scratch(),
       delivery: {} as never,
       osascript: async () => {
         osascriptActions += 1;
         return { deliveredAt: new Date(), externalRef: null };
-      }
+      },
+      moduleName: "routing",
+      targetFragment,
+      configuration: targetFragment.configuration,
+      thresholds: Object.freeze({ storm_count: 5, storm_window_seconds: 60 }),
+      thresholdVersion: 7
     });
+    expect((globalThis as typeof globalThis & { __obsRouterCreateInput: Readonly<Record<string, unknown>> })
+      .__obsRouterCreateInput).toMatchObject({
+        moduleName: "routing",
+        targetFragment,
+        configuration: targetFragment.configuration,
+        thresholds: { storm_count: 5, storm_window_seconds: 60 },
+        thresholdVersion: 7
+      });
     const { signalSchema } = await import(
       "../../apps/observation-agent/src/core/signals.js"
     );
@@ -175,8 +201,14 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       detected_at: "2026-09-03T12:00:03.000Z", recorded_at: "2026-09-03T12:00:03.000Z"
     });
     const policy = { rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 };
+    const module = Object.freeze({
+      thresholdVersion: 7,
+      thresholds: Object.freeze({ storm_count: 5, storm_window_seconds: 60 })
+    });
     for (const current of [info, degraded, cleared]) {
-      await router.onSignal({ signal: current, now: new Date(current.detected_at), policy, mute: null });
+      await router.onSignal({
+        signal: current, now: new Date(current.detected_at), policy, mute: null, module
+      });
     }
     expect((globalThis as typeof globalThis & { __obsRouterSignals: string[] })
       .__obsRouterSignals).toEqual(["INFO", "DEGRADED", "DEGRADED"]);
@@ -185,11 +217,41 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     const duplicateRoot = await scratch();
     (globalThis as typeof globalThis & { __obsRouterCreates: number })
       .__obsRouterCreates = 0;
-    await writeModule(duplicateRoot, "a", "a", undefined, routerSource);
-    await writeModule(duplicateRoot, "b", "b", undefined, routerSource);
+    await writeModule(duplicateRoot, "a", "a", "OBS-07.json", routerSource);
+    await writeModule(duplicateRoot, "b", "b", "OBS-08.json", routerSource);
     await expect(discoverObservationModules(duplicateRoot)).rejects.toMatchObject({
       code: "OBSERVATION_DUPLICATE_ROUTER"
     });
+    expect((globalThis as typeof globalThis & { __obsRouterCreates: number })
+      .__obsRouterCreates).toBe(0);
+
+    const missingTargetRoot = await scratch();
+    await writeModule(missingTargetRoot, "routing", "routing", undefined, routerSource);
+    await expect(discoverObservationModules(missingTargetRoot)).rejects.toMatchObject({
+      code: "OBSERVATION_MODULE_INVALID"
+    });
+
+    const invalidRouterRoot = await scratch();
+    await writeModule(invalidRouterRoot, "routing", "routing", "OBS-07.json", `{
+      create() { return { async onSignal() {}, async onTick() {} }; }
+    }`);
+    const invalidCatalog = await discoverObservationModules(invalidRouterRoot);
+    await expect(createOwnedSignalRouter(invalidCatalog.routerContribution!, {
+      stateDir: await scratch(), delivery: {} as never, osascript: async () => ({
+        deliveredAt: new Date(), externalRef: null
+      }), moduleName: "routing", targetFragment,
+      configuration: targetFragment.configuration, thresholds: Object.freeze({}),
+      thresholdVersion: 7
+    })).rejects.toMatchObject({ code: "OBSERVATION_MODULE_INVALID" });
+
+    (globalThis as typeof globalThis & { __obsRouterCreates: number }).__obsRouterCreates = 0;
+    await expect(createOwnedSignalRouter(catalog.routerContribution!, {
+      stateDir: await scratch(), delivery: {} as never, osascript: async () => ({
+        deliveredAt: new Date(), externalRef: null
+      }), moduleName: "other", targetFragment,
+      configuration: targetFragment.configuration, thresholds: Object.freeze({}),
+      thresholdVersion: 7
+    })).rejects.toMatchObject({ code: "OBSERVATION_MODULE_INVALID" });
     expect((globalThis as typeof globalThis & { __obsRouterCreates: number })
       .__obsRouterCreates).toBe(0);
   });

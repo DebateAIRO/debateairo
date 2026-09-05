@@ -78,6 +78,51 @@ const ESTABLISHED_TEMPLATE_PROJECTIONS = Object.freeze([
   })
 ] as const);
 
+const ROUTER_STATUS_PROJECTIONS = Object.freeze([
+  Object.freeze({
+    kind: "channels", key: "route.fatal",
+    channels: Object.freeze(["digest", "status", "osascript", "sendmail", "kanban"])
+  }),
+  Object.freeze({ kind: "component", key: "storm.root", component: "postgres" }),
+  Object.freeze({
+    kind: "uuid", key: "ack.signal", value: "70000000-0000-4000-8000-000000000001"
+  }),
+  Object.freeze({
+    kind: "identifier", key: "board", identifierType: "board", value: "ops-alerts"
+  }),
+  Object.freeze({
+    kind: "identifier", key: "ticket", identifierType: "external_ref", value: "t_70000001"
+  }),
+  Object.freeze({ kind: "loopback_endpoint", key: "status", port: 9797, path: "/status" }),
+  Object.freeze({
+    kind: "state_child_path", key: "capture.dir",
+    segments: Object.freeze(["dev-mail-capture"])
+  }),
+  Object.freeze({
+    kind: "template", key: "storm", template: "COUNT_SECONDS_THRESHOLD",
+    count: 5, windowSeconds: 60
+  })
+] as const);
+
+const STORED_ROUTER_STATUS_PROJECTIONS = [
+  {
+    kind: "channels", key: "route.fatal",
+    channels: ["digest", "status", "osascript", "sendmail", "kanban"]
+  },
+  { kind: "component", key: "storm.root", component: "postgres" },
+  { kind: "uuid", key: "ack.signal", value: "70000000-0000-4000-8000-000000000001" },
+  { kind: "identifier", key: "board", identifier_type: "board", value: "ops-alerts" },
+  {
+    kind: "identifier", key: "ticket", identifier_type: "external_ref", value: "t_70000001"
+  },
+  { kind: "loopback_endpoint", key: "status", port: 9797, path: "/status" },
+  { kind: "state_child_path", key: "capture.dir", segments: ["dev-mail-capture"] },
+  {
+    kind: "template", key: "storm", template: "COUNT_SECONDS_THRESHOLD",
+    count: 5, window_seconds: 60
+  }
+] as const;
+
 async function runProjection(projection: unknown): Promise<unknown> {
   const { ObservationModuleRuntime } = await import(
     "../../apps/observation-agent/src/core/runtime.js"
@@ -222,5 +267,97 @@ describe("OBS-01 closed composite status projections", () => {
       })).rejects.toThrow();
       await expect(access(join(stateDir, "status.json"))).rejects.toThrow();
     }
+  });
+
+  it("round-trips every closed router-status projection into exact stored shapes", async () => {
+    const { storedModuleStatusProjectionSchema, toStoredModuleStatusProjection } = await import(
+      "../../apps/observation-agent/src/store/status.js"
+    );
+    const mapper = toStoredModuleStatusProjection as (projection: never) => unknown;
+
+    for (const [index, projection] of ROUTER_STATUS_PROJECTIONS.entries()) {
+      await expect(runProjection(projection)).resolves.toMatchObject({ projections: [projection] });
+      const stored = mapper(projection as never);
+      expect(stored).toEqual(STORED_ROUTER_STATUS_PROJECTIONS[index]);
+      expect(storedModuleStatusProjectionSchema.parse(stored))
+        .toEqual(STORED_ROUTER_STATUS_PROJECTIONS[index]);
+
+      await expect(runProjection({ ...projection, unexpected: true }))
+        .rejects.toThrow("OBSERVATION_MODULE_PROBE_INVALID");
+      expect(() => storedModuleStatusProjectionSchema.parse({
+        ...STORED_ROUTER_STATUS_PROJECTIONS[index], unexpected: true
+      })).toThrow();
+    }
+  });
+
+  it("rejects unsafe router-status values without a free-text escape hatch", async () => {
+    const invalid = [
+      { kind: "string", key: "message", value: "raw product error" },
+      { kind: "identifier", key: "board", identifierType: "board", value: "ops alerts" },
+      {
+        kind: "identifier", key: "ticket", identifierType: "external_ref", value: "<script>"
+      },
+      {
+        kind: "loopback_endpoint", key: "status", port: 9797,
+        path: "http://0.0.0.0/status"
+      },
+      { kind: "loopback_endpoint", key: "status", port: 80, path: "/status" },
+      { kind: "state_child_path", key: "capture.dir", segments: ["..", "secret"] },
+      { kind: "channels", key: "route.fatal", channels: ["kanban", "kanban"] },
+      { kind: "channels", key: "route.fatal", channels: ["webhook"] },
+      {
+        kind: "template", key: "storm", template: "COUNT_SECONDS_THRESHOLD",
+        count: 5, windowSeconds: 0
+      }
+    ];
+    for (const projection of invalid) {
+      await expect(runProjection(projection)).rejects.toThrow("OBSERVATION_MODULE_PROBE_INVALID");
+    }
+
+    const { storedModuleStatusProjectionSchema } = await import(
+      "../../apps/observation-agent/src/store/status.js"
+    );
+    for (const projection of [
+      { kind: "string", key: "message", value: "raw product error" },
+      { kind: "identifier", key: "board", identifier_type: "board", value: "ops alerts" },
+      { kind: "identifier", key: "ticket", identifier_type: "external_ref", value: "<script>" },
+      { kind: "loopback_endpoint", key: "status", port: 9797, path: "http://0.0.0.0/status" },
+      { kind: "loopback_endpoint", key: "status", port: 80, path: "/status" },
+      { kind: "state_child_path", key: "capture.dir", segments: ["..", "secret"] },
+      { kind: "channels", key: "route.fatal", channels: ["kanban", "kanban"] },
+      { kind: "channels", key: "route.fatal", channels: ["webhook"] },
+      {
+        kind: "template", key: "storm", template: "COUNT_SECONDS_THRESHOLD",
+        count: 5, window_seconds: 0
+      }
+    ]) {
+      expect(() => storedModuleStatusProjectionSchema.parse(projection)).toThrow();
+    }
+  });
+
+  it("allows a key in distinct views but rejects a duplicate view-and-key pair", async () => {
+    const { writeStatusSnapshot } = await import(
+      "../../apps/observation-agent/src/store/status.js"
+    );
+    const stateDir = await scratch();
+    const snapshot = (projections: readonly unknown[]) => ({
+      pid: 1,
+      version: "0.1.0",
+      thresholds_version: 1,
+      mute: null,
+      components: {},
+      modules: { routing: projections }
+    });
+    const capacity = {
+      kind: "state", key: "shared.health", state: "UP", view: "capacity"
+    } as const;
+    const throughput = {
+      kind: "state", key: "shared.health", state: "UP", view: "throughput"
+    } as const;
+
+    await expect(writeStatusSnapshot(stateDir, snapshot([capacity, throughput])))
+      .resolves.toBeUndefined();
+    await expect(writeStatusSnapshot(stateDir, snapshot([capacity, { ...capacity, state: "DOWN" }])))
+      .rejects.toThrow("OBSERVATION_STATUS_DUPLICATE_KEY");
   });
 });

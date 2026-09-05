@@ -238,6 +238,60 @@ describe("OBS-01 core oactl controls", () => {
     ].join("\n"));
   });
 
+  it("renders module-owned router status through fixed privacy-safe forms", async () => {
+    const stateDir = await scratch("obs-01-router-status-");
+    await writeFile(join(stateDir, "status.json"), JSON.stringify({
+      pid: 790,
+      version: "0.1.0",
+      thresholds_version: 10,
+      mute: null,
+      components: {},
+      modules: {
+        routing: [
+          {
+            kind: "channels", key: "route.fatal",
+            channels: ["digest", "status", "osascript", "sendmail", "kanban"]
+          },
+          { kind: "component", key: "storm.root", component: "postgres" },
+          {
+            kind: "uuid", key: "ack.signal",
+            value: "70000000-0000-4000-8000-000000000001"
+          },
+          {
+            kind: "identifier", key: "board", identifier_type: "board", value: "ops-alerts"
+          },
+          {
+            kind: "identifier", key: "ticket", identifier_type: "external_ref",
+            value: "t_70000001"
+          },
+          { kind: "loopback_endpoint", key: "status", port: 9797, path: "/status" },
+          { kind: "state_child_path", key: "capture.dir", segments: ["dev-mail-capture"] },
+          {
+            kind: "template", key: "storm", template: "COUNT_SECONDS_THRESHOLD",
+            count: 5, window_seconds: 60
+          }
+        ]
+      }
+    }));
+    const { renderStatus } = await import(
+      "../../apps/observation-agent/src/oactl/core/status.js"
+    );
+
+    expect(await renderStatus(stateDir)).toBe([
+      `state_dir ${stateDir}`,
+      "pid 790",
+      "thresholds v10",
+      "ack signal 70000000-0000-4000-8000-000000000001",
+      "board ops-alerts",
+      `capture dir ${join(stateDir, "dev-mail-capture")}`,
+      "route fatal digest,status,osascript,sendmail,kanban",
+      "status http://127.0.0.1:9797/status",
+      "storm 5/60s",
+      "storm root postgres",
+      "ticket t_70000001"
+    ].join("\n"));
+  });
+
   it("provisions one repo-root 0600 credential file without returning the secret", async () => {
     const repoRoot = await scratch("obs-01-provision-repo-");
     const home = await scratch("obs-01-provision-home-");

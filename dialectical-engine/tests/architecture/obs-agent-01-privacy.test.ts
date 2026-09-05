@@ -44,4 +44,23 @@ describe("OBS-01 privacy and template-only delivery", () => {
     expect(source).not.toMatch(/shell\s*:\s*true/u);
     expect(source).not.toMatch(/\bexec\s*\(/u);
   });
+
+  it("keeps shared status and routing code behind the closed privacy boundary", async () => {
+    const sources = await Promise.all([
+      "apps/observation-agent/src/core/types.ts",
+      "apps/observation-agent/src/core/runtime.ts",
+      "apps/observation-agent/src/core/routing.ts",
+      "apps/observation-agent/src/core/modules.ts",
+      "apps/observation-agent/src/store/status.ts",
+      "apps/observation-agent/src/oactl/core/status.ts",
+      "apps/observation-agent/src/main.ts"
+    ].map((path) => readFile(path, "utf8")));
+    const prohibited = [
+      "raw_text", "occurrence_detail", "content_ciphertext", "innerHTML",
+      "dangerouslySetInnerHTML", "process.env", "0.0.0.0", "webhook"
+    ];
+    for (const source of sources) {
+      for (const value of prohibited) expect(source).not.toContain(value);
+    }
+  });
 });

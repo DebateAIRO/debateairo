@@ -34,10 +34,15 @@ export const STATUS_TEMPLATES = Object.freeze([
   "EVALUATOR_UNBOUND_BY_REGISTER", "NO_SCHEDULE_RULED", "CAPTURE_NOT_WIRED",
   "SLOW_QUERIES_NOT_OBSERVABLE", "PROVIDER_LATENCY_NOT_OBSERVABLE",
   "COUNT_WINDOW_THRESHOLD", "PERCENT_MINIMUM_THRESHOLD", "RATIO_WINDOW_STATE",
-  "DURATION_WINDOW_STATE"
+  "DURATION_WINDOW_STATE", "COUNT_SECONDS_THRESHOLD"
 ] as const);
 
 export type StatusTemplate = typeof STATUS_TEMPLATES[number];
+export const STATUS_CHANNELS = Object.freeze([
+  "digest", "status", "osascript", "sendmail", "kanban"
+] as const);
+export type StatusChannel = typeof STATUS_CHANNELS[number];
+export type StatusIdentifierType = "board" | "external_ref";
 export const STATUS_VIEW_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u;
 export type StatusView = string;
 
@@ -61,6 +66,44 @@ export type ModuleStatusProjection =
       kind: "timestamp";
       key: string;
       value: Date | null;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "channels";
+      key: string;
+      channels: readonly StatusChannel[];
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "component";
+      key: string;
+      component: ObservationComponent;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "uuid";
+      key: string;
+      value: string | null;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "identifier";
+      key: string;
+      identifierType: StatusIdentifierType;
+      value: string;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "loopback_endpoint";
+      key: string;
+      port: number;
+      path: string;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "state_child_path";
+      key: string;
+      segments: readonly string[];
       view?: StatusView;
     }>
   | Readonly<{
@@ -110,6 +153,14 @@ export type ModuleStatusProjection =
       valueSeconds: number;
       windowMinutes: number;
       state: StatusState;
+      view?: StatusView;
+    }>
+  | Readonly<{
+      kind: "template";
+      key: string;
+      template: "COUNT_SECONDS_THRESHOLD";
+      count: number;
+      windowSeconds: number;
       view?: StatusView;
     }>;
 

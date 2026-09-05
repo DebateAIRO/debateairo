@@ -9,6 +9,7 @@ import {
 import {
   OBSERVATION_COMPONENTS,
   SIGNAL_CLASSES,
+  STATUS_CHANNELS,
   STATUS_STATES,
   STATUS_UNITS,
   STATUS_VIEW_PATTERN,
@@ -29,6 +30,13 @@ const sampleIntentSchema = z.object({
 
 const statusViewSchema = z.string().regex(STATUS_VIEW_PATTERN);
 const statusKeySchema = z.string().min(1).max(128).regex(/^[a-z][a-z0-9_.-]*$/u);
+const safeIdentifierSchema = z.string().min(1).max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u);
+const endpointPathSchema = z.string().min(2).max(128)
+  .regex(/^\/[a-z0-9][a-z0-9/_-]{0,127}$/u);
+const stateSegmentSchema = z.string().min(1).max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
+  .refine((value) => value !== "." && value !== "..");
 
 const stateStatusProjectionSchema = z.object({
   kind: z.literal("state"),
@@ -51,6 +59,55 @@ const timestampStatusProjectionSchema = z.object({
   kind: z.literal("timestamp"),
   key: statusKeySchema,
   value: z.date().nullable(),
+  view: statusViewSchema.optional()
+}).strict();
+
+const channelsStatusProjectionSchema = z.object({
+  kind: z.literal("channels"),
+  key: statusKeySchema,
+  channels: z.array(z.enum(STATUS_CHANNELS)).min(1).max(STATUS_CHANNELS.length)
+    .superRefine((channels, context) => {
+      if (new Set(channels).size !== channels.length) {
+        context.addIssue({ code: "custom", message: "OBSERVATION_STATUS_CHANNEL_DUPLICATE" });
+      }
+    }),
+  view: statusViewSchema.optional()
+}).strict();
+
+const componentStatusProjectionSchema = z.object({
+  kind: z.literal("component"),
+  key: statusKeySchema,
+  component: z.enum(OBSERVATION_COMPONENTS),
+  view: statusViewSchema.optional()
+}).strict();
+
+const uuidStatusProjectionSchema = z.object({
+  kind: z.literal("uuid"),
+  key: statusKeySchema,
+  value: z.uuid().nullable(),
+  view: statusViewSchema.optional()
+}).strict();
+
+const identifierStatusProjectionSchema = z.object({
+  kind: z.literal("identifier"),
+  key: statusKeySchema,
+  identifierType: z.enum(["board", "external_ref"]),
+  value: safeIdentifierSchema,
+  view: statusViewSchema.optional()
+}).strict();
+
+const loopbackEndpointStatusProjectionSchema = z.object({
+  kind: z.literal("loopback_endpoint"),
+  key: statusKeySchema,
+  port: z.number().int().min(1024).max(65_535),
+  path: endpointPathSchema,
+  view: statusViewSchema.optional()
+}).strict();
+
+const stateChildPathStatusProjectionSchema = z.object({
+  kind: z.literal("state_child_path"),
+  key: statusKeySchema,
+  segments: z.array(stateSegmentSchema).min(1).max(8),
   view: statusViewSchema.optional()
 }).strict();
 
@@ -100,6 +157,11 @@ const templateStatusProjectionSchemas = [
     template: z.literal("DURATION_WINDOW_STATE"), valueSeconds: z.number().finite().nonnegative(),
     windowMinutes: z.number().finite().positive(), state: z.enum(STATUS_STATES),
     view: statusViewSchema.optional()
+  }).strict(),
+  z.object({
+    kind: z.literal("template"), key: statusKeySchema,
+    template: z.literal("COUNT_SECONDS_THRESHOLD"), count: z.number().int().nonnegative(),
+    windowSeconds: z.number().int().positive(), view: statusViewSchema.optional()
   }).strict()
 ] as const;
 
@@ -107,8 +169,18 @@ const moduleStatusProjectionSchema = z.union([
   stateStatusProjectionSchema,
   metricStatusProjectionSchema,
   timestampStatusProjectionSchema,
+  channelsStatusProjectionSchema,
+  componentStatusProjectionSchema,
+  uuidStatusProjectionSchema,
+  identifierStatusProjectionSchema,
+  loopbackEndpointStatusProjectionSchema,
+  stateChildPathStatusProjectionSchema,
   ...templateStatusProjectionSchemas
 ]);
+
+export function parseModuleStatusProjection(input: unknown): ModuleStatusProjection {
+  return moduleStatusProjectionSchema.parse(input) as ModuleStatusProjection;
+}
 
 const probeObservationSchema = z.object({
   component: z.enum(OBSERVATION_COMPONENTS),
@@ -175,6 +247,56 @@ function parseProbeObservation(input: unknown): ProbeObservation {
             ...(projection.view === undefined ? {} : { view: projection.view })
           });
         }
+        if (projection.kind === "channels") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            channels: Object.freeze([...projection.channels]),
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.kind === "component") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            component: projection.component,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.kind === "uuid") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            value: projection.value,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.kind === "identifier") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            identifierType: projection.identifierType,
+            value: projection.value,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.kind === "loopback_endpoint") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            port: projection.port,
+            path: projection.path,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.kind === "state_child_path") {
+          return Object.freeze({
+            kind: projection.kind,
+            key: projection.key,
+            segments: Object.freeze([...projection.segments]),
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
         if (projection.template === "CAPTURE_NOT_WIRED") {
           return Object.freeze({
             kind: projection.kind, key: projection.key, template: projection.template,
@@ -209,6 +331,13 @@ function parseProbeObservation(input: unknown): ProbeObservation {
             kind: projection.kind, key: projection.key, template: projection.template,
             valueSeconds: projection.valueSeconds, windowMinutes: projection.windowMinutes,
             state: projection.state,
+            ...(projection.view === undefined ? {} : { view: projection.view })
+          });
+        }
+        if (projection.template === "COUNT_SECONDS_THRESHOLD") {
+          return Object.freeze({
+            kind: projection.kind, key: projection.key, template: projection.template,
+            count: projection.count, windowSeconds: projection.windowSeconds,
             ...(projection.view === undefined ? {} : { view: projection.view })
           });
         }

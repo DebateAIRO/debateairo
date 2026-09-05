@@ -97,6 +97,44 @@ describe("OBS-01 observation schema foundation", () => {
     }
   });
 
+  it("exposes only explicit suspected defects and their matching clears to the listener", async () => {
+    await pool().query(`
+      INSERT INTO observation.signal(
+        signal_id,state,class,component,severity,impact_code,first_failed_probe_at,
+        detected_at,evidence,suspected_defect,defect_kind,run_ref,work_item_ref,
+        threshold_version,clears_signal_id,recorded_at
+      ) VALUES
+        ('70000000-0000-4000-8000-000000000001','OPEN','INFRA_DOWN','postgres','FATAL',
+         'IMPACT_PG_DOWN',now(),now(),'{}',false,null,null,null,1,null,now()),
+        ('70000000-0000-4000-8000-000000000002','OPEN','SUSPICIOUS_SUCCESS','runner','SEVERE',
+         'IMPACT_SUSPICIOUS_SUCCESS',now(),now(),'{}',true,'SUSPICIOUS_SUCCESS',null,null,1,null,now()),
+        ('70000000-0000-4000-8000-000000000003','CLEARED','INFRA_DOWN','postgres','INFO',
+         'IMPACT_CLEARED',now(),now(),'{}',false,null,null,null,1,
+         '70000000-0000-4000-8000-000000000001',now()),
+        ('70000000-0000-4000-8000-000000000004','CLEARED','SUSPICIOUS_SUCCESS','runner','INFO',
+         'IMPACT_CLEARED',now(),now(),'{}',false,null,null,null,1,
+         '70000000-0000-4000-8000-000000000002',now())
+    `);
+    const listener = await pool().connect();
+    try {
+      await listener.query("BEGIN");
+      await listener.query("SET LOCAL ROLE debateai_obs_listener");
+      const visible = await listener.query<{ signal_id: string; defect_kind: string | null }>(`
+        SELECT signal_id::text,defect_kind
+        FROM observation.defect_signal_v
+        WHERE signal_id::text LIKE '70000000-%'
+        ORDER BY signal_id
+      `);
+      expect(visible.rows).toEqual([
+        { signal_id: "70000000-0000-4000-8000-000000000002", defect_kind: "SUSPICIOUS_SUCCESS" },
+        { signal_id: "70000000-0000-4000-8000-000000000004", defect_kind: null }
+      ]);
+    } finally {
+      await listener.query("ROLLBACK");
+      listener.release();
+    }
+  });
+
   it("gives the agent only the required mutable-table updates", async () => {
     const agent = await pool().connect();
     try {
