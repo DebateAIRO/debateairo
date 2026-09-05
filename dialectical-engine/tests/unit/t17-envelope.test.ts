@@ -325,6 +325,11 @@ describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
   /**
    * S09B's defect, and what survives F-T17T9-3.
    *
+   * SCOPE (codex r1 F4): what follows pins shape, chain identity and the
+   * consistency of the two serve-leg disclosures. It does not establish that
+   * every accepted receipt is one the constructor could have minted — the
+   * author/panel/reviewer legs and the attempt total are taken as disclosed.
+   *
    * The serve leg is disclosed TWICE — as the billed count (`call_sites.serve`)
    * and as the arm it was read from (`serve_leg`) — and nothing made them agree,
    * so a basis could bill a count its own disclosed leg did not support. That

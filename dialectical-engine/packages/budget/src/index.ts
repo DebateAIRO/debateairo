@@ -92,6 +92,15 @@ const costEnvelopeBasisSchema = z.object({
    * The tie policy and the larger-arm guard are GONE rather than relaxed:
    * with one arm there is nothing to select between, and the retired arm can no
    * longer appear on a receipt at all (the schema above is strict).
+   *
+   * WHAT THIS CHECKS, EXACTLY (codex r1 F4). Three things: the receipt's SHAPE
+   * (the strict schema above), the CHAIN IDENTITY (`selected` must be
+   * `SERVE_LEG.chain`), and the internal CONSISTENCY of the two disclosures
+   * (`call_sites.serve` must equal the leg it discloses). It does NOT prove that
+   * an accepted receipt is one the constructor would have minted: the other
+   * legs — author, panel, reviewer — and `max_model_attempts` are read as
+   * disclosed, and nothing here recomputes them from panel size and depth. A
+   * receipt with a self-consistent serve leg and a wrong author count parses.
    */
   const billed = SERVE_LEG.billed(basis.serve_leg);
   if (basis.call_sites.serve !== billed) {
