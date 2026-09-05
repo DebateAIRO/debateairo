@@ -207,7 +207,8 @@ const SHIPPED_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs"];
  *
  *   DEPTH_BOUND_LITERAL  any line mentioning a depth that also carries the
  *                        literal 5, or a 6 in an exclusive-bound position
- *   DOMAIN_ENUMERATION   any line spelling the whole domain 1,2,3,4,5
+ *   DOMAIN_ENUMERATION   any line spelling the whole domain 1,2,3,4,5 — and only
+ *                        the domain, never a longer run that merely contains it
  *
  * and then allows exactly ONE line in the whole tree: the owning declaration.
  * A new spelling does not need a new detector; it needs a new exemption, which
@@ -227,7 +228,33 @@ type DuplicateKind = "DEPTH_BOUND_LITERAL" | "DOMAIN_ENUMERATION";
 const MENTIONS_A_DEPTH = /depth/i;
 const BARE_FIVE = /(?<![\w.$])5(?![\w.$])/;
 const SIX_AS_EXCLUSIVE_BOUND = /(?:[<>]=?\s*6(?![\w.$])|\.(?:lt|gte)\(\s*6\s*\))/;
-const WHOLE_DOMAIN = /\b1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\b/;
+/**
+ * The ruled domain spelled out as literal values — and ONLY when the run IS the
+ * domain, never when it is a SUBSEQUENCE of a longer numeric run.
+ *
+ * EXCLUDED, by shape (F-T1-ORACLE-LOGINFP; codex W5 r2 F1): a run extended past
+ * either end. `[0, 1, 2, 3, 4, 5]` — the six 0-based boxes of the login code at
+ * apps/ui/components/LoginFlow.tsx:252 — and `[1, 2, 3, 4, 5, 6]`, which overshoots
+ * the ceiling. Neither is a second definition of the 1–5 bound; both are different
+ * domains that merely contain the ruled one's digits in order. The r3 pattern was
+ * unanchored at both ends, so it read the subsequence as the domain and reported a
+ * file holding no depth token at all.
+ *
+ * KEPT: the ruled domain's literal values wherever they sit — `[1, 2, 3, 4, 5]`,
+ * `new Set([1, 2, 3, 4, 5])`, and the same values wrapped one per line. Those carry
+ * no depth token either, and they must keep firing: the bare option-domain controls
+ * are what this arm exists for. So the rule is the SHAPE of the run, never a file
+ * allow-list and never a rename.
+ *
+ * Deliberately NOT a "depth token in reach" rule. The domain run always contains a
+ * bare `5`, so any candidate that spells the run AND mentions a depth is already
+ * returned by the CEILING-LITERAL arm before this one is consulted — a depth-token
+ * disjunct here could never fire, and a check that cannot fire for the reason it
+ * exists is D56. What the narrowing gives up is therefore only depth-FREE longer
+ * runs, and that is pinned in both directions: by the subsequence negative controls
+ * and by "still catches a longer run when a depth token is in reach".
+ */
+const WHOLE_DOMAIN = /(?<!\d\s*,\s*)\b1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\b(?!\s*,\s*\d)/;
 
 /**
  * The SINGLE owning declaration, allowed by exact text. Not a path exemption:
@@ -244,7 +271,13 @@ interface DuplicateSite {
   readonly text: string;
 }
 
-/** The two predicates, applied to one candidate text. Unchanged by T1B. */
+/**
+ * The two predicates, applied to one candidate text. Bodies unchanged by T1B.
+ * F-T1-ORACLE-LOGINFP narrowed the shared `WHOLE_DOMAIN` constant rather than one
+ * arm's copy of it, so this predicate and `kindOfCeilingLiteral` below inherit the
+ * same correction: the subsequence defect lived in the pattern, in both arms, and
+ * fixing one call site would have left the other reading a login array as a domain.
+ */
 function kindOf(candidate: string): DuplicateKind | null {
   if (MENTIONS_A_DEPTH.test(candidate) && (BARE_FIVE.test(candidate) || SIX_AS_EXCLUSIVE_BOUND.test(candidate))) {
     return "DEPTH_BOUND_LITERAL";
@@ -670,6 +703,58 @@ describe("S1-1 · the depth bound has a single source", () => {
     "    if (!Number.isInteger(depth) || depth < 1) {"                // floor-only, no ceiling literal
   ])("does not flag unrelated depth code: %s", (planted) => {
     expect(duplicateBoundSites(planted)).toEqual([]);
+  });
+
+  // SUBSEQUENCE NEGATIVE CONTROLS — MEASURED, not imagined (F-T1-ORACLE-LOGINFP;
+  // codex W5 r2 F1). The first entry is the real expression at
+  // apps/ui/components/LoginFlow.tsx:252 verbatim: six visual boxes for a six-digit
+  // login code, indexed 0..5. It is not a depth domain — the file holds no depth
+  // token at all — and the r3 arm reported it only because the unanchored run
+  // `1,2,3,4,5` is a SUBSEQUENCE of the 0-based run `0,1,2,3,4,5`.
+  //
+  // The CLASS is "a longer numeric run that merely CONTAINS the ruled domain", and
+  // it has two members, both asserted here: a run extended BEFORE the 1 (0-based
+  // origin) and a run extended AFTER the 5 (past the ruled ceiling). The wrapped
+  // form is asserted too, because the declaration window joins it back into one
+  // unit and a line-only guard would pass this file while still reporting the tree.
+  it.each([
+    { shape: "the real six-slot login array", planted: "                  {[0, 1, 2, 3, 4, 5].map((slot) => (" },
+    { shape: "0-based origin, one line", planted: "  const slots = [0, 1, 2, 3, 4, 5];" },
+    {
+      shape: "0-based origin, wrapped",
+      planted: [
+        "  const slots = [",
+        "    0,",
+        "    1,",
+        "    2,",
+        "    3,",
+        "    4,",
+        "    5",
+        "  ];"
+      ].join("\n")
+    },
+    { shape: "extended past the ruled ceiling", planted: "  const pages = [1, 2, 3, 4, 5, 6];" }
+  ])("does not read a longer numeric run as the ruled domain — $shape", ({ planted }) => {
+    expect(duplicateBoundSites(planted)).toEqual([]);
+  });
+
+  // WHAT THE NARROWING COSTS, asserted rather than argued.
+  //
+  // The narrowing is safe because it can only ever reach candidates that carry NO
+  // depth token. The ruled domain's own run always contains a bare `5`, so any
+  // candidate that spells the run AND mentions a depth is returned by the
+  // CEILING-LITERAL arm before the domain arm is consulted at all. That is why the
+  // fix does not — and must not — add a "depth token in reach" disjunct to the
+  // domain arm: such a disjunct is unreachable, a check that cannot fire for the
+  // reason it exists (D56).
+  //
+  // So these two shapes, which the domain arm no longer claims, are still caught —
+  // by the other arm. If anyone ever narrows BARE_FIVE, this control says so.
+  it.each([
+    { shape: "0-based origin with a depth token in reach", planted: "  const depthSlots = [0, 1, 2, 3, 4, 5];" },
+    { shape: "past the ceiling with a depth token in reach", planted: "  const depthChoices = [1, 2, 3, 4, 5, 6];" }
+  ])("still catches a longer run when a depth token is in reach — $shape", ({ planted }) => {
+    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
   });
 
   it("names packages/contract as the exported single source", () => {
