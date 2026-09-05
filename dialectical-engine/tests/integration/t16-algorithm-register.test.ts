@@ -25,6 +25,7 @@ import {
   buildAcceptanceRegisterRows,
   seedAcceptanceRegister
 } from "../../acceptance/seed-register.js";
+import { EXPANSION_DEPTH_MAX } from "@debateai/contract";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
@@ -149,7 +150,15 @@ const T16_EXPECTED_ROWS = [
       reviewerCallsPerNode: 1,
       synthesizerMaxRounds: 3,
       evaluatorMaxRounds: 3,
-      panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE"
+      panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE",
+      // The seeder gained this key in 4bbb13e5 (T17 rework r2): the sealed
+      // maximum ADMISSION refuses above, so an over-bound ask is refused at
+      // admission instead of minting a ceiling the runner rejects later. This
+      // expectation predated it by a day (c85d8c6f) and the mismatch was hidden
+      // by the conformance break until d08ee928 fixed it (F-GATE-1).
+      // Read from the contract owner, never restated: the register derives the
+      // same constant (V-T1B3-1), and a literal here would be a second source.
+      maxDepth: EXPANSION_DEPTH_MAX
     }
   }
 ] as const;

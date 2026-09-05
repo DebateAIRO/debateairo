@@ -1215,3 +1215,57 @@ zero, which is the probe that tells the truth; `ls` does not. `tests/unit/s14-ui
   rather than a shell one. Fix: build a real array in **bash** — `while IFS= read -r l; do
   F+=("$l"); done < list.txt; cmd "${F[@]}"` — and note macOS bash 3.2 has **no `mapfile`**.
   (algorithm-live-loop, W5 dev-sync)
+- **A vitest `-t` filter that matches NOTHING reports `Tests N skipped (N)` and exits 0.** It is
+  indistinguishable from a pass at a glance, and every downstream gate treats exit 0 as evidence.
+  T1B ran five mutation probes that tested nothing this way: the filter was
+  `-t "laid out as (multiline zod chain)"` while `it.each` had interpolated `$spelling` into the
+  name **with quotes**, `laid out as 'multiline zod chain'`. **`N skipped` with `0 passed` is a
+  FAILED MEASUREMENT, not a green run** — assert that a filtered run passed at least one test
+  before you believe its verdict. (T1B)
+- **`gate-run.sh` stamps `git rev-parse HEAD`, which is the WRONG commit whenever the working
+  tree is dirty.** Run a gate before committing your fix and the record binds to the *previous*
+  commit while measuring code that is not in any commit. The record even prints the dirt on its
+  `porcelain BEFORE` line — it just does not draw the conclusion, so nothing fails. `stamp-check`
+  then reports STALE much later, after the run is expensive to repeat. Commit first, then gate;
+  T1B re-ran five gates for this. (T1B)
+- **Verify a merge by comparing diff LINE SETS in both directions, not by reading hunks.** For
+  each file both sides touched: `diff(base,lane)` must equal `diff(integration,merged)`, and
+  `diff(base,integration)` must equal `diff(lane,merged)` — take `git diff -U0 … | grep '^[+-][^+-]' | sort`
+  and compare. Two `diff` calls per file prove neither side's contribution was dropped, which
+  no amount of reading the merged file does. A clean auto-merge resolves by POSITION and is the
+  case that most needs this. (T1B)
+
+
+## `pnpm typecheck` is BLIND to `acceptance/` — that project has its own tsconfig
+Found by W4 (2026-09-03): the root `tsconfig.json` `include` list is
+`apps/ packages/ tools/ tests/ vitest.config.ts drizzle.config.ts` — `acceptance/` is not
+in it. `acceptance/tsconfig.json` covers that tree separately. An unknown-property error in
+an acceptance file therefore does not appear in `tsc --noEmit`; it needs
+`tsc --noEmit -p acceptance/tsconfig.json`. W4's RED signal (`TS2353 … 'testOnlyCodexSessionsRoot'
+does not exist`) was invisible to the root run, which instead printed only the pre-existing
+`tests/unit/s14-ui.test.ts` errors from the absent `web/` tree. Typecheck BOTH projects, or a
+type-level RED frame silently reads as green.
+
+## The acceptance vitest config must be run from `dialectical-engine/`, not the worktree root
+Found by W4 (2026-09-03): `acceptance/vitest.config.ts` sets `include:
+["acceptance/**/*.test.ts"]`, resolved against the config's own root. Invoked from the
+worktree root — which is what `gate-run.sh <worktree>` does if you pass the repo root — vitest
+prints `No test files found, exiting with code 1` and the gate records exit=1. That is
+indistinguishable at a glance from a failing suite. Pass the PACKAGE root
+(`<worktree>/dialectical-engine`) as gate-run.sh's first argument; it stamps the same commit
+because `git -C` still resolves inside the repo. Cost: one wasted gate record.
+
+## A scratchpad `.ts` file runs as CJS under tsx — top-level `await` dies
+Found by W4 (2026-09-03): `tsx /tmp/.../probe.ts` fails with `Top-level await is currently
+not supported with the "cjs" output format`, because the scratch directory has no
+`package.json` declaring `"type": "module"`. Name throwaway probes `.mts`. Cost: one failed
+probe run before a live call was made (no live call was wasted).
+
+## A loose secret-scan regex matches CSS property names — read the match, never the count
+Found by W4 (2026-09-03): `grep -rlE "sk-[A-Za-z0-9_-]{16,}"` over the mission log tree
+reported a hit in a codex review log, which looked like a leaked API key in a committed
+record. The actual matched text was a minified CSS property-name blob —
+`…mask-composite`, `mask-size`, `mask-position…` — where `sk-` is the tail of `mask-`.
+Printing the match with `grep -oE` instead of trusting `-l` prevented a false security
+finding. Scan for the KEY NAME with its value (`"ANTHROPIC_API_KEY":"…"`) or a
+vendor-prefixed form (`sk-ant-`), and always print what matched.

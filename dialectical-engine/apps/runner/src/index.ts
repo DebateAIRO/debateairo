@@ -108,6 +108,7 @@ import {
   type SynthesizerRequest,
   type VerdictLabelBasis
 } from "@debateai/serve";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
@@ -144,7 +145,44 @@ const compositionSchema = z.object({
  * by `assertEvaluatorVerdict` in the serve package, so a provider cannot claim
  * satisfaction while failing a criterion.
  */
-const evaluatorVerdictSchema = z.object({
+/**
+ * F-SEALEDROWS-A / codex r2 B1a · THE EVALUATOR CONTRACT TEXT, exported so the
+ * conformance fingerprint can hash THE THING THAT IS SENT instead of searching
+ * this file for it.
+ *
+ * Three locators died to get here, and all three failed the same way — they
+ * could resolve to something that is not this prompt. Quoting the prompt's own
+ * words matched ZERO when T9 reworded it (loud). Taking the first object with a
+ * `criteria` member let an unrelated schema declared earlier win (quiet).
+ * Balancing braces over raw text miscounted a `}` inside a string, comment,
+ * regex or template literal, and — worse — matched a COMMENTED-OUT declaration
+ * after a real rename, returning an unrelated prompt with exit 0 (quiet again).
+ * Text is not syntax, and every lexical approximation of syntax has an input
+ * that defeats it.
+ *
+ * So there is no locator. The seeders import this constant and digest it; the
+ * call site below sends this constant. The hashed value and the sent value are
+ * the same object, which no search can be wrong about.
+ *
+ * V RULING 2026-09-04 is preserved exactly: the conformance slot covers the
+ * EVALUATOR prompt ALONE. The writer's prompt keeps its own
+ * `composerContractHash`. The text is unchanged byte for byte by this move, so
+ * the sealed fingerprint VALUE is unchanged.
+ *
+ * EDITING THIS STRING CHANGES A SEALED REGISTER VALUE. That is the intended
+ * behaviour — the fingerprint exists to make the change visible — but it means
+ * both deployment registers must be re-seeded when it moves.
+ */
+export const EVALUATOR_CONTRACT_TEXT =
+  "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null.";
+
+// codex r3 B1 part 2: EXPORTED so the schema/prompt agreement check can read the
+// DECLARED criterion keys at runtime rather than scanning this file for them.
+// Adding or renaming a criterion here without editing EVALUATOR_CONTRACT_TEXT is a
+// real defect — providers follow the SENT prompt, so every response would omit a
+// member this parser requires and the content-repair path would exhaust on a prompt
+// that cannot satisfy its own schema. The test turns that red.
+export const evaluatorVerdictSchema = z.object({
   satisfied: z.boolean(),
   objection: z.string().nullable(),
   criteria: z.object({
@@ -1179,7 +1217,7 @@ export interface WalkingSkeletonSettings {
    * every maker count — the same shape as `verdictLabelPolicy` and for the same
    * reason (S06 codex r1 B1, board F33).
    */
-  readonly synthesisRolePolicy?: RunnerSynthesisRolePolicy;
+  readonly synthesisRolePolicy: RunnerSynthesisRolePolicy;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1475,13 +1513,18 @@ export function buildDigestFollowingServeNodes(input: {
   return nodes;
 }
 
-/** DR-159 B3-B: depth is a closed, ASK-time count of expansion rounds. */
+/**
+ * DR-159 B3-B: depth is a closed, ASK-time count of expansion rounds.
+ * S1-1: the range itself is the contract's (EXPANSION_DEPTH_MIN/MAX) — this
+ * guard is defence in depth behind the contract door, never a second source.
+ */
 export function resolveExpansionDepth(depthParams: Readonly<Record<string, unknown>>): number {
   const depth = depthParams.depth;
-  if (!Number.isInteger(depth) || typeof depth !== "number" || depth < 1 || depth > 5) {
+  if (!Number.isInteger(depth) || typeof depth !== "number"
+    || depth < EXPANSION_DEPTH_MIN || depth > EXPANSION_DEPTH_MAX) {
     throw new TypedDomainError(
       "RUN_DEPTH_PARAMS_INVALID",
-      "DR-157/DR-159 require a pinned integer expansion depth from 1 through 5"
+      `DR-157/DR-159 require a pinned integer expansion depth from ${EXPANSION_DEPTH_MIN} through ${EXPANSION_DEPTH_MAX}`
     );
   }
   return depth;
@@ -4110,7 +4153,7 @@ export class WalkingSkeletonRunner {
         const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const packet: PromptPacket = { messages: [
-          { role: "system", content: "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null." },
+          { role: "system", content: EVALUATOR_CONTRACT_TEXT },
           { role: "user", content: JSON.stringify(request) }
         ] };
         const response = await callSynthesisRole(role.provider, {

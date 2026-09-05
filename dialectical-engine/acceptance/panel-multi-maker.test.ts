@@ -10,6 +10,7 @@ import { readPanelWeightingControls } from "@debateai/register";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { bearingsForRequest } from "../tests/support/reviewBearings.js";
+import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
 
 /**
  * T3 / S2-2 — the ACCEPTANCE-path receipt for the wired judge panel.
@@ -136,8 +137,15 @@ async function startProviderDouble(input: {
           reasons: [`${input.label} review ${calls}`],
           edge_bearings: bearingsForRequest(body)
         });
-      } else if (body.includes("conforms,findings")) {
-        content = JSON.stringify({ conforms: true, findings: [] });
+      } else if (isEvaluatorPacket(body)) {
+        // F-SEALEDROWS-B: T9 replaced the retired `{conforms,findings}` and
+        // `{pass}` branches that stood here with ONE evaluator verdict. Both
+        // retired branches were dead: measured before this repair, the
+        // evaluator call matched no branch at all and this double refused it
+        // with `PANEL_DOUBLE_UNCLASSIFIED_CALL`, printing the packet verbatim.
+        // The discriminator is the SHIPPED prompt (see
+        // `test-fixtures/evaluator-double.ts`), so it cannot go stale silently.
+        content = evaluatorSatisfied();
       } else if (body.includes("served_number_refs")) {
         content = JSON.stringify({
           segments: [
@@ -154,8 +162,6 @@ async function startProviderDouble(input: {
         content = judgementBody(`${input.label} position ${calls}.`, input.scores);
       } else if (body.includes("discovery health probe")) {
         content = "panel-health-probe";
-      } else if (body.includes("pass")) {
-        content = JSON.stringify({ pass: true });
       } else {
         // Never guess: an unclassified call names itself so a fixture gap can
         // never masquerade as a production failure.

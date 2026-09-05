@@ -88,11 +88,15 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
 
   it("offers the ruled depth range without exposing the computed tripwire", () => {
     expect(newPage).not.toContain("contractClient.readDeployment");
-    // Depth is a slider now, so the 1..5 range lives in its bounds rather than
-    // in an option list — the gate is that neither end drifts.
-    expect(newPage).toContain("const DEPTH_MIN = 1;");
-    expect(newPage).toContain("const DEPTH_MAX = 5;");
-    expect(newPage).toMatch(/min=\{DEPTH_MIN\}\s+max=\{DEPTH_MAX\}/);
+    // S1-1/J6 reconciled with UX-01: the surviving control is a SLIDER, so the
+    // ruled range lives in its bounds — and those bounds are read from the
+    // contract's single source, not re-declared here. Both intents hold: the
+    // range is still offered, and `apps/ui/app/new/page.tsx` holds no second
+    // definition of the bound (tests/unit/s1-1-depth-contract.test.ts scans
+    // shipped code for exactly that).
+    expect(newPage).toContain('from "@debateai/contract"');
+    expect(newPage).toMatch(/min=\{EXPANSION_DEPTH_MIN\}\s+max=\{EXPANSION_DEPTH_MAX\}/);
+    expect(newPage).not.toMatch(/const\s+DEPTH_(?:MIN|MAX)\s*=/);
     expect(newPage).not.toContain("runCostEnvelope");
     expect(newPage).not.toContain("maxModelAttempts");
     expect(newPage).not.toContain("up to 9 model attempts");

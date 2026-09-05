@@ -69,7 +69,16 @@ const runnerRowsSchema = z.object({
       label: z.string().trim().min(1),
       ceilingBand: z.string().trim().min(1),
       liftPath: z.string().trim().min(1)
-    }).strict())
+    }).strict()),
+    // F-T9B-3 / codex r1 B2: the entry whose trigger is the EMPTY BASIS itself.
+    // REQUIRED, for the same reason as the ceremony twin — a strict schema that
+    // admits an incomplete sealed row defers its refusal to runtime, which is
+    // the defect class this mission has now produced three times.
+    emptyBasisFloor: z.object({
+      label: z.string().trim().min(1),
+      ceilingBand: z.string().trim().min(1),
+      liftPath: z.string().trim().min(1)
+    }).strict()
   }).strict(),
   judgementSelectionPolicy: z.object({
     kind: z.literal("MAXIMIZE_WEIGHTED_TAU"),

@@ -121,7 +121,7 @@ const ceilingRow = (): BandCeilingRegisterRow => ({
   sourceRef: "test-layer:DR-082-086",
   value: {
     bandOrder: [...ENGINE_BAND_ORDER],
-    ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_REASONING_CEILING"],
+    ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_REASONING_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
     defaultCeiling: {
       label: "TEST_DEFAULT_CEILING",
       ceilingBand: TOP_BAND,
@@ -132,7 +132,16 @@ const ceilingRow = (): BandCeilingRegisterRow => ({
       label: "TEST_REASONING_CEILING",
       ceilingBand: CEILING_BAND,
       liftPath: "test-layer:gather-evidence-to-lift"
-    }]
+    }],
+    // F-T9B-3: the entry whose trigger is the EMPTY BASIS itself. Before it
+    // existed the floored record was selected from `cuts` by band, which on
+    // this row means TEST_REASONING_CEILING — the right band under a name
+    // describing a reasoning share that cannot fire on an empty basis.
+    emptyBasisFloor: {
+      label: "TEST_EMPTY_BASIS_FLOOR",
+      ceilingBand: CEILING_BAND,
+      liftPath: "test-layer:gather-any-verified-evidence-to-lift"
+    }
   }
 });
 
@@ -411,11 +420,12 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       // pinned here, so a record that misdescribes its own decision fails.
       confidenceBand: CEILING_BAND,
       bandCeiling: {
-        // The row entry that actually names the floor band — never the default
-        // entry, whose band is the TOP one and whose lift path claims the band
-        // was retained.
-        label: "TEST_REASONING_CEILING",
-        liftPath: "test-layer:gather-evidence-to-lift",
+        // F-T9B-3: the row's EMPTY-BASIS entry — never the default entry, whose
+        // band is the TOP one and whose lift path claims the band was retained,
+        // and never the reasoning cut, whose share trigger cannot fire on an
+        // empty basis. The record names the decision that actually produced it.
+        label: "TEST_EMPTY_BASIS_FLOOR",
+        liftPath: "test-layer:gather-any-verified-evidence-to-lift",
         basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 },
         registerRowKey: "test-layer:wayOfKnowingCeiling",
         registerVersion: 1,
@@ -500,7 +510,7 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
       ...row,
       value: {
         ...row.value,
-        cuts: [{ ...row.value.cuts[0]!, label: "TEST_LABEL_NOT_IN_THE_VOCABULARY" }]
+        emptyBasisFloor: { ...row.value.emptyBasisFloor!, label: "TEST_LABEL_NOT_IN_THE_VOCABULARY" }
       }
     };
     expect(() => deriveBandCeiling({
@@ -510,16 +520,18 @@ describe("T12 — the confidence band's basis counts the nodes the statement CIT
     })).toThrowError(expect.objectContaining({ code: "BAND_CEILING_LABEL_UNKNOWN" }));
   });
 
-  it("refuses when NO ceiling entry names the row's own floor band", () => {
+  it("refuses when the row carries NO empty-basis entry to describe its floor", () => {
     const row = ceilingRow();
-    // Every entry now names the TOP band, so nothing describes the floor.
-    const broken: BandCeilingRegisterRow = {
-      ...row,
-      value: {
-        ...row.value,
-        cuts: [{ ...row.value.cuts[0]!, ceilingBand: TOP_BAND }]
-      }
-    };
+    // F-T9B-3: the floor is described by `emptyBasisFloor` alone, so removing
+    // it is what leaves the floor undescribed. Mutating `cuts` no longer
+    // reaches this guard — before the entry existed this test passed whether or
+    // not its mutation mattered, because the fixture described no floor either
+    // way.
+    const { emptyBasisFloor: _removed, ...withoutFloor } = row.value;
+    // The member is REQUIRED now (F-SEALEDROWS-D), so an incomplete row is
+    // unconstructible in typed code and can only reach the guard through
+    // `unknown` — which is exactly the hand-built caller the guard exists for.
+    const broken = { ...row, value: withoutFloor } as unknown as BandCeilingRegisterRow;
     expect(() => deriveBandCeiling({
       basis: { LOOKED_UP: 0, RAN: 0, REASONING: 0 },
       candidateConfidenceBand: TOP_BAND,

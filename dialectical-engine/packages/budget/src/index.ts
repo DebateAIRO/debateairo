@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { ExpansionDepthSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
@@ -44,7 +45,7 @@ const costEnvelopeBasisSchema = z.object({
   kind: z.literal("COMPUTED_STRUCTURAL_CEILING"),
   max_model_attempts: z.number().int().positive(),
   panel_size: z.number().int().positive(),
-  depth: z.number().int().min(1).max(5),
+  depth: ExpansionDepthSchema,
   per_site_attempts: z.object({
     judge: z.number().int().positive(),
     organ: z.number().int().positive(),

@@ -2,6 +2,7 @@
 
 import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
@@ -35,9 +36,6 @@ const BUDGET_TIER_OPTIONS: ReadonlyArray<{ value: CompositionBudgetTier; label: 
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" }
 ];
-
-const DEPTH_MIN = 1;
-const DEPTH_MAX = 5;
 
 /* The document draws every text field at its resting height — one line for the
    question — so the field grows with its content instead of scrolling inside a
@@ -100,7 +98,7 @@ function NewDebateForm({ token }: { token: string }) {
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    depth >= DEPTH_MIN && depth <= DEPTH_MAX &&
+    depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -198,8 +196,8 @@ function NewDebateForm({ token }: { token: string }) {
               id="treeDepth"
               label="Tree depth"
               hint="How far the debate expands when cross-maker review is available"
-              min={DEPTH_MIN}
-              max={DEPTH_MAX}
+              min={EXPANSION_DEPTH_MIN}
+              max={EXPANSION_DEPTH_MAX}
               value={depth}
               onChange={setDepth}
             />

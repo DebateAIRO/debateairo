@@ -31,12 +31,14 @@ import {
   applySingleLineageBandCap,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
+  EVALUATOR_CONTRACT_TEXT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
+import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
@@ -134,7 +136,7 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       sourceRef: "test-layer:DR-086",
       value: {
         bandOrder: ["TEST_CAPPED_BAND", "TEST_TOP_BAND"],
-        ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING"],
+        ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
         defaultCeiling: {
           label: "TEST_DEFAULT_CEILING", ceilingBand: "TEST_TOP_BAND",
           liftPath: "test-layer:retain-band"
@@ -143,7 +145,14 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
           minimumShares: { LOOKED_UP: 0.5 },
           label: "TEST_LOOKED_UP_CEILING", ceilingBand: "TEST_CAPPED_BAND",
           liftPath: "test-layer:improve-way-of-knowing"
-        }]
+        }],
+        // F-T9B-3 / codex r2: every row describes its own floor. The
+        // LOOKED_UP cut names the same band but its share trigger cannot
+        // fire on an empty basis, so it cannot describe this case.
+        emptyBasisFloor: {
+          label: "TEST_EMPTY_BASIS_FLOOR", ceilingBand: "TEST_CAPPED_BAND",
+          liftPath: "test-layer:gather-any-verified-evidence-to-lift"
+        }
       }
     }
   },
@@ -395,7 +404,7 @@ async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
   panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
 ): Promise<{
-  endpoint: string; calls(): number; stop(): Promise<void>;
+  endpoint: string; calls(): number; bodies(): readonly string[]; stop(): Promise<void>;
 }> {
   // T9: the EVALUATOR is a class of its own. The retired CONFORMANCE and R9
   // classes stay in the vocabulary so a fixture that still scripts one is
@@ -426,11 +435,19 @@ async function startProviderDouble(
   });
   const pending = [...classified];
   let calls = 0;
+  // codex r5 B1: EVERY inbound /chat/completions body is retained. The gateway
+  // builds a content-repair packet INSIDE itself
+  // (packages/providers OpenAICompatibleProviderGateway: `attemptPacket =
+  // request.buildRepairPacket(...)`), so a wrapper around `ProviderGateway.call`
+  // sees the FIRST attempt only. The wire is the one place every attempt —
+  // initial and repaired — is visible.
+  const bodies: string[] = [];
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      bodies.push(body);
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -490,6 +507,7 @@ async function startProviderDouble(
   return {
     endpoint: `http://127.0.0.1:${address.port}`,
     calls: () => calls,
+    bodies: () => bodies,
     async stop() { server.close(); await once(server, "close"); }
   };
 }
@@ -580,6 +598,33 @@ async function executeResil01Scenario(input: {
     await secondary.stop();
     await primary.stop();
   }
+}
+
+/**
+ * codex r4 B1 · THE PROVIDER BOUNDARY, RETAINED.
+ *
+ * `ProviderGateway` is a one-method interface and the runner takes it in its
+ * constructor, so wrapping it observes the EXACT `ProviderCallRequest` the
+ * runner hands over — `packet.messages` before any encoding. Nothing here reads
+ * source text, which is the whole point: the four previous guards inspected the
+ * code that BUILDS the request instead of watching the request, and each one
+ * was satisfiable by code that sends something else.
+ */
+function recordingRunner(endpoint: string, settings = runnerSettings()): {
+  readonly runner: WalkingSkeletonRunner;
+  readonly evaluatorCalls: readonly ProviderCallRequest[];
+} {
+  const evaluatorCalls: ProviderCallRequest[] = [];
+  const inner = createPostgresProviderGateway(database.pool, {
+    endpoint, model: "test-layer/model", maker: "test-layer"
+  });
+  const gateway: ProviderGateway = {
+    call: async (request) => {
+      if (request.role === "EVALUATOR") evaluatorCalls.push(request);
+      return inner.call(request);
+    }
+  };
+  return { runner: new WalkingSkeletonRunner(database.pool, gateway, settings), evaluatorCalls };
 }
 
 function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): WalkingSkeletonRunner {
@@ -3905,12 +3950,21 @@ describe("apps/runner — legal command lifecycle", () => {
       });
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
       const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:happy-path");
+      // F-H-1 / T11 (goal 196-221). This fixture is agentCount=1, depth=1: ONE maker, so one
+      // servable root and no runner-up to measure a margin against; ONE judge, so the winning
+      // root's panel dispersion is NULL. Both limbs of the label basis are therefore ABSENT
+      // (receipt: basisAbsence ["MARGIN","DISAGREEMENT"], candidateCount 1), which is rung 0 of
+      // the ladder -- CONTESTED with LABEL-BASIS-INCOMPLETE, by design, because a solo voice can
+      // never print SUPPORTED (confirm-item 6). SUPPORTED lives at rung 3 and is UNREACHABLE
+      // here: rung 0 returns first and needs both limbs MEASURED to decline. The retired binary
+      // derivation this once asserted returned SUPPORTED for any usable basis; that property is
+      // still pinned, by `verdict_unavailable: null` on the next line.
       expect(projection).toMatchObject({
-        verdict_state: "SUPPORTED",
+        verdict_state: "CONTESTED",
         verdict_unavailable: null,
         confidence_band: "TEST_CAPPED_BAND",
         band_ceiling: { label: "TEST_DEFAULT_CEILING" },
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"]
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "LABEL-BASIS-INCOMPLETE"]
       });
       expect(projection?.condition_mark_records).toEqual(expect.arrayContaining([
         expect.objectContaining({
@@ -4060,6 +4114,124 @@ describe("apps/runner — legal command lifecycle", () => {
       await expect(new ServeRepository(database.pool).readInspectionProjection(
         result.answerId, "asker:not-owner", 1
       )).resolves.toBeNull();
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * F-SEALEDROWS-A · what the runner SENDS for the EVALUATOR role is the
+   * exported contract value — observed, not inferred from source.
+   *
+   * Four guards died here before this one. Each read the runner's source to
+   * decide whether the right thing would be sent: a text search that a comment
+   * could redirect, a first-`criteria` match an earlier schema could capture, a
+   * brace balancer a `}` in a string could miscount, and finally a whitelist of
+   * one spelling that codex defeated by putting the expected fragments in a
+   * COMMENT while pointing the real packet at another identifier — keeping the
+   * value pin, the schema agreement and both seeder dataflow tests green while
+   * the provider received different text.
+   *
+   * This one watches the wire instead. The gateway is the runner's own provider
+   * boundary, so the assertion is about the request that was actually made. A
+   * comment cannot enter it, an alias cannot disguise it, and reformatting or
+   * reordering the object literal cannot break it — only sending something else
+   * can, which is the single thing that must fail.
+   */
+  it("SENDS the exported evaluator contract to the provider, observed at the gateway boundary", async () => {
+    const provider = await startProviderDouble([
+      JSON.stringify({ statement: "A looked-up answer.", way_of_knowing: "LOOKED_UP",
+        locator: "https://example.invalid/test-layer", restatement_text: "A looked-up answer.", restatement_status: "PASS", value_laden: false,
+        steelman: { summary: "A looked-up answer.", fidelity: 0.72 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      JSON.stringify({ satisfied: true }),
+      JSON.stringify({ satisfied: true }),
+      evaluatorSatisfied()
+    ]);
+    try {
+      // codex r6 B1 · THE SEALED BOUND IS 3, NOT 2. Both deployments seal
+      // CONFORMANCE.maxAttempts: 3 (acceptance `acceptanceOrganCostBounds`,
+      // development DEVELOPMENT_ORGAN_COST_BOUNDS), so production permits TWO
+      // repairs — the second being the callback applied to an ALREADY-REPAIRED
+      // packet. The previous fixture capped attempts at 2, so that second
+      // callback and the third wire attempt did not exist, and a helper that
+      // preserved the contract on its first call but not its second passed.
+      // The bound is now the shipped one and the fixture drives all three.
+      const settings = {
+        ...runnerSettings(),
+        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 3 }
+      };
+      const { runner, evaluatorCalls } = recordingRunner(provider.endpoint, settings);
+      // NB: the question line feeds the code-first claim classifier
+      // (packages/judgement/src/s04.ts). Words like "observed" resolve to
+      // `empirical`, which this file's composition row does not ratify, so the
+      // run would die at COMPOSITION_UNRESOLVED before reaching the evaluator.
+      const work = await createRunnerWork("evaluator-send-at-the-gateway");
+      const result = await runner.executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      /**
+       * codex r5 B1 · EVERY EVALUATOR ATTEMPT ON THE WIRE, not just the first.
+       *
+       * A wrapper around `ProviderGateway.call` sees the OUTER request once.
+       * When a reply fails the schema the gateway builds a content-repair packet
+       * INSIDE itself and sends THAT on the next HTTP request, so the wrapper
+       * never sees it. Measured here: the recorder holds 1 outer call while the
+       * wire carries 2 evaluator attempts. The wire is the only place the
+       * invariant can be checked for every attempt.
+       *
+       * Evaluator attempts are identified by the `role` field of the request
+       * payload the runner serialises into the user message — deliberately NOT
+       * by the system prompt, which is the thing under test. Selecting them by
+       * their system text would make a dropped constant vanish from the
+       * selection and pass vacuously.
+       */
+      const attempts = provider.bodies()
+        .map((body) => JSON.parse(body) as { messages: { role: string; content: string }[] })
+        .filter((packet) => packet.messages.some((message) => {
+          // EVERY user message is scanned, never just the first: a legitimate
+          // repair may place its user message before the serialised envelope,
+          // and assuming a position would drop that attempt out of the
+          // selection — which is a vacuous pass wearing a filter.
+          if (message.role !== "user") return false;
+          try { return (JSON.parse(message.content) as { role?: string }).role === "EVALUATOR"; }
+          catch { return false; }
+        }));
+
+      /**
+       * THE COUNT IS THE VACUITY GUARD, and it is the only one (codex r6 B2).
+       * Three attempts are expected because the sealed bound permits three and
+       * the fixture fails the schema twice; a run that stopped early cannot
+       * satisfy this, so the loop below cannot pass over an empty or short set.
+       *
+       * NOTHING HERE PINS REPAIR SHAPE. The previous version required the
+       * second packet to carry exactly one more message than the first, which
+       * asserts the current helper's implementation rather than the invariant:
+       * a repair that appended two context messages, or reordered later ones,
+       * would keep the contract leading and still fail. AMENDMENT 6 said not to
+       * add shape constraints and that one slipped in anyway.
+       */
+      expect(attempts).toHaveLength(3);
+      expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the three
+
+      // THE INVARIANT, and the whole of it: every attempt LEADS with the
+      // exported contract. Role and exact content, nothing else.
+      for (const [index, packet] of attempts.entries()) {
+        expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
+        expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
+      }
+
+      const messages = evaluatorCalls[0]!.packet.messages;
+      const system = messages.filter((message) => message.role === "system");
+      expect(system).toHaveLength(1);
+      expect(system[0]!.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // and it leads the packet, so no earlier instruction can displace it
+      expect(messages[0]?.role).toBe("system");
+      expect(messages[0]?.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // the fingerprinted contract and the sent contract are the same value
+      expect(evaluatorCalls[0]!.contractHash).toBe(runnerSettings().conformanceContractHash);
     } finally { await provider.stop(); }
   });
 
@@ -5436,7 +5608,14 @@ describe("T10/T11 · the served root and its label, through the production runne
     const question = `t09-unsealed-synthesis-family-${randomUUID()}`;
     const work = await createRunnerWork(question);
     const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
-    const { synthesisRolePolicy: _omitted, ...settingsWithoutSynthesisRolePolicy } = runnerSettings();
+    // T9 x board F33: the field is now REQUIRED on WalkingSkeletonSettings, so
+    // omitting it is a compile error and this deliberate omission needs a cast.
+    // The cast is the point: the TYPE now stops a deployment from dropping the
+    // family, and this test still pins the RUNTIME gate that catches a caller
+    // who defeats the type — a JavaScript caller, a cast like this one, or a
+    // settings object built from parsed data.
+    const { synthesisRolePolicy: _omitted, ...omitted } = runnerSettings();
+    const settingsWithoutSynthesisRolePolicy = omitted as unknown as WalkingSkeletonSettings;
     try {
       await expect(
         runnerWithEndpoint(provider.endpoint, settingsWithoutSynthesisRolePolicy).executeWorkItem(work.workItemId)
@@ -5886,5 +6065,71 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
     await expect(
       serve.persist(freshInput as Parameters<ServeRepository["persist"]>[0])
     ).rejects.toMatchObject({ code: "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE" });
+  });
+});
+
+/**
+ * F-H-2 — the liveness refresh path with content encryption OFF.
+ *
+ * `core.run_private_content_is_live` is a v1-ENCRYPTED-run predicate: its body ends
+ * `WHERE run.run_id=p_run_id AND run.content_encryption_version=1`, wrapped in
+ * `COALESCE(...,false)`, so it answers FALSE for a run that has no private content at all.
+ * Eleven of its twelve call sites guard it accordingly; `recordQuery`'s candidate filter did
+ * not, so with encryption off — the default — every run was invisible to it.
+ *
+ * These two tests pin the BLAST RADIUS rather than the symptom. The lifecycle test proves the
+ * ARCHIVED_REVIVED transition end to end; it does not prove that a query refreshes liveness at
+ * all, and that refresh is what feeds `sweep`'s `HAVING max(query.occurred_at)` and
+ * `decideRetirement`'s `lastQueriedAt`.
+ */
+describe("F-H-2 · liveness refresh with content encryption off", () => {
+  const retirementPolicy = {
+    rowKey: "livenessPolicy",
+    registerVersion: 1,
+    sourceRef: "test-layer:DR-015-016",
+    questionClass: "standard",
+    reviewAfterMs: 86_400_000,
+    retireAfterMs: 180 * 86_400_000
+  } as const;
+
+  /**
+   * PROPERTY: an owned, unencrypted, non-erased run IS a `recordQuery` candidate, and the query
+   * is recorded against it at the instant it was asked. Mutant this catches: restoring the
+   * unguarded `core.run_private_content_is_live(run.run_id)` in the candidate filter, which
+   * makes the run invisible and the returned count 0.
+   */
+  it("F-H-2 counts an unencrypted run as a candidate and records its QUERY event", async () => {
+    const question = `f-h-2-refresh-${randomUUID()}`;
+    const runId = await createRun(question);
+    const askedAt = new Date("2030-01-01T00:00:00.000Z");
+
+    const recorded = await new LivenessRepository(database.pool)
+      .recordQuery(question, `asker:${question}`, askedAt);
+
+    expect(recorded).toBe(1);
+    const events = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM core.question_liveness_event
+        WHERE run_id=$1 AND kind='QUERY' AND occurred_at=$2`,
+      [runId, askedAt]
+    );
+    expect(events.rows[0]?.count).toBe("1");
+  });
+
+  /**
+   * PROPERTY: re-asking a question keeps it alive — the refreshed `lastQueriedAt` is what
+   * `decideRetirement` reads, so a run queried one day ago is NOT retired under a 180-day
+   * window, however old the run itself is. This is the user-visible half of the defect: without
+   * the refresh, a question being actively re-asked is archived anyway.
+   */
+  it("F-H-2 keeps a re-asked run out of a later retirement sweep", async () => {
+    const question = `f-h-2-not-retired-${randomUUID()}`;
+    const runId = await createRun(question);
+    const liveness = new LivenessRepository(database.pool);
+
+    // The run was created "now"; without a refresh it is years stale by 2030 and retires.
+    await liveness.recordQuery(question, `asker:${question}`, new Date("2030-06-01T00:00:00.000Z"));
+    const archived = await liveness.sweep(new Date("2030-06-02T00:00:00.000Z"), retirementPolicy);
+
+    expect(archived).not.toContain(runId);
   });
 });

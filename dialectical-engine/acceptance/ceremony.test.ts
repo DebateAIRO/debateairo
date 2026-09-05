@@ -11,6 +11,7 @@ import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
+import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -33,15 +34,17 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
   readonly endpoint: string;
   stop(): Promise<void>;
 }> {
-  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "EVALUATOR" | "GENERAL";
   const classifyContent = (content: string): ResponseClass => {
     try {
       const value = JSON.parse(content) as Record<string, unknown>;
       if ("statement" in value) return "JUDGE";
       if ("outcome" in value) return "REVIEW";
       if ("segments" in value) return "COMPOSE";
-      if ("conforms" in value) return "CONFORMANCE";
-      if ("pass" in value) return "R9";
+      // F-SEALEDROWS-B: T9 folded the retired `{conforms,findings}` and `{pass}`
+      // organs into ONE evaluator verdict, so those two classes no longer exist
+      // and a fixture scripting them scripts a call nobody makes.
+      if ("satisfied" in value) return "EVALUATOR";
     } catch { /* health-probe fixtures retain FIFO semantics */ }
     return "GENERAL";
   };
@@ -72,22 +75,37 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
       // the FIFO fallback below hid it.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
         : body.includes("restatement_text") ? "JUDGE"
-          : body.includes("conforms,findings") ? "CONFORMANCE"
-            : body.includes("{pass}") ? "R9"
-              : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
-      const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
+          // F-SEALEDROWS-B: the EVALUATOR discriminator is the SHIPPED prompt
+          // itself (see `test-fixtures/evaluator-double.ts`), so it cannot go
+          // stale against the runner the way the two retired ones did. Measured
+          // before the repair: the evaluator call matched NONE of the four
+          // discriminators here and fell through to GENERAL, where the FIFO
+          // fallback answered it out of whatever queue it landed on.
+          : isEvaluatorPacket(body) ? "EVALUATOR"
+            : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      // T3 N4: never GUESS ACROSS CLASSES — in EITHER direction. A request of
+      // any class, GENERAL included, consumes the first scripted response of
+      // ITS OWN class and otherwise refuses by name; FIFO order survives WITHIN
+      // a class, which is all the untyped health probes ever needed.
+      //
+      // This was one-directional until a mutant said so. Only RECOGNISED
+      // requests were held to the rule; an UNRECOGNISED one still took the head
+      // of the queue whatever class sat there — which is exactly how the
+      // EVALUATOR call was answered out of a retired-conformance queue before
+      // F-SEALEDROWS-B was repaired. It also made the repair untestable: with a
+      // deliberately dead EVALUATOR discriminator the call fell through to
+      // GENERAL, the fallback served the evaluator entry anyway, and this
+      // ceremony stayed GREEN while classifying nothing
+      // (`logs/demo-path/r1-mut-M3-dead-discriminator-ceremony.log`). A wrong
+      // class must cost a refusal, never a lucky answer.
+      const matching = pending.findIndex((entry) => entry.kind === requestKind);
       calls += 1;
-      // T3 N4: never GUESS ACROSS CLASSES. A recognised request with no scripted
-      // response of its own class refuses by name instead of serving whatever sits at
-      // the head of the queue — a wrong-class answer surfaces as a bogus production
-      // schema failure and costs a debugging round. Untyped requests (health probes)
-      // keep honest FIFO order.
-      if (requestKind !== "GENERAL" && matching < 0) {
+      if (matching < 0) {
         response.writeHead(500, { "content-type": "application/json" })
           .end(JSON.stringify({ error: "PROVIDER_DOUBLE_UNSCRIPTED_CLASS", requestKind }));
         return;
       }
-      const scripted = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
+      const scripted = pending.splice(matching, 1)[0]?.content;
       // T5/S3-1: a review response must measure exactly the edges THIS call
       // offered, so the declared policy is resolved against the live request.
       const content = scripted !== undefined && requestKind === "REVIEW"
@@ -177,10 +195,7 @@ beforeAll(async () => {
     JSON.stringify({ segments: [
       { segment_id: "segment:verdict", text: "A provisional acceptance answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:next", text: "Verify the proposal independently.", node_refs: [], served_number_refs: [] }
-    ] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ pass: true })
+    ] })
   ]);
   // PANEL-01: the second maker independently authors a root, grows both
   // primary-root children, and authors its ordered cross-root response.
@@ -190,7 +205,16 @@ beforeAll(async () => {
     judgementDouble("A genuine supporting case for the acceptance answer."),
     judgementDouble("The strongest genuine counter-position to the acceptance answer."),
     judgementDouble("The second maker directly defends its root and attacks the primary root."),
-    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`))
+    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`)),
+    // T9 / F-SEALEDROWS-B: the sealed EVALUATOR identity is the SECOND
+    // configured family's first provider — `acceptance:claude-cli`, this
+    // double — while the SYNTHESIZER stays with `acceptance:codex-cli`. The
+    // retired conformance and R9 responses sat on the primary provider and
+    // were never consumed once T9 landed; the one call that IS made arrives
+    // here. One entry, because a satisfied verdict ends the loop in round 1
+    // and a second evaluator call would be a real change this fixture should
+    // refuse by name rather than answer.
+    evaluatorSatisfied()
   ]);
 });
 
@@ -220,6 +244,24 @@ describe("ACC-01 dry-run ceremony", () => {
       conformanceBound: bound,
       providerRef: "acceptance:codex-cli",
       maker: "OpenAI",
+      // T9 x board F33 — the class closure. `synthesisRolePolicy` is REQUIRED on
+      // WalkingSkeletonSettings, so a deployment or fixture can no longer omit the
+      // family the runner refuses over: omission is a compile error, not a claim-time
+      // surprise. Provisioning only — this refusal fires on an EARLIER gate, and both
+      // refs name this fixture's own configured provider (identical refs stay lawful,
+      // goal 84-85), so no assertion here changes.
+      synthesisRolePolicy: {
+        registerVersion: 1,
+        synthesizerRoleRef: "acceptance:codex-cli",
+        evaluatorRoleRef: "acceptance:codex-cli",
+        evaluatorLoopMaxRounds: 3,
+        identicalRoleRefs: true,
+        sourceRefs: {
+          synthesizerRoleRef: "test-layer:J8",
+          evaluatorRoleRef: "test-layer:J8",
+          evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+        }
+      },
       judgeContractHash: "a".repeat(64),
       composerContractHash: "b".repeat(64),
       conformanceContractHash: "c".repeat(64),
@@ -250,9 +292,16 @@ describe("ACC-01 dry-run ceremony", () => {
           sourceRef: "acceptance:test-layer",
           value: {
             bandOrder: ["CAPPED", "FULL"],
-            ceilingLabels: ["DEFAULT_CEILING"],
+            ceilingLabels: ["DEFAULT_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
             defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
-            cuts: []
+            cuts: [],
+            // F-T9B-3 / codex r1 B2: the current fixture describes its own
+            // floor, as every current sealed row now must.
+            emptyBasisFloor: {
+              label: "NO_VERIFIED_EVIDENCE_FLOOR",
+              ceilingBand: "CAPPED",
+              liftPath: "gather-any-verified-evidence-to-lift"
+            }
           }
         }
       },

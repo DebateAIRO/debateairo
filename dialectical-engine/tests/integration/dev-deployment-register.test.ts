@@ -408,6 +408,24 @@ describe("DEV-05 complete development deployment register", () => {
       judgeBound: policy.bounds.JUDGE, composerBound: policy.bounds.COMPOSER,
       conformanceBound: policy.bounds.CONFORMANCE,
       providerRef: "provider:t3c:primary", maker: "maker:primary",
+      // T9 x board F33 — the class closure. `synthesisRolePolicy` is REQUIRED on
+      // WalkingSkeletonSettings, so a deployment or fixture can no longer omit the
+      // family the runner refuses over: omission is a compile error, not a claim-time
+      // surprise. Provisioning only — this refusal fires on an EARLIER gate, and both
+      // refs name this fixture's own configured provider (identical refs stay lawful,
+      // goal 84-85), so no assertion here changes.
+      synthesisRolePolicy: {
+        registerVersion: 1,
+        synthesizerRoleRef: "provider:t3c:primary",
+        evaluatorRoleRef: "provider:t3c:primary",
+        evaluatorLoopMaxRounds: 3,
+        identicalRoleRefs: true,
+        sourceRefs: {
+          synthesizerRoleRef: "test-layer:J8",
+          evaluatorRoleRef: "test-layer:J8",
+          evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+        }
+      },
       critique: {
         provider: unreachable("maker:secondary"),
         providerRef: "provider:t3c:secondary", maker: "maker:secondary"
@@ -516,6 +534,24 @@ describe("DEV-05 complete development deployment register", () => {
       conformanceBound: policy.bounds.CONFORMANCE,
       // The refs MATCH the discovered panel, so the probe decides.
       providerRef: "provider:test-layer", maker: "maker:1",
+      // T9 x board F33 — the class closure. `synthesisRolePolicy` is REQUIRED on
+      // WalkingSkeletonSettings, so a deployment or fixture can no longer omit the
+      // family the runner refuses over: omission is a compile error, not a claim-time
+      // surprise. Provisioning only — this refusal fires on an EARLIER gate, and both
+      // refs name this fixture's own configured provider (identical refs stay lawful,
+      // goal 84-85), so no assertion here changes.
+      synthesisRolePolicy: {
+        registerVersion: 1,
+        synthesizerRoleRef: "provider:test-layer",
+        evaluatorRoleRef: "provider:test-layer",
+        evaluatorLoopMaxRounds: 3,
+        identicalRoleRefs: true,
+        sourceRefs: {
+          synthesizerRoleRef: "test-layer:J8",
+          evaluatorRoleRef: "test-layer:J8",
+          evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+        }
+      },
       critique: {
         provider: gateway("maker:2"),
         providerRef: "provider:test-layer:secondary", maker: "maker:2"
