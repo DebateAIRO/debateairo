@@ -36,7 +36,7 @@ export const BATTERY_BUDGET_CONTRACTS = Object.freeze(
 );
 
 /**
- * T17 (DR-184-v3): the run head's basis carries the four call-site legs and the
+ * T17 (DR-184-v4): the run head's basis carries the four call-site legs and the
  * serve chain it was minted against, so an audit of a stored receipt can see
  * WHICH topology the run was admitted under. The schema is strict on purpose —
  * a DR-184-v2 basis, which counted no panel leg, is REFUSED loudly here rather

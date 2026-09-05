@@ -516,6 +516,29 @@ describe("F-T17T9-3 · the serve rule has ONE home", () => {
   });
 
   /**
+   * The row carries the loop bound ONCE PER ROLE, but the runner has ONE bound
+   * (`evaluatorLoopMaxRounds`) and TWO roles. A row sealing 5 synthesizer rounds
+   * and 1 evaluator round still SUMS to six and would mint an identical ceiling
+   * while describing a runner that cannot exist — the exact class of defect this
+   * lane repeals. The rule refuses it instead of summing it.
+   */
+  it("refuses per-role round bounds that disagree, rather than summing them to the same six", () => {
+    expect(() => SERVE_LEG.sites({ synthesizerMaxRounds: 5, evaluatorMaxRounds: 1 }))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_SYNTHESIS_ROUNDS_INCOHERENT"
+      }));
+    // …and it reaches the constructor, so no such basis can be minted at all.
+    expect(() => computeStructuralCeilingBasis({
+      ...ceilingInput(2, 1), synthesizerMaxRounds: 5, evaluatorMaxRounds: 1
+    })).toThrowError(expect.objectContaining({
+      code: "STRUCTURAL_CEILING_SYNTHESIS_ROUNDS_INCOHERENT"
+    }));
+    // THE NEIGHBOUR it must NOT catch: equal bounds at another value are lawful.
+    expect(SERVE_LEG.sites({ synthesizerMaxRounds: 4, evaluatorMaxRounds: 4 })).toBe(8);
+  });
+
+  /**
    * THE ANTI-DRIFT PIN. The parser must READ `SERVE_LEG`, not copy it. If the
    * parser held its own literal, mutating the register's constant would leave
    * this green — so this asserts the parser's accepted chain IS the register's
