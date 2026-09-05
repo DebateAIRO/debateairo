@@ -220,7 +220,7 @@ describe("OBS-07 severity routing", () => {
     });
     expect(router.status()).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "identifier", key: "board", value: "signal-board" }),
-      expect.objectContaining({ kind: "template", key: "storm.threshold",
+      expect.objectContaining({ kind: "template", key: "storm",
         count: 6, windowSeconds: 70 })
     ]));
 
@@ -233,7 +233,7 @@ describe("OBS-07 severity routing", () => {
     });
     expect(router.status()).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "identifier", key: "board", value: "tick-board" }),
-      expect.objectContaining({ kind: "template", key: "storm.threshold",
+      expect.objectContaining({ kind: "template", key: "storm",
         count: 7, windowSeconds: 80 })
     ]));
   });

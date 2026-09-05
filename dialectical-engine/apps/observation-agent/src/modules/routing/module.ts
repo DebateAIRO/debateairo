@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { observationRepoRoot } from "../../core/paths.js";
 import type { RouterBootstrapInput } from "../../core/routing.js";
 import type { ObservationModuleManifest } from "../../core/types.js";
 import { createKanbanDeliveryExecutor } from "../channels-kanban/kanban.js";
@@ -21,6 +22,7 @@ const manifest: ObservationModuleManifest = Object.freeze({
         executors: Object.freeze({
           osascript: (signal, now) => input.osascript(signal, now, 2_000),
           sendmail: createSendmailDeliveryExecutor({
+            repoRoot: input.repoRoot ?? observationRepoRoot(),
             stateDir: input.stateDir,
             configuration: input.configuration
           }),

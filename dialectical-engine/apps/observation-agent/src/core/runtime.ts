@@ -410,6 +410,7 @@ export class ObservationModuleRuntime {
     timeoutMs: number;
     databaseUrl: string;
     stateDir: string;
+    repoRoot: string;
     targets: readonly unknown[];
     targetFragments?: readonly ModuleTargetFragment[];
     moduleThresholds?: Readonly<Record<string, ModuleConfigurationObject>>;
@@ -445,6 +446,7 @@ export class ObservationModuleRuntime {
           timeoutMs: Math.min(input.timeoutMs, module.cadence.timeoutMs),
           databaseUrl: input.databaseUrl,
           stateDir: input.stateDir,
+          repoRoot: input.repoRoot,
           targets: targetFragment?.targets ?? [],
           targetFragment,
           configuration,

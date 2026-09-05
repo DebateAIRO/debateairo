@@ -4,6 +4,7 @@ import pg from "pg";
 import { loadObservationAgentEnvironment } from "../../../packages/register/src/runtime-environment.js";
 import { ObservationError, normalizeObservationError } from "./core/errors.js";
 import { createOwnedSignalRouter, discoverObservationModules } from "./core/modules.js";
+import { observationRepoRoot } from "./core/paths.js";
 import { ObservationModuleRuntime, parseModuleStatusProjection } from "./core/runtime.js";
 import { createLegacyOsaScriptRouter } from "./core/routing.js";
 import { signalSchema, type ObservationSignal, type Severity } from "./core/signals.js";
@@ -127,6 +128,7 @@ function livenessSignal(input: Readonly<{
 }
 
 async function boot(): Promise<void> {
+  const repoRoot = observationRepoRoot();
   let environment: ReturnType<typeof loadObservationAgentEnvironment>;
   try {
     environment = loadObservationAgentEnvironment();
@@ -179,6 +181,7 @@ async function boot(): Promise<void> {
     ? createLegacyOsaScriptRouter({ delivery, osascript })
     : await createOwnedSignalRouter(routerOwner, {
         stateDir: environment.OBSERVATION_STATE_DIR,
+        repoRoot,
         delivery,
         osascript,
         moduleName: routerOwner.moduleName,
@@ -331,6 +334,7 @@ async function boot(): Promise<void> {
       timeoutMs: policy.value.liveness.probe_timeout_ms,
       databaseUrl: environment.OBSERVATION_DATABASE_URL,
       stateDir: environment.OBSERVATION_STATE_DIR,
+      repoRoot,
       targets,
       targetFragments: targetCatalog.fragments,
       ...(policy.value.modules === undefined ? {} : { moduleThresholds: policy.value.modules }),

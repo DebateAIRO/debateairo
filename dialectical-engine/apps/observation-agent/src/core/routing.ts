@@ -29,6 +29,7 @@ export type RouterCurrentContext = Readonly<{
 
 export type RouterBootstrapInput = Readonly<{
   stateDir: string;
+  repoRoot: string;
   delivery: DeliveryCoordinator;
   osascript: OsaScriptDeliveryExecutor;
   moduleName: string;

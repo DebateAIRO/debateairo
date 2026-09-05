@@ -2,12 +2,17 @@ import { spawn } from "node:child_process";
 import { lstat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { ObservationError } from "../../core/errors.js";
+import {
+  observationRepoRoot,
+  resolveRepoPath,
+  type ResolvedRepoPath
+} from "../../core/paths.js";
 import { renderImpact, signalSchema } from "../../core/signals.js";
 import type { ModuleConfigurationObject } from "../../core/types.js";
 import type { RoutedChannelExecutor } from "../routing/router.js";
 
 export type SendmailSpawnRequest = Readonly<{
-  file: string;
+  file: ResolvedRepoPath;
   args: readonly string[];
   stdin: string;
   env: Readonly<{
@@ -92,6 +97,7 @@ async function spawnSendmail(request: SendmailSpawnRequest): Promise<Readonly<{
 }
 
 export function createSendmailDeliveryExecutor(input: Readonly<{
+  repoRoot: string;
   stateDir: string;
   configuration: ModuleConfigurationObject;
   spawn?: SendmailSpawn;
@@ -101,7 +107,9 @@ export function createSendmailDeliveryExecutor(input: Readonly<{
   const captureDirectory = notify?.dev_capture_dir;
   const from = notify?.from;
   const to = notify?.to;
-  if (typeof sendmailPath !== "string" || !SAFE_PATH.test(sendmailPath)
+  if (typeof sendmailPath !== "string"
+    || sendmailPath !== "deploy/dev-auth/sendmail-capture.mjs"
+    || !SAFE_PATH.test(sendmailPath)
     || sendmailPath.split("/").includes("..")
     || typeof captureDirectory !== "string" || !SAFE_PATH.test(captureDirectory)
     || captureDirectory.split("/").includes("..")
@@ -109,6 +117,7 @@ export function createSendmailDeliveryExecutor(input: Readonly<{
     || typeof to !== "string" || !EMAIL.test(to)) {
     throw new ObservationError("OBSERVATION_SENDMAIL_CONFIG_INVALID");
   }
+  const executable = resolveRepoPath(input.repoRoot ?? observationRepoRoot(), sendmailPath);
   const execute = input.spawn ?? spawnSendmail;
   return async (candidate, now) => {
     const signal = signalSchema.safeParse(candidate);
@@ -119,7 +128,7 @@ export function createSendmailDeliveryExecutor(input: Readonly<{
     const subject = `dialectical-engine ${signal.data.severity} ${signal.data.component} ${signal.data.class}`;
     const message = `Subject: ${subject}\nContent-Type: text/plain; charset=utf-8\n\n${renderImpact(signal.data)}\n`;
     await execute(Object.freeze({
-      file: sendmailPath,
+      file: executable,
       args: Object.freeze(["-i", "-f", from, "--", to]),
       stdin: message,
       env: Object.freeze({

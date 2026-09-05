@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -64,11 +64,24 @@ describe("OBS-07 sendmail channel", () => {
   });
 
   it("uses exact argv, a fixed template, child-only capture env, stdin close, and 10s timeout", async () => {
-    const stateDir = await scratch();
+    const repoRoot = await scratch();
+    const stateDir = join(repoRoot, "state");
     const capture = join(stateDir, "dev-mail-capture");
-    await mkdir(capture, { mode: 0o700 });
+    const packageDirectory = join(repoRoot, "apps/observation-agent");
+    const sendmail = join(repoRoot, "deploy/dev-auth/sendmail-capture.mjs");
+    await Promise.all([
+      mkdir(capture, { recursive: true, mode: 0o700 }),
+      mkdir(packageDirectory, { recursive: true }),
+      mkdir(join(repoRoot, ".local/dev-auth/tls"), { recursive: true }),
+      mkdir(join(repoRoot, "deploy/dev-auth"), { recursive: true })
+    ]);
+    await Promise.all([
+      writeFile(join(repoRoot, ".local/dev-auth/tls/localhost.pem"), "certificate"),
+      writeFile(sendmail, "capture")
+    ]);
     const calls: unknown[] = [];
     const execute = createSendmailDeliveryExecutor({
+      repoRoot,
       stateDir,
       configuration: {
         notify: {
@@ -79,15 +92,22 @@ describe("OBS-07 sendmail channel", () => {
         }
       },
       async spawn(request) {
+        await readFile(request.file);
         calls.push(request);
         return Object.freeze({ stdout: "", stderr: "" });
       }
     });
     const now = new Date("2026-09-05T08:00:01.000Z");
-    await expect(execute(fatalSignal(), now, { ordinal: 0, openExternalRef: null }))
-      .resolves.toEqual({ deliveredAt: now, externalRef: null });
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(packageDirectory);
+      await expect(execute(fatalSignal(), now, { ordinal: 0, openExternalRef: null }))
+        .resolves.toEqual({ deliveredAt: now, externalRef: null });
+    } finally {
+      process.chdir(originalCwd);
+    }
     expect(calls).toEqual([{
-      file: "deploy/dev-auth/sendmail-capture.mjs",
+      file: sendmail,
       args: ["-i", "-f", "observation-agent@localhost", "--", "ops@localhost"],
       stdin: "Subject: dialectical-engine FATAL hatchet INFRA_DOWN\nContent-Type: text/plain; charset=utf-8\n\nHatchet is down: asks are accepted but no debate work is dispatched or run.\n",
       env: {

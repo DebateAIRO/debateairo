@@ -2,7 +2,14 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { writeStatusSnapshot } from "../../apps/observation-agent/src/store/status.js";
+import { renderStatus } from "../../apps/observation-agent/src/oactl/core/status.js";
+import {
+  createObservationSignalRouter
+} from "../../apps/observation-agent/src/modules/routing/router.js";
+import {
+  toStoredModuleStatusProjection,
+  writeStatusSnapshot
+} from "../../apps/observation-agent/src/store/status.js";
 import {
   createStatusPageRequestHandler,
   startStatusPage
@@ -45,6 +52,50 @@ function responseRecorder() {
 }
 
 describe("OBS-07 loopback status server", () => {
+  it("renders the exact storm line and gives the loopback endpoint one status owner", async () => {
+    const stateDir = await scratch();
+    const router = await createObservationSignalRouter({
+      stateDir,
+      delivery: {
+        async attempt(action) {
+          return Object.freeze({
+            delivery_id: crypto.randomUUID(),
+            signal_id: action.signal.signal_id,
+            channel: action.channel,
+            attempted_at: action.now.toISOString(),
+            delivered_at: null,
+            outcome: action.disposition === "EXECUTE" ? "DELIVERED" : action.disposition,
+            external_ref: null
+          });
+        }
+      },
+      executors: {
+        osascript: async (_signal, now) => ({ deliveredAt: now, externalRef: null }),
+        sendmail: async (_signal, now) => ({ deliveredAt: now, externalRef: null }),
+        kanban: async (_signal, now) => ({ deliveredAt: now, externalRef: null })
+      },
+      configuration: {},
+      thresholds: { storm_count: 5, storm_window_s: 60 },
+      thresholdVersion: 7
+    });
+    await writeStatusSnapshot(stateDir, {
+      pid: 732,
+      version: "0.1.0",
+      thresholds_version: 7,
+      mute: null,
+      components: {},
+      modules: {
+        routing: router.status().map(toStoredModuleStatusProjection),
+        "status-page": [{ kind: "loopback_endpoint", key: "status", port: 9797, path: "/status" }]
+      }
+    });
+    const lines = (await renderStatus(stateDir)).split("\n");
+    expect.soft(lines.filter((line) => line === "storm 5/60s")).toHaveLength(1);
+    expect.soft(lines.filter((line) => line === "status http://127.0.0.1:9797/status"))
+      .toHaveLength(1);
+    expect(lines).not.toContain("storm threshold 5/60s");
+  });
+
   it("binds exactly 127.0.0.1:9797 and rejects every configured alternative", async () => {
     const stateDir = await scratch();
     const listens: unknown[] = [];

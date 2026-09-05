@@ -25,5 +25,5 @@ fi
 set -a
 source "$environment_file"
 set +a
-cd "$repo_root/apps/observation-agent"
-exec node --import tsx src/main.ts
+cd "$repo_root"
+exec node --import tsx apps/observation-agent/src/main.ts

@@ -232,6 +232,7 @@ export type ProbeContext = Readonly<{
   timeoutMs: number;
   databaseUrl: string;
   stateDir: string;
+  repoRoot: string;
   targets: readonly unknown[];
   targetFragment: ModuleTargetFragment | null;
   configuration: ModuleConfigurationObject;

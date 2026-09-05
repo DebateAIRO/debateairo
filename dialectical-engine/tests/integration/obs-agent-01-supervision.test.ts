@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -66,6 +66,58 @@ describe("OBS-01 ratified threshold versions", () => {
 });
 
 describe("OBS-01 external supervision witnesses", () => {
+  it("launches from the repository root with the repository-relative entry point", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "obs-01-launch-root-"));
+    try {
+      const launchDirectory = join(repoRoot, "apps/observation-agent/bin");
+      const environmentDirectory = join(repoRoot, ".local/dev-auth");
+      const fakeBin = join(repoRoot, "test-bin");
+      await Promise.all([
+        mkdir(launchDirectory, { recursive: true }),
+        mkdir(environmentDirectory, { recursive: true }),
+        mkdir(fakeBin, { recursive: true })
+      ]);
+      const sourceLaunch = join(import.meta.dirname, "../../apps/observation-agent/bin/launch.sh");
+      const launchScript = join(launchDirectory, "launch.sh");
+      await Promise.all([
+        writeFile(launchScript, await readFile(sourceLaunch, "utf8")),
+        writeFile(join(environmentDirectory, "observation-agent.env"), "", { mode: 0o600 }),
+        writeFile(join(fakeBin, "node"), [
+          "#!/bin/zsh",
+          "print -r -- \"$PWD\"",
+          "for argument in \"$@\"; do print -r -- \"$argument\"; done",
+          ""
+        ].join("\n"))
+      ]);
+      await Promise.all([
+        chmod(launchScript, 0o755),
+        chmod(join(fakeBin, "node"), 0o755)
+      ]);
+      const result = await new Promise<Readonly<{ code: number | null; stdout: string; stderr: string }>>(
+        (resolveResult, reject) => {
+          const child = spawn(launchScript, [], {
+            env: { PATH: `${fakeBin}:/usr/bin:/bin` },
+            stdio: ["ignore", "pipe", "pipe"]
+          });
+          let stdout = "";
+          let stderr = "";
+          child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
+          child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
+          child.once("error", reject);
+          child.once("close", (code) => resolveResult({ code, stdout, stderr }));
+        }
+      );
+      const physicalRepoRoot = await realpath(repoRoot);
+      expect(result).toEqual({
+        code: 0,
+        stdout: `${physicalRepoRoot}\n--import\ntsx\napps/observation-agent/src/main.ts\n`,
+        stderr: ""
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it("rejects invalid targets with one code and exit 2 within five seconds", async () => {
     const startedAt = Date.now();
     const mainPath = join(import.meta.dirname, "../../apps/observation-agent/src/main.ts");

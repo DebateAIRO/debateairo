@@ -1,5 +1,6 @@
 import { X509Certificate } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { observationRepoRoot, resolveRepoPath, type ResolvedRepoPath } from "../../core/paths.js";
 import type { ModuleTargetFragment } from "../../core/types.js";
 
 export type CertificateCapacitySnapshot = Readonly<{
@@ -9,7 +10,7 @@ export type CertificateCapacitySnapshot = Readonly<{
 }>;
 
 export type CertificateCapacityDependencies = Readonly<{
-  read(path: string): Promise<Uint8Array>;
+  read(path: ResolvedRepoPath): Promise<Uint8Array>;
   notAfter(contents: Uint8Array): Date;
 }>;
 
@@ -41,9 +42,10 @@ function targetPath(fragment: ModuleTargetFragment | null): string {
 export async function readCertificateCapacity(
   targetFragment: ModuleTargetFragment | null,
   observedAt = new Date(),
-  dependencies: CertificateCapacityDependencies = productionDependencies
+  dependencies: CertificateCapacityDependencies = productionDependencies,
+  repoRoot = observationRepoRoot()
 ): Promise<CertificateCapacitySnapshot> {
-  const path = targetPath(targetFragment);
+  const path = resolveRepoPath(repoRoot, targetPath(targetFragment));
   const contents = await dependencies.read(path);
   const notAfter = dependencies.notAfter(contents);
   if (!Number.isFinite(notAfter.getTime())) throw new Error("OBSERVATION_CERTIFICATE_INVALID");

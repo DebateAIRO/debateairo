@@ -5,11 +5,16 @@ import { readCertificateCapacity, type CertificateCapacitySnapshot } from "./rea
 import { createCertificateCapacityTracker } from "./tracker.js";
 
 export type CertificateCapacityModuleDependencies = Readonly<{
-  readSnapshot(targetFragment: Parameters<typeof readCertificateCapacity>[0], at: Date): Promise<CertificateCapacitySnapshot>;
+  readSnapshot(
+    targetFragment: Parameters<typeof readCertificateCapacity>[0],
+    at: Date,
+    repoRoot: string
+  ): Promise<CertificateCapacitySnapshot>;
 }>;
 
 const productionDependencies: CertificateCapacityModuleDependencies = Object.freeze({
-  readSnapshot: (targetFragment, at) => readCertificateCapacity(targetFragment, at)
+  readSnapshot: (targetFragment, at, repoRoot) =>
+    readCertificateCapacity(targetFragment, at, undefined, repoRoot)
 });
 
 function numeric(configuration: ModuleConfigurationObject, key: string, fallback: number): number {
@@ -29,7 +34,7 @@ export function createCertificateCapacityModule(
     cadence: Object.freeze({ intervalMs: 86_400_000, timeoutMs: 2_000 }),
     targetFragmentBasename: "OBS-05.json",
     async probe(ctx) {
-      const snapshot = await resolved.readSnapshot(ctx.targetFragment, ctx.now);
+      const snapshot = await resolved.readSnapshot(ctx.targetFragment, ctx.now, ctx.repoRoot);
       const cycle = tracker.observe({
         snapshot,
         thresholds: Object.freeze({

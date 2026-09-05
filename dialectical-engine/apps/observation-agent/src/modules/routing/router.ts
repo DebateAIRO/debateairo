@@ -532,10 +532,9 @@ export async function createObservationSignalRouter(input: Readonly<{
         lastOutcomes.includes("RATE_LIMITED") ? "RATE_LIMITED" : "OPEN" }),
       Object.freeze({ kind: "metric", key: "escalation.fatal", value: fatalResends, unit: "COUNT" }),
       Object.freeze({ kind: "identifier", key: "board", identifierType: "board", value: board }),
-      Object.freeze({ kind: "loopback_endpoint", key: "status", port: 9797, path: "/status" }),
       Object.freeze({ kind: "state_child_path", key: "sendmail.capture",
         segments: Object.freeze([captureDirectory]) }),
-      Object.freeze({ kind: "template", key: "storm.threshold", template: "COUNT_SECONDS_THRESHOLD",
+      Object.freeze({ kind: "template", key: "storm", template: "COUNT_SECONDS_THRESHOLD",
         count: policy.count, windowSeconds: policy.windowSeconds }),
       Object.freeze({ kind: "state", key: "storm.state", state: storm?.state ?? "QUIET" })
     ];

@@ -25,7 +25,8 @@ describe("OBS-01 launchd custody and runtime bounds", () => {
     expect(launch).toContain("0600");
     expect(launch).toMatch(/\[\[ "\$mode" != "600" \]\]/u);
     expect(launch).toMatch(/\[\[ "\$owner" != "\$\(id -u\)" \]\]/u);
-    expect(launch).toContain("exec node --import tsx src/main.ts");
+    expect(launch).toContain('cd "$repo_root"');
+    expect(launch).toContain("exec node --import tsx apps/observation-agent/src/main.ts");
     expect((await stat(launchPath)).mode & 0o111).not.toBe(0);
   });
 
