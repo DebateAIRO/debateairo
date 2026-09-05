@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
 import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { once } from "node:events";
@@ -30,12 +31,14 @@ import {
   applySingleLineageBandCap,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
+  EVALUATOR_CONTRACT_TEXT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
+import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
@@ -79,6 +82,26 @@ async function persistHttpIdentity(identity:TestHttpIdentity,label:string):Promi
   ]);
 }
 
+/**
+ * T9: the EVALUATOR's wire shape. One EVALUATOR call replaced BOTH retired
+ * serve-path organs — per-segment CONFORMANCE and post-compose R9 — so the two
+ * conformance responses plus the r9 response that every served-run fixture used
+ * to script are now ONE satisfied verdict, and a satisfied evaluator ends the
+ * loop in round 1. Fixture provisioning only: no fixture's own subject
+ * assertions change.
+ */
+const evaluatorSatisfied = (): string => JSON.stringify({
+  satisfied: true,
+  objection: null,
+  criteria: {
+    fairness_to_losers: true,
+    statement_label_agreement: true,
+    no_overstatement: true,
+    restatement: true,
+    citation_tracing: true
+  }
+});
+
 const runnerSettings = (): WalkingSkeletonSettings => ({
   workerId: "runner:test-layer", claimMs: 10_000, claimMarginMs: 1_000,
   judgeBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
@@ -113,7 +136,7 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       sourceRef: "test-layer:DR-086",
       value: {
         bandOrder: ["TEST_CAPPED_BAND", "TEST_TOP_BAND"],
-        ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING"],
+        ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
         defaultCeiling: {
           label: "TEST_DEFAULT_CEILING", ceilingBand: "TEST_TOP_BAND",
           liftPath: "test-layer:retain-band"
@@ -122,7 +145,14 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
           minimumShares: { LOOKED_UP: 0.5 },
           label: "TEST_LOOKED_UP_CEILING", ceilingBand: "TEST_CAPPED_BAND",
           liftPath: "test-layer:improve-way-of-knowing"
-        }]
+        }],
+        // F-T9B-3 / codex r2: every row describes its own floor. The
+        // LOOKED_UP cut names the same band but its share trigger cannot
+        // fire on an empty basis, so it cannot describe this case.
+        emptyBasisFloor: {
+          label: "TEST_EMPTY_BASIS_FLOOR", ceilingBand: "TEST_CAPPED_BAND",
+          liftPath: "test-layer:gather-any-verified-evidence-to-lift"
+        }
       }
     }
   },
@@ -188,6 +218,25 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
       verdictLowCut: "test-layer:goal-v4:80-96",
       disagreementThreshold: "test-layer:J1",
       disagreementQuantity: "test-layer:goal-v4:80-96"
+    }
+  },
+  // T9 coherence consequence: every served statement now comes out of the
+  // synthesizer/evaluator loop, so every fixture that reaches a served answer
+  // needs the sealed synthesis-role family. Both refs name THIS fixture's one
+  // configured provider — the fixture has a single maker, so the loop's two
+  // roles are held by the same identity, which stays lawful (goal 84-85) and is
+  // exactly the case T16's identical-refs warning describes. Provisioning only:
+  // no fixture's own subject assertions change.
+  synthesisRolePolicy: {
+    registerVersion: 1,
+    synthesizerRoleRef: "provider:test-layer",
+    evaluatorRoleRef: "provider:test-layer",
+    evaluatorLoopMaxRounds: 3,
+    identicalRoleRefs: true,
+    sourceRefs: {
+      synthesizerRoleRef: "test-layer:J8",
+      evaluatorRoleRef: "test-layer:J8",
+      evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
     }
   },
   resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
@@ -355,9 +404,12 @@ async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
   panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
 ): Promise<{
-  endpoint: string; calls(): number; stop(): Promise<void>;
+  endpoint: string; calls(): number; bodies(): readonly string[]; stop(): Promise<void>;
 }> {
-  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  // T9: the EVALUATOR is a class of its own. The retired CONFORMANCE and R9
+  // classes stay in the vocabulary so a fixture that still scripts one is
+  // dispatched rather than silently served a judgement.
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "EVALUATOR" | "GENERAL";
   const classifyContent = (content: ProviderDoubleResponse): ResponseClass => {
     if (typeof content !== "string") return "GENERAL";
     try {
@@ -365,6 +417,7 @@ async function startProviderDouble(
       if ("statement" in value) return "JUDGE";
       if ("outcome" in value) return "REVIEW";
       if ("segments" in value) return "COMPOSE";
+      if ("satisfied" in value) return "EVALUATOR";
       if ("conforms" in value) return "CONFORMANCE";
       if ("pass" in value) return "R9";
     } catch { /* malformed fixtures retain FIFO semantics */ }
@@ -382,11 +435,19 @@ async function startProviderDouble(
   });
   const pending = [...classified];
   let calls = 0;
+  // codex r5 B1: EVERY inbound /chat/completions body is retained. The gateway
+  // builds a content-repair packet INSIDE itself
+  // (packages/providers OpenAICompatibleProviderGateway: `attemptPacket =
+  // request.buildRepairPacket(...)`), so a wrapper around `ProviderGateway.call`
+  // sees the FIRST attempt only. The wire is the one place every attempt —
+  // initial and repaired — is visible.
+  const bodies: string[] = [];
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      bodies.push(body);
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -405,11 +466,17 @@ async function startProviderDouble(
       // T3 N4 (same defect as acceptance/ceremony.test.ts): the JUDGE discriminator must
       // be ESCAPE-SAFE — the packet reaches the wire JSON-encoded, so `"statement":`
       // arrives as \"statement\" and the old check never matched.
+      // T9: `fairness_to_losers` appears in the EVALUATOR system prompt and
+      // nowhere else, and it is checked BEFORE the composer discriminator
+      // because an evaluator request carries the candidate statement, not the
+      // segment contract. Without this the evaluator was handed whatever sat at
+      // the head of the queue — a judgement — and failed its own schema.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
         : body.includes("restatement_text") ? "JUDGE"
-          : body.includes("conforms,findings") ? "CONFORMANCE"
-            : body.includes("{pass}") ? "R9"
-              : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+          : body.includes("fairness_to_losers") ? "EVALUATOR"
+            : body.includes("conforms,findings") ? "CONFORMANCE"
+              : body.includes("{pass}") ? "R9"
+                : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
       // T5/S3-1: a review response must measure exactly the edges THIS call
@@ -440,6 +507,7 @@ async function startProviderDouble(
   return {
     endpoint: `http://127.0.0.1:${address.port}`,
     calls: () => calls,
+    bodies: () => bodies,
     async stop() { server.close(); await once(server, "close"); }
   };
 }
@@ -530,6 +598,33 @@ async function executeResil01Scenario(input: {
     await secondary.stop();
     await primary.stop();
   }
+}
+
+/**
+ * codex r4 B1 · THE PROVIDER BOUNDARY, RETAINED.
+ *
+ * `ProviderGateway` is a one-method interface and the runner takes it in its
+ * constructor, so wrapping it observes the EXACT `ProviderCallRequest` the
+ * runner hands over — `packet.messages` before any encoding. Nothing here reads
+ * source text, which is the whole point: the four previous guards inspected the
+ * code that BUILDS the request instead of watching the request, and each one
+ * was satisfiable by code that sends something else.
+ */
+function recordingRunner(endpoint: string, settings = runnerSettings()): {
+  readonly runner: WalkingSkeletonRunner;
+  readonly evaluatorCalls: readonly ProviderCallRequest[];
+} {
+  const evaluatorCalls: ProviderCallRequest[] = [];
+  const inner = createPostgresProviderGateway(database.pool, {
+    endpoint, model: "test-layer/model", maker: "test-layer"
+  });
+  const gateway: ProviderGateway = {
+    call: async (request) => {
+      if (request.role === "EVALUATOR") evaluatorCalls.push(request);
+      return inner.call(request);
+    }
+  };
+  return { runner: new WalkingSkeletonRunner(database.pool, gateway, settings), evaluatorCalls };
 }
 
 function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): WalkingSkeletonRunner {
@@ -929,9 +1024,7 @@ describe("BUG-03 asker-scoped debates index", () => {
         { segment_id: "segment:verdict", text: "A served test-layer answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const served = await runnerWithEndpoint(provider.endpoint).executeWorkItem(servedWork.workItemId);
@@ -1750,9 +1843,7 @@ describe("apps/runner — legal command lifecycle", () => {
     const healthySecondary = await startProviderDouble([
       judgementDouble("The surviving real CLI authors the primary position", 0.4),
       resil01Composition,
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const question = `claim-primary-reselection-${randomUUID()}`;
@@ -1798,12 +1889,27 @@ describe("apps/runner — legal command lifecycle", () => {
           providerRef: secondaryMember.provider_ref,
           maker: secondaryMember.maker
         },
-        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // T9/J8: the sealed role refs name a CONFIGURED PROVIDER IDENTITY and are
+        // resolved by lookup, never by health — so on a deployment whose primary
+        // is absent, the rows must name the provider that actually holds the
+        // roles. Substituting a healthy provider for the sealed one is exactly
+        // what the sealed row exists to prevent, so the fixture states the
+        // identity rather than expecting the runner to guess it.
+        synthesisRolePolicy: {
+          ...runnerSettings().synthesisRolePolicy!,
+          synthesizerRoleRef: secondaryMember.provider_ref,
+          evaluatorRoleRef: secondaryMember.provider_ref
+        }
       });
 
       await expect(runner.executeWorkItem(workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
       expect(absentPrimary.calls()).toBe(0);
-      expect(healthySecondary.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(healthySecondary.calls()).toBe(3);
     } finally {
       await healthySecondary.stop();
       await absentPrimary.stop();
@@ -2324,9 +2430,7 @@ describe("apps/runner — legal command lifecycle", () => {
       judgementDouble("Primary hidden-frame position 4"),
       reviewDouble("agree", "Primary review 4"),
       composition,
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     const secondary = await startProviderDouble([
       judgementDouble("Secondary hidden-frame position 1"),
@@ -2580,9 +2684,7 @@ describe("apps/runner — legal command lifecycle", () => {
       judgementDouble("Primary unassessable-frame position 4"),
       reviewDouble("agree", "Primary review 4"),
       composition,
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     const secondary = await startProviderDouble([
       judgementDouble("Secondary unassessable-frame position 1"),
@@ -2869,9 +2971,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary D position ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary D review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary D position ${index + 1}`)),
@@ -2978,9 +3078,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary R1 position ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary R1 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary R1 position ${index + 1}`)),
@@ -3008,9 +3106,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { status: 503 }, { status: 503 },
         ...Array.from({ length: 3 }, (_, index) => reviewDouble("agree", `Primary no-root review ${index + 2}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary no-root position ${index + 1}`)),
@@ -3050,9 +3146,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T5 position ${index + 1}`, 0.5)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T5 review ${index + 1}`, bearings)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T5 position ${index + 1}`, 0.5)),
@@ -3162,9 +3256,7 @@ describe("apps/runner — legal command lifecycle", () => {
           ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T6 position ${index + 1}`)),
           ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T6 review ${index + 1}`)),
           resil01Composition,
-          JSON.stringify({ conforms: true, findings: [] }),
-          JSON.stringify({ conforms: true, findings: [] }),
-          JSON.stringify({ pass: true })
+          evaluatorSatisfied()
         ],
         secondary: [
           ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T6 position ${index + 1}`)),
@@ -3206,9 +3298,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary low position ${index + 1}`, 0.30)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary low review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary low position ${index + 1}`, 0.30)),
@@ -3235,9 +3325,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary attack-control ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary attack review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         judgementDouble("Secondary attack-control root"),
@@ -3277,9 +3365,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary boundary ${index + 1}`, 0.35)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary boundary review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary boundary ${index + 1}`, 0.35)),
@@ -3331,9 +3417,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Primary depth-2 surviving ${index + 1}`)),
         ...Array.from({ length: 7 }, (_, index) => reviewDouble("agree", `Primary depth-2 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         judgementDouble("Secondary depth-2 root"),
@@ -3402,9 +3486,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary T12 ${index + 1}`)),
         ...Array.from({ length: 3 }, (_, index) => reviewDouble("agree", `Primary T12 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Secondary T12 ${index + 1}`)),
@@ -3444,9 +3526,7 @@ describe("apps/runner — legal command lifecycle", () => {
         ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary T4 position ${index + 2}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary T4 review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary T4 position ${index + 1}`)),
@@ -3669,9 +3749,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "Family A position 1", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     // B parses, and scores ABOVE the author — only the discount keeps it from winning.
     const makerB = await startProviderDouble([
@@ -3835,15 +3913,17 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "A provisional answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const work = await createRunnerWork("happy-path");
       const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
       expect(result.kind).toBe("COMPLETED");
-      expect(provider.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(provider.calls()).toBe(3);
       const row = await database.pool.query<{ state: string; terminal: string; base_kind: string; final_kind: string; base_producer: string; final_producer: string; reduced_judgement_id: string; walked_reduced_judgement_ref: string; disagreement: unknown }>(
         `SELECT work.state, answer.terminal, judgement.number_kind AS base_kind, strength.number_kind AS final_kind,
                 judgement.producer AS base_producer, strength.producer AS final_producer,
@@ -3870,12 +3950,21 @@ describe("apps/runner — legal command lifecycle", () => {
       });
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
       const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:happy-path");
+      // F-H-1 / T11 (goal 196-221). This fixture is agentCount=1, depth=1: ONE maker, so one
+      // servable root and no runner-up to measure a margin against; ONE judge, so the winning
+      // root's panel dispersion is NULL. Both limbs of the label basis are therefore ABSENT
+      // (receipt: basisAbsence ["MARGIN","DISAGREEMENT"], candidateCount 1), which is rung 0 of
+      // the ladder -- CONTESTED with LABEL-BASIS-INCOMPLETE, by design, because a solo voice can
+      // never print SUPPORTED (confirm-item 6). SUPPORTED lives at rung 3 and is UNREACHABLE
+      // here: rung 0 returns first and needs both limbs MEASURED to decline. The retired binary
+      // derivation this once asserted returned SUPPORTED for any usable basis; that property is
+      // still pinned, by `verdict_unavailable: null` on the next line.
       expect(projection).toMatchObject({
-        verdict_state: "SUPPORTED",
+        verdict_state: "CONTESTED",
         verdict_unavailable: null,
         confidence_band: "TEST_CAPPED_BAND",
         band_ceiling: { label: "TEST_DEFAULT_CEILING" },
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"]
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "LABEL-BASIS-INCOMPLETE"]
       });
       expect(projection?.condition_mark_records).toEqual(expect.arrayContaining([
         expect.objectContaining({
@@ -4028,6 +4117,124 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
+  /**
+   * F-SEALEDROWS-A · what the runner SENDS for the EVALUATOR role is the
+   * exported contract value — observed, not inferred from source.
+   *
+   * Four guards died here before this one. Each read the runner's source to
+   * decide whether the right thing would be sent: a text search that a comment
+   * could redirect, a first-`criteria` match an earlier schema could capture, a
+   * brace balancer a `}` in a string could miscount, and finally a whitelist of
+   * one spelling that codex defeated by putting the expected fragments in a
+   * COMMENT while pointing the real packet at another identifier — keeping the
+   * value pin, the schema agreement and both seeder dataflow tests green while
+   * the provider received different text.
+   *
+   * This one watches the wire instead. The gateway is the runner's own provider
+   * boundary, so the assertion is about the request that was actually made. A
+   * comment cannot enter it, an alias cannot disguise it, and reformatting or
+   * reordering the object literal cannot break it — only sending something else
+   * can, which is the single thing that must fail.
+   */
+  it("SENDS the exported evaluator contract to the provider, observed at the gateway boundary", async () => {
+    const provider = await startProviderDouble([
+      JSON.stringify({ statement: "A looked-up answer.", way_of_knowing: "LOOKED_UP",
+        locator: "https://example.invalid/test-layer", restatement_text: "A looked-up answer.", restatement_status: "PASS", value_laden: false,
+        steelman: { summary: "A looked-up answer.", fidelity: 0.72 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      JSON.stringify({ satisfied: true }),
+      JSON.stringify({ satisfied: true }),
+      evaluatorSatisfied()
+    ]);
+    try {
+      // codex r6 B1 · THE SEALED BOUND IS 3, NOT 2. Both deployments seal
+      // CONFORMANCE.maxAttempts: 3 (acceptance `acceptanceOrganCostBounds`,
+      // development DEVELOPMENT_ORGAN_COST_BOUNDS), so production permits TWO
+      // repairs — the second being the callback applied to an ALREADY-REPAIRED
+      // packet. The previous fixture capped attempts at 2, so that second
+      // callback and the third wire attempt did not exist, and a helper that
+      // preserved the contract on its first call but not its second passed.
+      // The bound is now the shipped one and the fixture drives all three.
+      const settings = {
+        ...runnerSettings(),
+        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 3 }
+      };
+      const { runner, evaluatorCalls } = recordingRunner(provider.endpoint, settings);
+      // NB: the question line feeds the code-first claim classifier
+      // (packages/judgement/src/s04.ts). Words like "observed" resolve to
+      // `empirical`, which this file's composition row does not ratify, so the
+      // run would die at COMPOSITION_UNRESOLVED before reaching the evaluator.
+      const work = await createRunnerWork("evaluator-send-at-the-gateway");
+      const result = await runner.executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      /**
+       * codex r5 B1 · EVERY EVALUATOR ATTEMPT ON THE WIRE, not just the first.
+       *
+       * A wrapper around `ProviderGateway.call` sees the OUTER request once.
+       * When a reply fails the schema the gateway builds a content-repair packet
+       * INSIDE itself and sends THAT on the next HTTP request, so the wrapper
+       * never sees it. Measured here: the recorder holds 1 outer call while the
+       * wire carries 2 evaluator attempts. The wire is the only place the
+       * invariant can be checked for every attempt.
+       *
+       * Evaluator attempts are identified by the `role` field of the request
+       * payload the runner serialises into the user message — deliberately NOT
+       * by the system prompt, which is the thing under test. Selecting them by
+       * their system text would make a dropped constant vanish from the
+       * selection and pass vacuously.
+       */
+      const attempts = provider.bodies()
+        .map((body) => JSON.parse(body) as { messages: { role: string; content: string }[] })
+        .filter((packet) => packet.messages.some((message) => {
+          // EVERY user message is scanned, never just the first: a legitimate
+          // repair may place its user message before the serialised envelope,
+          // and assuming a position would drop that attempt out of the
+          // selection — which is a vacuous pass wearing a filter.
+          if (message.role !== "user") return false;
+          try { return (JSON.parse(message.content) as { role?: string }).role === "EVALUATOR"; }
+          catch { return false; }
+        }));
+
+      /**
+       * THE COUNT IS THE VACUITY GUARD, and it is the only one (codex r6 B2).
+       * Three attempts are expected because the sealed bound permits three and
+       * the fixture fails the schema twice; a run that stopped early cannot
+       * satisfy this, so the loop below cannot pass over an empty or short set.
+       *
+       * NOTHING HERE PINS REPAIR SHAPE. The previous version required the
+       * second packet to carry exactly one more message than the first, which
+       * asserts the current helper's implementation rather than the invariant:
+       * a repair that appended two context messages, or reordered later ones,
+       * would keep the contract leading and still fail. AMENDMENT 6 said not to
+       * add shape constraints and that one slipped in anyway.
+       */
+      expect(attempts).toHaveLength(3);
+      expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the three
+
+      // THE INVARIANT, and the whole of it: every attempt LEADS with the
+      // exported contract. Role and exact content, nothing else.
+      for (const [index, packet] of attempts.entries()) {
+        expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
+        expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
+      }
+
+      const messages = evaluatorCalls[0]!.packet.messages;
+      const system = messages.filter((message) => message.role === "system");
+      expect(system).toHaveLength(1);
+      expect(system[0]!.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // and it leads the packet, so no earlier instruction can displace it
+      expect(messages[0]?.role).toBe("system");
+      expect(messages[0]?.content).toBe(EVALUATOR_CONTRACT_TEXT);
+      // the fingerprinted contract and the sent contract are the same value
+      expect(evaluatorCalls[0]!.contractHash).toBe(runnerSettings().conformanceContractHash);
+    } finally { await provider.stop(); }
+  });
+
   it("derives and persists a firing WOK band ceiling from the register cut matrix", async () => {
     const provider = await startProviderDouble([
       JSON.stringify({ statement: "A looked-up answer.", way_of_knowing: "LOOKED_UP",
@@ -4038,9 +4245,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const work = await createRunnerWork("band-ceiling-capped");
@@ -4057,17 +4262,49 @@ describe("apps/runner — legal command lifecycle", () => {
           register_row_key: "wayOfKnowingCeiling"
         }
       });
-      expect(provider.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(provider.calls()).toBe(3);
     } finally { await provider.stop(); }
   });
 
-  it("persists and settles a pre-compose R9 block as components-only + DEFECT", async () => {
-    const provider = await startProviderDouble([JSON.stringify({
-      statement: "A blocked answer.", way_of_knowing: "REASONING", locator: null,
-      restatement_text: "Different meaning.", restatement_status: "FAIL", value_laden: false,
-      steelman: { summary: "A blocked answer.", fidelity: 0.4 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
-      evidence: { quality: 0.4, relevance: 0.4 }, context: { fit: 0.4, ambiguityFlags: [] }, fallacy: { severity: 0.6, fatalFlags: [] }
-    })]);
+  /**
+   * T9 (goal 248-251), at RUN level. This fixture used to prove the pre-compose
+   * R9 GATE: a load-bearing node whose restatement FAILED ended the run in
+   * COMPONENTS_ONLY + DEFECT after exactly one model call. That gate is retired
+   * — R9 is an EVALUATOR OBJECTION CRITERION now — so the same input must reach
+   * the synthesizer, earn the objection, and SERVE on the round that answers it.
+   */
+  it("serves a failed-restatement run through the evaluator instead of blocking it (former pre-compose R9 gate)", async () => {
+    const objection = "A stranger could not restate this claim from the digest alone.";
+    const reasoningSegments = JSON.stringify({ segments: [
+      { segment_id: "segment:hypothesis", text: "Hypothesis: the answer holds provisionally.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Research plan: find a source a stranger could restate.", node_refs: [], served_number_refs: [] }
+    ] });
+    const provider = await startProviderDouble([
+      JSON.stringify({
+        statement: "A blocked answer.", way_of_knowing: "REASONING", locator: null,
+        restatement_text: "Different meaning.", restatement_status: "FAIL", value_laden: false,
+        steelman: { summary: "A blocked answer.", fidelity: 0.4 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.4, relevance: 0.4 }, context: { fit: 0.4, ambiguityFlags: [] }, fallacy: { severity: 0.6, fatalFlags: [] }
+      }),
+      // round 1: the synthesizer writes, the evaluator objects ON RESTATEMENT —
+      // the very predicate the retired gate used to terminate on.
+      reasoningSegments,
+      JSON.stringify({
+        satisfied: false,
+        objection,
+        criteria: {
+          fairness_to_losers: true, statement_label_agreement: true,
+          no_overstatement: true, restatement: false, citation_tracing: true
+        }
+      }),
+      // round 2: the feedback is answered and the run serves.
+      reasoningSegments,
+      evaluatorSatisfied()
+    ]);
     try {
       const work = await createRunnerWork("pre-compose-block");
       const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(work.workItemId);
@@ -4077,24 +4314,139 @@ describe("apps/runner — legal command lifecycle", () => {
          FROM core.work_item AS work JOIN serve.answer AS answer ON answer.answer_id = work.settled_artifact_ref
          WHERE work.work_item_id = $1`, [work.workItemId]
       );
-      expect(row.rows[0]).toEqual({
-        state: "DONE", terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY", composed_text_id: null
+      // NOT components-only, and the second round is recorded as the recompose.
+      expect(row.rows[0]).toMatchObject({
+        state: "DONE", terminal: "DOWNGRADED", serve_state: "RECOMPOSED_ONCE"
       });
+      expect(row.rows[0]?.composed_text_id).not.toBeNull();
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
       const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:pre-compose-block");
-      expect(projection?.conformance_outcome).toBe("NOT_RUN");
       expect(projection).toMatchObject({
-        terminal: "COMPONENTS_ONLY",
-        serve_state: "COMPONENTS_ONLY",
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
-        verdict_state: null,
-        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
-        confidence_band: null,
-        band_ceiling: null
+        terminal: "DOWNGRADED",
+        serve_state: "RECOMPOSED_ONCE",
+        verdict_unavailable: null
       });
-      expect(provider.calls()).toBe(1);
+      expect(projection?.condition_marks).not.toContain("DEFECT");
+      // judge + (synthesizer, evaluator) x 2 rounds.
+      expect(provider.calls()).toBe(5);
+
+      // ---- J25 + J29 (+ ADDENDUM): the ROUNDS, read back and RESOLVED ----
+      // The verbatim-objection claim is asserted on the RECORDED REQUEST at the
+      // provider seam (tests/unit/t09-synthesis.test.ts), which is where the
+      // frozen SPEC puts it. This table holds no request body: the same
+      // in-memory object fed the packet and the row, so a stored copy could
+      // never have evidenced "as sent".
+      const rounds = await new ServeRepository(database.pool).readSynthesisRounds(
+        result.answerId, "asker:pre-compose-block", 1
+      );
+      expect(rounds.map((round) => round.round)).toEqual([1, 2]);
+      expect(rounds.map((round) => round.synthesizerStage)).toEqual(["INITIAL", "RETRY"]);
+      expect(rounds.map((round) => round.evaluatorSatisfied)).toEqual([false, true]);
+      const [first, second] = rounds;
+      // Each round names its OWN producer call sites, round number included.
+      expect(first!.candidateCallSiteKey).toBe("COMPOSER:SYNTHESIZER:INITIAL:1");
+      expect(second!.candidateCallSiteKey).toBe("COMPOSER:SYNTHESIZER:RETRY:2");
+      expect(first!.evaluatorCallSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:1");
+      expect(second!.evaluatorCallSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:2");
+      expect(first!.candidateArtifactRef).not.toBe(second!.candidateArtifactRef);
+
+      // codex r3 B2: resolve each reference through the LEDGER ENTRY that
+      // recorded it — this run, this work item, a successful MODEL_CALL, at the
+      // stored call site. "Belongs to the run" was not a producer binding.
+      const bound = await database.pool.query<{ round: number; role: string }>(
+        `SELECT synthesis_round.round,
+                CASE WHEN entry.raw_artifact_ref = synthesis_round.candidate_artifact_ref
+                     THEN 'SYNTHESIZER' ELSE 'EVALUATOR' END AS role
+           FROM serve.synthesis_round AS synthesis_round
+           JOIN serve.answer AS answer
+             ON answer.answer_id = synthesis_round.answer_id
+            AND answer.answer_version = synthesis_round.answer_version
+           JOIN ledger.ledger_entry AS entry
+             ON entry.run_id = answer.run_id
+            AND entry.subject_item_id = $2
+            AND entry.action_kind = 'MODEL_CALL'
+            AND entry.outcome = 'OK'
+            AND ((entry.raw_artifact_ref = synthesis_round.candidate_artifact_ref
+                  AND entry.call_site_key = synthesis_round.candidate_call_site_key)
+              OR (entry.raw_artifact_ref = synthesis_round.evaluator_artifact_ref
+                  AND entry.call_site_key = synthesis_round.evaluator_call_site_key))
+          WHERE synthesis_round.answer_id=$1 AND synthesis_round.answer_version=1
+          ORDER BY synthesis_round.round, role`,
+        [result.answerId, work.workItemId]
+      );
+      // Two rounds x two producers, each resolving to the call the ledger recorded.
+      expect(bound.rows.map((row) => `${String(row.round)}:${row.role}`))
+        .toEqual(["1:EVALUATOR", "1:SYNTHESIZER", "2:EVALUATOR", "2:SYNTHESIZER"]);
+
+      // A reader who is not the owner gets nothing.
+      await expect(new ServeRepository(database.pool).readSynthesisRounds(
+        result.answerId, "asker:someone-else", 1
+      )).resolves.toEqual([]);
+
+      // No content column exists on this table at all.
+      const columns = await database.pool.query<{ columns: string[] }>(
+        `SELECT array_agg(column_name::text) AS columns
+           FROM information_schema.columns
+          WHERE table_schema='serve' AND table_name='synthesis_round'`
+      );
+      for (const banned of ["synthesizer_request", "candidate_statement", "evaluator_request",
+        "evaluator_verdict", "round_objection", "content_ciphertext", "content_attestation"]) {
+        expect(columns.rows[0]?.columns).not.toContain(banned);
+      }
+
       const terminal = await database.pool.query("SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='TERMINAL'", [work.runId]);
       expect(terminal.rowCount).toBe(1);
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * F4 / codex r1 B3 / J25 — the RETIRED GUARD's disclosure, through persistence.
+   *
+   * Before T9 this run could not exist: the envelope terminal threw
+   * `PROTECTED_CORE_NOT_VERIFIED` whenever the served root's restatement had
+   * failed, because the guard was keyed on R9's gate-hood. R9 is an evaluator
+   * criterion now, so the terminal fires anyway — and the failing status must
+   * still reach a READER. The first filing put it in the gate trace, which
+   * persistence discards except for its last token, so nobody could see it.
+   */
+  it("F4 persists the retired-guard disclosure as a visible mark when the envelope stops a FAILED restatement", async () => {
+    const provider = await startProviderDouble([JSON.stringify({
+      statement: "A budget-bounded component.", way_of_knowing: "REASONING", locator: null,
+      restatement_text: "A different meaning.", restatement_status: "FAIL", value_laden: false,
+      steelman: { summary: "A budget-bounded component.", fidelity: 0.6 },
+      critic: { summary: "Plausible counter.", counterargumentStrength: 0.4, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.6, relevance: 0.6 }, context: { fit: 0.6, ambiguityFlags: [] },
+      fallacy: { severity: 0.4, fatalFlags: [] }
+    })]);
+    try {
+      const runId = await createRun("cost-envelope-retired-guard", 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: "runner-test:cost-envelope-retired-guard"
+      });
+      const result = await runnerWithEndpoint(provider.endpoint).executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The mark is on the SERVED ANSWER a reader projects, not in a returned array.
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:cost-envelope-retired-guard");
+      expect(projection?.terminal).toBe("COMPONENTS_ONLY");
+      expect(projection?.condition_marks).toContain("PROTECTED-CORE-GUARD-RETIRED");
+      expect(projection?.condition_marks).toContain("ENVELOPE_EXHAUSTED");
+
+      // ...and it has a paired RECORD naming the node and saying what happened.
+      const record = projection?.condition_mark_records
+        .find((entry) => entry.mark === "PROTECTED-CORE-GUARD-RETIRED");
+      expect(record).toBeDefined();
+      expect(record?.reason).toContain("FAIL");
+      expect(record?.reason).toContain("no longer decides");
+
+      // The row itself carries it, so this is not a projection-only artifact.
+      const stored = await database.pool.query<{ condition_marks: string[] }>(
+        "SELECT condition_marks FROM serve.answer WHERE answer_id=$1 AND answer_version=1",
+        [result.answerId]
+      );
+      expect(stored.rows[0]?.condition_marks).toContain("PROTECTED-CORE-GUARD-RETIRED");
     } finally { await provider.stop(); }
   });
 
@@ -4181,7 +4533,14 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
-  it("persists and settles the pre-compose composition-budget terminal as components-only", async () => {
+  /**
+   * T9 (goal 252-254, 263-266): the composition byte budget stopped being a
+   * quality GATE and became a code PRECONDITION on the digest. A bound of 1 is
+   * below the digest's size at MAXIMUM compression, so no digest can exist —
+   * the DIGEST_CANNOT_EXIST crash class, which carries its OWN named mark
+   * rather than the generic DEFECT, and never a silently truncated node set.
+   */
+  it("persists and settles the digest-cannot-exist crash class as components-only with its own mark", async () => {
     const provider = await startProviderDouble([JSON.stringify({
       statement: "A budget-bounded answer.", way_of_knowing: "REASONING", locator: null,
       restatement_text: "A budget-bounded answer.", restatement_status: "PASS", value_laden: false,
@@ -4218,7 +4577,7 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(row.rows[0]).toMatchObject({
         state: "DONE", terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY",
         composed_text_id: null, conformance_record_id: null,
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DIGEST-CANNOT-EXIST"],
         fact_bundle_id: expect.any(String)
       });
       expect(row.rows[0]?.settled_artifact_ref).toBe(result.kind === "COMPLETED" ? result.answerId : null);
@@ -4229,10 +4588,10 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection).toMatchObject({
         terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY",
         verdict_state: null,
-        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" },
+        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DIGEST" },
         confidence_band: null, band_ceiling: null,
         composed_text: [],
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DEFECT"],
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "DIGEST-CANNOT-EXIST"],
         conformance_outcome: "NOT_RUN"
       });
       const terminal = await database.pool.query(
@@ -4252,8 +4611,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "Replayable answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Verify it independently.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ conforms: true, findings: [] }), JSON.stringify({ conforms: true, findings: [] }),
-      JSON.stringify({ pass: true })
+      evaluatorSatisfied()
     ]);
     try {
       const work = await createRunnerWork("redelivery-completion");
@@ -4266,11 +4624,23 @@ describe("apps/runner — legal command lifecycle", () => {
       );
       const redelivery = await runner.executeWorkItem(work.workItemId);
       expect(redelivery).toEqual({ kind: "COMPLETED", answerId: first.answerId });
-      expect(provider.calls()).toBe(5);
+      // T9: a served run makes THREE model calls now — judge, SYNTHESIZER,
+      // EVALUATOR — where it used to make five (judge, composer, two
+      // conformance segments, post-compose R9). The two retired organs are
+      // one evaluator call, and a satisfied evaluator ends the loop in round 1.
+      expect(provider.calls()).toBe(3);
     } finally { await provider.stop(); }
   });
 
-  it("completes redelivery from a pre-compose components-only artifact without another provider call", async () => {
+  /**
+   * T9: the artifact this fixture redelivers from is no longer a pre-compose
+   * GATE block — that gate is retired. The scripted double answers the judge and
+   * nothing else, so the SYNTHESIZER's transport dies, which is one of the four
+   * enumerated crash classes (TRANSPORT_DEATH) and lands components-only + DEFECT.
+   * The fixture's SUBJECT is unchanged and is what the counts pin: redelivery
+   * reuses the sealed artifact and makes NO further provider call.
+   */
+  it("completes redelivery from a components-only artifact without another provider call", async () => {
     const provider = await startProviderDouble([JSON.stringify({
       statement: "Durably blocked answer.", way_of_knowing: "REASONING", locator: null,
       restatement_text: "Different meaning.", restatement_status: "FAIL", value_laden: false,
@@ -4282,13 +4652,23 @@ describe("apps/runner — legal command lifecycle", () => {
       const runner = runnerWithEndpoint(provider.endpoint);
       const first = await runner.executeWorkItem(work.workItemId);
       if (first.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      // judge + the synthesizer call whose transport died.
+      const callsAfterFirstRun = provider.calls();
+      expect(callsAfterFirstRun).toBe(2);
+      const sealed = await new ServeRepository(database.pool)
+        .readAnswerProjection(first.answerId, "asker:blocked-redelivery-completion");
+      expect(sealed).toMatchObject({
+        terminal: "COMPONENTS_ONLY",
+        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_DEFECT" }
+      });
       await database.pool.query(
         "UPDATE core.work_item SET state='READY', settled_attempt_id=NULL, settled_artifact_ref=NULL WHERE work_item_id=$1",
         [work.workItemId]
       );
       const redelivery = await runner.executeWorkItem(work.workItemId);
       expect(redelivery).toEqual({ kind: "COMPLETED", answerId: first.answerId });
-      expect(provider.calls()).toBe(1);
+      // THE SUBJECT: redelivery added nothing.
+      expect(provider.calls()).toBe(callsAfterFirstRun);
     } finally { await provider.stop(); }
   });
 
@@ -4407,7 +4787,10 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
   // behaves exactly like the live model: it returns the observed
   // under-segmented shape UNLESS the system prompt declares the contract.
   const reasoningContractFragments = [
-    "When the supplied nodes rest on reasoning alone",
+    // T9/J23: the prompt now names the DIGEST nodes a segment cites, because
+    // the citable set follows the digest. The fragment tracks the stable
+    // clause so the test keeps proving that the contract is DECLARED.
+    "rest on reasoning alone",
     "at least two segments",
     "first segment states the provisional answer as a hypothesis",
     "second segment states the research plan"
@@ -4456,10 +4839,12 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
             : JSON.stringify({ segments: [
                 { segment_id: "segment:verdict", text: "A reasoning-only provisional answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] }
               ] });
-        } else if (system.includes("{conforms,findings}")) {
-          content = JSON.stringify({ conforms: true, findings: [] });
         } else {
-          content = JSON.stringify({ pass: true });
+          // T9: the CONFORMANCE and post-compose-R9 prompts no longer exist on
+          // the serve path; the EVALUATOR's is the only non-composer prompt a
+          // served run can produce, and it is matched by its own text rather
+          // than by falling through to a retired organ's shape.
+          content = evaluatorSatisfied();
         }
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: "composer-contract-double", model: "test-layer/model",
@@ -4583,9 +4968,20 @@ describe("T10/T11 · the served root and its label, through the production runne
       { segment_id: "segment:verdict", text: statement, node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
     ] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ pass: true })
+    // T9: the two retired organs (per-segment CONFORMANCE, post-compose R9)
+    // are one EVALUATOR call now, and a satisfied evaluator ends the loop in
+    // round 1 — so the serve path is exactly two model calls, not four.
+    JSON.stringify({
+      satisfied: true,
+      objection: null,
+      criteria: {
+        fairness_to_losers: true,
+        statement_label_agreement: true,
+        no_overstatement: true,
+        restatement: true,
+        citation_tracing: true
+      }
+    })
   ];
 
   /**
@@ -4682,6 +5078,556 @@ describe("T10/T11 · the served root and its label, through the production runne
   });
 
   /**
+   * J24 discriminator (2) / codex r1 B1 — a sealed ref naming a provider this
+   * deployment never configured is refused BEFORE the work item is claimed.
+   * The family being syntactically present is not the same as its refs being
+   * resolvable, and the r1 filing only checked the former.
+   */
+  it("T9/J24 refuses an unconfigured sealed role ref before claiming, and names the role", async () => {
+    const question = `t09-role-ref-unconfigured-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    const provider = await startProviderDouble([...servedRunResponses("Never synthesized.", 0.8)]);
+    const settings = runnerSettings();
+    const unconfigured: WalkingSkeletonSettings = {
+      ...settings,
+      synthesisRolePolicy: {
+        ...settings.synthesisRolePolicy!,
+        evaluatorRoleRef: "provider:never-configured-on-this-deployment"
+      }
+    };
+    try {
+      await expect(
+        runnerWithEndpoint(provider.endpoint, unconfigured).executeWorkItem(work.workItemId)
+      ).rejects.toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED" });
+
+      // Nothing claimed, nothing spent: the work item is untouched.
+      const state = await database.pool.query<{ state: string; settled_artifact_ref: string | null }>(
+        "SELECT state, settled_artifact_ref FROM core.work_item WHERE work_item_id=$1", [work.workItemId]
+      );
+      expect(state.rows[0]).toMatchObject({ state: "READY", settled_artifact_ref: null });
+      expect(provider.calls()).toBe(0);
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [work.runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * J24 discriminator (3) / codex r1 B1 — the sealed ref IS configured, but
+   * claim-time probing found its provider absent. The r1 filing dropped it from
+   * the healthy set and then looked the role up in the UNFILTERED set, so the
+   * run called an already-absent provider and recorded the result as an
+   * ordinary transport death. It must refuse instead, without substituting the
+   * still-healthy maker, and leave a durable event naming the ROLE (J25).
+   */
+  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and never substitutes the healthy maker", async () => {
+    const absentRolePrimary = await startProviderDouble([]);
+    const healthySecondary = await startProviderDouble([
+      judgementDouble("The healthy maker would have authored this", 0.4),
+      resil01Composition,
+      evaluatorSatisfied()
+    ]);
+    try {
+      const question = `t09-role-absent-at-claim-${randomUUID()}`;
+      const panel = fixtureDiscoveredPanel(2);
+      const primaryMember = panel[0]!;
+      const secondaryMember = panel[1]!;
+      const runId = await new RunRepository(database.pool).startRun({
+        questionLine: question,
+        principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`,
+        callerScope: "ASKER",
+        asOf: new Date("2026-08-07T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low",
+        depthParams: { depth: 1 },
+        discoveredPanel: panel,
+        strangerSampleRate: 1,
+        envelopeBasis: fixtureStructuralCeiling(10, 2, 1),
+        registerVersion: 1,
+        batteryVersion: "s00",
+        batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: absentRolePrimary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...settings,
+        maker: "Primary test maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: healthySecondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: secondaryMember.provider_ref,
+          maker: secondaryMember.maker
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // Only the ROLE's provider is absent; the other maker stays healthy, so
+        // the run could have continued — which is exactly the substitution J24
+        // forbids.
+        claimTimeProbe: async (member) => member.provider_ref === primaryMember.provider_ref
+          ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+          : { state: "HEALTHY", modelId: member.model_id, failureCode: null }
+      });
+
+      await expect(runner.executeWorkItem(workItemId))
+        .rejects.toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+
+      // NO substitution: the healthy secondary was never asked to synthesize.
+      expect(healthySecondary.calls()).toBe(0);
+      expect(absentRolePrimary.calls()).toBe(0);
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+
+      // J25: the disclosure is DURABLE and names the role, so a reader of the
+      // run sees why it stopped. Both live-event surfaces render this kind.
+      const events = await database.pool.query<{ value_json: { state: string; call_site_key: string } }>(
+        `SELECT value_json FROM core.run_progress_event
+          WHERE run_id=$1 AND kind='ledger.could_not_do'`, [runId]
+      );
+      expect(events.rows).toHaveLength(1);
+      expect(events.rows[0]?.value_json.state).toBe("SYNTHESIS_ROLE_PROVIDER_ABSENT");
+      expect(events.rows[0]?.value_json.call_site_key)
+        .toBe(`SYNTHESIZER:${primaryMember.provider_ref}`);
+      // J26(c): the refusal's OWN shape. It states the role and why the provider
+      // was not claim-eligible, and it states NO measurement it did not take —
+      // there is no hold_ms/attempts_spent/planned_leg_count to read as zero.
+      expect(events.rows[0]?.value_json).toEqual({
+        state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+        call_site_key: `SYNTHESIZER:${primaryMember.provider_ref}`,
+        role_ref: primaryMember.provider_ref,
+        role: "SYNTHESIZER",
+        absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+      });
+
+      // J26(b) / J25: the PERSISTED terminal state, not the thrown error. The
+      // item is never released or re-queued — only a deployment change can fix
+      // a sealed identity that is absent.
+      const item = await database.pool.query<{
+        state: string; terminal_reason: string | null; claimed_by: string | null;
+      }>(
+        "SELECT state, terminal_reason, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [workItemId]
+      );
+      expect(item.rows[0]).toEqual({
+        state: "FAILED",
+        terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER",
+        claimed_by: null
+      });
+    } finally {
+      await healthySecondary.stop();
+      await absentRolePrimary.stop();
+    }
+  });
+
+  /**
+   * codex r2 B2 / J29 — a round reference must RESOLVE, and resolve INSIDE THIS
+   * RUN. The foreign key already refuses `artifact:ghost` (it resolves to
+   * nothing); what a foreign key cannot see is a reference to a real artifact
+   * belonging to a DIFFERENT run, which is why `persist` proves run membership
+   * before the answer transaction commits.
+   */
+  it("T9/J29 refuses a round reference that is not the producer's artifact", async () => {
+    // A run with a JUDGE artifact and NO answer yet, so the same-run
+    // wrong-producer case can be persisted without colliding with an existing
+    // answer. codex r3 B2: run identity alone let exactly this artifact through
+    // as both the candidate and the verdict reference.
+    const question = `t09-wrong-producer-${randomUUID()}`;
+    // Activation-free, for the reason codex r4 B2 gave: with `createRun`'s full
+    // battery, removing the guard under a mutant lets `persist` reach its
+    // TERMINAL progress event and die on `core.reject_terminal_with_wait`
+    // (23514 WAIT_DRAIN_REQUIRED) instead of on the assertion below. That is
+    // how R5M1/R5M2 were miscredited, and rebuilding the arms without also
+    // rebuilding this fixture reproduced it exactly (mutants B1M2/B1M3, first
+    // pass).
+    const runId = await new RunRepository(database.pool).startRun({
+      questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+      sessionId: `session:${question}`, callerScope: "ASKER",
+      asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual",
+      effectiveRiskTier: "casual", tierSource: "ASKER",
+      tierProvenanceRef: `asker-declaration:${question}`, compositionBudgetTier: "low",
+      depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
+      envelopeBasis: fixtureStructuralCeiling(90, 1, 1),
+      registerVersion: 1, batteryVersion: "s00", batteryRows: []
+    });
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+    });
+    const ledger = new LedgerRepository(database.pool);
+    const judgeArtifactId = randomUUID();
+    const attemptId = randomUUID();
+    await ledger.appendRawArtifact({
+      artifactId: judgeArtifactId, attemptId, runId,
+      providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
+      maker: "test-layer", modelVersion: "v1",
+      rawText: JSON.stringify({ judge: question }), metadata: {}, parseStatus: "PARSED",
+      inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: "a".repeat(64)
+    });
+    const now = new Date();
+    await ledger.append({
+      runId, attemptId, actionKind: "MODEL_CALL", callSiteKey: "JUDGE",
+      subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
+      actorRef: "provider:test-layer", inputHash: "input:test-layer",
+      contractHash: "9".repeat(64), rawArtifactRef: judgeArtifactId,
+      startedAt: now, finishedAt: now
+    });
+
+    const emptyDigest = { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 };
+    const codeLabel = { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 };
+    const round = {
+      round: 1,
+      synthesizerRequest: { role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel },
+      candidateRef: judgeArtifactId,
+      candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
+      candidateStatement: "A statement.",
+      evaluatorRequest: { role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel, candidateStatement: "A statement." },
+      verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
+      verdictRef: judgeArtifactId,
+      verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    const factBundle = {
+      facts: ["A fact."], residualObjections: [], badges: [], conditionMarks: [],
+      reversalPoint: "A contrary observation would reverse this.",
+      buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null
+    };
+
+    // SAME RUN, real artifact, WRONG PRODUCER: the judge's call site is not a
+    // synthesis call site, so the ledger has no such pairing.
+    await expect(persistTerminalAnswer({
+      pool: database.pool, runId, workItemId, fixtureKey: question, factBundle, loopRounds: [round]
+    })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // WRONG ROUND: a genuine round-1 synthesis pairing, filed as round 2. The
+    // ledger lookup would succeed — the pairing is real — so the round binding
+    // on the call site is the only thing that can refuse it.
+    const synthesisArtifactId = randomUUID();
+    const synthesisAttemptId = randomUUID();
+    await ledger.appendRawArtifact({
+      artifactId: synthesisArtifactId, attemptId: synthesisAttemptId, runId,
+      providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
+      maker: "test-layer", modelVersion: "v1",
+      rawText: JSON.stringify({ synthesizer: question }), metadata: {}, parseStatus: "PARSED",
+      inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: "b".repeat(64)
+    });
+    for (const callSiteKey of ["COMPOSER:SYNTHESIZER:INITIAL:1", "POST_COMPOSE_R9:EVALUATOR:1"]) {
+      await ledger.append({
+        runId, attemptId: synthesisAttemptId, actionKind: "MODEL_CALL", callSiteKey,
+        subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
+        actorRef: "provider:test-layer", inputHash: "input:test-layer",
+        contractHash: "9".repeat(64), rawArtifactRef: synthesisArtifactId,
+        startedAt: now, finishedAt: now
+      });
+    }
+    const roundTwoWithRoundOneSites = {
+      ...round,
+      round: 2,
+      candidateRef: synthesisArtifactId,
+      verdictRef: synthesisArtifactId
+    } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    // The persist SHARES the work item the ledger entries name, so the pairing
+    // resolves and ONLY the round binding can refuse this.
+    await expect(persistTerminalAnswer({
+      pool: database.pool, runId, workItemId, fixtureKey: `${question}-wrong-round`, factBundle,
+      loopRounds: [roundTwoWithRoundOneSites]
+    })).rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // The whole answer rolled back with it.
+    const rows = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
+    );
+    expect(rows.rows[0]?.count).toBe("0");
+    const answers = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
+    );
+    expect(answers.rows[0]?.count).toBe("0");
+  });
+
+  /**
+   * codex r4 B1 — ROLE IS A PREDICATE, not error text.
+   *
+   * The arm above supplies a NONEXISTENT synthesis key, so it proves an
+   * INVENTED pairing is rejected. It cannot see this defect: until the fix,
+   * `bound.role` was only ever interpolated into an error message, so a REAL,
+   * same-run, same-round pairing recorded under the OTHER role's call site
+   * satisfied both the suffix check and the ledger lookup, and a synthesizer
+   * response committed as the evaluator verdict.
+   *
+   * Three properties, one fixture. Both artifacts below are genuine: each is
+   * recorded at its OWN real call site, so nothing here is a forgery — the only
+   * thing wrong is WHICH ROLE each is offered as.
+   *
+   *  1. the CANDIDATE must be the artifact recorded at the SYNTHESIZER call
+   *     site for this round and stage; a real EVALUATOR artifact is refused
+   *  2. the VERDICT must be the artifact recorded at the EVALUATOR call site;
+   *     a real SYNTHESIZER artifact is refused
+   *  3. one artifact and key cannot hold BOTH roles in one round
+   *
+   * These call `persistTerminalAnswer`, the production writer with no work-item
+   * settle after it (D43): removing the guard must make the call RESOLVE, so
+   * the assertion here is the only thing that can go red.
+   */
+  it("T9/J29 refuses a REAL producer pair supplied for the WRONG ROLE", async () => {
+    const question = `t09-wrong-role-${randomUUID()}`;
+    // NO battery rows, deliberately (codex r4 B2 / D43). `createRun` seeds the
+    // full battery, whose undrained activations make `core.reject_terminal_with_wait`
+    // raise 23514 WAIT_DRAIN_REQUIRED the moment `persist` writes its TERMINAL
+    // progress event. That is precisely how R5M2 died and was miscredited: with
+    // the guard removed the arm went RED on a work-item constraint rather than
+    // on the binding assertion. An activation-free run lets `persist` RESOLVE
+    // when the guard is absent, so only the assertion below can refuse.
+    const runId = await new RunRepository(database.pool).startRun({
+      questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+      sessionId: `session:${question}`, callerScope: "ASKER",
+      asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual",
+      effectiveRiskTier: "casual", tierSource: "ASKER",
+      tierProvenanceRef: `asker-declaration:${question}`, compositionBudgetTier: "low",
+      depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
+      envelopeBasis: fixtureStructuralCeiling(90, 1, 1),
+      registerVersion: 1, batteryVersion: "s00", batteryRows: []
+    });
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+    });
+    const ledger = new LedgerRepository(database.pool);
+    const now = new Date();
+
+    // TWO genuine artifacts, each recorded at its own genuine call site.
+    const synthesizerArtifactId = randomUUID();
+    const evaluatorArtifactId = randomUUID();
+    // A THIRD artifact, recorded at BOTH role call sites. This is not exotic:
+    // the wrong-round fixture above records one artifact at both. It is the
+    // ONLY shape in which the derived-key ledger lookup cannot tell the roles
+    // apart, so it is the shape the equality predicate has to carry alone —
+    // mutant B1M1 SURVIVED until this arm existed (D56: construct the input
+    // that should make the check fail, or it is not a check).
+    const ambidextrousArtifactId = randomUUID();
+    const pairs = [
+      { artifactId: synthesizerArtifactId, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", contentHash: "c".repeat(64) },
+      { artifactId: evaluatorArtifactId, callSiteKey: "POST_COMPOSE_R9:EVALUATOR:1", contentHash: "d".repeat(64) },
+      { artifactId: ambidextrousArtifactId, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", contentHash: "e".repeat(64) },
+      { artifactId: ambidextrousArtifactId, callSiteKey: "POST_COMPOSE_R9:EVALUATOR:1", contentHash: "e".repeat(64) }
+    ];
+    const alreadyAppended = new Set<string>();
+    for (const pair of pairs) {
+      const attemptId = randomUUID();
+      if (!alreadyAppended.has(pair.artifactId)) {
+        alreadyAppended.add(pair.artifactId);
+        await ledger.appendRawArtifact({
+        artifactId: pair.artifactId, attemptId, runId,
+        providerRef: "provider:test-layer", provider: "test", model: "model/test-layer",
+        maker: "test-layer", modelVersion: "v1",
+        rawText: JSON.stringify({ at: pair.callSiteKey }), metadata: {}, parseStatus: "PARSED",
+        inputHash: "8".repeat(64), contractHash: "9".repeat(64), contentHash: pair.contentHash
+        });
+      }
+      await ledger.append({
+        runId, attemptId, actionKind: "MODEL_CALL", callSiteKey: pair.callSiteKey,
+        subjectItemId: workItemId, stanceAtAction: "UNASSIGNED", outcome: "OK",
+        actorRef: "provider:test-layer", inputHash: "input:test-layer",
+        contractHash: "9".repeat(64), rawArtifactRef: pair.artifactId,
+        startedAt: now, finishedAt: now
+      });
+    }
+
+    const emptyDigest = { nodes: [], emphasis: { topSurvivingObjectionNodeIds: [], runnerUpPositionNodeIds: [] }, compressionLevel: 0, summaryCharacterCap: null, byteSize: 0 };
+    const codeLabel = { verdictLabel: "CONTESTED", servedNodeId: "n", servedStrength: 0.5, margin: null, registerVersion: 1 };
+    const correctRound = {
+      round: 1,
+      synthesizerRequest: { role: "SYNTHESIZER", stage: "INITIAL", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel },
+      candidateRef: synthesizerArtifactId,
+      candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
+      candidateStatement: "A statement.",
+      evaluatorRequest: { role: "EVALUATOR", roleRef: "provider:test-layer", round: 1, instructions: "i", digest: emptyDigest, codeLabel, candidateStatement: "A statement." },
+      verdict: { satisfied: true, objection: null, criteria: { fairnessToLosers: true, statementLabelAgreement: true, noOverstatement: true, restatement: true, citationTracing: true } },
+      verdictRef: evaluatorArtifactId,
+      verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as unknown as NonNullable<ServeGateResult["loopRounds"]>[number];
+    const factBundle = {
+      facts: ["A fact."], residualObjections: [], badges: [], conditionMarks: [],
+      reversalPoint: "A contrary observation would reverse this.",
+      buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null
+    };
+    const persistRound = (round: NonNullable<ServeGateResult["loopRounds"]>[number]) =>
+      persistTerminalAnswer({
+        pool: database.pool, runId, workItemId, fixtureKey: question, factBundle, loopRounds: [round]
+      });
+
+    // 1. EVALUATOR-AS-CANDIDATE. A real evaluator artifact at its real
+    //    evaluator call site, offered as the round's candidate.
+    await expect(persistRound({
+      ...correctRound,
+      candidateRef: evaluatorArtifactId,
+      candidateCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // 2. SYNTHESIZER-AS-VERDICT, the same swap in the other direction.
+    await expect(persistRound({
+      ...correctRound,
+      verdictRef: synthesizerArtifactId,
+      verdictCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // 3. ONE ARTIFACT AND KEY FOR BOTH ROLES — codex r4 B1's exact
+    //    counterexample: a legitimate round-1 synthesizer artifact submitted as
+    //    candidate AND verdict. Both suffix checks pass and both ledger lookups
+    //    return the same valid row, so only a role predicate can refuse it.
+    await expect(persistRound({
+      ...correctRound,
+      verdictRef: synthesizerArtifactId,
+      verdictCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
+      candidateRef: synthesizerArtifactId,
+      candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // 4. THE EQUALITY ARM. `ambidextrousArtifactId` is legitimately recorded at
+    //    BOTH role call sites, so the ledger lookup by the DERIVED key finds a
+    //    row whichever role it is offered as. Nothing but the supplied key
+    //    disagreeing with the derived key can refuse this one.
+    await expect(persistRound({
+      ...correctRound,
+      candidateRef: ambidextrousArtifactId,
+      candidateCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1"
+    } as NonNullable<ServeGateResult["loopRounds"]>[number]))
+      .rejects.toMatchObject({ code: "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED" });
+
+    // The CORRECT pairing still commits — the guard refuses a wrong role, not
+    // every round. Without this the three arms above would pass against a
+    // predicate that simply refused everything.
+    await expect(persistRound(correctRound)).resolves.toMatchObject({
+      answerId: expect.any(String)
+    });
+
+    // Nothing from the three refusals survived.
+    const rows = await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.synthesis_round WHERE run_id=$1", [runId]
+    );
+    expect(rows.rows[0]?.count).toBe("1");
+  });
+
+  /**
+   * J26(b) — the ALL-ABSENT claim path. Every pinned provider is gone, so the
+   * pre-existing empty-panel refusal fires BEFORE the role check (it stands
+   * earlier in the same loop) and the role never gets to be the reason. What
+   * this arm pins is that the ordering does not cost the work item its terminal
+   * state: a claim-time refusal that only a deployment change can fix must not
+   * be left CLAIMED for the reaper to retry.
+   */
+  it("T9/J26 drives the all-absent claim path to a persisted terminal state", async () => {
+    const absentPrimary = await startProviderDouble([]);
+    const absentSecondary = await startProviderDouble([]);
+    try {
+      const question = `t09-all-absent-at-claim-${randomUUID()}`;
+      const panel = fixtureDiscoveredPanel(2);
+      const secondaryMember = panel[1]!;
+      const runId = await new RunRepository(database.pool).startRun({
+        questionLine: question,
+        principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`,
+        callerScope: "ASKER",
+        asOf: new Date("2026-08-07T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low",
+        depthParams: { depth: 1 },
+        discoveredPanel: panel,
+        strangerSampleRate: 1,
+        envelopeBasis: fixtureStructuralCeiling(10, 2, 1),
+        registerVersion: 1,
+        batteryVersion: "s00",
+        batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: absentPrimary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...settings,
+        maker: "Primary test maker",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: absentSecondary.endpoint,
+            model: "test-layer/secondary-model",
+            maker: "Secondary test maker"
+          }),
+          providerRef: secondaryMember.provider_ref,
+          maker: secondaryMember.maker
+        },
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        claimTimeProbe: async () => ({ state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" })
+      });
+
+      await expect(runner.executeWorkItem(workItemId))
+        .rejects.toMatchObject({ code: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" });
+
+      // THE ASSERTION THAT MATTERS: the persisted terminal state, read back.
+      const item = await database.pool.query<{
+        state: string; terminal_reason: string | null; claimed_by: string | null;
+      }>(
+        "SELECT state, terminal_reason, claimed_by FROM core.work_item WHERE work_item_id=$1",
+        [workItemId]
+      );
+      expect(item.rows[0]).toEqual({
+        state: "FAILED",
+        terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
+        claimed_by: null
+      });
+      expect(absentPrimary.calls()).toBe(0);
+      expect(absentSecondary.calls()).toBe(0);
+    } finally {
+      await absentSecondary.stop();
+      await absentPrimary.stop();
+    }
+  });
+
+  /**
+   * T9 × board F33 × J12, at run level. The synthesis-role family binds at
+   * EVERY maker count — every served statement is written by the synthesizer
+   * and graded by the evaluator — so a deployment that never handed the runner
+   * the sealed rows must refuse at claim time, before it spends anything, the
+   * same way T11's label family and J12's panel rows do.
+   */
+  it("T9 stops loudly instead of synthesizing when the sealed synthesis-role family is missing", async () => {
+    const question = `t09-unsealed-synthesis-family-${randomUUID()}`;
+    const work = await createRunnerWork(question);
+    const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
+    const { synthesisRolePolicy: _omitted, ...settingsWithoutSynthesisRolePolicy } = runnerSettings();
+    try {
+      await expect(
+        runnerWithEndpoint(provider.endpoint, settingsWithoutSynthesisRolePolicy).executeWorkItem(work.workItemId)
+      ).rejects.toMatchObject({ code: "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED" });
+
+      const answers = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [work.runId]
+      );
+      expect(answers.rows[0]?.count).toBe("0");
+      expect(provider.calls()).toBe(0);
+      const modelCalls = await database.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+          WHERE run_id=$1 AND action_kind='MODEL_CALL'`, [work.runId]
+      );
+      expect(modelCalls.rows[0]?.count).toBe("0");
+    } finally { await provider.stop(); }
+  });
+
+  /**
    * THE T10 RED, at run level. The FIRST configured provider authors the WEAKER
    * root; the second authors the stronger one. The served number, the served
    * root's disclosure and the receipt must all name the STRONGER root — under
@@ -4698,9 +5644,7 @@ describe("T10/T11 · the served root and its label, through the production runne
         ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary child ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         // The SECOND-configured maker authors the STRONGER root.
@@ -4820,9 +5764,7 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`B3 primary position ${index + 1}`)),
         ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `B3 primary review ${index + 1}`)),
         resil01Composition,
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ conforms: true, findings: [] }),
-        JSON.stringify({ pass: true })
+        evaluatorSatisfied()
       ],
       secondary: [
         ...Array.from({ length: 4 }, (_, index) => judgementDouble(`B3 secondary position ${index + 1}`)),
@@ -5116,5 +6058,71 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
     await expect(
       serve.persist(freshInput as Parameters<ServeRepository["persist"]>[0])
     ).rejects.toMatchObject({ code: "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE" });
+  });
+});
+
+/**
+ * F-H-2 — the liveness refresh path with content encryption OFF.
+ *
+ * `core.run_private_content_is_live` is a v1-ENCRYPTED-run predicate: its body ends
+ * `WHERE run.run_id=p_run_id AND run.content_encryption_version=1`, wrapped in
+ * `COALESCE(...,false)`, so it answers FALSE for a run that has no private content at all.
+ * Eleven of its twelve call sites guard it accordingly; `recordQuery`'s candidate filter did
+ * not, so with encryption off — the default — every run was invisible to it.
+ *
+ * These two tests pin the BLAST RADIUS rather than the symptom. The lifecycle test proves the
+ * ARCHIVED_REVIVED transition end to end; it does not prove that a query refreshes liveness at
+ * all, and that refresh is what feeds `sweep`'s `HAVING max(query.occurred_at)` and
+ * `decideRetirement`'s `lastQueriedAt`.
+ */
+describe("F-H-2 · liveness refresh with content encryption off", () => {
+  const retirementPolicy = {
+    rowKey: "livenessPolicy",
+    registerVersion: 1,
+    sourceRef: "test-layer:DR-015-016",
+    questionClass: "standard",
+    reviewAfterMs: 86_400_000,
+    retireAfterMs: 180 * 86_400_000
+  } as const;
+
+  /**
+   * PROPERTY: an owned, unencrypted, non-erased run IS a `recordQuery` candidate, and the query
+   * is recorded against it at the instant it was asked. Mutant this catches: restoring the
+   * unguarded `core.run_private_content_is_live(run.run_id)` in the candidate filter, which
+   * makes the run invisible and the returned count 0.
+   */
+  it("F-H-2 counts an unencrypted run as a candidate and records its QUERY event", async () => {
+    const question = `f-h-2-refresh-${randomUUID()}`;
+    const runId = await createRun(question);
+    const askedAt = new Date("2030-01-01T00:00:00.000Z");
+
+    const recorded = await new LivenessRepository(database.pool)
+      .recordQuery(question, `asker:${question}`, askedAt);
+
+    expect(recorded).toBe(1);
+    const events = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM core.question_liveness_event
+        WHERE run_id=$1 AND kind='QUERY' AND occurred_at=$2`,
+      [runId, askedAt]
+    );
+    expect(events.rows[0]?.count).toBe("1");
+  });
+
+  /**
+   * PROPERTY: re-asking a question keeps it alive — the refreshed `lastQueriedAt` is what
+   * `decideRetirement` reads, so a run queried one day ago is NOT retired under a 180-day
+   * window, however old the run itself is. This is the user-visible half of the defect: without
+   * the refresh, a question being actively re-asked is archived anyway.
+   */
+  it("F-H-2 keeps a re-asked run out of a later retirement sweep", async () => {
+    const question = `f-h-2-not-retired-${randomUUID()}`;
+    const runId = await createRun(question);
+    const liveness = new LivenessRepository(database.pool);
+
+    // The run was created "now"; without a refresh it is years stale by 2030 and retires.
+    await liveness.recordQuery(question, `asker:${question}`, new Date("2030-06-01T00:00:00.000Z"));
+    const archived = await liveness.sweep(new Date("2030-06-02T00:00:00.000Z"), retirementPolicy);
+
+    expect(archived).not.toContain(runId);
   });
 });

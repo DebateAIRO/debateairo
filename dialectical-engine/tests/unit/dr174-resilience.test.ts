@@ -198,11 +198,14 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
 
   it("T32 mints exactly H/L/N and enforces typed required records without pretending class N is revealable", () => {
     // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
-    // (LABEL-BASIS-INCOMPLETE): every new mark was minted MID-LIST, so the DR-176
-    // positional tail this test depends on is unchanged (asserted below). The two
-    // lanes each grew the vocabulary by one and both mints survive the merge, so
-    // the exact count is 33 — still an exact pin, not a loosened one.
-    expect(CONDITION_MARKS).toHaveLength(33);
+    // (LABEL-BASIS-INCOMPLETE), T9 33 -> 37 (SYNTHESIS-OBJECTION-STANDING,
+    // DIGEST-COMPRESSED, DIGEST-CANNOT-EXIST, PROTECTED-CORE-GUARD-RETIRED).
+    // MERGE T9B: lane/s07 pinned 36 (32 + T9's four) and integration 19bbb4c4
+    // pinned 33 (32 + T7's one); BOTH mints survive the merge, so the exact
+    // count at this tree is 37 — counted from the shipped array, not summed
+    // from these comments. Every new mark was minted MID-LIST, so the DR-176
+    // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
+    expect(CONDITION_MARKS).toHaveLength(37);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

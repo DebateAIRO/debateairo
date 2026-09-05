@@ -21,6 +21,8 @@ import {
   type BandCeilingRegisterRow,
   type ComposedSegment,
   type ConditionMarkRecord,
+  type DigestSourceNode,
+  type EvaluatorVerdict,
   type ServeGateInput,
   type ServeGateDependencies
 } from "@debateai/serve";
@@ -54,16 +56,57 @@ const input = (): ServeGateInput => ({
     loadBearing: true
   }],
   factBundle: factBundle(),
-  maxRecompose: 2,
   compositionBudget: {
     tier: "low",
-    bound: 10,
+    bound: 100_000,
     registerRowKey: "compositionBundleBudget.low",
     registerVersion: 91,
     sourceRef: "test-layer:DR-078"
   },
-  strangerSampleRate: 0.5,
-  candidateConfidenceBand: "TOP_TEST_BAND"
+  candidateConfidenceBand: "TOP_TEST_BAND",
+  digestNodes: digestNodes(),
+  servedRootNodeId: "node:test",
+  codeLabel: {
+    verdictLabel: "SUPPORTED",
+    servedNodeId: "node:test",
+    servedStrength: 0.8,
+    margin: 0.2,
+    registerVersion: 91
+  },
+  synthesisRoleControls: {
+    synthesizerRoleRef: "test-layer:synthesizer",
+    evaluatorRoleRef: "test-layer:evaluator",
+    evaluatorLoopMaxRounds: 3
+  }
+});
+
+const digestNodes = (): readonly DigestSourceNode[] => [{
+  nodeId: "node:test",
+  statement: "A ruled test fact.",
+  finalStrength: 0.8,
+  wayOfKnowing: "LOOKED_UP",
+  marks: [],
+  polarityRelations: [],
+  isPosition: true,
+  isSurvivingObjection: false
+}];
+
+const SATISFIED: EvaluatorVerdict = {
+  satisfied: true,
+  objection: null,
+  criteria: {
+    fairnessToLosers: true,
+    statementLabelAgreement: true,
+    noOverstatement: true,
+    restatement: true,
+    citationTracing: true
+  }
+};
+
+const unsatisfied = (objection: string): EvaluatorVerdict => ({
+  satisfied: false,
+  objection,
+  criteria: { ...SATISFIED.criteria, citationTracing: false }
 });
 
 const passCeiling: BandCeilingDecision = {
@@ -85,7 +128,7 @@ const bandCeilingRow = (): BandCeilingRegisterRow => ({
   sourceRef: "test-layer:DR-082-086",
   value: {
     bandOrder: ["TEST_LOW_BAND", "TEST_TOP_BAND"],
-    ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_REASONING_CEILING"],
+    ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_REASONING_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
     defaultCeiling: {
       label: "TEST_DEFAULT_CEILING",
       ceilingBand: "TEST_TOP_BAND",
@@ -96,18 +139,32 @@ const bandCeilingRow = (): BandCeilingRegisterRow => ({
       label: "TEST_REASONING_CEILING",
       ceilingBand: "TEST_LOW_BAND",
       liftPath: "test-layer:improve-way-of-knowing"
-    }]
+    }],
+    // F-T9B-3 / codex r1 B2: every CURRENT fixture carries a truthful
+    // empty-basis entry. Its name must differ from the share cut's, because the
+    // cut's trigger cannot fire on an empty basis.
+    emptyBasisFloor: {
+      label: "TEST_EMPTY_BASIS_FLOOR",
+      ceilingBand: "TEST_LOW_BAND",
+      liftPath: "test-layer:gather-any-verified-evidence-to-lift"
+    }
   }
 });
 
 function dependencies(overrides: Partial<ServeGateDependencies> = {}): ServeGateDependencies {
   return {
-    measureCompositionBundle: () => 1,
-    compose: async () => [segment("segment:verdict", "Evidence-backed verdict.", true)],
-    selectSample: (candidate) => candidate.segmentId === "segment:sampled",
-    conform: async (candidate, state) => ({ segmentId: candidate.segmentId, state, conforms: true }),
-    postComposeR9: async () => true,
-    applyBandCeiling: () => passCeiling,
+    synthesize: async () => ({
+      candidate: [segment("segment:verdict", "Evidence-backed verdict.", true)],
+      candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+    }),
+    evaluate: async () => ({ verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" }),
+    // F-T9B-1: the ceiling is derived on EVERY served path now, including the
+    // empty basis a tracing-failed run produces, so this double must PRINT the
+    // basis it was handed. `passCeiling`'s fixed basis was never read before —
+    // the chain skipped the call whenever the basis was empty — and
+    // `validateBandCeilingDecision` rightly refuses a decision that reports a
+    // basis it was not derived from.
+    applyBandCeiling: ({ basis }) => ({ ...passCeiling, ceiling: { ...passCeiling.ceiling, basis } }),
     ...overrides
   };
 }
@@ -133,56 +190,71 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
   });
 
   it("requires composition evidence only after the composition stage begins", async () => {
-    const basePreComposeR9Input = input();
-    const preComposeR9TerminalInput = {
-      ...basePreComposeR9Input,
-      nodes: basePreComposeR9Input.nodes.map((node, index) => index === 0
+    // T9: the three PRE-composition quality terminals this test used to build
+    // (R9 block, Q53 block, byte-budget block) are gone — they all serve now.
+    // The predicate is unchanged and still discriminates: a crash class that
+    // never reached synthesis carries no composition evidence; a served answer
+    // does. DIGEST_CANNOT_EXIST is the pre-synthesis case that remains.
+    const preSynthesisTerminal = await runServeGateChain({
+      ...input(),
+      digestNodes: digestNodes().map((node) => ({ ...node, statement: "z".repeat(20_000) })),
+      compositionBudget: { ...input().compositionBudget, bound: 64 }
+    }, dependencies());
+    const retiredR9Input = input();
+    const servedDespiteFailedRestatement = await runServeGateChain({
+      ...retiredR9Input,
+      nodes: retiredR9Input.nodes.map((node, index) => index === 0
         ? { ...node, restatementStatus: "FAIL" as const }
         : node)
-    };
-    const preComposeR9Terminal = await runServeGateChain(preComposeR9TerminalInput, dependencies());
-    const preComposeQ53TerminalInput = input();
-    preComposeQ53TerminalInput.factBundle = buildFactBundle({
-      ...factBundle(), residualObjections: ["test-layer objection"]
-    });
-    const preComposeQ53Terminal = await runServeGateChain(preComposeQ53TerminalInput, dependencies());
-    const preComposeBudgetTerminal = await runServeGateChain(input(), dependencies({
-      measureCompositionBundle: () => 11
-    }));
-    const postComposeTerminal = await runServeGateChain(input(), dependencies({
-      conform: async (candidate, state) => ({ segmentId: candidate.segmentId, state, conforms: false })
+    }, dependencies());
+    const servedDespiteObjections = await runServeGateChain({
+      ...input(),
+      factBundle: buildFactBundle({ ...factBundle(), residualObjections: ["test-layer objection"] })
+    }, dependencies());
+    const servedDespiteUntracedCitation = await runServeGateChain(input(), dependencies({
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
 
-    expect(preComposeR9Terminal).toMatchObject({
-      terminal: "COMPONENTS_ONLY", coverageMode: "NOT_RUN", conditionMarks: ["DEFECT"]
+    expect(preSynthesisTerminal).toMatchObject({
+      terminal: "COMPONENTS_ONLY", coverageMode: "NOT_RUN", crashClass: "DIGEST_CANNOT_EXIST"
     });
-    expect(preComposeQ53Terminal).toMatchObject({
-      terminal: "COMPONENTS_ONLY", coverageMode: "NOT_RUN", conditionMarks: ["DEFECT"]
-    });
-    expect(compositionEvidenceRequired(preComposeR9Terminal)).toBe(false);
-    expect(compositionEvidenceRequired(preComposeQ53Terminal)).toBe(false);
-    expect(compositionEvidenceRequired(preComposeBudgetTerminal)).toBe(false);
-    expect(compositionEvidenceRequired(postComposeTerminal)).toBe(true);
+    expect(servedDespiteFailedRestatement.terminal).toBe("SERVED");
+    expect(servedDespiteObjections.terminal).toBe("SERVED");
+    // F-T9B-1 (V ruling 2026-09-03): an exhausted citation-tracing objection
+    // SERVES — it is not refused and it is not a crash class — at the DOWNGRADED
+    // terminal, carrying its mark and the band's FLOOR. The candidate is the
+    // file's landed single-segment one: serving must not depend on segment count.
+    expect(servedDespiteUntracedCitation.terminal).toBe("DOWNGRADED");
+    expect(servedDespiteUntracedCitation.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(compositionEvidenceRequired(preSynthesisTerminal)).toBe(false);
+    expect(compositionEvidenceRequired(servedDespiteFailedRestatement)).toBe(true);
+    expect(compositionEvidenceRequired(servedDespiteObjections)).toBe(true);
+    expect(compositionEvidenceRequired(servedDespiteUntracedCitation)).toBe(true);
   });
 
   it("distinguishes the independent composition budget from the cost envelope", async () => {
-    let composeCalls = 0;
-    const result = await runServeGateChain(input(), dependencies({
-      measureCompositionBundle: () => 11,
-      compose: async () => { composeCalls += 1; return [segment("never", "never", true)]; }
+    // T9: the byte budget is a code PRECONDITION now — it tightens the digest's
+    // summaries. It still has nothing to do with the run cost envelope, and it
+    // still reaches a terminal only when no digest can exist at all.
+    let synthesizeCalls = 0;
+    const result = await runServeGateChain({
+      ...input(),
+      digestNodes: digestNodes().map((node) => ({ ...node, statement: "z".repeat(20_000) })),
+      compositionBudget: { ...input().compositionBudget, bound: 64 }
+    }, dependencies({
+      synthesize: async () => {
+        synthesizeCalls += 1;
+        return { candidate: [segment("never", "never", true)], candidateRef: "artifact:never", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" };
+      }
     }));
 
     expect(result.terminal).toBe("COMPONENTS_ONLY");
-    expect(result.conditionMarks).toEqual(["DEFECT"]);
-    expect(result.gateTrace).toEqual([
-      "GATE1_R9_PASS",
-      "GATE2_Q53_PASS_VACUOUS",
-      "COMPOSITION_BUDGET_EXCEEDED",
-      "COMPONENTS_ONLY_DEFECT"
-    ]);
+    expect(result.crashClass).toBe("DIGEST_CANNOT_EXIST");
+    expect(result.conditionMarks).toEqual(["DIGEST-CANNOT-EXIST"]);
+    expect(result.gateTrace).toEqual(["DIGEST_CANNOT_EXIST", "COMPONENTS_ONLY_DIGEST"]);
     expect(result.compositionBudget).toMatchObject({ tier: "low", registerVersion: 91 });
     expect(result.gateTrace).not.toContain("ENVELOPE_EXHAUSTED");
-    expect(composeCalls).toBe(0);
+    expect(synthesizeCalls).toBe(0);
   });
 
   it("caps a served band as an independent final gate and never adds a terminal", async () => {
@@ -205,66 +277,75 @@ describe("S05 P9 / FX-LG-03 / FX-SRV-13 — typed gate pipeline", () => {
     expect(result.gateTrace).not.toContain("COMPONENTS_ONLY_DEFECT");
   });
 
-  it("samples only non-load-bearing segments and preserves stable ids plus number refs", async () => {
-    const observed: Array<[string, string]> = [];
+  it("traces EVERY segment's citations through one evaluator call and keeps stable ids plus number refs", async () => {
+    // T9: sampling belonged to the retired conformance gate. The evaluator
+    // traces every load-bearing claim to a digest node, so the coverage is
+    // EXHAUSTIVE by construction and there is no unsampled segment left.
+    const judged: string[] = [];
     const result = await runServeGateChain(input(), dependencies({
-      compose: async () => [
-        segment("segment:load", "Load-bearing.", true),
-        segment("segment:sampled", "Sampled detail.", false),
-        segment("segment:omitted", "Unsampled detail.", false)
-      ],
-      conform: async (candidate, state) => {
-        observed.push([candidate.segmentId, state]);
-        return { segmentId: candidate.segmentId, state, conforms: true };
+      synthesize: async () => ({
+        candidate: [
+          segment("segment:load", "Load-bearing.", true),
+          segment("segment:second", "Second detail.", false),
+          segment("segment:third", "Third detail.", false)
+        ],
+        candidateRef: "artifact:test-layer:synthesizer", candidateCallSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1"
+      }),
+      evaluate: async (request) => {
+        judged.push(request.candidateStatement);
+        return { verdict: SATISFIED, verdictRef: "artifact:test-layer:evaluator", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" };
       }
     }));
 
-    expect(observed).toEqual([
-      ["segment:load", "JUDGED"],
-      ["segment:sampled", "SAMPLED_PASSED"]
-    ]);
+    expect(judged).toEqual(["Load-bearing.\nSecond detail.\nThird detail."]);
     expect(result.conformance).toEqual([
       { segmentId: "segment:load", state: "JUDGED", conforms: true },
-      { segmentId: "segment:sampled", state: "SAMPLED_PASSED", conforms: true },
-      { segmentId: "segment:omitted", state: "NOT_SAMPLED", conforms: true }
+      { segmentId: "segment:second", state: "JUDGED", conforms: true },
+      { segmentId: "segment:third", state: "JUDGED", conforms: true }
     ]);
     expect(result.segments[0]).toMatchObject({
       segmentId: "segment:load",
       servedNumberRefs: ["number:segment:load"]
     });
-    expect(result.coverageMode).toBe("SAMPLED");
+    expect(result.coverageMode).toBe("EXHAUSTIVE");
   });
 
-  it("covers Q53, recompose-to-pass, second-failure, and Q51 provenance terminals as values", async () => {
+  it("covers the retired Q53, the retry-to-satisfied loop, the exhausted loop and the retired Q51 locator block as values", async () => {
+    // Every arm below used to end in COMPONENTS_ONLY + DEFECT. Under T9 each
+    // one SERVES, and the record says which route it took.
     const q53 = input();
     q53.factBundle = buildFactBundle({ ...factBundle(), residualObjections: ["test-layer objection"] });
     expect((await runServeGateChain(q53, dependencies())).gateTrace).toEqual([
-      "GATE1_R9_PASS", "GATE2_Q53_BLOCK", "COMPONENTS_ONLY_DEFECT"
+      "DIGEST_BUILT", "COMPOSED", "SYNTHESIS_LOOP_SATISFIED",
+      "GATE4_Q51_PASS", "BAND_CEILING_PASS", "SERVE"
     ]);
 
-    let conformCalls = 0;
+    let evaluateCalls = 0;
     const recovered = await runServeGateChain(input(), dependencies({
-      conform: async (candidate, state) => ({
-        segmentId: candidate.segmentId,
-        state,
-        conforms: ++conformCalls > 1
+      evaluate: async () => ({
+        verdict: ++evaluateCalls > 1 ? SATISFIED : unsatisfied("Round 1 objection."),
+        verdictRef: `artifact:round-${String(evaluateCalls)}`,
+        verdictCallSiteKey: `POST_COMPOSE_R9:EVALUATOR:${String(evaluateCalls)}`
       })
     }));
     expect(recovered.terminal).toBe("SERVED");
     expect(recovered.gateTrace).toContain("RECOMPOSED_ONCE");
+    expect(recovered.loopRounds).toHaveLength(2);
 
     const exhausted = await runServeGateChain(input(), dependencies({
-      conform: async (candidate, state) => ({ segmentId: candidate.segmentId, state, conforms: false })
+      evaluate: async () => ({ verdict: unsatisfied("A claim traces to no digest node."), verdictRef: "artifact:e", verdictCallSiteKey: "POST_COMPOSE_R9:EVALUATOR:1" })
     }));
-    expect(exhausted.terminal).toBe("COMPONENTS_ONLY");
+    expect(exhausted.terminal).toBe("DOWNGRADED");
+    expect(exhausted.answerForm).not.toBeNull();
+    expect(exhausted.standingObjection).toBe("A claim traces to no digest node.");
+    expect(exhausted.conditionMarks).toContain("SYNTHESIS-OBJECTION-STANDING");
 
     const provenance = input();
     provenance.nodes[0]!.locator = null;
-    const provenanceFailure = await runServeGateChain(provenance, dependencies());
-    expect(provenanceFailure.terminal).toBe("COMPONENTS_ONLY");
-    expect(provenanceFailure.gateTrace.slice(-2))
-      .toEqual(["GATE4_Q51_LOCATOR_BLOCK", "COMPONENTS_ONLY_DEFECT"]);
-    expect(deriveConformanceOutcome(provenanceFailure.coverageMode, provenanceFailure.conformance)).toBe("PASS");
+    const provenanceServed = await runServeGateChain(provenance, dependencies());
+    expect(provenanceServed.terminal).toBe("SERVED");
+    expect(provenanceServed.gateTrace).not.toContain("GATE4_Q51_LOCATOR_BLOCK");
+    expect(deriveConformanceOutcome(provenanceServed.coverageMode, provenanceServed.conformance)).toBe("PASS");
   });
 });
 
@@ -278,7 +359,9 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
       compositionBudget: input().compositionBudget,
       verifiedNodeIds: ["node:openai-root"],
       skippedEnrichmentRows: [],
-      protectedCoreVerified: true
+      // F4: the guard is retired; the status is recorded, not consulted.
+      protectedCoreRestatement: "PASS",
+      servedStatementExists: false
     });
     const unservedMakerRecord = {
       mark: "UNSERVED-MAKER-POSITION",
@@ -329,9 +412,11 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
   it("requires honesty fields outside the composition model and renders them in components-only mode", async () => {
     const marked = input();
     marked.factBundle = buildFactBundle({ ...factBundle(), conditionMarks: ["TEST-LAYER-MARK"] });
-    const result = await runServeGateChain(marked, dependencies({
-      measureCompositionBundle: () => 11
-    }));
+    const result = await runServeGateChain({
+      ...marked,
+      digestNodes: digestNodes().map((node) => ({ ...node, statement: "z".repeat(20_000) })),
+      compositionBudget: { ...marked.compositionBudget, bound: 64 }
+    }, dependencies());
     expect(result.factBundle).toMatchObject({
       badges: ["TEST-LAYER"],
       reversalPoint: expect.any(String),
@@ -339,7 +424,7 @@ describe("S05 AC-54/55/63 — machine-owned output shape", () => {
       memoryDisclosure: null
     });
     expect(result.answerForm).toBeNull();
-    expect(result.conditionMarks).toEqual(["TEST-LAYER-MARK", "DEFECT"]);
+    expect(result.conditionMarks).toEqual(["TEST-LAYER-MARK", "DIGEST-CANNOT-EXIST"]);
     expect(result.projections).toEqual({
       reversalPoint: "A contrary test-layer observation would reverse the answer.",
       buildsOnPrevious: { value: false, answerRef: null },

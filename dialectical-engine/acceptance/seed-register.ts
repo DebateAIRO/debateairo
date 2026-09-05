@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
+import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
 import {
   ENGINE_BAND_ORDER,
   buildAlgorithmRegisterRows,
@@ -110,6 +111,7 @@ function requireMatch(source: string, expression: RegExp, label: string): string
   return value;
 }
 
+
 async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]> {
   const [judge, runner, propagation, serve] = await Promise.all([
     readFile(new URL("../packages/judgement/src/index.ts", import.meta.url), "utf8"),
@@ -117,11 +119,6 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     readFile(new URL("../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
-    .map((match) => match[1]!);
-  if (conformanceTexts.length !== 2) {
-    throw new Error("SHIPPED_CONTRACT_TEXT_UNRESOLVED:conformance");
-  }
   const values = {
     judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
     composerContractHash: digest(requireMatch(
@@ -129,7 +126,10 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
       /content: "(Return only JSON with a segments array[^"]+)"/,
       "composer"
     )),
-    conformanceContractHash: digest(conformanceTexts.join("\n")),
+    conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),
+    // codex r2 B1a: the fingerprint is taken from the constant the runner
+    // SENDS, not from a search of the runner's source. There is nothing left
+    // for a comment, string, regex or template literal to confuse.
     propagationContractHash: digest(propagation),
     serveContractHash: digest(serve)
   };
@@ -220,14 +220,26 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
       rowKey: "wayOfKnowingCeiling",
       value: {
         bandOrder: [...ENGINE_BAND_ORDER],
-        ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING"],
+        ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
         defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
         cuts: [{
           minimumShares: { REASONING: 0.5 },
           label: "REASONING_CEILING",
           ceilingBand: "CAPPED",
           liftPath: "gather-evidence-to-lift"
-        }]
+        }],
+        // F-T9B-3: the floor a run is entitled to on NO VERIFIED EVIDENCE —
+        // reached when the evaluator's citation-tracing criterion failed and
+        // the cited set is empty. It exists because the reasoning-share cut
+        // above names the right band for that case and the WRONG REASON: its
+        // trigger is a REASONING share of 0.5, which cannot fire on an empty
+        // basis. The lift path is "gather ANY evidence" rather than "gather
+        // evidence to lift", because nothing was verified at all.
+        emptyBasisFloor: {
+          label: "NO_VERIFIED_EVIDENCE_FLOOR",
+          ceilingBand: "CAPPED",
+          liftPath: "gather-any-verified-evidence-to-lift"
+        }
       },
       sourceRef: ACCEPTANCE_REGISTER_SOURCE_REF
     },

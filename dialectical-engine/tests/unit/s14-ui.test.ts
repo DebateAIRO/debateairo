@@ -114,10 +114,15 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
 
   it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
     // J13(b) 29 -> 31: PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE joined the
-    // vocabulary. T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE) and T11 32 -> 33
-    // (LABEL-BASIS-INCOMPLETE) both joined it mid-list. Both renderers below are
-    // asserted to label every member non-empty and distinct.
-    expect(CONDITION_MARKS).toHaveLength(33);
+    // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE), T9 33 -> 37 (SYNTHESIS-OBJECTION-STANDING,
+    // DIGEST-COMPRESSED, DIGEST-CANNOT-EXIST, PROTECTED-CORE-GUARD-RETIRED).
+    // MERGE T9B: lane/s07 pinned 36 (32 + T9's four) and integration 19bbb4c4
+    // pinned 33 (32 + T7's one); BOTH mints survive the merge, so the exact
+    // count at this tree is 37 — counted from the shipped array, not summed
+    // from these comments. Every new mark was minted MID-LIST, so the DR-176
+    // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
+    expect(CONDITION_MARKS).toHaveLength(37);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");

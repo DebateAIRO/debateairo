@@ -3,14 +3,10 @@ import type { Pool } from "pg";
 import type { RiskTier } from "@debateai/kernel";
 import { computeStructuralCeilingBasis } from "@debateai/register";
 import {
-  RUNNER_BRANCHING_FACTOR,
-  RUNNER_COMPOSITION_SEGMENT_CAP,
-  RUNNER_FIXED_ORGANS_PER_COMPOSITION,
-  RUNNER_MAX_RECOMPOSE
-} from "@debateai/runner";
-import {
   readClaimTypeCompositionMap,
-  type CompositionMapRegisterRow
+  readEnvelopeFormulaInputs,
+  type CompositionMapRegisterRow,
+  type EnvelopeFormulaInputs
 } from "@debateai/register";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
@@ -70,7 +66,16 @@ const runtimeRowsSchema = z.object({
     cuts: z.array(z.object({
       minimumShares: minimumSharesSchema,
       label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
-    }).strict())
+    }).strict()),
+    // F-T9B-3 / codex r1 B2: the entry whose trigger is the EMPTY BASIS itself.
+    // REQUIRED. It was optional, and the reviewer showed a strict parser then
+    // admitted an incomplete sealed row and deferred the refusal to whenever an
+    // empty basis happened to occur — `acceptance-parser-accepts-missing-floor
+    // true`. A sealed row that cannot describe its own floor is refused HERE,
+    // at read time.
+    emptyBasisFloor: z.object({
+      label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
+    }).strict()
   }).strict(),
   // FAIR-02 (DR-140): both real makers, in seeded order. The floor stays 1
   // (DR-137 mono-model admission); the honest 2-maker report comes from the
@@ -114,6 +119,12 @@ export interface AcceptanceRuntimePolicy {
     readonly value: 0.35;
     readonly sourceRef: typeof ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF;
   };
+  /**
+   * T17: the sealed `envelopeFormulaInputs` row. Read here so the acceptance
+   * deployment's ceiling comes from the register rather than from engine
+   * constants re-declared at the call site.
+   */
+  readonly envelopeFormulaInputs: EnvelopeFormulaInputs;
   /** DR-162-A/DR-177: configured real makers remain register-driven data. */
   readonly providers: ReadonlyArray<z.infer<typeof runtimeRowsSchema>["configuredProviderSet"]["providers"][number]>;
   readonly hashes: {
@@ -126,7 +137,7 @@ export interface AcceptanceRuntimePolicy {
 }
 
 export function computeAcceptanceStructuralCeiling(
-  policy: Pick<AcceptanceRuntimePolicy, "bounds" | "runDeathPolicy">,
+  policy: Pick<AcceptanceRuntimePolicy, "bounds" | "runDeathPolicy" | "envelopeFormulaInputs">,
   panelSize: number,
   depth: number
 ): ReturnType<typeof computeStructuralCeilingBasis> {
@@ -135,12 +146,16 @@ export function computeAcceptanceStructuralCeiling(
     depth,
     judgeMaxAttempts: policy.bounds.JUDGE.maxAttempts,
     organMaxAttempts: Math.max(policy.bounds.COMPOSER.maxAttempts, policy.bounds.CONFORMANCE.maxAttempts),
-    maxRecompose: RUNNER_MAX_RECOMPOSE,
     maxCooldownHoldsPerRun: policy.runDeathPolicy.maxCooldownHoldsPerRun,
     finalRetryAttempts: policy.runDeathPolicy.finalRetryAttempts,
-    branchingFactor: RUNNER_BRANCHING_FACTOR,
-    compositionSegmentCap: RUNNER_COMPOSITION_SEGMENT_CAP,
-    fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION
+    maxRecompose: policy.envelopeFormulaInputs.maxRecompose,
+    branchingFactor: policy.envelopeFormulaInputs.branchingFactor,
+    compositionSegmentCap: policy.envelopeFormulaInputs.compositionSegmentCap,
+    fixedOrgansPerComposition: policy.envelopeFormulaInputs.fixedOrgansPerComposition,
+    reviewerCallsPerNode: policy.envelopeFormulaInputs.reviewerCallsPerNode,
+    synthesizerMaxRounds: policy.envelopeFormulaInputs.synthesizerMaxRounds,
+    evaluatorMaxRounds: policy.envelopeFormulaInputs.evaluatorMaxRounds,
+    maxDepth: policy.envelopeFormulaInputs.maxDepth
   });
 }
 
@@ -195,6 +210,9 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
     result.rows.map((row) => [row.row_key, row.value_json])
   ));
   const compositionRow = await readClaimTypeCompositionMap(pool, ACCEPTANCE_REGISTER_VERSION);
+  // T17: the loud stop for the acceptance deployment — a register version that
+  // never sealed the envelope row cannot resolve a runtime policy at all.
+  const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, ACCEPTANCE_REGISTER_VERSION);
   const compositionBudgets = Object.freeze(Object.fromEntries(
     Object.entries(parsed.compositionBundleBudget).map(([tier, bound]) => [tier, Object.freeze({
       tier: tier as "low" | "medium" | "high",
@@ -228,6 +246,7 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       value: parsed.hiddenNodeScoreThreshold,
       sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     }),
+    envelopeFormulaInputs,
     providers: Object.freeze(parsed.configuredProviderSet.providers),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,

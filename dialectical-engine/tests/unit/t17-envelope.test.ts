@@ -1,0 +1,546 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildCrossRootExchangePlan,
+  buildMultiMakerExpansionPlan
+} from "@debateai/runner";
+import { computeStructuralCeilingBasis } from "@debateai/register";
+import { parseCostEnvelopeBasis } from "@debateai/budget";
+import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
+import type { AskRequest } from "@debateai/contract";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+
+/**
+ * T17 — the cost envelope for the LIVE topology (goal-v4 285-295, F36).
+ *
+ * `DR-184-v2` counted no panel leg and billed the serve leg per recompose
+ * round. Two legs of the shipped engine were wrong, and BOTH were established
+ * by MEASUREMENT against a real ledger, not by reading call sites:
+ *
+ *  1. PANEL — the one real undercount. `runNodePanel`
+ *     (apps/runner/src/index.ts:1797) hands every configured maker to
+ *     `runJudgePanel`, which skips the author (PRODUCER_GRADING_FORBIDDEN,
+ *     packages/judgement/src/s04.ts:233) and calls the rest — `panelSize - 1`
+ *     model calls for EVERY materialized node, roots (:2105) and
+ *     children/exchange nodes (:2299) alike. v2 counted this leg at ZERO.
+ *  2. SERVE — an OVER-count. `ENGINE_FIXED_ORGANS_PER_COMPOSITION` is
+ *     `1 + segmentCap + 1`, and multiplying it by `maxRecompose` bills a
+ *     post-compose R9 in every round. The chain
+ *     (packages/serve/src/index.ts:505-580) calls the composer and conformance
+ *     INSIDE the recompose loop but R9 ONCE AFTER it: 2 composers + 4
+ *     conformance + 1 R9 = SEVEN sites, not eight.
+ *
+ * PER-SITE ATTEMPTS ARE NOT A CORRECTION — v2 had them right. A cooldown-wrapped
+ * site spends `judgeMaxAttempts + finalRetryAttempts`, NOT two fresh sequences:
+ * `withCooldownRetry` runs two sequences but `createPostgresProviderGateway`
+ * (apps/runner/src/index.ts:3565-3577) counts attempts CUMULATIVELY per
+ * call-site key and passes `remaining = maxAttempts - consumed`, so the second
+ * sequence gets only the final retry. An earlier draft of this file asserted
+ * `2 * judgeMaxAttempts + finalRetryAttempts` and called it a second
+ * undercount; the ledger measured 4 where that predicted 7, and the claim is
+ * RETRACTED. Mutant M2b keeps it retracted.
+ *
+ * The serve chains are mutually exclusive — T9 replaces the composition organs
+ * with the synthesizer/evaluator loop — so the serve leg is the MAXIMUM of the
+ * two, never their sum.
+ *
+ * Every policy number below comes from T16's sealed `envelopeFormulaInputs`
+ * row (packages/register/src/algorithm-policy.ts:241). Nothing here invents one.
+ */
+
+/** The sealed `envelopeFormulaInputs` row's values, as T16 seeds them. */
+const SEALED = Object.freeze({
+  branchingFactor: 2,
+  compositionSegmentCap: 2,
+  fixedOrgansPerComposition: 4,
+  maxRecompose: 2,
+  reviewerCallsPerNode: 1,
+  synthesizerMaxRounds: 3,
+  evaluatorMaxRounds: 3,
+  /**
+   * The row NAMES the panel basis and its own zod literal
+   * (packages/register/src/algorithm-policy.ts:331) is the loud stop for any
+   * other one, so the formula derives (M-1) from a sealed name, not a guess.
+   */
+  panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE" as const,
+  /** T17/B2: the sealed maximum depth admission refuses above. */
+  maxDepth: 5
+});
+
+/** The ruled per-organ attempt bounds the acceptance register seeds. */
+const BOUNDS = Object.freeze({
+  judgeMaxAttempts: 3,
+  organMaxAttempts: 3,
+  finalRetryAttempts: 1,
+  maxCooldownHoldsPerRun: 2
+});
+
+function ceilingInput(panelSize: number, depth: number) {
+  const { panelCallsPerNodeBasis: _basis, ...formulaTerms } = SEALED;
+  return { panelSize, depth, ...BOUNDS, ...formulaTerms };
+}
+
+type SiteKind = "AUTHOR" | "PANEL" | "REVIEW" | "SERVE";
+
+/**
+ * An INDEPENDENT enumeration of the maximum path: it builds the actual call
+ * sites the runner opens, one row each, and reads the worst case off each row.
+ * It shares no arithmetic with the closed form under test — it walks the
+ * runner's OWN exported plans and counts.
+ */
+function enumerateMaximumPathSites(
+  panelSize: number,
+  depth: number
+): readonly { readonly kind: SiteKind; readonly worstCaseAttempts: number }[] {
+  const sites: { kind: SiteKind; worstCaseAttempts: number }[] = [];
+  const materializedNodeIds: string[] = [];
+  if (panelSize === 1) {
+    // S2-2: the walking-skeleton literal is reachable at M=1 only — one node.
+    materializedNodeIds.push("root:0");
+  } else {
+    for (let rootIndex = 0; rootIndex < panelSize; rootIndex += 1) {
+      materializedNodeIds.push(`root:${rootIndex}`);
+    }
+    for (const leg of buildMultiMakerExpansionPlan(depth, panelSize)) {
+      materializedNodeIds.push(`child:${leg.childIndex}`);
+    }
+    for (const leg of buildCrossRootExchangePlan(panelSize)) {
+      materializedNodeIds.push(`exchange:${leg.authorRootIndex}->${leg.targetRootIndex}`);
+    }
+  }
+  /**
+   * Attempts are counted CUMULATIVELY per call-site key, so a cooldown-wrapped
+   * site's two sequences share ONE allowance — never two fresh ones.
+   * Measured at 4 in tests/integration/t17-envelope-ledger.test.ts.
+   */
+  const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
+  for (const _nodeId of materializedNodeIds) {
+    sites.push({ kind: "AUTHOR", worstCaseAttempts: cooldownSite });
+    if (panelSize === 1) continue;
+    // runJudgePanel calls every non-author member once; no cooldown wrapper.
+    for (let member = 1; member < panelSize; member += 1) {
+      sites.push({ kind: "PANEL", worstCaseAttempts: BOUNDS.judgeMaxAttempts });
+    }
+    for (let visit = 0; visit < SEALED.reviewerCallsPerNode; visit += 1) {
+      sites.push({ kind: "REVIEW", worstCaseAttempts: cooldownSite });
+    }
+  }
+  /**
+   * The serve leg is WALKED, not multiplied: one composer plus one conformance
+   * per segment inside each recompose round, then ONE post-compose organ after
+   * the loop (packages/serve/src/index.ts:505-580). Deriving it as
+   * `maxRecompose * fixedOrgansPerComposition` is the over-count this lane
+   * removed, and copying that expression here would make this enumeration a
+   * restatement of the formula rather than a check on it.
+   */
+  const compositionSites: string[] = [];
+  for (let round = 1; round <= SEALED.maxRecompose; round += 1) {
+    compositionSites.push(`COMPOSER:${round}`);
+    for (let segment = 0; segment < SEALED.compositionSegmentCap; segment += 1) {
+      compositionSites.push(`CONFORMANCE:${round}:${segment}`);
+    }
+  }
+  // Once per RUN, keyed by the last round it followed (measured: POST_COMPOSE_R9:2).
+  compositionSites.push(`POST_COMPOSE_R9:${SEALED.maxRecompose}`);
+  const synthesisLoopSites = SEALED.synthesizerMaxRounds + SEALED.evaluatorMaxRounds;
+  for (let site = 0; site < Math.max(compositionSites.length, synthesisLoopSites); site += 1) {
+    sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts });
+  }
+  return Object.freeze(sites);
+}
+
+function enumerateMaximumPathAttempts(panelSize: number, depth: number): number {
+  return enumerateMaximumPathSites(panelSize, depth)
+    .reduce((total, site) => total + site.worstCaseAttempts, 0);
+}
+
+describe("T17 · the ceiling covers the live topology's maximum path", () => {
+  /**
+   * F36's undercount, stated ARITHMETICALLY: at M=2, depth=1 the live engine
+   * opens 8 author sites, 8 panel sites and 8 reviewer sites, and the maximum
+   * path spends 109 attempts, measured from a real ledger. DR-184-v2 minted 88
+   * on the same topology. The gap is TWO corrections in opposite directions:
+   * +24 for the panel leg v2 counted at zero (8 sites x 3 attempts), and -3
+   * for the post-compose organ v2 billed once per recompose round instead of
+   * once per run. v2's per-site attempt terms were right.
+   */
+  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 109 attempts, not 88", () => {
+    const DR_184_V2_UNDERCOUNT = 88;
+    expect(enumerateMaximumPathAttempts(2, 1)).toBe(109);
+    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(109);
+    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts)
+      .toBeGreaterThan(DR_184_V2_UNDERCOUNT);
+  });
+
+  it("refuses an omitted term loudly instead of minting a NaN ceiling", () => {
+    const { reviewerCallsPerNode: _omitted, ...withoutReviewerTerm } = ceilingInput(2, 1);
+    expect(() => computeStructuralCeilingBasis(withoutReviewerTerm as never))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_REVIEWERCALLSPERNODE_INVALID"
+      }));
+  });
+
+  it("covers the independently enumerated maximum path for M=1..8, depth=1..5", () => {
+    for (let panelSize = 1; panelSize <= 8; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        const basis = computeStructuralCeilingBasis(ceilingInput(panelSize, depth));
+        expect({
+          panelSize,
+          depth,
+          covers: basis.max_model_attempts >= enumerateMaximumPathAttempts(panelSize, depth)
+        }).toEqual({ panelSize, depth, covers: true });
+      }
+    }
+  });
+
+  it("EQUALS the enumerated maximum path — the ceiling is tight, not merely large", () => {
+    for (let panelSize = 1; panelSize <= 8; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        expect(computeStructuralCeilingBasis(ceilingInput(panelSize, depth)).max_model_attempts)
+          .toBe(enumerateMaximumPathAttempts(panelSize, depth));
+      }
+    }
+  });
+
+  it("pins the recomputed grid and the bumped formula version", () => {
+    const expected = [
+      [25, 25, 25, 25, 25],
+      [109, 197, 373, 725, 1429],
+      [231, 399, 735, 1407, 2751],
+      [429, 701, 1245, 2333, 4509]
+    ];
+    for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        const basis = computeStructuralCeilingBasis(ceilingInput(panelSize, depth));
+        expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
+        expect(basis.formula_version).toBe("DR-184-v3");
+      }
+    }
+  });
+
+  it("discloses the four call-site legs on the receipt, panel attempts included", () => {
+    const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
+    // M=2, depth=1: 2 roots + 4 expansion children + 2 exchange nodes = 8 nodes.
+    expect(basis.call_sites).toEqual({ author: 8, panel: 8, reviewer: 8, serve: 7 });
+    expect(basis.serve_leg).toEqual({
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 6,
+      selected: "COMPOSITION"
+    });
+    expect(basis.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 });
+  });
+
+  it("selects the synthesis loop once T9's retirement leaves fewer composition organs", () => {
+    // After T9 the composition organs are retired; the loop is the only serve
+    // chain left, and the leg must follow it rather than a dead constant.
+    // One recompose round: 1 composer + 2 conformance + 1 post-compose = 4 < 6.
+    const basis = computeStructuralCeilingBasis({ ...ceilingInput(2, 1), maxRecompose: 1 });
+    expect(basis.serve_leg).toEqual({
+      composition_sites: 4,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 6,
+      selected: "SYNTHESIS_LOOP"
+    });
+    expect(basis.call_sites).toEqual({ author: 8, panel: 8, reviewer: 8, serve: 6 });
+  });
+
+  it("refuses a sealed composition shape it has never measured", () => {
+    // The sealed row's `fixedOrgansPerComposition` must stay coherent with the
+    // decomposition (1 composer + segmentCap conformance + 1 post-compose), or
+    // the formula is costing a topology nobody counted.
+    expect(() => computeStructuralCeilingBasis({
+      ...ceilingInput(2, 1),
+      fixedOrgansPerComposition: 5
+    })).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",
+      code: "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT"
+    }));
+  });
+
+});
+
+describe("T17 · the receipt that carries the basis", () => {
+  it("round-trips the recomputed basis through the run-head schema", () => {
+    const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
+    expect(parseCostEnvelopeBasis(basis)).toMatchObject({
+      maxModelAttempts: 109,
+      panelSize: 2,
+      depth: 1
+    });
+  });
+
+  it("refuses a stale DR-184-v2 basis loudly rather than enforcing an undercount", () => {
+    expect(() => parseCostEnvelopeBasis({
+      kind: "COMPUTED_STRUCTURAL_CEILING",
+      max_model_attempts: 88,
+      panel_size: 2,
+      depth: 1,
+      per_site_attempts: { judge: 3, organ: 3 },
+      hold_cap: 2,
+      final_retry_attempts: 1,
+      formula_version: "DR-184-v2",
+      bounds_source_ref: "engine-exports+register"
+    })).toThrow("The run head has no valid register-supplied cost-envelope basis");
+  });
+
+  /**
+   * The v2 fixture above is refused for SEVERAL reasons at once, so on its own
+   * it pins only "some field is missing" — it survives a schema that quietly
+   * re-admits an incomplete `per_site_attempts`. Each disclosure field is
+   * therefore pinned INDIVIDUALLY: drop exactly one from an otherwise valid
+   * v3 basis and the run head must still refuse. The list below is ALL ELEVEN
+   * members v3 newly requires (2 under per_site_attempts, 4 call_sites,
+   * 3 serve_leg) — a partial matrix lets any omitted member be weakened to
+   * `.optional()` with every case still green (codex r1 B3).
+   */
+  it.each([
+    "per_site_attempts.panel_member",
+    "per_site_attempts.cooldown_site",
+    "call_sites.author",
+    "call_sites.panel",
+    "call_sites.reviewer",
+    "call_sites.serve",
+    "serve_leg.composition_sites",
+    "serve_leg.composition_sites_per_round",
+    "serve_leg.post_compose_sites_per_run",
+    "serve_leg.synthesis_loop_sites",
+    "serve_leg.selected"
+  ])("refuses a basis missing %s", (dottedPath) => {
+    const basis = structuredClone(
+      computeStructuralCeilingBasis(ceilingInput(2, 1)) as Record<string, Record<string, unknown>>
+    );
+    const [group, field] = dottedPath.split(".") as [string, string];
+    delete basis[group]![field];
+    expect(() => parseCostEnvelopeBasis(basis))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+});
+
+describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
+  function basis(): Record<string, Record<string, unknown>> {
+    return structuredClone(
+      computeStructuralCeilingBasis(ceilingInput(2, 1)) as Record<string, Record<string, unknown>>
+    );
+  }
+
+  it("refuses a serve call-site count that disagrees with the selected arm", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 6;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it("refuses a COMPOSITION arm that disagrees with the serve call-site count", () => {
+    const wire = basis();
+    wire.serve_leg!.composition_sites = 10;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it("refuses a composition arm that is not its own disclosed decomposition", () => {
+    const wire = basis();
+    // 7 sites, but claiming 4 per round + 1 per run: 6 is not divisible by 4.
+    wire.serve_leg!.composition_sites_per_round = 4;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it("accepts the SYNTHESIS_LOOP arm when the serve count follows it", () => {
+    const loop = computeStructuralCeilingBasis({ ...ceilingInput(2, 1), maxRecompose: 1 });
+    expect(loop.serve_leg).toMatchObject({ selected: "SYNTHESIS_LOOP" });
+    expect(parseCostEnvelopeBasis(loop)).toMatchObject({ panelSize: 2 });
+  });
+
+  /**
+   * T17B — the LANDED count check gets its own pin back.
+   *
+   * Adding the larger-arm guard made the landed count check redundant: a
+   * campaign mutant that disabled the count check entirely left all 38 tests
+   * green, because the larger-arm guard refused the same inputs. A guard no
+   * test can kill is a guard that can be deleted silently, so it is pinned the
+   * same way the two new guards are — on the refusal it produces, not merely on
+   * the fact that something refused.
+   *
+   * The three cross-field guards overlap by construction (any two imply the
+   * third), so NO input can make exactly one of them fire. Asserting the
+   * message is what makes each one individually killable regardless.
+   */
+  it("names the COUNT disagreement, so the landed count check stays killable", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 6;
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrow("serve call sites 6 disagree with the COMPOSITION arm 7");
+  });
+
+  /**
+   * T17B/B2 — the checks above are ONE cross-field check, and one is not enough.
+   *
+   * r3 required TWO independent cross-field checks: the selected arm must agree
+   * with `call_sites.serve`, AND `selected` must not name the SMALLER arm. Only
+   * the first was built, so a receipt could name the smaller arm and parse: the
+   * count check passes because it compares serve against whichever arm the
+   * receipt itself nominated, and it never asks whether that nomination is the
+   * one the constructor would have made.
+   *
+   * The constructor bills `Math.max(composition_sites, synthesis_loop_sites)`
+   * and selects `composition_sites >= synthesis_loop_sites ? COMPOSITION :
+   * SYNTHESIS_LOOP`. A receipt is a claim about what was billed, so a receipt
+   * the constructor could never have minted is a false claim about a persisted
+   * ceiling — the same class of statement this mission repeals everywhere else.
+   */
+  it("refuses a receipt that selects the SMALLER arm (the count check alone accepts it)", () => {
+    const wire = basis();
+    // The exact input from the S09B review. Its point is that EVERY check that
+    // existed before this test passes on it:
+    //   selected arm  = synthesis_loop_sites = 6 = call_sites.serve -> agrees
+    //   (7 - 1) % 3   = 0                                           -> decomposes
+    // while the constructor computes max(7, 6) = 7, bills SEVEN sites and
+    // selects COMPOSITION. The accepted receipt claims the opposite topology
+    // and a smaller ceiling leg than the one that was actually billed.
+    wire.call_sites!.serve = 6;
+    wire.serve_leg = {
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 6,
+      selected: "SYNTHESIS_LOOP"
+    };
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+    // WHICH check refused is part of the assertion. Without this the test is
+    // satisfied by either guard alone and cannot tell a two-check parser from a
+    // one-check parser — which is precisely how the first hole survived review.
+    expect(() => parseCostEnvelopeBasis(wire)).toThrow("are not the larger arm 7");
+  });
+
+  /**
+   * The TIE is what makes the second check independent rather than decorative.
+   *
+   * When the arms are equal both are the larger arm, so the serve-count check
+   * and the larger-arm check are BOTH satisfied by either nomination. Only the
+   * tie policy distinguishes them, and the constructor's is explicit: `>=`
+   * selects COMPOSITION. This input is therefore refused by exactly one guard,
+   * which is what lets a mutant of that guard be credited to this assertion.
+   */
+  it("refuses SYNTHESIS_LOOP on a TIE, where only the tie policy can tell", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 7;
+    wire.serve_leg = {
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 7,
+      selected: "SYNTHESIS_LOOP"
+    };
+    expect(() => parseCostEnvelopeBasis(wire))
+      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+    expect(() => parseCostEnvelopeBasis(wire)).toThrow("disagrees with the constructor tie policy COMPOSITION");
+  });
+
+  /**
+   * The NEIGHBOUR these two guards must NOT catch: a tie resolved the way the
+   * constructor resolves it. If this ever refuses, the guards are over-tight
+   * and every legitimately tied receipt has been made unparseable.
+   */
+  it("accepts a TIE resolved as COMPOSITION, exactly as the constructor resolves it", () => {
+    const wire = basis();
+    wire.call_sites!.serve = 7;
+    wire.serve_leg = {
+      composition_sites: 7,
+      composition_sites_per_round: 3,
+      post_compose_sites_per_run: 1,
+      synthesis_loop_sites: 7,
+      selected: "COMPOSITION"
+    };
+    expect(parseCostEnvelopeBasis(wire)).toMatchObject({ panelSize: 2 });
+  });
+});
+
+describe("T17 · an over-bound input still refuses loudly at admission", () => {
+  const ask: AskRequest = {
+    question_line: "What follows from this evidence?",
+    risk_tier: "standard",
+    tier_source: "ASKER",
+    tier_provenance_ref: "asker:test",
+    composition_budget_tier: "low",
+    depth_params: { depth: 1 },
+    decision_scope: "test-layer scope",
+    as_of: "2026-08-07T00:00:00.000Z",
+    steering_presets: [],
+    steering_annotations: []
+  };
+
+  function settings(override: Partial<RunCreationSettings> = {}): RunCreationSettings {
+    return {
+      strangerSampleRate: 0,
+      registerVersion: 1,
+      batteryVersion: "battery:test",
+      settlementWatchHandle: "watch:test",
+      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
+      resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
+        ...ceilingInput(input.panelSize, Number(input.depthParams.depth))
+      }),
+      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+        effectiveRiskTier,
+        tierSource,
+        tierProvenanceRef
+      }),
+      ...override
+    };
+  }
+
+  it("admits a lawful ask and pins the basis it admits it with", async () => {
+    await expect(evaluateAskAdmission(settings(), ask)).resolves.toMatchObject({
+      envelopeBasis: { max_model_attempts: 109, formula_version: "DR-184-v3" }
+    });
+  });
+
+  /**
+   * B2 — the DoD's actual clause. The cases below it are malformed inputs
+   * (zero, fractional, negative); NONE of them is OVER-BOUND, i.e. above a
+   * sealed maximum. `packages/contract` accepts `depth_params` as an arbitrary
+   * record, so before this lane an ask with depth 6 minted a POSITIVE depth-6
+   * ceiling, passed admission, and only stopped later in the runner
+   * (`resolveExpansionDepth`) or when the stored basis was parsed — after the
+   * asker had been admitted. Admission must refuse it, on the 422 face.
+   */
+  it.each([6, 7, 42])("refuses an OVER-BOUND depth of %i at admission, above the sealed maximum", async (depth) => {
+    await expect(evaluateAskAdmission(settings(), { ...ask, depth_params: { depth } }))
+      .rejects.toMatchObject({
+        name: "AskRefusal",
+        code: "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM"
+      });
+  });
+
+  it("still admits the sealed maximum depth itself — the bound is inclusive", async () => {
+    await expect(evaluateAskAdmission(settings(), { ...ask, depth_params: { depth: 5 } }))
+      .resolves.toMatchObject({ envelopeBasis: { depth: 5, formula_version: "DR-184-v3" } });
+  });
+
+  it("reads the bound from the SEALED row, not from a constant in the formula", () => {
+    // A deployment that seals a smaller maximum refuses at that smaller value.
+    expect(() => computeStructuralCeilingBasis({ ...ceilingInput(2, 3), maxDepth: 2 }))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM"
+      }));
+    expect(computeStructuralCeilingBasis({ ...ceilingInput(2, 3), maxDepth: 3 }).depth).toBe(3);
+  });
+
+  it.each([
+    { member: "depth", value: 0, code: "STRUCTURAL_CEILING_DEPTH_INVALID" },
+    { member: "synthesizerMaxRounds", value: 0, code: "STRUCTURAL_CEILING_SYNTHESIZERMAXROUNDS_INVALID" },
+    { member: "evaluatorMaxRounds", value: 1.5, code: "STRUCTURAL_CEILING_EVALUATORMAXROUNDS_INVALID" },
+    { member: "reviewerCallsPerNode", value: -1, code: "STRUCTURAL_CEILING_REVIEWERCALLSPERNODE_INVALID" }
+  ])("refuses $member=$value at admission as a typed AskRefusal", async ({ member, value, code }) => {
+    await expect(evaluateAskAdmission(settings({
+      resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
+        ...ceilingInput(input.panelSize, Number(input.depthParams.depth)),
+        [member]: value
+      } as never)
+    }), ask)).rejects.toMatchObject({ name: "AskRefusal", code });
+  });
+});

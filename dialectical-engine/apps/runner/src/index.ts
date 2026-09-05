@@ -90,22 +90,36 @@ import {
   deriveBandCeiling,
   deriveVerdictLabel,
   LABEL_BASIS_INCOMPLETE_MARK,
+  PROTECTED_CORE_GUARD_RETIRED_MARK,
   runServeGateChain,
   ServeRepository,
   type BandCeilingRegisterRow,
   type ComposedSegment,
   type CompositionBudgetResolution,
   type ConditionMarkRecord,
+  synthesisCallSiteKey,
+  type DigestSourceNode,
+  type EvaluatorRequest,
+  type EvaluatorVerdict,
   type FactBundle,
   type PreservedConditionMarkRecord,
   type ServeGateResult,
   type ServeNode,
+  type SynthesizerRequest,
   type VerdictLabelBasis
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
+
+/**
+ * T9 / J24 — the two sealed synthesis roles, named ONCE. Every check that has
+ * to refuse "without substitution" iterates this, so a role can never be
+ * checked in one place and forgotten in another.
+ */
+export const SYNTHESIS_ROLES = Object.freeze(["SYNTHESIZER", "EVALUATOR"] as const);
+export type SynthesisRoleName = typeof SYNTHESIS_ROLES[number];
 
 export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
 export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
@@ -120,8 +134,65 @@ const compositionSchema = z.object({
     served_number_refs: z.array(z.string().trim().min(1))
   }).strict()).min(1).max(RUNNER_COMPOSITION_SEGMENT_CAP, "Composer output exceeds the engine segment cap")
 }).strict();
-const conformanceSchema = z.object({ conforms: z.boolean(), findings: z.array(z.string()) }).strict();
-const r9Schema = z.object({ pass: z.boolean() }).strict();
+// T9 retired the CONFORMANCE and post-compose-R9 organ schemas with the gates
+// they served: both limbs are evaluator objection criteria now, graded in one
+// EVALUATOR call whose wire shape is `evaluatorVerdictSchema` below.
+/**
+ * T9: the EVALUATOR organ's wire shape. One call grades the whole candidate on
+ * the five criteria — the three the goal names (fairness to losers,
+ * statement-label agreement, overstatement) plus the two re-routed gates
+ * (restatement, citation tracing). `satisfied` is checked against the criteria
+ * by `assertEvaluatorVerdict` in the serve package, so a provider cannot claim
+ * satisfaction while failing a criterion.
+ */
+/**
+ * F-SEALEDROWS-A / codex r2 B1a · THE EVALUATOR CONTRACT TEXT, exported so the
+ * conformance fingerprint can hash THE THING THAT IS SENT instead of searching
+ * this file for it.
+ *
+ * Three locators died to get here, and all three failed the same way — they
+ * could resolve to something that is not this prompt. Quoting the prompt's own
+ * words matched ZERO when T9 reworded it (loud). Taking the first object with a
+ * `criteria` member let an unrelated schema declared earlier win (quiet).
+ * Balancing braces over raw text miscounted a `}` inside a string, comment,
+ * regex or template literal, and — worse — matched a COMMENTED-OUT declaration
+ * after a real rename, returning an unrelated prompt with exit 0 (quiet again).
+ * Text is not syntax, and every lexical approximation of syntax has an input
+ * that defeats it.
+ *
+ * So there is no locator. The seeders import this constant and digest it; the
+ * call site below sends this constant. The hashed value and the sent value are
+ * the same object, which no search can be wrong about.
+ *
+ * V RULING 2026-09-04 is preserved exactly: the conformance slot covers the
+ * EVALUATOR prompt ALONE. The writer's prompt keeps its own
+ * `composerContractHash`. The text is unchanged byte for byte by this move, so
+ * the sealed fingerprint VALUE is unchanged.
+ *
+ * EDITING THIS STRING CHANGES A SEALED REGISTER VALUE. That is the intended
+ * behaviour — the fingerprint exists to make the change visible — but it means
+ * both deployment registers must be re-seeded when it moves.
+ */
+export const EVALUATOR_CONTRACT_TEXT =
+  "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null.";
+
+// codex r3 B1 part 2: EXPORTED so the schema/prompt agreement check can read the
+// DECLARED criterion keys at runtime rather than scanning this file for them.
+// Adding or renaming a criterion here without editing EVALUATOR_CONTRACT_TEXT is a
+// real defect — providers follow the SENT prompt, so every response would omit a
+// member this parser requires and the content-repair path would exhaust on a prompt
+// that cannot satisfy its own schema. The test turns that red.
+export const evaluatorVerdictSchema = z.object({
+  satisfied: z.boolean(),
+  objection: z.string().nullable(),
+  criteria: z.object({
+    fairness_to_losers: z.boolean(),
+    statement_label_agreement: z.boolean(),
+    no_overstatement: z.boolean(),
+    restatement: z.boolean(),
+    citation_tracing: z.boolean()
+  }).strict()
+}).strict();
 
 /**
  * FAIR-01 (DR-140(b)): the SECOND real maker's leg. When configured, the
@@ -172,6 +243,24 @@ export interface RunnerVerdictLabelPolicy {
   readonly highCut: number;
   readonly lowCut: number;
   readonly disagreementThreshold: number;
+  readonly sourceRefs: Readonly<Record<string, string>>;
+}
+
+/**
+ * S6-2 / T9: the sealed T16 synthesis-role family as the runner consumes it.
+ *
+ * The two role refs are NAMED PROVIDER IDENTITIES chosen by ruling J8 — never
+ * by this file, and never by `#1 in the configured list`. `identicalRoleRefs`
+ * is carried, not re-derived: T16's reader already compared them and printed
+ * the startup warning (J7), and re-comparing here would be a second opinion
+ * about a sealed fact.
+ */
+export interface RunnerSynthesisRolePolicy {
+  readonly registerVersion: number;
+  readonly synthesizerRoleRef: string;
+  readonly evaluatorRoleRef: string;
+  readonly evaluatorLoopMaxRounds: number;
+  readonly identicalRoleRefs: boolean;
   readonly sourceRefs: Readonly<Record<string, string>>;
 }
 
@@ -1004,6 +1093,15 @@ export function createPostgresReviewCatchUpDependencies(input: {
           sourceRef: source.answer.band_ceiling.source_ref,
           liftPath: source.answer.band_ceiling.lift_path
         },
+        // DR-184 review catch-up appends a new VERSION of an answer that was
+        // already synthesized: it re-reads standing, it never re-runs the
+        // digest or the loop. So T9's four fields are absent rather than
+        // fabricated — projecting a loop this path did not run would put a
+        // synthesis record on an answer nobody synthesized.
+        digest: null,
+        loopRounds: Object.freeze([]),
+        standingObjection: null,
+        crashClass: null,
         projections: {
           reversalPoint: source.answer.reversal_point,
           buildsOnPrevious: source.factBundle.buildsOnPrevious,
@@ -1061,6 +1159,16 @@ export interface WalkingSkeletonSettings {
   readonly conformanceContractHash: string;
   readonly propagationContractHash: string;
   readonly serveContractHash: string;
+  /**
+   * T9 RETIRED this setting's only reader inside the runner: composition
+   * retries are gone, and the loop's bound is the sealed
+   * `evaluatorLoopMaxRounds` row. It stays on the settings because the
+   * deployment still declares it and T17's envelope formula still reads
+   * `maxRecompose * fixedOrgansPerComposition` as its call-site term — a term
+   * that is now WRONG for the serve leg (the real count is
+   * `rounds x 2 roles`). Refitting that formula is T17's, and is reported as a
+   * finding rather than changed here.
+   */
   readonly maxRecompose: number;
   readonly factBundleVersion: number;
   readonly judgementNumberKind: string;
@@ -1102,6 +1210,14 @@ export interface WalkingSkeletonSettings {
    * value this file invented.
    */
   readonly verdictLabelPolicy?: RunnerVerdictLabelPolicy;
+  /**
+   * S6-2 / T9: the sealed T16 synthesis-role family, READ from the register by
+   * the deployment's boot (`readSynthesisRoleControls`). EVERY served statement
+   * now comes out of the synthesizer/evaluator loop, so this is mandatory for
+   * every maker count — the same shape as `verdictLabelPolicy` and for the same
+   * reason (S06 codex r1 B1, board F33).
+   */
+  readonly synthesisRolePolicy?: RunnerSynthesisRolePolicy;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1178,7 +1294,15 @@ function buildSchemaRepairPacket(packet: PromptPacket, parseError: string): Prom
   };
 }
 
-async function callWithContentContract(
+/**
+ * T9 (goal 263-266): a SYNTHESIZER or EVALUATOR call whose transport dies is
+ * one of the four enumerated COMPONENTS_ONLY crash classes — a death, not a
+ * quality judgement. It is typed HERE, at the seam, so the serve chain can name
+ * the class without catching every error it sees. Content refusals keep their
+ * existing organ code: a provider that answered with unusable content is a
+ * contract error, not a dead transport.
+ */
+async function callSynthesisRole(
   provider: ProviderGateway,
   request: ProviderCallRequest,
   organFailureCode: string
@@ -1188,6 +1312,12 @@ async function callWithContentContract(
   } catch (error) {
     if (error instanceof ProviderContentUnacceptedError) {
       throw new TypedDomainError(organFailureCode, error.lastParseError);
+    }
+    if (error instanceof ProviderCallFailedError) {
+      throw new TypedDomainError(
+        "SYNTHESIS_TRANSPORT_DEATH",
+        `${request.role} transport exhausted after ${String(error.attempts)} attempts at ${request.callSiteKey}`
+      );
     }
     throw error;
   }
@@ -1328,6 +1458,59 @@ export function buildFixedSingleRootServeNodes(
     restatementStatus: root.restatementStatus,
     loadBearing: true
   })));
+}
+
+/**
+ * J23 / T9 — the SERVED and CITABLE node set follows the DIGEST.
+ *
+ * The goal's premise that T10 replaced `buildFixedSingleRootServeNodes` is
+ * false: T10 replaced the served-root SELECTION RULE only, so the serve set
+ * stayed one node and the composer could only ever cite `"primary"`. With one
+ * node in the set, the way-of-knowing basis can only ever be 0/1 — production
+ * shares were structurally incapable of being fractional.
+ *
+ * DR-159 B2-A, stated explicitly, is TWO constraints:
+ *   (1) "project exactly the selected root into the served-node set" — exactly
+ *       ONE maker POSITION is served;
+ *   (2) the two-segment cap on composer output (`partitionServedSegments`,
+ *       `RUNNER_COMPOSITION_SEGMENT_CAP`).
+ *
+ * This widening SATISFIES both rather than breaking either. Constraint (1) is
+ * about which position is SERVED, not about which nodes may be CITED: exactly
+ * one node here is load-bearing and it is the served root, and this function
+ * refuses any other shape. The remaining materialized nodes — the losing maker
+ * positions included — enter as CITABLE, NON-load-bearing evidence, which is
+ * what the evaluator's fairness-to-losers and citation-tracing criteria require
+ * a synthesizer to be able to reach. Constraint (2) is untouched: this changes
+ * the citable node set, never the segment count.
+ */
+export function buildDigestFollowingServeNodes(input: {
+  readonly authored: readonly FixedRootServeCandidate[];
+  readonly servedRootNodeId: string;
+}): readonly ServeNode[] {
+  const served = buildFixedSingleRootServeNodes(input.authored, input.servedRootNodeId);
+  const citable = input.authored
+    .filter((node) => node.nodeId !== input.servedRootNodeId)
+    .map((node) => Object.freeze({
+      nodeId: node.nodeId,
+      text: node.statement,
+      wayOfKnowing: node.wayOfKnowing,
+      provenanceRef: node.provenanceRef,
+      locator: node.locator,
+      restatementStatus: node.restatementStatus,
+      loadBearing: false
+    }));
+  const nodes = Object.freeze([...served, ...citable]);
+  if (nodes.filter((node) => node.loadBearing).length !== 1) {
+    throw new TypedDomainError(
+      "FIXED_SINGLE_ROOT_SERVE_VIOLATED",
+      "DR-159 B2-A requires exactly one served root; widening the citable set may never add a second"
+    );
+  }
+  if (new Set(nodes.map((node) => node.nodeId)).size !== nodes.length) {
+    throw new TypedDomainError("SERVE_NODE_IDS_NOT_UNIQUE", "A materialized node appears twice in the serve set");
+  }
+  return nodes;
 }
 
 /**
@@ -2028,6 +2211,33 @@ export class WalkingSkeletonRunner {
         "T11: the served answer's label reads gamma, the two cuts and the disagreement threshold from T16's sealed register rows; they are read from the register and never invented (goal 39-40)"
       );
     }
+    if (this.settings.synthesisRolePolicy === undefined) {
+      // S6-2 / T9 x J12 x board F33: EVERY served statement is written by the
+      // synthesizer and graded by the evaluator, both of them NAMED provider
+      // roles whose refs and loop bound are sealed T16 rows. So this family
+      // binds at every maker count, and its gate sits HERE beside the other
+      // two: refusing after judgement and propagation would bill the asker for
+      // a run that could never have served an answer.
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+        "T9: the synthesizer and evaluator role refs and the evaluator loop bound are sealed T16 register rows (J8); they are read from the register and never invented (goal 39-40)"
+      );
+    }
+    // J24 discriminator (2) — the family being PRESENT is not the same as its
+    // refs being RESOLVABLE. A sealed ref naming a provider this deployment
+    // never configured can be refused before the work item is claimed, because
+    // it needs no health information at all. Refusing here spends nothing.
+    for (const role of SYNTHESIS_ROLES) {
+      const roleRef = role === "SYNTHESIZER"
+        ? this.settings.synthesisRolePolicy.synthesizerRoleRef
+        : this.settings.synthesisRolePolicy.evaluatorRoleRef;
+      if (!this.#configuredMakers.some((maker) => maker.providerRef === roleRef)) {
+        throw new TypedDomainError(
+          "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",
+          `J24: the sealed ${role} role ref ${roleRef} (register version ${String(this.settings.synthesisRolePolicy.registerVersion)}) names no configured provider on this deployment; a sealed identity is never substituted`
+        );
+      }
+    }
     const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
     const claimed = workItemId === undefined
       ? await this.#work.claimNext(claimInput)
@@ -2175,9 +2385,72 @@ export class WalkingSkeletonRunner {
       configuredMakers.push(configured!);
     }
     if (configuredMakers.length === 0) {
+      // J26(b): this refusal is TERMINAL for the work item, for the same reason
+      // the sealed-role refusal below is — every pinned provider being absent is
+      // a condition only a deployment change can fix, so leaving the item
+      // CLAIMED hands it to the reaper to retry against an unchanged world.
+      // MEASURED, not assumed: before this line the item was left CLAIMED with a
+      // null terminal_reason, which the all-absent arm now pins.
+      await this.#work.recordTerminalFailure({
+        runId: run.runId,
+        workItemId: claimed.workItemId,
+        reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM"
+      });
       throw new TypedDomainError(
         "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
         "Every provider pinned at ask time was absent when the runner claimed the work item"
+      );
+    }
+    const synthesisRolePolicy = this.settings.synthesisRolePolicy;
+    if (synthesisRolePolicy === undefined) {
+      // Unreachable: the pre-claim gate refuses first. Typed rather than
+      // optional-chained so a future caller cannot reach synthesis without it.
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+        "T9: the sealed synthesis-role family is required before any role is resolved"
+      );
+    }
+    // J24 discriminator (3) — the sealed refs are resolved against the
+    // CLAIM-ELIGIBLE providers, i.e. after probing removed the absent ones. The
+    // r1 defect was exactly here: the late resolver looked the ref up in the
+    // UNFILTERED configured set, so a role provider that probing had just found
+    // absent was still called, and its inevitable transport death was recorded
+    // as an ordinary mid-call crash — a known role unavailability wearing the
+    // costume of a runtime accident. Refuse instead, without substitution, and
+    // leave a durable event naming the ROLE (J25: a disclosure a reader cannot
+    // see is not a disclosure).
+    for (const role of SYNTHESIS_ROLES) {
+      const roleRef = role === "SYNTHESIZER"
+        ? synthesisRolePolicy.synthesizerRoleRef
+        : synthesisRolePolicy.evaluatorRoleRef;
+      if (configuredMakers.some((maker) => maker.providerRef === roleRef)) continue;
+      const absent = absentAtClaim.find((entry) => entry.member.provider_ref === roleRef);
+      // J26(c): a refusal's own shape. No hold, no attempts, no legs — the three
+      // zeros the first draft wrote were measurements nobody took.
+      await this.#runs.recordRunLifecycleEvent({
+        runId: run.runId,
+        kind: "ledger.could_not_do",
+        value: {
+          state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+          call_site_key: `${role}:${roleRef}`,
+          role_ref: roleRef,
+          role,
+          absent_failure_code: absent?.failureCode ?? null
+        }
+      });
+      // J26(b): the refusal is TERMINAL for this work item. It is never released
+      // or re-queued — retrying a sealed identity that is absent would loop
+      // against a condition only a deployment change can fix, and substituting a
+      // healthy provider is what J24 forbids. The state is recorded BEFORE the
+      // throw so the terminal fact does not depend on who catches it.
+      await this.#work.recordTerminalFailure({
+        runId: run.runId,
+        workItemId: claimed.workItemId,
+        reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`
+      });
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
+        `J24: the sealed ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider the sealed row did not name`
       );
     }
     const effectiveMakerCount = configuredMakers.length;
@@ -3192,10 +3465,14 @@ export class WalkingSkeletonRunner {
       })
     });
     const verdictLabel = deriveVerdictLabel(verdictLabelBasis);
-    const servedNodes = buildFixedSingleRootServeNodes(
-      authoredMakerPositions,
-      servedRoot.nodeId
-    );
+    // J23: the citable set follows the DIGEST — same source, same membership,
+    // so "every load-bearing claim traces to a digest node" is satisfiable by
+    // construction rather than by the synthesizer guessing. Exactly one node is
+    // load-bearing (DR-159 B2-A clause 1); the rest are citable evidence.
+    const servedNodes = buildDigestFollowingServeNodes({
+      authored: authoredNodeList,
+      servedRootNodeId: servedRoot.nodeId
+    });
     const replayHandle = `replay:${run.runId}:${servedRoot.nodeId}`;
     const propagationRunId = await this.#ledger.recordPropagation({
       runId: run.runId,
@@ -3510,15 +3787,103 @@ export class WalkingSkeletonRunner {
         excludedFromServedNumber: null
       }))
     ]);
+    // ---- T9: the synthesis serve chain's inputs -------------------------
+    const synthesisRoles = this.settings.synthesisRolePolicy;
+    if (synthesisRoles === undefined) {
+      // Unreachable from executeWorkItem: the claim-time gate refuses first.
+      // Kept as the typed defence for any future caller that reaches serve by
+      // another path — a role ref is never a value this file chose.
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+        "T9: the synthesizer and evaluator role refs and the evaluator loop bound are sealed T16 register rows (J8); a deployment that never sealed them stops loudly rather than synthesizing on invented identities (goal 39-40)"
+      );
+    }
+    /**
+     * J8: the role ref names a CONFIGURED PROVIDER IDENTITY. Resolving it by
+     * lookup — never by position — is what keeps "the first configured
+     * provider" from quietly becoming the synthesizer when the deployment
+     * reorders its providers. An unresolvable ref is loud: synthesizing on a
+     * provider the sealed row did not name is exactly the substitution the
+     * sealed row exists to prevent.
+     */
+    const resolveSynthesisRoleMaker = (
+      roleRef: string,
+      role: SynthesisRoleName
+    ): { readonly provider: ProviderGateway; readonly providerRef: string } => {
+      // codex r1 B1: this looked the ref up in `this.#configuredMakers` — the
+      // UNFILTERED set — so a role provider that claim-time probing had already
+      // found absent was still called here. It resolves against the
+      // CLAIM-ELIGIBLE set now, and the claim-time discriminator above has
+      // already refused this run if either sealed ref is missing from it, so
+      // reaching this throw means a provider went away AFTER a healthy claim.
+      const configured = configuredMakers.find((maker) => maker.providerRef === roleRef);
+      if (configured === undefined) {
+        throw new TypedDomainError(
+          "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",
+          `${role} role ref ${roleRef} (register version ${String(synthesisRoles.registerVersion)}) is not among the claim-eligible providers`
+        );
+      }
+      return { provider: configured.provider, providerRef: configured.providerRef };
+    };
+    const strengthByNodeId = new Map(propagation.strengths.map((row) => [row.nodeId, row.strength] as const));
+    const makerPositionNodeIds = new Set(authoredMakerPositions.map((root) => root.nodeId));
+    const marksByNodeId = new Map<string, string[]>();
+    for (const record of conditionMarkRecords) {
+      for (const affected of record.affectedNodeIds) {
+        const existing = marksByNodeId.get(affected) ?? [];
+        if (!existing.includes(record.mark)) existing.push(record.mark);
+        marksByNodeId.set(affected, existing);
+      }
+    }
+    /**
+     * DIGEST membership (goal 223-226): one entry per MATERIALIZED node, roots
+     * and children alike. Not the served set, not the top-2, not the roots —
+     * everything the debate authored. A node with no propagated strength keeps
+     * its place with a null number; dropping it would be exactly the silent
+     * subset the goal forbids.
+     */
+    const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
+      nodeId: node.nodeId,
+      statement: node.statement,
+      finalStrength: strengthByNodeId.get(node.nodeId) ?? null,
+      wayOfKnowing: node.wayOfKnowing,
+      marks: Object.freeze([...(marksByNodeId.get(node.nodeId) ?? [])]),
+      polarityRelations: Object.freeze(materialised.arrows
+        .filter((arrow) => arrow.sourceNodeId === node.nodeId
+          && arrow.targetKind === "NODE" && arrow.targetNodeId !== null)
+        .map((arrow) => Object.freeze({
+          polarity: arrow.polarity === "attack" ? "attack" as const : "support" as const,
+          targetNodeId: arrow.targetNodeId!
+        }))),
+      isPosition: makerPositionNodeIds.has(node.nodeId),
+      // A SURVIVING objection: it attacks something and it still carries a
+      // propagated number at the end of the debate.
+      isSurvivingObjection: strengthByNodeId.has(node.nodeId)
+        && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack")
+    })));
     const serveStartedAt = new Date();
-    const evaluateEnvelope = (): Promise<BudgetPressureDecision> => this.#budget.evaluateRunPressure({
-      runId: run.runId,
-      basis: envelopeBasis,
-      pendingRows: BATTERY_BUDGET_CONTRACTS
-        .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
-        .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
-      verifiedNodeIds: [servedRoot.nodeId]
-    });
+    /**
+     * T17B/B1 — `pendingModelAttempts` names WHICH question is being asked.
+     *
+     * 0 (the default, and every caller that reports on what the run has already
+     * spent) asks "has this run spent MORE than it was allowed?" — J28's
+     * comparison, WITHIN at equality, unchanged.
+     *
+     * 1 asks "may this run spend ANOTHER attempt?", which is the only question
+     * the refused-attempt catch below has ever been asking. At `consumed ==
+     * max` those two have opposite answers, and before this argument existed
+     * both were being derived from the post-consumption count alone.
+     */
+    const evaluateEnvelope = (pendingModelAttempts = 0): Promise<BudgetPressureDecision> =>
+      this.#budget.evaluateRunPressure({
+        runId: run.runId,
+        basis: envelopeBasis,
+        pendingModelAttempts,
+        pendingRows: BATTERY_BUDGET_CONTRACTS
+          .filter((row) => row.budgetClass === "ENRICHMENT" || row.skipPolicy === "PROTECTED_CORE_REFUSES_SKIP")
+          .map((row) => ({ batteryRowId: row.batteryRowId, affectedNodeIds: [servedRoot.nodeId] })),
+        verifiedNodeIds: [servedRoot.nodeId]
+      });
     const recordEnvelope = (decision: BudgetPressureDecision): Promise<void> => this.#budget.recordDecision({
       runId: run.runId,
       workItemId: claimed.workItemId,
@@ -3553,14 +3918,37 @@ export class WalkingSkeletonRunner {
           liftPath: null,
           servedRootRule: null,
           affectedNodeIds: decision.terminal.servedNodeIds
-        })
+        }),
+        // F4 / J25: when the envelope terminal fires with the served root's R9
+        // restatement FAILING, the retired guard gets a RECORD, not only a
+        // trace token — `assertRequiredConditionMarkRecords` pairs every mark
+        // with one, and a reader of the answer sees the record, never the trace.
+        ...(servedRoot.restatementStatus === "PASS" ? [] : [Object.freeze({
+          mark: PROTECTED_CORE_GUARD_RETIRED_MARK,
+          scope: "answer" as const,
+          subjectRef: servedRoot.nodeId,
+          reason: `The envelope was exhausted with no served statement while the protected-core restatement status was ${servedRoot.restatementStatus}; under F4 that status is observed and disclosed, and no longer decides the terminal`,
+          liftPath: "Re-ask with a larger cost envelope, or restore a restatement a stranger can verify",
+          servedRootRule: null,
+          affectedNodeIds: Object.freeze([servedRoot.nodeId])
+        } satisfies ConditionMarkRecord)])
       ]);
       return createEnvelopeExhaustedResult({
         factBundle,
         compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
         verifiedNodeIds: decision.terminal.servedNodeIds,
         skippedEnrichmentRows: decision.enrichmentSkips.map((row) => row.batteryRowId),
-        protectedCoreVerified: servedRoot.restatementStatus === "PASS"
+        // F4 / goal 248-251: the protected-core guard was keyed on R9's
+        // GATE-HOOD, and T9 retired that gate — R9 is an evaluator objection
+        // criterion now. So the restatement status is OBSERVED and DISCLOSED
+        // here (it rides the trace as PROTECTED_CORE_GUARD_RETIRED when it is
+        // not PASS) and no longer DECIDES. An exhausted envelope with no served
+        // statement takes the envelope terminal either way.
+        protectedCoreRestatement: servedRoot.restatementStatus,
+        // Nothing has been persisted for this run yet at any of the three call
+        // sites below: the answer is written after the chain returns. The
+        // envelope terminal therefore never retracts a served answer.
+        servedStatementExists: false
       });
     };
     /**
@@ -3637,7 +4025,10 @@ export class WalkingSkeletonRunner {
     };
     const initialEnvelopeDecision = await evaluateEnvelope();
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
-    if (initialEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
+    // F4: no `restatementStatus === "PASS"` conjunct. The envelope terminal
+    // fires on HARD_STOP whenever no served statement exists yet, independent
+    // of restatement status — never serving over budget.
+    if (initialEnvelopeDecision.kind === "HARD_STOP") {
       result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
@@ -3646,36 +4037,66 @@ export class WalkingSkeletonRunner {
         result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
       nodes: servedNodes,
       factBundle,
-      maxRecompose: this.settings.maxRecompose,
       compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
-      strangerSampleRate: run.strangerSampleRate,
       // T6 / S4-2: the mono-lineage cap and, on top of it, the declared
       // downgrade a disputed cross-maker review fires.
-      candidateConfidenceBand
+      candidateConfidenceBand,
+      // T9: EVERY materialized node, with its number, its polarity relations,
+      // its way of knowing and its marks. This list is the digest's membership
+      // and the byte budget may not shorten it — only the summaries inside it.
+      digestNodes,
+      servedRootNodeId: servedRoot.nodeId,
+      // T10/T11's numbers, derived BEFORE synthesis, handed to both roles so
+      // the evaluator can check statement-label agreement against the label the
+      // code produced rather than one the synthesizer asserted.
+      codeLabel: Object.freeze({
+        verdictLabel: verdictLabel.label,
+        servedNodeId: servedRoot.nodeId,
+        servedStrength: servedRootSelection.servedStrength,
+        margin: servedRootSelection.margin.kind === "MEASURED" ? servedRootSelection.margin.value : null,
+        registerVersion: verdictLabelControls.registerVersion
+      }),
+      // J8: the role refs and the loop bound are SEALED rows. Nothing here
+      // defaults, derives or re-declares them.
+      synthesisRoleControls: Object.freeze({
+        synthesizerRoleRef: synthesisRoles.synthesizerRoleRef,
+        evaluatorRoleRef: synthesisRoles.evaluatorRoleRef,
+        evaluatorLoopMaxRounds: synthesisRoles.evaluatorLoopMaxRounds
+      })
     }, {
-      measureCompositionBundle: (facts) => Buffer.byteLength(JSON.stringify(facts), "utf8"),
-      compose: async (facts, attempt) => {
+      /**
+       * The SYNTHESIZER role call. Fresh context: the wire payload IS the
+       * recorded request, so "no debate transcript beyond the named artifacts"
+       * is a property of the bytes that leave this process, not a claim about
+       * them. On a retry the request carries the prior evaluator objection
+       * VERBATIM — the loop converges by feedback, never by accident.
+       */
+      synthesize: async (request: SynthesizerRequest) => {
+        const role = resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER");
+        const synthesizerCallSiteKey = synthesisCallSiteKey({
+          role: "SYNTHESIZER", stage: request.stage, round: request.round
+        });
         const packet: PromptPacket = { messages: [
-          // TERM-01 rework 2 (S04 prompt class, composer organ): the system
-          // prompt must declare the ruled serve-gate segment contract —
-          // including the reasoning-only two-segment form — because the gate
-          // is byte-strict and repairs nothing.
-          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the supplied nodes whose facts the segment asserts. Preserve the fact bundle and add no facts. When the supplied nodes rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
-          { role: "user", content: JSON.stringify({
-            factBundle: facts,
-            availableNodes: servedNodes.map((node) => ({ ref: "primary", nodeId: node.nodeId, fact: node.text })),
-            availableServedNumberRefs: ["number:final-strength"]
-          }) }
+          { role: "system", content: "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it." },
+          { role: "user", content: JSON.stringify(request) }
         ] };
-        const response = await callWithContentContract(primaryMaker.provider, {
+        const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
-          callSiteKey: `COMPOSER:${attempt}`,
-          role: "COMPOSER",
+          // CALL SITE vs ROLE. The `role` is the T9 identity making the call;
+          // the call-site KEY names the SLOT in the serve chain, and
+          // `core.read_terminal_recorded_facts` (migrations/0049) counts
+          // `COMPOSER:%` into `composer_calls`, which five battery-row
+          // PREDICATES read as `>= 1`. T9 moved WHO calls and WHAT is asked,
+          // not where the slot is, so the prefix stays and the role is named
+          // inside it. Renaming the slots needs a migration that redefines
+          // that function — filed as a follow-up, not smuggled in here.
+          callSiteKey: synthesizerCallSiteKey,
+          role: "SYNTHESIZER",
           lane: "served",
           bound: this.settings.composerBound,
           contractHash: this.settings.composerContractHash,
-          providerRef: primaryMaker.providerRef,
+          providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
           buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
@@ -3689,88 +4110,119 @@ export class WalkingSkeletonRunner {
           segmentId: segment.segment_id,
           text: segment.text,
           loadBearing: false,
+          // J23: a citation may name ANY node in the digest-following set by its
+          // real id. `"primary"` stays admissible as the served root's alias so
+          // sealed prompts and fixtures written against the one-node set keep
+          // working; an unknown ref is still a loud contract error.
           assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => {
-            if (ref !== "primary") {
+            if (ref === "primary") return servedRoot.nodeId;
+            if (!servedNodes.some((node) => node.nodeId === ref)) {
               throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${ref}`);
             }
-            return servedRoot.nodeId;
+            return ref;
           })),
           servedNumberRefs: Object.freeze([...segment.served_number_refs])
           });
         });
-        const renderedMemory = renderMemorySentence(facts.memoryDisclosure);
-        validateMemorySentence(facts.memoryDisclosure, renderedMemory);
+        const renderedMemory = renderMemorySentence(factBundle.memoryDisclosure);
+        validateMemorySentence(factBundle.memoryDisclosure, renderedMemory);
         const partitioned = partitionServedSegments(composedSegments, renderedMemory);
         finalSegments = partitioned.persistedSegments;
         compositionRawArtifactRef = response.rawArtifactRef;
-        compositionAttempt = attempt;
-        return partitioned.conformanceSegments;
+        // `serve_state` reads this: round 1 COMPOSED, a later round
+        // RECOMPOSED_ONCE. The loop round IS the composition attempt now.
+        compositionAttempt = request.round;
+        return {
+          candidate: partitioned.conformanceSegments,
+          // codex r1 B2: the RECORDED artifact for THIS round. `compositionRawArtifactRef`
+          // is overwritten by the next round, so the retry's back-reference has to be
+          // the per-round value taken here, never that field read later.
+          candidateRef: response.rawArtifactRef,
+          // codex r3 B2: the producer identity travels with the reference, and
+          // `persist` checks the pair against the ledger before committing.
+          candidateCallSiteKey: synthesizerCallSiteKey
+        };
       },
-      selectSample: (segment, sampleRate) => {
-        if (sampleRate <= 0) return false;
-        if (sampleRate >= 1) return true;
-        const sample = createHash("sha256").update(segment.segmentId).digest().readUInt32BE(0) / 0xffff_ffff;
-        return sample < sampleRate;
-      },
-      conform: async (segment, state) => {
-        const segmentIndex = finalSegments.findIndex((candidate) => candidate.segmentId === segment.segmentId);
+      /**
+       * The EVALUATOR role call. It replaces BOTH retired provider limbs —
+       * per-segment conformance and post-compose R9 — because both are now
+       * objection criteria rather than terminals, and one grader that sees the
+       * whole candidate can weigh them against each other.
+       */
+      evaluate: async (request: EvaluatorRequest) => {
+        const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
+        const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const packet: PromptPacket = { messages: [
-          { role: "system", content: "Return only JSON {conforms,findings}. Judge this segment against the frozen fact bundle." },
-          { role: "user", content: JSON.stringify({ factBundle, segment }) }
+          { role: "system", content: EVALUATOR_CONTRACT_TEXT },
+          { role: "user", content: JSON.stringify(request) }
         ] };
-        const response = await callWithContentContract(primaryMaker.provider, {
+        const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
-          callSiteKey: `CONFORMANCE:${compositionAttempt}:${segmentIndex}`,
-          role: "CONFORMANCE",
+          // Same contract as the synthesizer's key above: `POST_COMPOSE_R9:%`
+          // feeds `r9_calls`, which the R9 battery row prints in its executed
+          // check ref. The evaluator IS the restatement check now, so the slot
+          // is still occupied and the ref still names something that happened.
+          callSiteKey: evaluatorCallSiteKey,
+          role: "EVALUATOR",
           lane: "served",
           bound: this.settings.conformanceBound,
           contractHash: this.settings.conformanceContractHash,
-          providerRef: primaryMaker.providerRef,
+          providerRef: role.providerRef,
           packet,
-          classifyContent: (content) => classifyStructuredContent(content, conformanceSchema),
+          classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
           buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
-        }, "CONFORMANCE_CONTRACT_ERROR");
+        }, "EVALUATOR_CONTRACT_ERROR");
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
-        const parsed = parseContent(response.content, conformanceSchema, "CONFORMANCE_CONTRACT_ERROR");
-        return { segmentId: segment.segmentId, state, conforms: parsed.conforms };
+        const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+        return Object.freeze({
+          verdict: Object.freeze({
+            satisfied: parsed.satisfied,
+            objection: parsed.objection,
+            criteria: Object.freeze({
+              fairnessToLosers: parsed.criteria.fairness_to_losers,
+              statementLabelAgreement: parsed.criteria.statement_label_agreement,
+              noOverstatement: parsed.criteria.no_overstatement,
+              restatement: parsed.criteria.restatement,
+              citationTracing: parsed.criteria.citation_tracing
+            })
+          }),
+          // J29: the evaluator's own recorded artifact, so the round's verdict
+          // and objection resolve through `ledger.raw_artifact` rather than
+          // being duplicated into a second plaintext table.
+          verdictRef: response.rawArtifactRef,
+          verdictCallSiteKey: evaluatorCallSiteKey
+        });
       },
-      postComposeR9: async (segments) => {
-        const packet: PromptPacket = { messages: [
-          { role: "system", content: "Return only JSON {pass}. Apply the R9 stranger-restatement check to the composed verdict." },
-          { role: "user", content: JSON.stringify({ question: run.questionLine, segments }) }
-        ] };
-        const response = await callWithContentContract(primaryMaker.provider, {
-          runId: run.runId,
-          subjectItemId: claimed.workItemId,
-          callSiteKey: `POST_COMPOSE_R9:${compositionAttempt}`,
-          role: "CONFORMANCE",
-          lane: "served",
-          bound: this.settings.conformanceBound,
-          contractHash: this.settings.conformanceContractHash,
-          providerRef: primaryMaker.providerRef,
-          packet,
-          classifyContent: (content) => classifyStructuredContent(content, r9Schema),
-          buildRepairPacket: ({ parseError }) => buildSchemaRepairPacket(packet, parseError)
-        }, "POST_COMPOSE_R9_CONTRACT_ERROR");
-        conformanceRawArtifactRefs.push(response.rawArtifactRef);
-        return parseContent(response.content, r9Schema, "POST_COMPOSE_R9_CONTRACT_ERROR").pass;
-      },
-      applyBandCeiling: ({ basis, candidateConfidenceBand }) => deriveBandCeiling({
+      applyBandCeiling: ({ basis, candidateConfidenceBand: band }) => deriveBandCeiling({
         basis,
-        candidateConfidenceBand,
+        candidateConfidenceBand: band,
         row: servePolicy.bandCeiling
       })
         }));
       } catch (error) {
         if (!(error instanceof TypedDomainError) || error.code !== "RUN_COST_ENVELOPE_EXHAUSTED") throw error;
-        const exhausted = await evaluateEnvelope();
-        if (exhausted.kind !== "HARD_STOP" || servedRoot.restatementStatus !== "PASS") throw error;
+        // The gateway REFUSED a next provider call, so the question here is
+        // whether one more attempt fits — not whether the run has overspent.
+        // Asking with the pending attempt counted is what makes this context
+        // stop sharing J28's branch: at `consumed == max` a completed run is
+        // WITHIN and keeps its answer, while this refused attempt is a
+        // HARD_STOP and gets the ruled components-only terminal instead of a
+        // rethrow that produced no envelope record at all.
+        const exhausted = await evaluateEnvelope(1);
+        // NO restatement conjunct. F4 / goal 248-251: the protected-core guard
+        // was keyed on R9's gate-hood and is KNOWINGLY RETIRED with it, so the
+        // envelope terminal fires on HARD_STOP whenever no served statement
+        // exists yet, INDEPENDENT OF RESTATEMENT STATUS. The status is observed
+        // and disclosed as a condition mark instead of deciding the terminal.
+        // The two changes are orthogonal and both stand: T17B's `pendingModelAttempts`
+        // fixes WHICH question is asked, F4 removes a guard from the answer.
+        if (exhausted.kind !== "HARD_STOP") throw error;
         result = await makeEnvelopeTerminal(exhausted);
       }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
         const finalEnvelopeDecision = await evaluateEnvelope();
-        if (finalEnvelopeDecision.kind === "HARD_STOP" && servedRoot.restatementStatus === "PASS") {
+        if (finalEnvelopeDecision.kind === "HARD_STOP") {
           result = await makeEnvelopeTerminal(finalEnvelopeDecision);
         } else {
           await recordEnvelope(finalEnvelopeDecision);

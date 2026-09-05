@@ -250,9 +250,16 @@ describe("ACC-01 dry-run ceremony", () => {
           sourceRef: "acceptance:test-layer",
           value: {
             bandOrder: ["CAPPED", "FULL"],
-            ceilingLabels: ["DEFAULT_CEILING"],
+            ceilingLabels: ["DEFAULT_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
             defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
-            cuts: []
+            cuts: [],
+            // F-T9B-3 / codex r1 B2: the current fixture describes its own
+            // floor, as every current sealed row now must.
+            emptyBasisFloor: {
+              label: "NO_VERIFIED_EVIDENCE_FLOOR",
+              ceilingBand: "CAPPED",
+              liftPath: "gather-any-verified-evidence-to-lift"
+            }
           }
         }
       },
