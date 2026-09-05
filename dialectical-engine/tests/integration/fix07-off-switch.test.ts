@@ -61,8 +61,13 @@ const cadenceCases = [
   ["below default", "250", "250", 250],
   ["default", "5000", "5000", 5_000],
   ["non-default", "7250", "7250", 7_250],
-  ["maximum safe", "9007199254740991", "9007199254740991", Number.MAX_SAFE_INTEGER],
+  ["maximum safe", "9007199254740991", "9007199254740991", 5_000],
   ["overflow", "9007199254740992", "9007199254740992", 5_000],
+] as const;
+
+const nativeTimerCases = [
+  ["ceiling", "2147483647", 2_147_483_647],
+  ["first overflow", "2147483648", 5_000],
 ] as const;
 
 const scratchDirectories: string[] = [];
@@ -294,7 +299,9 @@ function removeRuntimeMocks(): void {
   vi.doUnmock("../../packages/obs-capture/src/emit.js");
 }
 
-async function loadRuntimeHarness(): Promise<{
+async function loadRuntimeHarness(
+  options: { readonly useActualBounds?: boolean } = {},
+): Promise<{
   readonly harness: RuntimeTestHarness;
   readonly runtime: typeof import("../../packages/obs-capture/src/runtime/index.js");
   readonly capture: typeof import("../../packages/obs-capture/src/emit.js");
@@ -324,19 +331,26 @@ async function loadRuntimeHarness(): Promise<{
     closeCalls: 0,
   };
 
-  vi.doMock("../../packages/obs-capture/src/runtime/config.js", async () => ({
-    ...await vi.importActual<typeof import("../../packages/obs-capture/src/runtime/config.js")>(
+  vi.doMock("../../packages/obs-capture/src/runtime/config.js", async () => {
+    const actual = await vi.importActual<
+      typeof import("../../packages/obs-capture/src/runtime/config.js")
+    >(
       "../../packages/obs-capture/src/runtime/config.js",
-    ),
-    readObsBounds: () => Object.freeze({
-      flushDeadlineMs: 25,
-      queueCapacity: 8,
-      spoolDir: undefined,
-      spoolAdmissionSeal: undefined,
-      writerDatabaseUrl: "postgresql://fix07.invalid/fix07",
-    }),
-    readObsControlDir: () => "/tmp/fix07-control",
-  }));
+    );
+    return {
+      ...actual,
+      readObsBounds: options.useActualBounds
+        ? actual.readObsBounds
+        : () => Object.freeze({
+            flushDeadlineMs: 25,
+            queueCapacity: 8,
+            spoolDir: undefined,
+            spoolAdmissionSeal: undefined,
+            writerDatabaseUrl: "postgresql://fix07.invalid/fix07",
+          }),
+      readObsControlDir: () => "/tmp/fix07-control",
+    };
+  });
   vi.doMock("../../packages/obs-capture/src/runtime/control.js", async () => ({
     ...await vi.importActual<typeof import("../../packages/obs-capture/src/runtime/control.js")>(
       "../../packages/obs-capture/src/runtime/control.js",
@@ -457,7 +471,7 @@ WITH supplied AS (
          flush_interval_ms,
          evaluated_at - interval '1 minute' AS period_cutoff
   FROM supplied
-  WHERE flush_interval_ms BETWEEN 1 AND 9007199254740991
+  WHERE flush_interval_ms BETWEEN 1 AND 2147483647
 ), runtimes(runtime) AS (
   VALUES ('api'), ('runner'), ('scheduler')
 ), gap_window AS (
@@ -720,9 +734,101 @@ function createRunnerChild(): DevelopmentRunnerChild & Readonly<{
   });
 }
 
+async function readCaptureOffFromFailure(
+  failure: unknown,
+): Promise<boolean> {
+  vi.doUnmock("node:fs/promises");
+  vi.resetModules();
+  const lstat = vi.fn(async (): Promise<never> => {
+    throw failure;
+  });
+  vi.doMock("node:fs/promises", async () => ({
+    ...await vi.importActual<typeof import("node:fs/promises")>(
+      "node:fs/promises",
+    ),
+    lstat,
+  }));
+  try {
+    const { readCaptureOff } = await import(
+      "../../packages/obs-capture/src/runtime/control.js"
+    );
+    return await readCaptureOff("/tmp/fix07-hostile-marker");
+  } finally {
+    expect(lstat).toHaveBeenCalledTimes(1);
+  }
+}
+
+interface NativeTimerObservation {
+  readonly canonicalDelay: number;
+  readonly requestedDelay: number;
+  readonly storedDelay: number;
+  readonly callbackEntries: number;
+  readonly registrations: number;
+}
+
+async function observeNativeRuntimeTimer(
+  raw: string,
+): Promise<NativeTimerObservation> {
+  const nativeSetInterval = globalThis.setInterval;
+  const nativeSetTimeout = globalThis.setTimeout;
+  let requestedDelay = Number.NaN;
+  let storedDelay = Number.NaN;
+  let callbackEntries = 0;
+  let registrations = 0;
+  const interval = vi.spyOn(globalThis, "setInterval").mockImplementation((
+    (
+      callback: (...args: unknown[]) => void,
+      delay?: number,
+      ...args: unknown[]
+    ): NodeJS.Timeout => {
+      registrations += 1;
+      requestedDelay = delay ?? 0;
+      const timer = nativeSetInterval((...callbackArgs: unknown[]) => {
+        callbackEntries += 1;
+        callback(...callbackArgs);
+      }, delay, ...args);
+      storedDelay = (
+        timer as NodeJS.Timeout & { readonly _idleTimeout: number }
+      )._idleTimeout;
+      return timer;
+    }
+  ) as typeof globalThis.setInterval);
+
+  let runtime:
+    | typeof import("../../packages/obs-capture/src/runtime/index.js")
+    | undefined;
+  let canonicalDelay = Number.NaN;
+  try {
+    await withObsFlushDeadlineAsync(raw, async () => {
+      canonicalDelay = readObsBounds().flushDeadlineMs;
+      ({ runtime } = await loadRuntimeHarness({ useActualBounds: true }));
+      await runtime.startCaptureRuntime({
+        runtime: "scheduler",
+        spoolFd: undefined,
+        installExitSink() {},
+      });
+      await new Promise<void>((resolve) => {
+        nativeSetTimeout(resolve, 30);
+      });
+    });
+  } finally {
+    await runtime?.stopCaptureRuntime({ deadlineMs: 100 });
+    interval.mockRestore();
+  }
+
+  return Object.freeze({
+    canonicalDelay,
+    requestedDelay,
+    storedDelay,
+    callbackEntries,
+    registrations,
+  });
+}
+
 afterEach(async () => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.doUnmock("node:fs/promises");
   removeCallerMocks();
   removeRuntimeMocks();
   vi.resetModules();
@@ -775,6 +881,89 @@ describe.sequential("FIX-07 C2 capture control and launch cadence", () => {
     await expect(readCaptureOff("\0invalid-descriptor-path")).resolves.toBe(true);
   });
 
+  it("totalizes direct OFF failures without reading hostile values", async () => {
+    const enoent = Object.defineProperty(new Error("missing"), "code", {
+      value: "ENOENT",
+      enumerable: true,
+      configurable: true,
+    });
+    await expect(readCaptureOffFromFailure(enoent)).resolves.toBe(false);
+
+    let getterReads = 0;
+    const accessor = Object.defineProperty(new Error("accessor"), "code", {
+      get() {
+        getterReads += 1;
+        throw new Error("CODE_ACCESSOR_TRAP");
+      },
+      configurable: true,
+    });
+    await expect(readCaptureOffFromFailure(accessor)).resolves.toBe(true);
+    expect(getterReads).toBe(0);
+
+    const trapReads = { get: 0, descriptor: 0 };
+    const proxy = new Proxy(
+      Object.defineProperty(new Error("proxy"), "code", {
+        value: "ENOENT",
+        configurable: true,
+      }),
+      {
+        get() {
+          trapReads.get += 1;
+          throw new Error("CODE_GET_TRAP");
+        },
+        getOwnPropertyDescriptor() {
+          trapReads.descriptor += 1;
+          throw new Error("CODE_DESCRIPTOR_TRAP");
+        },
+      },
+    );
+    await expect(readCaptureOffFromFailure(proxy)).resolves.toBe(true);
+    expect(trapReads).toEqual({ get: 0, descriptor: 0 });
+
+    const revoked = Proxy.revocable(
+      Object.defineProperty(new Error("revoked"), "code", {
+        value: "ENOENT",
+        configurable: true,
+      }),
+      {},
+    );
+    revoked.revoke();
+    await expect(readCaptureOffFromFailure(revoked.proxy)).resolves.toBe(true);
+
+    const inherited = Object.create(Object.defineProperty({}, "code", {
+      value: "ENOENT",
+      configurable: true,
+    })) as object;
+    const ambiguousFailures = [
+      undefined,
+      null,
+      "ENOENT",
+      2,
+      Symbol("ENOENT"),
+      new Error("missing code"),
+      inherited,
+      Object.defineProperty(new Error("numeric"), "code", {
+        value: -2,
+        configurable: true,
+      }),
+      Object.defineProperty(new Error("denied"), "code", {
+        value: "EACCES",
+        configurable: true,
+      }),
+    ] as const;
+    for (const failure of ambiguousFailures) {
+      await expect(readCaptureOffFromFailure(failure)).resolves.toBe(true);
+    }
+
+    const source = await readFile(
+      new URL("../../packages/obs-capture/src/runtime/control.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain('import { isProxy } from "node:util/types";');
+    expect(source).toContain("Object.getOwnPropertyDescriptor(error, \"code\")");
+    expect(source).not.toMatch(/\berror\.code\b/u);
+  });
+
   it.each(cadenceCases)(
     "transports %s without taking numeric authority",
     (_label, raw, forwarded, effective) => {
@@ -788,6 +977,155 @@ describe.sequential("FIX-07 C2 capture control and launch cadence", () => {
       });
     },
   );
+
+  it("uses one native interval without overflow storms across direct API and runner paths", async () => {
+    const credential = await createApiCredentialFixture();
+    const observations: Array<Readonly<{
+      label: string;
+      path: "direct" | "api" | "runner";
+      expectedDelay: number;
+      timer: NativeTimerObservation;
+    }>> = [];
+    const launchEchoes: Array<Readonly<{
+      label: string;
+      expected: string;
+      command: string | undefined;
+      api: string | undefined;
+      runner: string | undefined;
+      query: string | undefined;
+    }>> = [];
+
+    for (const [label, raw, expectedDelay] of nativeTimerCases) {
+      const parentCanonical = withObsFlushDeadline(
+        raw,
+        () => readObsBounds().flushDeadlineMs,
+      );
+      const canonical = String(parentCanonical);
+      let commandEnvironment: Readonly<Record<string, string>> | undefined;
+      let apiEnvironment: Readonly<Record<string, string>> | undefined;
+      let runnerEnvironment: Readonly<Record<string, string>> | undefined;
+
+      await withObsFlushDeadlineAsync(canonical, async () => {
+        commandEnvironment = loadDevelopmentCommandEnvironment();
+
+        const apiChild = createApiChild();
+        let probeCount = 0;
+        const api = await startDevelopmentApiProcess({
+          repositoryRoot: credential.root,
+          commandEnvironment,
+          operations: Object.freeze({
+            async probe() {
+              probeCount += 1;
+              return probeCount === 1
+                ? null
+                : Object.freeze({
+                    statusCode: 401,
+                    contentType: "application/json",
+                    body: '{"error":"SESSION_REQUIRED"}',
+                  });
+            },
+            startApi(environment: Readonly<Record<string, string>>) {
+              apiEnvironment = environment;
+              return apiChild;
+            },
+            async delay() {},
+          }),
+        });
+        await api.stop();
+
+        const runnerChild = createRunnerChild();
+        const runner = await startDevelopmentRunnerProcess({
+          repositoryRoot: credential.root,
+          commandEnvironment,
+          operations: Object.freeze({
+            async loadApiEnvironment() {
+              return credential.values;
+            },
+            startRunner(environment: Readonly<Record<string, string>>) {
+              runnerEnvironment = environment;
+              return runnerChild;
+            },
+          }),
+        });
+        await runner.stop();
+      });
+
+      const commandEcho = commandEnvironment?.OBS_FLUSH_DEADLINE_MS;
+      const apiEcho = apiEnvironment?.OBS_FLUSH_DEADLINE_MS;
+      const runnerEcho = runnerEnvironment?.OBS_FLUSH_DEADLINE_MS;
+      launchEchoes.push(Object.freeze({
+        label,
+        expected: String(expectedDelay),
+        command: commandEcho,
+        api: apiEcho,
+        runner: runnerEcho,
+        query: commandEcho,
+      }));
+      observations.push(
+        Object.freeze({
+          label,
+          path: "direct",
+          expectedDelay,
+          timer: await observeNativeRuntimeTimer(raw),
+        }),
+        Object.freeze({
+          label,
+          path: "api",
+          expectedDelay,
+          timer: await observeNativeRuntimeTimer(apiEcho!),
+        }),
+        Object.freeze({
+          label,
+          path: "runner",
+          expectedDelay,
+          timer: await observeNativeRuntimeTimer(runnerEcho!),
+        }),
+      );
+    }
+
+    for (const observation of observations) {
+      expect.soft({
+        label: observation.label,
+        path: observation.path,
+        canonicalDelay: observation.timer.canonicalDelay,
+        requestedDelay: observation.timer.requestedDelay,
+        storedDelay: observation.timer.storedDelay,
+        callbackEntries: observation.timer.callbackEntries,
+        registrations: observation.timer.registrations,
+      }).toEqual({
+        label: observation.label,
+        path: observation.path,
+        canonicalDelay: observation.expectedDelay,
+        requestedDelay: observation.expectedDelay,
+        storedDelay: observation.expectedDelay,
+        callbackEntries: 0,
+        registrations: 1,
+      });
+    }
+    for (const echo of launchEchoes) {
+      expect.soft({
+        command: echo.command,
+        api: echo.api,
+        runner: echo.runner,
+        query: echo.query,
+      }).toEqual({
+        command: echo.expected,
+        api: echo.expected,
+        runner: echo.expected,
+        query: echo.expected,
+      });
+    }
+    expect.soft(withObsFlushDeadline(
+      String(Number.MAX_SAFE_INTEGER),
+      () => readObsBounds().flushDeadlineMs,
+    )).toBe(5_000);
+
+    const runtimeSource = await readFile(
+      new URL("../../packages/obs-capture/src/runtime/index.ts", import.meta.url),
+      "utf8",
+    );
+    expect(runtimeSource.match(/\bsetInterval\(/gu)).toHaveLength(1);
+  }, 30_000);
 
   it("keeps asynchronous cadence scope active through every settlement and restores exactly", async () => {
     const originalHadOwn = Object.prototype.hasOwnProperty.call(process.env, CADENCE_KEY);
@@ -1417,7 +1755,7 @@ describe.sequential("FIX-07 C4 truthful periods and product invariance", () => {
       "250",
       "5000",
       "7250",
-      "9007199254740991",
+      "5000",
       "5000",
     ]);
     for (let index = 0; index < canonicalEchoes.length; index += 5) {
@@ -1435,7 +1773,11 @@ describe.sequential("FIX-07 C4 truthful periods and product invariance", () => {
         ["7250", 7_249, "QUIET"],
         ["7250", 7_250, "QUIET"],
         ["7250", 7_251, "OFF"],
-        ["9007199254740991", 30_000, "QUIET"],
+        ["2147483647", 30_000, "QUIET"],
+        ["2147483647", 2_147_483_647, "QUIET"],
+        ["2147483647", 2_147_483_647.001, "OFF"],
+        ["2147483648", 5_000, "QUIET"],
+        ["9007199254740991", 5_000, "QUIET"],
       ] as const;
       for (const [raw, ageMs, expectedPeriod] of boundaryCases) {
         const effective = withObsFlushDeadline(
@@ -1491,23 +1833,33 @@ describe.sequential("FIX-07 C4 truthful periods and product invariance", () => {
     }
     expect(acceptedMismatches).toBe(0);
 
-    for (const invalid of [0, -1, "1.5", "9007199254740992", undefined]) {
-      let acceptedQuietEvidence = false;
+    for (const invalid of [
+      0,
+      -1,
+      "1.5",
+      "2147483648",
+      "9007199254740991",
+      "9007199254740992",
+      undefined,
+    ]) {
+      let acceptedPeriodEvidence = false;
       try {
         const result = await database.pool.query<PeriodRow>(
           FIX07_PERIOD_QUERY,
           [invalid],
         );
-        acceptedQuietEvidence = result.rows.length === 3
-          && result.rows.some((row) => row.period === "QUIET");
+        acceptedPeriodEvidence = result.rows.length === 3;
       } catch {
-        acceptedQuietEvidence = false;
+        acceptedPeriodEvidence = false;
       }
-      expect(acceptedQuietEvidence).toBe(false);
+      expect(acceptedPeriodEvidence).toBe(false);
     }
 
     expect(FIX07_PERIOD_QUERY).toContain(
       "EXTRACT(EPOCH FROM (p.evaluated_at - h.observed_at)) * 1000",
+    );
+    expect(FIX07_PERIOD_QUERY).toContain(
+      "WHERE flush_interval_ms BETWEEN 1 AND 2147483647",
     );
     expect(FIX07_PERIOD_QUERY).not.toMatch(
       /h\.observed_at\s*[<>]=?\s*p\.period_cutoff/u,
