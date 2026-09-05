@@ -146,19 +146,117 @@ Run from the controller only when Step 1 printed `FIX04_ADMISSION_MODE=resume-ex
 
 ```zsh
 set -eu
+CONTROLLER_ENGINE=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/dialectical-engine
 FIX04_LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/dialectical-engine
 FIX04_WORKTREE_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04
 FIX04_BASE_REF=34ebf866f7801d9620ee56f14f548b220b6ad442
 FIX04_AUTHORITY_REF=d935aad03aa56e752016011c57a81c5d33d27680
 FIX01_REVIEW_REF=24d0b3e5de84876b6b46fa84b13a0a42aa2640a4
 EXPECTED_API_BLOB=174ee8ff60461eb4f5aa233441b0367bb3d174b7
+EXPECTED_COMMON_DIR=/Users/vladmihaimiron/Documents/DebateAIRO/.git
+EXPECTED_WORKTREE_BRANCH=refs/heads/slice/oa-fix-04
+EXPECTED_WORKTREE_STANZA=$'worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04\nHEAD 34ebf866f7801d9620ee56f14f548b220b6ad442\nbranch refs/heads/slice/oa-fix-04'
 ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
 MISPLACED_REPORT="$FIX04_WORKTREE_ROOT/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md"
 
+canonical_common_dir() {
+  local repository_path="$1"
+  local common_dir
+  common_dir="$(git -C "$repository_path" rev-parse --git-common-dir)"
+  if [[ "$common_dir" != /* ]]; then
+    common_dir="$repository_path/$common_dir"
+  fi
+  (
+    cd "$common_dir"
+    pwd -P
+  )
+}
+
+attest_worktree_registration() {
+  local registry_text="$1"
+  local controller_common_dir="$2"
+  local lane_common_dir="$3"
+  local stanza line stanza_touches
+  local exact_count=0
+  local conflict_count=0
+  local -a registry_stanzas stanza_lines
+
+  [[ "$controller_common_dir" == "$EXPECTED_COMMON_DIR" ]] || {
+    print -u2 'FIX04_CONTROLLER_COMMON_DIR_MISMATCH'
+    return 1
+  }
+  [[ "$lane_common_dir" == "$EXPECTED_COMMON_DIR" && "$lane_common_dir" == "$controller_common_dir" ]] || {
+    print -u2 'FIX04_WORKTREE_COMMON_DIR_MISMATCH'
+    return 1
+  }
+
+  registry_stanzas=("${(@ps:\n\n:)registry_text}")
+  for stanza in "${registry_stanzas[@]}"; do
+    stanza_touches=0
+    stanza_lines=("${(@f)stanza}")
+    for line in "${stanza_lines[@]}"; do
+      case "$line" in
+        ("worktree $FIX04_WORKTREE_ROOT"|"HEAD $FIX04_BASE_REF"|"branch $EXPECTED_WORKTREE_BRANCH") stanza_touches=1 ;;
+      esac
+    done
+    if [[ "$stanza" == "$EXPECTED_WORKTREE_STANZA" ]]; then
+      (( exact_count += 1 ))
+    elif (( stanza_touches )); then
+      (( conflict_count += 1 ))
+    fi
+  done
+
+  (( conflict_count == 0 )) || {
+    print -u2 'FIX04_WORKTREE_REGISTRATION_CONFLICT'
+    return 1
+  }
+  (( exact_count > 0 )) || {
+    print -u2 'FIX04_WORKTREE_REGISTRATION_MISSING'
+    return 1
+  }
+  (( exact_count == 1 )) || {
+    print -u2 'FIX04_WORKTREE_REGISTRATION_DUPLICATE'
+    return 1
+  }
+  print "FIX04_WORKTREE_REGISTRATION_ATTESTED path=$FIX04_WORKTREE_ROOT head=$FIX04_BASE_REF branch=$EXPECTED_WORKTREE_BRANCH common=$lane_common_dir"
+}
+
+assert_registration_rejected() {
+  local label="$1"
+  local registry_text="$2"
+  local controller_common_dir="$3"
+  local lane_common_dir="$4"
+  local expected_error="$5"
+  local inverse_output inverse_status
+  set +e
+  inverse_output="$(attest_worktree_registration "$registry_text" "$controller_common_dir" "$lane_common_dir" 2>&1)"
+  inverse_status=$?
+  set -e
+  (( inverse_status != 0 ))
+  [[ "$inverse_output" == "$expected_error" ]]
+  print "FIX04_WORKTREE_REGISTRATION_INVERSE label=$label status=$inverse_status reason=$inverse_output"
+}
+
 [[ -d "$FIX04_LANE" ]]
+[[ "$(cd "$CONTROLLER_ENGINE" && pwd -P)" == "$CONTROLLER_ENGINE" ]]
+[[ "$(cd "$FIX04_WORKTREE_ROOT" && pwd -P)" == "$FIX04_WORKTREE_ROOT" ]]
+[[ "$(cd "$EXPECTED_COMMON_DIR" && pwd -P)" == "$EXPECTED_COMMON_DIR" ]]
+controller_common_dir="$(canonical_common_dir "$CONTROLLER_ENGINE")"
+lane_common_dir="$(canonical_common_dir "$FIX04_LANE")"
+worktree_registry="$(git -C "$CONTROLLER_ENGINE" worktree list --porcelain)"
+registration_evidence="$(attest_worktree_registration "$worktree_registry" "$controller_common_dir" "$lane_common_dir")"
+[[ "$registration_evidence" == "FIX04_WORKTREE_REGISTRATION_ATTESTED path=$FIX04_WORKTREE_ROOT head=$FIX04_BASE_REF branch=$EXPECTED_WORKTREE_BRANCH common=$EXPECTED_COMMON_DIR" ]]
+
+UNRELATED_WORKTREE_STANZA=$'worktree /private/tmp/fix04-unrelated\nHEAD 0000000000000000000000000000000000000000\nbranch refs/heads/fix04-unrelated'
+CONFLICTING_WORKTREE_STANZA=$'worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04\nHEAD 0000000000000000000000000000000000000000\nbranch refs/heads/slice/oa-fix-04'
+assert_registration_rejected wrong-common-dir "$EXPECTED_WORKTREE_STANZA" "$controller_common_dir" /private/tmp/fix04-wrong-common FIX04_WORKTREE_COMMON_DIR_MISMATCH
+assert_registration_rejected missing-registration "$UNRELATED_WORKTREE_STANZA" "$controller_common_dir" "$lane_common_dir" FIX04_WORKTREE_REGISTRATION_MISSING
+assert_registration_rejected duplicate-registration "$EXPECTED_WORKTREE_STANZA"$'\n\n'"$EXPECTED_WORKTREE_STANZA" "$controller_common_dir" "$lane_common_dir" FIX04_WORKTREE_REGISTRATION_DUPLICATE
+assert_registration_rejected conflicting-registration "$EXPECTED_WORKTREE_STANZA"$'\n\n'"$CONFLICTING_WORKTREE_STANZA" "$controller_common_dir" "$lane_common_dir" FIX04_WORKTREE_REGISTRATION_CONFLICT
+
 [[ "$(git -C "$FIX04_LANE" rev-parse --show-toplevel)" == "$FIX04_WORKTREE_ROOT" ]]
 [[ "$(git -C "$FIX04_LANE" branch --show-current)" == slice/oa-fix-04 ]]
-[[ "$(git show-ref --verify --hash refs/heads/slice/oa-fix-04)" == "$FIX04_BASE_REF" ]]
+[[ "$(git -C "$CONTROLLER_ENGINE" show-ref --verify --hash "$EXPECTED_WORKTREE_BRANCH")" == "$FIX04_BASE_REF" ]]
 [[ "$(git -C "$FIX04_LANE" rev-parse HEAD)" == "$FIX04_BASE_REF" ]]
 [[ "$(git -C "$FIX04_LANE" rev-list --parents -n 1 HEAD)" == "$FIX04_BASE_REF $FIX04_AUTHORITY_REF $FIX01_REVIEW_REF" ]]
 [[ "$(git -C "$FIX04_LANE" log -1 --format=%s)" == 'chore(obs): compose FIX-04 reviewed dependencies' ]]
@@ -192,10 +290,10 @@ console.log(`FIX04_RESUME_ZONE bytes=${region.bytes} sha256=${region.contentHash
 )"
 [[ "$resume_zone_evidence" == 'FIX04_RESUME_ZONE bytes=1653 sha256=bff20f70edcff8df1f530a5b9f33417f1012017ce9c5e38edebb73b1d99f351d' ]]
 [[ -z "$(git -C "$FIX04_LANE" status --porcelain=v1 --untracked-files=all)" ]]
-print "FIX04_RESUME_ATTESTED base=$FIX04_BASE_REF parents=$FIX04_AUTHORITY_REF,$FIX01_REVIEW_REF receipt=absent c1=absent lane=clean"
+print "FIX04_RESUME_ATTESTED base=$FIX04_BASE_REF parents=$FIX04_AUTHORITY_REF,$FIX01_REVIEW_REF receipt=absent c1=absent lane=registered-clean"
 ```
 
-Expected: the exact existing merge, branch, registered worktree root, parents, subject, API blob, semantic region, clean tracked/untracked/index state, absent controller receipt, absent misplaced receipt, and absent C1 file all pass. Any other existing state stops; do not recreate, reset, amend, merge, stash, clean, or edit it.
+Expected: the exact existing merge, branch, registered worktree root, parents, subject, API blob, semantic region, clean tracked/untracked/index state, absent controller receipt, absent misplaced receipt, and absent C1 file all pass. The controller and lane resolve to the same canonical physical Git common directory, the controller registry has exactly one non-conflicting path/HEAD/branch stanza, and the in-memory wrong-common-directory, missing, duplicate, and conflicting registration controls all fail for their named reasons. Any other existing state stops; do not recreate, reset, amend, merge, stash, clean, or edit it.
 
 - [ ] **Step 3: Resolve and record the admitted zone evidence**
 
