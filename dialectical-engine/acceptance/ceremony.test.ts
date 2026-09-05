@@ -11,6 +11,7 @@ import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
+import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -33,15 +34,17 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
   readonly endpoint: string;
   stop(): Promise<void>;
 }> {
-  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "EVALUATOR" | "GENERAL";
   const classifyContent = (content: string): ResponseClass => {
     try {
       const value = JSON.parse(content) as Record<string, unknown>;
       if ("statement" in value) return "JUDGE";
       if ("outcome" in value) return "REVIEW";
       if ("segments" in value) return "COMPOSE";
-      if ("conforms" in value) return "CONFORMANCE";
-      if ("pass" in value) return "R9";
+      // F-SEALEDROWS-B: T9 folded the retired `{conforms,findings}` and `{pass}`
+      // organs into ONE evaluator verdict, so those two classes no longer exist
+      // and a fixture scripting them scripts a call nobody makes.
+      if ("satisfied" in value) return "EVALUATOR";
     } catch { /* health-probe fixtures retain FIFO semantics */ }
     return "GENERAL";
   };
@@ -72,9 +75,14 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
       // the FIFO fallback below hid it.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
         : body.includes("restatement_text") ? "JUDGE"
-          : body.includes("conforms,findings") ? "CONFORMANCE"
-            : body.includes("{pass}") ? "R9"
-              : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+          // F-SEALEDROWS-B: the EVALUATOR discriminator is the SHIPPED prompt
+          // itself (see `test-fixtures/evaluator-double.ts`), so it cannot go
+          // stale against the runner the way the two retired ones did. Measured
+          // before the repair: the evaluator call matched NONE of the four
+          // discriminators here and fell through to GENERAL, where the FIFO
+          // fallback answered it out of whatever queue it landed on.
+          : isEvaluatorPacket(body) ? "EVALUATOR"
+            : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       calls += 1;
       // T3 N4: never GUESS ACROSS CLASSES. A recognised request with no scripted
@@ -177,10 +185,7 @@ beforeAll(async () => {
     JSON.stringify({ segments: [
       { segment_id: "segment:verdict", text: "A provisional acceptance answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:next", text: "Verify the proposal independently.", node_refs: [], served_number_refs: [] }
-    ] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ pass: true })
+    ] })
   ]);
   // PANEL-01: the second maker independently authors a root, grows both
   // primary-root children, and authors its ordered cross-root response.
@@ -190,7 +195,16 @@ beforeAll(async () => {
     judgementDouble("A genuine supporting case for the acceptance answer."),
     judgementDouble("The strongest genuine counter-position to the acceptance answer."),
     judgementDouble("The second maker directly defends its root and attacks the primary root."),
-    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`))
+    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`)),
+    // T9 / F-SEALEDROWS-B: the sealed EVALUATOR identity is the SECOND
+    // configured family's first provider — `acceptance:claude-cli`, this
+    // double — while the SYNTHESIZER stays with `acceptance:codex-cli`. The
+    // retired conformance and R9 responses sat on the primary provider and
+    // were never consumed once T9 landed; the one call that IS made arrives
+    // here. One entry, because a satisfied verdict ends the loop in round 1
+    // and a second evaluator call would be a real change this fixture should
+    // refuse by name rather than answer.
+    evaluatorSatisfied()
   ]);
 });
 
