@@ -1316,3 +1316,39 @@ lane's blob had added the six-slot code array that tripped an incoming oracle.
 **Compare blob ids, never existence.** Cost: one wrong hypothesis, caught by
 checking the blob before writing it down.
 (algorithm-live-loop, W5 dev-sync r3)
+
+## `tools/mutate.sh` is MISSION-relative, not repo-relative
+Found by the T1-ORACLE-LOGINFP seat (2026-09-05). Packets say "via `tools/mutate.sh`
+v2", and a worker standing in its lane worktree reads that as
+`<lane>/dialectical-engine/tools/mutate.sh`, which does not exist — that directory
+holds only `check-text-control-bytes.ts`, `acceptance-bundle/` and `orphan-audit/`.
+The harness lives at `<mission dir>/tools/mutate.sh` and is not part of any tree.
+Cost: one `find` across the whole checkout before a single mutant could be built.
+**Packets should spell the mutate harness with the mission's absolute path**, the
+same way D64 ADDENDUM already requires for `packets/ logs/ board/`.
+(algorithm-live-loop, F-T1-ORACLE-LOGINFP)
+
+## `mutate.sh` runs its discriminating command from the LANE ROOT, not the package
+Same seat, same day. `mutate.sh` does `cd "$LANE"` and then execs `"$@"`, but this
+repo's package root is `<lane>/dialectical-engine`, so a command written the way it
+is written everywhere else — `pnpm exec vitest run tests/unit/...` — cannot resolve
+either the binary or the path. Wrap it:
+`bash -c 'cd dialectical-engine && pnpm exec vitest run …'`.
+The `<file-relative-to-worktree>` argument, by contrast, IS lane-root-relative
+(`dialectical-engine/tests/unit/…`), so the two arguments use different origins in
+the same call. Cost here: nil, caught by reading the script first; recorded because
+reading it first is the only reason.
+(algorithm-live-loop, F-T1-ORACLE-LOGINFP)
+
+## A mutant transcript cannot discriminate on a suite that is ALREADY red
+Same seat, same day, and the one that would have cost a round. `mutate.sh` records
+the discriminating command's `EXIT`, and a reviewer reads `EXIT = 1` as "the mutant
+died". On the dev-reconciled tree the depth-oracle file is red before any mutation —
+`tests/unit/s1-1-depth-contract.test.ts` carries a pre-existing J10 `ENOENT` on
+`web/package.json` — so **every** mutant in that file exits 1, including ones that
+change nothing the assertions can see. `EXIT` would have proved nothing in either
+direction. Narrow the command to the describe block under test
+(`vitest run <file> -t "<describe>"`) and verify it is GREEN at the un-mutated tip
+BEFORE building the first mutant; otherwise the transcript's own gate is vacuous —
+D56, arriving through the mutation harness rather than through a test.
+(algorithm-live-loop, F-T1-ORACLE-LOGINFP)
