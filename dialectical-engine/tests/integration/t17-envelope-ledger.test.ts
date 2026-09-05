@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
 import { RunRepository, migrate } from "@debateai/db";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY } from "@debateai/register";
-import { computeStructuralCeilingBasis } from "@debateai/register";
+import { SERVE_LEG, computeStructuralCeilingBasis } from "@debateai/register";
 import {
   createPostgresProviderGateway,
   WalkingSkeletonRunner,
@@ -68,8 +68,6 @@ const ATTEMPTS_PER_COOLDOWN_SITE = JUDGE_MAX_ATTEMPTS + FINAL_RETRY_ATTEMPTS;
 const ATTEMPTS_PER_PANEL_SITE = JUDGE_MAX_ATTEMPTS;
 /** Serve organs are not cooldown-wrapped either: one sequence, organ bound. */
 const ATTEMPTS_PER_SERVE_SITE = ORGAN_MAX_ATTEMPTS;
-/** 2 composers + (2 rounds x 2 segments) conformance + 1 post-compose R9. */
-const SERVE_SITES = 2 + 2 * 2 + 1;
 /**
  * T9's loop bound for this fixture. It is the SAME value the fixture seals into
  * `synthesisRolePolicy.evaluatorLoopMaxRounds` below — one constant, so the
@@ -79,6 +77,18 @@ const SERVE_SITES = 2 + 2 * 2 + 1;
 const EVALUATOR_LOOP_MAX_ROUNDS = 3;
 /** One SYNTHESIZER site and one EVALUATOR site per round, at the bound. */
 const SYNTHESIS_ROLE_SITES = 2 * EVALUATOR_LOOP_MAX_ROUNDS;
+/**
+ * F-T17T9-3: the serve leg FOLLOWS the sealed row — `SERVE_LEG.sites` applied to
+ * the row's own loop bound, never a literal typed to match the ledger. It was
+ * `2 + 2*2 + 1` = the retired chain's SEVEN composition organs; T9 wires none of
+ * them. The identity `SERVE_SITES === SYNTHESIS_ROLE_SITES` is asserted below:
+ * the ROW's rule and the INDEPENDENTLY enumerated role sites must agree, and
+ * they are computed from different places so that agreement is evidence.
+ */
+const SERVE_SITES = SERVE_LEG.sites({
+  synthesizerMaxRounds: EVALUATOR_LOOP_MAX_ROUNDS,
+  evaluatorMaxRounds: EVALUATOR_LOOP_MAX_ROUNDS
+});
 
 /** M=2, depth=1: 2 roots + 4 expansion children + 2 cross-root exchange nodes. */
 const MATERIALIZED_NODES = 8;
@@ -396,8 +406,8 @@ function runnerSettings(): WalkingSkeletonSettings {
     // values — the identical block in tests/integration/database.test.ts states
     // that 0/0 is set WIDE OF the fixtures' arithmetic so no existing fixture's
     // expansion is truncated. That claim is not taken on trust here: the
-    // maximum-path assertions below still require SEVEN serve sites, both
-    // composition rounds, and exactly 109 observed attempts, so a δ/ε that
+    // maximum-path assertions below still require the full six-site synthesis
+    // loop, three rounds, and exactly 106 observed attempts, so a δ/ε that
     // truncated this run's expansion would fail this file rather than pass it.
     stoppingPolicy: {
       registerVersion: 1,
@@ -611,16 +621,21 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
         "POST_COMPOSE_R9:EVALUATOR:2=3",
         "POST_COMPOSE_R9:EVALUATOR:3=3"
       ]);
-      // The post-T9 maximum this run actually spends. The seven-site expectation
-      // below is the PRE-T9 serve chain and stays RED on purpose (F-T17T9-3):
-      // the sealed envelope row is V's to re-rule, not a number to edit here.
+      // The post-T9 maximum this run actually spends, and — since V ruled the
+      // true number sealed (2026-09-05) — the ceiling too. Nothing here is
+      // padded: block (3) pins the ceiling to this same measured total.
       expect(observed).toBe(PRE_SERVE_ATTEMPTS + SYNTHESIS_ROLE_SITES * ATTEMPTS_PER_SERVE_SITE);
       expect(observed).toBe(106);
 
-      // (2b) THE SERVE LEG, MEASURED per namespace from the same ledger. This
-      //      is the second correction: R9 appears ONCE for the run, not once
-      //      per recompose round, so the maximum is SEVEN sites and not the
-      //      eight `maxRecompose * fixedOrgansPerComposition` bills.
+      // (2b) THE SERVE NAMESPACE, MEASURED from the same ledger. T9 kept the
+      //      SLOT prefixes — `COMPOSER:` feeds `composer_calls` and
+      //      `POST_COMPOSE_R9:` feeds `r9_calls` in migrations/0049, which
+      //      battery-row predicates read — and named the ROLE inside them. So
+      //      the namespace query must return EXACTLY the role sites of (2a):
+      //      every serve site is a role site, and not one bare composition-organ
+      //      key (`COMPOSER:1`, `CONFORMANCE:1:0`, `POST_COMPOSE_R9:2`) exists.
+      //      That is the assertion the pre-T9 seven-key list became: it used to
+      //      expect the retired chain, which is what made it RED (F-T17T9-3).
       const serve = await database.pool.query<{ call_site_key: string; attempts: string }>(
         `SELECT call_site_key, count(*)::text AS attempts
          FROM ledger.ledger_entry
@@ -630,22 +645,21 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
          GROUP BY call_site_key ORDER BY call_site_key`,
         [runId]
       );
-      expect(serve.rows.map((row) => `${row.call_site_key}=${row.attempts}`)).toEqual([
-        "COMPOSER:1=3", "COMPOSER:2=3",
-        "CONFORMANCE:1:0=3", "CONFORMANCE:1:1=3",
-        "CONFORMANCE:2:0=3", "CONFORMANCE:2:1=3",
-        // Keyed by the LAST composition round, not by a round of its own —
-        // which is itself the evidence that R9 runs once AFTER the loop.
-        "POST_COMPOSE_R9:2=3"
-      ]);
+      expect(serve.rows.map((row) => `${row.call_site_key}=${row.attempts}`))
+        .toEqual(roleSites.rows.map((row) => `${row.call_site_key}=${row.attempts}`));
+      expect(serve.rows.every((row) => /:(?:SYNTHESIZER|EVALUATOR):/.test(row.call_site_key))).toBe(true);
+      // THE ROW AND THE LEDGER AGREE. `SERVE_SITES` is the sealed row's rule;
+      // `SYNTHESIS_ROLE_SITES` is this fixture's own enumeration of roles x
+      // rounds. They are computed from different sources, so their agreement is
+      // evidence rather than a restatement — and the ledger matches both.
+      expect(SERVE_SITES).toBe(SYNTHESIS_ROLE_SITES);
       expect(serve.rows).toHaveLength(SERVE_SITES);
-      // BOTH composition rounds ran: round 2's sites exist at all.
-      expect(serve.rows.some((row) => row.call_site_key === "COMPOSER:2")).toBe(true);
-      // The receipt's own composition count agrees with what the run opened.
-      expect(ceilingBasis.serve_leg).toMatchObject({
-        composition_sites: SERVE_SITES,
-        composition_sites_per_round: 3,
-        post_compose_sites_per_run: 1
+      // The receipt's own serve leg agrees with what the run opened, and names
+      // the chain that ships. A basis still reporting COMPOSITION would be a
+      // basis minted against the retired chain.
+      expect(ceilingBasis.serve_leg).toEqual({
+        synthesis_loop_sites: SERVE_SITES,
+        selected: SERVE_LEG.chain
       });
 
       // (3) THE DoD: the recomputed ceiling COVERS the observed attempt count.
@@ -655,10 +669,15 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
         + 8 * ATTEMPTS_PER_COOLDOWN_SITE
         + 8 * ATTEMPTS_PER_PANEL_SITE
         + SERVE_SITES * ATTEMPTS_PER_SERVE_SITE);
-      expect(observed).toBe(109);
+      expect(observed).toBe(106);
       expect(observed).toBeLessThanOrEqual(ceiling);
-      // The ceiling is TIGHT: at the true maximum path it is spent exactly.
-      expect(ceiling).toBe(109);
+      // The ceiling is TIGHT, and now truthfully so: V ruled on 2026-09-05 to
+      // seal the true number rather than keep the retired chain's extra serve
+      // site as padding, so the maximum path spends the ceiling EXACTLY. Before
+      // that ruling this line read 109 against an observed 106 and the word
+      // "tight" was false by three attempts (F-T17T9-3, P5).
+      expect(ceiling).toBe(106);
+      expect(ceiling).toBe(observed);
 
       // (4) …and the DR-184-v2 ceiling for this exact topology would have been
       //     BREACHED by this same run. Without this arm, (3) is satisfiable by

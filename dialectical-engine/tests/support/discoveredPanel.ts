@@ -23,10 +23,11 @@ export function fixtureStructuralCeiling(maxModelAttempts: number, panelSize = 1
     panel_size: panelSize,
     depth,
     per_site_attempts: { judge: 1, organ: 1, panel_member: 1, cooldown_site: 3 },
-    call_sites: { author: 1, panel: 0, reviewer: 0, serve: 7 },
+    call_sites: { author: 1, panel: 0, reviewer: 0, serve: 6 },
+    // F-T17T9-3: one arm. The composition chain is retired, so the fixture no
+    // longer discloses it, and `call_sites.serve` follows the loop it bills.
     serve_leg: {
-      composition_sites: 7, composition_sites_per_round: 3, post_compose_sites_per_run: 1,
-      synthesis_loop_sites: 6, selected: "COMPOSITION" as const
+      synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" as const
     },
     hold_cap: 1,
     final_retry_attempts: 1,

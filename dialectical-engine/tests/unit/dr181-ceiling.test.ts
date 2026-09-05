@@ -24,10 +24,11 @@ describe("DR-181 computed structural tripwire", () => {
         const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
         // Cumulative per call-site key: sequence 2 only gets the final retry.
         const cooldownSite = 3 + 1;
-        // Walked, not multiplied: composer + one conformance per segment per
-        // recompose round, then ONE post-compose organ after the loop.
-        const compositionSites = RUNNER_MAX_RECOMPOSE * (1 + RUNNER_COMPOSITION_SEGMENT_CAP) + 1;
-        const fixedSites = Math.max(compositionSites, 3 + 3);
+        // F-T17T9-3: the serve leg is the shipped synthesis loop alone — one
+        // site per role per round. The composition chain T9 retired used to
+        // bind this leg at `maxRecompose * (1 + segmentCap) + 1` = 7 sites;
+        // the runner wires none of those organs now, so it bills nothing.
+        const fixedSites = 3 + 3;
         const independentWorstCase = (authored + reviews) * cooldownSite
           + panelCalls * 3
           + fixedSites * 3;
