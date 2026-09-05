@@ -16,7 +16,7 @@ const rows: readonly Row[] = [
   ["db", "packages/db", ["kernel", "crypto"]],
   ["register", "packages/register", ["kernel", "db"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
-  ["providers", "packages/providers", ["kernel", "register", "ledger"]],
+  ["providers", "packages/providers", ["kernel", "register", "ledger", "obs-capture"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
   ["judgement", "packages/judgement", ["kernel", "db", "ledger", "providers", "register"]],
   ["evidence", "packages/evidence", ["kernel", "db", "ledger", "providers", "register", "graph"]],

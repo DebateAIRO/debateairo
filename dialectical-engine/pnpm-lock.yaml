@@ -582,6 +582,9 @@ importers:
       '@debateai/ledger':
         specifier: workspace:*
         version: link:../ledger
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../obs-capture
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
