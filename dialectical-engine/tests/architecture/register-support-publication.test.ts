@@ -176,8 +176,16 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(loader).toContain("PRIVATE_FILE_MODE");
     expect(loader).toContain("PRIVATE_DIRECTORY_MODE");
     expect(loader).toContain("MAX_DEVELOPMENT_CREDENTIAL_FILE_BYTES");
+    expect(loader).toContain("MAX_PRODUCTION_CREDENTIAL_FILE_BYTES");
     expect(loader).toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
     expect(loader).toContain("debateai_dev_support_config_operator");
+    expect(loader).toContain("debateai_prod_support_config_operator");
+    expect(loader).toContain("loadProductionSupportConfigCliCredentials");
+    expect(loader).toContain("withProductionSupportConfigCliConnection");
+    expect(loader).toContain("connectionTimeoutMillis");
+    expect(loader).toContain("statement_timeout");
+    expect(loader).toContain("query_timeout");
+    expect(loader).toContain("await pool.end()");
     expect(loader).not.toMatch(/process[.]env|MIGRATION_DATABASE_URL/u);
 
     const keyList = apiEnvironment.slice(

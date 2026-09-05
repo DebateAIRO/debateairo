@@ -1,19 +1,36 @@
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import pg, { type PoolClient } from "pg";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
+
+const { Pool: PgPool } = pg;
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_DEVELOPMENT_CREDENTIAL_FILE_BYTES = 64 * 1024;
+const MAX_PRODUCTION_CREDENTIAL_FILE_BYTES = 4 * 1024;
 const SUPPORT_CONFIG_OPERATOR_DATABASE_URL = "SUPPORT_CONFIG_OPERATOR_DATABASE_URL";
-const SUPPORT_CONFIG_OPERATOR_ROLE = "debateai_dev_support_config_operator";
+const DEVELOPMENT_SUPPORT_CONFIG_OPERATOR_ROLE = "debateai_dev_support_config_operator";
+const PRODUCTION_SUPPORT_CONFIG_OPERATOR_ROLE = "debateai_prod_support_config_operator";
 const LOCAL_DATABASE_HOST = "127.0.0.1";
 const LOCAL_DATABASE_PORT = "55432";
 const LOCAL_DATABASE_NAME = "/debateai";
 
 export type DevelopmentSupportConfigCliCredentials = Readonly<{
   databaseUrl: string;
+}>;
+
+export type ProductionSupportConfigCliCredentials = Readonly<{
+  databaseUrl: string;
+  validUntil: string;
+}>;
+
+export type ValidatedProductionSupportConfigCredentialFile = Readonly<{
+  credentials: ProductionSupportConfigCliCredentials;
+  resolvedPath: string;
+  device: number;
+  inode: number;
 }>;
 
 function currentUid(): number {
@@ -34,7 +51,10 @@ async function assertPrivateDirectory(path: string): Promise<void> {
   }
 }
 
-async function readBoundedPrivateFile(path: string): Promise<string> {
+async function readBoundedPrivateFile(
+  path: string,
+  maximumBytes: number
+): Promise<Readonly<{ source: string; device: number; inode: number }>> {
   let handle;
   try {
     handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
@@ -48,10 +68,29 @@ async function readBoundedPrivateFile(path: string): Promise<string> {
       || metadata.nlink !== 1
       || (metadata.mode & 0o777) !== PRIVATE_FILE_MODE
       || metadata.size < 1
-      || metadata.size > MAX_DEVELOPMENT_CREDENTIAL_FILE_BYTES) {
+      || metadata.size > maximumBytes) {
       throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
     }
-    return await handle.readFile("utf8");
+    const bounded = Buffer.alloc(maximumBytes + 1);
+    let offset = 0;
+    while (offset < bounded.length) {
+      const { bytesRead } = await handle.read(
+        bounded,
+        offset,
+        bounded.length - offset,
+        null
+      );
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset > maximumBytes) {
+      throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+    }
+    return Object.freeze({
+      source: bounded.subarray(0, offset).toString("utf8"),
+      device: metadata.dev,
+      inode: metadata.ino
+    });
   } finally {
     await handle.close();
   }
@@ -82,7 +121,7 @@ function parseExactDevelopmentCredentials(source: string): ReadonlyMap<string, s
   return parsed;
 }
 
-function assertSupportConfigDatabaseUrl(raw: string): void {
+function assertDevelopmentSupportConfigDatabaseUrl(raw: string): void {
   let databaseUrl: URL;
   try {
     databaseUrl = new URL(raw);
@@ -95,10 +134,71 @@ function assertSupportConfigDatabaseUrl(raw: string): void {
     || databaseUrl.pathname !== LOCAL_DATABASE_NAME
     || databaseUrl.search !== ""
     || databaseUrl.hash !== ""
-    || databaseUrl.username !== SUPPORT_CONFIG_OPERATOR_ROLE
+    || databaseUrl.username !== DEVELOPMENT_SUPPORT_CONFIG_OPERATOR_ROLE
     || databaseUrl.password.length === 0) {
     throw new TypeError("SUPPORT_CONFIG_DATABASE_URL_INVALID");
   }
+}
+
+function parseExactProductionCredentials(
+  source: string,
+  allowExpired: boolean
+): ProductionSupportConfigCliCredentials {
+  if (source.includes("\0") || source.includes("\r") || source.includes("\n")) {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+  }
+  if (typeof value !== "object"
+    || value === null
+    || Array.isArray(value)
+    || JSON.stringify(Object.keys(value)) !== JSON.stringify(["databaseUrl", "validUntil"])) {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.databaseUrl !== "string" || typeof record.validUntil !== "string") {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+  }
+  const validUntil = new Date(record.validUntil);
+  const remainingMilliseconds = validUntil.getTime() - Date.now();
+  if (!Number.isFinite(validUntil.getTime())
+    || validUntil.toISOString() !== record.validUntil
+    || (!allowExpired && remainingMilliseconds <= 1_000)
+    || remainingMilliseconds > 15 * 60 * 1_000) {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_EXPIRY_INVALID");
+  }
+  let parsedUrl: URL;
+  let password: string;
+  try {
+    parsedUrl = new URL(record.databaseUrl);
+    password = decodeURIComponent(parsedUrl.password);
+  } catch {
+    throw new TypeError("SUPPORT_CONFIG_DATABASE_URL_INVALID");
+  }
+  const passwordBytes = Buffer.byteLength(password, "utf8");
+  if ((parsedUrl.protocol !== "postgres:" && parsedUrl.protocol !== "postgresql:")
+    || parsedUrl.hostname.length === 0
+    || parsedUrl.pathname !== "/debateai"
+    || parsedUrl.search !== ""
+    || parsedUrl.hash !== ""
+    || parsedUrl.username !== PRODUCTION_SUPPORT_CONFIG_OPERATOR_ROLE
+    || passwordBytes < 32
+    || passwordBytes > 1_024
+    || /[\0\r\n]/u.test(password)) {
+    throw new TypeError("SUPPORT_CONFIG_DATABASE_URL_INVALID");
+  }
+  const credentials = Object.freeze({
+    databaseUrl: record.databaseUrl,
+    validUntil: record.validUntil
+  });
+  if (JSON.stringify(credentials) !== source) {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+  }
+  return credentials;
 }
 
 export async function loadDevelopmentSupportConfigCliCredentials(
@@ -106,13 +206,77 @@ export async function loadDevelopmentSupportConfigCliCredentials(
 ): Promise<DevelopmentSupportConfigCliCredentials> {
   const resolvedPath = resolve(credentialFilePath);
   await assertPrivateDirectory(dirname(resolvedPath));
-  const credentials = parseExactDevelopmentCredentials(
-    await readBoundedPrivateFile(resolvedPath)
-  );
+  const credentials = parseExactDevelopmentCredentials((await readBoundedPrivateFile(
+    resolvedPath,
+    MAX_DEVELOPMENT_CREDENTIAL_FILE_BYTES
+  )).source);
   const databaseUrl = credentials.get(SUPPORT_CONFIG_OPERATOR_DATABASE_URL);
   if (databaseUrl === undefined) {
     throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
   }
-  assertSupportConfigDatabaseUrl(databaseUrl);
+  assertDevelopmentSupportConfigDatabaseUrl(databaseUrl);
   return Object.freeze({ databaseUrl });
+}
+
+async function validateProductionSupportConfigCredentialFile(
+  credentialFilePath: string,
+  allowExpired: boolean
+): Promise<ValidatedProductionSupportConfigCredentialFile> {
+  const resolvedPath = resolve(credentialFilePath);
+  await assertPrivateDirectory(dirname(resolvedPath));
+  const file = await readBoundedPrivateFile(
+    resolvedPath,
+    MAX_PRODUCTION_CREDENTIAL_FILE_BYTES
+  );
+  return Object.freeze({
+    credentials: parseExactProductionCredentials(file.source, allowExpired),
+    resolvedPath,
+    device: file.device,
+    inode: file.inode
+  });
+}
+
+export async function loadProductionSupportConfigCliCredentials(
+  credentialFilePath: string
+): Promise<ProductionSupportConfigCliCredentials> {
+  return (await validateProductionSupportConfigCredentialFile(
+    credentialFilePath,
+    false
+  )).credentials;
+}
+
+export async function validateProductionSupportConfigCredentialFileForCleanup(
+  credentialFilePath: string
+): Promise<ValidatedProductionSupportConfigCredentialFile> {
+  return validateProductionSupportConfigCredentialFile(credentialFilePath, true);
+}
+
+export async function withProductionSupportConfigCliConnection<T>(
+  credentialFilePath: string,
+  operation: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const credentials = await loadProductionSupportConfigCliCredentials(credentialFilePath);
+  const remainingMilliseconds = new Date(credentials.validUntil).getTime() - Date.now();
+  if (remainingMilliseconds <= 1_000) {
+    throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_EXPIRY_INVALID");
+  }
+  const phaseDeadlineMilliseconds = Math.min(5_000, Math.floor(remainingMilliseconds - 1));
+  const pool = new PgPool({
+    connectionString: credentials.databaseUrl,
+    max: 1,
+    connectionTimeoutMillis: phaseDeadlineMilliseconds,
+    statement_timeout: phaseDeadlineMilliseconds,
+    query_timeout: phaseDeadlineMilliseconds
+  });
+  pool.on("error", () => undefined);
+  try {
+    const client = await pool.connect();
+    try {
+      return await operation(client);
+    } finally {
+      client.release();
+    }
+  } finally {
+    await pool.end();
+  }
 }

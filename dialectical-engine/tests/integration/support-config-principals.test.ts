@@ -38,6 +38,7 @@ const LOCAL_ADMIN_DATABASE_URL =
 const SUPPORT_KEY = "SUPPORT_CONFIG_OPERATOR_DATABASE_URL";
 const SUPPORT_ROLE = "debateai_dev_support_config_operator";
 const SUPPORT_CAPABILITY = "debateai_support_config_operator";
+const PRODUCTION_SUPPORT_ROLE = "debateai_prod_support_config_operator";
 
 let database: TestDatabase;
 let repositoryRoot: string;
@@ -67,6 +68,14 @@ function parseEnvironment(source: string): ReadonlyMap<string, string> {
 async function loadDevelopmentCredentials(path: string): Promise<Readonly<{ databaseUrl: string }>> {
   const module = await import("../../apps/runner/src/support-config-cli-credentials.js");
   return module.loadDevelopmentSupportConfigCliCredentials(path);
+}
+
+async function loadProductionCredentials(path: string): Promise<Readonly<{
+  databaseUrl: string;
+  validUntil: string;
+}>> {
+  const module = await import("../../apps/runner/src/support-config-cli-credentials.js");
+  return module.loadProductionSupportConfigCliCredentials(path);
 }
 
 async function prepareCustodyRoot(): Promise<void> {
@@ -509,6 +518,125 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
         .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
       expect((await lstat(file)).isFile()).toBe(true);
     } finally {
+      vi.restoreAllMocks();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the production two-field parser disjoint from dev and rejects custody, fallback, and URL drift", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-prod-support-loader-"));
+    const file = join(root, "support-config-operator.json");
+    const developmentSource = await readFile(credentialFilePath, "utf8");
+    const databaseUrl = new URL(database.connectionString);
+    databaseUrl.username = PRODUCTION_SUPPORT_ROLE;
+    databaseUrl.password = "production-support-test-password-abcdefghijklmnopqrstuvwxyz";
+    databaseUrl.pathname = "/debateai";
+    const validUntil = new Date(Date.now() + 10 * 60 * 1_000).toISOString();
+    const exactSource = JSON.stringify({ databaseUrl: databaseUrl.toString(), validUntil });
+    try {
+      await writeFile(file, exactSource, { mode: 0o600 });
+      await expect(loadProductionCredentials(file)).resolves.toEqual({
+        databaseUrl: databaseUrl.toString(),
+        validUntil
+      });
+      await expect(loadDevelopmentCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+
+      await writeFile(file, developmentSource, { mode: 0o600 });
+      await expect(loadProductionCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
+      await writeFile(file, exactSource, { mode: 0o600 });
+
+      const linked = join(root, "linked.json");
+      await link(file, linked);
+      await expect(loadProductionCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+      await rm(linked);
+      const symbolic = join(root, "symbolic.json");
+      await symlink(file, symbolic);
+      await expect(loadProductionCredentials(symbolic))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+
+      await chmod(file, 0o640);
+      await expect(loadProductionCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+      await chmod(file, 0o600);
+      await chmod(root, 0o755);
+      await expect(loadProductionCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+      await chmod(root, 0o700);
+
+      const actualUid = process.getuid?.();
+      expect(actualUid).toBeTypeOf("number");
+      const ownerSpy = vi.spyOn(process, "getuid").mockReturnValue(actualUid! + 1);
+      await expect(loadProductionCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+      ownerSpy.mockRestore();
+
+      const mutatedUrls = [
+        { ...JSON.parse(exactSource), extra: true },
+        { databaseUrl: databaseUrl.toString() },
+        { databaseUrl: databaseUrl.toString(), validUntil: "not-a-timestamp" },
+        {
+          databaseUrl: databaseUrl.toString(),
+          validUntil: new Date(Date.now() - 1_000).toISOString()
+        },
+        {
+          databaseUrl: databaseUrl.toString(),
+          validUntil: new Date(Date.now() + 16 * 60 * 1_000).toISOString()
+        },
+        {
+          databaseUrl: databaseUrl.toString().replace("/debateai", "/other"),
+          validUntil
+        },
+        {
+          databaseUrl: databaseUrl.toString().replace(PRODUCTION_SUPPORT_ROLE, "debateai_obs_human"),
+          validUntil
+        },
+        {
+          databaseUrl: databaseUrl.toString().replace(
+            PRODUCTION_SUPPORT_ROLE,
+            "debateai_prod_migrator"
+          ),
+          validUntil
+        },
+        {
+          databaseUrl: databaseUrl.toString().replace(
+            PRODUCTION_SUPPORT_ROLE,
+            "debateai_prod_api_runtime"
+          ),
+          validUntil
+        },
+        {
+          databaseUrl: databaseUrl.toString().replace(
+            PRODUCTION_SUPPORT_ROLE,
+            SUPPORT_ROLE
+          ),
+          validUntil
+        },
+        { databaseUrl: `${databaseUrl.toString()}?sslmode=disable`, validUntil },
+        { databaseUrl: `${databaseUrl.toString()}#secret`, validUntil },
+        {
+          databaseUrl: databaseUrl.toString().replace(/:[^:@/]+@/u, "@"),
+          validUntil
+        }
+      ];
+      for (const invalid of mutatedUrls) {
+        await writeFile(file, JSON.stringify(invalid), { mode: 0o600 });
+        await expect(loadProductionCredentials(file)).rejects.toThrow();
+      }
+
+      await writeFile(file, `${exactSource}${"x".repeat(4 * 1024)}`, { mode: 0o600 });
+      await expect(loadProductionCredentials(file))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+
+      vi.stubEnv("MIGRATION_DATABASE_URL", database.connectionString);
+      vi.stubEnv("DATABASE_URL", database.connectionString);
+      vi.stubEnv("SUPPORT_CONFIG_OPERATOR_DATABASE_URL", databaseUrl.toString());
+      await expect(loadProductionCredentials(join(root, "missing.json")))
+        .rejects.toThrow("SUPPORT_CONFIG_CREDENTIAL_CUSTODY_INVALID");
+    } finally {
+      vi.unstubAllEnvs();
       vi.restoreAllMocks();
       await rm(root, { recursive: true, force: true });
     }

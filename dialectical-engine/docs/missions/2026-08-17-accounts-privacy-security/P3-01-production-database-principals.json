@@ -1,12 +1,12 @@
 {
-  "format": "debateai.production-database-principals.v2",
+  "format": "debateai.production-database-principals.v3",
   "status": "MIXED_PROVISIONING_STATE",
   "provisioner": {
     "command": "pnpm db:provision-principals",
     "source": "apps/runner/src/production-database-principals.ts",
     "cliSource": "apps/runner/src/production-database-principals-cli.ts",
     "runbook": "docs/missions/2026-08-17-accounts-privacy-security/P3-02-production-database-principal-provisioning.md",
-    "input": "STDIN_EXACT_JSON",
+    "input": "STDIN_EXACT_JSON_AND_PRIVATE_FILE_ARG",
     "managedPrincipalIds": [
       "api-runtime",
       "api-content-provision",
@@ -23,7 +23,8 @@
       "obs-writer",
       "obs-listener",
       "obs-watchdog",
-      "obs-human"
+      "obs-human",
+      "support-config-operator"
     ]
   },
   "principalProvisioning": [
@@ -44,6 +45,7 @@
     { "principalId": "obs-listener", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
     { "principalId": "obs-watchdog", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
     { "principalId": "obs-human", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
+    { "principalId": "support-config-operator", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
     { "principalId": "hatchet", "state": "EXTERNAL_COMPONENT", "source": "compose.dev.yaml" }
   ],
   "capabilityRoles": [
@@ -56,7 +58,8 @@
     { "roleName": "debateai_publication_cleanup", "login": false, "inherit": false, "directMemberships": [] },
     { "roleName": "debateai_replay", "login": false, "inherit": true, "directMemberships": [] },
     { "roleName": "debateai_runtime", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_settlement_watch", "login": false, "inherit": true, "directMemberships": [] }
+    { "roleName": "debateai_settlement_watch", "login": false, "inherit": true, "directMemberships": [] },
+    { "roleName": "debateai_support_config_operator", "login": false, "inherit": false, "directMemberships": [] }
   ],
   "ownershipRoles": [
     {
@@ -72,6 +75,13 @@
       "inherit": false,
       "ownsSchemas": [],
       "ownsRelations": ["obs.run_correlation_v"]
+    },
+    {
+      "roleName": "debateai_register_publication_owner",
+      "login": false,
+      "inherit": false,
+      "ownsSchemas": [],
+      "ownsRelations": []
     }
   ],
   "principals": [
@@ -163,8 +173,10 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -198,9 +210,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -234,9 +248,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -269,8 +285,10 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -303,9 +321,11 @@
         "debateai_evaluator_worker",
         "debateai_obs_view_owner",
         "debateai_prod_*",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -346,8 +366,10 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -381,8 +403,10 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -416,8 +440,10 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -451,8 +477,10 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -485,9 +513,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -520,9 +550,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -555,9 +587,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -591,9 +625,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -627,9 +663,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -663,9 +701,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": [],
@@ -699,6 +739,45 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
+        "debateai_replay",
+        "debateai_runtime",
+        "debateai_settlement_watch",
+        "debateai_support_config_operator",
+        "pg_*"
+      ],
+      "ownsDatabases": [],
+      "ownsSchemas": [],
+      "connectionPurposes": [
+        { "component": "human:observability", "environmentKey": null, "purpose": "JIT_OBSERVABILITY_READ", "binding": "JIT_HUMAN" }
+      ]
+    },
+    {
+      "id": "support-config-operator",
+      "roleName": "debateai_prod_support_config_operator",
+      "kind": "HUMAN_EXECUTE_ONLY",
+      "database": "debateai",
+      "login": true,
+      "inherit": true,
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "directMemberships": ["debateai_support_config_operator"],
+      "effectiveMemberships": ["debateai_support_config_operator"],
+      "forbiddenMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_content_provision",
+        "debateai_erasure_runtime",
+        "debateai_evaluator_api",
+        "debateai_evaluator_ddl",
+        "debateai_evaluator_reader",
+        "debateai_evaluator_worker",
+        "debateai_obs_view_owner",
+        "debateai_prod_*",
+        "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
@@ -707,7 +786,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "human:observability", "environmentKey": null, "purpose": "JIT_OBSERVABILITY_READ", "binding": "JIT_HUMAN" }
+        {
+          "component": "operator:support-config",
+          "sourceFile": "apps/runner/src/support-config-cli-credentials.ts",
+          "environmentKey": null,
+          "purpose": "JIT_SUPPORT_CONFIGURATION",
+          "binding": "JIT_HUMAN"
+        }
       ]
     },
     {
@@ -735,9 +820,11 @@
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_support_config_operator",
         "pg_*"
       ],
       "ownsDatabases": ["hatchet"],
@@ -774,7 +861,8 @@
     { "memberRole": "debateai_prod_scheduler_settlement", "grantedRole": "debateai_settlement_watch", "adminOption": false, "inheritOption": true, "setOption": true },
     { "memberRole": "debateai_prod_evaluator_worker", "grantedRole": "debateai_evaluator_worker", "adminOption": false, "inheritOption": true, "setOption": true },
     { "memberRole": "debateai_prod_evaluator_api", "grantedRole": "debateai_evaluator_api", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_evaluator_reader", "grantedRole": "debateai_evaluator_reader", "adminOption": false, "inheritOption": true, "setOption": true }
+    { "memberRole": "debateai_prod_evaluator_reader", "grantedRole": "debateai_evaluator_reader", "adminOption": false, "inheritOption": true, "setOption": true },
+    { "memberRole": "debateai_prod_support_config_operator", "grantedRole": "debateai_support_config_operator", "adminOption": false, "inheritOption": true, "setOption": true }
   ],
   "credentialRequirements": [
     { "principalId": "migration-admin", "credentialId": "credential:migration-admin", "lifecycle": "EPHEMERAL_JIT", "ownerTicket": "P3-02" },
@@ -793,7 +881,8 @@
     { "principalId": "obs-writer", "credentialId": "credential:obs-writer", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
     { "principalId": "obs-listener", "credentialId": "credential:obs-listener", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
     { "principalId": "obs-watchdog", "credentialId": "credential:obs-watchdog", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
-    { "principalId": "obs-human", "credentialId": "credential:obs-human-jit", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
+    { "principalId": "obs-human", "credentialId": "credential:obs-human-jit", "lifecycle": "JIT_SHORT_LIVED", "ownerTicket": "P3-02" },
+    { "principalId": "support-config-operator", "credentialId": "credential:support-config-operator-jit", "lifecycle": "JIT_SHORT_LIVED", "ownerTicket": "P3-02" },
     { "principalId": "hatchet", "credentialId": "credential:hatchet", "lifecycle": "EXTERNAL_COMPONENT", "ownerTicket": "P3-02" }
   ],
   "privilegeDisclosures": [

@@ -16,7 +16,8 @@ type ConnectionPurpose = Readonly<{
 type Principal = Readonly<{
   id: string;
   roleName: string;
-  kind: "PERSISTENT_MIGRATION_OWNER" | "SERVICE" | "HUMAN_READ_ONLY";
+  kind: "PERSISTENT_MIGRATION_OWNER" | "SERVICE" | "HUMAN_READ_ONLY"
+    | "HUMAN_EXECUTE_ONLY";
   database: "debateai" | "hatchet";
   login: boolean;
   inherit: boolean;
@@ -42,7 +43,7 @@ type Manifest = Readonly<{
     source: string;
     cliSource: string;
     runbook: string;
-    input: "STDIN_EXACT_JSON";
+    input: "STDIN_EXACT_JSON_AND_PRIVATE_FILE_ARG";
     managedPrincipalIds: readonly string[];
   }>;
   principalProvisioning: readonly Readonly<{
@@ -112,10 +113,15 @@ const capabilityRoles = [
   "debateai_publication_cleanup",
   "debateai_replay",
   "debateai_runtime",
-  "debateai_settlement_watch"
+  "debateai_settlement_watch",
+  "debateai_support_config_operator"
 ] as const;
 
-const ownershipRoles = ["debateai_evaluator_ddl", "debateai_obs_view_owner"] as const;
+const ownershipRoles = [
+  "debateai_evaluator_ddl",
+  "debateai_obs_view_owner",
+  "debateai_register_publication_owner"
+] as const;
 
 function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
   const governedRoles: string[] = [...capabilityRoles, ...ownershipRoles];
@@ -139,7 +145,7 @@ describe("P3-01 production database-principal manifest", () => {
   it("defines the exact capability, ownership, service, and connection-purpose inventory", async () => {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
 
-    expect(manifest.format).toBe("debateai.production-database-principals.v2");
+    expect(manifest.format).toBe("debateai.production-database-principals.v3");
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
     expect(manifest.capabilityRoles.map(({ roleName }) => roleName)).toEqual(capabilityRoles);
     expect(manifest.capabilityRoles.every(({ login }) => login === false)).toBe(true);
@@ -156,7 +162,8 @@ describe("P3-01 production database-principal manifest", () => {
       { roleName: "debateai_publication_cleanup", inherit: false, directMemberships: [] },
       { roleName: "debateai_replay", inherit: true, directMemberships: [] },
       { roleName: "debateai_runtime", inherit: true, directMemberships: [] },
-      { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] }
+      { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] },
+      { roleName: "debateai_support_config_operator", inherit: false, directMemberships: [] }
     ]);
     expect(manifest.ownershipRoles).toEqual([
       {
@@ -172,6 +179,13 @@ describe("P3-01 production database-principal manifest", () => {
         inherit: false,
         ownsSchemas: [],
         ownsRelations: ["obs.run_correlation_v"]
+      },
+      {
+        roleName: "debateai_register_publication_owner",
+        login: false,
+        inherit: false,
+        ownsSchemas: [],
+        ownsRelations: []
       }
     ]);
 
@@ -194,6 +208,11 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-listener", roleName: "debateai_obs_listener", kind: "SERVICE" },
         { id: "obs-watchdog", roleName: "debateai_obs_watchdog", kind: "SERVICE" },
         { id: "obs-human", roleName: "debateai_obs_human", kind: "HUMAN_READ_ONLY" },
+        {
+          id: "support-config-operator",
+          roleName: "debateai_prod_support_config_operator",
+          kind: "HUMAN_EXECUTE_ONLY"
+        },
         { id: "hatchet", roleName: "debateai_prod_hatchet", kind: "SERVICE" }
       ]);
     expect(manifest.principalProvisioning.map(({ principalId, state, source }) => ({
@@ -228,6 +247,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-listener", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-watchdog", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-human", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
+        { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
 
@@ -331,6 +351,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "obs-listener", environmentKey: "OBS_LISTENER_DATABASE_URL", purpose: "OBS_MACHINE_SAFE_LISTENER", binding: "REQUIRED_NOT_WIRED" },
         { component: "obs-watchdog", environmentKey: "OBS_WATCHDOG_DATABASE_URL", purpose: "OBS_WATCHDOG", binding: "REQUIRED_NOT_WIRED" },
         { component: "human:observability", environmentKey: null, purpose: "JIT_OBSERVABILITY_READ", binding: "JIT_HUMAN" },
+        { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
       ].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
     expect(manifest.developmentOnlyPrincipalBindings).toEqual([{
@@ -370,12 +391,34 @@ describe("P3-01 production database-principal manifest", () => {
       .toMatchObject({ lifecycle: "EPHEMERAL_JIT" });
     expect(manifest.credentialRequirements.find(({ principalId }) => principalId === "obs-human"))
       .toMatchObject({
-        lifecycle: "MIGRATION_MINTED_UNMANAGED",
-        currentProvisioner: "migrations/0034_obs_foundation.sql",
+        lifecycle: "JIT_SHORT_LIVED",
         ownerTicket: "P3-02"
       });
+    expect(manifest.credentialRequirements.find(
+      ({ principalId }) => principalId === "support-config-operator"
+    )).toMatchObject({ lifecycle: "JIT_SHORT_LIVED", ownerTicket: "P3-02" });
+    expect(manifest.principals
+      .filter(({ kind }) => kind === "HUMAN_READ_ONLY" || kind === "HUMAN_EXECUTE_ONLY")
+      .map(({ id, roleName, database, directMemberships, effectiveMemberships }) => ({
+        id, roleName, database, directMemberships, effectiveMemberships
+      }))).toEqual([
+        {
+          id: "obs-human",
+          roleName: "debateai_obs_human",
+          database: "debateai",
+          directMemberships: [],
+          effectiveMemberships: []
+        },
+        {
+          id: "support-config-operator",
+          roleName: "debateai_prod_support_config_operator",
+          database: "debateai",
+          directMemberships: ["debateai_support_config_operator"],
+          effectiveMemberships: ["debateai_support_config_operator"]
+        }
+      ]);
     expect(manifest.credentialRequirements
-      .filter(({ principalId }) => principalId.startsWith("obs-"))
+      .filter(({ principalId }) => /^(?:obs-writer|obs-listener|obs-watchdog)$/u.test(principalId))
       .every(({ lifecycle, currentProvisioner }) =>
         lifecycle === "MIGRATION_MINTED_UNMANAGED"
         && currentProvisioner === "migrations/0034_obs_foundation.sql")).toBe(true);

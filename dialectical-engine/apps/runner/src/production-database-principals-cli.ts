@@ -4,12 +4,35 @@ import { createPool } from "@debateai/db";
 import { loadMigrationEnvironment } from "@debateai/register";
 import {
   ProductionDatabasePrincipalProvisioningError,
+  cleanupProductionSupportConfigOperator,
   provisionProductionDatabasePrincipals
 } from "./production-database-principals.js";
 
 const MAXIMUM_STDIN_BYTES = 256 * 1_024;
 const MANIFEST_PATH =
   "docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json";
+const SUPPORT_CONFIG_CREDENTIAL_FILE_FLAG = "--support-config-credential-file";
+const CLEANUP_SUPPORT_CONFIG_OPERATOR_FLAG = "--cleanup-support-config-operator";
+
+function parseArguments(args: readonly string[]): Readonly<{
+  command: "PROVISION" | "CLEANUP";
+  supportConfigCredentialFilePath: string;
+}> {
+  const command = args[0] === CLEANUP_SUPPORT_CONFIG_OPERATOR_FLAG ? "CLEANUP" : "PROVISION";
+  const offset = command === "CLEANUP" ? 1 : 0;
+  if (args.length !== offset + 2
+    || args[offset] !== SUPPORT_CONFIG_CREDENTIAL_FILE_FLAG
+    || args[offset + 1] === undefined
+    || args[offset + 1]!.length === 0) {
+    throw new ProductionDatabasePrincipalProvisioningError(
+      "PRODUCTION_SUPPORT_CONFIG_CREDENTIAL_FILE_REQUIRED"
+    );
+  }
+  return Object.freeze({
+    command,
+    supportConfigCredentialFilePath: resolve(args[offset + 1]!)
+  });
+}
 
 async function readBoundedStdin(): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -42,7 +65,23 @@ async function readBoundedStdin(): Promise<unknown> {
 }
 
 async function main(): Promise<void> {
+  const arguments_ = parseArguments(process.argv.slice(2));
   const environment = loadMigrationEnvironment();
+  if (arguments_.command === "CLEANUP") {
+    const pool = createPool(environment.MIGRATION_DATABASE_URL);
+    try {
+      const receipt = await cleanupProductionSupportConfigOperator({
+        adminPool: pool,
+        supportConfigCredentialFilePath: arguments_.supportConfigCredentialFilePath
+      });
+      console.log(
+        `PRODUCTION_SUPPORT_CONFIG_OPERATOR_CLEANED=${receipt.terminatedSessionCount}`
+      );
+    } finally {
+      await pool.end();
+    }
+    return;
+  }
   const [manifestSource, credentialEnvelope] = await Promise.all([
     readFile(resolve(process.cwd(), MANIFEST_PATH), "utf8"),
     readBoundedStdin()
@@ -62,7 +101,8 @@ async function main(): Promise<void> {
       adminPool: pool,
       adminDatabaseUrl: environment.MIGRATION_DATABASE_URL,
       manifest,
-      credentialEnvelope
+      credentialEnvelope,
+      supportConfigCredentialFilePath: arguments_.supportConfigCredentialFilePath
     });
     console.log(`PRODUCTION_DATABASE_PRINCIPALS_READY=${receipt.principalCount}`);
   } finally {
