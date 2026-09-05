@@ -8,6 +8,7 @@ import { observationRepoRoot } from "./core/paths.js";
 import { ObservationModuleRuntime, parseModuleStatusProjection } from "./core/runtime.js";
 import { createLegacyOsaScriptRouter } from "./core/routing.js";
 import { signalSchema, type ObservationSignal, type Severity } from "./core/signals.js";
+import { readBootThresholdPolicy, ThresholdPolicyCache } from "./core/threshold-cache.js";
 import { loadObservationTargetCatalog } from "./core/targets.js";
 import {
   OBSERVATION_COMPONENTS,
@@ -147,9 +148,13 @@ async function boot(): Promise<void> {
     connectionString: environment.OBSERVATION_DATABASE_URL,
     max: 1
   });
+  const thresholdCache = new ThresholdPolicyCache(environment.OBSERVATION_STATE_DIR);
   let policy: RatifiedThresholdPolicy;
   try {
-    policy = await new ThresholdRepository(bootstrapPool).readCurrent();
+    ({ policy } = await readBootThresholdPolicy({
+      repository: new ThresholdRepository(bootstrapPool),
+      cache: thresholdCache
+    }));
   } finally {
     await bootstrapPool.end();
   }
@@ -347,7 +352,11 @@ async function boot(): Promise<void> {
     cycling = true;
     const now = new Date();
     try {
-      const reloaded = await reloadThresholdPolicy(repository, policy);
+      const reloaded = await reloadThresholdPolicy(
+        repository,
+        policy,
+        (current) => thresholdCache.write(current)
+      );
       if (reloaded.version !== policy.version) {
         const previousVersion = policy.version;
         policy = reloaded;

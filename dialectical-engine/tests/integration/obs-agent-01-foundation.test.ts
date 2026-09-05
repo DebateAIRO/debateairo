@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -24,6 +25,54 @@ function pool(): TestDatabase["pool"] {
 }
 
 describe("OBS-01 observation schema foundation", () => {
+  it("rejects invalid reachable threshold content instead of using a valid local cache", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-01-foundation-thresholds-"));
+    try {
+      const { ThresholdPolicyCache, readBootThresholdPolicy } = await import(
+        "../../apps/observation-agent/src/core/threshold-cache.js"
+      );
+      const { ThresholdRepository } = await import(
+        "../../apps/observation-agent/src/oactl/core/thresholds.js"
+      );
+      const cache = new ThresholdPolicyCache(stateDir);
+      await cache.write({
+        version: 1,
+        value: {
+          schema_version: 1,
+          liveness: {
+            probe_interval_ms: 5_000, probe_timeout_ms: 2_000,
+            open_after_failures: 2, clear_after_successes: 2
+          },
+          notification: {
+            rate_limit_ms: 600_000, degraded_after_ms: 900_000, timeout_ms: 2_000
+          },
+          resources: {
+            cpu_percent_max: 2, rss_mb_max: 150,
+            max_database_sessions: 2, statement_timeout_ms: 2_000
+          },
+          routing: {
+            INFRA_DOWN: "FATAL", INFRA_NOT_READY: "DEGRADED",
+            INFRA_UNKNOWN: "SEVERE", AGENT_SELF: "SEVERE"
+          }
+        },
+        sourceRef: "OBS-01-v1",
+        ratifiedBy: "V",
+        appliedAt: new Date("2026-09-03T09:00:00.000Z")
+      });
+      await pool().query(`
+        INSERT INTO observation.threshold_policy(version,applied_at,ratified_by,source_ref,value_json)
+        VALUES (9001,now(),'V','invalid-reachable','{"schema_version":1,"unexpected":true}')
+      `);
+
+      await expect(readBootThresholdPolicy({
+        repository: new ThresholdRepository(pool()),
+        cache
+      })).rejects.toThrow("OBSERVATION_THRESHOLDS_INVALID");
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
   it("ships replay-safe migration 0057 and creates exactly seven observation tables", async () => {
     await expect(readFile(migrationPath, "utf8")).resolves.toContain("CREATE SCHEMA IF NOT EXISTS observation");
     const result = await pool().query<{ table_name: string }>(`

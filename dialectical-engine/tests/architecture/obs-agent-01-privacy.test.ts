@@ -51,6 +51,7 @@ describe("OBS-01 privacy and template-only delivery", () => {
       "apps/observation-agent/src/core/runtime.ts",
       "apps/observation-agent/src/core/routing.ts",
       "apps/observation-agent/src/core/modules.ts",
+      "apps/observation-agent/src/core/threshold-cache.ts",
       "apps/observation-agent/src/store/status.ts",
       "apps/observation-agent/src/oactl/core/status.ts",
       "apps/observation-agent/src/main.ts"

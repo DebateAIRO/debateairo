@@ -74,6 +74,37 @@ export const thresholdPolicySchema = z.object({
 
 export type ThresholdPolicy = z.infer<typeof thresholdPolicySchema>;
 
+const appliedAtSchema = z.union([
+  z.date(),
+  z.iso.datetime().transform((value) => new Date(value))
+]);
+
+const ratifiedThresholdPolicySchema = z.object({
+  version: positiveInteger,
+  value: thresholdPolicySchema,
+  sourceRef: z.string().min(1),
+  ratifiedBy: z.string().min(1),
+  appliedAt: appliedAtSchema
+}).strict();
+
+export type RatifiedThresholdPolicy = Readonly<{
+  version: number;
+  value: ThresholdPolicy;
+  sourceRef: string;
+  ratifiedBy: string;
+  appliedAt: Date;
+}>;
+
+export function parseRatifiedThresholdPolicy(input: unknown): RatifiedThresholdPolicy {
+  try {
+    const policy = ratifiedThresholdPolicySchema.parse(input);
+    return Object.freeze({ ...policy, value: Object.freeze(policy.value) });
+  } catch (error) {
+    if (error instanceof ObservationError) throw error;
+    throw new ObservationError("OBSERVATION_THRESHOLDS_INVALID", error);
+  }
+}
+
 export function routeSeverity(
   policy: ThresholdPolicy,
   signalClass: SignalClass,
@@ -149,24 +180,20 @@ export function diffThresholdPolicies(
     .map(([path, value]) => `${path}: ${String(previousValues.get(path))} -> ${String(value)}`));
 }
 
-export type RatifiedThresholdPolicy = Readonly<{
-  version: number;
-  value: ThresholdPolicy;
-  sourceRef: string;
-  ratifiedBy: string;
-  appliedAt: Date;
-}>;
-
 export async function reloadThresholdPolicy(
   repository: Readonly<{ readCurrent(): Promise<RatifiedThresholdPolicy> }>,
-  current: RatifiedThresholdPolicy
+  current: RatifiedThresholdPolicy,
+  onSuccessfulRead?: (policy: RatifiedThresholdPolicy) => Promise<void>
 ): Promise<RatifiedThresholdPolicy> {
+  let reloaded: RatifiedThresholdPolicy;
   try {
-    return await repository.readCurrent();
+    reloaded = await repository.readCurrent();
   } catch (error) {
     if (error instanceof ObservationError) throw error;
     return current;
   }
+  await onSuccessfulRead?.(reloaded);
+  return reloaded;
 }
 
 async function configure(client: PoolClient): Promise<void> {
@@ -200,9 +227,9 @@ export class ThresholdRepository {
       } catch (error) {
         throw new ObservationError("OBSERVATION_THRESHOLDS_INVALID", error);
       }
-      return Object.freeze({
+      return parseRatifiedThresholdPolicy({
         version: row.version,
-        value: Object.freeze(value),
+        value,
         sourceRef: row.source_ref,
         ratifiedBy: row.ratified_by,
         appliedAt: row.applied_at
