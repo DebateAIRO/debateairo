@@ -691,15 +691,51 @@ Expected: each run executes exactly two tests, both pass, and prints `FIX04_ZONE
 
 - [ ] **Step 4: Verify source custody and scope**
 
-Before staging, run this fail-closed exact-set check from the FIX-04 lane:
+Before staging, run this fail-closed exact-set check from the mandated package cwd `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/dialectical-engine`. Porcelain v1 reports repository-root-relative paths and this Git does not accept `git status --relative`, so bind the package prefix exactly and emit package-relative evidence only after the complete raw porcelain set matches:
 
 ```zsh
 set -eu
 C1_PATH=tests/architecture/fix04-zone-region.test.ts
 EXPECTED_PRESTAGE_STATUS="?? $C1_PATH"
-[[ "$(git status --porcelain=v1 --untracked-files=all)" == "$EXPECTED_PRESTAGE_STATUS" ]]
-[[ -z "$(git diff --cached --name-only)" ]]
-[[ -z "$(git diff --name-only)" ]]
+
+attest_prestage_state() {
+  local repository_status="$1"
+  local package_prefix="$2"
+  [[ "$package_prefix" == dialectical-engine/ ]] || {
+    print -u2 'FIX04_C1_PACKAGE_PREFIX_MISMATCH'
+    return 1
+  }
+  [[ "$repository_status" == "?? ${package_prefix}${C1_PATH}" ]] || {
+    print -u2 'FIX04_PRESTAGE_PATH_SET_MISMATCH'
+    return 1
+  }
+  print -r -- "$EXPECTED_PRESTAGE_STATUS"
+}
+
+assert_prestage_rejected() {
+  local label="$1"
+  local repository_status="$2"
+  local package_prefix="$3"
+  local expected_error="$4"
+  local inverse_output inverse_status
+  set +e
+  inverse_output="$(attest_prestage_state "$repository_status" "$package_prefix" 2>&1)"
+  inverse_status=$?
+  set -e
+  (( inverse_status != 0 ))
+  [[ "$inverse_output" == "$expected_error" ]]
+  print "FIX04_PRESTAGE_INVERSE label=$label status=$inverse_status reason=$inverse_output"
+}
+
+PACKAGE_PREFIX="$(git rev-parse --show-prefix)"
+repository_status="$(git status --porcelain=v1 --untracked-files=all)"
+relative_prestage_status="$(attest_prestage_state "$repository_status" "$PACKAGE_PREFIX")"
+[[ "$relative_prestage_status" == "$EXPECTED_PRESTAGE_STATUS" ]]
+assert_prestage_rejected second-untracked "$repository_status"$'\n'"?? ${PACKAGE_PREFIX}tests/architecture/fix04-unreviewed.test.ts" "$PACKAGE_PREFIX" FIX04_PRESTAGE_PATH_SET_MISMATCH
+assert_prestage_rejected wrong-prefix '?? wrong-prefix/tests/architecture/fix04-zone-region.test.ts' wrong-prefix/ FIX04_C1_PACKAGE_PREFIX_MISMATCH
+
+[[ -z "$(git diff --cached --relative --name-only)" ]]
+[[ -z "$(git diff --relative --name-only)" ]]
 if whitespace_out="$(git diff --no-index --check /dev/null "$C1_PATH" 2>&1)"; then
   whitespace_rc=0
 else
@@ -710,30 +746,45 @@ fi
 [[ "$(rg -c 'readFileSync' "$C1_PATH")" -eq 2 ]]
 [[ "$(rg -c 'return readFileSync\(indexPath, "utf8"\);' "$C1_PATH")" -eq 1 ]]
 ! rg -n 'statSync|lstatSync|readdirSync|opendirSync|glob|packages/obs-capture/src/zone|apps/api/src/(registration|mfa|recovery|mail-channel|sessions|account-erasure|legacy-claim)' "$C1_PATH"
-print "FIX04_PRESTAGE_SCOPE_ATTESTED status=$EXPECTED_PRESTAGE_STATUS index=empty tracked_unstaged=empty"
+print "FIX04_PRESTAGE_SCOPE_ATTESTED status=$relative_prestage_status prefix=$PACKAGE_PREFIX index=empty tracked_unstaged=empty"
 ```
 
-Expected: porcelain contains exactly the one untracked C1 path; the index and unstaged tracked set are empty; the untracked file has no diff-check warning; source custody contains only the import plus the single permitted `readFileSync(indexPath, "utf8")` call and no zone path or metadata API.
+Expected: the complete repository-root-relative porcelain set contains exactly `?? dialectical-engine/tests/architecture/fix04-zone-region.test.ts`, the bound package-relative evidence is exactly `?? tests/architecture/fix04-zone-region.test.ts`, and the synthetic second-untracked and wrong-prefix states fail with their named reasons. The index and package-relative unstaged tracked set are empty; the untracked file has no diff-check warning; source custody contains only the import plus the single permitted `readFileSync(indexPath, "utf8")` call and no zone path or metadata API.
 
 - [ ] **Step 5: Commit C1 and write its normal report**
 
-Stage, attest, commit, and read back exactly the one architecture path:
+Continue from the same mandated package cwd. Stage, attest, commit, and read back exactly the one package-relative architecture path:
 
 ```zsh
 set -eu
 C1_PATH=tests/architecture/fix04-zone-region.test.ts
 EXPECTED_C1_SUBJECT='test(api): FIX-04 C1 — pin immutable zone delta'
+PACKAGE_PREFIX="$(git rev-parse --show-prefix)"
+[[ "$PACKAGE_PREFIX" == dialectical-engine/ ]]
+
+attest_staged_c1_status() {
+  local repository_status="$1"
+  [[ "$repository_status" == "A  ${PACKAGE_PREFIX}${C1_PATH}" ]] || {
+    print -u2 'FIX04_STAGED_PATH_SET_MISMATCH'
+    return 1
+  }
+  print -r -- "A  $C1_PATH"
+}
+
 git add -- "$C1_PATH"
+[[ "$(git diff --cached --name-status)" == $'A\tdialectical-engine/tests/architecture/fix04-zone-region.test.ts' ]]
 [[ "$(git diff --cached --relative --name-status)" == $'A\ttests/architecture/fix04-zone-region.test.ts' ]]
 git diff --cached --check
-[[ -z "$(git diff --name-only)" ]]
-[[ "$(git status --porcelain=v1 --untracked-files=all)" == 'A  tests/architecture/fix04-zone-region.test.ts' ]]
+[[ -z "$(git diff --relative --name-only)" ]]
+relative_staged_status="$(attest_staged_c1_status "$(git status --porcelain=v1 --untracked-files=all)")"
+[[ "$relative_staged_status" == 'A  tests/architecture/fix04-zone-region.test.ts' ]]
 git commit -m "$EXPECTED_C1_SUBJECT"
 FIX04_TIP_REF="$(git rev-parse HEAD)"
 [[ "$(git log -1 --format=%s "$FIX04_TIP_REF")" == "$EXPECTED_C1_SUBJECT" ]]
+[[ "$(git diff-tree --no-commit-id --name-status -r "$FIX04_TIP_REF")" == $'A\tdialectical-engine/tests/architecture/fix04-zone-region.test.ts' ]]
 [[ "$(git diff-tree --no-commit-id --name-status -r --relative "$FIX04_TIP_REF")" == $'A\ttests/architecture/fix04-zone-region.test.ts' ]]
-[[ -z "$(git diff --cached --name-only)" ]]
-[[ -z "$(git diff --name-only)" ]]
+[[ -z "$(git diff --cached --relative --name-only)" ]]
+[[ -z "$(git diff --relative --name-only)" ]]
 [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
 print "FIX04_C1_COMMIT_ATTESTED tip=$FIX04_TIP_REF subject=$EXPECTED_C1_SUBJECT delta=A:$C1_PATH"
 ```
