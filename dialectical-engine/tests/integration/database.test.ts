@@ -5599,7 +5599,14 @@ describe("T10/T11 · the served root and its label, through the production runne
     const question = `t09-unsealed-synthesis-family-${randomUUID()}`;
     const work = await createRunnerWork(question);
     const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
-    const { synthesisRolePolicy: _omitted, ...settingsWithoutSynthesisRolePolicy } = runnerSettings();
+    // T9 x board F33: the field is now REQUIRED on WalkingSkeletonSettings, so
+    // omitting it is a compile error and this deliberate omission needs a cast.
+    // The cast is the point: the TYPE now stops a deployment from dropping the
+    // family, and this test still pins the RUNTIME gate that catches a caller
+    // who defeats the type — a JavaScript caller, a cast like this one, or a
+    // settings object built from parsed data.
+    const { synthesisRolePolicy: _omitted, ...omitted } = runnerSettings();
+    const settingsWithoutSynthesisRolePolicy = omitted as unknown as WalkingSkeletonSettings;
     try {
       await expect(
         runnerWithEndpoint(provider.endpoint, settingsWithoutSynthesisRolePolicy).executeWorkItem(work.workItemId)

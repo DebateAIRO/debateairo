@@ -237,68 +237,89 @@ describe("T9 × F33 — the acceptance runtime policy carries the sealed synthes
   });
 
   /**
-   * PROPERTY: a synthesis-role row sealed by a DIFFERENT deployment is REFUSED,
-   * not consumed. `readFamily` in the shared reader only requires a non-empty
+   * PROPERTY: a T16 row sealed by a DIFFERENT deployment is REFUSED, not
+   * consumed — for EVERY family this deployment reads, not just the one this
+   * ticket added. `readFamily` in the shared reader only requires a non-empty
    * source_ref, so without a deployment-scoped check here a row written by
-   * another deployment at the same register version names a role identity this
-   * deployment never sealed, and the runner calls it. This is the check
-   * `dev-runner-policy.ts` already performs for its own four families.
+   * another deployment at the same register version reaches the runner, and in
+   * the role families it names an identity this deployment never sealed.
+   * `dev-runner-policy.ts` performs this check for its own families; codex r1
+   * FOLLOW-UP 2 established the acceptance path reads FIVE, not four —
+   * `envelopeFormulaInputs` is the fifth and also exposes `sourceRefs`.
    *
-   * The row is seeded foreign from the start rather than mutated: `register_row`
-   * is append-only (core.reject_mutation rejects UPDATE), and `seedAcceptanceRegister`
-   * re-reads every row it wrote and refuses a mismatch. Both of those are the
-   * system working; between them, the only way this deployment can meet a foreign
-   * row is a register written by something other than its own seeder — which is
-   * exactly the case under test, so the test builds that database directly.
+   * Each row is seeded foreign FROM THE START rather than mutated: `register_row`
+   * is append-only (core.reject_mutation rejects UPDATE), and
+   * `seedAcceptanceRegister` re-reads every row it wrote and refuses a mismatch.
+   * Both are the system working; between them, the only way this deployment can
+   * meet a foreign row is a register written by something other than its own
+   * seeder — exactly the case under test, so each case builds that database.
    */
-  it("refuses a synthesis-role row carrying another deployment's provenance", async () => {
-    const foreignSourceRef = "some-other-deployment:T16-algorithm-register+J8";
-    const directory = await mkdtemp(join(tmpdir(), "debateai-acc-foreign-provenance-"));
-    const foreign = await startStandingDatabase({ port: await reservePort(), dataDirectory: directory });
+  const FOREIGN_SOURCE_REF = "some-other-deployment:T16-algorithm-register+J8";
+
+  async function withRegister<T>(
+    label: string,
+    rows: readonly { rowKey: string; value: unknown; sourceRef: string }[],
+    use: (pool: StandingDatabase["pool"]) => Promise<T>
+  ): Promise<T> {
+    const directory = await mkdtemp(join(tmpdir(), `debateai-acc-${label}-`));
+    const database_ = await startStandingDatabase({ port: await reservePort(), dataDirectory: directory });
     try {
-      const rows = await buildAcceptanceRegisterRows();
-      const swapped = rows.map((row) => row.rowKey === "synthesizerRoleRef"
-        ? { ...row, sourceRef: foreignSourceRef }
-        : row);
-      // Exactly one row differs from what this deployment's own seeder writes.
-      expect(swapped.filter((row, index) => row.sourceRef !== rows[index]?.sourceRef)).toHaveLength(1);
-      for (const row of swapped) {
-        await foreign.pool.query(
+      for (const row of rows) {
+        await database_.pool.query(
           `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
            VALUES ($1, $2, $3::jsonb, $4)`,
           [ACCEPTANCE_REGISTER_VERSION, row.rowKey, JSON.stringify(row.value), row.sourceRef]
         );
       }
-
-      await expect(readAcceptanceRuntimePolicy(foreign.pool))
-        .rejects.toThrow("ACCEPTANCE_SYNTHESIS_ROLE_PROVENANCE_INVALID");
+      return await use(database_.pool);
     } finally {
-      await foreign.stop();
+      await database_.stop();
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }
+
+  /** One representative row per T16 family the acceptance path reads. */
+  const FAMILIES = Object.freeze([
+    { family: "synthesis-role", rowKey: "synthesizerRoleRef" },
+    { family: "envelope-formula", rowKey: "envelopeFormulaInputs" },
+    { family: "panel-weighting", rowKey: "dispersionScale" },
+    { family: "verdict-label", rowKey: "verdictMarginGamma" },
+    { family: "adaptive-stopping", rowKey: "globalStopDelta" }
+  ]);
+
+  it.each(FAMILIES)(
+    "refuses a $family row carrying another deployment's provenance",
+    async ({ family, rowKey }) => {
+      const rows = await buildAcceptanceRegisterRows();
+      // The row key must really be in this deployment's seed, or the case would
+      // swap nothing and assert against an unchanged register.
+      expect(rows.some((row) => row.rowKey === rowKey)).toBe(true);
+      const swapped = rows.map((row) => row.rowKey === rowKey
+        ? { ...row, sourceRef: FOREIGN_SOURCE_REF }
+        : row);
+      expect(swapped.filter((row, index) => row.sourceRef !== rows[index]?.sourceRef)).toHaveLength(1);
+
+      await withRegister(family, swapped, async (pool) => {
+        await expect(readAcceptanceRuntimePolicy(pool))
+          .rejects.toThrow("ACCEPTANCE_ALGORITHM_PROVENANCE_INVALID");
+      });
+    }
+  );
 
   /**
-   * The neighbouring case the refusal must NOT catch: the same database, seeded
-   * by this deployment's own rows, resolves. Without this, a check that refused
-   * every row would pass the assertion above and pin nothing.
+   * The neighbouring case the refusal must NOT catch: the same rows, all sealed
+   * by this deployment, resolve. Without this, a check that refused everything
+   * would satisfy every case above and pin nothing.
    */
-  it("accepts the same rows when every synthesis-role row carries this deployment's provenance", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "debateai-acc-own-provenance-"));
-    const own = await startStandingDatabase({ port: await reservePort(), dataDirectory: directory });
-    try {
-      for (const row of await buildAcceptanceRegisterRows()) {
-        await own.pool.query(
-          `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-           VALUES ($1, $2, $3::jsonb, $4)`,
-          [ACCEPTANCE_REGISTER_VERSION, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-        );
-      }
-
-      await expect(readAcceptanceRuntimePolicy(own.pool)).resolves.toBeDefined();
-    } finally {
-      await own.stop();
-      await rm(directory, { recursive: true, force: true });
-    }
+  it("accepts the same rows when every T16 family carries this deployment's provenance", async () => {
+    await withRegister("own-provenance", await buildAcceptanceRegisterRows(), async (pool) => {
+      const policy = await readAcceptanceRuntimePolicy(pool);
+      expect(policy.synthesisRolePolicy.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
+      // The other four families reach the runner off the same policy.
+      expect(policy.panelPolicy.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
+      expect(policy.verdictLabelPolicy.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
+      expect(policy.stoppingPolicy.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
+      expect(policy.envelopeFormulaInputs.registerVersion).toBe(ACCEPTANCE_REGISTER_VERSION);
+    });
   });
 });

@@ -1216,7 +1216,7 @@ export interface WalkingSkeletonSettings {
    * every maker count — the same shape as `verdictLabelPolicy` and for the same
    * reason (S06 codex r1 B1, board F33).
    */
-  readonly synthesisRolePolicy?: RunnerSynthesisRolePolicy;
+  readonly synthesisRolePolicy: RunnerSynthesisRolePolicy;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */

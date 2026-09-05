@@ -17,18 +17,28 @@ import { describe, expect, it } from "vitest";
  * `verdictLabelPolicy`, `scoringOperator`, and `synthesisRolePolicy` — this
  * ticket, on the acceptance deployment.
  *
- * The strongest available guard is a COMPILE ERROR: make the field required, so
- * a deployment that omits it cannot build. That is measured to cost four
- * repairs in three fixture files (see this lane's report), so it is filed rather
- * than taken here. This test is the guard that fits inside one file: it DERIVES
- * the obligation set from the runner's own refusal gates and checks it against
- * both shipped entry points, so a family added tomorrow is covered the moment
- * its gate lands — without anybody remembering to extend a list.
+ * The strongest guard is a COMPILE ERROR, and `synthesisRolePolicy` now has one:
+ * it is REQUIRED on `WalkingSkeletonSettings`, so omitting it on any deployment
+ * path does not build. That closes this member of the class outright.
  *
- * What it does NOT prove: that the value passed is the sealed row rather than a
- * restatement. That property is behavioural and lives with each family's own
- * reader test (for the acceptance synthesis-role family, in
- * acceptance/runtime-policy.test.ts).
+ * THE OTHER FOUR MEMBERS ARE STILL OPTIONAL, which is why this test remains.
+ * `panelPolicy`, `scoringOperator` and `stoppingPolicy` gate only at M>1 and
+ * `verdictLabelPolicy` gates unconditionally, yet all four are declared with
+ * `?`. Until each is made required in turn, this is the only check standing
+ * between them and a repeat: it DERIVES the obligation set from the runner's own
+ * refusal gates and checks it against both shipped entry points, so a family
+ * added tomorrow is covered the moment its gate lands, with no list to extend.
+ *
+ * What it does NOT do — codex r1 FOLLOW-UP 3, and it is worth stating plainly
+ * rather than overselling the guard: it does NOT make omission impossible. It
+ * matches SOURCE TEXT. A gate written in a different shape, a third deployment
+ * entry point nobody added here, or an incidental `foo:` inside the sliced
+ * region can each make it miss or falsely pass. It is an interim regression
+ * check whose replacement is the type change above, applied to the rest.
+ *
+ * Nor does it prove the value passed is the sealed row rather than a restatement.
+ * That property is behavioural and lives with each family's own reader test —
+ * for the acceptance families, in acceptance/runtime-policy.test.ts.
  */
 
 const RUNNER = new URL("../../apps/runner/src/index.ts", import.meta.url);

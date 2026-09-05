@@ -70,6 +70,15 @@ const ATTEMPTS_PER_PANEL_SITE = JUDGE_MAX_ATTEMPTS;
 const ATTEMPTS_PER_SERVE_SITE = ORGAN_MAX_ATTEMPTS;
 /** 2 composers + (2 rounds x 2 segments) conformance + 1 post-compose R9. */
 const SERVE_SITES = 2 + 2 * 2 + 1;
+/**
+ * T9's loop bound for this fixture. It is the SAME value the fixture seals into
+ * `synthesisRolePolicy.evaluatorLoopMaxRounds` below — one constant, so the
+ * double that drives the loop and the register row that bounds it cannot drift
+ * apart and quietly stop exercising the maximum.
+ */
+const EVALUATOR_LOOP_MAX_ROUNDS = 3;
+/** One SYNTHESIZER site and one EVALUATOR site per round, at the bound. */
+const SYNTHESIS_ROLE_SITES = 2 * EVALUATOR_LOOP_MAX_ROUNDS;
 
 /** M=2, depth=1: 2 roots + 4 expansion children + 2 cross-root exchange nodes. */
 const MATERIALIZED_NODES = 8;
@@ -90,6 +99,61 @@ function judgementDouble(statement: string, fidelity = 0.72): string {
     context: { fit: 0.72, ambiguityFlags: [] },
     fallacy: { severity: 0.28, fatalFlags: [] }
   });
+}
+
+/**
+ * The EVALUATOR's own round, read from the packet the runner actually sent.
+ *
+ * codex r1 BLOCKING: the first version of this double returned `satisfied: true`
+ * for EVERY evaluator input, so `runSynthesisLoop` broke out of its `for` after
+ * round 1 and this "maximum path" test measured a ONE-ROUND run — two role sites
+ * where the sealed bound allows six. A fixture that cannot reach the maximum
+ * cannot be evidence about the maximum.
+ *
+ * It throws rather than defaulting: a double that silently guesses a round would
+ * put the fixture straight back to measuring something other than what it says.
+ */
+function evaluatorRound(body: string): number {
+  let round: unknown;
+  try {
+    const envelope = JSON.parse(body) as { messages?: readonly { content?: unknown }[] };
+    const messages = envelope.messages ?? [];
+    const packet = messages[messages.length - 1]?.content;
+    if (typeof packet !== "string") throw new Error("no packet");
+    round = (JSON.parse(packet) as { round?: unknown }).round;
+  } catch (error) {
+    throw new Error("T17_EVALUATOR_PACKET_UNREADABLE", { cause: error });
+  }
+  if (typeof round !== "number" || !Number.isInteger(round) || round < 1) {
+    throw new Error(`T17_EVALUATOR_ROUND_UNREADABLE:${String(round)}`);
+  }
+  return round;
+}
+
+/**
+ * Rounds below the bound are REJECTED, the last round is accepted, so the loop
+ * runs to `EVALUATOR_LOOP_MAX_ROUNDS` and the run still serves an answer.
+ *
+ * `assertEvaluatorVerdict` (packages/serve) requires `satisfied` to agree with
+ * its own criteria and requires a non-empty objection when it is false, so the
+ * rejecting verdict carries BOTH — a rejection with all-true criteria is refused
+ * as incoherent, and one with a null objection is refused as missing.
+ */
+function evaluatorVerdict(round: number): {
+  satisfied: boolean; objection: string | null; criteria: Record<string, boolean>;
+} {
+  const satisfied = round >= EVALUATOR_LOOP_MAX_ROUNDS;
+  return {
+    satisfied,
+    objection: satisfied ? null : `test-layer: round ${round} overstates the surviving position`,
+    criteria: {
+      fairness_to_losers: true,
+      statement_label_agreement: true,
+      no_overstatement: satisfied,
+      restatement: true,
+      citation_tracing: true
+    }
+  };
 }
 
 const PANEL_ASSESSMENT = JSON.stringify({
@@ -210,20 +274,7 @@ async function startMaximumPathProvider(label: string): Promise<{
               // recomposes; round 2 passes and the run still completes. Counted
               // per packet, so each segment's first content response is round 1.
               ? JSON.stringify(conformanceVerdict(packetKey))
-              : kind === "EVALUATOR"
-                // One satisfied verdict ends the loop in round 1, the shape the
-                // sibling integration fixtures script.
-                ? JSON.stringify({
-                  satisfied: true,
-                  objection: null,
-                  criteria: {
-                    fairness_to_losers: true,
-                    statement_label_agreement: true,
-                    no_overstatement: true,
-                    restatement: true,
-                    citation_tracing: true
-                  }
-                })
+              : kind === "EVALUATOR" ? JSON.stringify(evaluatorVerdict(evaluatorRound(body)))
                 : kind === "R9" ? JSON.stringify({ pass: true })
                 : judgementDouble(`${label} position ${served}`);
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
@@ -383,7 +434,7 @@ function runnerSettings(): WalkingSkeletonSettings {
       registerVersion: 1,
       synthesizerRoleRef: "provider:test-layer",
       evaluatorRoleRef: "provider:test-layer",
-      evaluatorLoopMaxRounds: 3,
+      evaluatorLoopMaxRounds: EVALUATOR_LOOP_MAX_ROUNDS,
       identicalRoleRefs: true,
       sourceRefs: {
         synthesizerRoleRef: "test-layer:J8",
@@ -524,6 +575,47 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
       );
       expect(perSite.rows.length).toBeGreaterThan(0);
       expect(perSite.rows.every((row) => Number(row.attempts) === ATTEMPTS_PER_COOLDOWN_SITE)).toBe(true);
+
+      // (2a) THE SYNTHESIS LOOP REACHED ITS SEALED BOUND — codex r1 BLOCKING.
+      //      This runs BEFORE the serve-topology assertion below because it is
+      //      the precondition for calling any of this a maximum path: if the
+      //      evaluator accepts early, every cost number underneath is a
+      //      one-round number wearing a maximum's label. Measured off the same
+      //      ledger, by the role call-site keys `synthesisCallSiteKey` emits.
+      const roleSites = await database.pool.query<{ call_site_key: string; attempts: string }>(
+        `SELECT call_site_key, count(*)::text AS attempts
+         FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL'
+           AND (call_site_key LIKE 'COMPOSER:SYNTHESIZER:%'
+                OR call_site_key LIKE 'POST_COMPOSE_R9:EVALUATOR:%')
+         GROUP BY call_site_key ORDER BY call_site_key`,
+        [runId]
+      );
+      const roleAttempts = roleSites.rows.reduce((total, row) => total + Number(row.attempts), 0);
+      // Retained in the record so the maximum-path claim is read off the run
+      // rather than argued: T17T9 r1 measured 2 sites / 94 total here, which is
+      // the one-round path, not the maximum.
+      console.info("T17 MEASURED role sites:", JSON.stringify(roleSites.rows.map(
+        (row) => `${row.call_site_key}=${row.attempts}`
+      )), "| role attempts:", roleAttempts, "| ledger total:", observed);
+      expect(roleSites.rows).toHaveLength(SYNTHESIS_ROLE_SITES);
+      expect(roleAttempts).toBe(SYNTHESIS_ROLE_SITES * ATTEMPTS_PER_SERVE_SITE);
+      // Every round is present and each spent its full organ allowance: the
+      // synthesizer opens INITIAL then RETRIES to the bound, the evaluator
+      // answers each round, and none of the six sites stopped early.
+      expect(roleSites.rows.map((row) => `${row.call_site_key}=${row.attempts}`)).toEqual([
+        "COMPOSER:SYNTHESIZER:INITIAL:1=3",
+        "COMPOSER:SYNTHESIZER:RETRY:2=3",
+        "COMPOSER:SYNTHESIZER:RETRY:3=3",
+        "POST_COMPOSE_R9:EVALUATOR:1=3",
+        "POST_COMPOSE_R9:EVALUATOR:2=3",
+        "POST_COMPOSE_R9:EVALUATOR:3=3"
+      ]);
+      // The post-T9 maximum this run actually spends. The seven-site expectation
+      // below is the PRE-T9 serve chain and stays RED on purpose (F-T17T9-3):
+      // the sealed envelope row is V's to re-rule, not a number to edit here.
+      expect(observed).toBe(PRE_SERVE_ATTEMPTS + SYNTHESIS_ROLE_SITES * ATTEMPTS_PER_SERVE_SITE);
+      expect(observed).toBe(106);
 
       // (2b) THE SERVE LEG, MEASURED per namespace from the same ledger. This
       //      is the second correction: R9 appears ONCE for the run, not once
