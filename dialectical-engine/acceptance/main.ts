@@ -542,6 +542,14 @@ export async function createAcceptanceRuntime(input: {
       disagreementThreshold: verdictLabels.disagreementThreshold,
       sourceRefs: verdictLabels.sourceRefs
     },
+    // S6-2 / T9 (board F33 class): the acceptance entry point must LOAD and
+    // PASS every register family the run reads, exactly as the shipped dev
+    // entry point does. Without this line the claim-time gate refuses every
+    // work item and no statement is ever synthesized — which is what every
+    // acceptance path that reached synthesis did. The family is READ by
+    // `readAcceptanceRuntimePolicy` (with this deployment's provenance
+    // checked there) and never assembled out of parts chosen here.
+    synthesisRolePolicy: policy.synthesisRolePolicy,
     // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
     // leg for M=2 compatibility. Every further configured maker is carried by
     // additionalMakers; each artifact persists its maker/provider lineage.

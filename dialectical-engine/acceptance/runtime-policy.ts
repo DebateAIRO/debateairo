@@ -5,11 +5,14 @@ import { computeStructuralCeilingBasis } from "@debateai/register";
 import {
   readClaimTypeCompositionMap,
   readEnvelopeFormulaInputs,
+  readSynthesisRoleControls,
   type CompositionMapRegisterRow,
-  type EnvelopeFormulaInputs
+  type EnvelopeFormulaInputs,
+  type SynthesisRoleControls
 } from "@debateai/register";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
+  ACCEPTANCE_ALGORITHM_SOURCE_REF,
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
   ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
   ACCEPTANCE_REGISTER_SOURCE_REF,
@@ -125,6 +128,15 @@ export interface AcceptanceRuntimePolicy {
    * constants re-declared at the call site.
    */
   readonly envelopeFormulaInputs: EnvelopeFormulaInputs;
+  /**
+   * S6-2 / T9 x board F33: the sealed T16 synthesis-role family, READ here so
+   * the acceptance deployment's entry point can hand the runner the same rows
+   * the dev deployment hands it (`dev-runner-policy.ts`). EVERY served
+   * statement comes out of the synthesizer/evaluator loop, so this binds at
+   * every maker count and is NOT optional on this policy: a deployment that
+   * cannot resolve it has no business claiming a work item.
+   */
+  readonly synthesisRolePolicy: SynthesisRoleControls;
   /** DR-162-A/DR-177: configured real makers remain register-driven data. */
   readonly providers: ReadonlyArray<z.infer<typeof runtimeRowsSchema>["configuredProviderSet"]["providers"][number]>;
   readonly hashes: {
@@ -213,6 +225,17 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
   // T17: the loud stop for the acceptance deployment — a register version that
   // never sealed the envelope row cannot resolve a runtime policy at all.
   const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, ACCEPTANCE_REGISTER_VERSION);
+  // S6-2 / T9 x board F33. The shared reader accepts any NON-EMPTY source_ref
+  // (`readFamily`), so provenance is the deployment's own duty: a row written
+  // by another deployment at this register version would otherwise name a role
+  // identity this deployment never sealed, and the runner would call it. The
+  // dev twin performs exactly this check against its own prefix.
+  const synthesisRoles = await readSynthesisRoleControls(pool, ACCEPTANCE_REGISTER_VERSION);
+  if (Object.values(synthesisRoles.sourceRefs).some(
+    (sourceRef) => !sourceRef.startsWith(ACCEPTANCE_ALGORITHM_SOURCE_REF)
+  )) {
+    throw new Error("ACCEPTANCE_SYNTHESIS_ROLE_PROVENANCE_INVALID");
+  }
   const compositionBudgets = Object.freeze(Object.fromEntries(
     Object.entries(parsed.compositionBundleBudget).map(([tier, bound]) => [tier, Object.freeze({
       tier: tier as "low" | "medium" | "high",
@@ -247,6 +270,9 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     }),
     envelopeFormulaInputs,
+    // The reader already froze it and owns every field; it travels whole, the
+    // same way the dev policy passes the adaptive-stopping family through.
+    synthesisRolePolicy: synthesisRoles,
     providers: Object.freeze(parsed.configuredProviderSet.providers),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,

@@ -105,11 +105,17 @@ const COMPOSITION = JSON.stringify({ segments: [
   { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
 ] });
 
-type RequestKind = "PANEL" | "REVIEW" | "JUDGE" | "CONFORMANCE" | "R9" | "COMPOSE";
+type RequestKind = "PANEL" | "REVIEW" | "JUDGE" | "CONFORMANCE" | "R9" | "COMPOSE" | "EVALUATOR";
 
 function classify(body: string): RequestKind {
   if (body.includes("Assess an existing debate node authored by another maker")) return "PANEL";
   if (body.includes("Review an existing debate node")) return "REVIEW";
+  // T9: the EVALUATOR replaced BOTH retired serve-path organs. Its marker is
+  // tested BEFORE "restatement_text" because the evaluator's criteria list
+  // names `restatement`, and before the COMPOSE marker for the same reason —
+  // a later branch would swallow it and answer with a judgement, which is what
+  // this double did when the synthesis loop first reached it.
+  if (body.includes("fairness_to_losers")) return "EVALUATOR";
   if (body.includes("restatement_text")) return "JUDGE";
   if (body.includes("conforms,findings")) return "CONFORMANCE";
   if (body.includes("{pass}")) return "R9";
@@ -136,7 +142,7 @@ async function startMaximumPathProvider(label: string): Promise<{
   stop(): Promise<void>;
 }> {
   const counts: Record<RequestKind, number> = {
-    PANEL: 0, REVIEW: 0, JUDGE: 0, CONFORMANCE: 0, R9: 0, COMPOSE: 0
+    PANEL: 0, REVIEW: 0, JUDGE: 0, CONFORMANCE: 0, R9: 0, COMPOSE: 0, EVALUATOR: 0
   };
   /**
    * Failures are counted PER SITE, keyed by the request packet itself, and the
@@ -171,7 +177,7 @@ async function startMaximumPathProvider(label: string): Promise<{
       served += 1;
       // EVERY reachable namespace is driven to its final allowed attempt.
       const failureBudget = kind === "PANEL" ? ATTEMPTS_PER_PANEL_SITE - 1
-        : kind === "COMPOSE" || kind === "CONFORMANCE" || kind === "R9"
+        : kind === "COMPOSE" || kind === "CONFORMANCE" || kind === "R9" || kind === "EVALUATOR"
           ? ATTEMPTS_PER_SERVE_SITE - 1
           : ATTEMPTS_PER_COOLDOWN_SITE - 1;
       const packetKey = `${kind}:${createHash("sha256").update(body).digest("hex")}`;
@@ -204,7 +210,21 @@ async function startMaximumPathProvider(label: string): Promise<{
               // recomposes; round 2 passes and the run still completes. Counted
               // per packet, so each segment's first content response is round 1.
               ? JSON.stringify(conformanceVerdict(packetKey))
-              : kind === "R9" ? JSON.stringify({ pass: true })
+              : kind === "EVALUATOR"
+                // One satisfied verdict ends the loop in round 1, the shape the
+                // sibling integration fixtures script.
+                ? JSON.stringify({
+                  satisfied: true,
+                  objection: null,
+                  criteria: {
+                    fairness_to_losers: true,
+                    statement_label_agreement: true,
+                    no_overstatement: true,
+                    restatement: true,
+                    citation_tracing: true
+                  }
+                })
+                : kind === "R9" ? JSON.stringify({ pass: true })
                 : judgementDouble(`${label} position ${served}`);
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
         id: `t17-${label}-${served}`,
@@ -346,6 +366,31 @@ function runnerSettings(): WalkingSkeletonSettings {
       }
     },
     scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+    // T9 x board F33, the SAME class as the stoppingPolicy repair directly
+    // above: a family sealed by one lane, consumed by the runner, and absent
+    // from a settings object another lane built. Every served statement now
+    // comes out of the synthesizer/evaluator loop, so this fixture cannot even
+    // claim its work item without the sealed rows.
+    //
+    // PROVISIONING ONLY. Both refs name THIS fixture's PRIMARY configured
+    // provider, exactly as the sibling helper in
+    // tests/integration/database.test.ts seals them: identical refs stay lawful
+    // (goal 84-85) and are the case T16's identical-refs warning describes. The
+    // fixture's own subject assertions — the observed ledger attempts, the
+    // serve-site count and the envelope terminal — are unchanged, and they are
+    // what would fail if this provisioning altered the run's shape.
+    synthesisRolePolicy: {
+      registerVersion: 1,
+      synthesizerRoleRef: "provider:test-layer",
+      evaluatorRoleRef: "provider:test-layer",
+      evaluatorLoopMaxRounds: 3,
+      identicalRoleRefs: true,
+      sourceRefs: {
+        synthesizerRoleRef: "test-layer:J8",
+        evaluatorRoleRef: "test-layer:J8",
+        evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+      }
+    },
     // Fixture provisioning only: run completion refuses to manufacture results
     // for outstanding WAIT rows, so the terminal evaluator is supplied exactly
     // as the sibling integration fixtures supply it.
