@@ -404,7 +404,7 @@ async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
   panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
 ): Promise<{
-  endpoint: string; calls(): number; stop(): Promise<void>;
+  endpoint: string; calls(): number; bodies(): readonly string[]; stop(): Promise<void>;
 }> {
   // T9: the EVALUATOR is a class of its own. The retired CONFORMANCE and R9
   // classes stay in the vocabulary so a fixture that still scripts one is
@@ -435,11 +435,19 @@ async function startProviderDouble(
   });
   const pending = [...classified];
   let calls = 0;
+  // codex r5 B1: EVERY inbound /chat/completions body is retained. The gateway
+  // builds a content-repair packet INSIDE itself
+  // (packages/providers OpenAICompatibleProviderGateway: `attemptPacket =
+  // request.buildRepairPacket(...)`), so a wrapper around `ProviderGateway.call`
+  // sees the FIRST attempt only. The wire is the one place every attempt —
+  // initial and repaired — is visible.
+  const bodies: string[] = [];
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      bodies.push(body);
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -499,6 +507,7 @@ async function startProviderDouble(
   return {
     endpoint: `http://127.0.0.1:${address.port}`,
     calls: () => calls,
+    bodies: () => bodies,
     async stop() { server.close(); await once(server, "close"); }
   };
 }
@@ -4128,10 +4137,15 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
       ] }),
+      JSON.stringify({ satisfied: true }),
       evaluatorSatisfied()
     ]);
     try {
-      const { runner, evaluatorCalls } = recordingRunner(provider.endpoint);
+      const settings = {
+        ...runnerSettings(),
+        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 2 }
+      };
+      const { runner, evaluatorCalls } = recordingRunner(provider.endpoint, settings);
       // NB: the question line feeds the code-first claim classifier
       // (packages/judgement/src/s04.ts). Words like "observed" resolve to
       // `empirical`, which this file's composition row does not ratify, so the
@@ -4139,6 +4153,45 @@ describe("apps/runner — legal command lifecycle", () => {
       const work = await createRunnerWork("evaluator-send-at-the-gateway");
       const result = await runner.executeWorkItem(work.workItemId);
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      /**
+       * codex r5 B1 · EVERY EVALUATOR ATTEMPT ON THE WIRE, not just the first.
+       *
+       * A wrapper around `ProviderGateway.call` sees the OUTER request once.
+       * When a reply fails the schema the gateway builds a content-repair packet
+       * INSIDE itself and sends THAT on the next HTTP request, so the wrapper
+       * never sees it. Measured here: the recorder holds 1 outer call while the
+       * wire carries 2 evaluator attempts. The wire is the only place the
+       * invariant can be checked for every attempt.
+       *
+       * Evaluator attempts are identified by the `role` field of the request
+       * payload the runner serialises into the user message — deliberately NOT
+       * by the system prompt, which is the thing under test. Selecting them by
+       * their system text would make a dropped constant vanish from the
+       * selection and pass vacuously.
+       */
+      const attempts = provider.bodies()
+        .map((body) => JSON.parse(body) as { messages: { role: string; content: string }[] })
+        .filter((packet) => {
+          const user = packet.messages.find((message) => message.role === "user");
+          if (user === undefined) return false;
+          try { return (JSON.parse(user.content) as { role?: string }).role === "EVALUATOR"; }
+          catch { return false; }
+        });
+
+      // the repair path REALLY RAN: two attempts reached the wire, the second
+      // carrying one more message than the first — that extra message is the
+      // repair. Without this the assertion below would hold vacuously on a
+      // single attempt, which is exactly the gap codex found.
+      expect(attempts).toHaveLength(2);
+      expect(attempts[1]!.messages.length).toBe(attempts[0]!.messages.length + 1);
+      expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the two
+
+      // THE INVARIANT: every attempt LEADS with the exported contract.
+      for (const [index, packet] of attempts.entries()) {
+        expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
+        expect(packet.messages[0]?.content, `attempt ${index}`).toBe(EVALUATOR_CONTRACT_TEXT);
+      }
 
       // the run really did reach the evaluator — otherwise this proves nothing
       expect(evaluatorCalls).toHaveLength(1);
