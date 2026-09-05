@@ -360,13 +360,23 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     );
     expect(config).toMatchObject({ steering_presets: [], steering_annotations: [] });
 
-    // THE SUBSTANTIVE ASSERTION. Not scoped to names: no sentinel typed into
-    // any text control, in either state, may appear anywhere in the ask config.
-    // A steering control re-added under ANY spelling — inside Options or not,
-    // single-line input or textarea — lands here.
-    for (const [key, value] of Object.entries(config)) {
+    // THE SUBSTANTIVE ASSERTION. Generalised over the CONTROL's name — the
+    // enumeration above selected by shape, so a steering box re-added under any
+    // spelling, in either state, was typed into — and scoped on the SINK side to
+    // the steering fields: the two canonical contract names, plus any further
+    // key spelt like steering. It is deliberately NOT a sweep of the whole
+    // config: an unrelated future field that legitimately carries asker text is
+    // not a violation of THIS property, and asserting over every key would fire
+    // on it (round 2 corrected exactly that over-broadness; m3 re-proves it).
+    const steeringKeys = [...new Set([
+      "steering_presets",
+      "steering_annotations",
+      ...Object.keys(config).filter((key) => /steer/i.test(key))
+    ])].sort();
+    expect(steeringKeys).toEqual(["steering_annotations", "steering_presets"]);
+    for (const key of steeringKeys) {
       for (const sentinel of everySentinel) {
-        expect(JSON.stringify(value) ?? "", `config.${key} carried asker text typed into a form control`)
+        expect(JSON.stringify(config[key]) ?? "", `${key} carried asker text typed into a form control`)
           .not.toContain(sentinel);
       }
     }
