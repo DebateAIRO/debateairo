@@ -368,7 +368,7 @@ describe("OBS-01 typed durable journal", () => {
     })).toThrow("OBSERVATION_EVIDENCE_INVALID");
   });
 
-  it("fsyncs one JSON line before a mirror can observe the signal", async () => {
+  it("fsyncs one v2 JSON line with lifecycle before raw digest and mirror consumers", async () => {
     const stateDir = await scratch();
     const { ObservationJournal } = await import(
       "../../apps/observation-agent/src/journal/journal.js"
@@ -378,17 +378,25 @@ describe("OBS-01 typed durable journal", () => {
     );
     const journal = new ObservationJournal(stateDir);
     const signal = openSignal();
+    const lifecycle = { owner: "core-liveness", correlationKey: "hatchet" } as const;
     let mirrorSawDurableLine = false;
     const result = await persistSignal({
       signal,
+      lifecycle,
       journal,
       mirror: {
-        async mirrorSignal() {
+        async mirrorSignal(mirroredSignal) {
           const source = await readFile(
             join(stateDir, "journal", "signals-2026-09-03.jsonl"), "utf8"
           );
-          mirrorSawDurableLine = source === `${JSON.stringify(signal)}\n`;
+          mirrorSawDurableLine = source === `${JSON.stringify({
+            record_version: 2,
+            kind: "signal",
+            signal,
+            lifecycle: { owner: "core-liveness", correlation_key: "hatchet" }
+          })}\n`;
           if (!mirrorSawDurableLine) throw new Error("MIRROR_BEFORE_JOURNAL");
+          expect(mirroredSignal).toEqual(signal);
         }
       }
     });
@@ -412,7 +420,12 @@ describe("OBS-01 typed durable journal", () => {
     expect(result).toEqual({ mirrored: false });
     expect((await readFile(
       join(stateDir, "journal", "signals-2026-09-03.jsonl"), "utf8"
-    )).trim()).toBe(JSON.stringify(openSignal()));
+    )).trim()).toBe(JSON.stringify({
+      record_version: 2,
+      kind: "signal",
+      signal: openSignal(),
+      lifecycle: null
+    }));
   });
 
   it("derives the previous run exit reason from durable lifecycle signals", async () => {

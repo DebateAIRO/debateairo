@@ -25,6 +25,7 @@ export type ImpactCode = typeof IMPACT_CODES[number];
 
 const safeTarget = z.string().min(1).max(512).regex(/^[A-Za-z0-9_.:/-]+$/u);
 const safeToken = z.string().min(1).max(128).regex(/^[A-Za-z0-9_.:@/-]+$/u);
+export const correlationKeySchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_.:-]+$/u);
 const finiteNonnegative = z.number().finite().nonnegative();
 const finitePositive = z.number().finite().positive();
 const nonnegativeInteger = z.number().int().nonnegative();

@@ -8,6 +8,7 @@ import {
   type ObservationDelivery,
   type ObservationSignal
 } from "../core/signals.js";
+import { signalFromJournalRecord } from "../journal/records.js";
 
 export class PostgresMirror {
   readonly pool: Pool;
@@ -82,7 +83,7 @@ export class PostgresMirror {
         for (const row of rows) {
           const value: unknown = JSON.parse(row);
           if (kind === "signals") {
-            await this.mirrorSignal(value);
+            await this.mirrorSignal(signalFromJournalRecord(value));
             signals += 1;
           } else {
             const envelope = deliveryJournalEnvelopeSchema.parse(value);

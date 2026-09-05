@@ -3,11 +3,15 @@ import { join } from "node:path";
 import {
   deliveryAttemptEnvelopeSchema,
   deliveryResultEnvelopeSchema,
-  signalSchema,
   type DeliveryAttemptEnvelope,
   type DeliveryResultEnvelope,
   type ObservationSignal
 } from "../core/signals.js";
+import type { SignalLifecycleIdentity } from "../core/lifecycle.js";
+import {
+  createSignalJournalRecordV2,
+  signalFromJournalRecord
+} from "./records.js";
 
 export class ObservationJournal {
   readonly stateDir: string;
@@ -16,10 +20,13 @@ export class ObservationJournal {
     this.stateDir = stateDir;
   }
 
-  async appendSignal(input: unknown): Promise<ObservationSignal> {
-    const signal = signalSchema.parse(input);
-    await this.append("signals", signal.detected_at.slice(0, 10), signal);
-    return signal;
+  async appendSignal(
+    input: unknown,
+    lifecycle: SignalLifecycleIdentity | null = null
+  ): Promise<ObservationSignal> {
+    const record = createSignalJournalRecordV2(input, lifecycle);
+    await this.append("signals", record.signal.detected_at.slice(0, 10), record);
+    return record.signal;
   }
 
   async appendDeliveryAttempt(input: unknown): Promise<DeliveryAttemptEnvelope> {
@@ -56,10 +63,15 @@ export class ObservationJournal {
         } catch {
           continue;
         }
-        const signal = signalSchema.safeParse(value);
-        if (!signal.success || signal.data.class !== "AGENT_SELF") continue;
-        if (signal.data.impact_code === "IMPACT_AGENT_STOP") return "CLEAN";
-        if (signal.data.impact_code === "IMPACT_AGENT_START") return "UNCLEAN";
+        let signal: ObservationSignal;
+        try {
+          signal = signalFromJournalRecord(value);
+        } catch {
+          continue;
+        }
+        if (signal.class !== "AGENT_SELF") continue;
+        if (signal.impact_code === "IMPACT_AGENT_STOP") return "CLEAN";
+        if (signal.impact_code === "IMPACT_AGENT_START") return "UNCLEAN";
       }
     }
     return "UNKNOWN";

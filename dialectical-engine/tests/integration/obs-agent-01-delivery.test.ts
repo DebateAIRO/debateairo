@@ -83,7 +83,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     )).rows[0]?.count).toBe("1");
   });
 
-  it("catches up a journaled signal after Postgres returns", async () => {
+  it("catches up legacy and v2 journaled signals after Postgres returns", async () => {
     const { ObservationJournal } = await import(
       "../../apps/observation-agent/src/journal/journal.js"
     );
@@ -95,10 +95,18 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
     );
     const catchUpDir = await mkdtemp(join(tmpdir(), "obs-01-catchup-"));
     try {
+      const legacy = signal({ seq: 39, id: "10000000-0000-4000-8000-000000000039" });
       const pending = signal({ seq: 40, id: "10000000-0000-4000-8000-000000000040" });
+      await mkdir(join(catchUpDir, "journal"), { recursive: true });
+      await writeFile(
+        join(catchUpDir, "journal", "signals-2026-09-02.jsonl"),
+        `${JSON.stringify(legacy)}\n`,
+        "utf8"
+      );
       const journal = new ObservationJournal(catchUpDir);
       await persistSignal({
         signal: pending,
+        lifecycle: { owner: "core-liveness", correlationKey: "hatchet" },
         journal,
         mirror: { async mirrorSignal() { throw new Error("postgres down"); } }
       });
@@ -123,10 +131,14 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
         }
       });
       const mirror = new PostgresMirror(database.pool);
-      await expect(mirror.catchUp(catchUpDir)).resolves.toEqual({ signals: 1, deliveries: 1 });
+      await expect(mirror.catchUp(catchUpDir)).resolves.toEqual({ signals: 2, deliveries: 1 });
       expect((await database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM observation.signal WHERE signal_id=$1",
         [pending.signal_id]
+      )).rows[0]?.count).toBe("1");
+      expect((await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM observation.signal WHERE signal_id=$1",
+        [legacy.signal_id]
       )).rows[0]?.count).toBe("1");
       expect((await database.pool.query<{ outcome: string }>(
         "SELECT outcome FROM observation.delivery WHERE delivery_id=$1",
@@ -304,7 +316,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
                   globalThis.__obsRouterEvents.push("signal:" + signal.class);
                   globalThis.__obsPersistedRouterSignals.push({
                     signalId: signal.signal_id,
-                    durableSignalId: rows.at(-1).signal_id,
+                    durableSignalId: rows.at(-1).signal.signal_id,
                     thresholdVersion: module.thresholdVersion,
                     thresholds: module.thresholds
                   });
@@ -475,7 +487,9 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       const durableSignals = (await readFile(
         join(moduleStateDir, "journal", "signals-2026-09-03.jsonl"), "utf8"
       )).trim().split("\n").map((line) => JSON.parse(line));
-      const moduleSignals = durableSignals.filter((row) => row.class !== "AGENT_SELF");
+      const moduleSignals = durableSignals
+        .map((row) => row.signal)
+        .filter((row) => row.class !== "AGENT_SELF");
       expect(moduleSignals.map((row) => [row.state, row.signal_id, row.clears_signal_id]))
         .toEqual([
           ["OPEN", "50000000-0000-4000-8000-000000000001", null],
@@ -489,8 +503,8 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
         }>;
       }).__obsPersistedRouterSignals.map(({ signalId, durableSignalId }) => ({
         signalId, durableSignalId
-      }))).toEqual(durableSignals.map((row) => ({ signalId: row.signal_id,
-        durableSignalId: row.signal_id })));
+      }))).toEqual(durableSignals.map((row) => ({ signalId: row.signal.signal_id,
+        durableSignalId: row.signal.signal_id })));
       const routedContexts = (globalThis as typeof globalThis & {
         __obsPersistedRouterSignals: Array<{
           thresholdVersion: number; thresholds: Readonly<Record<string, unknown>>;
@@ -504,7 +518,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
       expect(notifications).toBe(0);
       expect((await database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM observation.delivery WHERE signal_id = ANY($1::uuid[])",
-        [durableSignals.map((row) => row.signal_id)]
+        [durableSignals.map((row) => row.signal.signal_id)]
       )).rows[0]?.count).toBe("0");
     } finally {
       await rm(moduleRoot, { recursive: true, force: true });

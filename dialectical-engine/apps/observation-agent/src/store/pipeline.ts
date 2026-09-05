@@ -1,5 +1,6 @@
 import type { ObservationSignal } from "../core/signals.js";
 import { signalSchema } from "../core/signals.js";
+import type { SignalLifecycleIdentity } from "../core/lifecycle.js";
 import type { ObservationJournal } from "../journal/journal.js";
 import { appendDigest } from "../notify/digest.js";
 
@@ -9,11 +10,12 @@ export type SignalMirror = Readonly<{
 
 export async function persistSignal(input: Readonly<{
   signal: unknown;
+  lifecycle?: SignalLifecycleIdentity | null;
   journal: ObservationJournal;
   mirror: SignalMirror;
 }>): Promise<Readonly<{ mirrored: boolean }>> {
   const signal = signalSchema.parse(input.signal);
-  await input.journal.appendSignal(signal);
+  await input.journal.appendSignal(signal, input.lifecycle ?? null);
   await appendDigest(input.journal.stateDir, signal);
   try {
     await input.mirror.mirrorSignal(signal);
