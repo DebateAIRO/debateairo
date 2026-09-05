@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { runReaper, runReplaySelfTest, runSettlementWatch } from "../../apps/scheduler/src/index.js";
+import {
+  runLivenessSweep,
+  runReaper,
+  runReplaySelfTest,
+  runSettlementWatch,
+} from "../../apps/scheduler/src/index.js";
 
 describe("apps/scheduler entry-point honesty", () => {
   it("keeps reaper loud while publishing the third independent settlement watch", async () => {
@@ -9,6 +14,19 @@ describe("apps/scheduler entry-point honesty", () => {
       checked: 0, settled: 0, superseded: 0, incomplete: 0, results: []
     });
     await expect(runSettlementWatch(unreachablePool, [{} as never])).rejects.toThrow("SETTLEMENT_POLICY_REQUIRED");
+  });
+
+  it("reports the authoritative number of liveness versions checked", async () => {
+    const pool = {
+      async query() {
+        return { rows: [] };
+      },
+    } as unknown as Parameters<typeof runLivenessSweep>[0];
+
+    await expect(runLivenessSweep(pool)).resolves.toEqual({
+      checked: 0,
+      archived: [],
+    });
   });
 });
 
