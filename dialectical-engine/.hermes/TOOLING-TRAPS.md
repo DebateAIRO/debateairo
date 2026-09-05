@@ -1316,3 +1316,30 @@ lane's blob had added the six-slot code array that tripped an incoming oracle.
 **Compare blob ids, never existence.** Cost: one wrong hypothesis, caught by
 checking the blob before writing it down.
 (algorithm-live-loop, W5 dev-sync r3)
+
+## A receipt's PRODUCER and its PARSER restate the same invariant in two packages
+Found by T17T9-3 (2026-09-05). `computeStructuralCeilingBasis`
+(`packages/register/src/index.ts`) decides two things about the serve leg —
+`serveSites = max(compositionSites, synthesisLoopSites)` and
+`selected = compositionSites >= synthesisLoopSites ? COMPOSITION : SYNTHESIS_LOOP`.
+`parseCostEnvelopeBasis` (`packages/budget/src/index.ts`) re-derives BOTH from the
+persisted receipt and rejects any basis that disagrees — deliberately, and its
+comment says so: "These two guards restate the constructor's own two decisions,
+and they are INDEPENDENT of the one above." **A ticket scoped to the producer
+therefore cannot change the producer's decision at all**: the parser refuses
+every receipt the new producer would mint, and the refusal surfaces at the run
+head, not at compile time. Cost here: the whole ticket, blocked at the contract
+boundary. **Before scoping a lane to a value-producing function, grep for a
+parser/validator that re-derives its invariants and put it in the same contract.**
+The cheap probe is 12 lines — build the basis the new rule would mint, feed it to
+the parser, read the rejection — and it is worth running BEFORE the design, not
+after. (algorithm-live-loop, T17T9-3)
+
+## zsh eats an unquoted `--include=*.ts`, and reports it as "no matches found"
+Found by T17T9-3 (2026-09-05). `grep -rn "pattern" DIR --include=*.ts` fails in
+zsh with `(eval):2: no matches found: --include=*.ts` — zsh tries to glob the
+flag's value against the CWD before grep ever runs, and there are no `.ts` files
+next to a report directory. The message names the flag, not the search, so it
+reads like a grep problem. Quote it: `--include='*.ts'`. Same shape as the
+already-recorded macOS `awk`/`rg` traps: the harness's shell is zsh, not bash.
+Cost: one wasted call per occurrence. (algorithm-live-loop, T17T9-3)
