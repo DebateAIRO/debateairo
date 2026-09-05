@@ -17,7 +17,7 @@ export const IMPACT_CODES = Object.freeze([
   "IMPACT_SPOOL_STRANDED", "IMPACT_DISK", "IMPACT_MEMORY", "IMPACT_LOAD", "IMPACT_PROVIDER",
   "IMPACT_RUN_FAILURE", "IMPACT_CERT", "IMPACT_SCHEDULE_MISSED", "IMPACT_RESTART",
   "IMPACT_EXPECTED_ABSENT", "IMPACT_THRESHOLDS", "IMPACT_AGENT_START",
-  "IMPACT_AGENT_STOP", "IMPACT_AGENT_JOURNAL", "IMPACT_CLEARED"
+  "IMPACT_AGENT_STOP", "IMPACT_AGENT_JOURNAL", "IMPACT_AGENT_DELIVERY", "IMPACT_CLEARED"
 ] as const);
 
 export type Severity = typeof SEVERITIES[number];
@@ -63,6 +63,10 @@ const agentStartEvidenceSchema = z.object({
 
 const agentStopEvidenceSchema = z.object({ reason: z.literal("STOP") }).strict();
 const agentJournalEvidenceSchema = z.object({ reason: z.literal("JOURNAL_FAILURE") }).strict();
+const agentDeliveryEvidenceSchema = z.object({
+  reason: z.literal("DELIVERY_FAILURE"),
+  channel: z.enum(["osascript", "sendmail", "kanban"])
+}).strict();
 
 const thresholdEvidenceSchema = z.object({
   previous_version: positiveInteger,
@@ -386,6 +390,7 @@ const evidenceByImpact = {
   IMPACT_AGENT_START: agentStartEvidenceSchema,
   IMPACT_AGENT_STOP: agentStopEvidenceSchema,
   IMPACT_AGENT_JOURNAL: agentJournalEvidenceSchema,
+  IMPACT_AGENT_DELIVERY: agentDeliveryEvidenceSchema,
   IMPACT_CLEARED: clearedEvidenceSchema
 } satisfies Readonly<Record<ImpactCode, EvidenceValidator>>;
 
@@ -420,7 +425,10 @@ const impactsByClass = {
   CERT_EXPIRY: ["IMPACT_CERT", "IMPACT_CLEARED"],
   SCHEDULE_MISSED: ["IMPACT_SCHEDULE_MISSED", "IMPACT_CLEARED"],
   THRESHOLD_CHANGED: ["IMPACT_THRESHOLDS"],
-  AGENT_SELF: ["IMPACT_AGENT_START", "IMPACT_AGENT_STOP", "IMPACT_AGENT_JOURNAL"]
+  AGENT_SELF: [
+    "IMPACT_AGENT_START", "IMPACT_AGENT_STOP", "IMPACT_AGENT_JOURNAL",
+    "IMPACT_AGENT_DELIVERY"
+  ]
 } as const satisfies Readonly<Record<SignalClass, readonly ImpactCode[]>>;
 
 const signalBaseSchema = z.object({
@@ -455,6 +463,9 @@ export const signalSchema = signalBaseSchema.superRefine((signal, context) => {
   if ((signal.suspected_defect && signal.defect_kind === null)
     || (!signal.suspected_defect && signal.defect_kind !== null)) {
     context.addIssue({ code: "custom", message: "OBSERVATION_DEFECT_KIND_INVALID", path: ["defect_kind"] });
+  }
+  if (signal.impact_code === "IMPACT_AGENT_DELIVERY" && signal.suspected_defect) {
+    context.addIssue({ code: "custom", message: "OBSERVATION_DEFECT_KIND_INVALID", path: ["suspected_defect"] });
   }
   if ((signal.state === "OPEN" && signal.clears_signal_id !== null)
     || (signal.state === "CLEARED" && signal.clears_signal_id === null)) {
@@ -563,6 +574,7 @@ const IMPACT_RENDERERS: Readonly<Record<ImpactCode, (signal: RenderableSignal) =
   IMPACT_AGENT_START: () => "ObservationAgent started.",
   IMPACT_AGENT_STOP: () => "ObservationAgent stopped.",
   IMPACT_AGENT_JOURNAL: () => "ObservationAgent cannot write its journal: signals may be lost until storage is restored.",
+  IMPACT_AGENT_DELIVERY: (s) => `ObservationAgent could not deliver through ${stringEvidence(s, "channel")}: the signal remains stored and other channels continue.`,
   IMPACT_CLEARED: (s) => `${s.component}: ${s.class} cleared after ${numberEvidence(s, "duration_seconds")} seconds.`
 });
 

@@ -135,6 +135,56 @@ describe("OBS-01 observation schema foundation", () => {
     }
   });
 
+  it("replays migration and stores delivery failures outside the defect view", async () => {
+    await migrate(pool());
+    await expect(pool().query(`
+      INSERT INTO observation.signal(
+        signal_id,state,class,component,severity,impact_code,first_failed_probe_at,
+        detected_at,evidence,suspected_defect,defect_kind,run_ref,work_item_ref,
+        threshold_version,clears_signal_id,recorded_at
+      ) VALUES (
+        '00000000-0000-4000-8000-000000000059','OPEN','AGENT_SELF',
+        'observation_agent','DEGRADED','IMPACT_AGENT_DELIVERY',null,now(),
+        '{"reason":"DELIVERY_FAILURE","channel":"sendmail"}',false,null,null,null,1,null,now()
+      )
+    `)).resolves.toMatchObject({ rowCount: 1 });
+
+    const stored = await pool().query<{
+      class: string;
+      impact_code: string;
+      evidence: Record<string, unknown>;
+      suspected_defect: boolean;
+      visible_as_defect: boolean;
+    }>(`
+      SELECT class,impact_code,evidence,suspected_defect,
+        EXISTS(
+          SELECT 1 FROM observation.defect_signal_v AS defect
+          WHERE defect.signal_id=signal.signal_id
+        ) AS visible_as_defect
+      FROM observation.signal AS signal
+      WHERE signal_id='00000000-0000-4000-8000-000000000059'
+    `);
+    expect(stored.rows).toEqual([{
+      class: "AGENT_SELF",
+      impact_code: "IMPACT_AGENT_DELIVERY",
+      evidence: { reason: "DELIVERY_FAILURE", channel: "sendmail" },
+      suspected_defect: false,
+      visible_as_defect: false
+    }]);
+
+    await expect(pool().query(`
+      INSERT INTO observation.signal(
+        signal_id,state,class,component,severity,impact_code,first_failed_probe_at,
+        detected_at,evidence,suspected_defect,defect_kind,run_ref,work_item_ref,
+        threshold_version,clears_signal_id,recorded_at
+      ) VALUES (
+        '00000000-0000-4000-8000-000000000060','OPEN','AGENT_SELF',
+        'observation_agent','DEGRADED','IMPACT_AGENT_DELIVERY',null,now(),
+        '{"reason":"DELIVERY_FAILURE","channel":"sendmail"}',true,'STALL_DETECTED',null,null,1,null,now()
+      )
+    `)).rejects.toMatchObject({ code: "23514" });
+  });
+
   it("gives the agent only the required mutable-table updates", async () => {
     const agent = await pool().connect();
     try {

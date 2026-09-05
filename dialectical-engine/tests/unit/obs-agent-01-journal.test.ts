@@ -316,6 +316,58 @@ describe("OBS-01 typed durable journal", () => {
     })).not.toThrow();
   });
 
+  it("accepts only non-defect AGENT_SELF delivery failures and renders fixed channel copy", async () => {
+    const { renderImpact, signalSchema } = await import(
+      "../../apps/observation-agent/src/core/signals.js"
+    );
+    const deliveryFailure = (channel: "osascript" | "sendmail" | "kanban") => ({
+      ...openSignal(204),
+      class: "AGENT_SELF",
+      component: "observation_agent",
+      severity: "DEGRADED",
+      impact_code: "IMPACT_AGENT_DELIVERY",
+      first_failed_probe_at: null,
+      evidence: { reason: "DELIVERY_FAILURE", channel }
+    });
+
+    for (const channel of ["osascript", "sendmail", "kanban"] as const) {
+      const signal = deliveryFailure(channel);
+      expect(() => signalSchema.parse(signal)).not.toThrow();
+      expect(renderImpact(signal)).toBe(
+        `ObservationAgent could not deliver through ${channel}: the signal remains stored and other channels continue.`
+      );
+    }
+
+    expect(() => signalSchema.parse({
+      ...deliveryFailure("sendmail"),
+      evidence: { reason: "DELIVERY_FAILURE", channel: "webhook" }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...deliveryFailure("sendmail"),
+      evidence: {
+        reason: "DELIVERY_FAILURE", channel: "sendmail",
+        error: "raw failure", message: "raw failure", payload: { private: true }
+      }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...deliveryFailure("sendmail"),
+      suspected_defect: true,
+      defect_kind: "STALL_DETECTED"
+    })).toThrow("OBSERVATION_DEFECT_KIND_INVALID");
+    expect(() => signalSchema.parse({
+      ...deliveryFailure("sendmail"),
+      class: "INFRA_DOWN"
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...deliveryFailure("sendmail"),
+      evidence: { reason: "JOURNAL_FAILURE", channel: "sendmail" }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+    expect(() => signalSchema.parse({
+      ...deliveryFailure("sendmail"),
+      evidence: { reason: "DELIVERY_FAILURE" }
+    })).toThrow("OBSERVATION_EVIDENCE_INVALID");
+  });
+
   it("fsyncs one JSON line before a mirror can observe the signal", async () => {
     const stateDir = await scratch();
     const { ObservationJournal } = await import(

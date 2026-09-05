@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS observation.signal (
     'IMPACT_SPOOL_STRANDED','IMPACT_DISK','IMPACT_MEMORY','IMPACT_LOAD','IMPACT_PROVIDER',
     'IMPACT_RUN_FAILURE','IMPACT_CERT','IMPACT_SCHEDULE_MISSED','IMPACT_RESTART',
     'IMPACT_EXPECTED_ABSENT','IMPACT_THRESHOLDS','IMPACT_AGENT_START',
-    'IMPACT_AGENT_STOP','IMPACT_AGENT_JOURNAL','IMPACT_CLEARED'
+    'IMPACT_AGENT_STOP','IMPACT_AGENT_JOURNAL','IMPACT_AGENT_DELIVERY','IMPACT_CLEARED'
   )),
   first_failed_probe_at timestamptz,
   detected_at timestamptz NOT NULL,
@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS observation.signal (
   clears_signal_id uuid,
   recorded_at timestamptz NOT NULL,
   CHECK ((suspected_defect AND defect_kind IS NOT NULL) OR (NOT suspected_defect AND defect_kind IS NULL)),
+  CHECK (impact_code <> 'IMPACT_AGENT_DELIVERY' OR NOT suspected_defect),
   CHECK ((state='OPEN' AND clears_signal_id IS NULL) OR (state='CLEARED' AND clears_signal_id IS NOT NULL))
 );
 
