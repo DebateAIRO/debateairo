@@ -1,3 +1,4 @@
+import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
@@ -25,15 +26,23 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
   ]);
   const judgeText = judge.match(/content: `([\s\S]*?)`/)?.[1];
   const composerText = runner.match(/content: "(Return only JSON with a segments array[^"]+)"/)?.[1];
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
-    .map((match) => match[1]);
-  if (judgeText === undefined || composerText === undefined || conformanceTexts.length !== 2) {
+  // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints the
+  // EVALUATOR prompt alone.
+  //
+  // This line used to locate that prompt independently of the seeder, so that
+  // two different locators had to agree. THERE IS NOTHING LEFT TO CROSS-CHECK:
+  // codex r2 showed every lexical locator has an input that defeats it, so the
+  // prompt is now an exported constant that the runner SENDS and the seeders
+  // digest. Cross-checking one constant against itself would be theatre. The
+  // real guard moved to `tests/unit/f-sealedrows-a-conformance-extractor.test.ts`,
+  // which pins the digest VALUE and fails if the prompt is edited at all.
+  if (judgeText === undefined || composerText === undefined) {
     throw new Error("TEST_CONTRACT_TEXT_EXTRACTION_FAILED");
   }
   return {
     judgeContractHash: sha256(judgeText),
     composerContractHash: sha256(composerText),
-    conformanceContractHash: sha256(conformanceTexts.join("\n")),
+    conformanceContractHash: sha256(EVALUATOR_CONTRACT_TEXT),
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };
@@ -101,14 +110,24 @@ describe("ACC-01 acceptance register", () => {
       .toEqual([...CLAIM_TYPES].sort());
     expect(byKey.wayOfKnowingCeiling?.value).toEqual({
       bandOrder: ["CAPPED", "FULL"],
-      ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING"],
+      ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
       defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
       cuts: [{
         minimumShares: { REASONING: 0.5 },
         label: "REASONING_CEILING",
         ceilingBand: "CAPPED",
         liftPath: "gather-evidence-to-lift"
-      }]
+      }],
+      // F-T9B-3: the empty-basis floor. The reasoning cut above names the right
+      // band for a tracing-failed run and the WRONG REASON — its share trigger
+      // cannot fire on an empty basis — so the row carries an entry whose
+      // trigger IS the empty basis and whose lift path asks for ANY verified
+      // evidence rather than more of it.
+      emptyBasisFloor: {
+        label: "NO_VERIFIED_EVIDENCE_FLOOR",
+        ceilingBand: "CAPPED",
+        liftPath: "gather-any-verified-evidence-to-lift"
+      }
     });
     expect(byKey.acceptanceOrganCostBounds).toEqual({
       rowKey: "acceptanceOrganCostBounds",

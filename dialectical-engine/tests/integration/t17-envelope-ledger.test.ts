@@ -277,13 +277,20 @@ function runnerSettings(): WalkingSkeletonSettings {
         rowKey: "wayOfKnowingCeiling", registerVersion: 1, sourceRef: "test-layer:DR-086",
         value: {
           bandOrder: ["TEST_CAPPED_BAND", "TEST_TOP_BAND"],
-          ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING"],
+          ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
           defaultCeiling: { label: "TEST_DEFAULT_CEILING", ceilingBand: "TEST_TOP_BAND", liftPath: "test-layer:retain-band" },
           cuts: [{
             minimumShares: { LOOKED_UP: 0.5 },
             label: "TEST_LOOKED_UP_CEILING", ceilingBand: "TEST_CAPPED_BAND",
             liftPath: "test-layer:improve-way-of-knowing"
-          }]
+          }],
+          // F-T9B-3 / codex r2: every row describes its own floor. The
+          // LOOKED_UP cut names the same band but its share trigger cannot
+          // fire on an empty basis, so it cannot describe this case.
+          emptyBasisFloor: {
+            label: "TEST_EMPTY_BASIS_FLOOR", ceilingBand: "TEST_CAPPED_BAND",
+            liftPath: "test-layer:gather-any-verified-evidence-to-lift"
+          }
         }
       }
     },

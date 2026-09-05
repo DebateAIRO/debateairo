@@ -66,7 +66,16 @@ const runtimeRowsSchema = z.object({
     cuts: z.array(z.object({
       minimumShares: minimumSharesSchema,
       label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
-    }).strict())
+    }).strict()),
+    // F-T9B-3 / codex r1 B2: the entry whose trigger is the EMPTY BASIS itself.
+    // REQUIRED. It was optional, and the reviewer showed a strict parser then
+    // admitted an incomplete sealed row and deferred the refusal to whenever an
+    // empty basis happened to occur — `acceptance-parser-accepts-missing-floor
+    // true`. A sealed row that cannot describe its own floor is refused HERE,
+    // at read time.
+    emptyBasisFloor: z.object({
+      label: z.string().min(1), ceilingBand: z.string().min(1), liftPath: z.string().min(1)
+    }).strict()
   }).strict(),
   // FAIR-02 (DR-140): both real makers, in seeded order. The floor stays 1
   // (DR-137 mono-model admission); the honest 2-maker report comes from the

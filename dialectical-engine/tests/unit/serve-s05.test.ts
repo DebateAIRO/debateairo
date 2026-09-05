@@ -128,7 +128,7 @@ const bandCeilingRow = (): BandCeilingRegisterRow => ({
   sourceRef: "test-layer:DR-082-086",
   value: {
     bandOrder: ["TEST_LOW_BAND", "TEST_TOP_BAND"],
-    ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_REASONING_CEILING"],
+    ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_REASONING_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
     defaultCeiling: {
       label: "TEST_DEFAULT_CEILING",
       ceilingBand: "TEST_TOP_BAND",
@@ -139,7 +139,15 @@ const bandCeilingRow = (): BandCeilingRegisterRow => ({
       label: "TEST_REASONING_CEILING",
       ceilingBand: "TEST_LOW_BAND",
       liftPath: "test-layer:improve-way-of-knowing"
-    }]
+    }],
+    // F-T9B-3 / codex r1 B2: every CURRENT fixture carries a truthful
+    // empty-basis entry. Its name must differ from the share cut's, because the
+    // cut's trigger cannot fire on an empty basis.
+    emptyBasisFloor: {
+      label: "TEST_EMPTY_BASIS_FLOOR",
+      ceilingBand: "TEST_LOW_BAND",
+      liftPath: "test-layer:gather-any-verified-evidence-to-lift"
+    }
   }
 });
 

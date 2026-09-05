@@ -274,8 +274,33 @@ export interface BandCeilingRegisterRow {
       readonly ceilingBand: string;
       readonly liftPath: string;
     }[];
+    /**
+     * F-T9B-3: the entry describing NO VERIFIED EVIDENCE. Its trigger is the
+     * empty basis itself, which is why it sits beside `cuts` instead of in it:
+     * every `cuts` entry is selected by a SHARE threshold, and on an empty basis
+     * no share exists to threshold.
+     *
+     * REQUIRED (codex r2, closing F-SEALEDROWS-D). It was optional for one
+     * round, justified by a read-only fixture that could not be updated — which
+     * was a fact about a contract, not about what a sealed row means. It was
+     * then briefly a required STRUCTURAL SUBTYPE used by the two deployment
+     * readers, which codex correctly judged not to be versioning: with no
+     * discriminator and no historical adapter, the base type could still
+     * describe an incomplete row, and the live runner and `deriveBandCeiling`
+     * both still accepted it. A row that cannot describe its own floor is now
+     * unconstructible, so the refusal happens at the compiler, at the strict
+     * schemas on read, AND at derivation. Tests that need an incomplete row
+     * build one through `unknown`, which is the only caller that shape can now
+     * come from.
+     */
+    readonly emptyBasisFloor: {
+      readonly label: string;
+      readonly ceilingBand: string;
+      readonly liftPath: string;
+    };
   };
 }
+
 
 const WAYS_OF_KNOWING = ["LOOKED_UP", "RAN", "REASONING"] as const;
 
@@ -335,23 +360,45 @@ export function deriveBandCeiling(input: {
      * FAILS CLOSED. A row with no entry naming its own floor band cannot
      * describe this decision, and this refuses rather than inventing a label.
      *
-     * KNOWN RESIDUE, filed as F-T9B-3 and NOT fixed here: on the shipped row the
-     * only entry naming the floor is `REASONING_CEILING`, whose band and lift
-     * path are both right for this case but whose NAME describes a
-     * reasoning-share trigger that did not fire — the basis is empty, not
-     * reasoning-heavy. The row conflates an entry's trigger with its outcome, so
-     * no selection over the existing entries can be truthful about the reason.
-     * Curing that needs an explicit empty-basis entry in the sealed row, and the
-     * mission's slice map makes S01/T16 the sole owner of every new sealed row
-     * and schema. It is not T9's to take.
+     * F-T9B-3 IS NOW CLOSED, and this is what changed. The entry is no longer
+     * SELECTED by scanning `cuts` then `defaultCeiling` for one whose band
+     * happens to equal the floor. On the shipped row the only such entry was
+     * `REASONING_CEILING`, whose band and lift path were both right for this
+     * case but whose NAME describes a REASONING-SHARE trigger that CANNOT have
+     * fired here — the basis is empty, so no share of anything reached the
+     * sealed minimum. (The threshold itself is deliberately not quoted here:
+     * the T16 grep-proof treats a sealed value on this surface as a hardcode
+     * even inside a comment, and it is right to — a number repeated in prose
+     * goes stale exactly as silently as one repeated in code.) The record named
+     * a cause that did not occur. Because every entry carries ONE label serving
+     * as both trigger and outcome, no selection over the existing entries could
+     * be truthful, so the row now carries `emptyBasisFloor`, an entry whose
+     * TRIGGER IS THE EMPTY BASIS ITSELF.
+     *
+     * BOTH HALVES OF THE ROW ARE STILL VALIDATED, and the band half is now a
+     * REAL check rather than one that cannot fail. Previously the entry was
+     * found BY `ceilingBand === bandOrder[0]`, so re-checking it afterwards
+     * could never fail and was correctly omitted (D56). The entry is now named
+     * rather than found, so nothing guarantees its band — and a sealed row
+     * whose empty-basis entry points somewhere other than the floor is exactly
+     * the inconsistency `devRunnerPolicySchema` cannot catch, since it checks
+     * only that these strings are non-empty. So it is checked here.
+     *
+     * STILL FAILS CLOSED. A row that describes no floor cannot describe this
+     * decision, and this refuses rather than inventing a label.
      */
     const floorBand = bandOrder[0]!;
-    const floorEntry = [...input.row.value.cuts, input.row.value.defaultCeiling]
-      .find((entry) => entry.ceilingBand === floorBand);
+    const floorEntry = input.row.value.emptyBasisFloor;
     if (floorEntry === undefined) {
       throw new TypedDomainError(
         "BAND_CEILING_FLOOR_UNDESCRIBED",
-        `No ceiling entry names the floor band ${floorBand}, so an empty basis cannot be described`
+        `The row carries no empty-basis floor entry, so a basis of no verified evidence cannot be described`
+      );
+    }
+    if (floorEntry.ceilingBand !== floorBand) {
+      throw new TypedDomainError(
+        "BAND_CEILING_FLOOR_BAND_INVALID",
+        `The empty-basis entry names ${floorEntry.ceilingBand}, which is not the floor band ${floorBand}`
       );
     }
     const floorLabel = requiredText(floorEntry.label, "BAND_CEILING_LABEL_INVALID");
