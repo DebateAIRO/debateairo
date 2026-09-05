@@ -16,6 +16,7 @@
 - `FIX01_REVIEW_REF` is exactly `24d0b3e5de84876b6b46fa84b13a0a42aa2640a4`.
 - `FIX04_AUTHORITY_REF` is exactly reviewed authority commit `d935aad03aa56e752016011c57a81c5d33d27680`; a caller-supplied expectation, branch name, predecessor, or invocation-time `HEAD` is not a substitute.
 - `FIX04_BASE_REF` is the exact two-parent composition merge created before the first implementation edit.
+- The durable admission receipt is controller-owned at `/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md`; no FIX-04 code-worktree ignore or exclude mutation is permitted.
 - The controller's existing FIX-07 decision delta and unrelated untracked paths remain untouched and unstaged.
 - No command reads or uses `.hermes/**`.
 - Every focused test command captures output before checking status, requires a nonzero executed-test count, and runs three times. The worst run controls.
@@ -28,7 +29,7 @@
 **Files:**
 
 - Create: `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/`
-- Create: `.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md`
+- Create: `/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md`
 - Read: `.superpowers/sdd/PLAN-FixAgent/fix04-b2-authority-report.md`
 - Read: FIX-01 final review reports `task-17-fix01-c5-zone-veto-sol-final-review.md` and `task-19-fix01-runtime-race-sol-review.md`
 
@@ -93,20 +94,37 @@ git merge-base --is-ancestor 6649fd7d809c6bc2ff21123d8b47c3d8a2b553e9 "$FIX01_RE
 [[ "$(git rev-parse "$FIX04_AUTHORITY_REF:dialectical-engine/apps/api/src/index.ts")" == 174ee8ff60461eb4f5aa233441b0367bb3d174b7 ]]
 [[ "$(git rev-parse "$FIX01_REVIEW_REF:dialectical-engine/apps/api/src/index.ts")" == 174ee8ff60461eb4f5aa233441b0367bb3d174b7 ]]
 [[ -z "$(git diff --cached --name-only)" ]]
-[[ ! -e /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04 ]]
-! git show-ref --verify --quiet refs/heads/slice/oa-fix-04
+FIX04_WORKTREE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04
+ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+branch_present=0
+worktree_present=0
+git show-ref --verify --quiet refs/heads/slice/oa-fix-04 && branch_present=1
+[[ -d "$FIX04_WORKTREE/dialectical-engine" ]] && worktree_present=1
+[[ ! -e "$ADMISSION_REPORT" ]]
+if [[ $branch_present -eq 0 && $worktree_present -eq 0 ]]; then
+  print 'FIX04_ADMISSION_MODE=fresh'
+elif [[ $branch_present -eq 1 && $worktree_present -eq 1 ]]; then
+  print 'FIX04_ADMISSION_MODE=resume-existing-34ebf866'
+else
+  print "STOP: partial FIX-04 lane state branch=$branch_present worktree=$worktree_present"
+  exit 1
+fi
 ```
 
-Expected: exit `0`. The controller may still report the pre-existing unstaged FIX-07 decision path and unrelated untracked paths; none may enter the index.
+Expected: exit `0` and exactly one admission mode. The controller may still report the pre-existing unstaged FIX-07 decision path and unrelated untracked paths; none may enter the index. Run exactly Step 2F for `fresh` or Step 2R for `resume-existing-34ebf866`; never run both.
 
-- [ ] **Step 2: Create the one slice worktree and composition merge**
+- [ ] **Step 2F: Fresh mode — create the one slice worktree and composition merge**
 
-Run from the same controller directory:
+Run from the same controller directory only when Step 1 printed `FIX04_ADMISSION_MODE=fresh`:
 
 ```zsh
 set -eu
 FIX04_AUTHORITY_REF=d935aad03aa56e752016011c57a81c5d33d27680
 FIX01_REVIEW_REF=24d0b3e5de84876b6b46fa84b13a0a42aa2640a4
+ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+[[ ! -e /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04 ]]
+! git show-ref --verify --quiet refs/heads/slice/oa-fix-04
+[[ ! -e "$ADMISSION_REPORT" ]]
 zsh docs/missions/observability-agents/logs/prep-slice-worktree.sh FIX-04 "$FIX04_AUTHORITY_REF"
 FIX04_LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/dialectical-engine
 git -C "$FIX04_LANE" merge --no-ff "$FIX01_REVIEW_REF" -m 'chore(obs): compose FIX-04 reviewed dependencies'
@@ -122,11 +140,94 @@ print "FIX04_BASE_REF=$FIX04_BASE_REF"
 
 Expected: one merge commit with the authority ref first and FIX-01 ref second, a clean slice worktree, and one printed full `FIX04_BASE_REF`. A conflict, fast-forward, wrong parent, wrong subject, changed API blob, or dirty result is a stop.
 
+- [ ] **Step 2R: Resume mode — attest the already-created admission state without changing it**
+
+Run from the controller only when Step 1 printed `FIX04_ADMISSION_MODE=resume-existing-34ebf866`. This path accepts exactly the already-created Task-1 composition and performs no Git write:
+
+```zsh
+set -eu
+FIX04_LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/dialectical-engine
+FIX04_WORKTREE_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04
+FIX04_BASE_REF=34ebf866f7801d9620ee56f14f548b220b6ad442
+FIX04_AUTHORITY_REF=d935aad03aa56e752016011c57a81c5d33d27680
+FIX01_REVIEW_REF=24d0b3e5de84876b6b46fa84b13a0a42aa2640a4
+EXPECTED_API_BLOB=174ee8ff60461eb4f5aa233441b0367bb3d174b7
+ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+MISPLACED_REPORT="$FIX04_WORKTREE_ROOT/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md"
+
+[[ -d "$FIX04_LANE" ]]
+[[ "$(git -C "$FIX04_LANE" rev-parse --show-toplevel)" == "$FIX04_WORKTREE_ROOT" ]]
+[[ "$(git -C "$FIX04_LANE" branch --show-current)" == slice/oa-fix-04 ]]
+[[ "$(git show-ref --verify --hash refs/heads/slice/oa-fix-04)" == "$FIX04_BASE_REF" ]]
+[[ "$(git -C "$FIX04_LANE" rev-parse HEAD)" == "$FIX04_BASE_REF" ]]
+[[ "$(git -C "$FIX04_LANE" rev-list --parents -n 1 HEAD)" == "$FIX04_BASE_REF $FIX04_AUTHORITY_REF $FIX01_REVIEW_REF" ]]
+[[ "$(git -C "$FIX04_LANE" log -1 --format=%s)" == 'chore(obs): compose FIX-04 reviewed dependencies' ]]
+[[ "$(git -C "$FIX04_LANE" rev-parse HEAD:dialectical-engine/apps/api/src/index.ts)" == "$EXPECTED_API_BLOB" ]]
+[[ -z "$(git -C "$FIX04_LANE" status --porcelain=v1 --untracked-files=all)" ]]
+[[ -z "$(git -C "$FIX04_LANE" diff --cached --name-only)" ]]
+[[ -z "$(git -C "$FIX04_LANE" diff --name-only)" ]]
+[[ ! -e "$ADMISSION_REPORT" ]]
+[[ ! -e "$MISPLACED_REPORT" ]]
+[[ ! -e "$FIX04_LANE/tests/architecture/fix04-zone-region.test.ts" ]]
+! git -C "$FIX04_LANE" cat-file -e "$FIX04_BASE_REF:dialectical-engine/tests/architecture/fix04-zone-region.test.ts" 2>/dev/null
+
+resume_zone_evidence="$(
+  cd "$FIX04_LANE"
+  FIX04_BASE_REF="$FIX04_BASE_REF" pnpm exec node --import tsx --input-type=module -e '
+import { execFileSync } from "node:child_process";
+import { resolveZoneRouteMountRegion } from "./tests/support/zone-boundary.ts";
+const ref = process.env.FIX04_BASE_REF;
+const source = execFileSync("git", ["show", `${ref}:dialectical-engine/apps/api/src/index.ts`], { encoding: "utf8" });
+const region = resolveZoneRouteMountRegion(source);
+if (!region.ok) throw new Error(region.reason);
+const mounts = region.mounts.map(({ verb, path }) => ({ verb, path }));
+const expected = [
+  { verb: "post", path: "/v1/auth/register" },
+  { verb: "post", path: "/v1/auth/verify-email" },
+  { verb: "post", path: "/v1/auth/resend-verification" },
+];
+if (JSON.stringify(mounts) !== JSON.stringify(expected)) throw new Error("FIX04_RESUME_ZONE_SHAPE_MISMATCH");
+console.log(`FIX04_RESUME_ZONE bytes=${region.bytes} sha256=${region.contentHash}`);
+'
+)"
+[[ "$resume_zone_evidence" == 'FIX04_RESUME_ZONE bytes=1653 sha256=bff20f70edcff8df1f530a5b9f33417f1012017ce9c5e38edebb73b1d99f351d' ]]
+[[ -z "$(git -C "$FIX04_LANE" status --porcelain=v1 --untracked-files=all)" ]]
+print "FIX04_RESUME_ATTESTED base=$FIX04_BASE_REF parents=$FIX04_AUTHORITY_REF,$FIX01_REVIEW_REF receipt=absent c1=absent lane=clean"
+```
+
+Expected: the exact existing merge, branch, registered worktree root, parents, subject, API blob, semantic region, clean tracked/untracked/index state, absent controller receipt, absent misplaced receipt, and absent C1 file all pass. Any other existing state stops; do not recreate, reset, amend, merge, stash, clean, or edit it.
+
 - [ ] **Step 3: Resolve and record the admitted zone evidence**
 
 From the clean FIX-04 lane, use the existing semantic resolver on `FIX04_BASE_REF:dialectical-engine/apps/api/src/index.ts`. Require `ok=true`, three ordered POST mounts, `bytes=1653`, and `contentHash=bff20f70edcff8df1f530a5b9f33417f1012017ce9c5e38edebb73b1d99f351d`.
 
-Create `.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md` with `apply_patch`. Record these fields as literal expanded values, never as shell expressions:
+Before writing the receipt, prove the controller-owned destination is an existing writable normal-report directory covered by the controller's existing ignore policy, while the code worktree and both indexes retain their admitted state:
+
+```zsh
+set -eu
+CONTROLLER_ENGINE=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/dialectical-engine
+FIX04_LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/dialectical-engine
+FIX04_WORKTREE_ROOT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04
+ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+MISPLACED_REPORT="$FIX04_WORKTREE_ROOT/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md"
+EXPECTED_CONTROLLER_TRACKED_STATUS=' M dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md'
+
+[[ -d "${ADMISSION_REPORT:h}" && -w "${ADMISSION_REPORT:h}" ]]
+[[ ! -e "$ADMISSION_REPORT" ]]
+[[ ! -e "$MISPLACED_REPORT" ]]
+git -C "$CONTROLLER_ENGINE" check-ignore -q "$ADMISSION_REPORT"
+if git -C "$FIX04_LANE" check-ignore -q "$MISPLACED_REPORT"; then
+  print 'STOP: unexpected code-worktree receipt ignore rule'
+  exit 1
+fi
+[[ "$(git -C "$CONTROLLER_ENGINE" status --porcelain=v1 --untracked-files=no)" == "$EXPECTED_CONTROLLER_TRACKED_STATUS" ]]
+[[ -z "$(git -C "$CONTROLLER_ENGINE" diff --cached --name-only)" ]]
+[[ -z "$(git -C "$FIX04_LANE" status --porcelain=v1 --untracked-files=all)" ]]
+[[ -z "$(git -C "$FIX04_LANE" diff --cached --name-only)" ]]
+print "FIX04_RECEIPT_PATH_ATTESTED path=$ADMISSION_REPORT controller_tracked=preserved controller_index=empty lane=clean"
+```
+
+Create `/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md` with `apply_patch`. This is the controller-owned normal workspace, not the FIX-04 code worktree. Record these fields as literal expanded values, never as shell expressions:
 
 - `FIX04_AUTHORITY_REF`: the full value validated in Step 1;
 - `FIX01_REVIEW_REF`: `24d0b3e5de84876b6b46fa84b13a0a42aa2640a4`;
@@ -145,7 +246,10 @@ Run this total parser from the clean FIX-04 lane. It admits exactly eight unique
 
 ```zsh
 set -eu
-ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+CONTROLLER_ENGINE=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/dialectical-engine
+FIX04_LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/dialectical-engine
+EXPECTED_CONTROLLER_TRACKED_STATUS=' M dialectical-engine/docs/missions/observability-agents/slices/FIX-07/DECISIONS.md'
 EXPECTED_AUTHORITY_REF=d935aad03aa56e752016011c57a81c5d33d27680
 EXPECTED_FIX01_REF=24d0b3e5de84876b6b46fa84b13a0a42aa2640a4
 EXPECTED_API_BLOB=174ee8ff60461eb4f5aa233441b0367bb3d174b7
@@ -254,7 +358,11 @@ console.log(`FIX04_ZONE_BYTES=${region.bytes}`);
 console.log(`FIX04_ZONE_SHA256=${region.contentHash}`);
 ')"
 [[ "$zone_evidence" == $'FIX04_ZONE_BYTES=1653\nFIX04_ZONE_SHA256=bff20f70edcff8df1f530a5b9f33417f1012017ce9c5e38edebb73b1d99f351d' ]]
-[[ -z "$(git status --porcelain --untracked-files=all)" ]]
+git -C "$CONTROLLER_ENGINE" check-ignore -q "$ADMISSION_REPORT"
+[[ "$(git -C "$CONTROLLER_ENGINE" status --porcelain=v1 --untracked-files=no)" == "$EXPECTED_CONTROLLER_TRACKED_STATUS" ]]
+[[ -z "$(git -C "$CONTROLLER_ENGINE" diff --cached --name-only)" ]]
+[[ -z "$(git -C "$FIX04_LANE" status --porcelain=v1 --untracked-files=all)" ]]
+[[ -z "$(git -C "$FIX04_LANE" diff --cached --name-only)" ]]
 print "FIX04_RECEIPT_ATTESTED base=$FIX04_BASE_REF bytes=$EXPECTED_ZONE_BYTES sha256=$EXPECTED_ZONE_SHA256"
 ```
 
@@ -269,7 +377,7 @@ Expected: the real receipt and all eight Git/resolver comparisons pass; all four
 - Create: `tests/architecture/fix04-zone-region.test.ts`
 - Read: `tests/support/zone-boundary.ts`
 - Read: `apps/api/src/index.ts`
-- Read: `.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md`
+- Read: `/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md`
 
 **Interfaces:**
 
@@ -450,7 +558,7 @@ Re-attest the exact eight-field receipt, derive the only permitted full base SHA
 
 ```zsh
 set -eu
-ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/oa-fix-04/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
+ADMISSION_REPORT=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-plan/.superpowers/sdd/PLAN-FixAgent/fix04-admission-report.md
 receipt_text="$(LC_ALL=C rg '^[A-Za-z_][A-Za-z0-9_]*=' "$ADMISSION_REPORT")"
 [[ "$(print -r -- "$receipt_text" | awk 'NF { count += 1 } END { print count + 0 }')" -eq 8 ]]
 [[ "$(print -r -- "$receipt_text" | rg -c -x 'FIX04_AUTHORITY_REF=d935aad03aa56e752016011c57a81c5d33d27680')" -eq 1 ]]
@@ -635,6 +743,8 @@ Do not edit `apps/api/src/index.ts`, `apps/api/src/main.ts`, any capture package
 |---|---|---|
 | Exact reviewed authority | Task 1 | literal SHA, one parent, fixed subject, exact three-path delta, predecessor RED control |
 | Exact reviewed composition | Task 1 | two parents, fixed subject, fixed API blob |
+| Exact in-progress resume | Task 1 | literal `34ebf866...` HEAD, branch/worktree identity, topology, region, clean lane, absent receipt/C1 |
+| Controller-owned receipt | Task 1 | fixed absolute normal-workspace path, existing ignore policy, unchanged controller/lane tracked and index state |
 | Total admission receipt | Task 1 | eight unique fields; missing, duplicate, conflicting, and extra assignment controls |
 | Explicit `FIX04_BASE_REF` | Tasks 1-2 | receipt plus exact authority/FIX-01 topology, subject, API blob, and wrong-full-ref matrix |
 | Active option-B comparison | Task 2 | immutable base object versus worktree source, independently resolved |
