@@ -1269,3 +1269,50 @@ record. The actual matched text was a minified CSS property-name blob —
 Printing the match with `grep -oE` instead of trusting `-l` prevented a false security
 finding. Scan for the KEY NAME with its value (`"ANTHROPIC_API_KEY":"…"`) or a
 vendor-prefixed form (`sk-ant-`), and always print what matched.
+
+## `tools/mutate.sh` cannot express any mutant that ADDS JSX
+Found by W5 r3 (2026-09-05): the script applies its edit with
+`perl -0pi -e "s/\Q$OLD\E/$NEW/g"`, so a `/` in OLD or NEW terminates the
+substitution's pattern. **Every JSX element needs a `/`** — `<x />` or `</x>` —
+so no mutant that adds a control, a component, or any element can go through it.
+Measured: passing `<input id="guidance" type="text" />` as NEW aborts with
+`Search pattern not terminated at -e line 1.` and `ABORT: apply failed` (exit 5).
+It fails SAFE — the file is restored and the gates hold — but a packet that
+mandates mutate.sh custody for a JSX mutant is asking for something the tool
+cannot do, and you will burn time discovering that. Slash-free mutants (attribute
+values, identifier renames, call-site rewrites, `{ ...config, key: value }`
+spreads) work fine and should still go through it. For JSX, run the same gate
+sequence — clean-tree precondition, pre-count 0, sha BEFORE, apply, applied
+count > 0, command + exit, restore, post-count 0, sha AFTER equal, empty
+porcelain — with a substitution that is not a perl `s///`, and say in the
+transcript that you did and why. Cost here: ~40 minutes of trying to encode a
+`/`-free JSX element before measuring the tool's actual failure.
+(algorithm-live-loop, W5 dev-sync r3)
+
+## A merge that deletes a tree silently DISABLES the incoming tests that import it
+Found by W5 r3 (2026-09-05): the incoming branch added
+`tests/unit/s1-1-depth-contract.test.ts`, which imports `../../web/lib/api.js`.
+This lane had deleted `web/`. The merge is textually clean — no conflict, no
+marker, the file-level audits pass — and the suite reports
+`Test Files 1 failed (1)` with **`Tests: no tests`**. All 44 assertions in the
+incoming oracle were silent, including the one the round's packet named as the
+check on the resolution. **`Tests: no tests` next to a failed file is not a
+failing test — it is a suite that never ran, and a per-test-NAME failure
+partition cannot see it at all.** Grep every incoming test file for imports of
+paths your side deleted BEFORE trusting a gate, and count suite-load failures as
+their own category. Both parents were green; only the combination is broken.
+(algorithm-live-loop, W5 dev-sync r3)
+
+## `git rev-parse <sha>:<path>` echoes its argument when the path is ABSENT
+Found by W5 r3 (2026-09-05), re-confirming round 1's finding from the other
+direction: comparing blob ids across commits to decide "did this merge change
+the file" gives a false CHANGED for any path missing on one side, because
+`rev-parse` prints the literal `<sha>:<path>` string instead of failing. Guard
+with `|| echo ABSENT` and compare, or use `git ls-tree`. Related and worse: a
+file that EXISTS at both commits can still differ in the line you care about —
+here `apps/ui/components/LoginFlow.tsx` exists at base, lane and integration, so
+"the file exists on both sides" read as "not a merge-caused difference", when the
+lane's blob had added the six-slot code array that tripped an incoming oracle.
+**Compare blob ids, never existence.** Cost: one wrong hypothesis, caught by
+checking the blob before writing it down.
+(algorithm-live-loop, W5 dev-sync r3)
