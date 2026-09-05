@@ -1352,3 +1352,41 @@ direction. Narrow the command to the describe block under test
 BEFORE building the first mutant; otherwise the transcript's own gate is vacuous —
 D56, arriving through the mutation harness rather than through a test.
 (algorithm-live-loop, F-T1-ORACLE-LOGINFP)
+
+## A source-only scanner harness beats the test runner for any text-predicate oracle
+Found by codex r1 and reused by the T1-ORACLE-LOGINFP seat (2026-09-05). When an oracle's
+predicate is a pure function of source text, you do not need Vitest, the application,
+git mutation or a 50-minute suite to attack it. Extract the scanner block out of the test
+blob, strip the types in memory, and run it against strings:
+
+    import { stripTypeScriptTypes } from "node:module";
+    const blob  = execFileSync("git", ["-C", wt, "show", `${rev}:${path}`], {encoding:"utf8"});
+    const block = blob.slice(blob.indexOf("type DuplicateKind ="), blob.indexOf("function shippedSourceFiles("));
+    const js    = stripTypeScriptTypes(block + "\nexport { duplicateBoundSites };\n", {mode:"strip"});
+    const mod   = await import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+
+Two properties make it worth building every time: it runs both the OLD and the NEW scanner
+side by side over arbitrary input (~1 s), and it reads the blob from git, so the "before"
+scanner cannot drift. It found two blocking defects a green 49/50 suite could not, and it
+re-measured all 232 shipped files at two tips in about a second. Build it BEFORE the first
+mutant, not after the first review.
+(algorithm-live-loop, F-T1-ORACLE-LOGINFP r2)
+
+## A multi-window scanner cannot carry SUPPRESSION inside a window's predicate
+Same seat, same day, and the architectural version of the trap above. The depth oracle scans
+each file in three windows — physical line, declaration unit, conjunct — and merges them with
+
+    const record = (kind, line, text) => { if (kind === null) return; … }   // only ever ADDS
+
+so a window that declines to report can never retract what an earlier window already
+committed. A predicate that must EXCLUDE something therefore cannot live in the window: the
+physical-line window's candidate is truncated by construction, so it will see a bounded run
+whenever the disqualifying context sits on the previous line, record a site, and no later
+window can take it back. Symptom: the exclusion works on one line and fails when the same
+declaration is wrapped — layout dependence that looks like a regex bug and is not.
+**Detection belongs in a window; suppression belongs where the windows merge**, computed
+once against the whole source. And the control that catches this is not "the same thing
+wrapped" — it is the wrapping that moves the DECIDING TOKEN off the line while leaving the
+matched text intact. A one-value-per-line control cannot fail here, because it never puts
+the complete run on any line at all.
+(algorithm-live-loop, F-T1-ORACLE-LOGINFP r2)
