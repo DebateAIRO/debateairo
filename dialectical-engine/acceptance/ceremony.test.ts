@@ -83,19 +83,29 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
           // fallback answered it out of whatever queue it landed on.
           : isEvaluatorPacket(body) ? "EVALUATOR"
             : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
-      const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
+      // T3 N4: never GUESS ACROSS CLASSES — in EITHER direction. A request of
+      // any class, GENERAL included, consumes the first scripted response of
+      // ITS OWN class and otherwise refuses by name; FIFO order survives WITHIN
+      // a class, which is all the untyped health probes ever needed.
+      //
+      // This was one-directional until a mutant said so. Only RECOGNISED
+      // requests were held to the rule; an UNRECOGNISED one still took the head
+      // of the queue whatever class sat there — which is exactly how the
+      // EVALUATOR call was answered out of a retired-conformance queue before
+      // F-SEALEDROWS-B was repaired. It also made the repair untestable: with a
+      // deliberately dead EVALUATOR discriminator the call fell through to
+      // GENERAL, the fallback served the evaluator entry anyway, and this
+      // ceremony stayed GREEN while classifying nothing
+      // (`logs/demo-path/r1-mut-M3-dead-discriminator-ceremony.log`). A wrong
+      // class must cost a refusal, never a lucky answer.
+      const matching = pending.findIndex((entry) => entry.kind === requestKind);
       calls += 1;
-      // T3 N4: never GUESS ACROSS CLASSES. A recognised request with no scripted
-      // response of its own class refuses by name instead of serving whatever sits at
-      // the head of the queue — a wrong-class answer surfaces as a bogus production
-      // schema failure and costs a debugging round. Untyped requests (health probes)
-      // keep honest FIFO order.
-      if (requestKind !== "GENERAL" && matching < 0) {
+      if (matching < 0) {
         response.writeHead(500, { "content-type": "application/json" })
           .end(JSON.stringify({ error: "PROVIDER_DOUBLE_UNSCRIPTED_CLASS", requestKind }));
         return;
       }
-      const scripted = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
+      const scripted = pending.splice(matching, 1)[0]?.content;
       // T5/S3-1: a review response must measure exactly the edges THIS call
       // offered, so the declared policy is resolved against the live request.
       const content = scripted !== undefined && requestKind === "REVIEW"
