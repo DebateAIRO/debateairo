@@ -207,8 +207,9 @@ const SHIPPED_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs"];
  *
  *   DEPTH_BOUND_LITERAL  any line mentioning a depth that also carries the
  *                        literal 5, or a 6 in an exclusive-bound position
- *   DOMAIN_ENUMERATION   any line spelling the whole domain 1,2,3,4,5 — and only
- *                        the domain, never a longer run that merely contains it
+ *   DOMAIN_ENUMERATION   a declaration that DEFINES the ruled option domain 1,2,3,4,5 —
+ *                        the literal itself, or a longer literal the declaration narrows
+ *                        to it. A longer run left as some other domain is not one.
  *
  * and then allows exactly ONE line in the whole tree: the owning declaration.
  * A new spelling does not need a new detector; it needs a new exemption, which
@@ -258,56 +259,230 @@ const SIX_AS_EXCLUSIVE_BOUND = /(?:[<>]=?\s*6(?![\w.$])|\.(?:lt|gte)\(\s*6\s*\))
 const WHOLE_DOMAIN = /\b1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\b/;
 
 /**
- * THE ONE SHAPE THE DOMAIN ARM WITHHOLDS — decided once, over the whole source.
+ * THE DOMAIN VERDICT — one decision per literal occurrence, over one representation.
  *
  * The reported defect was `apps/ui/components/LoginFlow.tsx:252`,
  * `{[0, 1, 2, 3, 4, 5].map((slot) => (` — six visual boxes for a six-digit login code,
- * indexed 0..5. It is an INDEX RUN, and the file holds no depth token at all.
+ * indexed 0..5, in a file with no depth token. Two earlier attempts to exclude it failed,
+ * and BOTH failures are pinned by controls below rather than described here only.
  *
- * A run is withheld only when BOTH hold:
+ * r1 anchored the pattern so it could not match inside a longer run. codex refuted it twice:
+ * a longer literal can still DERIVE the ruled domain (`[0..5].slice(1)`), and a pattern
+ * cannot carry the exclusion at all because one reporting window is a truncated line.
  *
- *   1. it is a 0-based contiguous index run — `values[i] === i`, so `[0, 1, 2, 3, 4, 5]`
- *      qualifies and `[1, 2, 3, 4, 5, 6]` does not; and
- *   2. the declaration consumes it WHOLE — nothing is applied to the literal that could
- *      narrow it to the ruled domain. `.map`/`.forEach`/`.entries`/`.keys`/`.values`/
- *      `.join`/`.includes`/`.indexOf`/`.length` are length-preserving or return no array
- *      domain at all; a rest binding (`const [unused, ...choices] = …`) narrows; and
- *      **anything not on that list narrows until someone shows otherwise.**
+ * r2 moved the verdict to a source-level prepass — the right place — but decided it by
+ * asking what the FIRST operation on the literal was. codex refuted that in both directions:
  *
- * The burden is inverted, exactly as the rest of this oracle inverts it: an unlisted
- * spelling REPORTS. A miss is silent and ships a duplicate ceiling; a false positive is
- * loud and costs one visible diff to the list above. `.slice` is not on the list, so all
- * three B1 derivations report, and none of them needed to be enumerated as a detector.
+ *   MISSED, all defining exactly 1..5 — `[0..5,].slice(1)` (trailing comma, so the suffix
+ *   does not begin with a dot), `[0..5]["slice"](1)` (member access need not be a dot),
+ *   `([0..5] as const).slice(1)` (a type assertion sits in between),
+ *   `[0..5].map(n => n).slice(1)` (a listed first operation conceals a later narrowing),
+ *   and `new Set([0..5].map(n => n || 1))` (length preserved, values collapsed by the
+ *   wrapper). **Length preservation is not domain preservation.**
  *
- * `[1, 2, 3, 4, 5, 6]` therefore reports in EVERY layout. T1B-r1 excluded it and called
- * it "a different domain"; B1's `.slice(0, -1)` is that same literal deriving the ruled
- * domain, so the claim is withdrawn and the safe verdict is the reported one.
+ *   OVER-REPORTED — `[0..5].reverse()`, `.slice()`, `.slice(0, 4)`, `.sort()`,
+ *   `.filter(...)`, and a bare `[1, 2, 3, 4, 5, 6]`. r2 called the last one "consistent in
+ *   every layout", which it was; consistent is not correct. A six-page list is not a second
+ *   definition of the 1..5 bound. That `.slice(0, -1)` turns it into one is a reason to
+ *   distinguish the DERIVATION from the bare list, not to report both.
  *
- * WHY A LINE SET, and not a smarter predicate. Three windows can report a DOMAIN site
- * (physical line, declaration unit, and the line a unit starts on), and only the source
- * has the context to judge a run whose two ends sit on different lines. So the verdict is
- * computed once here, against the whole source, and applied as a set of lines on which no
- * window may record a DOMAIN site. Equivalent layouts then agree by CONSTRUCTION rather
- * than by assertion — which is what the wrapping controls check.
+ * So the question is not "what is applied to the literal" but "WHAT DOES THE DECLARATION
+ * DEFINE". Two rules answer it, and neither inspects a suffix:
  *
- * A line is withheld only when EVERY ruled-domain run touching it is withheld, so a real
- * domain sharing a line with an index run is still reported.
+ *   1. **The literal IS the domain.** If the run itself spells exactly 1,2,3,4,5 the domain
+ *      is written in the source and the site is reported, whatever is done to it afterwards.
+ *      This is what the three bare option-domain controls rest on, and it no longer depends
+ *      on any consumption rule.
+ *
+ *   2. **The literal is LONGER.** Then the run is simulated through the declaration over a
+ *      deliberately small, closed grammar — `slice` with integer-literal arguments, and
+ *      `reverse`/`sort`, which permute without changing the value set. Anything else makes
+ *      the value set UNKNOWN. The site is reported when the simulated set IS the ruled
+ *      domain, or when the values became unknown AND something could still narrow them to
+ *      it — another operation after the unknown one, or an enclosing value-collapsing
+ *      constructor. It is withheld when the simulation lands on some OTHER concrete domain
+ *      (0..5, 0..3, 1..6) or when the values are unknown and nothing downstream can select
+ *      from them, which is exactly LoginFlow's terminal `.map` into JSX.
+ *
+ * A rest binding on the left (`const [unused, ...choices] = …`) narrows, and reports.
+ *
+ * The grammar is small ON PURPOSE. Every unmodelled operation lands in UNKNOWN, and UNKNOWN
+ * is withheld only in the one position where nothing can act on the values afterwards.
+ * Widening the grammar is a visible diff; forgetting to widen it costs a false positive,
+ * never a miss on a derived domain.
  */
 const NUMERIC_RUN = /\d+(?:\s*,\s*\d+)+/g;
 const RULED_DOMAIN = [1, 2, 3, 4, 5] as const;
-const LENGTH_PRESERVING_USE = /^\.(?:map|forEach|entries|keys|values|join|includes|indexOf|length)\b/;
+const RULED_DOMAIN_KEY = "1,2,3,4,5";
 const NARROWS_WITH_A_REST_BINDING = /\.\.\.\s*[A-Za-z_$]/;
+// Anywhere in the declaration, not immediately before the literal: an enclosing constructor
+// may sit behind a call or an array bracket, and the safe error here is to REPORT.
+const COLLAPSES_THE_VALUE_DOMAIN = /new\s+(?:Set|Map)\s*\(/;
+
+/**
+ * Comments blanked to spaces, byte offsets and line breaks preserved.
+ *
+ * THIS IS THE FIX FOR codex r2 B2, and the reason it is a blanking rather than a strip.
+ * r2 classified each occurrence TWICE, in two different representations: once over the raw
+ * source, where a slot array with a block comment after its zero reads as a bare `1,2,3,4,5` because the
+ * comment interrupts the numeric run, and once over the lexer's comment-stripped unit text,
+ * where the same declaration reads as `0..5`. The two disagreed, so one line-set was
+ * assembled from two contradictory verdicts and equivalent layouts still disagreed.
+ *
+ * Blanking removes the disagreement at its source: comments cannot interrupt a run, and
+ * because every blanked character keeps its position, an offset in this text is the same
+ * offset in the original. One representation, one verdict per occurrence, and the line
+ * numbers still address the real file.
+ */
+function blankComments(source: string): string {
+  const out = source.split("");
+  let index = 0;
+  while (index < source.length) {
+    const char = source[index]!;
+    const next = source[index + 1];
+    if (char === "'" || char === '"') {
+      let end = index + 1;
+      while (end < source.length) {
+        if (source[end] === "\\") { end += 2; continue; }
+        if (source[end] === char || source[end] === "\n") { end += 1; break; }
+        end += 1;
+      }
+      index = end; continue;
+    }
+    if (char === "`") {
+      let end = index + 1;
+      while (end < source.length) {
+        if (source[end] === "\\") { end += 2; continue; }
+        if (source[end] === "`") { end += 1; break; }
+        end += 1;
+      }
+      index = end; continue;
+    }
+    if (char === "/" && next === "/") {
+      let end = index;
+      while (end < source.length && source[end] !== "\n") { out[end] = " "; end += 1; }
+      index = end; continue;
+    }
+    if (char === "/" && next === "*") {
+      const close = source.indexOf("*/", index + 2);
+      const end = close < 0 ? source.length : close + 2;
+      for (let scan = index; scan < end; scan += 1) if (out[scan] !== "\n") out[scan] = " ";
+      index = end; continue;
+    }
+    index += 1;
+  }
+  return out.join("");
+}
+
+interface ChainOperation {
+  readonly name: string;
+  /** Argument text, or null when the operation is a property access rather than a call. */
+  readonly args: string | null;
+}
+
+/**
+ * The operations applied to the literal, read forward from its last digit.
+ *
+ * Deliberately tolerant about SYNTAX and strict about SEMANTICS: a trailing comma, the
+ * literal's own `]`, wrapping `)`, a `as const` assertion and computed `["slice"]` access
+ * are all stepped over, because none of them changes what the declaration defines. That
+ * tolerance is what r2 lacked — it read one character after the run and branched on it.
+ */
+function operationsApplied(text: string, from: number): ChainOperation[] {
+  const operations: ChainOperation[] = [];
+  let index = from;
+  const skipInert = (): void => {
+    while (index < text.length && /[\s,\])]/.test(text[index]!)) index += 1;
+  };
+  const readArguments = (): string | null => {
+    let scan = index;
+    while (scan < text.length && /\s/.test(text[scan]!)) scan += 1;
+    if (text[scan] !== "(") return null;
+    let depth = 0;
+    const open = scan;
+    for (; scan < text.length; scan += 1) {
+      if (text[scan] === "(") depth += 1;
+      else if (text[scan] === ")") { depth -= 1; if (depth === 0) { scan += 1; break; } }
+    }
+    const args = text.slice(open + 1, scan - 1);
+    index = scan;
+    return args;
+  };
+  skipInert();
+  for (;;) {
+    const assertion = /^as\s+[A-Za-z_$][\w$]*/.exec(text.slice(index));
+    if (assertion) { index += assertion[0].length; skipInert(); continue; }
+    const dotted = /^\.\s*([A-Za-z_$][\w$]*)/.exec(text.slice(index));
+    if (dotted) {
+      index += dotted[0].length;
+      operations.push({ name: dotted[1]!, args: readArguments() });
+      skipInert(); continue;
+    }
+    const computed = /^\[\s*(['"])([A-Za-z_$][\w$]*)\1\s*\]/.exec(text.slice(index));
+    if (computed) {
+      index += computed[0].length;
+      operations.push({ name: computed[2]!, args: readArguments() });
+      skipInert(); continue;
+    }
+    return operations;
+  }
+}
+
+const INTEGER_ARGUMENTS = /^\s*(?:-?\d+\s*(?:,\s*-?\d+\s*)?)?$/;
+
+/** What the declaration defines, as far as a closed grammar can decide it. */
+type DerivedDomain = "RULED" | "OTHER" | "UNKNOWN_SELECTABLE" | "UNKNOWN_TERMINAL";
+
+function derivedDomain(values: number[], operations: ChainOperation[], collapsing: boolean): DerivedDomain {
+  let current: number[] | null = [...values];
+  for (const operation of operations) {
+    // Anything AFTER the values became unknown could still select the ruled domain out of
+    // them — this is r2's `.map(n => n).slice(1)` miss, and it is decided by POSITION.
+    if (current === null) return "UNKNOWN_SELECTABLE";
+    const args = operation.args;
+    if (operation.name === "slice" && args !== null && INTEGER_ARGUMENTS.test(args)) {
+      const bounds = args.trim() === "" ? [] : args.split(",").map((value) => Number(value.trim()));
+      current = current.slice(...(bounds as [number?, number?]));
+      continue;
+    }
+    if ((operation.name === "reverse" || operation.name === "sort") && (args ?? "").trim() === "") {
+      continue; // a permutation, so the value SET is untouched
+    }
+    current = null;
+  }
+  if (current !== null) {
+    const key = [...new Set(current)].sort((left, right) => left - right).join(",");
+    return key === RULED_DOMAIN_KEY ? "RULED" : "OTHER";
+  }
+  return collapsing ? "UNKNOWN_SELECTABLE" : "UNKNOWN_TERMINAL";
+}
 
 interface DomainRun {
-  readonly start: number;
-  readonly end: number;
-  /** true = an unrelated index run: this occurrence must not produce a DOMAIN site. */
+  /** Lines this occurrence's verdict addresses: its declaration's first line to its own last. */
+  readonly firstLine: number;
+  readonly lastLine: number;
+  /** true = this occurrence must not produce a DOMAIN site. */
   readonly withhold: boolean;
 }
 
-/** Every comma-separated integer run that spells the ruled domain, with its verdict. */
-function ruledDomainRuns(text: string): DomainRun[] {
-  const runs: DomainRun[] = [];
+/**
+ * Every ruled-domain occurrence in the source, classified ONCE, addressed by line.
+ *
+ * The address runs from the enclosing declaration's first line to the run's own last line,
+ * because three windows can report a DOMAIN site and they do not agree on where a site
+ * lives: the physical-line window addresses the line holding the text, and the declaration
+ * window addresses the line the declaration STARTS on, which can precede the run entirely.
+ * Covering the span serves both from the single verdict, so the second representation r2
+ * used to recover a start line — and which disagreed with the first — is gone.
+ */
+function ruledDomainOccurrences(source: string): DomainRun[] {
+  const text = blankComments(source);
+  const lineAt = (index: number): number => {
+    let line = 1;
+    for (let scan = 0; scan < index; scan += 1) if (text[scan] === "\n") line += 1;
+    return line;
+  };
+  const found: DomainRun[] = [];
   for (const match of text.matchAll(NUMERIC_RUN)) {
     const values = match[0].split(",").map((value) => Number(value.trim()));
     const spellsDomain = values.some((_, index) =>
@@ -315,45 +490,40 @@ function ruledDomainRuns(text: string): DomainRun[] {
     if (!spellsDomain) continue;
     const start = match.index;
     const end = start + match[0].length;
-    const isIndexRun = values.every((value, index) => value === index);
-    // What the declaration does to the literal, read forwards from the run's last digit …
-    const after = text.slice(end, end + 120).replace(/^[\s\])]*/, "");
-    const consumedWhole = !after.startsWith(".") || LENGTH_PRESERVING_USE.test(after);
-    // … and backwards to the nearest statement or block boundary, for a rest binding.
-    const before = text.slice(Math.max(0, start - 200), start);
-    const statement = before.slice(before.search(/[;{}][^;{}]*$/) + 1);
-    runs.push({
-      start,
-      end,
-      withhold: isIndexRun && consumedWhole && !NARROWS_WITH_A_REST_BINDING.test(statement)
+    const literalIsTheDomain = values.length === RULED_DOMAIN.length
+      && RULED_DOMAIN.every((wanted, index) => values[index] === wanted);
+    const before = text.slice(0, start);
+    const statementStart = before.search(/[;{}][^;{}]*$/) + 1;
+    const statement = before.slice(statementStart);
+    const reports = literalIsTheDomain
+      || NARROWS_WITH_A_REST_BINDING.test(statement)
+      || ["RULED", "UNKNOWN_SELECTABLE"].includes(derivedDomain(
+        values,
+        operationsApplied(text, end),
+        COLLAPSES_THE_VALUE_DOMAIN.test(statement)
+      ));
+    found.push({
+      firstLine: lineAt(statementStart + (/\S/.exec(statement)?.index ?? 0)),
+      lastLine: lineAt(end),
+      withhold: !reports
     });
   }
-  return runs;
+  return found;
 }
 
 /** Lines on which no window may record a DOMAIN_ENUMERATION site. */
 function withheldDomainLines(source: string): ReadonlySet<number> {
   const verdictsByLine = new Map<number, boolean[]>();
-  const note = (line: number, withhold: boolean): void => {
-    const seen = verdictsByLine.get(line) ?? [];
-    seen.push(withhold);
-    verdictsByLine.set(line, seen);
-  };
-  const lineAt = (index: number): number => {
-    let line = 1;
-    for (let scan = 0; scan < index; scan += 1) if (source[scan] === "\n") line += 1;
-    return line;
-  };
-  // Every physical line the run's own text touches — this is the window that lost context.
-  for (const run of ruledDomainRuns(source)) {
-    const last = lineAt(run.end);
-    for (let line = lineAt(run.start); line <= last; line += 1) note(line, run.withhold);
-  }
-  // And the line each declaration unit is ADDRESSED at, which may precede the run entirely.
-  for (const unit of declarationUnits(source)) {
-    for (const run of ruledDomainRuns(unit.text)) note(unit.line, run.withhold);
+  for (const occurrence of ruledDomainOccurrences(source)) {
+    for (let line = occurrence.firstLine; line <= occurrence.lastLine; line += 1) {
+      const seen = verdictsByLine.get(line) ?? [];
+      seen.push(occurrence.withhold);
+      verdictsByLine.set(line, seen);
+    }
   }
   const withheld = new Set<number>();
+  // A line is withheld only when EVERY occurrence addressing it is withheld, so a real
+  // domain sharing a declaration or a line with an index run is still reported.
   for (const [line, verdicts] of verdictsByLine) {
     if (verdicts.length > 0 && verdicts.every(Boolean)) withheld.add(line);
   }
@@ -376,11 +546,11 @@ interface DuplicateSite {
 }
 
 /**
- * The two predicates, applied to one candidate text. Bodies unchanged by T1B.
- * F-T1-ORACLE-LOGINFP narrowed the shared `WHOLE_DOMAIN` constant rather than one
- * arm's copy of it, so this predicate and `kindOfCeilingLiteral` below inherit the
- * same correction: the subsequence defect lived in the pattern, in both arms, and
- * fixing one call site would have left the other reading a login array as a domain.
+ * The two predicates, applied to one candidate text. Bodies unchanged by T1B, and
+ * `WHOLE_DOMAIN` is r3's pattern byte-for-byte: F-T1-ORACLE-LOGINFP r1 narrowed that
+ * constant and r2 put it back, because the exclusion cannot live in a pattern at all.
+ * These predicates DETECT; whether an occurrence is reported is decided once over the
+ * source by `withheldDomainLines` and applied where the windows merge, in `record`.
  */
 function kindOf(candidate: string): DuplicateKind | null {
   if (MENTIONS_A_DEPTH.test(candidate) && (BARE_FIVE.test(candidate) || SIX_AS_EXCLUSIVE_BOUND.test(candidate))) {
@@ -815,74 +985,95 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(duplicateBoundSites(planted)).toEqual([]);
   });
 
-  // INDEX-RUN NEGATIVE CONTROLS — the reported defect, in every layout it can be written.
+  // ── PAIRED CONTROLS: what the declaration DEFINES ──────────────────────────────────
   //
-  // The first entry is the real expression at apps/ui/components/LoginFlow.tsx:252 verbatim:
-  // six visual boxes for a six-digit login code, indexed 0..5, in a file with no depth token.
+  // Each pair below is the same syntactic feature on both sides of the verdict, because the
+  // two earlier rounds were each defeated by a shape that LOOKED like the excluded one. The
+  // question is never "what is applied to the literal" — r2 asked that and codex broke it in
+  // both directions — but "what domain does this declaration define".
+
+  // DEFINES THE RULED DOMAIN → a site. All of these evaluate to exactly [1, 2, 3, 4, 5],
+  // none of them names a depth, and every one is reported by the r3 base oracle. The first
+  // three are codex r1's; the rest are codex r2's, and each defeats a different assumption:
+  // that a suffix begins with a dot, that member access is a dot, that a type assertion is
+  // not in the way, that the FIRST operation settles it, and that preserving an array's
+  // LENGTH preserves its DOMAIN.
+  it.each([
+    { spelling: "leading sentinel dropped by .slice(1)", planted: "const choices = [0, 1, 2, 3, 4, 5].slice(1);" },
+    { spelling: "trailing value dropped by .slice(0, -1)", planted: "const choices = [1, 2, 3, 4, 5, 6].slice(0, -1);" },
+    { spelling: "leading sentinel dropped by a rest binding", planted: "const [unused, ...choices] = [0, 1, 2, 3, 4, 5];" },
+    { spelling: "trailing comma before the narrowing", planted: "const choices = [0, 1, 2, 3, 4, 5,].slice(1);" },
+    { spelling: "a later narrowing behind a length-preserving map", planted: "const choices = [0, 1, 2, 3, 4, 5].map(n => n).slice(1);" },
+    { spelling: "the same with a block callback", planted: "const choices = [0, 1, 2, 3, 4, 5].map(n => { return n; }).slice(1);" },
+    { spelling: "a length-preserving map inside a collapsing wrapper", planted: "const choices = new Set([0, 1, 2, 3, 4, 5].map(n => n || 1));" },
+    { spelling: "computed member access", planted: 'const choices = [0, 1, 2, 3, 4, 5]["slice"](1);' },
+    { spelling: "narrowing through a type assertion", planted: "const choices = ([0, 1, 2, 3, 4, 5] as const).slice(1);" }
+  ])("reports a declaration that DEFINES the ruled domain — $spelling", ({ planted }) => {
+    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
+  });
+
+  // DEFINES SOME OTHER DOMAIN → no site. The pair to the block above, and the direction r2
+  // got wrong: it reported all of these. `.reverse()` and `.slice()` keep the whole index
+  // domain; `.slice(0, 4)` narrows to 0..3; `.sort()` permutes; `.filter(...)` leaves the
+  // values unknown with nothing downstream able to select from them — which is exactly the
+  // shape of LoginFlow's terminal `.map` into JSX.
   //
-  // The WRAPPED entries are codex r1 B2. T1B-r1 anchored the domain pattern so it could not
-  // match inside a longer run, which excluded the one-line forms and PASSED these — because
-  // the physical-line window sees `1, 2, 3, 4, 5];` with its `0,` on the previous line, and a
-  // site recorded by one window is never retracted by another. They are the controls that
-  // force the verdict to be computed with whole-source context instead of per candidate.
+  // The bare six-page list is here deliberately. r2 made it POSITIVE and defended that as
+  // "consistent in every layout"; consistent is not correct. A six-page list is not a second
+  // definition of the 1..5 bound. That `.slice(0, -1)` turns it into one — asserted two
+  // blocks up — is the reason to distinguish the derivation from the bare list, not to
+  // report both.
+  it.each([
+    { spelling: "whole index domain, reversed", planted: "const slots = [0, 1, 2, 3, 4, 5].reverse();" },
+    { spelling: "whole index domain, copied", planted: "const slots = [0, 1, 2, 3, 4, 5].slice();" },
+    { spelling: "narrowed to a DIFFERENT domain", planted: "const slots = [0, 1, 2, 3, 4, 5].slice(0, 4);" },
+    { spelling: "whole index domain, sorted", planted: "const slots = [0, 1, 2, 3, 4, 5].sort();" },
+    { spelling: "values unknown, nothing downstream", planted: "const slots = [0, 1, 2, 3, 4, 5].filter(n => n % 2 === 0);" },
+    { spelling: "a bare six-page list", planted: "const pages = [1, 2, 3, 4, 5, 6];" },
+    { spelling: "a bare index run", planted: "const slots = [0, 1, 2, 3, 4, 5];" }
+  ])("does not report a declaration that defines another domain — $spelling", ({ planted }) => {
+    expect(duplicateBoundSites(planted)).toEqual([]);
+  });
+
+  // ── LAYOUT AND COMMENTS: one verdict per occurrence ────────────────────────────────
+  //
+  // The reported defect, written every way the scanner can see it. The wrapped entries are
+  // codex r1 B2 (a truncated physical line sees a bounded run); the COMMENTED entries are
+  // codex r2 B2, where the same declaration was classified twice in two representations —
+  // raw source, where a comment interrupts the numeric run and the remaining 1..5 reads as
+  // the bare domain, and comment-stripped unit text, where it reads as 0..5. The two
+  // disagreed, so equivalent layouts disagreed. Comments are now blanked in place, offsets
+  // preserved, and the verdict is taken once.
   it.each([
     { layout: "the real six-slot login array", planted: "                  {[0, 1, 2, 3, 4, 5].map((slot) => (" },
     { layout: "the real login array, wrapped after the sentinel", planted: "                  {[0,\n                  1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, block comment after the sentinel", planted: "                  {[0, /* first slot */ 1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, commented AND wrapped", planted: "                  {[0, /* first slot */\n                  1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, line comment after the sentinel", planted: "                  {[0, // first slot\n                  1, 2, 3, 4, 5].map((slot) => (" },
     { layout: "index run, one line", planted: "  const slots = [0, 1, 2, 3, 4, 5];" },
     { layout: "index run, wrapped after the sentinel", planted: "  const slots = [0,\n    1, 2, 3, 4, 5];" },
     { layout: "index run, wrapped before the last value", planted: "  const slots = [0, 1, 2, 3, 4,\n    5];" },
     { layout: "index run, one value per line", planted: "  const slots = [\n    0,\n    1,\n    2,\n    3,\n    4,\n    5\n  ];" },
-    { layout: "index run, literal on its own line", planted: "  const slots =\n    [0,\n     1, 2, 3, 4, 5];" }
-  ])("does not read an index run consumed whole as the ruled domain — $layout", ({ planted }) => {
+    { layout: "index run, literal on its own line", planted: "  const slots =\n    [0,\n     1, 2, 3, 4, 5];" },
+    { layout: "index run, block comment after the sentinel", planted: "  const slots = [0, /* first slot */ 1, 2, 3, 4, 5];" },
+    { layout: "index run, commented AND wrapped", planted: "  const slots =\n    [0, /* first slot */\n     1,\n     2,\n     3,\n     4,\n     5];" },
+    { layout: "index run, line comment after the sentinel", planted: "  const slots = [0, // first slot\n    1, 2, 3, 4, 5];" }
+  ])("does not read an index run left whole as the ruled domain — $layout", ({ planted }) => {
     expect(duplicateBoundSites(planted)).toEqual([]);
   });
 
-  // DERIVATION POSITIVE CONTROLS — codex r1 B1, verbatim counterexamples.
-  //
-  // Each of these evaluates to exactly `[1, 2, 3, 4, 5]`, which is a legitimate way to
-  // define a depth selector's options without naming depth. The r3 oracle reported all
-  // three; T1B-r1 reported none of them, because it claimed a longer literal was
-  // necessarily a different domain. **That claim was false** — the literal's input length
-  // does not fix the resulting domain — and these are the controls that hold it withdrawn.
-  //
-  // None of them mentions a depth, so neither the ceiling-literal nor the exclusive-six arm
-  // rescues them: if this arm misses them, nothing catches them.
-  it.each([
-    { derivation: "leading sentinel dropped by .slice(1)", planted: "const choices = [0, 1, 2, 3, 4, 5].slice(1);" },
-    { derivation: "trailing value dropped by .slice(0, -1)", planted: "const choices = [1, 2, 3, 4, 5, 6].slice(0, -1);" },
-    { derivation: "leading sentinel dropped by a rest binding", planted: "const [unused, ...choices] = [0, 1, 2, 3, 4, 5];" }
-  ])("reads a declaration that DERIVES the ruled domain as a site — $derivation", ({ planted }) => {
-    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
-  });
-
-  // THE WITHDRAWN CLAIM, asserted in the direction it was wrong.
-  //
-  // T1B-r1 excluded `[1, 2, 3, 4, 5, 6]` as "a different domain". B1's second counterexample
-  // is that same literal deriving the ruled domain, so the run's own values cannot settle it.
-  // Only a 0-based INDEX run is withheld now; every other longer run reports. Reporting is
-  // the safe direction — a miss ships a duplicate ceiling silently, a false positive costs
-  // one visible diff — and this control is what stops the exclusion being widened back.
-  it.each([
-    { layout: "one line", planted: "  const pages = [1, 2, 3, 4, 5, 6];" },
-    { layout: "wrapped before the last value", planted: "  const pages = [1, 2, 3, 4, 5,\n    6];" }
-  ])("reports a longer run that is not a 0-based index run — $layout", ({ planted }) => {
-    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
-  });
-
-  // EQUIVALENT LAYOUTS MUST AGREE (codex r1 B2's required property, asserted directly).
-  //
-  // Every group below is ONE declaration written several ways. The oracle's verdict must be
-  // a property of the declaration, never of where the newlines fell. A per-candidate rule
-  // cannot satisfy this — the physical-line window's candidate is truncated by construction
-  // — which is why the verdict is computed once over the source and obeyed by every window.
+  // EQUIVALENT LAYOUTS MUST AGREE, asserted directly rather than hoped for. Each group is
+  // ONE declaration written several ways, including with comments, which is what separates
+  // this from the round-2 version of the same control.
   it.each([
     {
-      group: "an index run consumed whole",
+      group: "an index run left whole",
       expected: false,
       layouts: [
         "{[0, 1, 2, 3, 4, 5].map((slot) => (",
         "{[0,\n  1, 2, 3, 4, 5].map((slot) => (",
-        "{[0, 1,\n  2, 3, 4, 5].map((slot) => (",
+        "{[0, /* first slot */ 1, 2, 3, 4, 5].map((slot) => (",
+        "{[0, /* first slot */\n  1, 2, 3, 4, 5].map((slot) => (",
         "const slots = [0, 1, 2, 3, 4, 5];",
         "const slots =\n  [0,\n   1, 2, 3, 4, 5];"
       ]
@@ -894,22 +1085,25 @@ describe("S1-1 · the depth bound has a single source", () => {
         "const allowed = [1, 2, 3, 4, 5];",
         "const allowed = [1,\n  2, 3, 4, 5];",
         "const allowed = [\n  1,\n  2,\n  3,\n  4,\n  5\n];",
-        "const allowed = new Set([1, 2, 3, 4, 5]);"
+        "const allowed = new Set([1, 2, 3, 4, 5]);",
+        "const allowed = [1, /* one */ 2, 3, 4, 5];"
       ]
     },
     {
-      group: "an index run narrowed to the ruled domain",
+      group: "a longer literal narrowed to the ruled domain",
       expected: true,
       layouts: [
         "const choices = [0, 1, 2, 3, 4, 5].slice(1);",
         "const choices = [0,\n  1, 2, 3, 4, 5].slice(1);",
-        "const choices = [0, 1, 2, 3, 4, 5]\n  .slice(1);",
-        "const [unused, ...choices] = [0,\n  1, 2, 3, 4, 5];"
+        "const choices = [0, 1, 2, 3, 4, 5,].slice(1);",
+        'const choices = [0, 1, 2, 3, 4, 5]["slice"](1);',
+        "const choices = ([0, 1, 2, 3, 4, 5] as const).slice(1);",
+        "const choices = [0, 1, 2, 3, 4, 5].map(n => n).slice(1);"
       ]
     },
     {
-      group: "a longer run that is not an index run",
-      expected: true,
+      group: "a bare six-page list left as 1..6",
+      expected: false,
       layouts: [
         "const pages = [1, 2, 3, 4, 5, 6];",
         "const pages = [1, 2, 3, 4, 5,\n  6];",
@@ -924,13 +1118,12 @@ describe("S1-1 · the depth bound has a single source", () => {
 
   // WHAT THE WITHHOLDING COSTS, asserted rather than argued.
   //
-  // The exclusion can only ever reach candidates that carry NO depth token: the ruled
-  // domain's run always contains a bare `5`, so a candidate that spells the run AND mentions
-  // a depth is returned by the CEILING-LITERAL arm before the domain arm is consulted. That
-  // is why the fix does not — and must not — add a "depth token in reach" disjunct to the
-  // domain arm: such a disjunct is unreachable, a check that cannot fire for the reason it
-  // exists (D56), and codex W5 r2 F1 refused it separately because it would delete the three
-  // bare option-domain controls above. These two shapes are still caught, by the other arm.
+  // It can only ever reach candidates carrying NO depth token: the ruled domain's run always
+  // contains a bare `5`, so a candidate that spells the run AND mentions a depth is returned
+  // by the CEILING-LITERAL arm before the domain arm is consulted. That is why the fix does
+  // not — and must not — add a "depth token in reach" disjunct to the domain arm: it is
+  // unreachable, a check that cannot fire for the reason it exists (D56), and codex W5 r2 F1
+  // refused it separately because it would delete the three bare option-domain controls.
   it.each([
     { shape: "index run with a depth token in reach", planted: "  const depthSlots = [0, 1, 2, 3, 4, 5];" },
     { shape: "past the ceiling with a depth token in reach", planted: "  const depthChoices = [1, 2, 3, 4, 5, 6];" }
