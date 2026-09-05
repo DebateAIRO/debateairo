@@ -12,7 +12,6 @@ import {
 import { resolveExpansionDepth } from "@debateai/runner";
 import { auditArchitecture, auditSourceRules } from "../../tools/orphan-audit/src/index.js";
 import { createDebate } from "../../apps/ui/lib/api.js";
-import { createBrowserContractClient } from "../../web/lib/api.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -122,8 +121,11 @@ describe("S1-1 · depth enforced at the contract door", () => {
   });
 
   // PROPERTY: the ruled endpoints of the range are accepted through the ask
-  // construction of BOTH client surfaces — the live apps/ui client and the
-  // legacy web/ client — and reach the application as a queued run.
+  // construction of the live apps/ui client and reach the application as a
+  // queued run. T1 authored this over BOTH client surfaces; dev's UI overhaul
+  // deleted `web/` wholesale (D23 ADDENDUM-2), so the legacy arm's SUBJECT is
+  // gone on this tree and the arm goes with it — the same rule round 1 applied
+  // to tests/architecture/s14-contract.test.ts. The surviving arm is unchanged.
   it.each([EXPANSION_DEPTH_MIN, EXPANSION_DEPTH_MAX])(
     "accepts depth %i through the live apps/ui client",
     async (depth) => {
@@ -152,33 +154,6 @@ describe("S1-1 · depth enforced at the contract door", () => {
         expect(accepted).toEqual({ id: RUN_ID });
         expect(seen).toHaveLength(1);
         expect(seen[0]!.depth_params).toEqual({ depth });
-      } finally {
-        await api.close();
-      }
-    }
-  );
-
-  it.each([EXPANSION_DEPTH_MIN, EXPANSION_DEPTH_MAX])(
-    "accepts depth %i through the legacy web/ client",
-    async (depth) => {
-      const api = buildAskApi();
-      try {
-        const client = createBrowserContractClient(async (input, init) => {
-          const url = new URL(String(input), "http://localhost");
-          const headers: Record<string, string> = { ...MUTATION_HEADERS };
-          new Headers(init?.headers).forEach((value, key) => { headers[key] = value; });
-          const response = await api.inject({
-            method: "POST",
-            url: url.pathname.replace(/^\/api/, ""),
-            headers: { ...headers, ...MUTATION_HEADERS },
-            payload: init?.body === undefined ? undefined : JSON.parse(String(init.body))
-          });
-          return new Response(response.body, {
-            status: response.statusCode, headers: { "content-type": "application/json" }
-          });
-        }, "/api");
-        await expect(client.submitAsk(askWithout({ depth }) as unknown as AskRequest))
-          .resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
       } finally {
         await api.close();
       }
