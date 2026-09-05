@@ -860,3 +860,37 @@ Found by CODE-T5C1 (2026-09-01): a jsdom dump test passed a URL derived from
 `import.meta.url` to `mkdirSync` and failed with `ERR_INVALID_URL_SCHEME` before writing
 the artifact. For repo-local throwaway artifacts, resolve the authorized destination from
 the test command's pinned `process.cwd()` with `node:path`; this cost one failed dump run.
+
+## `pnpm typecheck` is BLIND to `acceptance/` — that project has its own tsconfig
+Found by W4 (2026-09-03): the root `tsconfig.json` `include` list is
+`apps/ packages/ tools/ tests/ vitest.config.ts drizzle.config.ts` — `acceptance/` is not
+in it. `acceptance/tsconfig.json` covers that tree separately. An unknown-property error in
+an acceptance file therefore does not appear in `tsc --noEmit`; it needs
+`tsc --noEmit -p acceptance/tsconfig.json`. W4's RED signal (`TS2353 … 'testOnlyCodexSessionsRoot'
+does not exist`) was invisible to the root run, which instead printed only the pre-existing
+`tests/unit/s14-ui.test.ts` errors from the absent `web/` tree. Typecheck BOTH projects, or a
+type-level RED frame silently reads as green.
+
+## The acceptance vitest config must be run from `dialectical-engine/`, not the worktree root
+Found by W4 (2026-09-03): `acceptance/vitest.config.ts` sets `include:
+["acceptance/**/*.test.ts"]`, resolved against the config's own root. Invoked from the
+worktree root — which is what `gate-run.sh <worktree>` does if you pass the repo root — vitest
+prints `No test files found, exiting with code 1` and the gate records exit=1. That is
+indistinguishable at a glance from a failing suite. Pass the PACKAGE root
+(`<worktree>/dialectical-engine`) as gate-run.sh's first argument; it stamps the same commit
+because `git -C` still resolves inside the repo. Cost: one wasted gate record.
+
+## A scratchpad `.ts` file runs as CJS under tsx — top-level `await` dies
+Found by W4 (2026-09-03): `tsx /tmp/.../probe.ts` fails with `Top-level await is currently
+not supported with the "cjs" output format`, because the scratch directory has no
+`package.json` declaring `"type": "module"`. Name throwaway probes `.mts`. Cost: one failed
+probe run before a live call was made (no live call was wasted).
+
+## A loose secret-scan regex matches CSS property names — read the match, never the count
+Found by W4 (2026-09-03): `grep -rlE "sk-[A-Za-z0-9_-]{16,}"` over the mission log tree
+reported a hit in a codex review log, which looked like a leaked API key in a committed
+record. The actual matched text was a minified CSS property-name blob —
+`…mask-composite`, `mask-size`, `mask-position…` — where `sk-` is the tail of `mask-`.
+Printing the match with `grep -oE` instead of trusting `-l` prevented a false security
+finding. Scan for the KEY NAME with its value (`"ANTHROPIC_API_KEY":"…"`) or a
+vendor-prefixed form (`sk-ant-`), and always print what matched.

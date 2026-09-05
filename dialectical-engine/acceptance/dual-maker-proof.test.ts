@@ -11,6 +11,10 @@ import { runDualMakerProof } from "./dual-maker-proof.js";
 
 const fakeCodexCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
 const fakeClaudeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
+// The rollout tree the FAKE codex CLI belongs to. Its one rollout is keyed by the
+// thread id that CLI prints, so the model id under test is READ from this store —
+// never from the operator's real ~/.codex/sessions, which no fake ever writes to.
+const fakeCodexSessions = fileURLToPath(new URL("./test-fixtures/codex-sessions", import.meta.url));
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -44,6 +48,7 @@ describe("FAIR-02 dual-maker proof", () => {
     const report = await runDualMakerProof({
       pool: database.pool,
       testOnlyCodexCommand: { binary: process.execPath, prefixArguments: [fakeCodexCli] },
+      testOnlyCodexSessionsRoot: fakeCodexSessions,
       testOnlyClaudeCommand: { binary: process.execPath, prefixArguments: [fakeClaudeCli] }
     });
 
