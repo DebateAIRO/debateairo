@@ -220,6 +220,24 @@ describe("ACC-01 dry-run ceremony", () => {
       conformanceBound: bound,
       providerRef: "acceptance:codex-cli",
       maker: "OpenAI",
+      // T9 x board F33 — the class closure. `synthesisRolePolicy` is REQUIRED on
+      // WalkingSkeletonSettings, so a deployment or fixture can no longer omit the
+      // family the runner refuses over: omission is a compile error, not a claim-time
+      // surprise. Provisioning only — this refusal fires on an EARLIER gate, and both
+      // refs name this fixture's own configured provider (identical refs stay lawful,
+      // goal 84-85), so no assertion here changes.
+      synthesisRolePolicy: {
+        registerVersion: 1,
+        synthesizerRoleRef: "acceptance:codex-cli",
+        evaluatorRoleRef: "acceptance:codex-cli",
+        evaluatorLoopMaxRounds: 3,
+        identicalRoleRefs: true,
+        sourceRefs: {
+          synthesizerRoleRef: "test-layer:J8",
+          evaluatorRoleRef: "test-layer:J8",
+          evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+        }
+      },
       judgeContractHash: "a".repeat(64),
       composerContractHash: "b".repeat(64),
       conformanceContractHash: "c".repeat(64),

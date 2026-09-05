@@ -3,13 +3,21 @@ import type { Pool } from "pg";
 import type { RiskTier } from "@debateai/kernel";
 import { computeStructuralCeilingBasis } from "@debateai/register";
 import {
+  readAdaptiveStoppingControls,
   readClaimTypeCompositionMap,
   readEnvelopeFormulaInputs,
+  readPanelWeightingControls,
+  readSynthesisRoleControls,
+  readVerdictLabelControls,
+  type AdaptiveStoppingControls,
   type CompositionMapRegisterRow,
-  type EnvelopeFormulaInputs
+  type EnvelopeFormulaInputs,
+  type PanelWeightingControls,
+  type SynthesisRoleControls
 } from "@debateai/register";
 import type { BandCeilingRegisterRow, CompositionBudgetResolution } from "@debateai/serve";
 import {
+  ACCEPTANCE_ALGORITHM_SOURCE_REF,
   ACCEPTANCE_PROVIDER_SET_SOURCE_REF,
   ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF,
   ACCEPTANCE_REGISTER_SOURCE_REF,
@@ -125,6 +133,42 @@ export interface AcceptanceRuntimePolicy {
    * constants re-declared at the call site.
    */
   readonly envelopeFormulaInputs: EnvelopeFormulaInputs;
+  /**
+   * S2-2 / T3: the sealed panel inputs as the runner consumes them. The scale,
+   * multiplier, downgrade map and provider->family map are the panel-weighting
+   * family's; the disagreement threshold is the verdict-label family's row,
+   * paired here by one identifier rather than restated.
+   */
+  readonly panelPolicy: {
+    readonly registerVersion: number;
+    readonly dispersionScale: number;
+    readonly repeatedFamilyMultiplier: number;
+    readonly disagreementThreshold: number;
+    readonly oneStepDown: Readonly<Record<string, string>>;
+    readonly providerFamilies: PanelWeightingControls["providerFamilies"];
+    readonly unmappedReason: string;
+    readonly sourceRefs: Readonly<Record<string, string>>;
+  };
+  /** S3-2/S5-1 / T7: the sealed adaptive-stopping family, handed on whole. */
+  readonly stoppingPolicy: AdaptiveStoppingControls;
+  /** S6-1 / T11: the sealed verdict-label family as the runner consumes it. */
+  readonly verdictLabelPolicy: {
+    readonly registerVersion: number;
+    readonly gamma: number;
+    readonly highCut: number;
+    readonly lowCut: number;
+    readonly disagreementThreshold: number;
+    readonly sourceRefs: Readonly<Record<string, string>>;
+  };
+  /**
+   * S6-2 / T9 x board F33: the sealed T16 synthesis-role family, READ here so
+   * the acceptance deployment's entry point can hand the runner the same rows
+   * the dev deployment hands it (`dev-runner-policy.ts`). EVERY served
+   * statement comes out of the synthesizer/evaluator loop, so this binds at
+   * every maker count and is NOT optional on this policy: a deployment that
+   * cannot resolve it has no business claiming a work item.
+   */
+  readonly synthesisRolePolicy: SynthesisRoleControls;
   /** DR-162-A/DR-177: configured real makers remain register-driven data. */
   readonly providers: ReadonlyArray<z.infer<typeof runtimeRowsSchema>["configuredProviderSet"]["providers"][number]>;
   readonly hashes: {
@@ -188,6 +232,32 @@ export async function readOptionalScoringOperator(pool: Pool): Promise<{
   });
 }
 
+/**
+ * Every T16 family this deployment reads must carry THIS deployment's algorithm
+ * provenance. The shared reader (`readFamily`) only requires a source_ref to be
+ * non-empty, so scoping it to the deployment is the deployment's own duty — the
+ * dev runner policy performs the identical check against its own prefix.
+ *
+ * codex r1 FOLLOW-UP 2: the acceptance path reads FIVE such families, not four.
+ * `envelopeFormulaInputs` is the fifth and exposes `sourceRefs` like the rest,
+ * so it is checked here with them rather than left as the one unguarded read.
+ * Naming the family in the error keeps a refusal diagnosable without a debugger.
+ */
+function assertAcceptanceAlgorithmProvenance(
+  family: string,
+  sourceRefs: Readonly<Record<string, string>>
+): void {
+  const foreign = Object.entries(sourceRefs).filter(
+    ([, sourceRef]) => !sourceRef.startsWith(ACCEPTANCE_ALGORITHM_SOURCE_REF)
+  );
+  if (foreign.length > 0) {
+    throw new Error(
+      `ACCEPTANCE_ALGORITHM_PROVENANCE_INVALID:${family}:`
+      + foreign.map(([rowKey]) => rowKey).sort().join(",")
+    );
+  }
+}
+
 export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<AcceptanceRuntimePolicy> {
   const keys = Object.keys(runtimeRowsSchema.shape);
   const result = await pool.query<{ row_key: string; value_json: unknown; source_ref: string }>(
@@ -212,7 +282,23 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
   const compositionRow = await readClaimTypeCompositionMap(pool, ACCEPTANCE_REGISTER_VERSION);
   // T17: the loud stop for the acceptance deployment — a register version that
   // never sealed the envelope row cannot resolve a runtime policy at all.
-  const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, ACCEPTANCE_REGISTER_VERSION);
+  // EVERY T16 family the acceptance runtime reads is resolved HERE and checked
+  // against this deployment's provenance in one place, the way the dev runner
+  // policy resolves and checks its own. Reading them anywhere else is how one
+  // family ends up as the only guarded read (codex r1 FOLLOW-UP 2).
+  const [envelopeFormulaInputs, synthesisRoles, panelWeighting, verdictLabels, adaptiveStopping] =
+    await Promise.all([
+      readEnvelopeFormulaInputs(pool, ACCEPTANCE_REGISTER_VERSION),
+      readSynthesisRoleControls(pool, ACCEPTANCE_REGISTER_VERSION),
+      readPanelWeightingControls(pool, ACCEPTANCE_REGISTER_VERSION),
+      readVerdictLabelControls(pool, ACCEPTANCE_REGISTER_VERSION),
+      readAdaptiveStoppingControls(pool, ACCEPTANCE_REGISTER_VERSION)
+    ]);
+  assertAcceptanceAlgorithmProvenance("envelopeFormulaInputs", envelopeFormulaInputs.sourceRefs);
+  assertAcceptanceAlgorithmProvenance("synthesisRole", synthesisRoles.sourceRefs);
+  assertAcceptanceAlgorithmProvenance("panelWeighting", panelWeighting.sourceRefs);
+  assertAcceptanceAlgorithmProvenance("verdictLabel", verdictLabels.sourceRefs);
+  assertAcceptanceAlgorithmProvenance("adaptiveStopping", adaptiveStopping.sourceRefs);
   const compositionBudgets = Object.freeze(Object.fromEntries(
     Object.entries(parsed.compositionBundleBudget).map(([tier, bound]) => [tier, Object.freeze({
       tier: tier as "low" | "medium" | "high",
@@ -247,6 +333,27 @@ export async function readAcceptanceRuntimePolicy(pool: Pool): Promise<Acceptanc
       sourceRef: ACCEPTANCE_HIDDEN_SCORE_SOURCE_REF
     }),
     envelopeFormulaInputs,
+    panelPolicy: Object.freeze({
+      registerVersion: panelWeighting.registerVersion,
+      dispersionScale: panelWeighting.dispersionScale,
+      repeatedFamilyMultiplier: panelWeighting.repeatedFamilyMultiplier,
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      oneStepDown: panelWeighting.oneStepDown,
+      providerFamilies: panelWeighting.providerFamilies,
+      unmappedReason: panelWeighting.unmappedReason,
+      sourceRefs: Object.freeze({ ...verdictLabels.sourceRefs, ...panelWeighting.sourceRefs })
+    }),
+    // The readers already froze these and own every field; they travel whole.
+    stoppingPolicy: adaptiveStopping,
+    verdictLabelPolicy: Object.freeze({
+      registerVersion: verdictLabels.registerVersion,
+      gamma: verdictLabels.gamma,
+      highCut: verdictLabels.highCut,
+      lowCut: verdictLabels.lowCut,
+      disagreementThreshold: verdictLabels.disagreementThreshold,
+      sourceRefs: verdictLabels.sourceRefs
+    }),
+    synthesisRolePolicy: synthesisRoles,
     providers: Object.freeze(parsed.configuredProviderSet.providers),
     hashes: Object.freeze({
       judge: parsed.judgeContractHash,
