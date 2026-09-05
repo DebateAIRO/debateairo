@@ -14,7 +14,7 @@ const rows: readonly Row[] = [
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto"]],
-  ["register", "packages/register", ["kernel", "db"]],
+  ["register", "packages/register", ["kernel", "db", "contract"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
@@ -25,11 +25,11 @@ const rows: readonly Row[] = [
   ["liveness", "packages/liveness", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["settlement", "packages/settlement", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["valuation", "packages/valuation", ["kernel", "db", "ledger", "register", "graph", "propagation"]],
-  ["budget", "packages/budget", ["kernel", "db", "ledger", "register"]],
+  ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
   ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   ["web", "web", ["contract"]],
@@ -440,6 +440,25 @@ export function auditSurfaceAttachmentLiterals(name: string, source: string): re
     .map((match) => `${name}:${lineAt(source, match.index)} hand-authors s*Surface attachment instead of deriving production reachability`);
 }
 
+/**
+ * J10(b) — the ONE reconciliation between the source-purity law and the goal.
+ *
+ * The purity law refuses every exported numeric source literal outside
+ * packages/published-arithmetic, because a bare number in source is a policy
+ * value that belongs in a register/law carrier. Goal T1 (S1-1) nevertheless
+ * ORDERS the 1–5 expansion-depth bound to be declared ONCE as an exported
+ * contract constant, which every other surface imports. Both rules are correct;
+ * they collide on exactly two names.
+ *
+ * These two exports ARE the law carrier for that bound, so they are recognized
+ * as such — by NAME, in ONE file. This is deliberately not a path prefix and
+ * not a package exemption: a third numeric export in this very file still trips
+ * the law, and the law is unchanged everywhere else.
+ */
+const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
+]);
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -474,7 +493,10 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
-    if (/export\s+const\s+[A-Z][A-Z0-9_]*\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/.test(source) && !where.startsWith("packages/published-arithmetic/")) {
+    const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/g)]
+      .map((match) => match[1]!)
+      .filter((name) => !(GOAL_RULED_LAW_CARRIERS.get(where) ?? []).includes(name));
+    if (numericExports.length > 0 && !where.startsWith("packages/published-arithmetic/")) {
       blocking.push(`${where} exports a numeric source literal instead of a register/law carrier`);
     }
   }

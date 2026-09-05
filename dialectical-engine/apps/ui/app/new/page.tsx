@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, EXPANSION_DEPTH_VALUES } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
@@ -73,7 +74,7 @@ function NewDebateForm({ token }: { token: string }) {
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    depth >= 1 && depth <= 5 &&
+    depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -192,7 +193,7 @@ function NewDebateForm({ token }: { token: string }) {
                   onChange={(event) => setDepth(Number(event.target.value))}
                   aria-label="Tree depth"
                 >
-                  {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                  {EXPANSION_DEPTH_VALUES.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               </div>
             </div>

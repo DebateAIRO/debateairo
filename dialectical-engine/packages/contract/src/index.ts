@@ -104,13 +104,39 @@ export const NODE_LIFECYCLE_EVENT_CONSUMERS = Object.freeze({
   "node.scored": Object.freeze(["W6", "W8", "W10"])
 } as const);
 
+// S1-1 / DR-157 / DR-159: the expansion-depth bound is declared HERE and only
+// here. Every other surface — the ask schema below, the runner's
+// RUN_DEPTH_PARAMS_INVALID guard — imports these constants instead of restating
+// the range, so moving the bound is a one-line change with no second literal.
+export const EXPANSION_DEPTH_MIN = 1;
+export const EXPANSION_DEPTH_MAX = 5;
+
+export const ExpansionDepthSchema = z.number().int().min(EXPANSION_DEPTH_MIN).max(EXPANSION_DEPTH_MAX);
+export type ExpansionDepth = z.infer<typeof ExpansionDepthSchema>;
+
+/**
+ * The ruled domain, DERIVED from the bound above. Selectors and option lists
+ * import this instead of enumerating the values by hand, so widening the bound
+ * widens every chooser without touching a consumer.
+ */
+export const EXPANSION_DEPTH_VALUES: readonly number[] = Object.freeze(
+  Array.from(
+    { length: EXPANSION_DEPTH_MAX - EXPANSION_DEPTH_MIN + 1 },
+    (_unused, index) => EXPANSION_DEPTH_MIN + index
+  )
+);
+
+/** Closed at the contract door: exactly one key, an integer inside the range. */
+export const DepthParamsSchema = z.object({ depth: ExpansionDepthSchema }).strict();
+export type DepthParams = z.infer<typeof DepthParamsSchema>;
+
 export const AskRequestSchema = z.object({
   question_line: z.string().trim().min(1),
   risk_tier: RiskTierSchema,
   tier_source: AskTierSourceSchema,
   tier_provenance_ref: z.string().trim().min(1),
   composition_budget_tier: CompositionBudgetTierSchema,
-  depth_params: z.record(z.string(), z.unknown()),
+  depth_params: DepthParamsSchema,
   decision_scope: z.string().trim().min(1),
   as_of: z.iso.datetime(),
   steering_presets: z.array(z.string().trim().min(1)),

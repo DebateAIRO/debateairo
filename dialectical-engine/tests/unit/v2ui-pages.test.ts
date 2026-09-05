@@ -90,7 +90,12 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
 
   it("offers the ruled depth range without exposing the computed tripwire", () => {
     expect(newPage).not.toContain("contractClient.readDeployment");
-    expect(newPage).toContain("[1, 2, 3, 4, 5].map");
+    // S1-1/J6: the selector still offers the ruled range, but reads it from the
+    // contract's single source instead of re-enumerating `[1, 2, 3, 4, 5]` —
+    // that literal is now a forbidden second definition of the bound
+    // (tests/unit/s1-1-depth-contract.test.ts scans shipped code for it).
+    expect(newPage).toContain("EXPANSION_DEPTH_VALUES.map");
+    expect(newPage).toContain('from "@debateai/contract"');
     expect(newPage).not.toContain("runCostEnvelope");
     expect(newPage).not.toContain("maxModelAttempts");
     expect(newPage).not.toContain("up to 9 model attempts");

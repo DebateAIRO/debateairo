@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
+import { EXPANSION_DEPTH_MAX } from "@debateai/contract";
 import {
   ENGINE_BAND_ORDER,
   ENGINE_BRANCHING_FACTOR,
@@ -249,12 +250,15 @@ export function buildAlgorithmRegisterRows(
         synthesizerMaxRounds: 3,
         evaluatorMaxRounds: 3,
         panelCallsPerNodeBasis: "PANEL_SIZE_MINUS_ONE",
-        // T17/B2: the SEALED maximum the admission formula refuses above. The
-        // engine's own expansion rule is 1..5 (apps/runner resolveExpansionDepth,
-        // and the stored-basis parser in packages/budget); sealing it here is what
-        // lets ADMISSION refuse an over-bound ask instead of minting a ceiling the
-        // runner rejects later, after the asker has been admitted.
-        maxDepth: 5
+        // T17/B2: the SEALED maximum the admission formula refuses above.
+        // Sealing it in the register is what lets ADMISSION refuse an over-bound
+        // ask instead of minting a ceiling the runner rejects later, after the
+        // asker has been admitted.
+        // V-T1B3-1: the ceiling itself is the CONTRACT's and is DERIVED here,
+        // never restated. EXPANSION_DEPTH_MAX is the one source the runner guard
+        // (apps/runner resolveExpansionDepth) and the stored-basis parser
+        // (packages/budget) also read, so this row cannot drift from them.
+        maxDepth: EXPANSION_DEPTH_MAX
       },
       sourceRef: ref(T16_ENVELOPE_REF)
     }

@@ -209,3 +209,22 @@ Every entry below was paid for at least once. Do not pay for it again.
   0 (a crashed or filtered run looks identical). Wrap gates as
   `{ echo "\$ cmd"; cmd 2>&1; echo "EXIT STATUS: $?"; } > log`. A static reviewer correctly
   downgraded T6 r3's typecheck evidence to testimony-grade for exactly this. (T6 r4)
+- **A vitest `-t` filter that matches NOTHING reports `Tests N skipped (N)` and exits 0.** It is
+  indistinguishable from a pass at a glance, and every downstream gate treats exit 0 as evidence.
+  T1B ran five mutation probes that tested nothing this way: the filter was
+  `-t "laid out as (multiline zod chain)"` while `it.each` had interpolated `$spelling` into the
+  name **with quotes**, `laid out as 'multiline zod chain'`. **`N skipped` with `0 passed` is a
+  FAILED MEASUREMENT, not a green run** — assert that a filtered run passed at least one test
+  before you believe its verdict. (T1B)
+- **`gate-run.sh` stamps `git rev-parse HEAD`, which is the WRONG commit whenever the working
+  tree is dirty.** Run a gate before committing your fix and the record binds to the *previous*
+  commit while measuring code that is not in any commit. The record even prints the dirt on its
+  `porcelain BEFORE` line — it just does not draw the conclusion, so nothing fails. `stamp-check`
+  then reports STALE much later, after the run is expensive to repeat. Commit first, then gate;
+  T1B re-ran five gates for this. (T1B)
+- **Verify a merge by comparing diff LINE SETS in both directions, not by reading hunks.** For
+  each file both sides touched: `diff(base,lane)` must equal `diff(integration,merged)`, and
+  `diff(base,integration)` must equal `diff(lane,merged)` — take `git diff -U0 … | grep '^[+-][^+-]' | sort`
+  and compare. Two `diff` calls per file prove neither side's contribution was dropped, which
+  no amount of reading the merged file does. A clean auto-merge resolves by POSITION and is the
+  case that most needs this. (T1B)
