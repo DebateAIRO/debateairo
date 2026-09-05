@@ -3950,12 +3950,21 @@ describe("apps/runner — legal command lifecycle", () => {
       });
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
       const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:happy-path");
+      // F-H-1 / T11 (goal 196-221). This fixture is agentCount=1, depth=1: ONE maker, so one
+      // servable root and no runner-up to measure a margin against; ONE judge, so the winning
+      // root's panel dispersion is NULL. Both limbs of the label basis are therefore ABSENT
+      // (receipt: basisAbsence ["MARGIN","DISAGREEMENT"], candidateCount 1), which is rung 0 of
+      // the ladder -- CONTESTED with LABEL-BASIS-INCOMPLETE, by design, because a solo voice can
+      // never print SUPPORTED (confirm-item 6). SUPPORTED lives at rung 3 and is UNREACHABLE
+      // here: rung 0 returns first and needs both limbs MEASURED to decline. The retired binary
+      // derivation this once asserted returned SUPPORTED for any usable basis; that property is
+      // still pinned, by `verdict_unavailable: null` on the next line.
       expect(projection).toMatchObject({
-        verdict_state: "SUPPORTED",
+        verdict_state: "CONTESTED",
         verdict_unavailable: null,
         confidence_band: "TEST_CAPPED_BAND",
         band_ceiling: { label: "TEST_DEFAULT_CEILING" },
-        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"]
+        condition_marks: ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE", "LABEL-BASIS-INCOMPLETE"]
       });
       expect(projection?.condition_mark_records).toEqual(expect.arrayContaining([
         expect.objectContaining({
@@ -6049,5 +6058,71 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
     await expect(
       serve.persist(freshInput as Parameters<ServeRepository["persist"]>[0])
     ).rejects.toMatchObject({ code: "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE" });
+  });
+});
+
+/**
+ * F-H-2 — the liveness refresh path with content encryption OFF.
+ *
+ * `core.run_private_content_is_live` is a v1-ENCRYPTED-run predicate: its body ends
+ * `WHERE run.run_id=p_run_id AND run.content_encryption_version=1`, wrapped in
+ * `COALESCE(...,false)`, so it answers FALSE for a run that has no private content at all.
+ * Eleven of its twelve call sites guard it accordingly; `recordQuery`'s candidate filter did
+ * not, so with encryption off — the default — every run was invisible to it.
+ *
+ * These two tests pin the BLAST RADIUS rather than the symptom. The lifecycle test proves the
+ * ARCHIVED_REVIVED transition end to end; it does not prove that a query refreshes liveness at
+ * all, and that refresh is what feeds `sweep`'s `HAVING max(query.occurred_at)` and
+ * `decideRetirement`'s `lastQueriedAt`.
+ */
+describe("F-H-2 · liveness refresh with content encryption off", () => {
+  const retirementPolicy = {
+    rowKey: "livenessPolicy",
+    registerVersion: 1,
+    sourceRef: "test-layer:DR-015-016",
+    questionClass: "standard",
+    reviewAfterMs: 86_400_000,
+    retireAfterMs: 180 * 86_400_000
+  } as const;
+
+  /**
+   * PROPERTY: an owned, unencrypted, non-erased run IS a `recordQuery` candidate, and the query
+   * is recorded against it at the instant it was asked. Mutant this catches: restoring the
+   * unguarded `core.run_private_content_is_live(run.run_id)` in the candidate filter, which
+   * makes the run invisible and the returned count 0.
+   */
+  it("F-H-2 counts an unencrypted run as a candidate and records its QUERY event", async () => {
+    const question = `f-h-2-refresh-${randomUUID()}`;
+    const runId = await createRun(question);
+    const askedAt = new Date("2030-01-01T00:00:00.000Z");
+
+    const recorded = await new LivenessRepository(database.pool)
+      .recordQuery(question, `asker:${question}`, askedAt);
+
+    expect(recorded).toBe(1);
+    const events = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM core.question_liveness_event
+        WHERE run_id=$1 AND kind='QUERY' AND occurred_at=$2`,
+      [runId, askedAt]
+    );
+    expect(events.rows[0]?.count).toBe("1");
+  });
+
+  /**
+   * PROPERTY: re-asking a question keeps it alive — the refreshed `lastQueriedAt` is what
+   * `decideRetirement` reads, so a run queried one day ago is NOT retired under a 180-day
+   * window, however old the run itself is. This is the user-visible half of the defect: without
+   * the refresh, a question being actively re-asked is archived anyway.
+   */
+  it("F-H-2 keeps a re-asked run out of a later retirement sweep", async () => {
+    const question = `f-h-2-not-retired-${randomUUID()}`;
+    const runId = await createRun(question);
+    const liveness = new LivenessRepository(database.pool);
+
+    // The run was created "now"; without a refresh it is years stale by 2030 and retires.
+    await liveness.recordQuery(question, `asker:${question}`, new Date("2030-06-01T00:00:00.000Z"));
+    const archived = await liveness.sweep(new Date("2030-06-02T00:00:00.000Z"), retirementPolicy);
+
+    expect(archived).not.toContain(runId);
   });
 });
