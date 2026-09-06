@@ -120,6 +120,39 @@ describe("S01-C2 consent storage contract", () => {
       [
         "essential not true",
         '{"v":1,"essential":false,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z"}'
+      ],
+      // R01 says "exactly these five members and no others" (row V-19, default
+      // (a)): a SIXTH member was not written by this module, and accepting it
+      // hands an unaudited value to the caller inside a `ConsentDecision`.
+      [
+        "a sixth member beyond R01's five",
+        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z","rogue":"injected"}'
+      ],
+      // R01 says `decidedAt` is "the UTC ISO-8601 string produced by
+      // `new Date().toISOString()`". On a consent record the timestamp is the
+      // evidentiary member: a record whose stamp cannot be parsed cannot answer
+      // "when was consent given", so it is no decision and the visitor re-asks.
+      [
+        "decidedAt is not an instant at all",
+        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"yesterday"}'
+      ],
+      [
+        "decidedAt is empty",
+        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":""}'
+      ],
+      [
+        "decidedAt is epoch milliseconds as a string",
+        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"1788723500905"}'
+      ],
+      [
+        "decidedAt is an impossible instant",
+        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-13-45T99:99:99Z"}'
+      ],
+      // `toISOString()` always emits the millisecond field, so a second-precision
+      // stamp is the near-miss most likely to arrive from a hand edit.
+      [
+        "decidedAt carries no milliseconds",
+        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00Z"}'
       ]
     ] as const) {
       localStorage.setItem(CONSENT_KEY, raw);

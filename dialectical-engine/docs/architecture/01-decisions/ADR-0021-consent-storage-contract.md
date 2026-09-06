@@ -65,9 +65,25 @@ members and no others** (S01-R01):
 the visitor is asked again and the next decision overwrites the key. **No
 migration code is written**, and no branch on any other version exists.
 
-**3. A value that is absent, unparseable, not an object, or missing any of the
-five members is treated as no decision, and no read or write ever throws**
-(S01-R03). Every `localStorage` access is wrapped in `try/catch`:
+**3. A stored value is a decision if and only if it satisfies this predicate;
+anything else re-asks, and no read or write ever throws** (S01-R03, row
+**V-19** default (a)). Stated once, and the code states nothing else:
+
+> the raw string parses, and the parsed value is a non-array object with
+> **exactly five own members**, `v === 1`, `essential === true`, `quality` and
+> `analytics` both boolean, and `decidedAt` a string matching
+> `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`.
+
+R01 declares the record's shape and R03 declares the rejection rule, and the two
+did not compose: a record carrying a sixth member, or a hand-edited `decidedAt`,
+satisfied R03's "missing any of the five" test while violating R01's "exactly
+these five members and no others". V-19 closes the gap in R01's direction, which
+extends the earlier ruling on `essential !== true` from its instance to its whole
+class. Nothing in this product writes such a record — decision 6 makes this
+module the only writer — so both shapes arrive only from DevTools, a hand edit or
+an extension; re-asking such a visitor is the conservative reading of consent,
+and a record whose timestamp cannot be parsed cannot answer *when* consent was
+given. Every `localStorage` access is wrapped in `try/catch`:
 
 - If a **read** throws or returns nothing, the visitor is asked.
 - If a **write** throws, the surface still closes and the decision lives in React

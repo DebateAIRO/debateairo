@@ -90,20 +90,35 @@ export type ConsentToggles = {
 };
 
 /**
- * A *valid stored decision* parses, carries `v === 1`, and holds all five
- * members at their declared types. Anything else — including a record whose
- * `essential` is not `true`, which this module never writes — is no decision,
- * because re-asking is the conservative reading of consent (S01-R02, S01-R03).
+ * The exact shape `new Date().toISOString()` emits — millisecond precision, `Z`
+ * suffix — which S01-R01 names as `decidedAt`'s only form.
+ */
+const ISO_UTC_MS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/**
+ * A *valid stored decision* parses to a non-array object with **exactly the
+ * five members and no others**, `v === 1`, `essential === true`, `quality` and
+ * `analytics` boolean, and `decidedAt` matching {@link ISO_UTC_MS}. Anything
+ * else re-asks, because re-asking is the conservative reading of consent
+ * (S01-R01, S01-R02, S01-R03; row **V-19** default (a), which extends the
+ * earlier `essential !== true` ruling from its instance to its whole class).
+ *
+ * The two members V-19 added — a sixth key, and a `decidedAt` that is a string
+ * but not that instant — cannot arrive from this product: nothing else writes
+ * the key. They arrive from DevTools, a hand edit or an extension, and a record
+ * whose timestamp cannot be parsed cannot answer "when was consent given".
  */
 function isDecision(value: unknown): value is ConsentDecision {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return (
+    Object.keys(record).length === 5 &&
     record.v === CONSENT_VERSION &&
     record.essential === true &&
     typeof record.quality === "boolean" &&
     typeof record.analytics === "boolean" &&
-    typeof record.decidedAt === "string"
+    typeof record.decidedAt === "string" &&
+    ISO_UTC_MS.test(record.decidedAt)
   );
 }
 
@@ -149,7 +164,20 @@ export function writeConsent(decision: ConsentDecision): void {
  * live. `essential-only` ignores `toggles` on purpose: it is offered by the bar
  * and by the card, and both must produce the identical object, so the entry
  * point is never a discriminator of behaviour.
+ *
+ * **`save-choices` REQUIRES the toggles, and the compiler is the guard.** An
+ * omitted argument used to coerce to `false`/`false`, so a wiring mistake wrote
+ * a full denial for a visitor who had left the optional quality toggle ON — a
+ * silent, type-legal denial of consent that no test in this slice could see
+ * (`reviews/CODE-REV-S01-C1C2-r1.md` **N2**; orchestrator ruling on ticket
+ * `t_117e7f43`). The overloads below make `decisionFor("save-choices")` a
+ * compile error, so absence can no longer read as denial.
  */
+export function decisionFor(
+  control: "accept-all" | "essential-only",
+  toggles?: ConsentToggles
+): ConsentDecision;
+export function decisionFor(control: "save-choices", toggles: ConsentToggles): ConsentDecision;
 export function decisionFor(control: ConsentControl, toggles?: ConsentToggles): ConsentDecision {
   const chosen: Pick<ConsentDecision, "quality" | "analytics"> =
     control === "accept-all"
