@@ -12,6 +12,7 @@ import {
   readDefectInputs,
   type DefectQueryInputs
 } from "../defect-interface/queries.js";
+import { DetectorClockStore, type DetectorClocks } from "./clock-store.js";
 import { createDefectDetectorTracker } from "./detectors.js";
 import {
   createWorkerHeartbeatTracker,
@@ -69,7 +70,12 @@ export function createStallDetectorsModule(
 ): Module {
   const heartbeatTracker = createWorkerHeartbeatTracker();
   const defectDetector = createDefectDetectorTracker();
-  const defectLifecycle = createDefectLifecycle();
+  const defectLifecycles = Object.freeze({
+    STALL: createDefectLifecycle(),
+    QUEUE_NOT_DRAINING: createDefectLifecycle(),
+    NO_PROGRESS: createDefectLifecycle(),
+    SUSPICIOUS_SUCCESS: createDefectLifecycle()
+  });
   let lastDetectorAt: number | null = null;
   let pendingIntents: readonly SignalIntent[] = Object.freeze([]);
 
@@ -80,13 +86,16 @@ export function createStallDetectorsModule(
     lifecycle: Object.freeze({
       legacyCorrelationKey(signal: ObservationSignal) {
         return heartbeatTracker.legacyCorrelationKey(signal)
-          ?? defectLifecycle.legacyCorrelationKey(signal);
+          ?? defectLifecycles.STALL.legacyCorrelationKey(signal);
       },
       restore(openSignals: readonly RestoredOpenSignal[]) {
         heartbeatTracker.restore(openSignals.filter((open) =>
           heartbeatTracker.legacyCorrelationKey(open.signal) === open.correlationKey));
-        defectLifecycle.restore(openSignals.filter((open) =>
-          defectLifecycle.legacyCorrelationKey(open.signal) === open.correlationKey));
+        for (const [signalClass, lifecycle] of Object.entries(defectLifecycles)) {
+          lifecycle.restore(openSignals.filter((open) =>
+            open.signal.class === signalClass
+            && lifecycle.legacyCorrelationKey(open.signal) === open.correlationKey));
+        }
       }
     }),
     async probe(ctx) {
@@ -118,8 +127,18 @@ export function createStallDetectorsModule(
         suspiciousRows: Object.freeze([])
       });
       let postgres: "UP" | "UNKNOWN" = "UP";
+      let clocks: DetectorClocks = Object.freeze({
+        readyFirstObserved: new Map(),
+        progressLastChanged: new Map(),
+        exhausted: new Set<"READY" | "PROGRESS">()
+      });
       try {
         queryInputs = await dependencies.readDefectInputs(ctx.database);
+        clocks = await new DetectorClockStore(ctx.database).reconcile({
+          now: ctx.now,
+          ready: queryInputs.readyRows,
+          progress: queryInputs.progressRows
+        });
       } catch {
         postgres = "UNKNOWN";
       }
@@ -131,7 +150,7 @@ export function createStallDetectorsModule(
           readyAgeSeconds: positiveNumber(ctx.thresholds, "ready_age_s", 120),
           noProgressSeconds: positiveNumber(ctx.thresholds, "no_progress_s", 300)
         })
-      });
+      }, clocks);
       const health = Object.freeze({
         runner: snapshot.state,
         postgres,
@@ -140,7 +159,18 @@ export function createStallDetectorsModule(
       const eligible = health.runner === "FRESH"
         && health.postgres === "UP"
         && health.hatchet === "UP";
-      const defectIntents = defectLifecycle.reconcile(detected.candidates, health, ctx.now);
+      const reconcile = (signalClass: keyof typeof defectLifecycles) =>
+        defectLifecycles[signalClass].reconcile(
+          detected.candidates.filter((candidate) => candidate.class === signalClass),
+          health,
+          ctx.now
+        );
+      const defectIntents = Object.freeze([
+        ...reconcile("STALL"),
+        ...(eligible && clocks.exhausted.has("READY") ? [] : reconcile("QUEUE_NOT_DRAINING")),
+        ...(eligible && clocks.exhausted.has("PROGRESS") ? [] : reconcile("NO_PROGRESS")),
+        ...reconcile("SUSPICIOUS_SUCCESS")
+      ]);
       pendingIntents = Object.freeze([...defectIntents, ...heartbeatIntents]);
       return Object.freeze([
         projectWorkerHeartbeat(snapshot),

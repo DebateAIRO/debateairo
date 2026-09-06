@@ -1,10 +1,39 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { ObservationQueryClient } from "../../apps/observation-agent/src/core/database.js";
 
 const fixturePath = "tests/acceptance/obs-agent-03-fixture.ts";
+const clockRows = new Map<string, {
+  metric_key: string;
+  bucket: number;
+  observed_at: Date;
+  value: string;
+}>();
 const database = Object.freeze({
-  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+  async withClient<T>(operation: (client: ObservationQueryClient) => Promise<T>): Promise<T> {
+    const query = (async (text: string, values?: readonly unknown[]) => {
+      if (text.includes("SELECT metric_key,bucket,observed_at,value::text AS value")) {
+        return { rows: [...clockRows.values()] };
+      }
+      if (text.includes("INSERT INTO observation.sample_ring")) {
+        const metricKey = /SELECT '([^']+)'/u.exec(text)?.[1];
+        if (metricKey === undefined) throw new Error("TEST_CLOCK_KEY_MISSING");
+        const [buckets, times, encoded] = values as [number[], Date[], string[]];
+        for (let index = 0; index < buckets.length; index += 1) {
+          const bucket = buckets[index]!;
+          clockRows.set(`${metricKey}:${bucket}`, {
+            metric_key: metricKey,
+            bucket,
+            observed_at: times[index]!,
+            value: encoded[index]!
+          });
+        }
+      }
+      return { rows: [] };
+    }) as ObservationQueryClient["query"];
+    return operation(Object.freeze({ query }));
+  }
 });
 
 async function fixtureModule() {

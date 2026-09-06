@@ -3,6 +3,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
+import {
+  createObservationDatabasePort,
+  type ObservationDatabasePort,
+  type ObservationQueryClient
+} from "../../apps/observation-agent/src/core/database.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const queriesPath = "apps/observation-agent/src/modules/defect-interface/queries.ts";
@@ -94,6 +99,56 @@ describe("OBS-03 10x detector query budget", () => {
     for (const [name, query] of Object.entries(queries.DEFECT_QUERY_DEFINITIONS)) {
       expect(sql).toContain(`\\echo 'OBS-03 ${name}'`);
       expect(sql).toContain(`EXPLAIN (ANALYZE, TIMING OFF, SUMMARY ON)\n${query};`);
+    }
+  });
+
+  it("reconciles the 10x fixture with one callback and a fixed parameterized statement bound", async () => {
+    expect(database).toBeDefined();
+    const [{ DetectorClockStore, DETECTOR_CLOCK_KEYS }, { readDefectInputs }] = await Promise.all([
+      import("../../apps/observation-agent/src/modules/stall-detectors/clock-store.js"),
+      import("../../apps/observation-agent/src/modules/defect-interface/queries.js")
+    ]);
+    const base = createObservationDatabasePort(database!.pool);
+    const inputs = await readDefectInputs(base);
+    const calls: Array<{ text: string; values: readonly unknown[] | undefined }> = [];
+    let callbacks = 0;
+    const measured: ObservationDatabasePort = Object.freeze({
+      withClient<T>(operation: (client: ObservationQueryClient) => Promise<T>): Promise<T> {
+        callbacks += 1;
+        return base.withClient((client) => operation(Object.freeze({
+          query: (async (textOrConfig: string | { text?: string }, values?: readonly unknown[]) => {
+            const text = typeof textOrConfig === "string" ? textOrConfig : textOrConfig.text ?? "";
+            calls.push({ text, values });
+            return client.query(textOrConfig as never, values as never);
+          }) as ObservationQueryClient["query"]
+        })));
+      }
+    });
+    const startedAt = performance.now();
+    await new DetectorClockStore(measured).reconcile({
+      ready: inputs.readyRows,
+      progress: inputs.progressRows,
+      now: new Date("2026-09-03T08:05:00.000Z")
+    });
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(callbacks).toBe(1);
+    expect(calls.length).toBeLessThanOrEqual(8);
+    expect(elapsedMs).toBeLessThan(2_000);
+    const locks = calls.filter((call) => call.text.includes("pg_advisory_xact_lock"));
+    expect(locks).toEqual([expect.objectContaining({
+      values: [1_326_651_139, 1_129_073_475]
+    })]);
+    const inserts = calls.filter((call) => call.text.includes("INSERT INTO observation.sample_ring"));
+    expect(inserts).toHaveLength(3);
+    expect(inserts.every((call) => call.values?.length === 3)).toBe(true);
+    const sql = calls.map((call) => call.text).join("\n");
+    expect(sql).toContain(DETECTOR_CLOCK_KEYS.readyIdentity);
+    expect(sql).toContain(DETECTOR_CLOCK_KEYS.progressIdentity);
+    expect(sql).toContain(DETECTOR_CLOCK_KEYS.progressSequence);
+    for (const row of [...inputs.readyRows, ...inputs.progressRows]) {
+      const identity = "workItemId" in row ? row.workItemId : row.runId;
+      expect(sql).not.toContain(identity);
     }
   });
 });

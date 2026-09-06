@@ -20,6 +20,18 @@ function emptyInput(now: Date) {
   };
 }
 
+function clocks(input: Readonly<{
+  ready?: readonly (readonly [string, Date])[];
+  progress?: readonly (readonly [string, Readonly<{ sequence: number; at: Date }>])[];
+  exhausted?: readonly ("READY" | "PROGRESS")[];
+}> = {}) {
+  return {
+    readyFirstObserved: new Map(input.ready ?? []),
+    progressLastChanged: new Map(input.progress ?? []),
+    exhausted: new Set(input.exhausted ?? [])
+  };
+}
+
 describe("OBS-03 defect predicates", () => {
   it("opens STALL only for CLAIMED after the strict claim deadline plus grace boundary", async () => {
     const detectors = await detectorModule();
@@ -29,8 +41,9 @@ describe("OBS-03 defect predicates", () => {
       workItemId: workItemRef, runId: runRef, state: "CLAIMED" as const,
       claimDeadline: at(0)
     };
-    expect(tracker.observe({ ...emptyInput(at(15)), stallRows: [row] }).candidates).toEqual([]);
-    expect(tracker.observe({ ...emptyInput(at(15.001)), stallRows: [row] }).candidates)
+    expect(tracker.observe({ ...emptyInput(at(15)), stallRows: [row] }, clocks()).candidates)
+      .toEqual([]);
+    expect(tracker.observe({ ...emptyInput(at(15.001)), stallRows: [row] }, clocks()).candidates)
       .toEqual([expect.objectContaining({
         class: "STALL", severity: "SEVERE", defectKind: "STALL_DETECTED",
         runRef, workItemRef, firstFailedProbeAt: at(15),
@@ -41,17 +54,18 @@ describe("OBS-03 defect predicates", () => {
       })]);
     const invalid = { ...row, state: "RUNNING" } as never;
     expect(detectors!.createDefectDetectorTracker()
-      .observe({ ...emptyInput(at(16)), stallRows: [invalid] }).candidates).toEqual([]);
+      .observe({ ...emptyInput(at(16)), stallRows: [invalid] }, clocks()).candidates).toEqual([]);
   });
 
-  it("opens QUEUE_NOT_DRAINING at 120 seconds from the local first observation", async () => {
+  it("opens QUEUE_NOT_DRAINING from the durable first observation", async () => {
     const detectors = await detectorModule();
     expect(detectors).not.toBeNull();
     const tracker = detectors!.createDefectDetectorTracker();
     const ready = [{ workItemId: workItemRef, runId: runRef, state: "READY" as const }];
-    expect(tracker.observe({ ...emptyInput(at(0)), readyRows: ready }).candidates).toEqual([]);
-    expect(tracker.observe({ ...emptyInput(at(119.999)), readyRows: ready }).candidates).toEqual([]);
-    expect(tracker.observe({ ...emptyInput(at(120)), readyRows: ready }).candidates)
+    const durable = clocks({ ready: [[workItemRef, at(0)]] });
+    expect(tracker.observe({ ...emptyInput(at(119.999)), readyRows: ready }, durable).candidates)
+      .toEqual([]);
+    expect(tracker.observe({ ...emptyInput(at(120)), readyRows: ready }, durable).candidates)
       .toEqual([expect.objectContaining({
         class: "QUEUE_NOT_DRAINING", severity: "SEVERE", defectKind: "STALL_DETECTED",
         runRef, workItemRef, firstFailedProbeAt: at(0),
@@ -61,14 +75,15 @@ describe("OBS-03 defect predicates", () => {
       })]);
   });
 
-  it("opens NO_PROGRESS after 300 seconds and resets the clock on a higher sequence", async () => {
+  it("opens NO_PROGRESS from the durable last-change clock", async () => {
     const detectors = await detectorModule();
     expect(detectors).not.toBeNull();
     const tracker = detectors!.createDefectDetectorTracker();
     const progress = [{ runId: runRef, latestProgressSeq: 7 }];
-    expect(tracker.observe({ ...emptyInput(at(0)), progressRows: progress }).candidates).toEqual([]);
-    expect(tracker.observe({ ...emptyInput(at(299.999)), progressRows: progress }).candidates).toEqual([]);
-    expect(tracker.observe({ ...emptyInput(at(300)), progressRows: progress }).candidates)
+    const unchanged = clocks({ progress: [[runRef, { sequence: 7, at: at(0) }]] });
+    expect(tracker.observe({ ...emptyInput(at(299.999)), progressRows: progress }, unchanged).candidates)
+      .toEqual([]);
+    expect(tracker.observe({ ...emptyInput(at(300)), progressRows: progress }, unchanged).candidates)
       .toEqual([expect.objectContaining({
         class: "NO_PROGRESS", severity: "SEVERE", defectKind: "SILENT_NOOP",
         runRef, workItemRef: null, firstFailedProbeAt: at(0),
@@ -79,10 +94,10 @@ describe("OBS-03 defect predicates", () => {
       })]);
     expect(tracker.observe({
       ...emptyInput(at(301)), progressRows: [{ runId: runRef, latestProgressSeq: 8 }]
-    }).candidates).toEqual([]);
+    }, clocks({ progress: [[runRef, { sequence: 8, at: at(301) }]] })).candidates).toEqual([]);
     expect(tracker.observe({
       ...emptyInput(at(600)), progressRows: [{ runId: runRef, latestProgressSeq: 8 }]
-    }).candidates).toEqual([]);
+    }, clocks({ progress: [[runRef, { sequence: 8, at: at(301) }]] })).candidates).toEqual([]);
   });
 
   it("opens SUSPICIOUS_SUCCESS only for DONE without the required artifact", async () => {
@@ -92,7 +107,7 @@ describe("OBS-03 defect predicates", () => {
     const result = tracker.observe({ ...emptyInput(at(0)), suspiciousRows: [{
       workItemId: workItemRef, runId: runRef, state: "DONE" as const,
       settledArtifactPresent: false
-    }] });
+    }] }, clocks());
     expect(result.candidates).toEqual([expect.objectContaining({
       class: "SUSPICIOUS_SUCCESS", severity: "SEVERE", defectKind: "SUSPICIOUS_SUCCESS",
       runRef, workItemRef,
@@ -107,8 +122,6 @@ describe("OBS-03 defect predicates", () => {
     expect(detectors).not.toBeNull();
     const tracker = detectors!.createDefectDetectorTracker();
     const ready = [{ workItemId: workItemRef, runId: runRef, state: "READY" as const }];
-    tracker.observe({ ...emptyInput(at(0)), readyRows: ready,
-      progressRows: [{ runId: runRef, latestProgressSeq: 1 }] });
     const observed = tracker.observe({
       ...emptyInput(at(300)),
       stallRows: [{ workItemId: workItemRef, runId: runRef, state: "CLAIMED",
@@ -117,7 +130,10 @@ describe("OBS-03 defect predicates", () => {
       progressRows: [{ runId: runRef, latestProgressSeq: 1 }],
       suspiciousRows: [{ workItemId: workItemRef, runId: runRef, state: "DONE",
         settledArtifactPresent: false }]
-    });
+    }, clocks({
+      ready: [[workItemRef, at(0)]],
+      progress: [[runRef, { sequence: 1, at: at(0) }]]
+    }));
     expect(observed.status).toEqual({
       state: "OPEN",
       projections: [
@@ -131,5 +147,18 @@ describe("OBS-03 defect predicates", () => {
           observedAt: at(300) }
       ]
     });
+  });
+
+  it("marks only an exhausted durable-clock family ineligible without a candidate", async () => {
+    const detectors = await detectorModule();
+    expect(detectors).not.toBeNull();
+    const tracker = detectors!.createDefectDetectorTracker();
+    const ready = [{ workItemId: workItemRef, runId: runRef, state: "READY" as const }];
+    const result = tracker.observe(
+      { ...emptyInput(at(500)), readyRows: ready },
+      clocks({ ready: [[workItemRef, at(0)]], exhausted: ["READY"] })
+    );
+    expect(result.candidates).toEqual([]);
+    expect(result.status.state).toBe("INELIGIBLE");
   });
 });

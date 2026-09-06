@@ -713,8 +713,13 @@ function stallDetectorsDriver(): ActualLifecycleDriver {
         ]);
       }
       const seed = new Date(at.getTime() - 31_000);
-      detector.observe(rows(seed));
-      const candidates = detector.observe(rows(at)).candidates;
+      const clocks = Object.freeze({
+        readyFirstObserved: new Map([[item(3), seed]]),
+        progressLastChanged: new Map([[item(4), Object.freeze({ sequence: 2, at: seed })]]),
+        exhausted: new Set<"READY" | "PROGRESS">()
+      });
+      detector.observe(rows(seed), clocks);
+      const candidates = detector.observe(rows(at), clocks).candidates;
       return Object.freeze([
         ...heartbeat.observe(workerSnapshot("STALE", at)),
         ...defects.reconcile(candidates, health, at)

@@ -1,4 +1,5 @@
 import type { ModuleStatusProjection } from "../../core/types.js";
+import type { DetectorClocks } from "./clock-store.js";
 import type { DefectCandidate } from "./lifecycle.js";
 
 export type ClaimedWorkItem = Readonly<{
@@ -40,7 +41,7 @@ export type DefectDetectorInput = Readonly<{
 }>;
 
 export type DefectDetectorStatus = Readonly<{
-  state: "HEALTHY" | "OPEN";
+  state: "HEALTHY" | "OPEN" | "INELIGIBLE";
   projections: readonly ModuleStatusProjection[];
 }>;
 
@@ -48,8 +49,6 @@ export type DefectDetectorCycle = Readonly<{
   candidates: readonly DefectCandidate[];
   status: DefectDetectorStatus;
 }>;
-
-type ProgressMemory = Readonly<{ sequence: number; lastChangedAt: Date }>;
 
 function stallCandidate(row: ClaimedWorkItem, input: DefectDetectorInput): DefectCandidate | null {
   if (row.state !== "CLAIMED") return null;
@@ -110,12 +109,12 @@ function queueCandidate(
 
 function progressCandidate(
   row: InFlightRunProgress,
-  memory: ProgressMemory,
+  memory: Readonly<{ sequence: number; at: Date }>,
   input: DefectDetectorInput
 ): DefectCandidate | null {
   const silenceSeconds = Math.max(
     0,
-    (input.now.getTime() - memory.lastChangedAt.getTime()) / 1_000
+    (input.now.getTime() - memory.at.getTime()) / 1_000
   );
   if (silenceSeconds < input.thresholds.noProgressSeconds) return null;
   return Object.freeze({
@@ -124,7 +123,7 @@ function progressCandidate(
     class: "NO_PROGRESS",
     severity: "SEVERE",
     impactCode: "IMPACT_NO_PROGRESS",
-    firstFailedProbeAt: memory.lastChangedAt,
+    firstFailedProbeAt: memory.at,
     detectedAt: input.now,
     evidence: Object.freeze({
       count: 1,
@@ -167,50 +166,28 @@ function suspiciousCandidate(
 }
 
 export function createDefectDetectorTracker(): Readonly<{
-  observe(input: DefectDetectorInput): DefectDetectorCycle;
+  observe(input: DefectDetectorInput, clocks: DetectorClocks): DefectDetectorCycle;
 }> {
-  const readyFirstObserved = new Map<string, Date>();
-  const progressMemory = new Map<string, ProgressMemory>();
   return Object.freeze({
-    observe(input) {
-      const readyIds = new Set(input.readyRows.map((row) => row.workItemId));
-      for (const workItemId of readyFirstObserved.keys()) {
-        if (!readyIds.has(workItemId)) readyFirstObserved.delete(workItemId);
-      }
-      for (const row of input.readyRows) {
-        if (row.state === "READY" && !readyFirstObserved.has(row.workItemId)) {
-          readyFirstObserved.set(row.workItemId, input.now);
-        }
-      }
-
-      const progressRunIds = new Set(input.progressRows.map((row) => row.runId));
-      for (const runId of progressMemory.keys()) {
-        if (!progressRunIds.has(runId)) progressMemory.delete(runId);
-      }
-      for (const row of input.progressRows) {
-        const previous = progressMemory.get(row.runId);
-        if (previous === undefined || row.latestProgressSeq > previous.sequence) {
-          progressMemory.set(row.runId, Object.freeze({
-            sequence: row.latestProgressSeq,
-            lastChangedAt: input.now
-          }));
-        }
-      }
-
+    observe(input, clocks) {
       const candidates = Object.freeze([
         ...input.stallRows.flatMap((row) => {
           const candidate = stallCandidate(row, input);
           return candidate === null ? [] : [candidate];
         }),
         ...input.readyRows.flatMap((row) => {
-          const firstObservedAt = readyFirstObserved.get(row.workItemId);
+          const firstObservedAt = clocks.exhausted.has("READY")
+            ? undefined
+            : clocks.readyFirstObserved.get(row.workItemId);
           const candidate = firstObservedAt === undefined
             ? null
             : queueCandidate(row, firstObservedAt, input);
           return candidate === null ? [] : [candidate];
         }),
         ...input.progressRows.flatMap((row) => {
-          const memory = progressMemory.get(row.runId);
+          const memory = clocks.exhausted.has("PROGRESS")
+            ? undefined
+            : clocks.progressLastChanged.get(row.runId);
           const candidate = memory === undefined ? null : progressCandidate(row, memory, input);
           return candidate === null ? [] : [candidate];
         }),
@@ -220,7 +197,9 @@ export function createDefectDetectorTracker(): Readonly<{
         })
       ]);
 
-      const readyAges = [...readyFirstObserved.values()].map((firstObservedAt) =>
+      const readyAges = clocks.exhausted.has("READY")
+        ? []
+        : [...clocks.readyFirstObserved.values()].map((firstObservedAt) =>
         Math.max(0, (input.now.getTime() - firstObservedAt.getTime()) / 1_000));
       const count = (signalClass: DefectCandidate["class"]) =>
         candidates.filter((candidate) => candidate.class === signalClass).length;
@@ -246,7 +225,9 @@ export function createDefectDetectorTracker(): Readonly<{
       return Object.freeze({
         candidates,
         status: Object.freeze({
-          state: candidates.length === 0 ? "HEALTHY" : "OPEN",
+          state: candidates.length > 0
+            ? "OPEN"
+            : clocks.exhausted.size > 0 ? "INELIGIBLE" : "HEALTHY",
           projections: Object.freeze(projections)
         })
       });
