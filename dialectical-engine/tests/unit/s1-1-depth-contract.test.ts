@@ -677,8 +677,11 @@ describe("S1-1 · the depth bound has a single source", () => {
       source: "const choices = [].concat(1,2,3,4,5);"
     }
   ])("$id", ({ source }) => {
-    expect(candidatesOf("planted.ts", source)).toEqual([]);
+    // The VERDICT LIST is asserted first so that a mutation which admits the shape
+    // reports "one evaluated UNDETERMINED candidate" as its failure message — the
+    // observable the manifest binds these rows to — rather than a bare count.
     expect(evaluatedCandidatesOf("planted.ts", source).map((c) => c.verdict)).toEqual([]);
+    expect(candidatesOf("planted.ts", source)).toEqual([]);
   });
 
   // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects
