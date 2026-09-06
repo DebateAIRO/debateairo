@@ -55,11 +55,16 @@ It owns exactly six things: the **focus trap**, **initial focus**, **focus retur
 
 **The Esc-stack rule, which is law for every future overlay in this repo, not only for these
 two:** *the topmost open surface consumes `Escape`, and no other surface acts on the same
-event.* Its shape: a module-level LIFO array of open surfaces plus **exactly one** `document`
-`keydown` listener, installed when the array becomes non-empty and removed when it empties. On
-`Escape` only the last entry's `onClose` is invoked, and the handler calls `preventDefault()`
-and `stopPropagation()`. `Tab` is handled on the topmost entry only. A per-surface listener is
-rejected: a listener cannot know whether its own surface is topmost.
+event.* Its shape: a module-level registry array of open surfaces plus **exactly one**
+`document` `keydown` listener, installed when the array becomes non-empty and removed when it
+empties. **Topmost is derived from the DOM, never from the order the surfaces registered in:
+on `Escape` the module invokes the `onClose` of the one open surface that no other open surface
+contains and that comes last in document order (`compareDocumentPosition`)** — registration
+happens in a `React.useEffect`, which React runs child-first within a commit, so for a nested
+pair mounted together the last-registered entry is the surface *underneath* (measured:
+`CODE-REV-S02-C1C2` r1 B1). The handler calls `preventDefault()` and `stopPropagation()`.
+`Tab` is handled on that same topmost entry only. A per-surface listener is rejected: a
+listener cannot know whether its own surface is topmost.
 
 **The focusable set is queried inside the surface at the moment `Tab` is pressed and is never
 cached at open**, because the set changes while the surface is open (the policy modal's

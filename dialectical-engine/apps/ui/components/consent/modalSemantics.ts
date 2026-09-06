@@ -36,12 +36,27 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * `FOCUSABLE_SELECTOR` is an ATTRIBUTE match, and focusability is not an attribute. Two members
+ * of that gap are filtered here: `tabindex="-1"` on any element (the selector's
+ * `:not([tabindex="-1"])` guard sits on its `[tabindex]` arm ALONE, so `button`, `input`,
+ * `select`, `textarea` and `a[href]` re-admit it), and `input[type=hidden]`. The visibility
+ * member (`display:none` / `visibility:hidden` / `[hidden]` / `inert`) is NOT filtered by
+ * attribute: jsdom's `focus()` lands on all of those, so no test here can discriminate it —
+ * `trapTab` covers it instead by advancing past any candidate `focus()` did not land on, which
+ * is what a real browser reports. Positive-`tabindex` ORDERING stays out of scope.
+ */
+function isFocusCandidate(element: HTMLElement): boolean {
+  if (element.getAttribute("tabindex") === "-1") return false;
+  return !(element.nodeName === "INPUT" && (element as HTMLInputElement).type === "hidden");
+}
+
+/**
  * Queried at the moment `Tab` is pressed and never cached: the set changes while a surface is
  * open (the policy modal's `I have read it` is `disabled` until the scroll gate latches).
  */
 function focusableWithin(container: HTMLElement | null): HTMLElement[] {
   if (container === null) return [];
-  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(isFocusCandidate);
 }
 
 function focusElement(element: HTMLElement | null): void {
@@ -56,16 +71,46 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
   const active = document.activeElement as HTMLElement | null;
   const index = active === null ? -1 : focusable.indexOf(active);
   const step = event.shiftKey ? -1 : 1;
-  const next =
-    index === -1
-      ? focusable[event.shiftKey ? focusable.length - 1 : 0]!
-      : focusable[(index + step + focusable.length) % focusable.length]!;
+  // Focus outside the surface enters at the first (or, going backwards, the last) candidate.
+  let cursor = index === -1 ? (event.shiftKey ? focusable.length : -1) : index;
   event.preventDefault();
-  focusElement(next);
+  // Advance past any candidate `focus()` refused, so a control the selector matched but the
+  // platform will not focus (a hidden or invisible one) cannot turn Tab into a dead key.
+  for (let attempt = 0; attempt < focusable.length; attempt += 1) {
+    cursor = (cursor + step + focusable.length) % focusable.length;
+    const next = focusable[cursor]!;
+    focusElement(next);
+    if (document.activeElement === next) return;
+  }
+}
+
+/**
+ * The topmost surface — derived from the DOM, never from the order the surfaces registered in.
+ * Registration happens in `React.useEffect`, which runs CHILD-FIRST within one commit, so for a
+ * nested pair mounted together the LAST registered entry is the surface UNDERNEATH. Document
+ * position is the property itself: a surface contained by another is drawn over it, and among
+ * unrelated surfaces the later one in document order is on top. Entries whose container is not
+ * in the DOM yet cannot be compared and leave the incumbent standing, so a surface that renders
+ * no container still receives `Escape`.
+ */
+function topmostSurface(): StackEntry | undefined {
+  if (surfaceStack.length === 0) return undefined;
+  let top = surfaceStack[surfaceStack.length - 1]!;
+  for (const candidate of surfaceStack) {
+    const held = top.read().containerRef.current;
+    const other = candidate.read().containerRef.current;
+    if (held === null || other === null || held === other) continue;
+    const relation = held.compareDocumentPosition(other);
+    const above =
+      (relation & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0 ||
+      (relation & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    if (above) top = candidate;
+  }
+  return top;
 }
 
 function handleDocumentKeydown(event: KeyboardEvent): void {
-  const top = surfaceStack[surfaceStack.length - 1];
+  const top = topmostSurface();
   if (top === undefined) return;
   if (event.key === "Escape") {
     event.preventDefault();

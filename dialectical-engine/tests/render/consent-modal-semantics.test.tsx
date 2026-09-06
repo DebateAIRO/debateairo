@@ -145,6 +145,97 @@ describe("consent modal semantics helper", () => {
     expect(outerClose).toHaveBeenCalledTimes(0);
   });
 
+  it("delivers one Escape to the nested inner surface, not to the outer one it mounted with", async () => {
+    // The two surfaces mount in ONE commit, the inner as a React CHILD of the outer. React runs
+    // effects child-first, so registration order is [inner, outer] and "the last registered
+    // entry" names the surface UNDERNEATH. Topmost is a DOM property, not an effect-order one.
+    const outerClose = vi.fn();
+    const innerClose = vi.fn();
+
+    await render(
+      <TestSurface open name="outer" onClose={outerClose}>
+        <TestSurface open name="inner" onClose={innerClose} />
+      </TestSurface>
+    );
+    expect(openSurfaceCount()).toBe(2);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(innerClose).toHaveBeenCalledTimes(1);
+    expect(outerClose).toHaveBeenCalledTimes(0);
+  });
+
+  it("delivers one Escape to the innermost of three nested surfaces", async () => {
+    const closed: string[] = [];
+    const record = (name: string) => () => {
+      closed.push(name);
+    };
+
+    await render(
+      <TestSurface open name="a" onClose={record("a")}>
+        <TestSurface open name="b" onClose={record("b")}>
+          <TestSurface open name="c" onClose={record("c")} />
+        </TestSurface>
+      </TestSurface>
+    );
+    expect(openSurfaceCount()).toBe(3);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(closed).toEqual(["c"]);
+  });
+
+  it("delivers one Escape by document position when two surfaces opened out of DOM order", async () => {
+    // Same class as the nested pair: the surface that registered LAST is not the topmost one.
+    // Here `later` is rendered BEFORE `earlier` in the DOM but opens after it, so registration
+    // order is [earlier, later] while document order — which is what the visitor sees stacked —
+    // puts `earlier` on top. This is the arm of the rule that containment alone cannot decide.
+    const firstDomClose = vi.fn();
+    const secondDomClose = vi.fn();
+
+    function Harness({ firstDomOpen }: { firstDomOpen: boolean }): ReactNode {
+      return (
+        <>
+          <TestSurface open={firstDomOpen} name="first-dom" onClose={firstDomClose} />
+          <TestSurface open name="second-dom" onClose={secondDomClose} />
+        </>
+      );
+    }
+
+    await render(<Harness firstDomOpen={false} />);
+    expect(openSurfaceCount()).toBe(1);
+    await render(<Harness firstDomOpen />);
+    expect(openSurfaceCount()).toBe(2);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(secondDomClose).toHaveBeenCalledTimes(1);
+    expect(firstDomClose).toHaveBeenCalledTimes(0);
+  });
+
+  it("traps Tab inside the nested inner surface, not inside the outer one", async () => {
+    // The Tab trap reads the same "topmost" the Escape branch reads, so the nested pair must be
+    // asserted for Tab too: focus sitting in the outer surface is pulled into the inner one.
+    await render(
+      <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
+        <TestSurface open name="inner" onClose={vi.fn()} />
+      </TestSurface>
+    );
+
+    await act(async () => {
+      labelled("close-outer").focus();
+      pressTab();
+    });
+
+    expect(document.activeElement).toBe(labelled("close-inner"));
+  });
+
   it("moves initial focus to the element the caller names, not the first one", async () => {
     await render(
       <TestSurface
@@ -238,6 +329,66 @@ describe("consent modal semantics helper", () => {
     expect(document.activeElement).toBe(labelled("third"));
   });
 
+  it("skips a control that tabindex=-1 has removed from the tab order", async () => {
+    // The pinned selector's `:not([tabindex="-1"])` guard sits on the `[tabindex]` arm only, so
+    // `button:not([disabled])` re-admits a button carrying tabindex="-1". jsdom's focus() DOES
+    // land on such a button, so without the filter the trap parks focus where Tab cannot reach.
+    await render(
+      <TestSurface open name="only" onClose={vi.fn()}>
+        <button type="button" tabIndex={-1}>
+          untabbable
+        </button>
+        <button type="button">last</button>
+      </TestSurface>
+    );
+
+    await act(async () => {
+      labelled("close-only").focus();
+      pressTab();
+    });
+
+    expect(document.activeElement).toBe(labelled("last"));
+  });
+
+  it("skips a hidden input, so Tab inside the surface is never a no-op", async () => {
+    // `input:not([disabled])` matches `<input type="hidden">`. focus() is a no-op on it in jsdom
+    // and in every real browser, so an unfiltered cycle preventDefaults Tab and moves nothing.
+    await render(
+      <TestSurface open name="only" onClose={vi.fn()}>
+        <input type="hidden" name="csrf" />
+        <button type="button">last</button>
+      </TestSurface>
+    );
+
+    await act(async () => {
+      labelled("close-only").focus();
+      pressTab();
+    });
+
+    expect(document.activeElement).toBe(labelled("last"));
+  });
+
+  it("keeps Escape from reaching a window listener while a surface is open", async () => {
+    const onWindow = vi.fn();
+    window.addEventListener("keydown", onWindow);
+    const onClose = vi.fn();
+
+    // Control: with nothing open the same listener DOES see the key, so a run in which the
+    // event never reached the document at all cannot pass this case vacuously.
+    expect(openSurfaceCount()).toBe(0);
+    pressEscape();
+    expect(onWindow).toHaveBeenCalledTimes(1);
+
+    await render(<TestSurface open name="only" onClose={onClose} />);
+    await act(async () => {
+      pressEscape();
+    });
+    window.removeEventListener("keydown", onWindow);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onWindow).toHaveBeenCalledTimes(1);
+  });
+
   it("closes on a backdrop click only when the click landed on the backdrop", () => {
     const scrim = document.createElement("div");
     const child = document.createElement("div");
@@ -253,8 +404,10 @@ describe("consent modal semantics helper", () => {
   });
 
   it("reports no reduced-motion preference when matchMedia does not exist", () => {
-    // Measured environment fact (jsdom 30.0.1 in this repo): the property is absent.
-    expect(typeof window.matchMedia).toBe("undefined");
+    // The absent branch is DRIVEN here, never inherited from the environment: jsdom 30.0.1 in
+    // this repo happens to have no `window.matchMedia`, but that is an environment fact, and a
+    // jsdom upgrade that implements it must not read as a modal-semantics regression.
+    vi.stubGlobal("matchMedia", undefined);
     expect(prefersReducedMotion()).toBe(false);
 
     const queries: string[] = [];
