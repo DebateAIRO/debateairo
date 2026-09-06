@@ -95,6 +95,40 @@ const seed = (quality: boolean, analytics: boolean, decidedAt = "2026-01-01T00:0
   return value;
 };
 
+/**
+ * V-19's strict shape read in the FAILURE direction: ten values that are PRESENT
+ * under `debateai.consent` and are still not a decision.
+ *
+ * Every other case in this file seeds `null` or a valid decision, so the suite
+ * could tell *absent* from *valid* and could not tell *invalid* from *valid* —
+ * `readConsent()` answers "is a valid `v: 1` decision stored?" while
+ * `localStorage.getItem(CONSENT_KEY) !== null` answers "is anything stored?",
+ * and the two agree on every seed the file had (CODE-REV-S01-C5 r1 **N1**,
+ * measured: the presence mutants at `CookieConsent.tsx:87` and `:130` left this
+ * file at `11 passed (11)` and `CMD-C5` at verdict 0). S01-R14 and S01-R02 are
+ * written on the VALID predicate, so these ten seeds are what makes the
+ * assertions below derive from the requirement rather than from the narrative of
+ * the finding that produced them.
+ *
+ * The shapes are the class the reviewer's promoted probe
+ * (`.hermes/reports/consent-ui/probes/code-rev-s01-c5-r1-rev-state-machine.test.tsx`)
+ * enumerates; the property is re-expressed here in this file's own idiom rather
+ * than copied, so the seeds run through `mountConsent` / `mountSettings` /
+ * `dismissCard` and are read by the same helpers as every other case.
+ */
+const INVALID_SEEDS: [string, string][] = [
+  ["a future version", JSON.stringify({ v: 2, essential: true, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
+  ["essential denied", JSON.stringify({ v: 1, essential: false, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
+  ["a sixth member", JSON.stringify({ v: 1, essential: true, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00.000Z", tracking: true })],
+  ["a missing member", JSON.stringify({ v: 1, essential: true, quality: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
+  ["a non-boolean toggle", JSON.stringify({ v: 1, essential: true, quality: "yes", analytics: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
+  ["a non-ISO instant", JSON.stringify({ v: 1, essential: true, quality: true, analytics: true, decidedAt: "yesterday" })],
+  ["a local-time instant", JSON.stringify({ v: 1, essential: true, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00+02:00" })],
+  ["malformed JSON", "{not json"],
+  ["a bare string", JSON.stringify("accepted")],
+  ["an array", JSON.stringify([1, true, true])]
+];
+
 const raw = (): string | null => localStorage.getItem(CONSENT_KEY);
 const parsed = (): Record<string, unknown> => JSON.parse(raw() ?? "null") as Record<string, unknown>;
 
@@ -479,4 +513,52 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
       analytics: true
     });
   });
+
+  it.each(INVALID_SEEDS)(
+    "shows the bar at mount with %s stored — present is not valid",
+    (_shape, value) => {
+      // PROPERTY (S01-R14, S01-R02, V-19 — the CODE-REV-S01-C5 r1 **N1** pin, the
+      // FIRST of the machine's two decision points, `CookieConsent.tsx:87`): the
+      // mount asks whether a VALID `v: 1` decision is stored, never whether the
+      // key is merely present. A value this product cannot write but a future
+      // version, a hand edit or an extension can — `{"v":2,…}` is the concrete
+      // one — is no decision, so the bar is shown and the caller re-asks. Under
+      // the presence mutant the same value silences the bar from the first paint
+      // and R02's "the caller re-asks" is unpinned at the machine level.
+      // Nothing is rewritten: reading storage is not deciding.
+      localStorage.setItem(CONSENT_KEY, value);
+      mountConsent();
+
+      expect(bar(), "an invalid stored value is no decision: re-ask").not.toBeNull();
+      expect(card(), "and the card is not opened by a mount").toBeNull();
+      expect(raw(), "the invalid value is left exactly as it was found").toBe(value);
+    }
+  );
+
+  it.each(INVALID_SEEDS)(
+    "returns the bar when the card is dismissed from the SETTINGS entry with %s stored",
+    (_shape, value) => {
+      // PROPERTY (S01-R14, S01-R21, V-19 — the same pin at the SECOND decision
+      // point, `CookieConsent.tsx:130`): dismissing without deciding asks the same
+      // VALID question, so a signed-in visitor whose `debateai.consent` holds an
+      // invalid value cannot reach Silence through Settings → Privacy →
+      // `Cookie preferences` → back out. That is B1's own failure mode reached by
+      // a different route: under the presence mutant the bar never returns and no
+      // valid decision is stored. The bar showing BEHIND Settings is the same
+      // predicate read at mount, which is why one case can carry both halves.
+      localStorage.setItem(CONSENT_KEY, value);
+      mountSettings();
+      expect(bar(), "the bar is showing, because nothing VALID is stored").not.toBeNull();
+
+      act(() => document.querySelector<HTMLButtonElement>("button.setBtn")!.click());
+      expect(card(), "the card opened from Settings").not.toBeNull();
+      expect(bar(), "and the bar is not rendered while it is open").toBeNull();
+
+      dismissCard();
+
+      expect(bar(), "R14 says VALID, not PRESENT: the bar returns HERE TOO").not.toBeNull();
+      expect(card(), "the card is gone").toBeNull();
+      expect(raw(), "and a dismissal wrote nothing over it").toBe(value);
+    }
+  );
 });
