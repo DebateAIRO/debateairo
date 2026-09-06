@@ -56,23 +56,89 @@ export function signalFromJournalRecord(input: unknown): ObservationSignal {
 type DecodedSignalRecord = Readonly<{
   replayed: ReplayedOpenSignal;
   versioned: boolean;
+  legacySendmail: boolean;
 }>;
+
+const LEGACY_SENDMAIL_OWNER = "channels-sendmail";
+const LEGACY_SENDMAIL_KEY = "sendmail-failure";
+const ROUTING_OWNER = "routing";
+const ROUTING_SENDMAIL_KEY = "delivery:sendmail";
+
+function exactLegacySendmailOpen(signal: ObservationSignal): boolean {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  return signal.state === "OPEN"
+    && signal.component === "observation_agent"
+    && signal.class === "AGENT_SELF"
+    && signal.severity === "DEGRADED"
+    && signal.impact_code === "IMPACT_AGENT_DELIVERY"
+    && signal.first_failed_probe_at !== null
+    && signal.first_failed_probe_at === signal.detected_at
+    && signal.clears_signal_id === null
+    && signal.suspected_defect === false
+    && signal.defect_kind === null
+    && signal.run_ref === null
+    && signal.work_item_ref === null
+    && Object.keys(evidence).length === 2
+    && evidence.reason === "DELIVERY_FAILURE"
+    && evidence.channel === "sendmail";
+}
+
+function exactLegacySendmailClear(signal: ObservationSignal): boolean {
+  const evidence = signal.evidence as Readonly<Record<string, unknown>>;
+  return signal.state === "CLEARED"
+    && signal.component === "observation_agent"
+    && signal.class === "AGENT_SELF"
+    && signal.severity === "DEGRADED"
+    && signal.impact_code === "IMPACT_CLEARED"
+    && signal.first_failed_probe_at !== null
+    && signal.clears_signal_id !== null
+    && signal.suspected_defect === false
+    && signal.defect_kind === null
+    && signal.run_ref === null
+    && signal.work_item_ref === null
+    && Object.keys(evidence).length === 1
+    && typeof evidence.duration_seconds === "number"
+    && Number.isFinite(evidence.duration_seconds)
+    && evidence.duration_seconds >= 0;
+}
+
+function exactLegacySendmailPair(
+  opened: ObservationSignal,
+  cleared: ObservationSignal
+): boolean {
+  if (!exactLegacySendmailOpen(opened) || !exactLegacySendmailClear(cleared)
+    || cleared.first_failed_probe_at !== opened.first_failed_probe_at) return false;
+  const duration = Math.max(0,
+    (Date.parse(cleared.detected_at) - Date.parse(opened.first_failed_probe_at!)) / 1_000);
+  return (cleared.evidence as Readonly<Record<string, unknown>>).duration_seconds === duration;
+}
 
 function decodeSignalRecord(input: unknown): DecodedSignalRecord {
   const record = signalJournalRecordSchema.parse(input);
   if (!("record_version" in record)) {
     return Object.freeze({
       replayed: Object.freeze({ signal: record, lifecycle: null }),
-      versioned: false
+      versioned: false,
+      legacySendmail: false
     });
   }
-  const lifecycle = record.lifecycle === null ? null : Object.freeze({
+  let lifecycle = record.lifecycle === null ? null : Object.freeze({
     owner: record.lifecycle.owner,
     correlationKey: record.lifecycle.correlation_key
   });
+  let legacySendmail = false;
+  if (lifecycle?.owner === LEGACY_SENDMAIL_OWNER) {
+    if (lifecycle.correlationKey !== LEGACY_SENDMAIL_KEY
+      || (record.signal.state === "OPEN"
+        ? !exactLegacySendmailOpen(record.signal)
+        : !exactLegacySendmailClear(record.signal))) invalid();
+    lifecycle = Object.freeze({ owner: ROUTING_OWNER, correlationKey: ROUTING_SENDMAIL_KEY });
+    legacySendmail = true;
+  }
   return Object.freeze({
     replayed: Object.freeze({ signal: record.signal, lifecycle }),
-    versioned: true
+    versioned: true,
+    legacySendmail
   });
 }
 
@@ -148,6 +214,7 @@ export async function replayObservationJournals(
   const names = await journalFiles(stateDir);
   const openById = new Map<string, ReplayedOpenSignal>();
   const openByLifecycle = new Map<string, string>();
+  const legacySendmailOpenIds = new Set<string>();
   const seenSignalIds = new Set<string>();
   const deliveryResults: ReplayedJournals["deliveryResults"][number][] = [];
 
@@ -177,6 +244,7 @@ export async function replayObservationJournals(
           if (currentLifecycle !== undefined) invalid();
           openById.set(signal.signal_id, decoded.replayed);
           if (lifecycle !== null) openByLifecycle.set(lifecycleKey(lifecycle), signal.signal_id);
+          if (decoded.legacySendmail) legacySendmailOpenIds.add(signal.signal_id);
           continue;
         }
 
@@ -185,6 +253,9 @@ export async function replayObservationJournals(
         if (opened === undefined
           || opened.signal.component !== signal.component
           || opened.signal.class !== signal.class
+          || (decoded.legacySendmail
+            && (!legacySendmailOpenIds.has(clearsId!)
+              || !exactLegacySendmailPair(opened.signal, signal)))
           || (opened.lifecycle !== null && !sameLifecycle(opened.lifecycle, lifecycle))) {
           invalid();
         }
@@ -193,6 +264,7 @@ export async function replayObservationJournals(
           if (lifecycleOpenId !== undefined && lifecycleOpenId !== clearsId) invalid();
         }
         openById.delete(clearsId!);
+        legacySendmailOpenIds.delete(clearsId!);
         if (opened.lifecycle !== null) openByLifecycle.delete(lifecycleKey(opened.lifecycle));
       }
     }

@@ -165,6 +165,7 @@ describe("OBS-07 Kanban channel", () => {
     let allStarted!: () => void;
     const channelsStarted = new Promise<void>((resolvePromise) => { allStarted = resolvePromise; });
     const failures: string[] = [];
+    const results: string[] = [];
     const opened = signal("OPEN");
     const router = await createObservationSignalRouter({
       stateDir,
@@ -205,7 +206,8 @@ describe("OBS-07 Kanban channel", () => {
         }
       },
       configuration: {}, thresholds: {}, thresholdVersion: 7,
-      onChannelFailure(channel) { failures.push(channel); }
+      onChannelFailure(channel) { failures.push(channel); },
+      onChannelResult(channel, outcome) { results.push(`${channel}:${outcome}`); }
     });
     const routing = router.onSignal({
       signal: opened, now: new Date(opened.detected_at), mute: null,
@@ -217,6 +219,10 @@ describe("OBS-07 Kanban channel", () => {
     releaseSendmail();
     await routing;
     expect(failures).toEqual(["sendmail"]);
+    expect(results).toEqual(expect.arrayContaining([
+      "osascript:DELIVERED", "sendmail:FAILED", "kanban:DELIVERED"
+    ]));
+    expect(results).toHaveLength(3);
   });
 
   it("resumes the same pending signal/channel/ordinal after restart", async () => {

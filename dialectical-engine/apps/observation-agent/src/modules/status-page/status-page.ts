@@ -178,6 +178,11 @@ function defaultCreateServer(handler: StatusPageHandler): StatusPageServer {
   });
 }
 
+function isExpectedBindFailure(error: unknown): boolean {
+  return error instanceof Error && "code" in error
+    && ["EADDRINUSE", "EACCES", "EPERM"].includes(String(error.code));
+}
+
 export async function startStatusPage(input: Readonly<{
   stateDir: string;
   host?: string;
@@ -205,7 +210,10 @@ export async function startStatusPage(input: Readonly<{
       settled = true;
       server.removeListener("listening", ready);
       server.removeListener("error", failed);
-      rejectPromise(new ObservationError("OBSERVATION_STATUS_BIND_FAILED", error));
+      try { server.close(); } catch {}
+      rejectPromise(isExpectedBindFailure(error)
+        ? new ObservationError("OBSERVATION_STATUS_BIND_FAILED", error)
+        : error);
     };
     try {
       server.once("error", failed);
@@ -214,7 +222,10 @@ export async function startStatusPage(input: Readonly<{
       settled = true;
       server.removeListener("listening", ready);
       server.removeListener("error", failed);
-      rejectPromise(new ObservationError("OBSERVATION_STATUS_BIND_FAILED", error));
+      try { server.close(); } catch {}
+      rejectPromise(isExpectedBindFailure(error)
+        ? new ObservationError("OBSERVATION_STATUS_BIND_FAILED", error)
+        : error);
     }
   });
   server.unref?.();

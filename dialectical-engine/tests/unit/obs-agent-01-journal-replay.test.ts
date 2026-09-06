@@ -159,12 +159,12 @@ describe("OBS-01 signal and delivery journal replay", () => {
     );
     await expect(replayObservationJournals(
       stateDir,
-      new Set(["core-liveness", "channels-sendmail"])
+      new Set(["core-liveness", "routing"])
     ))
       .resolves.toEqual({
         openSignals: [{
           signal: statefulOpen,
-          lifecycle: { owner: "channels-sendmail", correlationKey: "sendmail-failure" }
+          lifecycle: { owner: "routing", correlationKey: "delivery:sendmail" }
         }],
         deliveryResults: []
       });

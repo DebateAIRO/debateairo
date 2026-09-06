@@ -13,6 +13,7 @@ import {
 } from "./types.js";
 import type { DeliveryCoordinator } from "../notify/delivery.js";
 import type { OsaScriptDeliveryExecutor } from "../notify/osascript.js";
+import type { DeliveryResultEnvelope } from "./signals.js";
 
 export type SignalRoutingPolicy = Readonly<{
   rateLimitMs: number;
@@ -37,6 +38,7 @@ export type RouterBootstrapInput = Readonly<{
   configuration: ModuleConfigurationObject;
   thresholds: ModuleConfigurationObject;
   thresholdVersion: number;
+  deliveryResults?: readonly DeliveryResultEnvelope[];
 }>;
 
 export type PersistedSignalRoutingInput = Readonly<{

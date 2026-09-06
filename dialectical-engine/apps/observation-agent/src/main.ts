@@ -247,7 +247,8 @@ async function boot(): Promise<void> {
         targetFragment: routerTargetFragments[0]!,
         configuration: routerTargetFragments[0]!.configuration,
         thresholds: initialRouterModule.thresholds,
-        thresholdVersion: initialRouterModule.thresholdVersion
+        thresholdVersion: initialRouterModule.thresholdVersion,
+        deliveryResults: replayed.deliveryResults
       });
   router = initializedRouter;
 

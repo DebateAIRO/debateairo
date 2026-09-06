@@ -7,12 +7,6 @@ import {
   createSendmailDeliveryExecutor,
   resolveCaptureDirectory
 } from "../../apps/observation-agent/src/modules/channels-sendmail/sendmail.js";
-import {
-  createSendmailFailureTracker,
-  sendmailDeliveryObservation,
-  sendmailFailureObservation,
-  sendmailFailureSignal
-} from "../../apps/observation-agent/src/modules/channels-sendmail/failures.js";
 
 const scratchDirectories: string[] = [];
 afterEach(async () => {
@@ -38,65 +32,6 @@ function fatalSignal() {
 }
 
 describe("OBS-07 sendmail channel", () => {
-  it("maps delivery failure to the truthful closed AGENT_SELF impact and evidence", () => {
-    const at = new Date("2026-09-05T08:00:02.000Z");
-    expect(sendmailFailureSignal(sendmailFailureObservation(at))).toMatchObject({
-      component: "observation_agent",
-      class: "AGENT_SELF",
-      severity: "DEGRADED",
-      impactCode: "IMPACT_AGENT_DELIVERY",
-      evidence: { reason: "DELIVERY_FAILURE", channel: "sendmail" },
-      suspectedDefect: false,
-      defectKind: null
-    });
-  });
-
-  it("restores a bounded sendmail failure and clears the original lifecycle", () => {
-    const failedAt = new Date("2026-09-05T08:00:02.000Z");
-    const recoveredAt = new Date("2026-09-05T08:00:07.000Z");
-    const opened = createSendmailFailureTracker().observe(
-      sendmailDeliveryObservation("FAILED", failedAt)
-    )[0]!;
-    const openedSignal = signalSchema.parse({
-      seq: 702,
-      signal_id: "70000000-0000-4000-8000-000000000702",
-      state: opened.state,
-      class: opened.class,
-      component: opened.component,
-      severity: opened.severity,
-      impact_code: opened.impactCode,
-      first_failed_probe_at: opened.firstFailedProbeAt?.toISOString() ?? null,
-      detected_at: opened.detectedAt.toISOString(),
-      evidence: opened.evidence,
-      suspected_defect: opened.suspectedDefect,
-      defect_kind: opened.defectKind,
-      run_ref: opened.runRef,
-      work_item_ref: opened.workItemRef,
-      threshold_version: 7,
-      clears_signal_id: null,
-      recorded_at: opened.detectedAt.toISOString()
-    });
-    const restarted = createSendmailFailureTracker();
-    restarted.restore([Object.freeze({
-      correlationKey: "sendmail-failure",
-      signal: openedSignal
-    })]);
-
-    expect(restarted.observe(sendmailDeliveryObservation("FAILED", recoveredAt))).toEqual([]);
-    expect(restarted.observe(sendmailDeliveryObservation("DELIVERED", recoveredAt))).toEqual([
-      expect.objectContaining({
-        correlationKey: "sendmail-failure",
-        state: "CLEARED",
-        impactCode: "IMPACT_CLEARED",
-        firstFailedProbeAt: failedAt,
-        suspectedDefect: false,
-        defectKind: null,
-        runRef: null,
-        workItemRef: null
-      })
-    ]);
-  });
-
   it("validates a V-owned mode-0700 state child and rejects escape or weak custody", async () => {
     const stateDir = await scratch();
     const capture = join(stateDir, "dev-mail-capture");

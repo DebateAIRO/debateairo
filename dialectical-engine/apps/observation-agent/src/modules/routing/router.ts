@@ -123,7 +123,7 @@ export async function createObservationSignalRouter(input: Readonly<{
     channel: RoutedChannel,
     outcome: "DELIVERED" | "FAILED",
     at: Date
-  ) => void;
+  ) => Promise<void> | void;
 }>): Promise<SignalRouter> {
   let state = await readRoutingState(input.stateDir);
   let currentModule: RouterCurrentContext = Object.freeze({
@@ -201,7 +201,11 @@ export async function createObservationSignalRouter(input: Readonly<{
     }
     if (result.outcome === "FAILED") input.onChannelFailure?.(pending.channel, route.now);
     if (result.outcome === "FAILED" || result.outcome === "DELIVERED") {
-      input.onChannelResult?.(pending.channel, result.outcome, route.now);
+      await input.onChannelResult?.(
+        pending.channel,
+        result.outcome,
+        new Date(result.delivered_at ?? result.attempted_at)
+      );
     }
     if (pending.purpose === "STORM_SUMMARY" && state.latest_storm !== null
       && state.latest_storm.summary_signal_id === signal.signal_id) {

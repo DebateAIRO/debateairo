@@ -41,11 +41,11 @@ import { createRunFailureTracker } from "../../apps/observation-agent/src/module
 import { createHatchetThroughputTracker } from "../../apps/observation-agent/src/modules/hatchet-throughput/tracker.js";
 import { createContainerWitness } from "../../apps/observation-agent/src/modules/witness/state.js";
 import { createScheduleTracker } from "../../apps/observation-agent/src/modules/job-witness/witness.js";
-import { createSendmailFailureTracker } from "../../apps/observation-agent/src/modules/channels-sendmail/failures.js";
-import { recordSendmailResult } from "../../apps/observation-agent/src/modules/channels-sendmail/failures.js";
+import {
+  createDeliveryHealthTracker,
+  deliveryHealthLegacyCorrelationKey
+} from "../../apps/observation-agent/src/modules/routing/delivery-health.js";
 import { createChannelsSendmailModule } from "../../apps/observation-agent/src/modules/channels-sendmail/module.js";
-import { createObservationSignalRouter } from "../../apps/observation-agent/src/modules/routing/router.js";
-import { DeliveryCoordinator } from "../../apps/observation-agent/src/notify/delivery.js";
 
 const scratchDirectories: string[] = [];
 const start = new Date("2026-09-06T00:00:00.000Z");
@@ -517,7 +517,12 @@ function producerImpossibleEvidence(signal: ObservationSignal): Readonly<Record<
     const { last_completed_at: _lastCompletedAt, ...remaining } = evidence;
     return Object.freeze(remaining);
   }
-  if (signal.class === "AGENT_SELF") return Object.freeze({ ...evidence, channel: "osascript" });
+  if (signal.class === "AGENT_SELF") {
+    return Object.freeze({
+      ...evidence,
+      channel: evidence.channel === "kanban" ? "sendmail" : "kanban"
+    });
+  }
   throw new TypeError(`missing producer-impossible evidence mutation for ${signal.class}`);
 }
 
@@ -1004,17 +1009,27 @@ function scheduleDriver(): ActualLifecycleDriver {
   });
 }
 
-function sendmailDriver(): ActualLifecycleDriver {
-  const tracker = createSendmailFailureTracker();
+function deliveryHealthDriver(): ActualLifecycleDriver {
+  const tracker = createDeliveryHealthTracker(Object.freeze([]));
   return Object.freeze({
-    lifecycle: lifecycleOf(tracker),
+    lifecycle: Object.freeze({
+      legacyCorrelationKey: deliveryHealthLegacyCorrelationKey,
+      restore: tracker.restore
+    }),
     signals(phase, at) {
-      return tracker.observe(Object.freeze({
-        component: "observation_agent", ok: phase === "RECOVERED", class: "AGENT_SELF",
-        probe: "sendmail_delivery", lastStatus: phase === "RECOVERED" ? "DELIVERED" : "FAILED",
-        observedAt: at
-      })).filter((intent) => intent.state === (phase === "RECOVERED" ? "CLEARED" : "OPEN"));
+      for (const channel of ["osascript", "sendmail", "kanban"] as const) {
+        tracker.record({ channel, outcome: phase === "RECOVERED" ? "DELIVERED" : "FAILED", at });
+      }
+      return tracker.drain();
     }
+  });
+}
+
+function deliveryHealthLifecycle(): ModuleLifecycle {
+  const tracker = createDeliveryHealthTracker(Object.freeze([]));
+  return Object.freeze({
+    legacyCorrelationKey: deliveryHealthLegacyCorrelationKey,
+    restore: tracker.restore
   });
 }
 
@@ -1131,9 +1146,11 @@ const realLifecycleScenarios: readonly Readonly<{
     createDriver: scheduleDriver
   }),
   Object.freeze({
-    name: "bounded sendmail delivery", owner: "channels-sendmail",
-    expectedCorrelationKeys: Object.freeze(["sendmail-failure"]),
-    createDriver: sendmailDriver
+    name: "independent channel delivery health", owner: "routing",
+    expectedCorrelationKeys: Object.freeze([
+      "delivery:osascript", "delivery:sendmail", "delivery:kanban"
+    ]),
+    createDriver: deliveryHealthDriver
   })
 ]);
 
@@ -1721,103 +1738,19 @@ describe("OBS-01 restart lifecycle restoration", () => {
     expect(emitted).toEqual([]);
   });
 
-  it("replays a real router sendmail failure and clears its original UUID after delivery recovery", async () => {
-    const stateDir = await mkdtemp(join(tmpdir(), "obs-restart-sendmail-"));
-    scratchDirectories.push(stateDir);
-    const journal = new ObservationJournal(stateDir);
-    const delivery = new DeliveryCoordinator({
-      journal,
-      mirror: { async mirrorDelivery() { throw new Error("POSTGRES_UNAVAILABLE"); } }
-    });
-    let sendmailFails = true;
-    const router = await createObservationSignalRouter({
-      stateDir,
-      delivery,
-      executors: Object.freeze({
-        osascript: async (_signal, now) => ({ deliveredAt: now, externalRef: null }),
-        sendmail: async (_signal, now) => {
-          if (sendmailFails) throw new Error("SENDMAIL_FAILED");
-          return { deliveredAt: now, externalRef: null };
-        },
-        kanban: async (_signal, now) => ({ deliveredAt: now, externalRef: "ticket-1" })
-      }),
-      configuration: Object.freeze({}),
-      thresholds: Object.freeze({ escalation_interval_ms: 1_000, fatal_resend_max: 3 }),
-      thresholdVersion: 4,
-      onChannelResult(channel, outcome, at) {
-        if (channel === "sendmail") recordSendmailResult(outcome, at);
-      }
-    });
-    const fault = livenessOpen("75000000-0000-4000-8000-000000000030");
-    const routingContext = (now: Date) => Object.freeze({
-      now,
-      policy: Object.freeze({ rateLimitMs: 600_000, degradedAfterMs: 900_000, timeoutMs: 2_000 }),
-      mute: null,
-      module: Object.freeze({
-        thresholdVersion: 4,
-        thresholds: Object.freeze({ escalation_interval_ms: 1_000, fatal_resend_max: 3 })
-      })
-    });
-    await router.onSignal({ signal: fault, ...routingContext(start) });
-
+  it("keeps the sendmail executor module stateless after routing takes lifecycle ownership", async () => {
+    const module = createChannelsSendmailModule();
     const emitted: ObservationSignal[] = [];
-    let sequence = 30;
-    const openId = "75000000-0000-4000-8000-000000000031";
-    const runtime = (
-      module: Module,
-      replayedOpenSignals: readonly ReplayedOpenSignal[] = Object.freeze([])
-    ) => new ObservationModuleRuntime({
-      modules: Object.freeze([module]),
-      replayedOpenSignals,
-      nextSequence: () => ++sequence,
-      nextSignalId: () => sequence === 31
-        ? openId
-        : `75000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
+    expect(module.lifecycle).toBeUndefined();
+    const runtime = new ObservationModuleRuntime({
+      modules: [module],
+      nextSequence: () => 1,
+      nextSignalId: () => "75000000-0000-4000-8000-000000000031",
       sampleStore: { async write() {} },
-      async emitSignal(signal, now, lifecycle) {
-        const persisted = await persistSignal({
-          signal,
-          lifecycle,
-          journal,
-          mirror: { async mirrorSignal() { throw new Error("POSTGRES_UNAVAILABLE"); } }
-        });
-        expect(persisted.mirrored).toBe(false);
-        emitted.push(signal);
-        await router.onSignal({ signal, ...routingContext(now) });
-      }
+      async emitSignal(signal) { emitted.push(signal); }
     });
-    const firstModule = createChannelsSendmailModule();
-    await runtime(firstModule).run(runtimeInput(firstModule, new Date(start.getTime() + 1)));
-    expect(emitted).toEqual([expect.objectContaining({
-      signal_id: openId,
-      state: "OPEN",
-      impact_code: "IMPACT_AGENT_DELIVERY"
-    })]);
-
-    const replayed = await replayObservationJournals(stateDir, new Set(["channels-sendmail"]));
-    expect(replayed.openSignals).toEqual([expect.objectContaining({
-      lifecycle: { owner: "channels-sendmail", correlationKey: "sendmail-failure" },
-      signal: expect.objectContaining({ signal_id: openId })
-    })]);
-    const restartedModule = createChannelsSendmailModule();
-    const restartedRuntime = runtime(restartedModule, replayed.openSignals);
-
-    const continuingAt = new Date(start.getTime() + 6_000);
-    await router.onTick(routingContext(continuingAt));
-    await restartedRuntime.run(runtimeInput(restartedModule, continuingAt));
-    expect(emitted).toHaveLength(1);
-
-    sendmailFails = false;
-    const recoveredAt = new Date(start.getTime() + 12_000);
-    await router.onTick(routingContext(recoveredAt));
-    await restartedRuntime.run(runtimeInput(restartedModule, recoveredAt));
-    expect(emitted).toHaveLength(2);
-    expect(emitted[1]).toMatchObject({
-      state: "CLEARED",
-      class: "AGENT_SELF",
-      impact_code: "IMPACT_CLEARED",
-      clears_signal_id: openId
-    });
+    await runtime.run(runtimeInput(module, start));
+    expect(emitted).toEqual([]);
   });
 });
 
@@ -2350,18 +2283,20 @@ describe("canonical restored OPEN ownership", () => {
           job: "liveness-sweep", cadence_s: 60, grace_s: 10
         })
       }),
-      Object.freeze({
-        owner: "channels-sendmail", correlationKey: "sendmail-failure",
-        lifecycle: lifecycleOf(createSendmailFailureTracker()),
+      ...(["osascript", "sendmail", "kanban"] as const).map((channel, index) => Object.freeze({
+        owner: "routing", correlationKey: `delivery:${channel}`,
+        lifecycle: deliveryHealthLifecycle(),
         signal: exactOpen({
-          id: "75000000-0000-4000-8000-000000000014", component: "observation_agent",
-          class: "AGENT_SELF", severity: "DEGRADED", impactCode: "IMPACT_AGENT_DELIVERY",
-          evidence: Object.freeze({ reason: "DELIVERY_FAILURE", channel: "sendmail" })
+          id: `75000000-0000-4000-8000-${String(14 + index).padStart(12, "0")}`,
+          component: "observation_agent", class: "AGENT_SELF", severity: "DEGRADED",
+          impactCode: "IMPACT_AGENT_DELIVERY",
+          evidence: Object.freeze({ reason: "DELIVERY_FAILURE", channel })
         }),
         producerImpossibleEvidence: Object.freeze({
-          reason: "DELIVERY_FAILURE", channel: "osascript"
+          reason: "DELIVERY_FAILURE",
+          channel: channel === "sendmail" ? "osascript" : "sendmail"
         })
-      })
+      }))
     ]);
     const replacementRef = "75000000-0000-4000-8000-000000000099";
     for (const ownerCase of cases) {

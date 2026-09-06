@@ -147,7 +147,9 @@ describe("OBS-07 loopback status server", () => {
         createServer() {
           return {
             listen() {
-              queueMicrotask(() => errorListener?.(new Error("EADDRINUSE")));
+              queueMicrotask(() => errorListener?.(Object.assign(new Error("address in use"), {
+                code: "EADDRINUSE"
+              })));
               return this;
             },
             close() { return this; },
@@ -168,6 +170,34 @@ describe("OBS-07 loopback status server", () => {
     ]);
     expect(outcome).toBeInstanceOf(Error);
     expect((outcome as Error).message).toContain("OBSERVATION_STATUS_BIND_FAILED");
+    expect(errorListener).toBeUndefined();
+  });
+
+  it("does not reclassify unexpected listen errors as recoverable bind failures", async () => {
+    const stateDir = await scratch();
+    let errorListener: ((error: Error) => void) | undefined;
+    await expect(startStatusPage({
+      stateDir,
+      createServer() {
+        return {
+          listen() {
+            queueMicrotask(() => errorListener?.(Object.assign(new Error("unexpected"), {
+              code: "EIO"
+            })));
+            return this;
+          },
+          close() { return this; },
+          once(_event: string, listener: (error: Error) => void) {
+            errorListener = listener;
+            return this;
+          },
+          removeListener(_event: string, listener: (error: Error) => void) {
+            if (errorListener === listener) errorListener = undefined;
+            return this;
+          }
+        };
+      }
+    })).rejects.toThrow("unexpected");
     expect(errorListener).toBeUndefined();
   });
 });
