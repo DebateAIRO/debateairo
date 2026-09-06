@@ -158,17 +158,17 @@ export function candidatesOf(path: string, source: string): DiscoveredCandidate[
 export function domainSites(path: string, source: string): Site[] {
   const parsed = parseModule(path, source);
   if (parsed.ok) return [];
-  const first = parsed.diagnostics[0];
+  return inconclusiveFor(path, parsed.diagnostics);
+}
+
+/** The one conservative record a rejected parse produces. Mutation K27 empties this. */
+function inconclusiveFor(
+  path: string,
+  diagnostics: readonly { readonly line: number; readonly message: string }[]
+): Site[] {
+  const first = diagnostics[0];
   const message = first ? first.message : "unparsed";
-  return [
-    {
-      kind: "INCONCLUSIVE",
-      line: first ? first.line : 1,
-      text: message,
-      path,
-      diagnostic: message
-    }
-  ];
+  return [{ kind: "INCONCLUSIVE", line: first ? first.line : 1, text: message, path, diagnostic: message }];
 }
 
 /* ------------------------------------------------------------------------- *
