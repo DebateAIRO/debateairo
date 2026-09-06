@@ -77,14 +77,22 @@ export function CookieConsent() {
    * element has to be a LATER SIBLING of the card, and a child cannot render its
    * own sibling.
    *
-   * **Nothing resets it when the card closes, and that is deliberate.** Every
-   * exit the policy has — its footer `Close`, its `×`, its backdrop and the
-   * shared helper's key arm — is the one `onClose` below, so the flag is already
-   * false before any route that could close the CARD becomes reachable: while the
-   * policy is open it is the topmost surface, it owns the keystroke, and its
-   * scrim covers every control of the card. A defensive reset in `openCard` was
-   * written first and then deleted, because no mutant of it is observable: it is
-   * a line no test can pin (`heartbeat-worker` §2).
+   * **It is PER-OPEN state, and `openCard` resets it.** The flag has to be false
+   * at the start of every open, and closing the POLICY is not the only way it
+   * gets there: the CARD can be closed while the policy still stands over it —
+   * by the card's own backdrop, and by `Save choices` — and both routes unmount
+   * the card and the policy element together while this component stays mounted,
+   * stranding the flag at `true`. The next open would then render the policy over
+   * a card the visitor opened fresh (CODE-REV-S01-C6 r1 **B1**, measured; both
+   * routes are pinned in `tests/render/consent-policy-link.test.tsx`).
+   *
+   * An earlier version of this comment argued the reset was unreachable because
+   * the policy's scrim "covers every control of the card". That is a CSS claim,
+   * and the rule it names does not exist in this lane: `globals.css` carries no
+   * `.policy*` rule at all, and the `--z-policy-*` tokens S01-C1 declared for
+   * S02's stylesheet are unconsumed — while the card's own scrim is
+   * `position: fixed; inset: 0`. **A component whose correctness depends on an
+   * unwritten stylesheet in another lane is not verifiable by this slice's gate.**
    */
   const [policyOpen, setPolicyOpen] = useState(false);
 
@@ -110,8 +118,13 @@ export function CookieConsent() {
    * at every open — not from the last open, and never from where the request
    * came from — so the two entry points are indistinguishable to the card
    * (S01-R17, S01-R21, B1's class).
+   *
+   * Every piece of per-open state is set here, and `policyOpen` is the first of
+   * them precisely because it is the only one whose previous value can survive a
+   * close (see its declaration above).
    */
   const openCard = useCallback((opener: HTMLElement | null): void => {
+    setPolicyOpen(false);
     openerRef.current = opener;
     setInitial(togglesFor(readConsent()));
     setOpens((count) => count + 1);

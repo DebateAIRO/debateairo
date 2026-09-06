@@ -397,13 +397,13 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // nonetheless clean, because every exit the policy has runs through the one
     // `onClose` that clears it.
     //
-    // **Declared, per `heartbeat-worker` §2: this case does not pin a mutant of
-    // its own.** The mutant it catches — `onClose={(): void => {}}` on the modal —
-    // is the one the S01-S39 case above already catches, and the defensive
-    // `setPolicyOpen(false)` in `openCard` that this case was written for turned
-    // out to be unobservable (the suite stays 11/11 with it removed), so that line
-    // was deleted rather than shipped unpinned. What is left here is a regression
-    // net over the two-open LOOP, which no other case walks.
+    // **This is the CONTROL for the two cases below it**, and it is the clean
+    // path: the policy is closed by its own route FIRST, so the reset in
+    // `openCard` is not what makes this case green and it stays green with that
+    // line removed. It was originally declared here as pinning no mutant of its
+    // own, on the premise that the reset was unobservable; CODE-REV-S01-C6 r1
+    // **B1** measured the premise false — the mutant needs a case that closes the
+    // CARD while the policy is open, which is what the two cases below drive.
     mountSettings();
     activate(labelled("Cookie preferences"));
     activate(labelled("Privacy notice"));
@@ -419,6 +419,81 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(card(), "the card is open again").not.toBeNull();
     expect(policy(), "and the policy did not come back with it").toBeNull();
     expect(dialogs().length, "one dialog, not two").toBe(1);
+  });
+
+  it("opens a CLEAN card after the card was closed by its scrim under an open policy", () => {
+    // PROPERTY (S01-R20 read across two opens; CODE-REV-S01-C6 r1 **B1**):
+    // `policyOpen` is PER-OPEN state of the card surface, so every open starts
+    // with no policy over it — WHATEVER closed the previous card, not only the
+    // routes that run the policy's own `onClose`.
+    //
+    // The route is reachable TODAY. The card's scrim is `position: fixed;
+    // inset: 0` (`globals.css:7384-7393`) and the policy's scrim has no rule in
+    // this lane at all — a line-scan of `globals.css` for
+    // `^\s*\.policy[A-Za-z]*\s*[,{]` returns `[]`, and the `--z-policy-*` tokens
+    // S01-C1 declared for that stylesheet are unconsumed — so a pointer click
+    // lands on the CARD's backdrop while the policy stands over it. The card and
+    // the policy element unmount together; the flag lives one level up, in this
+    // still-mounted component, and outlives both.
+    mountBar();
+    activate(labelled("Choose what to store"));
+    activate(labelled("Privacy notice"));
+    expect(policy(), "the policy is open over the card").not.toBeNull();
+    expect(dialogs().length, "two dialogs while the visitor has both open").toBe(2);
+
+    const scrim = document.querySelector<HTMLElement>(".consentScrim")!;
+    act(() => scrim.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(card(), "the CARD is dismissed from under the open policy").toBeNull();
+    expect(policy(), "and the policy element unmounts with it").toBeNull();
+    expect(bar(), "the bar returns, because nothing valid is stored").not.toBeNull();
+    expect(raw(), "a backdrop dismissal writes nothing").toBeNull();
+
+    activate(labelled("Choose what to store"));
+
+    expect(card(), "the card is open again").not.toBeNull();
+    expect(policy(), "and it is CLEAN — no policy the visitor did not ask for").toBeNull();
+    expect(dialogs().length, "exactly one dialog on a freshly opened card").toBe(1);
+    expect(openSurfaceCount(), "and exactly one surface on the stack").toBe(1);
+  });
+
+  it("opens a CLEAN card after the card was settled by Save choices under an open policy", () => {
+    // PROPERTY: the same per-open property through the OTHER exit class. The case
+    // above leaves by a DISMISSAL (writes nothing, re-reads storage); this one
+    // leaves by a SETTLE (writes a decision and goes Silent), from the Settings
+    // entry, where the opener survives the card. Two exits, two routes to the same
+    // stranded flag — a reset written into `dismiss` instead of `openCard` fixes
+    // the case above and leaves this one red, which is why both are here.
+    //
+    // `Save choices` sits behind the open policy in paint order and is in the
+    // document and enabled; nothing in this lane's stylesheet covers it.
+    const stored = JSON.stringify({
+      v: 1,
+      essential: true,
+      quality: true,
+      analytics: false,
+      decidedAt: "2026-02-02T00:00:00.000Z"
+    });
+    localStorage.setItem(CONSENT_KEY, stored);
+    mountSettings();
+    activate(labelled("Cookie preferences"));
+    activate(labelled("Privacy notice"));
+    expect(policy(), "the policy is open over the card").not.toBeNull();
+
+    // Clicked WITHOUT focusing it, unlike `activate`: the point of the case is
+    // that this control settles the card from behind the policy.
+    act(() => labelled("Save choices").click());
+
+    expect(card(), "the card settled and closed").toBeNull();
+    expect(policy(), "and the policy element unmounts with it").toBeNull();
+    expect(raw(), "the settle wrote a decision").not.toBeNull();
+
+    activate(labelled("Cookie preferences"));
+
+    expect(card(), "reopened from Settings").not.toBeNull();
+    expect(policy(), "CLEAN — the settle route left no policy behind either").toBeNull();
+    expect(dialogs().length, "one dialog, not two").toBe(1);
+    expect(openSurfaceCount(), "and one surface on the stack").toBe(1);
   });
 
   it("closes the card on a backdrop click through the shared helper, and not on a click inside it", () => {
