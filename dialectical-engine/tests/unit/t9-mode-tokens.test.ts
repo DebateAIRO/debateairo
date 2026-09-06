@@ -302,6 +302,7 @@ const MODE_INDEPENDENT = {
   "--fvs-display": "\"SOFT\" 0, \"WONK\" 1",
   "--fw-display": "480",
   "--shadow-thumb": "0 1px 4px rgba(0,0,0,.3)",
+  "--shadow-knob": "0 1px 3px rgba(0,0,0,.3)",
   "--qr-paper": "#FFFFFF",
   "--qr-ink": "#111111",
   "--scrim": "rgba(10,8,6,.42)",

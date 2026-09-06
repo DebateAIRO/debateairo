@@ -53,6 +53,10 @@
   --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
   --shadow-chrome: 0 20px 46px -22px rgba(26,22,19,.26);
   --shadow-thumb: 0 1px 4px rgba(0,0,0,.3);
+  /* the 10b toggle knob's own shadow — consent-ui S01. One pixel tighter than
+     --shadow-thumb, which is the .ndSlider thumb's and belongs to another
+     surface, so it is copied rather than re-valued (CODE-REV-S01-C3C4 r1 N3) */
+  --shadow-knob: 0 1px 3px rgba(0,0,0,.3);
   --shadow-tab: 0 6px 16px -8px rgba(41,38,31,.55);
   /* a QR must stay dark-on-light for scanners in both modes */
   --qr-paper: #FFFFFF;
@@ -7335,9 +7339,17 @@ a:focus-visible {
 
 .consentGhostStrong { color: var(--ink); }
 
+/* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
+   choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
+   :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
+   used size is content + padding + border, so a 1px edge the artboard omits
+   ships the primary 2px taller and 2px wider — and breaks the equality the
+   design builds on, where a ghost pill's `9px 15px` + 1px border and a
+   primary's `10px` + 0 border are both 10px of effective edge in the same row
+   (CODE-REV-S01-C3C4 r1 N2). */
 .consentPrimary {
   background: var(--ink);
-  border: 1px solid var(--ink);
+  border: none;
   border-radius: var(--r-pill);
   color: var(--bg);
   cursor: pointer;
@@ -7353,6 +7365,17 @@ a:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* 10a's own spring, transcribed from the artboard
+   (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
+   `Save choices` with no transition, and one class serving two artboards must
+   take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
+   Its reduced-motion counterpart is the block at the end of this file. */
+.consentBar .consentPrimary {
+  transition: transform .5s cubic-bezier(.34,1.56,.64,1);
+}
+
+.consentBar .consentPrimary:hover { transform: scale(1.04); }
 
 /* --- 10b: the preferences card. One presentation serves both entry points
    (the bar's "Choose what to store" and Settings -> Privacy), because there is
@@ -7515,7 +7538,7 @@ a:focus-visible {
 .consentKnob {
   background: var(--muted);
   border-radius: var(--r-dot);
-  box-shadow: var(--shadow-thumb);
+  box-shadow: var(--shadow-knob);
   height: 16px;
   width: 16px;
 }
@@ -7528,6 +7551,13 @@ a:focus-visible {
   gap: 9px;
   margin-top: 18px;
 }
+
+/* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
+   all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
+   `10px 19px` at :39). One class serves both surfaces, so the second artboard
+   states its own value here rather than inheriting the first's
+   (CODE-REV-S01-C3C4 r1 N1). */
+.consentCardFooter .consentPrimary { padding: 10px 18px; }
 
 .consentFooterGap { flex: 1; }
 
@@ -7571,5 +7601,15 @@ a:focus-visible {
     min-width: 0;
     white-space: nowrap;
   }
+}
+
+/* S01-R27: the slice animates one thing — 10a's primary — so it ships the
+   scoped counterpart itself. There is no global reduced-motion reset here; the
+   four existing blocks (:269, :3663, :4681, :5244) are each scoped to their own
+   component, and this one names only the selectors above. */
+@media (prefers-reduced-motion: reduce) {
+  .consentBar .consentPrimary { transition: none; }
+
+  .consentBar .consentPrimary:hover { transform: none; }
 }
 /* === end consent-ui S01 === */

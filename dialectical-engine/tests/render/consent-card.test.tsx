@@ -361,6 +361,64 @@ describe("S01-C4 the cookie preferences card (10b)", () => {
     expect(literals, "no colour literal anywhere in the S01 block").toEqual([]);
   });
 
+  it("draws the card's primary at 10b's own 18px padding and the knob at 10b's own shadow", () => {
+    // PROPERTY (CODE-REV-S01-C3C4 r1 N1/N2/N3): a class shared by two artboards
+    // carries EACH artboard's values, and a token is reused only when its VALUE
+    // equals the design's, never because its shape matches.
+    //   Accept all   padding=10px 19px  border=NONE  (10a, design line 39)
+    //   Save choices padding=10px 18px  border=NONE  (10b, design line 130)
+    //   knob shadow  0 1px 3px rgba(0,0,0,.3)        (10b, design line 121)
+    // `--shadow-thumb` is `0 1px 4px rgba(0,0,0,.3)` (globals.css:55) and may not
+    // be re-valued: `.ndSlider::-webkit-slider-thumb` / `::-moz-range-thumb`
+    // (:5106, :5115) are another mission's surface. So the knob gets its own
+    // mode-independent token, declared beside it in `:root` exactly as C1's own
+    // six mode-independent tokens are, and registered in the t9 maps.
+    const base = unconditional(withoutComments(s01Block()));
+
+    expectDeclarations(base, ".consentPrimary", ["padding: 10px 19px", "border: none"]);
+    expectDeclarations(base, ".consentCardFooter .consentPrimary", ["padding: 10px 18px"]);
+    expectDeclarations(base, ".consentKnob", ["box-shadow: var(--shadow-knob)"]);
+    expect(
+      s01Block().includes("--shadow-thumb"),
+      "the S01 block still reaches for the slider's own shadow token"
+    ).toBe(false);
+
+    // The token itself: declared in `:root`, absent from the Chamber block —
+    // C1's pattern for a mode-independent value, and `--shadow-thumb`'s own.
+    const css = globalsSource();
+    const chamberAt = css.indexOf('html[data-mode="chamber"] {');
+    expect(chamberAt, "globals.css declares the Chamber token block").toBeGreaterThan(-1);
+    const rootBlock = css.slice(css.indexOf(":root {"), chamberAt);
+    const chamberBlock = css.slice(chamberAt, chamberAt + css.slice(chamberAt).indexOf("\n}"));
+    expect(
+      rootBlock.includes("--shadow-knob: 0 1px 3px rgba(0,0,0,.3);"),
+      ":root declares --shadow-knob comma-tight"
+    ).toBe(true);
+    expect(chamberBlock.includes("--shadow-knob"), "the Chamber block re-declares it").toBe(false);
+  });
+
+  it("documents at the prop that `initial` is read once, by the mount", () => {
+    // PROPERTY (CODE-REV-S01-C3C4 r1 N6): a prop consumed by a `useState`
+    // initialiser is read at MOUNT and never again, and the consumer is told so
+    // at the prop rather than left to discover it. Measured by the reviewer's
+    // probe: re-rendering the mounted card with a different `initial` keeps the
+    // FIRST value, so a caller that keeps the card mounted and re-renders it
+    // after a save shows the visitor stale toggles and can write a decision
+    // nobody picked. The remedy on THIS side of the boundary is the contract
+    // sentence; cluster C5 owns the fresh mount that honours it.
+    const source = cardSource();
+    expect(
+      source.includes(
+        "read once, by the mount; the caller mounts the card fresh for each open"
+      ),
+      "the `initial` prop states that it is read once"
+    ).toBe(true);
+    expect(
+      source.includes("a re-render with a new `initial` is ignored"),
+      "the `initial` prop states what a re-render does NOT do"
+    ).toBe(true);
+  });
+
   it("writes R04's rows from the footer's three controls, and offers no fourth", () => {
     // PROPERTY (S01-R19, S01-R04): `Essential only` and `Save choices` each
     // invoke exactly one callback carrying the decision R04's table names, and

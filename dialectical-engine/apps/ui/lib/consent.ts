@@ -195,6 +195,32 @@ export function decisionFor(control: ConsentControl, toggles?: ConsentToggles): 
   };
 }
 
+/**
+ * A COMPILER PIN, never called and never exported.
+ *
+ * The two overloads above are enforced by the type checker and by nothing else:
+ * deleting both — a complete regression of the fix they exist to deliver — left
+ * every gate in this repo green, measured (`apps/ui` tsc exit 0, root typecheck
+ * 0 diagnostics outside the pin, the C2 and C4 suites green). The reason is that
+ * the only OTHER call that would catch it lives in a `.tsx` test, and the root
+ * `tsconfig.json` takes `tests/**` as `.ts` only while excluding `apps/ui`, so
+ * all three of this mission's `.tsx` tests are typechecked by no project at all
+ * (`reviews/CODE-REV-S01-C3C4-r1.md` **N7**).
+ *
+ * This directive is the guard: with the overloads present the call below is an
+ * error and the directive is used; delete them and the call becomes legal, which
+ * makes the directive itself `error TS2578: Unused '@ts-expect-error' directive.`
+ * under `apps/ui`'s own project — the arm COMMON §10.30 already runs after every
+ * commit. (Part 2, teaching the ROOT tsconfig about `tests/**` + `.tsx`, is the
+ * orchestrator's ticket `t_94c9010a`, not this file's business.)
+ */
+function pinSaveChoicesRequiresToggles(): void {
+  // @ts-expect-error `save-choices` may not be called without its toggles: an
+  // omitted argument coerced to false/false and wrote a full denial of consent
+  // for a visitor who had left the optional quality toggle ON.
+  decisionFor("save-choices");
+}
+
 /** Notified when some distant component asks for the preferences card. */
 export type PreferenceRequestListener = (opener: HTMLElement | null) => void;
 

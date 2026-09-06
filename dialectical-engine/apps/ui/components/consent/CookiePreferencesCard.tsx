@@ -41,6 +41,14 @@ export type CookiePreferencesCardProps = {
    * The two operable toggles as the card opens: a valid stored decision's
    * booleans, or R17's defaults when nothing valid is stored. Which of the two
    * is a question about STORAGE, and the caller has already answered it.
+   *
+   * **read once, by the mount; the caller mounts the card fresh for each open —
+   * a re-render with a new `initial` is ignored.** It feeds a `useState`
+   * initialiser, which runs at mount and never again, so a caller that keeps the
+   * card mounted and hands it new booleans after a save shows the visitor the
+   * OLD toggles and can write a decision nobody picked. Measured by
+   * `probes/code-rev-s01-c3c4-r1-stale-initial.test.tsx`
+   * (CODE-REV-S01-C3C4 r1 **N6**); `CookieConsent` mounts a fresh card per open.
    */
   initial: ConsentToggles;
   /** R04 row 4 — the current toggles. */

@@ -289,6 +289,53 @@ describe("S01-C3 the cookie bar (10a)", () => {
     expect(literals, "no colour literal anywhere in the S01 block").toEqual([]);
   });
 
+  it("draws the bar's primary at the artboard's padding, borderless, with the design's hover spring", () => {
+    // PROPERTY (CODE-REV-S01-C3C4 r1 N1/N2/N4): every declaration of a class the
+    // design draws is diffed against the artboard that draws it, not against a
+    // neighbouring artboard that happens to share the class. 10a's `Accept all`
+    // is `padding:10px 19px`, has NO border, and carries
+    // `transition:transform .5s cubic-bezier(.34,1.56,.64,1)` with a hover
+    // `scale(1.04)` (turn-10-cookie-consent.html:39).
+    //
+    // The border is load-bearing arithmetic, not taste: `* { box-sizing:
+    // border-box }` (globals.css:176-177) with `width: auto` makes the used size
+    // content + padding + border, so a 1px edge the design omits ships a primary
+    // 2px taller and 2px wider than the artboard — and breaks the design's own
+    // equality, where a ghost pill's `padding: 9px 15px` + 1px border and a
+    // primary's `padding: 10px` + 0 border are both 10px of effective edge in the
+    // same `align-items: center` row.
+    //
+    // Motion is shipped rather than dropped (orchestrator ruling on N4), so
+    // S01-R27's second branch is now the operative one: the slice animates, and
+    // it therefore owns a scoped `prefers-reduced-motion` counterpart. jsdom
+    // computes no layout and runs no transition — this asserts the declared rule
+    // TEXT; whether the spring reads well is V's, acceptance steps 1-2.
+    const block = withoutComments(s01Block());
+    const base = unconditional(block);
+
+    expectDeclarations(base, ".consentPrimary", [
+      "padding: 10px 19px",
+      "border: none",
+      "white-space: nowrap"
+    ]);
+    expect(
+      declarationsFor(base, ".consentPrimary").includes("border: 1px solid var(--ink)"),
+      "the primary keeps the border the design does not draw"
+    ).toBe(false);
+
+    expectDeclarations(base, ".consentBar .consentPrimary", [
+      "transition: transform .5s cubic-bezier(.34,1.56,.64,1)"
+    ]);
+    expectDeclarations(base, ".consentBar .consentPrimary:hover", ["transform: scale(1.04)"]);
+
+    // R27: the slice's own scoped block, naming its own selectors. There is no
+    // global reduced-motion reset in this codebase — the four existing blocks
+    // (globals.css:269,3663,4681,5244) are each scoped to their own component.
+    const reduced = atRule(block, "@media (prefers-reduced-motion: reduce)");
+    expectDeclarations(reduced, ".consentBar .consentPrimary", ["transition: none"]);
+    expectDeclarations(reduced, ".consentBar .consentPrimary:hover", ["transform: none"]);
+  });
+
   it("stacks below 720px, the width at which the designed row stops fitting", () => {
     // PROPERTY (S01-R10): below the measured breakpoint the button group moves
     // under the copy block and nothing is allowed to wrap mid-label.
