@@ -1,11 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   COOKIE_CATEGORIES,
   type ConsentToggles,
   type CookieCategory
 } from "../../lib/consent";
+import { backdropCloseHandler, useModalSurface } from "./modalSemantics";
 
 /**
  * 10b — the per-category preferences card.
@@ -24,10 +25,11 @@ import {
  *
  * **It writes no modal semantics of its own.** Focus trap, initial focus, focus
  * return, backdrop close, reduced motion and the Esc stack all come from the
- * ONE shared helper `modalSemantics.ts`, which S02 owns and cluster C6 wires in
- * (S01-R18/R20, SPEC §Out of scope). `onDismiss` is the callback that helper
- * will drive; this cluster accepts it and wires nothing to it, because a
- * temporary second implementation is still a second implementation.
+ * ONE shared helper `modalSemantics.ts`, which S02 owns and S01 consumes
+ * UNCHANGED (S01-R18/R20, SPEC §Out of scope, `COMMON.md` §10.7). Cluster C6
+ * wires it in: `onDismiss` is what the helper's Esc arm and backdrop arm call,
+ * and the two refs below are the only thing this component contributes — a
+ * container to trap inside and a first target to open on.
  */
 export type ConsentChoice = {
   /** Always true — the locked category is not a choice (S01-R04). */
@@ -74,6 +76,30 @@ export function CookiePreferencesCard({
     analytics: initial.analytics
   });
 
+  const scrimRef = useRef<HTMLDivElement | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+  const firstOperableRef = useRef<HTMLElement | null>(null);
+
+  /**
+   * Initial focus goes to the first OPERABLE toggle (S01-R18). Derived from the
+   * records rather than named: Essential is `locked: true` and is not a choice,
+   * so it is not a place to put a visitor's focus — and a later ruling that
+   * unlocks a category or reorders the three (contested row Q7-01) moves this
+   * target without touching this file (S01-R28).
+   */
+  const firstOperableId = COOKIE_CATEGORIES.find((category) => !category.locked)?.id;
+
+  /**
+   * The card is mounted only while it is open — `CookieConsent` renders it in the
+   * `card` surface and nowhere else, with a fresh `key` per open — so `open` is
+   * the constant `true` and the helper's mount/unmount IS the open/close.
+   */
+  useModalSurface(true, {
+    containerRef: cardRef,
+    initialFocusRef: firstOperableRef,
+    onClose: onDismiss
+  });
+
   /** The locked category is not in `ConsentToggles`: its state is the constant `true`. */
   const stateOf = (id: CookieCategory["id"]): boolean =>
     id === "essential" ? true : toggles[id];
@@ -89,8 +115,24 @@ export function CookiePreferencesCard({
   };
 
   return (
-    <div className="consentScrim">
-      <div className="consentCard" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div
+      className="consentScrim"
+      ref={scrimRef}
+      // Resolved at CLICK time, never at render time: `scrimRef.current` is
+      // still null during the first render, and a handler built then would close
+      // on nothing. The helper's own rule is that only a click landing ON the
+      // scrim closes — a click on any descendant is a click inside the card.
+      onClick={(event) => backdropCloseHandler(scrimRef.current, onDismiss)(event)}
+    >
+      <div
+        className="consentCard"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        ref={(node) => {
+          cardRef.current = node;
+        }}
+      >
         <div className="consentCardCore">
           <span className="consentTab" aria-hidden="true" />
           <div className="consentEyebrow">CHOOSE WHAT TO STORE</div>
@@ -118,6 +160,13 @@ export function CookiePreferencesCard({
                     aria-disabled={category.locked || undefined}
                     aria-label={category.name}
                     className="consentSwitch"
+                    ref={
+                      category.id === firstOperableId
+                        ? (node) => {
+                            firstOperableRef.current = node;
+                          }
+                        : undefined
+                    }
                     onClick={() => flip(category)}
                     // Space and Enter, per S01-R17. `preventDefault` is what
                     // keeps this ONE activation: a real browser fires a native

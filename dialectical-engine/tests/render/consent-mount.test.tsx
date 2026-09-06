@@ -358,22 +358,28 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     expect(raw(), "a dismissal writes nothing").toBeNull();
   });
 
-  it("dispatches Escape into a lane that has no listener yet, and records that it does nothing", () => {
-    // NOT a requirement — a MEASUREMENT, so the reason the three dismissal cases
-    // above and below drive `onDismiss` instead of the keyboard is a fact in the
-    // record rather than a claim in a handoff. The Esc listener belongs to the
-    // ONE shared helper `modalSemantics.ts` (S02's, arriving with the C6 merge);
-    // S01-R18 and SPEC §Out of scope forbid this cluster from writing a second
-    // one, and S01-S45's guard asserts that no file under
-    // `apps/ui/components/consent/` except that helper contains `addEventListener`
-    // or the string Escape. This case is expected to CHANGE in C6, where
-    // S01-S40 makes one Escape close exactly one surface.
+  it("dispatches Escape into a lane that now HAS the shared listener, and records what it does", () => {
+    // NOT a requirement — a MEASUREMENT, kept so the reason the three dismissal
+    // cases above and below drive `onDismiss` instead of the keyboard is a fact
+    // in the record rather than a claim in a handoff.
+    //
+    // **CHANGED BY C6, exactly as this case said it would be.** In C5 the lane had
+    // no document-level listener at all and this case recorded that an Escape
+    // keydown changed nothing. Cluster C6 wired `CookiePreferencesCard` to the ONE
+    // shared helper `modalSemantics.ts` (S02's), so the same keydown now reaches
+    // the card's `onClose` — which is the very `onDismiss` the cases around it
+    // call directly. Both routes therefore land on the same callback, and the
+    // three dismissal cases still exercise it directly because THIS file's subject
+    // is the state machine, not the keystroke. The keystroke's own contract — one
+    // Escape moves the visitor exactly ONE surface, with the policy modal open
+    // over the card — is S01-S40's, pinned in `tests/render/consent-policy-link.test.tsx`.
     mountConsent();
     clickLabelled("Choose what to store");
 
     pressEscape();
 
-    expect(card(), "no listener exists in this lane yet, so the card stands").not.toBeNull();
+    expect(card(), "the shared helper's Esc arm reaches onDismiss").toBeNull();
+    expect(bar(), "so the bar returns, because nothing valid is stored").not.toBeNull();
     expect(raw(), "and nothing was written").toBeNull();
   });
 

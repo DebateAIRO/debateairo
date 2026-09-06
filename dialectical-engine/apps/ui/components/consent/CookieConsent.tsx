@@ -12,6 +12,7 @@ import {
 } from "../../lib/consent";
 import { CookieBar } from "./CookieBar";
 import { CookiePreferencesCard, type ConsentChoice } from "./CookiePreferencesCard";
+import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 
 /**
  * The ONE consent state machine (cluster S01-C5).
@@ -69,6 +70,23 @@ export function CookieConsent() {
    * picked (CODE-REV-S01-C3C4 r1 **N6**, measured).
    */
   const [opens, setOpens] = useState(0);
+
+  /**
+   * Whether the read-only policy modal is open OVER the card (S01-R20). It is
+   * this component's state rather than the card's for one reason: the modal
+   * element has to be a LATER SIBLING of the card, and a child cannot render its
+   * own sibling.
+   *
+   * **Nothing resets it when the card closes, and that is deliberate.** Every
+   * exit the policy has — its footer `Close`, its `×`, its backdrop and the
+   * shared helper's key arm — is the one `onClose` below, so the flag is already
+   * false before any route that could close the CARD becomes reachable: while the
+   * policy is open it is the topmost surface, it owns the keystroke, and its
+   * scrim covers every control of the card. A defensive reset in `openCard` was
+   * written first and then deleted, because no mutant of it is observable: it is
+   * a line no test can pin (`heartbeat-worker` §2).
+   */
+  const [policyOpen, setPolicyOpen] = useState(false);
 
   /**
    * The control that asked for the card, kept so the shared modal helper can
@@ -133,17 +151,38 @@ export function CookieConsent() {
   if (surface === undefined || surface === "silent") return null;
 
   if (surface === "card") {
+    /**
+     * **DOM ORDER IS LOAD-BEARING, and this is the whole of it.** The shared
+     * helper resolves which of two unrelated open surfaces is topmost by
+     * DOCUMENT POSITION — `CONTAINED_BY || FOLLOWING` — and not by the order
+     * they opened in (S02 `DECISIONS.md` 2026-09-07, CODE-REV-S02-C5C6 r1 N2,
+     * measured; ticket `t_457c9898`). The policy modal is therefore the card's
+     * LATER SIBLING: with the two swapped, one press of the dismiss key closes
+     * the CARD and leaves the policy standing over nothing. `S01-S40` is the pin.
+     * (Written without spelling that key: S01-S45's slice-wide guard is
+     * grep-shaped and a grep does not know what a comment is — `COMMON.md` §8,
+     * and CODE-S01-C5 F1 measured a JSDoc mention counting as a hit.)
+     *
+     * The modal is mounted CONDITIONALLY, so every open is a fresh read (S02
+     * `DECISIONS.md` 2026-09-07, the N7 ruling) — the same treatment the card
+     * itself gets from `key={opens}`.
+     */
     return (
-      <CookiePreferencesCard
-        key={opens}
-        initial={initial}
-        onSave={(choice: ConsentChoice): void =>
-          settle(decisionFor("save-choices", { quality: choice.quality, analytics: choice.analytics }))
-        }
-        onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
-        onDismiss={dismiss}
-        onRequestPolicy={(): void => {}}
-      />
+      <>
+        <CookiePreferencesCard
+          key={opens}
+          initial={initial}
+          onSave={(choice: ConsentChoice): void =>
+            settle(decisionFor("save-choices", { quality: choice.quality, analytics: choice.analytics }))
+          }
+          onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
+          onDismiss={dismiss}
+          onRequestPolicy={(): void => setPolicyOpen(true)}
+        />
+        {policyOpen && (
+          <PrivacyPolicyModal open mode="read" onClose={(): void => setPolicyOpen(false)} />
+        )}
+      </>
     );
   }
 
