@@ -662,6 +662,25 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(evaluated[0]!.verdict).toBe("RULED");
   });
 
+  // K28 and K38 — the two round-2 mutation baselines, on their canonical sources.
+  // Discovery admits neither a mixed array nor an empty one, so both yield NO
+  // candidate. Each mutation admits its shape and produces exactly one evaluated
+  // UNDETERMINED candidate; asserting the VERDICT LIST makes that the failure
+  // message rather than a bare count.
+  it.each([
+    {
+      id: "K28 — a mixed array is not a candidate",
+      source: 'const sentinel = "s";\nconst choices = [0, sentinel, 2, 3, 4, 5];'
+    },
+    {
+      id: "K38 — an empty array literal is not a candidate",
+      source: "const choices = [].concat(1,2,3,4,5);"
+    }
+  ])("$id", ({ source }) => {
+    expect(candidatesOf("planted.ts", source)).toEqual([]);
+    expect(evaluatedCandidatesOf("planted.ts", source).map((c) => c.verdict)).toEqual([]);
+  });
+
   // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects
   // yields exactly ONE conservative INCONCLUSIVE site and never a fabricated
   // DOMAIN_ENUMERATION; discovery yields nothing. Narrowed with a `throw` per
