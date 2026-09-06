@@ -17,10 +17,35 @@ import {
   candidatesOf,
   ceilingSites,
   domainSites,
+  evaluatedCandidatesOf,
   kindOf,
   parseModule,
+  type Cell,
+  type EvaluatedCandidate,
   type Site
 } from "../support/depthOracle.js";
+
+/** Exactly one evaluated candidate, or the count is the failure. */
+function evaluateOne(path: string, source: string): EvaluatedCandidate {
+  const all = evaluatedCandidatesOf(path, source);
+  if (all.length !== 1) {
+    throw new Error(`expected exactly one candidate in ${path}, got ${all.length}`);
+  }
+  return all[0]!;
+}
+
+/** The EXACT cells of an evaluated candidate; anything else is the failure. */
+function cellsOf(candidate: EvaluatedCandidate): readonly Cell[] {
+  if (candidate.value.kind !== "EXACT") {
+    throw new Error(`expected an EXACT value, got ${candidate.value.kind}`);
+  }
+  return candidate.value.cells;
+}
+
+/** Cells rendered for assertion: a number when numeric, otherwise the tag. */
+function cellValues(cells: readonly Cell[]): readonly (number | string)[] {
+  return cells.map((cell) => (cell.t === "num" ? cell.v : cell.t));
+}
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ANSWER_ID = "44444444-4444-4444-8444-444444444444";
@@ -477,6 +502,164 @@ describe("S1-1 · the depth bound has a single source", () => {
     }
   ])("addresses $id", ({ path, source, expected }) => {
     expect(candidatesOf(path, source)).toEqual(expected);
+  });
+
+  // ══════════════════ ROUND 2 — THE EVALUATOR ══════════════════
+  //
+  // PROPERTY: for one declaration, decide whether it DEFINES the ruled option
+  // domain 1..5 — soundly inside the declared grammar, conservatively outside it.
+  // Rule 1 is consulted FIRST; only a different literal reaches the chain.
+  //
+  // These rows are written BEFORE the transfer rules exist. Under the declared
+  // stub ("every operation and wrapper yields UNKNOWN, rule-1 precedence kept")
+  // the five named cases below fail BY WRONG VERDICT — not by a missing API and
+  // not by a malformed fixture, both of which would prove nothing.
+
+  it.each([
+    {
+      id: "0-5 then slice(1) — the ruled suffix",
+      source: "const choices = [0,1,2,3,4,5].slice(1);",
+      verdict: "RULED" as const,
+      cells: [1, 2, 3, 4, 5]
+    },
+    {
+      id: "the even filter — a decided, non-ruled value",
+      source: "const choices = [0,1,2,3,4,5].filter(n => n % 2 === 0);",
+      verdict: "OTHER" as const,
+      cells: [0, 2, 4]
+    },
+    {
+      id: "reverse then slice(1) — order is load-bearing",
+      source: "const choices = [0,1,2,3,4,5].reverse().slice(1);",
+      verdict: "OTHER" as const,
+      cells: [4, 3, 2, 1, 0]
+    },
+    {
+      id: "Array.from over a Set of the OR-map, then slice(1)",
+      source: "const choices = Array.from(new Set([0,1,2,3,4,5].map(n => n || 1))).slice(1);",
+      verdict: "OTHER" as const,
+      cells: [2, 3, 4, 5]
+    },
+    {
+      id: "1-6 then slice(0,-1) — the ruled prefix",
+      source: "const choices = [1,2,3,4,5,6].slice(0,-1);",
+      verdict: "RULED" as const,
+      cells: [1, 2, 3, 4, 5]
+    }
+  ])("evaluates $id", ({ source, verdict, cells }) => {
+    const evaluated = evaluateOne("planted.ts", source);
+    expect(evaluated.verdict).toBe(verdict);
+    expect(cellValues(cellsOf(evaluated))).toEqual(cells);
+  });
+
+  // GREEN UNDER THE STUB, and green afterwards — these must not move.
+  it.each([
+    { id: "bare 0-5 is a decided non-ruled literal", source: "const choices = [0,1,2,3,4,5];", verdict: "OTHER" as const },
+    { id: "bare 1-6 is a decided non-ruled literal", source: "const choices = [1,2,3,4,5,6];", verdict: "OTHER" as const },
+    { id: "rule 1: the bare ruled domain", source: "const allowed = [1,2,3,4,5];", verdict: "RULED" as const },
+    { id: "rule 1 precedes the chain: map-to-zero over the ruled literal", source: "const choices = [1,2,3,4,5].map(n => 0);", verdict: "RULED" as const },
+    { id: "K50 control: NOT_ARRAY continuation reports", source: 'const choices = [0,1,2,3,4,5].join("").split("").map(n => +n).slice(1);', verdict: "UNDETERMINED" as const }
+  ])("evaluates $id", ({ source, verdict }) => {
+    expect(evaluateOne("planted.ts", source).verdict).toBe(verdict);
+  });
+
+  // THE SEVEN ACTIVE CONTROLS (manifest Part 2c), each with its canonical source.
+  it.each([
+    { id: "K7b — combined: three parameters, assignment and element access", source: "const choices = [0,1,2,3,4,5].map(n => n === 5 ? 6 : n).filter((n, i, a) => { a[5] = 5; return n > 0; });", verdict: "UNDETERMINED" as const },
+    { id: "K7c — async only (purity clause 4)", source: "const choices = [0,1,2,3,4,5].map(async n => n);", verdict: "UNDETERMINED" as const },
+    { id: "K20b — computed member name with a string literal", source: 'const choices = [0,1,2,3,4,5]["slice"](1);', verdict: "RULED" as const },
+    { id: "K34 — a direct unmodelled call", source: "const choices = ((x) => x.slice(1))([0,1,2,3,4,5]);", verdict: "UNDETERMINED" as const },
+    { id: "K35 — truthiness filter", source: "const choices = [0,1,2,3,4,5].filter(n => n);", verdict: "RULED" as const },
+    { id: "K37 — a non-finite calculation reports", source: "const choices = [0,1,2,3,4,5].map(n => n * n / n).filter(n => n);", verdict: "UNDETERMINED" as const }
+  ])("evaluates control $id", ({ source, verdict }) => {
+    expect(evaluateOne("planted.ts", source).verdict).toBe(verdict);
+  });
+
+  // K7d — the REAL assignment-rejection assertion (codex r1c point 5). A generic
+  // UNKNOWN stub also makes this green, so the candidate identity and the REASON
+  // are asserted too: the rejection must be attributable to purity clause 3.
+  it("evaluates control K7d — assignment alone fails the purity gate, with identity and reason", () => {
+    const source = "const choices = [0,1,2,3,4,5].map(n => (n = n));";
+    const evaluated = evaluateOne("planted.ts", source);
+    expect(evaluated.start).toBe(16);
+    expect(evaluated.end).toBe(29);
+    expect(evaluated.elementLine).toBe(1);
+    expect(evaluated.statementLine).toBe(1);
+    expect(evaluated.verdict).toBe("UNDETERMINED");
+    expect(evaluated.value.kind).toBe("UNKNOWN");
+    expect(evaluated.reason).toMatch(/assignment/i);
+  });
+
+  // THE FOUR O1 SEMANTIC CONTROLS (K48-K51), written before their transfer rules.
+  it.each([
+    { id: "K48 — signed zero is falsy under the truthiness rule", source: "const choices = [-0,1,2,3,4,5].filter(n => n);", verdict: "RULED" as const },
+    { id: "K49 — ?? skips a null left operand", source: "const choices = [0,1,2,3,4,5].map(n => (n === 0 ? null : n) ?? 1);", verdict: "RULED" as const },
+    { id: "K50 — an operation over NOT_ARRAY reports", source: 'const choices = [0,1,2,3,4,5].join("").split("").map(n => +n).slice(1);', verdict: "UNDETERMINED" as const },
+    { id: "K51 — any bound output being RULED decides the occurrence", source: "const [head, ...choices] = [0,1,2,3,4,5];", verdict: "RULED" as const }
+  ])("evaluates $id", ({ source, verdict }) => {
+    expect(evaluateOne("planted.ts", source).verdict).toBe(verdict);
+  });
+
+  // THE REPAIRED MANIFEST FIXTURES (K9, K10, K31, K43, K47), each with the cells
+  // or the verdict the manifest binds it to.
+  it("evaluates K10's fixture with its exact baseline cells", () => {
+    const evaluated = evaluateOne("planted.ts", "const choices = [0,1,2,3,4,5].map(n => n || 1);");
+    expect(cellValues(cellsOf(evaluated))).toEqual([1, 1, 2, 3, 4, 5]);
+    expect(evaluated.verdict).toBe("RULED");
+  });
+
+  it("evaluates K43's fixture: known string cells reach the element-return rule", () => {
+    const evaluated = evaluateOne("planted.ts", 'const choices = [0,1,2,3,4,5].map(n => "x").at(0);');
+    expect(evaluated.start).toBe(16);
+    expect(evaluated.end).toBe(29);
+    expect(evaluated.verdict).toBe("UNDETERMINED");
+  });
+
+  it("evaluates K31's in-grammar over-budget fixture as UNDETERMINED", () => {
+    const sum = "(((((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0))) + (((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0)))) + ((((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0))) + (((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0)))))";
+    const source = `const choices = [0,1,2,3,4,5].map(n => n + ${sum}).slice(1);`;
+    expect(evaluateOne("planted.ts", source).verdict).toBe("UNDETERMINED");
+  });
+
+  it("evaluates K47's SAME-sentinel source: dedupe of a non-numeric cell is observable", () => {
+    const evaluated = evaluateOne("planted.ts", 'const choices = [...new Set([0,0,1,2,3,4,5].map(n => n === 0 ? "s" : n))].slice(1);');
+    expect(evaluated.verdict).toBe("RULED");
+  });
+
+  // K45 — callee role and spans, from ITS OWN bytes. The array literal is at
+  // (64,77); the outer call is textually 16-87. M17's (16,94) belonged to a
+  // different source and is NOT inherited.
+  it("evaluates K45: the member is an ARGUMENT, not the callee, and the span is its own", () => {
+    const source = "const choices = ((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes);";
+    const evaluated = evaluateOne("planted.ts", source);
+    expect(evaluated.start).toBe(64);
+    expect(evaluated.end).toBe(77);
+    expect(source.slice(16, 87)).toBe("((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes)");
+    expect(evaluated.consumedStart).toBe(64);
+    expect(evaluated.consumedEnd).toBe(87);
+    expect(evaluated.verdict).toBe("UNDETERMINED");
+  });
+
+  it("evaluates K45's computed-member twin, whose call is textually 16-90", () => {
+    const source = 'const choices = ((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5]["includes"]);';
+    const evaluated = evaluateOne("planted.ts", source);
+    expect(evaluated.start).toBe(64);
+    expect(evaluated.end).toBe(77);
+    expect(source.slice(16, 90)).toBe('((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5]["includes"])');
+    expect(evaluated.consumedEnd).toBe(90);
+    expect(evaluated.verdict).toBe("UNDETERMINED");
+  });
+
+  // The three bare DOMAIN controls gain RULED evaluated-candidate assertions while
+  // remaining on the old emitter for site emission (plan §5.6 R4, round 2 row).
+  it.each([
+    { spelling: "array option domain", planted: "  {[1, 2, 3, 4, 5].map((value) => value)}", path: "planted.tsx" },
+    { spelling: "set option domain", planted: "  const allowed = new Set([1, 2, 3, 4, 5]);", path: "planted.ts" },
+    { spelling: "multiline domain enumeration", planted: "  const allowed = [\n    1,\n    2,\n    3,\n    4,\n    5\n  ];", path: "planted.ts" }
+  ])("evaluates the bare option-domain control $spelling as RULED by rule 1", ({ planted, path }) => {
+    const evaluated = evaluatedCandidatesOf(path, planted);
+    expect(evaluated).toHaveLength(1);
+    expect(evaluated[0]!.verdict).toBe("RULED");
   });
 
   // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects
