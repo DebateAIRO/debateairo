@@ -322,6 +322,7 @@ describe("rendered auth flow integration", () => {
     field("recovery-email").value = " recovery@example.test ";
     field("password").value = "correct horse battery staple";
     field("adult-affirmed").checked = true;
+    field("privacy-accepted").checked = true;
     await submit();
 
     expect(register).toHaveBeenCalledWith(
@@ -446,6 +447,7 @@ describe("rendered auth flow integration", () => {
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "password";
     field("adult-affirmed").checked = true;
+    field("privacy-accepted").checked = true;
     await submit();
 
     expect(document.querySelector('[role="alert"]')?.textContent)
@@ -464,6 +466,7 @@ describe("rendered auth flow integration", () => {
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "password";
     field("adult-affirmed").checked = true;
+    field("privacy-accepted").checked = true;
     await submit();
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
 

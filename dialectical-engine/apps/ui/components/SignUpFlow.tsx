@@ -18,6 +18,10 @@ const PASSWORD_RULES: ReadonlyArray<{ label: string; met: (value: string) => boo
   { label: "One special character", met: (value) => /[^A-Za-z0-9]/.test(value) }
 ];
 
+/* The id the privacy row's input points at with aria-labelledby: its sentence holds an
+   interactive control, so the row cannot be a <label> (see the consent group below). */
+const PRIVACY_CONSENT_TEXT_ID = "signup-privacy-consent-text";
+
 // Deliberately permissive: the address is checked for shape, not existence.
 const shapedEmail = (value: string) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value);
 
@@ -182,10 +186,38 @@ export function SignUpFlow({
           </ul>
         </div>
 
-        <label className="authCheck">
-          <input name="adult-affirmed" type="checkbox" required disabled={busy || sent} />
-          <span>I affirm that I am at least 18 years old.</span>
-        </label>
+        {/* Consent group — design artboard 8a (turn-8a-checkbox-group.html:1-10).
+            Row 1 is a <label> wrapping its input, so the square, the text and the row
+            all toggle it natively. Row 2 cannot be a <label>: its Privacy Policy
+            control is interactive content, which the <label> content model forbids —
+            so it is a <div> and the input takes its name from aria-labelledby. */}
+        <div className="consentGroup">
+          <label className="consentRow">
+            <input
+              className="consentBox"
+              name="adult-affirmed"
+              type="checkbox"
+              required
+              disabled={busy || sent}
+            />
+            <span className="consentText">I am 18 or over.</span>
+          </label>
+          <div className="consentRow">
+            <input
+              className="consentBox"
+              name="privacy-accepted"
+              type="checkbox"
+              required
+              disabled={busy || sent}
+              aria-labelledby={PRIVACY_CONSENT_TEXT_ID}
+            />
+            <span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>
+              I agree to the{" "}
+              <button type="button" className="consentPolicyLink">Privacy Policy</button>
+              , including that my debates may be published publicly.
+            </span>
+          </div>
+        </div>
 
         <button className="authPrimary" type="submit" disabled={busy || sent}>
           {busy ? "Creating…" : "Create account"}
