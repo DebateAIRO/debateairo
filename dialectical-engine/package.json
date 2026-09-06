@@ -79,6 +79,7 @@
     "testcontainers": "12.1.0",
     "tsx": "4.23.11",
     "typescript": "7.0.2",
+    "typescript-classic": "npm:typescript@5.9.3",
     "vitest": "4.1.10"
   }
 }

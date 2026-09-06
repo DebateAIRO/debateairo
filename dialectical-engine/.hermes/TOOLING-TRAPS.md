@@ -1316,3 +1316,29 @@ lane's blob had added the six-slot code array that tripped an incoming oracle.
 **Compare blob ids, never existence.** Cost: one wrong hypothesis, caught by
 checking the blob before writing it down.
 (algorithm-live-loop, W5 dev-sync r3)
+
+## A fresh lane worktree has NO `node_modules`, so "baselines FIRST" collides with a single-install grant
+Found by F-T1-ORACLE-EVALUATOR round 0 (2026-09-06) in `.worktrees/lane-t1-oracle-evaluator`.
+The packet ordered baselines on the clean base BEFORE the one authorised `pnpm install`. But the
+worktree had no `node_modules` at all (`ls -ld node_modules` -> No such file or directory), so
+`pnpm exec vitest` and `pnpm typecheck` could not run at all until something installed. A seat
+reading "one install" literally either burns its single grant on setup or reports itself blocked.
+**The resolution, and it is provable rather than a judgement call:** `pnpm install --frozen-lockfile`
+CANNOT modify `package.json` or `pnpm-lock.yaml`, so it is setup, not the granted dependency change —
+run it, then print `git status --porcelain` to show both manifests untouched. The grant's install is
+the one WITHOUT `--frozen-lockfile`. Also required before any suite run: `pnpm run generate:contract`
+(`packages/contract/generated/client.ts` is gitignored and absent from every fresh worktree — already
+recorded above, and it bit again here).
+**Rule for packet authors: when a packet says "baselines first" and also "exactly one install", it must
+say which command establishes the toolchain.** Cost here: one analysis detour before any command ran.
+
+## An aliased dependency can produce a lockfile delta with NO `packages:` entry — that is correct, not incomplete
+Same round. Adding `"typescript-classic": "npm:typescript@5.9.3"` produced a **3-line, 0-removal**
+`pnpm-lock.yaml` delta consisting only of the root importer stanza (`typescript-classic:` / `specifier:
+npm:typescript@5.9.3` / `version: typescript@5.9.3`). No `packages:` block was added **because
+`typescript@5.9.3` was already resolved in the lockfile** (apps/ui pins `^5.6.0`), so the alias reuses
+the existing resolution. A reviewer expecting a new `packages:` entry can read this as a truncated or
+partial delta and send the round back.
+**State it affirmatively in the report, with the pre-existing `typescript@5.9.3:` lockfile line numbers
+quoted.** The strong evidence that no unrelated upgrade rode along is the **zero-removal** count: an
+upgrade rewrites an existing line and therefore always produces a removal.
