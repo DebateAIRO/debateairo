@@ -6,6 +6,9 @@ import { createHostCapacityModule } from "../../apps/observation-agent/src/modul
 import { createCertificateCapacityModule } from "../../apps/observation-agent/src/modules/certificate-capacity/module.js";
 
 const start = new Date("2026-09-03T12:00:00.000Z");
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 describe("OBS-05 capacity lifecycle", () => {
   it("deduplicates every ruled capacity condition and emits schema-valid clears", async () => {
@@ -60,7 +63,7 @@ describe("OBS-05 capacity lifecycle", () => {
     });
     const input = (now: Date) => ({
       modules: [postgres, host, certificate], now, timeoutMs: 2_000,
-      databaseUrl: "unused", stateDir: "unused", targets: [], thresholdVersion: 5,
+      database, stateDir: "unused", targets: [], thresholdVersion: 5,
       targetFragments: [Object.freeze({ basename: "OBS-05.json", targets: Object.freeze([]), configuration: Object.freeze({}) })],
       moduleThresholds: {
         "postgres-capacity": { clear_samples: 2 },

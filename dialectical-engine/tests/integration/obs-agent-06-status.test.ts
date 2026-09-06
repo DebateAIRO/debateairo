@@ -20,6 +20,9 @@ import type {
 } from "../../apps/observation-agent/src/core/types.js";
 
 const scratchDirectories: string[] = [];
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 afterEach(async () => {
   await Promise.all(scratchDirectories.splice(0).map((path) =>
@@ -41,7 +44,7 @@ async function projections(
   return Object.freeze((await module.probe({
     now,
     timeoutMs: 2_000,
-    databaseUrl: "postgresql://fixture.invalid/fixture",
+    database,
     stateDir: "/tmp/obs-06-status-fixture",
     targets,
     targetFragment: null,
@@ -156,7 +159,7 @@ describe("OBS-06 exact throughput status", () => {
     }));
     const module = createProviderHealthModule({ readCalls: async () => Object.freeze(calls) });
     const context = Object.freeze({
-      now, timeoutMs: 2_000, databaseUrl: "postgresql://fixture.invalid/fixture",
+      now, timeoutMs: 2_000, database,
       stateDir: "/tmp/obs-06-status-fixture", targets: Object.freeze([]),
       targetFragment: null, configuration: Object.freeze({}),
       thresholds: Object.freeze({ window_minutes: 5, minimum_calls: 10, failure_ratio: 0.5 })

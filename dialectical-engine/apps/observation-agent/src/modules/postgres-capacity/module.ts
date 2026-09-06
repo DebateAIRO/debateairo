@@ -6,6 +6,7 @@ import type {
   SampleIntent,
   SignalIntent
 } from "../../core/types.js";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import {
   readPostgresCapacity,
   type PostgresCapacityQueryThresholds,
@@ -18,7 +19,7 @@ import {
 
 export type PostgresCapacityDependencies = Readonly<{
   readSnapshot(
-    databaseUrl: string,
+    database: ObservationDatabasePort,
     observedAt: Date,
     thresholds: PostgresCapacityQueryThresholds
   ): Promise<PostgresCapacitySnapshot>;
@@ -108,7 +109,7 @@ export function createPostgresCapacityModule(
     }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const capacityThresholds = thresholds(ctx.thresholds);
-      const snapshot = await resolved.readSnapshot(ctx.databaseUrl, ctx.now, Object.freeze({
+      const snapshot = await resolved.readSnapshot(ctx.database, ctx.now, Object.freeze({
         lockWaitSeconds: capacityThresholds.lockWaitSeconds,
         idleInTransactionSeconds: capacityThresholds.idleInTransactionSeconds
       }));

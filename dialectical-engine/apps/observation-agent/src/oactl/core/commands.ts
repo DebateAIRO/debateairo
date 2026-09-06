@@ -1,14 +1,13 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import { z } from "zod";
 import { normalizeObservationError, ObservationError } from "../../core/errors.js";
-import { discoverObservationModules } from "../../core/modules.js";
+import { discoverObservationRuntimeModules } from "../../core/modules.js";
 import { OBSERVATION_COMPONENTS, STATUS_VIEW_PATTERN } from "../../core/types.js";
-import type { OactlVerbContribution } from "../../core/types.js";
 import {
   installLaunchAgent,
   killLaunchAgent,
@@ -33,10 +32,80 @@ export type OactlIo = Readonly<{
   stderr(value: string): void;
 }>;
 
+export type OactlVerbContribution = Readonly<{
+  verb: string;
+  run(args: readonly string[]): Promise<number>;
+}>;
+
 export function assertNoCoreVerbCollisions(contributions: readonly OactlVerbContribution[]): void {
   if (contributions.some((contribution) => CORE_VERB_NAMES.includes(contribution.verb as never))) {
     throw new ObservationError("OBSERVATION_DUPLICATE_VERB");
   }
+}
+
+function requireVerb(candidate: unknown): OactlVerbContribution {
+  if (candidate === null || typeof candidate !== "object") {
+    throw new ObservationError("OBSERVATION_VERB_INVALID");
+  }
+  const contribution = candidate as Partial<OactlVerbContribution>;
+  if (typeof contribution.verb !== "string"
+    || !/^[a-z][a-z0-9-]*$/u.test(contribution.verb)
+    || typeof contribution.run !== "function") {
+    throw new ObservationError("OBSERVATION_VERB_INVALID");
+  }
+  return Object.freeze(contribution as OactlVerbContribution);
+}
+
+async function importDefault(path: string): Promise<unknown> {
+  const imported = await import(pathToFileURL(path).href) as Readonly<{ default?: unknown }>;
+  return imported.default;
+}
+
+async function moduleVerbFiles(moduleRoot: string): Promise<readonly string[]> {
+  const root = join(moduleRoot, "oactl");
+  try {
+    return (await readdir(root, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+      .map((entry) => join(root, entry.name))
+      .sort();
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+export async function discoverObservationCommandVerbs(
+  modulesRoot: string
+): Promise<readonly OactlVerbContribution[]> {
+  await discoverObservationRuntimeModules(modulesRoot);
+  const directories = (await readdir(modulesRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const verbs: OactlVerbContribution[] = [];
+  const verbNames = new Set<string>();
+
+  for (const directory of directories) {
+    const moduleRoot = join(modulesRoot, directory);
+    const modulePath = join(moduleRoot, "module.ts");
+    try {
+      await access(modulePath);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") continue;
+      throw error;
+    }
+    const candidates = await Promise.all((await moduleVerbFiles(moduleRoot)).map(importDefault));
+    for (const candidate of candidates) {
+      const contribution = requireVerb(candidate);
+      if (verbNames.has(contribution.verb)) {
+        throw new ObservationError("OBSERVATION_DUPLICATE_VERB");
+      }
+      verbNames.add(contribution.verb);
+      verbs.push(contribution);
+    }
+  }
+
+  return Object.freeze(verbs);
 }
 
 type Context = Readonly<{
@@ -245,14 +314,14 @@ export async function runOactl(
   try {
     if (verb === undefined) throw new ObservationError("OBSERVATION_VERB_REQUIRED");
     const context = contextInput ?? defaultContext();
-    const catalog = await discoverObservationModules(
+    const contributions = await discoverObservationCommandVerbs(
       join(context.repoRoot, "apps", "observation-agent", "src", "modules")
     );
-    assertNoCoreVerbCollisions(catalog.verbs);
+    assertNoCoreVerbCollisions(contributions);
     if (CORE_VERB_NAMES.includes(verb as never)) {
       return await runCoreVerb(verb as typeof CORE_VERB_NAMES[number], argv.slice(1), io, context);
     }
-    const contribution = catalog.verbs.find((candidate) => candidate.verb === verb);
+    const contribution = contributions.find((candidate) => candidate.verb === verb);
     if (contribution === undefined) throw new ObservationError("OBSERVATION_VERB_UNKNOWN");
     const code = await contribution.run(argv.slice(1));
     return Number.isInteger(code) ? code : 1;

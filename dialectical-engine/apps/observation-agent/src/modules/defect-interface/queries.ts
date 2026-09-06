@@ -1,4 +1,4 @@
-import pg from "pg";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import type {
   ClaimedWorkItem,
   InFlightRunProgress,
@@ -94,16 +94,8 @@ export async function readDefectInputsFromClient(client: QueryClient): Promise<D
   });
 }
 
-export async function readDefectInputs(databaseUrl: string): Promise<DefectQueryInputs> {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  try {
-    const client = await pool.connect();
-    try {
-      return await readDefectInputsFromClient(client);
-    } finally {
-      client.release();
-    }
-  } finally {
-    await pool.end();
-  }
+export async function readDefectInputs(
+  database: ObservationDatabasePort
+): Promise<DefectQueryInputs> {
+  return database.withClient(readDefectInputsFromClient);
 }

@@ -1,4 +1,4 @@
-import pg from "pg";
+import type { ObservationDatabasePort } from "../../core/database.js";
 
 export type PostgresCapacitySnapshot = Readonly<{
   usedConnections: number;
@@ -86,14 +86,12 @@ export function postgresCapacityParameters(
 }
 
 export async function readPostgresCapacity(
-  databaseUrl: string,
+  database: ObservationDatabasePort,
   observedAt: Date,
   thresholds: PostgresCapacityQueryThresholds
 ): Promise<PostgresCapacitySnapshot> {
   const parameters = postgresCapacityParameters(thresholds) as [number, number];
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  const client = await pool.connect();
-  try {
+  return database.withClient(async (client) => {
     await client.query("BEGIN");
     await client.query("SET LOCAL statement_timeout = 2000");
     await client.query("SET LOCAL ROLE pg_monitor");
@@ -120,11 +118,5 @@ export async function readPostgresCapacity(
       hatchetDatabaseBytes: finite(row.hatchet_database_bytes, "hatchet_database_bytes"),
       observedAt
     });
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-    await pool.end();
-  }
+  });
 }

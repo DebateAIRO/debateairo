@@ -1,4 +1,4 @@
-import pg from "pg";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import type {
   Module,
   ModuleStatusProjection,
@@ -16,13 +16,12 @@ export type ProviderCall = Readonly<{
 }>;
 
 export type ProviderHealthDependencies = Readonly<{
-  readCalls(databaseUrl: string): Promise<readonly ProviderCall[]>;
+  readCalls(database: ObservationDatabasePort): Promise<readonly ProviderCall[]>;
 }>;
 
-async function readCalls(databaseUrl: string): Promise<readonly ProviderCall[]> {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  try {
-    const result = await pool.query<{
+async function readCalls(database: ObservationDatabasePort): Promise<readonly ProviderCall[]> {
+  return database.withClient(async (client) => {
+    const result = await client.query<{
       provider_ref: string; model_id: string; parse_status: string; at_seq: string;
     }>(`SELECT calls.provider_ref,calls.model_id,calls.parse_status,calls.at_seq::text
         FROM obs.provider_call_v AS calls
@@ -34,9 +33,7 @@ async function readCalls(databaseUrl: string): Promise<readonly ProviderCall[]> 
       parseStatus: row.parse_status,
       atSequence: Number(row.at_seq)
     })));
-  } finally {
-    await pool.end();
-  }
+  });
 }
 
 const productionDependencies: ProviderHealthDependencies = Object.freeze({ readCalls });
@@ -67,7 +64,7 @@ export function createProviderHealthModule(
       restore: tracker.restore
     }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
-      const calls = await dependencies.readCalls(ctx.databaseUrl);
+      const calls = await dependencies.readCalls(ctx.database);
       for (const call of calls) {
         if (!Number.isSafeInteger(call.atSequence) || call.atSequence < 0) {
           throw new TypeError("OBSERVATION_PROVIDER_SEQUENCE_INVALID");

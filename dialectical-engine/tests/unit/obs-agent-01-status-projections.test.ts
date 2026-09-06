@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const scratchDirectories: string[] = [];
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 afterEach(async () => {
   await Promise.all(scratchDirectories.splice(0).map((path) =>
@@ -151,7 +154,7 @@ async function runProjection(projection: unknown): Promise<unknown> {
     }],
     now: new Date("2026-09-04T08:00:00.000Z"),
     timeoutMs: 2_000,
-    databaseUrl: "postgresql://agent:test@127.0.0.1:55432/debateai",
+    database,
     stateDir: "/tmp/observation-state",
     targets: [],
     thresholdVersion: 1

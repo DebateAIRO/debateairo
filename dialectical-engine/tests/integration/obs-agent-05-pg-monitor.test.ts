@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
+import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import { readPostgresCapacity } from "../../apps/observation-agent/src/modules/postgres-capacity/query.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -45,7 +46,7 @@ describe("OBS-05 pg_monitor migration and numeric query", () => {
 
   it("returns only finite numeric statistics and both fixed database sizes", async () => {
     const observedAt = new Date("2026-09-03T08:00:00.000Z");
-    const result = await readPostgresCapacity(fixture().connectionString, observedAt, {
+    const result = await readPostgresCapacity(createObservationDatabasePort(fixture().pool), observedAt, {
       lockWaitSeconds: 60,
       idleInTransactionSeconds: 120
     });

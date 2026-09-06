@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import pg from "pg";
 import { loadObservationAgentEnvironment } from "../../../packages/register/src/runtime-environment.js";
+import { createObservationDaemonDatabase } from "./core/database.js";
 import { ObservationError, normalizeObservationError } from "./core/errors.js";
 import type { SignalLifecycleIdentity } from "./core/lifecycle.js";
-import { createOwnedSignalRouter, discoverObservationModules } from "./core/modules.js";
+import { createOwnedSignalRouter, discoverObservationRuntimeModules } from "./core/modules.js";
 import { observationRepoRoot } from "./core/paths.js";
 import { ObservationModuleRuntime, parseModuleStatusProjection } from "./core/runtime.js";
 import { createLegacyOsaScriptRouter, type SignalRouter } from "./core/routing.js";
@@ -63,7 +64,7 @@ async function boot(): Promise<void> {
   } catch (error) {
     throw new ObservationError("OBSERVATION_ENV_INVALID", error);
   }
-  const moduleCatalog = await discoverObservationModules(join(import.meta.dirname, "modules"));
+  const moduleCatalog = await discoverObservationRuntimeModules(join(import.meta.dirname, "modules"));
   const targetCatalog = await loadObservationTargetCatalog(environment.OBSERVATION_TARGETS_PATH);
   const ownedTargetFragments = new Set(moduleCatalog.targetFragments);
   if (targetCatalog.fragments.some((fragment) => !ownedTargetFragments.has(fragment.basename))) {
@@ -97,9 +98,9 @@ async function boot(): Promise<void> {
     await bootstrapPool.end();
   }
 
-  const pool = new pg.Pool({
+  const { pool, database } = createObservationDaemonDatabase({
     connectionString: environment.OBSERVATION_DATABASE_URL,
-    max: policy.value.resources.max_database_sessions
+    policy
   });
   const repository = new ThresholdRepository(pool);
   const mirror = new PostgresMirror(pool);
@@ -299,7 +300,7 @@ async function boot(): Promise<void> {
       modules: moduleCatalog.modules,
       now,
       timeoutMs: policy.value.liveness.probe_timeout_ms,
-      databaseUrl: environment.OBSERVATION_DATABASE_URL,
+      database,
       stateDir: environment.OBSERVATION_STATE_DIR,
       repoRoot,
       targets,

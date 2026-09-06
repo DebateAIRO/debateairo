@@ -1,4 +1,4 @@
-import pg from "pg";
+import type { ObservationDatabasePort } from "../../core/database.js";
 
 export const CAPTURE_CURSOR_KEYS = Object.freeze({
   captureGap: "obs04.cursor.capture_gap",
@@ -174,16 +174,8 @@ export async function readCaptureSnapshotFromClient(client: QueryClient): Promis
   }
 }
 
-export async function readCaptureSnapshot(databaseUrl: string): Promise<CaptureSnapshot> {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  try {
-    const client = await pool.connect();
-    try {
-      return await readCaptureSnapshotFromClient(client);
-    } finally {
-      client.release();
-    }
-  } finally {
-    await pool.end();
-  }
+export async function readCaptureSnapshot(
+  database: ObservationDatabasePort
+): Promise<CaptureSnapshot> {
+  return database.withClient(readCaptureSnapshotFromClient);
 }

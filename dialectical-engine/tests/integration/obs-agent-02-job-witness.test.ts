@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   createScheduleTracker,
-  projectJobWitnessStatus,
-  runWitnessCommand
+  projectJobWitnessStatus
 } from "../../apps/observation-agent/src/modules/job-witness/witness.js";
+import { runWitnessCommand } from "../../apps/observation-agent/src/modules/job-witness/oactl/support/command.js";
 
 describe("OBS-02 scheduler completion witness", () => {
   it("records one parsed JSON receipt and preserves the child's exact exit code", async () => {

@@ -4,6 +4,9 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const scratchDirectories: string[] = [];
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 afterEach(async () => {
   await Promise.all(scratchDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -57,7 +60,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
 
     const requiredMembers = ["cadence", "name", "probe", "samples", "signals"];
     const allowedMembers = new Set([
-      ...requiredMembers, "lifecycle", "oactl", "router", "targetFragmentBasename"
+      ...requiredMembers, "lifecycle", "router", "targetFragmentBasename"
     ]);
     for (const module of catalog.modules) {
       const members = Object.keys(module);
@@ -261,8 +264,8 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
   });
 
   it("loads module-owned oactl files lexically and rejects a duplicate verb", async () => {
-    const { discoverObservationModules } = await import(
-      "../../apps/observation-agent/src/core/modules.js"
+    const { discoverObservationCommandVerbs } = await import(
+      "../../apps/observation-agent/src/oactl/core/commands.js"
     );
     const root = await scratch();
     await writeModule(root, "a", "a");
@@ -275,7 +278,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
         "utf8"
       );
     }
-    await expect(discoverObservationModules(root)).rejects.toMatchObject({
+    await expect(discoverObservationCommandVerbs(root)).rejects.toMatchObject({
       code: "OBSERVATION_DUPLICATE_VERB"
     });
   });
@@ -555,7 +558,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       modules: [module("hatchet-throughput", "OBS-06.json"), module("channels-sendmail", "OBS-07.json")],
       now: new Date(`2026-09-03T07:30:${String(second).padStart(2, "0")}.000Z`),
       timeoutMs: 2_000,
-      databaseUrl: "postgresql://agent:test@127.0.0.1:55432/debateai",
+      database,
       stateDir: "/tmp/observation-state",
       targets: catalog.targets,
       targetFragments: catalog.fragments,
@@ -625,7 +628,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
       }],
       now: new Date("2026-09-03T07:30:00.000Z"),
       timeoutMs: 2_000,
-      databaseUrl: "postgresql://agent:test@127.0.0.1:55432/debateai",
+      database,
       stateDir: "/tmp/observation-state",
       targets: [],
       thresholdVersion: 1
@@ -669,7 +672,7 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     const input = {
       now: new Date("2026-09-03T07:30:00.000Z"),
       timeoutMs: 2_000,
-      databaseUrl: "postgresql://agent:test@127.0.0.1:55432/debateai",
+      database,
       stateDir: "/tmp/observation-state",
       targets: [],
       thresholdVersion: 1

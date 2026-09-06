@@ -8,6 +8,9 @@ import { createCertificateCapacityTracker } from "../../apps/observation-agent/s
 
 const now = new Date("2026-09-03T12:00:00.000Z");
 const scratchDirectories: string[] = [];
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 afterEach(async () => {
   await Promise.all(scratchDirectories.splice(0).map((path) =>
@@ -73,7 +76,7 @@ describe("OBS-05 certificate capacity", () => {
     expect(module.cadence).toEqual({ intervalMs: 86_400_000, timeoutMs: 2_000 });
     expect(module.targetFragmentBasename).toBe("OBS-05.json");
     const observations = await module.probe({
-      now, timeoutMs: 2_000, databaseUrl: "unused", stateDir: "unused",
+      now, timeoutMs: 2_000, database, stateDir: "unused",
       repoRoot: resolve(import.meta.dirname, "../.."), targets: [],
       targetFragment, configuration: {}, thresholds: {}
     });

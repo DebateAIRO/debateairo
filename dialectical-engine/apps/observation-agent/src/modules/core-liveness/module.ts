@@ -9,7 +9,7 @@ const coreLivenessModule: Module = Object.freeze({
     return runCoreLivenessProbes({
       now: ctx.now,
       timeoutMs: ctx.timeoutMs,
-      databaseUrl: ctx.databaseUrl,
+      database: ctx.database,
       stateDir: ctx.stateDir,
       targets: ctx.targets
     });

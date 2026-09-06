@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readHostCapacity } from "../../apps/observation-agent/src/modules/host-capacity/commands.js";
 import { createHostCapacityModule } from "../../apps/observation-agent/src/modules/host-capacity/module.js";
 
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
+
 describe("OBS-05 Docker and host collection", () => {
   it("executes only frozen read-only requests and emits numeric container samples", async () => {
     const calls: string[] = [];
@@ -39,7 +43,7 @@ describe("OBS-05 Docker and host collection", () => {
 
     const module = createHostCapacityModule({ readSnapshot: async () => snapshot });
     const observations = await module.probe({
-      now: observedAt, timeoutMs: 2_000, databaseUrl: "unused", stateDir: "unused",
+      now: observedAt, timeoutMs: 2_000, database, stateDir: "unused",
       targets: [], targetFragment: null, configuration: {}, thresholds: {}
     });
     const samples = module.samples(observations, { now: observedAt });

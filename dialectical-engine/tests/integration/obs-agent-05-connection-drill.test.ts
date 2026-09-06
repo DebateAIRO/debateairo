@@ -4,6 +4,10 @@ import { renderImpact, type ObservationSignal } from "../../apps/observation-age
 import { createPostgresCapacityModule } from "../../apps/observation-agent/src/modules/postgres-capacity/module.js";
 import { measuredConnectionEvidence } from "../../apps/observation-agent/src/modules/postgres-capacity/tracker.js";
 
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
+
 describe("OBS-05 measured connection drill", () => {
   it("binds B+25 acceptance, evidence and copy to measured U within the 35-second budget", async () => {
     const baseline = 4;
@@ -34,7 +38,7 @@ describe("OBS-05 measured connection drill", () => {
       async emitSignal(signal) { emitted.push(signal); }
     });
     await runtime.run({
-      modules: [module], now: observedAt, timeoutMs: 2_000, databaseUrl: "unused",
+      modules: [module], now: observedAt, timeoutMs: 2_000, database,
       stateDir: "unused", targets: [], thresholdVersion: 2,
       moduleThresholds: { "postgres-capacity": { connections_severe_percent: 20 } }
     });

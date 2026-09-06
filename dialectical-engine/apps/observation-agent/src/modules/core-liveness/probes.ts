@@ -1,7 +1,7 @@
 import { rename, mkdir, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { join } from "node:path";
-import pg from "pg";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import type { ObservationComponent, ProbeObservation } from "../../core/types.js";
 import {
   observationTargetSchema,
@@ -24,7 +24,7 @@ export type ProbeDependencies = Readonly<{
   runDocker?: (command: "info", operands: readonly string[], timeoutMs: number) => Promise<DockerResult>;
   queryPostgres?: (
     target: PostgresTarget,
-    databaseUrl: string,
+    database: ObservationDatabasePort,
     timeoutMs: number
   ) => Promise<void>;
 }>;
@@ -64,29 +64,25 @@ async function inspectContainer(container: string, timeoutMs: number): Promise<C
 
 async function queryPostgres(
   target: PostgresTarget,
-  databaseUrl: string,
+  database: ObservationDatabasePort,
   timeoutMs: number
 ): Promise<void> {
   await tcpProbe(target.host, target.port, timeoutMs);
-  const client = new pg.Client({ connectionString: databaseUrl });
-  try {
-    await client.connect();
+  await database.withClient(async (client) => {
     await client.query(`SET statement_timeout = ${Math.trunc(timeoutMs)}`);
     await client.query("SELECT 1");
-  } finally {
-    await client.end().catch(() => undefined);
-  }
+  });
 }
 
 export async function probePostgres(
   target: PostgresTarget,
-  databaseUrl: string,
+  database: ObservationDatabasePort,
   dependencies: ProbeDependencies
 ): Promise<ProbeObservation> {
   const inspect = dependencies.inspectContainer ?? inspectContainer;
   const query = dependencies.queryPostgres ?? queryPostgres;
   try {
-    await query(target, databaseUrl, dependencies.timeoutMs);
+    await query(target, database, dependencies.timeoutMs);
     const container = await inspect(target.container, dependencies.timeoutMs);
     return Object.freeze({
       component: "postgres", ok: container.status === "running", class: "INFRA_DOWN",
@@ -194,7 +190,7 @@ export function classifyContainerWhenDockerUnavailable(
 export async function runCoreLivenessProbes(input: Readonly<{
   now: Date;
   timeoutMs: number;
-  databaseUrl: string;
+  database: ObservationDatabasePort;
   stateDir: string;
   targets: readonly unknown[];
 }>): Promise<readonly ProbeObservation[]> {
@@ -207,7 +203,7 @@ export async function runCoreLivenessProbes(input: Readonly<{
     if (target.kind === "docker") continue;
     if (target.kind === "postgres") {
       observations.push(docker.ok
-        ? await probePostgres(target, input.databaseUrl, { timeoutMs: input.timeoutMs })
+        ? await probePostgres(target, input.database, { timeoutMs: input.timeoutMs })
         : classifyContainerWhenDockerUnavailable("postgres"));
     } else if (target.kind === "hatchet") {
       observations.push(docker.ok

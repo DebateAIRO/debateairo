@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
+import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import { PostgresMirror } from "../../apps/observation-agent/src/store/postgres.js";
 import { createCaptureHealthModule } from "../../apps/observation-agent/src/modules/capture-health/module.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -50,7 +51,7 @@ describe("OBS-04 isolated gap drill", () => {
     });
     const run = (now: Date) => runtime.run({
       modules: [module], now, timeoutMs: 2_000,
-      databaseUrl: db().connectionString, stateDir: "/tmp/obs-04-isolated-state",
+      database: createObservationDatabasePort(db().pool), stateDir: "/tmp/obs-04-isolated-state",
       targets: [], thresholdVersion: 1,
       moduleThresholds: { "capture-health": {
         expected_runtimes: ["runner"], detector_interval_ms: 15_000,

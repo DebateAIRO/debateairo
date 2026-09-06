@@ -71,7 +71,7 @@ describe("OBS-06 stimulus-only fixture and projections", () => {
     try {
       await migrate(database.pool);
       await runFixture({
-        pool: database.pool, databaseUrl: database.connectionString, stateDir,
+        pool: database.pool, stateDir,
         firstSeq: 60_600, now
       });
       const signals = await database.pool.query<{

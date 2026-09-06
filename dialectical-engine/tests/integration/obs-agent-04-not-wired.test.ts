@@ -6,6 +6,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const modulePath = "apps/observation-agent/src/modules/capture-health/module.ts";
 const temporaryDirectories: string[] = [];
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 const at = (day: number, seconds = 0) =>
   new Date(Date.UTC(2026, 8, day, 8, 0, seconds));
 
@@ -32,7 +35,7 @@ function snapshot(input: Readonly<{
 
 function context(now: Date, stateDir: string) {
   return {
-    now, timeoutMs: 2_000, databaseUrl: "postgresql://isolated/obs04",
+    now, timeoutMs: 2_000, database,
     stateDir, targets: [], targetFragment: null, configuration: {},
     thresholds: {
       detector_interval_ms: 15_000, blind_window_s: 120,

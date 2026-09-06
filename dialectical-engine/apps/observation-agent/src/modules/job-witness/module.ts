@@ -16,7 +16,7 @@ const jobWitnessModule: Module = Object.freeze({
     restore: tracker.restore
   }),
   async probe(ctx) {
-    const completions = await readLastJobCompletions(ctx.databaseUrl).catch(() => Object.freeze([]));
+    const completions = await readLastJobCompletions(ctx.database).catch(() => Object.freeze([]));
     const projected = projectJobWitnessStatus(completions, ctx.thresholds);
     pendingIntents = tracker.observe(completions, ctx.thresholds, ctx.now);
     return Object.freeze([Object.freeze({

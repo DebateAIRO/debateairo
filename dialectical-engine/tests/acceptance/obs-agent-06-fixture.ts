@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pg, { type Pool } from "pg";
 import { migrate } from "../../packages/db/src/index.js";
+import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import type { ModuleStatusProjection } from "../../apps/observation-agent/src/core/types.js";
 import { ObservationJournal } from "../../apps/observation-agent/src/journal/journal.js";
@@ -136,7 +137,6 @@ async function seedOpenAnomalyInput(pool: Pool, now: Date): Promise<void> {
 
 export async function runOpenAnomalyFixture(input: Readonly<{
   pool: Pool;
-  databaseUrl: string;
   stateDir: string;
   firstSeq: number;
   now: Date;
@@ -180,7 +180,7 @@ export async function runOpenAnomalyFixture(input: Readonly<{
     modules,
     now: input.now,
     timeoutMs: 2_000,
-    databaseUrl: input.databaseUrl,
+    database: createObservationDatabasePort(input.pool),
     stateDir: input.stateDir,
     targets: Object.freeze([target]),
     targetFragments: Object.freeze([Object.freeze({
@@ -238,7 +238,7 @@ async function main(): Promise<void> {
     await migrate(pool);
     if (parsed.mode === "open-anomalies") {
       await runOpenAnomalyFixture({
-        pool, databaseUrl: plan.databaseUrl, stateDir: plan.stateDir,
+        pool, stateDir: plan.stateDir,
         firstSeq: plan.firstSeq, now: new Date()
       });
     } else {

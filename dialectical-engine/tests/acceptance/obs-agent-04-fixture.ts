@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
 import { migrate } from "../../packages/db/src/index.js";
+import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import type { ModuleStatusProjection } from "../../apps/observation-agent/src/core/types.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import { ObservationJournal } from "../../apps/observation-agent/src/journal/journal.js";
@@ -149,8 +150,8 @@ function fixtureCaptureModule(
   liveness: "UP" | "DOWN"
 ) {
   return createCaptureHealthModule({
-    readSnapshot: async (databaseUrl): Promise<CaptureSnapshot> => {
-      const snapshot = await readCaptureSnapshot(databaseUrl);
+    readSnapshot: async (database): Promise<CaptureSnapshot> => {
+      const snapshot = await readCaptureSnapshot(database);
       if (snapshot.state === "UNKNOWN") return snapshot;
       return Object.freeze({
         ...snapshot,
@@ -177,6 +178,7 @@ async function runOpenFixture(plan: ReturnType<typeof planAcceptanceFixture>): P
   let projections: readonly ModuleStatusProjection[] = Object.freeze([]);
   try {
     await migrate(pool);
+    const database = createObservationDatabasePort(pool);
     await applyGapStimulus(pool, {
       gapId,
       source: "obs04_acceptance",
@@ -204,7 +206,7 @@ async function runOpenFixture(plan: ReturnType<typeof planAcceptanceFixture>): P
     });
     await runtime.run({
       modules: [fixtureCaptureModule(detectedAt, "UP")],
-      now: detectedAt, timeoutMs: 2_000, databaseUrl: plan.databaseUrl,
+      now: detectedAt, timeoutMs: 2_000, database,
       stateDir: plan.stateDir, targets: Object.freeze([]), thresholdVersion: 1,
       moduleThresholds: Object.freeze({ "capture-health": Object.freeze({
         expected_runtimes: Object.freeze(["runner"]), detector_interval_ms: 15_000,
@@ -250,6 +252,7 @@ async function runCloseFixture(): Promise<void> {
   };
   const detectedAt = new Date();
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+  const database = createObservationDatabasePort(pool);
   try {
     const journal = new ObservationJournal(stateDir);
     const mirror = new PostgresMirror(pool);
@@ -273,7 +276,7 @@ async function runCloseFixture(): Promise<void> {
     });
     const module = fixtureCaptureModule(detectedAt, "DOWN");
     const run = (now: Date) => runtime.run({
-      modules: [module], now, timeoutMs: 2_000, databaseUrl,
+      modules: [module], now, timeoutMs: 2_000, database,
       stateDir, targets: Object.freeze([]), thresholdVersion: 1,
       moduleThresholds: Object.freeze({ "capture-health": Object.freeze({
         expected_runtimes: Object.freeze(["runner"]), detector_interval_ms: 15_000,

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import type { RouterCurrentContext } from "../../apps/observation-agent/src/core/routing.js";
 import { migrate } from "../../packages/db/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -492,7 +493,7 @@ describe("OBS-01 journal mirror and osascript delivery", () => {
           modules: catalog.modules,
           now: new Date(`2026-09-03T07:20:${String(second).padStart(2, "0")}.000Z`),
           timeoutMs: 2_000,
-          databaseUrl: database.connectionString,
+          database: createObservationDatabasePort(database.pool),
           stateDir: moduleStateDir,
           targets: [],
           moduleThresholds: { routing: currentModule.thresholds },

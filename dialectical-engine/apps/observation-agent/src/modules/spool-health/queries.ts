@@ -1,4 +1,4 @@
-import pg from "pg";
+import type { ObservationDatabasePort } from "../../core/database.js";
 
 export type SpoolReceiptSnapshot = Readonly<{
   state: "CURRENT" | "UNKNOWN";
@@ -37,20 +37,12 @@ export async function readSpoolReceiptsFromClient(
 }
 
 export async function readSpoolReceipts(
-  databaseUrl: string,
+  database: ObservationDatabasePort,
   refs: readonly string[]
 ): Promise<SpoolReceiptSnapshot> {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
   try {
-    const client = await pool.connect();
-    try {
-      return await readSpoolReceiptsFromClient(client, refs);
-    } finally {
-      client.release();
-    }
+    return await database.withClient((client) => readSpoolReceiptsFromClient(client, refs));
   } catch {
     return Object.freeze({ state: "UNKNOWN", refs: Object.freeze([]) });
-  } finally {
-    await pool.end();
   }
 }

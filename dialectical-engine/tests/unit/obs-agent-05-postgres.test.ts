@@ -6,6 +6,9 @@ import {
 } from "../../apps/observation-agent/src/modules/postgres-capacity/query.js";
 
 const at = (seconds: number) => new Date(1_800_500_000_000 + seconds * 1_000);
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 function snapshot(overrides: Partial<PostgresCapacitySnapshot> = {}): PostgresCapacitySnapshot {
   return Object.freeze({
@@ -28,7 +31,7 @@ function context(now = at(0), thresholds: Readonly<Record<string, number>> = {})
   return {
     now,
     timeoutMs: 2_000,
-    databaseUrl: "postgresql://fixture.invalid/debateai",
+    database,
     stateDir: "/tmp/obs-05-fixture",
     targets: [],
     targetFragment: null,
@@ -63,7 +66,7 @@ describe("OBS-05 Postgres capacity", () => {
     await module.probe(context(contextNow, { lock_wait_s: 7, idle_in_transaction_s: 11 }));
 
     expect(readSnapshot).toHaveBeenCalledWith(
-      "postgresql://fixture.invalid/debateai",
+      database,
       contextNow,
       { lockWaitSeconds: 7, idleInTransactionSeconds: 11 }
     );
@@ -83,7 +86,7 @@ describe("OBS-05 Postgres capacity", () => {
     expect(() => parameters({ lockWaitSeconds: 7, idleInTransactionSeconds: -1 }))
       .toThrow("OBSERVATION_POSTGRES_CAPACITY_INVALID:idleInTransactionSeconds");
     await expect(readPostgresCapacity(
-      "postgresql://[invalid",
+      database,
       at(0),
       { lockWaitSeconds: -1, idleInTransactionSeconds: 11 }
     )).rejects.toThrow("OBSERVATION_POSTGRES_CAPACITY_INVALID:lockWaitSeconds");

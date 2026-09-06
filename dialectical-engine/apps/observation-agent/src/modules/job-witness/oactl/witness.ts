@@ -1,4 +1,4 @@
-import { runWitnessCommand } from "../witness.js";
+import { runWitnessCommand } from "./support/command.js";
 
 export default Object.freeze({
   verb: "witness",

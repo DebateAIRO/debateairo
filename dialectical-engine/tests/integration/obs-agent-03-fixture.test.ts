@@ -3,6 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const fixturePath = "tests/acceptance/obs-agent-03-fixture.ts";
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 async function fixtureModule() {
   if (!existsSync(fixturePath)) return null;
@@ -99,7 +102,7 @@ describe("OBS-03 stimulus-only acceptance fixture", () => {
       }
     });
     const context = (now: Date) => ({
-      now, timeoutMs: 2_000, databaseUrl: "postgresql://test@127.0.0.1/test",
+      now, timeoutMs: 2_000, database,
       stateDir: "/tmp/state", targets: [], targetFragment: null, configuration: {},
       thresholds: {
         claim_grace_s: 15, ready_age_s: 120, no_progress_s: 300,

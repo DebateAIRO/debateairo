@@ -1,4 +1,5 @@
 import { loadObservationAgentEnvironment } from "../../../../../packages/register/src/runtime-environment.js";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import type {
   Module,
   ModuleConfigurationObject,
@@ -25,7 +26,7 @@ type HeartbeatInput = Parameters<typeof readWorkerHeartbeat>[0];
 export type StallDetectorDependencies = Readonly<{
   tokenPath(): string | undefined;
   readHeartbeat(input: HeartbeatInput): Promise<WorkerHeartbeatSnapshot>;
-  readDefectInputs(databaseUrl: string): Promise<DefectQueryInputs>;
+  readDefectInputs(database: ObservationDatabasePort): Promise<DefectQueryInputs>;
 }>;
 
 const productionDependencies: StallDetectorDependencies = Object.freeze({
@@ -118,7 +119,7 @@ export function createStallDetectorsModule(
       });
       let postgres: "UP" | "UNKNOWN" = "UP";
       try {
-        queryInputs = await dependencies.readDefectInputs(ctx.databaseUrl);
+        queryInputs = await dependencies.readDefectInputs(ctx.database);
       } catch {
         postgres = "UNKNOWN";
       }

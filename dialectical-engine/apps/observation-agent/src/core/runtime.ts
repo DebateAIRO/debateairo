@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ObservationDatabasePort } from "./database.js";
 import { ObservationError } from "./errors.js";
 import {
   signalLifecycleIdentitySchema,
@@ -437,7 +438,7 @@ export class ObservationModuleRuntime {
     modules: readonly Module[];
     now: Date;
     timeoutMs: number;
-    databaseUrl: string;
+    database: ObservationDatabasePort;
     stateDir: string;
     repoRoot: string;
     targets: readonly unknown[];
@@ -473,7 +474,7 @@ export class ObservationModuleRuntime {
         const output = await module.probe({
           now: input.now,
           timeoutMs: Math.min(input.timeoutMs, module.cadence.timeoutMs),
-          databaseUrl: input.databaseUrl,
+          database: input.database,
           stateDir: input.stateDir,
           repoRoot: input.repoRoot,
           targets: targetFragment?.targets ?? [],

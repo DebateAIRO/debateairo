@@ -4,6 +4,7 @@ import type {
   ProbeObservation,
   SignalIntent
 } from "../../core/types.js";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import {
   readSpoolReceipts,
   type SpoolReceiptSnapshot
@@ -21,7 +22,7 @@ export type SpoolHealthDependencies = Readonly<{
     now: Date;
     thresholdSeconds: number;
   }>): Promise<SpoolScan>;
-  readReceipts(databaseUrl: string, refs: readonly string[]): Promise<SpoolReceiptSnapshot>;
+  readReceipts(database: ObservationDatabasePort, refs: readonly string[]): Promise<SpoolReceiptSnapshot>;
 }>;
 
 const productionDependencies: SpoolHealthDependencies = Object.freeze({
@@ -68,7 +69,7 @@ export function createSpoolHealthModule(
       const receipts = scan.state === "UNKNOWN"
         ? Object.freeze({ state: "UNKNOWN" as const, refs: Object.freeze([]) })
         : await resolved.readReceipts(
-            ctx.databaseUrl,
+            ctx.database,
             scan.files.map((file) => file.spoolRef)
           );
       const cycle = tracker.observe({ scan, receipts, now: ctx.now, thresholdSeconds });

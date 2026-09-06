@@ -17,10 +17,13 @@ describe("OBS-05 SQL privacy and resource boundary", () => {
     expect(source).not.toMatch(/pg_stat_statements|fingerprint|statement_text|sql_text/iu);
   });
 
-  it("uses one bounded session, the 2000 ms timeout, and no literal drill numerator", async () => {
+  it("uses the shared database port, transaction-local role, and no literal drill numerator", async () => {
     const source = await productionSource();
-    expect(source).toContain("max: 1");
+    expect(source).toContain("database: ObservationDatabasePort");
+    expect(source).toContain("return database.withClient(async (client) => {");
+    expect(source).not.toMatch(/new pg\.(?:Pool|Client)\s*\(/u);
     expect(source).toContain("SET LOCAL statement_timeout = 2000");
+    expect(source).toContain("SET LOCAL ROLE pg_monitor");
     expect(source).not.toMatch(/(?:usedConnections|\bused\b)\s*[:=]\s*25\b/u);
     expect(source).not.toMatch(/25\s*\/\s*100/u);
   });

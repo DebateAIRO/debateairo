@@ -1,5 +1,6 @@
 import type { ImpactCode, ObservationSignal, Severity } from "./signals.js";
 import type { SignalRouterFactory } from "./routing.js";
+import type { ObservationDatabasePort } from "./database.js";
 
 export type RestoredOpenSignal = Readonly<{
   correlationKey: string;
@@ -240,7 +241,7 @@ export type SignalIntent = Readonly<{
 export type ProbeContext = Readonly<{
   now: Date;
   timeoutMs: number;
-  databaseUrl: string;
+  database: ObservationDatabasePort;
   stateDir: string;
   repoRoot: string;
   targets: readonly unknown[];
@@ -258,17 +259,11 @@ export type SignalContext = Readonly<{
   thresholds: ModuleConfigurationObject;
 }>;
 
-export type OactlVerbContribution = Readonly<{
-  verb: string;
-  run(args: readonly string[]): Promise<number>;
-}>;
-
 export type ObservationModuleManifest = Readonly<{
   name: string;
   cadence: Readonly<{ intervalMs: number; timeoutMs: number }>;
   lifecycle?: ModuleLifecycle;
   targetFragmentBasename?: string;
-  oactl?: readonly OactlVerbContribution[];
   router?: SignalRouterFactory;
   probe(ctx: ProbeContext): Promise<readonly ProbeObservation[]>;
   samples(observations: readonly ProbeObservation[], ctx: SampleContext): readonly SampleIntent[];

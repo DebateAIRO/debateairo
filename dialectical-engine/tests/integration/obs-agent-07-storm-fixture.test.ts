@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { discoverObservationModules } from "../../apps/observation-agent/src/core/modules.js";
 import { loadObservationTargetCatalog } from "../../apps/observation-agent/src/core/targets.js";
+import { discoverObservationCommandVerbs } from "../../apps/observation-agent/src/oactl/core/commands.js";
 import { loadMergedThresholdPolicy } from "../../apps/observation-agent/src/oactl/core/thresholds.js";
 
 const fixturePath = "tests/acceptance/obs-agent-07-storm-fixture.ts";
@@ -13,7 +14,8 @@ describe("OBS-07 stimulus-only storm fixture", () => {
     expect(catalog.modules.map(({ name }) => name)).toEqual(expect.arrayContaining([
       "channels-sendmail", "channels-kanban", "routing", "status-page"
     ]));
-    expect(catalog.verbs.map(({ verb }) => verb)).toContain("ack");
+    expect((await discoverObservationCommandVerbs(resolve("apps/observation-agent/src/modules")))
+      .map(({ verb }) => verb)).toContain("ack");
     expect(catalog.routerContribution).toMatchObject({
       moduleName: "routing", targetFragmentBasename: "OBS-07.json"
     });

@@ -5,6 +5,10 @@ import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
 import { migrate } from "../../packages/db/src/index.js";
+import {
+  createObservationDatabasePort,
+  type ObservationDatabasePort
+} from "../../apps/observation-agent/src/core/database.js";
 import { signalSchema, type ObservationSignal } from "../../apps/observation-agent/src/core/signals.js";
 import type {
   Module,
@@ -181,11 +185,16 @@ async function armFinalInputs(
     `obs-03-success-${fixture.workItemIds[3]}`]);
 }
 
-function moduleContext(now: Date, databaseUrl: string, stateDir: string, targetsPath: string) {
+function moduleContext(
+  now: Date,
+  database: ObservationDatabasePort,
+  stateDir: string,
+  targetsPath: string
+) {
   return Object.freeze({
     now,
     timeoutMs: 2_000,
-    databaseUrl,
+    database,
     stateDir,
     targets: Object.freeze([]),
     targetFragment: Object.freeze({
@@ -348,6 +357,7 @@ async function runOpenFixture(plan: ReturnType<typeof planAcceptanceFixture>): P
   const origin = new Date("2026-09-03T08:00:00.000Z");
   try {
     await migrate(pool);
+    const database = createObservationDatabasePort(pool);
     const fixture = await seedOpenInputs(pool, origin);
     const module = createStallDetectorsModule({
       tokenPath: () => "/fixture/no-secret-read",
@@ -358,7 +368,7 @@ async function runOpenFixture(plan: ReturnType<typeof planAcceptanceFixture>): P
       manifest: module,
       origin,
       contextAt: (now) => moduleContext(
-        now, plan.databaseUrl, plan.stateDir, plan.targetsPath
+        now, database, plan.stateDir, plan.targetsPath
       ),
       prime: () => addReadyInput(pool, fixture),
       armFinal: () => armFinalInputs(pool, fixture)

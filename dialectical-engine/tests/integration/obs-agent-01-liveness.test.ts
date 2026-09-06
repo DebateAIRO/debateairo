@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -146,7 +147,7 @@ describe("OBS-01 four liveness probes and state transitions", () => {
       host: databaseUrl.hostname,
       port: Number(databaseUrl.port),
       container: "debateai-v3-postgres-1"
-    }, database.connectionString, {
+    }, createObservationDatabasePort(database.pool), {
       timeoutMs: 2_000,
       inspectContainer: async () => ({ status: "running", restartPolicy: "no", exitCode: 0 })
     });

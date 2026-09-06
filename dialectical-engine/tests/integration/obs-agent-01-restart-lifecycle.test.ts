@@ -50,6 +50,9 @@ import { DeliveryCoordinator } from "../../apps/observation-agent/src/notify/del
 const scratchDirectories: string[] = [];
 const start = new Date("2026-09-06T00:00:00.000Z");
 const originalId = "74000000-0000-4000-8000-000000000001";
+const database = Object.freeze({
+  async withClient<T>(): Promise<T> { throw new Error("UNUSED_DATABASE_PORT"); }
+});
 
 afterEach(async () => {
   await Promise.all(scratchDirectories.splice(0).map((path) =>
@@ -77,7 +80,7 @@ function runtimeInput(module: Module, now: Date) {
     modules: Object.freeze([module]),
     now,
     timeoutMs: 2_000,
-    databaseUrl: "postgresql://unavailable.invalid/observation",
+    database,
     stateDir: "/tmp/obs-agent-restart-fixture",
     repoRoot: "/tmp/obs-agent-restart-repo",
     targets: Object.freeze([]),
@@ -1910,7 +1913,7 @@ describe("canonical restored OPEN ownership", () => {
       port: 5432,
       container: "postgres-container"
     });
-    const failed = await probePostgres(target, "postgresql://fixture.invalid/debateai", {
+    const failed = await probePostgres(target, database, {
       timeoutMs: 2_000,
       async queryPostgres() {},
       async inspectContainer() {
@@ -1969,7 +1972,7 @@ describe("canonical restored OPEN ownership", () => {
       async emitSignal() {}
     })).not.toThrow();
 
-    const healthy = await probePostgres(target, "postgresql://fixture.invalid/debateai", {
+    const healthy = await probePostgres(target, database, {
       timeoutMs: 2_000,
       async queryPostgres() {},
       async inspectContainer() {

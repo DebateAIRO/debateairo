@@ -1,4 +1,7 @@
-import pg from "pg";
+import type {
+  ObservationDatabasePort,
+  ObservationQueryClient
+} from "../../core/database.js";
 import type { Module, ModuleStatusProjection, ProbeObservation, SampleIntent, SignalIntent } from "../../core/types.js";
 import { computeThroughputDelta, type ThroughputCounters } from "./deltas.js";
 import { THROUGHPUT_COUNTERS_SELECT } from "./queries.js";
@@ -13,7 +16,7 @@ export type ThroughputRead = Readonly<{
 
 export type ThroughputDependencies = Readonly<{
   read(
-    databaseUrl: string,
+    database: ObservationDatabasePort,
     now?: Date,
     fiveMinuteWindow?: number,
     hourlyWindow?: number
@@ -40,10 +43,10 @@ function counters(row: Readonly<Record<string, string>>): ThroughputCounters {
 }
 
 async function storedCounters(
-  pool: pg.Pool,
+  client: ObservationQueryClient,
   cutoff: Date | null
 ): Promise<ThroughputCounters | null> {
-  const stored = await pool.query<{ metric_key: string; value: string }>(`
+  const stored = await client.query<{ metric_key: string; value: string }>(`
     SELECT DISTINCT ON (metric_key) metric_key,value::text
     FROM observation.sample_ring
     WHERE metric_key = ANY($1::text[])
@@ -57,8 +60,8 @@ async function storedCounters(
   )) as ThroughputCounters;
 }
 
-async function rollupCompletedHours(pool: pg.Pool, now: Date): Promise<void> {
-  await pool.query(`
+async function rollupCompletedHours(client: ObservationQueryClient, now: Date): Promise<void> {
+  await client.query(`
     INSERT INTO observation.sample_hourly(
       sample_hourly_id,metric_key,hour,minimum,average,maximum,sample_count
     )
@@ -74,30 +77,31 @@ async function rollupCompletedHours(pool: pg.Pool, now: Date): Promise<void> {
 }
 
 async function read(
-  databaseUrl: string,
+  database: ObservationDatabasePort,
   now = new Date(),
   fiveMinuteWindow = 5,
   hourlyWindow = 60
 ): Promise<ThroughputRead> {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  try {
-    await rollupCompletedHours(pool, now);
-    const currentResult = await pool.query<Record<string, string>>(THROUGHPUT_COUNTERS_SELECT);
+  return database.withClient(async (client) => {
+    await rollupCompletedHours(client, now);
+    const currentResult = await client.query<Record<string, string>>(THROUGHPUT_COUNTERS_SELECT);
     const current = counters(currentResult.rows[0] ?? {});
-    const [previous, fiveMinuteBaseline, hourlyBaseline] = await Promise.all([
-      storedCounters(pool, null),
-      storedCounters(pool, new Date(now.getTime() - fiveMinuteWindow * 60_000)),
-      storedCounters(pool, new Date(now.getTime() - hourlyWindow * 60_000))
-    ]);
+    const previous = await storedCounters(client, null);
+    const fiveMinuteBaseline = await storedCounters(
+      client,
+      new Date(now.getTime() - fiveMinuteWindow * 60_000)
+    );
+    const hourlyBaseline = await storedCounters(
+      client,
+      new Date(now.getTime() - hourlyWindow * 60_000)
+    );
     return Object.freeze({
       current,
       previous: previous ?? current,
       fiveMinuteBaseline: fiveMinuteBaseline ?? current,
       hourlyBaseline: hourlyBaseline ?? current
     });
-  } finally {
-    await pool.end();
-  }
+  });
 }
 
 const productionDependencies: ThroughputDependencies = Object.freeze({ read });
@@ -121,7 +125,7 @@ export function createThroughputModule(dependencies: ThroughputDependencies = pr
       const throughputWindowMinutes = positive(ctx.thresholds.window_minutes, 5);
       const windowMinutes = positive(ctx.thresholds.run_failure_window_minutes, 60);
       const snapshot = await dependencies.read(
-        ctx.databaseUrl,
+        ctx.database,
         ctx.now,
         throughputWindowMinutes,
         windowMinutes

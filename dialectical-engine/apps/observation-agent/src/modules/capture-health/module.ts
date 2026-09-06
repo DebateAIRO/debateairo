@@ -6,6 +6,7 @@ import type {
   SignalIntent
 } from "../../core/types.js";
 import type { ObservationSignal } from "../../core/signals.js";
+import type { ObservationDatabasePort } from "../../core/database.js";
 import { appendDailyNotWiredImpact } from "./daily.js";
 import { createCaptureGapTracker } from "./gaps.js";
 import {
@@ -19,7 +20,7 @@ import {
 import { createCaptureHealthTracker } from "./tracker.js";
 
 export type CaptureHealthDependencies = Readonly<{
-  readSnapshot(databaseUrl: string): Promise<CaptureSnapshot>;
+  readSnapshot(database: ObservationDatabasePort): Promise<CaptureSnapshot>;
   readRuntimeLiveness(
     stateDir: string,
     runtimes: readonly string[]
@@ -69,7 +70,7 @@ export function createCaptureHealthModule(
     async probe(ctx): Promise<readonly ProbeObservation[]> {
       const runtimes = expectedRuntimes(ctx.thresholds);
       const [snapshot, liveness] = await Promise.all([
-        resolved.readSnapshot(ctx.databaseUrl),
+        resolved.readSnapshot(ctx.database),
         resolved.readRuntimeLiveness(ctx.stateDir, runtimes)
       ]);
       const cycle = tracker.observe({
