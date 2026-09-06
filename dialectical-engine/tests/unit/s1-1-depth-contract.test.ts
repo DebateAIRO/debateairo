@@ -13,6 +13,14 @@ import { resolveExpansionDepth } from "@debateai/runner";
 import { auditArchitecture, auditSourceRules } from "../../tools/orphan-audit/src/index.js";
 import { createDebate } from "../../apps/ui/lib/api.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import {
+  candidatesOf,
+  ceilingSites,
+  domainSites,
+  kindOf,
+  parseModule,
+  type Site
+} from "../support/depthOracle.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ANSWER_ID = "44444444-4444-4444-8444-444444444444";
@@ -222,12 +230,6 @@ const SHIPPED_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs"];
  * finding F-T1-4, owned by T2 — argued, not silenced, and pinned by a negative
  * control below.
  */
-type DuplicateKind = "DEPTH_BOUND_LITERAL" | "DOMAIN_ENUMERATION";
-
-const MENTIONS_A_DEPTH = /depth/i;
-const BARE_FIVE = /(?<![\w.$])5(?![\w.$])/;
-const SIX_AS_EXCLUSIVE_BOUND = /(?:[<>]=?\s*6(?![\w.$])|\.(?:lt|gte)\(\s*6\s*\))/;
-const WHOLE_DOMAIN = /\b1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\b/;
 
 /**
  * The SINGLE owning declaration, allowed by exact text. Not a path exemption:
@@ -238,221 +240,21 @@ const OWNING_DECLARATION = Object.freeze({
   text: "export const EXPANSION_DEPTH_MAX = 5;"
 });
 
-interface DuplicateSite {
-  readonly kind: DuplicateKind;
-  readonly line: number;
-  readonly text: string;
-}
-
-/** The two predicates, applied to one candidate text. Unchanged by T1B. */
-function kindOf(candidate: string): DuplicateKind | null {
-  if (MENTIONS_A_DEPTH.test(candidate) && (BARE_FIVE.test(candidate) || SIX_AS_EXCLUSIVE_BOUND.test(candidate))) {
-    return "DEPTH_BOUND_LITERAL";
-  }
-  return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
-}
-
 /**
- * The CEILING-LITERAL arms only — the composition the DECLARATION-UNIT scan uses.
+ * THE OLD EMITTER, preserved for ROUND 1.
  *
- * r3's `kindOf` above is unchanged and is what the line scan still applies. This
- * narrower set exists because the two arms are not the same kind of evidence, and
- * therefore do not deserve the same window:
+ * Its ceiling composition (line scan + declaration units + conjunct units, keyed
+ * `line:kind`, with the `WHOLE_DOMAIN` fallback) now lives in ONE place —
+ * `ceilingSites` in tests/support/depthOracle.ts — and this alias keeps the
+ * inherited call sites and their behaviour exactly as they were. It is TEXT ONLY
+ * and never parses, so the malformed ceiling fragments below are not rewritten
+ * into parseable source.
  *
- *   · `5` and the enumerated domain `1,2,3,4,5` ARE the ceiling. Wherever they
- *     appear inside a declaration that mentions a depth, the ceiling is there.
- *     Widening their window finds real ceilings that wrapping had hidden.
- *   · `6` is NOT the ceiling. It is an INFERENCE from an exclusive comparison
- *     (`depth < 6`), and that inference is carried by the `6` and the depth token
- *     belonging to the SAME comparison. Widen its window to the declaration and it
- *     stops finding ceilings and starts manufacturing pairings — the measured
- *     example is `topic.trim().length > 6` a conjunct from an unrelated `depth`, at
- *     apps/ui/app/new/page.tsx:75.
- *
- * r1 got that distinction right and then drew the wrong conclusion from it: it made
- * the `6` arm LINE-scoped. Comparison-local is not line-local, and refuting the
- * too-wide declaration window was never evidence for the too-narrow line one. The
- * line window turned out to be wrong in BOTH directions — a newline inside one
- * comparison hid a real bound, and collapsing the negative control onto one line
- * manufactured the false one it exists to forbid.
- *
- * So the `6` arm gets the unit that actually matches its own argument: the
- * CONJUNCT. Same lexer, same layout independence, one extra boundary.
- *
- * This is a UNIT decision, not a predicate one: all four regexes are byte-unchanged
- * and r3's `kindOf` is retained verbatim above. It is the one place the oracle is
- * NOT a superset of r3, and that divergence is asserted, not left silent — see
- * "narrows r3 in exactly one place".
+ * The three bare DOMAIN controls and the shipped scan still run through here.
+ * Round 3 removes the `WHOLE_DOMAIN` fallback and routes those three to
+ * `domainSites` (plan §5.6 R4) — not this round.
  */
-function kindOfCeilingLiteral(candidate: string): DuplicateKind | null {
-  if (MENTIONS_A_DEPTH.test(candidate) && BARE_FIVE.test(candidate)) return "DEPTH_BOUND_LITERAL";
-  return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
-}
-
-/** The exclusive-bound arm only — the composition the CONJUNCT-unit scan uses. */
-function kindOfExclusiveBound(candidate: string): DuplicateKind | null {
-  return MENTIONS_A_DEPTH.test(candidate) && SIX_AS_EXCLUSIVE_BOUND.test(candidate)
-    ? "DEPTH_BOUND_LITERAL"
-    : null;
-}
-
-/**
- * DECLARATION UNITS — the layout-independent half of the oracle (T1B, codex r3 B1).
- *
- * The r3 oracle scanned PHYSICAL LINES, so it could only see a ceiling whose depth
- * token and whose literal happened to be typed on the same row. Three ordinary
- * formattings defeated it — a wrapped Zod chain, a comparison split after the
- * operator, and a wrapped `[1, 2, 3, 4, 5]`. That is a check that could not fail
- * for the reason it exists (D56), and the fault was the UNIT, never the predicates.
- *
- * So the predicates above are untouched and only the unit changes: a unit is the
- * enclosing DECLARATION, gathered by a lexer rather than by newline. Newlines are
- * ordinary whitespace, so a ceiling reads the same however it is wrapped.
- *
- * A unit ENDS at:
- *   · `;` or `,` at the unit's own bracket depth   — statement / element separator
- *   · `{` or `}` at any depth                      — a block or object body is its own scope
- *   · a closer that would drop below the start depth
- *
- * Every one of those is a boundary between DISTINCT declarations, elements or
- * scopes. Nothing splits WITHIN an expression — in particular `&&`, `||` and `??`
- * are ordinary characters here.
- *
- * `splitConjuncts` adds ONE further boundary — `&&`, `||`, `??`, at ANY bracket
- * depth — and is used ONLY for the exclusive-`6` arm, whose own argument is that a
- * `6` is evidence about the comparison it sits in. At any depth, not the unit's own
- * depth: a logical operator separates conjuncts just as much inside `if (...)` as
- * at statement level, and the shallower rule let `if (topic.length > 6 && depth >=
- * MIN)` join into one unit.
- *
- * T1B r1 applied that boundary to the CEILING-LITERAL arm instead, and codex was
- * right to block it: the same expression was then caught on one line and missed
- * when wrapped. The boundary was never wrong — it was on the wrong arm. An
- * operand-order rule was rejected outright: `&&` commutes, so a verdict that
- * depended on which conjunct came first would be layout dependence again.
- *
- * Comments do NOT contribute to unit text — a comment defines no ceiling, and
- * gluing prose into a joined unit invents pairings. Nothing is lost: the LINE scan
- * is retained beside this one and still reads comments exactly as r3 did.
- *
- * WHAT THIS STILL CANNOT SEE, stated plainly rather than claimed away:
- *   · indirection — `const CEILING = 5;` then `depth > CEILING` are two units
- *   · a ceiling that is not the literal `5`: `2 + 3`, `0x5`, `5.0` (a PREDICATE
- *     limit, not a layout one — `BARE_FIVE` never matched those on one line either)
- *   · a bound assembled across two statements or across a brace
- *   · a `6` whose depth token lives in a DIFFERENT conjunct of the same comparison
- *     chain — deliberate, and the whole reason the `6` arm is conjunct-scoped
- * A single-quoted or double-quoted string is closed at the newline, so a regex
- * literal mis-read as a string can only desync within one line, never past it.
- */
-function declarationUnits(
-  source: string,
-  splitConjuncts = false
-): { readonly line: number; readonly text: string }[] {
-  const units: { line: number; text: string }[] = [];
-  let buffer = "";
-  let bracketDepth = 0;
-  let startDepth = 0;
-  let line = 1;
-  let startLine = 0;
-  const flush = (): void => {
-    const text = buffer.replace(/\s+/g, " ").trim();
-    if (text) units.push({ line: startLine || 1, text });
-    buffer = "";
-    startLine = 0;
-  };
-  const begin = (): void => { flush(); startDepth = bracketDepth; };
-  const mark = (): void => { if (startLine === 0) startLine = line; };
-  let index = 0;
-  while (index < source.length) {
-    const char = source[index]!;
-    const next = source[index + 1];
-    if (char === "\n") { line += 1; buffer += " "; index += 1; continue; }
-    if (char === "/" && next === "/") {
-      let end = index;
-      while (end < source.length && source[end] !== "\n") end += 1;
-      buffer += " "; index = end; continue;
-    }
-    if (char === "/" && next === "*") {
-      const close = source.indexOf("*/", index + 2);
-      const end = close < 0 ? source.length : close + 2;
-      line += (source.slice(index, end).match(/\n/g) ?? []).length;
-      buffer += " "; index = end; continue;
-    }
-    if (char === "'" || char === '"') {
-      let end = index + 1;
-      while (end < source.length) {
-        if (source[end] === "\\") { end += 2; continue; }
-        if (source[end] === char) { end += 1; break; }
-        if (source[end] === "\n") break;
-        end += 1;
-      }
-      mark(); buffer += source.slice(index, end); index = end; continue;
-    }
-    if (char === "`") {
-      let end = index + 1;
-      while (end < source.length) {
-        if (source[end] === "\\") { end += 2; continue; }
-        if (source[end] === "`") { end += 1; break; }
-        if (source[end] === "$" && source[end + 1] === "{") {
-          let nested = 1; let scan = end + 2;
-          while (scan < source.length && nested > 0) {
-            if (source[scan] === "{") nested += 1;
-            else if (source[scan] === "}") nested -= 1;
-            scan += 1;
-          }
-          end = scan; continue;
-        }
-        if (source[end] === "\n") line += 1;
-        end += 1;
-      }
-      mark(); buffer += source.slice(index, end).replace(/\s+/g, " "); index = end; continue;
-    }
-    if (char === "{") { bracketDepth += 1; buffer += " "; begin(); index += 1; continue; }
-    if (char === "}") { bracketDepth -= 1; buffer += " "; begin(); index += 1; continue; }
-    if (char === "(" || char === "[") { mark(); bracketDepth += 1; buffer += char; index += 1; continue; }
-    if (char === ")" || char === "]") {
-      bracketDepth -= 1;
-      if (bracketDepth < startDepth) { begin(); index += 1; continue; }
-      mark(); buffer += char; index += 1; continue;
-    }
-    if ((char === ";" || char === ",") && bracketDepth === startDepth) { begin(); index += 1; continue; }
-    if (splitConjuncts && next !== undefined && char === next
-      && (char === "&" || char === "|" || char === "?")) { begin(); index += 2; continue; }
-    mark(); buffer += char; index += 1;
-  }
-  flush();
-  return units;
-}
-
-/**
- * The oracle, over text — so it can be controlled with planted sources.
- *
- * THREE WINDOWS, each carrying the arms whose evidence it fits:
- *
- *   LINE        · ceiling-literal arms · r3's own window. Kept so that a `5` and a
- *                 depth crowded onto one line still register even where a unit
- *                 boundary falls between them, and so comments stay covered.
- *   DECLARATION · ceiling-literal arms · the ceiling is the ceiling wherever it
- *                 sits in the declaration.
- *   CONJUNCT    · exclusive-`6` arm    · a `6` is evidence only about its own
- *                 comparison.
- *
- * Deduplicated on `line` + `kind`, line text winning, which keeps the
- * owning-declaration exemption matching on its exact r3 text.
- */
-function duplicateBoundSites(source: string): DuplicateSite[] {
-  const byAddress = new Map<string, DuplicateSite>();
-  const record = (kind: DuplicateKind | null, line: number, text: string): void => {
-    if (kind === null) return;
-    const address = `${line}:${kind}`;
-    if (!byAddress.has(address)) byAddress.set(address, { kind, line, text });
-  };
-  source.split("\n").forEach((raw, index) => record(kindOfCeilingLiteral(raw), index + 1, raw.trim()));
-  for (const unit of declarationUnits(source)) record(kindOfCeilingLiteral(unit.text), unit.line, unit.text);
-  for (const unit of declarationUnits(source, true)) record(kindOfExclusiveBound(unit.text), unit.line, unit.text);
-  return [...byAddress.values()].sort((left, right) => left.line - right.line);
-}
+const duplicateBoundSites = (source: string): Site[] => ceilingSites(source);
 
 function shippedSourceFiles(): string[] {
   const found: string[] = [];
@@ -485,6 +287,143 @@ function duplicateBoundSitesInShippedCode(): string[] {
 }
 
 describe("S1-1 · the depth bound has a single source", () => {
+  // ROUND 1 — the corpus parse gate. PROPERTY: every shipped file the oracle scans
+  // is parsed by the pinned classic parser with no syntactic diagnostic, under the
+  // ScriptKind its extension selects. Mutation K23 makes that mapping wrong.
+  it("parses every shipped file with no syntactic diagnostic", () => {
+    const scanned = shippedSourceFiles();
+    const failures: string[] = [];
+    for (const absolute of scanned) {
+      const path = relative(REPOSITORY_ROOT, absolute).split(sep).join("/");
+      const parsed = parseModule(path, readFileSync(absolute, "utf8"));
+      if (parsed.ok) continue;
+      const first = parsed.diagnostics[0];
+      failures.push(`${path}: ${first ? `${first.line}: ${first.message}` : "no diagnostic"}`);
+    }
+    expect(failures).toEqual([]);
+    // The corpus is ENUMERATED, not assumed: 232 files, of which 59 are .tsx.
+    expect(scanned.length).toBe(232);
+    expect(scanned.filter((absolute) => absolute.endsWith(".tsx")).length).toBe(59);
+  });
+
+  // ROUND 1 — PARSE-CONTEXT FIXTURES (plan §1 R3). PROPERTY: what the parser calls
+  // an array-literal EXPRESSION is what the oracle may consider, and contexts that
+  // merely look like one are not candidates. Each row is a node-kind fact, which a
+  // `[`-numerics-`]` token pattern cannot express.
+  it.each([
+    { context: "JSX text that spells the run", path: "planted.tsx", source: "const view = <p>[1,2,3,4,5]</p>;" },
+    { context: "a computed property name", path: "planted.ts", source: 'const m = { [1]: "x" };' },
+    { context: "computed element access", path: "planted.ts", source: "const v = a[1];" },
+    { context: "a tuple TYPE, not an expression", path: "planted.ts", source: "type T = [1,2,3,4,5];" },
+    { context: "an empty array literal", path: "planted.ts", source: "const none = [];" },
+    { context: "a mixed array literal", path: "planted.ts", source: "const mixed = [1, two, 3, 4, 5];" }
+  ])("finds no candidate in $context", ({ path, source }) => {
+    expect(candidatesOf(path, source)).toEqual([]);
+  });
+
+  // ROUND 1 — A1..A11 ADDRESSING (plan §2.3 R2, §2 R3). Every row asserts exact
+  // cardinality and, per candidate, the literal `(start, end, elementLine,
+  // statementLine)`. `toEqual([])` is not accepted as an addressing assertion.
+  // Identity is the OFFSET PAIR; `statementLine` is display and never shares a
+  // field with it. Every literal below was MEASURED before it was asserted.
+  it.each([
+    {
+      id: "A1 — ASI: the owning statement begins on line 2",
+      path: "planted.ts",
+      source: "const marker = 0\nconst choices = [1,2,3,4,5]\n",
+      expected: [{ start: 33, end: 44, elementLine: 2, statementLine: 2 }]
+    },
+    {
+      id: "A2 — JSX container: the statement begins on line 1, the element on line 2",
+      path: "planted.tsx",
+      source: "const view = <section>{\n  [1,2,3,4,5]\n}</section>;",
+      expected: [{ start: 26, end: 37, elementLine: 2, statementLine: 1 }]
+    },
+    {
+      id: "A3 — two arrays on one line are two candidates with distinct spans",
+      path: "planted.ts",
+      source: "const a = [1,2,3,4,5]; const b = [1,2,3,4,5];",
+      expected: [
+        { start: 10, end: 21, elementLine: 1, statementLine: 1 },
+        { start: 33, end: 44, elementLine: 1, statementLine: 1 }
+      ]
+    },
+    {
+      id: "A4 — inside a template expression",
+      path: "planted.ts",
+      source: "const s = `x${[1,2,3,4,5].length}y`;",
+      expected: [{ start: 14, end: 25, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      id: "A5 — inside an object literal",
+      path: "planted.ts",
+      source: "const o = { a: [1,2,3,4,5] };",
+      expected: [{ start: 15, end: 26, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      id: "A6 — comments are trivia to the parser",
+      path: "planted.ts",
+      source: "const slots = [0, /* c */ 1, 2, 3, 4, 5];",
+      expected: [{ start: 14, end: 40, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      id: "A7 — a regex literal is not a candidate",
+      path: "planted.ts",
+      source: "const marker = /[//]/; const choices = [1,2,3,4,5];",
+      expected: [{ start: 39, end: 50, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      id: "A8 inline — comma expression",
+      path: "planted.ts",
+      source: 'const slots = (";", [0,1,2,3,4,5]);',
+      expected: [{ start: 20, end: 33, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      id: "A8 wrapped — the same statement line despite the newline",
+      path: "planted.ts",
+      source: 'const slots = (\n  ";", [0,1,2,3,4,5]);',
+      expected: [{ start: 23, end: 36, elementLine: 2, statementLine: 1 }]
+    },
+    {
+      id: "A9 — a ruled run beside a longer one: two candidates, distinct spans",
+      path: "planted.ts",
+      source: "const a = [1,2,3,4,5]; const b = [0,1,2,3,4,5];",
+      expected: [
+        { start: 10, end: 21, elementLine: 1, statementLine: 1 },
+        { start: 33, end: 46, elementLine: 1, statementLine: 1 }
+      ]
+    }
+  ])("addresses $id", ({ path, source, expected }) => {
+    expect(candidatesOf(path, source)).toEqual(expected);
+  });
+
+  // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects
+  // yields exactly ONE conservative INCONCLUSIVE site and never a fabricated
+  // DOMAIN_ENUMERATION; discovery yields nothing. Narrowed with a `throw` per
+  // §1.13 R4 — an `expect` does not narrow a TypeScript union.
+  it("reports exactly one INCONCLUSIVE site for a truncated source, and no candidate", () => {
+    const truncated = "export function LoginFlow() {\n  const choices = [1, 2, 3, 4, 5";
+    const sites = domainSites("planted.tsx", truncated);
+    expect(sites).toHaveLength(1);
+    const [site] = sites;
+    if (site?.kind !== "INCONCLUSIVE") {
+      throw new Error(`expected INCONCLUSIVE, got ${site?.kind ?? "none"}`);
+    }
+    expect(site.path).toBe("planted.tsx");
+    expect(site.line).toBeGreaterThan(0);
+    expect(site.diagnostic.length).toBeGreaterThan(0);
+    expect(site.text).toBe(site.diagnostic);
+    expect(candidatesOf("planted.tsx", truncated)).toEqual([]);
+    expect(parseModule("planted.tsx", truncated).ok).toBe(false);
+  });
+
+  // A clean parse yields NO domain site in round 1: DOMAIN emission needs the
+  // evaluator (round 2) and the rule-1 discriminator (round 3). The old emitter
+  // still owns every DOMAIN verdict until then.
+  it("emits no domain site from a clean parse while the old emitter still runs", () => {
+    expect(domainSites("planted.ts", "const allowed = [1, 2, 3, 4, 5];")).toEqual([]);
+  });
+
   // PROPERTY: exactly ONE line in shipped code fixes the ruled ceiling, and it is
   // the owning declaration. Site-addressed, so a second duplicate inside an
   // already-listed file cannot hide behind the first.
@@ -508,11 +447,22 @@ describe("S1-1 · the depth bound has a single source", () => {
     { spelling: "reversed operands", planted: "  const ready = 1 <= depth && 5 >= depth;" },
     { spelling: "zod .max", planted: "  depth: z.number().int().min(1).max(5)," },
     { spelling: "plain comparison", planted: "  const ready = depth >= 1 && depth <= 5;" },
-    { spelling: "exclusive six", planted: "  if (!Number.isInteger(depth) || depth < 6) {" },
+    { spelling: "exclusive six", planted: "  if (!Number.isInteger(depth) || depth < 6) {" }
+  ])("detects a duplicate written as $spelling", ({ planted }) => {
+    // ROUND 1: migrated to `ceilingSites` and asserting the KIND, never non-emptiness.
+    // An INCONCLUSIVE cannot satisfy this, and `ceilingSites` cannot produce one.
+    expect(ceilingSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
+  });
+
+  // THE TWO BARE OPTION-DOMAIN CONTROLS from this block. They are NOT ceiling
+  // controls and cannot pass a DEPTH_BOUND_LITERAL assertion. They stay on the old
+  // emitter's `WHOLE_DOMAIN` fallback for rounds 1-2 and are routed to `domainSites`
+  // in round 3 (plan §5.6 R4).
+  it.each([
     { spelling: "array option domain", planted: "  {[1, 2, 3, 4, 5].map((value) => value)}" },
     { spelling: "set option domain", planted: "  const allowed = new Set([1, 2, 3, 4, 5]);" }
   ])("detects a duplicate written as $spelling", ({ planted }) => {
-    expect(duplicateBoundSites(planted)).not.toEqual([]);
+    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
   });
 
   // LAYOUT CONTROLS (T1B, codex r3 B1) — the same three CLASSES as above, written
@@ -540,18 +490,6 @@ describe("S1-1 · the depth bound has a single source", () => {
       ].join("\n")
     },
     {
-      spelling: "multiline domain enumeration",
-      planted: [
-        "  const allowed = [",
-        "    1,",
-        "    2,",
-        "    3,",
-        "    4,",
-        "    5",
-        "  ];"
-      ].join("\n")
-    },
-    {
       spelling: "wrapped property inside an object literal",
       planted: [
         "const S = z.object({",
@@ -562,7 +500,25 @@ describe("S1-1 · the depth bound has a single source", () => {
       ].join("\n")
     }
   ])("detects a duplicate laid out as $spelling", ({ planted }) => {
-    expect(duplicateBoundSites(planted)).not.toEqual([]);
+    expect(ceilingSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
+  });
+
+  // THE THIRD BARE OPTION-DOMAIN CONTROL, same disposition as the two above.
+  it.each([
+    {
+      spelling: "multiline domain enumeration",
+      planted: [
+        "  const allowed = [",
+        "    1,",
+        "    2,",
+        "    3,",
+        "    4,",
+        "    5",
+        "  ];"
+      ].join("\n")
+    }
+  ])("detects a duplicate laid out as $spelling", ({ planted }) => {
+    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
   });
 
   // WRAPPED-CONJUNCT CONTROLS (T1B r1, codex B1). The r1 oracle flushed a unit at
@@ -576,7 +532,7 @@ describe("S1-1 · the depth bound has a single source", () => {
     { order: "ceiling first", planted: ["const ok = v <= 5 &&", "  isDepthField(v);"].join("\n") },
     { order: "same expression on one line", planted: "const ok = isDepthField(v) && v <= 5;" }
   ])("detects a ceiling wrapped across a conjunct — $order", ({ planted }) => {
-    expect(duplicateBoundSites(planted)).not.toEqual([]);
+    expect(ceilingSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
   });
 
   // LAYOUT NEGATIVE CONTROL — MEASURED, not imagined. This is the real shape of
@@ -607,7 +563,7 @@ describe("S1-1 · the depth bound has a single source", () => {
       ].join("\n")
     }
   ])("does not pair an unrelated ceiling with a depth a conjunct away — $order", ({ planted }) => {
-    expect(duplicateBoundSites(planted)).toEqual([]);
+    expect(ceilingSites(planted)).toEqual([]);
   });
 
   // EXCLUSIVE-SIX WINDOW — the PAIRED controls (T1B r2, codex B1).
@@ -628,7 +584,7 @@ describe("S1-1 · the depth bound has a single source", () => {
     { layout: "same comparison on one line", planted: "if (depth < 6) c.stop();" },
     { layout: "split after a logical operator", planted: ["if (!Number.isInteger(depth) ||", "  depth < 6) {"].join("\n") }
   ])("detects an exclusive six however the comparison is wrapped — $layout", ({ planted }) => {
-    expect(duplicateBoundSites(planted)).not.toEqual([]);
+    expect(ceilingSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
   });
 
   // The conjunct boundary must apply at ANY bracket depth, not at the unit's own.
@@ -637,13 +593,13 @@ describe("S1-1 · the depth bound has a single source", () => {
   // pairs `> 6` with a `depth` that is not its comparison's operand. Mutant m10 is
   // exactly that shallower rule, and this control is what kills it.
   it("does not pair a six with a depth in another conjunct of the same condition", () => {
-    expect(duplicateBoundSites("  if (topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN) {")).toEqual([]);
+    expect(ceilingSites("  if (topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN) {")).toEqual([]);
   });
 
   it("does not manufacture a site when the negative control is collapsed onto one line", () => {
     const collapsed =
       "  const ready = topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX && riskTier.length > 0;";
-    expect(duplicateBoundSites(collapsed)).toEqual([]);
+    expect(ceilingSites(collapsed)).toEqual([]);
   });
 
   // THE ONE DELIBERATE NARROWING, asserted rather than left silent.
@@ -657,7 +613,7 @@ describe("S1-1 · the depth bound has a single source", () => {
     const collapsed =
       "  const ready = topic.trim().length > 6 && depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX && riskTier.length > 0;";
     expect(kindOf(collapsed)).toBe("DEPTH_BOUND_LITERAL");
-    expect(duplicateBoundSites(collapsed)).toEqual([]);
+    expect(ceilingSites(collapsed)).toEqual([]);
   });
 
   // NEGATIVE CONTROLS — unrelated depth concepts, and a floor-only guard, are
@@ -669,7 +625,21 @@ describe("S1-1 · the depth bound has a single source", () => {
     "    topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 },", // a different depth field
     "    if (!Number.isInteger(depth) || depth < 1) {"                // floor-only, no ceiling literal
   ])("does not flag unrelated depth code: %s", (planted) => {
-    expect(duplicateBoundSites(planted)).toEqual([]);
+    expect(ceilingSites(planted)).toEqual([]);
+  });
+
+  // FLOOR IMPORT (plan §5.5 R4, codex r0 point 4) — the two ceiling controls this
+  // base lacked, adapted from the donor
+  // .worktrees/lane-t1-oracle-loginfp/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts
+  // at 60641339b983365952dd6cd61ed2f379aef6dc8a (donor line 1128). They carry a
+  // depth token in reach of a longer index run; the donor asserted them through the
+  // old emitter, and they are asserted here through `ceilingSites` with the exact
+  // kind. With these two the ceiling floor is 27 on this base.
+  it.each([
+    { shape: "index run with a depth token in reach", planted: "  const depthSlots = [0, 1, 2, 3, 4, 5];" },
+    { shape: "past the ceiling with a depth token in reach", planted: "  const depthChoices = [1, 2, 3, 4, 5, 6];" }
+  ])("still catches a longer run when a depth token is in reach — $shape", ({ planted }) => {
+    expect(ceilingSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
   });
 
   it("names packages/contract as the exported single source", () => {

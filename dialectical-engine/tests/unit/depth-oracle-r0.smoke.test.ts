@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import ts from "typescript-classic";
+import { parseModule } from "../support/depthOracle.js";
 
 /**
  * F-T1-ORACLE-EVALUATOR — round 0 dependency and resolution gate.
@@ -21,24 +22,23 @@ import ts from "typescript-classic";
  */
 
 /**
- * The ONE test-local diagnostic accessor.
+ * ROUND 1: THE ACCESSOR HAS MOVED.
  *
- * `parseDiagnostics` is populated by `createSourceFile` but is NOT part of
- * TypeScript's documented public surface, so it is read HERE and nowhere else.
- *
- * ROUND 1 MOVE (plan §1.5 R2 / §1.9 R3): this accessor moves into
- * `tests/support/depthOracle.ts`, behind `parseModule`, which returns
- * `{ ok:false, diagnostics }` from it. After that move this file's copy is
- * deleted — the property is read behind exactly one accessor in the lane, so a
- * future TypeScript bump touches one line.
+ * The round-0 copy of `parseDiagnosticsOf` that lived here has been DELETED.
+ * `parseDiagnostics` is now read behind exactly one accessor in the lane —
+ * inside `parseModule` in tests/support/depthOracle.ts — and this smoke observes
+ * both clean and malformed parses through that same shared path, including the
+ * explicit `.tsx`/`.ts` ScriptKind mapping. A future TypeScript bump touches one
+ * function, in one file.
  */
-function parseDiagnosticsOf(file: ts.SourceFile): readonly ts.Diagnostic[] {
-  return (file as unknown as { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics ?? [];
-}
 
-/** Parse exactly as plan §1.5 R2 specifies: Latest, setParentNodes true, explicit ScriptKind. */
-function parse(path: string, source: string, kind: ts.ScriptKind): ts.SourceFile {
-  return ts.createSourceFile(path, source, ts.ScriptTarget.Latest, /* setParentNodes */ true, kind);
+/** Parse through the shared module path, asserting the parse succeeded. */
+function parsedFile(path: string, source: string): ts.SourceFile {
+  const parsed = parseModule(path, source);
+  if (!parsed.ok) {
+    throw new Error(`expected a clean parse of ${path}, got: ${parsed.diagnostics.map((d) => d.message).join("; ")}`);
+  }
+  return parsed.file;
 }
 
 /** First node in the tree satisfying `predicate`, in source order. */
@@ -84,9 +84,7 @@ describe("depth oracle round 0 · the pinned classic parser is reachable and beh
 
   it("parses TypeScript with zero parse diagnostics, sets parent links, and reports the array literal's source position", () => {
     const source = ["const header = 1;", "const allowed = [1, 2, 3, 4, 5];", ""].join("\n");
-    const file = parse("planted.ts", source, ts.ScriptKind.TS);
-
-    expect(parseDiagnosticsOf(file)).toHaveLength(0);
+    const file = parsedFile("planted.ts", source);
 
     const array = findFirst(file, ts.isArrayLiteralExpression);
     expect(array).toBeDefined();
@@ -105,9 +103,7 @@ describe("depth oracle round 0 · the pinned classic parser is reachable and beh
 
   it("parses TSX with zero parse diagnostics and sets parent links through the JSX container", () => {
     const source = ["export const view = () => <p>{[1, 2, 3, 4, 5].length}</p>;", ""].join("\n");
-    const file = parse("planted.tsx", source, ts.ScriptKind.TSX);
-
-    expect(parseDiagnosticsOf(file)).toHaveLength(0);
+    const file = parsedFile("planted.tsx", source);
 
     const array = findFirst(file, ts.isArrayLiteralExpression);
     expect(array).toBeDefined();
@@ -120,15 +116,13 @@ describe("depth oracle round 0 · the pinned classic parser is reachable and beh
   });
 
   it("normalises numeric literal text and carries the sign as a separate prefix node (plan M14)", () => {
-    const file = parse("numbers.ts", "const values = [1_0, 0x10, 0o10, 0b10, 1.5];\n", ts.ScriptKind.TS);
-    expect(parseDiagnosticsOf(file)).toHaveLength(0);
+    const file = parsedFile("numbers.ts", "const values = [1_0, 0x10, 0o10, 0b10, 1.5];\n");
 
     // M14: the parser normalises the written form to a decimal string.
     expect(numericLiterals(file).map((literal) => literal.text)).toEqual(["10", "16", "8", "2", "1.5"]);
 
     // M14: the sign is NOT part of the literal — it is a separate prefix node.
-    const signed = parse("signed.ts", "const value = -1;\n", ts.ScriptKind.TS);
-    expect(parseDiagnosticsOf(signed)).toHaveLength(0);
+    const signed = parsedFile("signed.ts", "const value = -1;\n");
 
     const prefix = findFirst(signed, ts.isPrefixUnaryExpression);
     expect(prefix).toBeDefined();
@@ -138,17 +132,17 @@ describe("depth oracle round 0 · the pinned classic parser is reachable and beh
     expect((prefix.operand as ts.NumericLiteral).text).toBe("1");
   });
 
-  it("detects a deliberately malformed input through the single test-local diagnostic accessor", () => {
-    const file = parse("malformed.ts", "const broken = [1, 2, ;\n", ts.ScriptKind.TS);
+  it("detects a deliberately malformed input through the single shared diagnostic accessor", () => {
+    const parsed = parseModule("malformed.ts", "const broken = [1, 2, ;\n");
 
-    const diagnostics = parseDiagnosticsOf(file);
-    expect(diagnostics.length).toBeGreaterThan(0);
+    // The failure is observable through the SAME path the oracle uses.
+    if (parsed.ok) throw new Error("expected the malformed source to fail to parse");
+    expect(parsed.diagnostics.length).toBeGreaterThan(0);
 
     // The record carries a usable line and message — what plan §1.10 R3's
-    // INCONCLUSIVE site is built from in round 1.
-    const first = diagnostics[0]!;
-    expect(first.file).toBeDefined();
-    expect(typeof first.start).toBe("number");
-    expect(ts.flattenDiagnosticMessageText(first.messageText, " ")).not.toBe("");
+    // INCONCLUSIVE site is built from.
+    const first = parsed.diagnostics[0]!;
+    expect(first.line).toBeGreaterThan(0);
+    expect(first.message).not.toBe("");
   });
 });
