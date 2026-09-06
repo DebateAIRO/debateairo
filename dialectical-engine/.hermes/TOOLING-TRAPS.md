@@ -1342,3 +1342,48 @@ partial delta and send the round back.
 **State it affirmatively in the report, with the pre-existing `typescript@5.9.3:` lockfile line numbers
 quoted.** The strong evidence that no unrelated upgrade rode along is the **zero-removal** count: an
 upgrade rewrites an existing line and therefore always produces a removal.
+
+## CORRECTION to the two entries above (F-T1-ORACLE-EVALUATOR r1, after codex r0 F4/F5)
+The two entries I appended in round 0 taught two slogans that are stronger than the evidence. Both are
+narrowed here rather than edited, per this file's append-only rule.
+
+- **"`pnpm install --frozen-lockfile` CANNOT modify package.json or pnpm-lock.yaml" — too strong.** The
+  flag is not an immutability boundary; a frozen install still resolves a store and **executes package
+  scripts** (my own round-0 setup log shows it). What actually discharged the question was the
+  *observed state*: `git status --porcelain` empty afterwards, plus the complete recorded diff. **Rule:
+  cite the observed state and the diff, never the flag's promise.**
+- **"a zero-removal lockfile delta cannot contain an upgrade" — not a sufficient general proof.** It
+  held for the case I measured (one aliased devDependency reusing a resolution already in the file),
+  and it is good corroboration, but a lockfile format can express a change without a removed line, so
+  it must not be used as a standalone upgrade proof. **Rule: inspect the actual changed content and the
+  resulting resolved versions; use the removal count as corroboration only.**
+- **Evidence tools must be hardened BEFORE they are promoted.** A four-count parser that prints
+  `MISMATCH` without a nonzero exit, or a mutation harness that checks an anchor *exists* rather than
+  matching a declared multiplicity and does not enforce restoration on interrupt, is fine under a human
+  eye and unsafe as an unattended gate. Prefer the mission's `tools/mutate.sh` v2, which gates
+  pre/applied/restored, sha equality and empty porcelain.
+
+## Extracting code between files: COPY it, never retype it from a partial read
+Found by F-T1-ORACLE-EVALUATOR r1 (2026-09-06), and it cost a RED gate. Moving the depth oracle's
+ceiling arms into a new module, I reproduced `declarationUnits` from the first ~12 lines I had read on
+screen. The real function is ~60 lines and also handles line comments, block comments, string literals,
+template literals with nested `${}`, braces as unit boundaries, closing brackets below the start depth,
+commas as separators, and — the load-bearing part — splits conjuncts at `&&`/`||`/`??` at **any**
+bracket depth. My reconstruction split only at the unit's own depth, which silently widened the
+exclusive-six window and turned the inherited control
+`does not pair a six with a depth in another conjunct of the same condition` RED.
+**The control caught it, which is exactly why that floor exists.** Two lessons: (1) extract by copying
+the exact byte range and then assert byte-identity mechanically — I now diff every moved function
+against its source and print `verbatim: True` before trusting it; (2) a behaviour-preserving extraction
+must be proven by the inherited controls, so migrate them in the SAME step and run them.
+
+## vitest also TRUNCATES a long `it.each` name — a second way to miscount a suite
+Found by F-T1-ORACLE-EVALUATOR r1 (2026-09-06). The recorded `-t` trap above covers `it.each`
+interpolating `$var` **in quotes**. There is a second half: vitest also **truncates** a long rendered
+name with a `…`. A title of `` `addresses $id` `` with a 48-character `$id` prints as
+`addresses 'A1 — ASI: the owning statement begins…'`.
+So `grep -cF 'addresses A'` returned **0** while ten such tests existed and passed — I nearly filed a
+selected-group inventory that was ten short. `grep -cF "addresses 'A"` returns 10.
+**Rule: never count tests by grepping a name you composed in source; count the names the RUNNER
+printed, and match a prefix short enough to survive both the quoting and the truncation.** A `-t`
+filter is safe if its pattern is a substring of the *visible* prefix (`-t "A1 — ASI"` matched).
