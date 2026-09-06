@@ -7220,3 +7220,408 @@ a:focus-visible {
   .publicArgumentSpacer { display: none; }
   .publicModelPill { max-width: 100%; }
 }
+
+/* === consent-ui S02 === */
+/* Slice S02 of mission `consent-ui` — the sign-up privacy gate.
+   ONE block, appended at the end of the file, after S01's. Nothing above the opening
+   marker is touched: `globals.css` is the only file both slices write, and this delimiter
+   is what makes the single-writer contract mechanically visible (S02-S59).
+   Every colour is a `var(--token)` reference and this block declares NO token (S02-S60,
+   R22) — the two token blocks and `tests/unit/t9-mode-tokens.test.ts` belong to S01, which
+   declares `--scrim`, `--ok-edge`, `--z-policy-scrim` and `--z-policy-card` for this block.
+   Sources: `docs/missions/consent-ui/design/turn-10-cookie-consent.html:46-95` (10c) and
+   `.../turn-8a-checkbox-group.html:1-10` (8a). */
+
+/* --- The sign-up consent group (design 8a) -------------------------------------------- */
+
+.consentGroup {
+  padding: 2px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--shell);
+}
+
+.consentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 0;
+  cursor: pointer;
+}
+
+/* The hairline sits between the two rows, so it belongs to the FIRST row only (:2 carries it,
+   :6 does not). Written as a child selector on the group rather than as a `:not(:last-child)`
+   so a third row could never inherit it silently. */
+.consentGroup > .consentRow:first-child {
+  border-bottom: 1px solid var(--line);
+}
+
+/* The square IS the input: `appearance: none` keeps native focus, native activation, native
+   `required` and one focus ring, and the check glyph is a pseudo-element on it. */
+.consentBox {
+  flex: 0 0 auto;
+  margin: 1px 0 0;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  appearance: none;
+  border: 1.5px solid var(--ok-edge);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+
+.consentBox:checked {
+  background: var(--ok-dot);
+}
+
+.consentBox:checked::after {
+  content: "✓";
+  color: var(--core);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.consentBox:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.consentBox:disabled {
+  cursor: not-allowed;
+}
+
+.consentText {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* The design draws `Privacy Policy` as an <a>; ARCH-S02 ruled it a <button type="button">
+   because it opens a modal and navigates nowhere, so the button's UA chrome is reset back to
+   the anchor the artboard draws (:8). */
+.consentPolicyLink {
+  padding: 0;
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* --- The privacy-policy modal (design 10c) ------------------------------------------- */
+
+.policyScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-policy-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--scrim);
+  animation: consentPolicyScrimIn 140ms ease-out both;
+}
+
+/* 680 is the artboard's own modal width — 760px less the 40px inset each side (:48,:50);
+   92vh approximates its vertical proportion (660 less 34px top and bottom = 592, 89.7%).
+   The 32px of the clamp is this scrim's 16px padding on each side. */
+.policyBezel {
+  position: relative;
+  z-index: var(--z-policy-card);
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 32px));
+  max-height: 92vh;
+  padding: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  background: var(--shell);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink);
+  animation: consentPolicyCardIn 180ms cubic-bezier(.2, .7, .2, 1) both;
+}
+
+.policyCore {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--core);
+}
+
+.policyTab {
+  position: absolute;
+  top: 0;
+  left: 24px;
+  width: 52px;
+  height: 4px;
+  border-radius: var(--r-tab);
+  background: var(--gold);
+  z-index: 2;
+}
+
+.policyHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.policyHeadText {
+  flex: 1;
+  min-width: 0;
+}
+
+.policyEyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  color: var(--gold);
+}
+
+.policyTitle {
+  margin-top: 9px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.018em;
+}
+
+.policyLede {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.policyClose {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The scroll region. `min-height: 0` is what lets it shrink inside the flex column, and the
+   scroll-to-end gate (R15) measures exactly this element. */
+.policyBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px 8px;
+}
+
+.policyBody:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.policyJumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.policyPill {
+  padding: 4px 10px;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--shell);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.policySection {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.policySectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* `--accent` is set per section by the component as a token REFERENCE (`var(--ok-dot)`,
+   `var(--gold)`, ...), so the accent follows the mode toggle with nothing wired. The base
+   `--accent` declared in both token blocks is the fallback. */
+.policyNo {
+  flex: 0 0 26px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.policySectionTitle {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -.012em;
+}
+
+.policyText {
+  margin: 7px 0 0 38px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.policyItems {
+  margin: 9px 0 0 38px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.policyItem {
+  display: flex;
+  gap: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.policyDot {
+  flex: 0 0 auto;
+  margin-top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-dot);
+  background: var(--accent);
+}
+
+.policyItemText {
+  color: var(--text-2);
+}
+
+.policyEnd {
+  padding-bottom: 6px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--muted);
+}
+
+.policyFoot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--shell);
+}
+
+.policyContact {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.policyMail {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.policyFootSpacer {
+  flex: 1;
+}
+
+.policyPrimary {
+  padding: 10px 18px;
+  appearance: none;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* `.65` is MEASURED, not chosen: stepping alpha by 0.05 over the label and the face composited
+   on the footer's `--shell` ground gives .60 -> Terracotta 4.13 (fails 4.5:1), .65 -> 4.79 /
+   7.17, .70 -> 5.61 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
+   dimmed value that a reader can still read. The arithmetic is executed, not asserted, in
+   `tests/unit/consent-s02-style-contract.test.ts` (S02-S64). */
+.policyPrimary:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+   remove the element from the accessibility tree and take R15's description with it, so this is
+   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+.policyGateHint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+   remove the element from the accessibility tree and take R15's description with it, so this is
+   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+
+/* --- Motion, and switching it off (S02-S63, R24) -------------------------------------- */
+
+@keyframes consentPolicyScrimIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes consentPolicyCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* There is no global reduced-motion reset in this stylesheet — the four existing blocks are
+   each component-scoped — so S02 switches off its own two animations and nothing else. */
+@media (prefers-reduced-motion: reduce) {
+  .policyScrim,
+  .policyBezel {
+    animation: none;
+  }
+}
+
+/* === end consent-ui S02 === */
