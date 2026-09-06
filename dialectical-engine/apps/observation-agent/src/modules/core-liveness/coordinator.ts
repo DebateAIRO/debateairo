@@ -1,6 +1,10 @@
 import type { SignalLifecycleIdentity } from "../../core/lifecycle.js";
 import type { ObservationSignal, Severity } from "../../core/signals.js";
-import type { ComponentState, ProbeObservation } from "../../core/types.js";
+import type {
+  ComponentState,
+  ProbeObservation,
+  SignalEmissionResult
+} from "../../core/types.js";
 import { materializeLivenessSignal } from "./signals.js";
 import type { LivenessTransition } from "./state.js";
 
@@ -27,7 +31,7 @@ export function createCoreLivenessObservationCoordinator(input: Readonly<{
     signal: ObservationSignal,
     now: Date,
     lifecycle: SignalLifecycleIdentity
-  ): Promise<void>;
+  ): Promise<void | SignalEmissionResult>;
 }>): Readonly<{
   observe(request: Readonly<{
     observation: ProbeObservation;
@@ -41,6 +45,10 @@ export function createCoreLivenessObservationCoordinator(input: Readonly<{
     onCleared?(signalId: string): void;
   }>): Promise<LivenessTransition>;
 }> {
+  const rejectedOpenFirstFailedAt = new Map<string, Date>();
+  const commitEmission = (result: void | SignalEmissionResult): boolean =>
+    result === undefined || result.journaled;
+
   return Object.freeze({
     async observe(request): Promise<LivenessTransition> {
       const { observation, now } = request;
@@ -52,29 +60,45 @@ export function createCoreLivenessObservationCoordinator(input: Readonly<{
         at: now
       });
       request.onTransition?.(transition.state);
+      const lifecycle = Object.freeze({ owner: "core-liveness", correlationKey: key });
+      const retryRejectedOpen = transition.event === null
+        && !observation.ok
+        && transition.state === "DOWN"
+        && !input.openSignals.has(key)
+        && rejectedOpenFirstFailedAt.has(key);
 
-      if (transition.event?.kind === "OPEN") {
+      if ((transition.event?.kind === "OPEN" || retryRejectedOpen)
+        && !input.openSignals.has(key)) {
+        const firstFailedAt = transition.event?.firstFailedProbeAt
+          ?? rejectedOpenFirstFailedAt.get(key)
+          ?? now;
         const signal = materializeLivenessSignal({
           seq: input.nextSequence(),
           signalId: input.nextSignalId(),
           observation,
           kind: "OPEN",
           at: now,
-          ...(transition.event.firstFailedProbeAt === undefined ? {} : {
-            firstFailedAt: transition.event.firstFailedProbeAt
-          }),
+          firstFailedAt,
           thresholdVersion: request.thresholdVersion,
           threshold: request.openAfterFailures,
           severity: request.severity
         });
-        input.openSignals.set(key, Object.freeze({ signal, openedAt: now }));
-        request.onOpened?.(signal);
-        await input.emit(
-          signal,
-          now,
-          Object.freeze({ owner: "core-liveness", correlationKey: key })
-        );
-      } else if (transition.event?.kind === "CLEARED") {
+        const emitted = await input.emit(signal, now, lifecycle);
+        if (commitEmission(emitted)) {
+          rejectedOpenFirstFailedAt.delete(key);
+          input.openSignals.set(key, Object.freeze({ signal, openedAt: now }));
+          request.onOpened?.(signal);
+        } else {
+          rejectedOpenFirstFailedAt.set(key, firstFailedAt);
+        }
+        return transition;
+      }
+
+      const retryRejectedClear = transition.event === null
+        && observation.ok
+        && transition.state === "UP"
+        && input.openSignals.has(key);
+      if (transition.event?.kind === "CLEARED" || retryRejectedClear) {
         const opened = input.openSignals.get(key);
         if (opened !== undefined) {
           const signal = materializeLivenessSignal({
@@ -92,14 +116,16 @@ export function createCoreLivenessObservationCoordinator(input: Readonly<{
             }),
             openedAt: opened.openedAt
           });
-          input.openSignals.delete(key);
-          request.onCleared?.(opened.signal.signal_id);
-          await input.emit(
-            signal,
-            now,
-            Object.freeze({ owner: "core-liveness", correlationKey: key })
-          );
+          const emitted = await input.emit(signal, now, lifecycle);
+          if (commitEmission(emitted)) {
+            input.openSignals.delete(key);
+            request.onCleared?.(opened.signal.signal_id);
+          }
+          return transition;
         }
+      }
+      if (observation.ok && transition.state === "UP") {
+        rejectedOpenFirstFailedAt.delete(key);
       }
       return transition;
     }

@@ -1355,6 +1355,406 @@ describe("OBS-01 restart lifecycle restoration", () => {
       .resolves.toMatchObject({ openSignals: [] });
   });
 
+  it("does not clear a core OPEN whose journal append was rejected before durability", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-restart-core-rejected-open-"));
+    scratchDirectories.push(stateDir);
+    const journal = new ObservationJournal(stateDir);
+    const openSignals = new Map<string, Readonly<{
+      signal: ObservationSignal;
+      openedAt: Date;
+    }>>();
+    const attempts: ObservationSignal[] = [];
+    const transitions: string[] = [];
+    const openedCallbacks: string[] = [];
+    const clearedCallbacks: string[] = [];
+    const identifiers = [
+      "74000000-0000-4000-8000-000000000041",
+      "74000000-0000-4000-8000-000000000042"
+    ];
+    let sequence = 0;
+    let identifier = 0;
+    let rejectNextAppend = true;
+    const coordinator = createCoreLivenessObservationCoordinator({
+      tracker: createLivenessTracker({ openAfterFailures: 1, clearAfterSuccesses: 2 }),
+      openSignals,
+      nextSequence: () => ++sequence,
+      nextSignalId: () => identifiers[identifier++]!,
+      async emit(signal, _now, lifecycle) {
+        attempts.push(signal);
+        let journaled = false;
+        await persistSignal({
+          signal,
+          lifecycle,
+          journal: {
+            stateDir,
+            async appendSignal(...args: Parameters<ObservationJournal["appendSignal"]>) {
+              if (rejectNextAppend) {
+                rejectNextAppend = false;
+                throw new Error("PRE_FSYNC_OPEN_FAILURE");
+              }
+              return journal.appendSignal(...args);
+            }
+          } as never,
+          mirror: { async mirrorSignal() {} },
+          onJournaled() { journaled = true; }
+        }).catch(() => undefined);
+        return Object.freeze({ journaled });
+      }
+    });
+    const failed = Object.freeze({
+      component: "hatchet" as const,
+      class: "INFRA_DOWN" as const,
+      ok: false,
+      probe: "http_get",
+      target: "hatchet:/api/live",
+      lastStatus: 500
+    });
+    const healthy = Object.freeze({ ...failed, ok: true, lastStatus: 200 });
+    const observe = (observation: ProbeObservation, now: Date) => coordinator.observe({
+      observation,
+      now,
+      thresholdVersion: 4,
+      openAfterFailures: 1,
+      clearAfterSuccesses: 2,
+      severity: "FATAL",
+      onTransition(state) { transitions.push(state); },
+      onOpened(signal) { openedCallbacks.push(signal.signal_id); },
+      onCleared(signalId) { clearedCallbacks.push(signalId); }
+    });
+
+    await observe(failed, start);
+    expect(openSignals.size).toBe(0);
+    expect(transitions).toEqual(["DOWN"]);
+    expect(openedCallbacks).toEqual([]);
+
+    await observe(healthy, new Date(start.getTime() + 1_000));
+    await observe(healthy, new Date(start.getTime() + 2_000));
+
+    expect(attempts).toEqual([expect.objectContaining({
+      signal_id: identifiers[0], state: "OPEN", clears_signal_id: null
+    })]);
+    expect(clearedCallbacks).toEqual([]);
+    const replayed = await replayObservationJournals(stateDir, new Set(["core-liveness"]));
+    expect(replayed.openSignals).toEqual([]);
+    expect(() => new ObservationModuleRuntime({
+      modules: Object.freeze([]),
+      replayedOpenSignals: replayed.openSignals,
+      lifecycleOwners: Object.freeze([Object.freeze({
+        owner: "core-liveness",
+        lifecycle: lifecycleOf(createLivenessTracker({
+          openAfterFailures: 1,
+          clearAfterSuccesses: 2
+        }))
+      })]),
+      nextSequence: () => 1,
+      nextSignalId: () => identifiers[1]!,
+      sampleStore: { async write() {} },
+      async emitSignal() {}
+    })).not.toThrow();
+  });
+
+  it("retries a rejected core OPEN while the component remains down", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-restart-core-retry-open-"));
+    scratchDirectories.push(stateDir);
+    const journal = new ObservationJournal(stateDir);
+    const openSignals = new Map<string, Readonly<{
+      signal: ObservationSignal;
+      openedAt: Date;
+    }>>();
+    const attempts: ObservationSignal[] = [];
+    const openedCallbacks: string[] = [];
+    const identifiers = [
+      "74000000-0000-4000-8000-000000000043",
+      "74000000-0000-4000-8000-000000000044"
+    ];
+    let sequence = 0;
+    let identifier = 0;
+    let rejectNextAppend = true;
+    const coordinator = createCoreLivenessObservationCoordinator({
+      tracker: createLivenessTracker({ openAfterFailures: 1, clearAfterSuccesses: 2 }),
+      openSignals,
+      nextSequence: () => ++sequence,
+      nextSignalId: () => identifiers[identifier++]!,
+      async emit(signal, _now, lifecycle) {
+        attempts.push(signal);
+        let journaled = false;
+        await persistSignal({
+          signal,
+          lifecycle,
+          journal: {
+            stateDir,
+            async appendSignal(...args: Parameters<ObservationJournal["appendSignal"]>) {
+              if (rejectNextAppend) {
+                rejectNextAppend = false;
+                throw new Error("PRE_FSYNC_OPEN_FAILURE");
+              }
+              return journal.appendSignal(...args);
+            }
+          } as never,
+          mirror: { async mirrorSignal() {} },
+          onJournaled() { journaled = true; }
+        }).catch(() => undefined);
+        return Object.freeze({ journaled });
+      }
+    });
+    const failed = Object.freeze({
+      component: "hatchet" as const,
+      class: "INFRA_DOWN" as const,
+      ok: false,
+      probe: "http_get",
+      target: "hatchet:/api/live",
+      lastStatus: 500
+    });
+    const observe = (now: Date) => coordinator.observe({
+      observation: failed,
+      now,
+      thresholdVersion: 4,
+      openAfterFailures: 1,
+      clearAfterSuccesses: 2,
+      severity: "FATAL",
+      onOpened(signal) { openedCallbacks.push(signal.signal_id); }
+    });
+
+    await observe(start);
+    expect(openSignals.size).toBe(0);
+    await observe(new Date(start.getTime() + 1_000));
+
+    expect(attempts).toEqual([
+      expect.objectContaining({ signal_id: identifiers[0], state: "OPEN" }),
+      expect.objectContaining({
+        signal_id: identifiers[1],
+        state: "OPEN",
+        first_failed_probe_at: start.toISOString()
+      })
+    ]);
+    expect(openedCallbacks).toEqual([identifiers[1]]);
+    expect(openSignals.get("hatchet:INFRA_DOWN")?.signal.signal_id).toBe(identifiers[1]);
+    await expect(replayObservationJournals(stateDir, new Set(["core-liveness"])))
+      .resolves.toMatchObject({
+        openSignals: [expect.objectContaining({
+          signal: expect.objectContaining({
+            signal_id: identifiers[1],
+            first_failed_probe_at: start.toISOString()
+          })
+        })]
+      });
+  });
+
+  it("retains and retries a durable core OPEN after its CLEAR append is rejected", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-restart-core-rejected-clear-"));
+    scratchDirectories.push(stateDir);
+    const journal = new ObservationJournal(stateDir);
+    const openSignals = new Map<string, Readonly<{
+      signal: ObservationSignal;
+      openedAt: Date;
+    }>>();
+    const attempts: ObservationSignal[] = [];
+    const openedCallbacks: string[] = [];
+    const clearedCallbacks: string[] = [];
+    const identifiers = [
+      "74000000-0000-4000-8000-000000000051",
+      "74000000-0000-4000-8000-000000000052",
+      "74000000-0000-4000-8000-000000000053"
+    ];
+    let sequence = 0;
+    let identifier = 0;
+    let rejectNextAppend = false;
+    const coordinator = createCoreLivenessObservationCoordinator({
+      tracker: createLivenessTracker({ openAfterFailures: 1, clearAfterSuccesses: 2 }),
+      openSignals,
+      nextSequence: () => ++sequence,
+      nextSignalId: () => identifiers[identifier++]!,
+      async emit(signal, _now, lifecycle) {
+        attempts.push(signal);
+        let journaled = false;
+        await persistSignal({
+          signal,
+          lifecycle,
+          journal: {
+            stateDir,
+            async appendSignal(...args: Parameters<ObservationJournal["appendSignal"]>) {
+              if (rejectNextAppend) {
+                rejectNextAppend = false;
+                throw new Error("PRE_FSYNC_CLEAR_FAILURE");
+              }
+              return journal.appendSignal(...args);
+            }
+          } as never,
+          mirror: { async mirrorSignal() {} },
+          onJournaled() { journaled = true; }
+        }).catch(() => undefined);
+        return Object.freeze({ journaled });
+      }
+    });
+    const failed = Object.freeze({
+      component: "hatchet" as const,
+      class: "INFRA_DOWN" as const,
+      ok: false,
+      probe: "http_get",
+      target: "hatchet:/api/live",
+      lastStatus: 500
+    });
+    const healthy = Object.freeze({ ...failed, ok: true, lastStatus: 200 });
+    const observe = (observation: ProbeObservation, now: Date) => coordinator.observe({
+      observation,
+      now,
+      thresholdVersion: 4,
+      openAfterFailures: 1,
+      clearAfterSuccesses: 2,
+      severity: "FATAL",
+      onOpened(signal) { openedCallbacks.push(signal.signal_id); },
+      onCleared(signalId) { clearedCallbacks.push(signalId); }
+    });
+
+    await observe(failed, start);
+    expect(openedCallbacks).toEqual([identifiers[0]]);
+    expect(openSignals.get("hatchet:INFRA_DOWN")?.signal.signal_id).toBe(identifiers[0]);
+    await observe(healthy, new Date(start.getTime() + 1_000));
+    rejectNextAppend = true;
+    await observe(healthy, new Date(start.getTime() + 2_000));
+
+    expect(clearedCallbacks).toEqual([]);
+    expect(openSignals.get("hatchet:INFRA_DOWN")?.signal.signal_id).toBe(identifiers[0]);
+    await expect(replayObservationJournals(stateDir, new Set(["core-liveness"])))
+      .resolves.toMatchObject({
+        openSignals: [expect.objectContaining({
+          signal: expect.objectContaining({ signal_id: identifiers[0] })
+        })]
+      });
+
+    await observe(healthy, new Date(start.getTime() + 3_000));
+
+    expect(attempts).toEqual([
+      expect.objectContaining({ signal_id: identifiers[0], state: "OPEN" }),
+      expect.objectContaining({
+        signal_id: identifiers[1],
+        state: "CLEARED",
+        clears_signal_id: identifiers[0]
+      }),
+      expect.objectContaining({
+        signal_id: identifiers[2],
+        state: "CLEARED",
+        clears_signal_id: identifiers[0]
+      })
+    ]);
+    expect(clearedCallbacks).toEqual([identifiers[0]]);
+    expect(openSignals.size).toBe(0);
+    await expect(replayObservationJournals(stateDir, new Set(["core-liveness"])))
+      .resolves.toMatchObject({ openSignals: [] });
+  });
+
+  it("does not replace a durable core OPEN after its CLEAR append is rejected", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-restart-core-rejected-clear-reopen-"));
+    scratchDirectories.push(stateDir);
+    const journal = new ObservationJournal(stateDir);
+    const openSignals = new Map<string, Readonly<{
+      signal: ObservationSignal;
+      openedAt: Date;
+    }>>();
+    const attempts: ObservationSignal[] = [];
+    const openedCallbacks: string[] = [];
+    const clearedCallbacks: string[] = [];
+    const identifiers = [
+      "74000000-0000-4000-8000-000000000061",
+      "74000000-0000-4000-8000-000000000062",
+      "74000000-0000-4000-8000-000000000063"
+    ];
+    let sequence = 0;
+    let identifier = 0;
+    let rejectNextAppend = false;
+    const coordinator = createCoreLivenessObservationCoordinator({
+      tracker: createLivenessTracker({ openAfterFailures: 2, clearAfterSuccesses: 2 }),
+      openSignals,
+      nextSequence: () => ++sequence,
+      nextSignalId: () => identifiers[identifier++]!,
+      async emit(signal, _now, lifecycle) {
+        attempts.push(signal);
+        let journaled = false;
+        await persistSignal({
+          signal,
+          lifecycle,
+          journal: {
+            stateDir,
+            async appendSignal(...args: Parameters<ObservationJournal["appendSignal"]>) {
+              if (rejectNextAppend) {
+                rejectNextAppend = false;
+                throw new Error("PRE_FSYNC_CLEAR_FAILURE");
+              }
+              return journal.appendSignal(...args);
+            }
+          } as never,
+          mirror: { async mirrorSignal() {} },
+          onJournaled() { journaled = true; }
+        }).catch(() => undefined);
+        return Object.freeze({ journaled });
+      }
+    });
+    const failed = Object.freeze({
+      component: "hatchet" as const,
+      class: "INFRA_DOWN" as const,
+      ok: false,
+      probe: "http_get",
+      target: "hatchet:/api/live",
+      lastStatus: 500
+    });
+    const healthy = Object.freeze({ ...failed, ok: true, lastStatus: 200 });
+    const observe = (observation: ProbeObservation, now: Date) => coordinator.observe({
+      observation,
+      now,
+      thresholdVersion: 4,
+      openAfterFailures: 2,
+      clearAfterSuccesses: 2,
+      severity: "FATAL",
+      onOpened(signal) { openedCallbacks.push(signal.signal_id); },
+      onCleared(signalId) { clearedCallbacks.push(signalId); }
+    });
+
+    await observe(failed, start);
+    await observe(failed, new Date(start.getTime() + 1_000));
+    await observe(healthy, new Date(start.getTime() + 2_000));
+    rejectNextAppend = true;
+    await observe(healthy, new Date(start.getTime() + 3_000));
+    await observe(failed, new Date(start.getTime() + 4_000));
+    await observe(failed, new Date(start.getTime() + 5_000));
+
+    const replayed = await replayObservationJournals(stateDir, new Set(["core-liveness"]));
+    expect(identifier).toBe(2);
+    expect(sequence).toBe(2);
+    expect(attempts).toEqual([
+      expect.objectContaining({ signal_id: identifiers[0], state: "OPEN" }),
+      expect.objectContaining({
+        signal_id: identifiers[1],
+        state: "CLEARED",
+        clears_signal_id: identifiers[0]
+      })
+    ]);
+    expect(openedCallbacks).toEqual([identifiers[0]]);
+    expect(clearedCallbacks).toEqual([]);
+    expect(openSignals.get("hatchet:INFRA_DOWN")?.signal.signal_id).toBe(identifiers[0]);
+    expect(replayed.openSignals).toEqual([expect.objectContaining({
+      lifecycle: Object.freeze({
+        owner: "core-liveness",
+        correlationKey: "hatchet:INFRA_DOWN"
+      }),
+      signal: expect.objectContaining({ signal_id: identifiers[0] })
+    })]);
+    expect(() => new ObservationModuleRuntime({
+      modules: Object.freeze([]),
+      replayedOpenSignals: replayed.openSignals,
+      lifecycleOwners: Object.freeze([Object.freeze({
+        owner: "core-liveness",
+        lifecycle: lifecycleOf(createLivenessTracker({
+          openAfterFailures: 2,
+          clearAfterSuccesses: 2
+        }))
+      })]),
+      nextSequence: () => 3,
+      nextSignalId: () => identifiers[2]!,
+      sampleStore: { async write() {} },
+      async emitSignal() {}
+    })).not.toThrow();
+  });
+
   it("adopts one legacy raw OPEN through its unique native owner", async () => {
     const stateDir = await mkdtemp(join(tmpdir(), "obs-restart-legacy-"));
     scratchDirectories.push(stateDir);

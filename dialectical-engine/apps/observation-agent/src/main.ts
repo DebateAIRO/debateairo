@@ -267,7 +267,7 @@ async function boot(): Promise<void> {
     openSignals,
     nextSequence: sequence,
     nextSignalId: randomUUID,
-    emit: async (signal, now, lifecycle) => { await emit(signal, now, lifecycle); }
+    emit
   });
 
   const startAt = new Date();
