@@ -7572,9 +7572,12 @@ a:focus-visible {
 
 /* `.65` is MEASURED, not chosen: stepping alpha by 0.05 over the label and the face composited
    on the footer's `--shell` ground gives .60 -> Terracotta 4.13 (fails 4.5:1), .65 -> 4.79 /
-   7.17, .70 -> 5.61 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
-   dimmed value that a reader can still read. The arithmetic is executed, not asserted, in
-   `tests/unit/consent-s02-style-contract.test.ts` (S02-S64). */
+   7.17, .70 -> 5.54 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
+   dimmed value that a reader can still read. Every rung above is now ASSERTED, not just narrated,
+   in `tests/unit/consent-s02-style-contract.test.ts` (S02-S64) — the first version of this
+   comment said 5.61 at .70, which is what `Math.round` returns only if `1 - .70` is re-spelled
+   as the literal `.30`; the rung is a tie and the two spellings fall on opposite sides of it
+   (CODE-REV-S02-C8-r1 B1). */
 .policyPrimary:disabled {
   opacity: .65;
   cursor: not-allowed;
@@ -7597,11 +7600,24 @@ a:focus-visible {
   border: 0;
 }
 
-/* The reason the button is disabled reaches assistive technology through `aria-describedby`
-   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
-   remove the element from the accessibility tree and take R15's description with it, so this is
-   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
-   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+/* --- Focus rings for the controls the repo's shared rule cannot reach --------------------- */
+
+/* The repo's shared ring (`globals.css:488-495`) is keyed on `.btn, .iconBtn, .modeToggle,
+   .input, input, textarea, select, a` — a class list plus four element names. Every control
+   here is a BARE `<button>`, so it matches none of them and falls through to the browser's own
+   ring, which is chrome-coloured: the one paint on either S02 surface that would NOT follow the
+   Terracotta/Chamber toggle. `SPEC.md:612` maps focus rings to `--focus`, `:637` requires them
+   on every control in both modes, so the treatment is added HERE rather than by widening
+   `:488-495`, which is above this block's opening marker and outside S02's single-writer
+   contract. `.consentBox` and `.policyBody` carry their own rules above; the four grouped here
+   are the rest of the block's focusable inventory (CODE-REV-S02-C8-r1 N1). */
+.consentPolicyLink:focus-visible,
+.policyClose:focus-visible,
+.policyPill:focus-visible,
+.policyPrimary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 
 /* --- Motion, and switching it off (S02-S63, R24) -------------------------------------- */
 
