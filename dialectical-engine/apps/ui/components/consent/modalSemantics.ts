@@ -26,7 +26,15 @@ export type ModalSurface = Readonly<{
  */
 type StackEntry = Readonly<{ read: () => ModalSurface }>;
 
-/** The Esc stack: LIFO, module-level, shared by every surface in the app. */
+/**
+ * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
+ * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
+ * is never "the last one registered". Which surface is topmost is decided by `topmostSurface()`
+ * from DOM containment: a surface contained by another is drawn over it and wins, and among
+ * unrelated siblings the one later in document order wins — which in this product tracks the
+ * order they opened in, because the stacking is the `--z-consent-bar` < `--z-consent-card` <
+ * `--z-policy-*` ladder. The most recently registered entry is only where that search starts.
+ */
 const surfaceStack: StackEntry[] = [];
 
 /** Exactly one `document` keydown listener exists while the stack is non-empty. */
@@ -90,8 +98,9 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
  * nested pair mounted together the LAST registered entry is the surface UNDERNEATH. Document
  * position is the property itself: a surface contained by another is drawn over it, and among
  * unrelated surfaces the later one in document order is on top. Entries whose container is not
- * in the DOM yet cannot be compared and leave the incumbent standing, so a surface that renders
- * no container still receives `Escape`.
+ * in the DOM yet (`null`) cannot be compared and leave the incumbent standing, so a surface that
+ * renders no container still receives `Escape`; an entry whose container has LEFT the document
+ * is a different case and is skipped outright, because it is no longer on screen at all.
  */
 function topmostSurface(): StackEntry | undefined {
   if (surfaceStack.length === 0) return undefined;
@@ -100,6 +109,15 @@ function topmostSurface(): StackEntry | undefined {
     const held = top.read().containerRef.current;
     const other = candidate.read().containerRef.current;
     if (held === null || other === null || held === other) continue;
+    // A container that has left the document cannot be compared for stacking: jsdom answers
+    // DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC in BOTH directions, so a detached node
+    // reads as "above" whichever way it is asked and the entry iterated last would win. A
+    // detached candidate therefore never wins, and a detached incumbent never stands.
+    if (!other.isConnected) continue;
+    if (!held.isConnected) {
+      top = candidate;
+      continue;
+    }
     const relation = held.compareDocumentPosition(other);
     const above =
       (relation & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0 ||

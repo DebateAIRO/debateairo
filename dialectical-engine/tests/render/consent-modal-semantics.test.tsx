@@ -219,6 +219,73 @@ describe("consent modal semantics helper", () => {
     expect(firstDomClose).toHaveBeenCalledTimes(0);
   });
 
+  it("never lets a surface whose container has detached consume Escape", async () => {
+    // `topmostSurface()` compares containers by document position, and jsdom answers a
+    // comparison involving a DETACHED node with DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC
+    // in BOTH directions (measured, 37 each way) — so "above" is true whichever node is asked,
+    // and the surface iterated LAST simply wins. The detaching surface therefore mounts SECOND
+    // here, which is the arrangement that lets it capture the key; mounted first it would lose
+    // to the same coincidence and the case would pass against a module that has no guard.
+    // The reachable shape is React 19's cleanup-returning callback ref: it does NOT null the
+    // ref on detach, so a surface that stays registered while it stops rendering its container
+    // holds a stale detached node. The precondition is asserted, not assumed, so the case
+    // cannot pass through the `null` branch that already skips such an entry.
+    const staleClose = vi.fn();
+    const liveClose = vi.fn();
+    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
+
+    function DetachingSurface({ mounted }: { mounted: boolean }): ReactNode {
+      const containerRef = useRef<HTMLElement | null>(null);
+      const initialFocusRef = useRef<HTMLElement | null>(null);
+      captured.ref = containerRef;
+      useModalSurface(true, { containerRef, initialFocusRef, onClose: staleClose });
+      if (!mounted) return null;
+      return (
+        <div
+          data-surface="stale"
+          ref={(node) => {
+            containerRef.current = node;
+            return () => {};
+          }}
+        >
+          <button
+            type="button"
+            ref={(node) => {
+              initialFocusRef.current = node;
+            }}
+          >
+            close-stale
+          </button>
+        </div>
+      );
+    }
+
+    function Harness({ mounted }: { mounted: boolean }): ReactNode {
+      return (
+        <>
+          <TestSurface open name="live" onClose={liveClose} />
+          <DetachingSurface mounted={mounted} />
+        </>
+      );
+    }
+
+    await render(<Harness mounted />);
+    expect(openSurfaceCount()).toBe(2);
+    await render(<Harness mounted={false} />);
+    expect(openSurfaceCount()).toBe(2);
+
+    const stale = captured.ref!.current;
+    expect(stale, "the stale surface must still hold its container ref").not.toBeNull();
+    expect(stale!.isConnected).toBe(false);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(liveClose).toHaveBeenCalledTimes(1);
+    expect(staleClose).toHaveBeenCalledTimes(0);
+  });
+
   it("traps Tab inside the nested inner surface, not inside the outer one", async () => {
     // The Tab trap reads the same "topmost" the Escape branch reads, so the nested pair must be
     // asserted for Tab too: focus sitting in the outer surface is pulled into the inner one.
@@ -348,6 +415,32 @@ describe("consent modal semantics helper", () => {
     });
 
     expect(document.activeElement).toBe(labelled("last"));
+  });
+
+  it("advances past a control inside a disabled fieldset, so Tab is not a dead key", async () => {
+    // `button:not([disabled])` MATCHES this button — the `disabled` attribute is on the
+    // fieldset, not on the button — so the attribute filter keeps it, while `focus()` refuses
+    // it in jsdom exactly as a real browser does (HTML: a descendant of a disabled fieldset is
+    // itself disabled). It is the SECOND unfocusable shape this environment can discriminate,
+    // and it is the one that pins the advance loop: without that loop, the trap preventDefaults
+    // Tab, calls focus() on a control the platform refuses, and Tab becomes a dead key.
+    await render(
+      <TestSurface open name="only" onClose={vi.fn()}>
+        <fieldset disabled>
+          <button type="button">locked</button>
+        </fieldset>
+        <button type="button">next-real</button>
+      </TestSurface>
+    );
+
+    expect(labelled("locked").matches('button:not([disabled])')).toBe(true);
+
+    await act(async () => {
+      labelled("close-only").focus();
+      pressTab();
+    });
+
+    expect(document.activeElement).toBe(labelled("next-real"));
   });
 
   it("skips a hidden input, so Tab inside the surface is never a no-op", async () => {
