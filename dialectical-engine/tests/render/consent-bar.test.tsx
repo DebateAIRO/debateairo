@@ -346,8 +346,24 @@ describe("S01-C3 the cookie bar (10a)", () => {
       "bottom: calc(22px + var(--safe-b))"
     ]);
 
-    const everyBottom = [...block.matchAll(/bottom:\s*([^;]+);/g)].map((match) => match[1]?.trim());
-    for (const value of everyBottom) {
+    // Scoped to the `bottom` PROPERTY on rules that select `.consentBar`, in
+    // the media query too. An unscoped /bottom:/ also matches `border-bottom:`,
+    // which C4 added to the same block — measured, and it turned this case red
+    // against a correct stylesheet.
+    const barBottoms: string[] = [];
+    const rules = /([^{}]+)\{([^{}]*)\}/g;
+    for (;;) {
+      const match = rules.exec(block);
+      if (match === null) break;
+      const selectors = (match[1] ?? "").split(",").map((one) => one.trim());
+      if (!selectors.includes(".consentBar")) continue;
+      for (const declaration of (match[2] ?? "").split(";")) {
+        const [property, ...rest] = declaration.split(":");
+        if (property?.trim() === "bottom") barBottoms.push(rest.join(":").trim());
+      }
+    }
+    expect(barBottoms.length, "the bar declares a bottom offset in both layouts").toBe(2);
+    for (const value of barBottoms) {
       expect(value, "every bar offset is a plain inset plus the safe-area inset").toMatch(
         /^calc\(\d+px \+ var\(--safe-b\)\)$/
       );

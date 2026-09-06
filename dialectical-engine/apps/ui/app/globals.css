@@ -7354,6 +7354,197 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* --- 10b: the preferences card. One presentation serves both entry points
+   (the bar's "Choose what to store" and Settings -> Privacy), because there is
+   no bar in Settings to replace or to grow from (S01-R14). --- */
+
+.consentScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-consent-scrim);
+  align-items: center;
+  background: var(--scrim);
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.consentCard {
+  position: relative;
+  z-index: var(--z-consent-card);
+  width: min(520px, calc(100vw - 32px));
+  max-height: 92vh;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  padding: 7px;
+}
+
+.consentCardCore {
+  position: relative;
+  overflow: hidden;
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 22px 24px 20px;
+}
+
+.consentCardCore .consentTab { left: 24px; }
+
+.consentCardTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin-top: 9px;
+}
+
+.consentLede {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+.consentCatList {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.consentCatRow {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.consentCatMain { flex: 1; min-width: 0; }
+
+.consentCatHead { align-items: center; display: flex; gap: 8px; }
+
+.consentCatName {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.consentTag {
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 2px 8px;
+}
+
+.consentTag-essential {
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+  color: var(--ok-dot);
+}
+
+.consentTag-quality {
+  background: var(--gold-bg);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+}
+
+.consentTag-analytics {
+  background: var(--muted-bg);
+  border: 1px solid var(--muted-border);
+  color: var(--muted);
+}
+
+.consentCatDesc {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.consentCatDetail {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  margin-top: 5px;
+}
+
+.consentSwitch {
+  align-items: center;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  height: 22px;
+  justify-content: flex-start;
+  margin-top: 2px;
+  padding: 2px;
+  width: 38px;
+}
+
+.consentSwitch[aria-checked="true"] {
+  background: var(--ok-dot);
+  border-color: var(--ok-edge);
+  justify-content: flex-end;
+}
+
+/* The locked track keeps the design's softer fill so "on and not yours to
+   change" reads differently from "on because you chose it" (design-data.js:44). */
+.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
+
+.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
+
+.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.consentKnob {
+  background: var(--muted);
+  border-radius: var(--r-dot);
+  box-shadow: var(--shadow-thumb);
+  height: 16px;
+  width: 16px;
+}
+
+.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
+
+.consentCardFooter {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.consentFooterGap { flex: 1; }
+
+.consentLink {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.consentLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
 /* Below the derived 720px breakpoint the designed row stops fitting: the three
    labels measure ~118 + 155 + 100 = 373px, plus two 9px gaps = ~391px; a
    readable copy column needs ~260px; the row gap is 24px and the core's
