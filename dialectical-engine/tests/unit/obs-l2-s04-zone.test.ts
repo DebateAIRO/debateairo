@@ -30,7 +30,7 @@ import {
 const ROOT = process.cwd();
 const INDEX_PATH = resolve(ROOT, "apps/api/src/index.ts");
 const INDEX_SOURCE = readFileSync(INDEX_PATH, "utf8");
-const BASE_REF = "29f370e0f1017245aa26443ad366e020e815c301";
+const BASE_REF = "9d0c8e309e8da79199b508a9ec5f5cbe9545684e";
 
 function syntheticError(
   repoRelativeFrames: readonly string[],
@@ -85,6 +85,11 @@ describe("S04 semantic zone boundary", () => {
     const afterRegion = INDEX_SOURCE.slice(base.endOffset);
     const beforeClosingBrace = base.startOffset + base.region.lastIndexOf("\n") + 1;
     const fourthMount = '    api.get("/v1/auth/extra", async () => ({}));\n';
+    const disagreementNeedle =
+      '        recoveryEmail: typeof body.recovery_email === "string" ? body.recovery_email : "",';
+    const disagreementNeedleOffset = base.region.indexOf(disagreementNeedle);
+    expect(disagreementNeedleOffset).toBeGreaterThan(-1);
+    expect(base.region.indexOf(disagreementNeedle, disagreementNeedleOffset + 1)).toBe(-1);
 
     const f1 = insertAt(
       INDEX_SOURCE,
@@ -129,9 +134,10 @@ describe("S04 semantic zone boundary", () => {
       beforeClosingBrace,
       "    const templateMutation = `value:${String(1)}`;\n",
     );
-    const g4 = INDEX_SOURCE.replace(
-      "      ip: request.ip,",
-      "      ip: request.ip,\n  }",
+    const g4 = insertAt(
+      INDEX_SOURCE,
+      base.startOffset + disagreementNeedleOffset + disagreementNeedle.length,
+      "\n  }",
     );
     const g5 = INDEX_SOURCE.replace(
       "if (options.registration !== undefined) {",
@@ -161,6 +167,7 @@ describe("S04 semantic zone boundary", () => {
       expect(resolved(source).contentHash).toBe(base.contentHash);
     }
     expect(resolved(g3).contentHash).not.toBe(base.contentHash);
+    expect(g4).not.toBe(INDEX_SOURCE);
     const disagreement = resolveZoneRouteMountRegion(g4);
     expect(disagreement.ok).toBe(false);
     if (!disagreement.ok) expect(disagreement.reason).toContain("resolver methods disagree");
