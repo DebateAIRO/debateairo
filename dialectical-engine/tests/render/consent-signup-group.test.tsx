@@ -125,6 +125,11 @@ describe("sign-up consent checkbox group", () => {
     const control = consentRows[1].querySelector(".consentPolicyLink");
     expect(control, "missing the Privacy Policy control").not.toBeNull();
     expect(control!.textContent).toBe(POLICY_CONTROL_TEXT);
+    /* The control sits INSIDE the sign-up form, so its `type` is what stops an
+       activation from submitting the registration. Asserted as the ATTRIBUTE:
+       jsdom performs no form submission from a button activation, so a
+       behavioural pin here would be green against a submit button too. */
+    expect(control!.getAttribute("type"), "Privacy Policy control type").toBe("button");
   });
 
   /* S02-S19 — form semantics. */
