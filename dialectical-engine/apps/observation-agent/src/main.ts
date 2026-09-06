@@ -16,6 +16,7 @@ import {
   OBSERVATION_COMPONENTS,
   type ModuleConfigurationObject,
   type ProbeObservation,
+  type SignalEmissionResult,
   type StatusState
 } from "./core/types.js";
 import { ObservationJournal } from "./journal/journal.js";
@@ -144,13 +145,20 @@ async function boot(): Promise<void> {
     signal: ObservationSignal,
     now: Date,
     lifecycle: SignalLifecycleIdentity | null = null
-  ): Promise<void> {
+  ): Promise<SignalEmissionResult> {
+    let journaled = false;
     try {
-      await persistSignal({ signal, lifecycle, journal, mirror });
+      await persistSignal({
+        signal,
+        lifecycle,
+        journal,
+        mirror,
+        onJournaled() { journaled = true; }
+      });
     } catch {
       await deliverJournalFailureDirect({ timeoutMs: policy.value.notification.timeout_ms })
         .catch(() => undefined);
-      return;
+      if (!journaled) return Object.freeze({ journaled: false });
     }
     const componentStatus = status.get(signal.component) ?? {
       state: "UNKNOWN" as const,
@@ -161,25 +169,27 @@ async function boot(): Promise<void> {
     status.set(signal.component, componentStatus);
     if (signal.state === "OPEN") componentStatus.openSignalIds.add(signal.signal_id);
     else if (signal.clears_signal_id !== null) componentStatus.openSignalIds.delete(signal.clears_signal_id);
-    if (router === null) throw new ObservationError("OBSERVATION_LIFECYCLE_RESTORE_INVALID");
-    const routingMute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
-    await router.onSignal({
-      signal,
-      now,
-      policy: {
-        rateLimitMs: policy.value.notification.rate_limit_ms,
-        degradedAfterMs: policy.value.notification.degraded_after_ms,
-        timeoutMs: policy.value.notification.timeout_ms
-      },
-      mute: routingMute === null || routingMute.component === undefined
-        ? routingMute === null ? null : {}
-        : { component: routingMute.component },
-      module: currentRouterModule()
-    }).catch(async (error) => {
+    try {
+      if (router === null) throw new ObservationError("OBSERVATION_LIFECYCLE_RESTORE_INVALID");
+      const routingMute = await readMute(environment.OBSERVATION_STATE_DIR, now).catch(() => null);
+      await router.onSignal({
+        signal,
+        now,
+        policy: {
+          rateLimitMs: policy.value.notification.rate_limit_ms,
+          degradedAfterMs: policy.value.notification.degraded_after_ms,
+          timeoutMs: policy.value.notification.timeout_ms
+        },
+        mute: routingMute === null || routingMute.component === undefined
+          ? routingMute === null ? null : {}
+          : { component: routingMute.component },
+        module: currentRouterModule()
+      });
+    } catch {
       await deliverJournalFailureDirect({ timeoutMs: policy.value.notification.timeout_ms })
         .catch(() => undefined);
-      throw error;
-    });
+    }
+    return Object.freeze({ journaled: true });
   }
 
   const moduleRuntime = new ObservationModuleRuntime({
@@ -257,7 +267,7 @@ async function boot(): Promise<void> {
     openSignals,
     nextSequence: sequence,
     nextSignalId: randomUUID,
-    emit
+    emit: async (signal, now, lifecycle) => { await emit(signal, now, lifecycle); }
   });
 
   const startAt = new Date();

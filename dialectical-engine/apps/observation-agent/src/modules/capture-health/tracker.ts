@@ -6,7 +6,6 @@ import type { RuntimeLiveness } from "./liveness.js";
 type RuntimeState = {
   notWiredOpen: boolean;
   notWiredOpenedAt: Date | null;
-  lastDigestDay: string | null;
   blindOpen: boolean;
   blindOpenedAt: Date | null;
 };
@@ -138,6 +137,7 @@ function blindIntent(
 export function createCaptureHealthTracker(): Readonly<{
   legacyCorrelationKey(signal: ObservationSignal): string | null;
   restore(openSignals: readonly RestoredOpenSignal[]): void;
+  reconcile(openSignals: readonly RestoredOpenSignal[]): void;
   observe(input: Readonly<{
     snapshot: CaptureSnapshot;
     runtimeLiveness: Readonly<Record<string, RuntimeLiveness>>;
@@ -159,7 +159,7 @@ export function createCaptureHealthTracker(): Readonly<{
           throw new TypeError("OBSERVATION_CAPTURE_RESTORE_INVALID");
         }
         const state = states.get(runtime) ?? {
-          notWiredOpen: false, notWiredOpenedAt: null, lastDigestDay: null,
+          notWiredOpen: false, notWiredOpenedAt: null,
           blindOpen: false, blindOpenedAt: null
         };
         states.set(runtime, state);
@@ -170,7 +170,6 @@ export function createCaptureHealthTracker(): Readonly<{
           && !state.notWiredOpen) {
           state.notWiredOpen = true;
           state.notWiredOpenedAt = new Date(restored.signal.detected_at);
-          state.lastDigestDay = restored.signal.detected_at.slice(0, 10);
         } else if (restored.signal.component === "obs_capture"
           && restored.signal.class === "BLIND_PERIOD"
           && restored.signal.impact_code === "IMPACT_BLIND"
@@ -185,11 +184,57 @@ export function createCaptureHealthTracker(): Readonly<{
         }
       }
     },
+    reconcile(openSignals): void {
+      for (const state of states.values()) {
+        state.notWiredOpen = false;
+        state.notWiredOpenedAt = null;
+        state.blindOpen = false;
+        state.blindOpenedAt = null;
+      }
+      for (const open of openSignals) {
+        const runtime = (open.signal.evidence as Readonly<Record<string, unknown>>).runtime;
+        if (typeof runtime !== "string" || restoredCaptureKey(open.signal) !== open.correlationKey) {
+          throw new TypeError("OBSERVATION_CAPTURE_RESTORE_INVALID");
+        }
+        const state = states.get(runtime) ?? {
+          notWiredOpen: false, notWiredOpenedAt: null,
+          blindOpen: false, blindOpenedAt: null
+        };
+        states.set(runtime, state);
+        if (open.correlationKey === `not-wired:${runtime}` && !state.notWiredOpen) {
+          state.notWiredOpen = true;
+          state.notWiredOpenedAt = new Date(open.signal.detected_at);
+        } else if (open.correlationKey === `blind:${runtime}` && !state.blindOpen) {
+          state.blindOpen = true;
+          state.blindOpenedAt = open.signal.first_failed_probe_at === null
+            ? new Date(open.signal.detected_at)
+            : new Date(open.signal.first_failed_probe_at);
+        } else {
+          throw new TypeError("OBSERVATION_CAPTURE_RESTORE_INVALID");
+        }
+      }
+    },
     observe(input) {
       if (input.snapshot.state === "UNKNOWN") {
+        const intents: SignalIntent[] = [];
+        for (const runtime of input.expectedRuntimes) {
+          const state = states.get(runtime);
+          if (state?.blindOpen && input.runtimeLiveness[runtime] === "DOWN") {
+            intents.push(blindIntent(
+              runtime,
+              "CLEARED",
+              input.now,
+              state.blindOpenedAt ?? input.now,
+              state.blindOpenedAt ?? input.now,
+              input.blindWindowSeconds
+            ));
+            state.blindOpen = false;
+            state.blindOpenedAt = null;
+          }
+        }
         return Object.freeze({
           state: "UNKNOWN" as const,
-          intents: Object.freeze([]),
+          intents: Object.freeze(intents),
           projections: Object.freeze([Object.freeze({
             kind: "state" as const,
             key: "obs_capture",
@@ -199,7 +244,6 @@ export function createCaptureHealthTracker(): Readonly<{
           dailyNotWiredRuntimes: Object.freeze([])
         });
       }
-      const day = input.now.toISOString().slice(0, 10);
       const intents: SignalIntent[] = [];
       const dailyNotWiredRuntimes: string[] = [];
       const projections: ModuleStatusProjection[] = [];
@@ -208,11 +252,22 @@ export function createCaptureHealthTracker(): Readonly<{
         const state = states.get(runtime) ?? {
           notWiredOpen: false,
           notWiredOpenedAt: null,
-          lastDigestDay: null,
           blindOpen: false,
           blindOpenedAt: null
         };
         states.set(runtime, state);
+        if (state.blindOpen && input.runtimeLiveness[runtime] === "DOWN") {
+          intents.push(blindIntent(
+            runtime,
+            "CLEARED",
+            input.now,
+            state.blindOpenedAt ?? input.now,
+            state.blindOpenedAt ?? input.now,
+            input.blindWindowSeconds
+          ));
+          state.blindOpen = false;
+          state.blindOpenedAt = null;
+        }
         const authority = positiveAuthority(input.snapshot, runtime);
         if (authority === undefined) {
           missing += 1;
@@ -223,10 +278,8 @@ export function createCaptureHealthTracker(): Readonly<{
           if (!state.notWiredOpen) {
             state.notWiredOpen = true;
             state.notWiredOpenedAt = input.now;
-            state.lastDigestDay = day;
             intents.push(notWiredIntent(runtime, "OPEN", input.now, input.now));
-          } else if (state.lastDigestDay !== day) {
-            state.lastDigestDay = day;
+          } else {
             dailyNotWiredRuntimes.push(runtime);
           }
           continue;

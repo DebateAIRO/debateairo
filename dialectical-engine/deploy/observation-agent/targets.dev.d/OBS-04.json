@@ -1,10 +1,4 @@
 {
   "schema_version": 1,
-  "targets": [
-    {
-      "component": "spool",
-      "kind": "spool_directory",
-      "path": "/tmp/dialectical-engine-observation-spool"
-    }
-  ]
+  "targets": []
 }

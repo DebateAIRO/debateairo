@@ -27,6 +27,7 @@ import {
   type ProbeObservation,
   type RestoredOpenSignal,
   type SampleIntent,
+  type SignalEmissionResult,
   type SignalIntent
 } from "./types.js";
 
@@ -391,7 +392,7 @@ export class ObservationModuleRuntime {
     signal: ObservationSignal,
     now: Date,
     lifecycle: SignalLifecycleIdentity
-  ) => Promise<void>;
+  ) => Promise<void | SignalEmissionResult>;
   private readonly updateModuleStatus: ((
     moduleName: string,
     update: ModuleStatusUpdate
@@ -409,7 +410,7 @@ export class ObservationModuleRuntime {
       signal: ObservationSignal,
       now: Date,
       lifecycle: SignalLifecycleIdentity
-    ) => Promise<void>;
+    ) => Promise<void | SignalEmissionResult>;
     modules?: readonly Module[];
     replayedOpenSignals?: readonly ReplayedOpenSignal[];
     lifecycleOwners?: readonly Readonly<{ owner: string; lifecycle: ModuleLifecycle }>[];
@@ -477,6 +478,7 @@ export class ObservationModuleRuntime {
           database: input.database,
           stateDir: input.stateDir,
           repoRoot: input.repoRoot,
+          openSignals: this.currentOpenSignals(module.name),
           targets: targetFragment?.targets ?? [],
           targetFragment,
           configuration,
@@ -586,12 +588,21 @@ export class ObservationModuleRuntime {
       throw new ObservationError("OBSERVATION_MODULE_SIGNAL_INVALID", error);
     }
     const lifecycle = Object.freeze({ owner: moduleName, correlationKey: intent.correlationKey });
-    await this.emitSignal(signal, context.now, lifecycle);
+    const emission = await this.emitSignal(signal, context.now, lifecycle);
+    if (emission !== undefined && !emission.journaled) return;
     if (intent.state === "OPEN") {
       this.openSignals.set(correlationKey, signal);
     } else {
       this.openSignals.delete(correlationKey);
     }
+  }
+
+  private currentOpenSignals(owner: string): readonly RestoredOpenSignal[] {
+    const prefix = `${owner}:`;
+    return Object.freeze([...this.openSignals].flatMap(([identity, signal]) =>
+      identity.startsWith(prefix)
+        ? [Object.freeze({ correlationKey: identity.slice(prefix.length), signal })]
+        : []));
   }
 
   private restoreOpenSignals(

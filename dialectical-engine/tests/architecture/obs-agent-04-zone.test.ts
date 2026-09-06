@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const captureRoot = "apps/observation-agent/src/modules/capture-health";
 const spoolRoot = "apps/observation-agent/src/modules/spool-health";
+const spoolTargetFragment = "deploy/observation-agent/targets.dev.d/OBS-04.json";
 
 async function moduleSource(root: string): Promise<string> {
   if (!existsSync(root)) return "";
@@ -31,5 +32,12 @@ describe("OBS-04 privacy, zone, and read-only boundary", () => {
     const source = `${await moduleSource(captureRoot)}\n${await moduleSource(spoolRoot)}`;
     expect(source).not.toMatch(/(?:INSERT|UPDATE|DELETE|TRUNCATE)[\s\S]{0,80}obs\./iu);
     expect(source).not.toMatch(/suspectedDefect:\s*true|defectKind:\s*["'][^"']+["']/u);
+  });
+
+  it("commits no guessed spool path while capture wiring is unconfigured", async () => {
+    const fragment = JSON.parse(await readFile(spoolTargetFragment, "utf8")) as {
+      targets?: unknown[];
+    };
+    expect(fragment.targets).toEqual([]);
   });
 });

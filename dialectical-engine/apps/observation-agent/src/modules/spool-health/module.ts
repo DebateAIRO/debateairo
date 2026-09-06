@@ -59,10 +59,30 @@ export function createSpoolHealthModule(
       restore: tracker.restore
     }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
+      const targets = spoolTargets(ctx.targetFragment);
+      if (targets.length === 0) {
+        pendingIntents = Object.freeze([]);
+        return Object.freeze([Object.freeze({
+          component: "spool",
+          ok: false,
+          class: "SPOOL_STRANDED",
+          probe: "spool_metadata",
+          lastStatus: "UNKNOWN",
+          observedAt: ctx.now,
+          management: "module",
+          statusState: "UNKNOWN",
+          status: Object.freeze([Object.freeze({
+            kind: "state" as const,
+            key: "spool",
+            state: "UNKNOWN" as const,
+            observedAt: ctx.now
+          })])
+        })]);
+      }
       const thresholdSeconds = typeof ctx.thresholds.spool_age_s === "number"
         ? ctx.thresholds.spool_age_s : 600;
       const scan = await resolved.scan({
-        targets: spoolTargets(ctx.targetFragment),
+        targets,
         now: ctx.now,
         thresholdSeconds
       });

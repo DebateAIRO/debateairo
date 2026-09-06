@@ -7,6 +7,7 @@ import type {
 } from "../../core/types.js";
 import type { ObservationSignal } from "../../core/signals.js";
 import type { ObservationDatabasePort } from "../../core/database.js";
+import type { ReplayedOpenSignal } from "../../core/lifecycle.js";
 import { appendDailyNotWiredImpact } from "./daily.js";
 import { createCaptureGapTracker } from "./gaps.js";
 import {
@@ -25,7 +26,12 @@ export type CaptureHealthDependencies = Readonly<{
     stateDir: string,
     runtimes: readonly string[]
   ): Promise<Readonly<Record<string, RuntimeLiveness>>>;
-  appendDailyNotWiredImpact(stateDir: string, runtime: string, now: Date): Promise<void>;
+  appendDailyNotWiredImpact(input: Readonly<{
+    stateDir: string;
+    runtime: string;
+    now: Date;
+    openSignals: readonly ReplayedOpenSignal[];
+  }>): Promise<"APPENDED" | "ALREADY_PRESENT" | "OPEN_IDENTITY_MISSING">;
 }>;
 
 const productionDependencies: CaptureHealthDependencies = Object.freeze({
@@ -68,6 +74,10 @@ export function createCaptureHealthModule(
       }
     }),
     async probe(ctx): Promise<readonly ProbeObservation[]> {
+      if (ctx.openSignals !== undefined) {
+        tracker.reconcile(ctx.openSignals.filter((open) =>
+          tracker.legacyCorrelationKey(open.signal) === open.correlationKey));
+      }
       const runtimes = expectedRuntimes(ctx.thresholds);
       const [snapshot, liveness] = await Promise.all([
         resolved.readSnapshot(ctx.database),
@@ -90,8 +100,22 @@ export function createCaptureHealthModule(
           ? ctx.thresholds.gap_severe_lost_count : 100
       });
       pendingIntents = Object.freeze([...cycle.intents, ...gaps.intents]);
+      const openSignals: readonly ReplayedOpenSignal[] = Object.freeze(
+        (ctx.openSignals ?? []).map((open) => Object.freeze({
+          signal: open.signal,
+          lifecycle: Object.freeze({
+            owner: "capture-health",
+            correlationKey: open.correlationKey
+          })
+        }))
+      );
       for (const runtime of cycle.dailyNotWiredRuntimes) {
-        await resolved.appendDailyNotWiredImpact(ctx.stateDir, runtime, ctx.now);
+        await resolved.appendDailyNotWiredImpact({
+          stateDir: ctx.stateDir,
+          runtime,
+          now: ctx.now,
+          openSignals
+        });
       }
       return Object.freeze([Object.freeze({
         component: "obs_capture",

@@ -3,7 +3,11 @@ import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
+import { signalSchema } from "../../apps/observation-agent/src/core/signals.js";
+import { createCaptureHealthModule } from "../../apps/observation-agent/src/modules/capture-health/module.js";
 import { createCaptureHealthTracker } from "../../apps/observation-agent/src/modules/capture-health/tracker.js";
+import { createSpoolHealthModule } from "../../apps/observation-agent/src/modules/spool-health/module.js";
 
 const scanPath = "apps/observation-agent/src/modules/spool-health/scan.ts";
 const trackerPath = "apps/observation-agent/src/modules/spool-health/tracker.ts";
@@ -27,6 +31,34 @@ function captureSnapshot(flushAt: Date | undefined, state: "CURRENT" | "UNKNOWN"
     }],
     cursor: { captureGapMs: 0, componentHealthMs: 0, spoolReceiptMs: 0 }
   } as const;
+}
+
+function blindOpen(signalId: string) {
+  return signalSchema.parse({
+    seq: 1,
+    signal_id: signalId,
+    state: "OPEN",
+    class: "BLIND_PERIOD",
+    component: "obs_capture",
+    severity: "DEGRADED",
+    impact_code: "IMPACT_BLIND",
+    first_failed_probe_at: at(120).toISOString(),
+    detected_at: at(135).toISOString(),
+    evidence: {
+      runtime: "runner",
+      last_flush_ok_at: at(0).toISOString(),
+      silence_s: 135,
+      threshold_s: 120,
+      health: "WIRED_SILENT"
+    },
+    suspected_defect: false,
+    defect_kind: null,
+    run_ref: null,
+    work_item_ref: null,
+    threshold_version: 1,
+    clears_signal_id: null,
+    recorded_at: at(135).toISOString()
+  });
 }
 
 afterEach(async () => {
@@ -91,6 +123,113 @@ describe("OBS-04 blind periods", () => {
       snapshot: captureSnapshot(undefined, "UNKNOWN"), runtimeLiveness: { runner: "UP" },
       expectedRuntimes: ["runner"], now: at(135), blindWindowSeconds: 120
     }).intents).toEqual([]);
+  });
+
+  it("clears a restored blind period by its original UUID when DOWN has no fresh capture authority", async () => {
+    const originalId = "70000000-0000-4000-8000-000000000401";
+    const module = createCaptureHealthModule({
+      readSnapshot: async () => captureSnapshot(undefined),
+      readRuntimeLiveness: async () => ({ runner: "DOWN" }),
+      appendDailyNotWiredImpact: async () => "OPEN_IDENTITY_MISSING"
+    });
+    const emitted: ReturnType<typeof signalSchema.parse>[] = [];
+    let nextId = 1;
+    const runtime = new ObservationModuleRuntime({
+      modules: [module],
+      replayedOpenSignals: [{
+        signal: blindOpen(originalId),
+        lifecycle: { owner: "capture-health", correlationKey: "blind:runner" }
+      }],
+      nextSequence: () => 10 + nextId,
+      nextSignalId: () => `70000000-0000-4000-8000-${String(++nextId).padStart(12, "0")}`,
+      sampleStore: { async write() {} },
+      emitSignal: async (signal) => { emitted.push(signal); }
+    });
+
+    await runtime.run({
+      modules: [module], now: at(150), timeoutMs: 2_000,
+      database: {} as never, stateDir: "/tmp/obs-04-blind-down",
+      repoRoot: process.cwd(), targets: [], thresholdVersion: 1,
+      moduleThresholds: { "capture-health": {
+        expected_runtimes: ["runner"], blind_window_s: 120,
+        gap_window_s: 300, gap_severe_lost_count: 100
+      } }
+    });
+
+    expect(emitted.filter((signal) => signal.class === "BLIND_PERIOD")).toEqual([
+      expect.objectContaining({
+        state: "CLEARED",
+        clears_signal_id: originalId,
+        impact_code: "IMPACT_CLEARED",
+        suspected_defect: false
+      })
+    ]);
+  });
+
+  it("retains and retries the original blind UUID when a pre-journal CLEAR fails", async () => {
+    const originalId = "70000000-0000-4000-8000-000000000416";
+    const module = createCaptureHealthModule({
+      readSnapshot: async () => captureSnapshot(undefined),
+      readRuntimeLiveness: async () => ({ runner: "DOWN" }),
+      appendDailyNotWiredImpact: async () => "OPEN_IDENTITY_MISSING"
+    });
+    const blindAttempts: ReturnType<typeof signalSchema.parse>[] = [];
+    let sequence = 0;
+    let identifier = 0;
+    const runtime = new ObservationModuleRuntime({
+      modules: [module],
+      replayedOpenSignals: [{
+        signal: blindOpen(originalId),
+        lifecycle: { owner: "capture-health", correlationKey: "blind:runner" }
+      }],
+      nextSequence: () => ++sequence,
+      nextSignalId: () => `70000000-0000-4000-8000-${String(++identifier).padStart(12, "0")}`,
+      sampleStore: { async write() {} },
+      emitSignal: async (signal) => {
+        if (signal.class !== "BLIND_PERIOD") return { journaled: true };
+        blindAttempts.push(signal);
+        return { journaled: blindAttempts.length === 2 };
+      }
+    });
+    const run = (now: Date) => runtime.run({
+      modules: [module], now, timeoutMs: 2_000,
+      database: {} as never, stateDir: "/tmp/obs-04-blind-clear-retry",
+      repoRoot: process.cwd(), targets: [], thresholdVersion: 1,
+      moduleThresholds: { "capture-health": {
+        expected_runtimes: ["runner"], blind_window_s: 120,
+        gap_window_s: 300, gap_severe_lost_count: 100
+      } }
+    });
+
+    await run(at(150));
+    await run(at(165));
+
+    expect(blindAttempts).toHaveLength(2);
+    expect(blindAttempts).toEqual([
+      expect.objectContaining({
+        state: "CLEARED", class: "BLIND_PERIOD", clears_signal_id: originalId
+      }),
+      expect.objectContaining({
+        state: "CLEARED", class: "BLIND_PERIOD", clears_signal_id: originalId
+      })
+    ]);
+  });
+
+  it("retains a restored blind period when UNKNOWN has no fresh capture authority", () => {
+    const tracker = createCaptureHealthTracker();
+    tracker.restore([{
+      correlationKey: "blind:runner",
+      signal: blindOpen("70000000-0000-4000-8000-000000000402")
+    }]);
+
+    expect(tracker.observe({
+      snapshot: captureSnapshot(undefined, "UNKNOWN"), runtimeLiveness: { runner: "UNKNOWN" },
+      expectedRuntimes: ["runner"], now: at(150), blindWindowSeconds: 120
+    }).intents.filter((intent) => intent.class === "BLIND_PERIOD")).toEqual([]);
+    expect(tracker.observe({
+      snapshot: captureSnapshot(at(0)), runtimeLiveness: { runner: "UP" },
+      expectedRuntimes: ["runner"], now: at(165), blindWindowSeconds: 120
+    }).intents.filter((intent) => intent.class === "BLIND_PERIOD")).toEqual([]);
   });
 });
 
@@ -200,5 +339,86 @@ describe("OBS-04 metadata-only stranded spool", () => {
       })).resolves.toEqual({ state: "UNKNOWN", files: [] });
     }
     expect(contacts).toBe(0);
+  });
+
+  it("publishes fixed UNKNOWN and performs no scan or database work when unconfigured", async () => {
+    let scanCalls = 0;
+    let databaseCalls = 0;
+    const module = createSpoolHealthModule({
+      scan: async () => {
+        scanCalls += 1;
+        return { state: "CURRENT", files: [] };
+      },
+      readReceipts: async () => {
+        databaseCalls += 1;
+        return { state: "CURRENT", refs: [] };
+      }
+    });
+    const now = at(600);
+    const observations = await module.probe({
+      now, timeoutMs: 2_000, database: {} as never,
+      stateDir: "/tmp/obs-04-spool-unconfigured", repoRoot: process.cwd(),
+      targets: [], targetFragment: {
+        basename: "OBS-04.json", targets: [], configuration: {}
+      },
+      configuration: {}, thresholds: { spool_age_s: 600 }
+    });
+
+    expect(scanCalls).toBe(0);
+    expect(databaseCalls).toBe(0);
+    expect(observations).toEqual([expect.objectContaining({
+      component: "spool", ok: false, lastStatus: "UNKNOWN", statusState: "UNKNOWN",
+      status: [{ kind: "state", key: "spool", state: "UNKNOWN", observedAt: now }]
+    })]);
+    expect(module.signals(observations, {
+      now, thresholdVersion: 1, targetFragment: null,
+      configuration: {}, thresholds: { spool_age_s: 600 }
+    })).toEqual([]);
+  });
+
+  it("preserves scan and receipt behavior for a genuinely configured target", async () => {
+    const spoolRef = "runner-42-45000000-0000-4000-8000-000000000003.spool";
+    let scanCalls = 0;
+    let databaseCalls = 0;
+    const module = createSpoolHealthModule({
+      scan: async (input) => {
+        scanCalls += 1;
+        expect(input.targets).toEqual([{
+          component: "spool", kind: "spool_directory", path: "/var/tmp/obs-04-spool"
+        }]);
+        return {
+          state: "CURRENT",
+          files: [{ runtime: "runner", spoolRef, mtime: at(0), ageSeconds: 600 }]
+        };
+      },
+      readReceipts: async (_database, refs) => {
+        databaseCalls += 1;
+        expect(refs).toEqual([spoolRef]);
+        return { state: "CURRENT", refs: [spoolRef] };
+      }
+    });
+    const now = at(600);
+    const observations = await module.probe({
+      now, timeoutMs: 2_000, database: {} as never,
+      stateDir: "/tmp/obs-04-spool-configured", repoRoot: process.cwd(),
+      targets: [], targetFragment: {
+        basename: "OBS-04.json",
+        targets: [{
+          component: "spool", kind: "spool_directory", path: "/var/tmp/obs-04-spool"
+        }],
+        configuration: {}
+      },
+      configuration: {}, thresholds: { spool_age_s: 600 }
+    });
+
+    expect(scanCalls).toBe(1);
+    expect(databaseCalls).toBe(1);
+    expect(observations).toEqual([expect.objectContaining({
+      component: "spool", ok: true, lastStatus: "CURRENT", statusState: "CURRENT"
+    })]);
+    expect(module.signals(observations, {
+      now, thresholdVersion: 1, targetFragment: null,
+      configuration: {}, thresholds: { spool_age_s: 600 }
+    })).toEqual([]);
   });
 });

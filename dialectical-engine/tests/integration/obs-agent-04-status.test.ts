@@ -51,10 +51,7 @@ describe("OBS-04 defaults and projections", () => {
       "deploy/observation-agent/targets.dev.d"
     ));
     expect(catalog.fragments.find((fragment) => fragment.basename === "OBS-04.json"))
-      .toMatchObject({ targets: [{
-        component: "spool", kind: "spool_directory",
-        path: "/tmp/dialectical-engine-observation-spool"
-      }] });
+      .toMatchObject({ targets: [] });
     const policy = await loadMergedThresholdPolicy({
       defaultsDirectory: resolve("deploy/observation-agent/thresholds/defaults")
     });

@@ -238,12 +238,17 @@ export type SignalIntent = Readonly<{
   workItemRef: string | null;
 }>;
 
+export type SignalEmissionResult = Readonly<{
+  journaled: boolean;
+}>;
+
 export type ProbeContext = Readonly<{
   now: Date;
   timeoutMs: number;
   database: ObservationDatabasePort;
   stateDir: string;
   repoRoot: string;
+  openSignals?: readonly RestoredOpenSignal[];
   targets: readonly unknown[];
   targetFragment: ModuleTargetFragment | null;
   configuration: ModuleConfigurationObject;

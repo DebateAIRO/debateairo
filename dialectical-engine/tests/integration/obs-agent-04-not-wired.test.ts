@@ -3,6 +3,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
+import { signalSchema } from "../../apps/observation-agent/src/core/signals.js";
 
 const modulePath = "apps/observation-agent/src/modules/capture-health/module.ts";
 const temporaryDirectories: string[] = [];
@@ -42,6 +44,32 @@ function context(now: Date, stateDir: string) {
       gap_window_s: 300, gap_severe_lost_count: 100,
       expected_runtimes: ["runner"]
     }
+  };
+}
+
+function restoredNotWiredOpen() {
+  const detectedAt = "2026-09-02T08:00:00.000Z";
+  return {
+    correlationKey: "not-wired:runner",
+    signal: signalSchema.parse({
+      seq: 1,
+      signal_id: "70000000-0000-4000-8000-000000000409",
+      state: "OPEN",
+      class: "CAPTURE_NOT_WIRED",
+      component: "obs_capture",
+      severity: "INFO",
+      impact_code: "IMPACT_CAPTURE_NOT_WIRED",
+      first_failed_probe_at: detectedAt,
+      detected_at: detectedAt,
+      evidence: { runtime: "runner", flush_ok_count: 0, health: "NOT_WIRED" },
+      suspected_defect: false,
+      defect_kind: null,
+      run_ref: null,
+      work_item_ref: null,
+      threshold_version: 1,
+      clears_signal_id: null,
+      recorded_at: detectedAt
+    })
   };
 }
 
@@ -95,7 +123,7 @@ describe("OBS-04 NOT WIRED authority", () => {
     })]);
   });
 
-  it("deduplicates the fixed NOT-WIRED digest impact once per UTC day", async () => {
+  it("deduplicates a restored NOT-WIRED OPEN by its original UUID after restart", async () => {
     const implementation = await captureModule();
     expect(implementation).not.toBeNull();
     const stateDir = await mkdtemp(join(tmpdir(), "obs-04-daily-"));
@@ -104,14 +132,50 @@ describe("OBS-04 NOT WIRED authority", () => {
       readSnapshot: async () => snapshot(),
       readRuntimeLiveness: async () => ({ runner: "UP" as const })
     });
+    const restored = restoredNotWiredOpen();
+    const runtime = new ObservationModuleRuntime({
+      modules: [manifest],
+      replayedOpenSignals: [{
+        signal: restored.signal,
+        lifecycle: { owner: "capture-health", correlationKey: restored.correlationKey }
+      }],
+      nextSequence: () => { throw new Error("UNEXPECTED_SIGNAL_SEQUENCE"); },
+      nextSignalId: () => { throw new Error("UNEXPECTED_SIGNAL_ID"); },
+      sampleStore: { async write() {} },
+      emitSignal: async () => { throw new Error("UNEXPECTED_SIGNAL_EMIT"); }
+    });
 
     for (const now of [at(3), at(3, 15), at(4), at(4, 15)]) {
-      const observed = await manifest.probe(context(now, stateDir));
-      manifest.signals(observed, { ...context(now, stateDir), thresholdVersion: 1 });
+      await runtime.run({
+        modules: [manifest], now, timeoutMs: 2_000, database, stateDir,
+        repoRoot: process.cwd(), targets: [], thresholdVersion: 1,
+        moduleThresholds: { "capture-health": context(now, stateDir).thresholds }
+      });
     }
     const dayTwo = await readFile(join(stateDir, "digest", "2026-09-04.md"), "utf8");
     expect(dayTwo.match(/CAPTURE_NOT_WIRED.*Error capture is not wired into the product/gmu))
       .toHaveLength(1);
+    expect(dayTwo).toContain(restored.signal.signal_id);
+  });
+
+  it("never falls back to boot-only OPEN state when current runtime identities are absent", async () => {
+    const implementation = await captureModule();
+    expect(implementation).not.toBeNull();
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-04-daily-no-current-opens-"));
+    temporaryDirectories.push(stateDir);
+    const manifest = implementation!.createCaptureHealthModule({
+      readSnapshot: async () => snapshot(),
+      readRuntimeLiveness: async () => ({ runner: "UP" as const })
+    });
+    manifest.lifecycle!.restore([restoredNotWiredOpen()]);
+
+    await manifest.probe({ ...context(at(3), stateDir), repoRoot: process.cwd() });
+    await manifest.probe({ ...context(at(4), stateDir), repoRoot: process.cwd() });
+
+    await expect(readFile(join(stateDir, "digest", "2026-09-03.md"), "utf8"))
+      .rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(join(stateDir, "digest", "2026-09-04.md"), "utf8"))
+      .rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("projects UNKNOWN without clearing or claiming health when a capture read fails", async () => {

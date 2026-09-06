@@ -13,9 +13,11 @@ export async function persistSignal(input: Readonly<{
   lifecycle?: SignalLifecycleIdentity | null;
   journal: ObservationJournal;
   mirror: SignalMirror;
+  onJournaled?: () => void;
 }>): Promise<Readonly<{ mirrored: boolean }>> {
   const signal = signalSchema.parse(input.signal);
   await input.journal.appendSignal(signal, input.lifecycle ?? null);
+  input.onJournaled?.();
   await appendDigest(input.journal.stateDir, signal);
   try {
     await input.mirror.mirrorSignal(signal);
