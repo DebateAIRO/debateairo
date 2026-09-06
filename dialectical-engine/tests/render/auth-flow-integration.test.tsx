@@ -475,4 +475,46 @@ describe("rendered auth flow integration", () => {
       .toBe("Verification instructions could not be resent.");
     expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);
   });
+
+  // S02-S31 (SPEC.md S02-R18): a bare `new Event("submit")` bypasses HTML constraint
+  // validation, so `required` gates nothing against a scripted submit. The handler
+  // refuses from the two FormData reads — never from R17's React mirror, which an
+  // assignment never updates.
+  it("refuses to register when either consent box is left unticked", async () => {
+    const registerWithoutPrivacy = vi.fn();
+    await act(async () =>
+      root!.render(
+        <SignUpFlow client={{ register: registerWithoutPrivacy, resendVerification: vi.fn() }} />
+      )
+    );
+
+    field("email").value = "person@example.test";
+    field("recovery-email").value = "recovery@example.test";
+    field("password").value = "correct horse battery staple";
+    field("adult-affirmed").checked = true;
+    await submit();
+
+    expect(registerWithoutPrivacy).not.toHaveBeenCalled();
+
+    await act(async () => root!.unmount());
+    document.body.replaceChildren();
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    const registerWithoutAdult = vi.fn();
+    await act(async () =>
+      root!.render(
+        <SignUpFlow client={{ register: registerWithoutAdult, resendVerification: vi.fn() }} />
+      )
+    );
+
+    field("email").value = "person@example.test";
+    field("recovery-email").value = "recovery@example.test";
+    field("password").value = "correct horse battery staple";
+    field("privacy-accepted").checked = true;
+    await submit();
+
+    expect(registerWithoutAdult).not.toHaveBeenCalled();
+  });
 });

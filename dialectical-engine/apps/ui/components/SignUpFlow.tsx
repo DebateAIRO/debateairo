@@ -55,6 +55,11 @@ export function SignUpFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginHref, setLoginHref] = useState("/login");
+  /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
+     computing the submit button's `disabled`, so it reflects the boxes live.
+     FormData is the truth at submit — see submitRegistration. */
+  const [adultAffirmed, setAdultAffirmed] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -65,6 +70,10 @@ export function SignUpFlow({
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
+       validation, so `required` alone gates nothing against a scripted submit.
+       These are the two FormData reads, never the mirrors above. */
+    if (data.get("adult-affirmed") !== "on" || data.get("privacy-accepted") !== "on") return;
     const submitted = String(data.get("email") ?? "").trim();
     setBusy(true);
     setError(null);
@@ -199,6 +208,7 @@ export function SignUpFlow({
               type="checkbox"
               required
               disabled={busy || sent}
+              onChange={(event) => setAdultAffirmed(event.currentTarget.checked)}
             />
             <span className="consentText">I am 18 or over.</span>
           </label>
@@ -210,6 +220,14 @@ export function SignUpFlow({
               required
               disabled={busy || sent}
               aria-labelledby={PRIVACY_CONSENT_TEXT_ID}
+              /* The SETTLED value, not the in-flight one: a cancelled change never
+                 reaches the DOM, so mirroring its `true` would record a state the box
+                 never holds. `adult-affirmed`'s handler is the literal form. */
+              onChange={(event) =>
+                setPrivacyAccepted(
+                  event.currentTarget.checked && !event.nativeEvent.defaultPrevented
+                )
+              }
             />
             <span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>
               I agree to the{" "}
@@ -219,7 +237,11 @@ export function SignUpFlow({
           </div>
         </div>
 
-        <button className="authPrimary" type="submit" disabled={busy || sent}>
+        <button
+          className="authPrimary"
+          type="submit"
+          disabled={busy || sent || !adultAffirmed || !privacyAccepted}
+        >
           {busy ? "Creating…" : "Create account"}
         </button>
 
