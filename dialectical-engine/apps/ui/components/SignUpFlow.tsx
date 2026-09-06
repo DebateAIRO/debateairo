@@ -18,6 +18,10 @@ const PASSWORD_RULES: ReadonlyArray<{ label: string; met: (value: string) => boo
   { label: "One special character", met: (value) => /[^A-Za-z0-9]/.test(value) }
 ];
 
+/* The id the privacy row's input points at with aria-labelledby: its sentence holds an
+   interactive control, so the row cannot be a <label> (see the consent group below). */
+const PRIVACY_CONSENT_TEXT_ID = "signup-privacy-consent-text";
+
 // Deliberately permissive: the address is checked for shape, not existence.
 const shapedEmail = (value: string) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value);
 
@@ -51,6 +55,11 @@ export function SignUpFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginHref, setLoginHref] = useState("/login");
+  /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
+     computing the submit button's `disabled`, so it reflects the boxes live.
+     FormData is the truth at submit — see submitRegistration. */
+  const [adultAffirmed, setAdultAffirmed] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -61,6 +70,10 @@ export function SignUpFlow({
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
+       validation, so `required` alone gates nothing against a scripted submit.
+       These are the two FormData reads, never the mirrors above. */
+    if (data.get("adult-affirmed") !== "on" || data.get("privacy-accepted") !== "on") return;
     const submitted = String(data.get("email") ?? "").trim();
     setBusy(true);
     setError(null);
@@ -182,12 +195,53 @@ export function SignUpFlow({
           </ul>
         </div>
 
-        <label className="authCheck">
-          <input name="adult-affirmed" type="checkbox" required disabled={busy || sent} />
-          <span>I affirm that I am at least 18 years old.</span>
-        </label>
+        {/* Consent group — design artboard 8a (turn-8a-checkbox-group.html:1-10).
+            Row 1 is a <label> wrapping its input, so the square, the text and the row
+            all toggle it natively. Row 2 cannot be a <label>: its Privacy Policy
+            control is interactive content, which the <label> content model forbids —
+            so it is a <div> and the input takes its name from aria-labelledby. */}
+        <div className="consentGroup">
+          <label className="consentRow">
+            <input
+              className="consentBox"
+              name="adult-affirmed"
+              type="checkbox"
+              required
+              disabled={busy || sent}
+              onChange={(event) => setAdultAffirmed(event.currentTarget.checked)}
+            />
+            <span className="consentText">I am 18 or over.</span>
+          </label>
+          <div className="consentRow">
+            <input
+              className="consentBox"
+              name="privacy-accepted"
+              type="checkbox"
+              required
+              disabled={busy || sent}
+              aria-labelledby={PRIVACY_CONSENT_TEXT_ID}
+              /* The SETTLED value, not the in-flight one: a cancelled change never
+                 reaches the DOM, so mirroring its `true` would record a state the box
+                 never holds. `adult-affirmed`'s handler is the literal form. */
+              onChange={(event) =>
+                setPrivacyAccepted(
+                  event.currentTarget.checked && !event.nativeEvent.defaultPrevented
+                )
+              }
+            />
+            <span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>
+              I agree to the{" "}
+              <button type="button" className="consentPolicyLink">Privacy Policy</button>
+              , including that my debates may be published publicly.
+            </span>
+          </div>
+        </div>
 
-        <button className="authPrimary" type="submit" disabled={busy || sent}>
+        <button
+          className="authPrimary"
+          type="submit"
+          disabled={busy || sent || !adultAffirmed || !privacyAccepted}
+        >
           {busy ? "Creating…" : "Create account"}
         </button>
 
