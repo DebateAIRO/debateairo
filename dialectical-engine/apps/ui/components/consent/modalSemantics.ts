@@ -29,11 +29,11 @@ type StackEntry = Readonly<{ read: () => ModalSurface }>;
 /**
  * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
  * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
- * is never "the last one registered". Which surface is topmost is decided by `topmostSurface()`
- * from DOM containment: a surface contained by another is drawn over it and wins, and among
- * unrelated siblings the one later in document order wins — which in this product tracks the
- * order they opened in, because the stacking is the `--z-consent-bar` < `--z-consent-card` <
- * `--z-policy-*` ladder. The most recently registered entry is only where that search starts.
+ * is never "the last one registered": that entry is only where `topmostSurface()` starts. It
+ * decides from DOM POSITION — a surface contained by another is drawn over it and wins, and
+ * among unrelated siblings the one later in DOCUMENT order wins. `compareDocumentPosition`
+ * knows nothing of the `--z-*` ladder, so what makes that right for this product is its
+ * ARRANGEMENT: the policy modal renders AFTER the card (V-20; CODE-REV-S02-C5C6 r1 N2).
  */
 const surfaceStack: StackEntry[] = [];
 

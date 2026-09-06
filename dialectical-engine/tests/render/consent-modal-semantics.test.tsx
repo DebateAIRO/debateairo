@@ -97,6 +97,46 @@ function pressEscape(): void {
   );
 }
 
+/**
+ * A SPEC-CONFORMANT `compareDocumentPosition`, installed for one case only.
+ *
+ * jsdom 30.0.1 answers `DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC` (37) in BOTH directions
+ * for any pair involving a disconnected node, which the DOM standard forbids: the two directions
+ * must disagree. Under that violation a connected candidate displaces a detached incumbent by
+ * coincidence, so the incumbent half of the guard in `topmostSurface()` cannot be discriminated.
+ * The shim answers 37 one way and `DISCONNECTED|PRECEDING|IMPLEMENTATION_SPECIFIC` (35) the
+ * other — a disconnected node sorts AFTER a connected one — and the case asserts that
+ * consistency before it relies on it, so it can never pass through a broken shim.
+ */
+let conformantCDP: PropertyDescriptor | undefined;
+
+function installConformantCDP(): void {
+  const original = Object.getOwnPropertyDescriptor(Node.prototype, "compareDocumentPosition")!;
+  conformantCDP = original;
+  const real = original.value as (this: Node, other: Node) => number;
+  Object.defineProperty(Node.prototype, "compareDocumentPosition", {
+    configurable: true,
+    writable: true,
+    value(this: Node, other: Node): number {
+      if (this.isConnected && other.isConnected) return real.call(this, other);
+      const direction = other.isConnected
+        ? Node.DOCUMENT_POSITION_PRECEDING
+        : Node.DOCUMENT_POSITION_FOLLOWING;
+      return (
+        Node.DOCUMENT_POSITION_DISCONNECTED |
+        Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC |
+        direction
+      );
+    }
+  });
+}
+
+function restoreConformantCDP(): void {
+  if (conformantCDP === undefined) return;
+  Object.defineProperty(Node.prototype, "compareDocumentPosition", conformantCDP);
+  conformantCDP = undefined;
+}
+
 function pressTab(shiftKey = false): KeyboardEvent {
   const event = new KeyboardEvent("keydown", {
     key: "Tab",
@@ -117,6 +157,9 @@ describe("consent modal semantics helper", () => {
   });
 
   afterEach(async () => {
+    // First, so a failed assertion inside the shimmed case cannot leak the prototype patch
+    // into the next one.
+    restoreConformantCDP();
     if (root !== null) await act(async () => root!.unmount());
     root = null;
     container?.remove();
@@ -277,6 +320,87 @@ describe("consent modal semantics helper", () => {
     const stale = captured.ref!.current;
     expect(stale, "the stale surface must still hold its container ref").not.toBeNull();
     expect(stale!.isConnected).toBe(false);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(liveClose).toHaveBeenCalledTimes(1);
+    expect(staleClose).toHaveBeenCalledTimes(0);
+  });
+
+  it("never lets a DETACHED INCUMBENT stand, under a conformant compareDocumentPosition", async () => {
+    // The other half of the same guard, and the half jsdom's default cannot see. The case above
+    // pins "a detached CANDIDATE never wins"; this one pins "a detached INCUMBENT never stands",
+    // which is the four-line clause in `topmostSurface()`. Under jsdom's two-way FOLLOWING the
+    // connected surface displaces the detached incumbent whether or not that clause exists, so
+    // the mutant survives there (measured by CODE-S02-C5C6 as MN7b) — the shim is what makes the
+    // property observable. The stale surface registers LAST, so it is the incumbent
+    // `topmostSurface()` starts from, and under the shim it compares as PRECEDING the live one,
+    // i.e. NOT above: without the clause it stays `top` and swallows the key.
+    installConformantCDP();
+
+    const staleClose = vi.fn();
+    const liveClose = vi.fn();
+    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
+
+    function DetachingSurface({ mounted }: { mounted: boolean }): ReactNode {
+      const containerRef = useRef<HTMLElement | null>(null);
+      const initialFocusRef = useRef<HTMLElement | null>(null);
+      captured.ref = containerRef;
+      useModalSurface(true, { containerRef, initialFocusRef, onClose: staleClose });
+      if (!mounted) return null;
+      return (
+        <div
+          data-surface="stale"
+          ref={(node) => {
+            containerRef.current = node;
+            return () => {};
+          }}
+        >
+          <button
+            type="button"
+            ref={(node) => {
+              initialFocusRef.current = node;
+            }}
+          >
+            close-stale
+          </button>
+        </div>
+      );
+    }
+
+    function Harness({ mounted }: { mounted: boolean }): ReactNode {
+      return (
+        <>
+          <TestSurface open name="live" onClose={liveClose} />
+          <DetachingSurface mounted={mounted} />
+        </>
+      );
+    }
+
+    await render(<Harness mounted />);
+    expect(openSurfaceCount()).toBe(2);
+    await render(<Harness mounted={false} />);
+    expect(openSurfaceCount()).toBe(2);
+
+    const stale = captured.ref!.current;
+    expect(stale, "the stale surface must still hold its container ref").not.toBeNull();
+    expect(stale!.isConnected).toBe(false);
+    const live = document.querySelector<HTMLElement>('[data-surface="live"]');
+    expect(live, "the live surface must still be rendered").not.toBeNull();
+
+    // The shim's own consistency, asserted rather than assumed: exactly one direction is
+    // FOLLOWING and exactly one is PRECEDING. jsdom's default answers 37 both ways and would
+    // fail this precondition, so the case cannot silently degrade into the old arrangement.
+    const staleToLive = stale!.compareDocumentPosition(live!);
+    const liveToStale = live!.compareDocumentPosition(stale!);
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    const preceding = Node.DOCUMENT_POSITION_PRECEDING;
+    expect(staleToLive, "detached -> connected is DISCONNECTED|PRECEDING|IMPL_SPECIFIC").toBe(35);
+    expect(liveToStale, "connected -> detached is DISCONNECTED|FOLLOWING|IMPL_SPECIFIC").toBe(37);
+    expect((staleToLive & following) !== 0).toBe(false);
+    expect((liveToStale & preceding) !== 0).toBe(false);
 
     await act(async () => {
       pressEscape();
