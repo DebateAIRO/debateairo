@@ -79,10 +79,6 @@ async function boot(): Promise<void> {
       .filter((module) => module.lifecycle !== undefined)
       .map((module) => module.name)
   ]);
-  const replayed = await replayObservationJournals(
-    environment.OBSERVATION_STATE_DIR,
-    lifecycleOwners
-  );
 
   const bootstrapPool = new pg.Pool({
     connectionString: environment.OBSERVATION_DATABASE_URL,
@@ -98,6 +94,10 @@ async function boot(): Promise<void> {
   } finally {
     await bootstrapPool.end();
   }
+  const replayed = await replayObservationJournals(
+    environment.OBSERVATION_STATE_DIR,
+    lifecycleOwners
+  );
 
   const { pool, database } = createObservationDaemonDatabase({
     connectionString: environment.OBSERVATION_DATABASE_URL,

@@ -277,11 +277,11 @@ The repaired boot/cycle order is:
 ```text
 load four-key environment and code-derived repo root
   -> discover modules and validate targets
-  -> replay signal and delivery journals
   -> read threshold policy with bootstrap pool
        -> on success validate and atomically cache it
        -> on connection failure validate the last-ratified local cache
        -> close bootstrap pool
+  -> replay signal and delivery journals
   -> open the single max-2 daemon pool
   -> restore core/module lifecycle and delivery-health state
   -> construct the router from validated owned configuration

@@ -1,10 +1,12 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { join, resolve } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ObservationError } from "../../apps/observation-agent/src/core/errors.js";
 import type { ReplayedOpenSignal } from "../../apps/observation-agent/src/core/lifecycle.js";
 import { ObservationModuleRuntime } from "../../apps/observation-agent/src/core/runtime.js";
 import { signalSchema, type ObservationSignal } from "../../apps/observation-agent/src/core/signals.js";
+import { ThresholdPolicyCache } from "../../apps/observation-agent/src/core/threshold-cache.js";
 import type { Module, ModuleLifecycle, ProbeObservation, SignalIntent } from "../../apps/observation-agent/src/core/types.js";
 import { ObservationJournal } from "../../apps/observation-agent/src/journal/journal.js";
 import { replayObservationJournals } from "../../apps/observation-agent/src/journal/records.js";
@@ -45,7 +47,10 @@ import {
   createDeliveryHealthTracker,
   deliveryHealthLegacyCorrelationKey
 } from "../../apps/observation-agent/src/modules/routing/delivery-health.js";
+import { createRoutingModule } from "../../apps/observation-agent/src/modules/routing/module.js";
+import { createStatusPageModule } from "../../apps/observation-agent/src/modules/status-page/module.js";
 import { createChannelsSendmailModule } from "../../apps/observation-agent/src/modules/channels-sendmail/module.js";
+import { parseRatifiedThresholdPolicy } from "../../apps/observation-agent/src/oactl/core/thresholds.js";
 
 const scratchDirectories: string[] = [];
 const start = new Date("2026-09-06T00:00:00.000Z");
@@ -2737,5 +2742,359 @@ describe("all current stateful owners restore their native state", () => {
       exitCode: 0, reportOk: true
     }], thresholds, new Date(start.getTime() + 91_000)))
       .toEqual([expect.objectContaining({ correlationKey: "schedule:replay-self-test", state: "CLEARED" })]);
+  });
+});
+
+describe("OBS-01 complete boot restoration", () => {
+  it("boots from cache and journal through recovery, contained module failure, and atomic status", async () => {
+    const root = resolve(import.meta.dirname, "../..");
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-complete-boot-"));
+    const targetsDir = join(stateDir, "targets");
+    scratchDirectories.push(stateDir);
+    await mkdir(targetsDir, { recursive: true });
+    await Promise.all(["OBS-03.json", "OBS-07.json"].map(async (name) => {
+      await writeFile(
+        join(targetsDir, name),
+        await readFile(resolve(root, "deploy/observation-agent/targets.dev.d", name), "utf8")
+      );
+    }));
+
+    const basePolicy = JSON.parse(await readFile(
+      resolve(root, "deploy/observation-agent/thresholds/defaults/OBS-01.json"),
+      "utf8"
+    )) as Readonly<Record<string, unknown>>;
+    const policy = parseRatifiedThresholdPolicy({
+      version: 9,
+      value: {
+        ...basePolicy,
+        routing: {
+          ...(basePolicy.routing as Readonly<Record<string, unknown>>),
+          WORKER_LOST: "SEVERE"
+        },
+        modules: {
+          "stall-detectors": {
+            heartbeat_age_s: 30,
+            detector_interval_ms: 15_000,
+            worker_ref: "debateai-dev-runner",
+            worker_list_url: "http://127.0.0.1:8888/api/v1/tenants/main/worker"
+          },
+          routing: {
+            storm_count: 5,
+            storm_window_s: 60,
+            escalation_interval_ms: 1_800_000,
+            fatal_resend_max: 3,
+            board: "ops-alerts"
+          },
+          "status-page": { port: 9797 }
+        }
+      },
+      sourceRef: "task-9-cache",
+      ratifiedBy: "V",
+      appliedAt: new Date("2026-09-06T00:00:00.000Z")
+    });
+    await new ThresholdPolicyCache(stateDir).write(policy);
+
+    const journal = new ObservationJournal(stateDir);
+    await journal.appendSignal(workerOpen(originalId), {
+      owner: "stall-detectors",
+      correlationKey: "worker:debateai-dev-runner"
+    });
+    const failedAt = new Date(Date.now() + 60_000);
+    await journal.appendDeliveryResult({
+      kind: "RESULT",
+      delivery: {
+        delivery_id: "79000000-0000-4000-8000-000000000901",
+        signal_id: originalId,
+        channel: "sendmail",
+        attempted_at: failedAt.toISOString(),
+        delivered_at: null,
+        outcome: "FAILED",
+        external_ref: null
+      }
+    });
+
+    const timeline: string[] = [];
+    const restoredAtProbe: string[][] = [];
+    const routed: ObservationSignal[] = [];
+    let sentinelRuns = 0;
+    const stallBase = createStallDetectorsModule({
+      tokenPath: () => undefined,
+      readHeartbeat: async (input) => workerSnapshot("FRESH", input.now),
+      readDefectInputs: async () => Object.freeze({
+        stallRows: Object.freeze([]), readyRows: Object.freeze([]),
+        progressRows: Object.freeze([]), suspiciousRows: Object.freeze([])
+      })
+    });
+    const stallLifecycle = stallBase.lifecycle!;
+    const stall: Module = Object.freeze({
+      ...stallBase,
+      lifecycle: Object.freeze({
+        legacyCorrelationKey: stallLifecycle.legacyCorrelationKey,
+        restore(opens: Parameters<ModuleLifecycle["restore"]>[0]) {
+          timeline.push("lifecycle:stall-detectors");
+          stallLifecycle.restore(opens);
+        }
+      }),
+      async probe(context) {
+        timeline.push("probe:stall-detectors");
+        restoredAtProbe.push((context.openSignals ?? []).map((open) => open.signal.signal_id));
+        return stallBase.probe(context);
+      }
+    });
+    const routingBase = createRoutingModule();
+    const routingLifecycle = routingBase.lifecycle!;
+    const routing: Module = Object.freeze({
+      ...routingBase,
+      lifecycle: Object.freeze({
+        legacyCorrelationKey: routingLifecycle.legacyCorrelationKey,
+        restore(opens: Parameters<ModuleLifecycle["restore"]>[0]) {
+          timeline.push("lifecycle:routing");
+          routingLifecycle.restore(opens);
+        }
+      }),
+      async probe(context) {
+        timeline.push("probe:routing");
+        return routingBase.probe(context);
+      }
+    });
+    const statusBase = createStatusPageModule({
+      async start() {
+        throw new ObservationError("OBSERVATION_STATUS_BIND_FAILED");
+      }
+    });
+    const statusPage: Module = Object.freeze({
+      ...statusBase,
+      async probe(context) {
+        timeline.push("probe:status-page");
+        return statusBase.probe(context);
+      }
+    });
+    const sentinel: Module = Object.freeze({
+      name: "zz-sentinel",
+      cadence: Object.freeze({ intervalMs: 30_000, timeoutMs: 2_000 }),
+      async probe() {
+        timeline.push("probe:zz-sentinel");
+        sentinelRuns += 1;
+        return Object.freeze([]);
+      },
+      samples() { return Object.freeze([]); },
+      signals() { return Object.freeze([]); }
+    });
+    const modules = Object.freeze([stall, routing, statusPage, sentinel]);
+    const offline = () => Object.assign(new Error("POSTGRES_UNAVAILABLE"), {
+      code: "ECONNREFUSED"
+    });
+    const daemonPool = Object.freeze({
+      async connect(): Promise<never> { throw offline(); },
+      async end() {}
+    });
+    const priorTermListeners = new Set(process.listeners("SIGTERM"));
+    const priorInterruptListeners = new Set(process.listeners("SIGINT"));
+    const priorExitCode = process.exitCode;
+
+    vi.resetModules();
+    vi.stubGlobal("setInterval", () => 1);
+    vi.stubGlobal("clearInterval", () => undefined);
+    vi.doMock("pg", () => ({
+      default: {
+        Pool: class {
+          async connect(): Promise<never> { throw offline(); }
+          async end() {}
+        }
+      }
+    }));
+    vi.doMock("../../packages/register/src/runtime-environment.js", () => ({
+      loadObservationAgentEnvironment: () => ({
+        OBSERVATION_DATABASE_URL: "postgresql://127.0.0.1:1/unavailable",
+        OBSERVATION_STATE_DIR: stateDir,
+        OBSERVATION_TARGETS_PATH: targetsDir
+      })
+    }));
+    vi.doMock("../../apps/observation-agent/src/core/database.js", () => ({
+      createObservationDaemonDatabase: () => Object.freeze({
+        pool: daemonPool,
+        database: Object.freeze({
+          async withClient<T>(): Promise<T> { throw offline(); }
+        })
+      })
+    }));
+    vi.doMock("../../apps/observation-agent/src/core/modules.js", async () => {
+      const actual = await vi.importActual<typeof import(
+        "../../apps/observation-agent/src/core/modules.js"
+      )>("../../apps/observation-agent/src/core/modules.js");
+      return {
+        ...actual,
+        discoverObservationRuntimeModules: async () => Object.freeze({
+          modules,
+          targetFragments: Object.freeze(["OBS-03.json", "OBS-07.json"]),
+          routerContribution: Object.freeze({
+            moduleName: "routing",
+            targetFragmentBasename: "OBS-07.json",
+            factory: routing.router!
+          })
+        }),
+        async createOwnedSignalRouter(...args: Parameters<typeof actual.createOwnedSignalRouter>) {
+          const created = await actual.createOwnedSignalRouter(...args);
+          timeline.push("router-construction");
+          return Object.freeze({
+            async onSignal(input: Parameters<typeof created.onSignal>[0]) {
+              routed.push(input.signal);
+              if (input.signal.impact_code === "IMPACT_AGENT_START") {
+                timeline.push("initial-self-signal");
+              }
+              await created.onSignal(input);
+            },
+            onTick: created.onTick,
+            status: created.status
+          });
+        }
+      };
+    });
+    vi.doMock("../../apps/observation-agent/src/core/targets.js", async () => {
+      const actual = await vi.importActual<typeof import(
+        "../../apps/observation-agent/src/core/targets.js"
+      )>("../../apps/observation-agent/src/core/targets.js");
+      return {
+        ...actual,
+        async loadObservationTargetCatalog(path: string) {
+          const catalog = await actual.loadObservationTargetCatalog(path);
+          timeline.push("validated-targets");
+          return catalog;
+        }
+      };
+    });
+    vi.doMock("../../apps/observation-agent/src/core/threshold-cache.js", async () => {
+      const actual = await vi.importActual<typeof import(
+        "../../apps/observation-agent/src/core/threshold-cache.js"
+      )>("../../apps/observation-agent/src/core/threshold-cache.js");
+      return {
+        ...actual,
+        async readBootThresholdPolicy(
+          input: Parameters<typeof actual.readBootThresholdPolicy>[0]
+        ) {
+          const selected = await actual.readBootThresholdPolicy(input);
+          timeline.push(`policy:${selected.source}`);
+          return selected;
+        }
+      };
+    });
+    vi.doMock("../../apps/observation-agent/src/journal/records.js", async () => {
+      const actual = await vi.importActual<typeof import(
+        "../../apps/observation-agent/src/journal/records.js"
+      )>("../../apps/observation-agent/src/journal/records.js");
+      return {
+        ...actual,
+        async replayObservationJournals(
+          ...args: Parameters<typeof actual.replayObservationJournals>
+        ) {
+          const replayed = await actual.replayObservationJournals(...args);
+          timeline.push("journal-replay");
+          return replayed;
+        }
+      };
+    });
+    vi.doMock("../../apps/observation-agent/src/modules/self/heartbeat.js", () => ({
+      HeartbeatWriter: class {},
+      writeHeartbeatFailOpen: async () => false
+    }));
+    vi.doMock("../../apps/observation-agent/src/store/samples.js", () => ({
+      SampleRingStore: class { async write() {} }
+    }));
+    vi.doMock("../../apps/observation-agent/src/store/status.js", async () => {
+      const actual = await vi.importActual<typeof import(
+        "../../apps/observation-agent/src/store/status.js"
+      )>("../../apps/observation-agent/src/store/status.js");
+      return {
+        ...actual,
+        async writeStatusSnapshot(...args: Parameters<typeof actual.writeStatusSnapshot>) {
+          await actual.writeStatusSnapshot(...args);
+          timeline.push("atomic-status-write");
+        }
+      };
+    });
+
+    try {
+      process.exitCode = undefined;
+      await import("../../apps/observation-agent/src/main.js");
+      await vi.waitFor(() => {
+        expect(timeline).toContain("atomic-status-write");
+      });
+
+      expect(timeline).toEqual([
+        "validated-targets",
+        "policy:LAST_RATIFIED_CACHE",
+        "journal-replay",
+        "lifecycle:stall-detectors",
+        "lifecycle:routing",
+        "router-construction",
+        "initial-self-signal",
+        "probe:stall-detectors",
+        "probe:routing",
+        "probe:status-page",
+        "probe:zz-sentinel",
+        "atomic-status-write"
+      ]);
+      expect(restoredAtProbe).toEqual([[originalId]]);
+      expect(routed.filter((signal) => signal.class === "WORKER_LOST")).toEqual([
+        expect.objectContaining({ state: "CLEARED", clears_signal_id: originalId })
+      ]);
+      expect(routed).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ state: "OPEN", class: "WORKER_LOST" })
+      ]));
+      const deliveryHealth = routed.find((signal) =>
+        signal.impact_code === "IMPACT_AGENT_DELIVERY");
+      expect(deliveryHealth).toMatchObject({
+        state: "OPEN",
+        component: "observation_agent",
+        class: "AGENT_SELF",
+        suspected_defect: false,
+        defect_kind: null,
+        evidence: { reason: "DELIVERY_FAILURE", channel: "sendmail" }
+      });
+      const finalReplay = await replayObservationJournals(
+        stateDir,
+        new Set(["core-liveness", "stall-detectors", "routing"])
+      );
+      expect(finalReplay.openSignals).toEqual([
+        expect.objectContaining({
+          lifecycle: { owner: "routing", correlationKey: "delivery:sendmail" },
+          signal: expect.objectContaining({ signal_id: deliveryHealth?.signal_id })
+        })
+      ]);
+      expect(finalReplay.deliveryResults).toHaveLength(1);
+      expect(sentinelRuns).toBe(1);
+      const snapshot = JSON.parse(await readFile(join(stateDir, "status.json"), "utf8")) as {
+        components: Record<string, { open_signal_ids: string[] }>;
+        modules: Record<string, readonly unknown[]>;
+      };
+      expect(snapshot.components.runner?.open_signal_ids).toEqual([]);
+      expect(snapshot.components.observation_agent?.open_signal_ids)
+        .toContain(deliveryHealth?.signal_id);
+      expect(snapshot.modules["status-page"]).toEqual(expect.arrayContaining([
+        expect.objectContaining({ kind: "state", key: "status.health", state: "DEGRADED" })
+      ]));
+    } finally {
+      process.exitCode = priorExitCode;
+      for (const listener of process.listeners("SIGTERM")) {
+        if (!priorTermListeners.has(listener)) process.removeListener("SIGTERM", listener);
+      }
+      for (const listener of process.listeners("SIGINT")) {
+        if (!priorInterruptListeners.has(listener)) process.removeListener("SIGINT", listener);
+      }
+      vi.unstubAllGlobals();
+      for (const path of [
+        "pg",
+        "../../packages/register/src/runtime-environment.js",
+        "../../apps/observation-agent/src/core/database.js",
+        "../../apps/observation-agent/src/core/modules.js",
+        "../../apps/observation-agent/src/core/targets.js",
+        "../../apps/observation-agent/src/core/threshold-cache.js",
+        "../../apps/observation-agent/src/journal/records.js",
+        "../../apps/observation-agent/src/modules/self/heartbeat.js",
+        "../../apps/observation-agent/src/store/samples.js",
+        "../../apps/observation-agent/src/store/status.js"
+      ]) vi.doUnmock(path);
+      vi.resetModules();
+    }
   });
 });
