@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
-import { chmod, lstat, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
+import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
 
@@ -60,6 +60,11 @@ export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
     roleName: "debateai_dev_support_config_operator",
     capabilityRole: "debateai_support_config_operator",
     environmentKey: "SUPPORT_CONFIG_OPERATOR_DATABASE_URL"
+  }),
+  Object.freeze({
+    roleName: "debateai_dev_support",
+    capabilityRole: "debateai_support",
+    environmentKey: "SUPPORT_DATABASE_URL"
   })
 ] satisfies readonly DevelopmentDatabasePrincipal[]);
 
@@ -75,15 +80,115 @@ export type DevelopmentDatabasePrincipalReceipt = Readonly<{
 }>;
 
 const ROLE_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
-const LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEYS = Object.freeze(
-  DEVELOPMENT_DATABASE_PRINCIPALS
-    .filter(({ environmentKey }) => environmentKey !== "SUPPORT_CONFIG_OPERATOR_DATABASE_URL")
-    .map(({ environmentKey }) => environmentKey)
-);
+const PRIVATE_DIRECTORY_MODE = 0o700;
+const PRIVATE_FILE_MODE = 0o600;
+const MAX_CREDENTIAL_FILE_BYTES = 64 * 1024;
+const LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEY_SETS = Object.freeze([
+  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -2)
+    .map(({ environmentKey }) => environmentKey)),
+  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -1)
+    .map(({ environmentKey }) => environmentKey))
+]);
 
 function quoteIdentifier(value: string): string {
   if (!ROLE_NAME_PATTERN.test(value)) throw new TypeError("DEV_DATABASE_ROLE_NAME_INVALID");
   return `"${value}"`;
+}
+
+type FileIdentity = Readonly<{ device: number; inode: number }>;
+
+function currentUid(errorCode: string): number {
+  if (typeof process.getuid !== "function") throw new TypeError(errorCode);
+  return process.getuid();
+}
+
+function identity(metadata: Readonly<{ dev: number; ino: number }>): FileIdentity {
+  return Object.freeze({ device: metadata.dev, inode: metadata.ino });
+}
+
+function hasIdentity(
+  metadata: Readonly<{ dev: number; ino: number }>,
+  expected: FileIdentity
+): boolean {
+  return metadata.dev === expected.device && metadata.ino === expected.inode;
+}
+
+async function assertCredentialRoot(
+  credentialRoot: string,
+  expected?: FileIdentity
+): Promise<FileIdentity> {
+  const metadata = await lstat(credentialRoot).catch(() => null);
+  if (metadata === null || metadata.isSymbolicLink() || !metadata.isDirectory()
+    || metadata.uid !== currentUid("DEV_DATABASE_CREDENTIAL_ROOT_INVALID")
+    || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE
+    || (expected !== undefined && !hasIdentity(metadata, expected))) {
+    throw new TypeError("DEV_DATABASE_CREDENTIAL_ROOT_INVALID");
+  }
+  return identity(metadata);
+}
+
+function assertCredentialMetadata(
+  metadata: Readonly<{
+    isFile(): boolean;
+    uid: number;
+    nlink: number;
+    mode: number;
+    size: number;
+  }>
+): void {
+  if (!metadata.isFile()
+    || metadata.uid !== currentUid("DEV_DATABASE_CREDENTIAL_FILE_INVALID")
+    || metadata.nlink !== 1
+    || (metadata.mode & 0o777) !== PRIVATE_FILE_MODE
+    || metadata.size < 1
+    || metadata.size > MAX_CREDENTIAL_FILE_BYTES) {
+    throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+  }
+}
+
+async function readCredentialFile(
+  resolvedPath: string,
+  credentialRoot: string,
+  rootIdentity: FileIdentity,
+  expected?: FileIdentity
+): Promise<Readonly<{ source: string; identity: FileIdentity }>> {
+  await assertCredentialRoot(credentialRoot, rootIdentity);
+  let handle;
+  try {
+    handle = await open(resolvedPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch {
+    throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+  }
+  try {
+    const metadata = await handle.stat();
+    assertCredentialMetadata(metadata);
+    if (expected !== undefined && !hasIdentity(metadata, expected)) {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
+    const bounded = Buffer.alloc(MAX_CREDENTIAL_FILE_BYTES + 1);
+    let offset = 0;
+    while (offset < bounded.length) {
+      const { bytesRead } = await handle.read(bounded, offset, bounded.length - offset, null);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset > MAX_CREDENTIAL_FILE_BYTES) {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
+    const pathMetadata = await lstat(resolvedPath).catch(() => null);
+    if (pathMetadata === null) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    assertCredentialMetadata(pathMetadata);
+    if (!hasIdentity(pathMetadata, identity(metadata))) {
+      throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    }
+    await assertCredentialRoot(credentialRoot, rootIdentity);
+    return Object.freeze({
+      source: bounded.subarray(0, offset).toString("utf8"),
+      identity: identity(metadata)
+    });
+  } finally {
+    await handle.close();
+  }
 }
 
 function databaseLocation(url: URL): string {
@@ -157,24 +262,30 @@ async function ensureCredentialFile(
 ): Promise<ReadonlyMap<string, URL>> {
   const resolvedPath = resolve(credentialFilePath);
   const credentialRoot = dirname(resolvedPath);
-  await mkdir(credentialRoot, { recursive: true, mode: 0o700 });
-  const rootStatus = await lstat(credentialRoot);
-  if (rootStatus.isSymbolicLink() || !rootStatus.isDirectory()) {
-    throw new TypeError("DEV_DATABASE_CREDENTIAL_ROOT_INVALID");
-  }
-  await chmod(credentialRoot, 0o700);
+  await mkdir(credentialRoot, { recursive: true, mode: PRIVATE_DIRECTORY_MODE });
+  const rootIdentity = await assertCredentialRoot(credentialRoot);
 
-  try {
-    const fileStatus = await lstat(resolvedPath);
-    if (fileStatus.isSymbolicLink() || !fileStatus.isFile()) {
+  const initialStatus = await lstat(resolvedPath).catch((error: unknown) => {
+    if (isMissingFileError(error)) return null;
+    throw error;
+  });
+  if (initialStatus !== null) {
+    if (initialStatus.isSymbolicLink()) {
       throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     }
-  } catch (error) {
-    if (!isMissingFileError(error)) throw error;
+    assertCredentialMetadata(initialStatus);
+  } else {
     try {
-      const handle = await open(resolvedPath, "wx", 0o600);
+      const handle = await open(
+        resolvedPath,
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY
+          | (constants.O_NOFOLLOW ?? 0),
+        PRIVATE_FILE_MODE
+      );
       try {
         await handle.writeFile(credentialSource(adminDatabaseUrl), { encoding: "utf8" });
+        await handle.sync();
+        assertCredentialMetadata(await handle.stat());
       } finally {
         await handle.close();
       }
@@ -182,23 +293,22 @@ async function ensureCredentialFile(
       if (!isExistingFileError(createError)) throw createError;
     }
   }
-  const finalStatus = await lstat(resolvedPath);
-  if (finalStatus.isSymbolicLink() || !finalStatus.isFile()) {
-    throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
-  }
-  await chmod(resolvedPath, 0o600);
-  const existingSource = await readFile(resolvedPath, "utf8");
+  const opened = await readCredentialFile(
+    resolvedPath,
+    credentialRoot,
+    rootIdentity,
+    initialStatus === null ? undefined : identity(initialStatus)
+  );
+  const existingSource = opened.source;
   const existing = readCredentials(existingSource, adminDatabaseUrl, false);
   const missing = DEVELOPMENT_DATABASE_PRINCIPALS.filter(
     ({ environmentKey }) => !existing.has(environmentKey)
   );
   if (missing.length > 0) {
-    const isExactLegacyFile = existing.size === LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEYS.length
-      && LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEYS.every((environmentKey) =>
-        existing.has(environmentKey)
-      )
-      && missing.length === 1
-      && missing[0]?.environmentKey === "SUPPORT_CONFIG_OPERATOR_DATABASE_URL";
+    const isExactLegacyFile = LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEY_SETS.some(
+      (environmentKeys) => existing.size === environmentKeys.length
+        && environmentKeys.every((environmentKey) => existing.has(environmentKey))
+    );
     if (!isExactLegacyFile) {
       throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     }
@@ -215,9 +325,18 @@ async function ensureCredentialFile(
           { encoding: "utf8" }
         );
         await handle.sync();
+        assertCredentialMetadata(await handle.stat());
       } finally {
         await handle.close();
       }
+      await assertCredentialRoot(credentialRoot, rootIdentity);
+      const targetStatus = await lstat(resolvedPath).catch(() => null);
+      if (targetStatus === null) throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+      assertCredentialMetadata(targetStatus);
+      if (!hasIdentity(targetStatus, opened.identity)) {
+        throw new TypeError("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+      }
+      await assertCredentialRoot(credentialRoot, rootIdentity);
       await rename(replacementPath, resolvedPath);
     } finally {
       await unlink(replacementPath).catch((error: unknown) => {
@@ -225,7 +344,11 @@ async function ensureCredentialFile(
       });
     }
   }
-  return readCredentials(await readFile(resolvedPath, "utf8"), adminDatabaseUrl);
+  return readCredentials((await readCredentialFile(
+    resolvedPath,
+    credentialRoot,
+    rootIdentity
+  )).source, adminDatabaseUrl);
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

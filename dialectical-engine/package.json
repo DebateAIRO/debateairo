@@ -32,6 +32,8 @@
     "dev:auth:api": "tsx apps/runner/src/dev-api-process-cli.ts",
     "dev:auth:ui": "tsx apps/runner/src/dev-ui-process-cli.ts",
     "dev:auth:up": "tsx apps/runner/src/dev-auth-stack-cli.ts",
+    "support:switch": "tsx apps/runner/src/support-switch-cli.ts",
+    "support:status": "tsx apps/runner/src/support-status-cli.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",

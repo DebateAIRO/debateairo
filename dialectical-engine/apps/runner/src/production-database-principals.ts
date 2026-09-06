@@ -22,6 +22,8 @@ const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const SUPPORT_CONFIG_OPERATOR_ID = "support-config-operator";
 const SUPPORT_CONFIG_OPERATOR_ROLE = "debateai_prod_support_config_operator";
+const SUPPORT_DATA_PRINCIPAL_ID = "api-support";
+const SUPPORT_DATA_PRINCIPAL_ROLE = "debateai_prod_api_support";
 const GLOBAL_PRINCIPAL_LEASE_KEY = "debateai:production-database-principals:v1";
 const SUPPORT_CONFIG_PRINCIPAL_LEASE_KEY =
   "debateai:production-support-config-operator";
@@ -386,6 +388,18 @@ function managedPrincipals(manifest: ProductionPrincipalManifest): readonly Mana
       !== JSON.stringify(["debateai_support_config_operator"])) {
     fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
   }
+  const supportDataPrincipal = manifestById.get(SUPPORT_DATA_PRINCIPAL_ID);
+  if (supportDataPrincipal === undefined
+    || supportDataPrincipal.roleName !== SUPPORT_DATA_PRINCIPAL_ROLE
+    || supportDataPrincipal.kind !== "SERVICE"
+    || supportDataPrincipal.database !== "debateai"
+    || !supportDataPrincipal.inherit
+    || JSON.stringify(supportDataPrincipal.directMemberships)
+      !== JSON.stringify(["debateai_support"])
+    || JSON.stringify(supportDataPrincipal.effectiveMemberships)
+      !== JSON.stringify(["debateai_support"])) {
+    fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
+  }
 
   const requirements = new Map(manifest.credentialRequirements.map((row) => [
     row.principalId,
@@ -399,6 +413,9 @@ function managedPrincipals(manifest: ProductionPrincipalManifest): readonly Mana
         && lifecycle !== "MIGRATION_MINTED_UNMANAGED")) {
       fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
     }
+  }
+  if (requirements.get(SUPPORT_DATA_PRINCIPAL_ID) !== "ROTATED_SERVICE") {
+    fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
   }
 
   const grants = manifest.membershipGrants.filter(({ memberRole }) =>

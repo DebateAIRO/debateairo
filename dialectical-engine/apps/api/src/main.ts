@@ -1,5 +1,6 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import {
   Argon2WorkerPool,
   AuditContextHasher,
@@ -12,12 +13,13 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, configureContentEncryption, createPool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   loadApiEnvironment,
+  createSupportConfigurationPort,
   readDeploymentRiskTier,
   computeStructuralCeilingBasis,
   ENGINE_BRANCHING_FACTOR,
@@ -33,6 +35,7 @@ import {
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
+import { loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
   HatchetDispatcher,
@@ -50,7 +53,7 @@ import {
   createSingleFlightErasureReconciler,
   PostgresAccountErasureApplication
 } from "./account-erasure.js";
-import { installGracefulShutdown } from "./graceful-shutdown.js";
+import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
@@ -59,6 +62,7 @@ import {
 } from "./provider-discovery.js";
 
 const environment = loadApiEnvironment();
+const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
 const kek = loadKek(environment.KEK_PATH);
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
@@ -339,6 +343,10 @@ const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
+const supportPool = createPool(environment.SUPPORT_DATABASE_URL);
+const supportConfiguration = createSupportConfigurationPort(
+  createSupportControlPlanePool(environment.DATABASE_URL)
+);
 const api = buildApi({
   application,
   accountErasure:erasureApplication,
@@ -347,6 +355,17 @@ const api = buildApi({
   mfa,
   sessions,
   legacyRunClaim,
+  support: {
+    configuration: supportConfiguration,
+    sessions: new PostgresSupportRepository(supportPool),
+    knowledge: {
+      status: async () => Object.freeze({
+        kbVersion: supportKnowledge.kbVersion,
+        shipped: supportKnowledge.shippedCount,
+        ignored: supportKnowledge.ignoredCount
+      })
+    }
+  },
   ...(publications === undefined ? {} : { publications }),
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
@@ -359,7 +378,7 @@ if (publicationCleanupTimer !== undefined) {
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
-const shutdown = installGracefulShutdown({
+const startup = installStartupResourceOwner({
   api,
   registration,
   auditContextHasher,
@@ -380,19 +399,19 @@ const shutdown = installGracefulShutdown({
         || erasurePool === publicationCleanupPool
         || erasurePool === contentProvisionPool
       ? [] : [erasurePool]),
-    ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool])
+    ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
+    supportPool,
+    { end: () => supportConfiguration.close() }
   ]
 });
-try {
+await startup.run("support-attestation", async () => {
+  await assertSupportDatabaseRole(pool, supportPool);
+});
+await startup.run("listen", async () => {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });
-  // Queue draining is deliberately background-only. A bounded sendmail
-  // timeout can never hold readiness hostage, while the SQL ACK gate still
-  // prevents any user-key destruction before completion delivery succeeds.
-  triggerErasureReconciliation();
-  triggerAuthenticationRiskCleanup();
-} catch (error) {
-  // A listen failure still owns every worker, secret cache, and DB handle built
-  // above. Reuse the exact shutdown graph before surfacing the startup failure.
-  await shutdown.close("listen-failure").catch(() => undefined);
-  throw error;
-}
+});
+// Queue draining is deliberately background-only. A bounded sendmail timeout
+// can never hold readiness hostage, while the SQL ACK gate still prevents any
+// user-key destruction before completion delivery succeeds.
+triggerErasureReconciliation();
+triggerAuthenticationRiskCleanup();

@@ -36,7 +36,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 const LOCAL_ADMIN_DATABASE_URL =
   "postgresql://debateai:dev-only@127.0.0.1:55432/debateai";
 const SUPPORT_KEY = "SUPPORT_CONFIG_OPERATOR_DATABASE_URL";
+const SUPPORT_DATA_KEY = "SUPPORT_DATABASE_URL";
 const SUPPORT_ROLE = "debateai_dev_support_config_operator";
+const SUPPORT_DATA_ROLE = "debateai_dev_support";
 const SUPPORT_CAPABILITY = "debateai_support_config_operator";
 const PRODUCTION_SUPPORT_ROLE = "debateai_prod_support_config_operator";
 
@@ -49,7 +51,7 @@ function parseExactMaster(source: string): ReadonlyMap<string, string> {
   expect(source.endsWith("\n")).toBe(true);
   expect(source).not.toContain("\r");
   const rows = source.slice(0, -1).split("\n");
-  expect(rows).toHaveLength(10);
+  expect(rows).toHaveLength(11);
   expect(rows.map((row) => row.slice(0, row.indexOf("="))))
     .toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.map(({ environmentKey }) => environmentKey));
   return new Map(rows.map((row) => {
@@ -76,6 +78,21 @@ async function loadProductionCredentials(path: string): Promise<Readonly<{
 }>> {
   const module = await import("../../apps/runner/src/support-config-cli-credentials.js");
   return module.loadProductionSupportConfigCliCredentials(path);
+}
+
+async function loadDevelopmentStatusCredentials(path: string): Promise<Readonly<{
+  configurationDatabaseUrl: string;
+  supportDatabaseUrl: string;
+}>> {
+  const module = await import("../../apps/runner/src/support-status-cli-credentials.js");
+  return module.loadDevelopmentSupportStatusCliCredentials(path);
+}
+
+async function loadProductionStatusCredentials(path: string): Promise<Readonly<{
+  supportDatabaseUrl: string;
+}>> {
+  const module = await import("../../apps/runner/src/support-status-cli-credentials.js");
+  return module.loadProductionSupportStatusCliCredentials(path);
 }
 
 async function prepareCustodyRoot(): Promise<void> {
@@ -138,16 +155,17 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     }
   });
 
-  it("credential privacy: one ten-row master file feeds only the dedicated loader", async () => {
+  it("credential privacy: one eleven-row master file feeds only the dedicated loaders", async () => {
     await expect(provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: LOCAL_ADMIN_DATABASE_URL,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 10 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 11 });
 
     const masterSource = await readFile(credentialFilePath, "utf8");
     const master = parseExactMaster(masterSource);
     const supportDatabaseUrl = master.get(SUPPORT_KEY)!;
+    const supportDataDatabaseUrl = master.get(SUPPORT_DATA_KEY)!;
     expect(new URL(supportDatabaseUrl)).toMatchObject({
       hostname: "127.0.0.1",
       port: "55432",
@@ -156,6 +174,12 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     });
     await expect(loadDevelopmentCredentials(credentialFilePath))
       .resolves.toEqual({ databaseUrl: supportDatabaseUrl });
+    await expect(loadDevelopmentStatusCredentials(credentialFilePath)).resolves.toEqual({
+      configurationDatabaseUrl: supportDatabaseUrl,
+      supportDatabaseUrl: supportDataDatabaseUrl
+    });
+    expect(new URL(supportDataDatabaseUrl).username).toBe(SUPPORT_DATA_ROLE);
+    expect(supportDataDatabaseUrl).not.toBe(supportDatabaseUrl);
 
     const receipt = await assembleDevelopmentApiEnvironment({
       repositoryRoot,
@@ -449,7 +473,7 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
       adminPool: database.pool,
       adminDatabaseUrl: LOCAL_ADMIN_DATABASE_URL,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 10 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 11 });
   }, 120_000);
 
   it("rejects loader custody, exact-schema, ordering, and endpoint drift", async () => {
@@ -638,6 +662,54 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     } finally {
       vi.unstubAllEnvs();
       vi.restoreAllMocks();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts only a private exact one-entry v1 envelope for the production support data credential", async () => {
+    const root = await mkdtemp(join(tmpdir(), "debateai-prod-support-data-loader-"));
+    const file = join(root, "api-support.json");
+    const databaseUrl = new URL(database.connectionString);
+    databaseUrl.username = "debateai_prod_api_support";
+    databaseUrl.password = "production-api-support-test-password-abcdefghijklmnopqrstuvwxyz";
+    databaseUrl.pathname = "/debateai";
+    const exact = JSON.stringify({
+      format: "debateai.production-database-principal-credentials.v1",
+      credentials: [{ principalId: "api-support", databaseUrl: databaseUrl.toString() }]
+    });
+    try {
+      await writeFile(file, exact, { mode: 0o600 });
+      await expect(loadProductionStatusCredentials(file)).resolves.toEqual({
+        supportDatabaseUrl: databaseUrl.toString()
+      });
+      for (const invalid of [
+        `${exact}\n`,
+        JSON.stringify({ ...JSON.parse(exact), extra: true }),
+        JSON.stringify({
+          format: "debateai.production-database-principal-credentials.v1",
+          credentials: [{ principalId: "api-runtime", databaseUrl: databaseUrl.toString() }]
+        }),
+        JSON.stringify({
+          format: "debateai.production-database-principal-credentials.v1",
+          credentials: [{
+            principalId: "api-support",
+            databaseUrl: databaseUrl.toString().replace("debateai_prod_api_support", "debateai_prod_api_runtime")
+          }]
+        })
+      ]) {
+        await writeFile(file, invalid, { mode: 0o600 });
+        await expect(loadProductionStatusCredentials(file)).rejects.toThrow();
+      }
+      await writeFile(file, exact);
+      await chmod(file, 0o640);
+      await expect(loadProductionStatusCredentials(file))
+        .rejects.toThrow("SUPPORT_STATUS_CREDENTIAL_CUSTODY_INVALID");
+      await chmod(file, 0o600);
+      vi.stubEnv("SUPPORT_DATABASE_URL", databaseUrl.toString());
+      await expect(loadProductionStatusCredentials(join(root, "missing.json")))
+        .rejects.toThrow("SUPPORT_STATUS_CREDENTIAL_CUSTODY_INVALID");
+    } finally {
+      vi.unstubAllEnvs();
       await rm(root, { recursive: true, force: true });
     }
   });

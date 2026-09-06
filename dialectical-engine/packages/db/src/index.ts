@@ -25,6 +25,13 @@ export {
 } from "./legacy-claim.js";
 
 export {
+  assertSupportDatabaseRole,
+  PostgresSupportRepository,
+  type SupportRepositoryRecord,
+  type SupportRepositoryStatus
+} from "./support.js";
+
+export {
   assertPublicationCleanupDatabaseRole,
   assertPublicationDatabaseRoleSeparation,
   PostgresPublicationRepository,

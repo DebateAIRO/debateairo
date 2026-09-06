@@ -110,6 +110,7 @@ describe("DEV-09 private local API environment", () => {
       await readFile(test.databaseCredentialFilePath, "utf8")
     );
     const supportOperatorUrl = masterCredentials.get("SUPPORT_CONFIG_OPERATOR_DATABASE_URL")!;
+    const supportUrl = masterCredentials.get("SUPPORT_DATABASE_URL")!;
     const receipt = await assemble(test.repositoryRoot);
     expect(receipt).toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     expect(JSON.stringify(receipt)).not.toMatch(/password|token|postgresql|11111111/i);
@@ -128,6 +129,9 @@ describe("DEV-09 private local API environment", () => {
       .not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
     expect(await readFile(test.outputFilePath, "utf8")).not.toContain(supportOperatorUrl);
     expect(environment.get("DATABASE_URL")).toContain("debateai_dev_runtime");
+    expect(environment.get("SUPPORT_DATABASE_URL")).toContain("debateai_dev_support");
+    expect(environment.get("SUPPORT_DATABASE_URL")).toBe(supportUrl);
+    expect(environment.get("SUPPORT_DATABASE_URL")).not.toBe(environment.get("DATABASE_URL"));
     expect(environment.get("CONTENT_PROVISION_DATABASE_URL"))
       .toContain("debateai_dev_content_provision");
     expect(environment.get("AUTHORIZATION_DATABASE_URL"))

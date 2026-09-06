@@ -13,7 +13,7 @@ MIGRATION_DATABASE_URL='<short-lived-admin-url>' pnpm db:provision-principals \
 ```
 
 The command reads exactly one bounded JSON envelope from standard input and
-prints only `PRODUCTION_DATABASE_PRINCIPALS_READY=17`. It never accepts
+prints only `PRODUCTION_DATABASE_PRINCIPALS_READY=18`. It never accepts
 credentials through argv and never returns a URL, password, verifier, or human
 credential expiry. The required file argument is the sole production
 `REGISTER-SUPPORT-PUBLICATION` credential source. Network/HBA/TLS enforcement
@@ -62,13 +62,13 @@ The top-level object has exactly these fields:
 }
 ```
 
-`credentials` must contain exactly the seventeen IDs listed in
+`credentials` must contain exactly the eighteen IDs listed in
 `provisioner.managedPrincipalIds` in the P3-01 manifest. Each URL must use the
 exact role name, database, host, and port; each decoded password must be 32 to
 1,024 UTF-8 bytes and pairwise distinct. Exactly the two human purposes,
 `obs-human` and `support-config-operator`, carry `validUntil`; each window is
 checked independently against the database clock. The example is a shape
-description and intentionally omits the other fourteen governed rows and all
+description and intentionally omits the other fifteen governed rows and all
 usable secret material.
 
 ## Reconciliation guarantees
@@ -86,7 +86,7 @@ For each governed LOGIN wrapper the command transactionally:
 - rejects ownership and effective `pg_*` membership;
 - reattests the privileged `pg_authid` SCRAM verifier, expiry, exact direct and
   effective capabilities, zero members, zero settings, and zero ownership; and
-- commits all seventeen roles together or rolls the transaction back.
+- commits all eighteen roles together or rolls the transaction back.
 
 Only after the role transaction succeeds, the command publishes the support
 credential as this exact compact JSON (no whitespace or trailing newline):
@@ -124,15 +124,24 @@ removes a temporary or backup file only when this invocation created and still
 owns that exact device/inode; an exclusive-create collision is preserved
 byte-for-byte.
 
-The production support CLI accepts only that exact two-field, compact file and
+The production support-configuration CLI accepts only that exact two-field, compact file and
 never consults an environment variable, the migration URL, `obs-human`, or the
-development ten-row file. It rejects a symlink, hard link, wrong owner or mode,
+development eleven-row file. It rejects a symlink, hard link, wrong owner or mode,
 unsafe parent, file larger than 4 KiB, non-canonical timestamp, expired or
 out-of-window credential, endpoint/role/database drift, query/fragment fields,
 and malformed or secret-bearing extra fields. Each operation creates one fresh
 single-connection pool whose connect, statement, and query deadlines are
 strictly shorter than the remaining credential validity, and closes both the
 client and pool.
+
+`pnpm support:status` additionally requires a separate private rotated service
+credential for `api-support`; it never gives the JIT configuration operator
+support-table access. Supply the JIT file above with `--credential-file` and an
+exact one-entry v1 credential envelope with
+`--support-data-credential-file`. The latter contains only `api-support` and its
+`debateai_prod_api_support` URL, is mode `0600` beneath an owned mode `0700`
+directory, and has no trailing newline. The command opens distinct bounded
+configuration and data connections and closes both on success or failure.
 
 ## Support configuration rollout and forward-only rollback
 

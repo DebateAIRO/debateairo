@@ -56,6 +56,7 @@ const CAPABILITY_ROLES = [
   "debateai_replay",
   "debateai_runtime",
   "debateai_settlement_watch",
+  "debateai_support",
   "debateai_support_config_operator"
 ] as const;
 const PRODUCTION_SUPPORT_VALUE_TEXT = Object.freeze<Record<string, string>>({
@@ -357,7 +358,7 @@ afterAll(async () => {
 });
 
 describe("P3-02 production database LOGIN principal provisioning", () => {
-  it("creates and idempotently reuses seventeen pairwise-distinct actual LOGIN principals", async () => {
+  it("creates and idempotently reuses eighteen pairwise-distinct actual LOGIN principals", async () => {
     const envelope = credentialEnvelope();
     const first = await provisionProductionDatabasePrincipals({
       adminPool,
@@ -367,8 +368,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       supportConfigCredentialFilePath
     });
     expect(first).toMatchObject({
-      principalCount: 17,
-      createdCount: 13,
+      principalCount: 18,
+      createdCount: 14,
       supportConfigCredentialFilePath
     });
     expect(first.humanCredentialExpiresAtByPrincipal).toEqual({
@@ -417,7 +418,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       WHERE rolname=ANY($1::text[])
       ORDER BY rolname
     `,[roleNames]);
-    expect(catalog.rows).toHaveLength(17);
+    expect(catalog.rows).toHaveLength(18);
     expect(catalog.rows.every((role) => role.rolcanlogin
       && !role.rolsuper
       && !role.rolcreatedb
@@ -479,7 +480,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       manifest,
       credentialEnvelope: envelope,
       supportConfigCredentialFilePath
-    })).resolves.toMatchObject({ principalCount: 17, createdCount: 0 });
+    })).resolves.toMatchObject({ principalCount: 18, createdCount: 0 });
 
     const repaired = (await adminPool.query<{
       rolinherit: boolean;
@@ -568,7 +569,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         manifest,
         credentialEnvelope: envelope,
         supportConfigCredentialFilePath
-      })).resolves.toMatchObject({ principalCount: 17, createdCount: 0 });
+      })).resolves.toMatchObject({ principalCount: 18, createdCount: 0 });
 
       const direct = (await adminPool.query<{
         databaseAclCount: number;
@@ -3102,6 +3103,6 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       expect(output).not.toContain(new URL(databaseUrl).password);
       expect(output).not.toContain(decodeURIComponent(new URL(databaseUrl).password));
     }
-    expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=17\n");
+    expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=18\n");
   }, 120_000);
 });

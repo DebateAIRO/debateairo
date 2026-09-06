@@ -100,7 +100,9 @@ const apiEnvironmentShape = {
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
-    DATABASE_URL: z.string().url(), API_HOST: z.string().min(1), API_PORT: positiveInteger,
+    DATABASE_URL: z.string().url(),
+    SUPPORT_DATABASE_URL: z.string().url(),
+    API_HOST: z.string().min(1), API_PORT: positiveInteger,
     STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: legacyRegisterVersion,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
@@ -159,6 +161,17 @@ function validateApiEnvironment(
   }
   if (environment.AUTHORIZATION_DATABASE_URL === environment.DATABASE_URL) {
     throw new TypeError("AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  const supportConflicts = [
+    environment.DATABASE_URL,
+    environment.AUTHORIZATION_DATABASE_URL,
+    environment.CONTENT_PROVISION_DATABASE_URL,
+    environment.PUBLICATION_CLEANUP_DATABASE_URL,
+    environment.ERASURE_DATABASE_URL,
+    environment.EVALUATOR_DEV_MENU_DATABASE_URL
+  ];
+  if (supportConflicts.includes(environment.SUPPORT_DATABASE_URL)) {
+    throw new TypeError("SUPPORT_DATABASE_URL_MUST_BE_SEPARATE");
   }
   if (environment.PUBLICATION_ENABLED === "true"
     && (environment.CORPUS_KEK_PATH === environment.KEK_PATH
