@@ -1,5 +1,6 @@
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { TopBar } from "@/components/TopBar";
+import { CookieConsent } from "@/components/consent/CookieConsent";
 import "./globals.css";
 
 const display = Fraunces({
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="appShell">
           <TopBar />
           {children}
+          <CookieConsent />
         </div>
       </body>
     </html>

@@ -8,6 +8,7 @@ import type { SettingsView } from "@/lib/v3/adapter";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
 import { EvaluatorDevMenu } from "@/components/EvaluatorDevMenu";
 import { SessionControls } from "@/components/SessionControls";
+import { ConsentSettingsPanel } from "@/components/consent/ConsentSettingsPanel";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
 import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 
@@ -75,6 +76,7 @@ function AccountSettingsScreen() {
           </div>
 
           <SessionControls />
+          <ConsentSettingsPanel />
           <LegacyRunClaimControls />
           <AccountErasureControls />
         </div>
