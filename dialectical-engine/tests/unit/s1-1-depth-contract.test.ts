@@ -321,6 +321,88 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(candidatesOf(path, source)).toEqual([]);
   });
 
+  // ROUND-1 REWORK (codex r1 B6) — THREE FURTHER PARSE CONTEXTS, each an input the
+  // A1-A11 rows do NOT cover: A7's regex sits in a variable initializer, not after a
+  // control-condition parenthesis; A4 has one template, not a template nested inside
+  // another template's substitution. Each asserts a CLEAN parse and the literal
+  // candidate offsets, measured before they were written (31-B6-measurements.log).
+  it.each([
+    {
+      context: "a regex literal after a control-condition parenthesis",
+      path: "planted.ts",
+      source: "if (ready) /[//]/.test(text); const choices = [1,2,3,4,5];",
+      expected: [{ start: 46, end: 57, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      context: "JSX text that resembles a line comment",
+      path: "planted.tsx",
+      source: "const view = <p>// example</p>; const choices = [1,2,3,4,5];",
+      expected: [{ start: 48, end: 59, elementLine: 1, statementLine: 1 }]
+    },
+    {
+      context: "a template nested inside another template's substitution",
+      path: "planted.ts",
+      source: "const s = `a${`b${[1,2,3,4,5].length}c`}d`;",
+      expected: [{ start: 18, end: 29, elementLine: 1, statementLine: 1 }]
+    }
+  ])("parses cleanly and addresses the candidate in $context", ({ path, source, expected }) => {
+    expect(parseModule(path, source).ok).toBe(true);
+    expect(candidatesOf(path, source)).toEqual(expected);
+  });
+
+  // ROUND-1 REWORK (codex r1 B6) — THE FIVE ORIGINAL TRUNCATED PREFIXES, imported from
+  // the donor at 60641339b983365952dd6cd61ed2f379aef6dc8a, tests/unit/s1-1-depth-contract.test.ts
+  // lines 1047-1051, preserving their wrapping and comment bytes EXACTLY (the 18-space
+  // indent, the `/* first slot */` block comment, the `// first slot` line comment and the
+  // newline positions are all load-bearing: they are what made the same declaration read
+  // two different ways in the donor's text pipeline).
+  //
+  // PROPERTY: a source the parser rejects yields NO discovery candidate and exactly ONE
+  // narrowed INCONCLUSIVE carrying path, line and message. Measured first: each fails with
+  // exactly one diagnostic, "Expression expected." (31-B6-measurements.log).
+  it.each([
+    {
+      layout: "the real six-slot login array",
+      planted: "                  {[0, 1, 2, 3, 4, 5].map((slot) => (",
+      line: 1
+    },
+    {
+      layout: "the real login array, wrapped after the sentinel",
+      planted: "                  {[0,\n                  1, 2, 3, 4, 5].map((slot) => (",
+      line: 2
+    },
+    {
+      layout: "the real login array, block comment after the sentinel",
+      planted: "                  {[0, /* first slot */ 1, 2, 3, 4, 5].map((slot) => (",
+      line: 1
+    },
+    {
+      layout: "the real login array, commented AND wrapped",
+      planted: "                  {[0, /* first slot */\n                  1, 2, 3, 4, 5].map((slot) => (",
+      line: 2
+    },
+    {
+      layout: "the real login array, line comment after the sentinel",
+      planted: "                  {[0, // first slot\n                  1, 2, 3, 4, 5].map((slot) => (",
+      line: 2
+    }
+  ])("reports one INCONCLUSIVE and no candidate for the truncated prefix — $layout", ({ planted, line }) => {
+    const parsed = parseModule("planted.tsx", planted);
+    expect(parsed.ok).toBe(false);
+    expect(candidatesOf("planted.tsx", planted)).toEqual([]);
+
+    const sites = domainSites("planted.tsx", planted);
+    expect(sites).toHaveLength(1);
+    const [site] = sites;
+    if (site?.kind !== "INCONCLUSIVE") {
+      throw new Error(`expected INCONCLUSIVE, got ${site?.kind ?? "none"}`);
+    }
+    expect(site.path).toBe("planted.tsx");
+    expect(site.line).toBe(line);
+    expect(site.diagnostic).toBe("Expression expected.");
+    expect(site.text).toBe(site.diagnostic);
+  });
+
   // ROUND 1 — A1..A11 ADDRESSING (plan §2.3 R2, §2 R3). Every row asserts exact
   // cardinality and, per candidate, the literal `(start, end, elementLine,
   // statementLine)`. `toEqual([])` is not accepted as an addressing assertion.
