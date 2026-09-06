@@ -7236,3 +7236,149 @@ a:focus-visible {
   .publicArgumentSpacer { display: none; }
   .publicModelPill { max-width: 100%; }
 }
+
+/* === consent-ui S01 === */
+/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
+   The ONE delimited block this slice may append, at the very end of the file
+   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
+   slice adds live in the two token blocks at the top, which S01 also owns. */
+
+.consentBar {
+  position: fixed;
+  left: 22px;
+  right: 22px;
+  bottom: calc(22px + var(--safe-b));
+  z-index: var(--z-consent-bar);
+}
+
+.consentBarBezel {
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 7px;
+}
+
+.consentBarCore {
+  align-items: center;
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  gap: 24px;
+  overflow: hidden;
+  padding: 17px 20px 16px;
+  position: relative;
+}
+
+.consentTab {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 52px;
+  height: 4px;
+  border-radius: var(--r-tab);
+  background: var(--gold);
+}
+
+.consentCopy {
+  flex: 1;
+  min-width: 0;
+}
+
+.consentEyebrow {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.consentTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin-top: 7px;
+}
+
+.consentBody {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+  max-width: 560px;
+  text-wrap: pretty;
+}
+
+.consentActions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+
+.consentGhost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 9px 15px;
+  white-space: nowrap;
+}
+
+.consentGhostStrong { color: var(--ink); }
+
+.consentPrimary {
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-pill);
+  color: var(--bg);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 19px;
+  white-space: nowrap;
+}
+
+.consentGhost:focus-visible,
+.consentPrimary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Below the derived 720px breakpoint the designed row stops fitting: the three
+   labels measure ~118 + 155 + 100 = 373px, plus two 9px gaps = ~391px; a
+   readable copy column needs ~260px; the row gap is 24px and the core's
+   horizontal padding is 40px — 391 + 260 + 24 + 40 = 715px. 720 also sits below
+   the 768px tablet-portrait width, so tablets keep the designed layout. */
+@media (max-width: 719.98px) {
+  .consentBar {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + var(--safe-b));
+  }
+
+  .consentBarCore {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .consentActions { flex-wrap: wrap; }
+
+  .consentGhost,
+  .consentPrimary {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+/* === end consent-ui S01 === */
