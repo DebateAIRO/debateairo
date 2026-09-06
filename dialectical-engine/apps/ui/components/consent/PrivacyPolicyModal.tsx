@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { POLICY_JUMP, POLICY_SECTIONS } from "../../lib/privacyPolicy";
+import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
 
 /**
  * The privacy policy modal (design 10c). Standalone and prop-driven: it owns no consent state,
@@ -50,6 +51,7 @@ type _PropKeysAreExact = Expect<
  * a CSS id selector.
  */
 const TITLE_ID = "policy-modal-title";
+const GATE_HINT_ID = "policy-modal-gate-hint";
 
 /**
  * The per-section accent reaches the DOM as a TOKEN REFERENCE, never as a colour: the number and
@@ -71,16 +73,100 @@ const TITLE = "What we store, and why";
 const LEDE =
   "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Eleven sections — scroll to the end.";
 const END_MARKER = "END OF POLICY · GDPR (EU) 2016/679 · v2.1";
+const GATE_HINT = "Scroll to the end of the policy to continue.";
+
+/**
+ * The scroll-to-end criterion's slack, in pixels (`SPEC.md` R15). DERIVED, not conventional: the
+ * body text is 11.5px at `line-height: 1.65` ≈ 19px per line, so 8px is under half a line — the
+ * end marker cannot count as reached while a line of policy is still hidden — while still
+ * absorbing the sub-pixel and browser-zoom rounding that exact equality does not.
+ */
+const SCROLL_SLACK = 8;
 
 export function PrivacyPolicyModal({
   open,
-  mode
+  mode,
+  onClose,
+  onAcknowledge
 }: PrivacyPolicyModalProps): React.ReactElement | null {
+  const scrimRef = React.useRef<HTMLDivElement | null>(null);
+  const dialogRef = React.useRef<HTMLElement | null>(null);
+  const closeRef = React.useRef<HTMLElement | null>(null);
+  const bodyRef = React.useRef<HTMLDivElement | null>(null);
+  const [reachedEnd, setReachedEnd] = React.useState(false);
+
+  // Focus trap, initial focus on the close control, focus return on close, backdrop close and
+  // the Esc STACK — all of it from the ONE shared helper. This component installs no keydown
+  // listener of its own, which is what the listener-count arm of S02-S46 pins.
+  useModalSurface(open, { containerRef: dialogRef, initialFocusRef: closeRef, onClose });
+
+  React.useEffect(() => {
+    // `mode="read"` applies no scroll-to-end gate at all (R14), so the listeners are not even
+    // attached there.
+    if (!open || mode !== "consent") return undefined;
+    const region = bodyRef.current;
+    if (region === null) return undefined;
+    const evaluate = (): void => {
+      // The latch lives in the updater: once true it is never recomputed to false, so scrolling
+      // back up to re-read a section cannot take the button away again.
+      setReachedEnd(
+        (latched) =>
+          latched || region.scrollTop + region.clientHeight >= region.scrollHeight - SCROLL_SLACK
+      );
+    };
+    evaluate();
+    region.addEventListener("scroll", evaluate);
+    // On `resize` too, and on `window`: a taller viewport can show the end of the policy without
+    // the reader scrolling at all, and a criterion bound only to `scroll` would leave the button
+    // disabled with the end marker in plain sight.
+    window.addEventListener("resize", evaluate);
+    return () => {
+      region.removeEventListener("scroll", evaluate);
+      window.removeEventListener("resize", evaluate);
+    };
+  }, [open, mode]);
+
   if (!open) return null;
 
+  const gateOpen = reachedEnd;
+
+  const acknowledge = (): void => {
+    // The ONLY route that ticks the box, and it exists only in `mode="consent"`. `×`, Esc and
+    // the backdrop reach `onClose` and nothing else, so no dismissal can consent on the
+    // reader's behalf. Acknowledge first, then close, so the consumer sees the acknowledgement
+    // before the surface goes away.
+    onAcknowledge?.();
+    onClose();
+  };
+
+  const jumpTo = (target: string): void => {
+    const section = dialogRef.current?.querySelector<HTMLElement>(`[id="${target}"]`) ?? null;
+    // Guarded on both hops: jsdom 30.0.1 has no `Element.prototype.scrollIntoView` at all, so an
+    // unguarded call throws a TypeError naming a DOM API and the failure reads as an environment
+    // bug rather than as this component's. A reader who asked for no animation gets none.
+    section?.scrollIntoView?.({
+      block: "start",
+      behavior: prefersReducedMotion() ? "auto" : "smooth"
+    });
+  };
+
   return (
-    <div className="policyScrim">
-      <div className="policyBezel" role="dialog" aria-modal="true" aria-labelledby={TITLE_ID}>
+    <div
+      className="policyScrim"
+      ref={scrimRef}
+      // Resolved at CLICK time, never at render time: `scrimRef.current` is still null during
+      // the first render, and a handler built then would close on nothing.
+      onClick={(event) => backdropCloseHandler(scrimRef.current, onClose)(event)}
+    >
+      <div
+        className="policyBezel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={TITLE_ID}
+        ref={(node) => {
+          dialogRef.current = node;
+        }}
+      >
         <div className="policyCore">
           <span className="policyTab" aria-hidden="true" />
           <div className="policyHead">
@@ -91,11 +177,22 @@ export function PrivacyPolicyModal({
               </div>
               <div className="policyLede">{LEDE}</div>
             </div>
-            <button type="button" className="policyClose" aria-label="Close">
+            <button
+              type="button"
+              className="policyClose"
+              aria-label="Close"
+              onClick={onClose}
+              ref={(node) => {
+                closeRef.current = node;
+              }}
+            >
               {"×"}
             </button>
           </div>
-          <div className="policyBody">
+          {/* `tabindex="0"` plus a name of its own: paging this region is the ONLY way a
+              keyboard-only reader can satisfy the scroll gate, and the name says what is inside
+              it rather than repeating the dialog's title. */}
+          <div className="policyBody" tabIndex={0} aria-label="Privacy Policy text" ref={bodyRef}>
             <div className="policyJumps">
               {POLICY_JUMP.map((jump) => (
                 <button
@@ -103,6 +200,7 @@ export function PrivacyPolicyModal({
                   type="button"
                   className="policyPill"
                   data-jump={jump.target}
+                  onClick={() => jumpTo(jump.target)}
                 >
                   {jump.label}
                 </button>
@@ -148,11 +246,29 @@ export function PrivacyPolicyModal({
             </span>
             <span className="policyFootSpacer" />
             {mode === "consent" ? (
-              <button type="button" className="policyPrimary">
-                {"I have read it"}
-              </button>
+              <>
+                {/* The reason the button is disabled, as an accessible DESCRIPTION and not as a
+                    `title` — the SPEC forbids a tooltip, which is invisible to a keyboard user
+                    and to a screen reader alike. `.policyGateHint` is the class C8 styles with
+                    the repo's visually-hidden treatment. */}
+                {!gateOpen ? (
+                  <span id={GATE_HINT_ID} className="policyGateHint">
+                    {GATE_HINT}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="policyPrimary"
+                  disabled={!gateOpen}
+                  aria-disabled={!gateOpen ? "true" : undefined}
+                  aria-describedby={!gateOpen ? GATE_HINT_ID : undefined}
+                  onClick={acknowledge}
+                >
+                  {"I have read it"}
+                </button>
+              </>
             ) : (
-              <button type="button" className="policyPrimary">
+              <button type="button" className="policyPrimary" onClick={onClose}>
                 {"Close"}
               </button>
             )}
