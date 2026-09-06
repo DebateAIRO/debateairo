@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
 import type { ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
+import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { contractClient } from "@/lib/api";
 
 type RegistrationClient = Pick<ContractClient, "register" | "resendVerification">;
@@ -60,6 +61,8 @@ export function SignUpFlow({
      FormData is the truth at submit — see submitRegistration. */
   const [adultAffirmed, setAdultAffirmed] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const privacyInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -105,6 +108,72 @@ export function SignUpFlow({
     } finally {
       setBusy(false);
     }
+  }
+
+  /* THE ONE CLICK RULE for the privacy row. */
+  function onPrivacyRowClick(event: ReactMouseEvent<HTMLElement>): void {
+    const input = privacyInputRef.current;
+    if (input === null) return;
+    /* THE PREDICATE READS THE REACT MIRROR, NEVER THE DOM. The pre-click activation steps
+       have ALREADY flipped `input.checked` by the time this runs, so `if (input.checked)`
+       takes the CHECKED branch on a bare click on an EMPTY box: the policy would never open
+       and the box would tick — the one behaviour V's goal forbids. `privacyAccepted` is the
+       settled value (ARCH-REV-S02 r3 N12, measured). */
+    if (privacyAccepted) {
+      /* No preventDefault: the box unchecks directly, with no modal. A click that did not
+         originate ON the input toggles nothing natively — the row is a <div>, not a <label>
+         — so it is driven through `.click()`, the path React's change detection listens to.
+         The `event.target !== input` guard is also what stops that synthesised click, which
+         bubbles back through this same handler, from recursing. */
+      if (event.target !== input) input.click();
+      return;
+    }
+    event.preventDefault();
+    /* The helper returns focus to whatever was focused when the surface opened, so focusing
+       the input HERE is what makes focus come back to it from every entry point. */
+    input.focus();
+    setPolicyOpen(true);
+    /* THE TRACKER RESYNC, and it runs AFTER the dispatch, never inside it.
+       React's value tracker desynchronises across a cancelled click: the box is toggled
+       BEFORE dispatch, React's change extraction records `true`, and the canceled-activation
+       steps revert the DOM to `false` AFTER dispatch — leaving tracker `true` over DOM
+       `false`, so a later genuine change can go unannounced. A PLAIN instance assignment
+       re-syncs it (the prototype setter and a synthesised `.click()` are both measured NOT
+       to: probe code-rev-s02-c3c4-r1-recovery.test.tsx, R1 against R2/R3).
+       PLACEMENT IS LOAD-BEARING AND IS MEASURED. Assigning inside this handler leaves the
+       box CHECKED under jsdom 30.0.1, whose canceled-activation behaviour for a checkbox is
+       `this.checked = !this.checked` — a TOGGLE, not the spec's restore-to-pre-click-value
+       (jsdom/living/nodes/HTMLInputElement-impl.js:179-182) — so it inverts the `false` this
+       line writes. Measured that way round: `the box must stay unticked: expected true to be
+       false`. A microtask runs after the activation steps in every environment, and touches
+       only the tracker (the DOM value is already `false`), so no frame shows a ticked box. */
+    queueMicrotask(() => {
+      const box = privacyInputRef.current;
+      if (box !== null) box.checked = false;
+    });
+  }
+
+  /* `I have read it` is the ONLY route that ticks the box, and it must set BOTH halves.
+     The DOM, because `FormData` is the truth at submit and the R18 refusal reads it; and the
+     R17 mirror, because the button's live `disabled` is computed from the mirrors. Setting
+     only the DOM leaves `Create account` disabled with both boxes visibly ticked; setting
+     only the mirror sends an empty box to `FormData` and R18 refuses the registration. */
+  function acknowledgePolicy(): void {
+    const input = privacyInputRef.current;
+    if (input !== null) input.checked = true;
+    setPrivacyAccepted(true);
+    setPolicyOpen(false);
+  }
+
+  /* Every dismissal route — the close control, Esc and a backdrop click all arrive here.
+     The mirror is re-read FROM THE DOM before closing: member 1 (the `onChange` guard on the
+     privacy input) already makes every route end `false`, measured, so this changes no
+     observable outcome today. It is kept because it makes the invariant structural instead
+     of accidental — the mirror cannot outlive the DOM across a close, whatever a later edit
+     does to the open path. */
+  function closePolicy(): void {
+    setPrivacyAccepted(privacyInputRef.current?.checked ?? false);
+    setPolicyOpen(false);
   }
 
   const sent = submittedEmail !== null;
@@ -212,7 +281,10 @@ export function SignUpFlow({
             />
             <span className="consentText">I am 18 or over.</span>
           </label>
-          <div className="consentRow">
+          {/* ONE onClick, on the ROW: the check square, the sentence and the Privacy Policy
+              control are three entry points onto one behaviour, and a handler placed on any
+              one of them covers only that one. */}
+          <div className="consentRow" onClick={onPrivacyRowClick}>
             <input
               className="consentBox"
               name="privacy-accepted"
@@ -220,6 +292,7 @@ export function SignUpFlow({
               required
               disabled={busy || sent}
               aria-labelledby={PRIVACY_CONSENT_TEXT_ID}
+              ref={privacyInputRef}
               /* The SETTLED value, not the in-flight one: a cancelled change never
                  reaches the DOM, so mirroring its `true` would record a state the box
                  never holds. `adult-affirmed`'s handler is the literal form. */
@@ -254,6 +327,23 @@ export function SignUpFlow({
           </p>
         ) : null}
       </form>
+
+      {/* OUTSIDE the sign-up form element (S02-S57) — spelled in prose because
+          `authRoutes.source-test.mjs:159-165` counts form OPENING TAGS in this file's source
+          text and a grep-based guard does not know what a comment is: the literal tag written
+          here took that count from 3 to 4. No control inside the policy can submit the
+          registration, whatever its `type` says, and `Enter` inside it cannot register an
+          account. Mounted CONDITIONALLY, so every open is a fresh read — the scroll gate
+          resets, the reader starts at the top, and `I have read it` is disabled again until
+          they reach the end (orchestrator ruling 2026-09-07 from CODE-REV-S02-C5C6 r1 N7). */}
+      {policyOpen ? (
+        <PrivacyPolicyModal
+          open
+          mode="consent"
+          onClose={closePolicy}
+          onAcknowledge={acknowledgePolicy}
+        />
+      ) : null}
     </AuthShell>
   );
 }
