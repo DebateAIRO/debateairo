@@ -146,7 +146,11 @@ const TERRACOTTA = {
   "--lp-r-nav": "16px",
   "--lp-fw-display": "480",
   "--lp-ls-display": "-0.035em",
-  "--shadow-tab": "0 6px 16px -8px rgba(41,38,31,.55)"
+  "--shadow-tab": "0 6px 16px -8px rgba(41,38,31,.55)",
+  "--ok-soft": "rgba(62,122,78,.28)",
+  "--ok-edge": "rgba(62,122,78,.55)",
+  "--muted-bg": "rgba(110,103,92,.1)",
+  "--muted-border": "rgba(110,103,92,.4)"
 } as const satisfies Readonly<Record<TokenName, string>>;
 
 const CHAMBER = {
@@ -256,7 +260,11 @@ const CHAMBER = {
   "--lp-r-nav": "999px",
   "--lp-fw-display": "400",
   "--lp-ls-display": "-0.045em",
-  "--shadow-tab": "0 6px 16px -8px rgba(0,0,0,.75)"
+  "--shadow-tab": "0 6px 16px -8px rgba(0,0,0,.75)",
+  "--ok-soft": "rgba(134,181,141,.35)",
+  "--ok-edge": "rgba(134,181,141,.55)",
+  "--muted-bg": "rgba(156,144,122,.14)",
+  "--muted-border": "rgba(156,144,122,.5)"
 } as const satisfies Readonly<Record<TokenName, string>>;
 
 const MODE_INDEPENDENT = {
@@ -295,7 +303,13 @@ const MODE_INDEPENDENT = {
   "--fw-display": "480",
   "--shadow-thumb": "0 1px 4px rgba(0,0,0,.3)",
   "--qr-paper": "#FFFFFF",
-  "--qr-ink": "#111111"
+  "--qr-ink": "#111111",
+  "--scrim": "rgba(10,8,6,.42)",
+  "--z-consent-bar": "45",
+  "--z-consent-scrim": "75",
+  "--z-consent-card": "76",
+  "--z-policy-scrim": "77",
+  "--z-policy-card": "78"
 } as const satisfies Readonly<Record<TokenName, string>>;
 
 const TEXT_TOKENS = [
@@ -332,6 +346,32 @@ function canonicalCssValue(value: string): string {
     .replace(/"\s+(?=[\d-])/g, '"')
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Flattens a translucent `rgba(r,g,b,a)` token onto the opaque surface it is
+ * painted over, per channel: `c = round(alpha*fg + (1-alpha)*bg)`.
+ *
+ * It exists because `tests/support/contrast.ts:3-5` throws on any argument that
+ * is not `#RRGGBB`, so a tint's contrast cannot be asked of the shared helper at
+ * all — and a reader never sees the tint, only this composite. Local to this
+ * file on purpose: `tests/support/contrast.ts` is iterated by 34 published
+ * contrast rows other missions depend on and is not this slice's to change.
+ */
+function composite(rgba: string, hexSurface: string): string {
+  const parsed = /^rgba\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\.\d+|\d+(?:\.\d+)?)\)$/.exec(rgba);
+  if (!parsed) throw new TypeError(`Expected a comma-tight rgba() colour, received ${rgba}`);
+  if (!/^#[0-9a-f]{6}$/i.test(hexSurface)) {
+    throw new TypeError(`Expected an #RRGGBB surface, received ${hexSurface}`);
+  }
+  const alpha = Number(parsed[4]);
+  const channel = (index: number): string => {
+    const foreground = Number(parsed[index + 1]);
+    const background = Number.parseInt(hexSurface.slice(1 + index * 2, 3 + index * 2), 16);
+    const flattened = Math.round(alpha * foreground + (1 - alpha) * background);
+    return flattened.toString(16).toUpperCase().padStart(2, "0");
+  };
+  return `#${channel(0)}${channel(1)}${channel(2)}`;
 }
 
 /** A 1-indexed, inclusive line interval. */
@@ -431,6 +471,51 @@ describe("T9-C3 token contract", () => {
       }
     }
     expect(measuredRows).toBe(34);
+  });
+
+  it("clears 4.5:1 for --muted on --muted-bg over --core, and 3:1 for the toggle's ON-vs-OFF state, in both modes", async () => {
+    // PROPERTY: a translucent tint's readability is measured against the colour a
+    // reader actually sees — the tint composited over its opaque surface — never
+    // against the tint's own unrenderable rgba string. The two toggle rows are
+    // WCAG 1.4.11 non-text contrast: the ON and OFF tracks are adjacent states of
+    // one control and must be tellable apart at 3:1.
+    const { styledDocument, tokenValue } = await tokenContract();
+    const { contrastRatio } = await contrastContract();
+
+    // The ratios are pinned to three decimals, not merely floored, so that any
+    // edit to --muted, --muted-bg, --core, --ok-dot or --shell has to restate
+    // this measurement in the same commit rather than drift past it silently.
+    for (const [mode, expectedSurface, expectedRatio] of [
+      ["terracotta", "#EFECE7", 4.743],
+      ["chamber", "#2A251F", 4.833]
+    ] as const) {
+      const { window } = styledDocument();
+      const surface = composite(
+        tokenValue(window, "--muted-bg", mode),
+        tokenValue(window, "--core", mode)
+      );
+      expect(surface, `${mode} --muted-bg over --core`).toBe(expectedSurface);
+
+      const ratio = contrastRatio(tokenValue(window, "--muted", mode), surface);
+      expect(ratio, `${mode} --muted on ${surface} = ${ratio.toFixed(3)}`).toBeGreaterThanOrEqual(
+        4.5
+      );
+      expect(Number(ratio.toFixed(3)), `${mode} --muted on ${surface}`).toBe(expectedRatio);
+    }
+
+    for (const [mode, expectedRatio] of [
+      ["terracotta", 4.246],
+      ["chamber", 7.171]
+    ] as const) {
+      const { window } = styledDocument();
+      const on = tokenValue(window, "--ok-dot", mode);
+      const off = tokenValue(window, "--shell", mode);
+      const ratio = contrastRatio(on, off);
+      expect(ratio, `${mode} toggle ON ${on} vs OFF ${off} = ${ratio.toFixed(3)}`).toBeGreaterThanOrEqual(
+        3
+      );
+      expect(Number(ratio.toFixed(3)), `${mode} toggle ON ${on} vs OFF ${off}`).toBe(expectedRatio);
+    }
   });
 });
 

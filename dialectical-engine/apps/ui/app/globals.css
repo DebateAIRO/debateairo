@@ -10,6 +10,8 @@
   --ink: #29261F; --ink-hover: #3A362D;
   --text: #29261F; --text-strong: #1A1613; --text-2: #555147;
   --text-3: #6E675C; --muted: #6E675C; --muted-2: #6E675C;
+  /* the mute tag pill: tint(mute, .1) and tint(mute, .4) — consent-ui S01 */
+  --muted-bg: rgba(110,103,92,.1); --muted-border: rgba(110,103,92,.4);
   --line: rgba(41,38,31,.10); --line-2: rgba(41,38,31,.12); --line-strong: rgba(41,38,31,.20);
   --grid-dot: rgba(41,38,31,.12);
 
@@ -27,6 +29,8 @@
   --agree: #3E7A4E; --agree-text: #3C754B; --agree-bg: #E6ECE2; --agree-border: #ADC5AF;
   --dispute: #B0432F; --dispute-text: #B0432F; --dispute-bg: #F4E5DE; --dispute-border: #DDAEA2;
   --ok-dot: #3E7A4E; --ok-text: #3C754B; --ok-bg: #E6ECE2; --ok-border: #ADC5AF;
+  /* locked-toggle track fill and accent edge: tint(ok, .28) and tint(ok, .55) — consent-ui S01 */
+  --ok-soft: rgba(62,122,78,.28); --ok-edge: rgba(62,122,78,.55);
   --gen-dot: #A8823E; --gen-text: #826530; --gen-bg: #F3ECE0; --gen-border: #D9C8A9;
   --score-strength-text: #3C754B; --score-strength-bg: #E6ECE2; --score-strength-border: #ADC5AF;
   --score-uncertainty-text: #826530; --score-uncertainty-bg: #F3ECE0; --score-uncertainty-border: #D9C8A9;
@@ -53,6 +57,8 @@
   /* a QR must stay dark-on-light for scanners in both modes */
   --qr-paper: #FFFFFF;
   --qr-ink: #111111;
+  /* the consent dialogs' overlay: one wash for both modes, from artboard 10c — consent-ui S01 */
+  --scrim: rgba(10,8,6,.42);
   --shadow-auth-card: 0 48px 90px -44px rgba(26,22,19,.5);
 
   /* mode-independent typography */
@@ -76,6 +82,12 @@
   --zoom-cluster-offset-b: calc(var(--dock-offset-b) + var(--dock-max-h) + 12px);
   --token-dock-clearance: calc(18px + var(--dock-max-h));
   --z-canvas-sticky: 4; --z-zoom-cluster: 5;
+  /* consent-ui S01 — the bar clears .topBar 30 and .tokenDock 40 but stays under
+     .drawerScrim 54; the two consent dialogs clear .modalScrim 70 and the policy
+     modal clears the card it opens from; .toast 80 keeps the ceiling */
+  --z-consent-bar: 45;
+  --z-consent-scrim: 75; --z-consent-card: 76;
+  --z-policy-scrim: 77; --z-policy-card: 78;
 
   /* landing page — the document ships two variants: Terracotta rides soft
      12-20px radii at display weight 480, Chamber the editorial variant */
@@ -103,6 +115,8 @@ html[data-mode="chamber"] {
   --ink: #F2EAD9; --ink-hover: #FFF8E8;
   --text: #F2EAD9; --text-strong: #FFFFFF; --text-2: #B5A88F;
   --text-3: #9C907A; --muted: #9C907A; --muted-2: #9C907A;
+  /* the mute tag pill: tint(mute, .14) and tint(mute, .5) — consent-ui S01 */
+  --muted-bg: rgba(156,144,122,.14); --muted-border: rgba(156,144,122,.5);
   --line: rgba(242,234,217,.09); --line-2: rgba(242,234,217,.08); --line-strong: rgba(242,234,217,.18);
   --grid-dot: rgba(242,234,217,.08);
 
@@ -118,6 +132,8 @@ html[data-mode="chamber"] {
   --agree: #86B58D; --agree-text: #86B58D; --agree-bg: #2A2E24; --agree-border: #4F654F;
   --dispute: #D67F65; --dispute-text: #D67F65; --dispute-bg: #36251E; --dispute-border: #774A3B;
   --ok-dot: #86B58D; --ok-text: #86B58D; --ok-bg: #2A2E24; --ok-border: #4F654F;
+  /* locked-toggle track fill and accent edge: tint(ok, .35) and tint(ok, .55) — consent-ui S01 */
+  --ok-soft: rgba(134,181,141,.35); --ok-edge: rgba(134,181,141,.55);
   --gen-dot: #C8A055; --gen-text: #C8A055; --gen-bg: #342A1B; --gen-border: #705A33;
   --score-strength-text: #86B58D; --score-strength-bg: #2A2E24; --score-strength-border: #4F654F;
   --score-uncertainty-text: #C8A055; --score-uncertainty-bg: #342A1B; --score-uncertainty-border: #705A33;
