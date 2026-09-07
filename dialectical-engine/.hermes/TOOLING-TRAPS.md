@@ -2289,3 +2289,29 @@ and check the other two.** A mutant that survives every runtime check is evidenc
 layer is blind to it, never evidence that nothing can see it. Cost of the overstatement: one review
 round. Mutating a call site (the earlier entry's rule) remains the right way to show the SHIPPED
 compiler agrees — the contract check and that mutant are complementary, not alternatives.
+
+## A "shape-legal synthetic" copied from a sibling test can be illegal for YOUR regex
+Found by lane/diag-tail (F-DIAG-DEV-API-CLI, 2026-09-07). The bounded-vocabulary tests in this
+corpus all use a synthetic message that is deliberately SHAPE-LEGAL for the rule being removed, so
+the row proves the vocabulary is doing the work and not the shape. The established constant is
+`DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER`, written against the joiner's
+`/^DEV_[A-Z0-9_]+$/u` (apps/runner/src/dev-auth-stack.ts:312). I reused its shape for a DIFFERENT
+rule — the dev API CLI's `/^DEV_API_ENVIRONMENT_[A-Z_]+$/u` — whose class carries **no digits**.
+`PW_42` therefore never matched, the synthetic reached the fallback under the shape rule and under
+the vocabulary alike, and the row pinned nothing while reading as if it pinned everything. Its
+comment asserted the opposite in prose.
+
+**Nothing caught it except the mutant.** The suite was green, the RED capture was red for the right
+reason (the classifier did not exist yet, so every row failed), and the restored-shape-rule mutant
+came back `EXIT = 0`. A green suite plus a red RED capture is not evidence that a row discriminates.
+
+**Rule.** A synthetic that exists to be admitted by a rule must be checked AGAINST THAT RULE before
+the assertion is written — one line settles it:
+`node -e 'console.log(/^DEV_API_ENVIRONMENT_[A-Z_]+$/u.test("<synthetic>"))'`. Character classes
+differ between sibling rules in this repo (`[A-Z_]` vs `[A-Z0-9_]`), so "it works in the other
+test" is not transitive. Cost: one full re-take of every final-head gate and mutant record, because
+the fix moved the tip after the records were already stamped.
+
+**Second-order rule, same round.** Append to this file and stage every other artifact BEFORE taking
+the final record set, not after: a trap append is a tracked edit, so it moves the tip and invalidates
+every record already stamped. Two re-takes in this lane, both avoidable by ordering.
