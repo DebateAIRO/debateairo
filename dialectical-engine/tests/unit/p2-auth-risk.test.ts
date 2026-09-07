@@ -399,3 +399,64 @@ describe("F-POISONED-REQUIRED-CATEGORY the required category has a persistent ob
     expect(supplied.arity).toEqual([]);
   });
 });
+
+/**
+ * F-AUTH-RISK-RETENTION-LOOP. `retentionMs` is a POLICY value — the repository holds it
+ * beside `maxSignals` (packages/db/src/auth-risk.ts:170-171) and both are read from
+ * `RECOVERY_POLICY_REGISTER_ROW.value.risk_signals`. Its shape check nevertheless sat inside
+ * the per-signal loop, as one disjunct of the `poisoned("signal-shape")` condition
+ * (auth-risk.ts:117), which cost two things:
+ *   - a policy defect was reported as a SIGNAL defect, the exact mislabelling the bounded
+ *     category set landed by F-AUTH-RISK-POISONED-CATCH exists to prevent; and
+ *   - with an EMPTY signal list the loop never ran, so the policy was never checked at all
+ *     and an out-of-shape retention was accepted silently.
+ * The per-signal AGREEMENT check (`expiresAt - observedAt === retentionMs`) is a property OF
+ * A SIGNAL and stays in the loop; the third row below is what keeps it there.
+ */
+describe("F-AUTH-RISK-RETENTION-LOOP retention is policy, validated once before the loop", () => {
+  const now = new Date(Date.UTC(2026, 0, 2));
+  // Every value `Number.isInteger(retentionMs) && retentionMs >= 1` rejects.
+  const OUT_OF_SHAPE_RETENTIONS = [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY] as const;
+
+  it("poisons an out-of-shape retention as policy-shape with an EMPTY signal list", () => {
+    for (const retentionMs of OUT_OF_SHAPE_RETENTIONS) {
+      const error = evaluationRejection([], now, retentionMs, MAX_AUTHENTICATION_RISK_SIGNAL_SCAN);
+
+      expect(error).toBeInstanceOf(TypeError);
+      expect((error as Error).message).toBe("AUTH_RISK_SIGNAL_POISONED");
+      expect(authenticationRiskSignalPoisonCategory(error)).toBe("policy-shape");
+    }
+  });
+
+  it("names the policy stage, not the signal stage, when signals are present too", () => {
+    const error = evaluationRejection(
+      [signal(0)], now, 0, MAX_AUTHENTICATION_RISK_SIGNAL_SCAN
+    );
+
+    expect((error as Error).message).toBe("AUTH_RISK_SIGNAL_POISONED");
+    expect(authenticationRiskSignalPoisonCategory(error)).toBe("policy-shape");
+  });
+
+  // The neighbouring control. A signal whose lifetime disagrees with a VALID retention is a
+  // signal defect and must keep its `signal-shape` label — moving the whole retention
+  // condition out of the loop would relabel this row too.
+  it("keeps a signal whose lifetime disagrees with a valid retention as signal-shape", () => {
+    const base = signal(0);
+    const disagreeing = { ...base, expiresAt: new Date(base.expiresAt.getTime() + 1) };
+
+    const error = evaluationRejection(
+      [disagreeing], now,
+      AUTHENTICATION_RISK_SIGNAL_RETENTION_MS, MAX_AUTHENTICATION_RISK_SIGNAL_SCAN
+    );
+
+    expect(authenticationRiskSignalPoisonCategory(error)).toBe("signal-shape");
+  });
+
+  // The second neighbouring control: a VALID retention with an empty list still summarises,
+  // so the new check rejects only out-of-shape values rather than every empty evaluation.
+  it("still summarises an empty signal list under a valid retention", () => {
+    expect(evaluateAuthenticationRiskSignals(
+      [], now, AUTHENTICATION_RISK_SIGNAL_RETENTION_MS, MAX_AUTHENTICATION_RISK_SIGNAL_SCAN
+    ).signalCount).toBe(0);
+  });
+});

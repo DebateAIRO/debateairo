@@ -30,6 +30,15 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 export class DevTlsFrontDoorError extends Error {
+  /**
+   * F-DEV-TLS-DOUBLE-WRAP. `cause` is the RAW error, exactly as the declared contract says
+   * (`constructor(code: string, cause?: unknown)`, tls-front-door.d.mts:40) and exactly as
+   * the sibling `DevelopmentAuthStackError` is called (apps/runner/src/dev-auth-stack.ts:323,
+   * :337, :423). This line does the ONE wrap. Handing it `{ cause: error }` wraps twice, and
+   * the second wrapper is a PLAIN OBJECT: the cause walk in `developmentAuthStackErrorCode`
+   * advances only while `current instanceof Error` (dev-auth-stack.ts:299), so it stops there
+   * and the inner producer code is lost from the joined chain.
+   */
   constructor(code, cause) {
     super(code, cause === undefined ? undefined : { cause });
     this.name = "DevTlsFrontDoorError";
@@ -260,7 +269,7 @@ async function cleanupFrontDoor(frontDoor) {
   try {
     await frontDoor.close();
   } catch (error) {
-    throw new DevTlsFrontDoorError("DEV_TLS_FRONT_DOOR_CLEANUP_FAILED", { cause: error });
+    throw new DevTlsFrontDoorError("DEV_TLS_FRONT_DOOR_CLEANUP_FAILED", error);
   }
 }
 
@@ -285,7 +294,7 @@ export async function startAttestedDevTlsFrontDoor(input) {
   } catch (error) {
     throw error instanceof DevTlsFrontDoorError
       ? error
-      : new DevTlsFrontDoorError("DEV_TLS_FRONT_DOOR_START_FAILED", { cause: error });
+      : new DevTlsFrontDoorError("DEV_TLS_FRONT_DOOR_START_FAILED", error);
   }
   try {
     for (let attempt = 0; attempt < maximumProbeAttempts; attempt += 1) {
