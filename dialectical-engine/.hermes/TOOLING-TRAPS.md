@@ -1946,3 +1946,41 @@ shape that loses a cause is a bare catch whose body is a ZERO-ARGUMENT notifier 
 same two greps return 132 and 1, the one remaining being auth-risk.ts:212, which replaces a
 decrypt/parse cause with a fixed `AUTH_RISK_SIGNAL_POISONED` and is still open (it is in
 `packages/`, outside this lane's contract).
+## FOLLOW-UP to the entry above: the pin was cheap, and the reason I thought it wasn't (lane/sessions-argon2 r1, 2026-09-07)
+The entry above ends "if you add one, add it in the same round". I did not, and codex returned
+CHANGES with that as the blocking finding. Correcting the record, because the numbers in it are
+round-0 state: B1/B2 are now **KILLED**, not surviving (`logs/sessions-argon2/14-mut-B1-killed.log`,
+`15-mut-B2-killed.log`), by two new failure-path cases per service.
+The useful part is WHY I skipped it. I believed pinning `sessions.ts`'s catch meant duplicating the
+81-line Argon2 worker-pool fixture from `tests/integration/session-database.test.ts` into a file
+that has to stay green three runs running. That was wrong, and checkable in two minutes:
+- `completeLogin`'s **TOTP branch** reaches the risk-signal catch using `decrypt` (AES-GCM) and
+  `matchTotpStep` (HMAC) only. Argon2 appears on the **recovery-code** branch (`verifyRecoveryCode`)
+  and in `SessionService.create` — and `create` hashes a dummy password ONLY when you omit
+  `dummyPasswordHash`. Pass a syntactically valid argon2id string (`parseEncodedArgon2id` parses it
+  before `verifyPassword` delegates) and a stub `Argon2Executor`, and no Argon2 runs at all.
+- So the pin is a plain unit test with small stubs: two cases, 19 ms and 2 ms.
+Two transferable tricks from writing it:
+- **Capture the binding hash from the service, don't re-derive it.** `beginLogin` computes
+  `bindingHash` and hands it to `repository.createLoginChallenge`; capture it there and feed it back
+  through the `readLoginChallenge` stub. Re-deriving the HMAC in the test duplicates production
+  logic and would let a change to that derivation pass silently.
+- **`dekStore.load` must return a FRESH copy each call** (`Buffer.from(dek)`): `totpStep` zeroes the
+  buffer it is handed in its `finally`, so a shared buffer decrypts once and then fails.
+And the estimating lesson, which is the real one: **before declining work because it is expensive,
+measure the cost.** I let an unchecked estimate decide, and the estimate was wrong by an order of
+magnitude. A sentence of the form "I did not do X because X is expensive" needs a number in it.
+## A stub that is never reached looks exactly like a stub that carries the case (lane/sessions-argon2 r1, 2026-09-07)
+I claimed `tests/unit/p2-recovery-start.test.ts`'s second case exercised the risk-signal catch in
+`recovery.ts`, and cited its line numbers. It exercises nothing: that case's `repository.start()`
+throws `DATABASE_UNAVAILABLE`, and the catch sits inside `if(outcome.status==="created")`, so the
+block is unreachable and the `recordForRecovery` stub below it is dead code. The stub is right
+there in the source, three lines under the thing that makes it unreachable.
+The tell was already in my own evidence: the mutant on that catch survived at `3 passed (3)`. I read
+that as "no assertion on the delivered value" when it equally meant "this code never runs" — one
+measurement, two possible conclusions, and I recorded only the smaller one. When a mutant on a
+branch survives, rule out "the branch is never entered" BEFORE concluding "the assertion is weak";
+they need different fixes and only one of them is a missing assertion.
+State coverage as the BRANCH a test enters, never as the stub it supplies. "This case drives the
+`status==="created"` path into the catch" is falsifiable by reading one `if`; "this case supplies a
+scope_unresolved recorder" is not a claim about coverage at all.
