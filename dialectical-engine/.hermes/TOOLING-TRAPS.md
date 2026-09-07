@@ -2241,3 +2241,19 @@ is 4, not 0 — so an empty NEW always trips `RESULT: FAIL pre-gate` no matter w
 holds. To remove a manifest entry, mutate it into something inert instead (prefixing `#` works
 when the reader skips comment lines). STRENGTH: entailed, read from mutate.sh's own `count()`
 heredoc, not measured by a deliberate failing run.
+
+## An identity gate whose extractor greps the log it wrote its own header into
+Found by lane/dev-health (2026-09-07), one entry below the SORTED-derivative trap and the same
+false break by a different mechanism. The typecheck identity gate writes a header, appends
+`pnpm typecheck` output to the same file, then extracts the diagnostics with `grep 'error TS'`.
+One header line explained the method and CONTAINED the token it was about. The extract came back
+with 9 lines against the baseline's 8, the sha256 differed, and the gate printed
+`VERDICT: DIFFERENT` — which on an identity gate reads exactly like "your diff changed the
+diagnostics". The ninth line was the comment. The same extraction taken minutes earlier from a
+file with no header was byte-identical to the baseline.
+**Rule: an extractor must not be able to match the prose in its own artifact. Grep a pattern only
+real output can satisfy (`'): error TS'`, anchored to the compiler's `file(line,col):` shape),
+and drop comment lines explicitly (`grep -v '^#'`). Better still, keep the raw command output in
+its own file and let the annotated record cite it.** And when an identity gate breaks, DIFF the
+two extracts and read the added line before touching the code — the line names the cause in one
+look. Cost here: ~2 minutes, and a few seconds of believing a clean typecheck had regressed.
