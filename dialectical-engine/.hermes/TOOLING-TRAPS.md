@@ -1991,3 +1991,7 @@ they need different fixes and only one of them is a missing assertion.
 State coverage as the BRANCH a test enters, never as the stub it supplies. "This case drives the
 `status==="created"` path into the catch" is falsifiable by reading one `if`; "this case supplies a
 scope_unresolved recorder" is not a claim about coverage at all.
+
+## `codex exec --sandbox workspace-write` cannot `listen()` — a full suite run inside it is not a gate (orchestrator, 2026-09-07)
+
+The codex sandbox (macOS seatbelt) refuses `listen` on 127.0.0.1: `Error: listen EPERM: operation not permitted 127.0.0.1`. Every embedded-PostgreSQL, relay and HTTP test then fails identically (97 `listen EPERM` in one run; 85 files red instead of 35), and `fourcount5` rejects the log (exit 5, identity mismatch). Seen first in the sessions codex review (it could not run one integration test), then in the evaluator implementer's closing suite. Rule: a Codex seat that implements in the sandbox files its unit/selected gates and STATES that the full suite is the orchestrator's; the orchestrator takes it outside the sandbox with `tools/gate-run.sh` at the seat's final tip and attributes it. A seat that instead reports a sandboxed full suite as a gate has reported a different environment's result as this one's.
