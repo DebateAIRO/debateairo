@@ -119,6 +119,20 @@ export function CookieConsent() {
    */
   const openerRef = useRef<HTMLElement | null>(null);
 
+  /**
+   * The bar's `Choose what to store` control, lent to the shared helper so it can put
+   * focus back there when the card closes (S01-R18's bar direction, V-22).
+   *
+   * It is a SECOND reference and not a use of `openerRef` above, because the two hold
+   * different things: `openerRef` holds the node that asked for the card, which for the
+   * bar entry is unmounted by the very commit that opens the card, while this one is
+   * attached by the bar and is therefore re-attached to the FRESH button when the bar
+   * comes back — which happens in the layout phase of that commit, before the card's
+   * cleanup reads it. This component still moves no focus itself; it lends a node and the
+   * ONE helper decides (SPEC §Out of scope bans a second implementation).
+   */
+  const manageRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     setSurface(readConsent() === null ? "bar" : "silent");
   }, []);
@@ -201,6 +215,7 @@ export function CookieConsent() {
           onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
           onDismiss={dismiss}
           onRequestPolicy={(): void => setPolicyOpen(true)}
+          returnFocusRef={manageRef}
         />
         {policyOpen && (
           <PrivacyPolicyModal open mode="read" onClose={(): void => setPolicyOpen(false)} />
@@ -214,6 +229,7 @@ export function CookieConsent() {
       onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
       onChoose={openCard}
       onAcceptAll={(): void => settle(decisionFor("accept-all"))}
+      chooseRef={manageRef}
     />
   );
 }

@@ -18,6 +18,27 @@ export type ModalSurface = Readonly<{
   containerRef: React.RefObject<HTMLElement | null>;
   initialFocusRef: React.RefObject<HTMLElement | null>;
   onClose: () => void;
+  /**
+   * OPTIONAL, and the only member added since the contract was fixed (V-22, ruled after
+   * both slices merged). The control focus should return to WHEN THE CAPTURED OPENER DID
+   * NOT SURVIVE the opening commit — never a general override of it.
+   *
+   * It exists because the capture is unusable for a whole CLASS of surfaces: one whose
+   * opener is unmounted by the same commit that opens it. The platform moves focus to
+   * `document.body` as the opener leaves the document, and it does so before any hook tier
+   * runs — `useLayoutEffect` sees `body` too (measured: CODE-REV-S01-C6 r1 B2) — so the
+   * capture is `body`, and even a captured reference would be a detached node. A
+   * PARENT-owned ref escapes that: React re-attaches it in the layout phase of the commit
+   * that remounts the control, which is before this hook's passive cleanup reads it. The
+   * cookie bar and its preferences card are the first member of the class; every
+   * mutually-exclusive surface pair is another.
+   *
+   * A surface that omits it keeps the captured-opener behaviour exactly, and a surface
+   * that supplies it keeps that behaviour too for every open where the opener is still on
+   * the page — see the ordering note in the cleanup below, which is measured law and not
+   * a preference.
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }>;
 
 /**
@@ -30,10 +51,13 @@ type StackEntry = Readonly<{ read: () => ModalSurface }>;
  * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
  * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
  * is never "the last one registered": that entry is only where `topmostSurface()` starts. It
- * decides from DOM POSITION — a surface contained by another is drawn over it and wins, and
- * among unrelated siblings the one later in DOCUMENT order wins. `compareDocumentPosition`
- * knows nothing of the `--z-*` ladder, so what makes that right for this product is its
- * ARRANGEMENT: the policy modal renders AFTER the card (V-20; CODE-REV-S02-C5C6 r1 N2).
+ * decides from DOM POSITION, in this order: CONTAINMENT first — a surface contained by
+ * another is drawn over it and wins outright — and only among UNRELATED surfaces does
+ * document order decide, the later one winning. `compareDocumentPosition` knows nothing of
+ * the `--z-*` ladder, so a surface that means to sit on top of another either nests inside
+ * it or renders after it; no other arrangement is supported (V-20; CODE-REV-S02-C5C6 r1 N2,
+ * and CODE-REV-S02-C7 r1 N5, which found this comment naming one consumer's arrangement as
+ * if it were the rule).
  */
 const surfaceStack: StackEntry[] = [];
 
@@ -173,7 +197,26 @@ export function useModalSurface(open: boolean, surface: ModalSurface): void {
       const index = surfaceStack.lastIndexOf(entry);
       if (index !== -1) surfaceStack.splice(index, 1);
       if (surfaceStack.length === 0) detachListener();
-      focusElement(opener);
+      // The captured opener wins whenever it SURVIVED, and the named control serves only
+      // when it did not. `document.body` is the degenerate value `document.activeElement`
+      // takes when no element holds focus, and it is exactly what the capture becomes for
+      // the class this member exists for, so it counts as "did not survive" rather than as
+      // an opener — otherwise every surface would return focus to the body it captured and
+      // the member would never be reached.
+      //
+      // The ORDER is load-bearing and is not V-22's wording. Measured here: with the named
+      // control preferred unconditionally, a surface whose opener is still on the page
+      // loses its focus return to whatever else the caller lent — the cookie card opened
+      // from Settings with nothing stored brings the bar back underneath it, and the bar's
+      // control would take a focus that belongs to the Settings opener (S01-R18 names both
+      // directions). Surviving-first satisfies both; named-first satisfies one.
+      const survived = opener !== null && opener !== document.body && opener.isConnected;
+      const named = surfaceRef.current.returnFocusRef?.current ?? null;
+      if (survived) {
+        focusElement(opener);
+        return;
+      }
+      if (named !== null && named.isConnected) focusElement(named);
     };
   }, [open]);
 }

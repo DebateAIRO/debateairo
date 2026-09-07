@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useRef, type ReactNode } from "react";
+import { act, useRef, type ReactNode, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -30,6 +30,11 @@ type TestSurfaceProps = {
   initialFocus?: string;
   /** Label of a button rendered with `disabled`, so the focusable set can change while open. */
   disabledButton?: string;
+  /**
+   * The caller-named control focus should return to (V-22). Omitted by every case that
+   * predates it, so those keep exercising the captured-opener path unchanged.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
   children?: ReactNode;
 };
 
@@ -40,11 +45,12 @@ function TestSurface({
   buttons = [],
   initialFocus,
   disabledButton,
+  returnFocusRef,
   children
 }: TestSurfaceProps): ReactNode {
   const containerRef = useRef<HTMLElement | null>(null);
   const initialFocusRef = useRef<HTMLElement | null>(null);
-  useModalSurface(open, { containerRef, initialFocusRef, onClose });
+  useModalSurface(open, { containerRef, initialFocusRef, onClose, returnFocusRef });
   if (!open) return null;
   const closeLabel = `close-${name}`;
   const named = initialFocus ?? closeLabel;
@@ -463,6 +469,163 @@ describe("consent modal semantics helper", () => {
 
     await render(<Harness open={false} />);
     expect(document.activeElement).toBe(opener);
+  });
+
+  it("returns focus to the named control when the opener was unmounted by the same commit", async () => {
+    // PROPERTY (V-22's default; S01-R18's bar direction): when `returnFocusRef` names a
+    // control that IS in the document at close, the helper prefers it over the
+    // `document.activeElement` it captured at open.
+    //
+    // The captured opener cannot serve this arrangement and no hook tier can rescue it:
+    // the commit that opens the surface also unmounts the opener, so the platform has
+    // already moved focus to `document.body` before any effect runs, and the control that
+    // comes back is a FRESH node (measured: CODE-REV-S01-C6 r1 B2). The fixture reproduces
+    // exactly that — opener and surface are mutually exclusive, like the cookie bar and
+    // its preferences card — and the ref is the parent's, so React re-attaches it in the
+    // layout phase of the commit that remounts the control, before this passive cleanup.
+    function Harness({ open }: { open: boolean }): ReactNode {
+      const returnFocusRef = useRef<HTMLElement | null>(null);
+      return open ? (
+        <TestSurface open name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
+      ) : (
+        <button
+          type="button"
+          ref={(node) => {
+            returnFocusRef.current = node;
+          }}
+        >
+          opener
+        </button>
+      );
+    }
+
+    await render(<Harness open={false} />);
+    const first = labelled("opener");
+    await act(async () => {
+      first.focus();
+    });
+    expect(document.activeElement, "the opener holds focus before the surface opens").toBe(first);
+
+    await render(<Harness open />);
+    expect(document.activeElement, "focus moved into the surface").toBe(labelled("close-only"));
+    expect(first.isConnected, "and the commit that opened it removed the opener").toBe(false);
+
+    await render(<Harness open={false} />);
+    const returned = labelled("opener");
+    expect(returned, "the control that came back is a fresh node").not.toBe(first);
+    expect(document.activeElement, "focus is on the control the caller named").toBe(returned);
+  });
+
+  it("keeps the captured opener ahead of the named control while the opener is on the page", async () => {
+    // PROPERTY: `returnFocusRef` serves the opens where the capture did NOT survive; it is
+    // not a general override. A caller that lends a control and still has its opener on the
+    // page gets the opener — which is what keeps the cookie card's Settings direction on
+    // `Cookie preferences` even though the bar returns underneath it and re-attaches the
+    // very ref the bar entry needs (measured; see the ordering note in the helper).
+    function Harness({ open }: { open: boolean }): ReactNode {
+      const returnFocusRef = useRef<HTMLElement | null>(null);
+      return (
+        <>
+          <input id="opener" name="opener" />
+          <button
+            type="button"
+            ref={(node) => {
+              returnFocusRef.current = node;
+            }}
+          >
+            named
+          </button>
+          <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
+        </>
+      );
+    }
+
+    await render(<Harness open={false} />);
+    const opener = document.querySelector<HTMLInputElement>("#opener")!;
+    await act(async () => {
+      opener.focus();
+    });
+
+    await render(<Harness open />);
+    expect(document.activeElement).toBe(labelled("close-only"));
+    expect(labelled("named").isConnected, "the named control is on the page and would win").toBe(
+      true
+    );
+
+    await render(<Harness open={false} />);
+    expect(document.activeElement, "the surviving opener kept the return").toBe(opener);
+  });
+
+  it("returns focus to the named control when the captured opener has since left the page", async () => {
+    // PROPERTY: "did the capture survive?" is asked at CLOSE, not at open. An opener that
+    // was on the page when the surface opened and has been removed while it was open is as
+    // unusable as one the opening commit removed, so the named control takes the return.
+    function Harness({ open, opener }: { open: boolean; opener: boolean }): ReactNode {
+      const returnFocusRef = useRef<HTMLElement | null>(null);
+      return (
+        <>
+          {opener ? <input id="opener" name="opener" /> : null}
+          <button
+            type="button"
+            ref={(node) => {
+              returnFocusRef.current = node;
+            }}
+          >
+            named
+          </button>
+          <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
+        </>
+      );
+    }
+
+    await render(<Harness open={false} opener />);
+    const opener = document.querySelector<HTMLInputElement>("#opener")!;
+    await act(async () => {
+      opener.focus();
+    });
+
+    await render(<Harness open opener />);
+    expect(document.activeElement, "the surface captured a live opener").toBe(
+      labelled("close-only")
+    );
+
+    await render(<Harness open opener={false} />);
+    expect(opener.isConnected, "and the capture has now left the document").toBe(false);
+
+    await render(<Harness open={false} opener={false} />);
+    expect(document.activeElement, "so the named control took the return").toBe(labelled("named"));
+  });
+
+  it("never hands focus to a named control that is not in the document", async () => {
+    // PROPERTY: the named control is taken only while it is connected. Focus lands nowhere
+    // rather than on a node that has left the page.
+    //
+    // NOT RED at base, and said so rather than implied: the base helper reads no such
+    // member at all, so this case passes there for the wrong reason — its RED is the
+    // `named.isConnected` mutant, watched in the handoff. And the assertion that
+    // DISCRIMINATES that mutant is the spy, not the active element: focusing a detached
+    // node and focusing nothing leave `document.activeElement` identical, so a purely
+    // behavioural assertion here would pin nothing.
+    const stale = document.createElement("button");
+    expect(stale.isConnected, "the named control is genuinely off-document").toBe(false);
+    const stealFocus = vi.spyOn(stale, "focus");
+
+    function Harness({ open }: { open: boolean }): ReactNode {
+      const returnFocusRef = useRef<HTMLElement | null>(stale);
+      return <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />;
+    }
+
+    await render(<Harness open={false} />);
+    expect(document.activeElement, "nothing holds focus, so the capture will be the body").toBe(
+      document.body
+    );
+
+    await render(<Harness open />);
+    expect(document.activeElement).toBe(labelled("close-only"));
+
+    await render(<Harness open={false} />);
+    expect(stealFocus, "the detached name was never asked for focus").not.toHaveBeenCalled();
+    expect(document.activeElement, "and focus went nowhere else either").toBe(document.body);
   });
 
   it("wraps Tab from the last focusable back to the first", async () => {

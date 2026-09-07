@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type RefObject } from "react";
 import {
   COOKIE_CATEGORIES,
   type ConsentToggles,
@@ -61,6 +61,18 @@ export type CookiePreferencesCardProps = {
   onDismiss: () => void;
   /** Opens the S02 policy modal in read-only mode, over the card (S01-R20). */
   onRequestPolicy: () => void;
+  /**
+   * Handed straight to the shared helper, which uses it when the opener it captured did
+   * not survive the commit that opened this card (S01-R18, V-22). The caller owns it
+   * because the control it names — the bar's `Choose what to store` — is unmounted while
+   * this card is open and comes back as a fresh node; nothing this component could capture
+   * would still be on the page at close.
+   *
+   * Spelled without the word this file's own source-text guard bans for the page-wide
+   * object (`consent-card.test.tsx`), which a grep cannot tell from a comment
+   * (`COMMON.md` §8).
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 export function CookiePreferencesCard({
@@ -68,7 +80,8 @@ export function CookiePreferencesCard({
   onSave,
   onEssentialOnly,
   onDismiss,
-  onRequestPolicy
+  onRequestPolicy,
+  returnFocusRef
 }: CookiePreferencesCardProps) {
   const titleId = useId();
   const [toggles, setToggles] = useState<ConsentToggles>({
@@ -97,7 +110,8 @@ export function CookiePreferencesCard({
   useModalSurface(true, {
     containerRef: cardRef,
     initialFocusRef: firstOperableRef,
-    onClose: onDismiss
+    onClose: onDismiss,
+    returnFocusRef
   });
 
   /** The locked category is not in `ConsentToggles`: its state is the constant `true`. */

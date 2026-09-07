@@ -322,28 +322,26 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(document.activeElement, "focus is back on `Cookie preferences`").toBe(opener);
   });
 
-  it("does NOT return focus to the bar opener, and records exactly why (FINDING C6-F1)", () => {
-    // NOT a requirement met — a MEASUREMENT, in the idiom `consent-mount.test.tsx`
-    // used for the Esc listener that did not exist yet, so the gap is a fact in
-    // the record rather than a claim in a handoff.
+  it("returns focus to the RETURNED bar's opener when the card closes", () => {
+    // PROPERTY (S01-R18, S01-S41, the BAR direction; V-22 option (a)): after the card
+    // closes with nothing decided, focus is on the `Choose what to store` control of the
+    // bar that came back.
     //
-    // S01-R18 asks for focus to return to `Choose what to store` (`CookieBar.tsx:61`).
-    // It cannot, and no edit inside C6's file surface can make it:
-    //   * the helper returns focus to whatever `document.activeElement` held when
-    //     the surface REGISTERED, and it registers in a `React.useEffect`
-    //     (`modalSemantics.ts:165-178`), i.e. after the commit;
-    //   * S01-R14 and the states table make the bar and the card mutually
-    //     exclusive, so that same commit REMOVED the bar — asserted below — and
-    //     the platform moves focus to `document.body` when the focused element
-    //     leaves the document;
-    //   * so the captured opener is `document.body`, and even a captured
-    //     reference to the old button would be a DETACHED node: the bar that
-    //     returns is a fresh mount with a fresh button.
-    // Every lawful remedy is outside this cluster: a fourth `ModalSurface` member
-    // (S02's file, a cross-slice interface change), a focus move written in S01
-    // (banned — the ONE helper owns focus), or the returning bar taking focus
-    // itself (`CookieBar.tsx`, cluster C3). Reported as C6-F1; the SETTINGS
-    // direction, where the opener survives, is asserted GREEN in the case above.
+    // It is the one direction the captured opener cannot serve, which is why the helper
+    // grew an optional `returnFocusRef` for it: S01-R14 makes the bar and the card
+    // mutually exclusive, so the commit that opened the card REMOVED the bar — asserted
+    // below — and the platform moves focus to `document.body` the moment the focused
+    // element leaves the document. Every hook tier is too late (`useLayoutEffect` sees
+    // `body` too — measured, CODE-REV-S01-C6 r1 B2), and a captured reference to the old
+    // button would be a DETACHED node, because the bar that returns is a fresh mount with
+    // a fresh button — also asserted below. What lands the focus is `CookieConsent`'s own
+    // ref, handed to the bar and to the card, which React re-attaches to the fresh button
+    // in the layout phase of the commit that remounts it, before the card's passive
+    // cleanup reads it.
+    //
+    // This case REPLACES the C6-F1 measurement that recorded the gap. S01 still writes no
+    // focus move of its own: it passes a reference, and the ONE helper moves the focus.
+    // The SETTINGS direction, where the opener survives, is the case above.
     mountBar();
     const opener = labelled("Choose what to store");
     activate(opener);
@@ -354,13 +352,11 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(card(), "the card is gone").toBeNull();
     expect(bar(), "and the bar is back").not.toBeNull();
-    expect(
-      labelled("Choose what to store"),
-      "as a FRESH node, so no captured reference could have been restored"
-    ).not.toBe(opener);
-    expect(document.activeElement, "focus is on the body — R18's bar direction is UNMET").toBe(
-      document.body
+    const returned = labelled("Choose what to store");
+    expect(returned, "as a FRESH node, so no captured reference could have been restored").not.toBe(
+      opener
     );
+    expect(document.activeElement, "focus is on the returned bar's opener").toBe(returned);
   });
 
   it("writes no modal machinery of its own: the card imports all of it", () => {

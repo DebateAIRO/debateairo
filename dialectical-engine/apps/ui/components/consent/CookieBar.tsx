@@ -17,6 +17,8 @@
  * delimited `consent-ui S01` block at the end of `apps/ui/app/globals.css`
  * (S01-R09, S01-R10) and every colour there is a `var(--token)` reference.
  */
+import type { RefObject } from "react";
+
 export type CookieBarProps = {
   /** Writes R04 row 2 and closes the bar. */
   onEssentialOnly: () => void;
@@ -30,9 +32,17 @@ export type CookieBarProps = {
   onChoose: (opener: HTMLElement | null) => void;
   /** Writes R04 row 1 and closes the bar. */
   onAcceptAll: () => void;
+  /**
+   * Attached to `Choose what to store`, so the ONE shared helper can put focus back on
+   * THIS bar's control when the card closes (S01-R18's bar direction, V-22). The bar is
+   * unmounted while the card is open, so the reference is re-attached to the fresh button
+   * when the bar returns — which is the whole point of it being the caller's ref and not
+   * the card's capture. The bar still moves no focus itself: it only lends the node.
+   */
+  chooseRef?: RefObject<HTMLButtonElement | null>;
 };
 
-export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll }: CookieBarProps) {
+export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll, chooseRef }: CookieBarProps) {
   return (
     <div className="consentBar" role="region" aria-label="Cookie consent">
       <div className="consentBarBezel">
@@ -56,6 +66,7 @@ export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll }: CookieBarP
             <button
               type="button"
               className="consentGhost consentGhostStrong"
+              ref={chooseRef}
               onClick={(event) => onChoose(event.currentTarget)}
             >
               Choose what to store

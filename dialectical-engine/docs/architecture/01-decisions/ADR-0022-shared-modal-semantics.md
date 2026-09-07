@@ -98,6 +98,27 @@ export function openSurfaceCount(): number;   // test-visible depth of the Esc s
 `openSurfaceCount` exists so the stack's depth is observable from a test without exporting the
 stack itself.
 
+### Addendum 2026-09-07 — a fourth, OPTIONAL `ModalSurface` member (V-22)
+
+Appended by seat `CODE-CROSS-01` as the one cross-slice change ticket `t_c1068d6f` authorises;
+nothing above this heading is edited. `ModalSurface` gains `returnFocusRef?:
+React.RefObject<HTMLElement | null>` — the control focus returns to when the opener captured at
+open did not survive the opening commit. The three original members and every other export are
+unchanged, and a surface that omits the member behaves exactly as before. It exists because the
+capture cannot serve a whole CLASS of surfaces — any surface whose opener is unmounted by the same
+commit that opens it, of which every mutually-exclusive surface pair is a member: the platform has
+moved focus to `document.body` before any hook tier runs (`useLayoutEffect` too — measured,
+CODE-REV-S01-C6 r1 B2), so the capture is `body` and a captured reference would be detached, while
+a parent-owned ref is re-attached to the fresh control in the layout phase of the commit that
+remounts it, before this hook's passive cleanup reads it. **The precedence is
+surviving-capture-first, not named-control-first** — V-22's default and CODE-REV-S01-C6 r1's remedy
+both word it the other way, and that wording is measurably wrong: a surface whose opener IS still
+on the page would lose its focus return to whatever else the caller lent it, which takes S01-R18's
+Settings direction off `Cookie preferences` the moment the cookie bar returns underneath the card.
+Both directions of S01-R18, and both sentences of V-22's own worked example, hold only under
+surviving-first. Pinned by four cases in `tests/render/consent-modal-semantics.test.tsx` and one in
+`tests/render/consent-policy-link.test.tsx`.
+
 ## Options considered
 
 - **A React context provider owning the stack.** Rejected: it would force slice S01's
