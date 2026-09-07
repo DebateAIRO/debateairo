@@ -13,17 +13,64 @@ import { resolveExpansionDepth } from "@debateai/runner";
 import { auditArchitecture, auditSourceRules } from "../../tools/orphan-audit/src/index.js";
 import { createDebate } from "../../apps/ui/lib/api.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import ts from "typescript-classic";
 import {
   candidatesOf,
   ceilingSites,
+  DEPTH_LIMIT,
   domainSites,
   evaluatedCandidatesOf,
   kindOf,
+  NODE_BUDGET,
   parseModule,
   type Cell,
   type EvaluatedCandidate,
-  type Site
+  type Site,
+  type Value
 } from "../support/depthOracle.js";
+
+/**
+ * Expectations are DERIVED, never copied from evaluator output (codex r2 B8's
+ * lesson): offsets come from the source text itself, and work-limit rows are
+ * measured by this file's own independent walker against the recorded semantics.
+ */
+function spanOf(source: string, fragment: string, occurrence = 0): [number, number] {
+  let index = -1;
+  for (let seen = 0; seen <= occurrence; seen += 1) index = source.indexOf(fragment, index + 1);
+  if (index < 0) throw new Error(`fragment not found in source: ${fragment}`);
+  return [index, index + fragment.length];
+}
+
+/** Line of an offset, 1-based, derived from the source text. */
+function lineOf(source: string, offset: number): number {
+  return source.slice(0, offset).split("\n").length;
+}
+
+/** The recorded counter semantics, re-implemented here so the test does not trust the module. */
+function measureCallbackBody(source: string): { nodes: number; depth: number } {
+  const file = ts.createSourceFile("m.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let arrow: ts.ArrowFunction | undefined;
+  const find = (n: ts.Node): void => {
+    if (arrow === undefined && ts.isArrowFunction(n)) arrow = n;
+    ts.forEachChild(n, find);
+  };
+  find(file);
+  if (arrow === undefined) throw new Error("no arrow function in source");
+  let nodes = 0;
+  let depth = 0;
+  const walk = (n: ts.Node, d: number): void => {
+    nodes += 1;
+    if (d > depth) depth = d;
+    ts.forEachChild(n, (c) => walk(c, d + 1));
+  };
+  walk(arrow.body, 0);
+  return { nodes, depth };
+}
+
+/** A numeric-cell Value, built from the spec rather than from observed output. */
+function numbers(cells: readonly number[], coll: "array" | "set" = "array"): Value {
+  return { kind: "EXACT", coll, cells: cells.map((v) => ({ t: "num" as const, v })) };
+}
 
 /** Exactly one evaluated candidate, or the count is the failure. */
 function evaluateOne(path: string, source: string): EvaluatedCandidate {
@@ -913,6 +960,373 @@ describe("S1-1 · the depth bound has a single source", () => {
     { id: "an operation over NOT_ARRAY reports (K50)", source: 'const choices = [0,1,2,3,4,5].join("").split("").map(n => +n).slice(1);' }
   ])("amendment A1 does NOT absorb: $id", ({ source }) => {
     expect(evaluateOne("planted.ts", source).verdict).toBe("UNDETERMINED");
+  });
+
+  // ══════════ R3 — THE COMPLETE EVALUATED-RECORD TABLE ══════════
+  //
+  // Each row asserts the WHOLE record: discovery identity, both display lines,
+  // BOTH consumed boundaries, the whole Value (kind, collection and every cell
+  // payload), the verdict and the reason. Identity and spans are DERIVED from
+  // the source text by `spanOf`/`lineOf` — never copied from evaluator output.
+  it.each([
+    {
+      id: "a bare ruled literal decided by rule 1",
+      source: "const allowed = [1,2,3,4,5];",
+      literal: "[1,2,3,4,5]", consumed: "[1,2,3,4,5]",
+      value: numbers([1, 2, 3, 4, 5]), verdict: "RULED" as const,
+      reason: "rule 1: the candidate's own distinct set is the ruled domain"
+    },
+    {
+      id: "a suffix slice over a non-ruled literal",
+      source: "const choices = [0,1,2,3,4,5].slice(1);",
+      literal: "[0,1,2,3,4,5]", consumed: "choices = [0,1,2,3,4,5].slice(1)",
+      value: numbers([1, 2, 3, 4, 5]), verdict: "RULED" as const,
+      reason: "applied slice"
+    },
+    {
+      id: "a transparent as-wrapper",
+      source: "const choices = ([0,1,2,3,4,5] as const).slice(1);",
+      literal: "[0,1,2,3,4,5]", consumed: "choices = ([0,1,2,3,4,5] as const).slice(1)",
+      value: numbers([1, 2, 3, 4, 5]), verdict: "RULED" as const,
+      reason: "applied slice"
+    },
+    {
+      id: "a Set converted back to an array by spread, then sliced",
+      source: "const choices = [...new Set([0,1,2,3,4,5])].slice(1);",
+      literal: "[0,1,2,3,4,5]", consumed: "choices = [...new Set([0,1,2,3,4,5])].slice(1)",
+      value: numbers([1, 2, 3, 4, 5]), verdict: "RULED" as const,
+      reason: "applied slice"
+    },
+    {
+      id: "an ordered reverse then slice",
+      source: "const choices = [0,1,2,3,4,5].reverse().slice(1);",
+      literal: "[0,1,2,3,4,5]", consumed: "choices = [0,1,2,3,4,5].reverse().slice(1)",
+      value: numbers([4, 3, 2, 1, 0]), verdict: "OTHER" as const,
+      reason: "applied slice"
+    },
+    {
+      id: "a decided scalar from includes",
+      source: 'const flag = [0,1,2,3,4,5].includes(3);',
+      literal: "[0,1,2,3,4,5]", consumed: "flag = [0,1,2,3,4,5].includes(3)",
+      value: { kind: "NOT_ARRAY" } as Value, verdict: "OTHER" as const,
+      reason: "applied includes"
+    },
+    {
+      id: "K45 — the member is an ARGUMENT, so the whole rejected call is consumed",
+      source: "const choices = ((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes);",
+      literal: "[0,1,2,3,4,5]",
+      consumed: "((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes)",
+      value: { kind: "UNKNOWN" } as Value, verdict: "UNDETERMINED" as const,
+      reason: "the candidate is an argument to an unmodelled call"
+    },
+    {
+      id: "A1 — a decided scalar discarded in a condition context",
+      source: "if (a || [502,503,504].includes(s)) { }",
+      literal: "[502,503,504]", consumed: "if (a || [502,503,504].includes(s)) { }",
+      value: { kind: "NOT_ARRAY" } as Value, verdict: "OTHER" as const,
+      reason: "terminal consumption: a decided scalar discarded in a condition context (amendment A1)"
+    },
+    {
+      id: "R1 — the same shape OUTSIDE a condition context continues, and reports",
+      source: 'const choices = ([0,1,2,3,4,5].join("") || "").split("").map(n => +n).slice(1);',
+      literal: "[0,1,2,3,4,5]", consumed: '[0,1,2,3,4,5].join("") || ""',
+      value: { kind: "UNKNOWN" } as Value, verdict: "UNDETERMINED" as const,
+      reason: "unmodelled owner"
+    },
+    {
+      id: "R2 — a sibling spread through a transparent wrapper folds in order",
+      source: "const choices = [...([1,2,3]), ...([4,5])];",
+      literal: "[1,2,3]", consumed: "choices = [...([1,2,3]), ...([4,5])]",
+      value: numbers([1, 2, 3, 4, 5]), verdict: "RULED" as const,
+      reason: "spread folded into the enclosing array, in order"
+    },
+    {
+      id: "a nested payload opened by an array binding",
+      source: "const [choices] = [[0,1,2,3,4,5].slice(1)];",
+      literal: "[0,1,2,3,4,5]", consumed: "[choices] = [[0,1,2,3,4,5].slice(1)]",
+      value: numbers([1, 2, 3, 4, 5]), verdict: "RULED" as const,
+      reason: "array binding: a bound output is the ruled domain"
+    },
+    {
+      id: "the comma operator discards a left operand",
+      source: "const slots = ([0,1,2,3,4,5], 7);",
+      literal: "[0,1,2,3,4,5]", consumed: "[0,1,2,3,4,5], 7",
+      value: { kind: "NOT_ARRAY" } as Value, verdict: "OTHER" as const,
+      reason: "comma operator: the candidate's value is discarded"
+    }
+  ])("records the complete evaluated candidate for $id", (row) => {
+    const { source, literal, consumed } = row;
+    const [start, end] = spanOf(source, literal);
+    const [consumedStart, consumedEnd] = spanOf(source, consumed);
+    const path = source.includes("<") ? "planted.tsx" : "planted.ts";
+    // The row NAMES which literal it is about, so the candidate is selected by the
+    // derived offset rather than by assuming the source has exactly one.
+    const evaluated = evaluatedCandidatesOf(path, source).find((c) => c.start === start);
+    if (evaluated === undefined) {
+      throw new Error(`no candidate at the derived offset ${start} in: ${source}`);
+    }
+    expect({
+      start: evaluated.start,
+      end: evaluated.end,
+      elementLine: evaluated.elementLine,
+      statementLine: evaluated.statementLine,
+      consumedStart: evaluated.consumedStart,
+      consumedEnd: evaluated.consumedEnd,
+      value: evaluated.value,
+      verdict: evaluated.verdict,
+      reason: evaluated.reason
+    }).toEqual({
+      start, end,
+      elementLine: lineOf(source, start),
+      statementLine: lineOf(source, consumedStart),
+      consumedStart, consumedEnd,
+      value: row.value,
+      verdict: row.verdict,
+      reason: row.reason
+    });
+  });
+
+  // R3 — admitted / exhausted ORIGINAL-BODY pairs for map AND flatMap, including
+  // return-only blocks, asserted at the OPERATION PREFIX so a later `.slice(1)`
+  // cannot overwrite the reason with "applied slice". The node and depth counts
+  // are measured by this file's own walker and the expected verdict is derived
+  // from the RECORDED LIMITS, not from what the evaluator returned.
+  const zeroSum = (n: number): string => (n === 1 ? "0" : `(${zeroSum(n >> 1)} + ${zeroSum(n - (n >> 1))})`);
+  const nest = (k: number, inner: string): string => "(".repeat(k) + inner + ")".repeat(k);
+
+  it.each([
+    { id: "map, expression body, node budget", source: `const choices = [0,1,2,3,4,5].map(n => n + ${zeroSum(16)});` },
+    { id: "map, return-only block, node budget", source: `const choices = [0,1,2,3,4,5].map(n => { return n + ${zeroSum(16)}; });` },
+    { id: "map, expression body, depth", source: `const choices = [0,1,2,3,4,5].map(n => ${nest(31, "n")});` },
+    { id: "map, return-only block, depth", source: `const choices = [0,1,2,3,4,5].map(n => { return ${nest(30, "n")}; });` },
+    { id: "flatMap, expression body, node budget", source: `const choices = [0,1,2,3,4,5].flatMap(n => [n + ${zeroSum(16)}]);` },
+    { id: "flatMap, return-only block, node budget", source: `const choices = [0,1,2,3,4,5].flatMap(n => { return [n + ${zeroSum(16)}]; });` },
+    { id: "flatMap, expression body, depth", source: `const choices = [0,1,2,3,4,5].flatMap(n => [${nest(29, "n")}]);` },
+    { id: "flatMap, return-only block, depth", source: `const choices = [0,1,2,3,4,5].flatMap(n => { return [${nest(28, "n")}]; });` }
+  ])("enforces the recorded work limits on the original body — $id", ({ source }) => {
+    const { nodes, depth } = measureCallbackBody(source);
+    const withinLimits = nodes <= NODE_BUDGET && depth <= DEPTH_LIMIT;
+    const evaluated = evaluateOne("planted.ts", source);
+    if (withinLimits) {
+      expect(evaluated.verdict).not.toBe("UNDETERMINED");
+    } else {
+      expect(evaluated.verdict).toBe("UNDETERMINED");
+      expect(evaluated.reason).toMatch(/work limit: (\d+ counted nodes exceeds the node budget|depth \d+ exceeds the depth limit)/);
+    }
+  });
+
+  // The two limits at their exact boundary, each crossed by ONE unit, with the
+  // boundary derived from the recorded constants rather than asserted as a literal.
+  it("admits the largest body within the node budget and rejects the next larger one", () => {
+    // A balanced sum keeps depth logarithmic, so the ONLY limit this family can
+    // cross is the node budget. Both members are found by measuring, so neither
+    // constant is copied from the evaluator.
+    let admitted = "";
+    let rejected = "";
+    for (let m = 1; m <= 64; m += 1) {
+      const source = `const choices = [0,1,2,3,4,5].map(n => n + ${zeroSum(m)});`;
+      const { nodes, depth } = measureCallbackBody(source);
+      if (depth > DEPTH_LIMIT) break;
+      if (nodes <= NODE_BUDGET) admitted = source;
+      else { rejected = source; break; }
+    }
+    expect(admitted).not.toBe("");
+    expect(rejected).not.toBe("");
+    expect(measureCallbackBody(admitted).nodes).toBeLessThanOrEqual(NODE_BUDGET);
+    expect(measureCallbackBody(rejected).nodes).toBeGreaterThan(NODE_BUDGET);
+    expect(measureCallbackBody(rejected).depth).toBeLessThanOrEqual(DEPTH_LIMIT);
+    expect(evaluateOne("planted.ts", admitted).verdict).not.toBe("UNDETERMINED");
+    const over = evaluateOne("planted.ts", rejected);
+    expect(over.verdict).toBe("UNDETERMINED");
+    expect(over.reason).toMatch(/exceeds the node budget/);
+  });
+
+  // ═══════ THE REVIEWER'S ATTACK LIST, RE-RUN AS A CHECKLIST ═══════
+  //
+  // MANDATED: every counterexample class codex used in r1, r1b, r2 and r2b, with
+  // the verdict the SPEC requires. The filed table (class · input · spec-expected ·
+  // observed · STRENGTH) is r2/36-attack-checklist.log.
+  it.each([
+    // ── r1 (plan review era) ──
+    { round: "r1", cls: "K31 out-of-grammar callback (array literal + element access)", source: "const choices = [0,1,2,3,4,5].map(n => [n,n][0]).slice(1);", expected: "UNDETERMINED" },
+    { round: "r1", cls: "K43 rule-1 masking: the inner literal IS the domain", source: "const choices = [[1,2,3,4,5]].at(0);", expected: "RULED" },
+    { round: "r1", cls: "K10 boolean-result OR over a Set, then slice", source: "const choices = [...new Set([0,1,2,3,4,5].map(n => n || 1))].slice(1);", expected: "OTHER" },
+    { round: "r1", cls: "K9/K48 shared fixture: the truthiness filter", source: "const choices = [0,1,2,3,4,5].filter(n => n);", expected: "RULED" },
+    // ── r1b ──
+    { round: "r1b", cls: "K7d old form: two purity clauses at once", source: "const choices = [0,1,2,3,4,5].map(n => { let m = 0; m = n; return m; });", expected: "UNDETERMINED" },
+    { round: "r1b", cls: "K7d new form: assignment ALONE", source: "const choices = [0,1,2,3,4,5].map(n => (n = n));", expected: "UNDETERMINED" },
+    // ── r2 B1–B11 ──
+    { round: "r2 B1", cls: "default parameter initialiser", source: "const choices = [0,1,2,3,4,5].map(n=>n===0?undefined:n).map((n=1)=>n);", expected: "UNDETERMINED" },
+    { round: "r2 B1", cls: "rest parameter", source: "const choices = [0,1,2,3,4,5].filter((...n) => n);", expected: "UNDETERMINED" },
+    { round: "r2 B2", cls: "flatMap with an async callback", source: "const choices = [0,1,2,3,4,5].flatMap(async n => n ? [n] : []);", expected: "UNDETERMINED" },
+    { round: "r2 B2", cls: "flatMap, assignment in an UNTAKEN branch", source: "const choices = [0,1,2,3,4,5].flatMap(n => true ? [n] : [(n = 1)]);", expected: "UNDETERMINED" },
+    { round: "r2 B2", cls: "flatMap, admitted return-only block", source: "const choices = [0,1,2,3,4,5].flatMap(n => { return n ? [n] : []; });", expected: "RULED" },
+    { round: "r2 B3", cls: "prefix increment in an untaken branch", source: "const choices = [0,1,2,3,4,5].map(n => true ? n : ++n);", expected: "UNDETERMINED" },
+    { round: "r2 B3", cls: "void in an untaken branch", source: "const choices = [0,1,2,3,4,5].map(n => true ? n : void n);", expected: "UNDETERMINED" },
+    { round: "r2 B5", cls: "ToBoolean(jsx) is true", source: "const choices = [0,1,2,3,4,5].map(n => (<span/>)).map(n => n ? 1 : 0);", expected: "OTHER", path: "planted.tsx" },
+    { round: "r2 B5", cls: "null renders in concatenation", source: 'const choices = [0,1,2,3,4,5].map(n => "" + null);', expected: "OTHER" },
+    { round: "r2 B5", cls: "undefined renders in concatenation", source: 'const choices = [0,1,2,3,4,5].map(n => undefined + "");', expected: "OTHER" },
+    { round: "r2 B6", cls: "zero-argument splice removes nothing", source: "const choices = [0,1,2,3,4,5].slice(1).splice();", expected: "OTHER" },
+    { round: "r2 B7", cls: "nested array binding pattern", source: "const [[head, ...choices]] = [[0,1,2,3,4,5]];", expected: "UNDETERMINED" },
+    { round: "r2 B7", cls: "nested pattern behind a rest token", source: "const [...[head, ...choices]] = [0,1,2,3,4,5];", expected: "UNDETERMINED" },
+    { round: "r2 B7", cls: "defaulted binding element", source: "const [choices = Array.from({length:5}, (_,i)=>i+1)] = [0,1,2,3,4,5].map(n=>undefined);", expected: "UNDETERMINED" },
+    { round: "r2 B8", cls: "K45 — the member is an argument", source: "const choices = ((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes);", expected: "UNDETERMINED" },
+    { round: "r2 B9", cls: "two exact sibling spreads", source: "const choices = [...[0,1,2,3,4,5], ...[6]].slice(1);", expected: "OTHER" },
+    { round: "r2 B10", cls: "freeze over a decided scalar", source: 'const choices = Object.freeze([0,1,2,3,4,5].join(""));', expected: "UNDETERMINED" },
+    // ── r2b R1: the logical-operator counterexamples ──
+    { round: "r2b R1", cls: "|| then split — continuation must not be hidden", source: 'const choices = ([0,1,2,3,4,5].join("") || "").split("").map(n => +n).slice(1);', expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "?? then split", source: 'const choices = ([0,1,2,3,4,5].join("") ?? "").split("").map(n => +n).slice(1);', expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "&& right operand then split", source: 'const choices = (true && [0,1,2,3,4,5].join("")).split("").map(n=>+n).slice(1);', expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "the OR itself yields the array", source: "const choices = [0,1,2,3,4,5].includes(7) || Array.from({length:5}, (_,i)=>i+1);", expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "the AND itself yields the array", source: "const choices = [0,1,2,3,4,5].includes(0) && Array.from({length:5}, (_,i)=>i+1);", expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "the ?? itself yields the array", source: "const choices = [0,1,2,3,4,5].at(99) ?? Array.from({length:5}, (_,i)=>i+1);", expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "unary ! then an unknown enclosing call", source: "const choices = f(![0,1,2,3,4,5].includes(0));", expected: "UNDETERMINED" },
+    { round: "r2b R1", cls: "the shipped if-condition still terminates", source: "if (a || [502,503,504].includes(s)) { }", expected: "OTHER" },
+    { round: "r2b R1", cls: "K50 paired control — differs ONLY by the logical wrapper", source: 'const choices = [0,1,2,3,4,5].join("").split("").map(n => +n).slice(1);', expected: "UNDETERMINED" },
+    // ── r2b R2: sibling operands under the admitted grammar ──
+    { round: "r2b R2", cls: "sibling spreads through parentheses", source: "const choices = [...([1,2,3]), ...([4,5])];", expected: "RULED" },
+    { round: "r2b R2", cls: "sibling spreads through new Set", source: "const choices = [...new Set([1,2,3]), ...new Set([4,5])];", expected: "RULED" },
+    { round: "r2b R2", cls: "sibling spreads derived by slice", source: "const choices = [...[0,1,2,3].slice(1), ...[3,4,5].slice(1)];", expected: "RULED" },
+    { round: "r2b R2", cls: "sibling spreads through as const", source: "const choices = [...([1,2,3] as const), ...([4,5] as const)];", expected: "RULED" },
+    { round: "r2b R2", cls: "sibling spreads through Object.freeze", source: "const choices = [...Object.freeze([1,2,3]), ...Object.freeze([4,5])];", expected: "RULED" },
+    { round: "r2b R2", cls: "an unmodelled sibling still reports", source: "const choices = [...[0,1,2,3,4,5], ...other].slice(1);", expected: "UNDETERMINED" }
+  ])("attack checklist [$round] $cls", ({ source, expected, path }) => {
+    const all = evaluatedCandidatesOf(path ?? "planted.ts", source);
+    expect(all.length).toBeGreaterThan(0);
+    expect(all[0]!.verdict).toBe(expected);
+  });
+
+  // ═══════════ THE BOUNDARY SWEEP OF §3 R4 ═══════════
+  //
+  // MANDATED by V's rework authorisation: for EVERY rule, one ADMITTED-boundary
+  // and one REJECTED-boundary assertion, each derived from the SPEC TEXT. The
+  // reviewer found eleven, then three, defects at boundaries that were never
+  // tested; these are written so the boundary is tested first.
+  //
+  // `admitted` = the largest/last input the rule still accepts.
+  // `rejected` = the smallest step past it, expected UNDETERMINED (conservative).
+  it.each([
+    { rule: "§3.9 clause 1 — parameter COUNT",
+      admitted: "const choices = [0,1,2,3,4,5].filter(n => n);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].filter((n, i) => n);" },
+    { rule: "§3.9 clause 1 — parameter FORM: default initialiser",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => n).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map((n = 1) => n).slice(1);" },
+    { rule: "§3.9 clause 1 — parameter FORM: rest",
+      admitted: "const choices = [0,1,2,3,4,5].filter(n => n);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].filter((...n) => n);" },
+    { rule: "§3.9 clause 1 — parameter FORM: binding pattern",
+      admitted: "const choices = [0,1,2,3,4,5].filter(n => n);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].filter(({ n }) => n);" },
+    { rule: "§3.9 clause 2 — the exact { return e; } form",
+      admitted: "const choices = [0,1,2,3,4,5].filter(n => { return n; });", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].filter(n => { const m = n; return m; });" },
+    { rule: "§3.9 clause 4 — async",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => n).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(async n => n).slice(1);" },
+    { rule: "§3.10 grammar — declared vs undeclared unary",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => +n).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => ++n).slice(1);" },
+    { rule: "§3.10 grammar — member access is outside it",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => n).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => n.valueOf()).slice(1);" },
+    { rule: "§3.15 slice arity — 0..2 integer literals",
+      admitted: "const choices = [0,1,2,3,4,5].slice(1, 6);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].slice(1, 6, 9);" },
+    { rule: "§3.15 slice arity — a non-literal argument",
+      admitted: "const choices = [0,1,2,3,4,5].slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].slice(k);" },
+    { rule: "§3.15 reverse arity — zero arguments",
+      admitted: "const choices = [5,4,3,2,1,0].reverse().slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [5,4,3,2,1,0].reverse(1).slice(1);" },
+    { rule: "§3.15 sort arity — no comparator",
+      admitted: "const choices = [0,1,2,3,4,5,10].sort().slice(1,-1);", admittedVerdict: "OTHER",
+      rejected: "const choices = [0,1,2,3,4,5,10].sort((a,b) => a-b).slice(1,-1);" },
+    { rule: "§3.15 map arity — exactly one callback",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => n).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => n, this).slice(1);" },
+    { rule: "§3.15 element-return — NOT_ARRAY only if every cell is a known number",
+      admitted: "const first = [0,1,2,3,4,5].at(0);", admittedVerdict: "OTHER",
+      rejected: 'const first = [0,1,2,3,4,5].map(n => (n ? "s" : n)).at(0);' },
+    { rule: "§3.15 reduce — always UNKNOWN",
+      admitted: "const choices = [0,1,2,3,4,5].slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].reduce((a, n) => a, []);" },
+    { rule: "§3.15 declared-unsupported array methods",
+      admitted: "const choices = [0,1,2,3,4,5].slice(1,4).slice(0);", admittedVerdict: "OTHER",
+      rejected: "const choices = [0,1,2,3,4,5].slice(1,4).concat(4,5);" },
+    { rule: "§3.15 non-call member — length vs any other",
+      admitted: "const size = [0,1,2,3,4,5].length;", admittedVerdict: "OTHER",
+      rejected: "const other = [0,1,2,3,4,5].foo;" },
+    { rule: "§3.15 NOT_ARRAY continuation — ends vs continues",
+      admitted: 'const text = [0,1,2,3,4,5].join("");', admittedVerdict: "OTHER",
+      rejected: 'const choices = [0,1,2,3,4,5].join("").split("");' },
+    { rule: "§3.17 Set equality — decidable vs unavailable identity",
+      admitted: "const choices = [...new Set([0,1,2,3,4,5])].slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [...new Set([0,1,2,3,4,5].map(n => (n ? n : k)))].slice(1);" },
+    { rule: "§3.16 collection kind — array methods over a Set",
+      admitted: "const choices = Array.from(new Set([0,1,2,3,4,5])).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = new Set([0,1,2,3,4,5]).slice(1);" },
+    { rule: "§3.16 Object.freeze — identity over exact vs continuation over a scalar",
+      admitted: "const choices = Object.freeze([0,1,2,3,4,5]).slice(1);", admittedVerdict: "RULED",
+      rejected: 'const choices = Object.freeze([0,1,2,3,4,5].join(""));' },
+    { rule: "§3.16 transparent wrapper vs an unmodelled owner",
+      admitted: "const choices = ([0,1,2,3,4,5]).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = ([0,1,2,3,4,5] + 1).slice(1);" },
+    { rule: "§3.16 comma role — right operand transparent, then an unmodelled owner",
+      admitted: 'const choices = ("x", [0,1,2,3,4,5]).slice(1);', admittedVerdict: "RULED",
+      rejected: 'const choices = f(("x", [0,1,2,3,4,5]));' },
+    { rule: "§3.16 array binding — elisions counted vs a nested pattern",
+      admitted: "const [, ...choices] = [0,1,2,3,4,5];", admittedVerdict: "RULED",
+      rejected: "const [[head, ...choices]] = [[0,1,2,3,4,5]];" },
+    { rule: "§3.16 nested { arr } payload — opened by a binding vs left nested",
+      admitted: "const [choices] = [[0,1,2,3,4,5].slice(1)];", admittedVerdict: "RULED",
+      rejected: "const choices = f([[0,1,2,3,4,5].slice(1)]);" },
+    { rule: "§3.16 sibling spread — exact vs unmodelled",
+      admitted: "const choices = [...([1,2,3]), ...([4,5])];", admittedVerdict: "RULED",
+      rejected: "const choices = [...[1,2,3], ...other];" },
+    { rule: "A1 — a condition context vs a value-producing logical operator",
+      admitted: "if (a || [502,503,504].includes(s)) { }", admittedVerdict: "OTHER",
+      rejected: 'const choices = ([0,1,2,3,4,5].join("") || "").split("").map(n => +n).slice(1);' },
+    { rule: "§3.18 callee role — the member is the callee vs an argument",
+      admitted: "const flag = [0,1,2,3,4,5].includes(3);", admittedVerdict: "OTHER",
+      rejected: "const choices = f([0,1,2,3,4,5].includes);" },
+    { rule: "§3.13 finite numbers — finite vs non-finite result",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => n * 1).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => n / 0).slice(1);" },
+    { rule: "§3.17 payload retention — unary + on a str is exact, binary * is not",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => `${n}`).map(n => +n).slice(1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => `${n}`).map(n => n * 1).slice(1);" },
+    { rule: "§3.10 logical operators return the OPERAND, and ?? skips null",
+      admitted: "const choices = [0,1,2,3,4,5].map(n => (n === 0 ? null : n) ?? 1);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => (n === 0 ? null : n) ?? k);" },
+    { rule: "§3.2 rule 1 precedes the chain",
+      admitted: "const choices = [1,2,3,4,5].map(n => 0);", admittedVerdict: "RULED",
+      rejected: "const choices = [0,1,2,3,4,5].map(n => k);" }
+  ])("boundary sweep — $rule", ({ admitted, admittedVerdict, rejected }) => {
+    const admittedPath = admitted.includes("<") ? "planted.tsx" : "planted.ts";
+    expect(evaluatedCandidatesOf(admittedPath, admitted)[0]!.verdict).toBe(admittedVerdict);
+    // The rejected side is CONSERVATIVE by the spec: outside the modelled grammar
+    // the evaluator reports, so the verdict is UNDETERMINED.
+    const rejectedPath = rejected.includes("<") ? "planted.tsx" : "planted.ts";
+    expect(evaluatedCandidatesOf(rejectedPath, rejected)[0]!.verdict).toBe("UNDETERMINED");
+  });
+
+  it("admits a body at the depth limit and rejects the next one", () => {
+    let admitted = "";
+    let rejected = "";
+    for (let k = 1; k <= 64; k += 1) {
+      const source = `const choices = [0,1,2,3,4,5].map(n => { return ${nest(k, "n")}; });`;
+      const { nodes, depth } = measureCallbackBody(source);
+      if (nodes > NODE_BUDGET) break;
+      if (depth === DEPTH_LIMIT) admitted = source;
+      if (depth === DEPTH_LIMIT + 1) { rejected = source; break; }
+    }
+    expect(admitted).not.toBe("");
+    expect(rejected).not.toBe("");
+    expect(evaluateOne("planted.ts", admitted).verdict).not.toBe("UNDETERMINED");
+    const over = evaluateOne("planted.ts", rejected);
+    expect(over.verdict).toBe("UNDETERMINED");
+    expect(over.reason).toMatch(/exceeds the depth limit/);
   });
 
   // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects

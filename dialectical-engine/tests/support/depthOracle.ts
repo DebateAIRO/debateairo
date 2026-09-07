@@ -715,53 +715,106 @@ function callbackRejection(call: ts.CallExpression | undefined, name: string): s
 }
 
 /**
- * CONTRACT AMENDMENT A1 (round-2 rework, codex r2 F1) — TERMINAL CONSUMPTION OF
- * A DECIDED SCALAR.
+ * CONTRACT AMENDMENT A1 — TERMINAL CONSUMPTION IN A PROVED CONDITION CONTEXT.
  *
- * §3.15 R3 says a chain that ENDS at `NOT_ARRAY` is `OTHER`, and that any
- * further operation over `NOT_ARRAY` is `UNKNOWN`. It did not say what happens
- * when a decided scalar is consumed by an enclosing BOOLEAN operator rather than
- * bound directly — so the shipped `[502, 503, 504].includes(error.status)` inside
- * an `||` inside an `if` fell to "unmodelled owner" and reported.
+ * REVISED after codex r2b R1. The first version terminated whenever a decided
+ * scalar was an operand of `&&`/`||`/`??` or of `!`. That was UNSOUND:
+ * `NOT_ARRAY` decides the OPERAND's type, never the OPERATOR's result. In
+ * `a.join("") || ""` the `||` yields the right operand; in
+ * `[...].includes(7) || Array.from(...)` it yields an array; and `!x` produces a
+ * boolean that still flows into whatever owns it. Each of those must continue,
+ * and continuation over a decided scalar is `UNKNOWN` (§3.15 R3).
  *
- * The amendment is deliberately narrow. It applies ONLY when:
- *   (a) the current value is already `NOT_ARRAY` — a decided scalar, never
- *       `UNKNOWN` and never `EXACT`; AND
- *   (b) the enclosing node consumes it in a position that cannot yield an array:
- *       an operand of `&&`, `||` or `??`; the operand of a unary `!`; or the
- *       condition of `if` / `while` / `do` / `for` / a conditional expression.
+ * The sound rule keeps only the case where the value is PROVABLY DISCARDED —
+ * a CONDITION whose enclosing construct's result never derives from it:
  *
- * Everything else over `NOT_ARRAY` remains `UNKNOWN` — member access, calls,
- * `new Set`, `Array.from`, spreads, array elements and bindings — so this is not
- * a blanket absorption and it does not stop at an arbitrary scalar prefix.
+ *   (a) the condition of an `if` / `while` / `do` / `for` statement; or
+ *   (b) the condition operand of a conditional expression `c ? a : b`.
+ *
+ * The candidate need not be the condition node itself: logical operators,
+ * unary `!` and parentheses are traversed UPWARD to find the outermost such
+ * expression, and A1 fires only if THAT node sits in a condition slot. If the
+ * outermost node instead flows into a declaration, a call, a member access or
+ * any other owner, its value is used and A1 does NOT fire.
  */
-function isBooleanConsumption(parent: ts.Node, node: ts.Node): boolean {
-  if (ts.isBinaryExpression(parent)) {
-    const op = parent.operatorToken.kind;
-    return op === ts.SyntaxKind.AmpersandAmpersandToken ||
-           op === ts.SyntaxKind.BarBarToken ||
-           op === ts.SyntaxKind.QuestionQuestionToken;
+function conditionContextOwner(node: ts.Node): ts.Node | undefined {
+  let current: ts.Node = node;
+  for (;;) {
+    const parent: ts.Node | undefined = current.parent;
+    if (parent === undefined) return undefined;
+    if (ts.isParenthesizedExpression(parent) ||
+        (ts.isPrefixUnaryExpression(parent) && parent.operator === ts.SyntaxKind.ExclamationToken) ||
+        (ts.isBinaryExpression(parent) &&
+          (parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+           parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+           parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken))) {
+      current = parent;                       // still inside the boolean/logical envelope
+      continue;
+    }
+    // `current` is the outermost node of that envelope. Is IT a condition?
+    if (ts.isIfStatement(parent) && parent.expression === current) return parent;
+    if ((ts.isWhileStatement(parent) || ts.isDoStatement(parent)) && parent.expression === current) return parent;
+    if (ts.isForStatement(parent) && parent.condition === current) return parent;
+    if (ts.isConditionalExpression(parent) && parent.condition === current) return parent;
+    return undefined;                          // the envelope's value is USED, not discarded
   }
-  if (ts.isPrefixUnaryExpression(parent)) return parent.operator === ts.SyntaxKind.ExclamationToken;
-  if (ts.isIfStatement(parent)) return parent.expression === node;
-  if (ts.isWhileStatement(parent) || ts.isDoStatement(parent)) return parent.expression === node;
-  if (ts.isForStatement(parent)) return parent.condition === node;
-  if (ts.isConditionalExpression(parent)) return parent.condition === node;
-  return false;
 }
 
-/** A sibling spread's cells when its operand is an exact numeric array literal (B9). */
-function siblingSpreadCells(element: ts.SpreadElement): readonly Cell[] | null {
-  const operand = element.expression;
-  if (!ts.isArrayLiteralExpression(operand)) return null;
-  const cells: Cell[] = [];
-  for (const inner of operand.elements) {
-    if (ts.isSpreadElement(inner)) return null;
-    const prim = literalPrim(inner);
-    if (prim.t === "unknown") return null;
-    cells.push(prim);
+/**
+ * R2 — evaluate an expression's VALUE under the bounded admitted grammar,
+ * stopping at that expression. This is the downward counterpart of the ownership
+ * walk and is what a sibling spread operand needs: the earlier version pattern-
+ * matched a bare `ArrayLiteralExpression`, so `...([1,2,3])`, `...new Set(x)`,
+ * `...(x as const)`, `...Object.freeze(x)`, `...Array.from(x)` and `...x.slice(1)`
+ * were all rejected despite having exact values.
+ *
+ * Anything outside the admitted compositions yields UNKNOWN.
+ */
+function valueOfExpression(node: ts.Expression, depth = 0): Value {
+  if (depth > 32) return UNKNOWN_VALUE;
+  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) {
+    return valueOfExpression(node.expression, depth + 1);
   }
-  return cells;
+  if (ts.isArrayLiteralExpression(node)) {
+    const cells: Cell[] = [];
+    for (const element of node.elements) {
+      if (ts.isSpreadElement(element)) {
+        const inner = valueOfExpression(element.expression, depth + 1);
+        if (inner.kind !== "EXACT") return UNKNOWN_VALUE;
+        cells.push(...inner.cells);
+        continue;
+      }
+      const prim = literalPrim(element);
+      if (prim.t === "unknown") return UNKNOWN_VALUE;
+      cells.push(prim);
+    }
+    return exact(cells);
+  }
+  if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Set" &&
+      node.arguments !== undefined && node.arguments.length === 1) {
+    const inner = valueOfExpression(node.arguments[0]!, depth + 1);
+    if (inner.kind !== "EXACT") return UNKNOWN_VALUE;
+    const deduped = dedupeSameValueZero(inner.cells);
+    return deduped === null ? UNKNOWN_VALUE : exact(deduped, "set");
+  }
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    const member = node.expression;
+    const owner = member.expression;
+    if (ts.isIdentifier(owner) && owner.text === "Array" && member.name.text === "from" && node.arguments.length === 1) {
+      const inner = valueOfExpression(node.arguments[0]!, depth + 1);
+      return inner.kind === "EXACT" ? exact(inner.cells, "array") : UNKNOWN_VALUE;
+    }
+    if (ts.isIdentifier(owner) && owner.text === "Object" && member.name.text === "freeze" && node.arguments.length === 1) {
+      const inner = valueOfExpression(node.arguments[0]!, depth + 1);
+      return inner.kind === "EXACT" ? inner : UNKNOWN_VALUE;
+    }
+    // a modelled member invocation on an evaluable receiver
+    return applyMember(valueOfExpression(owner, depth + 1), member.name.text, node);
+  }
+  if (ts.isPropertyAccessExpression(node)) {
+    return applyMember(valueOfExpression(node.expression, depth + 1), node.name.text, undefined);
+  }
+  return UNKNOWN_VALUE;
 }
 
 /** §3.16 R3 — the ownership walk. B8: BOTH consumed boundaries move with the owner. */
@@ -869,9 +922,10 @@ function ownershipWalk(
           if (value.kind !== "EXACT") { ok = false; break; }
           folded.push(...value.cells);
         } else if (ts.isSpreadElement(element)) {
-          const sibling = siblingSpreadCells(element);      // B9 — fold exact sibling spreads, in order
-          if (sibling === null) { ok = false; break; }
-          folded.push(...sibling);
+          // R2 — the sibling's VALUE under the admitted grammar, not a literal shape.
+          const sibling = valueOfExpression(element.expression);
+          if (sibling.kind !== "EXACT") { ok = false; break; }
+          folded.push(...sibling.cells);                    // array OR set cells, in order
         } else {
           const prim = literalPrim(element);
           if (prim.t === "unknown") { ok = false; break; }
@@ -897,11 +951,15 @@ function ownershipWalk(
       return { value: bound.value, consumedStart, consumedEnd, reason: bound.reason };
     }
 
-    // AMENDMENT A1 — a decided scalar consumed in a boolean position ENDS the chain.
-    if (value.kind === "NOT_ARRAY" && isBooleanConsumption(parent, node)) {
-      take(parent);
-      return { value, consumedStart, consumedEnd,
-               reason: "terminal consumption: a decided scalar consumed in a boolean position (amendment A1)" };
+    // AMENDMENT A1 — a decided scalar PROVABLY DISCARDED in a condition context.
+    // Logical operators alone never terminate: only a condition slot does.
+    if (value.kind === "NOT_ARRAY") {
+      const conditionOwner = conditionContextOwner(node);
+      if (conditionOwner !== undefined) {
+        take(conditionOwner);
+        return { value, consumedStart, consumedEnd,
+                 reason: "terminal consumption: a decided scalar discarded in a condition context (amendment A1)" };
+      }
     }
 
     if (ts.isCallExpression(parent) && parent.arguments.some((a) => a === node)) {
