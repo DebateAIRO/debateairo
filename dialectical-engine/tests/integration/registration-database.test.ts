@@ -6475,6 +6475,14 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       readonly order: T9Order;
       readonly scores: readonly T9Score[];
       readonly medianGapMs: number;
+      // How the cadence was actually DELIVERED, measured by the issuer from its own clock
+      // before any response is scored - so it is independent of the arm difference it is
+      // later used to judge. `intraSlotBreaches` counts the slots whose delivered interval
+      // overshot the intended cadence by more than the tolerance; `maxIntraSlotOvershootMs`
+      // is the worst one, reported for the receipt. Constructed inputs are delivered as
+      // designed and carry 0.
+      readonly maxIntraSlotOvershootMs: number;
+      readonly intraSlotBreaches: number;
     }
     interface T9Pair {
       readonly replicate: number;
@@ -6491,6 +6499,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       readonly duplicateTransformationCount: number;
       readonly localRejects: readonly boolean[];
       readonly replicatedDirection: boolean;
+      readonly maxIntraSlotOvershootMs: number;
+      readonly intraSlotBreaches: number;
+      readonly intraSlotTotal: number;
+      readonly measurementInvalid: boolean;
       readonly directedSigns: readonly number[];
       readonly constituentSigns: readonly Readonly<{ ab: number; ba: number }>[];
       readonly pairMedianGapsMs: readonly number[];
@@ -6508,6 +6520,17 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       basePolicy.channel.mailDispatchMinimumReservationMs
       / (basePolicy.channel.maxConcurrentVerificationDispatches / 2)
     );
+    // The timing difference this row already declares as the one that would matter.
+    const equivalenceBoundMs = 100;
+    // A cadence slot only blocks drift while its two members are issued one cadence apart.
+    // The tolerance is not a new number: it is the same declared timing tolerance above, so
+    // an interval that slipped by less than the difference this test calls material is still
+    // a delivered slot.
+    const cadenceToleranceMs = equivalenceBoundMs;
+    // The local error rate this row already runs Holm at, reused below as the share of slots
+    // whose cadence may slip before the delivered experiment stops being the designed one.
+    // Neither number is new, and no third one is introduced to decide measurement validity.
+    const localAlpha = 0.05 / endpointKinds.length;
 
     // This order function is shared by the immutable controls and the live
     // issuer. The RED-first legacy wiring deliberately returned AB for both
@@ -6611,6 +6634,23 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const duplicateTransformationCount = transformationKeys.length
         - new Set(transformationKeys).size;
 
+      // WAS THE DESIGNED EXPERIMENT ACTUALLY DELIVERED? Judged on the SHARE of cadence slots
+      // that slipped, not on the single worst one. Measured 2026-09-08 on this machine: a
+      // quiet six-window run still shows one warm-up slot near 107 ms against five windows
+      // at 2.7-8.1 ms, so "the worst slot breached" is true of almost every run and would
+      // hand back the very blanket waiver this disposition exists to remove. The share is
+      // compared against `localAlpha` - the rate this row already accepts being wrong at -
+      // so one stray slot in 192 is a delivered experiment and a pervasive stall is not.
+      const windows = pairs.flatMap((pair) => [pair.ab, pair.ba]);
+      const maxIntraSlotOvershootMs = Math.max(
+        ...windows.map((window) => window.maxIntraSlotOvershootMs)
+      );
+      const intraSlotBreaches = windows.reduce(
+        (total, window) => total + window.intraSlotBreaches, 0
+      );
+      const intraSlotTotal = windows.length * samplesPerArm;
+      const measurementInvalid = intraSlotBreaches / intraSlotTotal > localAlpha;
+
       const endpointStatistics: number[][] = [];
       const directedSigns: number[] = [];
       const constituentSigns: Array<Readonly<{ ab: number; ba: number }>> = [];
@@ -6674,7 +6714,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       // Holm within a replicate has two endpoints. At least one survives iff
       // the smaller raw p-value is <= .05/2.
       const localRejects = Object.freeze(pairs.map((_, replicate) =>
-        Math.min(rawPValues[replicate * 2]!, rawPValues[replicate * 2 + 1]!) <= 0.025));
+        Math.min(rawPValues[replicate * 2]!, rawPValues[replicate * 2 + 1]!) <= localAlpha));
       const replicatedDirection = [-1, 1].some((sign) => pairs.filter((_, replicate) =>
         localRejects[replicate]
         && directedSigns[replicate] === sign
@@ -6717,44 +6757,114 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         duplicateTransformationCount,
         localRejects,
         replicatedDirection,
+        maxIntraSlotOvershootMs,
+        intraSlotBreaches,
+        intraSlotTotal,
+        measurementInvalid,
         directedSigns: Object.freeze(directedSigns),
         constituentSigns: Object.freeze(constituentSigns),
         pairMedianGapsMs: Object.freeze(pairMedianGapsMs)
       });
     };
 
-    // The three classifications are not three shades of red.
-    //   T9_RESEND_EQUIVALENCE_GREEN       - the family did not reject; equivalence stands.
-    //   T9_RESEND_PRODUCT_REPAIR_REQUIRED - names the PRODUCT. The deterministic controls
-    //     below (blocked-power, arm-effect) are what it looks like: a family-wise rejection
-    //     whose direction REPLICATES - the same sign in at least two replicates, and in both
-    //     constituent orders of each.
-    //   T9_TEST_CONTRACT_INCONCLUSIVE     - names this TEST CONTRACT, not the product. The
-    //     family rejected, but the direction did not replicate, so these six windows decide
-    //     nothing either way. That is a condition of the measurement, not a finding about
-    //     the resend path.
-    // This text is the reason the INCONCLUSIVE branch exists: it carries every input the
-    // classification was computed from, so neither a red nor a skip has to be re-derived
-    // from some other log line. Its content is pinned on a deterministic control below.
+    // ACCEPTANCE POLICY - written down here so it is never inferred from the enum names.
+    //
+    //   GREEN          -> the family did not reject. Equivalence stands. The row passes.
+    //   PRODUCT_REPAIR -> a red. Unchanged. The deterministic blocked-power and arm-effect
+    //                     controls below are what it looks like, and arm-effect demands it
+    //                     even with every pair median gap inside the 100 ms bound.
+    //   INCONCLUSIVE   -> the family REJECTED and the evaluator could not attribute the
+    //                     difference. This is an UNRESOLVED result, and an unresolved result
+    //                     stays RED, carrying its receipt.
+    //
+    // Non-replication does NOT prove the difference is noise, and this test must not claim
+    // that it does. The deciding predicate requires LOCAL SIGNIFICANCE as well as agreeing
+    // signs, and `direction` is 0 whenever the two arms are AUC-tied - so a repeatable
+    // arm-dependent change in SPREAD can reject through the accuracy endpoint with signs of
+    // 0 that can never satisfy it, and a real effect confined to ONE replicate can never
+    // reach two. Both are constructed below, both are unresolved, and both are red.
+    //
+    // The single exception is a run that independently evidences that its own measurement
+    // was not delivered as designed. The cadence block is this design's control for drift,
+    // and it controls drift only while the two members of a slot are issued one cadence
+    // apart. `maxIntraSlotOvershootMs` is measured by the ISSUER from its own clock, before
+    // any response is scored, so it cannot be produced by the arm difference it is used to
+    // excuse. When it exceeds the timing tolerance this row already declares for itself,
+    // the block did not do its job and the run cannot be read either way -> typed skip
+    // naming that condition. Nothing else authorises a skip, and the 0.01 family threshold
+    // is not touched.
+    //
+    // The cause below carries every input the classification was computed from, each of the
+    // six statistical endpoints under a stable identity (r<replicate>.<auc|accuracy>) with
+    // its raw p, observed statistic and q99, and the replicate-level Holm and sign data
+    // labelled separately. It is pinned on deterministic controls, and pinned again on the
+    // message actually DELIVERED to the inconclusive disposition.
+    const endpointLabels = Object.freeze(
+      [1, 2, 3].flatMap((replicate) => endpointKinds.map((kind) => `r${replicate}.${kind}`))
+    );
     const classificationCause = (evaluation: T9Evaluation): string =>
       `classification=${evaluation.classification} `
       + `family_rejected=${evaluation.familyPValue <= 0.01} `
       + `p_fwer=${evaluation.familyPValue.toFixed(6)} `
-      + `raw_p=${evaluation.rawPValues.map((value) => value.toFixed(6)).join(",")} `
-      + `observed=${evaluation.endpointObserved.map((value) => value.toFixed(6)).join(",")} `
-      + `q99=${evaluation.endpointQ99.map((value) => value.toFixed(6)).join(",")} `
-      + `holm_local=${evaluation.localRejects.join(",")} `
+      + `endpoints=${endpointLabels.map((label, index) =>
+        `${label}:p=${evaluation.rawPValues[index]!.toFixed(6)}`
+        + `,obs=${evaluation.endpointObserved[index]!.toFixed(6)}`
+        + `,q99=${evaluation.endpointQ99[index]!.toFixed(6)}`).join(" ")} `
+      + `replicates=${evaluation.localRejects.map((holm, replicate) =>
+        `r${replicate + 1}:holm=${holm}`
+        + `,directed=${evaluation.directedSigns[replicate]}`
+        + `,ab=${evaluation.constituentSigns[replicate]!.ab}`
+        + `,ba=${evaluation.constituentSigns[replicate]!.ba}`
+        + `,gap_ms=${evaluation.pairMedianGapsMs[replicate]!.toFixed(3)}`).join(" ")} `
       + `local_reject_count=${evaluation.localRejects.filter(Boolean).length} `
       + `replicated_direction=${evaluation.replicatedDirection} `
-      + `directed_signs=${evaluation.directedSigns.join(",")} `
-      + `constituent_signs=${evaluation.constituentSigns
-        .map((one) => `${one.ab}/${one.ba}`).join(",")} `
-      + `pair_median_gap_ms=${evaluation.pairMedianGapsMs
-        .map((value) => value.toFixed(3)).join(",")} `
-      + `equivalence_bound_ms=100`;
+      + `measurement_invalid=${evaluation.measurementInvalid} `
+      + `intra_slot_breaches=${evaluation.intraSlotBreaches}/${evaluation.intraSlotTotal} `
+      + `max_intra_slot_overshoot_ms=${evaluation.maxIntraSlotOvershootMs.toFixed(3)} `
+      + `cadence_ms=${windowCadenceMs} cadence_tolerance_ms=${cadenceToleranceMs} `
+      + `local_alpha=${localAlpha} equivalence_bound_ms=${equivalenceBoundMs}`;
 
-    const syntheticPairs = (
-      score: (slot: number, firstPosition: boolean, arm: T9Arm) => number
+    // The disposition is a pure function of an evaluation, so the boundary controls below
+    // exercise the SAME code path the live windows reach, and the message they check is the
+    // message the live path delivers.
+    type T9Outcome = "green" | "red" | "skip";
+    const disposition = (evaluation: T9Evaluation): Readonly<{
+      outcome: T9Outcome; message: string;
+    }> => {
+      const cause = classificationCause(evaluation);
+      if (evaluation.classification === GREEN) {
+        return Object.freeze({
+          outcome: "green" as T9Outcome, message: `T9 equivalence upheld · ${cause}`
+        });
+      }
+      if (evaluation.classification === PRODUCT_REPAIR) {
+        return Object.freeze({
+          outcome: "red" as T9Outcome,
+          message: `T9 resend product repair required · ${cause}`
+        });
+      }
+      if (evaluation.measurementInvalid) {
+        return Object.freeze({
+          outcome: "skip" as T9Outcome,
+          message: "T9_TEST_CONTRACT_INCONCLUSIVE measurement not delivered as designed: "
+            + `${evaluation.intraSlotBreaches} of ${evaluation.intraSlotTotal} cadence slots `
+            + `overshot ${windowCadenceMs} ms by more than ${cadenceToleranceMs} ms `
+            + `(worst ${evaluation.maxIntraSlotOvershootMs.toFixed(3)} ms), above the `
+            + `${localAlpha} share this row accepts · ${cause}`
+        });
+      }
+      return Object.freeze({
+        outcome: "red" as T9Outcome,
+        message: "T9_TEST_CONTRACT_INCONCLUSIVE unresolved on a validly delivered "
+          + `measurement: the family rejected and the evaluator could not attribute the `
+          + `difference, so this run resolves nothing and is not a pass · ${cause}`
+      });
+    };
+
+    const syntheticPairsPerReplicate = (
+      score: (replicate: number, slot: number, firstPosition: boolean, arm: T9Arm) => number,
+      maxIntraSlotOvershootMs = 0,
+      intraSlotBreaches = 0
     ): readonly T9Pair[] => Object.freeze(Array.from({ length: 3 }, (_, replicate) => {
       const window = (order: T9Order): T9Window => {
         const arms = armsForOrder(order);
@@ -6763,18 +6873,25 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
             arm,
             slot,
             firstPosition: position === 0,
-            score: score(slot, position === 0, arm)
+            score: score(replicate, slot, position === 0, arm)
           }))).flat());
         return Object.freeze({
           order,
           scores,
           medianGapMs: Math.abs(
             median(scoresByArm(scores, "existing")) - median(scoresByArm(scores, "missing"))
-          )
+          ),
+          maxIntraSlotOvershootMs,
+          intraSlotBreaches
         });
       };
       return Object.freeze({ replicate, ab: window("AB"), ba: window("BA") });
     }));
+    const syntheticPairs = (
+      score: (slot: number, firstPosition: boolean, arm: T9Arm) => number
+    ): readonly T9Pair[] => syntheticPairsPerReplicate(
+      (_replicate, slot, firstPosition, arm) => score(slot, firstPosition, arm)
+    );
 
     // Immutable deterministic controls execute the exact evaluator used for
     // live data. They remain inside this one top-level test.
@@ -6800,25 +6917,150 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     expect(armControl.pairMedianGapsMs.every((gap) => gap < 100)).toBe(true);
     expect(armControl.classification).toBe(PRODUCT_REPAIR);
 
-    // The cause text is pinned here, on the deterministic blocked-power control, so it
-    // cannot quietly empty out and leave a live red or a live skip unexplained. Every
-    // fragment below is an INPUT the classification at the end of this test is computed
-    // from; the values are this control's, not the live windows'.
-    const blockedCause = classificationCause(blockedControl);
+    // BOUNDARY CONTROLS, through the disposition that changed. Both are UNRESOLVED results
+    // the evaluator reaches on its OWN from constructed inputs - no forced label - and both
+    // are shapes the deciding predicate can never resolve. Both must be RED.
+    //
+    // (1) accuracy-only. A repeatable, arm-dependent difference in SPREAD: the existing arm
+    //     swings +/-4 ms with cadence position, the missing arm does not. The arms are
+    //     AUC-tied, so every directed sign is 0 and no sign can ever match one, while a
+    //     single threshold separates them and the accuracy endpoint rejects in all three
+    //     replicates. Every pair median gap is 0 ms - inside the bound, and still unresolved.
+    const accuracyOnlySpread = (
+      _replicate: number, _slot: number, firstPosition: boolean, arm: T9Arm
+    ): number => arm === "missing" ? 500 : (firstPosition ? 496 : 504);
+    const accuracyOnlyControl = evaluate(
+      syntheticPairsPerReplicate(accuracyOnlySpread), "accuracy-only-boundary"
+    );
+    expect(accuracyOnlyControl.classification).toBe(INCONCLUSIVE);
+    expect(accuracyOnlyControl.familyPValue).toBeLessThanOrEqual(0.01);
+    expect(accuracyOnlyControl.directedSigns).toEqual([0, 0, 0]);
+    expect(accuracyOnlyControl.localRejects).toEqual([true, true, true]);
+    expect(accuracyOnlyControl.replicatedDirection).toBe(false);
+    expect(accuracyOnlyControl.measurementInvalid).toBe(false);
+    expect(accuracyOnlyControl.pairMedianGapsMs
+      .every((gap) => gap <= equivalenceBoundMs)).toBe(true);
+    expect(
+      disposition(accuracyOnlyControl).outcome,
+      "T9 an unresolved accuracy-only signal on a validly delivered measurement is RED"
+    ).toBe("red");
+
+    // (2) single replicate. A real arm effect present in replicate 1 only. Two locally
+    //     significant replicates can never be reached, so the predicate cannot resolve it.
+    const singleReplicateControl = evaluate(
+      syntheticPairsPerReplicate((replicate, slot, firstPosition, arm) =>
+        500 + (slot % 4) + (firstPosition ? 8 : 0)
+        + (replicate === 0 && arm === "missing" ? 32 : 0)),
+      "single-replicate-boundary"
+    );
+    expect(singleReplicateControl.classification).toBe(INCONCLUSIVE);
+    expect(singleReplicateControl.familyPValue).toBeLessThanOrEqual(0.01);
+    expect(singleReplicateControl.localRejects).toEqual([true, false, false]);
+    expect(singleReplicateControl.replicatedDirection).toBe(false);
+    expect(singleReplicateControl.measurementInvalid).toBe(false);
+    expect(
+      disposition(singleReplicateControl).outcome,
+      "T9 an unresolved single-replicate signal on a validly delivered measurement is RED"
+    ).toBe("red");
+
+    // (3) the SAME unresolved result, on a run that recorded an undelivered cadence. This is
+    //     the only thing that turns it into a typed skip, and it comes from the issuer's
+    //     clock, not from the arm difference.
+    const undeliveredCadenceControl = evaluate(
+      syntheticPairsPerReplicate(accuracyOnlySpread, cadenceToleranceMs + 1, samplesPerArm),
+      "undelivered-cadence-boundary"
+    );
+    expect(undeliveredCadenceControl.classification).toBe(INCONCLUSIVE);
+    expect(undeliveredCadenceControl.intraSlotBreaches).toBe(192);
+    expect(undeliveredCadenceControl.measurementInvalid).toBe(true);
+    expect(
+      disposition(undeliveredCadenceControl).outcome,
+      "T9 an undelivered cadence is the one condition that authorises the typed skip"
+    ).toBe("skip");
+
+    // (4) the other side of that boundary. ONE stray slot - the warm-up slot a quiet run
+    //     really does produce on this machine - is still a delivered experiment, so the same
+    //     unresolved result stays RED. Without this control the skip could be widened back
+    //     to "any run with a slow slot" and nothing here would notice.
+    const strayCadencePairs = syntheticPairsPerReplicate(accuracyOnlySpread);
+    const strayCadenceControl = evaluate(
+      Object.freeze([
+        Object.freeze({
+          replicate: 0,
+          ab: Object.freeze({ ...strayCadencePairs[0]!.ab, maxIntraSlotOvershootMs: 250,
+            intraSlotBreaches: 1 }),
+          ba: strayCadencePairs[0]!.ba
+        }),
+        strayCadencePairs[1]!,
+        strayCadencePairs[2]!
+      ]),
+      "stray-slot-boundary"
+    );
+    expect(strayCadenceControl.classification).toBe(INCONCLUSIVE);
+    expect(strayCadenceControl.intraSlotBreaches).toBe(1);
+    expect(strayCadenceControl.maxIntraSlotOvershootMs).toBe(250);
+    expect(strayCadenceControl.measurementInvalid).toBe(false);
+    expect(
+      disposition(strayCadenceControl).outcome,
+      "T9 one stray cadence slot does not buy a waiver: the unresolved result stays RED"
+    ).toBe("red");
+
+    // The other three controls keep their dispositions.
+    expect(disposition(cadenceControl).outcome).toBe("green");
+    expect(disposition(blockedControl).outcome).toBe("red");
+    expect(disposition(armControl).outcome).toBe("red");
+
+    // CAUSE CONTRACT. Pinned on the message the disposition actually DELIVERS, so removing
+    // an identity from the delivered cause fails here and not only in the formatter. Every
+    // one of the six statistical endpoints carries a stable identity with its raw p and its
+    // observed statistic; the replicate-level Holm and sign data is labelled separately.
+    const deliveredInconclusiveCause = disposition(accuracyOnlyControl).message;
     for (const fragment of [
+      "T9_TEST_CONTRACT_INCONCLUSIVE unresolved on a validly delivered measurement",
+      "classification=T9_TEST_CONTRACT_INCONCLUSIVE",
+      "family_rejected=true",
+      "endpoints=r1.auc:p=1.000000,obs=0.500000",
+      "r1.accuracy:p=0.000244,obs=0.750000",
+      "r2.auc:p=1.000000,obs=0.500000",
+      "r2.accuracy:p=0.000244,obs=0.750000",
+      "r3.auc:p=1.000000,obs=0.500000",
+      "r3.accuracy:p=0.000244,obs=0.750000",
+      "replicates=r1:holm=true,directed=0,ab=1,ba=-1,gap_ms=0.000",
+      "r3:holm=true,directed=0,ab=1,ba=-1,gap_ms=0.000",
+      "local_reject_count=3",
+      "replicated_direction=false",
+      "measurement_invalid=false",
+      "intra_slot_breaches=0/192",
+      "cadence_ms=357",
+      "cadence_tolerance_ms=100",
+      "local_alpha=0.025",
+      "equivalence_bound_ms=100"
+    ]) {
+      expect(
+        deliveredInconclusiveCause,
+        `T9 delivered inconclusive cause must carry ${fragment}`
+      ).toContain(fragment);
+    }
+
+    // The PRODUCT_REPAIR message keeps its own identities and its own wording.
+    const deliveredRepairCause = disposition(blockedControl).message;
+    for (const fragment of [
+      "T9 resend product repair required",
       "classification=T9_RESEND_PRODUCT_REPAIR_REQUIRED",
       "family_rejected=true",
       "p_fwer=0.000244",
-      "raw_p=0.000244,1.000000,0.000244,1.000000,0.000244,1.000000",
-      "holm_local=true,true,true",
+      "endpoints=r1.auc:p=0.000244,obs=0.515625",
+      "r1.accuracy:p=1.000000,obs=0.515625",
+      "r3.accuracy:p=1.000000,obs=0.515625",
+      "replicates=r1:holm=true,directed=1,ab=1,ba=1,gap_ms=10.000",
       "local_reject_count=3",
       "replicated_direction=true",
-      "directed_signs=1,1,1",
-      "constituent_signs=1/1,1/1,1/1",
-      "pair_median_gap_ms=10.000,10.000,10.000",
-      "equivalence_bound_ms=100"
+      "measurement_invalid=false"
     ]) {
-      expect(blockedCause, `T9 classification cause must carry ${fragment}`).toContain(fragment);
+      expect(
+        deliveredRepairCause,
+        `T9 delivered product-repair cause must carry ${fragment}`
+      ).toContain(fragment);
     }
 
     const runWindow = async (replicate: number, order: T9Order): Promise<T9Window> => {
@@ -6862,8 +7104,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           rateLimitAuditBefore.rows.map((row) => row.audit_id)
         );
         const issued: Array<Promise<T9Score & ResendObservation>> = [];
+        const issuedAtMs: number[] = [];
         const arms = armsForOrder(order);
         for (let position = 0; position < samplesPerArm * 2; position += 1) {
+          issuedAtMs.push(performance.now());
           const arm = arms[position % 2]!;
           const slot = Math.floor(position / 2);
           const email = arm === "existing"
@@ -6883,6 +7127,17 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           })));
           await new Promise<void>((resolve) => setTimeout(resolve, windowCadenceMs));
         }
+        // The delivered interval between the two members of each cadence slot, against the
+        // cadence the design intended. This is the issuer's own clock and is recorded before
+        // any response is scored, so no arm difference can manufacture or hide it.
+        const intraSlotOvershootsMs = Array.from(
+          { length: samplesPerArm },
+          (_, slot) => issuedAtMs[slot * 2 + 1]! - issuedAtMs[slot * 2]! - windowCadenceMs
+        );
+        const maxIntraSlotOvershootMs = Math.max(...intraSlotOvershootsMs);
+        const intraSlotBreaches = intraSlotOvershootsMs.filter(
+          (overshoot) => overshoot > cadenceToleranceMs
+        ).length;
         const observations = await Promise.all(issued);
         await flow.service.drainMailDispatches();
         await settleDatabaseStatistics();
@@ -6980,7 +7235,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         const existingScores = scoresByArm(scores, "existing");
         const missingScores = scoresByArm(scores, "missing");
         const medianGapMs = Math.abs(median(existingScores) - median(missingScores));
-        expect(medianGapMs).toBeLessThanOrEqual(100);
+        expect(medianGapMs).toBeLessThanOrEqual(equivalenceBoundMs);
 
         await expect(flow.service.verifyEmail({ token: seededToken }, {
           ip: `203.0.113.${windowIndex + 1}`,
@@ -7011,10 +7266,14 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           + `existing_median_ms=${median(existingScores).toFixed(3)} `
           + `missing_median_ms=${median(missingScores).toFixed(3)} `
           + `median_gap_ms=${medianGapMs.toFixed(3)} `
+          + `max_intra_slot_overshoot_ms=${maxIntraSlotOvershootMs.toFixed(3)} `
+          + `intra_slot_breaches=${intraSlotBreaches}/${samplesPerArm} `
           + `existing_ms=${existingScores.map((value) => value.toFixed(3)).join(",")} `
           + `missing_ms=${missingScores.map((value) => value.toFixed(3)).join(",")}`
         );
-        return Object.freeze({ order, scores, medianGapMs });
+        return Object.freeze({
+          order, scores, medianGapMs, maxIntraSlotOvershootMs, intraSlotBreaches
+        });
       } finally {
         await flow.service.drainMailDispatches();
         await api.close();
@@ -7028,24 +7287,23 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       livePairs.push(Object.freeze({ replicate, ab, ba }));
     }
     const live = evaluate(Object.freeze(livePairs), "live-six-window");
-    const liveCause = classificationCause(live);
-    console.info(`[T9 LIVE DISPOSITION] ${liveCause}`);
+    const liveDisposition = disposition(live);
+    console.info(
+      `[T9 LIVE DISPOSITION] outcome=${liveDisposition.outcome} ${liveDisposition.message}`
+    );
     expect(
-      live.pairMedianGapsMs.every((gap) => gap <= 100),
-      `T9 live equivalence bound exceeded · ${liveCause}`
+      live.pairMedianGapsMs.every((gap) => gap <= equivalenceBoundMs),
+      `T9 live equivalence bound exceeded · ${liveDisposition.message}`
     ).toBe(true);
     console.info(live.classification);
-    if (live.classification === INCONCLUSIVE) {
-      // The MEASUREMENT came out undecided, not the resend path: the family rejected
-      // while the direction failed to replicate across the three replicates. Reporting
-      // that as a red equivalence result claims evidence this run does not carry, and
-      // widening the 0.01 family threshold to make it green destroys the same evidence
-      // from the other side. The contract's own third state is what fits, so it is
-      // reported as a skip carrying the condition that produced it. A genuine product
-      // signal still lands as a red below, because PRODUCT_REPAIR is not this branch.
-      context.skip(`T9_TEST_CONTRACT_INCONCLUSIVE · ${liveCause}`);
+    if (liveDisposition.outcome === "skip") {
+      // The ONLY skip this row admits, and the boundary controls above hold it there: the
+      // run recorded that its own cadence was not delivered, so the block that controls
+      // drift did not hold and neither reading is available. Every other unresolved result
+      // falls through to the red below with its receipt.
+      context.skip(liveDisposition.message);
     }
-    expect(live.classification, `T9 live classification · ${liveCause}`).toBe(GREEN);
+    expect(liveDisposition.outcome, liveDisposition.message).toBe("green");
   }, 420_000);
 
   it("T9-A serializes expired-token verification against an eligible resend without deadlock", async () => {
