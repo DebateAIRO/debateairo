@@ -55,6 +55,22 @@ import {
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
 
+/**
+ * The three identifying fields a discarded risk-signal failure may contribute to a log line.
+ * Built as a NEW object from a named allow-list — never a spread or a stringify of the caught
+ * value — so nothing else an error carries (a driver's bound parameters, a `detail`, a nested
+ * `cause`) can reach the log beside the fixed tag.
+ */
+function riskSignalFailureIdentity(error:unknown):string{
+  if(!(error instanceof Error)) return `name=(not-an-Error) code=(none) message=(none)`;
+  const code=(error as {readonly code?:unknown}).code;
+  return [
+    `name=${error.name}`,
+    `code=${typeof code==="string"||typeof code==="number"?code:"(none)"}`,
+    `message=${error.message}`
+  ].join(" ");
+}
+
 const environment = loadApiEnvironment();
 const kek = loadKek(environment.KEK_PATH);
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
@@ -171,7 +187,9 @@ const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository
 const recovery = new RecoveryStartService({
   repository: new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore),
   riskSignals:authenticationRiskSignals,
-  onRiskSignalFailure:()=>console.error("[RECOVERY_RISK_SIGNAL_PENDING]"),
+  onRiskSignalFailure:(error)=>console.error(
+    "[RECOVERY_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
+  ),
   blindIndexKey,
   enumerationFloorMs: authPolicy.verification.enumerationResponseFloorMs,
   publicResponsePolicy: recoveryPolicy.publicResponse
@@ -220,7 +238,9 @@ const mfa = new MfaEnrollmentService({
 const sessions = await SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
   riskSignals:authenticationRiskSignals,
-  onRiskSignalFailure:()=>console.error("[LOGIN_RISK_SIGNAL_PENDING]"),
+  onRiskSignalFailure:(error)=>console.error(
+    "[LOGIN_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
+  ),
   dekStore,
   argon2: argon2Pool,
   authPolicy,

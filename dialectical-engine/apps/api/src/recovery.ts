@@ -41,7 +41,7 @@ export class RecoveryStartService implements RecoveryApplication {
   constructor(private readonly dependencies: Readonly<{
     repository: RecoveryStartRepository;
     riskSignals:RecoveryRiskSignalRecorder;
-    onRiskSignalFailure:()=>void;
+    onRiskSignalFailure:(error:unknown)=>void;
     blindIndexKey: Uint8Array;
     enumerationFloorMs: number;
     publicResponsePolicy: "ENUMERATION_RESISTANT_GENERIC";
@@ -81,7 +81,7 @@ export class RecoveryStartService implements RecoveryApplication {
             publicHandle:outcome.publicHandle,kind:"RECOVERY_STARTED",source
           });
           if(recorded!=="recorded") throw new TypeError("RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED");
-        }catch{this.dependencies.onRiskSignalFailure();}
+        }catch(error){this.dependencies.onRiskSignalFailure(error);}
       }
       return RECOVERY_START_PUBLIC_RESPONSE;
     } finally {

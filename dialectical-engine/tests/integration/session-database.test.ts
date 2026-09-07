@@ -480,7 +480,12 @@ describe("S5 sessions on real PostgreSQL", () => {
           RECOVERY_POLICY_REGISTER_ROW.value.risk_signals.raw_signal_retention_ms,
           RECOVERY_POLICY_REGISTER_ROW.value.risk_signals.maximum_evaluator_signals
         ),
-        onRiskSignalFailure:()=>{throw new Error("UNEXPECTED_RISK_SIGNAL_FAILURE");},
+        onRiskSignalFailure:(error:unknown)=>{
+          // still fatal — the risk signal must be recorded; the cause is now named in the
+          // failure message instead of being discarded by the service's catch.
+          const named=error instanceof Error?`${error.name}: ${error.message}`:String(error);
+          throw new Error(`UNEXPECTED_RISK_SIGNAL_FAILURE (${named})`);
+        },
         dekStore,
         argon2,
         authPolicy,
