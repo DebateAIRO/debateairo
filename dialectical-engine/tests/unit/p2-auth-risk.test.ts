@@ -16,6 +16,7 @@ import {
 import {
   authenticationRiskSignalAad,
   authenticationRiskSignalPoisonCategory,
+  AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES,
   PostgresAuthenticationRiskSignalRepository
 } from "../../packages/db/src/auth-risk.js";
 import { RECOVERY_POLICY_REGISTER_ROW } from "@debateai/register";
@@ -206,6 +207,87 @@ describe("F-AUTH-RISK-POISONED-CATCH decrypt and parse are distinguished interna
       // and the crypto class name must not ride along either.
       expect(rendered, `${label}: echoed a parser message`).not.toContain("JSON");
       expect(rendered, `${label}: echoed the key bytes`).not.toContain(Buffer.alloc(32, RIGHT_DEK).toString("base64"));
+    }
+  });
+});
+
+/**
+ * F-POISONED-REQUIRED-CATEGORY. `poisoned()` carried a DEFAULT category, so the three
+ * rejections inside `evaluateAuthenticationRiskSignals` — an out-of-shape scan bound,
+ * an out-of-shape evaluation instant, and a malformed stored signal — all arrived as
+ * the same `signal-shape`, and a FUTURE call site would inherit that label silently
+ * instead of being made to name itself. The parameter is now REQUIRED. These rows pin
+ * the stage each site rejects at, and that the PUBLIC classification is untouched: a
+ * TypeError whose message is exactly AUTH_RISK_SIGNAL_POISONED.
+ */
+function evaluationRejection(
+  signals: readonly DecryptedAuthenticationRiskSignal[],
+  evaluatedAt: Date,
+  retentionMs: number,
+  maxSignals: number
+): unknown {
+  try {
+    evaluateAuthenticationRiskSignals(signals, evaluatedAt, retentionMs, maxSignals);
+  } catch (error) {
+    return error;
+  }
+  throw new Error("EXPECTED_A_POISONED_REJECTION");
+}
+
+const OUT_OF_SHAPE_SCAN_BOUND = 0;
+const MALFORMED_SIGNAL = { ...signal(0), kind: "ACCOUNT_CONTENT_MATCH" } as unknown as
+  DecryptedAuthenticationRiskSignal;
+
+describe("F-POISONED-REQUIRED-CATEGORY every rejection names the stage that made it", () => {
+  const now = new Date(Date.UTC(2026, 0, 2));
+  const policyRejection = (): unknown => evaluationRejection(
+    [], now, AUTHENTICATION_RISK_SIGNAL_RETENTION_MS, OUT_OF_SHAPE_SCAN_BOUND
+  );
+  const evaluatedAtRejection = (): unknown => evaluationRejection(
+    [], new Date(Number.NaN), AUTHENTICATION_RISK_SIGNAL_RETENTION_MS,
+    MAX_AUTHENTICATION_RISK_SIGNAL_SCAN
+  );
+  const signalRejection = (): unknown => evaluationRejection(
+    [MALFORMED_SIGNAL], now, AUTHENTICATION_RISK_SIGNAL_RETENTION_MS,
+    MAX_AUTHENTICATION_RISK_SIGNAL_SCAN
+  );
+
+  it("categorises an out-of-shape scan bound as a policy rejection", () => {
+    const error = policyRejection();
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toBe("AUTH_RISK_SIGNAL_POISONED");
+    expect(authenticationRiskSignalPoisonCategory(error)).toBe("policy-shape");
+  });
+
+  it("categorises an out-of-shape evaluation instant as an evaluated-at rejection", () => {
+    const error = evaluatedAtRejection();
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toBe("AUTH_RISK_SIGNAL_POISONED");
+    expect(authenticationRiskSignalPoisonCategory(error)).toBe("evaluated-at-shape");
+  });
+
+  it("categorises a malformed stored signal as a signal-shape rejection", () => {
+    const error = signalRejection();
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toBe("AUTH_RISK_SIGNAL_POISONED");
+    expect(authenticationRiskSignalPoisonCategory(error)).toBe("signal-shape");
+  });
+
+  // The property behind the other three rows: these are three DISTINGUISHABLE stages,
+  // not one label worn three times. A default category collapses this set to size 1.
+  it("keeps the three stages distinguishable rather than collapsed onto one label", () => {
+    const categories = [policyRejection(), evaluatedAtRejection(), signalRejection()]
+      .map((error) => authenticationRiskSignalPoisonCategory(error));
+    expect(categories).toEqual(["policy-shape", "evaluated-at-shape", "signal-shape"]);
+    expect(new Set(categories).size).toBe(3);
+  });
+
+  // Every category this module can produce is one of the module's own constants —
+  // never a parser message, a ciphertext or a key.
+  it("draws every produced category from the module's bounded vocabulary", () => {
+    for (const error of [policyRejection(), evaluatedAtRejection(), signalRejection()]) {
+      expect(AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES)
+        .toContain(authenticationRiskSignalPoisonCategory(error));
     }
   });
 });

@@ -249,6 +249,9 @@ importers:
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
+      '@debateai/valuation':
+        specifier: workspace:*
+        version: link:../../packages/valuation
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
         version: 1.28.1(@grpc/grpc-js@1.14.4)(debug@4.4.3)(zod@4.4.3)
