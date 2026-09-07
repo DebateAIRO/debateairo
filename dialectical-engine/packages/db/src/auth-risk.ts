@@ -37,11 +37,17 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const kindSet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_KINDS);
 
 /**
- * Which stage rejected a stored signal. Bounded by construction: three constants of this
- * module, carrying no ciphertext, no plaintext, no key material and no parser message.
+ * Which stage rejected. Bounded by construction: five constants of this module, carrying
+ * no ciphertext, no plaintext, no key material and no parser message.
+ *
+ * The list is a VOCABULARY, not an execution order, and must not be read as one: reading a
+ * stored row decrypts and parses its context BEFORE the evaluator is called at all, so
+ * `context-decrypt` and `context-parse` can precede every other member on that path. Within
+ * the evaluator the argument checks do precede the per-row check, but that is a local fact
+ * about one function, not a property of this array.
  */
 export const AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES=Object.freeze([
-  "signal-shape","context-decrypt","context-parse"
+  "policy-shape","evaluated-at-shape","signal-shape","context-decrypt","context-parse"
 ] as const);
 export type AuthenticationRiskSignalPoisonCategory=
   typeof AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES[number];
@@ -49,7 +55,7 @@ const poisonCategorySet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_POISON_CATEGO
 
 /**
  * The internal category of a poisoned rejection, or null for anything that is not one or
- * whose cause is not one of the three constants. A caller/log path reads the stage through
+ * whose cause is not one of the constants above. A caller/log path reads the stage through
  * this function, so no caller has to reach into `cause` and decide what is safe to print.
  */
 export function authenticationRiskSignalPoisonCategory(
@@ -64,12 +70,17 @@ export function authenticationRiskSignalPoisonCategory(
 
 /**
  * PUBLIC classification unchanged: a TypeError whose message is exactly
- * AUTH_RISK_SIGNAL_POISONED. The stage rides on `cause` as one of the three constants
- * above — never the parser's message, the ciphertext, the plaintext or a key. The default
- * covers this module's shape/validation rejections in `evaluateAuthenticationRiskSignals`.
+ * AUTH_RISK_SIGNAL_POISONED. The stage rides on `cause` as one of the constants above —
+ * never the parser's message, the ciphertext, the plaintext or a key.
+ *
+ * The category is REQUIRED and carries no default. A default is not a neutral
+ * convenience here: it is a label a call site inherits without deciding, so a stage
+ * added later is mis-reported as whichever stage the default happens to name, and the
+ * mis-report is silent. Requiring the argument makes naming the stage part of adding
+ * the call site, and the compiler asks the question.
  */
 function poisoned(
-  category:AuthenticationRiskSignalPoisonCategory="signal-shape"
+  category:AuthenticationRiskSignalPoisonCategory
 ):never{throw new TypeError("AUTH_RISK_SIGNAL_POISONED",{cause:category});}
 function exactKeys(value:Record<string,unknown>,keys:readonly string[]):boolean{
   const actual=Object.keys(value).sort();
@@ -81,11 +92,11 @@ export function evaluateAuthenticationRiskSignals(
   signals:readonly DecryptedAuthenticationRiskSignal[],evaluatedAt:Date,
   retentionMs:number,maxSignals:number
 ):AuthenticationRiskSummary{
-  if(!Number.isInteger(maxSignals)||maxSignals<1) poisoned();
+  if(!Number.isInteger(maxSignals)||maxSignals<1) poisoned("policy-shape");
   if(signals.length>maxSignals){
     throw new TypeError("AUTH_RISK_SIGNAL_SCAN_SATURATED");
   }
-  if(!(evaluatedAt instanceof Date)||!Number.isFinite(evaluatedAt.getTime())) poisoned();
+  if(!(evaluatedAt instanceof Date)||!Number.isFinite(evaluatedAt.getTime())) poisoned("evaluated-at-shape");
   const counts:Record<AuthenticationRiskSignalKind,number>={
     LOGIN_SUCCESS:0,SESSION_CONTEXT_CHANGED:0,RECOVERY_STARTED:0,
     RECOVERY_PROOF_FAILED:0,RECOVERY_COMPLETED:0
@@ -113,7 +124,7 @@ export function evaluateAuthenticationRiskSignals(
       ||signal.context.v!==1
       ||!(signal.context.networkRef===null||opaqueRef.test(signal.context.networkRef))
       ||!(signal.context.clientRef===null||opaqueRef.test(signal.context.clientRef))){
-      poisoned();
+      poisoned("signal-shape");
     }
     ids.add(signal.riskSignalId);
     counts[signal.kind]++;

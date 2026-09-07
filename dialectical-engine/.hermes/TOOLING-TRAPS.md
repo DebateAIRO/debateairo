@@ -2216,3 +2216,76 @@ member of `Kind` would be a compile error. Measured on this repo's tsc 7.0.2:
 before you write a comment claiming it.** A guard nobody has seen fire is a comment, not a guard.
 Cost here: ~3 minutes, and it came within one commit of shipping a source comment that promised a
 guarantee the code did not provide — the exact class of defect this lane's review has been finding.
+
+## "Restore the default" is NOT a mutant for "this parameter is now REQUIRED"
+Found by lane/dev-health (2026-09-07). The ticket removed a defaulted parameter
+(`poisoned(category = "signal-shape")`) and made all five call sites name their category.
+The packet prescribed the obvious mutant — restore the default, expect typecheck or a test to
+fail. Measured on the fixed tip: it fails NOTHING. `pnpm typecheck` returned the same 8
+inherited s14-ui diagnostics and nothing else; `tests/unit/p2-auth-risk.test.ts` returned
+12/12 passed; mutate.sh recorded `RESULT: ok … cmd_exit=0`.
+
+The reason is structural, not a gap in the tests: once EVERY call site passes the argument, the
+default is dead code, and re-adding dead code is unobservable by construction. A mutant on the
+DECLARATION cannot discriminate a property whose whole content is what the CALL SITES do.
+**Rule: to pin "this parameter is required", mutate a CALL SITE — strip the argument and read
+tsc.** Measured: `packages/db/src/auth-risk.ts(91,51): error TS2554: Expected 1 arguments, but
+got 0`, a diagnostic that exists only because the default is gone. Cost here: ~4 minutes and
+one extra mutate.sh cycle, but the expensive version of this mistake is reporting the
+prescribed mutant as "expected failure" without running it, or quietly swapping in a different
+mutant and calling it the packet's.
+
+Related, same lane: **you cannot delete a line with mutate.sh by mutating it to the empty
+string.** Its pre-gate counts NEW as a substring via python `str.count`, and `"abc".count("")`
+is 4, not 0 — so an empty NEW always trips `RESULT: FAIL pre-gate` no matter what the file
+holds. To remove a manifest entry, mutate it into something inert instead (prefixing `#` works
+when the reader skips comment lines). STRENGTH: entailed, read from mutate.sh's own `count()`
+heredoc, not measured by a deliberate failing run.
+
+## An identity gate whose extractor greps the log it wrote its own header into
+Found by lane/dev-health (2026-09-07), one entry below the SORTED-derivative trap and the same
+false break by a different mechanism. The typecheck identity gate writes a header, appends
+`pnpm typecheck` output to the same file, then extracts the diagnostics with `grep 'error TS'`.
+One header line explained the method and CONTAINED the token it was about. The extract came back
+with 9 lines against the baseline's 8, the sha256 differed, and the gate printed
+`VERDICT: DIFFERENT` — which on an identity gate reads exactly like "your diff changed the
+diagnostics". The ninth line was the comment. The same extraction taken minutes earlier from a
+file with no header was byte-identical to the baseline.
+**Rule: an extractor must not be able to match the prose in its own artifact. Grep a pattern only
+real output can satisfy (`'): error TS'`, anchored to the compiler's `file(line,col):` shape),
+and drop comment lines explicitly (`grep -v '^#'`). Better still, keep the raw command output in
+its own file and let the annotated record cite it.** And when an identity gate breaks, DIFF the
+two extracts and read the added line before touching the code — the line names the cause in one
+look. Cost here: ~2 minutes, and a few seconds of believing a clean typecheck had regressed.
+
+## CORRECTION to "Restore the default is NOT a mutant for REQUIRED" — the impossibility claim was too broad
+Filed by lane/dev-health rework round 1 (2026-09-07), correcting the entry above, which is left
+standing because this file is append-only. Codex r1 (R1) refuted its universal half and is right.
+
+What the entry got right, and what it overstated. RIGHT: no RUNTIME row can observe a restored
+default, because a default is only visible at a call site that omits the argument, and once every
+call site names its category no such call site exists. Mutant b really does survive every runtime
+check, and that measurement stands. **OVERSTATED: "a mutant on a DECLARATION cannot discriminate a
+property whose whole content is what the CALL SITES do."** It cannot be discriminated at RUNTIME.
+It is perfectly observable at the TYPE level, and the entry should not have generalised from one
+layer to the language.
+
+The observer that works, and that the entry should have reached for: a **compile-negative contract
+check** living in the ordinary test file. Read the module's committed source, append one call that
+omits the argument, compile that virtual source in memory with `typescript-classic`, and require a
+TS2554 whose position lies past the end of the real source. Restore the default and the arity error
+disappears, so the check goes red. The helper stays private, nothing is exported for testing, and
+no invalid call is ever executed. Implemented at `tests/unit/p2-auth-risk.test.ts`.
+
+Two guards that check needs, both learned here. (1) Filter the arity diagnostic by POSITION, or a
+stray arity error inside the module can pass for the probe's. (2) Assert that no "cannot find name"
+diagnostic mentions the helper — if it stopped resolving there would be no arity error either, and
+"no arity error" would read exactly like a restored default. Measured with `noResolve: true`: the
+omitting probe yields 85 semantic diagnostics of which exactly 1 is TS2554, and the naming probe
+yields 84 of which 0 are; the rest is unresolved-import noise that the filters drop.
+
+**Rule, restated: before writing "X cannot be pinned", name the LAYER — runtime, type, or build —
+and check the other two.** A mutant that survives every runtime check is evidence that the runtime
+layer is blind to it, never evidence that nothing can see it. Cost of the overstatement: one review
+round. Mutating a call site (the earlier entry's rule) remains the right way to show the SHIPPED
+compiler agrees — the contract check and that mutant are complementary, not alternatives.

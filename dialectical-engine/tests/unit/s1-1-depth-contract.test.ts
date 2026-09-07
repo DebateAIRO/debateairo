@@ -13,6 +13,11 @@ import { resolveExpansionDepth } from "@debateai/runner";
 import { auditArchitecture, auditSourceRules } from "../../tools/orphan-audit/src/index.js";
 import { createDebate } from "../../apps/ui/lib/api.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import {
+  readShippedCorpusManifest,
+  shippedCorpusDrift,
+  writeShippedCorpusManifest
+} from "../support/shippedCorpusManifest.js";
 import ts from "typescript-classic";
 import {
   candidatesOf,
@@ -373,9 +378,21 @@ describe("S1-1 · the depth bound has a single source", () => {
       failures.push(`${path}: ${first ? `${first.line}: ${first.message}` : "no diagnostic"}`);
     }
     expect(failures).toEqual([]);
-    // The corpus is ENUMERATED, not assumed: 232 files, of which 59 are .tsx.
-    expect(scanned.length).toBe(232);
-    expect(scanned.filter((absolute) => absolute.endsWith(".tsx")).length).toBe(59);
+    // The corpus is ENUMERATED, not assumed — and it is enumerated BY NAME. A count
+    // (`toBe(232)`) is a number standing in for a set: it cannot say which file
+    // appeared, it cannot tell an addition from a balancing deletion, and a
+    // legitimately landed shipped file reddens this row with a message naming no
+    // path. The committed manifest names every scanned file, so a new shipped file
+    // is a deliberate manifest edit and a vanished one is reported by name.
+    const scannedPaths = scanned.map(
+      (absolute) => relative(REPOSITORY_ROOT, absolute).split(sep).join("/")
+    );
+    if (process.env.SHIPPED_CORPUS_MANIFEST_UPDATE === "1") writeShippedCorpusManifest(scannedPaths);
+    const manifest = readShippedCorpusManifest();
+    expect(shippedCorpusDrift(scannedPaths, manifest)).toEqual({ added: [], missing: [] });
+    // The .tsx share FOLLOWS from the manifest instead of from a second literal.
+    expect(scannedPaths.filter((path) => path.endsWith(".tsx")).length)
+      .toBe(manifest.filter((path) => path.endsWith(".tsx")).length);
   });
 
   // ROUND 1 — PARSE-CONTEXT FIXTURES (plan §1 R3). PROPERTY: what the parser calls
