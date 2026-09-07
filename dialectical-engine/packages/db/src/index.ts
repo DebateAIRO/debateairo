@@ -1269,31 +1269,56 @@ export class RunRepository {
       transactionStarted = false;
       return runId;
     } catch (error) {
-      if (commitAttempted) {
-        throw new TypedDomainError(
+      // F-DIAG-ROLLBACK-COLLAPSE. Three distinguishable failures used to throw one
+      // code with one message and nothing to tell them apart: a COMMIT whose
+      // outcome is unknown, a failed ROLLBACK, and a failed external content-key
+      // destroy. Each now carries a bounded category as the thrown error's
+      // `cause` — a literal declared right here, never the caught cause, which
+      // stays discarded exactly as before. The public code and the message are
+      // unchanged, byte for byte, because both are the outward classification
+      // (tests/integration/s6-content-encryption-database.test.ts asserts them).
+      const ROLLBACK_FAILURE_CATEGORIES = {
+        commitAmbiguous: "COMMIT_OUTCOME_AMBIGUOUS",
+        rollbackFailed: "ROLLBACK_FAILED",
+        contentKeyDestroyFailed: "CONTENT_KEY_DESTROY_FAILED",
+        bothFailed: "ROLLBACK_AND_CONTENT_KEY_DESTROY_FAILED"
+      } as const;
+      const incomplete = (
+        category: (typeof ROLLBACK_FAILURE_CATEGORIES)[keyof typeof ROLLBACK_FAILURE_CATEGORIES]
+      ): TypedDomainError => {
+        const failure = new TypedDomainError(
           "RUN_CONTENT_ROLLBACK_INCOMPLETE",
           "Run rollback or external content-key cleanup did not complete"
         );
+        failure.cause = category;
+        return failure;
+      };
+      if (commitAttempted) {
+        throw incomplete(ROLLBACK_FAILURE_CATEGORIES.commitAmbiguous);
       }
-      let rollbackIncomplete = false;
+      let rollbackFailed = false;
+      let contentKeyDestroyFailed = false;
       if (client !== undefined && transactionStarted) {
         try {
           await client.query("ROLLBACK");
         } catch {
-          rollbackIncomplete = true;
+          rollbackFailed = true;
         }
       }
       if (contentKeyProvisioned) {
         try {
           await cipher!.destroyRunKey(runId);
         } catch {
-          rollbackIncomplete = true;
+          contentKeyDestroyFailed = true;
         }
       }
-      if (rollbackIncomplete) {
-        throw new TypedDomainError(
-          "RUN_CONTENT_ROLLBACK_INCOMPLETE",
-          "Run rollback or external content-key cleanup did not complete"
+      if (rollbackFailed || contentKeyDestroyFailed) {
+        throw incomplete(
+          rollbackFailed && contentKeyDestroyFailed
+            ? ROLLBACK_FAILURE_CATEGORIES.bothFailed
+            : rollbackFailed
+              ? ROLLBACK_FAILURE_CATEGORIES.rollbackFailed
+              : ROLLBACK_FAILURE_CATEGORIES.contentKeyDestroyFailed
         );
       }
       throw error;

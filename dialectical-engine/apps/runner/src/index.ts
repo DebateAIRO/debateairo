@@ -4413,27 +4413,447 @@ export interface RunnerFailureRecorder {
   }): Promise<boolean>;
 }
 
-export function runnerTerminalFailureReason(error: unknown): string {
-  if (error instanceof TypedDomainError) return `RUNNER_EXECUTION_FAILED:${error.code}`;
+// ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET ─────────────────────────────────────
+// TWIN COPY. This block is byte-identical in apps/api/src/index.ts and
+// apps/runner/src/index.ts, and `tests/unit/api-operational-error.test.ts`
+// fails if the two copies drift. It is duplicated rather than shared because a
+// shared module is outside this change's file contract (F-DIAG-OPERATIONAL-REGEX);
+// the duplication is pinned by that test instead of by hand.
+//
+// WHAT IS BOUNDED HERE IS THE OUTPUT ALPHABET, not the input shape. Every string
+// this block can return is a literal declared inside it. The caught value is only
+// ever used as a LOOKUP KEY, and a key that misses becomes the fallback. Nothing
+// is derived from the caught value — no substring of it is returned, no regex
+// capture, no case transform.
+//
+// The two rules this replaces both returned caught text when it happened to LOOK
+// like a constant: `message` was returned verbatim when it matched
+// /^[A-Z][A-Z0-9_]{2,63}$/u, and `name` was camel-to-SNAKE upper-cased and
+// returned when the result matched the same shape. `code` was forwarded verbatim
+// as `DEPENDENCY_${code}` when it matched /^[A-Z0-9_]{2,32}$/u. All three are
+// attacker- or driver-influenced text; an uppercase-shaped string is not a known
+// constant (codex, sessions-argon2 r1 F2). A 20-character uppercase credential in
+// `.code`, an upper-cased SQL fragment in `.message`, and a hex digest in `.name`
+// all satisfied those shapes and were emitted verbatim.
+//
+// This follows the pattern that landed in apps/api/src/risk-signal-identity.ts.
+
+/** The one diagnostic emitted for anything not recognized below. */
+const OPERATIONAL_DIAGNOSTIC_FALLBACK = "UNEXPECTED_ERROR";
+
+/**
+ * Failure constants that can arrive as the `message` of a PLAIN error (not a
+ * TypedDomainError, which is answered by its own `code` above) on the paths these
+ * two formatters see. Two producer categories, both enumerated mechanically at
+ * commit d5b4f7f568aceec55a9cfca72b62473e7ee26c19 and cited per constant in
+ * .hermes/reports/2026-09-01-algorithm-live-loop/logs/diag-bounded/03-allow-list-citations.log:
+ *
+ *   TypeScript  grep -rEn 'new (Error|TypeError|RangeError|SyntaxError)("[A-Z][A-Z0-9_]{1,63}"'
+ *               --include='*.ts' packages apps/api/src | grep -v /tests/
+ *   PostgreSQL  grep -rnoE "MESSAGE *= *'[A-Z][A-Z0-9_]{1,63}'" migrations/*.sql
+ *               (a RAISE EXCEPTION reaches the driver as DatabaseError.message)
+ *
+ * Scope of that sweep, and what it deliberately leaves out: apps/ui,
+ * apps/evaluator-worker, apps/replay and apps/scheduler are separate processes
+ * that neither formatter's module imports; every apps/runner/src/dev-*.ts and
+ * main.ts constant is excluded because apps/runner/src/index.ts imports none of
+ * those modules, so none of them is reachable from executeWorkItem.
+ *
+ * The list is deliberately OVER-inclusive within that scope: admitting a constant
+ * that never actually arrives costs nothing, because the value returned on a hit
+ * is this block's own literal. Under-inclusion costs only diagnostic detail — an
+ * unlisted constant degrades to the error-class category or to the fallback, which
+ * is safe and visible. Both copies are identical, so a constant that can only
+ * reach one of the two formatters is inert in the other.
+ */
+const KNOWN_FAILURE_CONSTANTS: readonly string[] = Object.freeze([
+  "ACCOUNT_CREATE_OUTCOME_MISSING",
+  "ACCOUNT_CREATE_RECEIPT_INVALID",
+  "ACCOUNT_DUPLICATE_ID_MISSING",
+  "ACCOUNT_ERASURE_PREPARED",
+  "ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED",
+  "ACCOUNT_NOT_ACTIVE",
+  "ACCOUNT_RECOVERY_BINDING_IMMUTABLE",
+  "ADDON_GRADING_LINEAGE_UNRESOLVED",
+  "ARGON2_POOL_CAPACITY_INVALID",
+  "ARGON2_POOL_WORKER_COUNT_INVALID",
+  "ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE",
+  "ATTEMPT_LEDGER_CONSUMPTION_INVALID",
+  "ATTEMPT_LEDGER_PENDING_INVALID",
+  "AUDIT_ATTEMPT_NOT_CONSUMED",
+  "AUDIT_ATTEMPT_REQUIRED",
+  "AUDIT_CANONICAL_VALUE_INVALID",
+  "AUDIT_CHAIN_INVALID",
+  "AUDIT_CONTEXT_DIGEST_INVALID",
+  "AUDIT_EVENT_INVALID",
+  "AUDIT_EVENT_SEMANTICS_INVALID",
+  "AUDIT_EVENT_TARGET_INVALID",
+  "AUDIT_EVENT_TYPE_RESERVED",
+  "AUDIT_OPERATION_CAPABILITY_REQUIRED",
+  "AUDIT_SUCCESS_REQUIRES_DOMAIN_CAPABILITY",
+  "AUDIT_TOKEN_MUST_BE_RANDOM_UUID_V4",
+  "AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE",
+  "AUTHORIZATION_DATABASE_URL_REQUIRED",
+  "AUTH_RATE_LIMIT_POLICY_INVALID",
+  "AUTH_RISK_SIGNAL_CONTEXT_INVALID",
+  "AUTH_RISK_SIGNAL_CROSS_ACCOUNT",
+  "AUTH_RISK_SIGNAL_IMMUTABLE",
+  "AUTH_RISK_SIGNAL_KIND_INVALID",
+  "AUTH_RISK_SIGNAL_POISONED",
+  "AUTH_RISK_SIGNAL_PURGE_LIMIT_INVALID",
+  "AUTH_RISK_SIGNAL_PURGE_OUTCOME_INVALID",
+  "AUTH_RISK_SIGNAL_SCAN_SATURATED",
+  "AUTH_RISK_SIGNAL_SCOPE_AMBIGUOUS",
+  "AUTH_RISK_SIGNAL_SCOPE_UNRESOLVED",
+  "BLIND_SAMPLE_REASONS_INVALID",
+  "CAPTURE_QUEUE_CAPACITY_INVALID",
+  "CONFIGURED_PROVIDER_DUPLICATE",
+  "CONSUMER_OUTPUT_WRITE_FAILED",
+  "CONSUMER_PROVIDER_ISOLATION_FAILED",
+  "CONTENT_ATTESTATION_INVALID",
+  "CONTENT_ATTESTATION_REQUIRED",
+  "CONTENT_ATTESTATION_RUN_UNRESOLVED",
+  "CONTENT_ATTESTATION_SCOPE_UNRESOLVED",
+  "CONTENT_ATTESTATION_SECRET_UNRESOLVED",
+  "CONTENT_ATTESTATION_STATE_INVALID",
+  "CONTENT_BLIND_INDEX_CARRIER_UNDECLARED",
+  "CONTENT_BLIND_INDEX_STATE_INVALID",
+  "CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED",
+  "CONTENT_BLIND_INDEX_V1_ROWS_FORBIDDEN",
+  "CONTENT_CIPHER_ALREADY_CONFIGURED",
+  "CONTENT_DERIVED_LOCATOR_CARRIER_UNDECLARED",
+  "CONTENT_DERIVED_LOCATOR_V1_ROWS_FORBIDDEN",
+  "CONTENT_ENCRYPTION_KEY_PATHS_REQUIRED",
+  "CONTENT_LEASE_RUN_REQUIRED",
+  "CONTENT_LEASE_UNLOCK_FAILED",
+  "CONTENT_LOCATOR_RUN_UNRESOLVED",
+  "CONTENT_PROVISION_DATABASE_ROLE_ATTESTATION_FAILED",
+  "CONTENT_PROVISION_DATABASE_ROLE_MUST_BE_ISOLATED",
+  "CONTENT_PROVISION_DATABASE_URL_MUST_BE_SEPARATE",
+  "CONVERGENCE_EPSILON_INVALID",
+  "ENCRYPTED_RUN_OWNER_INVALID",
+  "ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP",
+  "ERASURE_DATABASE_ROLE_ATTESTATION_FAILED",
+  "ERASURE_DATABASE_ROLE_MUST_BE_ISOLATED",
+  "ERASURE_DATABASE_URL_MUST_BE_SEPARATE",
+  "ERASURE_NOTIFICATION_BINDING_IMMUTABLE",
+  "ERASURE_NOTIFICATION_CHANNEL_INVALID",
+  "ERASURE_NOTIFICATION_ERROR_CODE_INVALID",
+  "ERASURE_NOTIFICATION_LEASE_UNLOCK_FAILED",
+  "ERASURE_NOTIFICATION_REQUEST_INVALID",
+  "EVALUATOR_ADDON_ADVISORY_UNLOCK_FAILED",
+  "EVALUATOR_ADDON_OBSERVATION_CONFLICT",
+  "EVALUATOR_ADDON_RUN_ORDINAL_INVALID",
+  "EVALUATOR_ADDON_SAMPLE_INTERVAL_INVALID",
+  "EVALUATOR_ADDON_TIME_INVALID",
+  "EVALUATOR_CONSUMER_SELECTION_INVALID",
+  "EVALUATOR_CONSUMER_SELECTION_TIME_INVALID",
+  "EVALUATOR_DEV_MENU_DATABASE_URL_REQUIRED",
+  "EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN",
+  "EVALUATOR_DEV_MENU_REGISTER_VERSION_REQUIRED",
+  "EVALUATOR_HARVEST_TIME_INVALID",
+  "EVALUATOR_JUDGE_RANK_INVALID",
+  "EVALUATOR_JUDGE_SEAT_COUNT_INVALID",
+  "EVALUATOR_LEDGER_SCOPE_UNAUTHORIZED",
+  "EVALUATOR_PRIVATE_CONSUMER_OUTPUT_FORBIDDEN",
+  "EVALUATOR_PROFILE_DERIVATION_VERSION_INVALID",
+  "EVALUATOR_PROFILE_TIME_INVALID",
+  "EVALUATOR_PUBLIC_AGGREGATE_OUTPUT_REQUIRED",
+  "EVALUATOR_REGISTER_VERSION_INVALID",
+  "EVALUATOR_SEAT_COUNT_INVALID",
+  "EVALUATOR_SEAT_SHARE_CANDIDATE_DUPLICATE",
+  "EVALUATOR_SEAT_SHARE_DEPTH_INVALID",
+  "EVALUATOR_SEAT_SHARE_FORMULA_VERSION_INVALID",
+  "EVALUATOR_SEAT_SHARE_POLICY_RECEIPT_INVALID",
+  "EVALUATOR_SEAT_SHARE_PREMIUM_DEPTH_INVALID",
+  "EVALUATOR_SEAT_SHARE_PROWESS_RANK_INVALID",
+  "EVALUATOR_SEAT_SHARE_RELATIVE_COST_INVALID",
+  "EVALUATOR_SEAT_SHARE_WEIGHT_INVALID",
+  "EVALUATOR_SHADOW_DECISION_WRITE_FAILED",
+  "IDENTITY_CHANNEL_UNSUPPORTED",
+  "IDENTITY_CHILD_PARENT_IMMUTABLE",
+  "IDENTITY_OWNER_REF_IMMUTABLE",
+  "IDENTITY_PSEUDONYM_IMMUTABLE",
+  "IDENTITY_USER_NOT_FOUND",
+  "LEGACY_RUN_CLAIM_INVALID",
+  "LEGACY_RUN_CLAIM_RESULT_INVALID",
+  "LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED",
+  "MAIL_OPERATOR_CODE_INVALID",
+  "MFA_FAILURE_REASON_INVALID",
+  "MFA_POLICY_UNRESOLVED",
+  "MFA_RECOVERY_CODE_SET_INVALID",
+  "MODEL_CALL_USAGE_EMPTY",
+  "MODEL_CALL_USAGE_INVALID",
+  "MODEL_CALL_USAGE_TOKEN_INVALID",
+  "MODEL_CALL_USAGE_TOTAL_MISMATCH",
+  "MODEL_CALL_USAGE_WRITE_FAILED",
+  "OBS_CAPTURE_SELF_TEMPLATE_MISSING",
+  "OWNED_RUN_LOCK_SCOPE_INVALID",
+  "OWNER_ASK_ADMISSION_LEASE_UNLOCK_FAILED",
+  "OWNER_REF_UNRESOLVED",
+  "OWN_MAIL_CONFIGURATION_INVALID",
+  "PASSKEY_CREDENTIAL_BINDING_IMMUTABLE",
+  "PASSKEY_SIGNATURE_COUNTER_DECREASE",
+  "PRIVATE_CONTENT_ERASED",
+  "PRIVATE_CONTENT_OWNER_INACTIVE",
+  "PRIVATE_ERASURE_AUDIT_BINDING_REQUIRED",
+  "PRODUCER_GRADING_FORBIDDEN",
+  "PROVIDER_DISCOVERY_TARGETS_INVALID",
+  "PROVIDER_DISCOVERY_TARGETS_REQUIRED",
+  "PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID",
+  "PROVIDER_DISCOVERY_TARGET_DUPLICATE",
+  "PROVIDER_DISCOVERY_TARGET_SET_MISMATCH",
+  "PROVIDER_PROBE_FRESHNESS_INVALID",
+  "PROVIDER_PROBE_INVALID",
+  "PROVIDER_PROBE_RESPONSE_INVALID",
+  "PROVIDER_PROBE_TIMEOUT_INVALID",
+  "PROVIDER_PROBE_UNAVAILABLE",
+  "PSEUDONYM_ALLOCATION_EXHAUSTED",
+  "PUBLICATION_AUDIT_HEAD_CHANGED",
+  "PUBLICATION_CLEANUP_DATABASE_ROLE_INVALID",
+  "PUBLICATION_CLEANUP_DATABASE_URL_MUST_BE_SEPARATE",
+  "PUBLICATION_CLEANUP_DATABASE_URL_REQUIRED",
+  "PUBLICATION_DATABASE_ROLES_MUST_BE_SEPARATE",
+  "PUBLICATION_DATABASE_ROLE_ATTESTATION_FAILED",
+  "PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE",
+  "PUBLICATION_KEY_EXISTS",
+  "PUBLICATION_KEY_PATHS_REQUIRED",
+  "PUBLICATION_KEY_PROVISION_CLEANUP_PENDING",
+  "PUBLICATION_KEY_PROVISION_INTENT_INCOMPLETE",
+  "PUBLICATION_KEY_STORE_PATH_REQUIRED",
+  "PUBLICATION_LEASE_REF_REQUIRED",
+  "PUBLICATION_LEASE_UNLOCK_FAILED",
+  "PUBLICATION_REF_ALLOCATION_FAILED",
+  "PUBLICATION_REF_REPLAY",
+  "PUBLICATION_REQUIRES_CONTENT_ENCRYPTION",
+  "PUBLICATION_V2_AUDIT_BINDING_REQUIRED",
+  "PUBLICATION_V2_REF_BINDING_REQUIRED",
+  "PUBLIC_AGGREGATE_PROVIDER_CONFIGURATION_INVALID",
+  "RATE_LIMIT_REFUSAL_AGGREGATE_INVALID",
+  "RAW_ARTIFACT_RUN_REQUIRED",
+  "RECOVERY_ENUMERATION_FLOOR_INVALID",
+  "RECOVERY_PUBLIC_RESPONSE_POLICY_INVALID",
+  "RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED",
+  "RECOVERY_START_CANDIDATE_AMBIGUOUS",
+  "RECOVERY_START_INPUT_INVALID",
+  "RECOVERY_START_OUTCOME_INVALID",
+  "REDACTOR_RETURNED_UNBRANDED_ENVELOPE",
+  "REGISTER_REQUIRED_ROW_VERSION_INVALID",
+  "REGISTRATION_HASH_CANCELLED",
+  "RELATIVE_COST_RUNTIME_CLASS_MISMATCH",
+  "RELATIVE_COST_WINDOW_INVALID",
+  "RELATIVE_COST_WINDOW_ORDER_INVALID",
+  "RESEND_COOLDOWN_INVALID",
+  "RESEND_RECEIPT_INVALID",
+  "RUN_CONTENT_KEY_EXISTS",
+  "RUN_CONTENT_KEY_OWNER_REF_INVALID",
+  "RUN_CONTENT_KEY_RUN_ID_INVALID",
+  "RUN_CONTENT_KEY_STORE_PATH_REQUIRED",
+  "RUN_CONTENT_KEY_USER_ID_INVALID",
+  "RUN_EXECUTION_REF_ALLOCATION_FAILED",
+  "RUN_EXECUTION_REF_REQUIRED",
+  "RUN_KEY_PROVISION_INTENT_INCOMPLETE",
+  "RUN_LEGACY_ASKER_INVALID",
+  "RUN_OWNERSHIP_OWNER_REF_NOT_ACTIVE",
+  "RUN_OWNERSHIP_OWNER_REF_NOT_UUID_V4",
+  "RUN_OWNERSHIP_PRINCIPAL_INVALID",
+  "RUN_OWNERSHIP_RUN_NOT_FOUND",
+  "RUN_OWNER_REF_INVALID",
+  "S10_ENCRYPTED_RUN_OWNER_REWRAP_REQUIRED",
+  "S10_IDENTITY_SESSION_REF_MIGRATION_REQUIRED",
+  "S10_PUBLICATION_ACTOR_REF_MIGRATION_REQUIRED",
+  "S10_WHATSAPP_CHANNEL_UNSUPPORTED",
+  "S7_RAW_USER_ID_IN_IMMUTABLE_MEMORY",
+  "S7_RAW_USER_ID_IN_IMMUTABLE_RUN",
+  "SERVER_RUN_ENCRYPTION_INTENT_REQUIRED",
+  "SESSION_BINDING_KEY_INVALID",
+  "SESSION_CREDENTIAL_HASH_INVALID",
+  "SETTLEMENT_WATCH_HANDLE_REQUIRED",
+  "SPOOL_ENVELOPE_MAX_BYTES_INVALID",
+  "SPOOL_ENVELOPE_TOO_LARGE",
+  "SPOOL_FD_IDENTITY_CHANGED",
+  "SPOOL_FD_INVALID",
+  "SPOOL_REQUIRES_POST_REDACTION_ENVELOPE",
+  "SPOOL_REQUIRES_PREPARED_POST_REDACTION_RECORD",
+  "SPOOL_STREAM_POISONED",
+  "SPOOL_WRITE_INCOMPLETE",
+  "USER_DEK_STORE_PATH_REQUIRED",
+  "USER_DEK_STORE_USER_ID_INVALID",
+  "VERIFICATION_DELIVERY_OUTCOME_INVALID",
+  "ZONE_FLUSH_INTERVAL_INVALID",
+  "ZONE_FLUSH_JITTER_INVALID"
+]);
+
+/**
+ * Keyed by `message`, valued by this block's own literal, so the string returned
+ * on a hit is never the caught object's string even when the two are equal.
+ */
+const KNOWN_FAILURE_MESSAGES: ReadonlyMap<string, string> = new Map(
+  KNOWN_FAILURE_CONSTANTS.map((constant) => [constant, constant] as const)
+);
+
+/**
+ * Recognized Node/libuv system codes, keyed by `error.code`. A Node system
+ * rejection is a plain `Error` whose class says nothing, so `code` is consulted
+ * before `name`. Node's much larger `ERR_*` vocabulary is deliberately absent:
+ * those arrive with a class that the class map below already answers.
+ */
+const DEPENDENCY_CODE_CATEGORIES: ReadonlyMap<string, string> = new Map([
+  ["ENOENT", "DEPENDENCY_NODE_ENOENT"],
+  ["EACCES", "DEPENDENCY_NODE_EACCES"],
+  ["EPERM", "DEPENDENCY_NODE_EPERM"],
+  ["EISDIR", "DEPENDENCY_NODE_EISDIR"],
+  ["ENOTDIR", "DEPENDENCY_NODE_ENOTDIR"],
+  ["EEXIST", "DEPENDENCY_NODE_EEXIST"],
+  ["EMFILE", "DEPENDENCY_NODE_EMFILE"],
+  ["ENFILE", "DEPENDENCY_NODE_ENFILE"],
+  ["ENOSPC", "DEPENDENCY_NODE_ENOSPC"],
+  ["ECONNREFUSED", "DEPENDENCY_NODE_ECONNREFUSED"],
+  ["ECONNRESET", "DEPENDENCY_NODE_ECONNRESET"],
+  ["ECONNABORTED", "DEPENDENCY_NODE_ECONNABORTED"],
+  ["ETIMEDOUT", "DEPENDENCY_NODE_ETIMEDOUT"],
+  ["ENOTFOUND", "DEPENDENCY_NODE_ENOTFOUND"],
+  ["EPIPE", "DEPENDENCY_NODE_EPIPE"],
+  ["EHOSTUNREACH", "DEPENDENCY_NODE_EHOSTUNREACH"],
+  ["ENETUNREACH", "DEPENDENCY_NODE_ENETUNREACH"],
+  ["EADDRINUSE", "DEPENDENCY_NODE_EADDRINUSE"],
+  ["EAI_AGAIN", "DEPENDENCY_NODE_EAI_AGAIN"],
+  ["ABORT_ERR", "DEPENDENCY_NODE_ABORT_ERR"]
+]);
+
+/**
+ * PostgreSQL SQLSTATE CLASS (the first two characters of a five-character code),
+ * keyed by class and valued by this block's own literal. The full published class
+ * vocabulary of PostgreSQL's error-codes appendix is enumerated rather than the
+ * subset this system raises today, because the appendix is a closed contract and
+ * a subset would silently degrade an unfamiliar-but-real server rejection.
+ *
+ * The class, not the five-character code, is the unit: `DEPENDENCY_${code}` used
+ * to forward all five characters, and a five-character code is a value the server
+ * chose, not one this block declared. Two characters are used only as a lookup
+ * key; the string returned is the literal on the right.
+ */
+const SQLSTATE_CLASS_CATEGORIES: ReadonlyMap<string, string> = new Map([
+  ["00", "DEPENDENCY_SQL_00_SUCCESS"],
+  ["01", "DEPENDENCY_SQL_01_WARNING"],
+  ["02", "DEPENDENCY_SQL_02_NO_DATA"],
+  ["03", "DEPENDENCY_SQL_03_STATEMENT_INCOMPLETE"],
+  ["08", "DEPENDENCY_SQL_08_CONNECTION"],
+  ["09", "DEPENDENCY_SQL_09_TRIGGERED_ACTION"],
+  ["0A", "DEPENDENCY_SQL_0A_FEATURE_UNSUPPORTED"],
+  ["0B", "DEPENDENCY_SQL_0B_TRANSACTION_INITIATION"],
+  ["0F", "DEPENDENCY_SQL_0F_LOCATOR"],
+  ["0L", "DEPENDENCY_SQL_0L_GRANTOR"],
+  ["0P", "DEPENDENCY_SQL_0P_ROLE_SPECIFICATION"],
+  ["0Z", "DEPENDENCY_SQL_0Z_DIAGNOSTICS"],
+  ["20", "DEPENDENCY_SQL_20_CASE_NOT_FOUND"],
+  ["21", "DEPENDENCY_SQL_21_CARDINALITY"],
+  ["22", "DEPENDENCY_SQL_22_DATA_EXCEPTION"],
+  ["23", "DEPENDENCY_SQL_23_INTEGRITY_CONSTRAINT"],
+  ["24", "DEPENDENCY_SQL_24_CURSOR_STATE"],
+  ["25", "DEPENDENCY_SQL_25_TRANSACTION_STATE"],
+  ["26", "DEPENDENCY_SQL_26_STATEMENT_NAME"],
+  ["27", "DEPENDENCY_SQL_27_TRIGGERED_DATA_CHANGE"],
+  ["28", "DEPENDENCY_SQL_28_AUTHORIZATION"],
+  ["2B", "DEPENDENCY_SQL_2B_DEPENDENT_PRIVILEGES"],
+  ["2D", "DEPENDENCY_SQL_2D_TRANSACTION_TERMINATION"],
+  ["2F", "DEPENDENCY_SQL_2F_ROUTINE_EXCEPTION"],
+  ["34", "DEPENDENCY_SQL_34_CURSOR_NAME"],
+  ["38", "DEPENDENCY_SQL_38_EXTERNAL_ROUTINE"],
+  ["39", "DEPENDENCY_SQL_39_EXTERNAL_ROUTINE_INVOCATION"],
+  ["3B", "DEPENDENCY_SQL_3B_SAVEPOINT"],
+  ["3D", "DEPENDENCY_SQL_3D_CATALOG_NAME"],
+  ["3F", "DEPENDENCY_SQL_3F_SCHEMA_NAME"],
+  ["40", "DEPENDENCY_SQL_40_TRANSACTION_ROLLBACK"],
+  ["42", "DEPENDENCY_SQL_42_ACCESS_OR_SYNTAX"],
+  ["44", "DEPENDENCY_SQL_44_WITH_CHECK_OPTION"],
+  ["53", "DEPENDENCY_SQL_53_INSUFFICIENT_RESOURCES"],
+  ["54", "DEPENDENCY_SQL_54_PROGRAM_LIMIT"],
+  ["55", "DEPENDENCY_SQL_55_OBJECT_STATE"],
+  ["57", "DEPENDENCY_SQL_57_OPERATOR_INTERVENTION"],
+  ["58", "DEPENDENCY_SQL_58_SYSTEM"],
+  ["72", "DEPENDENCY_SQL_72_SNAPSHOT_FAILURE"],
+  ["F0", "DEPENDENCY_SQL_F0_CONFIG_FILE"],
+  ["HV", "DEPENDENCY_SQL_HV_FOREIGN_DATA_WRAPPER"],
+  ["P0", "DEPENDENCY_SQL_P0_PLPGSQL"],
+  ["XX", "DEPENDENCY_SQL_XX_INTERNAL"]
+]);
+
+/**
+ * Recognized error classes, keyed by `error.name`. The domain entries are the
+ * classes that set `this.name` in apps/ and packages/, read at the commit above;
+ * `pg`'s DatabaseError sets `name` to the wire message type, so an ordinary query
+ * rejection arrives as "error". The `Development*` and production-CLI classes are
+ * absent for the same reason their constants are: apps/runner/src/index.ts imports
+ * none of those modules.
+ */
+const ERROR_CLASS_CATEGORIES: ReadonlyMap<string, string> = new Map([
+  ["Error", "ERROR"],
+  ["TypeError", "TYPE_ERROR"],
+  ["RangeError", "RANGE_ERROR"],
+  ["SyntaxError", "SYNTAX_ERROR"],
+  ["ReferenceError", "REFERENCE_ERROR"],
+  ["EvalError", "EVAL_ERROR"],
+  ["URIError", "URI_ERROR"],
+  ["AggregateError", "AGGREGATE_ERROR"],
+  ["AbortError", "ABORT_ERROR"],
+  ["ZodError", "SCHEMA_VALIDATION_ERROR"],
+  ["error", "DATABASE_ERROR"],
+  ["DatabaseError", "DATABASE_ERROR"],
+  ["TypedDomainError", "TYPED_DOMAIN_ERROR"],
+  ["Argon2InfrastructureError", "HASHING_UNAVAILABLE"],
+  ["AskRefusal", "ASK_REFUSAL"],
+  ["AuthFlowError", "AUTH_FLOW_ERROR"],
+  ["ContractHttpError", "CONTRACT_HTTP_ERROR"],
+  ["CryptoError", "CRYPTO_ERROR"],
+  ["CryptoAuthenticationError", "CRYPTO_ERROR"],
+  ["CryptoInputError", "CRYPTO_ERROR"],
+  ["KekUnresolvedError", "CRYPTO_ERROR"],
+  ["RuntimeKekUnresolvedError", "CRYPTO_ERROR"],
+  ["PublicationKeyUnresolvedError", "CRYPTO_ERROR"],
+  ["RunContentKeyUnresolvedError", "CRYPTO_ERROR"],
+  ["MailDeliveryError", "MAIL_DELIVERY_ERROR"],
+  ["MalformedRequestError", "MALFORMED_REQUEST_ERROR"],
+  ["MfaEnrollmentHttpError", "MFA_ENROLLMENT_HTTP_ERROR"],
+  ["PanelMemberFailure", "PANEL_MEMBER_FAILURE"],
+  ["ProviderCallFailedError", "PROVIDER_CALL_FAILED_ERROR"],
+  ["ProviderContentUnacceptedError", "PROVIDER_CONTENT_UNACCEPTED_ERROR"],
+  ["RunnerStartupReconciliationError", "RUNNER_STARTUP_RECONCILIATION_ERROR"],
+  ["GracefulShutdownError", "GRACEFUL_SHUTDOWN_ERROR"]
+]);
+
+/**
+ * The complete diagnostic vocabulary for a caught operational failure: a
+ * TypedDomainError's own code, or one literal declared above.
+ */
+function operationalDiagnosticOf(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
   const record = error !== null && typeof error === "object"
     ? error as Readonly<{ code?: unknown; message?: unknown; name?: unknown }>
     : undefined;
-  const dependencyCode = typeof record?.code === "string"
-    && /^[A-Z0-9_]{2,32}$/u.test(record.code)
-    ? `DEPENDENCY_${record.code}`
-    : undefined;
-  const exactMessageCode = typeof record?.message === "string"
-    && /^[A-Z][A-Z0-9_]{2,63}$/u.test(record.message)
-    ? record.message
-    : undefined;
-  const errorClass = typeof record?.name === "string"
-    ? record.name.replace(/([a-z])([A-Z])/gu, "$1_$2").toUpperCase()
-    : undefined;
-  const diagnostic = dependencyCode ?? exactMessageCode
-    ?? (errorClass === undefined || !/^[A-Z][A-Z0-9_]{2,63}$/u.test(errorClass)
-      ? "UNEXPECTED_ERROR"
-      : errorClass);
-  return `RUNNER_EXECUTION_FAILED:${diagnostic}`;
+  if (typeof record?.message === "string") {
+    const known = KNOWN_FAILURE_MESSAGES.get(record.message);
+    if (known !== undefined) return known;
+  }
+  if (typeof record?.code === "string") {
+    const byCode = DEPENDENCY_CODE_CATEGORIES.get(record.code);
+    if (byCode !== undefined) return byCode;
+    if (record.code.length === 5) {
+      const bySqlstateClass = SQLSTATE_CLASS_CATEGORIES.get(record.code.slice(0, 2));
+      if (bySqlstateClass !== undefined) return bySqlstateClass;
+    }
+  }
+  if (typeof record?.name === "string") {
+    const byClass = ERROR_CLASS_CATEGORIES.get(record.name);
+    if (byClass !== undefined) return byClass;
+  }
+  return OPERATIONAL_DIAGNOSTIC_FALLBACK;
+}
+// ─── END OPERATIONAL DIAGNOSTIC ALPHABET ───────────────────────────────────────
+
+/** The `reason` recorded by recordTerminalFailure, and persisted with the run. */
+export function runnerTerminalFailureReason(error: unknown): string {
+  return `RUNNER_EXECUTION_FAILED:${operationalDiagnosticOf(error)}`;
 }
 
 export function declareHatchetWalkingSkeletonTask(input: {

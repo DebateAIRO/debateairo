@@ -2092,3 +2092,26 @@ noticed. Uncaught it would have shipped a RED record that pins nothing.
 Same family as the recorded macOS `timeout`/`rg`/`awk` traps. In `zsh`, `grep -rn foo dir/ --include=*.ts`
 dies with `no matches found: --include=*.ts` before grep ever runs, because zsh tries to glob the
 argument itself and `nomatch` is on. Bash users never see it. Quote it: `--include='*.ts'`.
+
+## `sed -E 's/…/\1/'` KEEPS the lines it fails to match — a generated allow-list silently grows source lines
+Found by lane/diag-bounded r0 (2026-09-07), building a 215-entry allow-list of failure constants by
+grepping the tree. `grep … | sed -E "s/.*'([A-Z][A-Z0-9_]*)'/\1/" | sort -u` looks like an extractor.
+It is not: `s///` rewrites the lines that match and **passes the rest through untouched**, so every
+line the pattern missed stayed in the output as a whole line of source — and `sort -u | wc -l` counted
+those as constants. Two pipelines over the same 122 matches disagreed, 85 against 79, and the six
+"extra" were `migrations/0037_run_ownership.sql:161:    RAISE EXCEPTION USING ERRCODE = '55000', …`
+in full. Nothing failed; the list was just wrong, and it was about to be pasted into two source files.
+(The BSD-grep half of the cause: `\s` is not a character class in `grep -E` on macOS, so
+`MESSAGE\s*=` matched nothing and every one of those lines fell through the `sed`.)
+**Rule: extract with a matcher that can only emit matches — `grep -o` and then split — never with a
+substitution. And when a list is going into source, cross-check the count two independent ways and
+`grep -v` the result against the shape you expect (`grep -vE '^[A-Z][A-Z0-9_]{1,63}$'` must be empty).**
+Cost here: ~6 minutes and one near-miss, caught only because I printed the list and read it.
+
+## `mutate.sh` runs your test command at the LANE ROOT, not in the package
+Same family as the recorded path traps. `mutate.sh` does `cd "$LANE"`, and `$LANE` is the worktree
+root (`.worktrees/lane-<x>`), one level ABOVE `dialectical-engine/`. So both arguments change shape:
+the target file is `dialectical-engine/apps/api/src/index.ts`, and a bare
+`pnpm exec vitest run tests/unit/x.test.ts` runs where there is no `package.json` and fails for a
+reason that has nothing to do with the mutant. Wrap it:
+`bash -c 'cd dialectical-engine && pnpm exec vitest run …'`.
