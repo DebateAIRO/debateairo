@@ -1639,6 +1639,79 @@ describe("S1-1 · the depth bound has a single source", () => {
     });
   });
 
+  // Canonical manifest sources, copied from Part 2 without shorthand expansion.
+  // The mutation audit prints observations BEFORE assertions, so a failing verdict
+  // cannot hide the payload, receiver prefix, address or emitted records.
+  const manifestFixtures: readonly {
+    id: string; source: string; verdict: string; count: number; cells?: Cell[];
+    receiver?: { source: string; cells: Cell[] }; pair?: { source: string; verdict: string };
+  }[] = [
+    {"id":"K1","source":"const choices = [1,2,3,4,5].map(n => 0);","verdict":"RULED","count":1},
+    {"id":"K2","source":"const choices = [...new Set([0,1,2,3,4,5].map(n => n || 1))].slice(1);","verdict":"OTHER","count":1},
+    {"id":"K6","source":"const choices = [0,1,2,3,4,5].map(n => `${n}`).map(n => n * 1).slice(1);","verdict":"UNDETERMINED","count":1},
+    {"id":"K6b","source":"const choices = [0,1,2,3,4,5].map(n => `${n}`).map(n => +n).slice(1);","verdict":"RULED","count":1},
+    {"id":"K7","source":"const choices = [0,1,2,3,4,5].filter((n, i) => 0);","verdict":"UNDETERMINED","count":1},
+    {"id":"K9","source":"const choices = [0,1,2,3,4,5].filter(n => n);","verdict":"RULED","count":1,"pair":{"source":"const choices = [-0,1,2,3,4,5].filter(n => n);","verdict":"RULED"}},
+    {"id":"K8","source":"const choices = [0,1,2,3,4,5].filter(n => n % 2 === 0);","verdict":"OTHER","count":1},
+    {"id":"K10","source":"const choices = [0,1,2,3,4,5].map(n => n || 1);","verdict":"RULED","count":1,"cells":[{"t":"num","v":1},{"t":"num","v":1},{"t":"num","v":2},{"t":"num","v":3},{"t":"num","v":4},{"t":"num","v":5}]},
+    {"id":"K11","source":"const choices = [0,1,2,3,4,5].flatMap(n => [n]);","verdict":"OTHER","count":1},
+    {"id":"K12","source":"const choices = [0,1,2,3,4,5].splice(1);","verdict":"RULED","count":1},
+    {"id":"K13","source":"const choices = [0,1,2,3,4,5].slice(1);","verdict":"RULED","count":1},
+    {"id":"K14","source":"const choices = [0,1,2,3,4,5].reverse().slice(0,-1);","verdict":"RULED","count":1},
+    {"id":"K15","source":"const choices = [0,1,2,3,4,5,10].sort().slice(1,-1);","verdict":"OTHER","count":1},
+    {"id":"K16","source":"const choices = [0,1,2,3,4,5].slice(1,4).concat(4,5);","verdict":"UNDETERMINED","count":1},
+    {"id":"K17","source":"const choices = [...[0,1,2,3,4,5],6].slice(1);","verdict":"OTHER","count":1},
+    {"id":"K18","source":"const [, ...choices] = [0,1,2,3,4,5];","verdict":"RULED","count":1},
+    {"id":"K19","source":"const [choices] = [[0,1,2,3,4,5].slice(1)];","verdict":"RULED","count":1},
+    {"id":"K20","source":"const choices = [0,1,2,3,4,5][\"slice\"](0,4);","verdict":"OTHER","count":1},
+    {"id":"K21","source":"const choices = ([0,1,2,3,4,5] as const).slice(1);","verdict":"RULED","count":1},
+    {"id":"K22","source":"const choices = Array.from(new Set([0,1,2,3,4,5].map(n => n || 1))).slice(1);","verdict":"OTHER","count":1},
+    {"id":"K26","source":"const a = [1,2,3,4,5]; const b = [1,2,3,4,5];","verdict":"RULED","count":2},
+    {"id":"K29","source":"const choices = [0,1,2,3,4,5].reduce((a, n) => n ? a.concat(n) : a, []);","verdict":"UNDETERMINED","count":1},
+    {"id":"K31","source":"const choices = [0,1,2,3,4,5].map(n => n + (((((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0))) + (((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0)))) + ((((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0))) + (((0 + 0) + (0 + 0)) + ((0 + 0) + (0 + 0)))))).slice(1);","verdict":"UNDETERMINED","count":1},
+    {"id":"K32","source":"const choices = [0,1,2,3,4,5].filter(n => { if (n > 9) return true; return n > 0; });","verdict":"UNDETERMINED","count":1},
+    {"id":"K33","source":"const choices = [0,1,2,3,4,5].slice(1,2,3);","verdict":"UNDETERMINED","count":1},
+    {"id":"K36","source":"const choices = [0,1,2,3,4,5].map(n => n === 0 ? 1 : n);","verdict":"RULED","count":1},
+    {"id":"K39","source":"const slots = (\";\", [0,1,2,3,4,5]);","verdict":"OTHER","count":1},
+    {"id":"K40","source":"const [choices] = [[0,1,2,3,4,5].slice(1)];","verdict":"RULED","count":1},
+    {"id":"K41","source":"const choices = new Set([0,1,2,3,4,5]).slice(1);","verdict":"UNDETERMINED","count":1},
+    {"id":"K42","source":"const choices = [0,1,2,3,4,5].reduce((a, n) => n ? a.concat(n) : a, []);","verdict":"UNDETERMINED","count":1},
+    {"id":"K43","source":"const choices = [0,1,2,3,4,5].map(n => \"x\").at(0);","verdict":"UNDETERMINED","count":1,"receiver":{"source":"const receiver = [0,1,2,3,4,5].map(n => \"x\");","cells":[{"t":"str","v":"x"},{"t":"str","v":"x"},{"t":"str","v":"x"},{"t":"str","v":"x"},{"t":"str","v":"x"},{"t":"str","v":"x"}]}},
+    {"id":"K44","source":"const choices = [0,1,2,3,4,5].foo;","verdict":"UNDETERMINED","count":1,"pair":{"source":"const length = [0,1,2,3,4,5].length;","verdict":"OTHER"}},
+    {"id":"K45","source":"const choices = ((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes);","verdict":"UNDETERMINED","count":1},
+    {"id":"K46","source":"const choices = [0,1,2,3,4,5].map(n => `${n}`).map(n => +n).slice(1);","verdict":"RULED","count":1},
+    {"id":"K47","source":"const choices = [...new Set([0,0,1,2,3,4,5].map(n => n === 0 ? \"s\" : n))].slice(1);","verdict":"RULED","count":1},
+    {"id":"K48","source":"const choices = [-0,1,2,3,4,5].filter(n => n);","verdict":"RULED","count":1,"pair":{"source":"const choices = [0,1,2,3,4,5].filter(n => n);","verdict":"RULED"}},
+    {"id":"K49","source":"const choices = [0,1,2,3,4,5].map(n => (n === 0 ? null : n) ?? 1);","verdict":"RULED","count":1},
+    {"id":"K50","source":"const choices = [0,1,2,3,4,5].join(\"\").split(\"\").map(n => +n).slice(1);","verdict":"UNDETERMINED","count":1},
+    {"id":"K51","source":"const [head, ...choices] = [0,1,2,3,4,5];","verdict":"RULED","count":1}
+  ];
+  it.each(manifestFixtures)("asserts canonical mutation fixture $id", (fixture) => {
+    const path = "planted.tsx";
+    const observed = evaluatedCandidatesOf(path, fixture.source);
+    const sites = domainSites(path, fixture.source);
+    const receiver = fixture.receiver ? evaluateOne(path, fixture.receiver.source) : undefined;
+    const pair = fixture.pair ? evaluateOne(path, fixture.pair.source) : undefined;
+    if (process.env.ORACLE_AUDIT === "1") console.log("MUTATION_ROW " + JSON.stringify({
+      id: fixture.id, source: fixture.source, observed, sites, receiver, pair,
+      limits: fixture.id === "K31" ? { ...measureCallbackBody(fixture.source), NODE_BUDGET, DEPTH_LIMIT } : undefined
+    }));
+    expect(parseModule(path, fixture.source).ok).toBe(true);
+    expect(observed).toHaveLength(fixture.count);
+    if (fixture.id === "K31") {
+      expect(new TextEncoder().encode(fixture.source).length).toBe(241);
+      expect(measureCallbackBody(fixture.source)).toEqual({ nodes: 128, depth: 11 });
+      expect(DEPTH_LIMIT).toBe(32);
+    }
+    if (fixture.receiver && receiver) expect(receiver.value).toEqual({ kind: "EXACT", coll: "array", cells: fixture.receiver.cells });
+    if (fixture.pair && pair) expect(pair.verdict).toBe(fixture.pair.verdict);
+    if (fixture.cells) expect(observed[0]!.value).toEqual({ kind: "EXACT", coll: "array", cells: fixture.cells });
+    expect(observed.map((candidate) => candidate.verdict)).toEqual(Array.from({ length: fixture.count }, () => fixture.verdict));
+    expect(sites).toEqual(fixture.verdict === "OTHER" ? [] : Array.from({ length: fixture.count }, () => ({
+      kind: "DOMAIN_ENUMERATION", line: 1, text: fixture.source
+    })));
+  });
+
   // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects
   // yields exactly ONE conservative INCONCLUSIVE site and never a fabricated
   // DOMAIN_ENUMERATION; discovery yields nothing. Narrowed with a `throw` per
