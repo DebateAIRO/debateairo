@@ -1,0 +1,41 @@
+<div id="8a" data-screen-label="8a Sign up" style="flex:0 0 auto; width:540px; border-radius:18px; overflow:hidden; border:1px solid rgba(26,22,19,.14); box-shadow:0 48px 90px -44px rgba(26,22,19,.5); background:{{ tA.page }}; color:{{ tA.ink }};">
+      <div style="padding:52px 56px 48px; background-image:radial-gradient({{ tA.gridDot }} 1px, transparent 1.4px); background-size:22px 22px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:34px;">
+          <span style="display:grid; place-items:center; width:26px; height:26px; border:1px solid {{ tA.hairStrong }}; border-radius:7px;"><span style="width:9px; height:9px; transform:rotate(45deg); background:{{ tA.gold }};"></span></span>
+          <span style="font-size:12.5px; font-weight:700;">Dialectical Engine</span>
+        </div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:9.5px; font-weight:700; letter-spacing:.22em; color:{{ tA.gold }};">CREATE AN ACCOUNT</div>
+        <h1 style="margin:12px 0 0; font-family:Fraunces,serif; font-weight:500; font-size:28px; letter-spacing:-.02em;">Put a claim to the bench.</h1>
+        <p style="margin:10px 0 0; font-size:12px; line-height:1.6; color:{{ tA.hint }}; text-wrap:pretty;">Email verification and authenticator enrolment are required before your account can be used.</p>
+        <div style="margin-top:24px; background:{{ tA.shell }}; border:1px solid {{ tA.hairStrong }}; border-radius:16px; padding:7px; box-shadow:{{ tA.shadow }};">
+          <div style="background:{{ tA.core }}; border:1px solid {{ tA.hair }}; border-radius:10px; padding:20px; display:flex; flex-direction:column; gap:13px;">
+            <div><div style="font-size:11px; font-weight:700; margin-bottom:6px;">Email</div>
+              <div style="display:flex; gap:8px;"><span style="flex:1; padding:10px 13px; border-radius:9px; border:1px solid {{ tA.hairStrong }}; background:{{ tA.shell }}; font-size:12px; color:{{ tA.mute }};">you@institution.edu</span><span style="align-self:stretch; display:grid; place-items:center; padding:0 14px; border-radius:9px; border:1px solid {{ goldBorder }}; background:{{ goldBg }}; color:{{ tA.gold }}; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;">Verify email</span></div>
+              <div style="margin-top:5px; font-size:10.5px; font-weight:600; color:{{ vOk }};">✓ Valid address · verification link sent — awaiting confirmation</div>
+            </div>
+            <div><div style="font-size:11px; font-weight:700; margin-bottom:6px;">Recovery email</div><div style="padding:10px 13px; border-radius:9px; border:1px solid {{ tA.hairStrong }}; background:{{ tA.shell }}; font-size:12px; color:{{ tA.mute }};">&nbsp;</div><div style="margin-top:5px; font-size:10.5px; color:{{ tA.hint }};">Use a different address reserved for account recovery.</div><div style="margin-top:4px; font-size:10.5px; font-weight:600; color:{{ vBad }};">✗ Must differ from the primary email</div></div>
+            <div><div style="font-size:11px; font-weight:700; margin-bottom:6px;">Password</div><div style="padding:10px 13px; border-radius:9px; border:1px solid {{ tA.hairStrong }}; background:{{ tA.shell }}; font-size:12px; color:{{ tA.mute }};">&nbsp;</div>
+              <div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">
+                <sc-for list="{{ pwRulesSignup }}" as="r" hint-placeholder-count="4">
+                  <span style="font-size:10px; font-weight:600; color:{{ r.c }};">{{ r.mark }} {{ r.t }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="border:1px solid {{ tA.hair }}; border-radius:11px; background:{{ tA.shell }}; padding:2px 13px;">
+              <div style="display:flex; align-items:flex-start; gap:10px; padding:11px 0; border-bottom:1px solid {{ tA.hair }}; cursor:pointer;">
+                <span style="flex:0 0 auto; margin-top:1px; width:17px; height:17px; border-radius:5px; border:1.5px solid {{ okBorder }}; background:{{ okC }}; display:grid; place-items:center; font-size:10px; font-weight:800; color:{{ tA.core }};">✓</span>
+                <span style="font-size:11.5px; line-height:1.5;">I am 18 or over.</span>
+              </div>
+              <div style="display:flex; align-items:flex-start; gap:10px; padding:11px 0; cursor:pointer;">
+                <span style="flex:0 0 auto; margin-top:1px; width:17px; height:17px; border-radius:5px; border:1.5px solid {{ okBorder }}; background:{{ okC }}; display:grid; place-items:center; font-size:10px; font-weight:800; color:{{ tA.core }};">✓</span>
+                <span style="font-size:11.5px; line-height:1.5;">I agree to the <a href="#10c" style="font-weight:700; color:{{ tA.ink }}; text-decoration:underline; text-underline-offset:3px;">Privacy Policy</a>, including that my debates may be published publicly.</span>
+              </div>
+            </div>
+            <span style="text-align:center; padding:11px; border-radius:999px; background:{{ tA.ink }}; color:{{ tA.page }}; font-size:12.5px; font-weight:700; cursor:pointer;">Create account</span>
+            <div style="text-align:center; font-size:11px; color:{{ tA.mute }};">Already have one? <span style="font-weight:700; color:{{ tA.ink }}; text-decoration:underline; text-underline-offset:3px; cursor:pointer;">Log in</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
