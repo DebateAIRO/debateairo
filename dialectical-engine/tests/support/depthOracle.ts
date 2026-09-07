@@ -1,15 +1,12 @@
 import ts from "typescript-classic";
 
 /**
- * F-T1-ORACLE-EVALUATOR — the depth oracle's parser, discovery and addressing stage.
+ * F-T1-ORACLE-EVALUATOR — conservative syntactic domain evaluation.
  *
- * ROUND 1 SCOPE: parse, discover candidates, address them. There is NO evaluation
- * here — no abstract domain, no transfer function, no verdict. `EvaluatedCandidate`,
- * consumed spans and DOMAIN emission belong to rounds 2 and 3 (plan §1.12 R4).
- *
- * Authority: plan REVISION 4 — §1.5 R2 (parseModule), §1.9 R3 (signatures),
- * §1.12–§1.14 R4 (records, site union), §2.2 R2 / §2 R3 (addressing), §5.6 R4
- * (the three bare DOMAIN controls stay on the old emitter in rounds 1–2).
+ * The pinned parser discovers numeric-array occurrences. A bounded interpreter
+ * evaluates their ownership chains without executing source callbacks. RULED and
+ * UNDETERMINED occurrences emit sites keyed by literal spans; OTHER is withheld.
+ * Text-only ceiling detection remains a separate arm (plan REVISION 4, §1–§3).
  *
  * NAMED FACT (D68 ADDENDUM 2), carried verbatim:
  * Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and imported under Node 25.7.0 only.
@@ -1097,17 +1094,24 @@ export function evaluatedCandidatesOf(path: string, source: string): EvaluatedCa
 }
 
 /**
- * §1.10 R3 — PARSER ONLY. On a failed parse it returns EXACTLY ONE conservative
- * `INCONCLUSIVE` record; it never fabricates a `DOMAIN_ENUMERATION`.
- *
- * ROUND 1: a successful parse yields `[]`. DOMAIN emission needs evaluation
- * (round 2) and the rule-1 discriminator (round 3); until then the three bare
- * DOMAIN controls stay on the old emitter's `WHOLE_DOMAIN` fallback (§5.6 R4).
+ * §1.10 / §2.2 — exactly one INCONCLUSIVE for a failed parse; otherwise one
+ * DOMAIN site per reported literal occurrence. Display uses the owning
+ * statement's first physical line, while identity uses the literal's span.
  */
 export function domainSites(path: string, source: string): Site[] {
   const parsed = parseModule(path, source);
-  if (parsed.ok) return [];
-  return inconclusiveFor(path, parsed.diagnostics);
+  if (!parsed.ok) return inconclusiveFor(path, parsed.diagnostics);
+  const sites = new Map<string, Site>();
+  const lines = source.split("\n");
+  for (const candidate of evaluatedCandidatesOf(path, source)) {
+    if (candidate.verdict === "OTHER") continue;
+    const address = `${candidate.start}:${candidate.end}`;
+    sites.set(address, {
+      kind: "DOMAIN_ENUMERATION", line: candidate.statementLine,
+      text: (lines[candidate.statementLine - 1] ?? "").trim()
+    });
+  }
+  return [...sites.values()];
 }
 
 /** The one conservative record a rejected parse produces. Mutation K27 empties this. */
@@ -1129,20 +1133,19 @@ function inconclusiveFor(
 const MENTIONS_A_DEPTH = /depth/i;
 const BARE_FIVE = /(?<![\w.$])5(?![\w.$])/;
 const SIX_AS_EXCLUSIVE_BOUND = /(?:[<>]=?\s*6(?![\w.$])|\.(?:lt|gte)\(\s*6\s*\))/;
-const WHOLE_DOMAIN = /\b1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\b/;
 
-/** The two predicates applied to one candidate text. Unchanged by this extraction. */
+/** Legacy ceiling predicate retained for the special narrowing control. */
 export function kindOf(candidate: string): DuplicateKind | null {
   if (MENTIONS_A_DEPTH.test(candidate) && (BARE_FIVE.test(candidate) || SIX_AS_EXCLUSIVE_BOUND.test(candidate))) {
     return "DEPTH_BOUND_LITERAL";
   }
-  return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
+  return null;
 }
 
-/** The ceiling-literal arm; its WHOLE_DOMAIN fallback is removed in ROUND 3, not here. */
+/** The text-only ceiling-literal arm. Domain decisions belong to domainSites. */
 export function kindOfCeilingLiteral(candidate: string): DuplicateKind | null {
   if (MENTIONS_A_DEPTH.test(candidate) && BARE_FIVE.test(candidate)) return "DEPTH_BOUND_LITERAL";
-  return WHOLE_DOMAIN.test(candidate) ? "DOMAIN_ENUMERATION" : null;
+  return null;
 }
 
 /** The exclusive-bound arm, applied to conjunct units. */
@@ -1250,7 +1253,7 @@ export function ceilingSites(source: string): Site[] {
   return [...byAddress.values()].sort((left, right) => left.line - right.line);
 }
 
-/** §1.9 R3 — `ceilingSites` ∪ `domainSites`, sorted. In round 1 the union adds nothing on a clean parse. */
+/** §1.9 R3 — independent ceiling and domain arms, ordered by statement line. */
 export function duplicateBoundSites(path: string, source: string): Site[] {
   return [...ceilingSites(source), ...domainSites(path, source)].sort((left, right) => left.line - right.line);
 }

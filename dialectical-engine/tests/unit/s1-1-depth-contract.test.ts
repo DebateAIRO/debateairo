@@ -19,6 +19,7 @@ import {
   ceilingSites,
   DEPTH_LIMIT,
   domainSites,
+  duplicateBoundSites,
   evaluatedCandidatesOf,
   kindOf,
   NODE_BUDGET,
@@ -302,7 +303,7 @@ const SHIPPED_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs"];
  *
  *   DEPTH_BOUND_LITERAL  any line mentioning a depth that also carries the
  *                        literal 5, or a 6 in an exclusive-bound position
- *   DOMAIN_ENUMERATION   any line spelling the whole domain 1,2,3,4,5
+ *   DOMAIN_ENUMERATION   a ruled or conservatively unknown numeric-array occurrence
  *
  * and then allows exactly ONE line in the whole tree: the owning declaration.
  * A new spelling does not need a new detector; it needs a new exemption, which
@@ -327,22 +328,6 @@ const OWNING_DECLARATION = Object.freeze({
   text: "export const EXPANSION_DEPTH_MAX = 5;"
 });
 
-/**
- * THE OLD EMITTER, preserved for ROUND 1.
- *
- * Its ceiling composition (line scan + declaration units + conjunct units, keyed
- * `line:kind`, with the `WHOLE_DOMAIN` fallback) now lives in ONE place —
- * `ceilingSites` in tests/support/depthOracle.ts — and this alias keeps the
- * inherited call sites and their behaviour exactly as they were. It is TEXT ONLY
- * and never parses, so the malformed ceiling fragments below are not rewritten
- * into parseable source.
- *
- * The three bare DOMAIN controls and the shipped scan still run through here.
- * Round 3 removes the `WHOLE_DOMAIN` fallback and routes those three to
- * `domainSites` (plan §5.6 R4) — not this round.
- */
-const duplicateBoundSites = (source: string): Site[] => ceilingSites(source);
-
 function shippedSourceFiles(): string[] {
   const found: string[] = [];
   const walk = (directory: string): void => {
@@ -361,7 +346,7 @@ function shippedSourceFiles(): string[] {
 function depthBoundSitesInShippedCode(): string[] {
   return shippedSourceFiles().flatMap((absolute) => {
     const path = relative(REPOSITORY_ROOT, absolute).split(sep).join("/");
-    return duplicateBoundSites(readFileSync(absolute, "utf8"))
+    return duplicateBoundSites(path, readFileSync(absolute, "utf8"))
       .map((site) => `${path}:${site.line} [${site.kind}] ${site.text}`);
   }).sort();
 }
@@ -445,7 +430,7 @@ describe("S1-1 · the depth bound has a single source", () => {
 
   // ROUND-1 REWORK (codex r1 B6) — THE FIVE ORIGINAL TRUNCATED PREFIXES, imported from
   // the donor at 60641339b983365952dd6cd61ed2f379aef6dc8a, tests/unit/s1-1-depth-contract.test.ts
-  // lines 1047-1051, preserving their wrapping and comment bytes EXACTLY (the 18-space
+  // lines 1048-1052, preserving their wrapping and comment bytes EXACTLY (the 18-space
   // indent, the `/* first slot */` block comment, the `// first slot` line comment and the
   // newline positions are all load-bearing: they are what made the same declaration read
   // two different ways in the donor's text pipeline).
@@ -715,6 +700,9 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(evaluated.consumedStart).toBe(16);
     expect(evaluated.consumedEnd).toBe(87);
     expect(evaluated.verdict).toBe("UNDETERMINED");
+    expect(domainSites("planted.ts", source)).toEqual([
+      { kind: "DOMAIN_ENUMERATION", line: 1, text: source }
+    ]);
   });
 
   it("evaluates K45's computed-member twin, whose call is textually 16-90", () => {
@@ -726,6 +714,9 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(evaluated.consumedStart).toBe(16);
     expect(evaluated.consumedEnd).toBe(90);
     expect(evaluated.verdict).toBe("UNDETERMINED");
+    expect(domainSites("planted.ts", source)).toEqual([
+      { kind: "DOMAIN_ENUMERATION", line: 1, text: source }
+    ]);
   });
 
   // K43's observable KNOWN-RECEIVER check (codex r2 B11): the manifest binds K43 to
@@ -1668,11 +1659,20 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(parseModule("planted.tsx", truncated).ok).toBe(false);
   });
 
-  // A clean parse yields NO domain site in round 1: DOMAIN emission needs the
-  // evaluator (round 2) and the rule-1 discriminator (round 3). The old emitter
-  // still owns every DOMAIN verdict until then.
-  it("emits no domain site from a clean parse while the old emitter still runs", () => {
-    expect(domainSites("planted.ts", "const allowed = [1, 2, 3, 4, 5];")).toEqual([]);
+  it.each([
+    { id: "A3", source: "const a = [1,2,3,4,5]; const b = [1,2,3,4,5];", count: 2 },
+    { id: "A9", source: "const a = [1,2,3,4,5]; const b = [0,1,2,3,4,5];", count: 1 }
+  ])("emits $id by literal identity with exact display records", ({ source, count }) => {
+    expect(domainSites("planted.ts", source)).toEqual(
+      Array.from({ length: count }, () => ({ kind: "DOMAIN_ENUMERATION", line: 1, text: source }))
+    );
+  });
+
+  it("emits a multiline literal on its owning statement line", () => {
+    const source = "const allowed =\n  [1,2,3,4,5];";
+    expect(domainSites("planted.ts", source)).toEqual([
+      { kind: "DOMAIN_ENUMERATION", line: 1, text: "const allowed =" }
+    ]);
   });
 
   // PROPERTY: exactly ONE line in shipped code fixes the ruled ceiling, and it is
@@ -1683,9 +1683,153 @@ describe("S1-1 · the depth bound has a single source", () => {
   });
 
   it("keeps the owning declaration as the only depth-bound site in shipped code", () => {
-    expect(depthBoundSitesInShippedCode()).toEqual([
+    const sites = depthBoundSitesInShippedCode();
+    if (process.env.ORACLE_AUDIT === "1") console.log("SHIPPED_SITES " + JSON.stringify(sites));
+    expect(sites).toEqual([
       `${OWNING_DECLARATION.path}:112 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
     ]);
+  });
+
+  // §5 R3: these donor prefixes are completed with the actual LoginFlow body.
+  // Original five truncated negatives above remain byte-for-byte unchanged.
+  const loginBody = [
+    '<span',
+    '  className="authCodeBox"',
+    '  key={slot}',
+    '  data-filled={code.length > slot ? "true" : undefined}',
+    '  data-next={code.length === slot ? "true" : undefined}',
+    '>',
+    '  {code[slot] ?? ""}',
+    '</span>'
+  ].join("\n");
+  const completeLoginLayout = (source: string): string => source.trimEnd().endsWith(".map((slot) => (")
+    ? "const view = <div>\n" + source + "\n" + loginBody + "\n))}</div>;"
+    : source;
+
+  it("models the actual shipped LoginFlow candidate as six JSX cells and OTHER", () => {
+    const path = "apps/ui/components/LoginFlow.tsx";
+    const source = readFileSync(join(REPOSITORY_ROOT, path), "utf8");
+    const candidate = evaluateOne(path, source);
+    expect(source.slice(candidate.start, candidate.end)).toBe("[0, 1, 2, 3, 4, 5]");
+    expect(candidate.value).toEqual({ kind: "EXACT", coll: "array", cells: Array.from({ length: 6 }, () => ({ t: "jsx" })) });
+    expect(candidate.verdict).toBe("OTHER");
+    expect(domainSites(path, source)).toEqual([]);
+  });
+
+  it.each([
+    { spelling: "leading sentinel dropped by .slice(1)", planted: "const choices = [0, 1, 2, 3, 4, 5].slice(1);" },
+    { spelling: "trailing value dropped by .slice(0, -1)", planted: "const choices = [1, 2, 3, 4, 5, 6].slice(0, -1);" },
+    { spelling: "leading sentinel dropped by a rest binding", planted: "const [unused, ...choices] = [0, 1, 2, 3, 4, 5];" },
+    { spelling: "trailing comma before the narrowing", planted: "const choices = [0, 1, 2, 3, 4, 5,].slice(1);" },
+    { spelling: "a later narrowing behind a length-preserving map", planted: "const choices = [0, 1, 2, 3, 4, 5].map(n => n).slice(1);" },
+    { spelling: "the same with a block callback", planted: "const choices = [0, 1, 2, 3, 4, 5].map(n => { return n; }).slice(1);" },
+    { spelling: "a length-preserving map inside a collapsing wrapper", planted: "const choices = new Set([0, 1, 2, 3, 4, 5].map(n => n || 1));" },
+    { spelling: "computed member access", planted: 'const choices = [0, 1, 2, 3, 4, 5]["slice"](1);' },
+    { spelling: "narrowing through a type assertion", planted: "const choices = ([0, 1, 2, 3, 4, 5] as const).slice(1);" }
+  ])("reports a declaration that DEFINES the ruled domain — $spelling", ({ planted }) => {
+    expect(domainSites("planted.tsx", completeLoginLayout(planted)).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
+  });
+
+  it.each([
+    { spelling: "whole index domain, reversed", planted: "const slots = [0, 1, 2, 3, 4, 5].reverse();" },
+    { spelling: "whole index domain, copied", planted: "const slots = [0, 1, 2, 3, 4, 5].slice();" },
+    { spelling: "narrowed to a DIFFERENT domain", planted: "const slots = [0, 1, 2, 3, 4, 5].slice(0, 4);" },
+    { spelling: "whole index domain, sorted", planted: "const slots = [0, 1, 2, 3, 4, 5].sort();" },
+    { spelling: "even filter defines the exact other domain", planted: "const slots = [0, 1, 2, 3, 4, 5].filter(n => n % 2 === 0);" },
+    { spelling: "a bare six-page list", planted: "const pages = [1, 2, 3, 4, 5, 6];" },
+    { spelling: "a bare index run", planted: "const slots = [0, 1, 2, 3, 4, 5];" }
+  ])("does not report a declaration that defines another domain — $spelling", ({ planted }) => {
+    const source = completeLoginLayout(planted);
+    expect(parseModule("planted.tsx", source).ok).toBe(true);
+    if (source !== planted) {
+      expect(evaluateOne("planted.tsx", source).value).toEqual({
+        kind: "EXACT", coll: "array", cells: Array.from({ length: 6 }, () => ({ t: "jsx" }))
+      });
+    }
+    expect(domainSites("planted.tsx", source)).toEqual([]);
+  });
+
+  it.each([
+    { layout: "the real six-slot login array", planted: "                  {[0, 1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, wrapped after the sentinel", planted: "                  {[0,\n                  1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, block comment after the sentinel", planted: "                  {[0, /* first slot */ 1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, commented AND wrapped", planted: "                  {[0, /* first slot */\n                  1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "the real login array, line comment after the sentinel", planted: "                  {[0, // first slot\n                  1, 2, 3, 4, 5].map((slot) => (" },
+    { layout: "index run, one line", planted: "  const slots = [0, 1, 2, 3, 4, 5];" },
+    { layout: "index run, wrapped after the sentinel", planted: "  const slots = [0,\n    1, 2, 3, 4, 5];" },
+    { layout: "index run, wrapped before the last value", planted: "  const slots = [0, 1, 2, 3, 4,\n    5];" },
+    { layout: "index run, one value per line", planted: "  const slots = [\n    0,\n    1,\n    2,\n    3,\n    4,\n    5\n  ];" },
+    { layout: "index run, literal on its own line", planted: "  const slots =\n    [0,\n     1, 2, 3, 4, 5];" },
+    { layout: "index run, block comment after the sentinel", planted: "  const slots = [0, /* first slot */ 1, 2, 3, 4, 5];" },
+    { layout: "index run, commented AND wrapped", planted: "  const slots =\n    [0, /* first slot */\n     1,\n     2,\n     3,\n     4,\n     5];" },
+    { layout: "index run, line comment after the sentinel", planted: "  const slots = [0, // first slot\n    1, 2, 3, 4, 5];" }
+  ])("does not read an index run left whole as the ruled domain — $layout", ({ planted }) => {
+    const source = completeLoginLayout(planted);
+    expect(parseModule("planted.tsx", source).ok).toBe(true);
+    if (source !== planted) {
+      expect(evaluateOne("planted.tsx", source).value).toEqual({
+        kind: "EXACT", coll: "array", cells: Array.from({ length: 6 }, () => ({ t: "jsx" }))
+      });
+    }
+    expect(domainSites("planted.tsx", source)).toEqual([]);
+  });
+
+  it.each([
+    {
+      group: "an index run left whole",
+      expected: false,
+      layouts: [
+        "{[0, 1, 2, 3, 4, 5].map((slot) => (",
+        "{[0,\n  1, 2, 3, 4, 5].map((slot) => (",
+        "{[0, /* first slot */ 1, 2, 3, 4, 5].map((slot) => (",
+        "{[0, /* first slot */\n  1, 2, 3, 4, 5].map((slot) => (",
+        "const slots = [0, 1, 2, 3, 4, 5];",
+        "const slots =\n  [0,\n   1, 2, 3, 4, 5];"
+      ]
+    },
+    {
+      group: "the ruled domain written bare",
+      expected: true,
+      layouts: [
+        "const allowed = [1, 2, 3, 4, 5];",
+        "const allowed = [1,\n  2, 3, 4, 5];",
+        "const allowed = [\n  1,\n  2,\n  3,\n  4,\n  5\n];",
+        "const allowed = new Set([1, 2, 3, 4, 5]);",
+        "const allowed = [1, /* one */ 2, 3, 4, 5];"
+      ]
+    },
+    {
+      group: "a longer literal narrowed to the ruled domain",
+      expected: true,
+      layouts: [
+        "const choices = [0, 1, 2, 3, 4, 5].slice(1);",
+        "const choices = [0,\n  1, 2, 3, 4, 5].slice(1);",
+        "const choices = [0, 1, 2, 3, 4, 5,].slice(1);",
+        'const choices = [0, 1, 2, 3, 4, 5]["slice"](1);',
+        "const choices = ([0, 1, 2, 3, 4, 5] as const).slice(1);",
+        "const choices = [0, 1, 2, 3, 4, 5].map(n => n).slice(1);"
+      ]
+    },
+    {
+      group: "a bare six-page list left as 1..6",
+      expected: false,
+      layouts: [
+        "const pages = [1, 2, 3, 4, 5, 6];",
+        "const pages = [1, 2, 3, 4, 5,\n  6];",
+        "const pages = [\n  1,\n  2,\n  3,\n  4,\n  5,\n  6\n];"
+      ]
+    }
+  ])("gives equivalent layouts the same verdict — $group", ({ layouts, expected }) => {
+    for (const planted of layouts) {
+      const source = completeLoginLayout(planted);
+      expect(parseModule("planted.tsx", source).ok).toBe(true);
+      if (source !== planted) expect(evaluateOne("planted.tsx", source).value).toEqual({
+        kind: "EXACT", coll: "array", cells: Array.from({ length: 6 }, () => ({ t: "jsx" }))
+      });
+    }
+    const verdicts = layouts.map((planted) =>
+      domainSites("planted.tsx", completeLoginLayout(planted)).some((site) => site.kind === "DOMAIN_ENUMERATION"));
+    expect(verdicts).toEqual(layouts.map(() => expected));
   });
 
   // POSITIVE CONTROLS — adversarial by design. The first three are the exact
@@ -1705,15 +1849,12 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(ceilingSites(planted).map((site) => site.kind)).toEqual(["DEPTH_BOUND_LITERAL"]);
   });
 
-  // THE TWO BARE OPTION-DOMAIN CONTROLS from this block. They are NOT ceiling
-  // controls and cannot pass a DEPTH_BOUND_LITERAL assertion. They stay on the old
-  // emitter's `WHOLE_DOMAIN` fallback for rounds 1-2 and are routed to `domainSites`
-  // in round 3 (plan §5.6 R4).
+  // Bare option-domain controls use the parsed domain emitter (§5.6 R4).
   it.each([
     { spelling: "array option domain", planted: "  {[1, 2, 3, 4, 5].map((value) => value)}" },
     { spelling: "set option domain", planted: "  const allowed = new Set([1, 2, 3, 4, 5]);" }
   ])("detects a duplicate written as $spelling", ({ planted }) => {
-    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
+    expect(domainSites("planted.tsx", planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
   });
 
   // LAYOUT CONTROLS (T1B, codex r3 B1) — the same three CLASSES as above, written
@@ -1769,7 +1910,7 @@ describe("S1-1 · the depth bound has a single source", () => {
       ].join("\n")
     }
   ])("detects a duplicate laid out as $spelling", ({ planted }) => {
-    expect(duplicateBoundSites(planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
+    expect(domainSites("planted.tsx", planted).map((site) => site.kind)).toEqual(["DOMAIN_ENUMERATION"]);
   });
 
   // WRAPPED-CONJUNCT CONTROLS (T1B r1, codex B1). The r1 oracle flushed a unit at
