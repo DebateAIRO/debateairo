@@ -54,22 +54,7 @@ import {
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
-
-/**
- * The three identifying fields a discarded risk-signal failure may contribute to a log line.
- * Built as a NEW object from a named allow-list — never a spread or a stringify of the caught
- * value — so nothing else an error carries (a driver's bound parameters, a `detail`, a nested
- * `cause`) can reach the log beside the fixed tag.
- */
-function riskSignalFailureIdentity(error:unknown):string{
-  if(!(error instanceof Error)) return `name=(not-an-Error) code=(none) message=(none)`;
-  const code=(error as {readonly code?:unknown}).code;
-  return [
-    `name=${error.name}`,
-    `code=${typeof code==="string"||typeof code==="number"?code:"(none)"}`,
-    `message=${error.message}`
-  ].join(" ");
-}
+import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 
 const environment = loadApiEnvironment();
 const kek = loadKek(environment.KEK_PATH);
