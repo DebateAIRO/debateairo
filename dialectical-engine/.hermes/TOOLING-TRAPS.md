@@ -2072,3 +2072,23 @@ selected-group inventory that was ten short. `grep -cF "addresses 'A"` returns 1
 **Rule: never count tests by grepping a name you composed in source; count the names the RUNNER
 printed, and match a prefix short enough to survive both the quoting and the truncation.** A `-t`
 filter is safe if its pattern is a substring of the *visible* prefix (`-t "A1 — ASI"` matched).
+
+## A RED that says "X is not a function" is a MISSING-SYMBOL frame, not the defect
+Found by lane/risk-signal-diagnostics r0 (2026-09-07), on a ticket whose whole content was
+"make an internal distinction VISIBLE" (decrypt-vs-parse behind one `AUTH_RISK_SIGNAL_POISONED`).
+I wrote the test against a reader that did not exist yet, ran it, and got three red tests whose
+message was `TypeError: authenticationRiskSignalPoisonCategory is not a function`. That transcript
+proves the reader is absent. It does **not** prove the two stages are collapsed — which is the
+thing the ticket exists to fix — so it is not admissible RED for this ticket, and a reviewer
+comparing it against the fix cannot tell whether the fix changed behaviour or only added a symbol.
+**Rule: when the defect is "an existing failure carries no distinguishing information", land the
+READ side first — the pure inspector that returns `null`/`undefined` when the information is
+missing — and take the RED against it.** The frame then reads `expected null to be 'context-decrypt'`,
+which is the defect stated in the runner's own words. The read side changes no behaviour, so it is
+not a fix smuggled in ahead of the test. Cost here: one extra capture, ~4 minutes, because I
+noticed. Uncaught it would have shipped a RED record that pins nothing.
+
+## zsh eats an unquoted `--include=*.ts`
+Same family as the recorded macOS `timeout`/`rg`/`awk` traps. In `zsh`, `grep -rn foo dir/ --include=*.ts`
+dies with `no matches found: --include=*.ts` before grep ever runs, because zsh tries to glob the
+argument itself and `nomatch` is on. Bash users never see it. Quote it: `--include='*.ts'`.

@@ -36,7 +36,41 @@ const opaqueRef=/^argon2id-audit:v1:[0-9a-f]{64}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const kindSet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_KINDS);
 
-function poisoned():never{throw new TypeError("AUTH_RISK_SIGNAL_POISONED");}
+/**
+ * Which stage rejected a stored signal. Bounded by construction: three constants of this
+ * module, carrying no ciphertext, no plaintext, no key material and no parser message.
+ */
+export const AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES=Object.freeze([
+  "signal-shape","context-decrypt","context-parse"
+] as const);
+export type AuthenticationRiskSignalPoisonCategory=
+  typeof AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES[number];
+const poisonCategorySet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES);
+
+/**
+ * The internal category of a poisoned rejection, or null for anything that is not one or
+ * whose cause is not one of the three constants. A caller/log path reads the stage through
+ * this function, so no caller has to reach into `cause` and decide what is safe to print.
+ */
+export function authenticationRiskSignalPoisonCategory(
+  error:unknown
+):AuthenticationRiskSignalPoisonCategory|null{
+  if(!(error instanceof TypeError)||error.message!=="AUTH_RISK_SIGNAL_POISONED") return null;
+  const cause=(error as {readonly cause?:unknown}).cause;
+  return typeof cause==="string"&&poisonCategorySet.has(cause)
+    ?cause as AuthenticationRiskSignalPoisonCategory
+    :null;
+}
+
+/**
+ * PUBLIC classification unchanged: a TypeError whose message is exactly
+ * AUTH_RISK_SIGNAL_POISONED. The stage rides on `cause` as one of the three constants
+ * above — never the parser's message, the ciphertext, the plaintext or a key. The default
+ * covers this module's shape/validation rejections in `evaluateAuthenticationRiskSignals`.
+ */
+function poisoned(
+  category:AuthenticationRiskSignalPoisonCategory="signal-shape"
+):never{throw new TypeError("AUTH_RISK_SIGNAL_POISONED",{cause:category});}
 function exactKeys(value:Record<string,unknown>,keys:readonly string[]):boolean{
   const actual=Object.keys(value).sort();
   const expected=[...keys].sort();
@@ -204,12 +238,16 @@ export class PostgresAuthenticationRiskSignalRepository{
     const key=await this.users.load(userId);
     try{
       const decoded=result.rows.map((row):DecryptedAuthenticationRiskSignal=>{
+        // One catch around both stages made a key/ciphertext mismatch and a malformed
+        // plaintext the same failure. Separate catches, one bounded category each.
+        let plaintext:Buffer;
+        try{
+          plaintext=decrypt(key,row.context_ciphertext,authenticationRiskSignalAad(userId));
+        }catch{poisoned("context-decrypt");}
         let context:unknown;
         try{
-          context=JSON.parse(decrypt(
-            key,row.context_ciphertext,authenticationRiskSignalAad(userId)
-          ).toString("utf8"));
-        }catch{poisoned();}
+          context=JSON.parse(plaintext.toString("utf8"));
+        }catch{poisoned("context-parse");}
         return Object.freeze({
           riskSignalId:row.risk_signal_id,kind:row.signal_kind,
           context:context as AuthenticationRiskSignalContext,
