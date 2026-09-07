@@ -27,10 +27,23 @@ export type TokenUnlockFailure =
 
 export function classifyTokenUnlockFailure(error: unknown): TokenUnlockFailure {
   if (!(error instanceof ContractHttpError)) {
-    const detail = error instanceof Error && error.message.trim().length > 0 ? error.message : "no detail reported";
+    // F-DIAG-TOKEN-UNLOCK-UNCLASSIFIED. This branch used to interpolate
+    // `error.message` into the sentence, and the sentence is user-facing:
+    // `apps/ui/app/debate/[id]/DebatePageClient.tsx:564` puts it straight into
+    // the page's error banner. Anything a fetch layer, a driver or a thrown
+    // string put in that message was rendered verbatim.
+    //
+    // The alphabet of this branch is now exactly ONE string. No bounded detail
+    // category is appended: the contract client wraps every failure it can name
+    // into a `ContractHttpError` handled below (`packages/contract/src/client.ts`
+    // :119-133,157-162), so what arrives here has no typed producer to key a map
+    // on — and a category keyed on an unbounded `error.name` would be a value
+    // derived from the caught object, which is the defect, not the fix. The
+    // `kind: "UNCLASSIFIED"` discriminant already carries what a caller can act
+    // on. DR-115 is preserved: this still never claims a rejection.
     return {
       kind: "UNCLASSIFIED",
-      message: `Token check failed before any verdict arrived (${detail}). The token was not rejected.`
+      message: "Token check failed before any verdict arrived. The token was not rejected."
     };
   }
   if (error.serverCode === "API_UPSTREAM_UNREACHABLE" || [502, 503, 504].includes(error.status)) {

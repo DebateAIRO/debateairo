@@ -2146,3 +2146,73 @@ assert the element count before AND after (`399 -> 398`); the assertion is one l
 class of bug from a confusing parse error into a message that names the count.
 Recovery is `git checkout -- <files>` and redo; nothing is salvageable from a bad splice.
 Cost here: ~4 minutes, all of it spent reading a parse error that pointed at the wrong place.
+
+## A `grep` that finds nothing (exit 1) silently kills the rest of an `&&`-chained diagnostic script
+Found by lane/diag-class-a (2026-09-07) while sweeping producer files. A multi-section sweep written
+as `echo A && grep X && echo B && grep Y && echo C` printed sections A and B and then STOPPED — not
+because the remaining greps found nothing, but because the FIRST grep with no match exited 1 and the
+`&&` chain aborted. The output reads exactly like "the remaining patterns are absent from the tree",
+which is the opposite of what happened: they were never searched. In this lane the missing sections
+were "is `DEV_` ever an env var?" and "what do the `fixedStep` wrappers do?" — two questions whose
+false "no" would have put a wrong alphabet into a shipped source file.
+**Rule: join the sections of a diagnostic script with `;` or newlines, never `&&`.** `&&` is for
+"only if the previous step succeeded"; a grep's exit code is an ANSWER, not a failure. Where you do
+want the answer, capture it explicitly (`grep …; echo "rc=$?"`) rather than letting the shell branch
+on it. Cost here: ~3 minutes and one re-run, plus the near-miss of reading an aborted chain as evidence.
+
+## zsh expands `--include=*.ts` before `grep` sees it: `no matches found`
+Same lane, same day. `grep -rn "name" --include=*.ts .` fails in zsh with
+`(eval):1: no matches found: --include=*.ts` — zsh treats the `*.ts` inside the option as a glob to
+expand against the CURRENT directory and errors when nothing matches, so grep never runs. bash does
+not do this, so the idiom is copied in from bash notes and dies here. It is not a grep error and the
+message does not name grep.
+**Rule: quote the pattern in every `--include` / `--exclude`: `--include='*.ts'`.** Same for
+`--exclude-dir='node_modules'`. Cost here: ~1 minute, but the failure mode is worth knowing because
+the message blames the shell, not the command you were debugging.
+
+## An identity gate compared against a SORTED derivative reports a false break
+Found by lane/diag-class-a rework round 1 (2026-09-07). The typecheck identity gate compares the
+diagnostic lines at the tip against the untouched-lane baseline. Round 0 saved the baseline as raw
+`grep` output (file order); round 1 re-extracted the tip's lines through `... | sort`. `diff` then
+exited 1 and the console read `identical-to-baseline exit=1` — which on an IDENTITY gate looks
+exactly like "your diff changed the diagnostics", the one thing that gate exists to catch. Both files
+had 8 lines and the same sha256 once compared like-for-like.
+**Rule: an identity gate must compare artifacts produced by the SAME pipeline, and should compare a
+HASH, not a diff exit code.** Save the baseline and the tip extract with identical commands, print
+both sha256 values beside the verdict, and let the hash be the claim. A diff exit of 1 tells you the
+files differ, not whether the DIAGNOSTICS differ. Cost here: ~1 minute, and a few seconds of believing
+a gate had broken.
+
+## `mutate.sh` APPENDS to its output path: re-running a mutant on a rework round hides the new stamp
+Found by lane/diag-class-a rework round 1 (2026-09-07). The round-1 tip re-ran the six round-0
+mutants into their existing numbered log paths. mutate.sh writes its transcript with `>>`, so each
+file ended up holding BOTH transcripts, round-0's first. `stamp-check.sh` reads the stamp with
+`grep -m1 -oiE 'commit[=: ]+[0-9a-f]{40}'` — the FIRST match — so all six re-taken records were
+reported STALE against the round-0 tip even though a correct round-1 transcript sat lower in the very
+same file. The comparator went from 6 expected failures to 14, and the six extra ones look exactly
+like "the worker forgot to re-run the mutants".
+**Rule: on any rework round, `rm` the mutant transcript (or write to a fresh path) BEFORE re-running
+mutate.sh.** If you have already appended, split at the second `^commit=<40 hex> tree=` line rather
+than re-running: the two transcripts are intact and separable. Keeping superseded transcripts is
+still worth doing — move them to a SUBDIRECTORY, which the comparator skips (`[ -f "$f" ] || continue`
+matches files only, and the glob does not recurse). Same trick keeps unstamped supplemental artifacts
+out of the population. Cost here: ~4 minutes, and one full re-measure cycle to re-stamp at the tip.
+
+## `x as Record<Union, T>` is NOT an exhaustiveness check — it silences the very error you wanted
+Found by lane/diag-class-a rework round 2 (2026-09-07), while building a private vocabulary that had
+to stay in step with an exported union. The literal was written
+`{ A: 0, B: 0, ... } as Record<Kind, 0>` and the comment above it claimed that adding or removing a
+member of `Kind` would be a compile error. Measured on this repo's tsc 7.0.2:
+
+    { A: 0, B: 0 } as Record<"A"|"B"|"C", 0>          -> NO ERROR        (missing C silenced)
+    const x: Record<"A"|"B"|"C", 0> = { A: 0, B: 0 }  -> TS2741 missing 'C'
+    { A: 0, B: 0 } satisfies Record<"A"|"B"|"C", 0>   -> TS2741 missing 'C'
+    { A:0,B:0,C:0,D:0 } satisfies Record<"A"|"B"|"C",0> -> TS2353 excess 'D'
+
+`as` is an ASSERTION: it tells the compiler to stop checking. A typed const declaration or a
+`satisfies` clause CHECKS. Only the latter two catch drift in both directions.
+**Rule: never write `as` where you mean "and the compiler will hold me to this" — use `satisfies`
+(or a typed declaration), and PROVE the guard fires by breaking it once and reading the error code
+before you write a comment claiming it.** A guard nobody has seen fire is a comment, not a guard.
+Cost here: ~3 minutes, and it came within one commit of shipping a source comment that promised a
+guarantee the code did not provide — the exact class of defect this lane's review has been finding.

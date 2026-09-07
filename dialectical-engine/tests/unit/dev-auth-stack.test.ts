@@ -106,6 +106,138 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       })
     }))).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_TLS_PUBLIC_READINESS_INVALID");
   });
+  /**
+   * F-DIAG-DEV-AUTH-STACK. The shape rule `/^DEV_[A-Z0-9_]+$/` forwards ANY
+   * message that merely LOOKS like a code. The landed pattern
+   * (`apps/api/src/risk-signal-identity.ts`) considered and rejected exactly
+   * that rule: "an uppercase-shaped message is still attacker- or
+   * driver-influenced text". The set below is written out independently here
+   * and is NOT imported from `dev-auth-stack.ts`; its producer audit is in
+   * agent-reports/diag-class-a.md.
+   */
+  it("refuses a message that is code-SHAPED but is not a known code", () => {
+    // Synthetic only (D18). Shape-legal for the old regex, absent from every producer.
+    const code = developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_TLS_FAILED", {
+      cause: new Error("DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER")
+    }));
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_UNRECOGNIZED");
+  });
+
+  it("returns the fixed fallback when the whole chain is code-shaped but unknown", () => {
+    const code = developmentAuthStackErrorCode(
+      new Error("DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER")
+    );
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_UNRECOGNIZED");
+  });
+
+  /**
+   * codex r1 F2. These four are TEMPLATE-BUILT, not literals: `probeEndpoint`
+   * composes `${errorCode}_BODY_TOO_LARGE` (tls-front-door.mjs:61) and
+   * `${errorCode}_TIMEOUT` (:72) over the only two prefixes its only caller
+   * supplies (:327 private, :336 public). Their source lines carry no DEV_ token,
+   * so a literal-only producer sweep misses them and the first round degraded all
+   * four to DEV_UNRECOGNIZED — a diagnostic regression, not a redaction. An
+   * ordinary UI probe that times out or overruns its body bound produces them.
+   */
+  it("retains the four template-built TLS probe codes, each distinct", () => {
+    const probeCodes = [
+      "DEV_TLS_PRIVATE_PROBE_FAILED_BODY_TOO_LARGE",
+      "DEV_TLS_PRIVATE_PROBE_FAILED_TIMEOUT",
+      "DEV_TLS_PUBLIC_PROBE_FAILED_BODY_TOO_LARGE",
+      "DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT"
+    ] as const;
+
+    const joined = probeCodes.map((code) => developmentAuthStackErrorCode(
+      new Error("DEV_AUTH_STACK_TLS_FAILED", { cause: new Error(code) })
+    ));
+
+    // Each is retained, and each stays DISTINCT from the other three — collapsing
+    // them to a shared category would also pass a "not DEV_UNRECOGNIZED" check.
+    expect(joined).toEqual(probeCodes.map((code) => `DEV_AUTH_STACK_TLS_FAILED:${code}`));
+    expect(new Set(joined).size).toBe(4);
+    // and the bare prefixes they are built from still join on their own
+    expect(developmentAuthStackErrorCode(new Error("DEV_TLS_PRIVATE_PROBE_FAILED")))
+      .toBe("DEV_TLS_PRIVATE_PROBE_FAILED");
+    expect(developmentAuthStackErrorCode(new Error("DEV_TLS_PUBLIC_PROBE_FAILED")))
+      .toBe("DEV_TLS_PUBLIC_PROBE_FAILED");
+  });
+
+  /**
+   * codex r1 F3. Validating one read of `message` and emitting another is not an
+   * allow-list. No concurrency is needed — an accessor that answers differently on
+   * the second read is enough. The guard must emit the snapshot it validated.
+   */
+  it("reads each link's message ONCE, so an unstable accessor cannot slip past the set", () => {
+    // Synthetic only (D18); shape-legal so the old regex would have forwarded it.
+    const SYNTHETIC = "DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER";
+    const shifty = new Error("placeholder");
+    let reads = 0;
+    Object.defineProperty(shifty, "message", {
+      configurable: true,
+      get: () => (reads++ === 0 ? "DEV_AUTH_STACK_TLS_FAILED" : SYNTHETIC)
+    });
+
+    const code = developmentAuthStackErrorCode(shifty);
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED");
+  });
+
+  it("reads once on a deeper link too, and keeps the join order", () => {
+    const SYNTHETIC = "DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER";
+    const inner = new Error("placeholder");
+    let reads = 0;
+    Object.defineProperty(inner, "message", {
+      configurable: true,
+      get: () => (reads++ === 0 ? "DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT" : SYNTHETIC)
+    });
+
+    const code = developmentAuthStackErrorCode(
+      new Error("DEV_AUTH_STACK_TLS_FAILED", { cause: inner })
+    );
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT");
+  });
+
+  it("control — a known chain still joins in the same order, to full depth", () => {
+    expect(developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_DATA_FAILED", {
+      cause: new Error("DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE", {
+        cause: new Error("DEV_AUTH_DATA_PLANE_DEPENDENCY_START_FAILED", {
+          cause: new Error("DEV_TLS_PORT_PROBE_TIMEOUT")
+        })
+      })
+    }))).toBe([
+      "DEV_AUTH_STACK_DATA_FAILED",
+      "DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE",
+      "DEV_AUTH_DATA_PLANE_DEPENDENCY_START_FAILED",
+      "DEV_TLS_PORT_PROBE_TIMEOUT"
+    ].join(":"));
+  });
+
+  it("control — the four-level walk still stops at four, and non-code links still fall away", () => {
+    expect(developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_API_FAILED", {
+      cause: new Error("not a code at all", {
+        cause: new Error("DEV_API_PROCESS_START_FAILED", {
+          cause: new Error("DEV_API_PROCESS_PROBE_TIMEOUT", {
+            cause: new Error("DEV_UI_PROCESS_EXITED")
+          })
+        })
+      })
+    }))).toBe("DEV_AUTH_STACK_API_FAILED:DEV_API_PROCESS_START_FAILED:DEV_API_PROCESS_PROBE_TIMEOUT");
+  });
+
+  it("control — a chain with no DEV-shaped message keeps the historical fallback", () => {
+    expect(developmentAuthStackErrorCode(new Error("plain failure", {
+      cause: new Error("another plain failure")
+    }))).toBe("DEV_AUTH_STACK_FAILED");
+    expect(developmentAuthStackErrorCode("not an error at all")).toBe("DEV_AUTH_STACK_FAILED");
+  });
+
   it("starts the exact attested chain and stops owned resources once in reverse order", async () => {
     const runtime = operations();
     const stack = await startDevelopmentAuthStack(runtime);

@@ -221,6 +221,91 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
   });
 }
 
+/**
+ * F-DIAG-S04-PANEL-NOTE — the bounded alphabet a panel note's `reason` is drawn from.
+ *
+ * The note is not a debug string. `apps/runner/src/index.ts:2695-2699` copies
+ * `reason` verbatim into `disagreement.panel.notes[]`, which is persisted and
+ * read back off a database row (`tests/integration/database.test.ts:3845`). The
+ * previous form forwarded `error.message` from the member's catch, so any text a
+ * provider, a driver or a parser put in a message reached storage — the same
+ * class as F-RISK-IDENTITY-LOG.
+ *
+ * What is bounded here is the OUTPUT ALPHABET, following the landed pattern in
+ * `apps/api/src/risk-signal-identity.ts`: every string this can return is either
+ * a member of the closed `PANEL_MEMBER_FAILURE_KINDS` list below or a literal
+ * declared right here. Nothing is derived from the caught value — no substring,
+ * no regex capture, no case transform. The caught value is only ever a LOOKUP
+ * KEY, and a key that misses becomes the fallback.
+ *
+ * Why the map is this small. `runJudgePanel` takes a caller-supplied
+ * `judge: () => Promise<...>`, so the type of what the catch receives is open
+ * (`unknown`), and the router's shape rule for an open key set is to redact
+ * wholesale rather than to enumerate. The one TYPED producer on the path is
+ * `PanelMemberFailure` (`packages/judgement/src/index.ts:499,505,510,513,514`),
+ * and its kind becomes the reason — but only after a RUNTIME membership check
+ * against a vocabulary this module OWNS.
+ * `instanceof` establishes ancestry, not membership: `PanelMemberFailureKind` is
+ * a compile-time union and `readonly` is erased, so a subclass or a mutated
+ * instance can carry any string in `failureKind` (codex r1 F1).
+ * And the membership store must not be the EXPORTED array: `PANEL_MEMBER_FAILURE_KINDS`
+ * is exported and never frozen — `as const` is a type-level assertion and
+ * `readonly string[]` aliases rather than copies — so checking through it closes the
+ * alphabet over that array's CURRENT CONTENTS, and a caller who pushes into the export
+ * widens the reason alphabet (codex r1b F1 remainder). `CANONICAL_MEMBER_FAILURE_KINDS`
+ * below is this helper's own copy, built from its own object literal, unreachable from
+ * any exported binding. The seven public spellings are unchanged, and drift between the
+ * two is a COMPILE error rather than a silent divergence: the literal carries
+ * `satisfies Record<PanelMemberFailureKind, 0>`, which errors in BOTH directions —
+ * TS2741 when a kind is missing, TS2353 when one is not in the union. (Measured on
+ * this repo's tsc 7.0.2; a plain `as` assertion silences the missing-key error and
+ * would NOT have given this guarantee.) The two codes below are the only other constants with a producer that
+ * can reach this catch un-converted: `ProviderCallFailedError` and
+ * `ProviderContentUnacceptedError` (`packages/providers/src/index.ts:53,69`),
+ * both `TypedDomainError`s whose `code` is a fixed literal. `assess()` converts
+ * both today, so they are listed for a caller that wires a judge closure
+ * straight to `provider.call` — enumerating a subset of a typed vocabulary is
+ * how a re-routed rejection silently degrades to the fallback.
+ */
+const UNCLASSIFIED_MEMBER_ERROR = "UNCLASSIFIED_MEMBER_ERROR";
+
+/**
+ * This helper's PRIVATE membership storage. Exhaustive against the declared union in
+ * both directions at compile time; independent of the exported array at runtime.
+ */
+const CANONICAL_MEMBER_FAILURE_KINDS: ReadonlySet<string> = new Set(Object.keys({
+  CONSTRUCTION_ERROR: 0,
+  TIMEOUT: 0,
+  PROVIDER_ERROR: 0,
+  PARSE_FAILURE: 0,
+  SCHEMA_FAILURE: 0,
+  UNCONFIGURED_FAMILY: 0,
+  PRODUCER_GRADING_FORBIDDEN: 0
+} satisfies Record<PanelMemberFailureKind, 0>));
+
+const MEMBER_FAILURE_CODES: ReadonlyMap<string, string> = new Map([
+  ["PROVIDER_CALL_FAILED", "PROVIDER_CALL_FAILED"],
+  ["PROVIDER_CONTENT_UNACCEPTED", "PROVIDER_CONTENT_UNACCEPTED"]
+]);
+
+function boundedMemberFailureReason(error: unknown): string {
+  if (error instanceof PanelMemberFailure) {
+    // ONE read. A getter or a mutated property that answers differently on a
+    // second read would defeat a check performed on a different read, so the
+    // value that is validated is the value that is returned — never a re-read.
+    const failureKind: unknown = error.failureKind;
+    return typeof failureKind === "string" && CANONICAL_MEMBER_FAILURE_KINDS.has(failureKind)
+      ? failureKind
+      : UNCLASSIFIED_MEMBER_ERROR;
+  }
+  if (!(error instanceof Error)) return UNCLASSIFIED_MEMBER_ERROR;
+  // Same discipline: `code` is read once, and the value RETURNED is this
+  // module's own map literal, never the string that was read.
+  const code: unknown = (error as { readonly code?: unknown }).code;
+  if (typeof code !== "string") return UNCLASSIFIED_MEMBER_ERROR;
+  return MEMBER_FAILURE_CODES.get(code) ?? UNCLASSIFIED_MEMBER_ERROR;
+}
+
 export async function runJudgePanel(input: {
   readonly artifactProducerRef: string;
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
@@ -242,7 +327,7 @@ export async function runJudgePanel(input: {
         contractHash: member.contractHash,
         kind: "MEMBER_FAILED",
         failureKind: error instanceof PanelMemberFailure ? error.failureKind : "PROVIDER_ERROR",
-        reason: error instanceof Error ? error.message : String(error)
+        reason: boundedMemberFailureReason(error)
       });
     }
   }
