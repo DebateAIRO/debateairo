@@ -1904,3 +1904,7 @@ that silently reports nothing while looking like it reported something. (W3 r4)
 `head -n -12 file` fails with `head: illegal line count -- -12` rather than trimming the tail.
 GNU head supports the negative form; the macOS one does not. Use `sed '$d'` repeatedly, awk with
 a line count, or just regenerate the file from its source rather than trimming it. (W3 r4)
+
+## zsh has no `$PIPESTATUS` — a logged `exit=` with an empty value is this trap, not a missing exit (orchestrator, 2026-09-07)
+
+`cmd | tail -3; echo "exit=${PIPESTATUS[0]}"` prints `exit=` under zsh (the array is `$pipestatus`, lowercase, in zsh; `PIPESTATUS` is bash). A provisioning log written this way showed `exit=` for both steps, and a worker packet that gated on "`exit=0` for both steps" became unpassable on a healthy lane (the seat read it literally and charged the packet). Either run the command unpiped and read `$?`, or use `${pipestatus[1]}` (zsh is 1-indexed) — and never gate a seat on a value you have not seen in the file.
