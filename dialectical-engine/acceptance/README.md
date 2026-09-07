@@ -74,11 +74,25 @@ actually ran. Call sites name their leg, round, and parent index
 The synthetic question remains neutral and outside the graph. Each maker also
 authors one cross-root response, represented by a support edge to its own root
 and an attack edge to the other root, with magnitude `UNKNOWN`. Serve remains
-the ruled single-primary-root B2-A shape. DR-161 makes that choice explicit as
-`first-configured-provider`: the selected root and rule travel on the required
-`UNSERVED-MAKER-POSITION` record, which names both makers and both root ids.
+the ruled single-primary-root B2-A shape, but T10 (goal 188-195, rulings
+S6-1/S6-3) repeals DR-161's provider-order choice: **the served root is the one
+carrying the maximum PROPAGATED strength** among the servable maker roots, so
+reordering the configured providers cannot change which answer is served. An
+exact strength tie is broken by lexicographic node id compared on code units
+(never locale collation, which would move with the host). The selected root and
+the rule travel on the required `UNSERVED-MAKER-POSITION` record — which names
+both makers and both root ids — under the recorded rule
+`max-propagated-strength-lexicographic-tiebreak`; the margin to the runner-up is
+recorded on the propagation receipt
+(`ledger.propagation_run.served_root_selection`).
 The other root remains graph-visible but is not composed into the served
-answer. Every node is still judged, recorded, and propagated. Each child carries its own stranger restatement, reduced judgement,
+answer.
+
+**Diagnosing a two-maker ceremony:** do NOT expect the first configured provider
+to win. Read the served root off the recorded per-node strengths, or off that
+receipt. Answers sealed before migration 0055 keep the retired
+`first-configured-provider` value on their own records — preserved history, not
+a live rule, and never relabelled. Every node is still judged, recorded, and propagated. Each child carries its own stranger restatement, reduced judgement,
 and per-node strength record citing its own artifact. Edge magnitude remains
 honestly `UNKNOWN` where no evidence verifier measured it. Classification uses
 the debate's one claim frame (the run question), not a child position's wording.

@@ -19,8 +19,18 @@ describe("DR-181 computed structural tripwire", () => {
         const exchange = buildCrossRootExchangePlan(panelSize);
         const authored = panelSize + expansion.length + exchange.length;
         const reviews = panelSize === 1 ? 0 : authored;
-        const fixedSites = 2 * RUNNER_FIXED_ORGANS_PER_COMPOSITION;
-        const independentWorstCase = (authored + reviews) * (3 + 1) + fixedSites * 3;
+        // T17: the panel leg — (M-1) non-author assessments at EVERY authored
+        // node — and the cooldown site's two provider sequences.
+        const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
+        // Cumulative per call-site key: sequence 2 only gets the final retry.
+        const cooldownSite = 3 + 1;
+        // Walked, not multiplied: composer + one conformance per segment per
+        // recompose round, then ONE post-compose organ after the loop.
+        const compositionSites = RUNNER_MAX_RECOMPOSE * (1 + RUNNER_COMPOSITION_SEGMENT_CAP) + 1;
+        const fixedSites = Math.max(compositionSites, 3 + 3);
+        const independentWorstCase = (authored + reviews) * cooldownSite
+          + panelCalls * 3
+          + fixedSites * 3;
         const basis = computeStructuralCeilingBasis({
           panelSize,
           depth,
@@ -31,7 +41,11 @@ describe("DR-181 computed structural tripwire", () => {
           finalRetryAttempts: 1,
           branchingFactor: RUNNER_BRANCHING_FACTOR,
           compositionSegmentCap: RUNNER_COMPOSITION_SEGMENT_CAP,
-          fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION
+          fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION,
+          reviewerCallsPerNode: 1,
+          synthesizerMaxRounds: 3,
+          evaluatorMaxRounds: 3,
+          maxDepth: 5
         });
         expect(basis.max_model_attempts).toBeGreaterThanOrEqual(independentWorstCase);
         expect(basis.max_model_attempts).toBeGreaterThanOrEqual(2 * authored);

@@ -469,14 +469,11 @@ export class ValuationRepository {
       operator_level: NodeStrengthRecord["operatorLevel"];
       position_label: string | null;
       lift_marker: unknown;
-      rival_operator: NodeStrengthRecord["rivalOperator"];
-      rival_strength: number | null;
     }>(`
       SELECT strength.node_id, strength.strength, strength.tau_source,
              strength.way_of_knowing, strength.judged_by, strength.abstained,
              strength.supported_by, strength.attacked_by, strength.operator_used,
-             strength.operator_level, strength.position_label, strength.lift_marker,
-             strength.rival_operator, strength.rival_strength
+             strength.operator_level, strength.position_label, strength.lift_marker
       FROM ledger.node_strength_record AS strength
       JOIN core.node AS node ON node.node_id = strength.node_id
       WHERE strength.propagation_run_id=$1 ORDER BY node.created_at_seq
@@ -497,9 +494,7 @@ export class ValuationRepository {
         operatorUsed: strength.operator_used,
         operatorLevel: strength.operator_level,
         positionLabel: strength.position_label,
-        liftMarker: Object.freeze(strength.lift_marker as NodeStrengthRecord["liftMarker"]),
-        rivalOperator: strength.rival_operator,
-        rivalStrength: strength.rival_strength === null ? null : Number(strength.rival_strength)
+        liftMarker: Object.freeze(strength.lift_marker as NodeStrengthRecord["liftMarker"])
       });
     });
     return Object.freeze({

@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError } from "@debateai/kernel";
-import type { Pool } from "pg";
+// UNION of both lanes: S06 needs the served-root rule vocabularies and the
+// retired-rule predicate; T6 needs PoolClient for its writer-resolved FK path.
+import type { ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
+import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
@@ -23,6 +25,50 @@ import {
   type MemoryDisclosure,
   type MemoryPullPolicy
 } from "@debateai/memory";
+import {
+  DIGEST_CANNOT_EXIST_MARK,
+  PROTECTED_CORE_GUARD_RETIRED_MARK,
+  DIGEST_COMPRESSED_MARK,
+  SYNTHESIS_OBJECTION_STANDING_MARK,
+  buildSynthesisDigest,
+  runSynthesisLoop,
+  synthesisCallSiteKey,
+  type DigestSourceNode,
+  type SynthesisCodeLabel,
+  type SynthesisDigest,
+  type SynthesisLoopRound,
+  type SynthesisLoopControls,
+  type SynthesisLoopOutcome,
+  type EvaluatorRequest,
+  type EvaluatedCandidate,
+  type EvaluatorVerdict,
+  type SynthesizedCandidate,
+  type SynthesizerRequest
+} from "./synthesis.js";
+
+// T9's digest, roles and loop live in `./synthesis.ts`; the package publishes a
+// single entry point, so they are re-exported here.
+export * from "./synthesis.js";
+
+/**
+ * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
+ *
+ * SOURCE OF TRUTH: the ledger's own CHECK,
+ * `migrations/0019_xrev01_node_review.sql:8`, which admits
+ * `agree | dispute | cannot-assess` and which no round of T6 has changed.
+ * `agree` and `dispute` are ordinary, LIVE states of a normally judged node.
+ *
+ * Named and exported so the invariant has somewhere to be asserted, because
+ * this column and `serve.condition_mark.review_outcome` are HOMONYMS: they
+ * share the words "review" and "outcome" and mean different things. The
+ * condition-mark column holds the single outcome that can be a REASON A NODE
+ * IS UNJUDGED, and J14's addendum narrowed it to `cannot-assess`. This one
+ * holds what a reviewer actually said. r3 retyped this column as if it were
+ * that one — the trap the do-not-tidy guard exists for — so the two now differ
+ * by name and not only by literal, and `tests/unit/t06-review-teeth.test.ts`
+ * pins that exactly one narrowed review-outcome read exists in this file.
+ */
+export type StoredNodeReviewOutcome = "agree" | "dispute" | "cannot-assess";
 
 export interface ServeNode {
   readonly nodeId: string;
@@ -81,10 +127,26 @@ export interface CompositionBudgetResolution {
 export interface ServeGateInput {
   readonly nodes: readonly ServeNode[];
   factBundle: FactBundle;
-  readonly maxRecompose: number;
+  /**
+   * T9 retired `maxRecompose` from this input. DR-049's `max_recompose = 2`
+   * bounded COMPOSITION RETRIES, and composition retries are gone: the loop's
+   * bound is `synthesisRoleControls.evaluatorLoopMaxRounds`, a sealed T16 row
+   * (goal 39-40 — no code constant may stand in for a register value). The
+   * runner setting itself is untouched; T17's envelope formula still reads it.
+   */
   readonly compositionBudget: CompositionBudgetResolution;
-  readonly strangerSampleRate: number;
   readonly candidateConfidenceBand: string;
+  /**
+   * T9 — every materialized node, for the digest. Membership here is
+   * membership in the digest: the byte budget shortens summaries, never this
+   * list. The served root must be a member.
+   */
+  readonly digestNodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+  /** T10/T11's numbers, computed BEFORE synthesis and handed to both roles. */
+  readonly codeLabel: SynthesisCodeLabel;
+  /** T16's sealed synthesis-role rows. Never a code constant (J8). */
+  readonly synthesisRoleControls: SynthesisLoopControls;
 }
 
 export interface ConformanceJudgement {
@@ -212,8 +274,33 @@ export interface BandCeilingRegisterRow {
       readonly ceilingBand: string;
       readonly liftPath: string;
     }[];
+    /**
+     * F-T9B-3: the entry describing NO VERIFIED EVIDENCE. Its trigger is the
+     * empty basis itself, which is why it sits beside `cuts` instead of in it:
+     * every `cuts` entry is selected by a SHARE threshold, and on an empty basis
+     * no share exists to threshold.
+     *
+     * REQUIRED (codex r2, closing F-SEALEDROWS-D). It was optional for one
+     * round, justified by a read-only fixture that could not be updated — which
+     * was a fact about a contract, not about what a sealed row means. It was
+     * then briefly a required STRUCTURAL SUBTYPE used by the two deployment
+     * readers, which codex correctly judged not to be versioning: with no
+     * discriminator and no historical adapter, the base type could still
+     * describe an incomplete row, and the live runner and `deriveBandCeiling`
+     * both still accepted it. A row that cannot describe its own floor is now
+     * unconstructible, so the refusal happens at the compiler, at the strict
+     * schemas on read, AND at derivation. Tests that need an incomplete row
+     * build one through `unknown`, which is the only caller that shape can now
+     * come from.
+     */
+    readonly emptyBasisFloor: {
+      readonly label: string;
+      readonly ceilingBand: string;
+      readonly liftPath: string;
+    };
   };
 }
+
 
 const WAYS_OF_KNOWING = ["LOOKED_UP", "RAN", "REASONING"] as const;
 
@@ -242,7 +329,95 @@ export function deriveBandCeiling(input: {
     if (!Number.isInteger(count) || count < 0) throw new TypedDomainError("BAND_CEILING_BASIS_INVALID", way);
     return sum + count;
   }, 0);
-  if (total === 0) throw new TypedDomainError("BAND_CEILING_BASIS_EMPTY", "No load-bearing node contributes to the ceiling");
+  if (total === 0) {
+    /**
+     * NO VERIFIED EVIDENCE -> THE ROW'S FLOOR BAND (V ruling 2026-09-03).
+     *
+     * Reached when the served statement's cited set is empty because the
+     * evaluator's citation-tracing criterion failed. V ruled a consumer must see
+     * a VALUE rather than an absence: the floor is the band you are entitled to
+     * on no verified evidence.
+     *
+     * THE RECORD MUST NAME THE DECISION THAT PRODUCED THE BAND (codex r3). A
+     * first pass took the band from `bandOrder[0]` but copied `defaultCeiling`'s
+     * label and lift path, which on the shipped row describe a DIFFERENT
+     * decision — `DEFAULT_CEILING`, band `FULL`, lift `retain-band` — so a
+     * floored answer carried a record claiming its band had been retained. It
+     * had not: it went from the candidate down to the floor.
+     *
+     * So the entry is SELECTED from the row by the band it actually names, cuts
+     * first and `defaultCeiling` last, and the record is built from THAT entry.
+     * ROW MEMBERSHIP IS ENFORCED ON THIS ROUTE, both halves. The label is
+     * checked against `ceilingLabels` explicitly, as the ordinary derivation
+     * does; skipping it here alone would accept an inconsistent sealed row that
+     * every other route rejects, since the deployment schema checks only that
+     * these strings are non-empty. The band half needs no separate check and
+     * deliberately has none: the entry is SELECTED by `ceilingBand === bandOrder[0]`,
+     * so its membership in `bandOrder` is a property of how it was found. An
+     * `includes` call after that could never fail, and a check that cannot fail
+     * for the reason it exists is not a check (D56).
+     *
+     * FAILS CLOSED. A row with no entry naming its own floor band cannot
+     * describe this decision, and this refuses rather than inventing a label.
+     *
+     * F-T9B-3 IS NOW CLOSED, and this is what changed. The entry is no longer
+     * SELECTED by scanning `cuts` then `defaultCeiling` for one whose band
+     * happens to equal the floor. On the shipped row the only such entry was
+     * `REASONING_CEILING`, whose band and lift path were both right for this
+     * case but whose NAME describes a REASONING-SHARE trigger that CANNOT have
+     * fired here — the basis is empty, so no share of anything reached the
+     * sealed minimum. (The threshold itself is deliberately not quoted here:
+     * the T16 grep-proof treats a sealed value on this surface as a hardcode
+     * even inside a comment, and it is right to — a number repeated in prose
+     * goes stale exactly as silently as one repeated in code.) The record named
+     * a cause that did not occur. Because every entry carries ONE label serving
+     * as both trigger and outcome, no selection over the existing entries could
+     * be truthful, so the row now carries `emptyBasisFloor`, an entry whose
+     * TRIGGER IS THE EMPTY BASIS ITSELF.
+     *
+     * BOTH HALVES OF THE ROW ARE STILL VALIDATED, and the band half is now a
+     * REAL check rather than one that cannot fail. Previously the entry was
+     * found BY `ceilingBand === bandOrder[0]`, so re-checking it afterwards
+     * could never fail and was correctly omitted (D56). The entry is now named
+     * rather than found, so nothing guarantees its band — and a sealed row
+     * whose empty-basis entry points somewhere other than the floor is exactly
+     * the inconsistency `devRunnerPolicySchema` cannot catch, since it checks
+     * only that these strings are non-empty. So it is checked here.
+     *
+     * STILL FAILS CLOSED. A row that describes no floor cannot describe this
+     * decision, and this refuses rather than inventing a label.
+     */
+    const floorBand = bandOrder[0]!;
+    const floorEntry = input.row.value.emptyBasisFloor;
+    if (floorEntry === undefined) {
+      throw new TypedDomainError(
+        "BAND_CEILING_FLOOR_UNDESCRIBED",
+        `The row carries no empty-basis floor entry, so a basis of no verified evidence cannot be described`
+      );
+    }
+    if (floorEntry.ceilingBand !== floorBand) {
+      throw new TypedDomainError(
+        "BAND_CEILING_FLOOR_BAND_INVALID",
+        `The empty-basis entry names ${floorEntry.ceilingBand}, which is not the floor band ${floorBand}`
+      );
+    }
+    const floorLabel = requiredText(floorEntry.label, "BAND_CEILING_LABEL_INVALID");
+    if (!labels.includes(floorLabel)) throw new TypedDomainError("BAND_CEILING_LABEL_UNKNOWN", floorLabel);
+    return Object.freeze({
+      // Follows validateBandCeilingDecision's invariant rather than asserting a
+      // kind: a candidate already at the floor is NOT_CAPPED and stays there.
+      kind: floorBand === input.candidateConfidenceBand ? "NOT_CAPPED" as const : "CAPPED" as const,
+      confidenceBand: floorBand,
+      ceiling: Object.freeze({
+        label: floorLabel,
+        basis: input.basis,
+        registerRowKey: input.row.rowKey,
+        registerVersion: input.row.registerVersion,
+        sourceRef: input.row.sourceRef,
+        liftPath: requiredText(floorEntry.liftPath, "BAND_CEILING_LIFT_PATH_INVALID")
+      })
+    });
+  }
 
   const selected = input.row.value.cuts.find((cut) => {
     const entries = Object.entries(cut.minimumShares) as Array<[WayOfKnowing, number]>;
@@ -294,45 +469,116 @@ function validateBandCeilingDecision(
 }
 
 export interface ServeGateDependencies {
-  readonly measureCompositionBundle: (facts: FactBundle) => number;
-  readonly compose: (facts: FactBundle, attempt: number) => Promise<readonly ComposedSegment[]>;
-  readonly selectSample: (segment: ComposedSegment, sampleRate: number) => boolean;
-  readonly conform: (
-    segment: ComposedSegment,
-    state: "JUDGED" | "SAMPLED_PASSED"
-  ) => Promise<ConformanceJudgement>;
-  readonly postComposeR9: (segments: readonly ComposedSegment[]) => Promise<boolean>;
+  /**
+   * T9: the SYNTHESIZER role call. It receives the recorded request — digest,
+   * code label/numbers and, on a retry, the prior objection verbatim — and
+   * returns the candidate as composed segments. It replaces `compose`, whose
+   * fact-bundle argument carried no digest and could not distinguish a retry.
+   */
+  readonly synthesize: (
+    request: SynthesizerRequest
+  ) => Promise<SynthesizedCandidate<readonly ComposedSegment[]>>;
+  /**
+   * T9: the EVALUATOR role call. It replaces BOTH retired provider limbs —
+   * per-segment conformance and post-compose R9 — because both are now
+   * evaluator objection criteria rather than terminals.
+   */
+  readonly evaluate: (request: EvaluatorRequest) => Promise<EvaluatedCandidate>;
   readonly applyBandCeiling: (input: {
     readonly basis: Readonly<Record<WayOfKnowing, number>>;
     readonly candidateConfidenceBand: string;
   }) => BandCeilingDecision;
 }
 
-export type GateTrace =
-  | "GATE1_R9_PASS"
-  | "GATE1_R9_BLOCK"
-  | "GATE2_Q53_PASS_VACUOUS"
-  | "GATE2_Q53_BLOCK"
-  | "COMPOSITION_BUDGET_PASS"
-  | "COMPOSITION_BUDGET_EXCEEDED"
+/**
+ * T9 — the gate-trace vocabulary a FRESH serve may write.
+ *
+ * The five former COMPONENTS_ONLY quality gates are gone: R9 (pre- and
+ * post-compose), residual-objections-empty, the composition byte budget, the
+ * conformance limb and the Q51 locator block. Their tokens survive only in
+ * `RETIRED_GATE_TRACE` below, which is a READ vocabulary — the same shape J17
+ * ruled lawful for `served_root_rule`: the kernel declares the history, the
+ * reader accepts it, and no fresh selection may write it. `runServeGateChain`
+ * builds a `LiveGateTrace[]`, so the compiler is what enforces that.
+ */
+export type LiveGateTrace =
+  | "DIGEST_BUILT"
+  | "DIGEST_COMPRESSED"
+  | "DIGEST_CANNOT_EXIST"
+  | "SYNTHESIS_LOOP_SATISFIED"
+  | "SYNTHESIS_LOOP_EXHAUSTED"
+  | "SYNTHESIS_OBJECTION_STANDING"
   | "COMPOSED"
-  | "GATE3_CONFORMANCE_PASS_EXHAUSTIVE"
-  | "GATE3_CONFORMANCE_PASS_SAMPLED"
-  | "GATE3_CONFORMANCE_FAIL"
   | "RECOMPOSED_ONCE"
   | "GATE4_Q51_PASS"
-  | "GATE4_Q51_LOCATOR_BLOCK"
   | "GATE4_Q51_DOWNGRADE"
-  | "POST_COMPOSE_R9_PASS"
-  | "POST_COMPOSE_R9_FAIL"
   | "BAND_CEILING_PASS"
   | "BAND_CEILING_CAPPED"
   | "ENVELOPE_ENRICHMENT_SKIPPED"
   | "PROTECTED_CORE_REFUSED_SKIP"
+  | "PROTECTED_CORE_GUARD_RETIRED"
   | "ENVELOPE_EXHAUSTED"
   | "COMPONENTS_ONLY_ENVELOPE"
+  | "COMPONENTS_ONLY_DIGEST"
   | "COMPONENTS_ONLY_DEFECT"
   | "SERVE";
+
+/**
+ * Retired by T9 (goal 248-266). Readable — sealed answers from before the
+ * synthesis chain carry these in `serve-gate:` reason refs — never writable.
+ */
+export const RETIRED_GATE_TRACE = Object.freeze([
+  "GATE1_R9_PASS",
+  "GATE1_R9_BLOCK",
+  "GATE2_Q53_PASS_VACUOUS",
+  "GATE2_Q53_BLOCK",
+  "COMPOSITION_BUDGET_PASS",
+  "COMPOSITION_BUDGET_EXCEEDED",
+  "GATE3_CONFORMANCE_PASS_EXHAUSTIVE",
+  "GATE3_CONFORMANCE_PASS_SAMPLED",
+  "GATE3_CONFORMANCE_FAIL",
+  "GATE4_Q51_LOCATOR_BLOCK",
+  "POST_COMPOSE_R9_PASS",
+  "POST_COMPOSE_R9_FAIL"
+] as const);
+export type RetiredGateTrace = typeof RETIRED_GATE_TRACE[number];
+
+/** True for a token a fresh serve may READ but never WRITE. */
+export function isRetiredGateTrace(value: string): value is RetiredGateTrace {
+  return (RETIRED_GATE_TRACE as readonly string[]).includes(value);
+}
+
+/** The READ union: live tokens plus the retired history. */
+export type GateTrace = LiveGateTrace | RetiredGateTrace;
+
+/**
+ * T9 — the ONLY reasons a COMPONENTS_ONLY terminal may exist (goal 263-266).
+ * Every entry names its terminal, its trace token and its condition mark, so
+ * "terminal + mark named per path" is a table a stranger can read, not a claim.
+ */
+export const SERVE_CRASH_CLASSES = Object.freeze({
+  TRANSPORT_DEATH: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_DEFECT" as const,
+    conditionMark: "DEFECT" as const
+  }),
+  NO_ARTIFACT: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_DEFECT" as const,
+    conditionMark: "DEFECT" as const
+  }),
+  DIGEST_CANNOT_EXIST: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_DIGEST" as const,
+    conditionMark: DIGEST_CANNOT_EXIST_MARK
+  }),
+  ENVELOPE_EXHAUSTED: Object.freeze({
+    terminal: "COMPONENTS_ONLY" as const,
+    gateTrace: "COMPONENTS_ONLY_ENVELOPE" as const,
+    conditionMark: "ENVELOPE_EXHAUSTED" as const
+  })
+});
+export type ServeCrashClass = keyof typeof SERVE_CRASH_CLASSES;
 
 export type AnswerForm =
   | { readonly kind: "VERDICT"; readonly text: string }
@@ -354,6 +600,14 @@ export interface ServeGateResult {
   readonly compositionBudget: CompositionBudgetResolution;
   readonly confidenceBand: string | null;
   readonly bandCeiling: BandCeiling | null;
+  /** T9: the digest handed to both roles, or null on a pre-digest crash. */
+  readonly digest: SynthesisDigest | null;
+  /** T9: one record per evaluator loop round, in order. Empty on a crash class. */
+  readonly loopRounds: readonly SynthesisLoopRound[];
+  /** T9: the objection still standing when the loop ended, or null. */
+  readonly standingObjection: string | null;
+  /** T9: the crash class, when and only when the terminal is COMPONENTS_ONLY. */
+  readonly crashClass: ServeCrashClass | null;
   readonly projections: {
     readonly reversalPoint: string;
     readonly buildsOnPrevious: FactBundle["buildsOnPrevious"];
@@ -367,18 +621,39 @@ export function compositionEvidenceRequired(
   return !(result.terminal === "COMPONENTS_ONLY" && result.coverageMode === "NOT_RUN");
 }
 
+/**
+ * The ENVELOPE_EXHAUSTED crash class — a RESOURCE death, not a quality
+ * judgement (goal 263-266). T17 owns keeping the ceiling big enough; T9 owns
+ * what happens when it is hit anyway.
+ *
+ * F4 / goal 248-251: the `protectedCoreVerified` guard that used to throw here
+ * was keyed on R9's GATE-HOOD, and R9 is no longer a gate — it is an evaluator
+ * objection criterion. The guard is therefore KNOWINGLY RETIRED with it: an
+ * exhausted envelope with no served statement takes this terminal even when
+ * restatement failed, and never serves over budget. The restatement status is
+ * still OBSERVED and DISCLOSED — it rides the trace as
+ * `PROTECTED_CORE_GUARD_RETIRED` — it simply no longer decides.
+ *
+ * `PROTECTED_CORE_REFUSED_SKIP` stays and means what it always meant: the
+ * protected-core battery rows refuse to be SKIPPED BY BUDGET. That is a
+ * different proposition from R9's gate-hood and T9 does not touch it.
+ */
 export function createEnvelopeExhaustedResult(input: {
   readonly factBundle: FactBundle;
   readonly compositionBudget: CompositionBudgetResolution;
   readonly verifiedNodeIds: readonly string[];
   readonly skippedEnrichmentRows: readonly string[];
-  readonly protectedCoreVerified: boolean;
+  readonly protectedCoreRestatement: ServeNode["restatementStatus"];
+  readonly servedStatementExists: boolean;
 }): ServeGateResult {
   if (input.verifiedNodeIds.length === 0) {
     throw new TypedDomainError("ENVELOPE_VERIFIED_NODE_SET_EMPTY", "Envelope hard stop requires inspected verified nodes");
   }
-  if (!input.protectedCoreVerified) {
-    throw new TypedDomainError("PROTECTED_CORE_NOT_VERIFIED", "R9 must pass; it cannot be skipped by the envelope");
+  if (input.servedStatementExists) {
+    throw new TypedDomainError(
+      "ENVELOPE_TERMINAL_OVER_SERVED_STATEMENT",
+      "The envelope terminal replaces an UNSERVED statement; a served answer is never retracted into components-only"
+    );
   }
   if (input.factBundle.conditionMarks.includes("DEFECT")) {
     throw new TypedDomainError("INDEPENDENT_BUDGET_MARKS_CONFLATED", "DEFECT and ENVELOPE_EXHAUSTED are independent terminals");
@@ -388,11 +663,21 @@ export function createEnvelopeExhaustedResult(input: {
     conditionMarks.push("SKIPPED-BY-BUDGET");
   }
   if (!conditionMarks.includes("ENVELOPE_EXHAUSTED")) conditionMarks.push("ENVELOPE_EXHAUSTED");
-  const gateTrace: GateTrace[] = [];
+  // J25: the gate trace does not survive to a reader — persistence keeps only
+  // its LAST token in `verdict_unavailable.reason_ref`. So the retired guard's
+  // disclosure is a MARK, which persists on the answer and both label switches
+  // render. The trace token stays as well, for a reader of the whole path.
+  const guardRetired = input.protectedCoreRestatement !== "PASS";
+  if (guardRetired && !conditionMarks.includes(PROTECTED_CORE_GUARD_RETIRED_MARK)) {
+    conditionMarks.push(PROTECTED_CORE_GUARD_RETIRED_MARK);
+  }
+  const gateTrace: LiveGateTrace[] = [];
   if (input.skippedEnrichmentRows.length > 0) gateTrace.push("ENVELOPE_ENRICHMENT_SKIPPED");
-  gateTrace.push("PROTECTED_CORE_REFUSED_SKIP", "ENVELOPE_EXHAUSTED", "COMPONENTS_ONLY_ENVELOPE");
+  gateTrace.push("PROTECTED_CORE_REFUSED_SKIP");
+  if (guardRetired) gateTrace.push("PROTECTED_CORE_GUARD_RETIRED");
+  gateTrace.push("ENVELOPE_EXHAUSTED", SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.gateTrace);
   return Object.freeze({
-    terminal: "COMPONENTS_ONLY",
+    terminal: SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal,
     answerForm: null,
     factBundle: input.factBundle,
     gateTrace: Object.freeze(gateTrace),
@@ -403,6 +688,10 @@ export function createEnvelopeExhaustedResult(input: {
     compositionBudget: input.compositionBudget,
     confidenceBand: null,
     bandCeiling: null,
+    digest: null,
+    loopRounds: Object.freeze([]),
+    standingObjection: null,
+    crashClass: "ENVELOPE_EXHAUSTED",
     projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
       buildsOnPrevious: input.factBundle.buildsOnPrevious,
@@ -411,126 +700,301 @@ export function createEnvelopeExhaustedResult(input: {
   });
 }
 
+/**
+ * The COMPONENTS_ONLY constructor. It takes a CRASH CLASS, not a trace: after
+ * T9 there is no other way to reach this terminal, so the enumerated set is
+ * the only thing that can name it (goal 263-266, DoD "no non-crash path
+ * returns COMPONENTS_ONLY").
+ */
 function componentsOnly(
   input: ServeGateInput,
-  gateTrace: readonly GateTrace[],
-  segments: readonly ComposedSegment[],
-  conformance: readonly ConformanceJudgement[],
-  coverageMode: ServeGateResult["coverageMode"]
+  crashClass: Exclude<ServeCrashClass, "ENVELOPE_EXHAUSTED">,
+  trace: readonly LiveGateTrace[],
+  digest: SynthesisDigest | null
 ): ServeGateResult {
-  return {
-    terminal: "COMPONENTS_ONLY",
+  const wiring = SERVE_CRASH_CLASSES[crashClass];
+  return Object.freeze({
+    terminal: wiring.terminal,
     answerForm: null,
     factBundle: input.factBundle,
-    gateTrace,
-    conditionMarks: input.factBundle.conditionMarks.includes("DEFECT")
-      ? input.factBundle.conditionMarks
-      : [...input.factBundle.conditionMarks, "DEFECT"],
-    conformance,
-    coverageMode,
-    segments,
+    gateTrace: Object.freeze([...trace, wiring.gateTrace]),
+    conditionMarks: Object.freeze(input.factBundle.conditionMarks.includes(wiring.conditionMark)
+      ? [...input.factBundle.conditionMarks]
+      : [...input.factBundle.conditionMarks, wiring.conditionMark]),
+    conformance: Object.freeze([]),
+    coverageMode: "NOT_RUN",
+    segments: Object.freeze([]),
     compositionBudget: input.compositionBudget,
     confidenceBand: null,
     bandCeiling: null,
-    projections: {
+    digest,
+    loopRounds: Object.freeze([]),
+    standingObjection: null,
+    crashClass,
+    projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
       buildsOnPrevious: input.factBundle.buildsOnPrevious,
       memoryDisclosure: input.factBundle.memoryDisclosure
-    }
-  };
+    })
+  });
 }
 
+/**
+ * T9 — the SYNTHESIS serve chain (goal-v4 222-270).
+ *
+ * What this used to be: five quality gates, each of which could end the run in
+ * COMPONENTS_ONLY with a DEFECT mark — pre-compose R9, residual-objections-
+ * empty, the composition byte budget, conformance, the Q51 locator block and
+ * post-compose R9. What it is now: a digest, a synthesizer/evaluator loop, and
+ * a serve. Their disposition, one by one (goal 248-262):
+ *
+ * - pre-compose R9 restatement → an EVALUATOR objection criterion. Its
+ *   companion, the envelope terminal's `protectedCoreVerified` guard, was
+ *   keyed on R9's gate-hood and is KNOWINGLY RETIRED with it (F4;
+ *   `createEnvelopeExhaustedResult` above).
+ * - residual-objections-empty → DELETED. Objections are now REQUIRED input to
+ *   the digest's emphasis fields, so a gate demanding their absence is
+ *   obsolete, not merely unused.
+ * - composition byte budget → a code PRECONDITION inside the digest builder:
+ *   tighten the per-node summaries and retry, then serve WITH the compression
+ *   mark. It reaches a crash class only when the digest cannot exist at all.
+ * - conformance ≤2 → an EVALUATOR objection criterion (citation tracing:
+ *   every load-bearing claim traces to a digest node).
+ * - the Q51 LOCATOR block → DELETED, unreachable by construction: it fired
+ *   when a load-bearing LOOKED_UP node had no locator, and T4 now normalizes
+ *   exactly that node to REASONING with a WAY-OF-KNOWING-DOWNGRADED mark
+ *   before serve ever sees it, so no input can satisfy the old predicate. The
+ *   Q51 DOWNGRADE limb is untouched — it is the answer FORM, which T13 owns.
+ * - post-compose R9 → an EVALUATOR objection criterion.
+ *
+ * After this, COMPONENTS_ONLY has exactly four causes, all of them deaths
+ * rather than quality judgements: `SERVE_CRASH_CLASSES`.
+ */
 export async function runServeGateChain(
   input: ServeGateInput,
   dependencies: ServeGateDependencies
 ): Promise<ServeGateResult> {
-  const trace: GateTrace[] = [];
+  const trace: LiveGateTrace[] = [];
 
   if (input.nodes.length === 0) {
     throw new TypedDomainError("SERVE_NODE_SET_EMPTY", "A serve chain requires at least one node");
   }
-  if (input.nodes.some((node) => node.loadBearing && node.restatementStatus !== "PASS")) {
-    trace.push("GATE1_R9_BLOCK", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, [], [], "NOT_RUN");
-  }
-  trace.push("GATE1_R9_PASS");
-
-  if (input.factBundle.residualObjections.length > 0) {
-    trace.push("GATE2_Q53_BLOCK", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, [], [], "NOT_RUN");
-  }
-  trace.push("GATE2_Q53_PASS_VACUOUS");
-
-  if (input.maxRecompose !== 2) {
-    throw new TypedDomainError("MAX_RECOMPOSE_INVALID", "DR-049 requires max_recompose = 2");
-  }
   if (!Number.isFinite(input.compositionBudget.bound) || input.compositionBudget.bound < 0) {
     throw new TypedDomainError("COMPOSITION_BUDGET_UNRESOLVED", "A V-ratified composition budget is required");
   }
-  const measuredBundle = dependencies.measureCompositionBundle(input.factBundle);
-  if (!Number.isFinite(measuredBundle) || measuredBundle < 0) {
-    throw new TypedDomainError("COMPOSITION_MEASUREMENT_INVALID", "The composition-bundle measurement must be finite");
-  }
-  if (measuredBundle > input.compositionBudget.bound) {
-    trace.push("COMPOSITION_BUDGET_EXCEEDED", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, [], [], "NOT_RUN");
-  }
-  trace.push("COMPOSITION_BUDGET_PASS");
 
-  let segments: readonly ComposedSegment[] = [];
-  let conformance: readonly ConformanceJudgement[] = [];
-  let coverageMode: ServeGateResult["coverageMode"] = "NOT_RUN";
-  for (let attempt = 1; attempt <= input.maxRecompose; attempt += 1) {
-    const composed = await dependencies.compose(input.factBundle, attempt);
-    const nodeIds = new Set(input.nodes.map((node) => node.nodeId));
-    const loadBearingNodeIds = new Set(input.nodes.filter((node) => node.loadBearing).map((node) => node.nodeId));
-    if (composed.some((segment) => segment.assertedNodeRefs.some((nodeRef) => !nodeIds.has(nodeRef)))) {
-      throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "A composed segment references a node outside the serve set");
+  // ---- DIGEST (goal 223-231) -------------------------------------------
+  const digestOutcome = buildSynthesisDigest({
+    nodes: input.digestNodes,
+    servedRootNodeId: input.servedRootNodeId,
+    budgetBound: input.compositionBudget.bound
+  });
+  if (digestOutcome.kind === "DIGEST_CANNOT_EXIST") {
+    // LOUD, never a silent subset: the enumerated crash class and its mark.
+    trace.push("DIGEST_CANNOT_EXIST");
+    return componentsOnly(input, "DIGEST_CANNOT_EXIST", trace, null);
+  }
+  const digest = digestOutcome.digest;
+  trace.push("DIGEST_BUILT");
+  if (digestOutcome.marks.length > 0) trace.push("DIGEST_COMPRESSED");
+
+  // ---- LOOP (goal 232-247) ---------------------------------------------
+  const nodeIds = new Set(input.nodes.map((node) => node.nodeId));
+  const loadBearingNodeIds = new Set(
+    input.nodes.filter((node) => node.loadBearing).map((node) => node.nodeId)
+  );
+  let loop: SynthesisLoopOutcome<readonly ComposedSegment[]>;
+  try {
+    loop = await runSynthesisLoop<readonly ComposedSegment[]>({
+      controls: input.synthesisRoleControls,
+      digest,
+      codeLabel: input.codeLabel
+    }, {
+      synthesize: async (request) => {
+        const produced = await dependencies.synthesize(request);
+        const composed = produced.candidate;
+        if (composed.length === 0) {
+          // NO_ARTIFACT: the role answered with nothing to serve. A crash
+          // class, not a quality judgement — hence a typed escape rather than
+          // a terminal invented inside the loop.
+          throw new TypedDomainError("SYNTHESIS_NO_ARTIFACT", "The synthesizer returned no segment to serve");
+        }
+        if (composed.some((segment) => segment.assertedNodeRefs.some((nodeRef) => !nodeIds.has(nodeRef)))) {
+          throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "A composed segment references a node outside the serve set");
+        }
+        if (composed.some((segment) =>
+          segment.segmentId.trim().length === 0 || segment.text.trim().length === 0
+        )) {
+          throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "A composed segment carries no id or no text");
+        }
+        if (new Set(composed.map((segment) => segment.segmentId)).size !== composed.length) {
+          throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
+        }
+        return {
+          candidate: composed.map((segment) => Object.freeze({
+            ...segment,
+            loadBearing: segment.servedNumberRefs.length > 0
+              || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
+          })),
+          // The adapter's OWN recorded reference and producer identity travel
+          // through unchanged.
+          candidateRef: produced.candidateRef,
+          candidateCallSiteKey: produced.candidateCallSiteKey
+        };
+      },
+      evaluate: (request) => dependencies.evaluate(request),
+      readCandidateStatement: (candidate) => candidate.map((segment) => segment.text).join("\n")
+    });
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === "SYNTHESIS_NO_ARTIFACT") {
+      return componentsOnly(input, "NO_ARTIFACT", trace, digest);
     }
-    segments = composed.map((segment) => Object.freeze({
-      ...segment,
-      loadBearing: segment.servedNumberRefs.length > 0
-        || segment.assertedNodeRefs.some((nodeRef) => loadBearingNodeIds.has(nodeRef))
-    }));
-    if (segments.length === 0 || segments.some((segment) =>
-      segment.segmentId.trim().length === 0 || segment.text.trim().length === 0
-    )) {
-      throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composition returned no segments");
+    if (error instanceof TypedDomainError && error.code === "SYNTHESIS_TRANSPORT_DEATH") {
+      return componentsOnly(input, "TRANSPORT_DEATH", trace, digest);
     }
-    if (new Set(segments.map((segment) => segment.segmentId)).size !== segments.length) {
-      throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
-    }
-    trace.push(attempt === 1 ? "COMPOSED" : "RECOMPOSED_ONCE");
-    coverageMode = input.strangerSampleRate >= 1 ? "EXHAUSTIVE" : "SAMPLED";
-    conformance = await Promise.all(segments.map(async (segment) => {
-      if (segment.loadBearing) return dependencies.conform(segment, "JUDGED");
-      if (input.strangerSampleRate >= 1 || dependencies.selectSample(segment, input.strangerSampleRate)) {
-        return dependencies.conform(segment, "SAMPLED_PASSED");
-      }
-      return { segmentId: segment.segmentId, state: "NOT_SAMPLED", conforms: true } as const;
-    }));
-    if (conformance.every((judgement) => judgement.conforms)) {
-      trace.push(coverageMode === "EXHAUSTIVE"
-        ? "GATE3_CONFORMANCE_PASS_EXHAUSTIVE"
-        : "GATE3_CONFORMANCE_PASS_SAMPLED");
-      break;
-    }
-    trace.push("GATE3_CONFORMANCE_FAIL");
+    throw error;
   }
 
-  if (!conformance.every((judgement) => judgement.conforms)) {
-    trace.push("COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, segments, conformance, coverageMode);
+  const segments = loop.candidate;
+  // `serve_state` reads this pair (COMPOSED vs RECOMPOSED_ONCE); a loop that
+  // needed a second round recomposed exactly once, by the same definition the
+  // retired composition retry used.
+  trace.push(loop.rounds.length > 1 ? "RECOMPOSED_ONCE" : "COMPOSED");
+  trace.push(loop.standingObjection === null ? "SYNTHESIS_LOOP_SATISFIED" : "SYNTHESIS_LOOP_EXHAUSTED");
+  if (loop.standingObjection !== null) trace.push("SYNTHESIS_OBJECTION_STANDING");
+
+  // The retired conformance record now holds the evaluator's CITATION TRACING
+  // criterion, per segment. The evaluator traces every load-bearing claim, so
+  // the coverage is exhaustive by construction — there is no sample any more.
+  const finalCriteria = loop.rounds.at(-1)!.verdict.criteria;
+  const conformance: readonly ConformanceJudgement[] = Object.freeze(segments.map((segment) => Object.freeze({
+    segmentId: segment.segmentId,
+    state: "JUDGED" as const,
+    conforms: finalCriteria.citationTracing
+  })));
+  const coverageMode: ServeGateResult["coverageMode"] = "EXHAUSTIVE";
+
+  /**
+   * T12 + T13 (S08) — the CITED set: what the served statement actually rests on.
+   *
+   * One set answers both questions the goal asks here: what FORM the answer may
+   * take (T13's honest downgrade) and how CONFIDENT it may claim to be (T12's
+   * band basis). That set is the nodes the composed statement CITES, restricted
+   * to the segments conformance actually verified.
+   *
+   * Two exclusions, each for its own reason:
+   *  · a served node the statement never mentions did not carry the answer, so
+   *    it may not lift the band or hold off a downgrade;
+   *  · a citation inside a segment conformance never sampled was checked by
+   *    nobody, so it is not evidence either (the goal's own parenthesis:
+   *    "conformance-verified set").
+   *
+   * Before this, both read `input.nodes.filter(loadBearing)` — the serve set,
+   * which `buildFixedSingleRootServeNodes` fixes at exactly one root. That
+   * one-node basis is the STRUCTURAL origin of the forced 0/1 way-of-knowing
+   * shares the goal names; T10 replaced the SELECTION of that root, not the set,
+   * so the basis had to stop reading the set.
+   */
+  /**
+   * THE COUPLING, RESTATED AT THE T9B MERGE — do not read the pre-merge version
+   * of this comment, which described a mechanism this chain no longer has.
+   *
+   * S08 wrote here that testing `state` alone is safe because a
+   * `!conformance.every((judgement) => judgement.conforms)` guard upstream
+   * returns componentsOnly before control arrives, and warned in the same
+   * breath: "whoever moves either piece must move both". T9 moved one piece —
+   * it retired the three-state sampled conformance gate into a single EVALUATOR
+   * criterion, and the synthesis loop SERVES a standing objection rather than
+   * withholding the answer. The guard went with it.
+   *
+   * So `conforms` is tested HERE now (V ruling, 2026-09-03, finding F-T9B-1):
+   * a run whose citation tracing failed must not have its citations counted
+   * into the confidence band. Both of S08's axes are live again, reached
+   * through T9's one criterion instead of three sampled states:
+   *   · `state !== "NOT_SAMPLED"` — vacuous at this tree, because every
+   *     judgement is minted JUDGED and `coverageMode` is EXHAUSTIVE. Kept
+   *     deliberately, not tidied: it costs nothing and is correct again the
+   *     moment a sampling path returns.
+   *   · `conforms` — the live one. Under this chain every judgement carries the
+   *     same `finalCriteria.citationTracing`, so a failed tracing criterion
+   *     empties the cited set. That case does NOT reach S08's empty-basis guard
+   *     below — it is separated out at `citationTracingFailed`, serves what was
+   *     composed, and reports the band at the register row's FLOOR. The guard
+   *     still refuses the different input it was written for: a statement that
+   *     cites nothing while tracing SUCCEEDED.
+   *
+   * This is deliberately NOT a fifth COMPONENTS_ONLY crash class, and not a
+   * refusal either. goal-v4 re-routes the conformance gate to an objection
+   * criterion, closes the terminal at four ("no non-crash path returns
+   * COMPONENTS_ONLY"), and says a run reaching its round bound with the
+   * evaluator still objecting SERVES REGARDLESS. The purpose V ruled is
+   * satisfied without touching any of that.
+   */
+  const verifiedSegmentIds = new Set(
+    conformance
+      .filter((judgement) => judgement.state !== "NOT_SAMPLED" && judgement.conforms)
+      .map((judgement) => judgement.segmentId)
+  );
+  const citedNodeIds = new Set(
+    segments
+      .filter((segment) => verifiedSegmentIds.has(segment.segmentId))
+      .flatMap((segment) => [...segment.assertedNodeRefs])
+  );
+  const citedNodes = input.nodes.filter((node) => citedNodeIds.has(node.nodeId));
+  /**
+   * V ruling 2026-09-03 (F-T9B-1): an exhausted CITATION-TRACING objection does
+   * not end the answer — goal-v4 says a run that reaches its round bound with
+   * the evaluator still objecting SERVES REGARDLESS, with the objection riding
+   * it as a visible mark. So this case is separated from S08's empty-basis
+   * guard below, which exists for a different input: a statement that cites
+   * nothing at all, where `[].every(...)` would otherwise downgrade on a
+   * vacuous truth. Here the cited set is empty for a KNOWN reason and the
+   * downgrade is the honest answer rather than an accident.
+   */
+  const citationTracingFailed = !finalCriteria.citationTracing;
+  if (citedNodes.length === 0 && !citationTracingFailed) {
+    // Banding on an empty basis is the silent degradation this gate exists to
+    // refuse: `deriveBandCeiling` would reject it downstream anyway, but the
+    // FORM decision happens first, and `[].every(...)` is `true` — an uncited
+    // statement would otherwise downgrade itself on a vacuous truth.
+    throw new TypedDomainError(
+      "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
+      "A served statement must cite at least one conformance-verified node: its form and its confidence band are both read from what it cites"
+    );
   }
 
+  // ---- SERVE ------------------------------------------------------------
   let terminal: ServeGateResult["terminal"];
   let answerForm: AnswerForm;
-  const loadBearingNodes = input.nodes.filter((node) => node.loadBearing);
-  if (loadBearingNodes.some((node) => node.wayOfKnowing === "LOOKED_UP" && node.locator === null)) {
-    trace.push("GATE4_Q51_LOCATOR_BLOCK", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, segments, conformance, coverageMode);
-  }
-  if (loadBearingNodes.every((node) => node.wayOfKnowing === "REASONING")) {
+  // The Q51 LOCATOR block that stood here on integration is NOT reinstated: T9
+  // deleted it as unreachable by construction (see this function's header —
+  // T4 normalizes a locator-less load-bearing LOOKED_UP node to REASONING with
+  // a WAY-OF-KNOWING-DOWNGRADED mark before serve is entered). The Q51
+  // DOWNGRADE limb below is untouched and now reads S08's CITED set, which is
+  // what T9's header already assigned to T13.
+  /**
+   * THE TWO CAUSES OF AN EMPTY CITED SET ARE SEPARATED HERE (V ruling
+   * 2026-09-03). Before this they collapsed onto one path, because
+   * `[].every(...)` is `true`: "no verified cited node, because tracing failed"
+   * fell into T13's REASONING-only limb, which is right about the terminal and
+   * wrong about the FORM. That limb requires a hypothesis AND a research plan,
+   * so a one-segment candidate crashed with COMPOSITION_CONTRACT_ERROR before
+   * any served result carrying the mark existed — and one segment is squarely
+   * within the production contract, since the synthesizer is asked for two only
+   * when the cited nodes rest on reasoning alone.
+   *
+   * Serving after the round bound must not depend on how many segments the
+   * synthesizer produced, so this arm serves WHATEVER WAS COMPOSED, at any
+   * count. It is DOWNGRADED and carries the standing-objection mark and the
+   * floor band; those three together say the answer is weak and why. Splitting
+   * one segment into a hypothesis and a plan it does not contain would be
+   * fabrication, so the form is the composed statement itself.
+   */
+  if (citationTracingFailed) {
+    trace.push("GATE4_Q51_DOWNGRADE");
+    terminal = "DOWNGRADED";
+    answerForm = { kind: "VERDICT", text: segments.map((segment) => segment.text).join("\n") };
+  } else if (citedNodes.every((node) => node.wayOfKnowing === "REASONING")) {
     if (segments.length < 2 || segments[0] === undefined || segments[1] === undefined) {
       throw new TypedDomainError(
         "COMPOSITION_CONTRACT_ERROR",
@@ -550,42 +1014,66 @@ export async function runServeGateChain(
     answerForm = { kind: "VERDICT", text: segments.map((segment) => segment.text).join("\n") };
   }
 
-  // DR-129 ratifies Q51 before the post-compose verdict-R9 limb; keep this citation at the chain.
-  if (!await dependencies.postComposeR9(segments)) {
-    trace.push("POST_COMPOSE_R9_FAIL", "COMPONENTS_ONLY_DEFECT");
-    return componentsOnly(input, trace, segments, conformance, coverageMode);
-  }
-  trace.push("POST_COMPOSE_R9_PASS");
-  const loadBearing = input.nodes.filter((node) => node.loadBearing);
+  // The POST_COMPOSE_R9 call that stood here on integration is NOT reinstated:
+  // T9 retired post-compose R9 into an evaluator objection criterion (this
+  // function's header, goal 248-262), and `dependencies.postComposeR9` no
+  // longer exists on ServeGateDependencies.
+  // T12: counted over the CITED set derived above — the same set T13's form
+  // decision read, so an answer's shape and its confidence can never describe
+  // different evidence.
   const basis = {
-    LOOKED_UP: loadBearing.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
-    RAN: loadBearing.filter((node) => node.wayOfKnowing === "RAN").length,
-    REASONING: loadBearing.filter((node) => node.wayOfKnowing === "REASONING").length
+    LOOKED_UP: citedNodes.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
+    // F5 / DECISIONS J4 do-not-tidy: T4 removed RAN from the judge schema, so
+    // this bucket can only be 0 today. It stays. The register's cut matrix and
+    // the persisted `band_ceiling.basis` both still name RAN, and the goal
+    // parks enum-reachability lint out of scope — deleting it is a TICKET.
+    RAN: citedNodes.filter((node) => node.wayOfKnowing === "RAN").length,
+    REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length
   };
+  /**
+   * The ceiling is ALWAYS derived. When citation tracing failed the basis above
+   * is empty, and `deriveBandCeiling` answers that with the register row's FLOOR
+   * band — a value, which V chose over an absence — built from the row entry
+   * that names that band.
+   *
+   * This does NOT touch the LABEL. Confirm-item 3 and the frozen S06 spec rule
+   * that a standing round-3 objection does not move the served label, which is
+   * code-derived from the propagated numbers BEFORE synthesis runs; an
+   * objection reaching back into it is exactly the cycle that clause forbids.
+   */
   const ceilingDecision = dependencies.applyBandCeiling({
     basis,
     candidateConfidenceBand: input.candidateConfidenceBand
   });
   validateBandCeilingDecision(ceilingDecision, input.candidateConfidenceBand, basis);
   trace.push(ceilingDecision.kind === "CAPPED" ? "BAND_CEILING_CAPPED" : "BAND_CEILING_PASS", "SERVE");
-  return {
+
+  const conditionMarks = [...input.factBundle.conditionMarks];
+  for (const mark of [...digestOutcome.marks, ...loop.marks]) {
+    if (!conditionMarks.includes(mark)) conditionMarks.push(mark);
+  }
+  return Object.freeze({
     terminal,
     answerForm,
     factBundle: input.factBundle,
-    gateTrace: trace,
-    conditionMarks: input.factBundle.conditionMarks,
+    gateTrace: Object.freeze(trace),
+    conditionMarks: Object.freeze(conditionMarks),
     conformance,
     coverageMode,
     segments,
     compositionBudget: input.compositionBudget,
     confidenceBand: ceilingDecision.confidenceBand,
     bandCeiling: ceilingDecision.ceiling,
-    projections: {
+    digest,
+    loopRounds: loop.rounds,
+    standingObjection: loop.standingObjection,
+    crashClass: null,
+    projections: Object.freeze({
       reversalPoint: input.factBundle.reversalPoint,
       buildsOnPrevious: input.factBundle.buildsOnPrevious,
       memoryDisclosure: input.factBundle.memoryDisclosure
-    }
-  };
+    })
+  });
 }
 
 const SERVE_ITEM_STATUSES = ["READY", "PENDING", "ERROR"] as const;
@@ -659,12 +1147,178 @@ export function deriveWorkReadState(input: {
     : { state: input.storedState };
 }
 
-export function deriveHonestVerdict(input: { readonly usableBasis: boolean; readonly reasonRef: string }):
-  | { readonly verdictState: "SUPPORTED"; readonly confidenceBand: null; readonly unavailable: null }
-  | { readonly verdictState: null; readonly confidenceBand: null; readonly unavailable: { readonly reasonRef: string } } {
-  return input.usableBasis
-    ? { verdictState: "SUPPORTED", confidenceBand: null, unavailable: null }
-    : { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef } };
+/**
+ * T11 (goal 196-221) — the three-state verdict label.
+ *
+ * A label input is either MEASURED or ABSENT. ABSENT is a RUNTIME value with a
+ * reason, never NaN and never a silent zero: a single servable root has no
+ * runner-up to measure a margin against, and a panel that produced fewer than
+ * two parseable judgements has no dispersion to compare (s04 `measureDispersion`
+ * returns exactly that shape).
+ */
+export type VerdictLabelQuantity =
+  | { readonly kind: "MEASURED"; readonly value: number }
+  | { readonly kind: "ABSENT"; readonly reason: string };
+
+/**
+ * gamma, the two cuts and the disagreement threshold, as the caller read them
+ * from T16's sealed register rows (`readVerdictLabelControls`). This module
+ * carries NO default for any of them — a label derived from a value this file
+ * invented would be uncalibratable and untunable, which is what the sealed rows
+ * exist to prevent (goal 39-40).
+ */
+export interface VerdictLabelControls {
+  readonly gamma: number;
+  readonly highCut: number;
+  readonly lowCut: number;
+  readonly disagreementThreshold: number;
+}
+
+export interface VerdictLabelBasis {
+  /** The served root's propagated strength. */
+  readonly winner: number;
+  /** The served root's margin over the runner-up root. */
+  readonly margin: VerdictLabelQuantity;
+  /**
+   * The recorded panel dispersion of the WINNING root's reduced judgement
+   * (T3's `dispersion` field), on T16's seeded scale.
+   */
+  readonly disagreement: VerdictLabelQuantity;
+  readonly controls: VerdictLabelControls;
+}
+
+export const LABEL_BASIS_INCOMPLETE_MARK = "LABEL-BASIS-INCOMPLETE" as const;
+
+export type VerdictLabelTrigger =
+  | "BASIS_INCOMPLETE"
+  | "BELOW_LOW_CUT"
+  | "MARGIN_WITHIN_GAMMA"
+  | "DISAGREEMENT_AT_THRESHOLD"
+  | "AT_OR_ABOVE_HIGH_CUT"
+  | "MID_BAND";
+
+export interface VerdictLabelDerivation {
+  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them. */
+  readonly rung: 0 | 1 | 2 | 3 | 4;
+  readonly trigger: VerdictLabelTrigger;
+  /** Which basis limbs were ABSENT; empty unless rung 0 fired. */
+  readonly basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
+  readonly marks: readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];
+}
+
+function assertLabelNumber(value: number, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_INPUT_INVALID",
+      `${label} must be a finite number; an unmeasurable input is ABSENT with a reason, never NaN`
+    );
+  }
+  return value;
+}
+
+/**
+ * The ORDERED, TOTAL, DISJOINT ladder, defined over the runtime domain with
+ * absent inputs included (goal 197-207). Exactly one rung fires at every point:
+ * the FIRST whose guard holds. Nothing here consults the round-3 evaluator
+ * objection — the derivation is acyclic and runs BEFORE synthesis, from the
+ * propagated numbers only (confirm-item 3, default NO).
+ */
+export function deriveVerdictLabel(input: VerdictLabelBasis): VerdictLabelDerivation {
+  const { gamma, highCut, lowCut, disagreementThreshold } = input.controls;
+  for (const [value, label] of [
+    [gamma, "gamma"], [highCut, "the high cut"], [lowCut, "the low cut"],
+    [disagreementThreshold, "the disagreement threshold"]
+  ] as const) assertLabelNumber(value, label);
+  if (!(lowCut < highCut)) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_CONTROLS_INVALID",
+      "The low cut must sit strictly below the high cut"
+    );
+  }
+  const winner = assertLabelNumber(input.winner, "the winning strength");
+  const margin = input.margin;
+  const disagreement = input.disagreement;
+  if (margin.kind === "MEASURED") assertLabelNumber(margin.value, "the margin");
+  if (disagreement.kind === "MEASURED") assertLabelNumber(disagreement.value, "the disagreement");
+
+  // Rung 0 — the basis itself is incomplete.
+  if (margin.kind === "ABSENT" || disagreement.kind === "ABSENT") {
+    return Object.freeze({
+      label: "CONTESTED", rung: 0, trigger: "BASIS_INCOMPLETE",
+      basisAbsence: Object.freeze([
+        ...(margin.kind === "ABSENT" ? ["MARGIN" as const] : []),
+        ...(disagreement.kind === "ABSENT" ? ["DISAGREEMENT" as const] : [])
+      ]),
+      marks: Object.freeze([LABEL_BASIS_INCOMPLETE_MARK])
+    });
+  }
+  const noAbsence = Object.freeze([]) as readonly ("MARGIN" | "DISAGREEMENT")[];
+  const noMarks = Object.freeze([]) as readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];
+
+  // Rung 1 — below the low cut.
+  if (winner < lowCut) {
+    return Object.freeze({
+      label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 2 — a tie-adjacent margin, or a panel that disagreed at the threshold.
+  const marginWithinGamma = margin.value <= gamma;
+  if (marginWithinGamma || disagreement.value >= disagreementThreshold) {
+    return Object.freeze({
+      label: "CONTESTED", rung: 2,
+      trigger: marginWithinGamma ? "MARGIN_WITHIN_GAMMA" : "DISAGREEMENT_AT_THRESHOLD",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 3 — at or above the high cut, with a clear margin and low disagreement.
+  if (winner >= highCut) {
+    return Object.freeze({
+      label: "SUPPORTED", rung: 3, trigger: "AT_OR_ABOVE_HIGH_CUT",
+      basisAbsence: noAbsence, marks: noMarks
+    });
+  }
+  // Rung 4 — the mid band: low <= winner < high.
+  return Object.freeze({
+    label: "CONTESTED", rung: 4, trigger: "MID_BAND",
+    basisAbsence: noAbsence, marks: noMarks
+  });
+}
+
+/**
+ * The served answer's verdict projection: exactly one of a label or an
+ * unavailability reason (the contract refuses both and neither). The label
+ * itself is T11's ladder above — never a constant this function chose.
+ */
+export function deriveHonestVerdict(input: {
+  readonly usableBasis: boolean;
+  readonly reasonRef: string;
+  readonly labelBasis: VerdictLabelBasis | null;
+}):
+  | {
+      readonly verdictState: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+      readonly confidenceBand: null;
+      readonly unavailable: null;
+      readonly derivation: VerdictLabelDerivation;
+    }
+  | {
+      readonly verdictState: null;
+      readonly confidenceBand: null;
+      readonly unavailable: { readonly reasonRef: string };
+      readonly derivation: null;
+    } {
+  if (!input.usableBasis) {
+    return { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef }, derivation: null };
+  }
+  if (input.labelBasis === null) {
+    throw new TypedDomainError(
+      "VERDICT_LABEL_BASIS_UNRESOLVED",
+      "A servable answer must carry the propagated label basis (winner, margin, disagreement, sealed controls); no label is invented here"
+    );
+  }
+  const derivation = deriveVerdictLabel(input.labelBasis);
+  return { verdictState: derivation.label, confidenceBand: null, unavailable: null, derivation };
 }
 
 export function projectProvenance(input: {
@@ -697,7 +1351,7 @@ export function projectProvenance(input: {
 }
 
 export interface ServedNumberEvent {
-  readonly status: "PRESENT" | "EVICTED" | "WITHHELD";
+  readonly status: "PRESENT" | "EVICTED";
   readonly reason: string | null;
   readonly atSequence: number;
 }
@@ -747,6 +1401,23 @@ export function decideReplayEviction(input: ReplaySelfTestInput):
     : { kind: "EVICT", servedNumberId: input.servedNumberId, mark: "MISSING-NUMBER" };
 }
 
+/** T9 / J25 — one loop round as a READER gets it back from the database. */
+export interface PersistedSynthesisRound {
+  readonly round: number;
+  readonly synthesizerStage: "INITIAL" | "RETRY";
+  /**
+   * Typed, PRODUCER-BOUND `ledger.raw_artifact` keys. Each was resolved through
+   * the ledger entry that recorded it before the answer committed, so it names
+   * the artifact this run produced at that call site — not merely an artifact
+   * that happens to share the run.
+   */
+  readonly candidateArtifactRef: string;
+  readonly candidateCallSiteKey: string;
+  readonly evaluatorArtifactRef: string;
+  readonly evaluatorCallSiteKey: string;
+  readonly evaluatorSatisfied: boolean;
+}
+
 export interface PersistServeInput {
   readonly runId: string;
   readonly workItemId: string;
@@ -758,7 +1429,7 @@ export interface PersistServeInput {
   readonly compositionRawArtifactRef: string | null;
   readonly compositionAttempt: number;
   readonly conformanceRawArtifactRefs: readonly string[];
-  readonly conditionMarkRecords?: readonly ConditionMarkRecord[];
+  readonly conditionMarkRecords?: readonly PersistableConditionMarkRecord[];
   readonly servedNumber: {
     readonly numberRef: string;
     readonly value: number;
@@ -768,6 +1439,13 @@ export interface PersistServeInput {
     readonly replayHandle: string;
     readonly propagationRunId: string;
   } | null;
+  /**
+   * T11: the propagated numbers this answer's three-state label is derived
+   * from, computed BEFORE synthesis. Required whenever the answer will carry a
+   * label (a served number on a SERVED/DOWNGRADED terminal); omitted on the
+   * DR-184 superseding path, which preserves the prior answer's projection.
+   */
+  readonly verdictLabelBasis?: VerdictLabelBasis | null;
   /** DR-184: append a new immutable version of an already-served answer. */
   readonly supersedes?: { readonly answerId: string };
 }
@@ -804,22 +1482,64 @@ export interface MemoryQuestionRegistration {
 }
 
 export interface ConditionMarkRecord {
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED";
+  // J13(b): PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE are node-scope panel
+  // degradation disclosures; the record union must name them or the runner cannot
+  // project the mark the kernel now mints.
+  // T7 / S3-2: BRANCH-FROZEN-LOW-LEVERAGE is the adaptive-stopping freeze
+  // disclosure; S6-1 / T11: LABEL-BASIS-INCOMPLETE is the served label's
+  // incomplete-basis disclosure; F4 / T9: PROTECTED-CORE-GUARD-RETIRED is the
+  // knowingly-retired R9 guard disclosure. The runner cannot project a mark the
+  // kernel mints unless the record union names it, so ALL THREE lanes' mints are
+  // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
+  // mid-list placement.
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
   readonly liftPath: string | null;
-  readonly servedRootRule: "first-configured-provider" | null;
+  /**
+   * The rule a FRESH selection recorded. Live vocabulary only: a new selection
+   * cannot even express a retired rule (T10 / codex r1 B3). A record carried
+   * forward from an older answer version uses `PreservedConditionMarkRecord`.
+   */
+  readonly servedRootRule: ServedRootRule | null;
   readonly affectedNodeIds: readonly string[];
   readonly callSiteKey?: string | null;
   readonly plannedLegCount?: number | null;
   readonly terminalTransportOutcome?: "TIMED_OUT" | "FAILED" | null;
+  /**
+   * T6 / S4-2 / J14 (+ ADDENDUM) — the second route into class H/D: the review
+   * LANDED and said it could not judge. Exactly one of this and
+   * `terminalTransportOutcome` is set on a class-H or class-D record.
+   *
+   * `cannot-assess` is the ONLY value this arm can take. `agree` and `dispute`
+   * both SEED judged standing, so neither can ever be the reason a node is
+   * unjudged; admitting them made the disclosure a writable lie (codex r1 B1).
+   * The provenance for this arm is not supplied by the caller — it is looked up
+   * in the ledger by `resolveTrueUnjudgedReasons` and written under a composite
+   * foreign key, so the record cannot name a review it does not have.
+   */
+  readonly reviewOutcome?: "cannot-assess" | null;
   readonly hiddenStrength?: number | null;
   readonly hiddenScoreThreshold?: number | null;
   readonly hiddenScoreThresholdSourceRef?: string | null;
   readonly excludedFromServedNumber?: boolean | null;
   readonly judgedBasisCount?: number | null;
 }
+
+/**
+ * A record carried forward onto a NEW VERSION of an existing answer (DR-184
+ * catch-up). It may carry a RETIRED rule, because the version it describes was
+ * selected under that rule and relabelling it would falsify the record. This is
+ * the only shape allowed to hold one, and only on a superseding write — the law
+ * is enforced at `persist`, which names it if it is broken.
+ */
+export type PreservedConditionMarkRecord =
+  Omit<ConditionMarkRecord, "servedRootRule">
+  & { readonly servedRootRule: ServedRootRuleHistory | null };
+
+/** Either shape; `persist` decides which is lawful from `supersedes`. */
+export type PersistableConditionMarkRecord = ConditionMarkRecord | PreservedConditionMarkRecord;
 
 const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "SKIPPED-BY-BUDGET",
@@ -832,13 +1552,16 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "HIDDEN-UNJUDGEABLE",
   "DERIVED-STANDING-UNREVIEWED",
   "HIDDEN-LOW-SCORE",
-  "UNAUTHORED-BRANCH-HALTED"
+  "UNAUTHORED-BRANCH-HALTED",
+  // T11: a label derived without a complete basis is disclosed on the answer it
+  // labelled, with a typed record naming which limb of the basis was absent.
+  "LABEL-BASIS-INCOMPLETE"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
 export function assertRequiredConditionMarkRecords(
   conditionMarks: readonly string[],
-  records: readonly ConditionMarkRecord[]
+  records: readonly PersistableConditionMarkRecord[]
 ): void {
   for (const mark of REQUIRED_CONDITION_MARK_RECORDS) {
     if (conditionMarks.includes(mark) && !records.some((record) => record.mark === mark)) {
@@ -853,11 +1576,23 @@ export function assertRequiredConditionMarkRecords(
     );
   }
   for (const record of records) {
+    // T6/J14: EXACTLY ONE unjudged reason — a transport outcome (the review
+    // never landed) XOR a review outcome (it landed and could not judge).
+    // Written as an XOR so the transport route keeps its existing requirement
+    // rather than the second route turning it into an optional field.
+    //
+    // J14 ADDENDUM (1): and the review arm admits only `cannot-assess`. The
+    // type already says so; this restates it as a runtime rule because the
+    // record also arrives from untyped edges (a projected answer, a stored
+    // row), and a reason that reached a judgement is not a reason at all.
+    const namesOneUnjudgedReason = (record.terminalTransportOutcome == null)
+      !== (record.reviewOutcome == null)
+      && (record.reviewOutcome == null || record.reviewOutcome === "cannot-assess");
     if (record.mark === "HIDDEN-UNJUDGEABLE" && (
-      record.callSiteKey == null || record.terminalTransportOutcome == null
+      record.callSiteKey == null || !namesOneUnjudgedReason
       || record.excludedFromServedNumber !== true
     )) {
-      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class H requires call site, transport outcome, and served-number exclusion");
+      throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class H requires call site, exactly one unjudged reason, and served-number exclusion");
     }
     if (record.mark === "HIDDEN-LOW-SCORE" && (
       record.hiddenStrength == null || record.hiddenScoreThreshold == null
@@ -866,14 +1601,14 @@ export function assertRequiredConditionMarkRecords(
       throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class L requires strength, threshold provenance, and presentation-only status");
     }
     if (record.mark === "DERIVED-STANDING-UNREVIEWED" && (
-      record.callSiteKey == null || record.terminalTransportOutcome == null
+      record.callSiteKey == null || !namesOneUnjudgedReason
       || record.excludedFromServedNumber !== false
       || record.judgedBasisCount == null || !Number.isInteger(record.judgedBasisCount)
       || record.judgedBasisCount < 1
     )) {
       throw new TypedDomainError(
         "DERIVED_STANDING_RECORD_INVALID",
-        "Class D requires failed-review provenance, presentation inclusion, and a positive judged basis count"
+        "Class D requires unjudged-review provenance, presentation inclusion, and a positive judged basis count"
       );
     }
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
@@ -882,6 +1617,121 @@ export function assertRequiredConditionMarkRecords(
       throw new TypedDomainError("HIDDEN_CONDITION_MARK_RECORD_INVALID", "Class N requires call site, planned leg count, and transport outcome");
     }
   }
+}
+
+/**
+ * The provenance a class-H/class-D row carries for the reason it names. Null on
+ * the transport arm, where the truth being reported is the ABSENCE of a review.
+ */
+export interface UnjudgedReasonProvenance {
+  readonly reviewRef: string | null;
+  readonly reviewNodeRef: string | null;
+}
+
+/**
+ * T6 / S4-2 / J14 ADDENDUM — the disclosure reason must be TRUE, not merely
+ * singular (codex r1 B1).
+ *
+ * `assertRequiredConditionMarkRecords` binds CARDINALITY: a class-H/class-D
+ * record names exactly one reason, and the review arm names `cannot-assess`.
+ * Neither that guard nor any CHECK constraint can see whether the reason is a
+ * FACT, because the fact lives in another table. Two lies survived r2:
+ *
+ *   1. the review arm claiming `cannot-assess` for a node whose review said
+ *      something else — or that has no review at all; and
+ *   2. the transport arm claiming "the review never landed" for a node whose
+ *      review is sitting in `ledger.node_review` (r2's own DDL probe asserted
+ *      that row was ACCEPTED).
+ *
+ * This is the guard that closes both, by consulting the ledger. The caller does
+ * not get to say WHICH review row it means: for the review arm the row is
+ * looked up by `(runId, subjectRef)` — `ledger.node_review` is `UNIQUE
+ * (node_id)`, so that is a function — and the resolved `node_review_id` is what
+ * `ServeRepository.persist` stores, under a composite foreign key. A
+ * mis-binding is therefore not merely refused, it is unspellable.
+ *
+ * WHAT ACTUALLY SERIALISES THIS (codex r2 N1): not the transaction. A
+ * transaction alone would not stop a concurrent review INSERT landing between
+ * this negative SELECT and the condition-mark INSERT — READ COMMITTED simply
+ * would not see it. The exclusion comes from the exclusive per-run content
+ * lease: `ServeRepository.persist` wraps its whole body in
+ * `withRunContentLease(pool, [runId], …)`, and so does
+ * `recordReviewWithMeasurements`, the ONLY production writer of
+ * `ledger.node_review`. Both take the same `pg_advisory_lock` on that run, so
+ * they cannot interleave at all. The transaction supplies ATOMICITY of the
+ * marks with the answer; the lease supplies the MUTUAL EXCLUSION this guard
+ * depends on. That is the floor J14's addendum (3) accepts in place of a
+ * database trigger — and it holds only while the review writer keeps taking
+ * the lease, which is why it is named here rather than left implicit.
+ *
+ * Marks outside class H/D carry no unjudged reason and are passed through
+ * untouched — a HIDDEN-LOW-SCORE row names a threshold, not a review, and its
+ * subject may perfectly well have a landed review.
+ */
+export async function resolveTrueUnjudgedReasons(
+  source: Pool | PoolClient,
+  runId: string,
+  // MERGE (S06 x T6): widened from ConditionMarkRecord to the union `persist`
+  // actually holds.
+  //
+  // CORRECTED in r4b (codex merge N1): an earlier version of this comment said
+  // the resolver reads only `mark` and `subjectRef`. It reads FOUR fields —
+  // `mark`, `subjectRef`, `reviewOutcome` and `terminalTransportOutcome` — and
+  // the last two are exactly what select and validate T6's review-versus-
+  // transport truth arm. Calling them irrelevant is the kind of note that lets a
+  // later change to either one pass review unexamined.
+  //
+  // The widening is safe for a stronger reason than "few fields are read".
+  // `PreservedConditionMarkRecord` is
+  //   Omit<ConditionMarkRecord, "servedRootRule">
+  //     & { servedRootRule: ServedRootRuleHistory | null }
+  // so EVERY field has the same type and meaning in both arms; the ONLY
+  // difference is `servedRootRule`, and this function never reads it. The body
+  // is otherwise unchanged from integration 362299d1, so no T6 truth-binding
+  // decision is weakened — the widening only stops the S06 catch-up path from
+  // being unrepresentable at T6's call site.
+  records: readonly PersistableConditionMarkRecord[]
+): Promise<readonly UnjudgedReasonProvenance[]> {
+  const carriesUnjudgedReason = (record: PersistableConditionMarkRecord): boolean =>
+    record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED";
+  const subjects = [...new Set(records.filter(carriesUnjudgedReason).map((record) => record.subjectRef))];
+  const landed = new Map<string, { readonly nodeReviewId: string; readonly outcome: string }>();
+  if (subjects.length > 0) {
+    const rows = await source.query<{ node_review_id: string; node_id: string; outcome: string }>(
+      `SELECT node_review_id::text AS node_review_id, node_id::text AS node_id, outcome
+         FROM ledger.node_review
+        WHERE run_id = $1 AND node_id::text = ANY($2::text[])`,
+      [runId, subjects]
+    );
+    for (const row of rows.rows) {
+      landed.set(row.node_id, { nodeReviewId: row.node_review_id, outcome: row.outcome });
+    }
+  }
+  return Object.freeze(records.map((record): UnjudgedReasonProvenance => {
+    if (!carriesUnjudgedReason(record)) return Object.freeze({ reviewRef: null, reviewNodeRef: null });
+    const review = landed.get(record.subjectRef);
+    if (record.reviewOutcome != null) {
+      // The arm says "the review landed and could not judge". The ledger must
+      // hold that node's own review, and it must say exactly that.
+      if (review === undefined || review.outcome !== record.reviewOutcome) {
+        throw new TypedDomainError(
+          "CONDITION_MARK_REVIEW_REASON_UNTRUE",
+          `${record.mark} names review outcome ${record.reviewOutcome} for ${record.subjectRef}, `
+          + `but the run's ledger holds ${review === undefined ? "no review" : review.outcome}`
+        );
+      }
+      return Object.freeze({ reviewRef: review.nodeReviewId, reviewNodeRef: record.subjectRef });
+    }
+    if (record.terminalTransportOutcome != null && review !== undefined) {
+      // The arm says "the review never landed". It did.
+      throw new TypedDomainError(
+        "CONDITION_MARK_TRANSPORT_REASON_UNTRUE",
+        `${record.mark} names transport outcome ${record.terminalTransportOutcome} for ${record.subjectRef}, `
+        + `but that node's review landed with outcome ${review.outcome}`
+      );
+    }
+    return Object.freeze({ reviewRef: null, reviewNodeRef: null });
+  }));
 }
 
 export class ServeRepository {
@@ -999,17 +1849,47 @@ export class ServeRepository {
     }
     const conditionMarkRecords = input.conditionMarkRecords ?? [];
     assertRequiredConditionMarkRecords(input.result.conditionMarks, conditionMarkRecords);
+    // T10 / codex r1 B3 — the read vocabulary is wider than the write one, and
+    // this is where the difference is enforced. A SUPERSEDING version may carry
+    // a retired rule forward, because the version it describes really was
+    // selected under it. A FRESH answer may not: there is no history to carry,
+    // so a retired value there could only be a relabelling or a fabrication.
+    if (input.supersedes === undefined) {
+      const retired = conditionMarkRecords.find((record) => isRetiredServedRootRule(record.servedRootRule));
+      if (retired !== undefined) {
+        throw new TypedDomainError(
+          "RETIRED_SERVED_ROOT_RULE_NOT_WRITABLE",
+          `${retired.mark} records the retired served-root rule "${retired.servedRootRule}" on a fresh answer; retired rules are readable history, never a new selection's rule`
+        );
+      }
+    }
     if (conditionMarkRecords.some((record) =>
       record.subjectRef.trim() === "" || record.reason.trim() === "" || record.affectedNodeIds.length === 0
     )) {
       throw new TypedDomainError("CONDITION_MARK_AFFECTED_NODES_REQUIRED", "Every S09 mark must inspect affected nodes");
     }
     return withRunContentLease(this.pool,[input.runId],async () => {
+    // DR-184's superseding path never re-derives: the prior answer's verdict
+    // projection is carried forward below, so it needs no label basis.
     const verdict = deriveHonestVerdict({
-      usableBasis: input.servedNumber !== null
+      usableBasis: input.supersedes === undefined
+        && input.servedNumber !== null
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
-      reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`
+      reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`,
+      labelBasis: input.verdictLabelBasis ?? null
     });
+    // The mark and the label are ONE decision. A derivation that says the basis
+    // was incomplete while the answer's marks stay silent is the facsimile shape
+    // this record exists to prevent, so it stops loudly instead of persisting.
+    if (verdict.derivation !== null) {
+      const declared = input.result.conditionMarks.includes(LABEL_BASIS_INCOMPLETE_MARK);
+      if (declared !== (verdict.derivation.marks.length > 0)) {
+        throw new TypedDomainError(
+          "LABEL_BASIS_DISCLOSURE_MISMATCH",
+          `The derived label basis ${verdict.derivation.marks.length > 0 ? "IS" : "is NOT"} incomplete, but the answer's condition marks say otherwise`
+        );
+      }
+    }
     const factBundleId = randomUUID();
     const factContent = await encryptAttestedContentForRun(
       this.pool, input.runId, "serve.fact_bundle", factBundleId,
@@ -1157,14 +2037,122 @@ export class ServeRepository {
             : JSON.stringify(input.result.projections.memoryDisclosure)
         ]
       );
-      for (const record of conditionMarkRecords) {
+      // T9 / J25 + J29 (+ ADDENDUM) — the loop-round records become DURABLE
+      // here, inside the answer's own write transaction.
+      //
+      // NO REQUEST BODY. The frozen SPEC asks for recorded-request ASSERTIONS
+      // and loop-round RECORDS; it never asks for the request to be persisted.
+      // The carrier I kept for the verbatim-objection claim could not prove it
+      // anyway: the SAME in-memory object feeds the provider packet and the row,
+      // so the row showed the object existed, never that it was the request AS
+      // SENT. It is gone, and with it the encryption machinery it needed.
+      //
+      // What remains is structural facts and TYPED PRODUCER-BOUND REFERENCES.
+      for (const round of input.result.loopRounds ?? []) {
+        // codex r3 B2: "same run" is not a producer binding. Each reference is
+        // resolved through the LEDGER ENTRY that recorded it — this run, this
+        // work item, a successful MODEL_CALL, at the EXPECTED call site — so an
+        // unrelated judge artifact from the same run can no longer stand in.
+        // codex r4 B1 — ROLE IS A PREDICATE. Each reference is bound to the
+        // call site its ROLE must have occupied, derived HERE from the typed
+        // role, the round's own synthesizer stage and its round number through
+        // the ONE builder the runner records with. Before this, `role` reached
+        // only the error text: the supplied key was checked for a `:<round>`
+        // suffix and then handed to the ledger as given, so a real
+        // `COMPOSER:SYNTHESIZER:INITIAL:1` artifact offered as the verdict
+        // passed both checks and a synthesizer response committed as the
+        // evaluator verdict. No stored round column is needed for this — every
+        // input is already in the round record.
+        for (const bound of [
+          {
+            ref: round.candidateRef,
+            callSiteKey: round.candidateCallSiteKey,
+            role: "SYNTHESIZER" as const,
+            expected: synthesisCallSiteKey({
+              role: "SYNTHESIZER",
+              stage: round.synthesizerRequest.stage,
+              round: round.round
+            })
+          },
+          {
+            ref: round.verdictRef,
+            callSiteKey: round.verdictCallSiteKey,
+            role: "EVALUATOR" as const,
+            expected: synthesisCallSiteKey({ role: "EVALUATOR", round: round.round })
+          }
+        ]) {
+          // EQUALITY, not a suffix. This subsumes the round check it replaces —
+          // the round is part of the derived key — and it is what refuses a
+          // real artifact recorded under the other role's call site.
+          if (bound.callSiteKey !== bound.expected) {
+            throw new TypedDomainError(
+              "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
+              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected}`
+            );
+          }
+          const producer = await client.query<{ raw_artifact_ref: string }>(
+            `SELECT entry.raw_artifact_ref::text
+               FROM ledger.ledger_entry AS entry
+               JOIN ledger.raw_artifact AS artifact
+                 ON artifact.raw_artifact_id = entry.raw_artifact_ref
+                AND artifact.run_id = entry.run_id
+              WHERE entry.run_id=$1 AND entry.subject_item_id=$2
+                AND entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
+                AND entry.call_site_key=$3 AND entry.raw_artifact_ref=$4::uuid`,
+            [input.runId, input.workItemId, bound.expected, bound.ref]
+          );
+          if (producer.rows.length !== 1) {
+            throw new TypedDomainError(
+              "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
+              `Round ${String(round.round)}'s ${bound.role} reference ${bound.ref} is not the artifact this run recorded at ${bound.callSiteKey}`
+            );
+          }
+        }
+        await client.query(
+          `INSERT INTO serve.synthesis_round (
+             answer_id, answer_version, run_id, round, synthesizer_stage,
+             candidate_artifact_ref, candidate_call_site_key,
+             evaluator_artifact_ref, evaluator_call_site_key,
+             evaluator_satisfied, sealed_at_seq
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [
+            answer.rows[0]!.answer_id,
+            answerVersion,
+            input.runId,
+            round.round,
+            round.synthesizerRequest.stage,
+            round.candidateRef,
+            round.candidateCallSiteKey,
+            round.verdictRef,
+            round.verdictCallSiteKey,
+            round.verdict.satisfied,
+            await allocateSequence(client)
+          ]
+        );
+      }
+      // T6 / J14 ADDENDUM — the reason each class-H/class-D record names is
+      // checked against the ledger HERE. Two mechanisms do two different jobs,
+      // and the transaction is NOT the one that excludes a concurrent review:
+      // it makes this check atomic with the answer version, so a later failure
+      // rolls the whole version back. What stops a review INSERT landing
+      // between the negative SELECT and the condition-mark INSERT is the shared
+      // per-run content lease — `ServeRepository.persist` takes it above, and
+      // `recordReviewWithMeasurements`, the review writer, takes the same one.
+      // The mutual-exclusion note on `resolveTrueUnjudgedReasons` carries the
+      // full argument and the condition under which it expires.
+      // The review arm's provenance is RESOLVED rather than accepted: what goes
+      // into `review_ref` is the row the ledger actually holds.
+      const unjudgedProvenance = await resolveTrueUnjudgedReasons(client, input.runId, conditionMarkRecords);
+      for (const [recordIndex, record] of conditionMarkRecords.entries()) {
+        const provenance = unjudgedProvenance[recordIndex]!;
         const mark = await client.query<{ condition_mark_id: string }>(
           `INSERT INTO serve.condition_mark (
              answer_id, answer_version, mark, scope, subject_ref, reason, lift_path, served_root_rule,
-             call_site_key, planned_leg_count, terminal_transport_outcome, hidden_strength,
+             call_site_key, planned_leg_count, terminal_transport_outcome, review_outcome,
+             review_ref, review_node_ref, hidden_strength,
              hidden_score_threshold, hidden_score_threshold_source_ref, excluded_from_served_number,
              judged_basis_count, at_seq
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
            RETURNING condition_mark_id`,
           [
             answer.rows[0]!.answer_id,
@@ -1178,6 +2166,9 @@ export class ServeRepository {
             record.callSiteKey ?? null,
             record.plannedLegCount ?? null,
             record.terminalTransportOutcome ?? null,
+            record.reviewOutcome ?? null,
+            provenance.reviewRef,
+            provenance.reviewNodeRef,
             record.hiddenStrength ?? null,
             record.hiddenScoreThreshold ?? null,
             record.hiddenScoreThresholdSourceRef ?? null,
@@ -1247,6 +2238,79 @@ export class ServeRepository {
       [answerId, answerVersion]
     );
     return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  /**
+   * T9 / J25 — read the persisted loop-round records for one sealed answer
+   * version, in round order.
+   *
+   * This exists so the DoD's round assertions can be made where a READER
+   * stands, on the far side of the write. A test that inspects the array
+   * `runServeGateChain` just returned proves the function returned it and
+   * nothing more; this method is what lets the same claim be made about the
+   * record.
+   */
+  /**
+   * T9 / J25 + J29 — read the persisted loop-round records for one sealed answer
+   * version, in round order.
+   *
+   * OWNERSHIP AND LEASE, like every other content reader. codex r2 B1: the first
+   * version took only `(answerId, answerVersion)` and returned plaintext, so any
+   * caller holding another answer's UUID could pull its whole transcript, and no
+   * lease guarded the decrypt. It now normalizes ownership exactly as
+   * `readAnswerProjection` does, reads under the run's content lease, and
+   * decrypts the one carrier this table holds.
+   *
+   * The candidate statement, the evaluator request and the verdict are NOT read
+   * from here — they are not stored here. Each round hands back the two typed
+   * artifact keys so a caller resolves them through `ledger.raw_artifact`.
+   */
+  async readSynthesisRounds(
+    answerId: string,
+    ownership: RunOwnershipInput,
+    answerVersion: number
+  ): Promise<readonly PersistedSynthesisRound[]> {
+    const access = normalizeRunOwnership(ownership);
+    const rows = await this.pool.query<{
+      run_id: string;
+      round: number;
+      synthesizer_stage: "INITIAL" | "RETRY";
+      candidate_artifact_ref: string;
+      candidate_call_site_key: string;
+      evaluator_artifact_ref: string;
+      evaluator_call_site_key: string;
+      evaluator_satisfied: boolean;
+    }>(
+      `SELECT synthesis_round.run_id::text, synthesis_round.round,
+              synthesis_round.synthesizer_stage,
+              synthesis_round.candidate_artifact_ref::text, synthesis_round.candidate_call_site_key,
+              synthesis_round.evaluator_artifact_ref::text, synthesis_round.evaluator_call_site_key,
+              synthesis_round.evaluator_satisfied
+         FROM serve.synthesis_round AS synthesis_round
+         JOIN serve.answer AS answer
+           ON answer.answer_id = synthesis_round.answer_id
+          AND answer.answer_version = synthesis_round.answer_version
+         JOIN core.run AS run ON run.run_id = answer.run_id
+        WHERE synthesis_round.answer_id=$1 AND synthesis_round.answer_version=$2
+          AND core.run_is_owned_by(run.run_id,$3,$4)
+        ORDER BY synthesis_round.round`,
+      [answerId, answerVersion, access.ownerRef, access.legacyAskerId]
+    );
+    if (rows.rows.length === 0) return Object.freeze([]);
+    // The lease is kept even though this table now holds no content: the rows
+    // point AT content carriers, and a reader that resolves them must not race
+    // an erasure that is shredding the run's key underneath it.
+    return withRunContentLease(this.pool, [rows.rows[0]!.run_id], async () => Object.freeze(
+      rows.rows.map((row) => Object.freeze({
+        round: Number(row.round),
+        synthesizerStage: row.synthesizer_stage,
+        candidateArtifactRef: row.candidate_artifact_ref,
+        candidateCallSiteKey: row.candidate_call_site_key,
+        evaluatorArtifactRef: row.evaluator_artifact_ref,
+        evaluatorCallSiteKey: row.evaluator_call_site_key,
+        evaluatorSatisfied: row.evaluator_satisfied
+      }))
+    ));
   }
 
   async readReviewCatchUpSource(runId: string): Promise<ReviewCatchUpSource> {
@@ -1467,7 +2531,7 @@ export class ServeRepository {
       replay_handle: string;
       provenance_ref: string;
       events: Array<{
-        status: "PRESENT" | "EVICTED" | "WITHHELD";
+        status: "PRESENT" | "EVICTED";
         reason: string | null;
         atSequence: number | string;
       }>;
@@ -1511,9 +2575,6 @@ export class ServeRepository {
         currentRead ? undefined : Number(row.sealed_at_seq)
       ).status;
       if (status === "EVICTED") return { status, mark: "MISSING-NUMBER" };
-      if (status === "WITHHELD") {
-        return { status, reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED", components: [] };
-      }
       return {
         status: "PRESENT",
         number: {
@@ -1541,10 +2602,18 @@ export class ServeRepository {
       subject_ref: string;
       reason: string;
       lift_path: string | null;
-      served_root_rule: "first-configured-provider" | null;
+      // T10 / codex r1 B3: the READ vocabulary. This row may have been sealed
+      // before migration 0055, in which case it carries the retired rule — the
+      // migration preserves it deliberately. Typing it live-only here made the
+      // projection assert that a value it really returns cannot exist.
+      served_root_rule: ServedRootRuleHistory | null;
       call_site_key: string | null;
       planned_leg_count: number | null;
       terminal_transport_outcome: "TIMED_OUT" | "FAILED" | null;
+      // T6 / J14 ADDENDUM (1): narrowed at the READ because the column is
+      // narrowed at the WRITE — `condition_mark_review_outcome_check` admits
+      // only `cannot-assess` in this arm, VALID over the existing rows.
+      review_outcome: "cannot-assess" | null;
       hidden_strength: number | null;
       hidden_score_threshold: number | null;
       hidden_score_threshold_source_ref: string | null;
@@ -1553,7 +2622,7 @@ export class ServeRepository {
       affected_node_ids: string[];
     }>(
       `SELECT mark, scope, subject_ref, reason, lift_path, served_root_rule,
-              call_site_key, planned_leg_count, terminal_transport_outcome,
+              call_site_key, planned_leg_count, terminal_transport_outcome, review_outcome,
               hidden_strength, hidden_score_threshold, hidden_score_threshold_source_ref,
               excluded_from_served_number, judged_basis_count,
               ARRAY(SELECT link.node_id::text FROM serve.condition_mark_node AS link
@@ -1621,6 +2690,7 @@ export class ServeRepository {
         call_site_key: record.call_site_key,
         planned_leg_count: record.planned_leg_count,
         terminal_transport_outcome: record.terminal_transport_outcome,
+        review_outcome: record.review_outcome,
         hidden_strength: record.hidden_strength === null ? null : Number(record.hidden_strength),
         hidden_score_threshold: record.hidden_score_threshold === null ? null : Number(record.hidden_score_threshold),
         hidden_score_threshold_source_ref: record.hidden_score_threshold_source_ref,
@@ -2033,7 +3103,10 @@ export class ServeRepository {
       model_version: string | null;
       provider: string | null;
       provider_ref: string | null;
-      review_outcome: "agree" | "dispute" | "cannot-assess" | null;
+      // T6 r4: `review.outcome` from `ledger.node_review` — the reviewer's own
+      // verdict, whose CHECK admits all three outcomes. NOT the condition-mark
+      // disclosure column narrowed below; see `StoredNodeReviewOutcome`.
+      review_outcome: StoredNodeReviewOutcome | null;
       review_reasons: string[] | null;
       node_review_id: string | null;
       review_content_ciphertext: CryptoEnvelope | null;

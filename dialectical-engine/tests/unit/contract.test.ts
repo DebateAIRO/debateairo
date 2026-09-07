@@ -321,7 +321,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
     expect(() => AnswerSchema.parse({ ...answer, serve_state: "BLOCKED" })).toThrow();
   });
 
-  it("FX-SRV-06 admits exactly PRESENT, EVICTED, and strict-AND WITHHELD slots", () => {
+  it("FX-SRV-06 admits exactly PRESENT and EVICTED slots — the withheld slot is repealed", () => {
     const number = {
       value: 0.7,
       kind: "test-layer",
@@ -332,12 +332,14 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
     };
     expect(NumberSlotSchema.parse({ status: "PRESENT", number }).status).toBe("PRESENT");
     expect(NumberSlotSchema.parse({ status: "EVICTED", mark: "MISSING-NUMBER" }).status).toBe("EVICTED");
-    expect(NumberSlotSchema.parse({
+    expect(() => NumberSlotSchema.parse({ status: "ABSENT" })).toThrow();
+    // T8 / S5-2: the withheld slot went with the branch that produced it. No
+    // reason — not even its own former literal — can revive it.
+    expect(() => NumberSlotSchema.parse({
       status: "WITHHELD",
       reason: "STRICT_AND_CONJUNCT_UNJUDGED_OR_ABSTAINED",
       components: [number]
-    }).status).toBe("WITHHELD");
-    expect(() => NumberSlotSchema.parse({ status: "ABSENT" })).toThrow();
+    })).toThrow();
     expect(() => NumberSlotSchema.parse({
       status: "WITHHELD", reason: "NO_OPERATOR_DECLARATION", components: []
     })).toThrow();

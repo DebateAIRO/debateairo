@@ -19,10 +19,13 @@ import { RECOVERY_POLICY_REGISTER_ROW } from "./recovery-policy.js";
 import { SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
-export const ENGINE_BRANCHING_FACTOR = 2 as const;
-export const ENGINE_COMPOSITION_SEGMENT_CAP = 2 as const;
-export const ENGINE_FIXED_ORGANS_PER_COMPOSITION = 1 + ENGINE_COMPOSITION_SEGMENT_CAP + 1;
-export const ENGINE_MAX_RECOMPOSE = 2 as const;
+export {
+  ENGINE_BAND_ORDER,
+  ENGINE_BRANCHING_FACTOR,
+  ENGINE_COMPOSITION_SEGMENT_CAP,
+  ENGINE_FIXED_ORGANS_PER_COMPOSITION,
+  ENGINE_MAX_RECOMPOSE
+} from "./engine-shape.js";
 
 const unitIntervalSchema = z.number().finite().min(0).max(1);
 const compositionMetricSchema = z.enum([
@@ -166,35 +169,176 @@ export interface StructuralCeilingInput {
   readonly branchingFactor: number;
   readonly compositionSegmentCap: number;
   readonly fixedOrgansPerComposition: number;
+  /**
+   * T17 — the sealed `envelopeFormulaInputs` row's terms. Every one of them is
+   * READ from the register (`readEnvelopeFormulaInputs`) and passed by the
+   * entry point; none is a code constant and none is re-declared here.
+   */
+  readonly reviewerCallsPerNode: number;
+  readonly synthesizerMaxRounds: number;
+  readonly evaluatorMaxRounds: number;
+  /**
+   * T17/B2 — the SEALED maximum depth. Admission refuses ABOVE it rather than
+   * minting a ceiling the run head's parser would reject later, after the ask
+   * was already admitted.
+   */
+  readonly maxDepth: number;
 }
 
-/** DR-181/182: an invisible bug tripwire derived from the engine's exported facts. */
+/**
+ * The DECLARED members, checked by name. Iterating `Object.entries(input)`
+ * instead — as DR-184-v2 did — validates only the members a caller happened to
+ * pass, so an omitted term reached the arithmetic as `undefined` and minted a
+ * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
+ */
+const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Object.freeze([
+  "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
+  "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
+  "compositionSegmentCap", "fixedOrgansPerComposition",
+  "reviewerCallsPerNode", "synthesizerMaxRounds", "evaluatorMaxRounds", "maxDepth"
+]);
+
+/**
+ * DR-181/182 + T17 (DR-184-v3): an invisible bug tripwire derived from the
+ * engine's exported facts and T16's sealed envelope row.
+ *
+ * The ceiling counts CALL SITES and multiplies each by the attempts that site
+ * can spend. Four legs, each one measured off the shipped runner:
+ *
+ *  · AUTHOR — one call per materialized node, wrapped in `withCooldownRetry`
+ *    (apps/runner/src/index.ts:250). That helper runs TWO provider sequences,
+ *    but they do NOT each get a fresh allowance: the shipped gateway counts
+ *    attempts CUMULATIVELY per call-site key off the ledger and passes
+ *    `remaining = bound.maxAttempts - consumed` (apps/runner/src/index.ts
+ *    :3565-3577, `remainingProviderAttempts`). So sequence 1 spends
+ *    `judgeMaxAttempts` and sequence 2 spends only the `finalRetryAttempts`
+ *    that remain: `judgeMaxAttempts + finalRetryAttempts` for the SITE.
+ *    (An earlier draft of this formula read the second sequence as a fresh
+ *    allowance and provisioned `2*judge + final`. The maximum-path ledger test
+ *    in tests/integration/t17-envelope-ledger.test.ts measured 4 attempts at a
+ *    site it had modelled as 7 and refuted it — the reason that test reads a
+ *    real ledger instead of a second in-memory model of this same file.)
+ *  · PANEL — the sealed row's `panelCallsPerNodeBasis` NAMES this leg's basis
+ *    (`PANEL_SIZE_MINUS_ONE`) and its own zod literal is the loud stop for any
+ *    other basis, so the derivation below is the row's, never this file's.
+ *    `runNodePanel` hands every configured maker to `runJudgePanel`,
+ *    which skips the author (PRODUCER_GRADING_FORBIDDEN) and calls the rest:
+ *    `panelSize - 1` calls per materialized node, at every node, not just the
+ *    roots. Not cooldown-wrapped, so `judgeMaxAttempts` each. DR-184-v2
+ *    counted this leg at ZERO — the defect F36 exists to close.
+ *  · REVIEWER — `reviewerCallsPerNode` cross-maker reviews per materialized
+ *    node, deduped by node and cooldown-wrapped like the author leg.
+ *  · SERVE — the two serve chains are MUTUALLY EXCLUSIVE. The composition
+ *    organs are what ships today, and their count is DECOMPOSED rather than
+ *    taken as `maxRecompose * fixedOrgansPerComposition`: the chain
+ *    (packages/serve/src/index.ts:505-580) calls the composer once and
+ *    conformance once per segment INSIDE the recompose loop, but post-compose
+ *    R9 ONCE AFTER it. `ENGINE_FIXED_ORGANS_PER_COMPOSITION` bundles all three
+ *    as `1 + segmentCap + 1` and multiplying it by the rounds bills R9 once per
+ *    round, which the chain never does. Measured from a ledger in
+ *    tests/integration/t17-envelope-ledger.test.ts: 2 composers + 4 conformance
+ *    + 1 R9 = SEVEN sites at maxRecompose=2, segmentCap=2 — not eight.
+ *    (This was the second unmeasured premise, of the same class as the cooldown
+ *    term: a constant multiplied by rounds without anyone counting the sites.)
+ *    T9 retires them and leaves the synthesizer/evaluator loop
+ *    (`synthesizerMaxRounds + evaluatorMaxRounds` role calls, one synthesizer
+ *    and one evaluator per round). The leg is therefore the MAXIMUM of the two
+ *    — a tight cover in both worlds, where the sum would be slack in both.
+ *
+ * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
+ * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
+ * so a repair is one of the `maxAttempts` the site already provisions.
+ */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
   readonly max_model_attempts: number;
 } {
-  for (const [name, value] of Object.entries(input)) {
-    if (!Number.isInteger(value) || value < 1) throw new TypeError(`STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`);
+  for (const name of STRUCTURAL_CEILING_MEMBERS) {
+    const value = input[name];
+    if (!Number.isInteger(value) || value < 1) {
+      throw new TypedDomainError(
+        `STRUCTURAL_CEILING_${name.toUpperCase()}_INVALID`,
+        `The structural ceiling input ${name} must be a positive integer`
+      );
+    }
+  }
+  if (input.depth > input.maxDepth) {
+    // B2: the refusal belongs HERE, at admission. `evaluateAskAdmission` wraps
+    // this call and `markAskRefusal` turns a TypedDomainError into an
+    // AskRefusal, so an over-bound ask is refused on the 422 face before any
+    // provider spend — instead of minting a positive ceiling that only stops
+    // later when the runner resolves the depth or parses the stored basis.
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM",
+      `Requested depth ${input.depth} exceeds the sealed maximum depth ${input.maxDepth}`
+    );
   }
   const nodesPerRoot = input.panelSize === 1
     ? 1
     : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
-  if (!Number.isInteger(nodesPerRoot)) throw new TypeError("STRUCTURAL_CEILING_TREE_INVALID");
-  const authored = input.panelSize === 1
+  if (!Number.isInteger(nodesPerRoot)) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_TREE_INVALID", "The expansion tree is not integral");
+  }
+  // S2-2: the walking-skeleton literal is reachable at M=1 only — one node, no
+  // panel, no cross-maker review.
+  const materializedNodes = input.panelSize === 1
     ? 1
     : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
-  const reviews = input.panelSize === 1 ? 0 : authored;
-  const fixedSites = input.maxRecompose * input.fixedOrgansPerComposition;
-  const maxModelAttempts = (authored + reviews) * (input.judgeMaxAttempts + input.finalRetryAttempts)
-    + fixedSites * input.organMaxAttempts;
+  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
+  const authorSites = materializedNodes;
+  const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
+  const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
+  // Per ROUND: one composer + one conformance per segment. Per RUN: one
+  // post-compose R9, outside the loop.
+  const compositionSitesPerRound = 1 + input.compositionSegmentCap;
+  const postComposeSitesPerRun = 1;
+  const compositionSites = input.maxRecompose * compositionSitesPerRound + postComposeSitesPerRun;
+  // The sealed row still declares `fixedOrgansPerComposition`. It is no longer
+  // multiplied by the rounds, but it must stay COHERENT with the shape above,
+  // or a deployment could seal a topology this decomposition never measured.
+  if (input.fixedOrgansPerComposition !== compositionSitesPerRound + postComposeSitesPerRun) {
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT",
+      `fixedOrgansPerComposition ${input.fixedOrgansPerComposition} does not equal `
+      + `1 composer + ${input.compositionSegmentCap} conformance + 1 post-compose organ`
+    );
+  }
+  const synthesisLoopSites = input.synthesizerMaxRounds + input.evaluatorMaxRounds;
+  const serveSites = Math.max(compositionSites, synthesisLoopSites);
+  const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
+    + panelSites * input.judgeMaxAttempts
+    + serveSites * input.organMaxAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
     panel_size: input.panelSize,
     depth: input.depth,
-    per_site_attempts: Object.freeze({ judge: input.judgeMaxAttempts, organ: input.organMaxAttempts }),
+    per_site_attempts: Object.freeze({
+      judge: input.judgeMaxAttempts,
+      organ: input.organMaxAttempts,
+      panel_member: input.judgeMaxAttempts,
+      cooldown_site: cooldownSiteAttempts
+    }),
+    call_sites: Object.freeze({
+      author: authorSites,
+      panel: panelSites,
+      reviewer: reviewerSites,
+      serve: serveSites
+    }),
+    /**
+     * Which serve chain bound the leg, so a reader of a stored receipt can see
+     * WHICH topology the run was admitted under. After T9 merges, a basis that
+     * still reports COMPOSITION is a basis minted against a retired chain.
+     */
+    serve_leg: Object.freeze({
+      composition_sites: compositionSites,
+      composition_sites_per_round: compositionSitesPerRound,
+      post_compose_sites_per_run: postComposeSitesPerRun,
+      synthesis_loop_sites: synthesisLoopSites,
+      selected: compositionSites >= synthesisLoopSites ? "COMPOSITION" : "SYNTHESIS_LOOP"
+    }),
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-184-v2",
+    formula_version: "DR-184-v3",
     bounds_source_ref: "engine-exports+register"
   });
 }
@@ -561,6 +705,35 @@ export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRe
     }
   }
 }
+
+export {
+  ADAPTIVE_STOPPING_ROW_KEYS,
+  ALGORITHM_REGISTER_ROW_FAMILIES,
+  ALGORITHM_REGISTER_ROW_KEYS,
+  ENVELOPE_FORMULA_ROW_KEYS,
+  PANEL_WEIGHTING_ROW_KEYS,
+  SYNTHESIS_ROLE_ROW_KEYS,
+  SYNTHESIS_ROLE_REFS_IDENTICAL_WARNING,
+  T16_ROLE_RULING_REF,
+  VERDICT_LABEL_ROW_KEYS,
+  buildAlgorithmRegisterRows,
+  buildOneStepDownBands,
+  warnOnIdenticalSynthesisRoleRefs,
+  readAdaptiveStoppingControls,
+  readEnvelopeFormulaInputs,
+  readPanelWeightingControls,
+  readSynthesisRoleControls,
+  readVerdictLabelControls,
+  type AdaptiveStoppingControls,
+  type AlgorithmRegisterRow,
+  type AlgorithmRegisterRowFamily,
+  type AlgorithmRegisterRowsInput,
+  type EnvelopeFormulaInputs,
+  type PanelWeightingControls,
+  type ProviderFamilyEntry,
+  type SynthesisRoleControls,
+  type VerdictLabelControls
+} from "./algorithm-policy.js";
 
 export {
   loadApiEnvironment,

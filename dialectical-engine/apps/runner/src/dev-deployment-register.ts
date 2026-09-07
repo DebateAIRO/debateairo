@@ -1,18 +1,23 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool, PoolClient } from "pg";
+import { EVALUATOR_CONTRACT_TEXT } from "./index.js";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   AUTH_POLICY_REGISTER_ROWS,
+  ENGINE_BAND_ORDER,
   MFA_POLICY_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
+  buildAlgorithmRegisterRows,
   loadBootstrapRegister,
+  warnOnIdenticalSynthesisRoleRefs,
   persistBootstrapRegister,
-  type BootstrapRegister
+  type BootstrapRegister,
+  type ProviderFamilyEntry
 } from "@debateai/register";
-import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import type { DevelopmentConfiguredProvider, DevelopmentProviderPanel } from "./dev-provider-panel.js";
 
 export type DevelopmentDeploymentRegisterRow = Readonly<{
   rowKey: string;
@@ -24,6 +29,9 @@ export const DEVELOPMENT_SOURCE_REF =
   "DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05" as const;
 export const DEVELOPMENT_RUNNER_SOURCE_REF =
   "DEV-12D-development-runner-policy.md#sealed-v2" as const;
+/** T16 · dev provenance for every sealed algorithm row (goal-v4 lines 80-96). */
+export const DEVELOPMENT_ALGORITHM_SOURCE_REF =
+  "DEV-T16-algorithm-register.md#goal-v4:80-96" as const;
 export const DEVELOPMENT_ORGAN_COST_BOUNDS = Object.freeze({
   kind: "ACCEPTANCE_ORGAN_COST_BOUNDS" as const,
   organs: Object.freeze({
@@ -39,7 +47,16 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
   max_cooldown_holds_per_run: 2,
   applies_to: "TRANSPORT_EXHAUSTION" as const
 });
-export const DEVELOPMENT_REGISTER_VERSION = 4 as const;
+/**
+ * T16 · version 4 is HISTORICAL and sealed: it exists in every dev database
+ * created before this lane and must never be re-opened to receive rows. The
+ * fifteen algorithm rows land in a NEWLY MINTED version 5, which becomes the
+ * current dev register. Every launch pin derives from this constant — the
+ * `REGISTER_VERSION=<n>` fixtures below are generated, never hand-written, so
+ * a future bump can never silently disarm them.
+ */
+export const DEVELOPMENT_REGISTER_VERSION = 5 as const;
+export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 4 as const;
 
 const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
   Object.freeze({
@@ -85,6 +102,86 @@ export function buildDevelopmentDeploymentRegisterRows(
   ]);
 }
 
+/**
+ * T16 · the provider→family map, read off the deployment's OWN configured
+ * provider set so the family names are exactly what the relay layer calls its
+ * makers (DECISIONS J1). First-appearance order is preserved.
+ */
+export function deriveProviderFamilies(
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
+): readonly ProviderFamilyEntry[] {
+  const byMaker = new Map<string, string[]>();
+  for (const provider of configuredProviders) {
+    const providerRefs = byMaker.get(provider.maker);
+    if (providerRefs === undefined) byMaker.set(provider.maker, [provider.providerRef]);
+    else providerRefs.push(provider.providerRef);
+  }
+  if (byMaker.size === 0) throw new TypeError("DEV_ALGORITHM_REGISTER_FAMILY_MAP_UNRESOLVED");
+  return Object.freeze([...byMaker].map(([familyRef, providerRefs]) =>
+    Object.freeze({ familyRef, providerRefs: Object.freeze([...providerRefs]) })
+  ));
+}
+
+/**
+ * T16 · dev-provisional synthesizer and evaluator identities (ruling J8): the
+ * first two configured providers of DIFFERENT makers. Identical refs stay
+ * lawful (goal 84-85) but the seeding entrypoint warns once (ruling J7); this
+ * default seeds two different ones, so the warning must not fire by default.
+ */
+export function deriveSynthesisRoleRefs(
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
+): Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string }> {
+  const families = deriveProviderFamilies(configuredProviders);
+  if (families.length < 2) throw new TypeError("DEV_ALGORITHM_REGISTER_ROLE_REFS_UNRESOLVED");
+  return Object.freeze({
+    synthesizerRoleRef: families[0]!.providerRefs[0]!,
+    evaluatorRoleRef: families[1]!.providerRefs[0]!
+  });
+}
+
+export type DevelopmentSynthesisRoleRefs = Readonly<{
+  synthesizerRoleRef: string;
+  evaluatorRoleRef: string;
+}>;
+
+/**
+ * Goal 84-85 PERMITS identical synthesizer and evaluator refs (and requires a
+ * warning when they are). An operator therefore needs a way to configure them;
+ * without one the permitted case is unreachable and its warning is dead code.
+ * Each override must name a CONFIGURED provider identity — an unknown ref
+ * fails loudly rather than sealing a role nothing can serve.
+ */
+export function resolveDevelopmentSynthesisRoleRefs(
+  providerPanel: DevelopmentProviderPanel,
+  source: Readonly<Record<string, string | undefined>> = {}
+): DevelopmentSynthesisRoleRefs {
+  const derived = deriveSynthesisRoleRefs(providerPanel.configuredProviders);
+  const configured = new Set(providerPanel.configuredProviders.map((provider) => provider.providerRef));
+  const resolve = (override: string | undefined, fallback: string): string => {
+    if (override === undefined || override.trim() === "") return fallback;
+    if (!configured.has(override)) {
+      throw new TypeError(`DEV_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED:${override}`);
+    }
+    return override;
+  };
+  return Object.freeze({
+    synthesizerRoleRef: resolve(source.DEBATEAI_DEV_SYNTHESIZER_ROLE_REF, derived.synthesizerRoleRef),
+    evaluatorRoleRef: resolve(source.DEBATEAI_DEV_EVALUATOR_ROLE_REF, derived.evaluatorRoleRef)
+  });
+}
+
+export function buildDevelopmentAlgorithmRegisterRows(
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders)
+): readonly DevelopmentDeploymentRegisterRow[] {
+  return Object.freeze(buildAlgorithmRegisterRows({
+    deploymentSourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF,
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    providerFamilies: deriveProviderFamilies(providerPanel.configuredProviders)
+  }).map((row) => Object.freeze(row)));
+}
+
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
 function requireMatch(source: string, expression: RegExp, label: string): string {
@@ -93,6 +190,7 @@ function requireMatch(source: string, expression: RegExp, label: string): string
   return value;
 }
 
+
 async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
   const [judge, runner, propagation, serve] = await Promise.all([
     readFile(new URL("../../../packages/judgement/src/index.ts", import.meta.url), "utf8"),
@@ -100,11 +198,6 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
     readFile(new URL("../../../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
-    .map((match) => match[1]!);
-  if (conformanceTexts.length !== 2) {
-    throw new TypeError("DEV_RUNNER_CONTRACT_TEXT_UNRESOLVED:conformance");
-  }
   const values = Object.freeze({
     judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
     composerContractHash: digest(requireMatch(
@@ -112,7 +205,10 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
       /content: "(Return only JSON with a segments array[^"]+)"/,
       "composer"
     )),
-    conformanceContractHash: digest(conformanceTexts.join("\n")),
+    conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),
+    // codex r2 B1a: the fingerprint is taken from the constant the runner
+    // SENDS, not from a search of the runner's source. There is nothing left
+    // for a comment, string, regex or template literal to confuse.
     propagationContractHash: digest(propagation),
     serveContractHash: digest(serve)
   });
@@ -154,8 +250,8 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
     {
       rowKey: "wayOfKnowingCeiling",
       value: Object.freeze({
-        bandOrder: Object.freeze(["CAPPED", "FULL"]),
-        ceilingLabels: Object.freeze(["DEFAULT_CEILING", "REASONING_CEILING"]),
+        bandOrder: ENGINE_BAND_ORDER,
+        ceilingLabels: Object.freeze(["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"]),
         defaultCeiling: Object.freeze({
           label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band"
         }),
@@ -163,7 +259,16 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
           minimumShares: Object.freeze({ REASONING: 0.5 }),
           label: "REASONING_CEILING", ceilingBand: "CAPPED",
           liftPath: "gather-evidence-to-lift"
-        })])
+        })]),
+        // F-T9B-3, the DEVELOPMENT twin of the acceptance entry: the floor a
+        // run is entitled to on NO VERIFIED EVIDENCE. The reasoning-share cut
+        // above names the right band for that case and the wrong reason — its
+        // trigger cannot fire on an empty basis.
+        emptyBasisFloor: Object.freeze({
+          label: "NO_VERIFIED_EVIDENCE_FLOOR",
+          ceilingBand: "CAPPED",
+          liftPath: "gather-any-verified-evidence-to-lift"
+        })
       }),
       sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF
     },
@@ -199,6 +304,8 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
 type SeedDevelopmentDeploymentRegisterInput = Readonly<{
   adminPool: Pool;
   providerPanel: DevelopmentProviderPanel;
+  /** Defaults to the two-different-makers derivation; the CLI supplies operator overrides. */
+  roleRefs?: DevelopmentSynthesisRoleRefs;
 }>;
 
 export type DevelopmentDeploymentRegisterReceipt = Readonly<{
@@ -219,7 +326,8 @@ function canonicalJson(value: unknown): string {
 
 function developmentRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs
 ): readonly DevelopmentDeploymentRegisterRow[] {
   const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
     Object.freeze({
@@ -235,7 +343,8 @@ function developmentRows(
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
-    ...buildDevelopmentDeploymentRegisterRows(providerPanel)
+    ...buildDevelopmentDeploymentRegisterRows(providerPanel),
+    ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
@@ -245,9 +354,13 @@ function developmentRows(
 
 async function expectedRunnerRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs
 ): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  const rows = [...developmentRows(bootstrap, providerPanel), ...await buildDevelopmentRunnerRegisterRows()];
+  const rows = [
+    ...developmentRows(bootstrap, providerPanel, roleRefs),
+    ...await buildDevelopmentRunnerRegisterRows()
+  ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_RUNNER_REGISTER_DEFINITION_INVALID");
   }
@@ -271,6 +384,9 @@ async function insertAndSeal(
      VALUES ($1,$2,true)`,
     [registerVersion, rows.length]
   );
+  // T16 · the migration-declared manifest fails the seal loudly, naming the
+  // family and row key, if any mandatory row was not supplied.
+  await client.query("SELECT register.assert_required_rows($1)", [registerVersion]);
   if (await readExactState(client, registerVersion, rows) !== "EXACT") {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DRIFT");
   }
@@ -363,6 +479,15 @@ export async function seedDevelopmentDeploymentRegister(
   input: SeedDevelopmentDeploymentRegisterInput
 ): Promise<DevelopmentDeploymentRegisterReceipt> {
   const bootstrap = await loadBootstrapRegister();
+  const roleRefs = input.roleRefs
+    ?? deriveSynthesisRoleRefs(input.providerPanel.configuredProviders);
+  // Ruling J7: the seeding entrypoint IS T16's startup surface. Emitted before
+  // any database work so the CLI warns even when the register is already sealed.
+  warnOnIdenticalSynthesisRoleRefs({
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    deploymentRef: DEVELOPMENT_ALGORITHM_SOURCE_REF
+  });
   const authorityClient = await input.adminPool.connect();
   try {
     await assertAdmin(authorityClient);
@@ -370,7 +495,7 @@ export async function seedDevelopmentDeploymentRegister(
     authorityClient.release();
   }
   await persistOrAcceptSealedHistoricalBootstrap(input.adminPool, bootstrap);
-  const rows = await expectedRunnerRows(bootstrap, input.providerPanel);
+  const rows = await expectedRunnerRows(bootstrap, input.providerPanel, roleRefs);
   const registerVersion = DEVELOPMENT_REGISTER_VERSION;
   if (registerVersion <= bootstrap.registerVersion) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_VERSION_INVALID");

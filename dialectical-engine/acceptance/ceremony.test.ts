@@ -9,7 +9,9 @@ import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { assertFairDebate } from "./fair-debate.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
-import { seedAcceptanceRegister } from "./seed-register.js";
+import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
+import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
+import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -32,15 +34,17 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
   readonly endpoint: string;
   stop(): Promise<void>;
 }> {
-  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "GENERAL";
+  type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "EVALUATOR" | "GENERAL";
   const classifyContent = (content: string): ResponseClass => {
     try {
       const value = JSON.parse(content) as Record<string, unknown>;
       if ("statement" in value) return "JUDGE";
       if ("outcome" in value) return "REVIEW";
       if ("segments" in value) return "COMPOSE";
-      if ("conforms" in value) return "CONFORMANCE";
-      if ("pass" in value) return "R9";
+      // F-SEALEDROWS-B: T9 folded the retired `{conforms,findings}` and `{pass}`
+      // organs into ONE evaluator verdict, so those two classes no longer exist
+      // and a fixture scripting them scripts a call nobody makes.
+      if ("satisfied" in value) return "EVALUATOR";
     } catch { /* health-probe fixtures retain FIFO semantics */ }
     return "GENERAL";
   };
@@ -51,14 +55,62 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      // T3 / S2-2: the judge panel asks every NON-AUTHOR maker to assess each
+      // authored node. That leg is answered straight from the contract rather
+      // than from `pending`, so every authoring/review/compose fixture below
+      // keeps its exact queue position — the panel adds calls, it does not
+      // re-order the ceremony's scripted ones.
+      if (body.includes("Assess an existing debate node authored by another maker")) {
+        calls += 1;
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+          id: `acceptance-panel-${calls}`,
+          model: "test-layer/model",
+          choices: [{ message: { content: panelAssessmentDouble() } }]
+        }));
+        return;
+      }
+      // T3 N4: the JUDGE discriminator must be ESCAPE-SAFE. The rendered packet reaches
+      // the wire JSON-encoded, so a quoted fragment like `"statement": non-empty string`
+      // arrives as \"statement\" and never matches — the old check was dead, and only
+      // the FIFO fallback below hid it.
       const requestKind: ResponseClass = body.includes("Review an existing debate node") ? "REVIEW"
-        : body.includes("\"statement\": non-empty string") ? "JUDGE"
-          : body.includes("{conforms,findings}") ? "CONFORMANCE"
-            : body.includes("{pass}") ? "R9"
-              : body.includes("segments") && body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
-      const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
-      const content = pending.splice(matching < 0 ? 0 : matching, 1)[0]?.content;
+        : body.includes("restatement_text") ? "JUDGE"
+          // F-SEALEDROWS-B: the EVALUATOR discriminator is the SHIPPED prompt
+          // itself (see `test-fixtures/evaluator-double.ts`), so it cannot go
+          // stale against the runner the way the two retired ones did. Measured
+          // before the repair: the evaluator call matched NONE of the four
+          // discriminators here and fell through to GENERAL, where the FIFO
+          // fallback answered it out of whatever queue it landed on.
+          : isEvaluatorPacket(body) ? "EVALUATOR"
+            : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      // T3 N4: never GUESS ACROSS CLASSES — in EITHER direction. A request of
+      // any class, GENERAL included, consumes the first scripted response of
+      // ITS OWN class and otherwise refuses by name; FIFO order survives WITHIN
+      // a class, which is all the untyped health probes ever needed.
+      //
+      // This was one-directional until a mutant said so. Only RECOGNISED
+      // requests were held to the rule; an UNRECOGNISED one still took the head
+      // of the queue whatever class sat there — which is exactly how the
+      // EVALUATOR call was answered out of a retired-conformance queue before
+      // F-SEALEDROWS-B was repaired. It also made the repair untestable: with a
+      // deliberately dead EVALUATOR discriminator the call fell through to
+      // GENERAL, the fallback served the evaluator entry anyway, and this
+      // ceremony stayed GREEN while classifying nothing
+      // (`logs/demo-path/r1-mut-M3-dead-discriminator-ceremony.log`). A wrong
+      // class must cost a refusal, never a lucky answer.
+      const matching = pending.findIndex((entry) => entry.kind === requestKind);
       calls += 1;
+      if (matching < 0) {
+        response.writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ error: "PROVIDER_DOUBLE_UNSCRIPTED_CLASS", requestKind }));
+        return;
+      }
+      const scripted = pending.splice(matching, 1)[0]?.content;
+      // T5/S3-1: a review response must measure exactly the edges THIS call
+      // offered, so the declared policy is resolved against the live request.
+      const content = scripted !== undefined && requestKind === "REVIEW"
+        ? withRequestDerivedBearings(scripted, body)
+        : scripted;
       if (content === undefined) {
         response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "UNEXPECTED_TEST_CALL" }));
         return;
@@ -100,8 +152,34 @@ function judgementDouble(statement: string): string {
   });
 }
 
-function reviewDouble(outcome: "agree" | "dispute" | "cannot-assess", reason: string): string {
-  return JSON.stringify({ outcome, reasons: [reason] });
+/**
+ * T5/S3-1: the review artifact now also carries one bearing per edge the
+ * reviewed node sources, and the count is pinned to the edges the CALL offered
+ * — which a scripted string cannot know. The fixture declares a POLICY and the
+ * double above expands it against the real request.
+ *
+ * The default is `cannot-assess`: this double does not assess bearings and says
+ * so in the goal's own vocabulary rather than claiming to have measured zero
+ * edges. Those edges stay UNKNOWN and contribute nothing, so the ceremony's
+ * numbers are exactly what they were before T5 landed.
+ */
+function reviewDouble(
+  outcome: "agree" | "dispute" | "cannot-assess",
+  reason: string,
+  bearings: ReviewBearingPolicy = "cannot-assess"
+): string {
+  return JSON.stringify({ outcome, reasons: [reason], edge_bearings: { __policy: bearings } });
+}
+
+/** T3 / S2-2: one panel member's assessment of a node another maker authored. */
+function panelAssessmentDouble(): string {
+  return JSON.stringify({
+    steelman: { summary: "The strongest reading of the assessed node.", fidelity: 0.61 },
+    critic: { summary: "A plausible counter to the assessed node.", counterargumentStrength: 0.34, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.61, relevance: 0.61 },
+    context: { fit: 0.61, ambiguityFlags: [] },
+    fallacy: { severity: 0.34, fatalFlags: [] }
+  });
 }
 
 beforeAll(async () => {
@@ -117,10 +195,7 @@ beforeAll(async () => {
     JSON.stringify({ segments: [
       { segment_id: "segment:verdict", text: "A provisional acceptance answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:next", text: "Verify the proposal independently.", node_refs: [], served_number_refs: [] }
-    ] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ conforms: true, findings: [] }),
-    JSON.stringify({ pass: true })
+    ] })
   ]);
   // PANEL-01: the second maker independently authors a root, grows both
   // primary-root children, and authors its ordered cross-root response.
@@ -130,7 +205,16 @@ beforeAll(async () => {
     judgementDouble("A genuine supporting case for the acceptance answer."),
     judgementDouble("The strongest genuine counter-position to the acceptance answer."),
     judgementDouble("The second maker directly defends its root and attacks the primary root."),
-    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`))
+    ...Array.from({ length: 4 }, (_, index) => reviewDouble("dispute", `Anthropic review ${index + 1}`)),
+    // T9 / F-SEALEDROWS-B: the sealed EVALUATOR identity is the SECOND
+    // configured family's first provider — `acceptance:claude-cli`, this
+    // double — while the SYNTHESIZER stays with `acceptance:codex-cli`. The
+    // retired conformance and R9 responses sat on the primary provider and
+    // were never consumed once T9 landed; the one call that IS made arrives
+    // here. One entry, because a satisfied verdict ends the loop in round 1
+    // and a second evaluator call would be a real change this fixture should
+    // refuse by name rather than answer.
+    evaluatorSatisfied()
   ]);
 });
 
@@ -160,6 +244,24 @@ describe("ACC-01 dry-run ceremony", () => {
       conformanceBound: bound,
       providerRef: "acceptance:codex-cli",
       maker: "OpenAI",
+      // T9 x board F33 — the class closure. `synthesisRolePolicy` is REQUIRED on
+      // WalkingSkeletonSettings, so a deployment or fixture can no longer omit the
+      // family the runner refuses over: omission is a compile error, not a claim-time
+      // surprise. Provisioning only — this refusal fires on an EARLIER gate, and both
+      // refs name this fixture's own configured provider (identical refs stay lawful,
+      // goal 84-85), so no assertion here changes.
+      synthesisRolePolicy: {
+        registerVersion: 1,
+        synthesizerRoleRef: "acceptance:codex-cli",
+        evaluatorRoleRef: "acceptance:codex-cli",
+        evaluatorLoopMaxRounds: 3,
+        identicalRoleRefs: true,
+        sourceRefs: {
+          synthesizerRoleRef: "test-layer:J8",
+          evaluatorRoleRef: "test-layer:J8",
+          evaluatorLoopMaxRounds: "test-layer:goal-v4:80-96"
+        }
+      },
       judgeContractHash: "a".repeat(64),
       composerContractHash: "b".repeat(64),
       conformanceContractHash: "c".repeat(64),
@@ -190,9 +292,16 @@ describe("ACC-01 dry-run ceremony", () => {
           sourceRef: "acceptance:test-layer",
           value: {
             bandOrder: ["CAPPED", "FULL"],
-            ceilingLabels: ["DEFAULT_CEILING"],
+            ceilingLabels: ["DEFAULT_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
             defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
-            cuts: []
+            cuts: [],
+            // F-T9B-3 / codex r1 B2: the current fixture describes its own
+            // floor, as every current sealed row now must.
+            emptyBasisFloor: {
+              label: "NO_VERIFIED_EVIDENCE_FLOOR",
+              ceilingBand: "CAPPED",
+              liftPath: "gather-any-verified-evidence-to-lift"
+            }
           }
         }
       },
@@ -216,11 +325,13 @@ describe("ACC-01 dry-run ceremony", () => {
   it("seeds idempotently, submits through the real API root, settles, and reads through the same token", async () => {
     const firstSeed = await seedAcceptanceRegister(database.pool);
     const countBefore = await database.pool.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=1"
+      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=$1",
+      [ACCEPTANCE_REGISTER_VERSION]
     );
     const secondSeed = await seedAcceptanceRegister(database.pool);
     const countAfter = await database.pool.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=1"
+      "SELECT count(*)::text AS count FROM register.register_row WHERE register_version=$1",
+      [ACCEPTANCE_REGISTER_VERSION]
     );
     expect(secondSeed).toEqual(firstSeed);
     expect(countAfter.rows[0]?.count).toBe(countBefore.rows[0]?.count);
@@ -229,7 +340,8 @@ describe("ACC-01 dry-run ceremony", () => {
     // with the ruling's own provenance (idempotent across the double seed).
     const scoringRow = await database.pool.query<{ value: string; source_ref: string }>(
       `SELECT value_json #>> '{}' AS value, source_ref FROM register.register_row
-       WHERE register_version=1 AND row_key='scoringOperator'`
+       WHERE register_version=$1 AND row_key='scoringOperator'`,
+      [ACCEPTANCE_REGISTER_VERSION]
     );
     expect(scoringRow.rows).toEqual([{ value: "accumulate", source_ref: "acceptance:DR-144:V-approved" }]);
 
@@ -332,6 +444,8 @@ describe("ACC-01 dry-run ceremony", () => {
     // DR-139(4): the served answer names each owed-but-unexecuted check.
     const answerPayload = owned.json() as {
       condition_marks: string[];
+      // T11: the code-derived three-state label the served answer carries.
+      verdict_state: string | null;
       condition_mark_records: {
         mark: string;
         subject_ref: string;
@@ -429,21 +543,36 @@ describe("ACC-01 dry-run ceremony", () => {
     expect(new Set(graphPayload.nodes.map((node) => node.review!.outcome))).toEqual(
       new Set(["agree", "dispute"])
     );
+    // T10: the served root is the STRONGER of the two authored roots, whichever
+    // maker configured first. The expectation is derived from the run's own
+    // propagated numbers — asserting node[0] here would be re-asserting the
+    // retired configuration-order rule under a new name.
+    const rootsByStrength = [positionNode, secondRootNode]
+      .slice()
+      .sort((left, right) => right.final_strength.value - left.final_strength.value
+        || (left.node_id < right.node_id ? -1 : left.node_id > right.node_id ? 1 : 0));
+    const servedRootNode = rootsByStrength[0]!;
+    const unservedRootNode = rootsByStrength[1]!;
     const unservedMakerRecord = answerPayload.condition_mark_records.find(
       (record) => record.mark === "UNSERVED-MAKER-POSITION"
     );
     expect(unservedMakerRecord).toEqual(expect.objectContaining({
-      subject_ref: positionNode.node_id,
-      served_root_rule: "first-configured-provider"
+      subject_ref: servedRootNode.node_id,
+      served_root_rule: "max-propagated-strength-lexicographic-tiebreak"
     }));
     expect(unservedMakerRecord?.reason).toContain("OpenAI");
     expect(unservedMakerRecord?.reason).toContain("Anthropic");
     expect(unservedMakerRecord?.reason).toContain(positionNode.node_id);
     expect(unservedMakerRecord?.reason).toContain(secondRootNode.node_id);
+    // A-r2-2 survives the rule change: the raw rule token stays off the human
+    // reason and lives only on the typed field. Both the retired and the live
+    // token are checked, so neither can leak back in.
     expect(unservedMakerRecord?.reason).not.toContain("first-configured-provider");
+    expect(unservedMakerRecord?.reason).not.toContain("max-propagated-strength");
     // The carried rule outcome must match served reality, not merely name a
     // policy: the served number belongs to the record's subject root.
-    expect(unservedMakerRecord?.subject_ref).toBe(positionNode.node_id);
+    expect(unservedMakerRecord?.subject_ref).toBe(servedRootNode.node_id);
+    expect(unservedRootNode.node_id).not.toBe(servedRootNode.node_id);
 
     // Honest per-node strength lineage: each recorded strength cites ITS node's
     // artifact, never the position's artifact stamped onto the counter.
@@ -461,11 +590,19 @@ describe("ACC-01 dry-run ceremony", () => {
       expect(row.source_ref).toBe(row.provenance_ref);
     }
 
-    // The served number remains the POSITION's final strength.
+    // T10: the served number is the SERVED root's final strength — the maximum
+    // over the authored roots, not the first-configured one's.
     const presentSlot = graphPayload.number_slots.find((slot) => slot.status === "PRESENT") as
       | { status: "PRESENT"; number: { value: number } }
       | undefined;
-    expect(presentSlot?.number.value).toBe(positionNode.final_strength.value);
+    expect(presentSlot?.number.value).toBe(servedRootNode.final_strength.value);
+    expect(presentSlot!.number.value).toBeGreaterThanOrEqual(unservedRootNode.final_strength.value);
+
+    // T11: the served answer carries a code-derived three-state label. Two
+    // parseable panel voices and two roots make the basis complete, so the
+    // incomplete-basis disclosure must be ABSENT here.
+    expect(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).toContain(answerPayload.verdict_state);
+    expect(answerPayload.condition_marks).not.toContain("LABEL-BASIS-INCOMPLETE");
 
     // DR-141(4): a run carrying critique packets REFUSES at terminal (Q42) —
     // the fair debate therefore records NO packet; the counter's independence

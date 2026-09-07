@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { ExpansionDepthSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
@@ -33,17 +34,107 @@ export const BATTERY_BUDGET_CONTRACTS = Object.freeze(
   }))
 );
 
+/**
+ * T17 (DR-184-v3): the run head's basis carries the four call-site legs and the
+ * serve chain it was minted against, so an audit of a stored receipt can see
+ * WHICH topology the run was admitted under. The schema is strict on purpose —
+ * a DR-184-v2 basis, which counted no panel leg, is REFUSED loudly here rather
+ * than enforced as an undercount against a live panel.
+ */
 const costEnvelopeBasisSchema = z.object({
   kind: z.literal("COMPUTED_STRUCTURAL_CEILING"),
   max_model_attempts: z.number().int().positive(),
   panel_size: z.number().int().positive(),
-  depth: z.number().int().min(1).max(5),
-  per_site_attempts: z.object({ judge: z.number().int().positive(), organ: z.number().int().positive() }).strict(),
+  depth: ExpansionDepthSchema,
+  per_site_attempts: z.object({
+    judge: z.number().int().positive(),
+    organ: z.number().int().positive(),
+    panel_member: z.number().int().positive(),
+    cooldown_site: z.number().int().positive()
+  }).strict(),
+  call_sites: z.object({
+    author: z.number().int().positive(),
+    panel: z.number().int().min(0),
+    reviewer: z.number().int().min(0),
+    serve: z.number().int().positive()
+  }).strict(),
+  serve_leg: z.object({
+    composition_sites: z.number().int().positive(),
+    /** Per ROUND: composer + one conformance per segment. */
+    composition_sites_per_round: z.number().int().positive(),
+    /** Per RUN: post-compose R9, outside the recompose loop. */
+    post_compose_sites_per_run: z.number().int().positive(),
+    synthesis_loop_sites: z.number().int().positive(),
+    selected: z.enum(["COMPOSITION", "SYNTHESIS_LOOP"])
+  }).strict(),
   hold_cap: z.number().int().positive(),
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
   bounds_source_ref: z.string().trim().min(1)
-}).strict();
+}).strict().superRefine((basis, ctx) => {
+  /**
+   * S09B: the split receipt was accepted in CONTRADICTORY forms. The serve leg
+   * is disclosed twice — once as the selected site count (`call_sites.serve`)
+   * and once as the arms it was chosen from (`serve_leg`) — and nothing made
+   * them agree, so a basis could name a COMPOSITION arm of 7 while billing 6
+   * serve sites, or split 7 into halves that sum to something else.
+   */
+  const { composition_sites, composition_sites_per_round, post_compose_sites_per_run,
+    synthesis_loop_sites, selected } = basis.serve_leg;
+  const selectedArm = selected === "COMPOSITION" ? composition_sites : synthesis_loop_sites;
+  if (basis.call_sites.serve !== selectedArm) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["call_sites", "serve"],
+      message: `serve call sites ${basis.call_sites.serve} disagree with the ${selected} arm ${selectedArm}`
+    });
+  }
+  /**
+   * T17B/B2 — the check above compares serve against whichever arm THE RECEIPT
+   * nominated, so it can never ask whether that nomination is the one the
+   * constructor would have made. A receipt naming the SMALLER arm satisfied it
+   * and parsed: serve 6 against a 6-site synthesis arm, while a 7-site
+   * composition arm sat beside it and the constructor would have billed seven
+   * and selected COMPOSITION. The persisted receipt then claimed the opposite
+   * topology and a smaller ceiling leg than the run was actually admitted under.
+   *
+   * These two guards restate the constructor's own two decisions, and they are
+   * INDEPENDENT of the one above rather than a restatement of it:
+   *   `serveSites = Math.max(compositionSites, synthesisLoopSites)`
+   *   `selected   = compositionSites >= synthesisLoopSites ? COMPOSITION : ...`
+   *
+   * The second is load-bearing precisely at a TIE, where both arms are the
+   * larger arm and neither the count check nor the larger-arm check can
+   * distinguish the nominations — only the `>=` policy can.
+   */
+  const largerArm = Math.max(composition_sites, synthesis_loop_sites);
+  if (basis.call_sites.serve !== largerArm) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["call_sites", "serve"],
+      message: `serve call sites ${basis.call_sites.serve} are not the larger arm ${largerArm}`
+    });
+  }
+  const tiePolicySelection = composition_sites >= synthesis_loop_sites ? "COMPOSITION" : "SYNTHESIS_LOOP";
+  if (selected !== tiePolicySelection) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["serve_leg", "selected"],
+      message: `selected ${selected} disagrees with the constructor tie policy ${tiePolicySelection}`
+    });
+  }
+  // The composition arm must equal its own disclosed decomposition for SOME
+  // whole number of rounds: per-round sites x rounds, plus the per-run organ.
+  const roundedSites = composition_sites - post_compose_sites_per_run;
+  if (roundedSites <= 0 || roundedSites % composition_sites_per_round !== 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["serve_leg", "composition_sites"],
+      message: `composition sites ${composition_sites} are not ${composition_sites_per_round} per round `
+        + `plus ${post_compose_sites_per_run} per run`
+    });
+  }
+});
 
 export interface CostEnvelopeBasis {
   readonly maxModelAttempts: number;
@@ -55,9 +146,25 @@ export interface CostEnvelopeBasis {
 export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
   const parsed = costEnvelopeBasisSchema.safeParse(value);
   if (!parsed.success) {
+    /**
+     * T17B/B2 — the refusal names WHICH check refused.
+     *
+     * Every basis defect used to produce one identical sentence, so no caller
+     * and no test could tell the cross-field guards apart. That is the shape
+     * D56 rules out: a guard whose firing cannot be observed cannot be shown to
+     * fire for the reason it exists, and two guards that are indistinguishable
+     * at the surface are indistinguishable to a mutant too — one of them can be
+     * deleted with every test still green.
+     *
+     * The CODE is unchanged, and the original sentence is kept as the prefix,
+     * so the existing consumers and the assertion that matches that sentence
+     * are unaffected. Only the numbers and enum names already present in the
+     * rejected receipt are appended.
+     */
     throw new TypedDomainError(
       "RUN_COST_ENVELOPE_UNRESOLVED",
-      "The run head has no valid register-supplied cost-envelope basis"
+      "The run head has no valid register-supplied cost-envelope basis: "
+        + parsed.error.issues.map((issue) => issue.message).join("; ")
     );
   }
   return Object.freeze({
@@ -131,13 +238,55 @@ export type BudgetPressureDecision =
 export function decideBudgetPressure(input: {
   readonly basis: CostEnvelopeBasis;
   readonly consumedModelAttempts: number;
+  /**
+   * T17B/B1 — how many FURTHER attempts the caller is asking about, default 0.
+   *
+   * THE TWO EQUALITY CONTEXTS. This function was being asked two different
+   * questions through one branch whose only input was the post-consumption
+   * count, and at `consumed == max` those questions have OPPOSITE answers:
+   *
+   *   pending 0 — "has this run spent MORE than it was allowed?"  no  -> WITHIN
+   *   pending 1 — "may this run spend ANOTHER attempt?"           no  -> HARD_STOP
+   *
+   * J28 ruled the first one, and it stays exactly as it was: a run that
+   * completes having spent its whole envelope is WITHIN and keeps its answer.
+   * The second is what `assertModelAttemptAllowed` has always decided when it
+   * refuses at `consumed >= max`; before this parameter existed the runner's
+   * catch re-derived that refusal from the count alone, got J28's WITHIN back,
+   * and rethrew — so a refused attempt reached neither the components-only
+   * envelope terminal nor an ENVELOPE_EXHAUSTED record.
+   *
+   * The caller now says WHICH question it is asking instead of the branch
+   * guessing from a number that cannot distinguish them.
+   */
+  readonly pendingModelAttempts?: number;
   readonly pendingRows: readonly PendingBudgetRow[];
   readonly verifiedNodeIds: readonly string[];
 }): BudgetPressureDecision {
   if (!Number.isInteger(input.consumedModelAttempts) || input.consumedModelAttempts < 0) {
     throw new TypeError("ATTEMPT_LEDGER_CONSUMPTION_INVALID");
   }
-  if (input.consumedModelAttempts < input.basis.maxModelAttempts) {
+  const pendingModelAttempts = input.pendingModelAttempts ?? 0;
+  if (!Number.isInteger(pendingModelAttempts) || pendingModelAttempts < 0) {
+    throw new TypeError("ATTEMPT_LEDGER_PENDING_INVALID");
+  }
+  /**
+   * J28 — the REPORTING comparison follows the PERMISSION comparison.
+   * `assertModelAttemptAllowed` PERMITS exactly `maxModelAttempts` attempts
+   * (it refuses at `consumed >= max`), so a run that spends exactly what the
+   * structure permits has not exceeded anything and is WITHIN. Reporting that
+   * state as EXHAUSTED made a lawful maximum-path run complete and then say it
+   * had run out — and, worse, fired the envelope terminal that REPLACED the
+   * answer it had just served (`makeEnvelopeTerminal`, in the runner's serve
+   * section). Nothing about what is ALLOWED changes here; only what the run
+   * says about itself. V-S09-8 records the alternative reading, which is V's.
+   *
+   * The `+ pendingModelAttempts` term is what keeps that ruling intact while
+   * still telling the truth about a REFUSED attempt: at the default 0 this is
+   * character-for-character J28's comparison, and the refusal context supplies
+   * the 1 that makes its own question the one being answered.
+   */
+  if (input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
       state: "WITHIN",
@@ -267,12 +416,17 @@ export class BudgetRepository {
   async evaluateRunPressure(input: {
     readonly runId: string;
     readonly basis: CostEnvelopeBasis;
+    /** T17B/B1 — see `decideBudgetPressure`: which question the caller is asking. */
+    readonly pendingModelAttempts?: number;
     readonly pendingRows: readonly PendingBudgetRow[];
     readonly verifiedNodeIds: readonly string[];
   }): Promise<BudgetPressureDecision> {
     return decideBudgetPressure({
       basis: input.basis,
       consumedModelAttempts: await this.countRunModelAttempts(input.runId),
+      // Resolved here rather than forwarded as `undefined`: the repo builds under
+      // `exactOptionalPropertyTypes`, so an absent caller means 0, explicitly.
+      pendingModelAttempts: input.pendingModelAttempts ?? 0,
       pendingRows: input.pendingRows,
       verifiedNodeIds: input.verifiedNodeIds
     });

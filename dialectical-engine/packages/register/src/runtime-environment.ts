@@ -42,7 +42,12 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     XDG_CONFIG_HOME: z.string().min(1).optional(),
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
-    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional()
+    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+    // T16 · operator overrides for the sealed synthesizer/evaluator role
+    // identities. Goal 84-85 permits identical refs; without an override the
+    // permitted case is unreachable and its startup warning is dead code.
+    DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: z.string().min(1).optional(),
+    DEBATEAI_DEV_EVALUATOR_ROLE_REF: z.string().min(1).optional()
   });
   return Object.freeze(Object.fromEntries(
     Object.entries(environment).filter((entry): entry is [string, string] => (
@@ -192,6 +197,10 @@ export function loadRunnerEnvironment() {
     VLLM_BASE_URL: z.string().url(), VLLM_MODEL: z.string().min(1), VLLM_MAKER: z.string().min(1),
     VLLM_AUTHORIZATION: z.string().min(1).optional(),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
+    // T3C / F34: the runner re-probes each pinned panel member at claim time
+    // (DR-182 VROW-5), so it needs the same probe timeout the API already reads.
+    // Same key, same shape, same default — one knob, two entry points.
+    PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
     ...hatchetShape
   });
   if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {

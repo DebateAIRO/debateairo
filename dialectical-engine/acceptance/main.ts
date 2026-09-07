@@ -30,7 +30,9 @@ import {
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
-import { resolveEffectiveRiskTier } from "@debateai/register";
+import {
+  resolveEffectiveRiskTier
+} from "@debateai/register";
 import {
   RUNNER_MAX_RECOMPOSE,
   createPostgresProviderGateway,
@@ -503,6 +505,19 @@ export async function createAcceptanceRuntime(input: {
       judgeWeightVersion: "acceptance:single-judge:v1",
       reducerVersion: "acceptance:DR-133:v1"
     },
+    // S2-2 / T3, S3-2/S5-1 / T7, S6-1 / T11, S6-2 / T9 (board F33 class): every
+    // sealed T16 family the run reads is LOADED by `readAcceptanceRuntimePolicy`
+    // — which checks all five against this deployment's own provenance — and
+    // PASSED here whole. Nothing is read a second time and no value is restated
+    // at this call site, exactly as the shipped dev entry point does it.
+    //
+    // Without the last of these lines the claim-time gate refuses every work
+    // item and no statement is ever synthesized, which is what every acceptance
+    // path that reached synthesis did before this lane.
+    panelPolicy: policy.panelPolicy,
+    stoppingPolicy: policy.stoppingPolicy,
+    verdictLabelPolicy: policy.verdictLabelPolicy,
+    synthesisRolePolicy: policy.synthesisRolePolicy,
     // FAIR-01 (DR-140(b)): the first non-primary maker retains the critique
     // leg for M=2 compatibility. Every further configured maker is carried by
     // additionalMakers; each artifact persists its maker/provider lineage.

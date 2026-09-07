@@ -5020,7 +5020,7 @@ a:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 .ndRowText { flex: 1; }
-/* Slider and steering rows pin the label column so the tracks line up. */
+/* Slider rows pin the label column so the tracks line up. */
 .ndRowSlider .ndRowText { flex: 0 0 200px; }
 .ndLabel { display: block; font-size: 13.5px; font-weight: 700; }
 .ndHint { margin-top: 4px; font-size: 11.5px; color: var(--text-2); }
@@ -5108,30 +5108,6 @@ a:focus-visible {
   font-weight: 700;
   color: var(--pro);
 }
-
-/* The two steering fields sit side by side, top-aligned. */
-.ndRowSteering { align-items: flex-start; }
-.ndSteerField { flex: 1; min-width: 0; }
-.ndSteerInput {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 10px 13px;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: var(--shell);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 11px;
-  /* the document's two-line resting box: 2 x 14px + 10px padding either side */
-  line-height: 14px;
-  min-height: 40px;
-  overflow: hidden;
-  resize: none;
-}
-.ndSteerInput::placeholder { color: var(--muted); }
-.ndSteerInput[data-italic="true"]::placeholder { font-style: italic; }
-.ndSteerInput:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 .ndOptionsToggle {
   display: flex;
@@ -5250,8 +5226,6 @@ a:focus-visible {
   .ndScreen { padding: 28px 20px 36px; }
   .ndRow { flex-wrap: wrap; }
   .ndRowSlider .ndRowText { flex: 1 1 100%; }
-  .ndRowSteering { flex-direction: column; }
-  .ndSteerField { width: 100%; }
 }
 
 /* ============================================================

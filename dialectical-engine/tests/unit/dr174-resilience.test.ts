@@ -126,9 +126,9 @@ const fullSnapshot: EvaluationSnapshot = {
     { nodeId: "sibling", baseStrength: 0.4, parentNodeId: "root" }
   ],
   arrows: [
-    { arrowId: "a:hidden", sourceNodeId: "hidden", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" },
-    { arrowId: "a:hidden-child", sourceNodeId: "hidden-child", targetKind: "NODE", targetNodeId: "hidden", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" },
-    { arrowId: "a:sibling", sourceNodeId: "sibling", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "EVIDENCE_VERIFIER" }
+    { arrowId: "a:hidden", sourceNodeId: "hidden", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" },
+    { arrowId: "a:hidden-child", sourceNodeId: "hidden-child", targetKind: "NODE", targetNodeId: "hidden", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" },
+    { arrowId: "a:sibling", sourceNodeId: "sibling", targetKind: "NODE", targetNodeId: "root", targetEdgeId: null, polarity: "support", kind: null, strength: null, magnitudeStatus: "UNKNOWN", strengthSource: "REVIEWER" }
   ],
   arrowOrder: ["a:hidden-child", "a:hidden", "a:sibling"],
   operatorResolutions: [{ parentNodeId: "root", operator: "accumulate", suppliedBy: "deployment" }],
@@ -197,7 +197,15 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
   });
 
   it("T32 mints exactly H/L/N and enforces typed required records without pretending class N is revealable", () => {
-    expect(CONDITION_MARKS).toHaveLength(28);
+    // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE), T9 33 -> 37 (SYNTHESIS-OBJECTION-STANDING,
+    // DIGEST-COMPRESSED, DIGEST-CANNOT-EXIST, PROTECTED-CORE-GUARD-RETIRED).
+    // MERGE T9B: lane/s07 pinned 36 (32 + T9's four) and integration 19bbb4c4
+    // pinned 33 (32 + T7's one); BOTH mints survive the merge, so the exact
+    // count at this tree is 37 — counted from the shipped array, not summed
+    // from these comments. Every new mark was minted MID-LIST, so the DR-176
+    // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
+    expect(CONDITION_MARKS).toHaveLength(37);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

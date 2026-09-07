@@ -14,7 +14,7 @@ const rows: readonly Row[] = [
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto"]],
-  ["register", "packages/register", ["kernel", "db"]],
+  ["register", "packages/register", ["kernel", "db", "contract"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
@@ -25,11 +25,11 @@ const rows: readonly Row[] = [
   ["liveness", "packages/liveness", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["settlement", "packages/settlement", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["valuation", "packages/valuation", ["kernel", "db", "ledger", "register", "graph", "propagation"]],
-  ["budget", "packages/budget", ["kernel", "db", "ledger", "register"]],
+  ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
   ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   ["web", "web", ["contract"]],
@@ -78,16 +78,16 @@ export async function auditArchitecture(): Promise<{
   const replaySource = await readFile(join(root, "apps/replay/src/index.ts"), "utf8");
   const replayImport = replaySource.match(/import\s*\{([^}]+)\}\s*from\s*["']@debateai\/published-arithmetic["']/)?.[1]
     ?.split(",").map((name) => name.trim()).sort();
-  if (JSON.stringify(replayImport) !== JSON.stringify(["agg", "product", "σ"].sort())) {
-    violations.push("apps/replay must import exactly agg, σ, product from published-arithmetic");
+  if (JSON.stringify(replayImport) !== JSON.stringify(["agg", "σ"].sort())) {
+    violations.push("apps/replay must import exactly agg, σ from published-arithmetic");
   }
   const arithmeticSource = await readFile(join(root, "packages/published-arithmetic/src/index.ts"), "utf8");
   const arithmeticExports = [...arithmeticSource.matchAll(/export function\s+([^\s(]+)/g)].map((match) => match[1]).sort();
-  if (JSON.stringify(arithmeticExports) !== JSON.stringify(["agg", "product", "σ"].sort())) {
-    violations.push("published-arithmetic must export exactly agg, σ, product");
+  if (JSON.stringify(arithmeticExports) !== JSON.stringify(["agg", "σ"].sort())) {
+    violations.push("published-arithmetic must export exactly agg, σ");
   }
   const replayWithoutImport = replaySource.replace(/import[^;]+;/g, "");
-  if (/(?:function|const|let|class)\s+(?:agg|σ|product)\b/.test(replayWithoutImport)) {
+  if (/(?:function|const|let|class)\s+(?:agg|σ)\b/.test(replayWithoutImport)) {
     violations.push("apps/replay declares a local arithmetic symbol");
   }
   return { edgeRowsChecked: rows.length, violations };
@@ -440,6 +440,25 @@ export function auditSurfaceAttachmentLiterals(name: string, source: string): re
     .map((match) => `${name}:${lineAt(source, match.index)} hand-authors s*Surface attachment instead of deriving production reachability`);
 }
 
+/**
+ * J10(b) — the ONE reconciliation between the source-purity law and the goal.
+ *
+ * The purity law refuses every exported numeric source literal outside
+ * packages/published-arithmetic, because a bare number in source is a policy
+ * value that belongs in a register/law carrier. Goal T1 (S1-1) nevertheless
+ * ORDERS the 1–5 expansion-depth bound to be declared ONCE as an exported
+ * contract constant, which every other surface imports. Both rules are correct;
+ * they collide on exactly two names.
+ *
+ * These two exports ARE the law carrier for that bound, so they are recognized
+ * as such — by NAME, in ONE file. This is deliberately not a path prefix and
+ * not a package exemption: a third numeric export in this very file still trips
+ * the law, and the law is unchanged everywhere else.
+ */
+const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
+]);
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -474,7 +493,10 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
-    if (/export\s+const\s+[A-Z][A-Z0-9_]*\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/.test(source) && !where.startsWith("packages/published-arithmetic/")) {
+    const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/g)]
+      .map((match) => match[1]!)
+      .filter((name) => !(GOAL_RULED_LAW_CARRIERS.get(where) ?? []).includes(name));
+    if (numericExports.length > 0 && !where.startsWith("packages/published-arithmetic/")) {
       blocking.push(`${where} exports a numeric source literal instead of a register/law carrier`);
     }
   }
@@ -605,10 +627,10 @@ export async function auditOrphans(): Promise<{
     neverCalled: [
       { package: "packages/kernel.exhaustive", reason: "closed-switch fall-through carrier is present; the S00 runtime path has no switch" },
       { package: "packages/graph.constructEdge", reason: "S02 exposes the pure construction seam, but its current callers are test fixtures; the first production caller belongs to a later graph-construction slice" },
-      { package: "packages/judgement.runJudgePanel", reason: "S04 proves the P15 panel bulkhead in the pure surface; the current production shell is honestly single-judge until panel routing is composed" },
-      { package: "packages/judgement.measureDispersion", reason: "S04 proves typed dispersion at two judgements; the current single-judge production shell persists null" },
-      { package: "packages/judgement.applyCorrelatedErrorDiscount", reason: "S04 proves first-appearance family discounting; production attachment waits for multi-member routing" },
-      { package: "packages/judgement.applyDeclaredDisagreement", reason: "S04 proves declared disagreement decisions in the pure surface; the single-judge production shell records truthful NOT_MEASURED instead" },
+      // T3 / S2-2: runJudgePanel, measureDispersion, applyCorrelatedErrorDiscount
+      // and applyDeclaredDisagreement left this list when the runner's judgement
+      // path was wired to the panel. They are production-reachable now, and the
+      // s04Surface rows below derive that attachment from reachability.
       { package: "packages/judgement.createTypedNonAnswer", reason: "S04 enforces spec section 12.3 at the pure seam; ignorance-ledger production attachment belongs to the serving shell" },
       { package: "packages/serve.projectProvenance", reason: "DR-081 layer projection is pure and test-covered; the S14 enriched provenance read owns its production attachment once V supplies the flip row" },
       { package: "packages/battery/decision.decideSplitClassification", reason: "callers are test fixtures; production SPLIT-loop attachment belongs to a later runner slice." },
@@ -635,10 +657,10 @@ export async function auditOrphans(): Promise<{
       { package: "tools/acceptance-bundle", reason: "S00 scaffolds its read edges; S15 owns invocation" }
     ],
     s04Surface: deriveSurfaceRows([
-      { package: "packages/judgement.runJudgePanel", evidence: "pure P15 bulkhead only; production runner is honestly single-judge" },
-      { package: "packages/judgement.measureDispersion", evidence: "pure >=2-judgement measurement only; production single-judge path persists null" },
-      { package: "packages/judgement.applyCorrelatedErrorDiscount", evidence: "pure multi-member family grouping only; no production panel routing exists" },
-      { package: "packages/judgement.applyDeclaredDisagreement", evidence: "two-way declared predicate evaluation is pure-only; production single-judge path truthfully records NOT_MEASURED" },
+      { package: "packages/judgement.runJudgePanel", evidence: "T3/S2-2: the runner's per-node panel routes every other healthy maker through the P15 producer bulkhead" },
+      { package: "packages/judgement.measureDispersion", evidence: "T3/S2-2: the runner measures panel dispersion per node and persists it on the reduced judgement" },
+      { package: "packages/judgement.applyCorrelatedErrorDiscount", evidence: "T3/S2-2: the runner discounts repeated provider families before the panel's selection arithmetic" },
+      { package: "packages/judgement.applyDeclaredDisagreement", evidence: "T3/S2-2: the runner declares the disagreement decision against the sealed threshold and records the band downgrade" },
       { package: "packages/judgement.createTypedNonAnswer", evidence: "pure spec section 12.3 enforcement only; serving-shell attachment remains later work" },
       { package: "packages/judgement.resolveClaimType", evidence: "Judge.judge calls the shared resolver for code-first then bounded model classification" }
     ], reachableCallables),

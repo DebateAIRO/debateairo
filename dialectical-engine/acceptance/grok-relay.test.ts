@@ -1,10 +1,35 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
+import {
+  GROK_BINARY,
+  resolveGrokBinary,
+  startGrokRelay,
+  type GrokRelayHandle
+} from "./grok-relay.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-grok-cli.mjs", import.meta.url));
 const handles: GrokRelayHandle[] = [];
+const temporaryDirectories: string[] = [];
+
+function posixQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/** A real executable at a path this test chooses (see claude-relay.test.ts). */
+async function hostBinary(name: string, fixture: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "relay-host-binary-"));
+  temporaryDirectories.push(directory);
+  const path = join(directory, name);
+  await writeFile(
+    path,
+    `#!/bin/sh\nexec ${posixQuote(process.execPath)} ${posixQuote(fixture)} "$@"\n`,
+    { mode: 0o755 }
+  );
+  return path;
+}
 
 async function start(timeoutMs = 1_000): Promise<GrokRelayHandle> {
   const handle = await startGrokRelay({
@@ -26,6 +51,9 @@ async function postCompletion(handle: GrokRelayHandle, content: string): Promise
 
 afterEach(async () => {
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
+  await Promise.all(temporaryDirectories.splice(0).map((path) =>
+    rm(path, { recursive: true, force: true })
+  ));
 });
 
 describe("GROK-01 Grok Build CLI relay", () => {
@@ -231,6 +259,84 @@ describe("GROK-01 Grok Build CLI relay", () => {
       })).rejects.toThrow("TEST_ONLY_GROK_COMMAND_FORBIDDEN");
     } finally {
       process.env.NODE_ENV = previous;
+    }
+  });
+});
+
+describe("D10 Grok relay binary resolution", () => {
+  it("keeps the compiled-in default when ACCEPTANCE_GROK_BINARY is absent", () => {
+    expect(GROK_BINARY).toBe("/Users/vladmihaimiron/.grok/bin/grok");
+    expect(resolveGrokBinary({})).toBe("/Users/vladmihaimiron/.grok/bin/grok");
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_GROK_BINARY", () => {
+    expect(resolveGrokBinary({ ACCEPTANCE_GROK_BINARY: "/host/bin/grok" }))
+      .toBe("/host/bin/grok");
+  });
+
+  it("fails loudly with a typed code when ACCEPTANCE_GROK_BINARY is present but blank", () => {
+    expect(() => resolveGrokBinary({ ACCEPTANCE_GROK_BINARY: "  " }))
+      .toThrow("GROK_CLI_BINARY_UNRESOLVED");
+  });
+
+  it("keeps the NODE_ENV=test command seam ahead of the environment override", async () => {
+    const previous = process.env.ACCEPTANCE_GROK_BINARY;
+    process.env.ACCEPTANCE_GROK_BINARY = "/nonexistent/host/grok";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("grok-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_GROK_BINARY;
+      else process.env.ACCEPTANCE_GROK_BINARY = previous;
+    }
+  });
+
+  // r2 regression arms (codex r1 B1) — see claude-relay.test.ts for the rule.
+  it("selects the test command seam when the override is blank, instead of throwing the override's code", async () => {
+    const previous = process.env.ACCEPTANCE_GROK_BINARY;
+    process.env.ACCEPTANCE_GROK_BINARY = "  ";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("grok-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_GROK_BINARY;
+      else process.env.ACCEPTANCE_GROK_BINARY = previous;
+    }
+  });
+
+  it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_GROK_COMMAND_FORBIDDEN when the override is blank", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_GROK_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_GROK_BINARY = "  ";
+    try {
+      await expect(startGrokRelay({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      })).rejects.toThrow("TEST_ONLY_GROK_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_GROK_BINARY;
+      else process.env.ACCEPTANCE_GROK_BINARY = previous;
+    }
+  });
+
+  it("spawns the binary named by ACCEPTANCE_GROK_BINARY rather than the compiled-in default", async () => {
+    const binary = await hostBinary("grok", fakeCli);
+    const previous = process.env.ACCEPTANCE_GROK_BINARY;
+    process.env.ACCEPTANCE_GROK_BINARY = binary;
+    try {
+      // No testOnlyCommand: the DEFAULT command path, the one the ceremony
+      // takes. The compiled-in default is another machine's home directory.
+      const relay = await startGrokRelay({ port: 0, timeoutMs: 10_000 });
+      handles.push(relay);
+
+      expect(relay.model).toBe("grok-fake-cli-model");
+      expect(relay.maker).toBe("xAI");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_GROK_BINARY;
+      else process.env.ACCEPTANCE_GROK_BINARY = previous;
     }
   });
 });

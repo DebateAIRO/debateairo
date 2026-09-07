@@ -113,7 +113,16 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
   });
 
   it("has a renderer for every ruled condition mark — including DR-161's unserved-maker disclosure", () => {
-    expect(CONDITION_MARKS).toHaveLength(28);
+    // J13(b) 29 -> 31: PANEL-PARTIAL and PANEL-DEGRADED-SINGLE-VOICE joined the
+    // J13(b) 29 -> 31, T7 31 -> 32 (BRANCH-FROZEN-LOW-LEVERAGE), T11 32 -> 33
+    // (LABEL-BASIS-INCOMPLETE), T9 33 -> 37 (SYNTHESIS-OBJECTION-STANDING,
+    // DIGEST-COMPRESSED, DIGEST-CANNOT-EXIST, PROTECTED-CORE-GUARD-RETIRED).
+    // MERGE T9B: lane/s07 pinned 36 (32 + T9's four) and integration 19bbb4c4
+    // pinned 33 (32 + T7's one); BOTH mints survive the merge, so the exact
+    // count at this tree is 37 — counted from the shipped array, not summed
+    // from these comments. Every new mark was minted MID-LIST, so the DR-176
+    // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
+    expect(CONDITION_MARKS).toHaveLength(37);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     expect(conditionMarkLabel("UNSERVED-MAKER-POSITION")).toBe("Another maker's position was not served");
@@ -154,10 +163,10 @@ describe("S14 / W10 — first-class graph edges", () => {
     const base = {
       edgeId: "edge:test", sourceNodeId: "node:child", sourceChildKind: "support",
       targetKind: "NODE" as const, targetRef: "node:parent", polarity: "support" as const,
-      strengthSource: "EVIDENCE_VERIFIER", provenanceRef: "provenance:edge"
+      strengthSource: "REVIEWER", provenanceRef: "provenance:edge"
     };
     expect(projectServeEdge({ ...base, magnitudeStatus: "MEASURED", strength: 0.6 }).strength).toMatchObject({
-      status: "PRESENT", number: { value: 0.6, source: "EVIDENCE_VERIFIER", replay_handle: "provenance:edge" }
+      status: "PRESENT", number: { value: 0.6, source: "REVIEWER", replay_handle: "provenance:edge" }
     });
     expect(projectServeEdge({ ...base, magnitudeStatus: "UNKNOWN", strength: null }).strength).toEqual({
       status: "UNKNOWN", reason: "NO_JUDGEMENT_OR_MAGNITUDE"

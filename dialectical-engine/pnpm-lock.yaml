@@ -204,6 +204,9 @@ importers:
       '@debateai/budget':
         specifier: workspace:*
         version: link:../../packages/budget
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
       '@debateai/critique':
         specifier: workspace:*
         version: link:../../packages/critique
@@ -364,6 +367,9 @@ importers:
 
   packages/budget:
     dependencies:
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@debateai/db':
         specifier: workspace:*
         version: link:../db
@@ -593,6 +599,9 @@ importers:
 
   packages/register:
     dependencies:
+      '@debateai/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@debateai/db':
         specifier: workspace:*
         version: link:../db
@@ -704,34 +713,6 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
-
-  web:
-    dependencies:
-      '@debateai/contract':
-        specifier: workspace:*
-        version: link:../packages/contract
-      next:
-        specifier: ^15.0.0
-        version: 15.5.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react:
-        specifier: ^19.0.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.8(react@19.2.8)
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.4(@types/react@19.2.18)
-      typescript:
-        specifier: ^5.6.0
-        version: 5.9.3
 
 packages:
 

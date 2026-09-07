@@ -1,10 +1,41 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
+import {
+  CLAUDE_BINARY,
+  preflightClaudeCli,
+  resolveClaudeBinary,
+  startClaudeRelay,
+  type ClaudeRelayHandle
+} from "./claude-relay.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
 const handles: ClaudeRelayHandle[] = [];
+const temporaryDirectories: string[] = [];
+
+function posixQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * A real executable at a path this test chooses, so the environment override
+ * can be observed the only honest way there is: by which binary is spawned.
+ * The relay takes no argument seam for the default command, so the fixture has
+ * to arrive as an executable file rather than as `node <fixture>`.
+ */
+async function hostBinary(name: string, fixture: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "relay-host-binary-"));
+  temporaryDirectories.push(directory);
+  const path = join(directory, name);
+  await writeFile(
+    path,
+    `#!/bin/sh\nexec ${posixQuote(process.execPath)} ${posixQuote(fixture)} "$@"\n`,
+    { mode: 0o755 }
+  );
+  return path;
+}
 
 async function start(timeoutMs = 1_000): Promise<ClaudeRelayHandle> {
   const handle = await startClaudeRelay({
@@ -32,6 +63,9 @@ async function postCompletion(handle: ClaudeRelayHandle, userContent: string): P
 
 afterEach(async () => {
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
+  await Promise.all(temporaryDirectories.splice(0).map((path) =>
+    rm(path, { recursive: true, force: true })
+  ));
 });
 
 describe("FAIR-02 Claude Code CLI relay", () => {
@@ -181,7 +215,10 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       expect(relayed.argumentList).toEqual([
         "-p", relayed.prompt,
         "--output-format", "json",
-        "--setting-sources", "",
+        // D18: "user", not "" — "" severed the CLI's keychain login.
+        // --safe-mode restores the isolation "" provided, without the auth cost.
+        "--setting-sources", "user",
+        "--safe-mode",
         "--strict-mcp-config",
         "--no-session-persistence",
         "--tools", "",
@@ -293,5 +330,199 @@ describe("FAIR-02 Claude Code CLI relay", () => {
     } finally {
       process.env.NODE_ENV = previous;
     }
+  });
+});
+
+describe("D10 Claude relay binary resolution", () => {
+  it("keeps the compiled-in default when ACCEPTANCE_CLAUDE_BINARY is absent", () => {
+    // The literal is pinned here, not read from the constant, so that moving
+    // the default is a deliberate edit to this expectation (D10: unset ⇒
+    // byte-identical to the behavior before the override existed).
+    expect(CLAUDE_BINARY).toBe("/Users/vladmihaimiron/.local/bin/claude");
+    expect(resolveClaudeBinary({})).toBe("/Users/vladmihaimiron/.local/bin/claude");
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_CLAUDE_BINARY", () => {
+    expect(resolveClaudeBinary({ ACCEPTANCE_CLAUDE_BINARY: "/host/bin/claude" }))
+      .toBe("/host/bin/claude");
+  });
+
+  it("fails loudly with a typed code when ACCEPTANCE_CLAUDE_BINARY is present but blank", () => {
+    expect(() => resolveClaudeBinary({ ACCEPTANCE_CLAUDE_BINARY: "  " }))
+      .toThrow("CLAUDE_CLI_BINARY_UNRESOLVED");
+  });
+
+  it("keeps the NODE_ENV=test command seam ahead of the environment override", async () => {
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.ACCEPTANCE_CLAUDE_BINARY = "/nonexistent/host/claude";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("claude-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+
+  // r2 regression arms (codex r1 B1). A BLANK override must not reach the
+  // test-seam path at all: the override is only consulted when no
+  // testOnlyCommand is supplied, so resolveTestGuardedCommand stays the sole
+  // authority for selecting the seam and for rejecting it outside test.
+  it("selects the test command seam when the override is blank, instead of throwing the override's code", async () => {
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.ACCEPTANCE_CLAUDE_BINARY = "  ";
+    try {
+      const relay = await start();
+      expect(relay.model).toBe("claude-fake-cli-model");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+
+  it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN when the override is blank", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_CLAUDE_BINARY = "  ";
+    try {
+      await expect(startClaudeRelay({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      })).rejects.toThrow("TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+
+  it("spawns the binary named by ACCEPTANCE_CLAUDE_BINARY rather than the compiled-in default", async () => {
+    const binary = await hostBinary("claude", fakeCli);
+    const previous = process.env.ACCEPTANCE_CLAUDE_BINARY;
+    process.env.ACCEPTANCE_CLAUDE_BINARY = binary;
+    try {
+      // No testOnlyCommand: this is the DEFAULT command path, the one the
+      // ceremony takes. The compiled-in default is another machine's home
+      // directory, so a relay that ignores the override cannot hand back a
+      // model id at all.
+      const relay = await startClaudeRelay({ port: 0, timeoutMs: 10_000 });
+      handles.push(relay);
+
+      expect(relay.model).toBe("claude-fake-cli-model");
+      expect(relay.maker).toBe("Anthropic");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CLAUDE_BINARY;
+      else process.env.ACCEPTANCE_CLAUDE_BINARY = previous;
+    }
+  });
+});
+
+/**
+ * Replaces the prompt payload with a placeholder so two argument vectors built
+ * for different prompts can be compared for SHAPE.
+ */
+function argumentShape(argumentList: readonly string[]): readonly string[] {
+  const index = argumentList.indexOf("-p");
+  return index < 0
+    ? argumentList
+    : [...argumentList.slice(0, index + 1), "<prompt>", ...argumentList.slice(index + 2)];
+}
+
+describe("D18 Claude relay keychain-login visibility", () => {
+  it("loads the user setting source so the CLI can see its own keychain login", async () => {
+    // Measured on claude 2.1.247 (logs/trel2/probe-0{2,3,4}): with
+    // `--setting-sources ""` the CLI answers `Not logged in · Please run
+    // /login` (is_error true, zero cost); with `user` it answers normally;
+    // with `project,local` — every source EXCEPT user — it fails again. The
+    // login is carried by the user source and by nothing else.
+    const relay = await start();
+    const response = await postCompletion(relay, "Auth visibility.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    const index = relayed.argumentList.indexOf("--setting-sources");
+
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(relayed.argumentList[index + 1]).toBe("user");
+  });
+
+  it("keeps project and local settings out of the relayed call", async () => {
+    const relay = await start();
+    const response = await postCompletion(relay, "Isolation retained.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    const sources = relayed.argumentList[relayed.argumentList.indexOf("--setting-sources") + 1] ?? "";
+
+    expect(sources.split(",").map((source) => source.trim())).not.toContain("project");
+    expect(sources.split(",").map((source) => source.trim())).not.toContain("local");
+  });
+});
+
+describe("F26 ceremony preflight parity", () => {
+  it("builds the preflight command from the relay's own adapter, so preflight cannot drift", async () => {
+    const preflight = await preflightClaudeCli({
+      timeoutMs: 10_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    const preflightEcho = JSON.parse(preflight.handshake.content) as {
+      argumentList: readonly string[];
+      environment: Readonly<Record<string, string>>;
+    };
+
+    const relay = await start();
+    const response = await postCompletion(relay, "Parity.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayedEcho = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+      environment: Readonly<Record<string, string>>;
+    };
+
+    // The three divergences F26 names, each asserted: same binary, same
+    // argument shape, same child-environment key set.
+    expect(preflight.command.binary).toBe(process.execPath);
+    expect(argumentShape(preflightEcho.argumentList)).toEqual(argumentShape(relayedEcho.argumentList));
+    expect(Object.keys(preflightEcho.environment).sort())
+      .toEqual(Object.keys(relayedEcho.environment).sort());
+  });
+
+  it("reports the CLI-reported model from the preflight handshake, never a guessed literal", async () => {
+    const preflight = await preflightClaudeCli({
+      timeoutMs: 10_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+
+    expect(preflight.handshake.model).toBe("claude-fake-cli-model");
+  });
+});
+
+describe("D18 r2 — CLI customizations excluded from relayed calls", () => {
+  it("passes --safe-mode so user memory, hooks and plugins cannot enter a relayed call", async () => {
+    // Measured on claude 2.1.247 (logs/trel2/probe-05, probe-06), identical
+    // prompt, only --safe-mode differing:
+    //   --setting-sources user              -> model answers YES (user CLAUDE.md in context), 5423 ctx tokens
+    //   --setting-sources user --safe-mode  -> model answers NO,                              2717 ctx tokens
+    // Both authenticate (is_error false, exactly one reported model), so the
+    // isolation is free of any auth cost.
+    const relay = await start();
+    const response = await postCompletion(relay, "Customizations disabled.");
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+
+    expect(relayed.argumentList).toContain("--safe-mode");
   });
 });

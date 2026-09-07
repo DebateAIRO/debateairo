@@ -50,16 +50,7 @@ export type NewDebateAskDefaults = {
   readonly depth: number;
   readonly asOfWasEdited: boolean;
   readonly riskTierWasEdited?: boolean;
-  readonly steeringPresets?: string;
-  readonly steeringAnnotations?: string;
 };
-
-// Both steering fields are line-oriented in the contract, so a blank textarea
-// and a textarea of blank lines both mean "the asker steered nothing".
-export function steeringLines(value: string | undefined): string[] {
-  if (value === undefined) return [];
-  return value.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-}
 
 export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTime: Date): Record<string, unknown> {
   const asOf = defaults.asOfWasEdited ? new Date(defaults.asOf) : submitTime;
@@ -74,7 +65,10 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     depth: defaults.depth,
     decision_scope: defaults.decisionScope.trim(),
     as_of: asOf.toISOString(),
-    steering_presets: steeringLines(defaults.steeringPresets),
-    steering_annotations: steeringLines(defaults.steeringAnnotations)
+    // S1-2 · V ruling 2026-09-03: the asker has no steering control, so these
+    // are always empty. The two contract fields stay PRESENT rather than being
+    // dropped, so the submitted ask and every already-stored ask stay valid.
+    steering_presets: [],
+    steering_annotations: []
   };
 }

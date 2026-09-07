@@ -11,8 +11,12 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(packageJson.scripts?.["dev:auth:seed-register"])
       .toBe("tsx apps/runner/src/dev-deployment-register-cli.ts");
     expect(cli).toContain("loadMigrationEnvironment()");
-    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment())");
-    expect(cli).toContain("seedDevelopmentDeploymentRegister({ adminPool: pool, providerPanel })");
+    // The panel and the T16 role identities both come from the ONE development
+    // command environment the CLI loads (T16 ruling J7 added the role refs).
+    expect(cli).toContain("loadDevelopmentCommandEnvironment()");
+    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(commandEnvironment)");
+    expect(cli).toContain("resolveDevelopmentSynthesisRoleRefs(providerPanel, commandEnvironment)");
+    expect(cli).toContain("seedDevelopmentDeploymentRegister({ adminPool: pool, providerPanel, roleRefs })");
     expect(cli).toContain("DEV_DEPLOYMENT_REGISTER_READY=");
     expect(source).toContain("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
     expect(source).not.toMatch(/acceptance\/|seedAcceptanceRegister/);

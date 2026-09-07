@@ -1,9 +1,22 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
-import { loadBootstrapRegister } from "@debateai/register";
+import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
+import {
+  ENGINE_BAND_ORDER,
+  buildAlgorithmRegisterRows,
+  loadBootstrapRegister,
+  warnOnIdenticalSynthesisRoleRefs,
+  type ProviderFamilyEntry
+} from "@debateai/register";
 
-export const ACCEPTANCE_REGISTER_VERSION = 1 as const;
+/**
+ * T16 · version 1 is HISTORICAL and sealed in every ceremony database created
+ * before this lane; it is never re-opened. The fifteen algorithm rows land in a
+ * NEWLY MINTED version 2, which becomes the current ceremony register.
+ */
+export const ACCEPTANCE_REGISTER_VERSION = 2 as const;
+export const ACCEPTANCE_HISTORICAL_REGISTER_VERSION = 1 as const;
 export const ACCEPTANCE_REGISTER_SOURCE_REF = "acceptance:DR-133:V-approved" as const;
 export const ACCEPTANCE_CONVERGENCE_SOURCE_REF = "acceptance:DR-136:V-approved" as const;
 export const ACCEPTANCE_DISCOVERY_SOURCE_REF = "acceptance:DR-182:V-approved" as const;
@@ -21,6 +34,68 @@ export const ACCEPTANCE_PROVIDER_SET_SOURCE_REF = "acceptance:DR-177:V-approved"
  * it through the SHIPPED resolveScoringOperator chain (P8) and records the
  * supplying level on the propagation receipt. */
 export const ACCEPTANCE_SCORING_OPERATOR_SOURCE_REF = "acceptance:DR-144:V-approved" as const;
+/** T16 (goal-v4 80-96): ceremony provenance for the sealed algorithm rows. */
+export const ACCEPTANCE_ALGORITHM_SOURCE_REF = "acceptance:T16-algorithm-register" as const;
+
+/** GROK-01 (DR-177) roster — the single source for the configured provider set
+ * row AND for T16's provider→family map, so the two can never disagree. */
+export const ACCEPTANCE_CONFIGURED_PROVIDERS = Object.freeze([
+  Object.freeze({ providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http" as const, maker: "OpenAI" }),
+  Object.freeze({ providerRef: "acceptance:claude-cli", adapterKind: "openai-compatible-http" as const, maker: "Anthropic" }),
+  Object.freeze({ providerRef: "acceptance:grok-cli", adapterKind: "openai-compatible-http" as const, maker: "xAI" })
+]);
+
+function acceptanceProviderFamilies(): readonly ProviderFamilyEntry[] {
+  const byMaker = new Map<string, string[]>();
+  for (const provider of ACCEPTANCE_CONFIGURED_PROVIDERS) {
+    const refs = byMaker.get(provider.maker);
+    if (refs === undefined) byMaker.set(provider.maker, [provider.providerRef]);
+    else refs.push(provider.providerRef);
+  }
+  return Object.freeze([...byMaker].map(([familyRef, providerRefs]) =>
+    Object.freeze({ familyRef, providerRefs: Object.freeze([...providerRefs]) })
+  ));
+}
+
+/**
+ * T16 · the ceremony's synthesizer/evaluator identities (ruling J8): the first
+ * two configured providers of DIFFERENT makers. Goal 84-85 permits identical
+ * refs, so an operator override exists; an override naming an unconfigured
+ * provider fails loudly rather than sealing a role nothing can serve.
+ */
+export function resolveAcceptanceSynthesisRoleRefs(
+  source: NodeJS.ProcessEnv = process.env
+): Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string }> {
+  const families = acceptanceProviderFamilies();
+  const configured = new Set<string>(
+    ACCEPTANCE_CONFIGURED_PROVIDERS.map((provider) => provider.providerRef)
+  );
+  const resolve = (override: string | undefined, fallback: string): string => {
+    if (override === undefined || override.trim() === "") return fallback;
+    if (!configured.has(override)) {
+      throw new TypeError(`ACCEPTANCE_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED:${override}`);
+    }
+    return override;
+  };
+  return Object.freeze({
+    synthesizerRoleRef: resolve(source.ACCEPTANCE_SYNTHESIZER_ROLE_REF, families[0]!.providerRefs[0]!),
+    evaluatorRoleRef: resolve(source.ACCEPTANCE_EVALUATOR_ROLE_REF, families[1]!.providerRefs[0]!)
+  });
+}
+
+/** T16 · the ceremony's copy of every sealed algorithm row. Same ruled values as
+ * the dev deployment register; ceremony provenance and ceremony role identities. */
+export function buildAcceptanceAlgorithmRegisterRows(
+  roleRefs: Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string }>
+    = resolveAcceptanceSynthesisRoleRefs()
+): readonly AcceptanceRegisterRow[] {
+  return buildAlgorithmRegisterRows({
+    deploymentSourceRef: ACCEPTANCE_ALGORITHM_SOURCE_REF,
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    providerFamilies: acceptanceProviderFamilies()
+  });
+}
 
 export interface AcceptanceRegisterRow {
   readonly rowKey: string;
@@ -36,6 +111,7 @@ function requireMatch(source: string, expression: RegExp, label: string): string
   return value;
 }
 
+
 async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]> {
   const [judge, runner, propagation, serve] = await Promise.all([
     readFile(new URL("../packages/judgement/src/index.ts", import.meta.url), "utf8"),
@@ -43,11 +119,6 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     readFile(new URL("../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
-  const conformanceTexts = [...runner.matchAll(/content: "(Return only JSON \{(?:conforms,findings|pass)\}[^\"]+)"/g)]
-    .map((match) => match[1]!);
-  if (conformanceTexts.length !== 2) {
-    throw new Error("SHIPPED_CONTRACT_TEXT_UNRESOLVED:conformance");
-  }
   const values = {
     judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
     composerContractHash: digest(requireMatch(
@@ -55,7 +126,10 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
       /content: "(Return only JSON with a segments array[^"]+)"/,
       "composer"
     )),
-    conformanceContractHash: digest(conformanceTexts.join("\n")),
+    conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),
+    // codex r2 B1a: the fingerprint is taken from the constant the runner
+    // SENDS, not from a search of the runner's source. There is nothing left
+    // for a comment, string, regex or template literal to confuse.
     propagationContractHash: digest(propagation),
     serveContractHash: digest(serve)
   };
@@ -145,15 +219,27 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
     {
       rowKey: "wayOfKnowingCeiling",
       value: {
-        bandOrder: ["CAPPED", "FULL"],
-        ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING"],
+        bandOrder: [...ENGINE_BAND_ORDER],
+        ceilingLabels: ["DEFAULT_CEILING", "REASONING_CEILING", "NO_VERIFIED_EVIDENCE_FLOOR"],
         defaultCeiling: { label: "DEFAULT_CEILING", ceilingBand: "FULL", liftPath: "retain-band" },
         cuts: [{
           minimumShares: { REASONING: 0.5 },
           label: "REASONING_CEILING",
           ceilingBand: "CAPPED",
           liftPath: "gather-evidence-to-lift"
-        }]
+        }],
+        // F-T9B-3: the floor a run is entitled to on NO VERIFIED EVIDENCE —
+        // reached when the evaluator's citation-tracing criterion failed and
+        // the cited set is empty. It exists because the reasoning-share cut
+        // above names the right band for that case and the WRONG REASON: its
+        // trigger is a REASONING share of 0.5, which cannot fire on an empty
+        // basis. The lift path is "gather ANY evidence" rather than "gather
+        // evidence to lift", because nothing was verified at all.
+        emptyBasisFloor: {
+          label: "NO_VERIFIED_EVIDENCE_FLOOR",
+          ceilingBand: "CAPPED",
+          liftPath: "gather-any-verified-evidence-to-lift"
+        }
       },
       sourceRef: ACCEPTANCE_REGISTER_SOURCE_REF
     },
@@ -239,22 +325,15 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
       value: {
         kind: "CONFIGURED_PROVIDER_SET",
         requiredDistinctMakers: 1,
-        providers: [{
-          providerRef: "acceptance:codex-cli",
-          adapterKind: "openai-compatible-http",
-          maker: "OpenAI"
-        }, {
-          providerRef: "acceptance:claude-cli",
-          adapterKind: "openai-compatible-http",
-          maker: "Anthropic"
-        }, {
-          providerRef: "acceptance:grok-cli",
-          adapterKind: "openai-compatible-http",
-          maker: "xAI"
-        }]
+        providers: ACCEPTANCE_CONFIGURED_PROVIDERS.map((provider) => ({
+          providerRef: provider.providerRef,
+          adapterKind: provider.adapterKind,
+          maker: provider.maker
+        }))
       },
       sourceRef: ACCEPTANCE_PROVIDER_SET_SOURCE_REF
-    }
+    },
+    ...buildAcceptanceAlgorithmRegisterRows()
   ];
   return Object.freeze(
     [...ruledRows, ...await computeContractHashes()].map((row) => Object.freeze(row))
@@ -273,6 +352,13 @@ function canonicalJson(value: unknown): string {
 }
 
 export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly rowCount: number }> {
+  // Ruling J7: the ceremony's seeding path is a T16 startup surface.
+  const roleRefs = resolveAcceptanceSynthesisRoleRefs();
+  warnOnIdenticalSynthesisRoleRefs({
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    deploymentRef: ACCEPTANCE_ALGORITHM_SOURCE_REF
+  });
   const [bootstrap, acceptanceRows] = await Promise.all([
     loadBootstrapRegister(),
     buildAcceptanceRegisterRows()
@@ -300,6 +386,9 @@ export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly row
        ON CONFLICT (register_version) DO NOTHING`,
       [ACCEPTANCE_REGISTER_VERSION, rows.length]
     );
+    // T16 · the migration-declared manifest fails the seal loudly, naming the
+    // family and row key, if any mandatory row was not supplied.
+    await client.query("SELECT register.assert_required_rows($1)", [ACCEPTANCE_REGISTER_VERSION]);
     const persisted = await client.query<{ row_key: string; value_json: unknown; source_ref: string }>(
       `SELECT row_key, value_json, source_ref FROM register.register_row
        WHERE register_version=$1 AND row_key=ANY($2::text[]) ORDER BY row_key`,

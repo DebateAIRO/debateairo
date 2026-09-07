@@ -3,7 +3,9 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  CODEX_BINARY,
   parseCodexCompletion,
+  resolveCodexBinary,
   startModelShim,
   type ModelShimHandle
 } from "./model-shim.js";
@@ -243,5 +245,120 @@ describe("ACC-01 model shim", () => {
 
     expect(response.status).toBe(504);
     expect(await response.json()).toEqual({ error: "CODEX_CLI_TIMEOUT" });
+  });
+});
+
+/**
+ * There is deliberately NO spawn-level test of the codex DEFAULT command here,
+ * and none may be added. Unlike the Claude and Grok defaults — which point into
+ * an absent `/Users/vladmihaimiron` home and therefore fail with ENOENT — the
+ * compiled-in CODEX_BINARY is a real, installed, executable path on developer
+ * machines. A test that reaches the default command would make a live provider
+ * call. The override is pinned here at the resolver, and its wiring into
+ * startModelShim is the same three lines proven end-to-end for the other two
+ * makers in claude-relay.test.ts and grok-relay.test.ts.
+ */
+describe("D10 Codex shim binary resolution", () => {
+  it("keeps the compiled-in default when ACCEPTANCE_CODEX_BINARY is absent", () => {
+    expect(CODEX_BINARY).toBe("/Applications/ChatGPT.app/Contents/Resources/codex");
+    expect(resolveCodexBinary({})).toBe("/Applications/ChatGPT.app/Contents/Resources/codex");
+  });
+
+  it("resolves this host's binary from ACCEPTANCE_CODEX_BINARY", () => {
+    expect(resolveCodexBinary({ ACCEPTANCE_CODEX_BINARY: "/host/bin/codex" }))
+      .toBe("/host/bin/codex");
+  });
+
+  it("fails loudly with a typed code when ACCEPTANCE_CODEX_BINARY is present but blank", () => {
+    expect(() => resolveCodexBinary({ ACCEPTANCE_CODEX_BINARY: "  " }))
+      .toThrow("CODEX_CLI_BINARY_UNRESOLVED");
+  });
+
+  it("keeps the NODE_ENV=test command seam ahead of the environment override", async () => {
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.ACCEPTANCE_CODEX_BINARY = "/nonexistent/host/codex";
+    try {
+      const shim = await start();
+      expect(shim.model).toBe("gpt-5.6-sol");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
+  });
+
+  // r2 regression arms (codex r1 B1) — see claude-relay.test.ts for the rule.
+  // Both arms keep testOnlyCommand supplied, so the codex default is never
+  // reached and no live provider call is possible.
+  it("selects the test command seam when the override is blank, instead of throwing the override's code", async () => {
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.ACCEPTANCE_CODEX_BINARY = "  ";
+    try {
+      const shim = await start();
+      expect(shim.model).toBe("gpt-5.6-sol");
+    } finally {
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
+  });
+
+  // r3 regression arm (codex r2 B1). Codex is the only maker with a SECOND
+  // test-only seam, and its guard sits after command resolution. With no
+  // command seam supplied the binary default is reached first, so a blank
+  // override must not be allowed to pre-empt this pre-existing typed-loud code.
+  // No testOnlyCommand here, but both the defective and the correct behaviour
+  // throw before invokeCli, so the codex default is never spawned.
+  it("rejects a forbidden testOnlySessionsRoot outside NODE_ENV=test when the override is blank and no command seam is supplied", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_CODEX_BINARY = "  ";
+    try {
+      await expect(startModelShim({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlySessionsRoot: fakeSessionsRoot
+      })).rejects.toThrow("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
+  });
+
+  // Companion to the arm above: the guard added for it is conditioned on the
+  // command seam being ABSENT, so that a supplied command seam keeps baseline
+  // precedence. Without this arm that condition is pinned by nothing — dropping
+  // it passes every other test in the file.
+  it("keeps TEST_ONLY_CODEX_COMMAND_FORBIDDEN ahead of the sessions-root code when both seams are supplied outside NODE_ENV=test", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      await expect(startModelShim({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] },
+        testOnlySessionsRoot: fakeSessionsRoot
+      })).rejects.toThrow("TEST_ONLY_CODEX_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("still rejects the seam outside NODE_ENV=test with TEST_ONLY_CODEX_COMMAND_FORBIDDEN when the override is blank", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previous = process.env.ACCEPTANCE_CODEX_BINARY;
+    process.env.NODE_ENV = "production";
+    process.env.ACCEPTANCE_CODEX_BINARY = "  ";
+    try {
+      await expect(startModelShim({
+        port: 0,
+        timeoutMs: 1_000,
+        testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      })).rejects.toThrow("TEST_ONLY_CODEX_COMMAND_FORBIDDEN");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
+      else process.env.ACCEPTANCE_CODEX_BINARY = previous;
+    }
   });
 });
