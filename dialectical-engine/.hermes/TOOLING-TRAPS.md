@@ -2092,3 +2092,57 @@ noticed. Uncaught it would have shipped a RED record that pins nothing.
 Same family as the recorded macOS `timeout`/`rg`/`awk` traps. In `zsh`, `grep -rn foo dir/ --include=*.ts`
 dies with `no matches found: --include=*.ts` before grep ever runs, because zsh tries to glob the
 argument itself and `nomatch` is on. Bash users never see it. Quote it: `--include='*.ts'`.
+
+## `sed -E 's/…/\1/'` KEEPS the lines it fails to match — a generated allow-list silently grows source lines
+Found by lane/diag-bounded r0 (2026-09-07), building a 215-entry allow-list of failure constants by
+grepping the tree. `grep … | sed -E "s/.*'([A-Z][A-Z0-9_]*)'/\1/" | sort -u` looks like an extractor.
+It is not: `s///` rewrites the lines that match and **passes the rest through untouched**, so every
+line the pattern missed stayed in the output as a whole line of source — and `sort -u | wc -l` counted
+those as constants. Two pipelines over the same 122 matches disagreed, 85 against 79, and the six
+"extra" were `migrations/0037_run_ownership.sql:161:    RAISE EXCEPTION USING ERRCODE = '55000', …`
+in full. Nothing failed; the list was just wrong, and it was about to be pasted into two source files.
+(The BSD-grep half of the cause: `\s` is not a character class in `grep -E` on macOS, so
+`MESSAGE\s*=` matched nothing and every one of those lines fell through the `sed`.)
+**Rule: extract with a matcher that can only emit matches — `grep -o` and then split — never with a
+substitution. And when a list is going into source, cross-check the count two independent ways and
+`grep -v` the result against the shape you expect (`grep -vE '^[A-Z][A-Z0-9_]{1,63}$'` must be empty).**
+Cost here: ~6 minutes and one near-miss, caught only because I printed the list and read it.
+
+## `mutate.sh` runs your test command at the LANE ROOT, not in the package
+Same family as the recorded path traps. `mutate.sh` does `cd "$LANE"`, and `$LANE` is the worktree
+root (`.worktrees/lane-<x>`), one level ABOVE `dialectical-engine/`. So both arguments change shape:
+the target file is `dialectical-engine/apps/api/src/index.ts`, and a bare
+`pnpm exec vitest run tests/unit/x.test.ts` runs where there is no `package.json` and fails for a
+reason that has nothing to do with the mutant. Wrap it:
+`bash -c 'cd dialectical-engine && pnpm exec vitest run …'`.
+
+## A negative lookahead after `\s*` matches everything multi-line — 180 false "dynamic" sites
+Found by lane/diag-bounded r1 (2026-09-07), enumerating which `new TypedDomainError(...)` calls pass a
+literal code and which pass a variable. The literal probe was
+`new TypedDomainError\(\s*"([A-Z][A-Z0-9_]*)"` and the complement was
+`new TypedDomainError\(\s*(?!")(...)`. The complement reported **180** dynamic sites; the true number is
+**13**. Cause: `\s*` is greedy but backtracks to ZERO width, so on a wrapped call —
+`new TypedDomainError(\n        "MAKER_POSITION_UNAVAILABLE",` — the engine tries `\s*` = empty, the
+lookahead then inspects `\n`, which is not `"`, and the "not a literal" branch matches every multi-line
+call in the file. The two patterns are not complements even though they read as though they are.
+**Rule: never put a negative lookahead directly after a variable-width whitespace match.** Anchor the
+lookahead to a fixed position instead — match what you DO want (`\s*(?:"[^"]*"|\`[^\`]*\`|[A-Za-z_$][\w$.]*)`)
+and classify the capture afterwards, which is the same "only emit matches" rule the `sed` trap above states.
+Cheap self-check: the two branch counts must sum to the total call count — 419 + 180 against 432 calls
+was the tell, and it was visible for free.
+Cost here: ~5 minutes, and it would have put ~170 phantom entries in a hand-audited citation table.
+
+## Splicing an array literal by `index("[")` hits the `[]` of `readonly string[]` first
+Found by lane/diag-bounded r2 (2026-09-07), replacing the body of
+`const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([ … ]);` in two files. The splice was
+`a = block.index("[", block.index("const KNOWN_DOMAIN_CODES"))` — which finds the `[` of the TYPE
+ANNOTATION `string[]`, not the array literal eleven characters later. The result was syntactically
+broken TypeScript written to both files, and the failure surfaced as an oxc
+`[PARSE_ERROR] Expected ] but found ,` pointing at the FIRST ARRAY ELEMENT, ~50 lines below the real
+damage and in a file the message made look corrupt.
+**Rule: anchor a structural splice on the longest unambiguous literal that ends where you want to cut —
+here `const NAME: readonly string[] = Object.freeze([` — never on a bare bracket after a name.** Then
+assert the element count before AND after (`399 -> 398`); the assertion is one line and it converts this
+class of bug from a confusing parse error into a message that names the count.
+Recovery is `git checkout -- <files>` and redo; nothing is salvageable from a bad splice.
+Cost here: ~4 minutes, all of it spent reading a parse error that pointed at the wrong place.
