@@ -6,6 +6,12 @@ import {
   startDevelopmentAuthStack,
   type DevelopmentAuthStackOperations
 } from "../../apps/runner/src/dev-auth-stack.js";
+import {
+  startAttestedDevTlsFrontDoor,
+  type DevTlsOwnedFrontDoor,
+  type DevTlsReadinessOperations,
+  type DevTlsUiProbe
+} from "../../deploy/dev-auth/tls-front-door.mjs";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 type Exit = Readonly<{ code: number | null; signal: NodeJS.Signals | null }>;
@@ -370,4 +376,117 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(cli).toContain("runtimeFault.dispose()");
   });
 
+});
+
+/**
+ * F-DEV-TLS-DOUBLE-WRAP. `DevTlsFrontDoorError`'s constructor ALREADY wraps its second
+ * argument (`super(code, cause === undefined ? undefined : { cause })`,
+ * deploy/dev-auth/tls-front-door.mjs:32-35), and its DECLARED contract takes the cause raw
+ * (`constructor(code: string, cause?: unknown)`, deploy/dev-auth/tls-front-door.d.mts:40) —
+ * the same convention the sibling `DevelopmentAuthStackError` is called under in the subject
+ * of this file (dev-auth-stack.ts:323, :337, :423, each passing a bare `error`). Two throw
+ * sites passed `{ cause: error }` instead, so `error.cause` was a plain object
+ * `{ cause: <real error> }`. `developmentAuthStackErrorCode` advances only while
+ * `current instanceof Error` (dev-auth-stack.ts:299), so the walk stopped one link short and
+ * the inner producer code never joined.
+ *
+ * Each row asserts the WRAP DEPTH directly — `cause` is the object that was thrown, not a
+ * wrapper around it — and then the consequence the ticket names: the joined chain reaches it.
+ * The depth assertion is what makes these rows independent of which producer supplied the
+ * inner error; the join assertion is what makes the diagnostic loss visible.
+ */
+const DEV_TLS_READY_UI: DevTlsUiProbe = Object.freeze({
+  login: Object.freeze({
+    statusCode: 200,
+    contentType: "text/html; charset=utf-8",
+    body: "<html><body>Back to the graph.</body></html>"
+  }),
+  session: Object.freeze({
+    statusCode: 401,
+    contentType: "application/json; charset=utf-8",
+    body: '{"error":"SESSION_REQUIRED"}'
+  })
+});
+
+function tlsReadinessOperations(overrides: Readonly<{
+  startFrontDoor?: () => Promise<DevTlsOwnedFrontDoor>;
+  probePublicUi?: () => Promise<DevTlsUiProbe | null>;
+}> = {}): DevTlsReadinessOperations {
+  return Object.freeze({
+    isPublicPortOccupied: async () => false,
+    probePrivateUi: async () => DEV_TLS_READY_UI,
+    startFrontDoor: overrides.startFrontDoor
+      ?? (async () => Object.freeze({ port: 3_000, close: async () => undefined })),
+    probePublicUi: overrides.probePublicUi ?? (async () => DEV_TLS_READY_UI),
+    delay: async () => undefined
+  });
+}
+
+async function rejectionOf(work: Promise<unknown>): Promise<unknown> {
+  try {
+    await work;
+  } catch (error) {
+    return error;
+  }
+  throw new Error("EXPECTED_A_REJECTION");
+}
+
+describe("F-DEV-TLS-DOUBLE-WRAP the front door wraps a cause exactly once", () => {
+  it("joins the inner DEV code of a front-door START failure instead of stopping at the outer code", async () => {
+    // A real producer code: `DevCertificateError("DEV_TLS_CERTIFICATE_INVALID")`
+    // (deploy/dev-auth/create-local-certificate.mjs:27, :74) is NOT a DevTlsFrontDoorError,
+    // so it takes the wrapping branch of the ternary at tls-front-door.mjs:286-288 rather
+    // than the pass-through branch.
+    const inner = new Error("DEV_TLS_CERTIFICATE_INVALID");
+
+    const caught = await rejectionOf(startAttestedDevTlsFrontDoor({
+      operations: tlsReadinessOperations({ startFrontDoor: () => Promise.reject(inner) })
+    }));
+
+    expect((caught as Error).message).toBe("DEV_TLS_FRONT_DOOR_START_FAILED");
+    expect((caught as Error).cause).toBe(inner);
+    expect(developmentAuthStackErrorCode(caught))
+      .toBe("DEV_TLS_FRONT_DOOR_START_FAILED:DEV_TLS_CERTIFICATE_INVALID");
+  });
+
+  it("joins the inner DEV code of a front-door CLEANUP failure instead of stopping at the outer code", async () => {
+    // The owned front door's `close` arrives through the injected operations, so its
+    // rejection is whatever that implementation raises. DEV_TLS_LISTEN_FAILED is drawn from
+    // this module's own vocabulary (tls-front-door.mjs:241); the depth assertion below is
+    // what pins the property, and it does not depend on the producer.
+    const inner = new Error("DEV_TLS_LISTEN_FAILED");
+    const unreadyUi: DevTlsUiProbe = Object.freeze({
+      login: Object.freeze({ ...DEV_TLS_READY_UI.login, statusCode: 503 }),
+      session: DEV_TLS_READY_UI.session
+    });
+
+    const caught = await rejectionOf(startAttestedDevTlsFrontDoor({
+      operations: tlsReadinessOperations({
+        startFrontDoor: async () => Object.freeze({
+          port: 3_000,
+          close: () => Promise.reject(inner)
+        }),
+        probePublicUi: async () => unreadyUi
+      })
+    }));
+
+    expect((caught as Error).message).toBe("DEV_TLS_FRONT_DOOR_CLEANUP_FAILED");
+    expect((caught as Error).cause).toBe(inner);
+    expect(developmentAuthStackErrorCode(caught))
+      .toBe("DEV_TLS_FRONT_DOOR_CLEANUP_FAILED:DEV_TLS_LISTEN_FAILED");
+  });
+
+  // The neighbouring control: a front-door error the ternary passes through UNWRAPPED must
+  // still carry no cause at all. A "fix" that made the constructor stop wrapping, or that
+  // attached a cause everywhere, would also satisfy the two rows above.
+  it("leaves a DevTlsFrontDoorError raised by startFrontDoor untouched, with no cause", async () => {
+    const caught = await rejectionOf(startAttestedDevTlsFrontDoor({
+      operations: tlsReadinessOperations({ probePublicUi: async () => null }),
+      maximumProbeAttempts: 1
+    }));
+
+    expect((caught as Error).message).toBe("DEV_TLS_PUBLIC_READINESS_TIMEOUT");
+    expect((caught as Error).cause).toBeUndefined();
+    expect(developmentAuthStackErrorCode(caught)).toBe("DEV_TLS_PUBLIC_READINESS_TIMEOUT");
+  });
 });
