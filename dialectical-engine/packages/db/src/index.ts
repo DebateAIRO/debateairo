@@ -10,6 +10,7 @@ import type {
   PreparedRunContentCipher
 } from "@debateai/crypto";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
+import { captureHandled } from "@debateai/obs-capture";
 
 export {
   PostgresSessionRepository,
@@ -66,6 +67,11 @@ const ownerAskAdmissionScope = new AsyncLocalStorage<Readonly<{
   lease: OwnerAskAdmissionLease;
 }>>();
 const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";
+const DATABASE_POOL_FAILURE_MESSAGE = "PostgreSQL pool operation failed";
+const DATABASE_POOL_CAPTURE_CONTEXT = Object.freeze({
+  source: "database_pool",
+  code: DATABASE_POOL_FAILED
+});
 const wrappedPoolClients = new WeakSet<PoolClient>();
 const contentCiphers = new WeakMap<Pool, ContentCipher>();
 
@@ -607,8 +613,15 @@ type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
   if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
-  const detail = error instanceof Error ? error.message : String(error);
-  return new TypedDomainError(DATABASE_POOL_FAILED, `PostgreSQL pool operation failed: ${detail}`);
+  return new TypedDomainError(DATABASE_POOL_FAILED, DATABASE_POOL_FAILURE_MESSAGE, { cause: error });
+}
+
+function capturePoolFailure(error: TypedDomainError): void {
+  try {
+    captureHandled(error, DATABASE_POOL_CAPTURE_CONTEXT);
+  } catch {
+    // A capture failure cannot change the database failure seen by the caller.
+  }
 }
 
 function typedQueryFailure(error: unknown): unknown {
@@ -661,8 +674,9 @@ export function createPool(connectionString: string): Pool {
   let terminalFailure: TypedDomainError | undefined;
 
   pool.on("error", (error: Error) => {
-    terminalFailure ??= typedPoolFailure(error);
-    console.error(`[${DATABASE_POOL_FAILED}] ${terminalFailure.message}`);
+    if (terminalFailure !== undefined) return;
+    terminalFailure = typedPoolFailure(error);
+    capturePoolFailure(terminalFailure);
   });
 
   const mutablePool = pool as unknown as { query: UntypedMethod; connect: UntypedMethod };

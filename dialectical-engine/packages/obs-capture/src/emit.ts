@@ -1,5 +1,9 @@
 import { getObsContext, type ObsContext } from "./context.js";
 import {
+  snapshotEmittedCause,
+  snapshotHandledCause,
+} from "./cause-chain.js";
+import {
   CAPTURE_GAP_CLASSES,
   CAPTURE_HEALTH_CODES,
   createCaptureGapCounter,
@@ -13,6 +17,7 @@ export interface CaptureQueueEntry {
   readonly payload_ref: unknown;
   readonly ambient_context_ref: ObsContext | undefined;
   readonly handled_context_ref?: unknown;
+  readonly cause_chain_codes_ref?: readonly string[];
 }
 
 export interface CaptureQueuePort {
@@ -71,6 +76,7 @@ export function createCaptureEmitter(options: {
           kind: "envelope",
           payload_ref: envelope,
           ambient_context_ref: getObsContext(),
+          cause_chain_codes_ref: snapshotEmittedCause(envelope),
         });
       } catch {
         deferLoss("EMIT_FAILURE");
@@ -83,6 +89,7 @@ export function createCaptureEmitter(options: {
           payload_ref: error,
           ambient_context_ref: getObsContext(),
           handled_context_ref: context,
+          cause_chain_codes_ref: snapshotHandledCause(error, context),
         });
       } catch {
         deferLoss("EMIT_FAILURE");
@@ -93,15 +100,40 @@ export function createCaptureEmitter(options: {
 
 const DEFAULT_HEALTH = createCaptureHealth();
 const DEFAULT_GAPS = createCaptureGapCounter({ health: DEFAULT_HEALTH });
+let defaultGapTransfer: Promise<void> | undefined;
 let activeEmitter: CaptureEmitter = createCaptureEmitter({
   queue: Object.freeze({ offer: () => false }),
   health: DEFAULT_HEALTH,
   gaps: DEFAULT_GAPS,
 });
 
+function transferDefaultGaps(
+  target: Pick<CaptureGapCounter, "recordLoss">,
+): Promise<void> {
+  defaultGapTransfer ??= (async () => {
+    await Promise.resolve();
+    while (await DEFAULT_GAPS.flushOne((row) => {
+      target.recordLoss(row.source, row.gap_class, row.lost_count);
+    })) {}
+  })();
+  return defaultGapTransfer;
+}
+
 /** Installed lazily after register-backed bounds are available. */
-export function installCaptureEmitter(emitter: CaptureEmitter): void {
+export function installCaptureEmitter(emitter: CaptureEmitter): void;
+export function installCaptureEmitter(
+  emitter: CaptureEmitter,
+  pendingLossTarget: Pick<CaptureGapCounter, "recordLoss">,
+): Promise<void>;
+export function installCaptureEmitter(
+  emitter: CaptureEmitter,
+  pendingLossTarget?: Pick<CaptureGapCounter, "recordLoss">,
+): void | Promise<void> {
   activeEmitter = emitter;
+  if (pendingLossTarget === undefined) {
+    return;
+  }
+  return transferDefaultGaps(pendingLossTarget);
 }
 
 export function emit(envelope: unknown): void {
@@ -119,4 +151,3 @@ export function captureHandled(error: unknown, context: unknown): void {
     // Product failure semantics always win over observability.
   }
 }
-

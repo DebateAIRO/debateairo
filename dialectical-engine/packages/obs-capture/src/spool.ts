@@ -1,5 +1,10 @@
-import { writeSync } from "node:fs";
+import { fstatSync, writeSync } from "node:fs";
 
+import {
+  clampSpoolRecordLimit,
+  SPOOL_FILE_MAX_BYTES,
+  SPOOL_RECORD_MAX_BYTES,
+} from "./safe-metadata.js";
 import {
   isPostRedactionEnvelope,
   type PostRedactionEnvelope,
@@ -42,6 +47,7 @@ export function createPreopenedSpool(options: {
   ) {
     throw new RangeError("SPOOL_ENVELOPE_MAX_BYTES_INVALID");
   }
+  const envelopeMaxBytes = clampSpoolRecordLimit(options.envelopeMaxBytes);
   const write = options.write ?? NODE_SYNC_WRITER;
   let poisoned = false;
 
@@ -50,7 +56,7 @@ export function createPreopenedSpool(options: {
       throw new TypeError("SPOOL_REQUIRES_POST_REDACTION_ENVELOPE");
     }
     const bytes = Buffer.from(`${JSON.stringify(envelope)}\n`, "utf8");
-    if (bytes.byteLength > options.envelopeMaxBytes) {
+    if (bytes.byteLength > envelopeMaxBytes) {
       throw new RangeError("SPOOL_ENVELOPE_TOO_LARGE");
     }
     const record = Object.freeze({
@@ -60,13 +66,24 @@ export function createPreopenedSpool(options: {
     return record;
   }
 
-  function appendPrepared(record: PreparedSpoolRecord): void {
+  function appendPrepared(
+    record: PreparedSpoolRecord,
+    maximumFileBytes: number,
+  ): void {
     const bytes = PREPARED_BYTES.get(record);
     if (bytes === undefined) {
       throw new TypeError("SPOOL_REQUIRES_PREPARED_POST_REDACTION_RECORD");
     }
     if (poisoned) {
       throw new Error("SPOOL_STREAM_POISONED");
+    }
+    const currentSize = fstatSync(options.fd).size;
+    if (
+      !Number.isSafeInteger(currentSize)
+      || currentSize < 0
+      || currentSize + bytes.byteLength > maximumFileBytes
+    ) {
+      throw new RangeError("SPOOL_FILE_CAPACITY_EXCEEDED");
     }
     let offset = 0;
     try {
@@ -94,12 +111,17 @@ export function createPreopenedSpool(options: {
   }
 
   function append(envelope: PostRedactionEnvelope): void {
-    appendPrepared(prepare(envelope));
+    appendPrepared(
+      prepare(envelope),
+      SPOOL_FILE_MAX_BYTES - SPOOL_RECORD_MAX_BYTES,
+    );
   }
 
   return Object.freeze({
     prepare,
     append,
-    appendOnExit: appendPrepared,
+    appendOnExit(record: PreparedSpoolRecord): void {
+      appendPrepared(record, SPOOL_FILE_MAX_BYTES);
+    },
   });
 }

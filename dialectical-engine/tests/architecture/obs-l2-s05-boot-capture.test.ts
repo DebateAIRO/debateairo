@@ -30,6 +30,7 @@ const BOOT_STALL_SEPARATOR_COUNT = 60_000;
 const BOOT_STALL_MAX_MS = 2_000;
 const BOOT_STALL_PROBE_TIMEOUT_MS = 10_000;
 const EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED = 16_384;
+const SPOOL_INDEX_NAME = ".obs-spool-index-v1";
 
 type Runtime = typeof RUNTIMES[number];
 type ImportMode = "dynamic" | "static";
@@ -716,11 +717,14 @@ describe("S05 fatal-boundary installers", () => {
       });
 
       expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
-      const spoolFiles = readdirSync(spoolDirectory);
+      const spoolFiles = readdirSync(spoolDirectory)
+        .filter((name) => name.endsWith(".spool"));
       expect(spoolFiles).toHaveLength(1);
       expect(spoolFiles[0]).toMatch(
         new RegExp(`^${runtime}-${result.pid}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.spool$`, "u"),
       );
+      expect(readFileSync(join(spoolDirectory, SPOOL_INDEX_NAME), "utf8"))
+        .toBe(`\n${spoolFiles[0]}\n`);
       const raw = readFileSync(join(spoolDirectory, spoolFiles[0]!), "utf8");
       expect(raw.endsWith("\n")).toBe(true);
       const lines = raw.trimEnd().split("\n");
@@ -736,6 +740,7 @@ describe("S05 fatal-boundary installers", () => {
         disposition: "SELF",
         fallback_minimized: true,
       });
+      expect(envelope).not.toHaveProperty("cause_chain_codes");
 
       const { createSharedRedactor } = await import("@debateai/obs-capture");
       const expected = JSON.parse(JSON.stringify(createSharedRedactor(redactorConfig(runtime)).redact({
@@ -748,6 +753,7 @@ describe("S05 fatal-boundary installers", () => {
       delete envelope.source_event_ref;
       delete expected.occurred_at;
       delete expected.source_event_ref;
+      delete expected.cause_chain_codes;
       expect(envelope).toEqual(expected);
     },
   );
@@ -925,26 +931,29 @@ describe("S05 fatal-boundary installers", () => {
     expect(readFileSync(join(spoolDirectory, spoolFile!), "utf8")).toBe("");
   });
 
-  it("pins the exact default Tier-0 envelope seed at 16,384 bytes", () => {
+  it("minimizes oversized Tier-0 metadata before the shared record cap", () => {
     const baselineDirectory = makeScratchDirectory();
     const baseline = defaultEnvelopeSeedProbe(baselineDirectory, "x");
     expect(baseline.result.status, `stdout=${baseline.result.stdout}\nstderr=${baseline.result.stderr}`).toBe(1);
     expect(Buffer.byteLength(baseline.raw)).toBeGreaterThan(1);
 
-    const fixedOverheadBytes = Buffer.byteLength(baseline.raw) - 1;
-    const atCapBuildRefLength = EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED - fixedOverheadBytes;
-    expect(atCapBuildRefLength).toBeGreaterThan(0);
-
-    const atCapDirectory = makeScratchDirectory();
-    const atCap = defaultEnvelopeSeedProbe(atCapDirectory, "x".repeat(atCapBuildRefLength));
-    expect(atCap.result.status, `stdout=${atCap.result.stdout}\nstderr=${atCap.result.stderr}`).toBe(1);
-    expect(Buffer.byteLength(atCap.raw)).toBe(EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED);
-    expect(JSON.parse(atCap.raw)).toMatchObject({ code: "OBS_CAPTURE_SELF", runtime: "runner" });
-
-    const overCapDirectory = makeScratchDirectory();
-    const overCap = defaultEnvelopeSeedProbe(overCapDirectory, "x".repeat(atCapBuildRefLength + 1));
-    expect(overCap.result.status, `stdout=${overCap.result.stdout}\nstderr=${overCap.result.stderr}`).toBe(1);
-    expect(overCap.raw).toBe("");
+    const oversizedDirectory = makeScratchDirectory();
+    const oversized = defaultEnvelopeSeedProbe(
+      oversizedDirectory,
+      "x".repeat(EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED),
+    );
+    expect(
+      oversized.result.status,
+      `stdout=${oversized.result.stdout}\nstderr=${oversized.result.stderr}`,
+    ).toBe(1);
+    expect(Buffer.byteLength(oversized.raw))
+      .toBeLessThan(EXPECTED_SPOOL_ENVELOPE_MAX_BYTES_SEED);
+    expect(JSON.parse(oversized.raw)).toMatchObject({
+      code: "OBS_CAPTURE_SELF",
+      runtime: "runner",
+      build_ref: "UNTRACKED-DEV:UNKNOWN",
+      fallback_minimized: true,
+    });
   });
 
   it("refuses a predictable symlink target without writing outside the spool directory", () => {
@@ -1168,11 +1177,9 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
     expect(readdirSync(physicalSpool)).toEqual([]);
   });
 
-  // Node has no openat-style primitive, so a check-to-open window remains after this single
-  // resolution. It is about 17 microseconds, depth-independent, requires pre-existing write
-  // access to the spool directory's parent, and is bounded by O_CREAT | O_EXCL | O_NOFOLLOW
-  // on a mode-0600 file. This test pins the single-resolution trace; it does not close that window.
-  it("resolves the normalized spool directory exactly once", () => {
+  // Node has no openat-style primitive, so a check-to-open window remains after directory
+  // resolution. The exclusive create is followed by one pathname-to-held-fd identity check.
+  it("resolves the spool directory once and verifies the indexed pathname", () => {
     const root = makeScratchDirectory();
     const spoolDirectory = join(root, "named-spool");
     const attackerDirectory = join(root, "attacker");
@@ -1183,7 +1190,10 @@ throw new Error(${JSON.stringify(ERROR_TOKEN)});`;
     const result = finalComponentSwapProbe(spoolDirectory, attackerDirectory, resolutionMarker);
 
     expect(result.status, `stdout=${result.stdout}\nstderr=${result.stderr}`).toBe(1);
-    expect(readFileSync(resolutionMarker, "utf8").trimEnd().split("\n")).toEqual(["realpathSync"]);
+    expect(readFileSync(resolutionMarker, "utf8").trimEnd().split("\n")).toEqual([
+      "realpathSync",
+      "lstatSync",
+    ]);
     expect(lstatSync(spoolDirectory).isDirectory()).toBe(true);
     expect(readdirSync(attackerDirectory)).toEqual([]);
     expect(readdirSync(spoolDirectory).filter((name) => name.endsWith(".spool"))).toHaveLength(1);

@@ -365,6 +365,10 @@ export const INDIRECT_ORIGINS = Object.freeze([
 export const AUTHORED_CODES = frozenCodes([
   "OBS_CAPTURE_SELF",
   "OBS_COMPONENT_HEALTH",
+  "OBS_SCHEDULER_JOB_STARTED",
+  "OBS_SCHEDULER_JOB_SUCCEEDED",
+  "OBS_SCHEDULER_JOB_FAILED",
+  "OBS_SCHEDULER_JOB_NOOP",
 ]);
 
 export interface RegistryCodePartitions {
@@ -459,13 +463,77 @@ export type TemplateParameterDeclaration =
 
 export type SafeTemplateId = `tpl.${RegistryCode}`;
 
+export interface SafeEnvelopeBinding {
+  readonly taxonomy_class: TaxonomyClass;
+  readonly capture_point: "job";
+  readonly disposition: "DETECTED" | "THROWN";
+  readonly source: "first_party";
+}
+
 export interface SafeTemplate {
   readonly code: RegistryCode;
   readonly id: SafeTemplateId;
   readonly parameters: readonly TemplateParameterDeclaration[];
+  readonly binding?: SafeEnvelopeBinding;
 }
 
 const EMPTY_PARAMETERS = Object.freeze([]) as readonly TemplateParameterDeclaration[];
+const SCHEDULER_JOBS = Object.freeze([
+  "replay-self-test",
+  "liveness-sweep",
+  "settlement-watch",
+] as const);
+const JOB_PARAMETER = Object.freeze({
+  name: "job",
+  type: "closed_enum" as const,
+  members: SCHEDULER_JOBS,
+});
+const COUNT_PARAMETER = Object.freeze({
+  name: "count",
+  type: "bounded_int" as const,
+  minimum: 0,
+  maximum: Number.MAX_SAFE_INTEGER,
+});
+const JOB_LIFECYCLE_BINDING = Object.freeze({
+  taxonomy_class: "JOB_LIFECYCLE" as TaxonomyClass,
+  capture_point: "job" as const,
+  disposition: "DETECTED" as const,
+  source: "first_party" as const,
+});
+const JOB_FAILURE_BINDING = Object.freeze({
+  taxonomy_class: "JOB_FAILURE" as TaxonomyClass,
+  capture_point: "job" as const,
+  disposition: "THROWN" as const,
+  source: "first_party" as const,
+});
+const JOB_PARAMETERS = Object.freeze([JOB_PARAMETER]);
+const JOB_COUNT_PARAMETERS = Object.freeze([JOB_PARAMETER, COUNT_PARAMETER]);
+
+function lifecycleTemplateFields(code: RegistryCode): Readonly<{
+  readonly parameters: readonly TemplateParameterDeclaration[];
+  readonly binding?: SafeEnvelopeBinding;
+}> {
+  switch (code) {
+    case "OBS_SCHEDULER_JOB_STARTED":
+    case "OBS_SCHEDULER_JOB_SUCCEEDED":
+      return Object.freeze({
+        parameters: JOB_PARAMETERS,
+        binding: JOB_LIFECYCLE_BINDING,
+      });
+    case "OBS_SCHEDULER_JOB_FAILED":
+      return Object.freeze({
+        parameters: JOB_PARAMETERS,
+        binding: JOB_FAILURE_BINDING,
+      });
+    case "OBS_SCHEDULER_JOB_NOOP":
+      return Object.freeze({
+        parameters: JOB_COUNT_PARAMETERS,
+        binding: JOB_LIFECYCLE_BINDING,
+      });
+    default:
+      return Object.freeze({ parameters: EMPTY_PARAMETERS });
+  }
+}
 
 export const FIRST_ID_PARAMETER_SECURITY_GATE =
   "FIRST_ID_PARAMETER_REQUIRES_EXPLICIT_SECURITY_REVIEW" as const;
@@ -497,13 +565,15 @@ export function safeTemplateId(code: RegistryCode): SafeTemplateId {
 }
 
 export const SAFE_TEMPLATES = Object.freeze(
-  ALL_REGISTRY_CODES.map((code) =>
-    Object.freeze({
+  ALL_REGISTRY_CODES.map((code) => {
+    const lifecycle = lifecycleTemplateFields(code);
+    return Object.freeze({
       code,
       id: safeTemplateId(code),
-      parameters: EMPTY_PARAMETERS,
-    }),
-  ),
+      parameters: lifecycle.parameters,
+      ...(lifecycle.binding === undefined ? {} : { binding: lifecycle.binding }),
+    });
+  }),
 );
 
 assertParameterSecurityGates(
@@ -660,7 +730,12 @@ export type Severity = (typeof SEVERITY_LADDER)[number];
 export const SEVERITY_DEFAULT: Severity = "DEGRADED";
 export const SEVERITY_OVERRIDES: Readonly<
   Partial<Record<RegistryCode, Severity>>
-> = Object.freeze({});
+> = Object.freeze({
+  OBS_SCHEDULER_JOB_STARTED: "INFO",
+  OBS_SCHEDULER_JOB_SUCCEEDED: "INFO",
+  OBS_SCHEDULER_JOB_FAILED: "SEVERE",
+  OBS_SCHEDULER_JOB_NOOP: "INFO",
+} as Partial<Record<RegistryCode, Severity>>);
 
 export function severity(code: RegistryCode): Severity {
   return SEVERITY_OVERRIDES[code] ?? SEVERITY_DEFAULT;
@@ -689,6 +764,7 @@ export const TAXONOMY_CLASSES = Object.freeze([
   "CLIENT_FAILURE",
   "CAPTURE_SELF",
   "ORIGIN_UNKNOWN",
+  "JOB_LIFECYCLE",
 ] as const);
 export type TaxonomyClass = (typeof TAXONOMY_CLASSES)[number];
 
