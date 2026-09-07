@@ -159,8 +159,20 @@ function composite(fg: string, bg: string, alpha: number): string {
  * (ratio 5.5450, printed `5.54`); re-derived by hand as `0.70·38 + 0.30·233` it is
  * 96.49999999999999, `Math.round` gives 96, and the ratio becomes 5.6077 — `5.61`. The model that
  * ships is `composite()` above, and these assertions are now the only place either number lives.
+ *
+ * IT RETURNS BOTH THE LABEL AND THE NUMBER, and every filter below compares the NUMBER
+ * (`CODE-REV-S02-C8 r2` N1r2, ADVISORY, class binding; ticket `t_e7801ab7`). The intermediate
+ * form of this helper returned the label alone, so the gate had to re-parse it —
+ * `Number.parseFloat(entry.split(" ")[1]) < 4.5` — which formats to 2 dp FIRST and compares
+ * SECOND. A true ratio in `[4.495, 4.5)` therefore rounds to `"4.50"`, parses to `4.5`, and
+ * escapes a `< 4.5` filter: measured, Chamber at `opacity: .4784` is **4.498360**, a genuine
+ * WCAG AA failure the string form does not list (424 of 200,000 alphas report a wrong failure
+ * SET; the assertion's verdict never flips, which is why the finding is an N and not a B).
+ * A guard that compares a FORMATTED number has silently moved its own threshold, so the
+ * string is for the MESSAGE and the number is for the COMPARISON — the shape this helper had
+ * before the refactor that broke it.
  */
-function ratiosAt(alpha: number): string[] {
+function ratiosAt(alpha: number): Array<[string, number]> {
   return (
     [
       ["Terracotta", ":root"],
@@ -171,9 +183,18 @@ function ratiosAt(alpha: number): string[] {
     const face = tokenValue(blockSelector, "--ink");
     const label = tokenValue(blockSelector, "--bg");
     const ratio = contrastRatio(composite(label, ground, alpha), composite(face, ground, alpha));
-    return `${mode} ${ratio.toFixed(2)}`;
+    return [`${mode} ${ratio.toFixed(2)}`, ratio];
   });
 }
+
+/** The printed rungs of `ratiosAt`, unchanged in text by N1r2's repair. */
+const labelsAt = (alpha: number): string[] => ratiosAt(alpha).map(([label]) => label);
+
+/** The rungs BELOW 4.5:1 at one alpha, selected on the ratio and reported as the label. */
+const failingAt = (alpha: number): string[] =>
+  ratiosAt(alpha)
+    .filter(([, ratio]) => ratio < 4.5)
+    .map(([label]) => label);
 
 /** The S02 block's inner text, with both markers excluded. Throws if the block is not well formed. */
 function s02Block(): string {
@@ -189,6 +210,20 @@ function s02Block(): string {
 
 describe("S02-C8 consent-ui style contract", () => {
   it("S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
+    // THE ONE THING `stripComments()` MADE INVISIBLE (orchestrator note on `t_4f97ca86`,
+    // 2026-09-07 03:09, from `CODE-S02-C8-REWORK-R1` R1). Every other assertion in this file
+    // reads the block through `stripComments()`, so a comment DUPLICATED inside the S02 block —
+    // the shape `CODE-REV-S02-C8 r1` N2 found as an ORPHANED comment, one commit earlier — is
+    // unreachable by any mutant this suite can build. Comment text is the only documentation a
+    // stylesheet carries, and a paragraph pasted twice is a real defect that nothing else here
+    // can see. The `> 0` arm is a satisfiability arm: an empty comment list would satisfy the
+    // uniqueness assertion vacuously, which is the `TOOLING-TRAPS` "guard that cannot fail" class.
+    const comments = s02Block().match(/\/\*[\s\S]*?\*\//g) ?? [];
+    expect(comments.length, "the S02 block is commented at all").toBeGreaterThan(0);
+    expect(new Set(comments).size, "no comment is duplicated inside the S02 block").toBe(
+      comments.length
+    );
+
     expect(occurrences(css, OPEN_MARKER)).toBe(1);
     expect(occurrences(css, CLOSE_MARKER)).toBe(1);
     expect(css.indexOf(OPEN_MARKER)).toBeLessThan(css.indexOf(CLOSE_MARKER));
@@ -347,23 +382,36 @@ describe("S02-C8 consent-ui style contract", () => {
 
     // The claim the step exists to make: at the alpha the stylesheet DECLARES, neither mode is
     // below 4.5:1. Read from the block, never transcribed, so moving the declaration moves this.
-    expect(
-      ratiosAt(alpha).filter((entry) => Number.parseFloat(entry.split(" ")[1]!) < 4.5)
-    ).toEqual([]);
+    // The selection is on the RATIO, never on its 2-dp rendering (N1r2; see `ratiosAt`).
+    expect(failingAt(alpha)).toEqual([]);
 
     // And the LADDER the sentence above narrates, executed rung by rung. `.60` is the rung that
     // fails and is therefore the reason `.65` is pinned; `.70` is the rung whose figure round 1
     // shipped wrong. A derivation written as prose beside an executable assertion is unexecuted
     // prose, and this is what that cost.
-    expect(ratiosAt(0.6)).toEqual(["Terracotta 4.13", "Chamber 6.29"]);
-    expect(ratiosAt(0.65)).toEqual(["Terracotta 4.79", "Chamber 7.17"]);
-    expect(ratiosAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
+    expect(labelsAt(0.6)).toEqual(["Terracotta 4.13", "Chamber 6.29"]);
+    expect(labelsAt(0.65)).toEqual(["Terracotta 4.79", "Chamber 7.17"]);
+    expect(labelsAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
 
     // `.65` is the SMALLEST 0.05 step that clears 4.5:1 in both modes — the claim the pin rests
     // on — so the rung below it must fail. Stated as a property, not as a number.
-    expect(
-      ratiosAt(0.6).some((entry) => Number.parseFloat(entry.split(" ")[1]!) < 4.5)
-    ).toBe(true);
+    expect(ratiosAt(0.6).some(([, ratio]) => ratio < 4.5)).toBe(true);
+
+    // THE BLIND WINDOW, executed rather than described (`CODE-REV-S02-C8 r2` N1r2, `t_e7801ab7`).
+    // This is the discriminator between "filter the ratio" and "filter its 2-dp rendering", and
+    // it is the only assertion in this file that can tell them apart: at `alpha = 0.4784`
+    // Chamber's true ratio is 4.498360 — BELOW 4.5, a real AA failure — and it PRINTS as
+    // `"4.50"`. Comparing the printed string lists Terracotta alone; comparing the number lists
+    // both, which is what a reader of a failure message needs. Independently recomputed here
+    // before it was written: Terracotta 2.927853, Chamber 4.498360.
+    expect(labelsAt(0.4784), "the blind window's printed rungs").toEqual([
+      "Terracotta 2.93",
+      "Chamber 4.50"
+    ]);
+    expect(failingAt(0.4784), "a true ratio in [4.495, 4.5) is REPORTED as failing").toEqual([
+      "Terracotta 2.93",
+      "Chamber 4.50"
+    ]);
   });
 
   it("S02-S65 · no auth-shell ancestor becomes the containing block for the fixed scrim", () => {

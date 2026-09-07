@@ -123,6 +123,27 @@ function dialog(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[role="dialog"]');
 }
 
+/**
+ * React's PRIVATE value tracker, READ and never written.
+ *
+ * ACCEPTED REACT-INTERNAL COUPLING (orchestrator ruling 2026-09-07 on
+ * `CODE-REV-S02-C7 r1 N2`, recorded in `slices/S02/DECISIONS.md`). `_valueTracker` is not part
+ * of React's public surface and a React upgrade may rename it — that is the price of the pin
+ * and it was paid deliberately. The alternative on the table was DELETING the resync at
+ * `SignUpFlow.tsx:150-153`; the ruling kept it as declared defence in depth, and
+ * `heartbeat-protocol` §2.2 forbids leaving shipped code both unpinned and unexplained. The
+ * tracker is the ONLY observable this property has: the reviewer measured that removing the
+ * resync changes no DOM value, no button state and no route outcome anywhere in the slice
+ * (mutant M11, `Tests 14 passed (14)`), because `acknowledgePolicy`'s instance assignment
+ * re-syncs the tracker before any later uncheck can be swallowed. The helper degrades to the
+ * string `"NO-TRACKER"` rather than throwing, so a React version that drops the field fails
+ * on an assertion that NAMES the coupling instead of on a `TypeError`.
+ */
+function trackerValue(input: HTMLInputElement): string {
+  const tracker = (input as unknown as { _valueTracker?: { getValue(): string } })._valueTracker;
+  return tracker === undefined ? "NO-TRACKER" : tracker.getValue();
+}
+
 function scrollRegion(): HTMLElement {
   const region = document.querySelector<HTMLElement>(".policyBody");
   expect(region, "missing the policy scroll region").not.toBeNull();
@@ -212,6 +233,40 @@ async function mirrorArm(): Promise<void> {
   expect(createAccountButton().disabled, "Create account after the mirror arm").toBe(true);
 }
 
+/**
+ * THE FOCUS-RETURN ARM, for an entry point that is not the check square.
+ *
+ * `SPEC.md` constant (5) quantifies over ALL THREE entry points — *focus return lands on the
+ * input whatever the entry point* — and the mechanism is one line, `input.focus()` at
+ * `SignUpFlow.tsx:134`, which runs before the surface opens so that `modalSemantics`
+ * remembers the input as the element to restore. Until this arm existed the constant was
+ * pinned for the SQUARE only: `S02-S53`/`S02-S54`/`S02-S55`/`S02-S56` all open from the
+ * square, and `S02-S50`/`S02-S51` opened from the text and the control and never dismissed,
+ * so they asserted nothing about focus. Measured by `CODE-REV-S02-C7 r1 N1`: the mutant
+ * `if (event.target === input) input.focus();` — focus only when the click started on the
+ * square — survived the whole file, `R9 | exit=0 | Tests 14 passed (14)`. A keyboard or
+ * screen-reader user who activates the `Privacy Policy` control and then dismisses the policy
+ * lands on `<body>` instead of the box they were filling in, and the mouse path is unaffected,
+ * so nothing shows it without this assertion.
+ *
+ * Placed AFTER each case's existing assertions and after `mirrorArm()`, so no existing
+ * assertion is reordered or weakened; the dismissal is the `×` control, the same route
+ * `S02-S54` uses, and the element `modalSemantics` restores was captured at OPEN, which is
+ * why the intervening `adult-affirmed` click cannot influence it.
+ */
+async function dismissAndExpectFocusReturn(entry: "text" | "control"): Promise<void> {
+  expect(dialog(), `the ${entry} route must still have the policy open`).not.toBeNull();
+
+  await clickElement(policyButton("×"));
+
+  expect(dialog(), `the close control must close the policy opened from the ${entry}`).toBeNull();
+  expect(
+    document.activeElement,
+    `constant (5): focus returns to the privacy input from the ${entry} entry point`
+  ).toBe(field("privacy-accepted"));
+  expect(field("privacy-accepted").checked, "and the dismissal ticks nothing").toBe(false);
+}
+
 describe("sign-up card ↔ privacy policy modal", () => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -254,6 +309,8 @@ describe("sign-up card ↔ privacy policy modal", () => {
     expect(dialog(), "the policy modal must be open").not.toBeNull();
     expect(field("privacy-accepted").checked, "the box must stay unticked").toBe(false);
     await mirrorArm();
+
+    await dismissAndExpectFocusReturn("text");
   });
 
   /* S02-S51 — R05, R17. The third entry point, and SPEC.md R05 calls this the single most
@@ -266,6 +323,78 @@ describe("sign-up card ↔ privacy policy modal", () => {
     expect(dialog(), "the policy modal must be open").not.toBeNull();
     expect(field("privacy-accepted").checked, "the box must stay unticked").toBe(false);
     await mirrorArm();
+
+    await dismissAndExpectFocusReturn("control");
+  });
+
+  /* CODE-REV-S02-C7 r1 N2, the tracker resync (`SignUpFlow.tsx:150-153`), pinned directly.
+     Orchestrator ruling 2026-09-07 (`t_c0fd0601`), recorded in `slices/S02/DECISIONS.md`: the
+     `queueMicrotask` block is KEPT as declared defence in depth, and it must therefore stop
+     being both unpinned and unexplained (`heartbeat-protocol` §2.2).
+
+     PROPERTY. After ONE cancelled click on the empty privacy box, React's value tracker for
+     that input agrees with the DOM — both `"false"`. The cancelled click is the whole
+     mechanism: the pre-click activation steps flip `checked` to `true`, React's change
+     extraction records `"true"` in the tracker, and the canceled-activation steps then revert
+     the DOM to `false` AFTER dispatch — leaving tracker `"true"` over DOM `false`, a state in
+     which a later genuine change can go unannounced.
+
+     WHY THE TRACKER AND NOT AN OUTCOME. The reviewer measured that no route in the slice turns
+     that desync into an observable outcome today (mutant M11, the block deleted:
+     `Tests 14 passed (14)`, and all nine of the reviewer's probes still green), because
+     `acknowledgePolicy`'s plain instance assignment re-syncs the tracker before any uncheck
+     could be swallowed. So an outcome-level assertion here would pin nothing; this one is the
+     only one that discriminates. `trackerValue`'s doc-comment states the accepted coupling. */
+  it("re-syncs React's value tracker after a cancelled click on the empty box", async () => {
+    await mount();
+    const input = field("privacy-accepted");
+    expect(trackerValue(input), "React tracks this input's value at all").not.toBe("NO-TRACKER");
+    expect(trackerValue(input), "the tracker starts in step with the empty box").toBe("false");
+
+    await clickElement(input);
+
+    expect(dialog(), "the cancelled click opens the policy").not.toBeNull();
+    expect(input.checked, "and leaves the DOM box empty").toBe(false);
+    expect(
+      trackerValue(input),
+      "the tracker must be back in step with the DOM after the cancelled click"
+    ).toBe("false");
+  });
+
+  /* CODE-REV-S02-C7 r1 N6, the re-entrancy guard (`SignUpFlow.tsx:128`,
+     `if (event.target !== input) input.click();`), pinned with a DISPATCHED event (`t_086c1d78`).
+
+     PROPERTY. One user click on the TICKED privacy box runs the row handler exactly once and
+     leaves the box unticked.
+
+     WHY A DISPATCH AND NOT `.click()`. Every other case in this file reaches the DOM through
+     `HTMLElement.click()`, and the HTML spec's "click in progress" flag — set by the click
+     METHOD — makes the handler's synthesised `input.click()` a no-op, so the guard is
+     unobservable through that path: the reviewer measured mutant R1 (the guard dropped, the
+     `.click()` unconditional) as `Tests 14 passed (14)`. A real user click sets no such flag,
+     and neither does `dispatchEvent(new MouseEvent("click"))`, which is why this is the one
+     idiom that can see it: `HEAD -> handlerRuns=1 dom=false`, `R1 -> handlerRuns=2 dom=TRUE`
+     (probe P4). With the guard gone a user clicking a ticked privacy box in a browser fails to
+     untick it — two toggles instead of one — and no other test in the slice would say so.
+     The `capture: true` listener counts arrivals at the row element itself, which is where the
+     component's own `onClick` lives, so a re-entry is one extra count and nothing else is. */
+  it("runs the row handler once for a dispatched click on the ticked box, and unticks it", async () => {
+    await mount();
+    await acknowledgePolicy();
+    const input = field("privacy-accepted");
+    expect(input.checked, "precondition: the acknowledgement ticked the box").toBe(true);
+
+    let handlerRuns = 0;
+    privacyRow().addEventListener("click", () => { handlerRuns += 1; }, { capture: true });
+
+    await act(async () => {
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    await settle();
+
+    expect(handlerRuns, "the row handler must run exactly once per user click").toBe(1);
+    expect(input.checked, "a click on the ticked box unticks it").toBe(false);
+    expect(dialog(), "and unticking opens no dialog").toBeNull();
   });
 
   /* S02-S52 — R06. The checked row unchecks directly, with no modal. The mirror arm is folded

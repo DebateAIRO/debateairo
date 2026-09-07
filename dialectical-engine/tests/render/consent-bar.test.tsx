@@ -237,9 +237,34 @@ describe("S01-C3 the cookie bar (10a)", () => {
     const css = globalsSource();
     expect(css.split(OPEN_MARKER).length - 1, "exactly one S01 block is opened").toBe(1);
     expect(css.split(CLOSE_MARKER).length - 1, "exactly one S01 block is closed").toBe(1);
-    expect(css.trimEnd().endsWith(CLOSE_MARKER), "the S01 block is the last block in the file").toBe(
-      true
-    );
+
+    // RELAXED BY THE S02-S66 MERGE, and by nothing else (`CODE-S02-C9`, first commit).
+    // This assertion read `css.trimEnd().endsWith(CLOSE_MARKER)` — "the S01 block is the last
+    // block in the file" — which was true while S01's lane was alone and became false the
+    // moment `slice/consent-s01` was merged into `slice/consent-s02`. Both slices append a
+    // delimited block at the end of `globals.css`; the vertical-slice law ACCEPTS that
+    // conflict and fixes the resolution as S01's block first and S02's second
+    // (`slices/S02/PLAN.md` S02-S66 and §"The single-writer rule against S01"). What S01
+    // actually owns — its rules live in ONE block appended after every pre-existing rule, and
+    // nothing of S01's is stranded outside it — is unchanged, and this is that property in the
+    // form that survives the merge: after S01's closing marker there is nothing but whitespace,
+    // or S02's ONE delimited block and then nothing but whitespace. A third block, a stray
+    // rule between the two, or anything at all after S02's closing marker still fails here.
+    const tail = css.slice(css.indexOf(CLOSE_MARKER) + CLOSE_MARKER.length);
+    const S02_OPEN = "/* === consent-ui S02 === */";
+    const S02_CLOSE = "/* === end consent-ui S02 === */";
+    const s02At = tail.indexOf(S02_OPEN);
+    if (s02At === -1) {
+      expect(tail.trim(), "nothing but whitespace follows the S01 block").toBe("");
+    } else {
+      expect(tail.split(S02_OPEN).length - 1, "exactly one S02 block is opened after S01's").toBe(1);
+      expect(tail.split(S02_CLOSE).length - 1, "exactly one S02 block is closed after S01's").toBe(1);
+      expect(tail.slice(0, s02At).trim(), "nothing but whitespace between the two blocks").toBe("");
+      expect(
+        tail.slice(tail.indexOf(S02_CLOSE) + S02_CLOSE.length).trim(),
+        "nothing but whitespace follows S02's closing marker"
+      ).toBe("");
+    }
 
     const block = withoutComments(s01Block());
     const base = unconditional(block);
