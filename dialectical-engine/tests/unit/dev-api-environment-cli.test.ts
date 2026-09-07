@@ -41,10 +41,17 @@ const PRODUCER_CODES = [
 const FALLBACK = "DEV_API_ENVIRONMENT_FAILED";
 
 /**
- * Synthetic only (D18). Shape-legal for the removed regex — the old rule would have printed
- * this verbatim — and absent from every producer.
+ * Synthetic only (D18). Absent from every producer, and shape-legal for the REMOVED rule —
+ * the old CLI would have printed it verbatim.
+ *
+ * The removed rule was `/^DEV_API_ENVIRONMENT_[A-Z_]+$/u`, whose class carries NO DIGITS.
+ * That differs from the joiner's `/^DEV_[A-Z0-9_]+$/u` in dev-auth-stack.ts:312, so the
+ * `PW_42`-style synthetic used by tests/unit/dev-auth-stack.test.ts is shape-legal THERE and
+ * not here. A digit in this constant makes the row below pass against the restored shape rule
+ * as well as against the vocabulary, i.e. pin nothing — measured: the first version of this
+ * file carried `PW_42` and the shape-rule mutant survived it.
  */
-const SYNTHETIC_SENSITIVE = "DEV_API_ENVIRONMENT_PW_42_LEAKED_FROM_A_DRIVER";
+const SYNTHETIC_SENSITIVE = "DEV_API_ENVIRONMENT_PASSWORD_LEAKED_FROM_A_DRIVER";
 
 describe("F-DIAG-DEV-API-CLI the printed code comes from a vocabulary, never from a shape", () => {
   it("admits exactly the codes its producers throw, and nothing else", () => {
@@ -60,7 +67,7 @@ describe("F-DIAG-DEV-API-CLI the printed code comes from a vocabulary, never fro
   it("refuses a message that is code-SHAPED but is not a producer code", () => {
     const code = developmentApiEnvironmentErrorCode(new TypeError(SYNTHETIC_SENSITIVE));
 
-    expect(code).not.toContain("PW_42");
+    expect(code).not.toContain("PASSWORD_LEAKED");
     expect(code).toBe(FALLBACK);
   });
 
@@ -105,7 +112,7 @@ describe("F-DIAG-DEV-API-CLI the printed code comes from a vocabulary, never fro
 
     const code = developmentApiEnvironmentErrorCode(shifty);
 
-    expect(code).not.toContain("PW_42");
+    expect(code).not.toContain("PASSWORD_LEAKED");
     expect(code).toBe("DEV_API_ENVIRONMENT_DRIFT");
   });
 
