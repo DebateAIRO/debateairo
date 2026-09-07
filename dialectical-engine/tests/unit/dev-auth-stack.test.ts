@@ -134,6 +134,76 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(code).toBe("DEV_UNRECOGNIZED");
   });
 
+  /**
+   * codex r1 F2. These four are TEMPLATE-BUILT, not literals: `probeEndpoint`
+   * composes `${errorCode}_BODY_TOO_LARGE` (tls-front-door.mjs:61) and
+   * `${errorCode}_TIMEOUT` (:72) over the only two prefixes its only caller
+   * supplies (:327 private, :336 public). Their source lines carry no DEV_ token,
+   * so a literal-only producer sweep misses them and the first round degraded all
+   * four to DEV_UNRECOGNIZED — a diagnostic regression, not a redaction. An
+   * ordinary UI probe that times out or overruns its body bound produces them.
+   */
+  it("retains the four template-built TLS probe codes, each distinct", () => {
+    const probeCodes = [
+      "DEV_TLS_PRIVATE_PROBE_FAILED_BODY_TOO_LARGE",
+      "DEV_TLS_PRIVATE_PROBE_FAILED_TIMEOUT",
+      "DEV_TLS_PUBLIC_PROBE_FAILED_BODY_TOO_LARGE",
+      "DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT"
+    ] as const;
+
+    const joined = probeCodes.map((code) => developmentAuthStackErrorCode(
+      new Error("DEV_AUTH_STACK_TLS_FAILED", { cause: new Error(code) })
+    ));
+
+    // Each is retained, and each stays DISTINCT from the other three — collapsing
+    // them to a shared category would also pass a "not DEV_UNRECOGNIZED" check.
+    expect(joined).toEqual(probeCodes.map((code) => `DEV_AUTH_STACK_TLS_FAILED:${code}`));
+    expect(new Set(joined).size).toBe(4);
+    // and the bare prefixes they are built from still join on their own
+    expect(developmentAuthStackErrorCode(new Error("DEV_TLS_PRIVATE_PROBE_FAILED")))
+      .toBe("DEV_TLS_PRIVATE_PROBE_FAILED");
+    expect(developmentAuthStackErrorCode(new Error("DEV_TLS_PUBLIC_PROBE_FAILED")))
+      .toBe("DEV_TLS_PUBLIC_PROBE_FAILED");
+  });
+
+  /**
+   * codex r1 F3. Validating one read of `message` and emitting another is not an
+   * allow-list. No concurrency is needed — an accessor that answers differently on
+   * the second read is enough. The guard must emit the snapshot it validated.
+   */
+  it("reads each link's message ONCE, so an unstable accessor cannot slip past the set", () => {
+    // Synthetic only (D18); shape-legal so the old regex would have forwarded it.
+    const SYNTHETIC = "DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER";
+    const shifty = new Error("placeholder");
+    let reads = 0;
+    Object.defineProperty(shifty, "message", {
+      configurable: true,
+      get: () => (reads++ === 0 ? "DEV_AUTH_STACK_TLS_FAILED" : SYNTHETIC)
+    });
+
+    const code = developmentAuthStackErrorCode(shifty);
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED");
+  });
+
+  it("reads once on a deeper link too, and keeps the join order", () => {
+    const SYNTHETIC = "DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER";
+    const inner = new Error("placeholder");
+    let reads = 0;
+    Object.defineProperty(inner, "message", {
+      configurable: true,
+      get: () => (reads++ === 0 ? "DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT" : SYNTHETIC)
+    });
+
+    const code = developmentAuthStackErrorCode(
+      new Error("DEV_AUTH_STACK_TLS_FAILED", { cause: inner })
+    );
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT");
+  });
+
   it("control — a known chain still joins in the same order, to full depth", () => {
     expect(developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_DATA_FAILED", {
       cause: new Error("DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE", {

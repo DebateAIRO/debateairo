@@ -339,6 +339,52 @@ describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught me
     });
   });
 
+  /**
+   * codex r1 F1. `instanceof` establishes ANCESTRY, not membership.
+   * `PanelMemberFailureKind` is a compile-time union and `readonly` is erased, so
+   * a subclass or a mutated instance can carry any string in `failureKind` and the
+   * old helper returned it verbatim. The declared list is a vocabulary; only a
+   * runtime check makes it a guarantee.
+   */
+  it("refuses a runtime failureKind outside the declared vocabulary", async () => {
+    const rogue = new PanelMemberFailure("TIMEOUT", "irrelevant");
+    (rogue as unknown as { failureKind: string }).failureKind = SYNTHETIC_SENSITIVE;
+    const result = await panelWith(async () => { throw rogue; });
+
+    const note = result.notes[0]!;
+    expect(note.reason).not.toContain("synthetic-pw-42");
+    expect(note.reason).toBe("UNCLASSIFIED_MEMBER_ERROR");
+    expect(EXPECTED_PANEL_NOTE_REASONS).toContain(note.reason);
+  });
+
+  it("refuses an out-of-domain kind carried by a subclass", async () => {
+    class ForgedFailure extends PanelMemberFailure {
+      constructor() {
+        super("PARSE_FAILURE", "irrelevant");
+        (this as unknown as { failureKind: string }).failureKind = "DEV_LEAKED_" + SYNTHETIC_SENSITIVE;
+      }
+    }
+    const result = await panelWith(async () => { throw new ForgedFailure(); });
+
+    const note = result.notes[0]!;
+    expect(note.reason).not.toContain("synthetic-pw-42");
+    expect(note.reason).toBe("UNCLASSIFIED_MEMBER_ERROR");
+  });
+
+  it("reads the kind ONCE, so an accessor that changes between reads cannot slip past the check", async () => {
+    const shifty = new PanelMemberFailure("TIMEOUT", "irrelevant");
+    let reads = 0;
+    Object.defineProperty(shifty, "failureKind", {
+      configurable: true,
+      get: () => (reads++ === 0 ? "TIMEOUT" : SYNTHETIC_SENSITIVE)
+    });
+    const result = await panelWith(async () => { throw shifty; });
+
+    const note = result.notes[0]!;
+    expect(note.reason).not.toContain("synthetic-pw-42");
+    expect(EXPECTED_PANEL_NOTE_REASONS).toContain(note.reason);
+  });
+
   it("maps a typed provider code that reaches the catch un-converted", async () => {
     class ProviderCallFailedStub extends Error {
       readonly code = "PROVIDER_CALL_FAILED";
@@ -349,5 +395,27 @@ describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught me
     const note = result.notes[0]!;
     expect(note.reason).toBe("PROVIDER_CALL_FAILED");
     expect(note.reason).not.toContain("synthetic-pw-42");
+  });
+
+  it("maps the second typed provider code too", async () => {
+    class ProviderContentUnacceptedStub extends Error {
+      readonly code = "PROVIDER_CONTENT_UNACCEPTED";
+      constructor() { super(SYNTHETIC_SENSITIVE); this.name = "TypedDomainError"; }
+    }
+    const result = await panelWith(async () => { throw new ProviderContentUnacceptedStub(); });
+
+    const note = result.notes[0]!;
+    expect(note.reason).toBe("PROVIDER_CONTENT_UNACCEPTED");
+    expect(note.reason).not.toContain("synthetic-pw-42");
+  });
+
+  it("refuses a code property that is not in the two-entry map", async () => {
+    class UnknownCodeStub extends Error {
+      readonly code = "SOME_OTHER_TYPED_CODE";
+      constructor() { super(SYNTHETIC_SENSITIVE); this.name = "TypedDomainError"; }
+    }
+    const result = await panelWith(async () => { throw new UnknownCodeStub(); });
+
+    expect(result.notes[0]!.reason).toBe("UNCLASSIFIED_MEMBER_ERROR");
   });
 });

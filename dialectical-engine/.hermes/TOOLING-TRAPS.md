@@ -2169,3 +2169,16 @@ message does not name grep.
 **Rule: quote the pattern in every `--include` / `--exclude`: `--include='*.ts'`.** Same for
 `--exclude-dir='node_modules'`. Cost here: ~1 minute, but the failure mode is worth knowing because
 the message blames the shell, not the command you were debugging.
+
+## An identity gate compared against a SORTED derivative reports a false break
+Found by lane/diag-class-a rework round 1 (2026-09-07). The typecheck identity gate compares the
+diagnostic lines at the tip against the untouched-lane baseline. Round 0 saved the baseline as raw
+`grep` output (file order); round 1 re-extracted the tip's lines through `... | sort`. `diff` then
+exited 1 and the console read `identical-to-baseline exit=1` — which on an IDENTITY gate looks
+exactly like "your diff changed the diagnostics", the one thing that gate exists to catch. Both files
+had 8 lines and the same sha256 once compared like-for-like.
+**Rule: an identity gate must compare artifacts produced by the SAME pipeline, and should compare a
+HASH, not a diff exit code.** Save the baseline and the tip extract with identical commands, print
+both sha256 values beside the verdict, and let the hash be the claim. A diff exit of 1 tells you the
+files differ, not whether the DIAGNOSTICS differ. Cost here: ~1 minute, and a few seconds of believing
+a gate had broken.

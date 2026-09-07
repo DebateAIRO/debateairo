@@ -243,8 +243,12 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
  * (`unknown`), and the router's shape rule for an open key set is to redact
  * wholesale rather than to enumerate. The one TYPED producer on the path is
  * `PanelMemberFailure` (`packages/judgement/src/index.ts:499,505,510,513,514`),
- * whose `failureKind` is already the closed vocabulary — so it becomes the
- * reason. The two codes below are the only other constants with a producer that
+ * and its kind becomes the reason — but only after a RUNTIME membership check.
+ * `instanceof` establishes ancestry, not membership: `PanelMemberFailureKind` is
+ * a compile-time union and `readonly` is erased, so a subclass or a mutated
+ * instance can carry any string in `failureKind` (codex r1 F1). The declared
+ * list is a vocabulary, not a runtime guarantee, and the check below is what
+ * makes it one for this field. The two codes below are the only other constants with a producer that
  * can reach this catch un-converted: `ProviderCallFailedError` and
  * `ProviderContentUnacceptedError` (`packages/providers/src/index.ts:53,69`),
  * both `TypedDomainError`s whose `code` is a fixed literal. `assess()` converts
@@ -260,9 +264,20 @@ const MEMBER_FAILURE_CODES: ReadonlyMap<string, string> = new Map([
 ]);
 
 function boundedMemberFailureReason(error: unknown): string {
-  if (error instanceof PanelMemberFailure) return error.failureKind;
+  if (error instanceof PanelMemberFailure) {
+    // ONE read. A getter or a mutated property that answers differently on a
+    // second read would defeat a check performed on a different read, so the
+    // value that is validated is the value that is returned — never a re-read.
+    const failureKind: unknown = error.failureKind;
+    const declared: readonly string[] = PANEL_MEMBER_FAILURE_KINDS;
+    return typeof failureKind === "string" && declared.includes(failureKind)
+      ? failureKind
+      : UNCLASSIFIED_MEMBER_ERROR;
+  }
   if (!(error instanceof Error)) return UNCLASSIFIED_MEMBER_ERROR;
-  const code = (error as { readonly code?: unknown }).code;
+  // Same discipline: `code` is read once, and the value RETURNED is this
+  // module's own map literal, never the string that was read.
+  const code: unknown = (error as { readonly code?: unknown }).code;
   if (typeof code !== "string") return UNCLASSIFIED_MEMBER_ERROR;
   return MEMBER_FAILURE_CODES.get(code) ?? UNCLASSIFIED_MEMBER_ERROR;
 }

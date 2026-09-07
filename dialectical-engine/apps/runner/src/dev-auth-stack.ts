@@ -273,6 +273,17 @@ const KNOWN_DEVELOPMENT_ERROR_CODES: ReadonlySet<string> = new Set([
   "DEV_TLS_PUBLIC_PROBE_FAILED",
   "DEV_TLS_PUBLIC_READINESS_INVALID",
   "DEV_TLS_PUBLIC_READINESS_TIMEOUT",
+  // deploy/dev-auth/tls-front-door.mjs — TEMPLATE-BUILT, not literals. `probeEndpoint`
+  // composes `${errorCode}_BODY_TOO_LARGE` (:61) and `${errorCode}_TIMEOUT` (:72); the
+  // errorCode prefix is supplied by the only two callers of `probeUi` (:327 private,
+  // :336 public), and `probeUi` (:83) is the only caller of `probeEndpoint` (:84,:91).
+  // Two prefixes x two suffixes = these four; the bare prefixes are listed above. The
+  // suffix lines carry no DEV_ token at all, which is why a literal-only sweep misses
+  // them (codex r1 F2). They reach this joiner through startTls -> fixedStage.
+  "DEV_TLS_PRIVATE_PROBE_FAILED_BODY_TOO_LARGE",
+  "DEV_TLS_PRIVATE_PROBE_FAILED_TIMEOUT",
+  "DEV_TLS_PUBLIC_PROBE_FAILED_BODY_TOO_LARGE",
+  "DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT",
   // deploy/dev-auth/validate-compose-postgres.mjs
   "DEV_POSTGRES_HEALTHCHECK_REQUIRED",
   "DEV_POSTGRES_HEALTH_DEPENDENCY_REQUIRED",
@@ -286,12 +297,20 @@ export function developmentAuthStackErrorCode(error: unknown): string {
   const codes: string[] = [];
   let current: unknown = error;
   for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
-    // Set membership decides, not the shape. The shape only decides whether a
-    // link was TRYING to be a code, so an unknown one keeps its position in the
-    // join instead of silently shortening the chain; a link that is not
-    // code-shaped still falls away exactly as before.
-    if (KNOWN_DEVELOPMENT_ERROR_CODES.has(current.message)) codes.push(current.message);
-    else if (/^DEV_[A-Z0-9_]+$/u.test(current.message)) codes.push(DEV_UNRECOGNIZED);
+    // ONE read of the message per link. Validating one read and emitting another
+    // is not an allow-list: a message accessor that answers differently on the
+    // second read would pass the check and then emit the unchecked value
+    // (codex r1 F3). The snapshot decides membership, decides the unknown-code
+    // case, and is the only thing that can be emitted.
+    const message: unknown = current.message;
+    if (typeof message === "string") {
+      // Set membership decides, not the shape. The shape only decides whether a
+      // link was TRYING to be a code, so an unknown one keeps its position in the
+      // join instead of silently shortening the chain; a link that is not
+      // code-shaped still falls away exactly as before.
+      if (KNOWN_DEVELOPMENT_ERROR_CODES.has(message)) codes.push(message);
+      else if (/^DEV_[A-Z0-9_]+$/u.test(message)) codes.push(DEV_UNRECOGNIZED);
+    }
     current = current.cause;
   }
   return codes.length > 0 ? codes.join(":") : "DEV_AUTH_STACK_FAILED";
