@@ -2182,3 +2182,18 @@ HASH, not a diff exit code.** Save the baseline and the tip extract with identic
 both sha256 values beside the verdict, and let the hash be the claim. A diff exit of 1 tells you the
 files differ, not whether the DIAGNOSTICS differ. Cost here: ~1 minute, and a few seconds of believing
 a gate had broken.
+
+## `mutate.sh` APPENDS to its output path: re-running a mutant on a rework round hides the new stamp
+Found by lane/diag-class-a rework round 1 (2026-09-07). The round-1 tip re-ran the six round-0
+mutants into their existing numbered log paths. mutate.sh writes its transcript with `>>`, so each
+file ended up holding BOTH transcripts, round-0's first. `stamp-check.sh` reads the stamp with
+`grep -m1 -oiE 'commit[=: ]+[0-9a-f]{40}'` — the FIRST match — so all six re-taken records were
+reported STALE against the round-0 tip even though a correct round-1 transcript sat lower in the very
+same file. The comparator went from 6 expected failures to 14, and the six extra ones look exactly
+like "the worker forgot to re-run the mutants".
+**Rule: on any rework round, `rm` the mutant transcript (or write to a fresh path) BEFORE re-running
+mutate.sh.** If you have already appended, split at the second `^commit=<40 hex> tree=` line rather
+than re-running: the two transcripts are intact and separable. Keeping superseded transcripts is
+still worth doing — move them to a SUBDIRECTORY, which the comparator skips (`[ -f "$f" ] || continue`
+matches files only, and the glob does not recurse). Same trick keeps unstamped supplemental artifacts
+out of the population. Cost here: ~4 minutes, and one full re-measure cycle to re-stamp at the tip.
