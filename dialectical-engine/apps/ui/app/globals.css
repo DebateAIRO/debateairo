@@ -10,6 +10,8 @@
   --ink: #29261F; --ink-hover: #3A362D;
   --text: #29261F; --text-strong: #1A1613; --text-2: #555147;
   --text-3: #6E675C; --muted: #6E675C; --muted-2: #6E675C;
+  /* the mute tag pill: tint(mute, .1) and tint(mute, .4) — consent-ui S01 */
+  --muted-bg: rgba(110,103,92,.1); --muted-border: rgba(110,103,92,.4);
   --line: rgba(41,38,31,.10); --line-2: rgba(41,38,31,.12); --line-strong: rgba(41,38,31,.20);
   --grid-dot: rgba(41,38,31,.12);
 
@@ -27,6 +29,8 @@
   --agree: #3E7A4E; --agree-text: #3C754B; --agree-bg: #E6ECE2; --agree-border: #ADC5AF;
   --dispute: #B0432F; --dispute-text: #B0432F; --dispute-bg: #F4E5DE; --dispute-border: #DDAEA2;
   --ok-dot: #3E7A4E; --ok-text: #3C754B; --ok-bg: #E6ECE2; --ok-border: #ADC5AF;
+  /* locked-toggle track fill and accent edge: tint(ok, .28) and tint(ok, .55) — consent-ui S01 */
+  --ok-soft: rgba(62,122,78,.28); --ok-edge: rgba(62,122,78,.55);
   --gen-dot: #A8823E; --gen-text: #826530; --gen-bg: #F3ECE0; --gen-border: #D9C8A9;
   --score-strength-text: #3C754B; --score-strength-bg: #E6ECE2; --score-strength-border: #ADC5AF;
   --score-uncertainty-text: #826530; --score-uncertainty-bg: #F3ECE0; --score-uncertainty-border: #D9C8A9;
@@ -49,10 +53,16 @@
   --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
   --shadow-chrome: 0 20px 46px -22px rgba(26,22,19,.26);
   --shadow-thumb: 0 1px 4px rgba(0,0,0,.3);
+  /* the 10b toggle knob's own shadow — consent-ui S01. One pixel tighter than
+     --shadow-thumb, which is the .ndSlider thumb's and belongs to another
+     surface, so it is copied rather than re-valued (CODE-REV-S01-C3C4 r1 N3) */
+  --shadow-knob: 0 1px 3px rgba(0,0,0,.3);
   --shadow-tab: 0 6px 16px -8px rgba(41,38,31,.55);
   /* a QR must stay dark-on-light for scanners in both modes */
   --qr-paper: #FFFFFF;
   --qr-ink: #111111;
+  /* the consent dialogs' overlay: one wash for both modes, from artboard 10c — consent-ui S01 */
+  --scrim: rgba(10,8,6,.42);
   --shadow-auth-card: 0 48px 90px -44px rgba(26,22,19,.5);
 
   /* mode-independent typography */
@@ -76,6 +86,12 @@
   --zoom-cluster-offset-b: calc(var(--dock-offset-b) + var(--dock-max-h) + 12px);
   --token-dock-clearance: calc(18px + var(--dock-max-h));
   --z-canvas-sticky: 4; --z-zoom-cluster: 5;
+  /* consent-ui S01 — the bar clears .topBar 30 and .tokenDock 40 but stays under
+     .drawerScrim 54; the two consent dialogs clear .modalScrim 70 and the policy
+     modal clears the card it opens from; .toast 80 keeps the ceiling */
+  --z-consent-bar: 45;
+  --z-consent-scrim: 75; --z-consent-card: 76;
+  --z-policy-scrim: 77; --z-policy-card: 78;
 
   /* landing page — the document ships two variants: Terracotta rides soft
      12-20px radii at display weight 480, Chamber the editorial variant */
@@ -103,6 +119,8 @@ html[data-mode="chamber"] {
   --ink: #F2EAD9; --ink-hover: #FFF8E8;
   --text: #F2EAD9; --text-strong: #FFFFFF; --text-2: #B5A88F;
   --text-3: #9C907A; --muted: #9C907A; --muted-2: #9C907A;
+  /* the mute tag pill: tint(mute, .14) and tint(mute, .5) — consent-ui S01 */
+  --muted-bg: rgba(156,144,122,.14); --muted-border: rgba(156,144,122,.5);
   --line: rgba(242,234,217,.09); --line-2: rgba(242,234,217,.08); --line-strong: rgba(242,234,217,.18);
   --grid-dot: rgba(242,234,217,.08);
 
@@ -118,6 +136,8 @@ html[data-mode="chamber"] {
   --agree: #86B58D; --agree-text: #86B58D; --agree-bg: #2A2E24; --agree-border: #4F654F;
   --dispute: #D67F65; --dispute-text: #D67F65; --dispute-bg: #36251E; --dispute-border: #774A3B;
   --ok-dot: #86B58D; --ok-text: #86B58D; --ok-bg: #2A2E24; --ok-border: #4F654F;
+  /* locked-toggle track fill and accent edge: tint(ok, .35) and tint(ok, .55) — consent-ui S01 */
+  --ok-soft: rgba(134,181,141,.35); --ok-edge: rgba(134,181,141,.55);
   --gen-dot: #C8A055; --gen-text: #C8A055; --gen-bg: #342A1B; --gen-border: #705A33;
   --score-strength-text: #86B58D; --score-strength-bg: #2A2E24; --score-strength-border: #4F654F;
   --score-uncertainty-text: #C8A055; --score-uncertainty-bg: #342A1B; --score-uncertainty-border: #705A33;
@@ -7220,6 +7240,379 @@ a:focus-visible {
   .publicArgumentSpacer { display: none; }
   .publicModelPill { max-width: 100%; }
 }
+
+/* === consent-ui S01 === */
+/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
+   The ONE delimited block this slice may append, at the very end of the file
+   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
+   slice adds live in the two token blocks at the top, which S01 also owns. */
+
+.consentBar {
+  position: fixed;
+  left: 22px;
+  right: 22px;
+  bottom: calc(22px + var(--safe-b));
+  z-index: var(--z-consent-bar);
+}
+
+.consentBarBezel {
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 7px;
+}
+
+.consentBarCore {
+  align-items: center;
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  gap: 24px;
+  overflow: hidden;
+  padding: 17px 20px 16px;
+  position: relative;
+}
+
+.consentTab {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 52px;
+  height: 4px;
+  border-radius: var(--r-tab);
+  background: var(--gold);
+}
+
+.consentCopy {
+  flex: 1;
+  min-width: 0;
+}
+
+.consentEyebrow {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.consentTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin-top: 7px;
+}
+
+.consentBody {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+  max-width: 560px;
+  text-wrap: pretty;
+}
+
+.consentActions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+
+.consentGhost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 9px 15px;
+  white-space: nowrap;
+}
+
+.consentGhostStrong { color: var(--ink); }
+
+/* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
+   choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
+   :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
+   used size is content + padding + border, so a 1px edge the artboard omits
+   ships the primary 2px taller and 2px wider — and breaks the equality the
+   design builds on, where a ghost pill's `9px 15px` + 1px border and a
+   primary's `10px` + 0 border are both 10px of effective edge in the same row
+   (CODE-REV-S01-C3C4 r1 N2). */
+.consentPrimary {
+  background: var(--ink);
+  border: none;
+  border-radius: var(--r-pill);
+  color: var(--bg);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 19px;
+  white-space: nowrap;
+}
+
+.consentGhost:focus-visible,
+.consentPrimary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 10a's own spring, transcribed from the artboard
+   (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
+   `Save choices` with no transition, and one class serving two artboards must
+   take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
+   Its reduced-motion counterpart is the block at the end of this file. */
+.consentBar .consentPrimary {
+  transition: transform .5s cubic-bezier(.34,1.56,.64,1);
+}
+
+.consentBar .consentPrimary:hover { transform: scale(1.04); }
+
+/* --- 10b: the preferences card. One presentation serves both entry points
+   (the bar's "Choose what to store" and Settings -> Privacy), because there is
+   no bar in Settings to replace or to grow from (S01-R14). --- */
+
+.consentScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-consent-scrim);
+  align-items: center;
+  background: var(--scrim);
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.consentCard {
+  position: relative;
+  z-index: var(--z-consent-card);
+  width: min(520px, calc(100vw - 32px));
+  max-height: 92vh;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  padding: 7px;
+}
+
+.consentCardCore {
+  position: relative;
+  overflow: hidden;
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 22px 24px 20px;
+}
+
+.consentCardCore .consentTab { left: 24px; }
+
+.consentCardTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin-top: 9px;
+}
+
+.consentLede {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+.consentCatList {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.consentCatRow {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.consentCatMain { flex: 1; min-width: 0; }
+
+.consentCatHead { align-items: center; display: flex; gap: 8px; }
+
+.consentCatName {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.consentTag {
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 2px 8px;
+}
+
+.consentTag-essential {
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+  color: var(--ok-dot);
+}
+
+.consentTag-quality {
+  background: var(--gold-bg);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+}
+
+.consentTag-analytics {
+  background: var(--muted-bg);
+  border: 1px solid var(--muted-border);
+  color: var(--muted);
+}
+
+.consentCatDesc {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.consentCatDetail {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  margin-top: 5px;
+}
+
+.consentSwitch {
+  align-items: center;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  height: 22px;
+  justify-content: flex-start;
+  margin-top: 2px;
+  padding: 2px;
+  width: 38px;
+}
+
+.consentSwitch[aria-checked="true"] {
+  background: var(--ok-dot);
+  border-color: var(--ok-edge);
+  justify-content: flex-end;
+}
+
+/* The locked track keeps the design's softer fill so "on and not yours to
+   change" reads differently from "on because you chose it" (design-data.js:44). */
+.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
+
+.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
+
+.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.consentKnob {
+  background: var(--muted);
+  border-radius: var(--r-dot);
+  box-shadow: var(--shadow-knob);
+  height: 16px;
+  width: 16px;
+}
+
+.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
+
+.consentCardFooter {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+/* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
+   all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
+   `10px 19px` at :39). One class serves both surfaces, so the second artboard
+   states its own value here rather than inheriting the first's
+   (CODE-REV-S01-C3C4 r1 N1). */
+.consentCardFooter .consentPrimary { padding: 10px 18px; }
+
+.consentFooterGap { flex: 1; }
+
+.consentLink {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.consentLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Below the derived 720px breakpoint the designed row stops fitting: the three
+   labels measure ~118 + 155 + 100 = 373px, plus two 9px gaps = ~391px; a
+   readable copy column needs ~260px; the row gap is 24px and the core's
+   horizontal padding is 40px — 391 + 260 + 24 + 40 = 715px. 720 also sits below
+   the 768px tablet-portrait width, so tablets keep the designed layout. */
+@media (max-width: 719.98px) {
+  .consentBar {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + var(--safe-b));
+  }
+
+  .consentBarCore {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .consentActions { flex-wrap: wrap; }
+
+  .consentGhost,
+  .consentPrimary {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+/* S01-R27: the slice animates one thing — 10a's primary — so it ships the
+   scoped counterpart itself. There is no global reduced-motion reset here; the
+   four existing blocks (:269, :3663, :4681, :5244) are each scoped to their own
+   component, and this one names only the selectors above. */
+@media (prefers-reduced-motion: reduce) {
+  .consentBar .consentPrimary { transition: none; }
+
+  .consentBar .consentPrimary:hover { transform: none; }
+}
+/* === end consent-ui S01 === */
 
 /* === consent-ui S02 === */
 /* Slice S02 of mission `consent-ui` — the sign-up privacy gate.
