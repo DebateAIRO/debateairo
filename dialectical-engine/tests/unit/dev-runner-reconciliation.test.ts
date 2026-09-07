@@ -4,6 +4,7 @@ import {
   reconcileRunnerStartupWork,
   RunnerStartupReconciliationError
 } from "../../apps/runner/src/runner-startup-reconciliation.js";
+import { TypedDomainError } from "../../packages/kernel/src/index.js";
 import { runnerTerminalFailureReason } from "../../apps/runner/src/index.js";
 import { developmentRunnerClaimMs } from "../../apps/runner/src/dev-runner-process.js";
 
@@ -93,6 +94,43 @@ describe("development runner startup reconciliation", () => {
     const pathInMessage = runnerTerminalFailureReason(new Error(FILE_PATH));
     expect(pathInMessage).not.toContain("secrets");
     expect(pathInMessage).toBe("RUNNER_EXECUTION_FAILED:ERROR");
+  });
+
+  it("maps a declared domain code and refuses an undeclared typed code", async () => {
+    // codex r1 F1. This reason is PERSISTED (core.work_item.terminal_reason via
+    // packages/battery/src/index.ts:434) with no later alphabet check, so an
+    // undeclared typed code used to become durable state.
+    expect(runnerTerminalFailureReason(
+      new TypedDomainError("RUNNER_FAILURE_STATE_NOT_RECORDED", "not recorded")
+    )).toBe("RUNNER_EXECUTION_FAILED:RUNNER_FAILURE_STATE_NOT_RECORDED");
+    expect(runnerTerminalFailureReason(
+      new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "composition contract")
+    )).toBe("RUNNER_EXECUTION_FAILED:COMPOSITION_CONTRACT_ERROR");
+
+    expect(runnerTerminalFailureReason(new TypedDomainError("DIAG_REVIEW_SENTINEL", "probe")))
+      .toBe("RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR");
+
+    const tokenTyped = runnerTerminalFailureReason(new TypedDomainError(FAKE_TOKEN, "probe"));
+    expect(tokenTyped).not.toContain(FAKE_TOKEN);
+    expect(tokenTyped).toBe("RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR");
+
+    const sqlTyped = runnerTerminalFailureReason(new TypedDomainError(SQL_FRAGMENT, "probe"));
+    expect(sqlTyped).not.toContain(SQL_FRAGMENT);
+    expect(sqlTyped).toBe("RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR");
+
+    const source = await readFile("apps/runner/src/index.ts", "utf8");
+    const block = source.slice(
+      source.indexOf("// ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET"),
+      source.indexOf("// ─── END OPERATIONAL DIAGNOSTIC ALPHABET")
+    );
+    const declaration = block.slice(block.indexOf("const KNOWN_DOMAIN_CODES"));
+    const body = declaration.slice(declaration.indexOf("["), declaration.indexOf("]);"));
+    const codes = [...body.matchAll(/"([A-Z][A-Z0-9_]*)"/gu)].map((match) => match[1]!);
+    expect(codes.length).toBeGreaterThan(300);
+    for (const code of codes) {
+      expect(runnerTerminalFailureReason(new TypedDomainError(code, "declared")))
+        .toBe(`RUNNER_EXECUTION_FAILED:${code}`);
+    }
   });
 
   it("prefixes every allow-listed failure constant without re-deriving it", async () => {

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { TypedDomainError } from "../../packages/kernel/src/index.js";
 import { apiOperationalErrorDiagnostic } from "../../apps/api/src/index.js";
 
 // Synthetic sensitive content. None of these is a real credential; each is shaped
@@ -20,8 +21,8 @@ function diagnosticAlphabetBlock(source: string): string {
   return source.slice(start, end + ALPHABET_END.length);
 }
 
-function allowListedConstants(block: string): readonly string[] {
-  const declaration = block.slice(block.indexOf("const KNOWN_FAILURE_CONSTANTS"));
+function declaredList(block: string, name: string): readonly string[] {
+  const declaration = block.slice(block.indexOf(`const ${name}`));
   const body = declaration.slice(declaration.indexOf("["), declaration.indexOf("]);"));
   return Object.freeze([...body.matchAll(/"([A-Z][A-Z0-9_]*)"/gu)].map((match) => match[1]!));
 }
@@ -81,7 +82,7 @@ describe("API operational error diagnostics", () => {
 
   it("still maps every allow-listed failure constant, whatever produced it", async () => {
     const block = diagnosticAlphabetBlock(await readFile("apps/api/src/index.ts", "utf8"));
-    const constants = allowListedConstants(block);
+    const constants = declaredList(block, "KNOWN_FAILURE_CONSTANTS");
     expect(constants.length).toBeGreaterThan(200);
 
     // Cited producers, one per admitted category.
@@ -98,6 +99,41 @@ describe("API operational error diagnostics", () => {
 
     for (const constant of constants) {
       expect(apiOperationalErrorDiagnostic(new Error(constant))).toBe(constant);
+    }
+  });
+
+  it("maps a declared domain code and refuses an undeclared typed code", async () => {
+    // codex r1 F1: `TypedDomainError`'s `code` is typed `string`
+    // (packages/kernel/src/index.ts:388), so this branch used to return whatever
+    // the constructor was handed. Control first — a declared code keeps its
+    // diagnostic, which is the whole point of not simply dropping the branch.
+    expect(apiOperationalErrorDiagnostic(
+      new TypedDomainError("RUN_CONTENT_ROLLBACK_INCOMPLETE", "Run rollback did not complete")
+    )).toBe("RUN_CONTENT_ROLLBACK_INCOMPLETE");
+    expect(apiOperationalErrorDiagnostic(
+      new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "composition contract")
+    )).toBe("COMPOSITION_CONTRACT_ERROR");
+
+    // Rejection — the reviewer's own probe value, which is not a declared code.
+    expect(apiOperationalErrorDiagnostic(new TypedDomainError("DIAG_REVIEW_SENTINEL", "probe")))
+      .toBe("UNRECOGNIZED_DOMAIN_ERROR");
+
+    // Rejection — a credential-shaped typed code must not survive the branch.
+    const tokenTyped = apiOperationalErrorDiagnostic(new TypedDomainError(FAKE_TOKEN, "probe"));
+    expect(tokenTyped).not.toContain(FAKE_TOKEN);
+    expect(tokenTyped).toBe("UNRECOGNIZED_DOMAIN_ERROR");
+
+    // Rejection — an upper-cased SQL fragment carried as a typed code.
+    const sqlTyped = apiOperationalErrorDiagnostic(new TypedDomainError(SQL_FRAGMENT, "probe"));
+    expect(sqlTyped).not.toContain(SQL_FRAGMENT);
+    expect(sqlTyped).toBe("UNRECOGNIZED_DOMAIN_ERROR");
+
+    const block = diagnosticAlphabetBlock(await readFile("apps/api/src/index.ts", "utf8"));
+    const codes = declaredList(block, "KNOWN_DOMAIN_CODES");
+    expect(codes.length).toBeGreaterThan(300);
+    expect(codes).not.toContain("DIAG_REVIEW_SENTINEL");
+    for (const code of codes) {
+      expect(apiOperationalErrorDiagnostic(new TypedDomainError(code, "declared"))).toBe(code);
     }
   });
 

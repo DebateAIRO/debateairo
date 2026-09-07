@@ -2115,3 +2115,19 @@ the target file is `dialectical-engine/apps/api/src/index.ts`, and a bare
 `pnpm exec vitest run tests/unit/x.test.ts` runs where there is no `package.json` and fails for a
 reason that has nothing to do with the mutant. Wrap it:
 `bash -c 'cd dialectical-engine && pnpm exec vitest run …'`.
+
+## A negative lookahead after `\s*` matches everything multi-line — 180 false "dynamic" sites
+Found by lane/diag-bounded r1 (2026-09-07), enumerating which `new TypedDomainError(...)` calls pass a
+literal code and which pass a variable. The literal probe was
+`new TypedDomainError\(\s*"([A-Z][A-Z0-9_]*)"` and the complement was
+`new TypedDomainError\(\s*(?!")(...)`. The complement reported **180** dynamic sites; the true number is
+**13**. Cause: `\s*` is greedy but backtracks to ZERO width, so on a wrapped call —
+`new TypedDomainError(\n        "MAKER_POSITION_UNAVAILABLE",` — the engine tries `\s*` = empty, the
+lookahead then inspects `\n`, which is not `"`, and the "not a literal" branch matches every multi-line
+call in the file. The two patterns are not complements even though they read as though they are.
+**Rule: never put a negative lookahead directly after a variable-width whitespace match.** Anchor the
+lookahead to a fixed position instead — match what you DO want (`\s*(?:"[^"]*"|\`[^\`]*\`|[A-Za-z_$][\w$.]*)`)
+and classify the capture afterwards, which is the same "only emit matches" rule the `sed` trap above states.
+Cheap self-check: the two branch counts must sum to the total call count — 419 + 180 against 432 calls
+was the tell, and it was visible for free.
+Cost here: ~5 minutes, and it would have put ~170 phantom entries in a hand-audited citation table.
