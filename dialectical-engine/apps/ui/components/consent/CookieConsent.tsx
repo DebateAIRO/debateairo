@@ -194,7 +194,10 @@ export function CookieConsent() {
      * shape, and `S01-S40` pins it — but nothing about which surface answers
      * the dismiss key now depends on it. The shared helper resolves two
      * UNRELATED open surfaces by the order they OPENED in, and applies
-     * containment only where one surface is nested inside the other; it makes
+     * containment only where one surface's container is a STRICT DESCENDANT of
+     * the other's — two surfaces holding the SAME container node are not nested
+     * either way, so open order decides between them too (the strictness is the
+     * correction CODE-REV-CROSS-03 r1 B1 measured); it makes
      * no `compareDocumentPosition` call and has no `FOLLOWING` arm (V-20 (b′),
      * `modalSemantics.ts` `topmostSurface()`; ADR-0022's two 2026-09-07
      * addenda). Swap these two and the policy still answers, because it is

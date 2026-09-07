@@ -208,6 +208,53 @@ open.** The addendum's decision and its precedence sentence (surviving-capture-f
 named-control-first) are unaffected. The same clause is corrected in place in the
 `ModalSurface` member's JSDoc and in `CookiePreferencesCard`'s prop doc.
 
+### Addendum 2026-09-07 — correction to the (b′) addendum: the tiebreak is STRICT, and it is pinned by THREE cases (CODE-REV-CROSS-03 r1 B1 and N1)
+
+Nothing above this heading is edited; this addendum supersedes two of its statements and leaves
+the decision itself standing.
+
+**1. The relation is STRICT DESCENDANT, and bare `Node.contains` is not the rule.** The (b′)
+addendum above says pass 2 "replaces the incumbent by any connected entry whose container the
+incumbent's container `contains` (`Node.contains`)", and its closing argument offers "one
+`Node.contains` call" as the mechanism. `Node.contains` is **reflexive** — `n.contains(n)` is
+`true` — while the ruled word is *descendant*, which is strict, so the shipped predicate was
+descendant-**or-self**. Measured consequence, not argued (CODE-REV-CROSS-03 r1 B1, probe
+`.hermes/reports/consent-ui/probes/code-rev-cross-03-r1-reflexive-contains.probe.test.tsx`,
+three runs, registration order asserted): two surfaces registered against the SAME container
+node hand `Escape` to the one opened **first**; three sharers hand it to the **earliest**
+registered, because pass 2 keeps matching against that same node and reassigning `topContainer`
+to it. That is a full inversion of open order — `CODE-REV-S02-C9` r1 **B1**'s harm in a third
+shape.
+
+**Read the rule as:** a lower entry replaces the incumbent when, and only when, its container is
+a **strict descendant** of the incumbent's — `topContainer.contains(container)` **and**
+`container !== topContainer`. Anyone implementing from this ADR (`A11Y-OVERLAYS`, `t_8962842f`)
+writes both terms, or picks a primitive that is already strict
+(`compareDocumentPosition(container) & DOCUMENT_POSITION_CONTAINED_BY`, which is what
+`CODE-REV-CROSS-02` r1 N2 actually measured). The (b′) addendum's *"each replacement is strictly
+deeper"* argument for a single pass is FALSE for the reflexive predicate and TRUE for this one;
+it is the identity term that earns it. The decision, the absence of a `FOLLOWING` arm, the
+`null`-container branch, the detached-entry skip and the exported surface are all unchanged, and
+the probe goes `2 failed | 4 passed (6)` → `6 passed (6)` under the correction with the consent
+SET unmoved.
+
+**2. THREE cases pin the tiebreak, not four.** The (b′) addendum says *"Pinned by four cases in
+`tests/render/consent-modal-semantics.test.tsx`"* and names them. The mutant that removes the
+tiebreak reds **three**: `delivers one Escape to the nested INNER surface of a pair mounted in ONE
+commit`, `delivers one Escape to exactly one of three surfaces, and it is the innermost`, and
+`traps Tab in the same surface Escape reaches, for the same nested pair`. The fourth —
+`delivers one Escape to a nested inner surface that opened in a LATER commit` — stays **green with
+the tiebreak removed**, correctly: there the inner surface is already the last registered, so
+plain open order reaches it, and the test file's own comment says as much. It is a valuable case
+about open order; it is not evidence for the tiebreak. Do not delete one of the three believing
+four cover it (CODE-REV-CROSS-03 r1 N1).
+
+**3. Two further cases pin the STRICTNESS**, added with this correction and red at `4ef2f7d3`:
+`delivers one Escape to the LAST-OPENED of two surfaces that SHARE one container node` and its
+three-surface twin. `Tab` is deliberately not asserted in either: surfaces sharing one container
+give the focus trap an identical candidate list whichever entry is chosen, so no mutant of the
+tiebreak can move it.
+
 ## Options considered
 
 - **A React context provider owning the stack.** Rejected: it would force slice S01's

@@ -148,10 +148,18 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
  *    the walk continues to the entry below it; that is the one guard this function keeps from the
  *    document-order version it replaces.
  * 2. **The containment tiebreak** (V-20 (b′)). Keep scanning DOWNWARDS from the incumbent. A
- *    lower entry replaces the incumbent when, and only when, its container is inside the
- *    incumbent's — `Node.contains`. Because each replacement is strictly deeper, one pass reaches
- *    the innermost open surface: anything nested in the new incumbent was nested in the old one
- *    too, so nothing already scanned can be missed.
+ *    lower entry replaces the incumbent when, and only when, its container is a STRICT
+ *    DESCENDANT of the incumbent's — `topContainer.contains(container)` AND the two are not the
+ *    SAME node. The identity term is load-bearing, not defensive: `Node.contains` is REFLEXIVE
+ *    (`n.contains(n)` is `true`), so without it two surfaces registered against ONE container
+ *    node rank by the reverse of open order — with two sharers the earlier-opened one takes the
+ *    key, and with three the walk reassigns `topContainer` to the same node twice and reaches
+ *    the EARLIEST-registered of the group (CODE-REV-CROSS-03 r1 B1, measured; probe
+ *    `.hermes/reports/consent-ui/probes/code-rev-cross-03-r1-reflexive-contains.probe.test.tsx`).
+ *    With the identity term, every replacement IS strictly deeper, so one pass reaches the
+ *    innermost open surface: anything nested in the new incumbent was nested in the old one too,
+ *    so nothing already scanned can be missed, and the depth strictly decreasing is what makes
+ *    the single pass sufficient rather than merely terminating.
  *
  * **There is no `FOLLOWING` arm and no document-order comparison between UNRELATED surfaces.**
  * That comparison is what produced CODE-REV-S02-C9 r1 B1: `app/layout.tsx` mounts
@@ -184,13 +192,22 @@ function topmostSurface(): StackEntry | undefined {
     }
   }
   if (top === undefined) return undefined;
-  // A `null` incumbent renders no node, so nothing can be nested inside it and open order
-  // decides alone.
+  // A `null` incumbent renders no node, so nothing can be a strict descendant of it and open
+  // order decides alone.
   for (index -= 1; topContainer !== null && index >= 0; index -= 1) {
     const entry = surfaceStack[index]!;
     const container = entry.read().containerRef.current;
+    // `!container.isConnected` is UNREACHABLE here and is kept as a stated invariant, not as a
+    // live branch: this pass runs only while `topContainer !== null`, pass 1 chose a `null` or
+    // CONNECTED container, and every node a connected element `contains()` is itself connected —
+    // so a disconnected `container` already fails the next line. No fixture can distinguish it
+    // (CODE-REV-CROSS-03 r1 N2: removing it survives the whole suite); do not spend a round
+    // trying to pin it. `container === null` is a real branch — a surface that renders no
+    // container of its own — and is skipped because nothing can be nested inside nothing.
     if (container === null || !container.isConnected) continue;
-    if (!topContainer.contains(container)) continue;
+    // STRICT descendant: `Node.contains` is reflexive, so the identity term is what stops two
+    // surfaces that SHARE one container node from inverting open order (CODE-REV-CROSS-03 r1 B1).
+    if (container === topContainer || !topContainer.contains(container)) continue;
     top = entry;
     topContainer = container;
   }

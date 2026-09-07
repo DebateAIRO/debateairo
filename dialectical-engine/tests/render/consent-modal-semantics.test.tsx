@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useRef, type ReactNode, type RefObject } from "react";
+import { act, useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -79,6 +79,44 @@ function TestSurface({
       ))}
       {children}
     </div>
+  );
+}
+
+/**
+ * A surface whose container ref is supplied by the CALLER, so two or more of them can be
+ * pointed at the SAME node. `TestSurface` cannot express that shape: it owns its container ref
+ * and renders its own container `<div>`, so two of them are always two distinct nodes.
+ *
+ * `registrations` is a push-on-mount log. It sits AFTER `useModalSurface`, so within one
+ * component the stack registration runs first and the log entry second; across siblings React
+ * runs each component's effects in tree order. The log is therefore the REGISTRATION order,
+ * measured rather than assumed.
+ */
+function SharedContainerSurface({
+  containerRef,
+  name,
+  onClose,
+  registrations
+}: {
+  containerRef: RefObject<HTMLElement | null>;
+  name: string;
+  onClose: () => void;
+  registrations?: string[];
+}): ReactNode {
+  const initialFocusRef = useRef<HTMLElement | null>(null);
+  useModalSurface(true, { containerRef, initialFocusRef, onClose });
+  useEffect(() => {
+    registrations?.push(name);
+  }, [name, registrations]);
+  return (
+    <button
+      type="button"
+      ref={(node) => {
+        initialFocusRef.current = node;
+      }}
+    >
+      {`close-${name}`}
+    </button>
   );
 }
 
@@ -254,6 +292,122 @@ describe("consent modal semantics helper", () => {
     });
 
     expect(closed).toEqual(["c"]);
+  });
+
+  it("delivers one Escape to the LAST-OPENED of two surfaces that SHARE one container node", async () => {
+    // PROPERTY (V-20 (b′), and the word is STRICT): the containment tiebreak fires only when a
+    // lower entry's container is a STRICT DESCENDANT of the incumbent's. A node is not a
+    // descendant of itself, so two surfaces registered against the SAME container node are not
+    // nested — neither is inside the other — nothing overrides open order, and the surface
+    // opened LAST answers Escape.
+    //
+    // Why this needs its own case: `Node.contains` is REFLEXIVE (`n.contains(n)` is `true`), so a
+    // tiebreak written `topContainer.contains(container)` alone ALSO fires when the two are the
+    // same node. The incumbent is then replaced by the entry below it and one Escape closes the
+    // surface the visitor opened FIRST, leaving focus trapped in the one that refused the key —
+    // CODE-REV-S02-C9 r1 B1's harm in a third shape, measured as CODE-REV-CROSS-03 r1 B1 (probe
+    // `.hermes/reports/consent-ui/probes/code-rev-cross-03-r1-reflexive-contains.probe.test.tsx`,
+    // case P3: `firstClose=1 secondClose=0`). The identity term in `topmostSurface()`'s pass 2 is
+    // what this case pins; removing it turns this case red.
+    const order: string[] = [];
+    const firstClose = vi.fn();
+    const secondClose = vi.fn();
+
+    function SharedPair(): ReactNode {
+      const sharedRef = useRef<HTMLElement | null>(null);
+      return (
+        <div
+          data-shared="host"
+          ref={(node) => {
+            sharedRef.current = node;
+          }}
+        >
+          <SharedContainerSurface
+            containerRef={sharedRef}
+            name="first"
+            onClose={firstClose}
+            registrations={order}
+          />
+          <SharedContainerSurface
+            containerRef={sharedRef}
+            name="second"
+            onClose={secondClose}
+            registrations={order}
+          />
+        </div>
+      );
+    }
+
+    await render(<SharedPair />);
+    expect(openSurfaceCount()).toBe(2);
+
+    // Both premises MEASURED, never assumed: there is exactly ONE container node and it holds
+    // both surfaces' controls, and `first` registered before `second`. Without these the case
+    // could pass because the two surfaces turned out to be unrelated siblings.
+    const hosts = [...document.querySelectorAll<HTMLElement>('[data-shared="host"]')];
+    expect(hosts.length, "the two surfaces share ONE container node").toBe(1);
+    expect(hosts[0]!.contains(labelled("close-first"))).toBe(true);
+    expect(hosts[0]!.contains(labelled("close-second"))).toBe(true);
+    expect(order, "registration (open) order").toEqual(["first", "second"]);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(secondClose, "the surface opened LAST answers Escape").toHaveBeenCalledTimes(1);
+    expect(firstClose, "the surface opened first does not").toHaveBeenCalledTimes(0);
+
+    // `Tab` is deliberately NOT asserted here and the omission is the point: both entries hold
+    // the SAME container, so `trapTab` builds the identical candidate list whichever entry
+    // `topmostSurface()` returned. No mutant of the tiebreak can move it, so an assertion on it
+    // would pin nothing (`heartbeat-worker` §2). The reviewer's own probe says the same in its
+    // P5 comment. The case that DOES pin "Tab reads the entry Escape reaches" is the nested pair
+    // below, where the two containers differ.
+  });
+
+  it("delivers one Escape to the LAST-OPENED of three surfaces that SHARE one container node", async () => {
+    // The same property one step deeper, and it is not a duplicate of the pair above: under the
+    // reflexive predicate the walk does not stop after one step. Pass 2 keeps matching
+    // `topContainer.contains(container)` against the very same node, reassigns `topContainer` to
+    // it, and walks past BOTH lower entries — so Escape reaches the EARLIEST-registered surface,
+    // the bottom of the group rather than the one below the top (probe P4: `closed=["a"]` where
+    // the rule requires `["c"]`).
+    //
+    // It is also the ONLY case here that reds a fix which guards identity on the first pass-2
+    // iteration alone: with two sharers pass 2 runs exactly once, so such a fix is green against
+    // the pair above and wrong against this one.
+    const closed: string[] = [];
+    const record = (name: string) => () => {
+      closed.push(name);
+    };
+
+    function SharedThree(): ReactNode {
+      const sharedRef = useRef<HTMLElement | null>(null);
+      return (
+        <div
+          data-shared="host"
+          ref={(node) => {
+            sharedRef.current = node;
+          }}
+        >
+          <SharedContainerSurface containerRef={sharedRef} name="a" onClose={record("a")} />
+          <SharedContainerSurface containerRef={sharedRef} name="b" onClose={record("b")} />
+          <SharedContainerSurface containerRef={sharedRef} name="c" onClose={record("c")} />
+        </div>
+      );
+    }
+
+    await render(<SharedThree />);
+    expect(openSurfaceCount()).toBe(3);
+
+    const hosts = [...document.querySelectorAll<HTMLElement>('[data-shared="host"]')];
+    expect(hosts.length, "the three surfaces share ONE container node").toBe(1);
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(closed, "exactly one onClose runs, and it is the last-opened surface").toEqual(["c"]);
   });
 
   it("delivers one Escape by OPEN order when two surfaces opened out of DOM order", async () => {
