@@ -64,7 +64,13 @@ const FAKE_TOKEN = "dbai_sess_PLACEHOLDERTOKENVALUE0000000000000000";
 const FAKE_HASH = `argon2id-audit:v1:${"a".repeat(64)}`;
 const FAKE_CIPHERTEXT = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const FAKE_SQL = `INSERT INTO identity."user" (email) VALUES ('subject@example.test')`;
-const SENSITIVE = [FAKE_TOKEN, FAKE_HASH, FAKE_CIPHERTEXT, FAKE_SQL] as const;
+// Short and SCREAMING_SNAKE on purpose: a "forward the message when it is shaped like a
+// constant" rule would pass this straight through, and the long probes below are too long
+// for the 64-character bound such a rule usually carries. Without this one the corpus does
+// not distinguish an explicit map from a shape test — measured, this round: the regex
+// mechanism codex rejected survived the corpus until this literal was added.
+const FAKE_UPPER_SECRET = "SESSION_TOKEN_A1B2C3D4E5F6";
+const SENSITIVE = [FAKE_TOKEN, FAKE_HASH, FAKE_CIPHERTEXT, FAKE_SQL, FAKE_UPPER_SECRET] as const;
 
 function fieldsOf(line: string): Readonly<{ reason: string; category: string }> {
   const match = /^reason=([^ ]+) category=([^ ]+)$/u.exec(line);
@@ -81,8 +87,10 @@ const CORPUS: readonly (readonly [string, unknown])[] = [
     new Error(`duplicate key value violates unique constraint — ${FAKE_SQL}`),
     { name: "error", code: "23505", detail: FAKE_TOKEN, table: "user" }
   )],
-  // A message that a "forward it when it looks like a constant" rule would forward whole.
+  // Messages a "forward it when it looks like a constant" rule would forward whole.
   ["an unknown all-caps message", new TypeError(`UNKNOWN_REASON_CARRYING_${FAKE_CIPHERTEXT}`)],
+  ["a short message shaped exactly like a reason constant", new TypeError(FAKE_UPPER_SECRET)],
+  ["a short constant-shaped code", Object.assign(new Error("boom"), { code: FAKE_UPPER_SECRET })],
   ["an unknown all-caps code", Object.assign(new Error("boom"), { code: `UNKNOWN_${FAKE_CIPHERTEXT}` })],
   ["a known reason placed in the wrong field", Object.assign(
     new Error(FAKE_TOKEN), { name: "LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED" }
@@ -146,6 +154,18 @@ describe("F-RISK-IDENTITY-LOG risk-signal failure diagnostics", () => {
     ))).toBe("reason=KEK_UNRESOLVED category=crypto");
     expect(riskSignalFailureIdentity(Object.assign(
       new Error("some driver prose"), { name: "error", code: "23505" }
+    ))).toBe("reason=unrecognized-error category=database");
+  });
+
+  it("does not accept a message merely SHAPED like a reason constant", () => {
+    // The mechanism must be an explicit map of known constants, not a test of the message's
+    // shape: an uppercase regex leaves `name` and `code` unsanitised and forwards any
+    // constant-shaped text an upstream module or a driver happens to produce
+    // (codex sessions-argon2 r1 F2).
+    expect(riskSignalFailureIdentity(new TypeError(FAKE_UPPER_SECRET)))
+      .toBe("reason=unrecognized-error category=application-invariant");
+    expect(riskSignalFailureIdentity(Object.assign(
+      new Error("driver prose"), { name: "error", code: FAKE_UPPER_SECRET }
     ))).toBe("reason=unrecognized-error category=database");
   });
 });
