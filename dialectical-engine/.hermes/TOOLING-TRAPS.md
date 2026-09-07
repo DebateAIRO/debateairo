@@ -2216,3 +2216,28 @@ member of `Kind` would be a compile error. Measured on this repo's tsc 7.0.2:
 before you write a comment claiming it.** A guard nobody has seen fire is a comment, not a guard.
 Cost here: ~3 minutes, and it came within one commit of shipping a source comment that promised a
 guarantee the code did not provide — the exact class of defect this lane's review has been finding.
+
+## "Restore the default" is NOT a mutant for "this parameter is now REQUIRED"
+Found by lane/dev-health (2026-09-07). The ticket removed a defaulted parameter
+(`poisoned(category = "signal-shape")`) and made all five call sites name their category.
+The packet prescribed the obvious mutant — restore the default, expect typecheck or a test to
+fail. Measured on the fixed tip: it fails NOTHING. `pnpm typecheck` returned the same 8
+inherited s14-ui diagnostics and nothing else; `tests/unit/p2-auth-risk.test.ts` returned
+12/12 passed; mutate.sh recorded `RESULT: ok … cmd_exit=0`.
+
+The reason is structural, not a gap in the tests: once EVERY call site passes the argument, the
+default is dead code, and re-adding dead code is unobservable by construction. A mutant on the
+DECLARATION cannot discriminate a property whose whole content is what the CALL SITES do.
+**Rule: to pin "this parameter is required", mutate a CALL SITE — strip the argument and read
+tsc.** Measured: `packages/db/src/auth-risk.ts(91,51): error TS2554: Expected 1 arguments, but
+got 0`, a diagnostic that exists only because the default is gone. Cost here: ~4 minutes and
+one extra mutate.sh cycle, but the expensive version of this mistake is reporting the
+prescribed mutant as "expected failure" without running it, or quietly swapping in a different
+mutant and calling it the packet's.
+
+Related, same lane: **you cannot delete a line with mutate.sh by mutating it to the empty
+string.** Its pre-gate counts NEW as a substring via python `str.count`, and `"abc".count("")`
+is 4, not 0 — so an empty NEW always trips `RESULT: FAIL pre-gate` no matter what the file
+holds. To remove a manifest entry, mutate it into something inert instead (prefixing `#` works
+when the reader skips comment lines). STRENGTH: entailed, read from mutate.sh's own `count()`
+heredoc, not measured by a deliberate failing run.
