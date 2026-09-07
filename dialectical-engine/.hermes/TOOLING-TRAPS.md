@@ -1995,3 +1995,80 @@ scope_unresolved recorder" is not a claim about coverage at all.
 ## `codex exec --sandbox workspace-write` cannot `listen()` — a full suite run inside it is not a gate (orchestrator, 2026-09-07)
 
 The codex sandbox (macOS seatbelt) refuses `listen` on 127.0.0.1: `Error: listen EPERM: operation not permitted 127.0.0.1`. Every embedded-PostgreSQL, relay and HTTP test then fails identically (97 `listen EPERM` in one run; 85 files red instead of 35), and `fourcount5` rejects the log (exit 5, identity mismatch). Seen first in the sessions codex review (it could not run one integration test), then in the evaluator implementer's closing suite. Rule: a Codex seat that implements in the sandbox files its unit/selected gates and STATES that the full suite is the orchestrator's; the orchestrator takes it outside the sandbox with `tools/gate-run.sh` at the seat's final tip and attributes it. A seat that instead reports a sandboxed full suite as a gate has reported a different environment's result as this one's.
+
+## Lane lane/t1-oracle-evaluator appends carried across the dev merge (2026-09-07; union, nothing removed)
+
+
+## Lane lane/t1-oracle-evaluator appends carried across the dev merge (2026-09-07; union, nothing removed)
+
+
+## A fresh lane worktree has NO `node_modules`, so "baselines FIRST" collides with a single-install grant
+Found by F-T1-ORACLE-EVALUATOR round 0 (2026-09-06) in `.worktrees/lane-t1-oracle-evaluator`.
+The packet ordered baselines on the clean base BEFORE the one authorised `pnpm install`. But the
+worktree had no `node_modules` at all (`ls -ld node_modules` -> No such file or directory), so
+`pnpm exec vitest` and `pnpm typecheck` could not run at all until something installed. A seat
+reading "one install" literally either burns its single grant on setup or reports itself blocked.
+**The resolution, and it is provable rather than a judgement call:** `pnpm install --frozen-lockfile`
+CANNOT modify `package.json` or `pnpm-lock.yaml`, so it is setup, not the granted dependency change —
+run it, then print `git status --porcelain` to show both manifests untouched. The grant's install is
+the one WITHOUT `--frozen-lockfile`. Also required before any suite run: `pnpm run generate:contract`
+(`packages/contract/generated/client.ts` is gitignored and absent from every fresh worktree — already
+recorded above, and it bit again here).
+**Rule for packet authors: when a packet says "baselines first" and also "exactly one install", it must
+say which command establishes the toolchain.** Cost here: one analysis detour before any command ran.
+
+## An aliased dependency can produce a lockfile delta with NO `packages:` entry — that is correct, not incomplete
+Same round. Adding `"typescript-classic": "npm:typescript@5.9.3"` produced a **3-line, 0-removal**
+`pnpm-lock.yaml` delta consisting only of the root importer stanza (`typescript-classic:` / `specifier:
+npm:typescript@5.9.3` / `version: typescript@5.9.3`). No `packages:` block was added **because
+`typescript@5.9.3` was already resolved in the lockfile** (apps/ui pins `^5.6.0`), so the alias reuses
+the existing resolution. A reviewer expecting a new `packages:` entry can read this as a truncated or
+partial delta and send the round back.
+**State it affirmatively in the report, with the pre-existing `typescript@5.9.3:` lockfile line numbers
+quoted.** The strong evidence that no unrelated upgrade rode along is the **zero-removal** count: an
+upgrade rewrites an existing line and therefore always produces a removal.
+
+## CORRECTION to the two entries above (F-T1-ORACLE-EVALUATOR r1, after codex r0 F4/F5)
+The two entries I appended in round 0 taught two slogans that are stronger than the evidence. Both are
+narrowed here rather than edited, per this file's append-only rule.
+
+- **"`pnpm install --frozen-lockfile` CANNOT modify package.json or pnpm-lock.yaml" — too strong.** The
+  flag is not an immutability boundary; a frozen install still resolves a store and **executes package
+  scripts** (my own round-0 setup log shows it). What actually discharged the question was the
+  *observed state*: `git status --porcelain` empty afterwards, plus the complete recorded diff. **Rule:
+  cite the observed state and the diff, never the flag's promise.**
+- **"a zero-removal lockfile delta cannot contain an upgrade" — not a sufficient general proof.** It
+  held for the case I measured (one aliased devDependency reusing a resolution already in the file),
+  and it is good corroboration, but a lockfile format can express a change without a removed line, so
+  it must not be used as a standalone upgrade proof. **Rule: inspect the actual changed content and the
+  resulting resolved versions; use the removal count as corroboration only.**
+- **Evidence tools must be hardened BEFORE they are promoted.** A four-count parser that prints
+  `MISMATCH` without a nonzero exit, or a mutation harness that checks an anchor *exists* rather than
+  matching a declared multiplicity and does not enforce restoration on interrupt, is fine under a human
+  eye and unsafe as an unattended gate. Prefer the mission's `tools/mutate.sh` v2, which gates
+  pre/applied/restored, sha equality and empty porcelain.
+
+## Extracting code between files: COPY it, never retype it from a partial read
+Found by F-T1-ORACLE-EVALUATOR r1 (2026-09-06), and it cost a RED gate. Moving the depth oracle's
+ceiling arms into a new module, I reproduced `declarationUnits` from the first ~12 lines I had read on
+screen. The real function is ~60 lines and also handles line comments, block comments, string literals,
+template literals with nested `${}`, braces as unit boundaries, closing brackets below the start depth,
+commas as separators, and — the load-bearing part — splits conjuncts at `&&`/`||`/`??` at **any**
+bracket depth. My reconstruction split only at the unit's own depth, which silently widened the
+exclusive-six window and turned the inherited control
+`does not pair a six with a depth in another conjunct of the same condition` RED.
+**The control caught it, which is exactly why that floor exists.** Two lessons: (1) extract by copying
+the exact byte range and then assert byte-identity mechanically — I now diff every moved function
+against its source and print `verbatim: True` before trusting it; (2) a behaviour-preserving extraction
+must be proven by the inherited controls, so migrate them in the SAME step and run them.
+
+## vitest also TRUNCATES a long `it.each` name — a second way to miscount a suite
+Found by F-T1-ORACLE-EVALUATOR r1 (2026-09-06). The recorded `-t` trap above covers `it.each`
+interpolating `$var` **in quotes**. There is a second half: vitest also **truncates** a long rendered
+name with a `…`. A title of `` `addresses $id` `` with a 48-character `$id` prints as
+`addresses 'A1 — ASI: the owning statement begins…'`.
+So `grep -cF 'addresses A'` returned **0** while ten such tests existed and passed — I nearly filed a
+selected-group inventory that was ten short. `grep -cF "addresses 'A"` returns 10.
+**Rule: never count tests by grepping a name you composed in source; count the names the RUNNER
+printed, and match a prefix short enough to survive both the quoting and the truncation.** A `-t`
+filter is safe if its pattern is a substring of the *visible* prefix (`-t "A1 — ASI"` matched).
