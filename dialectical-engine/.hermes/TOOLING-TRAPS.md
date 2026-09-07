@@ -2197,3 +2197,22 @@ than re-running: the two transcripts are intact and separable. Keeping supersede
 still worth doing — move them to a SUBDIRECTORY, which the comparator skips (`[ -f "$f" ] || continue`
 matches files only, and the glob does not recurse). Same trick keeps unstamped supplemental artifacts
 out of the population. Cost here: ~4 minutes, and one full re-measure cycle to re-stamp at the tip.
+
+## `x as Record<Union, T>` is NOT an exhaustiveness check — it silences the very error you wanted
+Found by lane/diag-class-a rework round 2 (2026-09-07), while building a private vocabulary that had
+to stay in step with an exported union. The literal was written
+`{ A: 0, B: 0, ... } as Record<Kind, 0>` and the comment above it claimed that adding or removing a
+member of `Kind` would be a compile error. Measured on this repo's tsc 7.0.2:
+
+    { A: 0, B: 0 } as Record<"A"|"B"|"C", 0>          -> NO ERROR        (missing C silenced)
+    const x: Record<"A"|"B"|"C", 0> = { A: 0, B: 0 }  -> TS2741 missing 'C'
+    { A: 0, B: 0 } satisfies Record<"A"|"B"|"C", 0>   -> TS2741 missing 'C'
+    { A:0,B:0,C:0,D:0 } satisfies Record<"A"|"B"|"C",0> -> TS2353 excess 'D'
+
+`as` is an ASSERTION: it tells the compiler to stop checking. A typed const declaration or a
+`satisfies` clause CHECKS. Only the latter two catch drift in both directions.
+**Rule: never write `as` where you mean "and the compiler will hold me to this" — use `satisfies`
+(or a typed declaration), and PROVE the guard fires by breaking it once and reading the error code
+before you write a comment claiming it.** A guard nobody has seen fire is a comment, not a guard.
+Cost here: ~3 minutes, and it came within one commit of shipping a source comment that promised a
+guarantee the code did not provide — the exact class of defect this lane's review has been finding.

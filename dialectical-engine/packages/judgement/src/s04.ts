@@ -243,12 +243,23 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
  * (`unknown`), and the router's shape rule for an open key set is to redact
  * wholesale rather than to enumerate. The one TYPED producer on the path is
  * `PanelMemberFailure` (`packages/judgement/src/index.ts:499,505,510,513,514`),
- * and its kind becomes the reason — but only after a RUNTIME membership check.
+ * and its kind becomes the reason — but only after a RUNTIME membership check
+ * against a vocabulary this module OWNS.
  * `instanceof` establishes ancestry, not membership: `PanelMemberFailureKind` is
  * a compile-time union and `readonly` is erased, so a subclass or a mutated
- * instance can carry any string in `failureKind` (codex r1 F1). The declared
- * list is a vocabulary, not a runtime guarantee, and the check below is what
- * makes it one for this field. The two codes below are the only other constants with a producer that
+ * instance can carry any string in `failureKind` (codex r1 F1).
+ * And the membership store must not be the EXPORTED array: `PANEL_MEMBER_FAILURE_KINDS`
+ * is exported and never frozen — `as const` is a type-level assertion and
+ * `readonly string[]` aliases rather than copies — so checking through it closes the
+ * alphabet over that array's CURRENT CONTENTS, and a caller who pushes into the export
+ * widens the reason alphabet (codex r1b F1 remainder). `CANONICAL_MEMBER_FAILURE_KINDS`
+ * below is this helper's own copy, built from its own object literal, unreachable from
+ * any exported binding. The seven public spellings are unchanged, and drift between the
+ * two is a COMPILE error rather than a silent divergence: the literal carries
+ * `satisfies Record<PanelMemberFailureKind, 0>`, which errors in BOTH directions —
+ * TS2741 when a kind is missing, TS2353 when one is not in the union. (Measured on
+ * this repo's tsc 7.0.2; a plain `as` assertion silences the missing-key error and
+ * would NOT have given this guarantee.) The two codes below are the only other constants with a producer that
  * can reach this catch un-converted: `ProviderCallFailedError` and
  * `ProviderContentUnacceptedError` (`packages/providers/src/index.ts:53,69`),
  * both `TypedDomainError`s whose `code` is a fixed literal. `assess()` converts
@@ -257,6 +268,20 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
  * how a re-routed rejection silently degrades to the fallback.
  */
 const UNCLASSIFIED_MEMBER_ERROR = "UNCLASSIFIED_MEMBER_ERROR";
+
+/**
+ * This helper's PRIVATE membership storage. Exhaustive against the declared union in
+ * both directions at compile time; independent of the exported array at runtime.
+ */
+const CANONICAL_MEMBER_FAILURE_KINDS: ReadonlySet<string> = new Set(Object.keys({
+  CONSTRUCTION_ERROR: 0,
+  TIMEOUT: 0,
+  PROVIDER_ERROR: 0,
+  PARSE_FAILURE: 0,
+  SCHEMA_FAILURE: 0,
+  UNCONFIGURED_FAMILY: 0,
+  PRODUCER_GRADING_FORBIDDEN: 0
+} satisfies Record<PanelMemberFailureKind, 0>));
 
 const MEMBER_FAILURE_CODES: ReadonlyMap<string, string> = new Map([
   ["PROVIDER_CALL_FAILED", "PROVIDER_CALL_FAILED"],
@@ -269,8 +294,7 @@ function boundedMemberFailureReason(error: unknown): string {
     // second read would defeat a check performed on a different read, so the
     // value that is validated is the value that is returned — never a re-read.
     const failureKind: unknown = error.failureKind;
-    const declared: readonly string[] = PANEL_MEMBER_FAILURE_KINDS;
-    return typeof failureKind === "string" && declared.includes(failureKind)
+    return typeof failureKind === "string" && CANONICAL_MEMBER_FAILURE_KINDS.has(failureKind)
       ? failureKind
       : UNCLASSIFIED_MEMBER_ERROR;
   }

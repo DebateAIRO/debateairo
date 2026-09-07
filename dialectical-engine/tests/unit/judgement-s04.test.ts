@@ -7,6 +7,7 @@ import {
   createUnmeasuredDisagreement,
   createTypedNonAnswer,
   measureDispersion,
+  PANEL_MEMBER_FAILURE_KINDS,
   PanelMemberFailure,
   parseJudgeAssessment,
   reduceAssessment,
@@ -383,6 +384,70 @@ describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught me
     const note = result.notes[0]!;
     expect(note.reason).not.toContain("synthetic-pw-42");
     expect(EXPECTED_PANEL_NOTE_REASONS).toContain(note.reason);
+  });
+
+  /**
+   * codex r1b F1 remainder. `PANEL_MEMBER_FAILURE_KINDS` is EXPORTED and NOT frozen:
+   * `as const` is a type-level assertion and `readonly string[]` aliases rather than
+   * copies. A membership check that reads through the export closes the alphabet over
+   * the array's CURRENT CONTENTS, not over the seven promised spellings — so a caller
+   * that pushes into the export widens the reason alphabet. The helper must own its
+   * vocabulary.
+   */
+  it("does not admit a kind pushed into the exported vocabulary at runtime", async () => {
+    const exported = PANEL_MEMBER_FAILURE_KINDS as unknown as string[];
+    const original = [...exported];
+    // Synthetic only (D18); shaped like a kind so only the STORAGE decides the outcome.
+    const INJECTED = "SYNTHETIC_INJECTED_KIND";
+    let reason: string;
+    try {
+      exported.push(INJECTED);
+      const failure = new PanelMemberFailure("TIMEOUT", "irrelevant");
+      (failure as unknown as { failureKind: string }).failureKind = INJECTED;
+
+      const result = await panelWith(async () => { throw failure; });
+      reason = result.notes[0]!.reason;
+    } finally {
+      exported.length = 0;
+      exported.push(...original);
+    }
+
+    expect(reason).toBe("UNCLASSIFIED_MEMBER_ERROR");
+    expect(reason).not.toBe(INJECTED);
+    // the export is restored, so no later test inherits a widened vocabulary
+    expect([...(PANEL_MEMBER_FAILURE_KINDS as unknown as string[])]).toEqual(original);
+    expect(original).toHaveLength(7);
+  });
+
+  /**
+   * codex r1b: the round-1 accessor test only showed REFUSAL of an invalid helper input,
+   * because the unchanged note construction reads `failureKind` FIRST for its own field
+   * and the helper's read was therefore the second, invalid one. This drives the helper's
+   * SUCCESSFUL-membership branch into a changing accessor instead, and observes the exact
+   * reason: the helper must emit the value it validated, and must not read again.
+   */
+  it("emits exactly the kind it validated when every read returns something different", async () => {
+    const failure = new PanelMemberFailure("TIMEOUT", "irrelevant");
+    const reads: string[] = [];
+    // read 1 -> the note's own failureKind field; read 2 -> the helper; any further read
+    // would be a re-read and would surface the synthetic value.
+    const sequence = ["PARSE_FAILURE", "TIMEOUT", SYNTHETIC_SENSITIVE];
+    Object.defineProperty(failure, "failureKind", {
+      configurable: true,
+      get: () => {
+        const value = sequence[Math.min(reads.length, sequence.length - 1)]!;
+        reads.push(value);
+        return value;
+      }
+    });
+
+    const result = await panelWith(async () => { throw failure; });
+
+    const note = result.notes[0]!;
+    expect(note.failureKind).toBe("PARSE_FAILURE");
+    expect(note.reason).toBe("TIMEOUT");
+    expect(reads).toEqual(["PARSE_FAILURE", "TIMEOUT"]);
+    expect(note.reason).not.toContain("synthetic-pw-42");
   });
 
   it("maps a typed provider code that reaches the catch un-converted", async () => {
