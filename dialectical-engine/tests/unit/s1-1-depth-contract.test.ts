@@ -635,7 +635,9 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(evaluated.start).toBe(64);
     expect(evaluated.end).toBe(77);
     expect(source.slice(16, 87)).toBe("((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5].includes)");
-    expect(evaluated.consumedStart).toBe(64);
+    // B8: BOTH consumed boundaries move to the consumed owner — here the whole
+    // rejected outer call (16,87). The literal identity (64,77) is unchanged.
+    expect(evaluated.consumedStart).toBe(16);
     expect(evaluated.consumedEnd).toBe(87);
     expect(evaluated.verdict).toBe("UNDETERMINED");
   });
@@ -646,8 +648,24 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(evaluated.start).toBe(64);
     expect(evaluated.end).toBe(77);
     expect(source.slice(16, 90)).toBe('((method) => Array.from({length:5},(_,i)=>i+1))([0,1,2,3,4,5]["includes"])');
+    expect(evaluated.consumedStart).toBe(16);
     expect(evaluated.consumedEnd).toBe(90);
     expect(evaluated.verdict).toBe("UNDETERMINED");
+  });
+
+  // K43's observable KNOWN-RECEIVER check (codex r2 B11): the manifest binds K43 to
+  // six known str("x") receiver cells, and asserting only the final UNDETERMINED
+  // would be satisfied by an earlier map failure. The receiver prefix is evaluated
+  // on its own so the receiver stage is observable.
+  it("evaluates K43's receiver prefix to six known str cells", () => {
+    const receiver = evaluateOne("planted.ts", 'const receiver = [0,1,2,3,4,5].map(n => "x");');
+    expect(receiver.value.kind).toBe("EXACT");
+    expect(cellsOf(receiver)).toEqual([
+      { t: "str", v: "x" }, { t: "str", v: "x" }, { t: "str", v: "x" },
+      { t: "str", v: "x" }, { t: "str", v: "x" }, { t: "str", v: "x" }
+    ]);
+    expect(receiver.verdict).toBe("OTHER");
+    expect(receiver.reason).toBe("applied map");
   });
 
   // The three bare DOMAIN controls gain RULED evaluated-candidate assertions while
@@ -682,6 +700,219 @@ describe("S1-1 · the depth bound has a single source", () => {
     // observable the manifest binds these rows to — rather than a bare count.
     expect(evaluatedCandidatesOf("planted.ts", source).map((c) => c.verdict)).toEqual([]);
     expect(candidatesOf("planted.ts", source)).toEqual([]);
+  });
+
+  // ══════ ROUND-2 REWORK — the purity, grammar, work-limit and ownership rows ══════
+  // Every row gives COMPLETE source and asserts the verdict AND the attributable
+  // reason, so a row cannot be satisfied by an unrelated UNKNOWN. Values measured
+  // before assertion (r2/22-rework-measurements.log, r2/23-worklimit-measurements.log).
+
+  // B1 — parameter admission. Only a plain identifier is a parameter this grammar
+  // models; an initialiser or a rest token rejects the WHOLE operation. K7's
+  // parameter-COUNT mutation stays a separate row.
+  it.each([
+    {
+      id: "B1 a default initialiser on the callback parameter",
+      source: "const choices = [0,1,2,3,4,5].map(n=>n===0?undefined:n).map((n=1)=>n);",
+      reason: /purity clause 1: the parameter has a default initialiser/
+    },
+    {
+      id: "B1 a rest parameter",
+      source: "const choices = [0,1,2,3,4,5].filter((...n) => n);",
+      reason: /purity clause 1: the parameter is a rest parameter/
+    }
+  ])("rejects $id", ({ source, reason }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect(e.verdict).toBe("UNDETERMINED");
+    expect(e.value.kind).toBe("UNKNOWN");
+    expect(e.reason).toMatch(reason);
+  });
+
+  // B2 — flatMap runs through the SAME purity gate, with its declared array-shape
+  // exception. Admission examines the whole syntax; evaluation visits only the
+  // selected branch.
+  it.each([
+    { id: "B2 flatMap with an async callback", source: "const choices = [0,1,2,3,4,5].flatMap(async n => n ? [n] : []);", reason: /purity clause 4: the callback is async/ },
+    { id: "B2 flatMap with an assignment in an UNTAKEN branch", source: "const choices = [0,1,2,3,4,5].flatMap(n => true ? [n] : [(n = 1)]);", reason: /purity clause 3: the body contains assignment/ }
+  ])("rejects $id", ({ source, reason }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect(e.verdict).toBe("UNDETERMINED");
+    expect(e.reason).toMatch(reason);
+  });
+
+  it("admits flatMap's declared return-only block form", () => {
+    const e = evaluateOne("planted.ts", "const choices = [0,1,2,3,4,5].flatMap(n => { return n ? [n] : []; });");
+    expect(e.verdict).toBe("RULED");
+    expect(cellValues(cellsOf(e))).toEqual([1, 2, 3, 4, 5]);
+    expect(e.reason).toBe("applied flatMap");
+  });
+
+  // B3 — POSITIVE grammar admission: an undeclared operator rejects the whole
+  // operation even when it sits in an untaken branch. Neither is evaluated.
+  it.each([
+    { id: "B3 a prefix increment in an untaken branch", source: "const choices = [0,1,2,3,4,5].map(n => true ? n : ++n);", reason: /the unary operator PlusPlusToken/ },
+    { id: "B3 `void` in an untaken branch", source: "const choices = [0,1,2,3,4,5].map(n => true ? n : void n);", reason: /the body contains void/ }
+  ])("rejects $id", ({ source, reason }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect(e.verdict).toBe("UNDETERMINED");
+    expect(e.reason).toMatch(reason);
+  });
+
+  // B4 — the work limits are measured on the ORIGINAL body node (body = 0,
+  // forEachChild), so a return-only block counts its Block and ReturnStatement.
+  // Both limits are exhausted independently, and flatMap is measured too.
+  const balancedZeroSum = (n: number): string =>
+    n === 1 ? "0" : `(${balancedZeroSum(n >> 1)} + ${balancedZeroSum(n - (n >> 1))})`;
+
+  it.each([
+    {
+      id: "B4 a return-only body of 66 nodes exceeds the 64 budget",
+      source: `const choices = [0,1,2,3,4,5].map(n => { return n + ${balancedZeroSum(16)}; }).slice(1);`,
+      verdict: "UNDETERMINED" as const
+    },
+    {
+      id: "B4 the same expression as a 64-node expression body is admitted",
+      source: `const choices = [0,1,2,3,4,5].map(n => n + ${balancedZeroSum(16)}).slice(1);`,
+      verdict: "RULED" as const
+    },
+    {
+      id: "B4 depth 34 exceeds the 32 depth limit, independently of the node count",
+      source: `const choices = [0,1,2,3,4,5].map(n => { return ${"(".repeat(32)}n${")".repeat(32)}; }).slice(1);`,
+      verdict: "UNDETERMINED" as const
+    },
+    {
+      id: "B4 depth 28 is admitted",
+      source: `const choices = [0,1,2,3,4,5].map(n => ${"(".repeat(28)}n${")".repeat(28)}).slice(1);`,
+      verdict: "RULED" as const
+    },
+    {
+      id: "B4 flatMap's body is measured too — 129 nodes exceeds the budget",
+      source: `const choices = [0,1,2,3,4,5].flatMap(n => [n + ${balancedZeroSum(32)}]).slice(1);`,
+      verdict: "UNDETERMINED" as const
+    }
+  ])("$id", ({ source, verdict }) => {
+    expect(evaluateOne("planted.ts", source).verdict).toBe(verdict);
+  });
+
+  // B5 — the two missing Prim transfers, with their PAYLOADS pinned.
+  it("applies ToBoolean(jsx) = true", () => {
+    const e = evaluateOne("planted.tsx", "const choices = [0,1,2,3,4,5].map(n => (<span/>)).map(n => n ? 1 : 0);");
+    expect(cellsOf(e)).toEqual([
+      { t: "num", v: 1 }, { t: "num", v: 1 }, { t: "num", v: 1 },
+      { t: "num", v: 1 }, { t: "num", v: 1 }, { t: "num", v: 1 }
+    ]);
+    expect(e.verdict).toBe("OTHER");
+  });
+
+  it.each([
+    { id: "null renders as \"null\"", source: 'const choices = [0,1,2,3,4,5].map(n => "" + null);', text: "null" },
+    { id: "undefined renders as \"undefined\"", source: 'const choices = [0,1,2,3,4,5].map(n => undefined + "");', text: "undefined" }
+  ])("renders in string concatenation: $id", ({ source, text }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect(cellsOf(e)).toEqual(Array.from({ length: 6 }, () => ({ t: "str", v: text })));
+    expect(e.verdict).toBe("OTHER");
+  });
+
+  // B6 — zero-argument splice removes NOTHING, after a ruled derivation so the
+  // error would change the verdict.
+  it("distinguishes splice() from splice(start)", () => {
+    const zero = evaluateOne("planted.ts", "const choices = [0,1,2,3,4,5].slice(1).splice();");
+    expect(zero.verdict).toBe("OTHER");
+    expect(cellsOf(zero)).toEqual([]);
+    const one = evaluateOne("planted.ts", "const choices = [0,1,2,3,4,5].splice(1);");
+    expect(one.verdict).toBe("RULED");
+    expect(cellValues(cellsOf(one))).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  // B7 — unsupported binding forms are REJECTED before any output is classified.
+  it.each([
+    { id: "a nested array binding pattern", source: "const [[head, ...choices]] = [[0,1,2,3,4,5]];", reason: /nested binding pattern/ },
+    { id: "a nested pattern behind a rest token", source: "const [...[head, ...choices]] = [0,1,2,3,4,5];", reason: /nested binding pattern/ },
+    { id: "a defaulted binding element", source: "const [choices = Array.from({length:5}, (_,i)=>i+1)] = [0,1,2,3,4,5].map(n=>undefined);", reason: /defaulted binding element/ }
+  ])("rejects $id", ({ source, reason }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect(e.verdict).toBe("UNDETERMINED");
+    expect(e.reason).toMatch(reason);
+  });
+
+  // B8 — both consumed boundaries move with the owner; the literal identity does not.
+  it.each([
+    { id: "a transparent wrapper", source: "const choices = ([0,1,2,3,4,5] as const).slice(1);", start: 17, end: 30, cs: 6, ce: 49 },
+    { id: "an array binding declaration", source: "const [, ...choices] = [0,1,2,3,4,5];", start: 23, end: 36, cs: 6, ce: 36 }
+  ])("carries both consumed boundaries through $id", ({ source, start, end, cs, ce }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect([e.start, e.end]).toEqual([start, end]);
+    expect([e.consumedStart, e.consumedEnd]).toEqual([cs, ce]);
+    expect(e.verdict).toBe("RULED");
+  });
+
+  // B9 — exact sibling spreads fold in order; an unmodelled sibling stays UNKNOWN.
+  it("folds exact sibling spreads in order, to the ruled domain", () => {
+    const all = evaluatedCandidatesOf("planted.ts", "const choices = [...[1,2,3], ...[4,5]];");
+    expect(all).toHaveLength(2);
+    for (const e of all) {
+      expect(e.verdict).toBe("RULED");
+      expect(cellValues(cellsOf(e))).toEqual([1, 2, 3, 4, 5]);
+      expect(e.reason).toBe("spread folded into the enclosing array, in order");
+    }
+  });
+
+  it("folds exact sibling spreads to a decided non-ruled value", () => {
+    const all = evaluatedCandidatesOf("planted.ts", "const choices = [...[0,1,2], ...[3,4,5]];");
+    expect(all).toHaveLength(2);
+    for (const e of all) {
+      expect(e.verdict).toBe("OTHER");
+      expect(cellValues(cellsOf(e))).toEqual([0, 1, 2, 3, 4, 5]);
+    }
+  });
+
+  it("reports when a sibling spread is not exact under the admitted grammar", () => {
+    const e = evaluateOne("planted.ts", "const choices = [...[0,1,2,3,4,5], ...other].slice(1);");
+    expect(e.verdict).toBe("UNDETERMINED");
+  });
+
+  // B10 — the receiver-state continuation rule comes BEFORE freeze identity.
+  it("applies NOT_ARRAY continuation before Object.freeze identity", () => {
+    const scalar = evaluateOne("planted.ts", 'const choices = Object.freeze([0,1,2,3,4,5].join(""));');
+    expect(scalar.verdict).toBe("UNDETERMINED");
+    expect(scalar.value.kind).toBe("UNKNOWN");
+    expect(scalar.reason).toMatch(/continuation yields UNKNOWN/);
+    const exactValue = evaluateOne("planted.ts", "const choices = Object.freeze([0,1,2,3,4,5]).slice(1);");
+    expect(exactValue.verdict).toBe("RULED");
+  });
+
+  // Further §3 rows the stage contract calls for.
+  it("sorts by String(cell), not numerically", () => {
+    const e = evaluateOne("planted.ts", "const choices = [0,1,2,3,4,5,10].sort().slice(1,-1);");
+    expect(cellValues(cellsOf(e))).toEqual([1, 10, 2, 3, 4]);
+    expect(e.verdict).toBe("OTHER");
+  });
+
+  it.each([
+    { id: "the same sentinel twice dedupes", source: 'const choices = [...new Set([0,6,1,2,3,4,5].map(n => n===0?"a":n===6?"a":n))].slice(2);', verdict: "OTHER" as const, cells: [2, 3, 4, 5] },
+    { id: "two different sentinels do not", source: 'const choices = [...new Set([0,6,1,2,3,4,5].map(n => n===0?"a":n===6?"b":n))].slice(2);', verdict: "RULED" as const, cells: [1, 2, 3, 4, 5] }
+  ])("applies SameValueZero to Set: $id", ({ source, verdict, cells }) => {
+    const e = evaluateOne("planted.ts", source);
+    expect(cellValues(cellsOf(e))).toEqual(cells);
+    expect(e.verdict).toBe(verdict);
+  });
+
+  // CONTRACT AMENDMENT A1 (codex r2 F1) — terminal consumption of a decided scalar,
+  // with its POSITIVE case and its CONSERVATIVE counter-controls. The counter-controls
+  // are what keep this from being a blanket NOT_ARRAY exemption.
+  it("ends the chain when a decided scalar is consumed in a boolean position (amendment A1)", () => {
+    const e = evaluateOne("planted.ts", "if (a || [502,503,504].includes(s)) { }");
+    expect(e.verdict).toBe("OTHER");
+    expect(e.value.kind).toBe("NOT_ARRAY");
+    expect(e.reason).toMatch(/terminal consumption/);
+  });
+
+  it.each([
+    { id: "new Set over a scalar could still yield an array of characters", source: 'const choices = new Set([0,1,2,3,4,5].join(""));' },
+    { id: "a member access over a scalar could still yield an array", source: 'const choices = [0,1,2,3,4,5].join("").split("");' },
+    { id: "an operation over NOT_ARRAY reports (K50)", source: 'const choices = [0,1,2,3,4,5].join("").split("").map(n => +n).slice(1);' }
+  ])("amendment A1 does NOT absorb: $id", ({ source }) => {
+    expect(evaluateOne("planted.ts", source).verdict).toBe("UNDETERMINED");
   });
 
   // ROUND 1 — the TRUNCATED-PREFIX block. PROPERTY: a source the parser rejects

@@ -233,15 +233,15 @@ export function candidatesOf(path: string, source: string): DiscoveredCandidate[
 }
 
 /* ========================================================================== *
- * ROUND 2 — THE COMPLETE DECLARED EVALUATOR
+ * ROUND 2 — THE COMPLETE DECLARED EVALUATOR  (rework after codex r2 B1–B11)
  *
- * plan §3.9 R2 (purity gate) · §3.10 R2 (callback grammar and per-operation
+ * plan §3.9 R2 (purity gate) · §3.10 R2 (callback grammar, per-operation
  * results) · §3.13 R3 (primitive contract) · §3.15 R3 (operations by return
  * contract) · §3.16 R3 (ownership walk) · §3.17 R4 (cells ARE primitives) ·
  * §3.18 R4 (a modelled member invocation requires the member to be the CALLEE).
  *
  * The evaluator NEVER executes source. It evaluates the syntax tree over the
- * finite known cells, with the two recorded work limits below.
+ * finite known cells, under the two recorded work limits below.
  * ========================================================================== */
 
 /** The two work limits, recorded here as the plan requires the worker to do. */
@@ -254,9 +254,10 @@ const exact = (cells: readonly Cell[], coll: "array" | "set" = "array"): Value =
   ({ kind: "EXACT", coll, cells });
 
 /**
- * Counter semantics, as recorded in the manifest: every node reachable from the
- * callback BODY INCLUSIVE via `ts.forEachChild`; depth counts the body as 0 and
- * adds 1 per `forEachChild` level.
+ * B4 — the work limits are measured on the ORIGINAL callback body node, before
+ * any return expression is extracted: the body is depth 0 and each
+ * `ts.forEachChild` level adds one. A return-only block therefore counts its
+ * Block and ReturnStatement, as the recorded semantics require.
  */
 function measureBody(body: ts.Node): { nodes: number; depth: number } {
   let nodes = 0;
@@ -270,43 +271,105 @@ function measureBody(body: ts.Node): { nodes: number; depth: number } {
   return { nodes, depth };
 }
 
-/** §3.13 R3's expression grammar. Returns the first violation, or null. */
-function outOfGrammarReason(node: ts.Node): string | null {
-  let found: string | null = null;
-  const visit = (n: ts.Node): void => {
-    if (found !== null) return;
-    if (ts.isBinaryExpression(n)) {
-      const op = n.operatorToken.kind;
-      if (op === ts.SyntaxKind.EqualsToken ||
-          (op >= ts.SyntaxKind.PlusEqualsToken && op <= ts.SyntaxKind.CaretEqualsToken)) {
-        found = "assignment"; return;
-      }
+/** The binary operators §3.10 R2 declares. */
+const DECLARED_BINARY = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.PlusToken, ts.SyntaxKind.MinusToken, ts.SyntaxKind.AsteriskToken,
+  ts.SyntaxKind.SlashToken, ts.SyntaxKind.PercentToken,
+  ts.SyntaxKind.LessThanToken, ts.SyntaxKind.LessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanToken, ts.SyntaxKind.GreaterThanEqualsToken,
+  ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken
+]);
+
+/** The unary operators §3.10 R2 declares. */
+const DECLARED_UNARY = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.MinusToken, ts.SyntaxKind.PlusToken, ts.SyntaxKind.ExclamationToken
+]);
+
+function isJsxAtom(node: ts.Node): boolean {
+  return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+}
+
+/**
+ * B3 — POSITIVE admission of the declared expression grammar. Every node must be
+ * one of the declared forms; anything else names itself and rejects the WHOLE
+ * operation, including inside an untaken conditional branch. JSX is ATOMIC: it
+ * is a `jsx` cell and its children are not descended into.
+ *
+ * `arrayShape` admits flatMap's narrowly declared exception at the positions
+ * where flatMap allows it (the body, or a conditional branch of the body).
+ */
+function admitExpression(node: ts.Expression, arrayShape: boolean): string | null {
+  if (isJsxAtom(node)) return null;                       // atomic, not descended
+  if (ts.isParenthesizedExpression(node)) return admitExpression(node.expression, arrayShape);
+  if (ts.isNumericLiteral(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return null;
+  if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword ||
+      node.kind === ts.SyntaxKind.NullKeyword) return null;
+  if (ts.isIdentifier(node)) return null;                 // the parameter, or `undefined`
+  if (ts.isTemplateExpression(node)) {
+    for (const span of node.templateSpans) {
+      const bad = admitExpression(span.expression, false);
+      if (bad !== null) return bad;
     }
-    if (ts.isCallExpression(n)) { found = "call"; return; }
-    if (ts.isPropertyAccessExpression(n)) { found = "member access"; return; }
-    if (ts.isElementAccessExpression(n)) { found = "member access"; return; }
-    if (n.kind === ts.SyntaxKind.ThisKeyword) { found = "this"; return; }
-    if (ts.isAwaitExpression(n)) { found = "await"; return; }
-    if (ts.isYieldExpression(n)) { found = "yield"; return; }
-    if (ts.isTaggedTemplateExpression(n)) { found = "tagged template"; return; }
-    if (ts.isObjectLiteralExpression(n)) { found = "object literal"; return; }
-    if (ts.isArrayLiteralExpression(n)) { found = "array literal"; return; }
-    if (ts.isArrowFunction(n) || ts.isFunctionExpression(n)) { found = "nested function"; return; }
-    if (ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) || ts.isJsxFragment(n)) return; // a jsx cell
-    ts.forEachChild(n, visit);
-  };
-  visit(node);
-  return found;
+    return null;
+  }
+  if (ts.isPrefixUnaryExpression(node)) {
+    if (!DECLARED_UNARY.has(node.operator)) return `the unary operator ${ts.SyntaxKind[node.operator]}`;
+    return admitExpression(node.operand, false);
+  }
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind;
+    if (op === ts.SyntaxKind.EqualsToken ||
+        (op >= ts.SyntaxKind.PlusEqualsToken && op <= ts.SyntaxKind.CaretEqualsToken)) return "assignment";
+    if (!DECLARED_BINARY.has(op)) return `the binary operator ${ts.SyntaxKind[op]}`;
+    return admitExpression(node.left, false) ?? admitExpression(node.right, false);
+  }
+  if (ts.isConditionalExpression(node)) {
+    return admitExpression(node.condition, false)
+      ?? admitExpression(node.whenTrue, arrayShape)
+      ?? admitExpression(node.whenFalse, arrayShape);
+  }
+  if (arrayShape && ts.isArrayLiteralExpression(node)) {
+    // flatMap's declared shapes: `[]` or `[e]`.
+    if (node.elements.length === 0) return null;
+    if (node.elements.length !== 1) return "a flatMap array literal with more than one element";
+    const only = node.elements[0]!;
+    if (ts.isSpreadElement(only)) return "a spread inside a flatMap array literal";
+    return admitExpression(only, false);
+  }
+  if (ts.isCallExpression(node)) return "a call";
+  if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) return "member access";
+  if (node.kind === ts.SyntaxKind.ThisKeyword) return "this";
+  if (ts.isAwaitExpression(node)) return "await";
+  if (ts.isYieldExpression(node)) return "yield";
+  if (ts.isTaggedTemplateExpression(node)) return "a tagged template";
+  if (ts.isObjectLiteralExpression(node)) return "an object literal";
+  if (ts.isArrayLiteralExpression(node)) return "an array literal";
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return "a nested function";
+  if (ts.isPostfixUnaryExpression(node)) return `the postfix operator ${ts.SyntaxKind[node.operator]}`;
+  if (ts.isVoidExpression(node)) return "void";
+  if (ts.isTypeOfExpression(node)) return "typeof";
+  if (ts.isSpreadElement(node)) return "a spread";
+  return `the unsupported syntax ${ts.SyntaxKind[node.kind]}`;
 }
 
 type Admitted =
   | { ok: true; body: ts.Expression; parameter: string }
   | { ok: false; reason: string };
 
-/** §3.9 R2 — the four purity clauses, each independently reported. */
-function admitCallback(node: ts.Expression): Admitted {
+/**
+ * §3.9 R2 — the four purity clauses, each reported independently, PLUS the two
+ * recorded work limits measured on the original body (B4).
+ *
+ * B1: clause 1 rejects an initialiser, a rest token, an optional marker and any
+ * binding pattern — only a plain identifier is a parameter this grammar models.
+ * B2: `arrayShape` routes flatMap through this same gate.
+ */
+function admitCallback(node: ts.Expression, arrayShape = false): Admitted {
   if (!ts.isArrowFunction(node) && !ts.isFunctionExpression(node)) {
-    return { ok: false, reason: "callback is not a function expression" };
+    return { ok: false, reason: "the callback is not a function expression" };
   }
   const fn = node;
   const modifiers = ts.canHaveModifiers(fn) ? (ts.getModifiers(fn) ?? []) : [];
@@ -320,8 +383,25 @@ function admitCallback(node: ts.Expression): Admitted {
     return { ok: false, reason: `purity clause 1: ${fn.parameters.length} parameters, expected exactly one` };
   }
   const first = fn.parameters[0]!;
+  if (first.dotDotDotToken !== undefined) {
+    return { ok: false, reason: "purity clause 1: the parameter is a rest parameter" };
+  }
+  if (first.initializer !== undefined) {
+    return { ok: false, reason: "purity clause 1: the parameter has a default initialiser" };
+  }
+  if (first.questionToken !== undefined) {
+    return { ok: false, reason: "purity clause 1: the parameter is optional" };
+  }
   if (!ts.isIdentifier(first.name)) {
-    return { ok: false, reason: "purity clause 1: the parameter is not a plain identifier" };
+    return { ok: false, reason: "purity clause 1: the parameter is a binding pattern, not a plain identifier" };
+  }
+  // B4: measure the ORIGINAL body, before extracting any return expression.
+  const { nodes, depth } = measureBody(fn.body);
+  if (nodes > NODE_BUDGET) {
+    return { ok: false, reason: `work limit: ${nodes} counted nodes exceeds the node budget ${NODE_BUDGET}` };
+  }
+  if (depth > DEPTH_LIMIT) {
+    return { ok: false, reason: `work limit: depth ${depth} exceeds the depth limit ${DEPTH_LIMIT}` };
   }
   let body: ts.Expression;
   if (ts.isBlock(fn.body)) {
@@ -334,34 +414,31 @@ function admitCallback(node: ts.Expression): Admitted {
   } else {
     body = fn.body;
   }
-  const violation = outOfGrammarReason(body);
+  const violation = admitExpression(body, arrayShape);
   if (violation !== null) {
     return { ok: false, reason: `purity clause 3: the body contains ${violation}` };
-  }
-  const { nodes, depth } = measureBody(body);
-  if (nodes > NODE_BUDGET) {
-    return { ok: false, reason: `work limit: ${nodes} counted nodes exceeds the node budget ${NODE_BUDGET}` };
-  }
-  if (depth > DEPTH_LIMIT) {
-    return { ok: false, reason: `work limit: depth ${depth} exceeds the depth limit ${DEPTH_LIMIT}` };
   }
   return { ok: true, body, parameter: first.name.text };
 }
 
 const UNKNOWN_PRIM: Prim = { t: "unknown" };
 
-/** §3.10 R2 — truthiness is DEFINED: `{n}` falsy iff n === 0; str/bool/null/undef decided; unknown propagates. */
+/**
+ * §3.10 R2 — truthiness is DEFINED.
+ * B5: `ToBoolean(jsx)` is **true** — a JSX element is an object.
+ */
 function truthiness(p: Prim): boolean | "unknown" {
   switch (p.t) {
     case "num": return p.v !== 0;
     case "str": return p.v.length > 0;
     case "bool": return p.v;
     case "null": case "undef": return false;
+    case "jsx": return true;
     default: return "unknown";
   }
 }
 
-/** A `Cell` lifted to the `Prim` a callback parameter receives (§3.17 R4: total, identity on the six). */
+/** §3.17 R4 — total, and the identity on the six primitive constructors. */
 function cellToPrim(cell: Cell): Prim {
   return cell.t === "arr" ? UNKNOWN_PRIM : cell;
 }
@@ -370,9 +447,26 @@ function numeric(p: Prim): number | null {
   return p.t === "num" ? p.v : null;
 }
 
+/**
+ * B5 — exact string rendering for concatenation and template substitution.
+ * `null` and `undefined` render; `jsx` and `unknown` do not (object coercion is
+ * not available to this abstraction, and guessing is what produces a silent miss).
+ */
+function renderString(p: Prim): string | null {
+  switch (p.t) {
+    case "str": return p.v;
+    case "num": return String(p.v);
+    case "bool": return String(p.v);
+    case "null": return "null";
+    case "undef": return "undefined";
+    default: return null;
+  }
+}
+
 /** §3.13 R3 + §3.10 R2 — the callback mini-evaluator. No source is executed. */
 function evalPrim(node: ts.Expression, parameter: string, argument: Prim): Prim {
   if (ts.isParenthesizedExpression(node)) return evalPrim(node.expression, parameter, argument);
+  if (isJsxAtom(node)) return { t: "jsx" };
   if (ts.isNumericLiteral(node)) {
     const v = Number(node.text);
     return Number.isFinite(v) ? { t: "num", v } : UNKNOWN_PRIM;
@@ -381,9 +475,6 @@ function evalPrim(node: ts.Expression, parameter: string, argument: Prim): Prim 
   if (node.kind === ts.SyntaxKind.TrueKeyword) return { t: "bool", v: true };
   if (node.kind === ts.SyntaxKind.FalseKeyword) return { t: "bool", v: false };
   if (node.kind === ts.SyntaxKind.NullKeyword) return { t: "null" };
-  if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) {
-    return { t: "jsx" };                       // §5.2 R2 — the JSX model, in this round
-  }
   if (ts.isIdentifier(node)) {
     if (node.text === parameter) return argument;
     if (node.text === "undefined") return { t: "undef" };
@@ -392,14 +483,9 @@ function evalPrim(node: ts.Expression, parameter: string, argument: Prim): Prim 
   if (ts.isTemplateExpression(node)) {
     let out = node.head.text;
     for (const span of node.templateSpans) {
-      const part = evalPrim(span.expression, parameter, argument);
-      if (part.t === "num") out += String(part.v);
-      else if (part.t === "str") out += part.v;
-      else if (part.t === "bool") out += String(part.v);
-      else if (part.t === "null") out += "null";
-      else if (part.t === "undef") out += "undefined";
-      else return UNKNOWN_PRIM;
-      out += span.literal.text;
+      const part = renderString(evalPrim(span.expression, parameter, argument));
+      if (part === null) return UNKNOWN_PRIM;
+      out += part + span.literal.text;
     }
     return { t: "str", v: out };
   }
@@ -409,22 +495,19 @@ function evalPrim(node: ts.Expression, parameter: string, argument: Prim): Prim 
       const t = truthiness(operand);
       return t === "unknown" ? UNKNOWN_PRIM : { t: "bool", v: !t };
     }
-    if (node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken) {
-      // §3.17 R4: unary conversion READS the retained payload, so `+"3"` is exact.
-      let v: number | null = null;
-      if (operand.t === "num") v = operand.v;
-      else if (operand.t === "str") { const n = Number(operand.v); v = Number.isFinite(n) ? n : null; }
-      else if (operand.t === "bool") v = operand.v ? 1 : 0;
-      else if (operand.t === "null") v = 0;
-      if (v === null) return UNKNOWN_PRIM;
-      const signed = node.operator === ts.SyntaxKind.MinusToken ? -v : v;
-      return Number.isFinite(signed) ? { t: "num", v: signed } : UNKNOWN_PRIM;
-    }
-    return UNKNOWN_PRIM;
+    let v: number | null = null;
+    if (operand.t === "num") v = operand.v;
+    else if (operand.t === "str") { const n = Number(operand.v); v = Number.isFinite(n) ? n : null; }
+    else if (operand.t === "bool") v = operand.v ? 1 : 0;
+    else if (operand.t === "null") v = 0;
+    if (v === null) return UNKNOWN_PRIM;
+    const signed = node.operator === ts.SyntaxKind.MinusToken ? -v : v;
+    return Number.isFinite(signed) ? { t: "num", v: signed } : UNKNOWN_PRIM;
   }
   if (ts.isConditionalExpression(node)) {
     const t = truthiness(evalPrim(node.condition, parameter, argument));
     if (t === "unknown") return UNKNOWN_PRIM;
+    // Only the SELECTED branch is evaluated; admission already examined both.
     return evalPrim(t ? node.whenTrue : node.whenFalse, parameter, argument);
   }
   if (ts.isBinaryExpression(node)) {
@@ -434,7 +517,6 @@ function evalPrim(node: ts.Expression, parameter: string, argument: Prim): Prim 
       const t = truthiness(left);
       if (t === "unknown") return UNKNOWN_PRIM;
       const takeLeft = op === ts.SyntaxKind.AmpersandAmpersandToken ? !t : t;
-      // §3.10 R2: `&&`/`||` return the OPERAND VALUE, not a boolean.
       return takeLeft ? left : evalPrim(node.right, parameter, argument);
     }
     if (op === ts.SyntaxKind.QuestionQuestionToken) {
@@ -449,41 +531,29 @@ function evalPrim(node: ts.Expression, parameter: string, argument: Prim): Prim 
       op === ts.SyntaxKind.AsteriskToken || op === ts.SyntaxKind.SlashToken || op === ts.SyntaxKind.PercentToken;
     if (arithmetic) {
       if (op === ts.SyntaxKind.PlusToken && (left.t === "str" || right.t === "str")) {
-        const render = (p: Prim): string | null =>
-          p.t === "str" ? p.v : p.t === "num" ? String(p.v) : p.t === "bool" ? String(p.v) : null;
-        const l = render(left); const r = render(right);
+        const l = renderString(left); const r = renderString(right);
         return l === null || r === null ? UNKNOWN_PRIM : { t: "str", v: l + r };
       }
       const l = numeric(left); const r = numeric(right);
-      // §3.10 R2's B2 fix: a non-numeric operand under arithmetic is UNKNOWN, never NONNUMBER.
-      if (l === null || r === null) return UNKNOWN_PRIM;
+      if (l === null || r === null) return UNKNOWN_PRIM;   // §3.10 R2's B2 fix
       const v = op === ts.SyntaxKind.PlusToken ? l + r
         : op === ts.SyntaxKind.MinusToken ? l - r
         : op === ts.SyntaxKind.AsteriskToken ? l * r
         : op === ts.SyntaxKind.SlashToken ? l / r : l % r;
-      // §3.17 R4: any non-finite numeric result is `unknown`.
       return Number.isFinite(v) ? { t: "num", v } : UNKNOWN_PRIM;
     }
-    const comparison =
-      op === ts.SyntaxKind.LessThanToken || op === ts.SyntaxKind.LessThanEqualsToken ||
-      op === ts.SyntaxKind.GreaterThanToken || op === ts.SyntaxKind.GreaterThanEqualsToken ||
-      op === ts.SyntaxKind.EqualsEqualsEqualsToken || op === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
-      op === ts.SyntaxKind.EqualsEqualsToken || op === ts.SyntaxKind.ExclamationEqualsToken;
-    if (comparison) {
-      const bothNum = left.t === "num" && right.t === "num";
-      const bothStr = left.t === "str" && right.t === "str";
-      if (!bothNum && !bothStr) return UNKNOWN_PRIM;
-      const l = left.t === "num" ? left.v : (left as { t: "str"; v: string }).v;
-      const r = right.t === "num" ? right.v : (right as { t: "str"; v: string }).v;
-      const v = op === ts.SyntaxKind.LessThanToken ? l < r
-        : op === ts.SyntaxKind.LessThanEqualsToken ? l <= r
-        : op === ts.SyntaxKind.GreaterThanToken ? l > r
-        : op === ts.SyntaxKind.GreaterThanEqualsToken ? l >= r
-        : op === ts.SyntaxKind.EqualsEqualsEqualsToken || op === ts.SyntaxKind.EqualsEqualsToken ? l === r
-        : l !== r;
-      return { t: "bool", v };
-    }
-    return UNKNOWN_PRIM;
+    const bothNum = left.t === "num" && right.t === "num";
+    const bothStr = left.t === "str" && right.t === "str";
+    if (!bothNum && !bothStr) return UNKNOWN_PRIM;
+    const l = left.t === "num" ? left.v : (left as { t: "str"; v: string }).v;
+    const r = right.t === "num" ? right.v : (right as { t: "str"; v: string }).v;
+    const v = op === ts.SyntaxKind.LessThanToken ? l < r
+      : op === ts.SyntaxKind.LessThanEqualsToken ? l <= r
+      : op === ts.SyntaxKind.GreaterThanToken ? l > r
+      : op === ts.SyntaxKind.GreaterThanEqualsToken ? l >= r
+      : op === ts.SyntaxKind.EqualsEqualsEqualsToken || op === ts.SyntaxKind.EqualsEqualsToken ? l === r
+      : l !== r;
+    return { t: "bool", v };
   }
   return UNKNOWN_PRIM;
 }
@@ -500,19 +570,19 @@ function integerArg(node: ts.Expression): number | null {
   return null;
 }
 
-/** §3.17 R4 — SameValueZero over cells; decidable only when every cell is a primitive value. */
+/** §3.17 R4 — SameValueZero; decidable only when every cell is a primitive value. */
 function dedupeSameValueZero(cells: readonly Cell[]): readonly Cell[] | null {
   const keys: string[] = [];
   const out: Cell[] = [];
   for (const cell of cells) {
     let key: string;
     switch (cell.t) {
-      case "num": key = `n:${cell.v === 0 ? 0 : cell.v}`; break;   // +0 and -0 are one element
+      case "num": key = `n:${cell.v === 0 ? 0 : cell.v}`; break;
       case "str": key = `s:${cell.v}`; break;
       case "bool": key = `b:${cell.v}`; break;
       case "null": key = "null"; break;
       case "undef": key = "undef"; break;
-      default: return null;                                        // jsx / arr / unknown: identity unavailable
+      default: return null;
     }
     if (!keys.includes(key)) { keys.push(key); out.push(cell); }
   }
@@ -524,43 +594,42 @@ const BOOLEAN_RETURNING = ["includes", "some", "every"];
 const NUMBER_RETURNING = ["indexOf", "lastIndexOf", "findIndex"];
 const UNSUPPORTED_ARRAY = ["concat", "flat", "fill", "with", "toSorted", "toReversed", "copyWithin"];
 
-/** §3.15 R3's element-returning rule: NOT_ARRAY only if every cell is a known number. */
 function elementReturn(cells: readonly Cell[]): Value {
   return cells.every((c) => c.t === "num") ? NOT_ARRAY_VALUE : UNKNOWN_VALUE;
 }
 
-/** Evaluate one admitted callback over one cell. The result is always a `Prim`. */
 function mapCell(admitted: { body: ts.Expression; parameter: string }, cell: Cell): Prim {
   return evalPrim(admitted.body, admitted.parameter, cellToPrim(cell));
 }
 
-/** flatMap's admitted body shapes: `[e]`, `[]`, `c ? [e] : []` (either branch order). */
+/**
+ * B2 — flatMap runs through the SAME purity gate as map/filter, with the
+ * narrowly declared array-shape exception. Admission has already examined the
+ * whole syntax; here only the selected branch is visited.
+ */
 function flatMapCells(callback: ts.Expression, cells: readonly Cell[]): Value {
-  if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return UNKNOWN_VALUE;
-  const fn = callback;
-  if (fn.parameters.length !== 1) return UNKNOWN_VALUE;
-  const nameNode = fn.parameters[0]!.name;
-  if (!ts.isIdentifier(nameNode)) return UNKNOWN_VALUE;
-  const parameter = nameNode.text;
-  const body = ts.isBlock(fn.body) ? undefined : fn.body;
-  if (body === undefined) return UNKNOWN_VALUE;
+  const admitted = admitCallback(callback, /* arrayShape */ true);
+  if (!admitted.ok) return UNKNOWN_VALUE;
+  const { body, parameter } = admitted;
+  const unwrap = (e: ts.Expression): ts.Expression =>
+    ts.isParenthesizedExpression(e) ? unwrap(e.expression) : e;
   const branchCells = (expr: ts.Expression, cell: Cell): Cell[] | null => {
-    if (!ts.isArrayLiteralExpression(expr)) return null;
-    if (expr.elements.length === 0) return [];
-    if (expr.elements.length !== 1) return null;
-    const inner = expr.elements[0]!;
-    if (outOfGrammarReason(inner) !== null) return null;
+    const target = unwrap(expr);
+    if (!ts.isArrayLiteralExpression(target)) return null;
+    if (target.elements.length === 0) return [];
+    const inner = target.elements[0]!;
     return [evalPrim(inner, parameter, cellToPrim(cell))];
   };
   const out: Cell[] = [];
   for (const cell of cells) {
+    const target = unwrap(body);
     let produced: Cell[] | null;
-    if (ts.isConditionalExpression(body)) {
-      const t = truthiness(evalPrim(body.condition, parameter, cellToPrim(cell)));
+    if (ts.isConditionalExpression(target)) {
+      const t = truthiness(evalPrim(target.condition, parameter, cellToPrim(cell)));
       if (t === "unknown") return UNKNOWN_VALUE;
-      produced = branchCells(t ? body.whenTrue : body.whenFalse, cell);
+      produced = branchCells(t ? target.whenTrue : target.whenFalse, cell);
     } else {
-      produced = branchCells(body, cell);
+      produced = branchCells(target, cell);
     }
     if (produced === null) return UNKNOWN_VALUE;
     out.push(...produced);
@@ -573,20 +642,15 @@ function flatMapCells(callback: ts.Expression, cells: readonly Cell[]): Value {
  * the member is the CALLEE (§3.18 R4); undefined for a bare member read.
  */
 function applyMember(receiver: Value, name: string, call: ts.CallExpression | undefined): Value {
-  // §3.15 R3 continuation: any operation applied to NOT_ARRAY or UNKNOWN is UNKNOWN.
-  if (receiver.kind !== "EXACT") return UNKNOWN_VALUE;
+  if (receiver.kind !== "EXACT") return UNKNOWN_VALUE;      // §3.15 continuation
   const cells = receiver.cells;
 
   if (receiver.coll === "set") {
     if (name === "has") return call === undefined ? UNKNOWN_VALUE : NOT_ARRAY_VALUE;
     if (name === "size") return call === undefined ? NOT_ARRAY_VALUE : UNKNOWN_VALUE;
-    return UNKNOWN_VALUE;                       // array methods over a Set are not modelled
+    return UNKNOWN_VALUE;
   }
-
-  if (call === undefined) {
-    // A non-call member read: only `length` is modelled.
-    return name === "length" ? NOT_ARRAY_VALUE : UNKNOWN_VALUE;
-  }
+  if (call === undefined) return name === "length" ? NOT_ARRAY_VALUE : UNKNOWN_VALUE;
 
   const args = call.arguments;
   if (BOOLEAN_RETURNING.includes(name) || NUMBER_RETURNING.includes(name) || name === "join" || name === "forEach") {
@@ -596,25 +660,32 @@ function applyMember(receiver: Value, name: string, call: ts.CallExpression | un
   if (name === "reduce" || name === "reduceRight") return UNKNOWN_VALUE;
   if (UNSUPPORTED_ARRAY.includes(name)) return UNKNOWN_VALUE;
 
-  if (name === "slice" || name === "splice") {
+  if (name === "slice") {
     if (args.length > 2) return UNKNOWN_VALUE;
     const parsed: number[] = [];
     for (const a of args) { const v = integerArg(a); if (v === null) return UNKNOWN_VALUE; parsed.push(v); }
+    return exact([...cells].slice(...(parsed as [number?, number?])));
+  }
+  if (name === "splice") {
+    // B6 — zero, one and two arguments are three different contracts.
+    if (args.length > 2) return UNKNOWN_VALUE;
+    const parsed: number[] = [];
+    for (const a of args) { const v = integerArg(a); if (v === null) return UNKNOWN_VALUE; parsed.push(v); }
+    if (parsed.length === 0) return exact([]);             // splice() removes NOTHING
     const copy = [...cells];
-    if (name === "slice") return exact(copy.slice(...(parsed as [number?, number?])));
-    // splice returns the REMOVED cells
-    const start = parsed.length > 0 ? parsed[0]! : 0;
-    const count = parsed.length > 1 ? parsed[1]! : copy.length;
-    const from = start < 0 ? Math.max(copy.length + start, 0) : Math.min(start, copy.length);
-    return exact(copy.slice(from, from + Math.max(count, 0)));
+    const raw = parsed[0]!;
+    const from = raw < 0 ? Math.max(copy.length + raw, 0) : Math.min(raw, copy.length);
+    const count = parsed.length === 1 ? copy.length - from : Math.max(parsed[1]!, 0);
+    return exact(copy.slice(from, from + count));          // the REMOVED cells
   }
   if (name === "reverse") return args.length === 0 ? exact([...cells].reverse()) : UNKNOWN_VALUE;
   if (name === "sort") {
     if (args.length !== 0) return UNKNOWN_VALUE;
     if (!cells.every((c) => c.t === "num")) return UNKNOWN_VALUE;
-    return exact([...cells].sort((a, b) =>
-      String((a as { v: number }).v) < String((b as { v: number }).v) ? -1
-      : String((a as { v: number }).v) > String((b as { v: number }).v) ? 1 : 0));
+    return exact([...cells].sort((a, b) => {
+      const x = String((a as { v: number }).v); const y = String((b as { v: number }).v);
+      return x < y ? -1 : x > y ? 1 : 0;
+    }));
   }
   if (name === "map" || name === "filter" || name === "flatMap") {
     if (args.length !== 1) return UNKNOWN_VALUE;
@@ -634,106 +705,161 @@ function applyMember(receiver: Value, name: string, call: ts.CallExpression | un
   return UNKNOWN_VALUE;
 }
 
-/** Why an admitted-callback operation was rejected, for the `reason` field. */
+/** The rejection reason for a callback operation, for the `reason` field. */
 function callbackRejection(call: ts.CallExpression | undefined, name: string): string | null {
   if (call === undefined) return null;
-  if (name !== "map" && name !== "filter") return null;
+  if (name !== "map" && name !== "filter" && name !== "flatMap") return null;
   if (call.arguments.length !== 1) return null;
-  const admitted = admitCallback(call.arguments[0]!);
+  const admitted = admitCallback(call.arguments[0]!, name === "flatMap");
   return admitted.ok ? null : admitted.reason;
 }
 
-/** §3.16 R3 — the ownership walk, first match wins, each row advancing the consumed span. */
+/**
+ * CONTRACT AMENDMENT A1 (round-2 rework, codex r2 F1) — TERMINAL CONSUMPTION OF
+ * A DECIDED SCALAR.
+ *
+ * §3.15 R3 says a chain that ENDS at `NOT_ARRAY` is `OTHER`, and that any
+ * further operation over `NOT_ARRAY` is `UNKNOWN`. It did not say what happens
+ * when a decided scalar is consumed by an enclosing BOOLEAN operator rather than
+ * bound directly — so the shipped `[502, 503, 504].includes(error.status)` inside
+ * an `||` inside an `if` fell to "unmodelled owner" and reported.
+ *
+ * The amendment is deliberately narrow. It applies ONLY when:
+ *   (a) the current value is already `NOT_ARRAY` — a decided scalar, never
+ *       `UNKNOWN` and never `EXACT`; AND
+ *   (b) the enclosing node consumes it in a position that cannot yield an array:
+ *       an operand of `&&`, `||` or `??`; the operand of a unary `!`; or the
+ *       condition of `if` / `while` / `do` / `for` / a conditional expression.
+ *
+ * Everything else over `NOT_ARRAY` remains `UNKNOWN` — member access, calls,
+ * `new Set`, `Array.from`, spreads, array elements and bindings — so this is not
+ * a blanket absorption and it does not stop at an arbitrary scalar prefix.
+ */
+function isBooleanConsumption(parent: ts.Node, node: ts.Node): boolean {
+  if (ts.isBinaryExpression(parent)) {
+    const op = parent.operatorToken.kind;
+    return op === ts.SyntaxKind.AmpersandAmpersandToken ||
+           op === ts.SyntaxKind.BarBarToken ||
+           op === ts.SyntaxKind.QuestionQuestionToken;
+  }
+  if (ts.isPrefixUnaryExpression(parent)) return parent.operator === ts.SyntaxKind.ExclamationToken;
+  if (ts.isIfStatement(parent)) return parent.expression === node;
+  if (ts.isWhileStatement(parent) || ts.isDoStatement(parent)) return parent.expression === node;
+  if (ts.isForStatement(parent)) return parent.condition === node;
+  if (ts.isConditionalExpression(parent)) return parent.condition === node;
+  return false;
+}
+
+/** A sibling spread's cells when its operand is an exact numeric array literal (B9). */
+function siblingSpreadCells(element: ts.SpreadElement): readonly Cell[] | null {
+  const operand = element.expression;
+  if (!ts.isArrayLiteralExpression(operand)) return null;
+  const cells: Cell[] = [];
+  for (const inner of operand.elements) {
+    if (ts.isSpreadElement(inner)) return null;
+    const prim = literalPrim(inner);
+    if (prim.t === "unknown") return null;
+    cells.push(prim);
+  }
+  return cells;
+}
+
+/** §3.16 R3 — the ownership walk. B8: BOTH consumed boundaries move with the owner. */
 function ownershipWalk(
   literal: ts.ArrayLiteralExpression,
   file: ts.SourceFile
-): { value: Value; consumedEnd: number; reason: string } {
+): { value: Value; consumedStart: number; consumedEnd: number; reason: string } {
   let value: Value = exact(ownCells(literal));
   let node: ts.Node = literal;
+  let consumedStart = literal.getStart(file);
   let consumedEnd = literal.getEnd();
   let reason = "literal bound directly; no operation applied";
   let guard = 0;
+  const take = (owner: ts.Node): void => {
+    consumedStart = owner.getStart(file);
+    consumedEnd = owner.getEnd();
+  };
 
   for (;;) {
-    if ((guard += 1) > 256) return { value: UNKNOWN_VALUE, consumedEnd, reason: "walk guard exceeded" };
+    if ((guard += 1) > 256) {
+      return { value: UNKNOWN_VALUE, consumedStart, consumedEnd, reason: "walk guard exceeded" };
+    }
     const parent: ts.Node | undefined = node.parent;
     if (parent === undefined || isTerminalOwner(parent)) {
       if (parent !== undefined && (ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) ||
           ts.isReturnStatement(parent) || ts.isJsxExpression(parent))) {
-        consumedEnd = parent.getEnd();
+        take(parent);
       }
-      return { value, consumedEnd, reason };
+      return { value, consumedStart, consumedEnd, reason };
     }
 
-    // transparent wrappers
     if (ts.isParenthesizedExpression(parent) || ts.isAsExpression(parent) || ts.isSatisfiesExpression(parent)) {
-      node = parent; consumedEnd = parent.getEnd();
-      reason = "transparent wrapper"; continue;
+      node = parent; take(parent); reason = "transparent wrapper"; continue;
     }
 
-    // the comma operator: right operand transparent, left operand discarded
     if (ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.CommaToken) {
-      consumedEnd = parent.getEnd();
+      take(parent);
       if (parent.right === node) { node = parent; reason = "comma operator: candidate is the right operand"; continue; }
-      return { value: NOT_ARRAY_VALUE, consumedEnd, reason: "comma operator: the candidate's value is discarded" };
+      return { value: NOT_ARRAY_VALUE, consumedStart, consumedEnd,
+               reason: "comma operator: the candidate's value is discarded" };
     }
 
-    // a member whose RECEIVER is the candidate
     if ((ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node) {
       const name = ts.isPropertyAccessExpression(parent)
         ? parent.name.text
         : (ts.isStringLiteral(parent.argumentExpression) ? parent.argumentExpression.text : null);
       const grand: ts.Node | undefined = parent.parent;
-      // §3.18 R4: a modelled invocation requires the MEMBER to be the CALLEE.
       const call = grand !== undefined && ts.isCallExpression(grand) && grand.expression === parent ? grand : undefined;
       if (name === null) {
-        // computed numeric index access: element-returning
         const numericIndex = ts.isElementAccessExpression(parent) && integerArg(parent.argumentExpression) !== null;
         value = numericIndex && value.kind === "EXACT" ? elementReturn(value.cells) : UNKNOWN_VALUE;
-        consumedEnd = (call ?? parent).getEnd();
-        node = call ?? parent;
+        const owner = call ?? parent; take(owner); node = owner;
         reason = numericIndex ? "numeric index access" : "computed member is not a string literal";
         continue;
       }
       const rejection = callbackRejection(call, name);
       value = applyMember(value, name, call);
-      consumedEnd = (call ?? parent).getEnd();
-      node = call ?? parent;
+      const owner = call ?? parent; take(owner); node = owner;
       reason = rejection !== null ? `${name}: ${rejection}` : `applied ${name}`;
       continue;
     }
 
-    // new Set(x) / new Map(x), sole argument
     if (ts.isNewExpression(parent) && parent.arguments !== undefined && parent.arguments.length === 1 &&
         parent.arguments[0] === node && ts.isIdentifier(parent.expression)) {
-      consumedEnd = parent.getEnd();
+      take(parent);
       if (parent.expression.text === "Set") {
         if (value.kind !== "EXACT") { value = UNKNOWN_VALUE; reason = "new Set over a non-exact value"; }
         else {
           const deduped = dedupeSameValueZero(value.cells);
           value = deduped === null ? UNKNOWN_VALUE : exact(deduped, "set");
-          reason = deduped === null ? "new Set: object identity is unavailable for a jsx/arr/unknown cell"
-                                    : "new Set: SameValueZero dedupe";
+          reason = deduped === null
+            ? "new Set: object identity is unavailable for a jsx/arr/unknown cell"
+            : "new Set: SameValueZero dedupe";
         }
       } else { value = UNKNOWN_VALUE; reason = `new ${parent.expression.text} is not modelled`; }
       node = parent; continue;
     }
 
-    // Array.from(x) / Object.freeze(x), sole argument
     if (ts.isCallExpression(parent) && parent.arguments.length === 1 && parent.arguments[0] === node &&
         ts.isPropertyAccessExpression(parent.expression) && ts.isIdentifier(parent.expression.expression)) {
       const owner = parent.expression.expression.text;
       const member = parent.expression.name.text;
       if (owner === "Array" && member === "from") {
         value = value.kind === "EXACT" ? exact(value.cells, "array") : UNKNOWN_VALUE;
-        consumedEnd = parent.getEnd(); node = parent; reason = "Array.from: converted to an array"; continue;
+        take(parent); node = parent; reason = "Array.from: converted to an array"; continue;
       }
       if (owner === "Object" && member === "freeze") {
-        consumedEnd = parent.getEnd(); node = parent; reason = "Object.freeze: identity"; continue;
+        // B10 — the receiver-state continuation rule comes BEFORE freeze identity.
+        if (value.kind !== "EXACT") {
+          value = UNKNOWN_VALUE;
+          take(parent);
+          return { value, consumedStart, consumedEnd,
+                   reason: "Object.freeze over a non-exact receiver: continuation yields UNKNOWN" };
+        }
+        take(parent); node = parent; reason = "Object.freeze: identity over an exact value"; continue;
       }
     }
 
-    // a spread element inside an enclosing array literal
     if (ts.isSpreadElement(parent) && parent.parent !== undefined && ts.isArrayLiteralExpression(parent.parent)) {
       const enclosing = parent.parent;
       const folded: Cell[] = [];
@@ -742,50 +868,72 @@ function ownershipWalk(
         if (element === parent) {
           if (value.kind !== "EXACT") { ok = false; break; }
           folded.push(...value.cells);
-        } else if (ts.isSpreadElement(element)) { ok = false; break; }
-        else {
+        } else if (ts.isSpreadElement(element)) {
+          const sibling = siblingSpreadCells(element);      // B9 — fold exact sibling spreads, in order
+          if (sibling === null) { ok = false; break; }
+          folded.push(...sibling);
+        } else {
           const prim = literalPrim(element);
           if (prim.t === "unknown") { ok = false; break; }
           folded.push(prim);
         }
       }
       value = ok ? exact(folded) : UNKNOWN_VALUE;
-      consumedEnd = enclosing.getEnd(); node = enclosing;
-      reason = ok ? "spread folded into the enclosing array" : "spread: a sibling is not foldable";
+      take(enclosing); node = enclosing;
+      reason = ok ? "spread folded into the enclosing array, in order"
+                  : "spread: a sibling is not exact under the admitted grammar";
       continue;
     }
 
-    // the candidate is a plain element of an enclosing array literal -> an { arr } cell
     if (ts.isArrayLiteralExpression(parent) && parent.elements.some((e) => e === node)) {
       const cells: Cell[] = parent.elements.map((e) => (e === node ? { t: "arr", value } : literalPrim(e)));
-      value = exact(cells); consumedEnd = parent.getEnd(); node = parent;
+      value = exact(cells); take(parent); node = parent;
       reason = "nested as an { arr } cell of the enclosing array"; continue;
     }
 
-    // a destructuring declaration
     if (ts.isVariableDeclaration(parent) && parent.initializer === node && ts.isArrayBindingPattern(parent.name)) {
-      consumedEnd = parent.getEnd();
-      return { value: bindingValue(parent.name, value), consumedEnd, reason: "array binding pattern" };
+      take(parent);
+      const bound = bindingValue(parent.name, value);
+      return { value: bound.value, consumedStart, consumedEnd, reason: bound.reason };
     }
 
-    // any other CallExpression where the candidate is an ARGUMENT: the call result is not the argument
+    // AMENDMENT A1 — a decided scalar consumed in a boolean position ENDS the chain.
+    if (value.kind === "NOT_ARRAY" && isBooleanConsumption(parent, node)) {
+      take(parent);
+      return { value, consumedStart, consumedEnd,
+               reason: "terminal consumption: a decided scalar consumed in a boolean position (amendment A1)" };
+    }
+
     if (ts.isCallExpression(parent) && parent.arguments.some((a) => a === node)) {
-      return { value: UNKNOWN_VALUE, consumedEnd: parent.getEnd(),
+      take(parent);
+      return { value: UNKNOWN_VALUE, consumedStart, consumedEnd,
                reason: "the candidate is an argument to an unmodelled call" };
     }
 
-    return { value: UNKNOWN_VALUE, consumedEnd: parent.getEnd(), reason: "unmodelled owner" };
+    take(parent);
+    return { value: UNKNOWN_VALUE, consumedStart, consumedEnd, reason: "unmodelled owner" };
   }
 }
 
 /**
- * §3.16 R3 — positions counted over ALL elements including elisions; `...rest`
- * binds from its index; a non-rest binding binds that cell, opening `{ arr }`.
- * One candidate, one verdict: RULED if ANY bound output is ruled, else
- * UNDETERMINED if any is unknown, else OTHER.
+ * §3.16 R3 — array binding. B7: unsupported nested or defaulted binding forms
+ * are REJECTED to UNKNOWN before any output is classified. Elision offsets,
+ * nested `{arr}` extraction into a plain name and any-`RULED` aggregation are
+ * unchanged.
  */
-function bindingValue(pattern: ts.ArrayBindingPattern, value: Value): Value {
-  if (value.kind !== "EXACT") return UNKNOWN_VALUE;
+function bindingValue(pattern: ts.ArrayBindingPattern, value: Value): { value: Value; reason: string } {
+  for (const element of pattern.elements) {
+    if (ts.isOmittedExpression(element)) continue;
+    if (element.initializer !== undefined) {
+      return { value: UNKNOWN_VALUE, reason: "array binding: a defaulted binding element is not modelled" };
+    }
+    if (!ts.isIdentifier(element.name)) {
+      return { value: UNKNOWN_VALUE, reason: "array binding: a nested binding pattern is not modelled" };
+    }
+  }
+  if (value.kind !== "EXACT") {
+    return { value: UNKNOWN_VALUE, reason: "array binding over a non-exact value" };
+  }
   const cells = value.cells;
   const outputs: Value[] = [];
   pattern.elements.forEach((element, index) => {
@@ -795,13 +943,13 @@ function bindingValue(pattern: ts.ArrayBindingPattern, value: Value): Value {
     if (cell === undefined) { outputs.push(UNKNOWN_VALUE); return; }
     outputs.push(cell.t === "arr" ? cell.value : exact([cell]));
   });
-  if (outputs.length === 0) return UNKNOWN_VALUE;
-  if (outputs.some((o) => verdictOf(o) === "RULED")) {
-    return outputs.find((o) => verdictOf(o) === "RULED")!;
-  }
+  if (outputs.length === 0) return { value: UNKNOWN_VALUE, reason: "array binding with no bound name" };
+  const ruled = outputs.find((o) => verdictOf(o) === "RULED");
+  if (ruled !== undefined) return { value: ruled, reason: "array binding: a bound output is the ruled domain" };
   const unknown = outputs.find((o) => verdictOf(o) === "UNDETERMINED");
-  return unknown ?? outputs[0]!;
+  return { value: unknown ?? outputs[0]!, reason: "array binding: no bound output is the ruled domain" };
 }
+
 
 /**
  * Owners at which evaluation STOPS and the computed value is the bound value
@@ -824,12 +972,11 @@ function isTerminalOwner(parent: ts.Node | undefined): boolean {
  * ROUND-2 HISTORY: this function previously held the declared semantic stub
  * ("every operation and wrapper yields UNKNOWN, rule-1 precedence retained"),
  * whose RED frame is recorded in logs/t1-oracle-evaluator/r2/05-stub-RED.log.
- * It now delegates to the real walk.
  */
 function evaluateFrom(
   node: ts.ArrayLiteralExpression,
   file: ts.SourceFile
-): { value: Value; consumedEnd: number; reason: string } {
+): { value: Value; consumedStart: number; consumedEnd: number; reason: string } {
   return ownershipWalk(node, file);
 }
 
@@ -863,8 +1010,8 @@ export function evaluatedCandidatesOf(path: string, source: string): EvaluatedCa
                value: { kind: "EXACT", coll: "array", cells }, verdict: "RULED",
                reason: "rule 1: the candidate's own distinct set is the ruled domain" };
     }
-    const { value, consumedEnd, reason } = evaluateFrom(node, file);
-    return { ...candidate, consumedStart: candidate.start, consumedEnd, value,
+    const { value, consumedStart, consumedEnd, reason } = evaluateFrom(node, file);
+    return { ...candidate, consumedStart, consumedEnd, value,
              verdict: verdictOf(value), reason };
   });
 }
