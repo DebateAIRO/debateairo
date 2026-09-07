@@ -2146,3 +2146,26 @@ assert the element count before AND after (`399 -> 398`); the assertion is one l
 class of bug from a confusing parse error into a message that names the count.
 Recovery is `git checkout -- <files>` and redo; nothing is salvageable from a bad splice.
 Cost here: ~4 minutes, all of it spent reading a parse error that pointed at the wrong place.
+
+## A `grep` that finds nothing (exit 1) silently kills the rest of an `&&`-chained diagnostic script
+Found by lane/diag-class-a (2026-09-07) while sweeping producer files. A multi-section sweep written
+as `echo A && grep X && echo B && grep Y && echo C` printed sections A and B and then STOPPED — not
+because the remaining greps found nothing, but because the FIRST grep with no match exited 1 and the
+`&&` chain aborted. The output reads exactly like "the remaining patterns are absent from the tree",
+which is the opposite of what happened: they were never searched. In this lane the missing sections
+were "is `DEV_` ever an env var?" and "what do the `fixedStep` wrappers do?" — two questions whose
+false "no" would have put a wrong alphabet into a shipped source file.
+**Rule: join the sections of a diagnostic script with `;` or newlines, never `&&`.** `&&` is for
+"only if the previous step succeeded"; a grep's exit code is an ANSWER, not a failure. Where you do
+want the answer, capture it explicitly (`grep …; echo "rc=$?"`) rather than letting the shell branch
+on it. Cost here: ~3 minutes and one re-run, plus the near-miss of reading an aborted chain as evidence.
+
+## zsh expands `--include=*.ts` before `grep` sees it: `no matches found`
+Same lane, same day. `grep -rn "name" --include=*.ts .` fails in zsh with
+`(eval):1: no matches found: --include=*.ts` — zsh treats the `*.ts` inside the option as a glob to
+expand against the CURRENT directory and errors when nothing matches, so grep never runs. bash does
+not do this, so the idiom is copied in from bash notes and dies here. It is not a grep error and the
+message does not name grep.
+**Rule: quote the pattern in every `--include` / `--exclude`: `--include='*.ts'`.** Same for
+`--exclude-dir='node_modules'`. Cost here: ~1 minute, but the failure mode is worth knowing because
+the message blames the shell, not the command you were debugging.

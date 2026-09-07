@@ -106,6 +106,68 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       })
     }))).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_TLS_PUBLIC_READINESS_INVALID");
   });
+  /**
+   * F-DIAG-DEV-AUTH-STACK. The shape rule `/^DEV_[A-Z0-9_]+$/` forwards ANY
+   * message that merely LOOKS like a code. The landed pattern
+   * (`apps/api/src/risk-signal-identity.ts`) considered and rejected exactly
+   * that rule: "an uppercase-shaped message is still attacker- or
+   * driver-influenced text". The set below is written out independently here
+   * and is NOT imported from `dev-auth-stack.ts`; its producer audit is in
+   * agent-reports/diag-class-a.md.
+   */
+  it("refuses a message that is code-SHAPED but is not a known code", () => {
+    // Synthetic only (D18). Shape-legal for the old regex, absent from every producer.
+    const code = developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_TLS_FAILED", {
+      cause: new Error("DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER")
+    }));
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_UNRECOGNIZED");
+  });
+
+  it("returns the fixed fallback when the whole chain is code-shaped but unknown", () => {
+    const code = developmentAuthStackErrorCode(
+      new Error("DEV_SYNTHETIC_PW_42_LEAKED_FROM_A_DRIVER")
+    );
+
+    expect(code).not.toContain("SYNTHETIC_PW_42");
+    expect(code).toBe("DEV_UNRECOGNIZED");
+  });
+
+  it("control — a known chain still joins in the same order, to full depth", () => {
+    expect(developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_DATA_FAILED", {
+      cause: new Error("DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE", {
+        cause: new Error("DEV_AUTH_DATA_PLANE_DEPENDENCY_START_FAILED", {
+          cause: new Error("DEV_TLS_PORT_PROBE_TIMEOUT")
+        })
+      })
+    }))).toBe([
+      "DEV_AUTH_STACK_DATA_FAILED",
+      "DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE",
+      "DEV_AUTH_DATA_PLANE_DEPENDENCY_START_FAILED",
+      "DEV_TLS_PORT_PROBE_TIMEOUT"
+    ].join(":"));
+  });
+
+  it("control — the four-level walk still stops at four, and non-code links still fall away", () => {
+    expect(developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_API_FAILED", {
+      cause: new Error("not a code at all", {
+        cause: new Error("DEV_API_PROCESS_START_FAILED", {
+          cause: new Error("DEV_API_PROCESS_PROBE_TIMEOUT", {
+            cause: new Error("DEV_UI_PROCESS_EXITED")
+          })
+        })
+      })
+    }))).toBe("DEV_AUTH_STACK_API_FAILED:DEV_API_PROCESS_START_FAILED:DEV_API_PROCESS_PROBE_TIMEOUT");
+  });
+
+  it("control — a chain with no DEV-shaped message keeps the historical fallback", () => {
+    expect(developmentAuthStackErrorCode(new Error("plain failure", {
+      cause: new Error("another plain failure")
+    }))).toBe("DEV_AUTH_STACK_FAILED");
+    expect(developmentAuthStackErrorCode("not an error at all")).toBe("DEV_AUTH_STACK_FAILED");
+  });
+
   it("starts the exact attested chain and stops owned resources once in reverse order", async () => {
     const runtime = operations();
     const stack = await startDevelopmentAuthStack(runtime);

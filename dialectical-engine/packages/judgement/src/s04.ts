@@ -221,6 +221,52 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
   });
 }
 
+/**
+ * F-DIAG-S04-PANEL-NOTE — the bounded alphabet a panel note's `reason` is drawn from.
+ *
+ * The note is not a debug string. `apps/runner/src/index.ts:2695-2699` copies
+ * `reason` verbatim into `disagreement.panel.notes[]`, which is persisted and
+ * read back off a database row (`tests/integration/database.test.ts:3845`). The
+ * previous form forwarded `error.message` from the member's catch, so any text a
+ * provider, a driver or a parser put in a message reached storage — the same
+ * class as F-RISK-IDENTITY-LOG.
+ *
+ * What is bounded here is the OUTPUT ALPHABET, following the landed pattern in
+ * `apps/api/src/risk-signal-identity.ts`: every string this can return is either
+ * a member of the closed `PANEL_MEMBER_FAILURE_KINDS` list below or a literal
+ * declared right here. Nothing is derived from the caught value — no substring,
+ * no regex capture, no case transform. The caught value is only ever a LOOKUP
+ * KEY, and a key that misses becomes the fallback.
+ *
+ * Why the map is this small. `runJudgePanel` takes a caller-supplied
+ * `judge: () => Promise<...>`, so the type of what the catch receives is open
+ * (`unknown`), and the router's shape rule for an open key set is to redact
+ * wholesale rather than to enumerate. The one TYPED producer on the path is
+ * `PanelMemberFailure` (`packages/judgement/src/index.ts:499,505,510,513,514`),
+ * whose `failureKind` is already the closed vocabulary — so it becomes the
+ * reason. The two codes below are the only other constants with a producer that
+ * can reach this catch un-converted: `ProviderCallFailedError` and
+ * `ProviderContentUnacceptedError` (`packages/providers/src/index.ts:53,69`),
+ * both `TypedDomainError`s whose `code` is a fixed literal. `assess()` converts
+ * both today, so they are listed for a caller that wires a judge closure
+ * straight to `provider.call` — enumerating a subset of a typed vocabulary is
+ * how a re-routed rejection silently degrades to the fallback.
+ */
+const UNCLASSIFIED_MEMBER_ERROR = "UNCLASSIFIED_MEMBER_ERROR";
+
+const MEMBER_FAILURE_CODES: ReadonlyMap<string, string> = new Map([
+  ["PROVIDER_CALL_FAILED", "PROVIDER_CALL_FAILED"],
+  ["PROVIDER_CONTENT_UNACCEPTED", "PROVIDER_CONTENT_UNACCEPTED"]
+]);
+
+function boundedMemberFailureReason(error: unknown): string {
+  if (error instanceof PanelMemberFailure) return error.failureKind;
+  if (!(error instanceof Error)) return UNCLASSIFIED_MEMBER_ERROR;
+  const code = (error as { readonly code?: unknown }).code;
+  if (typeof code !== "string") return UNCLASSIFIED_MEMBER_ERROR;
+  return MEMBER_FAILURE_CODES.get(code) ?? UNCLASSIFIED_MEMBER_ERROR;
+}
+
 export async function runJudgePanel(input: {
   readonly artifactProducerRef: string;
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
@@ -242,7 +288,7 @@ export async function runJudgePanel(input: {
         contractHash: member.contractHash,
         kind: "MEMBER_FAILED",
         failureKind: error instanceof PanelMemberFailure ? error.failureKind : "PROVIDER_ERROR",
-        reason: error instanceof Error ? error.message : String(error)
+        reason: boundedMemberFailureReason(error)
       });
     }
   }

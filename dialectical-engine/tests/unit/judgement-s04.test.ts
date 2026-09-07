@@ -251,3 +251,103 @@ describe("DR-077 / FX-S22-01 / FX-PT-D1 — selection, disagreement and no defau
     })).toThrow("outside spec §12.3");
   });
 });
+
+/**
+ * F-DIAG-S04-PANEL-NOTE — the note's `reason` is drawn from a BOUNDED alphabet.
+ *
+ * The note is not a debug string: `apps/runner/src/index.ts:2695-2699` copies
+ * `reason` into `disagreement.panel.notes[]`, which is persisted and read back
+ * from a database row (`tests/integration/database.test.ts:3845`). A raw caught
+ * message therefore lands in storage. Same class as F-RISK-IDENTITY-LOG.
+ *
+ * The expected alphabet below is written out HERE, independently, and is NOT
+ * imported from `s04.ts` — a stored list re-exported by the thing under test is
+ * not an independent derivation (codex's qualification on the landed pattern).
+ * Its producer audit is in agent-reports/diag-class-a.md.
+ */
+const EXPECTED_PANEL_NOTE_REASONS = [
+  // the closed PanelMemberFailure vocabulary, forwarded as the note's reason
+  "CONSTRUCTION_ERROR", "TIMEOUT", "PROVIDER_ERROR", "PARSE_FAILURE",
+  "SCHEMA_FAILURE", "UNCONFIGURED_FAMILY", "PRODUCER_GRADING_FORBIDDEN",
+  // typed provider codes that can arrive un-converted on a caller-wired judge
+  "PROVIDER_CALL_FAILED", "PROVIDER_CONTENT_UNACCEPTED",
+  // the fixed fallback, and the pre-existing self-grading constant
+  "UNCLASSIFIED_MEMBER_ERROR", "FX-HR-H6"
+] as const;
+
+describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught message", () => {
+  // Synthetic only (D18): no value here is, or resembles, a real credential.
+  const SYNTHETIC_SENSITIVE =
+    "connect failed for postgres://asker:synthetic-pw-42@10.0.0.4:5432/debate (asker=synthetic.person@example.invalid)";
+
+  const panelWith = (judge: () => Promise<{ judgementRef: string; assessment: JudgeAssessment }>) =>
+    runJudgePanel({
+      artifactProducerRef: "actor:producer",
+      primary: { judgementRef: "judgement:primary", assessment: assessment(), memberRole: "primary" },
+      members: [{ memberRole: "critic-a", actorRef: "actor:critic-a", contractHash: "contract:a", judge }]
+    });
+
+  it("bounds the reason when an untyped member error carries sensitive text", async () => {
+    const result = await panelWith(async () => { throw new Error(SYNTHETIC_SENSITIVE); });
+
+    const note = result.notes[0]!;
+    expect(note.kind).toBe("MEMBER_FAILED");
+    // The property: nothing DERIVED from the caught value reaches the note. Not a
+    // redaction of known-bad substrings — a closed output alphabet.
+    expect(EXPECTED_PANEL_NOTE_REASONS).toContain(note.reason);
+    expect(note.reason).not.toContain("synthetic-pw-42");
+    expect(note.reason).not.toContain("postgres://");
+    expect(note.reason).not.toContain("example.invalid");
+    expect(note.reason).toBe("UNCLASSIFIED_MEMBER_ERROR");
+  });
+
+  it("bounds the reason for a non-Error throw", async () => {
+    const result = await panelWith(async () => { throw SYNTHETIC_SENSITIVE; });
+
+    const note = result.notes[0]!;
+    expect(EXPECTED_PANEL_NOTE_REASONS).toContain(note.reason);
+    expect(note.reason).not.toContain("synthetic-pw-42");
+  });
+
+  it("control — a PanelMemberFailure still lands its kind, and the kind becomes the reason", async () => {
+    for (const kind of ["TIMEOUT", "PARSE_FAILURE", "SCHEMA_FAILURE", "PROVIDER_ERROR"] as const) {
+      const result = await panelWith(async () => {
+        throw new PanelMemberFailure(kind, SYNTHETIC_SENSITIVE);
+      });
+
+      const note = result.notes[0]!;
+      expect(note.failureKind).toBe(kind);
+      expect(note.reason).toBe(kind);
+      expect(note.reason).not.toContain("synthetic-pw-42");
+    }
+  });
+
+  it("control — the producer's own refused seat keeps its existing bounded reason", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "actor:producer",
+      primary: { judgementRef: "judgement:primary", assessment: assessment(), memberRole: "primary" },
+      members: [{
+        memberRole: "producer", actorRef: "actor:producer", contractHash: "contract:self",
+        judge: async () => { throw new Error(SYNTHETIC_SENSITIVE); }
+      }]
+    });
+
+    expect(result.notes[0]!).toMatchObject({
+      kind: "PRODUCER_GRADING_FORBIDDEN",
+      failureKind: "PRODUCER_GRADING_FORBIDDEN",
+      reason: "FX-HR-H6"
+    });
+  });
+
+  it("maps a typed provider code that reaches the catch un-converted", async () => {
+    class ProviderCallFailedStub extends Error {
+      readonly code = "PROVIDER_CALL_FAILED";
+      constructor() { super(SYNTHETIC_SENSITIVE); this.name = "TypedDomainError"; }
+    }
+    const result = await panelWith(async () => { throw new ProviderCallFailedStub(); });
+
+    const note = result.notes[0]!;
+    expect(note.reason).toBe("PROVIDER_CALL_FAILED");
+    expect(note.reason).not.toContain("synthetic-pw-42");
+  });
+});
