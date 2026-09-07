@@ -146,7 +146,7 @@ export class SessionService implements SessionApplication {
   private constructor(private readonly dependencies: Readonly<{
     repository: SessionRepository;
     riskSignals:SessionRiskSignals;
-    onRiskSignalFailure:()=>void;
+    onRiskSignalFailure:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     authPolicy: AuthPolicy;
@@ -163,7 +163,7 @@ export class SessionService implements SessionApplication {
   static async create(dependencies: Readonly<{
     repository: SessionRepository;
     riskSignals:SessionRiskSignals;
-    onRiskSignalFailure:()=>void;
+    onRiskSignalFailure:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     authPolicy: AuthPolicy;
@@ -436,7 +436,7 @@ export class SessionService implements SessionApplication {
           tokenHash:material.sessionTokenHash,bindingHash,kind:"LOGIN_SUCCESS",source
         });
         if(recorded!=="recorded") throw new TypeError("LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED");
-      }catch{this.dependencies.onRiskSignalFailure();}
+      }catch(error){this.dependencies.onRiskSignalFailure(error);}
       this.limiter.clearEnrollment(rateKey);
       return Object.freeze({
         status: "authenticated" as const,

@@ -1908,3 +1908,86 @@ a line count, or just regenerate the file from its source rather than trimming i
 ## zsh has no `$PIPESTATUS` — a logged `exit=` with an empty value is this trap, not a missing exit (orchestrator, 2026-09-07)
 
 `cmd | tail -3; echo "exit=${PIPESTATUS[0]}"` prints `exit=` under zsh (the array is `$pipestatus`, lowercase, in zsh; `PIPESTATUS` is bash). A provisioning log written this way showed `exit=` for both steps, and a worker packet that gated on "`exit=0` for both steps" became unpassable on a healthy lane (the seat read it literally and charged the packet). Either run the command unpiped and read `$?`, or use `${pipestatus[1]}` (zsh is 1-indexed) — and never gate a seat on a value you have not seen in the file.
+
+## Lane lane/sessions-argon2 appends carried across the dev merge (2026-09-07; union, nothing removed)
+
+## A fixture pinned to a fixed CALENDAR DATE dies on a date, and blames the wrong thing (lane/sessions-argon2, 2026-09-07)
+`tests/integration/session-database.test.ts` fixed `now` at `2026-08-23T10:00:00Z` and injected
+it as the service clock. The session policy's idle TTL is 14 days, so the login created a session
+with idle expiry `2026-09-06T10:00:00Z`. The risk-signal scope query does NOT use that injected
+clock: `identity.prepare_authentication_risk_signal_for_session` (migrations/0046:83) filters on
+`clock_timestamp()`, the DATABASE clock. From 2026-09-06T10:00Z the session was already expired
+at the database, the scope resolved to no row, and the login failed. Nothing in the diff changed;
+the date did. The test had passed for weeks and would have passed on any earlier day.
+Two things to take from it:
+- **An injected clock only covers the code that reads it.** The moment an assertion path crosses
+  into SQL, `clock_timestamp()` / `now()` is a SECOND clock the fixture does not control. Grep the
+  functions your assertion path calls for `clock_timestamp` before you pin a date. The repair is
+  to read the time from the pool (`SELECT (extract(epoch FROM clock_timestamp())*1000)::bigint`)
+  and keep every advance relative to it — not to widen a policy and not to sleep.
+- **The failing test's NAME sent two seats after the wrong cause.** This one is titled "runs the
+  password-to-TOTP challenge through real Argon2 …", so the first diagnosis was a native Argon2
+  binding on this machine, and it was pursued as far as removing the alias from both manifests and
+  node_modules. Argon2 was in the title, not in the mechanism. A date-dependent failure looks
+  exactly like an environment-dependent one — both are "fails here, passed there". Before you
+  reach for the environment, check whether the fixture names an absolute date.
+## Fixing a DISCARDED error makes the failure readable, and is itself pinned by nothing (lane/sessions-argon2, 2026-09-07)
+`apps/api/src/sessions.ts:439` and `apps/api/src/recovery.ts:84` were `}catch{onRiskSignalFailure();}`
+— the failure was observable, its cause was not, which is why the fixture defect above could only
+be attributed by experiment instead of by reading a log. Passing the caught error to the callback
+turned `UNEXPECTED_RISK_SIGNAL_FAILURE` into `UNEXPECTED_RISK_SIGNAL_FAILURE (TypeError:
+LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED)` and named the cause in one run.
+The trap is what happens NEXT. Once the underlying defect is fixed, the catch is not entered on a
+healthy tip, so the mutant that re-discards the error (`}catch{onRiskSignalFailure();}`) SURVIVES:
+measured here at `11 passed (11)` on the whole session file, and `3 passed (3)` on
+`tests/unit/p2-recovery-start.test.ts` for the recovery half. A diagnostic improvement is invisible
+to a green suite by construction — the only test that can pin it is one that deliberately drives
+the failure path and asserts on what the callback RECEIVED. If you add one, add it in the same
+round; a diagnostic with no pin is one refactor away from being discarded again.
+Also worth knowing when you sweep this class: search for the SHAPE, not the keyword. On the tree
+BEFORE this fix, `grep -rnE "catch *\{" apps packages` returned 134 sites, most of them legitimate
+control flow (`try{JSON.parse(x)}catch{return null}` and the like) — too coarse to be a class. The
+shape that loses a cause is a bare catch whose body is a ZERO-ARGUMENT notifier call:
+`grep -rnE "catch *\{[^}]*\(\) *;? *\}" apps packages` returned exactly 3 — `sessions.ts:439`,
+`recovery.ts:84`, and `packages/db/src/auth-risk.ts:212` (`}catch{poisoned();}`). After this fix the
+same two greps return 132 and 1, the one remaining being auth-risk.ts:212, which replaces a
+decrypt/parse cause with a fixed `AUTH_RISK_SIGNAL_POISONED` and is still open (it is in
+`packages/`, outside this lane's contract).
+## FOLLOW-UP to the entry above: the pin was cheap, and the reason I thought it wasn't (lane/sessions-argon2 r1, 2026-09-07)
+The entry above ends "if you add one, add it in the same round". I did not, and codex returned
+CHANGES with that as the blocking finding. Correcting the record, because the numbers in it are
+round-0 state: B1/B2 are now **KILLED**, not surviving (`logs/sessions-argon2/14-mut-B1-killed.log`,
+`15-mut-B2-killed.log`), by two new failure-path cases per service.
+The useful part is WHY I skipped it. I believed pinning `sessions.ts`'s catch meant duplicating the
+81-line Argon2 worker-pool fixture from `tests/integration/session-database.test.ts` into a file
+that has to stay green three runs running. That was wrong, and checkable in two minutes:
+- `completeLogin`'s **TOTP branch** reaches the risk-signal catch using `decrypt` (AES-GCM) and
+  `matchTotpStep` (HMAC) only. Argon2 appears on the **recovery-code** branch (`verifyRecoveryCode`)
+  and in `SessionService.create` — and `create` hashes a dummy password ONLY when you omit
+  `dummyPasswordHash`. Pass a syntactically valid argon2id string (`parseEncodedArgon2id` parses it
+  before `verifyPassword` delegates) and a stub `Argon2Executor`, and no Argon2 runs at all.
+- So the pin is a plain unit test with small stubs: two cases, 19 ms and 2 ms.
+Two transferable tricks from writing it:
+- **Capture the binding hash from the service, don't re-derive it.** `beginLogin` computes
+  `bindingHash` and hands it to `repository.createLoginChallenge`; capture it there and feed it back
+  through the `readLoginChallenge` stub. Re-deriving the HMAC in the test duplicates production
+  logic and would let a change to that derivation pass silently.
+- **`dekStore.load` must return a FRESH copy each call** (`Buffer.from(dek)`): `totpStep` zeroes the
+  buffer it is handed in its `finally`, so a shared buffer decrypts once and then fails.
+And the estimating lesson, which is the real one: **before declining work because it is expensive,
+measure the cost.** I let an unchecked estimate decide, and the estimate was wrong by an order of
+magnitude. A sentence of the form "I did not do X because X is expensive" needs a number in it.
+## A stub that is never reached looks exactly like a stub that carries the case (lane/sessions-argon2 r1, 2026-09-07)
+I claimed `tests/unit/p2-recovery-start.test.ts`'s second case exercised the risk-signal catch in
+`recovery.ts`, and cited its line numbers. It exercises nothing: that case's `repository.start()`
+throws `DATABASE_UNAVAILABLE`, and the catch sits inside `if(outcome.status==="created")`, so the
+block is unreachable and the `recordForRecovery` stub below it is dead code. The stub is right
+there in the source, three lines under the thing that makes it unreachable.
+The tell was already in my own evidence: the mutant on that catch survived at `3 passed (3)`. I read
+that as "no assertion on the delivered value" when it equally meant "this code never runs" — one
+measurement, two possible conclusions, and I recorded only the smaller one. When a mutant on a
+branch survives, rule out "the branch is never entered" BEFORE concluding "the assertion is weak";
+they need different fixes and only one of them is a missing assertion.
+State coverage as the BRANCH a test enters, never as the stub it supplies. "This case drives the
+`status==="created"` path into the catch" is falsifiable by reading one `if`; "this case supplies a
+scope_unresolved recorder" is not a claim about coverage at all.
