@@ -1904,3 +1904,45 @@ that silently reports nothing while looking like it reported something. (W3 r4)
 `head -n -12 file` fails with `head: illegal line count -- -12` rather than trimming the tail.
 GNU head supports the negative form; the macOS one does not. Use `sed '$d'` repeatedly, awk with
 a line count, or just regenerate the file from its source rather than trimming it. (W3 r4)
+## A fixture pinned to a fixed CALENDAR DATE dies on a date, and blames the wrong thing (lane/sessions-argon2, 2026-09-07)
+`tests/integration/session-database.test.ts` fixed `now` at `2026-08-23T10:00:00Z` and injected
+it as the service clock. The session policy's idle TTL is 14 days, so the login created a session
+with idle expiry `2026-09-06T10:00:00Z`. The risk-signal scope query does NOT use that injected
+clock: `identity.prepare_authentication_risk_signal_for_session` (migrations/0046:83) filters on
+`clock_timestamp()`, the DATABASE clock. From 2026-09-06T10:00Z the session was already expired
+at the database, the scope resolved to no row, and the login failed. Nothing in the diff changed;
+the date did. The test had passed for weeks and would have passed on any earlier day.
+Two things to take from it:
+- **An injected clock only covers the code that reads it.** The moment an assertion path crosses
+  into SQL, `clock_timestamp()` / `now()` is a SECOND clock the fixture does not control. Grep the
+  functions your assertion path calls for `clock_timestamp` before you pin a date. The repair is
+  to read the time from the pool (`SELECT (extract(epoch FROM clock_timestamp())*1000)::bigint`)
+  and keep every advance relative to it — not to widen a policy and not to sleep.
+- **The failing test's NAME sent two seats after the wrong cause.** This one is titled "runs the
+  password-to-TOTP challenge through real Argon2 …", so the first diagnosis was a native Argon2
+  binding on this machine, and it was pursued as far as removing the alias from both manifests and
+  node_modules. Argon2 was in the title, not in the mechanism. A date-dependent failure looks
+  exactly like an environment-dependent one — both are "fails here, passed there". Before you
+  reach for the environment, check whether the fixture names an absolute date.
+## Fixing a DISCARDED error makes the failure readable, and is itself pinned by nothing (lane/sessions-argon2, 2026-09-07)
+`apps/api/src/sessions.ts:439` and `apps/api/src/recovery.ts:84` were `}catch{onRiskSignalFailure();}`
+— the failure was observable, its cause was not, which is why the fixture defect above could only
+be attributed by experiment instead of by reading a log. Passing the caught error to the callback
+turned `UNEXPECTED_RISK_SIGNAL_FAILURE` into `UNEXPECTED_RISK_SIGNAL_FAILURE (TypeError:
+LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED)` and named the cause in one run.
+The trap is what happens NEXT. Once the underlying defect is fixed, the catch is not entered on a
+healthy tip, so the mutant that re-discards the error (`}catch{onRiskSignalFailure();}`) SURVIVES:
+measured here at `11 passed (11)` on the whole session file, and `3 passed (3)` on
+`tests/unit/p2-recovery-start.test.ts` for the recovery half. A diagnostic improvement is invisible
+to a green suite by construction — the only test that can pin it is one that deliberately drives
+the failure path and asserts on what the callback RECEIVED. If you add one, add it in the same
+round; a diagnostic with no pin is one refactor away from being discarded again.
+Also worth knowing when you sweep this class: search for the SHAPE, not the keyword. On the tree
+BEFORE this fix, `grep -rnE "catch *\{" apps packages` returned 134 sites, most of them legitimate
+control flow (`try{JSON.parse(x)}catch{return null}` and the like) — too coarse to be a class. The
+shape that loses a cause is a bare catch whose body is a ZERO-ARGUMENT notifier call:
+`grep -rnE "catch *\{[^}]*\(\) *;? *\}" apps packages` returned exactly 3 — `sessions.ts:439`,
+`recovery.ts:84`, and `packages/db/src/auth-risk.ts:212` (`}catch{poisoned();}`). After this fix the
+same two greps return 132 and 1, the one remaining being auth-risk.ts:212, which replaces a
+decrypt/parse cause with a fixed `AUTH_RISK_SIGNAL_POISONED` and is still open (it is in
+`packages/`, outside this lane's contract).
