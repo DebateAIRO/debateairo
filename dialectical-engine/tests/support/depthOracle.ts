@@ -770,10 +770,27 @@ function conditionContextOwner(node: ts.Node): ts.Node | undefined {
  *
  * Anything outside the admitted compositions yields UNKNOWN.
  */
+type Member = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+
+/** Shared by upward ownership and downward operand evaluation (§3.18 R4). */
+function memberName(member: Member): string | null {
+  return ts.isPropertyAccessExpression(member) ? member.name.text
+    : ts.isStringLiteral(member.argumentExpression) ? member.argumentExpression.text : null;
+}
+
+function memberInvocation(member: Member, owner: ts.Node): ts.CallExpression | undefined {
+  const call = member.parent;
+  return member.expression === owner && call !== undefined && ts.isCallExpression(call) && call.expression === member
+    ? call : undefined;
+}
+
 function valueOfExpression(node: ts.Expression, depth = 0): Value {
   if (depth > 32) return UNKNOWN_VALUE;
   if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) {
     return valueOfExpression(node.expression, depth + 1);
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.CommaToken) {
+    return valueOfExpression(node.right, depth + 1);
   }
   if (ts.isArrayLiteralExpression(node)) {
     const cells: Cell[] = [];
@@ -797,22 +814,30 @@ function valueOfExpression(node: ts.Expression, depth = 0): Value {
     const deduped = dedupeSameValueZero(inner.cells);
     return deduped === null ? UNKNOWN_VALUE : exact(deduped, "set");
   }
-  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+  if (ts.isCallExpression(node) &&
+      (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression))) {
     const member = node.expression;
     const owner = member.expression;
-    if (ts.isIdentifier(owner) && owner.text === "Array" && member.name.text === "from" && node.arguments.length === 1) {
+    const call = memberInvocation(member, owner);
+    const name = memberName(member);
+    if (call !== node || name === null) return UNKNOWN_VALUE;
+    if (ts.isPropertyAccessExpression(member) && ts.isIdentifier(owner) && owner.text === "Array" && name === "from" && node.arguments.length === 1) {
       const inner = valueOfExpression(node.arguments[0]!, depth + 1);
       return inner.kind === "EXACT" ? exact(inner.cells, "array") : UNKNOWN_VALUE;
     }
-    if (ts.isIdentifier(owner) && owner.text === "Object" && member.name.text === "freeze" && node.arguments.length === 1) {
+    if (ts.isPropertyAccessExpression(member) && ts.isIdentifier(owner) && owner.text === "Object" && name === "freeze" && node.arguments.length === 1) {
       const inner = valueOfExpression(node.arguments[0]!, depth + 1);
       return inner.kind === "EXACT" ? inner : UNKNOWN_VALUE;
     }
     // a modelled member invocation on an evaluable receiver
-    return applyMember(valueOfExpression(owner, depth + 1), member.name.text, node);
+    return applyMember(valueOfExpression(owner, depth + 1), name, call);
   }
-  if (ts.isPropertyAccessExpression(node)) {
-    return applyMember(valueOfExpression(node.expression, depth + 1), node.name.text, undefined);
+  if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+    const receiver = valueOfExpression(node.expression, depth + 1);
+    const name = memberName(node);
+    if (name !== null) return applyMember(receiver, name, undefined);
+    return ts.isElementAccessExpression(node) && integerArg(node.argumentExpression) !== null && receiver.kind === "EXACT"
+      ? elementReturn(receiver.cells) : UNKNOWN_VALUE;
   }
   return UNKNOWN_VALUE;
 }
@@ -858,11 +883,8 @@ function ownershipWalk(
     }
 
     if ((ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node) {
-      const name = ts.isPropertyAccessExpression(parent)
-        ? parent.name.text
-        : (ts.isStringLiteral(parent.argumentExpression) ? parent.argumentExpression.text : null);
-      const grand: ts.Node | undefined = parent.parent;
-      const call = grand !== undefined && ts.isCallExpression(grand) && grand.expression === parent ? grand : undefined;
+      const name = memberName(parent);
+      const call = memberInvocation(parent, node);
       if (name === null) {
         const numericIndex = ts.isElementAccessExpression(parent) && integerArg(parent.argumentExpression) !== null;
         value = numericIndex && value.kind === "EXACT" ? elementReturn(value.cells) : UNKNOWN_VALUE;
