@@ -80,11 +80,21 @@ export function CookieConsent() {
    * **It is PER-OPEN state, and `openCard` resets it.** The flag has to be false
    * at the start of every open, and closing the POLICY is not the only way it
    * gets there: the CARD can be closed while the policy still stands over it —
-   * by the card's own backdrop, and by `Save choices` — and both routes unmount
-   * the card and the policy element together while this component stays mounted,
-   * stranding the flag at `true`. The next open would then render the policy over
-   * a card the visitor opened fresh (CODE-REV-S01-C6 r1 **B1**, measured; both
-   * routes are pinned in `tests/render/consent-policy-link.test.tsx`).
+   * by the card's own backdrop, and by EITHER footer control that settles it —
+   * and every such route unmounts the card and the policy element together while
+   * this component stays mounted, stranding the flag at `true`. The next open
+   * would then render the policy over a card the visitor opened fresh
+   * (CODE-REV-S01-C6 r1 **B1**, measured).
+   *
+   * **The list above is a CLASS, not an enumeration, and the reset is at the one
+   * entry point for exactly that reason:** every route that closes the card
+   * leaves this flag false at the next open, whether or not anyone has written
+   * that route down. An earlier version of this comment named two routes as if
+   * they were the whole set and missed `Essential only`
+   * (`CookiePreferencesCard.tsx:196`), which settles the card from the same
+   * footer (CODE-REV-S01-C6 r2 **N8**). The whole closing surface is driven in
+   * `tests/render/consent-policy-link.test.tsx`, which also pins the footer's
+   * control set so a fourth route cannot be added unnoticed.
    *
    * An earlier version of this comment argued the reset was unreachable because
    * the policy's scrim "covers every control of the card". That is a CSS claim,

@@ -496,6 +496,103 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(openSurfaceCount(), "and one surface on the stack").toBe(1);
   });
 
+  it("opens a CLEAN card after EVERY route that closes it under an open policy", () => {
+    // PROPERTY (CODE-REV-S01-C6 r2 **N7**, the CLASS the two cases above sample):
+    // the reset lives at the ONE entry point — `openCard` — so a card opened
+    // afresh carries no policy WHATEVER closed the previous one. The two cases
+    // above pin two route INSTANCES, and an invariant whose fix is a single
+    // entry point cannot be netted route by route: the reviewer's counterfeit
+    // mutant **MR-E** (the reset deleted from `openCard` and written instead
+    // into `dismiss` and into the `onSave` lambda) scores full marks against
+    // both of them and strands the flag on the third route.
+    //
+    // The third route is `Essential only` (`CookiePreferencesCard.tsx:196`): it
+    // calls `onEssentialOnly` -> `settle` DIRECTLY, never through the `onSave`
+    // lambda, so a per-route fix written for `Save choices` does not reach it.
+    //
+    // So this case asserts the property over the WHOLE closing surface, in two
+    // halves, and the second is worthless without the first:
+    //   1. it pins the card footer's control set on every open, so a FOURTH
+    //      control cannot appear without this case naming it; and
+    //   2. it drives every route that closes the CARD from under an open policy
+    //      — the scrim and the two footer controls that settle — and requires a
+    //      clean reopen after each.
+    //
+    // Escape is deliberately NOT one of those routes and that is a measured
+    // fact, not an omission: with the policy open the policy is the topmost
+    // surface and consumes the keystroke ("moves the visitor exactly ONE
+    // surface per Escape", above), so Escape never closes the card from under a
+    // standing policy. It is used here only to return to a closed card between
+    // routes, by the exact path the CONTROL case above already pins as clean.
+    const stored = JSON.stringify({
+      v: 1,
+      essential: true,
+      quality: true,
+      analytics: false,
+      decidedAt: "2026-03-03T00:00:00.000Z"
+    });
+    // The Settings entry over a valid decision: no bar ever appears, so ONE
+    // opener (`Cookie preferences`) serves every route unchanged and the three
+    // iterations differ in nothing but the route under test.
+    localStorage.setItem(CONSENT_KEY, stored);
+    mountSettings();
+
+    const routes: { name: string; close: () => void }[] = [
+      {
+        name: "the card's own scrim",
+        close: (): void => {
+          const scrim = document.querySelector<HTMLElement>(".consentScrim")!;
+          act(() => scrim.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+        }
+      },
+      // Both footer controls are clicked WITHOUT focusing them, unlike
+      // `activate`: the point is that they settle the card from BEHIND the
+      // policy. Nothing in this lane's stylesheet covers them — a line-scan of
+      // `globals.css` for a `.policy*` selector returns nothing at all.
+      {
+        name: "Essential only",
+        close: (): void => act(() => labelled("Essential only").click())
+      },
+      {
+        name: "Save choices",
+        close: (): void => act(() => labelled("Save choices").click())
+      }
+    ];
+
+    for (const route of routes) {
+      activate(labelled("Cookie preferences"));
+      expect(card(), `${route.name}: the card is open`).not.toBeNull();
+      expect(
+        [...document.querySelectorAll<HTMLButtonElement>(".consentCardFooter button")].map(
+          (control) => control.textContent?.trim()
+        ),
+        `${route.name}: the card footer's controls, in DOM order`
+      ).toEqual(["Privacy notice", "Essential only", "Save choices"]);
+
+      activate(labelled("Privacy notice"));
+      expect(policy(), `${route.name}: the policy stands over the card`).not.toBeNull();
+      expect(dialogs().length, `${route.name}: two dialogs while both stand`).toBe(2);
+
+      route.close();
+
+      expect(card(), `${route.name}: closed the CARD from under the open policy`).toBeNull();
+      expect(policy(), `${route.name}: the policy element unmounted with it`).toBeNull();
+
+      activate(labelled("Cookie preferences"));
+
+      expect(card(), `${route.name}: the card opens again`).not.toBeNull();
+      expect(
+        policy(),
+        `${route.name}: and it is CLEAN — no policy the visitor did not ask for`
+      ).toBeNull();
+      expect(dialogs().length, `${route.name}: exactly one dialog on the fresh card`).toBe(1);
+      expect(openSurfaceCount(), `${route.name}: one surface on the stack`).toBe(1);
+
+      press("Escape");
+      expect(card(), `${route.name}: closed again before the next route`).toBeNull();
+    }
+  });
+
   it("closes the card on a backdrop click through the shared helper, and not on a click inside it", () => {
     // PROPERTY (S01-R14/R18, S01-S41): the backdrop route is
     // `backdropCloseHandler(scrim, onClose)` — it closes only when the click landed
