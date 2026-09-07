@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { ExpansionDepthSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
+import { SERVE_LEG } from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
@@ -35,7 +36,7 @@ export const BATTERY_BUDGET_CONTRACTS = Object.freeze(
 );
 
 /**
- * T17 (DR-184-v3): the run head's basis carries the four call-site legs and the
+ * T17 (DR-184-v4): the run head's basis carries the four call-site legs and the
  * serve chain it was minted against, so an audit of a stored receipt can see
  * WHICH topology the run was admitted under. The schema is strict on purpose —
  * a DR-184-v2 basis, which counted no panel leg, is REFUSED loudly here rather
@@ -58,14 +59,16 @@ const costEnvelopeBasisSchema = z.object({
     reviewer: z.number().int().min(0),
     serve: z.number().int().positive()
   }).strict(),
+  /**
+   * F-T17T9-3: the leg has ONE arm. The composition chain is retired, so its
+   * three fields are gone from the receipt rather than carried unbilled, and
+   * `.strict()` makes a receipt that re-introduces them fail loudly. `selected`
+   * survives as the discriminator: it is `SERVE_LEG.chain`, READ from the
+   * constructor's package, so a pre-T9 basis naming COMPOSITION is refused.
+   */
   serve_leg: z.object({
-    composition_sites: z.number().int().positive(),
-    /** Per ROUND: composer + one conformance per segment. */
-    composition_sites_per_round: z.number().int().positive(),
-    /** Per RUN: post-compose R9, outside the recompose loop. */
-    post_compose_sites_per_run: z.number().int().positive(),
     synthesis_loop_sites: z.number().int().positive(),
-    selected: z.enum(["COMPOSITION", "SYNTHESIS_LOOP"])
+    selected: z.literal(SERVE_LEG.chain)
   }).strict(),
   hold_cap: z.number().int().positive(),
   final_retry_attempts: z.number().int().positive(),
@@ -73,65 +76,39 @@ const costEnvelopeBasisSchema = z.object({
   bounds_source_ref: z.string().trim().min(1)
 }).strict().superRefine((basis, ctx) => {
   /**
-   * S09B: the split receipt was accepted in CONTRADICTORY forms. The serve leg
-   * is disclosed twice — once as the selected site count (`call_sites.serve`)
-   * and once as the arms it was chosen from (`serve_leg`) — and nothing made
-   * them agree, so a basis could name a COMPOSITION arm of 7 while billing 6
-   * serve sites, or split 7 into halves that sum to something else.
+   * S09B: the serve leg is disclosed TWICE — once as the billed site count
+   * (`call_sites.serve`) and once as the arm it was read from (`serve_leg`) —
+   * and nothing made them agree, so a basis could bill a count its own
+   * disclosed leg did not support.
+   *
+   * The check is KEPT and its RULE is no longer restated here. Before
+   * F-T17T9-3 this block re-typed the constructor's two decisions
+   * (`max(composition, synthesis)` and the `>=` tie policy) as independent
+   * guards; they were faithful, and they made the rule unchangeable one file
+   * at a time — correcting the constructor produced bases this parser refused
+   * at the run head. It now READS the rule from `SERVE_LEG`, so the receipt is
+   * still checked against the constructor's rule and the two cannot drift.
+   *
+   * The tie policy and the larger-arm guard are GONE rather than relaxed:
+   * with one arm there is nothing to select between, and the retired arm can no
+   * longer appear on a receipt at all (the schema above is strict).
+   *
+   * WHAT THIS CHECKS, EXACTLY (codex r1 F4). Three things: the receipt's SHAPE
+   * (the strict schema above), the CHAIN IDENTITY (`selected` must be
+   * `SERVE_LEG.chain`), and the internal CONSISTENCY of the two disclosures
+   * (`call_sites.serve` must equal the leg it discloses). It does NOT prove that
+   * an accepted receipt is one the constructor would have minted: the other
+   * legs — author, panel, reviewer — and `max_model_attempts` are read as
+   * disclosed, and nothing here recomputes them from panel size and depth. A
+   * receipt with a self-consistent serve leg and a wrong author count parses.
    */
-  const { composition_sites, composition_sites_per_round, post_compose_sites_per_run,
-    synthesis_loop_sites, selected } = basis.serve_leg;
-  const selectedArm = selected === "COMPOSITION" ? composition_sites : synthesis_loop_sites;
-  if (basis.call_sites.serve !== selectedArm) {
+  const billed = SERVE_LEG.billed(basis.serve_leg);
+  if (basis.call_sites.serve !== billed) {
     ctx.addIssue({
       code: "custom",
       path: ["call_sites", "serve"],
-      message: `serve call sites ${basis.call_sites.serve} disagree with the ${selected} arm ${selectedArm}`
-    });
-  }
-  /**
-   * T17B/B2 — the check above compares serve against whichever arm THE RECEIPT
-   * nominated, so it can never ask whether that nomination is the one the
-   * constructor would have made. A receipt naming the SMALLER arm satisfied it
-   * and parsed: serve 6 against a 6-site synthesis arm, while a 7-site
-   * composition arm sat beside it and the constructor would have billed seven
-   * and selected COMPOSITION. The persisted receipt then claimed the opposite
-   * topology and a smaller ceiling leg than the run was actually admitted under.
-   *
-   * These two guards restate the constructor's own two decisions, and they are
-   * INDEPENDENT of the one above rather than a restatement of it:
-   *   `serveSites = Math.max(compositionSites, synthesisLoopSites)`
-   *   `selected   = compositionSites >= synthesisLoopSites ? COMPOSITION : ...`
-   *
-   * The second is load-bearing precisely at a TIE, where both arms are the
-   * larger arm and neither the count check nor the larger-arm check can
-   * distinguish the nominations — only the `>=` policy can.
-   */
-  const largerArm = Math.max(composition_sites, synthesis_loop_sites);
-  if (basis.call_sites.serve !== largerArm) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["call_sites", "serve"],
-      message: `serve call sites ${basis.call_sites.serve} are not the larger arm ${largerArm}`
-    });
-  }
-  const tiePolicySelection = composition_sites >= synthesis_loop_sites ? "COMPOSITION" : "SYNTHESIS_LOOP";
-  if (selected !== tiePolicySelection) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["serve_leg", "selected"],
-      message: `selected ${selected} disagrees with the constructor tie policy ${tiePolicySelection}`
-    });
-  }
-  // The composition arm must equal its own disclosed decomposition for SOME
-  // whole number of rounds: per-round sites x rounds, plus the per-run organ.
-  const roundedSites = composition_sites - post_compose_sites_per_run;
-  if (roundedSites <= 0 || roundedSites % composition_sites_per_round !== 0) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["serve_leg", "composition_sites"],
-      message: `composition sites ${composition_sites} are not ${composition_sites_per_round} per round `
-        + `plus ${post_compose_sites_per_run} per run`
+      message: `serve call sites ${basis.call_sites.serve} disagree with the `
+        + `${basis.serve_leg.selected} arm ${billed}`
     });
   }
 });
@@ -140,6 +117,11 @@ export interface CostEnvelopeBasis {
   readonly maxModelAttempts: number;
   readonly panelSize: number;
   readonly depth: number;
+  /** The serve leg the receipt discloses, so a reader need not re-parse it. */
+  readonly serveLeg: {
+    readonly synthesisLoopSites: number;
+    readonly selected: typeof SERVE_LEG.chain;
+  };
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -171,6 +153,10 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
     maxModelAttempts: parsed.data.max_model_attempts,
     panelSize: parsed.data.panel_size,
     depth: parsed.data.depth,
+    serveLeg: Object.freeze({
+      synthesisLoopSites: parsed.data.serve_leg.synthesis_loop_sites,
+      selected: parsed.data.serve_leg.selected
+    }),
     wire: Object.freeze(parsed.data)
   });
 }
