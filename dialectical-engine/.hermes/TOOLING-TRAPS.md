@@ -1317,6 +1317,597 @@ lane's blob had added the six-slot code array that tripped an incoming oracle.
 checking the blob before writing it down.
 (algorithm-live-loop, W5 dev-sync r3)
 
+## A receipt's PRODUCER and its PARSER restate the same invariant in two packages
+Found by T17T9-3 (2026-09-05). `computeStructuralCeilingBasis`
+(`packages/register/src/index.ts`) decides two things about the serve leg —
+`serveSites = max(compositionSites, synthesisLoopSites)` and
+`selected = compositionSites >= synthesisLoopSites ? COMPOSITION : SYNTHESIS_LOOP`.
+`parseCostEnvelopeBasis` (`packages/budget/src/index.ts`) re-derives BOTH from the
+persisted receipt and rejects any basis that disagrees — deliberately, and its
+comment says so: "These two guards restate the constructor's own two decisions,
+and they are INDEPENDENT of the one above." **A ticket scoped to the producer
+therefore cannot change the producer's decision at all**: the parser refuses
+every receipt the new producer would mint, and the refusal surfaces at the run
+head, not at compile time. Cost here: the whole ticket, blocked at the contract
+boundary. **Before scoping a lane to a value-producing function, grep for a
+parser/validator that re-derives its invariants and put it in the same contract.**
+The cheap probe is 12 lines — build the basis the new rule would mint, feed it to
+the parser, read the rejection — and it is worth running BEFORE the design, not
+after. (algorithm-live-loop, T17T9-3)
+
+## zsh eats an unquoted `--include=*.ts`, and reports it as "no matches found"
+Found by T17T9-3 (2026-09-05). `grep -rn "pattern" DIR --include=*.ts` fails in
+zsh with `(eval):2: no matches found: --include=*.ts` — zsh tries to glob the
+flag's value against the CWD before grep ever runs, and there are no `.ts` files
+next to a report directory. The message names the flag, not the search, so it
+reads like a grep problem. Quote it: `--include='*.ts'`. Same shape as the
+already-recorded macOS `awk`/`rg` traps: the harness's shell is zsh, not bash.
+Cost: one wasted call per occurrence. (algorithm-live-loop, T17T9-3)
+
+## An induced experiment can produce the right SYMPTOM by the wrong PATH
+Found by T17T9-3's B1 evidence round (2026-09-05). A probe shortened one queue deadline to force a
+timeout; the run failed with the expected label and a clean tip/parent parity table, and the write-up
+called the mechanism proven. It was not: the override only moved the SHARED default (18 000 ms), while
+the reservations that mattered were registration calls carrying their own explicit 28 000 ms deadline
+(`apps/api/src/registration.ts:1073` reads `request.waitDeadlineMs ?? channel...`, and `:1394` supplies
+the registration value). The wrong population expired, an earlier gate became unsatisfiable, and the
+episode under investigation was never entered. **The tell was in the probe's own output — 28.1 s
+creation→rejection against a "1.5 s" override — and nobody read it because the summary line agreed
+with the hypothesis.** After any induced experiment, check that the mechanism you INTENDED is the one
+that fired: compare the observed latency against the deadline you think you set, and confirm the run
+REACHED the phase you are studying rather than failing before it. A parity table produced by the wrong
+path is more expensive than no experiment, because it looks like proof. Cost: one full review round.
+(algorithm-live-loop, T17T9-3 B1)
+
+## Load generators that spawn processes cannot be combined with a fixed burner count
+Found by T17T9-3's B1 evidence round (2026-09-05). Four concurrent vitest integration suites (each
+spawning workers plus an embedded PostgreSQL) sat at loadavg ~8. Adding 12 CPU burners took the same
+machine to **188**, and the subject test never started. The suites' own parallelism multiplies with
+the burners rather than adding to them, so "N burners" is not a dial you can turn while another
+process pool is running. Calibrate contention with ONE model, and measure a cheap latency-vs-load
+curve before spending full test runs bisecting blind. Related: a repo on OneDrive gets an uncontrolled
+third load source — `OneDrive`/`FileProvider` reindexing after test churn held a core at 100 % and
+drove loadavg past 100 on its own. (algorithm-live-loop, T17T9-3 B1)
+
+
+## Appended 2026-09-07 by the orchestrator (D70): this machine's uncommitted trap appends (2026-09-01 → 09-07), captured before the dev merges, unioned here in order
+
+- `codex exec resume` accepts only a SUBSET of `codex exec` flags: `-s`/`--add-dir` are
+  rejected ("unexpected argument"). Pass sandbox via config keys instead:
+  `-c sandbox_mode="workspace-write" -c 'sandbox_workspace_write.writable_roots=[...]'`.
+  Also resume's session lookup is cwd-filtered — `cd` into the seat's worktree first (or
+  `--all`). (algorithm-correctness; one dead relaunch)
+- Codex workspace-write sandbox DENIES pnpm's `~/Library/pnpm/.tools` mkdir, local tsx
+  is absent in fresh worktrees (no install), and Corepack is not installed: dynamic
+  verification dies three ways before one assertion runs. Declare static-only in the
+  packet, or hand the seat a verification command proven to run in that sandbox.
+  (algorithm-correctness; 6–8 min, zero dynamic evidence)
+- `pnpm run typecheck`, `pnpm test`, and the acceptance ceremony ALL die on a fresh/synced
+  checkout because `packages/contract/generated/` (gitignored build output of
+  `generate:contract`, which only `build` runs) is absent: 157 tsc errors, 83 dead test
+  files, ceremony ERR_MODULE_NOT_FOUND — one cause. Provision worktrees with install AND
+  generate:contract. (algorithm-live-loop T0; three suite runs spent proving it)
+- `git check-ignore <dir>` on a directory that DOES NOT EXIST YET can report not-ignored
+  even when the .gitignore rule is real — verify at file level after the dir exists.
+  (algorithm-live-loop; one wrong "tree defect" alarm)
+- Acceptance relay binaries are HARDCODED absolute paths from a developer machine
+  (claude-relay.ts:27, grok-relay.ts:12) — no PATH lookup, no env override: any other host
+  discovers a 1-maker panel and FAIR-01 fails. TREL lane adds ACCEPTANCE_*_BINARY
+  overrides. (algorithm-live-loop T0; one ceremony attempt spent for zero provider cost)
+- A background launcher ending in `|| echo FAIL` converts every failure into exit 0 — the
+  completion notification lies. End launchers with the real command (let the exit code
+  propagate) and verify the marker LINE in the output, not the exit line.
+  (algorithm-live-loop orchestrator; one silently dead install, caught by path audit)
+- An "unidentified" background shell with an EMPTY output file is not a zombie when its
+  command redirects output into files — and subagent-spawned shells appear in the parent
+  orchestrator's task list. Decode the command preview BEFORE any TaskStop; killing by id
+  without identification is killing by name in disguise. (algorithm-live-loop
+  orchestrator; killed a live seat's test run ~1 min in)
+- Process cleanup keyed on a WORKTREE PATH (`pgrep -f "lane-x.*vitest"`) is unsafe: under
+  judge-stage/batched suites, a lane worktree is no longer exclusively its worker's, and
+  in an in-process agent fleet EVERY seat's shell shares one ancestor (the orchestrator
+  session PID) — ancestry cannot discriminate seats. Identify by the direct parent
+  shell's command/cwd, and when in doubt, don't kill. (algorithm-live-loop T1 seat;
+  correctly declined to "clean up" a run its own handoff depended on)
+- `git merge` in a FRESHLY-ADDED worktree under OneDrive can die with a bare
+  `fatal: stash failed` (merge internally runs `git stash create` while the sync storm
+  from checkout is still settling). Nothing is wrong with the branches: wait a beat and
+  retry; the same merge then completes. GIT_TRACE=1 is what names the internal stash
+  call. (algorithm-live-loop orchestrator; two "failed" merges that were fine)
+- OneDrive also FLIPS EXECUTABLE BITS (644→755) on random source files; with
+  core.fileMode=true git reports them modified and `merge` aborts on "local changes".
+  Diagnose with `git diff --stat` (0 insertions/0 deletions but files listed = mode-only;
+  the diff header shows old/new mode); cure with `git checkout -- <paths>` after proving
+  content-identity. Never `reset --hard` on reflex. (algorithm-live-loop orchestrator;
+  one blocked flagship merge)
+- vitest 4 **removed `--reporter=basic`**. Passing it is not a warning: the run dies in
+  startup with `Failed to load custom Reporter from basic` / `ERR_LOAD_URL`, ~40 lines of
+  Vite module-runner stack and NO test output, which reads like a broken test file. Use
+  the default reporter. (algorithm-live-loop T8; one wasted RED run)
+- The zsh no-word-splitting trap has a SECOND face that fails SILENTLY-GREEN-ADJACENT:
+  `FILES="a.test.ts b.test.ts"; npx vitest run $FILES` passes the whole string as ONE
+  filter, and vitest answers `No test files found, exiting with code 1` — an exit 1 that
+  looks like a test failure, and a `grep 'Tests '` over the log finds nothing, so a
+  three-run loop can print three empty verdicts and be mistaken for three green runs.
+  Use an array: `F=(a b); npx vitest run "${F[@]}"`. (algorithm-live-loop T8; one wasted
+  three-run cluster loop)
+- Restoring a worker's own edits with `git checkout HEAD -- <path>` DESTROYS them — HEAD
+  is the base, not your work. To run a suite against the unmodified base mid-lane:
+  `git diff > work.patch`, move UNTRACKED artifacts aside too (they survive the checkout
+  and silently contaminate the "base" run), `git checkout HEAD -- <dirs>`, run, then
+  `git apply work.patch` and prove restoration with `diff -q work.patch <(git diff)` —
+  porcelain alone only proves files are dirty, not that they are dirty in the right way.
+  (algorithm-live-loop T8; used five times, zero loss)
+- Root `pnpm run typecheck` passing is NOT evidence that a shared CONTRACT change is safe:
+  tsconfig.json:20 excludes web/ and apps/ui, so narrowing a zod discriminated union can
+  leave both Next apps with dead branches typed `never` while root typecheck exits 0.
+  D14's workspace-local gates are the only thing that sees it — run them whenever you
+  change a schema those apps consume, not only when you edit their files.
+  (algorithm-live-loop T8; 5 real errors invisible to the root gate)
+## `git diff <sha> -- <path>` is silent AND exit 0 when the pathspec matches nothing (F-TINT1-7, 2026-09-01)
+"Empty diff output" is not a byte-identity proof: a mistyped or moved path yields the same
+empty output and the same exit 0 as a genuine no-change, and `--exit-code` does not help.
+A packet that makes "prints nothing" the success criterion has written a check that cannot
+fail. Cure: precede it with `git ls-tree --name-only <sha> -- <path>` (must print the path)
+and compare two INDEPENDENT hashes (`git show <sha>:<path> | shasum -a 256` vs
+`shasum -a 256 <path>`). Drafted by the TINT1 seat; appended by the orchestrator (F32b).
+## `codex exec resume` rejects `--sandbox` after the subcommand (exit 2, usage text) (2026-09-01)
+`codex exec resume --last --sandbox workspace-write …` fails instantly with the usage line
+`Usage: codex exec resume --last --model <MODEL> [SESSION_ID] [PROMPT]`. `--sandbox` is an
+`exec`-level option: place it BEFORE `resume` (`codex exec --sandbox workspace-write
+resume --last -m <model> -c key=value "<prompt>"`); `-c`/`-m` are accepted on either side.
+A launcher with a fresh-`exec` fallback hides this (the review still runs, but as a NEW
+session — the lane's prior-round context is lost). Verify `RESUME FAILED` is absent from
+the log before trusting that a round was reviewed in-session. Drafted by the orchestrator.
+## zsh again: `for f in $files` over a multi-line variable runs ONCE (2026-09-01, orchestrator)
+Same class as the vitest-filter word-splitting trap, second bite: under zsh an unquoted
+`$files` holding newline-separated paths is ONE word, so the loop ran a single vitest
+invocation with a 21-line argument (exit 1, no summary, "DONE" printed anyway). Cure: write
+the list to a file and `while IFS= read -r f; do …; done < list`, or `setopt shwordsplit`,
+or run the launcher under `bash`. Print the per-file line INSIDE the loop and count the
+lines afterwards — a launcher whose "DONE" cannot fail is the same defect as `|| echo FAIL`.
+## CORRECTION to the resume trap above: `-c sandbox_workspace_write.writable_roots` before `resume` is NOT honored (2026-09-02 00:05)
+`codex exec --sandbox workspace-write -c 'sandbox_workspace_write.writable_roots=[…]' resume --last …`
+resumes the session (no usage error) but the resumed turn's patch to the extra root is
+"rejected: writing outside of the project" — the review ran ~40 min and its verdict
+survived only in the log. Until a working resume form is proven by a successful out-of-tree
+write, use a FRESH `codex exec` (all `-c` after `exec`) for every codex round and hand the
+prior round's verdict path in the packet instead of relying on session memory. Verify every
+codex launcher by the verdict FILE's existence, never by exit 0 (exit was 0 here).
+## OneDrive exec-bit flips get COMMITTED, not just seen (T6 codex r2 N3, 2026-09-02)
+The flip trap has a second bite: a seat that `git add -A`s after OneDrive flips a source file
+to 755 commits `mode 100644 -> 100755` on a .ts file inside its real change. Cure, two layers:
+(1) `git config core.fileMode false` in every worktree on this OneDrive path (set by the
+orchestrator on integration + lane-t6/t7/s06/s07/s08 at 00:4x on 2026-09-02) so flips are
+invisible to status/diff/add; (2) before filing, `git diff --summary <base>..HEAD | grep -c
+"mode change"` must print 0 — quote it. An already-committed flip is reverted with
+`git update-index --chmod=-x <path>` + a mode-only commit (content diff 0/0).
+- `cmd 2>&1 > file` sends **stderr to the terminal and stdout to the file** — the exact
+  opposite of `cmd > file 2>&1`. vitest prints its FAIL blocks on **stderr**, so a base-run
+  log captured that way contains the summary and NONE of the failures; a base-vs-head
+  failure diff then reports "0 baseline failures" and every head failure looks like yours.
+  Always `> file 2>&1`, and sanity-check the base log with `grep -c "^ FAIL "` before
+  trusting a comparison. (algorithm-live-loop S06; one 7-minute zone re-run)
+- A mutant can be **accidentally equivalent**, and a green suite then reads exactly like a
+  test gap — the reflex is to go weaken the test that was never wrong. Two examples from
+  one campaign: a rung hoisted above another but guarded on the condition that made the
+  hoist unreachable; a register value replaced by a default while the loud stop that
+  refuses before reading it was left in place. Before touching a test because a mutant
+  survived, ask "is this mutation observable at the seam at all?" and record the
+  non-discriminating mutant rather than deleting it. (algorithm-live-loop S06)
+- D24's transcript shape (token grep 0 → 1 → 0) presumes the mutation ADDS a token. For a
+  DELETION mutant the counts read 1 → absent → 1 and look like a violation. Shape deletion
+  mutants as a replacement with a MARKED constant (`/* MUTANT_X_REMOVED */`) so the marker
+  is added and the counts read in the intended direction. (algorithm-live-loop S06)
+- OneDrive's 644 → 755 flip rides into COMMITS, and setting `core.fileMode=false` afterwards
+  hides it from `git status` while leaving it in the history. The only check that sees it is
+  `git diff --summary <base>..HEAD | grep -c "mode change"` (must be 0). Cure without
+  touching content: `git update-index --chmod=-x <paths>` + a mode-only commit, proven by
+  that commit's own `--stat` reading `0 insertions(+), 0 deletions(-)`.
+  (algorithm-live-loop S06; two files, caught only by the coordinator's check)
+- A mutant harness that restores with `git checkout HEAD -- <path>` **destroys uncommitted
+  work** and leaves porcelain clean, which is exactly what a correct restore looks like. It
+  encodes an unchecked invariant — *HEAD is my work* — that holds only if you commit before
+  every mutant. Make the harness refuse a dirty tree, or snapshot the file itself (`cp` out,
+  `cp` back) instead of trusting git. (algorithm-live-loop S06 r2; deleted a blocking fix
+  mid-round, caught only because the next grep came back 0)
+## zsh word-splitting, fourth bite: a test-name filter built in a variable (S08 seat, 2026-09-02)
+Drafted by the S08 seat, appended by the orchestrator (F32b — seats may not write this file).
+Building a vitest `-t` filter or a file list in a shell variable and passing it unquoted under
+zsh collapses it into one word, so the command runs against a filter that matches nothing and
+reports a green run over zero tests. Cure: pass the filter as a single quoted argument, or
+write the list to a file and read it with `while IFS= read -r`. Always assert the reported test
+COUNT, not just the exit code — a run of zero tests exits 0.
+## vitest's ` FAIL ` lines are not a usable oracle from captured output (S09 seat, 2026-09-02)
+Drafted by the S09 seat, appended by the orchestrator (F32b). Grepping captured vitest output
+for ` FAIL ` returned zero matches for every mutant while the `Tests N failed` summary was
+correct, which made a whole mutation campaign report NOT_CAUGHT and nearly filed that as
+evidence. Cure: classify from the `Tests N failed | M passed` summary, or from the JSON
+reporter; if you parse per-test lines (` FAIL ` or the `×` marker), assert that the number of
+parsed names EQUALS the summary count and refuse to classify when they disagree — otherwise a
+zero-match parse looks exactly like a clean run. The mission's own D15 launcher was hardened
+this way on the same day.
+## A mutant gate that cannot tell "violated" from "my measurement is broken" (2026-09-02, S07)
+Two independent bugs in one D24 harness, and BOTH looked exactly like a real
+violation, so all ten mutants aborted on a clean tree:
+(1) `grep -F -c "$MULTILINE"` treats the pattern as MANY patterns and counts lines
+matching ANY of them — a pre-count of 214 on a file containing the token zero times.
+(2) `PRE=$(grep -F -c "$TOK" file || echo 0)` produces the string `"0\n0"` when grep
+matches nothing (grep prints `0` AND exits 1, so the fallback appends a second `0`);
+`[ "$PRE" -eq 0 ]` then errors and the gate fails closed.
+Cures: pass an explicit SINGLE-LINE token (the marker comment inside the mutation —
+D24 ADDENDUM's "the token is NEW" is satisfied by a marker carried by NEW, and the
+full (OLD,NEW) pair is still recorded as the mutation diff); and write
+`count() { grep -F -c -- "$1" "$2" 2>/dev/null | head -1 || printf '0'; }` so the
+fallback can never concatenate onto a real answer. Cost: one whole campaign run.
+Generalisation: before trusting a gate that ABORTS, prove it aborts on a real
+violation AND passes on a known-clean input — an abort-only gate is untested.
+## A provider double that dispatches by RESPONSE CLASS silently serves the wrong organ (2026-09-02, S07)
+`tests/integration/database.test.ts`'s `startProviderDouble` classifies each scripted
+response (`"statement"`→JUDGE, `"segments"`→COMPOSE, `"conforms"`→CONFORMANCE …) and
+picks the first PENDING entry whose class matches the REQUEST. Introduce a new organ
+without adding its class and the request falls to `GENERAL`, whose branch pops
+`pending[0]` — so the new organ is handed a JUDGEMENT and dies on its own schema, in a
+fixture whose subject is something else entirely. The failure reads like a product bug
+(a Zod error naming your new fields) and is a queue-routing bug. When you add an organ,
+add BOTH halves: a response discriminator and a request discriminator, and order the
+request checks so a more specific prompt is tested before a more general one.
+(Found while retiring the CONFORMANCE and post-compose-R9 organs for T9.)
+## A substring-counting mutant gate miscounts a 4-space fragment inside its 8-space twin (S08 seat, 2026-09-02)
+Drafted by the S08 seat, appended by the orchestrator. A mutation harness that counts OLD-text
+occurrences by substring will read an indented fragment as occurring inside a more deeply
+indented copy of itself, so the gate aborts with "OLD text occurs 2 times" — which is the gate
+working, but only by luck: without it the campaign would have mutated the wrong arm and credited
+the kill to another lane's code. Cure: match on the full line including its exact leading
+whitespace, or anchor the pattern; and keep the abort — the same gate caught a neighbour mutant
+whose own construction was broken (a dropped `.length`), which was fixed in the mutant, not in
+the test.
+## A vitest `-t` filter is part of the assertion, and a wrong one reports green over nothing (S07 seat, 2026-09-02)
+Drafted by the S07 seat, appended by the orchestrator. Running `vitest -t "at claim"` to check a
+new arm matched a pre-existing test plus an unrelated arm and never executed the new one, so the
+green looked like proof the reasoning was wrong. The correct filter produced the real failure.
+Cure: after any filtered run, assert the NUMBER of tests the filter matched (vitest prints it),
+and prefer naming the file plus the exact full test title over a substring. A filter that matches
+zero of the tests you meant is indistinguishable from a pass.
+## `grep -cF "$MULTILINE"` counts lines matching ANY line of the pattern (S08 seat, 2026-09-02)
+Drafted by the S08 seat, appended by the orchestrator. A multi-line token passed to `grep -cF`
+is treated as a set of alternative line patterns, so a file containing merely one of its lines
+reports a non-zero count — a mutation gate reading "the NEW token is already present" in a file
+that does not contain it. The mission's own tools/mutate.sh had this defect and now counts
+substring occurrences in python instead. Related limit, same source: a substitution that
+interpolates the replacement cannot carry `$ @ \ /` in either half; fit the token to the tool and
+say so, rather than editing the tool mid-campaign.
+## grep's `--include=*.ts` dies unquoted in zsh (T6B seat, F-T6B-2; the orchestrator hit it the same day)
+`grep -rn "X" --include=*.ts path/` fails with `(eval):3: no matches found: --include=*.ts` because
+zsh expands the bare glob BEFORE grep sees it, and with no matching file in the CWD it aborts the
+whole command. It is not a grep error and the message names the wrong culprit. Quote it —
+`--include='*.ts'` — or drop it and filter with a second grep. Same family as the other four
+word-splitting bites already listed here: in this harness the shell edits your command before the
+tool does.
+Cost: one wasted round trip each time, and it looks like a missing file rather than a quoting bug,
+so the natural next move is to go hunting for the file.
+## A mutant transcript with EXIT 127 is counted as a KILL by the index (S11 seat, 2026-09-02)
+Appended by the S11 seat under D32. Building the discriminating command in a shell variable and
+passing it unquoted (`... "$OUT" $T`) is the zsh no-word-splitting bite in its fourth shape: zsh
+hands the whole string to `mutate.sh` as ONE argv entry, the binary is never found, and every
+transcript records `EXIT = 127`. Every gate inside `mutate.sh` still passes — pre-count 0,
+applied 1, restored 0, hashes match, porcelain empty — because those gates are about the
+MUTATION, and the mutation was flawless. `tools/mutant-index.sh` then classified all eight as
+`THREW` and printed `exit-nonzero(killed)=8 · exit-zero(survived)=0`: a perfect campaign that
+never ran a single test. Caught only by reading `EXIT` in the index, never by a check.
+Cures, both cheap: (1) pass the test command as SEPARATE argv words, never as one variable —
+`run() { mutate.sh "$L" "$2" "$3" "$4" "$OUT" ./node_modules/.bin/vitest run <file>; }`;
+(2) exit 126/127 is `MEASUREMENT-BROKEN`, never a kill, and the TALLY should refuse to print
+while any transcript carries one. Same class as the S07 entry above — a gate that cannot tell
+"violated" from "my measurement is broken" — so this is its SECOND occurrence in the index rather
+than in the harness. Cost: one entire campaign.
+## Never edit a shell script while another process may be executing it
+bash does NOT read a script into memory up front — it reads incrementally, seeking by byte
+offset as it goes. Rewriting the file underneath a running instance makes it resume at the old
+offset in the new bytes: it executes a fragment of a line, or silently skips a block, and the
+failure looks like a logic bug in the script rather than what it is. The mission's shared tools
+(`gate-run.sh`, `stamp-check.sh`, `mutate.sh`) are executed BY SEATS, concurrently and without
+announcement, so any orchestrator edit to one is a live-patch of code another process is
+running.
+RULE: before amending a shared tool, confirm no seat is mid-gate; otherwise queue the change
+until the run lands. Writing a NEW file (a `.py` alongside, a `v3` name) is always safe; editing
+in place is not. Held a version-stamp change to `gate-run.sh` for exactly this reason on
+2026-09-02 while a seat was running its merge gates.
+## A counter that silently drops entries AGREES with the pin, and reads as confirmation (T9B seat)
+The T9B seat's first mark-counter returned 33 by dropping four identifiers containing underscores
+from its pattern. Integration's pin is 33. So the broken counter produced the EXPECTED number and
+would have been filed as a successful cross-check; the true merged count is 37. The seat caught it
+only by self-testing the counter against a deletion and an empty file first.
+This is the D56 shape at its most dangerous: a check that is wrong in the direction of agreement.
+A disagreeing check gets investigated; an agreeing one gets cited. When a counter, grep or filter
+reproduces a number you already expected, that is the moment to test it against a known-bad input
+— not the moment to relax.
+Routed by the orchestrator: the seat could not write this file, correctly, as it is outside its
+allowed list.
+## zsh does NOT word-split unquoted parameter expansions — the root cause of two false campaigns
+Diagnosed by the T9B seat after being caught twice by the SAME mechanism in different clothes.
+In bash, `cmd $VAR` with `VAR="a b c"` passes THREE arguments. **In zsh it passes ONE** — the whole
+string, spaces included. So:
+ · `$U` holding three log paths arrived as a single argument matching no file;
+ · `$4` holding `… -t producer` arrived as one argument, so vitest's file filter matched NOTHING,
+   the run selected zero tests, exited 1, and EVERY mutant — including both neighbours that were
+   supposed to survive — scored as KILLED.
+Both times the run "worked": a command ran, an exit code came back, transcripts were written. The
+campaign read 6/6 and was entirely fictional. **Both times the expected manifest caught it, not
+the seat and not the orchestrator.** This is also the same family as the `--include=*.ts` entry
+above: in this shell the argument list you think you wrote is not the one the tool receives.
+FIX: quote every expansion (`"$U"`), or build an explicit array and expand with `"${arr[@]}"`.
+And note the deeper lesson, which is not about quoting: a filter that matches nothing does not
+announce itself. `vitest -t nothing` exits 0 on some paths and 1 on others, and either way it
+proves NOTHING about the code. Any campaign or gate driven by a filter must assert the COUNT of
+tests it selected, not merely the exit code.
+## stamp-check.sh takes a PREFIX, not a glob — an expanded glob silently checks ONE file
+Found by the lane/sealedrows seat, 2026-09-03. Verified by reading `tools/stamp-check.sh:12-16`.
+Its contract is `stamp-check.sh <lane-worktree> <log-glob-prefix>` and it iterates
+`for f in "$PREFIX"*`. Pass an UNQUOTED glob and the shell expands it first, so `$2` becomes only
+the first matching file and `"$PREFIX"*` then matches that one file alone:
+# WRONG — checks r4-d16-ui-base.log and nothing else
+tools/stamp-check.sh .worktrees/lane-t6 $M/logs/t06/r4-*.log
+  records compared: 1 · failures: 0        # reads as a pass over 21 records
+# RIGHT — the prefix, quoted
+tools/stamp-check.sh .worktrees/lane-t6 "$M/logs/t06/r4-"
+The tool's own zero-match refusal does not catch this: one file is not zero files, so the guard
+that was built to reject an empty result passes a result of one. **`records compared: N` must be
+read against the number of records you expected**, every time.
+This is the same failure the D41/D45 stamping rules exist to prevent, arriving through the
+comparator instead of the producer, and it is plausibly how the T6 r4 provenance gap
+(F-T6B-1) went unnoticed.
+## `git diff --stat` hides untracked files — a new test file is invisible in the count
+Found by the lane/sealedrows seat, 2026-09-04, after it reported `221 insertions` where the truth
+was `527`. The 306-line gap was two ADDED test files, still untracked when the statistic was taken.
+git diff --stat <base>..HEAD        # tracked modifications only
+git status --porcelain              # the '??' rows are the ones the stat above cannot see
+The orchestrator then copied that number into a reviewer packet constant, which its own contract
+requires it to re-read from source at packet-write time. Codex caught it (P1). **A diff statistic
+taken over a working tree is not a handoff constant — derive it from committed tips, or add the
+untracked files first.**
+## A mutation driver that classifies on EXIT STATUS scores an aborted mutation as a kill
+Found by the same seat, same day, in its own driver — caught by a mismatched restore column, not
+by the gate. `mutate.sh` refuses at its pre-gate when the NEW token is already present in the
+file, and exits non-zero. A driver reading "non-zero means the test failed" records that abort as
+a KILLED mutant: a mutation that never ran, scored as evidence that it was caught.
+**Classify on whether the GATE actually applied, never on exit status** — this is D46/D50's rule
+arriving through a hand-rolled driver rather than through `mutant-index.py`. Retain the aborted
+run as its own transcript instead of dropping it; a NOT-RUN row is a finding, and a missing row is
+a silence.
+## `git checkout <base> -- <paths>` rejects the WHOLE command when any pathspec is absent at base
+Found by the lane/sealedrows seat, 2026-09-04, while proving a failure pre-existed the lane. It
+ran `git checkout <base> -- <paths>` to revert its files to the base tree, then ran the test and
+printed `AT BASE: 1 failed`. **Nothing had been reverted.** Three of the lane's test files are NEW
+— absent at base — and git rejects the entire checkout when any single pathspec does not match,
+exiting non-zero without touching the files that DO exist. A script that does not check the exit
+status, or checks it and continues, reports a base-tree result from the lane tree.
+The seat caught it only because the line above said `porcelain lines: 0` where the revert should
+have produced twelve. **A base-tree comparison must gate on the porcelain count the revert is
+expected to produce, not on the checkout's silence.** Better: build the base comparison in a
+separate worktree at the base tip, where there is nothing to revert and nothing to restore.
+This is the same shape as the stamp-check prefix trap — a tool doing less than asked while looking
+like it did the whole job — arriving through git instead of a mission script.
+## A set-equality key that truncates can MERGE two failures — and hide a new one behind a known one
+Found 2026-09-05 diagnosing why D15 batch b12 refused a verdict (`summary says 48 failed; parsed
+47 names`). The classifier's key normalised each failure name and then cut it at 120 characters.
+Two NEW t16 failures — `…leaves a base-shaped sealed dev v4 byte-identical…` and `…leaves a
+base-shaped sealed acceptance v1 byte-identical…` — are identical up to character 120 and differ
+only after it. The key merged them; 48 became 47; the refusal guard fired.
+The refusal was the tool working. The hazard is the case where it would NOT fire: a NEW failure
+whose first 120 characters match a KNOWN-RED name is keyed onto the known one, counted once, and
+the set comparison reports "no new failure" while one landed. Long vitest names with a shared
+describe-block prefix make this likely, not rare.
+**A key used for set equality must be injective over the names it will see.** Use the full
+normalised name, or a hash of it — never a prefix. The classifier is now `tools/d15-classify.py`
+(D60), keyed on the full name, standalone so a filed log can be re-classified without re-running.
+Suite-level `FAIL path [ path ]` lines are counted separately and never as tests: a suite that
+could not load has tests that never ran, and they are not in the count.
+**Second half of the same trap, found fixing the first.** The v1 classifier scoped the authority
+with hard-coded line numbers (`t0[187:210]`, `t0[213:231]`), which happened to be right. The
+replacement's first version parsed the WHOLE baseline file — and `t00-baseline.md` retains the
+pre-provisioning r1 record as a later h1 section under D9. Result: the authority grew from 23+5
+to 28+7, and both b11 and b12 reported five tests as VANISHED that provisioning had fixed and
+that were never in the baseline of record. **A retained historical section is data for humans
+and poison for a parser that does not know where the current record ends.** Anchor on the
+heading, stop at the next h1, and refuse on an empty parse. Confirmed by regression: b11 back
+to exactly its original verdict.
+## zsh: `grep --include=*.ts` dies before grep ever runs
+Found by lane/h-diag (F-SEALEDROWS-H, 2026-09-05). `grep -rn PATTERN . --include=*.ts` fails
+with `(eval):2: no matches found: --include=*.ts` — zsh tries to GLOB the unquoted `*.ts`
+against the current directory, finds no `.ts` file there, and aborts the command. grep is never
+invoked, so the failure looks like a grep error and is not one. Nothing is searched, and a seat
+reading the message as "no matches" concludes the symbol is absent when it was never looked for.
+Quote it (`--include='*.ts'`) or use `--exclude-dir=node_modules` with a path list. This file
+already records two zsh word-splitting/shadowing traps; this is the same family — zsh expands
+what bash passes through. Cost: three calls.
+## Two background gate-runs in ONE worktree, writing ONE log, silently corrupt each other
+Found by lane/h-diag (F-H-2, 2026-09-05). I launched an instrumented `gate-run.sh` in the
+background, spotted a defect in the wrapper, patched it and launched again — to the SAME output
+path, while the first was still running. Both `vitest` processes then ran in the same worktree,
+each creating and deleting its own scratch test file, and both appended to the same log. The
+result read as a coherent record and was not: it showed the FIRST run's assertion (the one the
+patch was meant to fix), so the patch looked ineffective when it had applied correctly. I nearly
+re-patched code that was already right.
+**What caught it:** `gate-run.sh`'s `CLEAN-STATE: CHANGED — this measurement is suspect` line —
+each run saw the other's scratch file in porcelain. That is D45/D49 doing exactly the job they
+were written for; without the porcelain bracket this would have been an invisible bad
+measurement.
+**Rules.** One gate-run per worktree at a time — a background launch is a lock you must wait on.
+Never reuse an output path for a second attempt; name it `-v2` so the first record survives as
+evidence. Before relaunching, check `ps` for a live run in your worktree. Retained the corrupted
+record as `f-h-2-r0-CORRUPTED-two-runs-one-log.log` rather than deleting it (D60:
+capture-before-destroy applies to a tool's output).
+## A probe inserted past the first failing assertion never runs
+Same seat, same session. I instrumented the staleness block at `database.test.ts:3990` and got
+zero probe output: vitest aborts a test at its FIRST failed `expect`, and an unrelated stale
+expectation at `:3908` was stopping execution ~80 lines earlier. A probe below a known failure
+is dead code. When instrumenting a long integration test, either apply the known upstream fix in
+the same scratch copy, or place the probe above the first failure — and always assert the probe
+FIRED (count the lines) before concluding anything from its silence.
+## A test appended to a shared-database suite inherits the WHOLE file's state
+Found by lane/h-diag (F-H-2 fix, 2026-09-05). Integration suites like
+`tests/integration/database.test.ts` share ONE embedded-postgres instance across ~87 tests, and
+vitest executes tests in DECLARATION order. So a new test with a global side effect — mine calls
+`LivenessRepository.sweep`, which archives every qualifying run in the register version, not just
+its own — will silently corrupt every test declared AFTER it. Declaring it last makes the side
+effect unreachable, but **"it runs last" is an assumption, not a fact, until you run the whole
+file**: a filtered `-t` run proves nothing about ordering because it skips the other 85 tests.
+Rule: a test with cross-test side effects goes at the END of the file, and the whole file is run
+once before handoff. The filtered run is for the RED/GREEN loop; the whole-file run is what
+licenses the claim that you disturbed nothing.
+## `register.register_row` is APPEND-ONLY: a test that mutates a seeded row dies in its own restore
+Found by lane/t17t9 (2026-09-05). To give the acceptance policy reader a row with another
+deployment's provenance I seeded the register normally and then `UPDATE`d one row's `source_ref`.
+Postgres refused: `error: append-only or immutable table register_row rejects UPDATE`, raised by
+`core.reject_mutation()`. The damage is not the refusal — it is WHERE it lands. My `UPDATE` sat in
+a `try`, and the matching restore sat in the `finally`, so the failure vitest reported was the
+RESTORE line, not the subject line. The test looked like a broken teardown when the real message
+was "this table cannot be mutated at all".
+Seeding a deliberately-bad row is also blocked from the other side: `seedAcceptanceRegister`
+re-reads every row it wrote and throws `ACCEPTANCE_REGISTER_CONFLICT:<rowKey>` on a mismatch, so
+pre-inserting the bad row before seeding fails too. Both guards are the system working correctly.
+**What to do instead:** start a second embedded database and INSERT the row set directly, with the
+one row's provenance swapped, without calling the deployment's seeder — the seeder is exactly the
+thing whose absence the scenario models. Assert that exactly one row differs from what the seeder
+would have written, or the fixture can drift into testing nothing. Cost: one gate-run.
+## An empty variable turns `sed -n "${n},+30p"` into a sed SYNTAX error, not a "not found"
+Same seat, same session, twice. `n=$(grep -n 'function foo' file | cut -d: -f1)` returns EMPTY when
+the symbol is not in that file, and the next line becomes `sed -n ",+30p"`, which prints
+`sed: 1: ",+30p": invalid command code ,`. That message names sed and a comma, so it reads as a
+quoting or dialect problem in the sed command — and I went looking for one. It is neither: the
+grep found nothing and the range lost its start address.
+**I checked before recording this, and BSD sed on macOS DOES support the `addr,+N` form** —
+`sed -n '2,+2p'` works here. So do not "fix" this by rewriting the range syntax; the syntax was
+never the problem. Guard the lookup instead: `[ -n "$n" ] || { echo "SYMBOL NOT FOUND"; exit 1; }`.
+Same family as this file's zsh `--include=*.ts` entry: a command that never ran, reported as a
+command that ran and failed.
+## `gate-run.sh <worktree>` runs the command in the WORKTREE ROOT, not the package root
+The script computes `PKG` ("the package root the gate actually runs in (this repo nests the engine
+one level down)") and uses it for the PROVISIONING block only. The command itself runs
+`( cd "$WT" && "$@" )`. In this repo the git root is `.worktrees/lane-X` and the engine is one level
+down, so `gate-run.sh .worktrees/lane-X out.log label pnpm typecheck` runs pnpm where there is no
+`package.json` and records:
+`ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND … was found in "…/.worktrees/lane-w3"`, `EXIT = 1`.
+That is a well-formed gate record of a FAILING GATE, and nothing in it says the gate never ran —
+I read it as a real typecheck failure first. Pass the ENGINE directory as `<worktree>`
+(`.worktrees/lane-X/dialectical-engine`); `git -C` still resolves the same commit and tree from
+there, and `git status --porcelain` still prints repo-root-relative paths, so the record is
+unaffected. (W3 r1)
+## A gate whose CWD has no package.json makes `npx` create an UNIGNORED `node_modules/` at the git root
+Direct consequence of the trap above, and it corrupts every LATER record in the lane.
+`.gitignore` ignores `dialectical-engine/node_modules/`, `dialectical-engine/web/node_modules/` and
+`dialectical-engine/apps/**/node_modules/` — it does NOT ignore `node_modules/` at the git root,
+which is a directory that exists in no other lane. My first `npx vitest` gate ran with CWD at the
+git root, vite wrote its cache to `<git-root>/node_modules/.vite`, and the record closed with
+`CLEAN-STATE: CHANGED — this measurement is suspect`. Every subsequent porcelain then carried
+`?? node_modules/` in BOTH halves, which reads as clean-but-dirty and quietly devalues the record.
+Check `git status --porcelain` for a bare `?? node_modules/` after any gate; if it is only
+`.vite`, it is yours, and removing it restores a pristine porcelain. (W3 r1)
+## A MISSING named export does not make a vitest file error — it binds `undefined` and the suite runs
+Importing `EXPANSION_DEPTH_MAX` from `@debateai/contract` when the tree has no such export did not
+throw `SyntaxError: … does not provide an export named …` the way native ESM would. Vitest's
+transform bound it to `undefined`, the file loaded, and the run reported an ordinary
+`Tests 15 failed | 31 passed (46)`. Read naively that says "the oracle disagrees with this tree";
+what it actually said is "the symbol this oracle is about is not in this tree at all", which is a
+different finding with a different owner. The check that NAMES it is the compiler:
+`tsc --noEmit` → `error TS2305: Module '"@debateai/contract"' has no exported member
+'EXPANSION_DEPTH_MAX'`. Run the typecheck before interpreting a cross-tree test result. (W3 r1)
+## `git grep <rev> -- <pathspec>` takes a CWD-RELATIVE pathspec and reports a miss as "absent"
+`git grep` and `git show` disagree about what a path means at a revision, and only one of them
+says so:
+- `git grep <rev> -- packages/contract/src/index.ts` — pathspec is **relative to CWD**.
+- `git show <rev>:tools/orphan-audit/src/index.ts` — path is **relative to the REPO ROOT**;
+  `<rev>:./tools/...` is the CWD-relative form.
+In this nested repo (git root `V5/`, engine at `dialectical-engine/`) I was in the engine
+directory and wrote the repo-root spelling for BOTH. `git show` refused loudly and printed the
+fix (`fatal: path '…' exists, but not '…'  hint: Did you mean '<rev>:./tools/…'`). `git grep`
+matched no path, found nothing, and exited non-zero — which my `&& PRESENT || absent` loop
+rendered as **"absent"** for every commit checked. That output was indistinguishable from the
+real finding it sat next to, and I nearly used it to contradict a coordinator amendment that was
+correct. The verification that caught it: re-run with **no pathspec at all** and count matching
+files per commit (`git grep -l <sym> <rev> | wc -l`) — 0 vs 5 is unambiguous where a filtered
+miss is not. Never let a pathspec'd `git grep` be the sole evidence for a NEGATIVE claim about a
+commit. (W3 r1)
+## `pnpm lint` is `audit:architecture && audit:source` — a PRE-EXISTING architecture failure hides the source audit entirely
+The root script is `pnpm run audit:architecture && pnpm run audit:source`. At this mission's
+integration tip the architecture audit already exits 1 (three `-> obs-capture is not a declared
+edge` violations that predate every current lane), so the `&&` short-circuits and **the source
+audit never runs**. The gate record looks complete: the command, a JSON body listing three
+violations, `EXIT = 1`. Nothing in it says a second audit was skipped.
+I was one step from reporting "the numeric-literal-export rule is satisfied" on the strength of a
+run that never evaluated that rule. Run `pnpm run audit:source` SEPARATELY whenever the
+architecture half is red, and never read a green/absent source-rule result out of a `pnpm lint`
+record whose architecture half failed. Same family as this file's existing entries: a command
+that never ran, reported as a command that ran and passed. (W3 r2)
+## A fallback that answers unrecognised requests makes the discriminator above it UNTESTABLE (lane/demo-path, 2026-09-05)
+Follow-on to this file's S07 entry on class-dispatching provider doubles. That entry names the
+SYMPTOM — an unrecognised organ falls to `GENERAL` and is handed the wrong scripted answer. This
+is about the repair, and it is worse: after you add the missing discriminator, the same fallback
+can keep the suite green when your discriminator does nothing at all.
+`acceptance/ceremony.test.ts` enforced "never guess across classes" in ONE direction only. A
+RECOGNISED request with no scripted response of its class refused by name; an UNRECOGNISED one
+still took `pending[0]`, whatever class sat there. I added the EVALUATOR discriminator, the suite
+went green, and I would have shipped it — except the mutant that deliberately breaks the
+discriminator (`includes(TEXT + "DRIFTED")`) left ceremony at **2 passed**. The call fell through
+to `GENERAL`, the fallback served the evaluator entry anyway, and the classification I had just
+added was carrying no weight. Green, and pinning nothing.
+Two things to take from it:
+- **Test the discriminator, not only the response.** A double has two halves and they fail
+  independently. The mutant that breaks the RESPONSE shape killed all three suites immediately;
+  the mutant that breaks the REQUEST match killed only the suite whose fallback could not cover
+  for it. Run both, and pair each with a neighbour that is still live (I weakened the match to a
+  shorter substring: it must survive, or the mutant is testing the wrong thing).
+- **A queue fallback is a class, so hold it to the same rule.** The cure was two lines: every
+  request class, `GENERAL` included, consumes the first scripted entry of ITS OWN class or
+  refuses by name. FIFO still works, within the class, which is all the health probes ever
+  needed. Asymmetric enforcement is how the wrong-organ answer happened in the first place.
+Transcripts: `logs/demo-path/r1-mut-M3-dead-discriminator-ceremony.log` (survived, before) and
+`r1-FINALMUT-M3-dead-discriminator-ceremony.log` (killed, after).
+## `tools/mutate.sh` cannot mutate a file that is not yet committed (lane/demo-path, 2026-09-05)
+Its first gate refuses a dirty tree and its restore is `git checkout -- <path>`, so a NEW file —
+a shared fixture you just wrote, say — is unmutatable while untracked: the tool aborts before it
+starts, and if it did not, `git checkout --` could not put an untracked file back. Commit the
+lane's work first, then mutate. Related but distinct from this file's `git diff --stat` entry:
+that one is about not SEEING an untracked file, this one is about not being able to RESTORE it.
+Also: re-run the campaign after any later fix. Eight of my transcripts were taken at the first
+commit; the fix that came out of the surviving mutant moved the tip, and `stamp-check.sh`
+correctly called all eight STALE. Mutant transcripts bind the tree they measured exactly as gate
+records do (D41), and a campaign spanning two commits is a campaign nobody can read.
+## A mutant killed ONLY by a planted control looks identical, in the suite summary, to one killed by real code
+Both read `1 failed | 45 passed (46)` with a green-to-red transition and a clean mutate.sh
+transcript. The summary line cannot tell you WHICH kind of kill you got, and a D24 transcript
+records the command's exit, not the identity of the assertion that produced it. So a mutation
+campaign can report full kill coverage while every kill is a fixture defending a fixture.
+Read the `FAIL >` test NAMES, not the counts. The discriminator is whether a WHOLE-TREE assertion
+(one that reads real files from disk) is among the dead. In this lane, mutating the conjunct rule
+two ways gave: the shallower-rule mutant → 1 failure, a planted string control; removing the
+boundary entirely → 7 failures INCLUDING both whole-tree assertions, naming a real file. Same
+tool, same shape of transcript, completely different strength of evidence. (W3 r4)
+## Before claiming "no real code exercises this rule", prove your instrument can SEE the difference
+I scanned every shipped file under both the current rule and the mutant and got "no real file
+differs" — which is the answer that closes a ticket, and is exactly the answer a BROKEN scanner
+also returns. The check that makes it admissible costs one extra run: feed the instrument the
+input the difference is KNOWN to exist on (here, the control the mutant kills) and confirm it
+reports a difference there. Mine did — `current=0 shallow=1` on the control, `same` on the real
+statement-level shape — which is what made the negative finding evidence rather than an absence
+of evidence. A negative result from an unvalidated instrument is not a measurement. (W3 r4)
+## zsh: `${PIPESTATUS[0]}` is EMPTY — the array is `$pipestatus` and it is 1-indexed
+The Bash tool's shell here is zsh. `cmd | tail -3; echo "EXIT=${PIPESTATUS[0]}"` prints `EXIT=`
+with no number and no error, so a gate that looks like it reports an exit code reports nothing at
+all — and an empty string is falsy in most comparisons that follow. zsh's equivalent is
+`${pipestatus[1]}` (lowercase, 1-indexed); bash's `${PIPESTATUS[0]}` works only under bash.
+Safest: don't pipe the command whose status you need, or run the gate through `gate-run.sh`, which
+captures the command's own exit properly. Same family as this file's other entries: a measurement
+that silently reports nothing while looking like it reported something. (W3 r4)
+## BSD `head -n -N` (all but the last N lines) is not supported on macOS
+`head -n -12 file` fails with `head: illegal line count -- -12` rather than trimming the tail.
+GNU head supports the negative form; the macOS one does not. Use `sed '$d'` repeatedly, awk with
+a line count, or just regenerate the file from its source rather than trimming it. (W3 r4)
+
+## Lane lane/t1-oracle-evaluator appends carried across the dev merge (2026-09-07; union, nothing removed)
+
+
 ## A fresh lane worktree has NO `node_modules`, so "baselines FIRST" collides with a single-install grant
 Found by F-T1-ORACLE-EVALUATOR round 0 (2026-09-06) in `.worktrees/lane-t1-oracle-evaluator`.
 The packet ordered baselines on the clean base BEFORE the one authorised `pnpm install`. But the

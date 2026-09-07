@@ -199,7 +199,52 @@ const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Ob
 ]);
 
 /**
- * DR-181/182 + T17 (DR-184-v3): an invisible bug tripwire derived from the
+ * THE SERVE-LEG RULE — stated ONCE, here, and READ by everything that needs it.
+ *
+ * Two things used to state it independently and on purpose: this package's
+ * `computeStructuralCeilingBasis` (which MINTS a basis) and
+ * `parseCostEnvelopeBasis` in @debateai/budget (which RE-READS a persisted one
+ * and refused anything the constructor would not have minted). The duplication
+ * was deliberate — a receipt is a claim, and a claim deserves an independent
+ * check — but it made the rule unchangeable one file at a time: correcting the
+ * constructor alone produced bases the parser rejected at the run head
+ * (F-T17T9-3, .hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/04).
+ *
+ * The independence is KEPT and the restatement is removed: the parser still
+ * checks the receipt against the rule, but it now READS the rule from here
+ * instead of re-typing it, so the two cannot disagree again.
+ */
+export const SERVE_LEG = Object.freeze({
+  /**
+   * The serve chain that ships after T9. The composition chain is retired, so
+   * there is no longer an arm to select BETWEEN — the field survives on the
+   * receipt as the discriminator that makes a pre-T9 basis fail loudly.
+   */
+  chain: "SYNTHESIS_LOOP",
+  /**
+   * One call site per synthesis role per round, at the sealed loop bound. The
+   * sealed row carries the bound once per role, so the two must agree: the
+   * runner has ONE `evaluatorLoopMaxRounds` and TWO roles, and a row sealing
+   * 5 and 1 would describe a runner that does not exist.
+   */
+  sites(input: { readonly synthesizerMaxRounds: number; readonly evaluatorMaxRounds: number }): number {
+    if (input.synthesizerMaxRounds !== input.evaluatorMaxRounds) {
+      throw new TypedDomainError(
+        "STRUCTURAL_CEILING_SYNTHESIS_ROUNDS_INCOHERENT",
+        `synthesizerMaxRounds ${input.synthesizerMaxRounds} and evaluatorMaxRounds `
+        + `${input.evaluatorMaxRounds} must be the one sealed loop bound`
+      );
+    }
+    return input.synthesizerMaxRounds + input.evaluatorMaxRounds;
+  },
+  /** The site count a DISCLOSED leg bills, for a reader of a persisted receipt. */
+  billed(leg: { readonly synthesis_loop_sites: number }): number {
+    return leg.synthesis_loop_sites;
+  }
+} as const);
+
+/**
+ * DR-181/182 + T17 (DR-184-v4): an invisible bug tripwire derived from the
  * engine's exported facts and T16's sealed envelope row.
  *
  * The ceiling counts CALL SITES and multiplies each by the attempts that site
@@ -228,22 +273,25 @@ const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Ob
  *    counted this leg at ZERO — the defect F36 exists to close.
  *  · REVIEWER — `reviewerCallsPerNode` cross-maker reviews per materialized
  *    node, deduped by node and cooldown-wrapped like the author leg.
- *  · SERVE — the two serve chains are MUTUALLY EXCLUSIVE. The composition
- *    organs are what ships today, and their count is DECOMPOSED rather than
- *    taken as `maxRecompose * fixedOrgansPerComposition`: the chain
- *    (packages/serve/src/index.ts:505-580) calls the composer once and
- *    conformance once per segment INSIDE the recompose loop, but post-compose
- *    R9 ONCE AFTER it. `ENGINE_FIXED_ORGANS_PER_COMPOSITION` bundles all three
- *    as `1 + segmentCap + 1` and multiplying it by the rounds bills R9 once per
- *    round, which the chain never does. Measured from a ledger in
- *    tests/integration/t17-envelope-ledger.test.ts: 2 composers + 4 conformance
- *    + 1 R9 = SEVEN sites at maxRecompose=2, segmentCap=2 — not eight.
- *    (This was the second unmeasured premise, of the same class as the cooldown
- *    term: a constant multiplied by rounds without anyone counting the sites.)
- *    T9 retires them and leaves the synthesizer/evaluator loop
- *    (`synthesizerMaxRounds + evaluatorMaxRounds` role calls, one synthesizer
- *    and one evaluator per round). The leg is therefore the MAXIMUM of the two
- *    — a tight cover in both worlds, where the sum would be slack in both.
+ *  · SERVE — the SYNTHESIS LOOP, and only it. T9 retired the composer,
+ *    per-segment conformance and post-compose R9 organs into the
+ *    synthesizer/evaluator pair, and the shipped runner wires none of them
+ *    (apps/runner/src/index.ts:1083 `conformance: []`; it mints no `COMPOSER:`
+ *    or `CONFORMANCE:` call-site key at all). The runner opens ONE site per
+ *    synthesis role per round — `synthesize` at :4076 and `evaluate` at :4154,
+ *    each keyed by `request.round` — so the leg is `roles x rounds`, which is
+ *    what `SERVE_LEG.sites` states. The runner says so itself at :1162-1172:
+ *    "the real count is `rounds x 2 roles`… Refitting that formula is T17's."
+ *    (F-T17T9-3. Until then the leg was `max(compositionSites, synthesisLoop)`,
+ *    which billed the retired chain's SEVEN sites and sealed a ceiling of 109
+ *    against a true maximum of 106 — measured from a real ledger in
+ *    tests/integration/t17-envelope-ledger.test.ts. V ruled on 2026-09-05 to
+ *    seal the true number rather than keep the difference as padding.)
+ *    `maxRecompose` and `fixedOrgansPerComposition` remain on the sealed row
+ *    because the deployment still declares them and `apps/api/src/main.ts`
+ *    still passes them; they are CHECKED for coherence below and BILLED
+ *    nowhere. `compositionSegmentCap` is NOT retired — it still caps the
+ *    synthesizer's segment array (apps/runner/src/index.ts:135).
  *
  * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
  * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
@@ -287,14 +335,17 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const authorSites = materializedNodes;
   const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
   const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
-  // Per ROUND: one composer + one conformance per segment. Per RUN: one
-  // post-compose R9, outside the loop.
+  // THE RETIRED COMPOSITION TOPOLOGY — declared, checked, and BILLED NOWHERE.
+  // The sealed row still carries `fixedOrgansPerComposition`, `maxRecompose`
+  // and `compositionSegmentCap`, and `apps/api/src/main.ts` still passes all
+  // three, so a deployment that declares an incoherent shape must still be
+  // refused. What changed in F-T17T9-3 is that the shape no longer produces a
+  // competing serve arm: `maxRecompose * (1 + segmentCap) + 1` used to bind the
+  // leg at seven sites, and the leg is now the synthesis loop unconditionally.
+  // (`compositionSegmentCap` is NOT retired either way — it still caps the
+  // synthesizer's segment array at apps/runner/src/index.ts:135.)
   const compositionSitesPerRound = 1 + input.compositionSegmentCap;
   const postComposeSitesPerRun = 1;
-  const compositionSites = input.maxRecompose * compositionSitesPerRound + postComposeSitesPerRun;
-  // The sealed row still declares `fixedOrgansPerComposition`. It is no longer
-  // multiplied by the rounds, but it must stay COHERENT with the shape above,
-  // or a deployment could seal a topology this decomposition never measured.
   if (input.fixedOrgansPerComposition !== compositionSitesPerRound + postComposeSitesPerRun) {
     throw new TypedDomainError(
       "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT",
@@ -302,8 +353,9 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
       + `1 composer + ${input.compositionSegmentCap} conformance + 1 post-compose organ`
     );
   }
-  const synthesisLoopSites = input.synthesizerMaxRounds + input.evaluatorMaxRounds;
-  const serveSites = Math.max(compositionSites, synthesisLoopSites);
+  // F-T17T9-3: the serve leg is the SHIPPED chain, read from the one rule.
+  const synthesisLoopSites = SERVE_LEG.sites(input);
+  const serveSites = synthesisLoopSites;
   const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
     + panelSites * input.judgeMaxAttempts
     + serveSites * input.organMaxAttempts;
@@ -326,19 +378,18 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     }),
     /**
      * Which serve chain bound the leg, so a reader of a stored receipt can see
-     * WHICH topology the run was admitted under. After T9 merges, a basis that
-     * still reports COMPOSITION is a basis minted against a retired chain.
+     * WHICH topology the run was admitted under. A basis that reports
+     * COMPOSITION is a basis minted against the chain T9 retired, and both the
+     * literal here and the parser's accepted value come from `SERVE_LEG.chain`
+     * — one constant, so a stale receipt fails loudly instead of parsing.
      */
     serve_leg: Object.freeze({
-      composition_sites: compositionSites,
-      composition_sites_per_round: compositionSitesPerRound,
-      post_compose_sites_per_run: postComposeSitesPerRun,
       synthesis_loop_sites: synthesisLoopSites,
-      selected: compositionSites >= synthesisLoopSites ? "COMPOSITION" : "SYNTHESIS_LOOP"
+      selected: SERVE_LEG.chain
     }),
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-184-v3",
+    formula_version: "DR-184-v4",
     bounds_source_ref: "engine-exports+register"
   });
 }
