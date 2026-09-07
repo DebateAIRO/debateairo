@@ -2131,3 +2131,18 @@ and classify the capture afterwards, which is the same "only emit matches" rule 
 Cheap self-check: the two branch counts must sum to the total call count — 419 + 180 against 432 calls
 was the tell, and it was visible for free.
 Cost here: ~5 minutes, and it would have put ~170 phantom entries in a hand-audited citation table.
+
+## Splicing an array literal by `index("[")` hits the `[]` of `readonly string[]` first
+Found by lane/diag-bounded r2 (2026-09-07), replacing the body of
+`const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([ … ]);` in two files. The splice was
+`a = block.index("[", block.index("const KNOWN_DOMAIN_CODES"))` — which finds the `[` of the TYPE
+ANNOTATION `string[]`, not the array literal eleven characters later. The result was syntactically
+broken TypeScript written to both files, and the failure surfaced as an oxc
+`[PARSE_ERROR] Expected ] but found ,` pointing at the FIRST ARRAY ELEMENT, ~50 lines below the real
+damage and in a file the message made look corrupt.
+**Rule: anchor a structural splice on the longest unambiguous literal that ends where you want to cut —
+here `const NAME: readonly string[] = Object.freeze([` — never on a bare bracket after a name.** Then
+assert the element count before AND after (`399 -> 398`); the assertion is one line and it converts this
+class of bug from a confusing parse error into a message that names the count.
+Recovery is `git checkout -- <files>` and redo; nothing is salvageable from a bad splice.
+Cost here: ~4 minutes, all of it spent reading a parse error that pointed at the wrong place.

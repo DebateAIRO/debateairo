@@ -5,11 +5,28 @@ import {
   RunnerStartupReconciliationError
 } from "../../apps/runner/src/runner-startup-reconciliation.js";
 import { TypedDomainError } from "../../packages/kernel/src/index.js";
+import {
+  ProviderCallFailedError,
+  ProviderContentUnacceptedError
+} from "../../packages/providers/src/index.js";
 import { runnerTerminalFailureReason } from "../../apps/runner/src/index.js";
 import { developmentRunnerClaimMs } from "../../apps/runner/src/dev-runner-process.js";
 
 // Synthetic sensitive content. None of these is a real credential; each is shaped
 // like a value that the removed rules would have emitted verbatim.
+// The canonical expected-membership lists live in tests/unit/api-operational-error.test.ts
+// and are read out of its SOURCE TEXT here. Importing that module would register its
+// suites a second time; reading the text keeps one canonical list and keeps this
+// test's expectation independent of the implementation it checks (codex r1b F2).
+async function expectedListFromApiTest(name: string): Promise<readonly string[]> {
+  const source = await readFile("tests/unit/api-operational-error.test.ts", "utf8");
+  const declaration = source.slice(source.indexOf(`const ${name}`));
+  const body = declaration.slice(declaration.indexOf("["), declaration.indexOf("]);"));
+  const values = [...body.matchAll(/"([A-Z][A-Z0-9_]*)"/gu)].map((match) => match[1]!);
+  expect(values.length).toBeGreaterThan(200);
+  return Object.freeze(values);
+}
+
 const FAKE_TOKEN = "AKIAIOSFODNN7EXAMPLE";
 const FAKE_DIGEST = "DEADBEEFCAFEBABE0123456789ABCDEF";
 const SQL_FRAGMENT = "SELECT_PASSWORD_HASH_FROM_IDENTITY_USER";
@@ -118,6 +135,12 @@ describe("development runner startup reconciliation", () => {
     expect(sqlTyped).not.toContain(SQL_FRAGMENT);
     expect(sqlTyped).toBe("RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR");
 
+    // Non-code literals that were wrongly admitted (codex r1b F2).
+    for (const notACode of ["MATCHED_EXISTING", "PROWESS_RANK", "UNASSESSABLE"]) {
+      expect(runnerTerminalFailureReason(new TypedDomainError(notACode, "probe")))
+        .toBe("RUNNER_EXECUTION_FAILED:UNRECOGNIZED_DOMAIN_ERROR");
+    }
+
     const source = await readFile("apps/runner/src/index.ts", "utf8");
     const block = source.slice(
       source.indexOf("// ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET"),
@@ -126,11 +149,39 @@ describe("development runner startup reconciliation", () => {
     const declaration = block.slice(block.indexOf("const KNOWN_DOMAIN_CODES"));
     const body = declaration.slice(declaration.indexOf("["), declaration.indexOf("]);"));
     const codes = [...body.matchAll(/"([A-Z][A-Z0-9_]*)"/gu)].map((match) => match[1]!);
-    expect(codes.length).toBeGreaterThan(300);
-    for (const code of codes) {
+    const expected = await expectedListFromApiTest("EXPECTED_DOMAIN_CODES");
+    expect([...codes].sort()).toEqual([...expected].sort());
+    for (const code of expected) {
       expect(runnerTerminalFailureReason(new TypedDomainError(code, "declared")))
         .toBe(`RUNNER_EXECUTION_FAILED:${code}`);
     }
+  });
+
+  it("preserves a declared provider subclass code without its raw fields", () => {
+    // codex r1b F3. This reason is PERSISTED, so a real provider failure degrading
+    // to the unknown fallback would become durable state that names nothing.
+    const called = new ProviderCallFailedError(
+      new Error("upstream 10.0.0.9:443 refused: key sk-live-EXAMPLE"),
+      3,
+      "TIMED_OUT",
+      "ledger:abc123"
+    );
+    const calledReason = runnerTerminalFailureReason(called);
+    expect(calledReason).toBe("RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED");
+    expect(calledReason).not.toContain("10.0.0.9");
+    expect(calledReason).not.toContain("sk-live-EXAMPLE");
+
+    const unaccepted = new ProviderContentUnacceptedError(
+      2,
+      "PARSE_FAILED",
+      "unexpected token at line 4: {\"secret\":\"sk-live-EXAMPLE\"}",
+      "artifact:raw-9f8ae2",
+      "ledger:def456"
+    );
+    const unacceptedReason = runnerTerminalFailureReason(unaccepted);
+    expect(unacceptedReason).toBe("RUNNER_EXECUTION_FAILED:PROVIDER_CONTENT_UNACCEPTED");
+    expect(unacceptedReason).not.toContain("secret");
+    expect(unacceptedReason).not.toContain("artifact:raw-9f8ae2");
   });
 
   it("prefixes every allow-listed failure constant without re-deriving it", async () => {
@@ -142,8 +193,9 @@ describe("development runner startup reconciliation", () => {
     const declaration = block.slice(block.indexOf("const KNOWN_FAILURE_CONSTANTS"));
     const body = declaration.slice(declaration.indexOf("["), declaration.indexOf("]);"));
     const constants = [...body.matchAll(/"([A-Z][A-Z0-9_]*)"/gu)].map((match) => match[1]!);
-    expect(constants.length).toBeGreaterThan(200);
-    for (const constant of constants) {
+    const expectedConstants = await expectedListFromApiTest("EXPECTED_FAILURE_CONSTANTS");
+    expect([...constants].sort()).toEqual([...expectedConstants].sort());
+    for (const constant of expectedConstants) {
       expect(runnerTerminalFailureReason(new Error(constant)))
         .toBe(`RUNNER_EXECUTION_FAILED:${constant}`);
     }

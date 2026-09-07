@@ -4461,21 +4461,53 @@ const UNRECOGNIZED_DOMAIN_CODE = "UNRECOGNIZED_DOMAIN_ERROR";
  * UNRECOGNIZED_DOMAIN_CODE. A TypeScript union would not do this job, because the
  * value arrives at runtime from a `string` field.
  *
- * Swept at commit d5b4f7f568aceec55a9cfca72b62473e7ee26c19 over packages/**,
- * apps/api/src/** and apps/runner/src/index.ts (the module each formatter lives
- * in, whose imports are the 14 @debateai packages plus zod, pg and the Hatchet
- * SDK), excluding tests. 419 sites pass a literal first argument; 13 pass a
- * variable, and each of those 13 is resolved to the literals its callers supply —
- * the parseContent/callSynthesisRole/runnerStage/requireNonblank/nonBlank/
- * requiredText/requireNonBlank code parameters, the DATABASE_POOL_FAILED
- * constant, the settlement ternary, and the two template forms in
- * packages/register (readFamily's family codes and STRUCTURAL_CEILING_*).
- * Per-code citations: logs/diag-bounded/r1-03-domain-code-citations.log.
+ * SWEEP REVISION: the producer sweep reads the tree at dev
+ * d5b4f7f568aceec55a9cfca72b62473e7ee26c19, and every cited line is a line of THAT
+ * revision. The r1 artifact cited r0-tip line numbers while naming the base, which
+ * was wrong for the two files this change itself edits (codex r1b C1).
+ *
+ * Scope: packages/**, apps/api/src/** and apps/runner/src/index.ts — the module
+ * each formatter lives in, whose imports are the 14 @debateai packages plus zod,
+ * pg and the Hatchet SDK — 90 files, tests excluded. Three producer forms:
+ *
+ *   420  `new TypedDomainError("CODE", …)` calls with a literal first argument.
+ *     2  subclass declarations passing a literal code to super(). These are the
+ *        only two classes extending TypedDomainError in the tree:
+ *        ProviderCallFailedError (packages/providers/src/index.ts:52, super at :62
+ *        → PROVIDER_CALL_FAILED) and ProviderContentUnacceptedError (:68, super at
+ *        :78 → PROVIDER_CONTENT_UNACCEPTED), both thrown by the provider gateway at
+ *        :491 and :499. A `new TypedDomainError(` sweep never visits super(), and
+ *        the class-name map below cannot cover for the omission: these objects
+ *        satisfy `instanceof TypedDomainError`, so this lookup answers first
+ *        (codex r1b F3).
+ *    13  calls whose first argument is a variable, each resolved to the literals its
+ *        callers supply — the parseContent / callSynthesisRole / runnerStage /
+ *        requireNonblank / nonBlank / requiredText / requireNonBlank code
+ *        parameters, the DATABASE_POOL_FAILED constant, the settlement ternary, and
+ *        the two template forms in packages/register (readFamily's family codes and
+ *        STRUCTURAL_CEILING_*).
+ *
+ * The requireNonblank resolution is 12 literal-argument calls plus ONE loop — the
+ * five `[input.x, "EVALUATOR_DOMAIN_*_INVALID"]` tuple pairs of
+ * validateAdmissionIdentity (packages/evaluator/src/index.ts:1019-1026). An earlier
+ * version matched any two-element array anywhere in that file, and so admitted
+ * MATCHED_EXISTING (an admission decision), PROWESS_RANK (a phase-order member) and
+ * UNASSESSABLE (a grade verdict) as though they were codes (codex r1b F2). None is
+ * a domain code; all three are excluded, and both formatter tests now assert that
+ * each of them is REFUSED.
+ *
+ * Per-code citations: logs/diag-bounded/r2-03-domain-code-citations.log.
  *
  * Over-inclusive within that scope, deliberately and in the safe direction: a
- * declared code that never arrives is inert, because a hit returns this list's
- * own literal. Membership is evidence of a DECLARED literal, not proof that the
- * code propagates to a formatter.
+ * declared code that never arrives is inert, because a hit returns this list's own
+ * literal. Membership is evidence of a code DECLARED at that file and line, not
+ * proof that it propagates to a formatter — callSynthesisRole (apps/runner/src/
+ * index.ts:1313-1321) deliberately replaces both provider codes with other typed
+ * codes on its own path, and cooldown handling consumes some transport failures.
+ * The expected membership is generated from those citations and committed in
+ * tests/unit/api-operational-error.test.ts; both formatter tests compare this map
+ * against it in BOTH directions, so a wrong member and a missing member each turn
+ * a test red.
  */
 const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "ABSENT_SIGNAL_HAS_FRESHNESS",
@@ -4666,7 +4698,6 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POLICY_INVALID",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
-  "MATCHED_EXISTING",
   "MEMORY_ASKER_SCOPE_MISMATCH",
   "MEMORY_DIFFERENCE_REQUIRED",
   "MEMORY_DISCLOSURE_GATE_FAILED",
@@ -4728,9 +4759,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROPAGATION_STRENGTH_INVALID",
   "PROPER_SCORE_INVALID",
   "PROTECTED_CITATION_COMPARE_SKIPPED",
+  "PROVIDER_CALL_FAILED",
   "PROVIDER_CALL_INSIDE_TRANSACTION",
+  "PROVIDER_CONTENT_UNACCEPTED",
   "PROVIDER_RUN_REQUIRED",
-  "PROWESS_RANK",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -4856,7 +4888,6 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "TERMINAL_ROW_NOT_EVALUATABLE",
   "TERMINAL_STATE_READ_FAILED",
   "TIER_PROVENANCE_MISSING",
-  "UNASSESSABLE",
   "UNDERCUT_TARGET_INVALID",
   "UNSERVED_MAKER_POSITION_UNRESOLVED",
   "UNSUPPRESSED_BAND_REQUIRED",
