@@ -18,9 +18,10 @@ import { openSurfaceCount } from "../../apps/ui/components/consent/modalSemantic
  * `PrivacyPolicyModal.tsx` are S02's, are consumed unchanged, and have their own
  * suites (`consent-modal-semantics.test.tsx`, `consent-policy-modal-*.test.tsx`).
  * What S01 owns is: that the card asks for the modal in READ mode and hands it no
- * `onAcknowledge`; that the modal element is rendered AFTER the card so the
- * helper's document-order stack puts it on top; and that the card takes its own
- * modal semantics from the same helper instead of writing a second copy.
+ * `onAcknowledge`; that the modal element is rendered AFTER the card — V-20's
+ * recorded arrangement for this pair, which under V-20 (b) no longer decides which
+ * of them takes the dismiss key; and that the card takes its own modal semantics
+ * from the same helper instead of writing a second copy.
  */
 
 // The acceptance command is pinned to the lane root, so source fixtures resolve
@@ -200,11 +201,14 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // PROPERTY (S01-R20's Esc stack, REQ-REV-01 **B3**, S01-S40): the topmost open
     // surface consumes Escape and no other surface acts on the same event.
     //
-    // The mechanism is DOCUMENT ORDER, not open order (S02 DECISIONS 2026-09-07,
-    // CODE-REV-S02-C5C6 r1 N2): `topmostSurface()` resolves unrelated siblings
-    // with `CONTAINED_BY || FOLLOWING`. So the arrangement is the requirement —
-    // the `<PrivacyPolicyModal>` element is rendered AFTER the card, and with the
-    // two swapped one Escape closes the CARD and leaves the policy open.
+    // The mechanism is OPEN ORDER, not document order (V-20 option (b), ruled
+    // 2026-09-07 after CODE-REV-S02-C9 r1 B1): `topmostSurface()` returns the
+    // LAST-REGISTERED entry whose container is still in the document. Here the
+    // policy is the surface opened second, which is why it takes the key; where
+    // the two elements sit relative to each other no longer decides anything.
+    // The document-position assertion below is KEPT as V-20's RECORDED
+    // ARRANGEMENT for this pair — the shape the slice ships and the one V rules
+    // on — and is no longer the reason the policy wins.
     mountBar();
     activate(labelled("Choose what to store"));
     const [, quality] = switches() as [HTMLElement, HTMLElement, HTMLElement];
@@ -215,7 +219,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(policy(), "the policy is open over the card").not.toBeNull();
     expect(
       card()!.compareDocumentPosition(policy()!) & Node.DOCUMENT_POSITION_FOLLOWING,
-      "the policy element FOLLOWS the card in document order — the helper's own topmost rule"
+      "the policy element FOLLOWS the card in document order — V-20's recorded arrangement"
     ).not.toBe(0);
     expect(openSurfaceCount(), "two surfaces on the stack").toBe(2);
 

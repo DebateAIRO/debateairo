@@ -119,6 +119,38 @@ Both directions of S01-R18, and both sentences of V-22's own worked example, hol
 surviving-first. Pinned by four cases in `tests/render/consent-modal-semantics.test.tsx` and one in
 `tests/render/consent-policy-link.test.tsx`.
 
+### Addendum 2026-09-07 — topmost is the surface opened LAST, not the one later in the document (V-20 (b))
+
+Appended by seat `CODE-CROSS-02` as the one cross-slice change ticket `t_cde7254d` authorises;
+nothing above this heading is edited, and the **Decision** paragraph's sentence "*Topmost is
+derived from the DOM, never from the order the surfaces registered in … comes last in document
+order (`compareDocumentPosition`)*" is superseded by this one. **`topmostSurface()` now returns the
+LAST REGISTERED entry whose container is still in the document**; an entry whose container is
+`null` still receives `Escape`, an entry whose container has left the document is skipped and the
+walk continues below it, and there is no arrangement constraint on any consumer. Everything else
+this ADR decides — one module, one `document` listener, the queried-at-`Tab` focusable set, the
+guarded `prefers-reduced-motion`, the exported surface — is unchanged.
+
+Why: the document-order rule was measurably wrong wherever both slices' surfaces coexist.
+`app/layout.tsx` mounts `<CookieConsent />` AFTER `{children}`, so on `/sign-up` the cookie
+preferences card is LATER in the document than the privacy policy that renders inside
+`SignUpFlow`, while the policy is HIGHER in paint (`--z-policy-card: 78` over
+`--z-consent-card: 76`). One `Escape` therefore closed the card underneath the open policy,
+discarding the visitor's unsaved category choices and leaving focus trapped in a surface that had
+just refused the key (`CODE-REV-S02-C9` r1 **B1**, measured three times with a control that
+discriminated document order from open order). Open order rather than a `--z-*` rank because every
+overlay here opens FROM a control of the surface below it, under its own scrim: the last-opened
+surface IS the one on top in every state a visitor can reach, and a z-rank would restate the
+ladder in TypeScript. **The one shape where the two part company** is a pair mounted in a SINGLE
+commit — React runs effects child-first, so a nested inner surface registers before its outer one
+and the OUTER one answers `Escape`. No surface in this repository has that shape today (both
+policy modals are mounted conditionally by a state change the visitor causes); a future overlay
+pair that needs its inner surface on top opens that surface in a later commit. Pinned by seven
+cases in `tests/render/consent-cross-slice.test.tsx` — the first suite in this mission to mount
+both slices in ONE document, in `layout.tsx`'s order — and by five in
+`tests/render/consent-modal-semantics.test.tsx`. **Status: this is the orchestrator's ruling under
+V-20 and V may undo it; the cost of undoing is this one function.**
+
 ## Options considered
 
 - **A React context provider owning the stack.** Rejected: it would force slice S01's

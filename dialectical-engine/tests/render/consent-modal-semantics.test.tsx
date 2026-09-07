@@ -103,46 +103,6 @@ function pressEscape(): void {
   );
 }
 
-/**
- * A SPEC-CONFORMANT `compareDocumentPosition`, installed for one case only.
- *
- * jsdom 30.0.1 answers `DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC` (37) in BOTH directions
- * for any pair involving a disconnected node, which the DOM standard forbids: the two directions
- * must disagree. Under that violation a connected candidate displaces a detached incumbent by
- * coincidence, so the incumbent half of the guard in `topmostSurface()` cannot be discriminated.
- * The shim answers 37 one way and `DISCONNECTED|PRECEDING|IMPLEMENTATION_SPECIFIC` (35) the
- * other — a disconnected node sorts AFTER a connected one — and the case asserts that
- * consistency before it relies on it, so it can never pass through a broken shim.
- */
-let conformantCDP: PropertyDescriptor | undefined;
-
-function installConformantCDP(): void {
-  const original = Object.getOwnPropertyDescriptor(Node.prototype, "compareDocumentPosition")!;
-  conformantCDP = original;
-  const real = original.value as (this: Node, other: Node) => number;
-  Object.defineProperty(Node.prototype, "compareDocumentPosition", {
-    configurable: true,
-    writable: true,
-    value(this: Node, other: Node): number {
-      if (this.isConnected && other.isConnected) return real.call(this, other);
-      const direction = other.isConnected
-        ? Node.DOCUMENT_POSITION_PRECEDING
-        : Node.DOCUMENT_POSITION_FOLLOWING;
-      return (
-        Node.DOCUMENT_POSITION_DISCONNECTED |
-        Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC |
-        direction
-      );
-    }
-  });
-}
-
-function restoreConformantCDP(): void {
-  if (conformantCDP === undefined) return;
-  Object.defineProperty(Node.prototype, "compareDocumentPosition", conformantCDP);
-  conformantCDP = undefined;
-}
-
 function pressTab(shiftKey = false): KeyboardEvent {
   const event = new KeyboardEvent("keydown", {
     key: "Tab",
@@ -163,9 +123,6 @@ describe("consent modal semantics helper", () => {
   });
 
   afterEach(async () => {
-    // First, so a failed assertion inside the shimmed case cannot leak the prototype patch
-    // into the next one.
-    restoreConformantCDP();
     if (root !== null) await act(async () => root!.unmount());
     root = null;
     container?.remove();
@@ -194,10 +151,20 @@ describe("consent modal semantics helper", () => {
     expect(outerClose).toHaveBeenCalledTimes(0);
   });
 
-  it("delivers one Escape to the nested inner surface, not to the outer one it mounted with", async () => {
-    // The two surfaces mount in ONE commit, the inner as a React CHILD of the outer. React runs
-    // effects child-first, so registration order is [inner, outer] and "the last registered
-    // entry" names the surface UNDERNEATH. Topmost is a DOM property, not an effect-order one.
+  it("delivers one Escape to the LAST-REGISTERED surface of a pair mounted in ONE commit", async () => {
+    // The one arrangement where "opened last" and "painted on top" part company, pinned here so
+    // it is on the record rather than discovered. The two surfaces mount in ONE commit, the
+    // inner as a React CHILD of the outer; React runs effects CHILD-FIRST, so registration order
+    // is [inner, outer] and the OUTER one — the surface underneath — answers Escape.
+    //
+    // Before V-20 (b) this case asserted the reverse, because the rank was document position and
+    // containment won outright. Open order was ruled on 2026-09-07 (CODE-REV-S02-C9 r1 B1): the
+    // document-order rule handed Escape to the cookie card UNDERNEATH an open sign-up policy on
+    // `/sign-up`, an arrangement a visitor reaches and this one is not. NO SURFACE IN THIS
+    // PRODUCT MOUNTS A PAIR IN ONE COMMIT — both policy modals are mounted conditionally, by a
+    // state change the visitor causes, so every reachable pair registers in the order it opened.
+    // A future overlay pair that needs its inner surface on top opens it in a LATER commit,
+    // which the case below pins.
     const outerClose = vi.fn();
     const innerClose = vi.fn();
 
@@ -212,11 +179,44 @@ describe("consent modal semantics helper", () => {
       pressEscape();
     });
 
+    expect(outerClose).toHaveBeenCalledTimes(1);
+    expect(innerClose).toHaveBeenCalledTimes(0);
+  });
+
+  it("delivers one Escape to a nested inner surface that opened in a LATER commit", async () => {
+    // The reachable half of the case above, and the shape every consumer in this product has:
+    // the outer surface is already open when the inner one opens, so registration order is
+    // [outer, inner] and the inner surface — the one the visitor opened last, and the one its
+    // own scrim covers the outer with — answers Escape. Nesting neither helps nor hinders it.
+    const outerClose = vi.fn();
+    const innerClose = vi.fn();
+
+    function Harness({ innerOpen }: { innerOpen: boolean }): ReactNode {
+      return (
+        <TestSurface open name="outer" onClose={outerClose}>
+          <TestSurface open={innerOpen} name="inner" onClose={innerClose} />
+        </TestSurface>
+      );
+    }
+
+    await render(<Harness innerOpen={false} />);
+    expect(openSurfaceCount()).toBe(1);
+    await render(<Harness innerOpen />);
+    expect(openSurfaceCount()).toBe(2);
+
+    await act(async () => {
+      pressEscape();
+    });
+
     expect(innerClose).toHaveBeenCalledTimes(1);
     expect(outerClose).toHaveBeenCalledTimes(0);
   });
 
-  it("delivers one Escape to the innermost of three nested surfaces", async () => {
+  it("delivers one Escape to exactly one of three surfaces, and it is the last registered", async () => {
+    // Three at once, mounted in ONE commit and nested, so child-first registration order is
+    // [c, b, a] and `a` — the last registered — takes the key. What the assertion pins is that
+    // EXACTLY ONE `onClose` runs (REQ-REV-01 B3), whichever it is: `toEqual` on the whole array
+    // fails both if a second surface acts and if the wrong one does.
     const closed: string[] = [];
     const record = (name: string) => () => {
       closed.push(name);
@@ -235,14 +235,21 @@ describe("consent modal semantics helper", () => {
       pressEscape();
     });
 
-    expect(closed).toEqual(["c"]);
+    expect(closed).toEqual(["a"]);
   });
 
-  it("delivers one Escape by document position when two surfaces opened out of DOM order", async () => {
-    // Same class as the nested pair: the surface that registered LAST is not the topmost one.
-    // Here `later` is rendered BEFORE `earlier` in the DOM but opens after it, so registration
-    // order is [earlier, later] while document order — which is what the visitor sees stacked —
-    // puts `earlier` on top. This is the arm of the rule that containment alone cannot decide.
+  it("delivers one Escape by OPEN order when two surfaces opened out of DOM order", async () => {
+    // THE discriminating case, and the mechanism V-20 (b) ruled on: `first-dom` is rendered
+    // BEFORE `second-dom` in the document but OPENS after it, so registration order is
+    // [second-dom, first-dom] while document order puts `second-dom` last. Ranking by document
+    // position gives the key to `second-dom`; ranking by open order gives it to `first-dom`,
+    // which is the surface the visitor just opened and — because it opened from a control of the
+    // one below it, under its own scrim — the one they are looking at.
+    //
+    // This is the abstract form of CODE-REV-S02-C9 r1 B1: on `/sign-up` the cookie card is later
+    // in the document (`layout.tsx` mounts `<CookieConsent />` after `{children}`) while the
+    // sign-up policy, which renders inside `{children}`, is the one opened last and painted on
+    // top. `tests/render/consent-cross-slice.test.tsx` pins it on the real surfaces.
     const firstDomClose = vi.fn();
     const secondDomClose = vi.fn();
 
@@ -264,21 +271,19 @@ describe("consent modal semantics helper", () => {
       pressEscape();
     });
 
-    expect(secondDomClose).toHaveBeenCalledTimes(1);
-    expect(firstDomClose).toHaveBeenCalledTimes(0);
+    expect(firstDomClose).toHaveBeenCalledTimes(1);
+    expect(secondDomClose).toHaveBeenCalledTimes(0);
   });
 
   it("never lets a surface whose container has detached consume Escape", async () => {
-    // `topmostSurface()` compares containers by document position, and jsdom answers a
-    // comparison involving a DETACHED node with DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC
-    // in BOTH directions (measured, 37 each way) — so "above" is true whichever node is asked,
-    // and the surface iterated LAST simply wins. The detaching surface therefore mounts SECOND
-    // here, which is the arrangement that lets it capture the key; mounted first it would lose
-    // to the same coincidence and the case would pass against a module that has no guard.
+    // The `isConnected` guard is the one clause `topmostSurface()` kept when it moved from
+    // document order to open order, and this is the arrangement that discriminates it: the
+    // detaching surface mounts SECOND, so it is the LAST-REGISTERED entry — the one the walk
+    // starts at — and only the guard stops it swallowing the key.
     // The reachable shape is React 19's cleanup-returning callback ref: it does NOT null the
     // ref on detach, so a surface that stays registered while it stops rendering its container
     // holds a stale detached node. The precondition is asserted, not assumed, so the case
-    // cannot pass through the `null` branch that already skips such an entry.
+    // cannot pass through the `null` branch that already returns such an entry.
     const staleClose = vi.fn();
     const liveClose = vi.fn();
     const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
@@ -335,30 +340,30 @@ describe("consent modal semantics helper", () => {
     expect(staleClose).toHaveBeenCalledTimes(0);
   });
 
-  it("never lets a DETACHED INCUMBENT stand, under a conformant compareDocumentPosition", async () => {
-    // The other half of the same guard, and the half jsdom's default cannot see. The case above
-    // pins "a detached CANDIDATE never wins"; this one pins "a detached INCUMBENT never stands",
-    // which is the four-line clause in `topmostSurface()`. Under jsdom's two-way FOLLOWING the
-    // connected surface displaces the detached incumbent whether or not that clause exists, so
-    // the mutant survives there (measured by CODE-S02-C5C6 as MN7b) — the shim is what makes the
-    // property observable. The stale surface registers LAST, so it is the incumbent
-    // `topmostSurface()` starts from, and under the shim it compares as PRECEDING the live one,
-    // i.e. NOT above: without the clause it stays `top` and swallows the key.
-    installConformantCDP();
+  it("never lets a DETACHED entry receive Escape, however many have detached", async () => {
+    // The same guard as the case above, taken to the shape only an open-order walk has: the two
+    // most recently registered surfaces have both detached, so the guard has to keep WALKING
+    // rather than step over one entry. It replaces the case that installed a spec-conformant
+    // `compareDocumentPosition` shim to make the "detached incumbent" half of the old
+    // document-order comparison observable; there is no comparison left to shim, and the shim
+    // and its helpers went with it. The outcome that case pinned — a detached surface never
+    // receives Escape, even though it is the entry the walk starts at — is what these two cases
+    // pin between them, now without patching a DOM prototype.
+    const closed: string[] = [];
+    const record = (name: string) => () => {
+      closed.push(name);
+    };
+    const captured: Record<string, { current: HTMLElement | null } | null> = {};
 
-    const staleClose = vi.fn();
-    const liveClose = vi.fn();
-    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
-
-    function DetachingSurface({ mounted }: { mounted: boolean }): ReactNode {
+    function DetachingSurface({ name, mounted }: { name: string; mounted: boolean }): ReactNode {
       const containerRef = useRef<HTMLElement | null>(null);
       const initialFocusRef = useRef<HTMLElement | null>(null);
-      captured.ref = containerRef;
-      useModalSurface(true, { containerRef, initialFocusRef, onClose: staleClose });
+      captured[name] = containerRef;
+      useModalSurface(true, { containerRef, initialFocusRef, onClose: record(name) });
       if (!mounted) return null;
       return (
         <div
-          data-surface="stale"
+          data-surface={name}
           ref={(node) => {
             containerRef.current = node;
             return () => {};
@@ -370,7 +375,7 @@ describe("consent modal semantics helper", () => {
               initialFocusRef.current = node;
             }}
           >
-            close-stale
+            {`close-${name}`}
           </button>
         </div>
       );
@@ -379,46 +384,48 @@ describe("consent modal semantics helper", () => {
     function Harness({ mounted }: { mounted: boolean }): ReactNode {
       return (
         <>
-          <TestSurface open name="live" onClose={liveClose} />
-          <DetachingSurface mounted={mounted} />
+          <TestSurface open name="live" onClose={record("live")} />
+          <DetachingSurface name="stale-1" mounted={mounted} />
+          <DetachingSurface name="stale-2" mounted={mounted} />
         </>
       );
     }
 
     await render(<Harness mounted />);
-    expect(openSurfaceCount()).toBe(2);
+    expect(openSurfaceCount()).toBe(3);
     await render(<Harness mounted={false} />);
-    expect(openSurfaceCount()).toBe(2);
+    expect(openSurfaceCount(), "both stale surfaces stay registered").toBe(3);
 
-    const stale = captured.ref!.current;
-    expect(stale, "the stale surface must still hold its container ref").not.toBeNull();
-    expect(stale!.isConnected).toBe(false);
-    const live = document.querySelector<HTMLElement>('[data-surface="live"]');
-    expect(live, "the live surface must still be rendered").not.toBeNull();
-
-    // The shim's own consistency, asserted rather than assumed: exactly one direction is
-    // FOLLOWING and exactly one is PRECEDING. jsdom's default answers 37 both ways and would
-    // fail this precondition, so the case cannot silently degrade into the old arrangement.
-    const staleToLive = stale!.compareDocumentPosition(live!);
-    const liveToStale = live!.compareDocumentPosition(stale!);
-    const following = Node.DOCUMENT_POSITION_FOLLOWING;
-    const preceding = Node.DOCUMENT_POSITION_PRECEDING;
-    expect(staleToLive, "detached -> connected is DISCONNECTED|PRECEDING|IMPL_SPECIFIC").toBe(35);
-    expect(liveToStale, "connected -> detached is DISCONNECTED|FOLLOWING|IMPL_SPECIFIC").toBe(37);
-    expect((staleToLive & following) !== 0).toBe(false);
-    expect((liveToStale & preceding) !== 0).toBe(false);
+    // The preconditions, asserted rather than assumed: each stale surface still holds its
+    // container ref (so the case cannot pass through the `null` branch, which RETURNS the entry
+    // rather than skipping it), and both of those nodes have left the document.
+    for (const name of ["stale-1", "stale-2"]) {
+      const node = captured[name]!.current;
+      expect(node, `${name} must still hold its container ref`).not.toBeNull();
+      expect(node!.isConnected, `${name} has left the document`).toBe(false);
+    }
+    expect(
+      document.querySelector('[data-surface="live"]'),
+      "the live surface must still be rendered"
+    ).not.toBeNull();
 
     await act(async () => {
       pressEscape();
     });
 
-    expect(liveClose).toHaveBeenCalledTimes(1);
-    expect(staleClose).toHaveBeenCalledTimes(0);
+    expect(closed, "the walk skipped both detached entries and stopped at the live one").toEqual([
+      "live"
+    ]);
   });
 
-  it("traps Tab inside the nested inner surface, not inside the outer one", async () => {
-    // The Tab trap reads the same "topmost" the Escape branch reads, so the nested pair must be
-    // asserted for Tab too: focus sitting in the outer surface is pulled into the inner one.
+  it("traps Tab in the same surface Escape reaches, for the same nested pair", async () => {
+    // The Tab trap reads the same `topmostSurface()` the Escape branch reads, so the nested pair
+    // is asserted for Tab too and the two must agree. Mounted in ONE commit, that surface is the
+    // OUTER one (child-first registration), so Tab from `close-outer` advances to the outer
+    // surface's OWN next control — `outer-2` — instead of jumping into the inner surface.
+    // Under the document-order rank this landed on `close-inner`; the pair moved together, which
+    // is the property, and `outer-2` is only reachable as the answer if Tab and Escape read the
+    // same entry.
     await render(
       <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
         <TestSurface open name="inner" onClose={vi.fn()} />
@@ -430,7 +437,7 @@ describe("consent modal semantics helper", () => {
       pressTab();
     });
 
-    expect(document.activeElement).toBe(labelled("close-inner"));
+    expect(document.activeElement).toBe(labelled("outer-2"));
   });
 
   it("moves initial focus to the element the caller names, not the first one", async () => {

@@ -48,16 +48,23 @@ export type ModalSurface = Readonly<{
 type StackEntry = Readonly<{ read: () => ModalSurface }>;
 
 /**
- * The Esc stack: a module-level REGISTRY of open surfaces, shared by every surface in the app.
- * It is not a LIFO — removal is `lastIndexOf` + `splice`, and the entry that receives `Escape`
- * is never "the last one registered": that entry is only where `topmostSurface()` starts. It
- * decides from DOM POSITION, in this order: CONTAINMENT first — a surface contained by
- * another is drawn over it and wins outright — and only among UNRELATED surfaces does
- * document order decide, the later one winning. `compareDocumentPosition` knows nothing of
- * the `--z-*` ladder, so a surface that means to sit on top of another either nests inside
- * it or renders after it; no other arrangement is supported (V-20; CODE-REV-S02-C5C6 r1 N2,
- * and CODE-REV-S02-C7 r1 N5, which found this comment naming one consumer's arrangement as
- * if it were the rule).
+ * The Esc stack: a module-level REGISTRY of open surfaces, in REGISTRATION order, shared by
+ * every surface in the app. The entry that receives `Escape` is the LAST REGISTERED one whose
+ * container is still in the document — the surface the visitor opened most recently. Removal
+ * stays `lastIndexOf` + `splice`, so a surface that closes out of order takes out its own entry
+ * and leaves the rest in order.
+ *
+ * There is NO arrangement constraint: where a surface renders in the document does not affect
+ * which one answers the key (V-20 option (b), ruled 2026-09-07 under CODE-REV-S02-C9 r1 B1).
+ * The previous rule ranked by `compareDocumentPosition`, and it was measurably wrong on
+ * `/sign-up`, where both slices' surfaces coexist: `app/layout.tsx` mounts `<CookieConsent />`
+ * AFTER `{children}` while the sign-up policy renders INSIDE them, so the cookie card was later
+ * in document order while the policy was higher in paint, and ONE `Escape` closed the card
+ * underneath the open policy — discarding the visitor's unsaved category choices.
+ *
+ * Open order rather than the `--z-*` ladder, because every surface here opens FROM the one below
+ * it and its scrim covers that surface's controls: the last-opened surface IS the one on top in
+ * every state a visitor can reach, and a z-rank would restate the ladder in TypeScript.
  */
 const surfaceStack: StackEntry[] = [];
 
@@ -117,38 +124,29 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
 }
 
 /**
- * The topmost surface — derived from the DOM, never from the order the surfaces registered in.
- * Registration happens in `React.useEffect`, which runs CHILD-FIRST within one commit, so for a
- * nested pair mounted together the LAST registered entry is the surface UNDERNEATH. Document
- * position is the property itself: a surface contained by another is drawn over it, and among
- * unrelated surfaces the later one in document order is on top. Entries whose container is not
- * in the DOM yet (`null`) cannot be compared and leave the incumbent standing, so a surface that
- * renders no container still receives `Escape`; an entry whose container has LEFT the document
- * is a different case and is skipped outright, because it is no longer on screen at all.
+ * The topmost surface: the LAST REGISTERED entry whose container is still in the document.
+ *
+ * An entry whose container is `null` — a surface that renders no container of its own — still
+ * receives `Escape`, exactly as before. An entry whose container has LEFT the document is
+ * skipped, because it is no longer on screen at all, and the walk continues to the entry below
+ * it; that is the one guard this function keeps from the document-order version it replaces.
+ *
+ * Registration order IS open order for every surface a visitor can reach, because they open one
+ * at a time — each from a control of the surface below it. The one shape where the two part
+ * company is a pair mounted in a SINGLE commit: registration happens in `React.useEffect`, which
+ * runs CHILD-FIRST, so a nested inner surface registers BEFORE its outer one and the OUTER one
+ * answers `Escape`. No surface in this product has that shape (both policy modals are mounted
+ * conditionally, by a state change the visitor causes), it is pinned as-is in
+ * `tests/render/consent-modal-semantics.test.tsx`, and a future overlay pair that needs its
+ * inner surface on top opens that surface in a later commit.
  */
 function topmostSurface(): StackEntry | undefined {
-  if (surfaceStack.length === 0) return undefined;
-  let top = surfaceStack[surfaceStack.length - 1]!;
-  for (const candidate of surfaceStack) {
-    const held = top.read().containerRef.current;
-    const other = candidate.read().containerRef.current;
-    if (held === null || other === null || held === other) continue;
-    // A container that has left the document cannot be compared for stacking: jsdom answers
-    // DISCONNECTED|FOLLOWING|IMPLEMENTATION_SPECIFIC in BOTH directions, so a detached node
-    // reads as "above" whichever way it is asked and the entry iterated last would win. A
-    // detached candidate therefore never wins, and a detached incumbent never stands.
-    if (!other.isConnected) continue;
-    if (!held.isConnected) {
-      top = candidate;
-      continue;
-    }
-    const relation = held.compareDocumentPosition(other);
-    const above =
-      (relation & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0 ||
-      (relation & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    if (above) top = candidate;
+  for (let index = surfaceStack.length - 1; index >= 0; index -= 1) {
+    const entry = surfaceStack[index]!;
+    const container = entry.read().containerRef.current;
+    if (container === null || container.isConnected) return entry;
   }
-  return top;
+  return undefined;
 }
 
 function handleDocumentKeydown(event: KeyboardEvent): void {
