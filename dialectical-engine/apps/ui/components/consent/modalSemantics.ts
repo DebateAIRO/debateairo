@@ -20,8 +20,15 @@ export type ModalSurface = Readonly<{
   onClose: () => void;
   /**
    * OPTIONAL, and the only member added since the contract was fixed (V-22, ruled after
-   * both slices merged). The control focus should return to WHEN THE CAPTURED OPENER DID
-   * NOT SURVIVE the opening commit — never a general override of it.
+   * both slices merged). The control focus should return to WHEN THE CAPTURED OPENER IS
+   * NOT A USABLE ELEMENT AT CLOSE — because the opening commit removed it, or because it
+   * left the document while the surface was open — never a general override of it.
+   *
+   * The trigger is the opener's STATE when the cleanup runs (`opener.isConnected` below),
+   * not the CAUSE that put it in that state; the earlier wording named only the opening
+   * commit and so described a strictly narrower rule than the code ships
+   * (CODE-REV-CROSS-01 r1 N3, and the case `returns focus to the named control when the
+   * captured opener has since left the page` pins the broader one).
    *
    * It exists because the capture is unusable for a whole CLASS of surfaces: one whose
    * opener is unmounted by the same commit that opens it. The platform moves focus to
@@ -50,17 +57,22 @@ type StackEntry = Readonly<{ read: () => ModalSurface }>;
 /**
  * The Esc stack: a module-level REGISTRY of open surfaces, in REGISTRATION order, shared by
  * every surface in the app. The entry that receives `Escape` is the LAST REGISTERED one whose
- * container is still in the document — the surface the visitor opened most recently. Removal
- * stays `lastIndexOf` + `splice`, so a surface that closes out of order takes out its own entry
- * and leaves the rest in order.
+ * container is still in the document — the surface the visitor opened most recently — unless
+ * another open surface is NESTED INSIDE it, in which case the innermost such surface wins
+ * (`topmostSurface()` below states the walk). Removal stays `lastIndexOf` + `splice`, so a
+ * surface that closes out of order takes out its own entry and leaves the rest in order.
  *
- * There is NO arrangement constraint: where a surface renders in the document does not affect
- * which one answers the key (V-20 option (b), ruled 2026-09-07 under CODE-REV-S02-C9 r1 B1).
- * The previous rule ranked by `compareDocumentPosition`, and it was measurably wrong on
- * `/sign-up`, where both slices' surfaces coexist: `app/layout.tsx` mounts `<CookieConsent />`
- * AFTER `{children}` while the sign-up policy renders INSIDE them, so the cookie card was later
- * in document order while the policy was higher in paint, and ONE `Escape` closed the card
- * underneath the open policy — discarding the visitor's unsaved category choices.
+ * There is NO ARRANGEMENT CONSTRAINT between UNRELATED surfaces: where two surfaces that do not
+ * contain one another render in the document does not affect which one answers the key (V-20
+ * option (b), ruled 2026-09-07 under CODE-REV-S02-C9 r1 B1; extended to (b′) with the
+ * containment tiebreak under CODE-REV-CROSS-02 r1 N2). The rule this replaced ranked by
+ * `compareDocumentPosition` — `CONTAINED_BY || FOLLOWING` — and the FOLLOWING arm was measurably
+ * wrong on `/sign-up`, where both slices' surfaces coexist: `app/layout.tsx` mounts
+ * `<CookieConsent />` AFTER `{children}` while the sign-up policy renders INSIDE them, so the
+ * cookie card was later in document order while the policy was higher in paint, and ONE
+ * `Escape` closed the card underneath the open policy — discarding the visitor's unsaved
+ * category choices. Containment is kept because it cannot mix unrelated surfaces up; FOLLOWING
+ * is gone because that is exactly what it did.
  *
  * Open order rather than the `--z-*` ladder, because every surface here opens FROM the one below
  * it and its scrim covers that surface's controls: the last-opened surface IS the one on top in
@@ -124,29 +136,65 @@ function trapTab(entry: StackEntry, event: KeyboardEvent): void {
 }
 
 /**
- * The topmost surface: the LAST REGISTERED entry whose container is still in the document.
+ * The topmost surface: the LAST REGISTERED entry whose container is still in the document, and
+ * then the DEEPEST surface nested inside that one, if any is open.
  *
- * An entry whose container is `null` — a surface that renders no container of its own — still
- * receives `Escape`, exactly as before. An entry whose container has LEFT the document is
- * skipped, because it is no longer on screen at all, and the walk continues to the entry below
- * it; that is the one guard this function keeps from the document-order version it replaces.
+ * Two passes, in this order:
+ *
+ * 1. **The incumbent, by open order.** Walk back from the last registered entry and take the
+ *    first whose container is `null` or still connected. An entry whose container is `null` — a
+ *    surface that renders no container of its own — still receives `Escape`. An entry whose
+ *    container has LEFT the document is skipped, because it is no longer on screen at all, and
+ *    the walk continues to the entry below it; that is the one guard this function keeps from the
+ *    document-order version it replaces.
+ * 2. **The containment tiebreak** (V-20 (b′)). Keep scanning DOWNWARDS from the incumbent. A
+ *    lower entry replaces the incumbent when, and only when, its container is inside the
+ *    incumbent's — `Node.contains`. Because each replacement is strictly deeper, one pass reaches
+ *    the innermost open surface: anything nested in the new incumbent was nested in the old one
+ *    too, so nothing already scanned can be missed.
+ *
+ * **There is no `FOLLOWING` arm and no document-order comparison between UNRELATED surfaces.**
+ * That comparison is what produced CODE-REV-S02-C9 r1 B1: `app/layout.tsx` mounts
+ * `<CookieConsent />` after `{children}`, so on `/sign-up` the cookie card is later in the
+ * document than the sign-up policy while the policy is the one opened last and painted on top,
+ * and one `Escape` closed the card underneath it. Containment cannot mix unrelated surfaces up;
+ * document order can, and did.
  *
  * Registration order IS open order for every surface a visitor can reach, because they open one
  * at a time — each from a control of the surface below it. The one shape where the two part
  * company is a pair mounted in a SINGLE commit: registration happens in `React.useEffect`, which
- * runs CHILD-FIRST, so a nested inner surface registers BEFORE its outer one and the OUTER one
- * answers `Escape`. No surface in this product has that shape (both policy modals are mounted
- * conditionally, by a state change the visitor causes), it is pinned as-is in
- * `tests/render/consent-modal-semantics.test.tsx`, and a future overlay pair that needs its
- * inner surface on top opens that surface in a later commit.
+ * runs CHILD-FIRST, so a nested inner surface registers BEFORE its outer one and "last
+ * registered" names the surface UNDERNEATH. Pass 2 is what stops that being B1's harm in a new
+ * shape (CODE-REV-CROSS-02 r1 N2). No surface in this product nests today — both policy modals
+ * are siblings, mounted conditionally by a state change the visitor causes — so the tiebreak
+ * changes nothing a visitor can reach; it is there for the next overlay pair, and both shapes
+ * are pinned in `tests/render/consent-modal-semantics.test.tsx`.
  */
 function topmostSurface(): StackEntry | undefined {
-  for (let index = surfaceStack.length - 1; index >= 0; index -= 1) {
+  let top: StackEntry | undefined;
+  let topContainer: HTMLElement | null = null;
+  let index = surfaceStack.length - 1;
+  for (; index >= 0; index -= 1) {
     const entry = surfaceStack[index]!;
     const container = entry.read().containerRef.current;
-    if (container === null || container.isConnected) return entry;
+    if (container === null || container.isConnected) {
+      top = entry;
+      topContainer = container;
+      break;
+    }
   }
-  return undefined;
+  if (top === undefined) return undefined;
+  // A `null` incumbent renders no node, so nothing can be nested inside it and open order
+  // decides alone.
+  for (index -= 1; topContainer !== null && index >= 0; index -= 1) {
+    const entry = surfaceStack[index]!;
+    const container = entry.read().containerRef.current;
+    if (container === null || !container.isConnected) continue;
+    if (!topContainer.contains(container)) continue;
+    top = entry;
+    topContainer = container;
+  }
+  return top;
 }
 
 function handleDocumentKeydown(event: KeyboardEvent): void {

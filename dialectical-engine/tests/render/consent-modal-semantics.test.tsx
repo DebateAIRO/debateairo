@@ -151,20 +151,26 @@ describe("consent modal semantics helper", () => {
     expect(outerClose).toHaveBeenCalledTimes(0);
   });
 
-  it("delivers one Escape to the LAST-REGISTERED surface of a pair mounted in ONE commit", async () => {
-    // The one arrangement where "opened last" and "painted on top" part company, pinned here so
-    // it is on the record rather than discovered. The two surfaces mount in ONE commit, the
-    // inner as a React CHILD of the outer; React runs effects CHILD-FIRST, so registration order
-    // is [inner, outer] and the OUTER one — the surface underneath — answers Escape.
+  it("delivers one Escape to the nested INNER surface of a pair mounted in ONE commit", async () => {
+    // PROPERTY (V-20 (b′)): when one open surface's container is a DOM DESCENDANT of another
+    // open surface's container, Escape reaches the DESCENDANT — whatever order the two
+    // registered in — and exactly one `onClose` runs.
     //
-    // Before V-20 (b) this case asserted the reverse, because the rank was document position and
-    // containment won outright. Open order was ruled on 2026-09-07 (CODE-REV-S02-C9 r1 B1): the
-    // document-order rule handed Escape to the cookie card UNDERNEATH an open sign-up policy on
-    // `/sign-up`, an arrangement a visitor reaches and this one is not. NO SURFACE IN THIS
-    // PRODUCT MOUNTS A PAIR IN ONE COMMIT — both policy modals are mounted conditionally, by a
-    // state change the visitor causes, so every reachable pair registers in the order it opened.
-    // A future overlay pair that needs its inner surface on top opens it in a LATER commit,
-    // which the case below pins.
+    // This is the one arrangement where open order alone gets it wrong. The two surfaces mount
+    // in ONE commit, the inner as a React CHILD of the outer; React runs effects CHILD-FIRST, so
+    // registration order is [inner, outer] and "last registered" names the OUTER surface — the
+    // one UNDERNEATH. Under plain open order (V-20 (b), shipped at c334136d) the outer surface
+    // answered, which is CODE-REV-S02-C9 r1 B1's exact harm in a different shape: the key closes
+    // the surface the visitor is not looking at, discards what they had in it, and leaves focus
+    // trapped in the surface that refused the key (CODE-REV-CROSS-02 r1 N2, measured).
+    //
+    // (b′) keeps open order and adds a CONTAINMENT-ONLY tiebreak: the last connected entry is
+    // the incumbent, and a lower entry replaces it only when the incumbent's container
+    // `contains` it. There is no FOLLOWING arm — document order between UNRELATED surfaces is
+    // what produced B1 and it is not consulted anywhere. No surface in this product nests today
+    // (both policy modals are siblings, mounted conditionally by a state change the visitor
+    // causes — CODE-REV-CROSS-02 r1's sweep), so the tiebreak changes nothing a visitor can
+    // reach; it exists so the next nested overlay does not re-create B1.
     const outerClose = vi.fn();
     const innerClose = vi.fn();
 
@@ -175,12 +181,21 @@ describe("consent modal semantics helper", () => {
     );
     expect(openSurfaceCount()).toBe(2);
 
+    // The premise, asserted rather than assumed: the inner container really is nested inside
+    // the outer one, so a pass here cannot come from the two being unrelated siblings.
+    const outerContainer = document.querySelector<HTMLElement>('[data-surface="outer"]')!;
+    const innerContainer = document.querySelector<HTMLElement>('[data-surface="inner"]')!;
+    expect(
+      outerContainer.contains(innerContainer),
+      "the inner surface's container is nested inside the outer one's"
+    ).toBe(true);
+
     await act(async () => {
       pressEscape();
     });
 
-    expect(outerClose).toHaveBeenCalledTimes(1);
-    expect(innerClose).toHaveBeenCalledTimes(0);
+    expect(innerClose).toHaveBeenCalledTimes(1);
+    expect(outerClose).toHaveBeenCalledTimes(0);
   });
 
   it("delivers one Escape to a nested inner surface that opened in a LATER commit", async () => {
@@ -212,11 +227,14 @@ describe("consent modal semantics helper", () => {
     expect(outerClose).toHaveBeenCalledTimes(0);
   });
 
-  it("delivers one Escape to exactly one of three surfaces, and it is the last registered", async () => {
-    // Three at once, mounted in ONE commit and nested, so child-first registration order is
-    // [c, b, a] and `a` — the last registered — takes the key. What the assertion pins is that
-    // EXACTLY ONE `onClose` runs (REQ-REV-01 B3), whichever it is: `toEqual` on the whole array
-    // fails both if a second surface acts and if the wrong one does.
+  it("delivers one Escape to exactly one of three surfaces, and it is the innermost", async () => {
+    // Three at once, mounted in ONE commit and nested `a > b > c`, so child-first registration
+    // order is [c, b, a] and `a` — the last registered — is the incumbent the walk starts at.
+    // (b′) then descends the containment chain twice, `a` → `b` → `c`, so the INNERMOST surface
+    // takes the key: the tiebreak repeats until nothing deeper is open, it does not stop at the
+    // first descendant it meets. What the assertion pins is that EXACTLY ONE `onClose` runs
+    // (REQ-REV-01 B3), whichever it is: `toEqual` on the whole array fails both if a second
+    // surface acts and if the wrong one does.
     const closed: string[] = [];
     const record = (name: string) => () => {
       closed.push(name);
@@ -235,7 +253,7 @@ describe("consent modal semantics helper", () => {
       pressEscape();
     });
 
-    expect(closed).toEqual(["a"]);
+    expect(closed).toEqual(["c"]);
   });
 
   it("delivers one Escape by OPEN order when two surfaces opened out of DOM order", async () => {
@@ -418,14 +436,66 @@ describe("consent modal semantics helper", () => {
     ]);
   });
 
+  it("delivers Escape to a registered surface that renders NO container of its own", async () => {
+    // PROPERTY (CODE-REV-CROSS-02 r1 N1): an entry whose container is `null` is RETURNED by the
+    // walk, not skipped — the third branch `topmostSurface()`'s doc comment states as a
+    // behaviour, and the only one nothing pinned. The comment claimed it; mutant M5 `NONULL`
+    // (`container !== null && container.isConnected`) survived every suite in the mission.
+    //
+    // A container-less surface is also the one incumbent no containment tiebreak can displace:
+    // with no node there is nothing for a lower entry to be a descendant OF, so open order
+    // decides alone. Both halves are asserted here.
+    //
+    // Unreachable in this product today — both consumers attach their container ref before the
+    // registering effect runs — so this is a contract pin for the next consumer, and it is GREEN
+    // at BASE by construction: its RED is the mutant's, not the base helper's.
+    const belowClose = vi.fn();
+    const containerlessClose = vi.fn();
+    const captured: { ref: { current: HTMLElement | null } | null } = { ref: null };
+
+    function ContainerlessSurface({ onClose }: { onClose: () => void }): ReactNode {
+      const containerRef = useRef<HTMLElement | null>(null);
+      const initialFocusRef = useRef<HTMLElement | null>(null);
+      captured.ref = containerRef;
+      useModalSurface(true, { containerRef, initialFocusRef, onClose });
+      return null;
+    }
+
+    await render(
+      <>
+        <TestSurface open name="below" onClose={belowClose} />
+        <ContainerlessSurface onClose={containerlessClose} />
+      </>
+    );
+    expect(openSurfaceCount()).toBe(2);
+
+    // The precondition, asserted rather than assumed: the later-registered surface really holds
+    // a `null` container, so a pass cannot come from the `isConnected` branch instead.
+    expect(captured.ref!.current, "the container-less surface has no container node").toBeNull();
+    expect(
+      document.querySelector('[data-surface="below"]'),
+      "the surface underneath is rendered, so it is a real rival for the key"
+    ).not.toBeNull();
+
+    await act(async () => {
+      pressEscape();
+    });
+
+    expect(containerlessClose).toHaveBeenCalledTimes(1);
+    expect(belowClose).toHaveBeenCalledTimes(0);
+  });
+
   it("traps Tab in the same surface Escape reaches, for the same nested pair", async () => {
     // The Tab trap reads the same `topmostSurface()` the Escape branch reads, so the nested pair
-    // is asserted for Tab too and the two must agree. Mounted in ONE commit, that surface is the
-    // OUTER one (child-first registration), so Tab from `close-outer` advances to the outer
-    // surface's OWN next control — `outer-2` — instead of jumping into the inner surface.
-    // Under the document-order rank this landed on `close-inner`; the pair moved together, which
-    // is the property, and `outer-2` is only reachable as the answer if Tab and Escape read the
-    // same entry.
+    // is asserted for Tab too and the two must agree — that agreement IS the property, and the
+    // title states it rather than an outcome. Under (b′) the surface Escape reaches is the INNER
+    // one, so Tab from `close-outer` — a control OUTSIDE the trapped surface — enters the inner
+    // surface at its first candidate, `close-inner`.
+    //
+    // `outer-2` is the discriminator and is why it is rendered: it is the outer surface's own
+    // next control, and it is exactly where Tab lands if the trap reads the OUTER entry. So this
+    // case fails in a NAMED direction under plain open order (V-20 (b)) as well as under a
+    // document-order rank, instead of merely failing.
     await render(
       <TestSurface open name="outer" onClose={vi.fn()} buttons={["outer-2"]}>
         <TestSurface open name="inner" onClose={vi.fn()} />
@@ -437,7 +507,7 @@ describe("consent modal semantics helper", () => {
       pressTab();
     });
 
-    expect(document.activeElement).toBe(labelled("outer-2"));
+    expect(document.activeElement).toBe(labelled("close-inner"));
   });
 
   it("moves initial focus to the element the caller names, not the first one", async () => {

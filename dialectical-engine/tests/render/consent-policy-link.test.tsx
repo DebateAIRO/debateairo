@@ -273,6 +273,16 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(card(), "the card is gone").toBeNull();
     expect(bar(), "and no bar returns").toBeNull();
     expect(raw(), "byte-for-byte what was stored").toBe(stored);
+    // CODE-REV-CROSS-01 r1 N1. The third of S01-R18's three focus landings, and the only one
+    // that was unpinned: no bar returns here, so `returnFocusRef.current` is `null` at the
+    // cleanup and the helper's SURVIVING-CAPTURE branch is the only one that can run. The
+    // sibling case at `:312` covers the same entry point with nothing stored, where a bar DOES
+    // return; `:359` covers the bar direction. Asserted in the existing `it()`, so no count
+    // moves (COMMON §10.42).
+    expect(
+      document.activeElement,
+      "focus returns to the Settings opener, which never left the page"
+    ).toBe(labelled("Cookie preferences"));
   });
 
   it("gives the card its initial focus and its Tab wrap from the shared helper", () => {

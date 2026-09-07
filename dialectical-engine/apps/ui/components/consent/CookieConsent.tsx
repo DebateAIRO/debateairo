@@ -131,7 +131,7 @@ export function CookieConsent() {
    * cleanup reads it. This component still moves no focus itself; it lends a node and the
    * ONE helper decides (SPEC §Out of scope bans a second implementation).
    */
-  const manageRef = useRef<HTMLButtonElement | null>(null);
+  const chooseRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     setSurface(readConsent() === null ? "bar" : "silent");
@@ -189,13 +189,24 @@ export function CookieConsent() {
 
   if (surface === "card") {
     /**
-     * **DOM ORDER IS LOAD-BEARING, and this is the whole of it.** The shared
-     * helper resolves which of two unrelated open surfaces is topmost by
-     * DOCUMENT POSITION — `CONTAINED_BY || FOLLOWING` — and not by the order
-     * they opened in (S02 `DECISIONS.md` 2026-09-07, CODE-REV-S02-C5C6 r1 N2,
-     * measured; ticket `t_457c9898`). The policy modal is therefore the card's
-     * LATER SIBLING: with the two swapped, one press of the dismiss key closes
-     * the CARD and leaves the policy standing over nothing. `S01-S40` is the pin.
+     * **THE ARRANGEMENT BELOW IS A RECORDED CONSTRAINT, NOT THE MECHANISM.**
+     * The policy modal is the card's LATER SIBLING because V-20 recorded that
+     * shape, and `S01-S40` pins it — but nothing about which surface answers
+     * the dismiss key now depends on it. The shared helper resolves two
+     * UNRELATED open surfaces by the order they OPENED in, and applies
+     * containment only where one surface is nested inside the other; it makes
+     * no `compareDocumentPosition` call and has no `FOLLOWING` arm (V-20 (b′),
+     * `modalSemantics.ts` `topmostSurface()`; ADR-0022's two 2026-09-07
+     * addenda). Swap these two and the policy still answers, because it is
+     * still the one opened last.
+     *
+     * The sentences this replaces said the opposite — "DOM ORDER IS
+     * LOAD-BEARING … topmost by DOCUMENT POSITION — `CONTAINED_BY ||
+     * FOLLOWING` — and not by the order they opened in", citing ticket
+     * `t_457c9898`. Every clause of that was false from `c334136d` onward
+     * (CODE-REV-CROSS-02 r1 N5, measured); the FOLLOWING arm it described is
+     * the defect CODE-REV-S02-C9 r1 B1 reported, and `t_457c9898` carries the
+     * same dead premise.
      * (Written without spelling that key: S01-S45's slice-wide guard is
      * grep-shaped and a grep does not know what a comment is — `COMMON.md` §8,
      * and CODE-S01-C5 F1 measured a JSDoc mention counting as a hit.)
@@ -215,7 +226,7 @@ export function CookieConsent() {
           onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
           onDismiss={dismiss}
           onRequestPolicy={(): void => setPolicyOpen(true)}
-          returnFocusRef={manageRef}
+          returnFocusRef={chooseRef}
         />
         {policyOpen && (
           <PrivacyPolicyModal open mode="read" onClose={(): void => setPolicyOpen(false)} />
@@ -229,7 +240,7 @@ export function CookieConsent() {
       onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
       onChoose={openCard}
       onAcceptAll={(): void => settle(decisionFor("accept-all"))}
-      chooseRef={manageRef}
+      chooseRef={chooseRef}
     />
   );
 }

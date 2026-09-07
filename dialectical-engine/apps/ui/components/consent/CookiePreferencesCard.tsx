@@ -62,15 +62,24 @@ export type CookiePreferencesCardProps = {
   /** Opens the S02 policy modal in read-only mode, over the card (S01-R20). */
   onRequestPolicy: () => void;
   /**
-   * Handed straight to the shared helper, which uses it when the opener it captured did
-   * not survive the commit that opened this card (S01-R18, V-22). The caller owns it
-   * because the control it names — the bar's `Choose what to store` — is unmounted while
-   * this card is open and comes back as a fresh node; nothing this component could capture
-   * would still be on the page at close.
+   * Handed straight to the shared helper, which uses it when the opener it captured is not
+   * a usable element AT CLOSE — because the commit that opened this card removed it, or
+   * because it left the page while the card was open (S01-R18, V-22). The trigger is the
+   * opener's state when the card closes, never which commit put it in that state
+   * (CODE-REV-CROSS-01 r1 N3; the earlier wording named only the opening commit and so
+   * described a strictly narrower rule than the helper ships). The caller owns it because
+   * the control it names — the bar's `Choose what to store` — is unmounted while this card
+   * is open and comes back as a fresh node; nothing this component could capture would
+   * still be on the page at close.
    *
-   * Spelled without the word this file's own source-text guard bans for the page-wide
-   * object (`consent-card.test.tsx`), which a grep cannot tell from a comment
-   * (`COMMON.md` §8).
+   * "The page" here IS the page-wide object, spelled around on purpose: this file's own
+   * source-text guards ban that word, the dismiss key's name and the focus call outright,
+   * comments included, because a grep cannot tell a comment from code (`COMMON.md` §8;
+   * CODE-S01-C5 F1 measured a JSDoc mention counting as a hit). Both guards are live —
+   * `tests/render/consent-card.test.tsx` scans this file alone,
+   * `tests/render/consent-policy-link.test.tsx` scans it beside `CookieConsent.tsx`, and
+   * `tests/render/consent-guards.test.tsx` (S01-S45) scans the whole directory bar the
+   * helper. Rewriting this paragraph with the plain word turns the first of them RED.
    */
   returnFocusRef?: RefObject<HTMLElement | null>;
 };

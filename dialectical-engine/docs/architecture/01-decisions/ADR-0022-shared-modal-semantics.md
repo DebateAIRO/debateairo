@@ -151,6 +151,63 @@ both slices in ONE document, in `layout.tsx`'s order — and by five in
 `tests/render/consent-modal-semantics.test.tsx`. **Status: this is the orchestrator's ruling under
 V-20 and V may undo it; the cost of undoing is this one function.**
 
+### Addendum 2026-09-07 — a CONTAINMENT-ONLY tiebreak on top of open order (V-20 (b′))
+
+Appended by seat `CODE-CROSS-03` as the one product change ticket `t_ed4c5e73` authorises;
+nothing above this heading is edited. The addendum directly above ("topmost is the surface
+opened LAST", V-20 (b)) keeps every sentence except its last two, which said the OUTER surface
+of a pair mounted in one commit answers `Escape` and that the shape is pinned as-is: those are
+superseded here.
+
+**`topmostSurface()` now runs two passes.** Pass 1 is unchanged — walk back from the last
+registered entry and take the first whose container is `null` or still connected. Pass 2 keeps
+scanning downwards and replaces the incumbent by any connected entry whose container the
+incumbent's container `contains` (`Node.contains`), repeating until nothing deeper is open. **So
+`Escape` reaches the innermost open surface of a nested group, and open order decides everything
+else.** The exported surface, the single `document` listener, the focus trap, the focus return,
+the `null`-container branch and the detached-entry skip are all unchanged.
+
+Why: (b) as ruled shipped a behaviour INVERSION for the one shape where open order and paint
+order part company. React runs effects child-first, so a pair mounted in a SINGLE commit
+registers `[inner, outer]` and "last registered" names the surface UNDERNEATH — one `Escape`
+would close the outer surface, discard whatever the visitor had in it, and leave focus trapped
+in the inner surface that refused the key. That is `CODE-REV-S02-C9` r1 **B1**'s exact harm in a
+different shape, reported as `CODE-REV-CROSS-02` r1 **N2** and measured by that seat before it
+was proposed: under the containment variant the full consent suite set ran
+`3 failed | 190 passed (193)`, the three failures being exactly the three synthetic cases that
+existed to pin the inversion, every cross-slice case green.
+
+**Why containment and not the whole DOM rank.** The previous rule was `CONTAINED_BY ||
+FOLLOWING`, and it was the `FOLLOWING` arm that produced B1: it ranked two UNRELATED surfaces —
+the cookie card, mounted after `{children}` by `app/layout.tsx`, and the sign-up policy inside
+them — by an accident of mount position. `CONTAINED_BY` cannot do that, because it only ever
+relates a surface to one that encloses it, which is a real z-order the browser also paints. The
+ADR's own argument against a DOM rank ("it would restate the ladder in TypeScript") is answered
+rather than abandoned: one `Node.contains` call, on the one relation where the DOM and the paint
+agree by construction, and no comparison at all between unrelated surfaces.
+
+No surface in this repository nests today — both policy modals are conditional siblings — so
+this changes nothing a visitor can reach; it removes the trap for the shape they cannot. Pinned
+by four cases in `tests/render/consent-modal-semantics.test.tsx` (the nested pair in one commit,
+the nested pair in a later commit, the three-deep chain, and the `Tab` trap reading the same
+entry) and left green by all seven of `tests/render/consent-cross-slice.test.tsx`, so B1 stays
+discharged. **Status: this is the orchestrator's ruling under V-20 and V may undo it; the cost
+of undoing is the second loop of one function.**
+
+### Addendum 2026-09-07 — correction to the V-22 addendum's trigger clause (CODE-REV-CROSS-01 r1 N3)
+
+The V-22 addendum above describes `returnFocusRef` as "the control focus returns to when the
+opener captured at open did not survive the opening commit". That names the CAUSE where the code
+tests the STATE: `modalSemantics.ts`'s cleanup evaluates `opener.isConnected` **at close**, so
+the named control also serves an opener that was on the page at open and left the document while
+the surface was open — a strictly broader rule than the sentence, and one the case
+`returns focus to the named control when the captured opener has since left the page` already
+pinned. Read that clause as: **when the captured opener is not a usable element at close —
+because the opening commit removed it, or because it left the document while the surface was
+open.** The addendum's decision and its precedence sentence (surviving-capture-first, not
+named-control-first) are unaffected. The same clause is corrected in place in the
+`ModalSurface` member's JSDoc and in `CookiePreferencesCard`'s prop doc.
+
 ## Options considered
 
 - **A React context provider owning the stack.** Rejected: it would force slice S01's

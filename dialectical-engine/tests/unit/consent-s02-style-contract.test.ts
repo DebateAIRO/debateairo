@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 // `.js`, not `.ts`: the root `tsconfig.json` resolves modules as `node16`, which requires an
 // explicit extension on a relative ESM import. Same idiom as `tests/unit/t9-mode-tokens.test.ts:326`.
 import { contrastRatio } from "../support/contrast.js";
+import { S02_CLOSE_MARKER, S02_OPEN_MARKER } from "../support/consentMarkers.js";
 
 /**
  * S02-C8 — the style contract for slice S02 of mission `consent-ui`.
@@ -26,8 +27,11 @@ const root = process.cwd();
 const globalsPath = resolve(root, "apps/ui/app/globals.css");
 const css = readFileSync(globalsPath, "utf8");
 
-const OPEN_MARKER = "/* === consent-ui S02 === */";
-const CLOSE_MARKER = "/* === end consent-ui S02 === */";
+// The marker literals live in `tests/support/consentMarkers.ts`, so this suite and S01's
+// `tests/render/consent-bar.test.tsx` read the same bytes across the slice boundary
+// (CODE-REV-S02-C9 r1 N3). The local aliases keep this file's existing call sites unchanged.
+const OPEN_MARKER = S02_OPEN_MARKER;
+const CLOSE_MARKER = S02_CLOSE_MARKER;
 
 function occurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
@@ -209,7 +213,7 @@ function s02Block(): string {
 }
 
 describe("S02-C8 consent-ui style contract", () => {
-  it("S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
+  it("S02-S59 · writes no duplicated comment inside the S02 block", () => {
     // THE ONE THING `stripComments()` MADE INVISIBLE (orchestrator note on `t_4f97ca86`,
     // 2026-09-07 03:09, from `CODE-S02-C8-REWORK-R1` R1). Every other assertion in this file
     // reads the block through `stripComments()`, so a comment DUPLICATED inside the S02 block —
@@ -218,12 +222,25 @@ describe("S02-C8 consent-ui style contract", () => {
     // stylesheet carries, and a paragraph pasted twice is a real defect that nothing else here
     // can see. The `> 0` arm is a satisfiability arm: an empty comment list would satisfy the
     // uniqueness assertion vacuously, which is the `TOOLING-TRAPS` "guard that cannot fail" class.
+    //
+    // It has its own `it()` because comment uniqueness is not block delimitation
+    // (CODE-REV-S02-C9 r1 N2): it rode inside the delimitation case below only because the
+    // packet that ordered it said "the FIRST line of that suite's next lawful edit", and a case
+    // whose title does not describe its first assertion is the class N1 and N2 both name. The
+    // operands are unchanged; only the `it()` they sit in is new.
     const comments = s02Block().match(/\/\*[\s\S]*?\*\//g) ?? [];
     expect(comments.length, "the S02 block is commented at all").toBeGreaterThan(0);
     expect(new Set(comments).size, "no comment is duplicated inside the S02 block").toBe(
       comments.length
     );
+  });
 
+  it("S02-S59 · appends exactly one delimited S02 block and ends the file with it", () => {
+    // The CO-OWNED property (CODE-REV-S02-C9 r1 N4): since S01's own case relaxed its
+    // end-of-file assertion for the S02-S66 merge, `after.trim() === ""` below is the only
+    // arm in the mission that reds when S02's block is NESTED INSIDE S01's — S01's closing
+    // marker then follows S02's, so the tail is not empty. `tests/render/consent-bar.test.tsx`
+    // names this case as the co-owner from its side.
     expect(occurrences(css, OPEN_MARKER)).toBe(1);
     expect(occurrences(css, CLOSE_MARKER)).toBe(1);
     expect(css.indexOf(OPEN_MARKER)).toBeLessThan(css.indexOf(CLOSE_MARKER));

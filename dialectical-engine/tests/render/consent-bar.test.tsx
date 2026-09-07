@@ -7,6 +7,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
 import { CookieBar } from "../../apps/ui/components/consent/CookieBar.js";
+import {
+  S01_CLOSE_MARKER,
+  S01_OPEN_MARKER,
+  S02_CLOSE_MARKER,
+  S02_OPEN_MARKER
+} from "../support/consentMarkers.js";
 
 // The acceptance command is pinned to the lane root, so source fixtures resolve
 // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
@@ -16,8 +22,11 @@ const barSource = (): string =>
 const globalsSource = (): string =>
   readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
 
-const OPEN_MARKER = "/* === consent-ui S01 === */";
-const CLOSE_MARKER = "/* === end consent-ui S01 === */";
+// The four marker literals live in `tests/support/consentMarkers.ts`, so S01's suite and S02's
+// read the same bytes and a rename cannot fail one slice's file with the other slice's message
+// (CODE-REV-S02-C9 r1 N3). The local aliases keep this file's existing call sites unchanged.
+const OPEN_MARKER = S01_OPEN_MARKER;
+const CLOSE_MARKER = S01_CLOSE_MARKER;
 const COLOUR_LITERAL = /oklch\(|#[0-9a-f]{3,8}\b|\brgba?\(/i;
 
 /** The ONE delimited S01 block, markers included (S01-R25, S01-S16). */
@@ -226,7 +235,7 @@ describe("S01-C3 the cookie bar (10a)", () => {
     expect(bar.textContent?.includes("×"), "the bar renders no close glyph").toBe(false);
   });
 
-  it("ships R09's geometry inside ONE delimited S01 block at the end of globals.css", () => {
+  it("ships R09's geometry inside ONE delimited S01 block, followed only by whitespace or S02's delimited block", () => {
     // PROPERTY (S01-R09, S01-R25): every one of R09's numbers appears in the
     // shipped stylesheet as written, the slice's rules live in exactly ONE
     // delimited block appended after every existing rule, and every colour in
@@ -250,9 +259,17 @@ describe("S01-C3 the cookie bar (10a)", () => {
     // form that survives the merge: after S01's closing marker there is nothing but whitespace,
     // or S02's ONE delimited block and then nothing but whitespace. A third block, a stray
     // rule between the two, or anything at all after S02's closing marker still fails here.
+    //
+    // WHAT THE RELAXATION GAVE UP, and who now owns it (CODE-REV-S02-C9 r1 N4, mutant GX3):
+    // this case no longer catches S02's whole block being NESTED INSIDE S01's — the tail below
+    // is empty in that arrangement and every assertion here passes. The CO-OWNER of that
+    // property is `tests/unit/consent-s02-style-contract.test.ts`'s
+    // `S02-S59 · appends exactly one delimited S02 block and ends the file with it`, whose
+    // `after.trim() === ""` arm reds on GX3 because S01's closing marker then follows S02's.
+    // Neither file pins "S01's block is at the end" alone any more; the pair does.
     const tail = css.slice(css.indexOf(CLOSE_MARKER) + CLOSE_MARKER.length);
-    const S02_OPEN = "/* === consent-ui S02 === */";
-    const S02_CLOSE = "/* === end consent-ui S02 === */";
+    const S02_OPEN = S02_OPEN_MARKER;
+    const S02_CLOSE = S02_CLOSE_MARKER;
     const s02At = tail.indexOf(S02_OPEN);
     if (s02At === -1) {
       expect(tail.trim(), "nothing but whitespace follows the S01 block").toBe("");
