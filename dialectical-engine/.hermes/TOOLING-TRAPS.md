@@ -2257,3 +2257,35 @@ and drop comment lines explicitly (`grep -v '^#'`). Better still, keep the raw c
 its own file and let the annotated record cite it.** And when an identity gate breaks, DIFF the
 two extracts and read the added line before touching the code — the line names the cause in one
 look. Cost here: ~2 minutes, and a few seconds of believing a clean typecheck had regressed.
+
+## CORRECTION to "Restore the default is NOT a mutant for REQUIRED" — the impossibility claim was too broad
+Filed by lane/dev-health rework round 1 (2026-09-07), correcting the entry above, which is left
+standing because this file is append-only. Codex r1 (R1) refuted its universal half and is right.
+
+What the entry got right, and what it overstated. RIGHT: no RUNTIME row can observe a restored
+default, because a default is only visible at a call site that omits the argument, and once every
+call site names its category no such call site exists. Mutant b really does survive every runtime
+check, and that measurement stands. **OVERSTATED: "a mutant on a DECLARATION cannot discriminate a
+property whose whole content is what the CALL SITES do."** It cannot be discriminated at RUNTIME.
+It is perfectly observable at the TYPE level, and the entry should not have generalised from one
+layer to the language.
+
+The observer that works, and that the entry should have reached for: a **compile-negative contract
+check** living in the ordinary test file. Read the module's committed source, append one call that
+omits the argument, compile that virtual source in memory with `typescript-classic`, and require a
+TS2554 whose position lies past the end of the real source. Restore the default and the arity error
+disappears, so the check goes red. The helper stays private, nothing is exported for testing, and
+no invalid call is ever executed. Implemented at `tests/unit/p2-auth-risk.test.ts`.
+
+Two guards that check needs, both learned here. (1) Filter the arity diagnostic by POSITION, or a
+stray arity error inside the module can pass for the probe's. (2) Assert that no "cannot find name"
+diagnostic mentions the helper — if it stopped resolving there would be no arity error either, and
+"no arity error" would read exactly like a restored default. Measured with `noResolve: true`: the
+omitting probe yields 85 semantic diagnostics of which exactly 1 is TS2554, and the naming probe
+yields 84 of which 0 are; the rest is unresolved-import noise that the filters drop.
+
+**Rule, restated: before writing "X cannot be pinned", name the LAYER — runtime, type, or build —
+and check the other two.** A mutant that survives every runtime check is evidence that the runtime
+layer is blind to it, never evidence that nothing can see it. Cost of the overstatement: one review
+round. Mutating a call site (the earlier entry's rule) remains the right way to show the SHIPPED
+compiler agrees — the contract check and that mutant are complementary, not alternatives.

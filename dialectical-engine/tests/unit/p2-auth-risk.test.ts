@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import ts from "typescript-classic";
 import type { Pool } from "pg";
 import {
   encrypt,
@@ -289,5 +292,110 @@ describe("F-POISONED-REQUIRED-CATEGORY every rejection names the stage that made
       expect(AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES)
         .toContain(authenticationRiskSignalPoisonCategory(error));
     }
+  });
+});
+
+/**
+ * R1 (codex r1). The requiredness of `poisoned(category)` had NO PERSISTENT OBSERVER.
+ * Restoring the default leaves every existing argument in place, so every runtime row
+ * above stays green — mutant b survived precisely because of that. The runtime rows are
+ * not at fault and cannot be: a default is only observable at a call site that OMITS the
+ * argument, and the whole point of this ticket is that no such call site exists.
+ *
+ * A TYPE contract can observe it. Compile the module's own committed source with one
+ * extra call that omits the category, and require the compiler to reject that call for
+ * ARITY. Restore the default and the rejection disappears, so this check goes red — which
+ * is the regression protection outcome §3 asks for.
+ *
+ * The helper stays private and no invalid call is ever executed: the probe is a virtual
+ * source assembled in memory from the file on disk, compiled, and discarded. Nothing is
+ * exported for testing and the production signature is untouched.
+ *
+ * The programmatic compiler here is `typescript-classic` (the repo's 5.9.3 alias, already
+ * used by the S1-1 oracle) because the shipped `typescript` 7.0.2 is the native port. That
+ * the SHIPPED compiler agrees is evidenced separately by mutant b2, which strips the
+ * argument at a real call site and reads TS2554 out of `pnpm exec tsc`.
+ */
+const AUTH_RISK_SOURCE_PATH = fileURLToPath(
+  new URL("../../packages/db/src/auth-risk.ts", import.meta.url)
+);
+const CONTRACT_PROBE_FILE = "auth-risk.contract-probe.ts";
+const ARITY_DIAGNOSTIC = 2554;
+const UNRESOLVED_NAME_DIAGNOSTIC = 2304;
+
+type ContractProbe = Readonly<{
+  arity: readonly ts.Diagnostic[];
+  unresolvedHelper: readonly ts.Diagnostic[];
+}>;
+
+/** Compile the committed auth-risk source plus one appended call, in memory. */
+function compileWithProbe(call: string): ContractProbe {
+  const source = readFileSync(AUTH_RISK_SOURCE_PATH, "utf8");
+  const text = `${source}\n// contract probe — assembled in memory, never written to disk\n${call}\n`;
+  const options: ts.CompilerOptions = {
+    strict: true,
+    noEmit: true,
+    // Module resolution is irrelevant to an ARITY question and would drag the whole
+    // workspace in. The unresolved-import noise it produces is filtered out below.
+    noResolve: true,
+    skipLibCheck: true,
+    target: ts.ScriptTarget.ES2022
+  };
+  const libraryPath = ts.getDefaultLibFilePath(options);
+  const libraryText = readFileSync(libraryPath, "utf8");
+  const host: ts.CompilerHost = {
+    getSourceFile: (name, languageVersion) =>
+      name === CONTRACT_PROBE_FILE
+        ? ts.createSourceFile(name, text, languageVersion, true)
+        : name === libraryPath
+          ? ts.createSourceFile(name, libraryText, languageVersion, true)
+          : undefined,
+    getDefaultLibFileName: () => libraryPath,
+    writeFile: () => {},
+    getCurrentDirectory: () => "/",
+    getCanonicalFileName: (name) => name,
+    useCaseSensitiveFileNames: () => true,
+    getNewLine: () => "\n",
+    fileExists: (name) => name === CONTRACT_PROBE_FILE || name === libraryPath,
+    readFile: (name) =>
+      name === CONTRACT_PROBE_FILE ? text : name === libraryPath ? libraryText : undefined
+  };
+  const program = ts.createProgram([CONTRACT_PROBE_FILE], options, host);
+  const probeFile = program.getSourceFile(CONTRACT_PROBE_FILE);
+  if (probeFile === undefined) throw new Error("CONTRACT_PROBE_NOT_COMPILED");
+  const diagnostics = program.getSemanticDiagnostics(probeFile);
+  return Object.freeze({
+    // Only an arity complaint about the APPENDED call counts: `start` must sit past the
+    // end of the committed source, so a stray arity error inside the module cannot pass
+    // for the probe's.
+    arity: diagnostics.filter(
+      (diagnostic) => diagnostic.code === ARITY_DIAGNOSTIC
+        && typeof diagnostic.start === "number" && diagnostic.start >= source.length
+    ),
+    // The guard against a silent false negative: if `poisoned` stopped resolving, there
+    // would be no arity error either, and "no arity error" would read like a restored
+    // default. This makes that case fail loudly instead.
+    unresolvedHelper: diagnostics.filter(
+      (diagnostic) => diagnostic.code === UNRESOLVED_NAME_DIAGNOSTIC
+        && ts.flattenDiagnosticMessageText(diagnostic.messageText, " ").includes("poisoned")
+    )
+  });
+}
+
+describe("F-POISONED-REQUIRED-CATEGORY the required category has a persistent observer", () => {
+  it("rejects a category-omitting call for arity — the error a restored default would remove", () => {
+    const omitted = compileWithProbe("poisoned();");
+    expect(omitted.unresolvedHelper).toEqual([]);
+    expect(omitted.arity).toHaveLength(1);
+    expect(ts.flattenDiagnosticMessageText(omitted.arity[0]?.messageText, " "))
+      .toBe("Expected 1 arguments, but got 0.");
+  });
+
+  // The neighbouring control: the check must object to the OMISSION, not to calling the
+  // helper at all. A check that reddened for both would pin nothing.
+  it("accepts a call that names its category", () => {
+    const supplied = compileWithProbe('poisoned("signal-shape");');
+    expect(supplied.unresolvedHelper).toEqual([]);
+    expect(supplied.arity).toEqual([]);
   });
 });

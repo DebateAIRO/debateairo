@@ -38,9 +38,13 @@ const kindSet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_KINDS);
 
 /**
  * Which stage rejected. Bounded by construction: five constants of this module, carrying
- * no ciphertext, no plaintext, no key material and no parser message. Listed in the order
- * the stages run — the two policy/instant arguments are checked before any stored row is
- * examined, then the row's own shape, then its context's decrypt and parse.
+ * no ciphertext, no plaintext, no key material and no parser message.
+ *
+ * The list is a VOCABULARY, not an execution order, and must not be read as one: reading a
+ * stored row decrypts and parses its context BEFORE the evaluator is called at all, so
+ * `context-decrypt` and `context-parse` can precede every other member on that path. Within
+ * the evaluator the argument checks do precede the per-row check, but that is a local fact
+ * about one function, not a property of this array.
  */
 export const AUTHENTICATION_RISK_SIGNAL_POISON_CATEGORIES=Object.freeze([
   "policy-shape","evaluated-at-shape","signal-shape","context-decrypt","context-parse"
@@ -51,7 +55,7 @@ const poisonCategorySet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_POISON_CATEGO
 
 /**
  * The internal category of a poisoned rejection, or null for anything that is not one or
- * whose cause is not one of the three constants. A caller/log path reads the stage through
+ * whose cause is not one of the constants above. A caller/log path reads the stage through
  * this function, so no caller has to reach into `cause` and decide what is safe to print.
  */
 export function authenticationRiskSignalPoisonCategory(
