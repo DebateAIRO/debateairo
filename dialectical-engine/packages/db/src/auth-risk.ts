@@ -97,6 +97,15 @@ export function evaluateAuthenticationRiskSignals(
     throw new TypeError("AUTH_RISK_SIGNAL_SCAN_SATURATED");
   }
   if(!(evaluatedAt instanceof Date)||!Number.isFinite(evaluatedAt.getTime())) poisoned("evaluated-at-shape");
+  // F-AUTH-RISK-RETENTION-LOOP. `retentionMs` is a POLICY argument, held beside
+  // `maxSignals` on the repository (:170-171) and read from the same register row. Its
+  // shape was checked INSIDE the per-signal loop below, which cost two things: a policy
+  // defect was reported under `signal-shape`, and an EMPTY signal list never ran the loop
+  // so the policy went unchecked entirely. Checked once, here, with the other policy
+  // argument. The per-signal AGREEMENT check further down
+  // (`expiresAt - observedAt === retentionMs`) stays in the loop: that is a property of a
+  // SIGNAL, not of the policy.
+  if(!Number.isInteger(retentionMs)||retentionMs<1) poisoned("policy-shape");
   const counts:Record<AuthenticationRiskSignalKind,number>={
     LOGIN_SUCCESS:0,SESSION_CONTEXT_CHANGED:0,RECOVERY_STARTED:0,
     RECOVERY_PROOF_FAILED:0,RECOVERY_COMPLETED:0
@@ -114,7 +123,6 @@ export function evaluateAuthenticationRiskSignals(
       ||!kindSet.has(signal.kind)
       ||!(signal.observedAt instanceof Date)||!Number.isFinite(signal.observedAt.getTime())
       ||!(signal.expiresAt instanceof Date)||!Number.isFinite(signal.expiresAt.getTime())
-      ||!Number.isInteger(retentionMs)||retentionMs<1
       ||signal.expiresAt.getTime()-signal.observedAt.getTime()!==retentionMs
       ||signal.expiresAt.getTime()<=evaluatedAt.getTime()
       ||typeof signal.context!=="object"||signal.context===null
