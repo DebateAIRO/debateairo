@@ -16,3 +16,5 @@ jq 'select(.category=="suspicious")' logs/developer-events.jsonl
 ```
 
 These logs are developer-only diagnostics. Do not persist them to the database, add migrations or log tables for them, or expose them through user-facing pages, components, or API surfaces.
+
+The client-report `obs` stream is a separate V-ordered class: developer JSONL diagnostics remain file-only and are never database-persisted, while client reports use only the closed-enumeration endpoint. Neither class imports or shares the other's transport.

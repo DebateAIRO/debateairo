@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { ReactNode } from "react";
+import { CLIENT_REPORTS, reportClientFault } from "../lib/obs/reporter.js";
 
 type ScoringErrorBoundaryProps = {
   children: ReactNode;
@@ -20,6 +21,10 @@ export class ScoringErrorBoundary extends React.Component<
 
   static getDerivedStateFromError(): ScoringErrorBoundaryState {
     return { hasError: true };
+  }
+
+  componentDidCatch(): void {
+    void reportClientFault(CLIENT_REPORTS.scoring);
   }
 
   render() {
