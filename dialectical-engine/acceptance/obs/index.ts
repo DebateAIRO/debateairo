@@ -8,6 +8,8 @@ import { randomUUID } from "node:crypto";
 import { corpusCase } from "./cases/corpus.js";
 import { identityCanaryCase } from "./cases/identity-canary.js";
 import { schemaManifestCase } from "./cases/schema-manifest.js";
+import { CHAOS_CASES } from "./cases/chaos-common.js";
+import { installerGraphCase } from "./cases/installer-graph.js";
 import {
   OBS_G1_READBACK_MAX_ROWS,
   ObsReadbackFailure,
@@ -22,6 +24,7 @@ export const OBS_G1_CHILD_KILL_GRACE_MS = 250 as const;
 const SAFE_CASE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SAFE_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const SAFE_METRIC = /^[a-z][a-z0-9_]{0,31}$/;
+const SAFE_MISSING_INPUT = /^(?:[A-Z][A-Z0-9_]{1,63}|[a-z0-9][a-z0-9./-]{0,255})$/;
 const FORBIDDEN_ZONE_ROOT = "packages/obs-capture/src/zone";
 const OBS_RUNTIMES = new Set([
   "api",
@@ -82,8 +85,9 @@ export interface SpawnReceipt {
 }
 
 export interface ObsVerdict {
-  readonly kind: "PASS" | "FAIL";
+  readonly kind: "PASS" | "FAIL" | "SKIP";
   readonly code?: string;
+  readonly missing?: string;
   readonly metrics: Readonly<Record<string, number>>;
 }
 
@@ -94,6 +98,7 @@ export interface ObsCaseContext {
     metrics?: Readonly<Record<string, number>>,
   ): ObsVerdict;
   passProcess(receipt: SpawnReceipt, metrics: Readonly<Record<string, number>>): ObsVerdict;
+  skipMissing(input: string, metrics?: Readonly<Record<string, number>>): ObsVerdict;
   fail(code: string, metrics?: Readonly<Record<string, number>>): ObsVerdict;
 }
 
@@ -142,14 +147,16 @@ function safeMetrics(metrics: Readonly<Record<string, number>>): Readonly<Record
 
 function mintVerdict(
   authority: CaseAuthority,
-  kind: "PASS" | "FAIL",
+  kind: "PASS" | "FAIL" | "SKIP",
   metrics: Readonly<Record<string, number>>,
-  code?: string,
+  details: Readonly<{ code?: string; missing?: string }> = {},
 ): ObsVerdict {
   const verdict = Object.freeze({
     kind,
-    ...(code === undefined ? {} : { code }),
-    metrics: safeMetrics(metrics),
+    ...details,
+    metrics: kind === "SKIP" && Object.keys(metrics).length === 0
+      ? Object.freeze({})
+      : safeMetrics(metrics),
   });
   authority.verdicts.add(verdict);
   return verdict;
@@ -161,7 +168,7 @@ function failVerdict(
   metrics: Readonly<Record<string, number>> = { failures: 1 },
 ): ObsVerdict {
   if (!SAFE_CODE.test(code)) throw new ObsHarnessFailure("FAIL_CODE_INVALID");
-  return mintVerdict(authority, "FAIL", metrics, code);
+  return mintVerdict(authority, "FAIL", metrics, { code });
 }
 
 function childEnvironment(
@@ -261,7 +268,7 @@ async function spawnSubject(
       } catch (error) {
         throw readbackFailure(error, "ROW_READBACK_QUERY_FAILED");
       }
-      declaredRunRef = `run:obs-g1:${randomUUID()}`;
+      declaredRunRef = randomUUID();
     }
 
     scratchDirectory = await mkdtemp(join(await realpath(scratchRoot), "obs-g1-"));
@@ -405,6 +412,13 @@ function createContext(repoRoot: string, scratchRoot: string): CaseExecution {
       if (hasRowProof) throw new ObsHarnessFailure("PROCESS_RECEIPT_CONTAINS_ROWS");
       return mintVerdict(authority, "PASS", metrics);
     },
+    skipMissing(input: string, metrics: Readonly<Record<string, number>> = {}): ObsVerdict {
+      if (!SAFE_MISSING_INPUT.test(input) || input.includes("..")) {
+        throw new ObsHarnessFailure("MISSING_INPUT_INVALID");
+      }
+      const safe = Object.keys(metrics).length === 0 ? {} : safeMetrics(metrics);
+      return mintVerdict(authority, "SKIP", safe, { missing: input });
+    },
     fail: (
       code: string,
       metrics?: Readonly<Record<string, number>>,
@@ -510,6 +524,9 @@ export async function runFamily(name: "obs-g1", options: RunFamilyOptions): Prom
           failed = true;
         } else if (verdict.kind === "PASS") {
           line = `${name}/${acceptanceCase.name} PASS(${renderMetrics(verdict.metrics)})`;
+        } else if (verdict.kind === "SKIP" && verdict.missing !== undefined) {
+          const metrics = renderMetrics(verdict.metrics);
+          line = `${name}/${acceptanceCase.name} SKIP(missing: ${verdict.missing}${metrics === "" ? "" : ` ${metrics}`})`;
         } else {
           line = `${name}/${acceptanceCase.name} FAIL(code=${verdict.code} ${renderMetrics(verdict.metrics)})`;
           failed = true;
@@ -533,9 +550,11 @@ const DEFAULT_OBS_G1_CASES: readonly ObsAcceptanceCase[] = Object.freeze([
   corpusCase,
   identityCanaryCase,
   schemaManifestCase,
+  ...CHAOS_CASES,
+  installerGraphCase,
 ]);
 
-function parseFamilyArguments(arguments_: readonly string[]): { readonly only?: readonly string[] } {
+export function parseObsG1Arguments(arguments_: readonly string[]): { readonly only?: readonly string[] } {
   const values = new Map<string, string>();
   for (let index = 0; index < arguments_.length; index += 2) {
     const name = arguments_[index];
@@ -549,7 +568,11 @@ function parseFamilyArguments(arguments_: readonly string[]): { readonly only?: 
   const only = values.get("--only");
   if (only === undefined) return {};
   const patterns = only.split(",");
-  if (patterns.some((pattern) => !SAFE_CASE_NAME.test(pattern.replace(/\*$/u, "")) || pattern.includes("*") && !pattern.endsWith("*"))) {
+  if (patterns.some((pattern) => {
+    if (!pattern.endsWith("*")) return !SAFE_CASE_NAME.test(pattern);
+    const prefix = pattern.slice(0, -1);
+    return prefix === "" || !/^[a-z0-9]+(?:-[a-z0-9]+)*-?$/u.test(prefix);
+  })) {
     throw new ObsHarnessFailure("ONLY_INVALID");
   }
   return { only: Object.freeze(patterns) };
@@ -559,7 +582,7 @@ export async function tryRunObsG1(arguments_: readonly string[]): Promise<boolea
   if (!arguments_.includes("--family")) return false;
   if (arguments_[arguments_.indexOf("--family") + 1] !== "obs-g1") return false;
   try {
-    const parsed = parseFamilyArguments(arguments_);
+    const parsed = parseObsG1Arguments(arguments_);
     const result = await runFamily("obs-g1", {
       cases: DEFAULT_OBS_G1_CASES,
       repoRoot: process.cwd(),

@@ -1,10 +1,11 @@
 import type { ObsAcceptanceCase, ObsCaseContext } from "../index.js";
+import { IDENTITY_CANARIES } from "../case-inputs.js";
+import { readCorrelationRows } from "../database.js";
 import { FIX08_RUNTIME_SUBJECT } from "./corpus.js";
 
-export const IDENTITY_CANARIES = Object.freeze({
-  asker: "00000000-0000-4000-8000-00000000a508",
-  session: "00000000-0000-4000-8000-00000000b508",
-});
+export { IDENTITY_CANARIES } from "../case-inputs.js";
+
+const CAPTURE_SUBJECT = "acceptance/obs/subjects/capture-subject.ts";
 
 export const OBS_CORRELATION_COLUMNS = Object.freeze([
   "run_ref",
@@ -55,8 +56,32 @@ export function evaluateIdentityCanaries(
 
 export const identityCanaryCase: ObsAcceptanceCase = Object.freeze({
   name: "identity-canary",
-  subjectPaths: Object.freeze([FIX08_RUNTIME_SUBJECT]),
+  subjectPaths: Object.freeze([FIX08_RUNTIME_SUBJECT, CAPTURE_SUBJECT]),
   async run(context: ObsCaseContext) {
-    return context.fail("LIVE_PIPELINE_BINDING_REQUIRED", { failures: 1 });
+    if (!process.env.OBS_WRITER_DATABASE_URL?.trim()) {
+      return context.skipMissing("OBS_WRITER_DATABASE_URL");
+    }
+    if (!process.env.OBS_LISTENER_DATABASE_URL?.trim()) {
+      return context.skipMissing("OBS_LISTENER_DATABASE_URL");
+    }
+    try {
+      const receipt = await context.spawn({
+        command: process.execPath,
+        arguments: ["--import", "tsx", CAPTURE_SUBJECT, "identity-canary"],
+        environment: { OBS_WRITER_DATABASE_URL: process.env.OBS_WRITER_DATABASE_URL },
+        timeoutMs: 10_000,
+        rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+      });
+      if (receipt.exitCode !== 0 || receipt.declaredRunRef === undefined || receipt.stderr !== "") {
+        return context.fail("IDENTITY_SUBJECT_FAILED", { failures: 1 });
+      }
+      const evaluation = evaluateIdentityCanaries(await readCorrelationRows(receipt.declaredRunRef));
+      if (!evaluation.passed) {
+        return context.fail("IDENTITY_CANARY_STORED", { hits: evaluation.hits.length });
+      }
+      return context.passRows(receipt, { scanned_cells: evaluation.scannedCells });
+    } catch {
+      return context.fail("IDENTITY_PROOF_UNAVAILABLE", { failures: 1 });
+    }
   },
 });

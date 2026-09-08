@@ -3,17 +3,14 @@ import { open, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ObsAcceptanceCase, ObsCaseContext } from "../index.js";
+import { readRawObsBytes } from "../database.js";
+import { CORPUS_TOKENS } from "../case-inputs.js";
 
 export const FIX08_RUNTIME_SUBJECT = "packages/obs-capture/src/runtime/index.ts" as const;
 
-export const CORPUS_TOKENS = Object.freeze({
-  bearerApiKey: "Bearer sk_fix08_local_A1B2C3D4E5F6",
-  passwordUrl: "postgres://fix08:OnlyLocal-Pass@127.0.0.1:1/fix08",
-  email: "fix08-canary@example.invalid",
-  jwt: "eyJhbGciOiJub25lIn0.eyJmaXgwOCI6ImxvY2FsIn0.",
-  privateKeyHeader: "-----BEGIN PRIVATE KEY-----",
-  sixDigitCode: "code 482913",
-});
+export { CORPUS_TOKENS } from "../case-inputs.js";
+
+const CAPTURE_SUBJECT = "acceptance/obs/subjects/capture-subject.ts";
 
 export interface RawByteSource {
   readonly source: string;
@@ -77,8 +74,45 @@ export async function readRawSpoolSources(spoolDirectory: string): Promise<reado
 
 export const corpusCase: ObsAcceptanceCase = Object.freeze({
   name: "corpus",
-  subjectPaths: Object.freeze([FIX08_RUNTIME_SUBJECT]),
+  subjectPaths: Object.freeze([FIX08_RUNTIME_SUBJECT, CAPTURE_SUBJECT]),
   async run(context: ObsCaseContext) {
-    return context.fail("LIVE_PIPELINE_BINDING_REQUIRED", { failures: 1 });
+    if (!process.env.OBS_WRITER_DATABASE_URL?.trim()) {
+      return context.skipMissing("OBS_WRITER_DATABASE_URL");
+    }
+    if (!process.env.OBS_LISTENER_DATABASE_URL?.trim()) {
+      return context.skipMissing("OBS_LISTENER_DATABASE_URL");
+    }
+    if (!process.env.OBS_SPOOL_DIR?.trim()) {
+      return context.skipMissing("OBS_SPOOL_DIR");
+    }
+    try {
+      const receipt = await context.spawn({
+        command: process.execPath,
+        arguments: ["--import", "tsx", CAPTURE_SUBJECT, "corpus"],
+        environment: {
+          OBS_WRITER_DATABASE_URL: process.env.OBS_WRITER_DATABASE_URL,
+          OBS_SPOOL_DIR: process.env.OBS_SPOOL_DIR,
+        },
+        timeoutMs: 10_000,
+        rowExpectation: { runtime: "scheduler", capturePoint: "job" },
+      });
+      if (receipt.exitCode !== 0 || receipt.declaredRunRef === undefined || receipt.stderr !== "") {
+        return context.fail("CORPUS_SUBJECT_FAILED", { failures: 1 });
+      }
+      const sources = [
+        ...await readRawObsBytes(receipt.declaredRunRef),
+        ...await readRawSpoolSources(process.env.OBS_SPOOL_DIR),
+      ];
+      const evaluation = evaluateCorpusBytes(sources);
+      if (!evaluation.passed) {
+        return context.fail("CORPUS_TOKEN_STORED", { hits: evaluation.hits.length });
+      }
+      return context.passRows(receipt, {
+        scanned_bytes: evaluation.scannedBytes,
+        token_classes: Object.keys(CORPUS_TOKENS).length,
+      });
+    } catch {
+      return context.fail("CORPUS_PROOF_UNAVAILABLE", { failures: 1 });
+    }
   },
 });

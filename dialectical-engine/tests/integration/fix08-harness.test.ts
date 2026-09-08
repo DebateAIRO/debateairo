@@ -132,6 +132,52 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
     ]);
   });
 
+  it("prints an explicit missing-input SKIP without treating it as a failure", async () => {
+    const repoRoot = await temporaryDirectory("fix08-missing-input-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "missing-input",
+        subjectPaths: [subject],
+        async run(context) {
+          return context.skipMissing("OBS_WRITER_DATABASE_URL");
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(lines).toEqual([
+      "obs-g1/missing-input SKIP(missing: OBS_WRITER_DATABASE_URL)",
+    ]);
+  });
+
+  it("keeps bounded calibration metrics on an honest missing-threshold SKIP", async () => {
+    const repoRoot = await temporaryDirectory("fix08-calibration-skip-");
+    const subject = await presentSubject(repoRoot);
+    const lines: string[] = [];
+
+    const result = await runFamily("obs-g1", {
+      cases: [{
+        name: "calibration-skip",
+        subjectPaths: [subject],
+        async run(context) {
+          return context.skipMissing("OBS_EMIT_P99_CEILING_MS", { calls: 10_000, p99_us: 7 });
+        },
+      }],
+      repoRoot,
+      writeLine: (line) => lines.push(line),
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(lines).toEqual([
+      "obs-g1/calibration-skip SKIP(missing: OBS_EMIT_P99_CEILING_MS calls=10000 p99_us=7)",
+    ]);
+  });
+
   it("prints one FAIL line and exits one", async () => {
     const repoRoot = await temporaryDirectory("fix08-fail-");
     const subject = await presentSubject(repoRoot);
@@ -491,7 +537,7 @@ describe("FIX-08 C1 obs-g1 family runner", () => {
       runtime: "scheduler",
       capturePoint: "job",
     });
-    expect(query?.runRef).toMatch(/^run:obs-g1:[0-9a-f-]{36}$/u);
+    expect(query?.runRef).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
     expect(childOutput).toEqual({ pid: receiptPid, run_ref: query?.runRef });
     expect(await readdir(scratchRoot)).toEqual([]);
   });
@@ -888,7 +934,7 @@ describe("FIX-08 C2 schema manifest", () => {
 });
 
 describe("FIX-08 C2 live CLI dependency gate", () => {
-  it("prints three exact SKIP lines and no PASS when the FIX-01 runtime is absent", () => {
+  it("prints three exact SKIP lines and no PASS when real connection inputs are absent", () => {
     const child = spawnSync(process.execPath, [
       "--import",
       "tsx",
@@ -908,9 +954,9 @@ describe("FIX-08 C2 live CLI dependency gate", () => {
     expect(child.status).toBe(0);
     expect(child.stderr).toBe("");
     expect(child.stdout.trim().split("\n")).toEqual([
-      "obs-g1/corpus SKIP(missing: packages/obs-capture/src/runtime/index.ts)",
-      "obs-g1/identity-canary SKIP(missing: packages/obs-capture/src/runtime/index.ts)",
-      "obs-g1/schema-manifest SKIP(missing: packages/obs-capture/src/runtime/index.ts)",
+      "obs-g1/corpus SKIP(missing: OBS_WRITER_DATABASE_URL)",
+      "obs-g1/identity-canary SKIP(missing: OBS_WRITER_DATABASE_URL)",
+      "obs-g1/schema-manifest SKIP(missing: OBS_LISTENER_DATABASE_URL)",
     ]);
     expect(child.stdout).not.toContain(" PASS");
   });
