@@ -14,7 +14,7 @@ const WORK = "20000000-0000-4000-8000-00000000cdef";
 const HATCHET_RUN = "30000000-0000-4000-8000-000000000123";
 const OBSERVED_AT = new Date("2026-09-08T10:10:00.000Z");
 
-const RECORDED_RUN_LIST_ROW = Object.freeze({
+const LOCAL_CONTRACT_RUN_LIST_ROW = Object.freeze({
   metadata: {
     id: HATCHET_RUN,
     createdAt: "2026-09-08T10:04:00.000Z",
@@ -64,7 +64,7 @@ class FixtureClient implements HatchetRunsClient {
     this.queries.push(query);
     if (query.offset === 0) {
       return {
-        rows: [RECORDED_RUN_LIST_ROW],
+        rows: [LOCAL_CONTRACT_RUN_LIST_ROW],
         pagination: { current_page: 1, next_page: 2, num_pages: 2 },
         retentionFloorAt: "2026-09-08T09:58:00.000Z"
       };
@@ -307,14 +307,14 @@ describe("FIX-15 C1 fixture-backed failed-run ingest", () => {
   });
 
   it("drops malformed and non-failure rows before persistence", () => {
-    expect(mapHatchetFailure({ ...RECORDED_RUN_LIST_ROW, status: "SUCCEEDED" }, {
+    expect(mapHatchetFailure({ ...LOCAL_CONTRACT_RUN_LIST_ROW, status: "SUCCEEDED" }, {
       observedAt: OBSERVED_AT, environment: "test", buildRef: "build:fixture"
     })).toBeNull();
-    expect(mapHatchetFailure({ ...RECORDED_RUN_LIST_ROW, attempt: 0 }, {
+    expect(mapHatchetFailure({ ...LOCAL_CONTRACT_RUN_LIST_ROW, attempt: 0 }, {
       observedAt: OBSERVED_AT, environment: "test", buildRef: "build:fixture"
     })).toBeNull();
     expect(mapHatchetFailure({
-      ...RECORDED_RUN_LIST_ROW,
+      ...LOCAL_CONTRACT_RUN_LIST_ROW,
       additionalMetadata: { v3RunId: RUN.toUpperCase(), v3WorkItemId: WORK }
     }, {
       observedAt: OBSERVED_AT, environment: "test", buildRef: "build:fixture"
