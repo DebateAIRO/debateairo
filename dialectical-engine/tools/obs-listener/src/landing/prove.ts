@@ -30,7 +30,12 @@ function parseCatalogCommand(command: string, cwd: string, signal?: AbortSignal)
   }
   const [binary, ...argumentsList] = command.split(/ +/u);
   if (binary === undefined || binary.length === 0 || binary.includes("=")) throw new TypeError("FIX13_CATALOG_COMMAND_INVALID");
-  return Object.freeze({ binary, arguments: Object.freeze(argumentsList), cwd, signal });
+  const parsed = { binary, arguments: Object.freeze(argumentsList), cwd };
+  return signal === undefined ? Object.freeze(parsed) : Object.freeze({ ...parsed, signal });
+}
+
+function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted ?? false;
 }
 
 async function applyPatch(worktree: string, patch: string): Promise<void> {
@@ -40,7 +45,7 @@ async function applyPatch(worktree: string, patch: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn("git", ["apply", "--whitespace=error-all", path], { cwd: worktree, stdio: ["ignore", "pipe", "pipe"] });
     const stderr: Buffer[] = [];
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => { stderr[stderr.length] = chunk; });
     child.once("error", () => reject(new TypeError("FIX13_PATCH_APPLY_FAILED")));
     child.once("close", (code) => code === 0 ? resolve() : reject(new TypeError(`FIX13_PATCH_APPLY_FAILED:${Buffer.concat(stderr).toString("utf8")}`)));
   });
@@ -50,7 +55,7 @@ async function changedPaths(worktree: string): Promise<readonly string[]> {
   const output = await new Promise<string>((resolve, reject) => {
     const child = spawn("git", ["diff", "--name-only"], { cwd: worktree, stdio: ["ignore", "pipe", "pipe"] });
     const stdout: Buffer[] = [];
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => { stdout[stdout.length] = chunk; });
     child.once("error", reject);
     child.once("close", (code) => code === 0 ? resolve(Buffer.concat(stdout).toString("utf8")) : reject(new TypeError("FIX13_DIFF_FAILED")));
   });
@@ -70,12 +75,12 @@ export async function provePatch(input: Readonly<{
   signal?: AbortSignal;
 }>): Promise<ProofResult> {
   if (!(await proofWorktreeIsClean(input.prepared))) return Object.freeze({ ok: false, code: "OBS_R112_DIRTY_BASE" });
-  if (input.signal?.aborted === true) return Object.freeze({ ok: false, code: "LEASE_REVOKED" });
+  if (isAborted(input.signal)) return Object.freeze({ ok: false, code: "LEASE_REVOKED" });
   const command = parseCatalogCommand(input.validation.command, input.prepared.path, input.signal);
   const red = await input.runner.run(command);
   if (red.outcome === "PASS") return Object.freeze({ ok: false, code: "REFUSED_RED_PASSED", red });
   if (red.outcome !== "TEST_FAILURE") return Object.freeze({ ok: false, code: "REFUSED_RED_BROKEN", red });
-  if (input.signal?.aborted === true) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red });
+  if (isAborted(input.signal)) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red });
   try { await applyPatch(input.prepared.path, input.patch); }
   catch { return Object.freeze({ ok: false, code: "REFUSED_PATCH_APPLY", red }); }
   const actualPaths = await changedPaths(input.prepared.path);
@@ -86,7 +91,7 @@ export async function provePatch(input: Readonly<{
   if (green.outcome !== "PASS") return Object.freeze({ ok: false, code: "REFUSED_GREEN_FAILED", red, green });
   const gates: ProofCommandResult[] = [];
   for (const gateCommand of input.gateCommands ?? []) {
-    if (input.signal?.aborted === true) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red, green });
+    if (isAborted(input.signal)) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red, green });
     const gate = await input.runner.run(parseCatalogCommand(gateCommand, input.prepared.path, input.signal));
     gates[gates.length] = gate;
     if (gate.outcome !== "PASS") return Object.freeze({ ok: false, code: "REFUSED_GATE_FAILED", red, green });

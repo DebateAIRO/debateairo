@@ -33,7 +33,15 @@ export interface MutationLease {
 
 export type BeginMutationResult =
   | Readonly<{ ok: true; lease: MutationLease }>
-  | Readonly<{ ok: false; code: "PROPOSAL_TAMPERED" | "NOT_A_FIX_TARGET" | "MUTATION_ALREADY_ACTIVE" | "WORKER_START_FAILED" }>;
+  | Readonly<{
+      ok: false;
+      code:
+        | "MUTATION_OFF"
+        | "PROPOSAL_TAMPERED"
+        | "NOT_A_FIX_TARGET"
+        | "MUTATION_ALREADY_ACTIVE"
+        | "WORKER_START_FAILED";
+    }>;
 
 function validateCandidate(candidate: ApprovedMutationProposal): FixProposal | "PROPOSAL_TAMPERED" | "NOT_A_FIX_TARGET" {
   if (candidate.rootVerdict !== "CODE_ROOT") return "NOT_A_FIX_TARGET";
@@ -65,6 +73,7 @@ function leaseBytes(lease: MutationLease): string {
 }
 
 export async function beginApprovedMutation(input: Readonly<{
+  mutationState: "OFF" | "ON";
   stateDirectory: string;
   candidate: ApprovedMutationProposal;
   pid: number;
@@ -72,6 +81,9 @@ export async function beginApprovedMutation(input: Readonly<{
   expiresAtMs: number;
   spawn(candidate: ApprovedMutationProposal): Promise<void>;
 }>): Promise<BeginMutationResult> {
+  if (input.mutationState !== "ON") {
+    return Object.freeze({ ok: false, code: "MUTATION_OFF" });
+  }
   const validated = validateCandidate(input.candidate);
   if (validated === "PROPOSAL_TAMPERED" || validated === "NOT_A_FIX_TARGET") {
     return Object.freeze({ ok: false, code: validated });

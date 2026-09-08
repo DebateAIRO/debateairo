@@ -71,7 +71,12 @@ export async function spawnFixWorker(input: Readonly<{
   if (!Number.isSafeInteger(input.deadlineMs) || input.deadlineMs <= 0) throw new TypeError("FIX13_WORKER_DEADLINE");
   await input.appendAction(Object.freeze({ kind: "WORKER_SPAWN", code: "STARTED" }));
   return new Promise((resolve, reject) => {
-    const child = spawn(input.invocation.binary, [...input.invocation.arguments], input.invocation.spawnOptions);
+    const child = spawn(input.invocation.binary, [...input.invocation.arguments], {
+      cwd: input.invocation.spawnOptions.cwd,
+      env: { ...input.invocation.spawnOptions.env },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
     const stdout: Buffer[] = [];
     let stdoutBytes = 0;
     let settled = false;

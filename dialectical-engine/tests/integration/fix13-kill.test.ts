@@ -42,7 +42,7 @@ describe("FIX-13 kill cleanup", () => {
     const proposal: FixProposal = Object.freeze({
       incidentId: "10000000-0000-4000-8000-000000000013",
       root: "apps/fixture/src/result.mjs:result",
-      diagnosis: { defectClass: "WRONG_BRANCH", params: { code: "OBS_FIXTURE_FAILED" } },
+      diagnosis: { defectClass: "WRONG_BRANCH" as const, params: { code: "OBS_FIXTURE_FAILED" } },
       changeScope: ["apps/fixture/src/result.mjs"], sizeLabel: "QUICK",
       redTestPlan: { invariantRef: "INV-FIXTURE-RETURN" }, spendUnits: 1,
       blastRadius: { reachableModules: 1, modules: ["apps/fixture/src/result.mjs"] },
@@ -51,6 +51,7 @@ describe("FIX-13 kill cleanup", () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "fix13-kill-state-"));
     const started = await beginApprovedMutation({
       stateDirectory,
+      mutationState: "ON",
       candidate: { proposalId: "proposal-13", incidentId: proposal.incidentId, repositoryId: "fixture", fingerprint: "f".repeat(64), storedHash: hash, approvedHash: hash, proposal, rootVerdict: "CODE_ROOT" },
       pid: 43210, nowMs: 100, expiresAtMs: 1_000,
       spawn: async () => undefined,

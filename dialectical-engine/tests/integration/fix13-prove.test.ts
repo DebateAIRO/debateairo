@@ -48,7 +48,7 @@ async function fixtureRepo(): Promise<Readonly<{ repository: string; baseSha: st
 }
 
 const fixtureRunner: SandboxProofRunner = Object.freeze({
-  async run(command) {
+  async run(command: Parameters<SandboxProofRunner["run"]>[0]) {
     try {
       const result = await run(command.binary, [...command.arguments], { cwd: command.cwd, encoding: "utf8", signal: command.signal });
       return Object.freeze({ outcome: "PASS" as const, exitCode: 0, stdout: result.stdout, stderr: result.stderr });

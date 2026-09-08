@@ -60,6 +60,7 @@ describe("FIX-13 mutation authority and lease", () => {
 
     await expect(beginApprovedMutation({
       stateDirectory,
+      mutationState: "ON",
       candidate: approved({ approvedHash: "0".repeat(64) }),
       pid: process.pid,
       nowMs: 1_000,
@@ -69,12 +70,24 @@ describe("FIX-13 mutation authority and lease", () => {
 
     await expect(beginApprovedMutation({
       stateDirectory,
+      mutationState: "ON",
       candidate: approved({ rootVerdict: "EXTERNAL_ROOT" }),
       pid: process.pid,
       nowMs: 1_000,
       expiresAtMs: 2_000,
       spawn: async (value) => { spawned.push(value.proposalId); },
     })).resolves.toEqual({ ok: false, code: "NOT_A_FIX_TARGET" });
+    expect(spawned).toEqual([]);
+
+    await expect(beginApprovedMutation({
+      stateDirectory,
+      mutationState: "OFF",
+      candidate: approved(),
+      pid: process.pid,
+      nowMs: 1_000,
+      expiresAtMs: 2_000,
+      spawn: async (value) => { spawned.push(value.proposalId); },
+    })).resolves.toEqual({ ok: false, code: "MUTATION_OFF" });
     expect(spawned).toEqual([]);
   });
 
@@ -83,6 +96,7 @@ describe("FIX-13 mutation authority and lease", () => {
     const spawned: string[] = [];
     const first = await beginApprovedMutation({
       stateDirectory,
+      mutationState: "ON",
       candidate: approved(),
       pid: process.pid,
       nowMs: 1_000,
@@ -93,6 +107,7 @@ describe("FIX-13 mutation authority and lease", () => {
 
     await expect(beginApprovedMutation({
       stateDirectory,
+      mutationState: "ON",
       candidate: approved({ proposalId: "proposal-14", fingerprint: "b".repeat(64) }),
       pid: process.pid,
       nowMs: 1_100,
