@@ -1,4 +1,8 @@
-import type { Client, Notification, QueryResultRow } from "pg";
+import type { Client, Notification } from "pg";
+import {
+  createFixagentDeliveryGeneration,
+  type FixagentDeliveryGeneration,
+} from "@debateai/obs-capture/chain/fixagent-delivery";
 import { deliverOccurrence } from "./fold.js";
 
 export interface DaemonConfig {
@@ -17,7 +21,7 @@ export type ClientFactory = (databaseUrl: string) => DaemonClient;
 
 interface ClientGeneration {
   readonly id: number;
-  readonly client: DaemonClient;
+  readonly client: FixagentDeliveryGeneration;
   readonly notification: (message: Notification) => void;
   readonly error: (error: Error) => void;
   readonly end: () => void;
@@ -26,8 +30,6 @@ interface ClientGeneration {
 }
 
 const CHANNEL = "obs_occurrence_inserted" as const;
-const GLOBAL_LEADER_SQL = "SELECT pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0)) AS acquired";
-
 export function isValidNotificationPayload(payload: string | undefined): boolean {
   if (payload === undefined || !/^[1-9][0-9]*$/.test(payload)) return false;
   return Number.isSafeInteger(Number(payload));
@@ -63,9 +65,9 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
     running && current?.id === generation.id;
 
   const detach = (generation: ClientGeneration): void => {
-    generation.client.removeListener("notification", generation.notification);
-    generation.client.removeListener("error", generation.error);
-    generation.client.removeListener("end", generation.end);
+    generation.client.removeNotification(generation.notification);
+    generation.client.removeError(generation.error);
+    generation.client.removeEnd(generation.end);
   };
 
   const scheduleReconnect = (): void => {
@@ -82,30 +84,16 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
     generation.leader = false;
     generation.connected = false;
     detach(generation);
-    void generation.client.end().catch(() => undefined);
+    void generation.client.close().catch(() => undefined);
     scheduleReconnect();
   };
 
   const selectPending = async (generation: ClientGeneration): Promise<string | undefined> => {
-    const result = await generation.client.query<{ occurrence_id: string } & QueryResultRow>(`
-      SELECT occurrence.occurrence_id
-      FROM obs.occurrence AS occurrence
-      WHERE NOT EXISTS (
-        SELECT 1 FROM obs.delivery AS delivery
-        WHERE delivery.occurrence_id=occurrence.occurrence_id
-          AND delivery.consumer='fixagent-daemon' AND delivery.delivery_status='ACKED'
-      )
-      ORDER BY CASE occurrence.severity
-        WHEN 'FATAL' THEN 0 WHEN 'SEVERE' THEN 1 WHEN 'DEGRADED' THEN 2 ELSE 3
-      END, occurrence.occurred_at ASC, occurrence.occ_seq ASC
-      LIMIT 1
-    `);
-    return result.rows[0]?.occurrence_id;
+    return generation.client.selectPending();
   };
 
   const tryLeadership = async (generation: ClientGeneration): Promise<boolean> => {
-    const result = await generation.client.query<{ acquired: boolean } & QueryResultRow>(GLOBAL_LEADER_SQL);
-    generation.leader = result.rows[0]?.acquired === true;
+    generation.leader = await generation.client.tryLeadership();
     return generation.leader;
   };
 
@@ -143,7 +131,7 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
   async function connectFresh(): Promise<void> {
     if (!running || current !== undefined || connecting !== undefined) return connecting;
     const attempt = (async () => {
-      const client = clients(config.databaseUrl);
+      const client = createFixagentDeliveryGeneration(clients(config.databaseUrl));
       const id = ++generationCounter;
       let generation!: ClientGeneration;
       generation = {
@@ -160,14 +148,14 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
         end: () => invalidate(generation)
       };
       current = generation;
-      client.on("notification", generation.notification);
-      client.on("error", generation.error);
-      client.on("end", generation.end);
+      client.onNotification(generation.notification);
+      client.onError(generation.error);
+      client.onEnd(generation.end);
       try {
         await client.connect();
         if (!generationIsCurrent(generation)) return;
         generation.connected = true;
-        await client.query(`LISTEN ${CHANNEL}`);
+        await client.listen();
         if (!generationIsCurrent(generation)) return;
         await tryLeadership(generation);
         if (generation.leader) kick();
@@ -201,7 +189,7 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
         generation.leader = false;
         generation.connected = false;
         detach(generation);
-        await generation.client.end().catch(() => undefined);
+        await generation.client.close().catch(() => undefined);
       }
       if (connecting !== undefined) await connecting;
       if (serialLoop !== undefined) await serialLoop;

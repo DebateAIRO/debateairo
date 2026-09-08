@@ -1,6 +1,15 @@
-import type { PoolClient } from "pg";
 import { fileURLToPath } from "node:url";
-import { advanceContiguousCursor, FIXAGENT_CONSUMER, readCursor } from "./cursor.js";
+import {
+  acknowledgeDelivery,
+  advanceDeliveryCursor,
+  deliveryIsAcknowledged,
+  loadAggregateMembers,
+  loadDeliveryOccurrence,
+  persistFolded,
+  readDeliveryCursor,
+  type FixagentDeliveryGeneration,
+  type FixagentDeliveryTransaction,
+} from "@debateai/obs-capture/chain/fixagent-delivery";
 import { decodeOccurrence, type OccurrenceRecord, type OccurrenceSeverity, type OccurrenceSource } from "./intake.js";
 import { appendPoisonReceipt, appendSkipReceipt } from "./poison.js";
 import { loadBundle } from "../../policy/loader.js";
@@ -97,66 +106,27 @@ export interface DeliveryOutcome {
   readonly cursor: bigint;
 }
 
-type DeliveryClient = Pick<PoolClient, "query">;
-
-async function appendAcknowledgement(client: DeliveryClient, occurrenceId: string): Promise<void> {
-  const attempt = await client.query<{ next_attempt: number }>(`
-    SELECT coalesce(max(attempt_index),-1)+1 AS next_attempt
-    FROM obs.delivery WHERE occurrence_id=$1 AND consumer=$2
-  `, [occurrenceId, FIXAGENT_CONSUMER]);
-  await client.query(`
-    INSERT INTO obs.delivery (occurrence_id,consumer,attempt_index,lease_ref,delivery_status)
-    SELECT $1,$2,$3,$4,'ACKED'
-    WHERE NOT EXISTS (
-      SELECT 1 FROM obs.delivery WHERE occurrence_id=$1 AND consumer=$2
-        AND delivery_status='ACKED'
-    )
-  `, [
-    occurrenceId, FIXAGENT_CONSUMER, attempt.rows[0]?.next_attempt ?? 0,
-    `${FIXAGENT_CONSUMER}:${occurrenceId}`
-  ]);
-}
-
-async function upsertAggregate(client: DeliveryClient, current: OccurrenceRecord): Promise<IncidentAggregate> {
-  const rows = await client.query<Record<string, unknown>>(`
-    SELECT occurrence.* FROM obs.occurrence AS occurrence
-    WHERE occurrence.fingerprint=$1 AND occurrence.fingerprint_version=$2
-      AND (occurrence.occurrence_id=$3 OR EXISTS (
-        SELECT 1 FROM obs.delivery AS delivery
-        WHERE delivery.occurrence_id=occurrence.occurrence_id
-          AND delivery.consumer=$4 AND delivery.delivery_status='ACKED'
-      )) ORDER BY occurrence.occ_seq
-  `, [current.fingerprint, current.fingerprintVersion, current.occurrenceId, FIXAGENT_CONSUMER]);
-  const accepted = rows.rows.flatMap((row) => {
+async function aggregateFor(
+  transaction: FixagentDeliveryTransaction,
+  current: OccurrenceRecord,
+): Promise<IncidentAggregate> {
+  const rows = await loadAggregateMembers(transaction,{
+    fingerprint:current.fingerprint,
+    fingerprintVersion:current.fingerprintVersion,
+    occurrenceId:current.occurrenceId,
+  });
+  const accepted = rows.flatMap((row) => {
     const result = decodeOccurrence(row);
     return result.kind === "ACCEPT" ? [result.occurrence] : [];
   });
-  const aggregate = foldIncident(accepted);
-  await client.query(`
-    INSERT INTO obs.incident (
-      fingerprint,fingerprint_version,first_seen_at,last_seen_at,
-      distinct_work_unit_count,max_severity,state,source_set
-    ) VALUES ($1,$2,$3,$4,$5,$6,'NEW',$7::jsonb)
-    ON CONFLICT (fingerprint,fingerprint_version) DO UPDATE SET
-      first_seen_at=EXCLUDED.first_seen_at,last_seen_at=EXCLUDED.last_seen_at,
-      distinct_work_unit_count=EXCLUDED.distinct_work_unit_count,
-      max_severity=EXCLUDED.max_severity,source_set=EXCLUDED.source_set,
-      updated_at=statement_timestamp()
-  `, [
-    aggregate.fingerprint, aggregate.fingerprintVersion, aggregate.firstSeenAt,
-    aggregate.lastSeenAt, aggregate.distinctWorkUnitCount.toString(), aggregate.maxSeverity,
-    JSON.stringify(aggregate.sourceSet)
-  ]);
-  return aggregate;
+  return foldIncident(accepted);
 }
 
-async function appendTierDecision(
-  client: DeliveryClient,
-  occurrenceId: string,
+function tierDecision(
   current: OccurrenceRecord,
   aggregate: IncidentAggregate,
   zoneContext: unknown,
-): Promise<void> {
+): ReturnType<typeof evaluateTierGate> {
   const input: TierGateInput = {
     schema: "fixagent-tier-input/v1",
     incident: {
@@ -171,72 +141,49 @@ async function appendTierDecision(
     root: { verdict: "UNCONFIRMED" },
     changeShape: null,
   };
-  const decision = evaluateTierGate(input, POLICY_BUNDLE);
-  await client.query(`
-    INSERT INTO obs.policy_decision (occurrence_id,policy_ref,input_hash,decision)
-    SELECT $1,$2,$3,$4
-    WHERE NOT EXISTS (
-      SELECT 1 FROM obs.policy_decision
-      WHERE occurrence_id=$1 AND policy_ref=$2 AND input_hash=$3 AND decision=$4
-    )
-  `, [occurrenceId, decision.policyRef, decision.inputHash, decision.decision]);
+  return evaluateTierGate(input, POLICY_BUNDLE);
 }
 
 export async function deliverOccurrence(
-  client: DeliveryClient,
+  generation: FixagentDeliveryGeneration,
   occurrenceId: string
 ): Promise<DeliveryOutcome> {
-  await client.query("BEGIN");
-  try {
-    await client.query(`
-      SELECT pg_advisory_xact_lock(
-        hashtextextended('fixagent-daemon:occurrence:' || $1::uuid::text, 0)
-      )
-    `, [occurrenceId]);
-    const selected = await client.query<Record<string, unknown>>(`
-      SELECT occurrence.* FROM obs.occurrence AS occurrence
-      WHERE occurrence.occurrence_id=$1
-    `, [occurrenceId]);
-    const row = selected.rows[0];
-    if (row === undefined) throw new TypeError("OCCURRENCE_NOT_FOUND");
+  return generation.withDelivery(occurrenceId,async (transaction) => {
+    const row = await loadDeliveryOccurrence(transaction,occurrenceId);
     const sequenceText = typeof row.occ_seq === "string" || typeof row.occ_seq === "number"
       || typeof row.occ_seq === "bigint" ? String(row.occ_seq) : "0";
     const occSeq = BigInt(sequenceText);
-    const prior = await client.query<{ acknowledged: boolean }>(`
-      SELECT EXISTS (SELECT 1 FROM obs.delivery WHERE occurrence_id=$1 AND consumer=$2
-        AND delivery_status='ACKED') AS acknowledged
-    `, [occurrenceId, FIXAGENT_CONSUMER]);
-    if (prior.rows[0]?.acknowledged === true) {
-      const cursor = await readCursor(client);
-      await client.query("COMMIT");
+    if (await deliveryIsAcknowledged(transaction,occurrenceId)) {
+      const cursor = await readDeliveryCursor(transaction);
       return Object.freeze({ occurrenceId, occSeq, result: "ALREADY_ACKED", cursor });
     }
 
     const intake = decodeOccurrence(row);
+    const source = row.source;
+    if (source !== "first_party" && source !== "hatchet" && source !== "ui_client") {
+      throw new TypeError("FIX09_DELIVERY_SOURCE");
+    }
     let result: DeliveryOutcome["result"];
     if (intake.kind === "ACCEPT") {
-      const aggregate = await upsertAggregate(client, intake.occurrence);
-      await appendTierDecision(
-        client,
-        occurrenceId,
-        intake.occurrence,
-        aggregate,
-        row.zone_context,
-      );
+      const aggregate = await aggregateFor(transaction,intake.occurrence);
+      const decision=tierDecision(intake.occurrence,aggregate,row.zone_context);
+      await persistFolded(transaction,{
+        occurrenceId,fingerprint:aggregate.fingerprint,
+        fingerprintVersion:aggregate.fingerprintVersion,firstSeenAt:aggregate.firstSeenAt,
+        lastSeenAt:aggregate.lastSeenAt,distinctWorkUnitCount:aggregate.distinctWorkUnitCount.toString(),
+        maxSeverity:aggregate.maxSeverity,sourceSet:aggregate.sourceSet,
+        policyRef:decision.policyRef,inputHash:decision.inputHash,decision:decision.decision,
+      });
       result = "FOLDED";
     } else if (intake.kind === "SKIP") {
-      await appendSkipReceipt(client, { occurrenceId, occSeq }, intake.reason);
+      await appendSkipReceipt(transaction, { occurrenceId, occSeq,source }, intake.reason);
       result = "SKIPPED";
     } else {
-      await appendPoisonReceipt(client, { occurrenceId, occSeq }, intake.reason);
+      await appendPoisonReceipt(transaction, { occurrenceId, occSeq,source }, intake.reason);
       result = "DEAD_LETTERED";
     }
-    await appendAcknowledgement(client, occurrenceId);
-    const cursor = await advanceContiguousCursor(client);
-    await client.query("COMMIT");
+    await acknowledgeDelivery(transaction,occurrenceId);
+    const cursor = await advanceDeliveryCursor(transaction);
     return Object.freeze({ occurrenceId, occSeq, result, cursor });
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  }
+  });
 }

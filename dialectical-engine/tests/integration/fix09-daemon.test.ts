@@ -5,7 +5,10 @@ import pg from "pg";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate, obsIncident, obsOccurrence } from "../../packages/db/src/index.js";
-import { deliverOccurrence } from "../../tools/obs-listener/src/daemon/fold.js";
+import {
+  createFixagentDeliveryGenerationForTest,
+} from "../../packages/obs-capture/src/chain/fixagent-delivery.js";
+import { deliverOccurrence as deliverThroughGeneration } from "../../tools/obs-listener/src/daemon/fold.js";
 import {
   createDaemon,
   isValidNotificationPayload,
@@ -32,6 +35,16 @@ const OCCURRENCE_TRY_LOCK_SQL = `
   ) AS acquired
 `;
 let database: TestDatabase;
+
+function deliverOccurrence(
+  client: Pick<PoolClient,"query">,
+  occurrenceId:string,
+) {
+  return deliverThroughGeneration(
+    createFixagentDeliveryGenerationForTest(client),
+    occurrenceId,
+  );
+}
 
 function roleUrl(role: string, password: string): string {
   const url = new URL(database.connectionString);
@@ -227,7 +240,9 @@ describe("FIX-09 C2 listener migration on real PostgreSQL", () => {
       SELECT tgname FROM pg_catalog.pg_trigger
       WHERE tgrelid='obs.occurrence'::regclass AND NOT tgisinternal ORDER BY tgname
     `);
-    expect(triggers.rows.map((row) => row.tgname)).toEqual(["reject_mutation", "reject_truncate"]);
+    expect(triggers.rows.map((row) => row.tgname)).toEqual([
+      "enforce_audit_chain_mode", "reject_mutation", "reject_truncate"
+    ]);
 
     const listenerGrants = await database.pool.query<{ privilege_type: string; table_name: string }>(`
       SELECT privilege_type, table_name FROM information_schema.role_table_grants
@@ -237,6 +252,7 @@ describe("FIX-09 C2 listener migration on real PostgreSQL", () => {
     expect(listenerGrants.rows).toEqual([
       { table_name: "agent_action", privilege_type: "INSERT" },
       { table_name: "agent_action", privilege_type: "SELECT" },
+      { table_name: "audit_chain_activation", privilege_type: "SELECT" },
       { table_name: "budget_usage", privilege_type: "INSERT" },
       { table_name: "budget_usage", privilege_type: "SELECT" },
       { table_name: "capture_gap", privilege_type: "SELECT" },
@@ -650,8 +666,8 @@ describe("FIX-09 C2 atomic delivery on real PostgreSQL", () => {
     for (const receipt of receipts) {
       await database.pool.query(`
         INSERT INTO obs.agent_action (
-          writer_identity,actor,action_kind,occurrence_id,action_ref,action_payload
-        ) VALUES ('fixagent-daemon','fixagent-daemon',$1,$2,$3,$4::jsonb)
+          source,writer_identity,actor,action_kind,occurrence_id,action_ref,action_payload
+        ) VALUES ('first_party','fixagent-daemon','fixagent-daemon',$1,$2,$3,$4::jsonb)
       `, [
         receipt.kind, receipt.occurrence.occurrenceId, receipt.ref,
         JSON.stringify({
@@ -721,9 +737,13 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
     const source = await readFile(
       new URL("../../tools/obs-listener/src/daemon/main.ts", import.meta.url), "utf8"
     );
-    expect(source).toContain("SELECT pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0)) AS acquired");
-    expect(source).toMatch(/occurred_at ASC, occurrence\.occ_seq ASC\s+LIMIT 1/);
-    expect(source).not.toMatch(/WHERE occurrence\.occ_seq\s*=\s*\$1/);
+    const adapterSource = await readFile(
+      new URL("../../packages/obs-capture/src/chain/fixagent-delivery.ts", import.meta.url), "utf8"
+    );
+    expect(source).toContain("createFixagentDeliveryGeneration");
+    expect(adapterSource).toContain("SELECT pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0)) AS acquired");
+    expect(adapterSource).toMatch(/occurred_at ASC, occurrence\.occ_seq ASC\s+LIMIT 1/);
+    expect(adapterSource).not.toMatch(/WHERE occurrence\.occ_seq\s*=\s*\$1/);
     expect(source).not.toMatch(/deliverOccurrence\([^,]+,\s*message\.payload/);
   });
 

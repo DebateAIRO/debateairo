@@ -8,6 +8,7 @@ import {
   integer,
   jsonb,
   pgSchema,
+  smallint,
   text,
   timestamp,
   unique,
@@ -59,7 +60,12 @@ export const obsOccurrence = obs.table("occurrence", {
   sourceEventRef: text("source_event_ref").notNull(),
   zoneContext: boolean("zone_context").notNull().default(false),
   attemptIndex: integer("attempt_index"),
-  writerIdentity: text("writer_identity").notNull()
+  writerIdentity: text("writer_identity").notNull(),
+  chainVersion: smallint("chain_version"),
+  chainKeyId: text("chain_key_id"),
+  chainSeq: bigint("chain_seq", { mode: "bigint" }),
+  chainSignature: bytea("chain_signature"),
+  chainLink: bytea("chain_link")
 }, (table) => [
   unique("occurrence_source_source_event_ref_key").on(table.source, table.sourceEventRef)
 ]);
@@ -112,7 +118,10 @@ export const obsTrace = obs.table("trace", {
 
 export const obsAgentAction = obs.table("agent_action", {
   agentActionId: uuid("agent_action_id").primaryKey().defaultRandom(),
+  actionSeq: bigint("action_seq", { mode: "bigint" }).notNull()
+    .default(sql`nextval('obs.agent_action_seq'::regclass)`).unique(),
   prevLink: bytea("prev_link"),
+  source: text("source").notNull().default("legacy"),
   writerIdentity: text("writer_identity").notNull(),
   actor: text("actor").notNull(),
   actionKind: text("action_kind").notNull(),
@@ -120,7 +129,28 @@ export const obsAgentAction = obs.table("agent_action", {
   incidentId: uuid("incident_id").references(() => obsIncident.incidentId),
   actionRef: text("action_ref").notNull(),
   actionPayload: jsonb("action_payload").notNull().default({}),
-  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow()
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  chainVersion: smallint("chain_version"),
+  chainKeyId: text("chain_key_id"),
+  chainSeq: bigint("chain_seq", { mode: "bigint" }),
+  chainSignature: bytea("chain_signature"),
+  chainLink: bytea("chain_link")
+});
+
+export const obsAuditChainActivation = obs.table("audit_chain_activation", {
+  singleton: boolean("singleton").primaryKey(),
+  protocol: text("protocol").notNull(),
+  activationId: uuid("activation_id").notNull().unique(),
+  activatedAt: timestamp("activated_at", { withTimezone: true }).notNull(),
+  occurrenceLegacyMaxSeq: bigint("occurrence_legacy_max_seq", { mode: "bigint" }).notNull(),
+  occurrenceLegacyCount: bigint("occurrence_legacy_count", { mode: "bigint" }).notNull(),
+  occurrenceLegacyDigest: bytea("occurrence_legacy_digest").notNull(),
+  agentActionLegacyMaxSeq: bigint("agent_action_legacy_max_seq", { mode: "bigint" }).notNull(),
+  agentActionLegacyCount: bigint("agent_action_legacy_count", { mode: "bigint" }).notNull(),
+  agentActionLegacyDigest: bytea("agent_action_legacy_digest").notNull(),
+  initialPublicKeyringSha256: bytea("initial_public_keyring_sha256").notNull(),
+  activationManifestSha256: bytea("activation_manifest_sha256").notNull(),
+  createdByCustodianId: text("created_by_custodian_id").notNull()
 });
 
 export const obsPolicyDecision = obs.table("policy_decision", {
