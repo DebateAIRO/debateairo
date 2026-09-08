@@ -32,7 +32,18 @@ export const IncidentPacketSchema = z.object({
   root: RootSchema,
 }).strict();
 
-export type IncidentPacket = z.infer<typeof IncidentPacketSchema>;
+type ParsedIncidentPacket = z.infer<typeof IncidentPacketSchema>;
+export type IncidentPacket = Readonly<
+  Omit<ParsedIncidentPacket, "codes" | "chainCodes" | "frames">
+  & {
+    readonly codes: readonly string[];
+    readonly chainCodes: readonly string[];
+    readonly frames: readonly (
+      | Readonly<{ readonly kind: "CODE"; readonly path: string; readonly symbol: string }>
+      | Readonly<{ readonly kind: "BOUNDARY"; readonly code: string }>
+    )[];
+  }
+>;
 
 export interface PacketIncidentInput {
   readonly incidentId: string;

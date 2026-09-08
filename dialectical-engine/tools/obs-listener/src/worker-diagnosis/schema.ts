@@ -64,5 +64,20 @@ export const FixProposalSchema = ModelProposalSchema.omit({
   }).strict(),
 }).strict();
 
-export type FixProposal = z.infer<typeof FixProposalSchema>;
+type ParsedFixProposal = z.infer<typeof FixProposalSchema>;
+export type FixProposal = Readonly<
+  Omit<ParsedFixProposal, "diagnosis" | "changeScope" | "redTestPlan" | "blastRadius">
+  & {
+    readonly diagnosis: Readonly<{
+      readonly defectClass: ParsedFixProposal["diagnosis"]["defectClass"];
+      readonly params: Readonly<Record<string, string | number | boolean>>;
+    }>;
+    readonly changeScope: readonly string[];
+    readonly redTestPlan: Readonly<{ readonly invariantRef: string }>;
+    readonly blastRadius: Readonly<{
+      readonly reachableModules: number;
+      readonly modules: readonly string[];
+    }>;
+  }
+>;
 export type DiagnosisDefectClass = (typeof DIAGNOSIS_DEFECT_CLASSES)[number];
