@@ -1,0 +1,5 @@
+; FIX-13 installation placeholder. Production must generate a path-bound
+; profile with buildFixWorkerProfile(); this file grants no capability.
+(version 1)
+(deny default)
+(deny network*)
