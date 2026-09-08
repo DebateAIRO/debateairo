@@ -66,3 +66,49 @@ commit to FIX-16 `DECISIONS.md`.
   FIX-16 `DECISIONS.md` snapshot-commit row after the four-tip preflight and V
   approval. Until then, root `pnpm audit:obs-inventory` exits 1 on the missing
   baseline by design, and full `pnpm lint` cannot be green.
+
+## 2026-09-08 — FIX-05 successor integration and FIX-16 authoritative baseline
+
+- Branch/worktree: `codex/fixagent-integration-1` at
+  `/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/fixagent-integration-1`;
+  starting tip `f662eb05061f54e4d3ab8f1dea9c2b0c4491d02a`.
+- FIX-05 successor authority: `ecbad9d60987a28d479dd13062fa763048aed4d8`.
+  Its patch was already present through ancestor `ab20ba50`, so the initial
+  cherry-pick recorded empty provenance commit `9dfad43c`. Because the FIX-16
+  preflight requires the exact reviewed commit to be an ancestor, merge
+  `8a71204f` records `ecbad9d6` as its second parent. The merge tree is
+  byte-identical to the starting tip.
+- Merge conflicts were limited to
+  `tests/integration/fix03-runner-artifact.test.ts` and
+  `tests/unit/fix05-provider-exhaustion.test.ts`. Both sides differed only in
+  the newer `captureHandled()` return contract; the composed
+  `UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE` return was retained. No production,
+  package, or lockfile delta resulted from conflict resolution.
+- Exact FIX-16 preflight tips all returned ancestor exit 0: FIX-02
+  `e7b9f6812cafc8808cf5e188cd6440f19beda831`, FIX-03
+  `322b188649e5db7b1a264ceef2155f35470acd3e`, FIX-04
+  `6d55ed4c5e3e8fef20b93ed91850cdd1766eac12`, and FIX-05 `ecbad9d6` above.
+- Authoritative baseline commit:
+  `f6e93e25019eb4d0d4d709b86edbcfbcd32ca421`; version 1, 534 entries,
+  SHA-256 `a049af21fc90be6ba64ccee6948fcd55f5f08bf76d046cd6a0399dbe8e609713`.
+  The unchanged generator wrote it at `29668 ms`. FIX-16 `DECISIONS.md`
+  records this immutable commit, count, and hash.
+- Full inventory stability used the unchanged CLI entrypoint with explicit V8
+  allocation settings. Three consecutive runs returned
+  `PASS baseline=534 new=0` at `29699`, `29531`, and `29582` ms. Cold/default
+  wrapper runs correctly failed closed at `31098`, `30992`, and `31084` ms;
+  this is an environment-timing caveat for root `pnpm lint`, not a finding-set
+  or baseline-content difference.
+- Focused evidence: FIX-05 unit plus architecture `8/8`; FIX-16 C1+C2 `69/69`.
+  The sandboxed FIX-05 deploy subprocess stalled; the same complete suite
+  outside sandbox process restrictions passed in 6.04 seconds.
+- Composed observability cluster: 78 files and 1,187 tests; 71 files and 1,167
+  tests passed. Twenty inherited composition failures remain in seven files:
+  one in `fix01-import-graph`, one missing-ref gate each in `fix04-zone-region`
+  and `fix06-zone-region`, three predecessor S05 boundary projection
+  expectations, eight pre-FIX-09 `fix02-chain-storage` expectations, four
+  predecessor S01 exact-schema/grant expectations, and two predecessor S04
+  zone-region expectations. None is on a FIX-05, FIX-16, baseline, decision,
+  or handoff-ledger surface; the FIX-05 ancestry merge is tree-identical to
+  the starting candidate.
+- No merge to `dev`, push, external write, or reviewer dispatch occurred.
