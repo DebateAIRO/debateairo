@@ -78,6 +78,7 @@ import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { RecoveryApplication } from "./recovery.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import { registerClientReportRoutes } from "./obs-client-report.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
@@ -122,6 +123,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  { route: "GET /v1/obs/client-report/enums", auth: "public", resource: "observability", action: "read-client-enums" },
+  { route: "POST /v1/obs/client-report", auth: "public", resource: "observability", action: "write-client-report" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
@@ -144,7 +147,7 @@ export const authorizationPolicyInventory = Object.freeze([
   route: string;
   auth: RouteAuthPolicy;
   origin?: RouteOriginPolicy;
-  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" | "deployment" | "evaluator";
+  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" | "deployment" | "evaluator" | "observability";
   action: string;
 }>[]);
 
@@ -811,6 +814,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(202).send(response);
     });
   }
+
+  registerClientReportRoutes(api);
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", routePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
