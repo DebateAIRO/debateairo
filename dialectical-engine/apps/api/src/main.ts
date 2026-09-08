@@ -1,3 +1,4 @@
+import "@debateai/obs-capture/install/api";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
 import {

@@ -62,6 +62,11 @@ import type {
 } from "@debateai/evaluator";
 import { Argon2InfrastructureError } from "@debateai/crypto";
 import {
+  captureHandled,
+  declaredRef,
+  runWithObsContext,
+} from "@debateai/obs-capture";
+import {
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
   type RegistrationApplication
@@ -165,6 +170,13 @@ function routePolicy(route: AuthorizationRoute): { readonly config: {
 function canonicalRoute(method: string, url: string): string {
   return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
 }
+
+const OBS_RUN_SCOPED_ROUTE_TEMPLATES = Object.freeze([
+  "/v1/runs/:id/events",
+  "/v1/runs/:id",
+  "/v1/runs/:id/answer",
+] as const);
+const EMPTY_OBS_REQUEST_CONTEXT = Object.freeze({});
 
 export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
@@ -336,6 +348,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
     exposeHeadRoutes: false
   });
+  api.addHook("onRequest", (request, _reply, done) => {
+    const routeTemplate = request.routeOptions.url;
+    const params = typeof request.params === "object" && request.params !== null
+      ? request.params as Readonly<Record<string, unknown>>
+      : undefined;
+    const runId = params?.id;
+    const verifiedRunId = OBS_RUN_SCOPED_ROUTE_TEMPLATES.some(
+      (candidate) => candidate === routeTemplate,
+    ) && typeof runId === "string" && ResourceIdSchema.safeParse(runId).success
+      ? runId
+      : undefined;
+    const context = verifiedRunId === undefined
+      ? EMPTY_OBS_REQUEST_CONTEXT
+      : Object.freeze({ run_ref: declaredRef("run", verifiedRunId) });
+    runWithObsContext(context, done);
+  });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
       const key = canonicalRoute(method, route.url);
@@ -436,7 +464,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
+  const obsExcludedCaptureResources = new Set([
+    "identity",
+    "session-self",
+    "session-owner",
+  ]);
   api.setErrorHandler((error, request, reply) => {
+    const activeRouteTemplate = request.routeOptions.url;
+    const capturePolicy = typeof activeRouteTemplate === "string"
+      ? authorizationPolicies.get(canonicalRoute(request.method, activeRouteTemplate))
+      : undefined;
+    const routeTemplate = capturePolicy !== undefined
+      && !obsExcludedCaptureResources.has(capturePolicy.resource)
+      ? activeRouteTemplate
+      : undefined;
+    const correlationId = captureHandled(error, Object.freeze({
+      capture_point: "http",
+      ...(routeTemplate === undefined ? {} : { route_template: routeTemplate }),
+    }));
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
       // the one connection instead of fabricating a terminal SSE event (DR-115)
@@ -485,10 +530,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         diagnostic: apiOperationalErrorDiagnostic(knownError)
       })));
     }
-    return reply.status(statusCode).send({
-      error: errorCode,
-      message: statusCode >= 500 ? errorCode : knownError.message
-    });
+    return reply.status(statusCode).send(statusCode >= 500
+      ? { error: errorCode, correlation_id: correlationId }
+      : { error: errorCode, message: knownError.message });
   });
 
   if (options.sessions !== undefined) {
