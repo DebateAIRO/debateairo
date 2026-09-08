@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readHostCapacity } from "../../apps/observation-agent/src/modules/host-capacity/commands.js";
 import { createHostCapacityModule } from "../../apps/observation-agent/src/modules/host-capacity/module.js";
@@ -76,6 +77,7 @@ describe("OBS-05 Docker and host collection", () => {
     });
     const context = {
       now: observedAt, timeoutMs: 2_000, database, stateDir: "unused",
+      repoRoot: resolve("."),
       targets: [], targetFragment: null, configuration: {}, thresholds: {}
     } as const;
 
@@ -88,7 +90,13 @@ describe("OBS-05 Docker and host collection", () => {
       status: [expect.objectContaining({ key: "host.capacity", state: "UNKNOWN" })]
     })]);
     expect(module.samples([], { now: observedAt })).toEqual([]);
-    expect(module.signals([], { now: observedAt })).toEqual([]);
+    expect(module.signals([], {
+      now: observedAt,
+      thresholdVersion: 7,
+      targetFragment: null,
+      configuration: {},
+      thresholds: {}
+    })).toEqual([]);
 
     await expect(module.probe({ ...context, now: new Date(observedAt.getTime() + 30_000) }))
       .resolves.toHaveLength(1);
