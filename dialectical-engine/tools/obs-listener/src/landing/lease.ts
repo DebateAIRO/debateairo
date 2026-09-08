@@ -142,3 +142,20 @@ export async function releaseMutationLease(stateDirectory: string, leaseId: stri
   if (lease.leaseId !== leaseId) throw new TypeError("FIX13_LEASE_MISMATCH");
   await unlink(join(stateDirectory, LEASE_FILE));
 }
+
+export async function revokeActiveMutation(input: Readonly<{
+  stateDirectory: string;
+  killProcessGroup(pid: number): Promise<void>;
+  cleanupProof(): Promise<void>;
+  comment(value: string): Promise<void>;
+  appendAction(value: Readonly<{ kind: "LEASE_REVOKED"; proposalId: string; leaseId: string }>): Promise<void>;
+}>): Promise<Readonly<{ revoked: false } | { revoked: true; proposalId: string }>> {
+  const lease = await readMutationLease(input.stateDirectory);
+  if (lease === null) return Object.freeze({ revoked: false });
+  await input.killProcessGroup(lease.pid);
+  await input.cleanupProof();
+  await releaseMutationLease(input.stateDirectory, lease.leaseId);
+  await input.appendAction(Object.freeze({ kind: "LEASE_REVOKED", proposalId: lease.proposalId, leaseId: lease.leaseId }));
+  await input.comment(`LEASE_REVOKED ${lease.proposalId}`);
+  return Object.freeze({ revoked: true, proposalId: lease.proposalId });
+}

@@ -88,7 +88,7 @@ export async function provePatch(input: Readonly<{
   for (const gateCommand of input.gateCommands ?? []) {
     if (input.signal?.aborted === true) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red, green });
     const gate = await input.runner.run(parseCatalogCommand(gateCommand, input.prepared.path, input.signal));
-    gates.push(gate);
+    gates[gates.length] = gate;
     if (gate.outcome !== "PASS") return Object.freeze({ ok: false, code: "REFUSED_GATE_FAILED", red, green });
   }
   return Object.freeze({ ok: true, red, green, gates: Object.freeze(gates) });
