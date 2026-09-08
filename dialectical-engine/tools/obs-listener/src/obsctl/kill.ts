@@ -7,6 +7,7 @@ export interface CommandResultRecord {
 export interface KillPort {
   appendIntent(): Promise<void>;
   ensureMarker(name: "CAPTURE_OFF" | "KILL"): Promise<void>;
+  revokeMutationLease?(): Promise<void>;
   sampleMarkers(): Promise<MarkerSample>;
   appendResult(result: CommandResultRecord): Promise<void>;
 }
@@ -33,6 +34,7 @@ export async function kill(port: KillPort): Promise<Readonly<{ exitCode: 0 | 1; 
   try { await port.appendIntent(); } catch { intent = false; }
   try { await port.ensureMarker("CAPTURE_OFF"); } catch { uncertain = true; }
   try { await port.ensureMarker("KILL"); } catch { uncertain = true; }
+  try { await port.revokeMutationLease?.(); } catch { uncertain = true; }
   let sample: MarkerSample;
   try { sample = await port.sampleMarkers(); }
   catch { sample = { captureOff: false, kill: false }; uncertain = true; }

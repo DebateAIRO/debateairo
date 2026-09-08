@@ -1,4 +1,36 @@
+import { timingSafeEqual } from "node:crypto";
+
 import type { CommandResultRecord, MarkerSample } from "./kill.js";
+
+export interface MutationArm {
+  arm(token: string): Readonly<{ ok: true; mutation: "ON" } | { ok: false; code: "MUTATION_AUTH_REJECTED" }>;
+  state(): Readonly<{ mutation: "OFF" | "ON"; quickArm: "OFF" | "ON" }>;
+}
+
+export function createMutationArm(input: Readonly<{
+  custodianToken: string;
+  quickArm: "OFF" | "ON";
+}>): MutationArm {
+  if (Buffer.byteLength(input.custodianToken, "utf8") < 16) {
+    throw new TypeError("FIX13_CUSTODIAN_TOKEN");
+  }
+  let mutation: "OFF" | "ON" = "OFF";
+  return Object.freeze({
+    arm(token: string) {
+      const expected = Buffer.from(input.custodianToken, "utf8");
+      const actual = Buffer.from(token, "utf8");
+      const authenticated = actual.byteLength === expected.byteLength && timingSafeEqual(expected, actual);
+      expected.fill(0);
+      actual.fill(0);
+      if (!authenticated) return Object.freeze({ ok: false as const, code: "MUTATION_AUTH_REJECTED" as const });
+      mutation = "ON";
+      return Object.freeze({ ok: true as const, mutation: "ON" as const });
+    },
+    state() {
+      return Object.freeze({ mutation, quickArm: input.quickArm });
+    },
+  });
+}
 
 export interface ArmPort {
   authenticate(): Promise<void>;
@@ -97,4 +129,11 @@ export async function runArmEntry(): Promise<Readonly<{ exitCode: number; stdout
       return Object.freeze({ exitCode: result.exitCode, stdout: result.output, stderr: "" });
     });
   } finally { hmac.fill(0); }
+}
+
+export async function runMutationArmEntry(): Promise<Readonly<{ exitCode: number; stdout: string; stderr: string }>> {
+  // Mutation authority lives in the daemon-owned executor. A standalone CLI
+  // process cannot persist an in-memory arm across a daemon restart and is not
+  // allowed to manufacture an ARMED/control artifact.
+  return Object.freeze({ exitCode: 1, stdout: "", stderr: "FIX13_EXECUTOR_REQUIRED:arm-mutation\n" });
 }
