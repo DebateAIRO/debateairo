@@ -61,6 +61,7 @@ import type {
   EvaluatorDevMenuView
 } from "@debateai/evaluator";
 import { Argon2InfrastructureError } from "@debateai/crypto";
+import { captureHandled } from "@debateai/obs-capture";
 import {
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
@@ -436,7 +437,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
+  const obsExcludedCaptureResources = new Set([
+    "identity",
+    "session-self",
+    "session-owner",
+  ]);
   api.setErrorHandler((error, request, reply) => {
+    const activeRouteTemplate = request.routeOptions.url;
+    const capturePolicy = typeof activeRouteTemplate === "string"
+      ? authorizationPolicies.get(canonicalRoute(request.method, activeRouteTemplate))
+      : undefined;
+    const routeTemplate = capturePolicy !== undefined
+      && !obsExcludedCaptureResources.has(capturePolicy.resource)
+      ? activeRouteTemplate
+      : undefined;
+    const correlationId = captureHandled(error, Object.freeze({
+      capture_point: "http",
+      ...(routeTemplate === undefined ? {} : { route_template: routeTemplate }),
+    }));
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
       // the one connection instead of fabricating a terminal SSE event (DR-115)
@@ -485,10 +503,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         diagnostic: apiOperationalErrorDiagnostic(knownError)
       })));
     }
-    return reply.status(statusCode).send({
-      error: errorCode,
-      message: statusCode >= 500 ? errorCode : knownError.message
-    });
+    return reply.status(statusCode).send(statusCode >= 500
+      ? { error: errorCode, correlation_id: correlationId }
+      : { error: errorCode, message: knownError.message });
   });
 
   if (options.sessions !== undefined) {
