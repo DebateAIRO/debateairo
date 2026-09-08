@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_INVENTORY_GATE_MS,
   evaluateInventoryGate,
-  parseInventoryGateMs,
   runInventoryGate,
   serializeBaseline,
 } from "../../tools/obs-inventory/src/gate.js";
@@ -62,12 +61,8 @@ describe("FIX-16 C2 inventory gate", () => {
       .toThrow("OBS_INVENTORY_BASELINE_INVALID");
   });
 
-  it("uses the labelled 30000 ms seed and accepts only positive integer overrides", () => {
+  it("uses the labelled 30000 ms seed", () => {
     expect(DEFAULT_INVENTORY_GATE_MS).toBe(30_000);
-    expect(parseInventoryGateMs(undefined)).toBe(30_000);
-    expect(parseInventoryGateMs("1")).toBe(1);
-    expect(() => parseInventoryGateMs("0")).toThrow("OBS_INVENTORY_GATE_MS_INVALID");
-    expect(() => parseInventoryGateMs("1.5")).toThrow("OBS_INVENTORY_GATE_MS_INVALID");
   });
 
   it("prints the baseline PASS and exact new-entry FAIL contracts", async () => {
@@ -162,7 +157,7 @@ describe("FIX-16 C2 inventory gate", () => {
       {
         cwd: join(fixtureRoot, fixture),
         encoding: "utf8",
-        env: { ...process.env, OBS_INVENTORY_GATE_MS: "30000" },
+        env: process.env,
       },
     );
 
@@ -184,5 +179,19 @@ describe("FIX-16 C2 inventory gate", () => {
     const source = await readFile(gatePath, "utf8");
 
     expect(scanSource(source, "tools/obs-inventory/src/gate.ts")).toEqual([]);
+  });
+
+  it("runs the independent inventory command from root lint before audit:source", async () => {
+    const packagePath = join(projectRoot, "package.json");
+    const packageJson = JSON.parse(await readFile(packagePath, "utf8")) as {
+      readonly scripts: Readonly<Record<string, string>>;
+    };
+
+    expect(packageJson.scripts["audit:obs-inventory"]).toBe("tsx tools/obs-inventory/src/index.ts");
+    expect(packageJson.scripts.lint?.split(" && ")).toEqual([
+      "pnpm run audit:architecture",
+      "pnpm run audit:obs-inventory",
+      "pnpm run audit:source",
+    ]);
   });
 });

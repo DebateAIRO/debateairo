@@ -105,15 +105,6 @@ export function serializeBaseline(findings: readonly InventoryFinding[]): string
   return `${JSON.stringify({ version: 1, entries }, null, 2)}\n`;
 }
 
-export function parseInventoryGateMs(rawValue: string | undefined): number {
-  if (rawValue === undefined) return DEFAULT_INVENTORY_GATE_MS;
-  const value = Number(rawValue);
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new InventoryGateError("OBS_INVENTORY_GATE_MS_INVALID", "expected a positive integer");
-  }
-  return value;
-}
-
 export async function runInventoryGate(options: RunInventoryGateOptions): Promise<0 | 1> {
   const now = options.now ?? performance.now.bind(performance);
   const writeOutput = options.writeOutput ?? ((line: string) => process.stdout.write(`${line}\n`));

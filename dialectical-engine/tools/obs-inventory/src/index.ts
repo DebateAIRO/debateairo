@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import {
+  DEFAULT_INVENTORY_GATE_MS,
   InventoryGateError,
-  parseInventoryGateMs,
   runInventoryGate,
 } from "./gate.js";
 
@@ -17,7 +17,7 @@ async function main(): Promise<0 | 1> {
     rootDirectory,
     baselinePath: resolve(rootDirectory, "tools/obs-inventory/baseline.json"),
     snapshot: snapshotRequested(process.argv.slice(2)),
-    gateMs: parseInventoryGateMs(process.env.OBS_INVENTORY_GATE_MS),
+    gateMs: DEFAULT_INVENTORY_GATE_MS,
   });
 }
 
