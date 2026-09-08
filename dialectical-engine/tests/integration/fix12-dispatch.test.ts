@@ -211,4 +211,19 @@ describe("FIX-12 report-only dispatch", () => {
     expect(occurrenceCodes).toEqual(["FIXAGENT_NOTIFICATION_FAILED"]);
     expect(store.actions).toHaveLength(1);
   });
+
+  it("keeps the stored proposal when the injected notifier itself throws", async () => {
+    const store = memoryStore();
+    const dispatcher = createDiagnosisDispatcher({
+      custodianToken: "custodian-token", bundle, store,
+      proposalIdFactory: () => "proposal-12",
+      notifier: { notify: async () => { throw new TypeError("NOTIFIER_TEST_FAILURE"); } },
+      model: { run: async () => ({ output: modelOutput, usage: { totalUnits: 7 } }) },
+    });
+    dispatcher.arm("custodian-token");
+    await expect(dispatcher.dispatch(packet)).resolves.toMatchObject({
+      kind: "PROPOSED", proposalId: "proposal-12",
+    });
+    expect(store.actions).toMatchObject([{ kind: "PROPOSAL", proposalId: "proposal-12" }]);
+  });
 });

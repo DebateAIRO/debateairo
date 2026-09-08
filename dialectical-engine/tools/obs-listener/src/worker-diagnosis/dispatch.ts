@@ -137,7 +137,7 @@ export function createDiagnosisDispatcher(options: DiagnosisDispatcherOptions): 
           ticketId,
           hash: validation.hash,
           proposal: validation.proposal,
-        }));
+        })).catch(() => undefined);
         return Object.freeze({ kind: "PROPOSED", proposalId, hash: validation.hash });
       } finally {
         active -= 1;

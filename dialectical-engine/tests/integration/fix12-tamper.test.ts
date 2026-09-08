@@ -82,6 +82,21 @@ describe("FIX-12 proposal approval controls", () => {
     expect(comments).toEqual([]);
   });
 
+  it("classifies a malformed stored payload as tampered instead of trusting its static type", async () => {
+    const store = controlStore("a".repeat(64));
+    const originalLoad = store.loadProposal;
+    store.loadProposal = async (proposalId) => {
+      const stored = await originalLoad(proposalId);
+      return stored === undefined ? undefined : { ...stored, proposal: { narrative: "not a proposal" } as never };
+    };
+    await expect(approveProposal("proposal-12", store, { comment: async () => undefined })).resolves.toEqual({
+      exitCode: 1, stdout: "PROPOSAL_TAMPERED proposal-12\n", stderr: "",
+    });
+    expect(store.actions).toMatchObject([{ kind: "PROPOSAL_TAMPERED" }]);
+    expect(store.discarded).toEqual(["proposal-12"]);
+    expect(store.states).toEqual(["TICKETED"]);
+  });
+
   it("reveals manifest drift without reading a zone path", () => {
     expect(revealDrift("a".repeat(64), null)).toEqual({ exitCode: 2, stdout: "SLOT_UNSET RP-1\n", stderr: "" });
     expect(revealDrift("a".repeat(64), "a".repeat(64))).toEqual({

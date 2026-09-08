@@ -13,7 +13,7 @@ export interface StoredProposal {
   readonly incidentId: string;
   readonly ticketId: string;
   readonly hash: string;
-  readonly proposal: FixProposal;
+  readonly proposal: unknown;
 }
 
 export interface ProposalControlAction {
@@ -46,8 +46,11 @@ async function loadUntampered(
   if (!SAFE_ID.test(proposalId)) throw new TypeError("FIX12_PROPOSAL_ID");
   const stored = await store.loadProposal(proposalId);
   if (stored === undefined) return Object.freeze({ exitCode: 1, stdout: "", stderr: "PROPOSAL_NOT_FOUND\n" });
-  const computed = canonicalProposalHash(stored.proposal);
-  if (!HASH.test(stored.hash) || stored.hash !== computed) {
+  const parsed = FixProposalSchema.safeParse(stored.proposal);
+  const computed = parsed.success
+    ? canonicalProposalHash(parsed.data)
+    : createHash("sha256").update("PROPOSAL_SCHEMA_INVALID", "utf8").digest("hex");
+  if (!parsed.success || !HASH.test(stored.hash) || stored.hash !== computed) {
     await store.appendAction(Object.freeze({
       kind: "PROPOSAL_TAMPERED",
       proposalId,
