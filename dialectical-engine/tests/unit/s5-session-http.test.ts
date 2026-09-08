@@ -352,7 +352,12 @@ describe("S5 HTTP session boundary", () => {
       method: "GET", url: `/v1/answers/${ANSWER_ID}`, headers: { cookie, "user-agent": "s5-test-browser" }
     });
     expect(response.statusCode).toBe(500);
-    expect(response.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
+    expect(response.json()).toEqual({
+      error: "INTERNAL_ERROR",
+      correlation_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+      )
+    });
     expect(response.body).not.toContain("uuid");
     expect(response.body).not.toContain("driver");
     await api.close();

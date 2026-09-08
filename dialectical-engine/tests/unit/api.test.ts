@@ -432,7 +432,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(submitResponse.statusCode).toBe(500);
     expect(submitResponse.json()).toEqual({
       error: "INTERNAL_ERROR",
-      message: "INTERNAL_ERROR"
+      correlation_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+      )
     });
     expect(submitResponse.body).not.toContain("Database and domain match predicates disagree");
     await submitApi.close();
@@ -448,7 +450,9 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(typedResponse.statusCode).toBe(500);
     expect(typedResponse.json()).toEqual({
       error: "INTERNAL_ERROR",
-      message: "INTERNAL_ERROR"
+      correlation_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+      )
     });
     expect(typedResponse.body).not.toContain("No sealed V3 deployment register exists");
     await typedApi.close();
@@ -460,7 +464,12 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       method: "GET", url: "/v1/answers?limit=1&offset=0", headers: USER_HEADERS
     });
     expect(crashedResponse.statusCode).toBe(500);
-    expect(crashedResponse.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
+    expect(crashedResponse.json()).toEqual({
+      error: "INTERNAL_ERROR",
+      correlation_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+      )
+    });
     expect(crashedResponse.body).not.toContain("database connection lost");
     await crashedApi.close();
   });
