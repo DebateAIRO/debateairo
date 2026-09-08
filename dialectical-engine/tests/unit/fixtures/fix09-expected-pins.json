@@ -1,5 +1,5 @@
 {
-  "bundle_hash": "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+  "bundle_hash": "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
   "taxonomy_pin": {
     "classes": [
       "PROCESS_DEATH",
@@ -62,10 +62,15 @@
     { "key": "obs.shedThresholdPct", "value": null, "status": "UNSET", "source_ref": "OBS-R044" },
     { "key": "obs.zoneFlushIntervalMs", "value": null, "status": "UNSET", "source_ref": "OBS-R044" },
     { "key": "obs.authorityProofStalenessMs", "value": null, "status": "UNSET", "source_ref": "FINALPLAN-A5" },
+    { "key": "obs.quickPreconditionMergedFixes", "value": 10, "status": "SEED", "source_ref": "FIX-14-R02-B" },
+    { "key": "obs.quickPreconditionAgreementRate", "value": 0.9, "status": "SEED", "source_ref": "FIX-14-R02-B" },
+    { "key": "obs.quickProductionLineCap", "value": 20, "status": "SEED", "source_ref": "FIX-14-R02-C" },
+    { "key": "obs.quickTotalLineCap", "value": 50, "status": "SEED", "source_ref": "FIX-14-R02-C" },
     { "key": "obs.fingerprintMaturityN", "value": 3, "status": "SEED", "source_ref": "E6-12" },
     { "key": "obs.blastRadiusMaxReachable", "value": null, "status": "UNSET", "source_ref": "RT-31" },
     { "key": "obs.canaryWindowMs", "value": null, "status": "UNSET", "source_ref": "BATCH-3-ROW-13" },
     { "key": "obs.lineageDepthMax", "value": null, "status": "UNSET", "source_ref": "RT-24" },
+    { "key": "obs.fixCooldownMs", "value": null, "status": "UNSET", "source_ref": "FIX-14-R02-C" },
     { "key": "obs.skewToleranceMs", "value": null, "status": "UNSET", "source_ref": "RT-15" },
     { "key": "obs.captureGapQuietWindowMs", "value": null, "status": "UNSET", "source_ref": "L2-ADDENDUM-2-5.5" },
     { "key": "obs.severeThreshold", "value": "SEVERE", "status": "SEED", "source_ref": "R-E6-09/RT-41" },

@@ -562,7 +562,7 @@ describe("FIX-09 C1 policy bundle", () => {
     const bundle = loadBundle(BUNDLE_PATH);
     const armed = { ...bundle, quick_arm: "ON" as const };
     const expectedHash =
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd";
+      "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8";
     const members = ["update", "digest"] as const;
     const variants = [
       "GETTER_FUNCTION",
@@ -776,7 +776,7 @@ describe("FIX-09 C1 policy bundle", () => {
       expect.soft(getterCalls, label).toBe(0);
       expect.soft(functionCalls, label).toBe(0);
       expect.soft(hash, label).toBe(
-        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       );
     }
 
@@ -1155,7 +1155,7 @@ describe("FIX-09 C1 policy bundle", () => {
       descriptorRestored: true,
       environment: "correct",
       escaped: null,
-      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       quickArm: null,
       refused: true,
     });
@@ -1271,7 +1271,7 @@ describe("FIX-09 C1 policy bundle", () => {
         descriptorRestored: true,
         environment: "correct",
         escaped: null,
-        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
         quickArm: null,
         refused: true,
       });
@@ -1384,7 +1384,7 @@ describe("FIX-09 C1 policy bundle", () => {
         descriptorRestored: true,
         environment: "correct",
         escaped: null,
-        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
         quickArm: null,
         refused: true,
       });
@@ -1531,7 +1531,7 @@ describe("FIX-09 C1 policy bundle", () => {
         callbackCalls: 0,
         environment: "correct",
         escaped: null,
-        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
         nameRestored: true,
         outerRefused: true,
         quickArm: null,
@@ -1660,7 +1660,7 @@ describe("FIX-09 C1 policy bundle", () => {
         descriptorRestored: true,
         environment: "correct",
         escaped: null,
-        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
         outerRefused: true,
         quickArm: null,
         reentrantError: null,
@@ -1793,7 +1793,7 @@ describe("FIX-09 C1 policy bundle", () => {
         descriptorRestored: true,
         environment: "correct",
         escaped: null,
-        hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
         outerQuickArm: null,
         quickArm: null,
         reentrantError: null,
@@ -1879,7 +1879,7 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(JSON.parse(outcome.stdout)).toEqual({
       callbackCalls: 0,
       environment: "correct",
-      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       outerError: {
         code: "REPIN_REFUSED",
         isExpectedInstance: true,
@@ -2023,7 +2023,7 @@ describe("FIX-09 C1 policy bundle", () => {
       callbackCalls: 0,
       environment: "correct",
       escaped: null,
-      hash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      hash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       outerError: {
         code: "REPIN_REFUSED",
         isExpectedInstance: true,
@@ -2761,7 +2761,7 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(repinError).toBeInstanceOf(RepinRefusedError);
     expect(repinned).toBeUndefined();
     expect(hash).toBe(
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
     );
     expect(pushDuringAttack).toEqual(pushDescriptor);
     expect(Object.getOwnPropertyDescriptor(Array.prototype, "push")).toEqual(
@@ -2774,7 +2774,7 @@ describe("FIX-09 C1 policy bundle", () => {
       hashDescriptor,
     );
     expect(bundleHash(bundle)).toBe(
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
     );
     expect(
       repin(bundle, { token: "correct" }, {
@@ -2862,7 +2862,7 @@ describe("FIX-09 C1 policy bundle", () => {
     expect(forgedHashCalls).toBe(0);
     expect(forgedEqualCalls).toBe(0);
     expect(hash).toBe(
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
     );
     expect(repinError).toBeInstanceOf(RepinRefusedError);
     expect(repinned).toBeUndefined();
@@ -2873,7 +2873,7 @@ describe("FIX-09 C1 policy bundle", () => {
       Object.getOwnPropertyDescriptor(crypto, "timingSafeEqual"),
     ).toEqual(equalDescriptor);
     expect(bundleHash(bundle)).toBe(
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
     );
   });
 
@@ -2943,7 +2943,7 @@ describe("FIX-09 C1 policy bundle", () => {
       isProxyDescriptor,
     );
     expect(bundleHash(bundle)).toBe(
-      "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+      "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
     );
   });
 
@@ -3156,7 +3156,7 @@ describe("FIX-09 C1 policy bundle", () => {
       expect(getterCalls, label).toBe(0);
       expect(functionCalls, label).toBe(0);
       expect(hash, label).toBe(
-        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       );
       expect(serialized, label).toBe(expectedNested);
     }
@@ -3194,7 +3194,7 @@ describe("FIX-09 C1 policy bundle", () => {
       expect(escaped, label).toBeUndefined();
       expect(functionCalls, label).toBe(0);
       expect(hash, label).toBe(
-        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       );
     }
   });
@@ -3249,7 +3249,7 @@ describe("FIX-09 C1 policy bundle", () => {
       expect(escaped, label).toEqual([]);
       expect(getterCalls, label).toBe(0);
       expect(hash, label).toBe(
-        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       );
       expect(loaded?.quick_arm, label).toBe("OFF");
       expect(repinned?.quick_arm, label).toBe("OFF");
@@ -3283,7 +3283,7 @@ describe("FIX-09 C1 policy bundle", () => {
 
       expect(escaped, label).toBeUndefined();
       expect(hash, label).toBe(
-        "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+        "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
       );
     }
   });
@@ -3431,7 +3431,7 @@ describe("FIX-09 C1 policy bundle", () => {
           expect.soft(functionCalls, label).toBe(0);
           if (outcome.success) {
             expect.soft(outcome.value.hash, label).toBe(
-              "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+              "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
             );
             expect.soft(outcome.value.loadError, label).toBeInstanceOf(
               PolicyBundleLoadError,
@@ -3711,7 +3711,7 @@ describe("FIX-09 C1 policy bundle", () => {
         expect(setterCalls, label).toBe(0);
         expectFrozenOwnDataSnapshot(projected, raw);
         expect(bundleHash(projected)).toBe(
-          "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
+          "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
         );
         expect(
           isFloorDenied(

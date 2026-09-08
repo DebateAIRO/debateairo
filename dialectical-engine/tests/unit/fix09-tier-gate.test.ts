@@ -112,8 +112,8 @@ describe("FIX-09 C3 deterministic tier gate", () => {
     expect(evaluateTierGate(BASE_INPUT, BUNDLE)).toEqual({
       schema: "fixagent-policy-decision/v1",
       policyRef: "fixagent-policy-v1",
-      bundleHash: "aa76b3fe955ca5d46bcdf05d7b8f78ac27c25341104bf0b3810b6fc833497ecd",
-      inputHash: "81df1442986a9db2728a8acc25cdf0bb54b7cb83bf60819f6e7b2c92b5171d6d",
+      bundleHash: "32aa4d12593355ee2503371265337bac9e50c12e3045d46fd58b79aba3af89c8",
+      inputHash: "7d29f0ae02ab52592f8a201569b6a526e4d40d3a7c5c7751648cdaf2b09be1f2",
       decision: "QUICK|FLOOR_CLEAR",
       sizeLabel: "QUICK",
       floorVerdict: "FLOOR_CLEAR",
