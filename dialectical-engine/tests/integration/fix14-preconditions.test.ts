@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { loadBundle } from "../../tools/obs-listener/policy/loader.js";
+import { evaluateQuickEntry } from "../../tools/obs-listener/policy/quick-arm.js";
 
 const BUNDLE_PATH = resolve(
   import.meta.dirname,
@@ -87,15 +88,9 @@ describe("FIX-14 QUICK entry preconditions", () => {
     });
   });
 
-  it("reports all seven OFF-half predicates as closed false or unset facts", async () => {
-    const quick = await import(
-      "../../tools/obs-listener/policy/quick-arm.js"
-    ).catch(() => null);
-    expect(quick).not.toBeNull();
-    if (quick === null) return;
-
+  it("reports all seven OFF-half predicates as closed false or unset facts", () => {
     const bundle = loadBundle(BUNDLE_PATH);
-    const report = quick.evaluateQuickEntry(bundle);
+    const report = evaluateQuickEntry(bundle);
 
     expect(report).toEqual({
       schema: "fixagent-quick-entry/v1",
@@ -115,13 +110,7 @@ describe("FIX-14 QUICK entry preconditions", () => {
     });
   });
 
-  it("evaluates each observed failing predicate without changing its neighbours", async () => {
-    const quick = await import(
-      "../../tools/obs-listener/policy/quick-arm.js"
-    ).catch(() => null);
-    expect(quick).not.toBeNull();
-    if (quick === null) return;
-
+  it("evaluates each observed failing predicate without changing its neighbours", () => {
     const bundle = loadBundle(BUNDLE_PATH);
     const cases = [
       ["a", { fix13Vetoed: false }, "FIX13_NOT_VETOED"],
@@ -137,7 +126,7 @@ describe("FIX-14 QUICK entry preconditions", () => {
     ] as const;
 
     for (const [key, evidence, reason] of cases) {
-      const report = quick.evaluateQuickEntry(bundle, evidence);
+      const report = evaluateQuickEntry(bundle, evidence);
       expect(report.predicates[key]).toEqual({ state: "FALSE", reason });
       for (const neighbour of ["a", "b", "c", "e", "f", "g"] as const) {
         if (neighbour !== key) {
