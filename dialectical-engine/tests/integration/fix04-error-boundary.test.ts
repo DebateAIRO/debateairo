@@ -293,8 +293,9 @@ describe("FIX-04 API error boundary", () => {
     expect(entries).toHaveLength(1);
     expect(order.indexOf("emit")).toBeGreaterThanOrEqual(0);
     expect(order.indexOf("destroy")).toBeGreaterThan(order.indexOf("emit"));
-    expect(redact(entries[0]!).component).toMatchObject({
-      route_template: "/v1/runs/:id/events",
+    expect(redact(entries[0]!)).toMatchObject({
+      run_ref: RUN_ID,
+      component: { route_template: "/v1/runs/:id/events" },
     });
     await api.close();
   });
