@@ -2315,3 +2315,29 @@ the fix moved the tip after the records were already stamped.
 **Second-order rule, same round.** Append to this file and stage every other artifact BEFORE taking
 the final record set, not after: a trap append is a tracked edit, so it moves the tip and invalidates
 every record already stamped. Two re-takes in this lane, both avoidable by ordering.
+- **Applying CPU load BEFORE an embedded-PostgreSQL start starves `initdb`, not the code
+  under test.** (lane/flakes, F-FLAKE-POL03, 2026-09-07.) The first reproduction attempt put
+  16 busy-loop processes on a 12-core machine and then ran `vitest run <integration file>`
+  in a loop. Load average went to 180; `startTestDatabase()` never finished in ten minutes
+  and the loop produced ZERO samples — the probe measured nothing at all, and a 10-minute
+  tool timeout was the only signal. **Start the database first, apply the load after it is
+  up, and keep the load at roughly 1x cores (8 burners on 12 was enough).** Same run, done
+  that way: 30 failures in 120 child runs versus 0 in 40 unloaded.
+- **For a race inside a spawned child, loop the CHILD, not the test file.** (lane/flakes,
+  2026-09-07.) `vitest run tests/integration/pol03-pool-resilience.test.ts` costs ~24 s per
+  sample and ~21 s of that is embedded-PostgreSQL startup plus module import; the actual
+  child runs for ~0.8 s. A driver that starts ONE database and then loops the child through
+  the existing test-support harness gives ~30x the sample rate for the same wall clock and
+  isolates the mechanism instead of the file. Name it `.mts` (the tsx/CJS trap above).
+- **A promise held across an `await` has no rejection handler for the whole window, and
+  Node kills the process for it.** (lane/flakes, F-FLAKE-POL03, 2026-09-07.) `const p =
+  client.query(...); await somethingThatMakesPReject(); await expectFailure(p);` attaches
+  the handler only at the third line. If the rejection is processed in an earlier tick than
+  the second line's reply, `processPromiseRejections` sees it unhandled and the default
+  `--unhandled-rejections=throw` ends the process — a crash whose stack points at the
+  library that TYPED the error, not at the call site that failed to attach a handler. The
+  fix is to attach in the same synchronous turn: `const p = expectFailure(client.query(...))`
+  then `await p` later. Read such a stack as "who was holding this promise", not "who threw".
+- **zsh expands an unquoted `--include=*.ts` argument.** `grep -rn "x" . --include=*.ts`
+  fails with `no matches found` before grep ever runs. Quote it: `--include='*.ts'`.
+  (lane/flakes, 2026-09-07; two wasted probes.)
