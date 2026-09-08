@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { parseModuleStatusProjection } from "../../apps/observation-agent/src/core/runtime.js";
 import { createHatchetThroughputModule } from "../../apps/observation-agent/src/modules/hatchet-throughput/module.js";
 import {
   createProviderHealthModule,
@@ -54,6 +55,34 @@ async function projections(
 }
 
 describe("OBS-06 exact throughput status", () => {
+  it("accepts the truthful zero-of-zero ratio before any terminal run exists", async () => {
+    const empty = Object.freeze({
+      runSequence: 0, runsStarted: 0, terminalRuns: 0, failedRuns: 0,
+      workItemSequence: 0, completedWorkItems: 0, failedWorkItems: 0
+    });
+    const module = createThroughputModule({
+      read: async () => Object.freeze({ previous: empty, current: empty })
+    });
+
+    const status = await projections(module, Object.freeze({
+      window_minutes: 5, run_failure_window_minutes: 60,
+      run_failure_minimum: 4, run_failure_ratio: 0.5
+    }));
+    const parsed = status.map(parseModuleStatusProjection);
+    expect(parsed).toContainEqual({
+      kind: "template", key: "run.failure", template: "RATIO_WINDOW_STATE",
+      numerator: 0, denominator: 0, windowMinutes: 60,
+      state: "INSUFFICIENT_SAMPLE", view: "throughput"
+    });
+    const stateDir = await mkdtemp(join(tmpdir(), "obs-06-empty-status-"));
+    scratchDirectories.push(stateDir);
+    await expect(writeStatusSnapshot(stateDir, {
+      pid: 606, version: "OBS-06-empty", thresholds_version: 7, mute: null,
+      components: {},
+      modules: { throughput: parsed.map(toStoredModuleStatusProjection) }
+    })).resolves.toBeUndefined();
+  });
+
   it("renders all five SPEC phrases from owned module values", async () => {
     const throughput = createThroughputModule({
       read: async () => Object.freeze({

@@ -1,5 +1,5 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { signalSchema } from "../../apps/observation-agent/src/core/signals.js";
@@ -94,7 +94,7 @@ describe("OBS-07 sendmail channel", () => {
       args: ["-i", "-f", "observation-agent@localhost", "--", "ops@localhost"],
       stdin: "Subject: dialectical-engine FATAL hatchet INFRA_DOWN\nContent-Type: text/plain; charset=utf-8\n\nHatchet is down: asks are accepted but no debate work is dispatched or run.\n",
       env: {
-        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        PATH: `${join(homedir(), ".local/bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,
         DEBATEAI_DEV_MAIL_CAPTURE_DIR: capture
       },
       timeoutMs: 10_000,

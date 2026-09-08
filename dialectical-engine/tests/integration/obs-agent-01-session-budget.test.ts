@@ -135,6 +135,27 @@ describe("OBS-01 daemon database session budget", () => {
     });
     try {
       expect(daemon.pool.options.max).toBe(1);
+      expect(daemon.pool.options.connectionTimeoutMillis).toBe(2_000);
+    } finally {
+      await daemon.pool.end();
+    }
+  });
+
+  it("contains an idle daemon-pool error so a database outage remains observable", async () => {
+    const api = await databaseApi();
+    expect(api.createObservationDaemonDatabase).toBeTypeOf("function");
+    if (api.createObservationDaemonDatabase === undefined) {
+      throw new Error("OBSERVATION_DAEMON_DATABASE_FACTORY_MISSING");
+    }
+    const daemon = api.createObservationDaemonDatabase({
+      connectionString: agentConnectionString(),
+      policy: await ratifiedPolicy()
+    });
+    try {
+      const outage = Object.assign(new Error("terminating connection due to administrator command"), {
+        code: "57P01"
+      });
+      expect(() => daemon.pool.emit("error", outage)).not.toThrow();
     } finally {
       await daemon.pool.end();
     }

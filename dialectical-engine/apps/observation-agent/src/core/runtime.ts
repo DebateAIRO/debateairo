@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ObservationDatabasePort } from "./database.js";
-import { ObservationError } from "./errors.js";
+import { isDatabaseUnavailableError, ObservationError } from "./errors.js";
 import {
   signalLifecycleIdentitySchema,
   type ReplayedOpenSignal,
@@ -156,10 +156,13 @@ const templateStatusProjectionSchemas = [
   z.object({
     kind: z.literal("template"), key: statusKeySchema,
     template: z.literal("RATIO_WINDOW_STATE"), numerator: z.number().int().nonnegative(),
-    denominator: z.number().int().positive(), windowMinutes: z.number().finite().positive(),
+    denominator: z.number().int().nonnegative(), windowMinutes: z.number().finite().positive(),
     state: z.enum(STATUS_STATES), view: statusViewSchema.optional()
   }).strict().refine((projection) => projection.numerator <= projection.denominator, {
     message: "OBSERVATION_STATUS_RATIO_INVALID"
+  }).refine((projection) => projection.denominator > 0
+    || (projection.numerator === 0 && projection.state === "INSUFFICIENT_SAMPLE"), {
+    message: "OBSERVATION_STATUS_RATIO_EMPTY_INVALID"
   }),
   z.object({
     kind: z.literal("template"), key: statusKeySchema,
@@ -448,6 +451,14 @@ export class ObservationModuleRuntime {
     thresholdVersion: number;
   }>): Promise<readonly ProbeObservation[]> {
     const observations: ProbeObservation[] = [];
+    let databaseUnavailable = false;
+    const unavailableDatabase: ObservationDatabasePort = Object.freeze({
+      async withClient<T>(): Promise<T> {
+        throw Object.assign(new Error("OBSERVATION_DATABASE_UNAVAILABLE"), {
+          code: "ECONNREFUSED"
+        });
+      }
+    });
     for (const module of input.modules) {
       const last = this.lastRun.get(module.name);
       if (last !== undefined && input.now.getTime() - last < module.cadence.intervalMs) continue;
@@ -470,12 +481,12 @@ export class ObservationModuleRuntime {
           }));
       const configuration = targetFragment?.configuration ?? Object.freeze({});
       const thresholds = Object.freeze(input.moduleThresholds?.[module.name] ?? {});
-      let moduleObservations: readonly ProbeObservation[];
+      let output: readonly ProbeObservation[];
       try {
-        const output = await module.probe({
+        output = await module.probe({
           now: input.now,
           timeoutMs: Math.min(input.timeoutMs, module.cadence.timeoutMs),
-          database: input.database,
+          database: databaseUnavailable ? unavailableDatabase : input.database,
           stateDir: input.stateDir,
           repoRoot: input.repoRoot,
           openSignals: this.currentOpenSignals(module.name),
@@ -484,6 +495,15 @@ export class ObservationModuleRuntime {
           configuration,
           thresholds
         });
+      } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+          databaseUnavailable = true;
+          continue;
+        }
+        throw new ObservationError("OBSERVATION_MODULE_PROBE_INVALID", error);
+      }
+      let moduleObservations: readonly ProbeObservation[];
+      try {
         moduleObservations = Object.freeze(output.map(parseProbeObservation));
       } catch (error) {
         throw new ObservationError("OBSERVATION_MODULE_PROBE_INVALID", error);
@@ -507,7 +527,16 @@ export class ObservationModuleRuntime {
       } catch (error) {
         throw new ObservationError("OBSERVATION_MODULE_SAMPLE_INVALID", error);
       }
-      for (const sample of samples) await this.sampleStore.write(sample, module.cadence.intervalMs);
+      for (const sample of samples) {
+        if (databaseUnavailable) break;
+        try {
+          await this.sampleStore.write(sample, module.cadence.intervalMs);
+        } catch (error) {
+          if (!isDatabaseUnavailableError(error)) throw error;
+          databaseUnavailable = true;
+          break;
+        }
+      }
 
       let signalIntents: readonly SignalIntent[];
       try {

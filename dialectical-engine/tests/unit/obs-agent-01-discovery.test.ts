@@ -654,6 +654,89 @@ describe("OBS-01 lexical module, verb, and target discovery", () => {
     }]);
   });
 
+  it("contains a module probe failure and still runs later health modules", async () => {
+    const { ObservationModuleRuntime } = await import(
+      "../../apps/observation-agent/src/core/runtime.js"
+    );
+    let laterRuns = 0;
+    let sampleAttempts = 0;
+    const runtime = new ObservationModuleRuntime({
+      nextSequence: () => 1,
+      nextSignalId: () => "60000000-0000-4000-8000-000000000001",
+      sampleStore: { async write() {
+        sampleAttempts += 1;
+        throw Object.assign(new Error("POSTGRES_UNAVAILABLE"), { code: "ECONNREFUSED" });
+      } },
+      emitSignal: async () => undefined
+    });
+    const observations = await runtime.run({
+      modules: [{
+        name: "sample-writer",
+        cadence: { intervalMs: 5_000, timeoutMs: 2_000 },
+        async probe() { return []; },
+        samples() {
+          return [{ metricKey: "sample.one", value: 1, observedAt: new Date() },
+            { metricKey: "sample.two", value: 2, observedAt: new Date() }];
+        },
+        signals() { return []; }
+      }, {
+        name: "database-reader",
+        cadence: { intervalMs: 5_000, timeoutMs: 2_000 },
+        async probe() {
+          throw Object.assign(new Error("POSTGRES_UNAVAILABLE"), { code: "ECONNREFUSED" });
+        },
+        samples() { return []; },
+        signals() { return []; }
+      }, {
+        name: "core-liveness",
+        cadence: { intervalMs: 5_000, timeoutMs: 2_000 },
+        async probe() {
+          laterRuns += 1;
+          return [{
+            component: "postgres", ok: false, class: "INFRA_DOWN",
+            probe: "tcp+select1", lastStatus: "FAILED"
+          }] as const;
+        },
+        samples() { return []; },
+        signals() { return []; }
+      }],
+      now: new Date("2026-09-03T07:30:00.000Z"),
+      timeoutMs: 2_000,
+      database,
+      stateDir: "/tmp/observation-state",
+      repoRoot: "/tmp/repository",
+      targets: [],
+      thresholdVersion: 1
+    });
+    expect(sampleAttempts).toBe(1);
+    expect(laterRuns).toBe(1);
+    expect(observations).toEqual([expect.objectContaining({
+      component: "postgres", ok: false, class: "INFRA_DOWN"
+    })]);
+
+    await expect(new ObservationModuleRuntime({
+      nextSequence: () => 1,
+      nextSignalId: () => "60000000-0000-4000-8000-000000000001",
+      sampleStore: { async write() { return undefined; } },
+      emitSignal: async () => undefined
+    }).run({
+      modules: [{
+        name: "broken-module",
+        cadence: { intervalMs: 5_000, timeoutMs: 2_000 },
+        async probe() { throw new Error("PROGRAMMER_ERROR"); },
+        samples() { return []; },
+        signals() { return []; }
+      }],
+      now: new Date("2026-09-03T07:30:00.000Z"),
+      timeoutMs: 2_000,
+      database,
+      stateDir: "/tmp/observation-state",
+      repoRoot: "/tmp/repository",
+      targets: [],
+      thresholdVersion: 1
+    })).rejects.toThrow("OBSERVATION_MODULE_PROBE_INVALID");
+  });
+
   it("fails closed when a module returns a malformed probe, sample, or signal intent", async () => {
     const { ObservationModuleRuntime } = await import(
       "../../apps/observation-agent/src/core/runtime.js"

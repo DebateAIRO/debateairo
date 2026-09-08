@@ -64,4 +64,34 @@ describe("OBS-05 Docker and host collection", () => {
       "container.debateai-v3-hatchet-lite-1.memory_percent"
     ]));
   });
+
+  it("contains a bounded Docker collection timeout as UNKNOWN and retries on the next cadence", async () => {
+    const observedAt = new Date("2026-09-03T12:00:00.000Z");
+    let attempts = 0;
+    const module = createHostCapacityModule({
+      async readSnapshot() {
+        attempts += 1;
+        throw new Error("OBSERVATION_CAPACITY_DOCKER_FAILED");
+      }
+    });
+    const context = {
+      now: observedAt, timeoutMs: 2_000, database, stateDir: "unused",
+      targets: [], targetFragment: null, configuration: {}, thresholds: {}
+    } as const;
+
+    await expect(module.probe(context)).resolves.toEqual([expect.objectContaining({
+      component: "host",
+      management: "module",
+      ok: false,
+      lastStatus: "UNKNOWN",
+      statusState: "UNKNOWN",
+      status: [expect.objectContaining({ key: "host.capacity", state: "UNKNOWN" })]
+    })]);
+    expect(module.samples([], { now: observedAt })).toEqual([]);
+    expect(module.signals([], { now: observedAt })).toEqual([]);
+
+    await expect(module.probe({ ...context, now: new Date(observedAt.getTime() + 30_000) }))
+      .resolves.toHaveLength(1);
+    expect(attempts).toBe(2);
+  });
 });

@@ -9,7 +9,7 @@ import {
   type FileHandle
 } from "node:fs/promises";
 import { join } from "node:path";
-import { ObservationError } from "./errors.js";
+import { isDatabaseUnavailableError, ObservationError } from "./errors.js";
 import {
   parseRatifiedThresholdPolicy,
   type RatifiedThresholdPolicy,
@@ -21,21 +21,6 @@ const CACHE_FILE = "last-ratified.json";
 
 function cacheInvalid(cause: unknown): ObservationError {
   return new ObservationError("OBSERVATION_THRESHOLDS_CACHE_INVALID", cause);
-}
-
-function errorCode(error: unknown): string | null {
-  if (error === null || typeof error !== "object" || !("code" in error)) return null;
-  return typeof error.code === "string" ? error.code : null;
-}
-
-function isDatabaseUnavailable(error: unknown): boolean {
-  const code = errorCode(error);
-  return code === "ECONNREFUSED"
-    || code === "ENOTFOUND"
-    || code === "ETIMEDOUT"
-    || code === "57P01"
-    || code === "57P03"
-    || (code !== null && /^08[0-9A-Z]{3}$/u.test(code));
 }
 
 function hasDirectoryCustody(metadata: Stats, expectedUid: number): boolean {
@@ -204,7 +189,7 @@ export async function readBootThresholdPolicy(input: Readonly<{
   try {
     policy = await input.repository.readCurrent();
   } catch (error) {
-    if (!isDatabaseUnavailable(error)) throw error;
+    if (!isDatabaseUnavailableError(error)) throw error;
     return Object.freeze({
       policy: await input.cache.read(),
       source: "LAST_RATIFIED_CACHE"

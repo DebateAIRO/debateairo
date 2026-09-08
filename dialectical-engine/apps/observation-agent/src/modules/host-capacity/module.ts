@@ -73,7 +73,22 @@ export function createHostCapacityModule(dependencies: Partial<HostCapacityModul
       restore: tracker.restore
     }),
     async probe(ctx) {
-      const snapshot = await resolved.readSnapshot(ctx.now, ctx.timeoutMs);
+      let snapshot: HostCapacitySnapshot;
+      try {
+        snapshot = await resolved.readSnapshot(ctx.now, ctx.timeoutMs);
+      } catch {
+        pendingSamples = Object.freeze([]);
+        pendingSignals = Object.freeze([]);
+        return Object.freeze([Object.freeze({
+          component: "host", ok: false, class: "CAPACITY",
+          probe: "host_capacity", lastStatus: "UNKNOWN", observedAt: ctx.now,
+          management: "module", statusState: "UNKNOWN",
+          status: Object.freeze([Object.freeze({
+            kind: "state" as const, key: "host.capacity", state: "UNKNOWN" as const,
+            observedAt: ctx.now, view: "capacity" as const
+          })])
+        })]);
+      }
       const cycle = tracker.observe({ snapshot, thresholds: thresholds(ctx.thresholds) });
       const measured = values(snapshot);
       pendingSamples = Object.freeze(measured.map(([key, value]) => Object.freeze({

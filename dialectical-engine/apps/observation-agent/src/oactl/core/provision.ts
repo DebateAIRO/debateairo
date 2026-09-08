@@ -11,13 +11,16 @@ function shellValue(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-export async function setObservationRolePassword(password: string): Promise<void> {
-  const pool = new pg.Pool({ connectionString: DEV_ADMIN_DATABASE_URL, max: 1 });
+export async function setObservationRolePassword(
+  password: string,
+  databaseUrl: string = DEV_ADMIN_DATABASE_URL
+): Promise<void> {
+  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
   const client = await pool.connect();
   try {
     await client.query("SET statement_timeout = 2000");
     const formatted = await client.query<{ statement: string }>(
-      "SELECT format('ALTER ROLE debateai_observation_agent PASSWORD %L', $1) AS statement",
+      "SELECT format('ALTER ROLE debateai_observation_agent PASSWORD %L', $1::text) AS statement",
       [password]
     );
     const statement = formatted.rows[0]?.statement;

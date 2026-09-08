@@ -71,7 +71,7 @@ describe("OBS-01 external supervision witnesses", () => {
     try {
       const launchDirectory = join(repoRoot, "apps/observation-agent/bin");
       const environmentDirectory = join(repoRoot, ".local/dev-auth");
-      const fakeBin = join(repoRoot, "test-bin");
+      const fakeBin = join(repoRoot, ".local/bin");
       await Promise.all([
         mkdir(launchDirectory, { recursive: true }),
         mkdir(environmentDirectory, { recursive: true }),
@@ -84,6 +84,7 @@ describe("OBS-01 external supervision witnesses", () => {
         writeFile(join(environmentDirectory, "observation-agent.env"), "", { mode: 0o600 }),
         writeFile(join(fakeBin, "node"), [
           "#!/bin/zsh",
+          "print -r -- \"${NODE_USE_SYSTEM_CA:-MISSING}\"",
           "print -r -- \"$PWD\"",
           "for argument in \"$@\"; do print -r -- \"$argument\"; done",
           ""
@@ -96,7 +97,7 @@ describe("OBS-01 external supervision witnesses", () => {
       const result = await new Promise<Readonly<{ code: number | null; stdout: string; stderr: string }>>(
         (resolveResult, reject) => {
           const child = spawn(launchScript, [], {
-            env: { PATH: `${fakeBin}:/usr/bin:/bin` },
+            env: { HOME: repoRoot, PATH: "/usr/bin:/bin" },
             stdio: ["ignore", "pipe", "pipe"]
           });
           let stdout = "";
@@ -110,7 +111,7 @@ describe("OBS-01 external supervision witnesses", () => {
       const physicalRepoRoot = await realpath(repoRoot);
       expect(result).toEqual({
         code: 0,
-        stdout: `${physicalRepoRoot}\n--import\ntsx\napps/observation-agent/src/main.ts\n`,
+        stdout: `1\n${physicalRepoRoot}\n--import\ntsx\napps/observation-agent/src/main.ts\n`,
         stderr: ""
       });
     } finally {

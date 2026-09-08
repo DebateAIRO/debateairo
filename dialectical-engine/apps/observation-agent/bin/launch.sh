@@ -25,5 +25,12 @@ fi
 set -a
 source "$environment_file"
 set +a
+user_home="${HOME:-}"
+if [[ -z "$user_home" ]]; then
+  print -u2 -- OBSERVATION_RUNTIME_PATH_INVALID
+  exit 2
+fi
+export PATH="$user_home/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export NODE_USE_SYSTEM_CA=1
 cd "$repo_root"
 exec node --import tsx apps/observation-agent/src/main.ts

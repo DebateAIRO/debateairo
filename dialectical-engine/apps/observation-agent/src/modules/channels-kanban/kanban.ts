@@ -92,7 +92,7 @@ export function createKanbanDeliveryExecutor(input: Readonly<{
     const result = await execute(input.hermesPath, [
       ...common, "create", title, "--body", renderImpact(signal.data),
       "--created-by", "observation-agent", "--idempotency-key",
-      `${signal.data.component}:${signal.data.class}:${signal.data.signal_id}`
+      `${signal.data.component}:${signal.data.class}:${signal.data.signal_id}`, "--json"
     ], 2_000);
     return Object.freeze({ deliveredAt: now, externalRef: ticketId(result.stdout) });
   };

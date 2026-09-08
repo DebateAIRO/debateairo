@@ -34,7 +34,11 @@ export function createObservationDaemonDatabase(input: Readonly<{
 }>): ObservationDaemonDatabase {
   const pool = new pg.Pool({
     connectionString: input.connectionString,
-    max: Math.min(2, input.policy.value.resources.max_database_sessions)
+    max: Math.min(2, input.policy.value.resources.max_database_sessions),
+    connectionTimeoutMillis: 2_000
+  });
+  pool.on("error", () => {
+    // Idle-client failures are surfaced by the next health probe; they must not terminate the daemon.
   });
   return Object.freeze({ pool, database: createObservationDatabasePort(pool) });
 }

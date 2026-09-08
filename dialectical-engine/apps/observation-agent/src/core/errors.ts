@@ -8,6 +8,21 @@ export class ObservationError extends Error {
   }
 }
 
+function errorCode(error: unknown): string | null {
+  if (error === null || typeof error !== "object" || !("code" in error)) return null;
+  return typeof error.code === "string" ? error.code : null;
+}
+
+export function isDatabaseUnavailableError(error: unknown): boolean {
+  const code = errorCode(error);
+  return code === "ECONNREFUSED"
+    || code === "ENOTFOUND"
+    || code === "ETIMEDOUT"
+    || code === "57P01"
+    || code === "57P03"
+    || (code !== null && /^08[0-9A-Z]{3}$/u.test(code));
+}
+
 export function normalizeObservationError(error: unknown): string {
   if (error instanceof ObservationError && /^OBSERVATION_[A-Z0-9_]+$/u.test(error.code)) {
     return error.code;

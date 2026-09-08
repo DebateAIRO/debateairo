@@ -77,7 +77,7 @@ describe("OBS-07 Kanban channel", () => {
           "dialectical-engine FATAL hatchet INFRA_DOWN", "--body",
           "Hatchet is down: asks are accepted but no debate work is dispatched or run.",
           "--created-by", "observation-agent", "--idempotency-key",
-          "hatchet:INFRA_DOWN:70000000-0000-4000-8000-000000000711"]
+          "hatchet:INFRA_DOWN:70000000-0000-4000-8000-000000000711", "--json"]
       },
       {
         file: "/Users/test/.local/bin/hermes",

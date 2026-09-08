@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { lstat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
 import { ObservationError } from "../../core/errors.js";
 import {
@@ -132,7 +133,7 @@ export function createSendmailDeliveryExecutor(input: Readonly<{
       args: Object.freeze(["-i", "-f", from, "--", to]),
       stdin: message,
       env: Object.freeze({
-        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        PATH: `${resolve(homedir(), ".local/bin")}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,
         DEBATEAI_DEV_MAIL_CAPTURE_DIR: capture
       }),
       timeoutMs: 10_000,

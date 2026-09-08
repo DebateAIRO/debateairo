@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -118,6 +119,26 @@ describe("OBS-01 observation schema foundation", () => {
         AND table_schema <> 'observation'
     `);
     expect(escaped.rows).toEqual([]);
+  });
+
+  it("provisions the agent role password through a real PostgreSQL connection", async () => {
+    const { setObservationRolePassword } = await import(
+      "../../apps/observation-agent/src/oactl/core/provision.js"
+    );
+    const password = "observation-agent-test-only";
+
+    await expect(setObservationRolePassword(password, database!.connectionString)).resolves.toBeUndefined();
+
+    const roleUrl = new URL(database!.connectionString);
+    roleUrl.username = "debateai_observation_agent";
+    roleUrl.password = password;
+    const rolePool = new pg.Pool({ connectionString: roleUrl.toString(), max: 1 });
+    try {
+      await expect(rolePool.query<{ current_user: string }>("SELECT current_user"))
+        .resolves.toMatchObject({ rows: [{ current_user: "debateai_observation_agent" }] });
+    } finally {
+      await rolePool.end();
+    }
   });
 
   it("lets the listener read only the defect view", async () => {

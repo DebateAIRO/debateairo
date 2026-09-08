@@ -118,10 +118,13 @@ const templateProjectionSchema = z.union([
   z.object({
     kind: z.literal("template"), key: statusKeySchema,
     template: z.literal("RATIO_WINDOW_STATE"), numerator: z.number().int().nonnegative(),
-    denominator: z.number().int().positive(), window_minutes: z.number().finite().positive(),
+    denominator: z.number().int().nonnegative(), window_minutes: z.number().finite().positive(),
     state: z.enum(STATUS_STATES), view: statusViewSchema.optional()
   }).strict().refine((projection) => projection.numerator <= projection.denominator, {
     message: "OBSERVATION_STATUS_RATIO_INVALID"
+  }).refine((projection) => projection.denominator > 0
+    || (projection.numerator === 0 && projection.state === "INSUFFICIENT_SAMPLE"), {
+    message: "OBSERVATION_STATUS_RATIO_EMPTY_INVALID"
   }),
   z.object({
     kind: z.literal("template"), key: statusKeySchema,
