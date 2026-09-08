@@ -103,6 +103,7 @@ const BUILD_REF_SEED = "UNTRACKED-DEV:UNKNOWN"; // seed — V ratifies at FIX-01
 const BUILD_DIRTY_SEED = true; // seed — V ratifies at FIX-01 acceptance
 const REDACTION_POLICY_VERSION_SEED = "g0"; // seed — V ratifies at FIX-01 acceptance
 const ALLOWLIST_SET_ID_SEED = "g0-empty-parameters"; // seed — V ratifies at FIX-01 acceptance
+const CAUSE_DEPTH_MAX_SEED = 64; // seed — V ratifies at FIX-11 acceptance
 
 const EMPTY_FLUSH_RESULT = Object.freeze({
   dequeued: 0,
@@ -230,6 +231,8 @@ function createStartingState(
       "OBS_ALLOWLIST_SET_ID",
       ALLOWLIST_SET_ID_SEED,
     ),
+    repoRoot: configValue("OBS_REPO_ROOT", process.cwd()),
+    causeDepthMax: CAUSE_DEPTH_MAX_SEED,
   });
   const spool = createSpool(options.spoolFd);
   const flusher = createCaptureFlusher({

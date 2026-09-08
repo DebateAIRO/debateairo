@@ -38,6 +38,10 @@ const OCCURRENCE_TRY_LOCK_SQL = `
   ) AS acquired
 `;
 let database: TestDatabase;
+const TEST_DAEMON_SAFETY = Object.freeze({
+  killed: async () => false,
+  abortLocal: async () => undefined,
+});
 
 function deliverOccurrence(
   clientOrUrl: string | Pick<PoolClient,"query">,
@@ -765,7 +769,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
       pollIntervalMs: 5_000,
       consumer: "fixagent-daemon"
-    }, factory);
+    }, factory, TEST_DAEMON_SAFETY);
     await daemon.start();
     try {
       const occurrence = await insertOccurrence();
@@ -788,7 +792,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
       pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, realGenerationFactory(created));
+    }, realGenerationFactory(created), TEST_DAEMON_SAFETY);
     await daemon.start();
     try {
       const live = created[0];
@@ -856,11 +860,11 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
     const daemonA = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, observingGenerationFactory(madeA, statementsA, probe));
+    }, observingGenerationFactory(madeA, statementsA, probe), TEST_DAEMON_SAFETY);
     const daemonB = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, observingGenerationFactory(madeB, statementsB, probe));
+    }, observingGenerationFactory(madeB, statementsB, probe), TEST_DAEMON_SAFETY);
     await daemonA.start();
     await daemonB.start();
     try {

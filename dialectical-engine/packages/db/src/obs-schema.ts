@@ -52,6 +52,7 @@ export const obsOccurrence = obs.table("occurrence", {
   ledgerRef: text("ledger_ref").notNull(),
   parentOccurrenceRef: text("parent_occurrence_ref").notNull(),
   causeRelation: text("cause_relation"),
+  causeChainCodes: jsonb("cause_chain_codes").notNull().default([]),
   atSeqWatermark: text("at_seq_watermark").notNull(),
   frames: jsonb("frames").notNull().default([]),
   safeTemplateId: text("safe_template_id").notNull(),
@@ -111,6 +112,7 @@ export const obsDelivery = obs.table("delivery", {
 export const obsTrace = obs.table("trace", {
   traceId: uuid("trace_id").primaryKey().defaultRandom(),
   occurrenceId: uuid("occurrence_id").notNull().references(() => obsOccurrence.occurrenceId),
+  incidentId: uuid("incident_id").references(() => obsIncident.incidentId),
   verdict: text("verdict").notNull(),
   evidence: jsonb("evidence").notNull(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow()

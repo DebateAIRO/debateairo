@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import {
   acknowledgeDelivery,
   advanceDeliveryCursor,
+  claimIncidentForTrace,
   deliveryIsAcknowledged,
   loadAggregateMembers,
   loadDeliveryOccurrence,
@@ -10,6 +11,7 @@ import {
   type FixagentDeliveryGeneration,
   type FixagentDeliveryTransaction,
 } from "@debateai/obs-capture/chain/fixagent-delivery";
+import type { TracerHook } from "./tracer-hook.js";
 import { decodeOccurrence, type OccurrenceRecord, type OccurrenceSeverity, type OccurrenceSource } from "./intake.js";
 import { appendPoisonReceipt, appendSkipReceipt } from "./poison.js";
 import { loadBundle } from "../../policy/loader.js";
@@ -106,6 +108,10 @@ export interface DeliveryOutcome {
   readonly cursor: bigint;
 }
 
+export type TransactionTracerHookFactory = (
+  transaction: FixagentDeliveryTransaction,
+) => TracerHook;
+
 async function aggregateFor(
   transaction: FixagentDeliveryTransaction,
   current: OccurrenceRecord,
@@ -146,7 +152,8 @@ function tierDecision(
 
 export async function deliverOccurrence(
   generation: FixagentDeliveryGeneration,
-  occurrenceId: string
+  occurrenceId: string,
+  tracerHookFactory?: TransactionTracerHookFactory,
 ): Promise<DeliveryOutcome> {
   return generation.withDelivery(occurrenceId,async (transaction) => {
     const row = await loadDeliveryOccurrence(transaction,occurrenceId);
@@ -174,6 +181,16 @@ export async function deliverOccurrence(
         maxSeverity:aggregate.maxSeverity,sourceSet:aggregate.sourceSet,
         policyRef:decision.policyRef,inputHash:decision.inputHash,decision:decision.decision,
       });
+      if (tracerHookFactory !== undefined) {
+        const incident = await claimIncidentForTrace(transaction, {
+          occurrenceId,
+          fingerprint: aggregate.fingerprint,
+          fingerprintVersion: aggregate.fingerprintVersion,
+        });
+        if (incident !== undefined) {
+          await tracerHookFactory(transaction).onIncidentNew(incident);
+        }
+      }
       result = "FOLDED";
     } else if (intake.kind === "SKIP") {
       await appendSkipReceipt(transaction, { occurrenceId, occSeq,source }, intake.reason);
