@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.debateai.obs-watchdog</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE_BINARY__</string>
+    <string>__DIALECTICAL_ENGINE_ROOT__/tools/obs-listener/dist/src/watchdog.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__DIALECTICAL_ENGINE_ROOT__</string>
+  <key>UserName</key>
+  <string>__WATCHDOG_OS_USER__</string>
+  <key>GroupName</key>
+  <string>__WATCHDOG_OS_GROUP__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OBS_WATCHDOG_DATABASE_URL</key>
+    <string>__WATCHDOG_DATABASE_URL__</string>
+    <key>OBS_CONTROL_DIR</key>
+    <string>__OBS_CONTROL_DIR__</string>
+    <key>OBS_WATCHDOG_INTERVAL_MS</key>
+    <string>__WATCHDOG_INTERVAL_MS__</string>
+    <key>OBS_WATCHDOG_HEARTBEAT_STALE_MS</key>
+    <string>__WATCHDOG_HEARTBEAT_STALE_MS__</string>
+    <key>OBS_WATCHDOG_CURSOR_LAG_LIMIT</key>
+    <string>__WATCHDOG_CURSOR_LAG_LIMIT__</string>
+    <key>V_PROVISIONER_UID</key>
+    <string>__V_PROVISIONER_UID__</string>
+    <key>OBS_CHAIN_PUBLIC_GID</key>
+    <string>__OBS_CHAIN_PUBLIC_GID__</string>
+    <key>WATCHDOG_UID</key>
+    <string>__WATCHDOG_UID__</string>
+    <key>WATCHDOG_GID</key>
+    <string>__WATCHDOG_GID__</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIRECTORY__/obs-watchdog.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIRECTORY__/obs-watchdog.stderr.log</string>
+</dict>
+</plist>
