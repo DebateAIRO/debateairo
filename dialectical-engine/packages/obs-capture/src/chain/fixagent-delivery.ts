@@ -168,6 +168,86 @@ export async function loadDeliveryOccurrence(
   return row;
 }
 
+export async function loadTraceOccurrence(
+  transaction: FixagentDeliveryTransaction,
+  occurrenceId: string,
+): Promise<Record<string, unknown> | undefined> {
+  const selected = await state(transaction).client.query<Record<string, unknown>>(`
+    SELECT occurrence_id,occ_seq,run_ref,build_ref,parent_occurrence_ref,cause_relation,
+      cause_chain_codes,frames,zone_context,source,code,taxonomy_class,capture_point,
+      redaction_policy_version,allowlist_set_id
+    FROM obs.occurrence WHERE occurrence_id=$1
+  `, [occurrenceId]);
+  return selected.rows[0];
+}
+
+export async function claimIncidentForTrace(
+  transaction: FixagentDeliveryTransaction,
+  input: Readonly<{
+    occurrenceId: string;
+    fingerprint: string;
+    fingerprintVersion: number;
+  }>,
+): Promise<Readonly<{
+  incidentId: string;
+  occurrenceId: string;
+  fingerprint: string;
+  fingerprintVersion: number;
+}> | undefined> {
+  const claimed = await state(transaction).client.query<{
+    incident_id: string;
+    fingerprint: string;
+    fingerprint_version: number;
+  }>(`
+    UPDATE obs.incident SET state='RESEARCHING',updated_at=statement_timestamp()
+    WHERE fingerprint=$1 AND fingerprint_version=$2 AND state='NEW'
+    RETURNING incident_id::text,fingerprint,fingerprint_version
+  `, [input.fingerprint, input.fingerprintVersion]);
+  const row = claimed.rows[0];
+  return row === undefined ? undefined : Object.freeze({
+    incidentId: row.incident_id,
+    occurrenceId: input.occurrenceId,
+    fingerprint: row.fingerprint,
+    fingerprintVersion: row.fingerprint_version,
+  });
+}
+
+export async function persistTraceResult(
+  transaction: FixagentDeliveryTransaction,
+  input: Readonly<{
+    incidentId: string;
+    occurrenceId: string;
+    verdict: string;
+    evidence: Readonly<Record<string, unknown>>;
+  }>,
+): Promise<Readonly<{
+  occurrenceId: string;
+  verdict: string;
+  evidence: Readonly<Record<string, unknown>>;
+}>> {
+  const client = state(transaction).client;
+  await client.query(`
+    INSERT INTO obs.trace (incident_id,occurrence_id,verdict,evidence)
+    VALUES ($1,$2,$3,$4::jsonb)
+    ON CONFLICT (incident_id) WHERE incident_id IS NOT NULL DO NOTHING
+  `, [input.incidentId, input.occurrenceId, input.verdict, JSON.stringify(input.evidence)]);
+  const selected = await client.query<{
+    occurrence_id: string;
+    verdict: string;
+    evidence: Record<string, unknown>;
+  }>(`
+    SELECT occurrence_id::text,verdict,evidence
+    FROM obs.trace WHERE incident_id=$1
+  `, [input.incidentId]);
+  const row = selected.rows[0];
+  if (row === undefined) fail("FIX11_TRACE_PERSISTENCE");
+  return Object.freeze({
+    occurrenceId: row.occurrence_id,
+    verdict: row.verdict,
+    evidence: Object.freeze(row.evidence),
+  });
+}
+
 export async function deliveryIsAcknowledged(
   transaction: FixagentDeliveryTransaction,
   occurrenceId: string,

@@ -312,7 +312,7 @@ async function insertLegacy(
     "build_dirty","runtime","component","capture_point","code","taxonomy_class","severity",
     "condition_mark","disposition","fingerprint","fingerprint_version","redaction_policy_version",
     "allowlist_set_id","fallback_minimized","capture_status","run_ref","work_item_ref","node_ref",
-    "attempt_ref","ledger_ref","parent_occurrence_ref","cause_relation","at_seq_watermark","frames",
+    "attempt_ref","ledger_ref","parent_occurrence_ref","cause_relation","cause_chain_codes","at_seq_watermark","frames",
     "safe_template_id","template_parameters","source","source_event_ref","zone_context","attempt_index",
     "writer_identity","chain_version","chain_key_id","chain_seq","chain_signature","chain_link",
   ];
@@ -322,7 +322,8 @@ async function insertLegacy(
     input.taxonomy_class,input.severity,input.condition_mark,input.disposition,input.fingerprint,
     input.fingerprint_version,input.redaction_policy_version,input.allowlist_set_id,input.fallback_minimized,
     input.capture_status,input.run_ref,input.work_item_ref,input.node_ref,input.attempt_ref,input.ledger_ref,
-    input.parent_occurrence_ref,input.cause_relation,input.at_seq_watermark,JSON.stringify(input.frames),
+    input.parent_occurrence_ref,input.cause_relation,JSON.stringify(input.cause_chain_codes),
+    input.at_seq_watermark,JSON.stringify(input.frames),
     input.safe_template_id,JSON.stringify(input.template_parameters),input.source,input.source_event_ref,
     input.zone_context,input.attempt_index,input.writer_identity,null,null,null,null,null,
   ];
@@ -400,7 +401,7 @@ async function insertChained(
     "build_dirty","runtime","component","capture_point","code","taxonomy_class","severity",
     "condition_mark","disposition","fingerprint","fingerprint_version","redaction_policy_version",
     "allowlist_set_id","fallback_minimized","capture_status","run_ref","work_item_ref","node_ref",
-    "attempt_ref","ledger_ref","parent_occurrence_ref","cause_relation","at_seq_watermark","frames",
+    "attempt_ref","ledger_ref","parent_occurrence_ref","cause_relation","cause_chain_codes","at_seq_watermark","frames",
     "safe_template_id","template_parameters","source","source_event_ref","zone_context","attempt_index",
     "writer_identity","chain_version","chain_key_id","chain_seq","chain_signature","chain_link",
   ];
@@ -410,7 +411,8 @@ async function insertChained(
     input.taxonomy_class,input.severity,input.condition_mark,input.disposition,input.fingerprint,
     input.fingerprint_version,input.redaction_policy_version,input.allowlist_set_id,input.fallback_minimized,
     input.capture_status,input.run_ref,input.work_item_ref,input.node_ref,input.attempt_ref,input.ledger_ref,
-    input.parent_occurrence_ref,input.cause_relation,input.at_seq_watermark,JSON.stringify(input.frames),
+    input.parent_occurrence_ref,input.cause_relation,JSON.stringify(input.cause_chain_codes),
+    input.at_seq_watermark,JSON.stringify(input.frames),
     input.safe_template_id,JSON.stringify(input.template_parameters),input.source,input.source_event_ref,
     input.zone_context,input.attempt_index,input.writer_identity,1,signer.keyId,chainSeq,signature,link,
   ];
