@@ -43,11 +43,11 @@ commit to FIX-16 `DECISIONS.md`.
 
 - Commits: `3f8384ef` (gate semantics, CLI, fixtures) and `39030e98`
   (root lint wiring, fixed seed, preflight documentation).
-- Focused post-refutation C2 cluster: `12/12` ×3. Combined C1+C2 cluster:
-  `69/69` ×3 before the final fixed-seed refinement; the final verification
-  command is recorded in the worker handoff.
-- Full production scan: stable `379` findings ×3, zero findings in the new C2
-  gate/CLI, elapsed `21028`, `21059`, and `21391` ms (all below 30,000 ms).
+- Focused post-refutation C2 cluster: `12/12` ×3. The final committed C1+C2
+  cluster is `69/69` ×3.
+- Final committed full production scan: stable `379` findings ×3, zero
+  findings in the new C2 gate/CLI, elapsed `21195`, `21070`, and `21081` ms
+  (all below 30,000 ms).
 - Typecheck: exit 1 with exactly the inherited eight diagnostics in
   `tests/unit/s14-ui.test.ts`; zero FIX-16 diagnostics.
 - `audit:source`: exit 1 with exactly the three inherited installer rows
