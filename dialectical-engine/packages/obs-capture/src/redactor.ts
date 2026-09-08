@@ -87,7 +87,11 @@ export interface PostRedactionEnvelope {
     | "listener"
     | "watchdog"
     | "ingest";
-  readonly component: Readonly<{ readonly process: string; readonly package: string }>;
+  readonly component: Readonly<{
+    readonly process: string;
+    readonly package: string;
+    readonly route_template?: string;
+  }>;
   readonly capture_point: CapturePoint;
   readonly code: string;
   readonly taxonomy_class: TaxonomyClass;
@@ -173,6 +177,45 @@ function stringMember<T extends string>(
     : undefined;
 }
 
+const ROUTE_TEMPLATE = /^\/[a-z0-9-]+(?:\/(?:[a-z0-9-]+|:[A-Za-z][A-Za-z0-9_]*))*$/u;
+const ROUTE_TEMPLATE_MAX_LENGTH = 192;
+
+interface HandledCaptureProjection {
+  readonly capturePoint: CapturePoint;
+  readonly routeTemplate: string | undefined;
+}
+
+function snapshotHandledCaptureContext(value: unknown): HandledCaptureProjection {
+  if (!isRecord(value)) {
+    return Object.freeze({ capturePoint: "boundary", routeTemplate: undefined });
+  }
+  try {
+    const capturePointDescriptor = Object.getOwnPropertyDescriptor(value, "capture_point");
+    const routeTemplateDescriptor = Object.getOwnPropertyDescriptor(value, "route_template");
+    const capturePointValue = capturePointDescriptor !== undefined
+      && Object.prototype.hasOwnProperty.call(capturePointDescriptor, "value")
+      ? capturePointDescriptor.value
+      : undefined;
+    const routeTemplateValue = routeTemplateDescriptor !== undefined
+      && Object.prototype.hasOwnProperty.call(routeTemplateDescriptor, "value")
+      ? routeTemplateDescriptor.value
+      : undefined;
+    const capturePoint = stringMember<CapturePoint>(
+      capturePointValue,
+      CAPTURE_POINT_SET,
+      "boundary",
+    ) ?? "boundary";
+    const routeTemplate = typeof routeTemplateValue === "string"
+      && routeTemplateValue.length <= ROUTE_TEMPLATE_MAX_LENGTH
+      && ROUTE_TEMPLATE.test(routeTemplateValue)
+      ? routeTemplateValue
+      : undefined;
+    return Object.freeze({ capturePoint, routeTemplate });
+  } catch {
+    return Object.freeze({ capturePoint: "boundary", routeTemplate: undefined });
+  }
+}
+
 export function isPostRedactionEnvelope(
   value: unknown,
 ): value is PostRedactionEnvelope {
@@ -217,10 +260,13 @@ export function createSharedRedactor(
     }
   }
 
-  function safeSourceEventRef(): Readonly<{
+  function safeSourceEventRef(reservedValue?: unknown): Readonly<{
     readonly value: string;
     readonly minimized: boolean;
   }> {
+    if (reservedValue !== undefined) {
+      return normalizeSourceEventRef(reservedValue);
+    }
     try {
       return normalizeSourceEventRef(sourceEventRef());
     } catch {
@@ -239,6 +285,8 @@ export function createSharedRedactor(
     readonly fallbackMinimized: boolean;
     readonly ambientContext: CaptureQueueEntry["ambient_context_ref"];
     readonly templateParameters: Readonly<Record<string, string | number>>;
+    readonly routeTemplate?: string;
+    readonly sourceEventRef?: unknown;
   }): PostRedactionEnvelope {
     const template = resolveSafeTemplate(options.code);
     const fallbackTemplate = resolveSafeTemplate("OBS_CAPTURE_SELF");
@@ -254,7 +302,10 @@ export function createSharedRedactor(
     const safeTaxonomy = template === undefined
       ? "CAPTURE_SELF"
       : (binding?.taxonomy_class ?? options.taxonomyClass);
-    const sourceRef = safeSourceEventRef();
+    const sourceRef = safeSourceEventRef(options.sourceEventRef);
+    const eventComponent = options.routeTemplate === undefined
+      ? component
+      : Object.freeze({ ...component, route_template: options.routeTemplate });
     const fingerprint = createHash("sha256")
       .update(`v1\u0000${safeCode}\u0000${safeTaxonomy}\u0000${metadata.runtime}\u0000${component.package}`)
       .digest("hex");
@@ -269,7 +320,7 @@ export function createSharedRedactor(
       build_ref: metadata.build_ref,
       build_dirty: config.build_dirty,
       runtime: metadata.runtime,
-      component,
+      component: eventComponent,
       capture_point: template === undefined
         ? "self"
         : (binding?.capture_point ?? options.capturePoint),
@@ -314,11 +365,16 @@ export function createSharedRedactor(
   function fallback(
     ambientContext: CaptureQueueEntry["ambient_context_ref"],
     zoneContext: boolean,
+    captureProjection: HandledCaptureProjection = Object.freeze({
+      capturePoint: "self",
+      routeTemplate: undefined,
+    }),
+    reservedSourceEventRef?: unknown,
   ): PostRedactionEnvelope {
     return build({
       code: "OBS_CAPTURE_SELF",
       taxonomyClass: "CAPTURE_SELF",
-      capturePoint: "self",
+      capturePoint: captureProjection.capturePoint,
       disposition: "SELF",
       source: "first_party",
       zoneContext,
@@ -326,6 +382,10 @@ export function createSharedRedactor(
       fallbackMinimized: true,
       ambientContext,
       templateParameters: Object.freeze({}),
+      ...(captureProjection.routeTemplate === undefined
+        ? {} : { routeTemplate: captureProjection.routeTemplate }),
+      ...(reservedSourceEventRef === undefined
+        ? {} : { sourceEventRef: reservedSourceEventRef }),
     });
   }
 
@@ -405,11 +465,21 @@ export function createSharedRedactor(
       let zoneContext = ambientSnapshot.zoneContext;
 
       try {
+        const captureProjection = entry.kind === "handled_error"
+          ? snapshotHandledCaptureContext(entry.handled_context_ref)
+          : Object.freeze({ capturePoint: "self" as const, routeTemplate: undefined });
+        const reservedSourceEventRef = entry.source_event_ref;
+        const fallbackEntry = (): PostRedactionEnvelope => fallback(
+          ambientContext,
+          zoneContext,
+          captureProjection,
+          reservedSourceEventRef,
+        );
         let payload: Readonly<Record<string, unknown>> | undefined;
         let codeValue: unknown;
         if (entry.kind === "envelope") {
           if (!isRecord(entry.payload_ref)) {
-            return fallback(ambientContext, zoneContext);
+            return fallbackEntry();
           }
           payload = entry.payload_ref;
           const payloadZoneValue = ownValue(payload, "zone_context");
@@ -417,11 +487,11 @@ export function createSharedRedactor(
             payloadZoneValue !== undefined &&
             typeof payloadZoneValue !== "boolean"
           ) {
-            return fallback(ambientContext, true);
+            return fallback(ambientContext, true, captureProjection, reservedSourceEventRef);
           }
           zoneContext = zoneContext || payloadZoneValue === true;
           if (Object.keys(payload).some((key) => !INPUT_ALLOWLIST.has(key))) {
-            return fallback(ambientContext, zoneContext);
+            return fallbackEntry();
           }
           codeValue = ownValue(payload, "code");
           if (codeValue === undefined) {
@@ -435,24 +505,24 @@ export function createSharedRedactor(
         }
 
         if (typeof codeValue !== "string") {
-          return fallback(ambientContext, zoneContext);
+          return fallbackEntry();
         }
         const safeTemplate = resolveSafeTemplate(codeValue);
         if (safeTemplate === undefined) {
-          return fallback(ambientContext, zoneContext);
+          return fallbackEntry();
         }
         const parameterValue = payload === undefined
           ? undefined
           : ownValue(payload, "template_parameters");
         if (parameterValue !== undefined && !isParameterRecord(parameterValue)) {
-          return fallback(ambientContext, zoneContext);
+          return fallbackEntry();
         }
         const validatedParameters = validateTemplateParameters(
           safeTemplate.parameters,
           parameterValue ?? Object.freeze({}),
         );
         if (validatedParameters.fallback_minimized) {
-          return fallback(ambientContext, zoneContext);
+          return fallbackEntry();
         }
         const binding = safeTemplate.binding;
         if (binding !== undefined) {
@@ -460,18 +530,18 @@ export function createSharedRedactor(
             payload === undefined
             || Object.keys(payload).some((key) => !LIFECYCLE_INPUT_ALLOWLIST.has(key))
           ) {
-            return fallback(ambientContext, zoneContext);
+            return fallbackEntry();
           }
           const hasError = hasOwn(payload, "error");
           if (
             (codeValue === "OBS_SCHEDULER_JOB_FAILED" && !hasError)
             || (codeValue !== "OBS_SCHEDULER_JOB_FAILED" && hasError)
           ) {
-            return fallback(ambientContext, zoneContext);
+            return fallbackEntry();
           }
           for (const [field, expected] of Object.entries(binding)) {
             if (hasOwn(payload, field) && ownValue(payload, field) !== expected) {
-              return fallback(ambientContext, zoneContext);
+              return fallbackEntry();
             }
           }
         }
@@ -481,12 +551,12 @@ export function createSharedRedactor(
         const taxonomy = typeof taxonomyValue === "string"
           ? resolveTaxonomyClass(taxonomyValue)?.taxonomy_class
           : undefined;
-        if (taxonomy === undefined) return fallback(ambientContext, zoneContext);
+        if (taxonomy === undefined) return fallbackEntry();
         const capturePoint = stringMember<CapturePoint>(
           binding?.capture_point
             ?? (payload === undefined ? undefined : ownValue(payload, "capture_point")),
           CAPTURE_POINT_SET,
-          entry.kind === "handled_error" ? "boundary" : "self",
+          entry.kind === "handled_error" ? captureProjection.capturePoint : "self",
         );
         const disposition = stringMember<CaptureDisposition>(
           binding?.disposition
@@ -501,7 +571,7 @@ export function createSharedRedactor(
           "first_party",
         );
         if (capturePoint === undefined || disposition === undefined || source === undefined) {
-          return fallback(ambientContext, zoneContext);
+          return fallbackEntry();
         }
         const attemptValue = payload === undefined
           ? undefined
@@ -510,7 +580,7 @@ export function createSharedRedactor(
           attemptValue !== undefined &&
           (!Number.isSafeInteger(attemptValue) || (attemptValue as number) < 0)
         ) {
-          return fallback(ambientContext, zoneContext);
+          return fallbackEntry();
         }
         return build({
           code: codeValue,
@@ -523,6 +593,10 @@ export function createSharedRedactor(
           fallbackMinimized: false,
           ambientContext,
           templateParameters: validatedParameters.parameters,
+          ...(captureProjection.routeTemplate === undefined
+            ? {} : { routeTemplate: captureProjection.routeTemplate }),
+          ...(reservedSourceEventRef === undefined
+            ? {} : { sourceEventRef: reservedSourceEventRef }),
         });
       } catch {
         return fallback(ambientContext, true);
