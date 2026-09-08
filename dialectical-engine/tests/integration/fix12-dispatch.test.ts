@@ -8,12 +8,13 @@ import {
   DIAGNOSIS_REGISTER_SEEDS,
   type DiagnosisAction,
   type DiagnosisActionStore,
-} from "../../tools/obs-listener/src/daemon/dispatch-arm.js";
+} from "../../tools/obs-listener/src/worker-diagnosis/dispatch.js";
 import {
   CodexCliDiagnosisPort,
   type DiagnosisModelPort,
 } from "../../tools/obs-listener/src/worker-diagnosis/spawn.js";
 import { buildPacket } from "../../tools/obs-listener/src/worker-diagnosis/packet.js";
+import { notifyProposal } from "../../tools/obs-listener/src/notify/index.js";
 
 const packet = buildPacket({
   incidentId: "10000000-0000-4000-8000-000000000012",
@@ -60,9 +61,11 @@ function memoryStore(callsToday = 0): DiagnosisActionStore & { actions: Diagnosi
   };
 }
 
+const noNotification = Object.freeze({ notify: async () => undefined });
+
 describe("FIX-12 report-only dispatch", () => {
   it("starts OFF after every construction and only the custodian can arm the sole phase-1 state", () => {
-    const first = createDiagnosisDispatcher({ custodianToken: "custodian-token", bundle, store: memoryStore(), model: {
+    const first = createDiagnosisDispatcher({ custodianToken: "custodian-token", bundle, store: memoryStore(), notifier: noNotification, model: {
       run: async () => ({ output: modelOutput, usage: { totalUnits: 7 } }),
     } });
     expect(first.state()).toBe("OFF");
@@ -71,7 +74,7 @@ describe("FIX-12 report-only dispatch", () => {
     expect(first.arm("custodian-token")).toEqual({ ok: true, state: "REPORT_ONLY_PROPOSAL" });
     expect(first.state()).toBe("REPORT_ONLY_PROPOSAL");
 
-    const restarted = createDiagnosisDispatcher({ custodianToken: "custodian-token", bundle, store: memoryStore(), model: {
+    const restarted = createDiagnosisDispatcher({ custodianToken: "custodian-token", bundle, store: memoryStore(), notifier: noNotification, model: {
       run: async () => ({ output: modelOutput, usage: { totalUnits: 7 } }),
     } });
     expect(restarted.state()).toBe("OFF");
@@ -119,7 +122,7 @@ describe("FIX-12 report-only dispatch", () => {
     const store = memoryStore();
     const model: DiagnosisModelPort = { run: async () => { calls += 1; return { output: modelOutput, usage: { totalUnits: 7 } }; } };
     const dispatcher = createDiagnosisDispatcher({
-      custodianToken: "custodian-token", bundle, store, model,
+      custodianToken: "custodian-token", bundle, store, model, notifier: noNotification,
       proposalIdFactory: () => "proposal-1",
     });
     expect(await dispatcher.dispatch(packet)).toEqual({ kind: "OFF" });
@@ -141,7 +144,7 @@ describe("FIX-12 report-only dispatch", () => {
 
   it("enforces the daily/concurrency caps and suspends dispatch when usage telemetry is missing", async () => {
     const atCap = createDiagnosisDispatcher({
-      custodianToken: "custodian-token", bundle, store: memoryStore(20),
+      custodianToken: "custodian-token", bundle, store: memoryStore(20), notifier: noNotification,
       model: { run: async () => ({ output: modelOutput, usage: { totalUnits: 7 } }) },
     });
     atCap.arm("custodian-token");
@@ -151,7 +154,7 @@ describe("FIX-12 report-only dispatch", () => {
     const firstCall = new Promise<void>((resolve) => { release = resolve; });
     const concurrentStore = memoryStore();
     const concurrent = createDiagnosisDispatcher({
-      custodianToken: "custodian-token", bundle, store: concurrentStore,
+      custodianToken: "custodian-token", bundle, store: concurrentStore, notifier: noNotification,
       model: { run: async () => { await firstCall; return { output: modelOutput, usage: { totalUnits: 7 } }; } },
     });
     concurrent.arm("custodian-token");
@@ -164,7 +167,7 @@ describe("FIX-12 report-only dispatch", () => {
 
     const missingStore = memoryStore();
     const missing = createDiagnosisDispatcher({
-      custodianToken: "custodian-token", bundle, store: missingStore,
+      custodianToken: "custodian-token", bundle, store: missingStore, notifier: noNotification,
       model: { run: async () => ({ output: modelOutput, usage: null }) },
     });
     missing.arm("custodian-token");
@@ -183,5 +186,29 @@ describe("FIX-12 report-only dispatch", () => {
       environment: { PATH: process.env.PATH, HOME: process.env.HOME },
     });
     await expect(port.run(packet)).rejects.toThrow("DIAGNOSIS_TIMEOUT");
+  });
+
+  it("notifies both local channels for every proposal and records notification failure without blocking", async () => {
+    const commands: { binary: string; args: readonly string[]; stdin?: string }[] = [];
+    const occurrenceCodes: string[] = [];
+    const notifier = notifyProposal({
+      osascript: { run: async (command) => { commands.push(command); throw new Error("test double failure"); } },
+      ticket: { run: async (command) => { commands.push(command); } },
+      occurrence: { record: async (value) => { occurrenceCodes.push(value.code); } },
+    });
+    const store = memoryStore();
+    const dispatcher = createDiagnosisDispatcher({
+      custodianToken: "custodian-token", bundle, store, notifier,
+      proposalIdFactory: () => "proposal-12",
+      ticketIdForIncident: async () => "ticket-12",
+      model: { run: async () => ({ output: modelOutput, usage: { totalUnits: 7 } }) },
+    });
+    dispatcher.arm("custodian-token");
+    expect(await dispatcher.dispatch(packet)).toMatchObject({ kind: "PROPOSED", proposalId: "proposal-12" });
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toMatchObject({ binary: "osascript", args: expect.arrayContaining([expect.stringContaining("incident 10000000-0000-4000-8000-000000000012 proposal proposal-12")]) });
+    expect(commands[1]).toMatchObject({ binary: "hermes", args: expect.arrayContaining(["comment", "ticket-12", expect.stringMatching(/^PROPOSAL proposal-12/)]) });
+    expect(occurrenceCodes).toEqual(["FIXAGENT_NOTIFICATION_FAILED"]);
+    expect(store.actions).toHaveLength(1);
   });
 });

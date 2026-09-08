@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-import { createDiagnosisDispatcher } from "../../tools/obs-listener/src/daemon/dispatch-arm.js";
+import { createDiagnosisDispatcher } from "../../tools/obs-listener/src/worker-diagnosis/dispatch.js";
 import { buildPacket } from "../../tools/obs-listener/src/worker-diagnosis/packet.js";
 
 describe("FIX-12 report-only boundary", () => {
@@ -30,6 +30,7 @@ describe("FIX-12 report-only boundary", () => {
         appendAction: async (action) => { actions.push(action); },
         recordUsage: async () => undefined,
       },
+      notifier: { notify: async () => undefined },
       model: { run: async () => ({
         output: {
           incidentId: packet.incidentId, root: packet.root,

@@ -26,7 +26,7 @@ export interface DiagnosisCommand {
 export interface CodexCliDiagnosisOptions {
   readonly command?: DiagnosisCommand;
   readonly deadlineMs?: number;
-  readonly environment?: NodeJS.ProcessEnv;
+  readonly environment: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_COMMAND: DiagnosisCommand = Object.freeze({
@@ -88,10 +88,10 @@ export class CodexCliDiagnosisPort implements DiagnosisModelPort {
   readonly #deadlineMs: number;
   readonly #environment: NodeJS.ProcessEnv;
 
-  constructor(options: CodexCliDiagnosisOptions = {}) {
+  constructor(options: CodexCliDiagnosisOptions) {
     this.#command = options.command ?? DEFAULT_COMMAND;
     this.#deadlineMs = options.deadlineMs ?? 600_000;
-    this.#environment = options.environment ?? process.env;
+    this.#environment = options.environment;
     if (!Number.isSafeInteger(this.#deadlineMs) || this.#deadlineMs <= 0) {
       throw new TypeError("DIAGNOSIS_DEADLINE_INVALID");
     }
