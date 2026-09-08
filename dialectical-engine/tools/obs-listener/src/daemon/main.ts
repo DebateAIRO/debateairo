@@ -4,6 +4,8 @@ import {
   type FixagentDeliveryNotification,
 } from "@debateai/obs-capture/chain/fixagent-delivery";
 import { deliverOccurrence } from "./fold.js";
+import { createTransactionTracerHook } from "../trace/hook.js";
+import { TRACE_CAUSE_DEPTH_MAX } from "../trace/verdict.js";
 
 export interface DaemonConfig {
   readonly databaseUrl: string;
@@ -117,7 +119,11 @@ export function createDaemon(
         while (generationIsCurrent(generation) && generation.leader) {
           const occurrenceId = await selectPending(generation);
           if (occurrenceId === undefined) break;
-          await deliverOccurrence(generation.client, occurrenceId);
+          await deliverOccurrence(
+            generation.client,
+            occurrenceId,
+            (transaction) => createTransactionTracerHook(transaction, TRACE_CAUSE_DEPTH_MAX),
+          );
         }
       } catch {
         invalidate(generation);

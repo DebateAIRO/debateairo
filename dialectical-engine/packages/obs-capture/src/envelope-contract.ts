@@ -187,6 +187,37 @@ function copyNullPrototypeRecord(
   return Object.freeze(copy);
 }
 
+function normalizeTraceFrames(value: unknown): readonly unknown[] | undefined {
+  const values = snapshotArray(value, 32);
+  if (values === undefined) return undefined;
+  const frames: Readonly<Record<string, unknown>>[] = [];
+  for (const candidate of values) {
+    const frame = snapshotOwnData(candidate);
+    if (frame === undefined) return undefined;
+    if (frame.kind === "OPAQUE_ZONE") {
+      if (!hasExactSnapshotKeys(frame, ["kind"])) return undefined;
+      frames.push(copyNullPrototypeRecord(frame));
+      continue;
+    }
+    if (
+      frame.kind !== "CODE"
+      || !hasExactSnapshotKeys(frame, ["kind", "path", "symbol"])
+      || typeof frame.path !== "string"
+      || frame.path.length === 0
+      || frame.path.length > 512
+      || frame.path.startsWith("/")
+      || !/^[A-Za-z0-9@+._/-]+$/u.test(frame.path)
+      || frame.path.split("/").some((segment) => segment.length === 0 || segment === "." || segment === "..")
+      || typeof frame.symbol !== "string"
+      || !/^(?:[A-Za-z_$][A-Za-z0-9_$]*)(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/u.test(frame.symbol)
+    ) {
+      return undefined;
+    }
+    frames.push(copyNullPrototypeRecord(frame));
+  }
+  return Object.freeze(frames);
+}
+
 function isCanonicalTimestamp(value: unknown): value is string {
   if (typeof value !== "string" || !CANONICAL_TIMESTAMP.test(value)) {
     return false;
@@ -249,8 +280,7 @@ function isNormalizedSafeEnvelope(
   }
   const hasCauseChain = (value.cause_chain_codes as readonly string[]).length > 0;
   if (
-    !Array.isArray(value.frames)
-    || value.frames.length !== 0
+    normalizeTraceFrames(value.frames) === undefined
     || typeof value.template_parameters !== "object"
     || value.template_parameters === null
     || Array.isArray(value.template_parameters)
@@ -323,7 +353,7 @@ export function normalizeSerializedSafeEnvelope(
 
     const componentSnapshot = snapshotOwnData(outer.component);
     const parameterSnapshot = snapshotOwnData(outer.template_parameters);
-    const frameSnapshot = snapshotArray(outer.frames, 0);
+    const frameSnapshot = normalizeTraceFrames(outer.frames);
     if (
       componentSnapshot === undefined
       || !hasExactSnapshotKeys(componentSnapshot, ["process", "package"])

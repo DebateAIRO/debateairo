@@ -18,6 +18,10 @@ import {
   UNKNOWN_DECLARED_KIND,
 } from "./safe-metadata.js";
 import {
+  projectTraceFrames,
+  type CapturedTraceFrame,
+} from "./trace-frames.js";
+import {
   resolveSafeTemplate,
   resolveTaxonomyClass,
   severity,
@@ -117,7 +121,7 @@ export interface PostRedactionEnvelope {
   readonly cause_relation: null | "WRAPS";
   readonly cause_chain_codes: readonly string[];
   readonly at_seq_watermark: ProjectedDeclaredRefs["at_seq_watermark"];
-  readonly frames: readonly [];
+  readonly frames: readonly CapturedTraceFrame[];
   readonly safe_template_id: string;
   readonly template_parameters: Readonly<Record<string, string | number>>;
   readonly source: DurableSource;
@@ -142,6 +146,8 @@ export interface SharedRedactorConfig {
   readonly allowlist_set_id: string;
   readonly now?: () => Date;
   readonly sourceEventRef?: () => string;
+  readonly repoRoot?: string;
+  readonly causeDepthMax?: number;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -168,6 +174,20 @@ function ownValue(
   return Object.prototype.hasOwnProperty.call(record, key)
     ? record[key]
     : undefined;
+}
+
+function ownDataValue(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+): unknown {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(record, key);
+    return descriptor !== undefined && Object.hasOwn(descriptor, "value")
+      ? descriptor.value
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function stringMember<T extends string>(
@@ -250,6 +270,7 @@ export function createSharedRedactor(
     readonly ambientContext: CaptureQueueEntry["ambient_context_ref"];
     readonly templateParameters: Readonly<Record<string, string | number>>;
     readonly causeChainCodes?: unknown;
+    readonly traceFrames: readonly CapturedTraceFrame[];
   }): PostRedactionEnvelope {
     const template = resolveSafeTemplate(options.code);
     const fallbackTemplate = resolveSafeTemplate("OBS_CAPTURE_SELF");
@@ -315,7 +336,7 @@ export function createSharedRedactor(
       cause_relation: hasCauseChain ? CAUSE_RELATION_WRAPS : null,
       cause_chain_codes: causeChainCodes,
       at_seq_watermark: declaredRefs.at_seq_watermark,
-      frames: Object.freeze([]) as readonly [],
+      frames: options.traceFrames,
       safe_template_id: safeTemplate.id,
       template_parameters: template === undefined
         ? Object.freeze({})
@@ -345,6 +366,7 @@ export function createSharedRedactor(
       fallbackMinimized: true,
       ambientContext,
       templateParameters: Object.freeze({}),
+      traceFrames: Object.freeze([]),
     });
   }
 
@@ -541,6 +563,13 @@ export function createSharedRedactor(
           ambientContext,
           templateParameters: validatedParameters.parameters,
           causeChainCodes: entry.cause_chain_codes_ref,
+          traceFrames: projectTraceFrames(
+            entry.kind === "handled_error"
+              ? entry.payload_ref
+              : (payload === undefined ? undefined : ownDataValue(payload, "error")),
+            config.repoRoot ?? "",
+            config.causeDepthMax ?? 64,
+          ),
         });
       } catch {
         return fallback(ambientContext, true);
