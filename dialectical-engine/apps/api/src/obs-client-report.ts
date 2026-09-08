@@ -8,6 +8,7 @@ import {
   createSharedRedactor,
   type PostRedactionEnvelope,
 } from "@debateai/obs-capture";
+import { readObsBounds } from "@debateai/obs-capture/runtime";
 import {
   AUTHORED_CODES,
   DECLARED_GAP_CODES,
@@ -226,10 +227,10 @@ export function registerClientReportRoutes(
     readonly limiter: TransientOriginRateLimiter;
   }>,
 ): void {
-  const buildRef = safeBuildRef(options?.buildRef ?? process.env.OBS_BUILD_REF);
-  const environment = safeEnvironment(options?.environment ?? process.env.OBS_ENVIRONMENT);
+  const buildRef = safeBuildRef(options?.buildRef ?? BUILD_REF_FALLBACK);
+  const environment = safeEnvironment(options?.environment ?? ENVIRONMENT_FALLBACK);
   const store = options?.store
-    ?? createPostgresClientReportStore(process.env.OBS_WRITER_DATABASE_URL);
+    ?? createPostgresClientReportStore(readObsBounds().writerDatabaseUrl);
   const limiter = options?.limiter ?? createTransientOriginRateLimiter({
     maxRequests: DEFAULT_MAX_REQUESTS,
     windowMs: DEFAULT_WINDOW_MS,
@@ -245,12 +246,12 @@ export function registerClientReportRoutes(
   const redactor = createSharedRedactor({
     environment,
     build_ref: buildRef,
-    build_dirty: process.env.OBS_BUILD_DIRTY !== "false",
+    build_dirty: true,
     runtime: "ui-client",
     component: Object.freeze({ process: "ui-client", package: "@debateai/ui-client" }),
     writer_identity: "ui-client-report",
-    redaction_policy_version: process.env.OBS_REDACTION_POLICY_VERSION ?? "g0",
-    allowlist_set_id: process.env.OBS_ALLOWLIST_SET_ID ?? "g0-empty-parameters",
+    redaction_policy_version: "g0",
+    allowlist_set_id: "g0-empty-parameters",
   });
 
   api.addHook("onClose", async () => store.close());
