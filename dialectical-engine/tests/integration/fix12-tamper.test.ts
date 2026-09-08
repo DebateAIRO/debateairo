@@ -125,4 +125,19 @@ describe("FIX-12 proposal approval controls", () => {
     expect(result).toEqual({ exitCode: 0, stdout: "ok\n", stderr: "" });
     expect(calls).toEqual(["approve:proposal-12"]);
   });
+
+  it("reserves obsctl arm --mutation without routing through FIX-12", async () => {
+    expect(parseObsctl(["arm", "--mutation"])).toEqual({ verb: "arm-mutation", args: [] });
+    const calls: string[] = [];
+    const result = await runObsctl(["arm", "--mutation"], {
+      kill: async () => ({ exitCode: 1, stdout: "", stderr: "" }),
+      arm: async () => ({ exitCode: 1, stdout: "", stderr: "" }),
+      status: async () => ({ exitCode: 1, stdout: "", stderr: "" }),
+      lifecycle: async () => ({ exitCode: 1, stdout: "", stderr: "" }),
+      fix12: async () => ({ exitCode: 1, stdout: "", stderr: "" }),
+      fix13: async (verb, args) => { calls.push(`${verb}:${args.join(":")}`); return { exitCode: 0, stdout: "MUTATION: ON\n", stderr: "" }; },
+    });
+    expect(result).toEqual({ exitCode: 0, stdout: "MUTATION: ON\n", stderr: "" });
+    expect(calls).toEqual(["arm-mutation:"]);
+  });
 });

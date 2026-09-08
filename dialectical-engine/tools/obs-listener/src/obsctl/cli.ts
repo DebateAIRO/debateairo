@@ -1,4 +1,4 @@
-import type { CliResult, Fix12ObsctlVerb, ObsctlVerb } from "./types.js";
+import type { CliResult, Fix12ObsctlVerb, Fix13ObsctlVerb, ObsctlVerb } from "./types.js";
 
 const CHAIN_SUBCOMMANDS = Object.freeze({
   "keyring-install": "chain-keyring-install",
@@ -16,12 +16,16 @@ export interface CliDispatch {
   status(): Promise<CliResult>;
   lifecycle(verb: Exclude<ObsctlVerb, "kill" | "arm" | "status" | Fix12ObsctlVerb>, args: readonly string[]): Promise<CliResult>;
   fix12(verb: Fix12ObsctlVerb, args: readonly string[]): Promise<CliResult>;
+  fix13?(verb: Fix13ObsctlVerb, args: readonly string[]): Promise<CliResult>;
 }
 
 export function parseObsctl(argv: readonly string[]): Readonly<{ verb: ObsctlVerb; args: readonly string[] }> {
   const [command, subcommand, ...args] = argv;
   if (command === "arm" && subcommand === "--dispatch" && args.length === 0) {
     return Object.freeze({ verb: "arm-dispatch", args: Object.freeze([]) });
+  }
+  if (command === "arm" && subcommand === "--mutation" && args.length === 0) {
+    return Object.freeze({ verb: "arm-mutation", args: Object.freeze([]) });
   }
   if (command === "approve" && subcommand !== undefined && args.length === 0 && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(subcommand)) {
     return Object.freeze({ verb: "approve", args: Object.freeze([subcommand]) });
@@ -54,6 +58,10 @@ export async function runObsctl(argv: readonly string[], dispatch?: CliDispatch)
   if (parsed.verb === "kill") return target.kill();
   if (parsed.verb === "arm") return target.arm();
   if (parsed.verb === "status") return target.status();
+  if (parsed.verb === "arm-mutation") {
+    if (target.fix13 === undefined) return Object.freeze({ exitCode: 1, stdout: "", stderr: "FIX13_EXECUTOR_REQUIRED:arm-mutation\n" });
+    return target.fix13(parsed.verb, parsed.args);
+  }
   if (parsed.verb === "arm-dispatch" || parsed.verb === "approve"
       || parsed.verb === "deny" || parsed.verb === "reveal-drift") {
     return target.fix12(parsed.verb, parsed.args);
@@ -73,6 +81,9 @@ async function defaultDispatch(): Promise<CliDispatch> {
     },
     async fix12(verb: Fix12ObsctlVerb, args: readonly string[]) {
       const module = await import("./fix12-entry.js"); return module.runFix12Entry(verb, args);
+    },
+    async fix13(_verb: Fix13ObsctlVerb, _args: readonly string[]) {
+      const module = await import("./arm.js"); return module.runMutationArmEntry();
     },
   });
 }
