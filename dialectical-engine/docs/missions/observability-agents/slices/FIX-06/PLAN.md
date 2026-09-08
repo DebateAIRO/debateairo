@@ -50,23 +50,23 @@ pnpm audit:source
 
 ### C1 — closed endpoint and counted limiter
 
-- [ ] **6.2** Write the endpoint test first. Prove unknown members and unknown keys return 400 without a write; a valid member returns 202 and writes a server-stamped `ui_client` / `ui-client` / `client` envelope; 200 same-origin calls eventually return 429 and persist a `CLIENT_REPORT_RATE_LIMITED` row; two module instances hash the same origin differently.
-- [ ] **6.3** Add `apps/api/src/obs-client-report.ts`, the public policy inventory rows, and one `registerClientReportRoutes(api)` line strictly after the registration block. Run the C1 command three times.
+- [x] **6.2** Write the endpoint test first. Prove unknown members and unknown keys return 400 without a write; a valid member returns 202 and writes a server-stamped `ui_client` / `ui-client` / `client` envelope; 200 same-origin calls eventually return 429 and persist a `CLIENT_REPORT_RATE_LIMITED` row; two module instances hash the same origin differently.
+- [x] **6.3** Add `apps/api/src/obs-client-report.ts`, the public policy inventory rows, and one `registerClientReportRoutes(api)` line strictly after the registration block. Run the C1 command three times.
 
 ### C2 — immutable registration-region guard
 
-- [ ] **6.4** Add the architecture test comparing `resolveZoneRouteMountRegion()` at `FIX06_BASE_REF` with the working file and proving the client-report mount begins after `endOffset`.
-- [ ] **6.5** Move the mount inside the captured region and show RED, restore it and show GREEN, then run C2 three times.
+- [x] **6.4** Add the architecture test comparing `resolveZoneRouteMountRegion()` at `FIX06_BASE_REF` with the working file and proving the client-report mount begins after `endOffset`.
+- [x] **6.5** Plant the mount before the captured region and show RED without changing a byte inside the region; use the in-memory inside-region mutant for the forbidden placement, restore the production line and show GREEN, then run C2 three times.
 
 ### C3 — one browser reporter
 
-- [ ] **6.6** Write the render test first. Prove both Next boundaries and `ScoringErrorBoundary` report once with exact closed keys; an extra `message`, `stack`, or `url` member is rejected before fetch; a real `window.error` event reports only its enumerated kind.
-- [ ] **6.7** Add `apps/ui/lib/obs/{enums,reporter}.ts`, both boundary files, the scoring rewire, and one README paragraph. Run C3 three times plus the UI package suite and mode-token gate.
+- [x] **6.6** Write the render test first. Prove both Next boundaries and `ScoringErrorBoundary` report once with exact closed keys; an extra `message`, `stack`, or `url` member is rejected before fetch; a real `window.error` event reports only its enumerated kind.
+- [x] **6.7** Add `apps/ui/lib/obs/{enums,reporter}.ts`, both boundary files, the scoring rewire, and one README paragraph. Run C3 three times plus the UI package suite and mode-token gate.
 
 ### C4 — eligibility dependency and final evidence
 
-- [ ] **6.8** Run the FIX-09 fold test at immutable tip `7a9765efad4d639ac042179f626573f49efc9784` and record that `fixEligibility(["ui_client"])` returns `FIX_INELIGIBLE`; do not compose unrelated FIX-09 files into this branch.
-- [ ] **6.9** Generate the contract, run typecheck and classify only the delta from the repository pin, run source audit, inspect the scoped diff, and hand off without V acceptance claims.
+- [x] **6.8** Run the FIX-09 fold test at immutable tip `7a9765efad4d639ac042179f626573f49efc9784` and record that `fixEligibility(["ui_client"])` returns `FIX_INELIGIBLE`; do not compose unrelated FIX-09 files into this branch.
+- [x] **6.9** Generate the contract, run typecheck and classify only the delta from the repository pin, run source audit, inspect the scoped diff, and hand off without V acceptance claims.
 
 ## Standing tests that READ this slice's write surface
 - `tests/integration/fix04-context-hook.test.ts` reads every registered API route and therefore covers the new public authorization rows.
@@ -75,3 +75,14 @@ pnpm audit:source
 
 ## V acceptance
 SPEC §5, verbatim, run by V personally. Never restated here. A green cluster is a worker milestone; Done is V's veto.
+
+## Worker handoff evidence — 2026-09-08
+
+- C1: 4/4 tests on each of three runs. The open-code mutant returned 202 for `NOT_A_MEMBER` and was caught; restored run 4/4.
+- C2: 2/2 tests on each of three runs. The before-region placement mutant failed the `endOffset` assertion; the in-memory inside-region mutant is rejected. Base and work region both report 1,653 bytes and SHA-256 `bff20f70edcff8df1f530a5b9f33417f1012017ce9c5e38edebb73b1d99f351d`.
+- C3: 3/3 tests on each of three runs. The extra-key mutant transmitted `message` and was caught; restored run 3/3. UI package suite: 59/59. UI package typecheck: exit 0.
+- FIX-09 dependency: immutable `7a9765efad4d639ac042179f626573f49efc9784`, `tests/unit/fix09-fold.test.ts`: 6/6 on each of three runs, including UI-only `FIX_INELIGIBLE`. No FIX-09 file is composed into this branch.
+- Contract generation: exit 0. Root typecheck: the pinned 8/8 diagnostics in `tests/unit/s14-ui.test.ts`, zero FIX-06 diagnostics. Mode-token neighbour: 6/8 with two inherited failures in unchanged `TopBar.tsx` and `globals.css`.
+- Source audit blocking array is inherited-only after the direct endpoint environment read was removed: `packages/obs-capture/install/api.ts`, `install/runner.ts`, `install/scheduler.ts`, `src/runtime/config.ts`, and `src/runtime/index.ts`.
+- FIX-04 regression: 7/7 with admitted base `34ebf866f7801d9620ee56f14f548b220b6ad442`.
+- Live browser, database, 200-curl, and V acceptance steps are external and not claimed by this worker.
