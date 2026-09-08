@@ -30,6 +30,10 @@ const ROOT = process.cwd();
 const DAEMON_ROOT = resolve(ROOT, "tools/obs-listener/src/daemon");
 const WRITER_PASSWORD = "fix09-c3-writer-test";
 const LISTENER_PASSWORD = "fix09-c3-listener-test";
+const TEST_DAEMON_SAFETY = Object.freeze({
+  killed: async () => false,
+  abortLocal: async () => undefined,
+});
 let database: TestDatabase;
 
 function roleUrl(role: string, password: string): string {
@@ -132,7 +136,7 @@ describe("FIX-09 C3 zero-model daemon", () => {
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
       pollIntervalMs: 40,
       consumer: "fixagent-daemon",
-    }, realClientFactory());
+    }, realClientFactory(), TEST_DAEMON_SAFETY);
     await daemon.start();
     const occurrenceId = randomUUID();
     try {
