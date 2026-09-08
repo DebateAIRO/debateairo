@@ -8,7 +8,8 @@
   },
   "exports": {
     "./daemon": "./src/daemon/main.ts",
-    "./obsctl": "./src/obsctl/cli.ts"
+    "./obsctl": "./src/obsctl/cli.ts",
+    "./watchdog": "./src/watchdog.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
