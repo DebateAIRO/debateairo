@@ -425,6 +425,8 @@ async function drainFile(
       } catch {
         return false;
       }
+      // A failed normalization or chained ingest leaves the source file in
+      // place because completion is materialized only after this loop.
       const envelope = normalizeSerializedSafeEnvelope(value, parsed.runtime);
       if (envelope === undefined) return false;
       const taxonomy = typeof envelope.taxonomy_class === "string"

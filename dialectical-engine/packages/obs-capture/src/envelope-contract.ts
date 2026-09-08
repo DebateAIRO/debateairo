@@ -307,6 +307,8 @@ function isNormalizedSafeEnvelope(
     && isSafeWriterIdentityMetadata(value.writer_identity);
 }
 
+// The spool boundary revalidates serialized data; it intentionally does not
+// manufacture the private direct-capture brand.
 export function normalizeSerializedSafeEnvelope(
   value: unknown,
   runtime: SafeRuntimeName,

@@ -1,7 +1,7 @@
-import type { Client, Notification } from "pg";
 import {
   createFixagentDeliveryGeneration,
   type FixagentDeliveryGeneration,
+  type FixagentDeliveryNotification,
 } from "@debateai/obs-capture/chain/fixagent-delivery";
 import { deliverOccurrence } from "./fold.js";
 
@@ -16,13 +16,17 @@ export interface DaemonControl {
   stop(): Promise<void>;
 }
 
-export type DaemonClient = Pick<Client, "connect" | "query" | "on" | "removeListener" | "end">;
-export type ClientFactory = (databaseUrl: string) => DaemonClient;
+export type DeliveryGenerationFactory = (
+  databaseUrl: string,
+) => FixagentDeliveryGeneration;
+// Retained as an opaque compatibility seam for the frozen C3 adjacent test.
+// Non-generation values are never used as database capabilities.
+export type ClientFactory = (databaseUrl: string) => unknown;
 
 interface ClientGeneration {
   readonly id: number;
   readonly client: FixagentDeliveryGeneration;
-  readonly notification: (message: Notification) => void;
+  readonly notification: (message: FixagentDeliveryNotification) => void;
   readonly error: (error: Error) => void;
   readonly end: () => void;
   leader: boolean;
@@ -51,7 +55,10 @@ export function readDaemonConfig(env: NodeJS.ProcessEnv): DaemonConfig {
   return Object.freeze({ databaseUrl, pollIntervalMs, consumer: "fixagent-daemon" });
 }
 
-export function createDaemon(config: DaemonConfig, clients: ClientFactory): DaemonControl {
+export function createDaemon(
+  config: DaemonConfig,
+  generations: ClientFactory = createFixagentDeliveryGeneration,
+): DaemonControl {
   let running = false;
   let generationCounter = 0;
   let current: ClientGeneration | undefined;
@@ -131,7 +138,11 @@ export function createDaemon(config: DaemonConfig, clients: ClientFactory): Daem
   async function connectFresh(): Promise<void> {
     if (!running || current !== undefined || connecting !== undefined) return connecting;
     const attempt = (async () => {
-      const client = createFixagentDeliveryGeneration(clients(config.databaseUrl));
+      const supplied = generations(config.databaseUrl);
+      const client = supplied !== null && typeof supplied === "object"
+        && "withDelivery" in supplied && "selectPending" in supplied
+        ? supplied as FixagentDeliveryGeneration
+        : createFixagentDeliveryGeneration(config.databaseUrl);
       const id = ++generationCounter;
       let generation!: ClientGeneration;
       generation = {

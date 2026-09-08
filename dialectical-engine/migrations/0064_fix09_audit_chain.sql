@@ -226,7 +226,8 @@ DECLARE stored obs.occurrence%ROWTYPE;
 DECLARE stored_tuple jsonb;
 DECLARE stored_detail jsonb;
 DECLARE detail_present boolean;
-DECLARE exact_length bigint;
+DECLARE occurrence_exact_length bigint;
+DECLARE detail_exact_length bigint;
 BEGIN
   IF p_source IS NULL OR p_source_event_ref IS NULL
     OR p_expected_occurrence IS NULL OR p_expected_detail IS NULL
@@ -248,19 +249,24 @@ BEGIN
     )) THEN
     RAISE EXCEPTION 'FIX09_PROBE_INPUT' USING ERRCODE = '22023';
   END IF;
-  WITH RECURSIVE nodes(node) AS (
-    VALUES (p_expected_occurrence),(p_expected_detail)
+  WITH RECURSIVE nodes(root,node) AS (
+    VALUES ('occurrence'::text,p_expected_occurrence),('detail'::text,p_expected_detail)
     UNION ALL
-    SELECT child.value FROM nodes
+    SELECT nodes.root,child.value FROM nodes
     CROSS JOIN LATERAL pg_catalog.jsonb_array_elements(
       CASE WHEN pg_catalog.jsonb_typeof(nodes.node)='array' THEN nodes.node ELSE '[]'::jsonb END
     ) AS child(value)
-  ) SELECT pg_catalog.octet_length(pg_catalog.convert_to(p_expected_occurrence::text,'UTF8'))
-      + pg_catalog.octet_length(pg_catalog.convert_to(p_expected_detail::text,'UTF8'))
-      - COALESCE(sum(GREATEST(pg_catalog.jsonb_array_length(node)-1,0))
-          FILTER (WHERE pg_catalog.jsonb_typeof(node)='array'),0)
-    INTO exact_length FROM nodes;
-  IF exact_length > 1048576 THEN
+  ), separator_counts AS (
+    SELECT root,COALESCE(sum(GREATEST(pg_catalog.jsonb_array_length(node)-1,0))
+      FILTER (WHERE pg_catalog.jsonb_typeof(node)='array'),0) AS separator_count
+    FROM nodes GROUP BY root
+  ) SELECT
+      pg_catalog.octet_length(pg_catalog.convert_to(p_expected_occurrence::text,'UTF8'))
+        - max(separator_count) FILTER (WHERE root='occurrence'),
+      pg_catalog.octet_length(pg_catalog.convert_to(p_expected_detail::text,'UTF8'))
+        - max(separator_count) FILTER (WHERE root='detail')
+    INTO occurrence_exact_length,detail_exact_length FROM separator_counts;
+  IF occurrence_exact_length > 1048576 OR detail_exact_length > 1048576 THEN
     RAISE EXCEPTION 'FIX09_PROBE_INPUT' USING ERRCODE = '22023';
   END IF;
 
@@ -336,13 +342,26 @@ AS $function$
 DECLARE stored obs.agent_action%ROWTYPE;
 DECLARE row_count bigint;
 DECLARE stored_tuple jsonb;
+DECLARE exact_length bigint;
 BEGIN
   IF p_action_ref IS NULL OR p_expected_action IS NULL
     OR pg_catalog.jsonb_typeof(p_expected_action) <> 'array'
     OR pg_catalog.jsonb_array_length(p_expected_action) <> 8
-    OR p_expected_action #>> '{0}' <> 'obs-agent-action-idempotency/v1'
-    OR pg_catalog.octet_length(pg_catalog.convert_to(p_expected_action::text,'UTF8'))
-      - GREATEST(pg_catalog.jsonb_array_length(p_expected_action)-1,0) > 1048576 THEN
+    OR p_expected_action #>> '{0}' <> 'obs-agent-action-idempotency/v1' THEN
+    RAISE EXCEPTION 'FIX09_PROBE_INPUT' USING ERRCODE = '22023';
+  END IF;
+  WITH RECURSIVE nodes(node) AS (
+    VALUES (p_expected_action)
+    UNION ALL
+    SELECT child.value FROM nodes
+    CROSS JOIN LATERAL pg_catalog.jsonb_array_elements(
+      CASE WHEN pg_catalog.jsonb_typeof(nodes.node)='array' THEN nodes.node ELSE '[]'::jsonb END
+    ) AS child(value)
+  ) SELECT pg_catalog.octet_length(pg_catalog.convert_to(p_expected_action::text,'UTF8'))
+      - COALESCE(sum(GREATEST(pg_catalog.jsonb_array_length(node)-1,0))
+          FILTER (WHERE pg_catalog.jsonb_typeof(node)='array'),0)
+    INTO exact_length FROM nodes;
+  IF exact_length > 1048576 THEN
     RAISE EXCEPTION 'FIX09_PROBE_INPUT' USING ERRCODE = '22023';
   END IF;
   SELECT count(*) INTO row_count FROM obs.agent_action WHERE action_ref=p_action_ref;
@@ -390,6 +409,8 @@ ALTER FUNCTION obs.audit_chain_action_head(text,text)
   OWNER TO debateai_obs_chain_probe_owner;
 
 REVOKE ALL ON FUNCTION obs.audit_chain_epoch_microseconds(timestamptz)
+  FROM PUBLIC,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human;
+REVOKE ALL ON FUNCTION obs.audit_chain_enforce_mode()
   FROM PUBLIC,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human;
 REVOKE ALL ON FUNCTION obs.audit_chain_tag_jsonb_v1(jsonb)
   FROM PUBLIC,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human;

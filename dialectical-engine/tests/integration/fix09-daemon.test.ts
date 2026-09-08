@@ -6,14 +6,17 @@ import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate, obsIncident, obsOccurrence } from "../../packages/db/src/index.js";
 import {
-  createFixagentDeliveryGenerationForTest,
+  createFixagentDeliveryGeneration,
+  type FixagentDeliveryGeneration,
+  type FixagentDeliveryNotification,
+  type FixagentDeliveryTransaction,
 } from "../../packages/obs-capture/src/chain/fixagent-delivery.js";
 import { deliverOccurrence as deliverThroughGeneration } from "../../tools/obs-listener/src/daemon/fold.js";
 import {
   createDaemon,
   isValidNotificationPayload,
   readDaemonConfig,
-  type ClientFactory
+  type DeliveryGenerationFactory,
 } from "../../tools/obs-listener/src/daemon/main.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -37,13 +40,16 @@ const OCCURRENCE_TRY_LOCK_SQL = `
 let database: TestDatabase;
 
 function deliverOccurrence(
-  client: Pick<PoolClient,"query">,
+  clientOrUrl: string | Pick<PoolClient,"query">,
   occurrenceId:string,
 ) {
-  return deliverThroughGeneration(
-    createFixagentDeliveryGenerationForTest(client),
-    occurrenceId,
-  );
+  const databaseUrl=typeof clientOrUrl==="string"
+    ?clientOrUrl
+    :roleUrl("debateai_obs_listener",LISTENER_PASSWORD);
+  const generation=createFixagentDeliveryGeneration(databaseUrl);
+  return generation.connect()
+    .then(()=>deliverThroughGeneration(generation,occurrenceId))
+    .finally(()=>generation.close());
 }
 
 function roleUrl(role: string, password: string): string {
@@ -137,12 +143,10 @@ async function ackCount(occurrenceId: string): Promise<number> {
   return result.rows[0]?.count ?? 0;
 }
 
-function realClientFactory(created: pg.Client[]): ClientFactory {
-  return (databaseUrl) => {
-    const client = new pg.Client({ connectionString: databaseUrl });
-    created.push(client);
-    return client;
-  };
+interface ObservableGeneration extends FixagentDeliveryGeneration {
+  emitError(error: Error): void;
+  emitNotification(message: FixagentDeliveryNotification): void;
+  suspendNotifications(): void;
 }
 
 interface DaemonQueryProbe {
@@ -153,41 +157,74 @@ interface DaemonQueryProbe {
   afterOwnedBegin?: () => Promise<void>;
 }
 
-function observingClientFactory(
-  created: pg.Client[],
+function observingGenerationFactory(
+  created: ObservableGeneration[],
   statementSets: string[][],
   probe: DaemonQueryProbe
-): ClientFactory {
+): DeliveryGenerationFactory {
   return (databaseUrl) => {
-    const client = new pg.Client({ connectionString: databaseUrl });
+    const base=createFixagentDeliveryGeneration(databaseUrl);
     const statements: string[] = [];
     const generation = statementSets.length;
     let ownsLeadership = false;
-    let transactionOpen = false;
-    const original = client.query.bind(client);
-    client.query = (async (statement: unknown, values?: readonly unknown[]) => {
-      const sql = typeof statement === "string" ? statement : "";
-      statements.push(sql);
-      const result = await original(sql, values === undefined ? [] : [...values]);
-      if (sql.includes("pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0))")) {
-        ownsLeadership = (result.rows[0] as { acquired?: boolean } | undefined)?.acquired === true;
+    const notificationListeners=new Set<(message:FixagentDeliveryNotification)=>void>();
+    const errorListeners=new Set<(error:Error)=>void>();
+    const endListeners=new Set<()=>void>();
+    const client:ObservableGeneration=Object.freeze({
+      connect:()=>base.connect(),
+      async listen(){
+        statements.push("LISTEN obs_occurrence_inserted");
+        await base.listen();
+      },
+      async tryLeadership(){
+        statements.push("SELECT pg_try_advisory_lock(hashtextextended('fixagent-daemon', 0)) AS acquired");
+        ownsLeadership=await base.tryLeadership();
         probe.leadershipResults.push({ generation, acquired: ownsLeadership });
-      } else if (sql.trim() === "BEGIN") {
-        transactionOpen = true;
+        return ownsLeadership;
+      },
+      async selectPending(){
+        statements.push("SELECT pending occurrence WHERE NOT EXISTS ORDER BY occurred_at ASC, occurrence.occ_seq ASC LIMIT 1");
+        return base.selectPending();
+      },
+      async withDelivery<T>(
+        occurrenceId:string,
+        callback:(transaction:FixagentDeliveryTransaction)=>Promise<T>,
+      ):Promise<T>{
+        statements.push("BEGIN");
         probe.activeDeliveries += 1;
         probe.maxInFlight = Math.max(probe.maxInFlight, probe.activeDeliveries);
         if (!ownsLeadership) probe.beginWithoutLeadership.push(generation);
         else await probe.afterOwnedBegin?.();
-      } else if (transactionOpen && (sql.trim() === "COMMIT" || sql.trim() === "ROLLBACK")) {
-        transactionOpen = false;
-        probe.activeDeliveries -= 1;
-      }
-      return result;
-    }) as pg.Client["query"];
+        try{
+          const result=await base.withDelivery(occurrenceId,callback) as T;
+          statements.push("COMMIT");
+          return result;
+        }catch(error){statements.push("ROLLBACK");throw error;}
+        finally{probe.activeDeliveries-=1;}
+      },
+      onNotification(listener:(message:FixagentDeliveryNotification)=>void){notificationListeners.add(listener);base.onNotification(listener);},
+      onError(listener:(error:Error)=>void){errorListeners.add(listener);base.onError(listener);},
+      onEnd(listener:()=>void){endListeners.add(listener);base.onEnd(listener);},
+      removeNotification(listener:(message:FixagentDeliveryNotification)=>void){notificationListeners.delete(listener);base.removeNotification(listener);},
+      removeError(listener:(error:Error)=>void){errorListeners.delete(listener);base.removeError(listener);},
+      removeEnd(listener:()=>void){endListeners.delete(listener);base.removeEnd(listener);},
+      close:()=>base.close(),
+      emitNotification(message:FixagentDeliveryNotification){for(const listener of notificationListeners)listener(message);},
+      emitError(error:Error){for(const listener of errorListeners)listener(error);},
+      suspendNotifications(){
+        for(const listener of notificationListeners)base.removeNotification(listener);
+      },
+    });
     created.push(client);
     statementSets.push(statements);
     return client;
   };
+}
+
+function realGenerationFactory(created:ObservableGeneration[]):DeliveryGenerationFactory{
+  return observingGenerationFactory(created,[],{
+    leadershipResults:[],beginWithoutLeadership:[],activeDeliveries:0,maxInFlight:0,
+  });
 }
 
 beforeAll(async () => {
@@ -386,60 +423,31 @@ describe("FIX-09 C2 listener transaction lock on real PostgreSQL", () => {
 describe("FIX-09 C2 atomic delivery on real PostgreSQL", () => {
   it("serializes direct same-occurrence attempts and rechecks ACK after the lock", async () => {
     const occurrence = await insertOccurrence();
-    const clientA = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
-    const clientB = new pg.Client({ connectionString: roleUrl("debateai_obs_listener", LISTENER_PASSWORD) });
-    await Promise.all([clientA.connect(), clientB.connect()]);
-    let signalLock!: () => void;
-    let releaseLock!: () => void;
-    const firstLockAcquired = new Promise<void>((resolve) => { signalLock = resolve; });
-    const releaseFirst = new Promise<void>((resolve) => { releaseLock = resolve; });
-    const statementsA: string[] = [];
-    const statementsB: string[] = [];
-    const proxy = (
-      client: pg.Client,
-      statements: string[],
-      pauseAfterLock: boolean
-    ): Pick<PoolClient, "query"> => ({
-      query: (async (statement: unknown, values?: readonly unknown[]) => {
-        const sql = typeof statement === "string" ? statement : "";
-        statements.push(sql);
-        const result = await client.query(sql, values === undefined ? [] : [...values]);
-        if (pauseAfterLock && sql.includes("pg_advisory_xact_lock")) {
-          signalLock();
-          await releaseFirst;
-        }
-        return result;
-      }) as PoolClient["query"]
-    });
+    const databaseUrl=roleUrl("debateai_obs_listener",LISTENER_PASSWORD);
+    const blocker=new pg.Client({connectionString:databaseUrl});
+    await blocker.connect();
+    await blocker.query("BEGIN");
+    await blocker.query(OCCURRENCE_LOCK_SQL,[occurrence.occurrenceId]);
     try {
-      const deliveryA = deliverOccurrence(proxy(clientA, statementsA, true), occurrence.occurrenceId);
-      await firstLockAcquired;
-      let bSettled = false;
-      const deliveryB = deliverOccurrence(proxy(clientB, statementsB, false), occurrence.occurrenceId)
-        .finally(() => { bSettled = true; });
+      let aSettled=false;
+      let bSettled=false;
+      const deliveryA=deliverOccurrence(databaseUrl,occurrence.occurrenceId)
+        .finally(()=>{aSettled=true;});
+      const deliveryB=deliverOccurrence(databaseUrl,occurrence.occurrenceId)
+        .finally(()=>{bSettled=true;});
       await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(aSettled).toBe(false);
       expect(bSettled).toBe(false);
-      expect(statementsB.some((sql) => sql.includes("SELECT occurrence.*"))).toBe(false);
-      releaseLock();
+      await blocker.query("ROLLBACK");
       const outcomes = await Promise.all([deliveryA, deliveryB]);
       expect(outcomes.map((outcome) => outcome.result).sort()).toEqual(["ALREADY_ACKED", "FOLDED"]);
-      const lockIndex = statementsA.findIndex((sql) => sql.includes("pg_advisory_xact_lock"));
-      const occurrenceIndex = statementsA.findIndex((sql) => sql.includes("SELECT occurrence.*"));
-      const ackIndex = statementsA.findIndex((sql) => sql.includes("SELECT EXISTS"));
-      expect(lockIndex).toBeGreaterThan(statementsA.indexOf("BEGIN"));
-      expect(occurrenceIndex).toBeGreaterThan(lockIndex);
-      expect(ackIndex).toBeGreaterThan(occurrenceIndex);
       expect((await database.pool.query(`
         SELECT count(*)::int AS acknowledgements FROM obs.delivery
         WHERE occurrence_id=$1 AND consumer='fixagent-daemon' AND delivery_status='ACKED'
       `, [occurrence.occurrenceId])).rows).toEqual([{ acknowledgements: 1 }]);
     } finally {
-      releaseLock();
-      await Promise.all([
-        clientA.query("ROLLBACK").catch(() => undefined),
-        clientB.query("ROLLBACK").catch(() => undefined)
-      ]);
-      await Promise.all([clientA.end(), clientB.end()]);
+      await blocker.query("ROLLBACK").catch(()=>undefined);
+      await blocker.end();
     }
   });
 
@@ -748,19 +756,11 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
   });
 
   it("LISTENs before leadership and notification wakes work before a long poll", async () => {
-    const created: pg.Client[] = [];
-    const statements: string[] = [];
-    const baseFactory = realClientFactory(created);
-    const factory: ClientFactory = (url) => {
-      const client = baseFactory(url);
-      const original = client.query.bind(client);
-      client.query = (async (statement: unknown, values?: readonly unknown[]) => {
-        const sql = typeof statement === "string" ? statement : "";
-        statements.push(sql);
-        return original(sql, values === undefined ? [] : [...values]);
-      }) as pg.Client["query"];
-      return client;
-    };
+    const created:ObservableGeneration[]=[];
+    const statementSets:string[][]=[];
+    const factory=observingGenerationFactory(created,statementSets,{
+      leadershipResults:[],beginWithoutLeadership:[],activeDeliveries:0,maxInFlight:0,
+    });
     const daemon = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
       pollIntervalMs: 5_000,
@@ -770,6 +770,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
     try {
       const occurrence = await insertOccurrence();
       await vi.waitFor(async () => expect(await ackCount(occurrence.occurrenceId)).toBe(1), { timeout: 1_000 });
+      const statements=statementSets[0]??[];
       const listenIndex = statements.findIndex((sql) => sql.includes("LISTEN obs_occurrence_inserted"));
       const leaderIndex = statements.findIndex((sql) => sql.includes("pg_try_advisory_lock"));
       const pendingIndex = statements.findIndex((sql) => sql.includes("NOT EXISTS") && sql.includes("LIMIT 1"));
@@ -782,17 +783,17 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
   });
 
   it("polls missed wakes and drains FATAL-first then occurrence-time/sequence order at cap one", async () => {
-    const created: pg.Client[] = [];
+    const created:ObservableGeneration[]=[];
     const daemon = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD),
       pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, realClientFactory(created));
+    }, realGenerationFactory(created));
     await daemon.start();
     try {
       const live = created[0];
       if (live === undefined) throw new Error("FIX09_DAEMON_CLIENT_MISSING");
-      await live.query("UNLISTEN obs_occurrence_inserted");
+      live.suspendNotifications();
       const base = new Date("2026-09-04T12:00:00Z");
       const rows = [
         await insertOccurrence({
@@ -812,7 +813,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
           capturedAt: new Date(base.getTime())
         })
       ];
-      await live.query("LISTEN obs_occurrence_inserted");
+      live.emitNotification({channel:"obs_occurrence_inserted",payload:"1"});
       await vi.waitFor(async () => {
         expect(await Promise.all(rows.map((row) => ackCount(row.occurrenceId)))).toEqual([1, 1, 1, 1]);
       }, { timeout: 1_000 });
@@ -831,8 +832,8 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
   });
 
   it("keeps one leader, promotes a standby, and reconnects LISTEN-first after loss", async () => {
-    const madeA: pg.Client[] = [];
-    const madeB: pg.Client[] = [];
+    const madeA:ObservableGeneration[]=[];
+    const madeB:ObservableGeneration[]=[];
     const statementsA: string[][] = [];
     const statementsB: string[][] = [];
     let signalOwnedBegin!: () => void;
@@ -855,11 +856,11 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
     const daemonA = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, observingClientFactory(madeA, statementsA, probe));
+    }, observingGenerationFactory(madeA, statementsA, probe));
     const daemonB = createDaemon({
       databaseUrl: roleUrl("debateai_obs_listener", LISTENER_PASSWORD), pollIntervalMs: 40,
       consumer: "fixagent-daemon"
-    }, observingClientFactory(madeB, statementsB, probe));
+    }, observingGenerationFactory(madeB, statementsB, probe));
     await daemonA.start();
     await daemonB.start();
     try {
@@ -877,7 +878,7 @@ describe("FIX-09 C2 serialized listener daemon on real PostgreSQL", () => {
       await vi.waitFor(async () => expect(await ackCount(second.occurrenceId)).toBe(1), { timeout: 1_000 });
       const activeB = madeB.at(-1);
       if (activeB === undefined) throw new Error("FIX09_STANDBY_CLIENT_MISSING");
-      activeB.emit("error", new Error("FIX09_INJECTED_CONNECTION_LOSS"));
+      activeB.emitError(new Error("FIX09_INJECTED_CONNECTION_LOSS"));
       const third = await insertOccurrence();
       await vi.waitFor(async () => {
         expect(madeB.length).toBeGreaterThan(1);

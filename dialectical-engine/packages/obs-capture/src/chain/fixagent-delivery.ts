@@ -1,29 +1,15 @@
-import type { Notification, Pool, PoolClient, QueryResult, QueryResultRow } from "pg";
+import pg from "pg";
+import type { Notification, QueryResult, QueryResultRow } from "pg";
+import {
+  invalidateFixagentActionTransaction,
+  registerFixagentActionTransaction,
+  type FixagentActionOperation,
+} from "./locks.js";
 
 declare const DELIVERY_TRANSACTION: unique symbol;
 
 export interface FixagentDeliveryTransaction {
   readonly [DELIVERY_TRANSACTION]: never;
-}
-
-export interface ActionInsertValues {
-  readonly action_seq: string;
-  readonly action_ref: string;
-  readonly action_kind: string;
-  readonly action_payload: string;
-  readonly actor: string;
-  readonly agent_action_id: string;
-  readonly chain_key_id: string | null;
-  readonly chain_link: Buffer | null;
-  readonly chain_seq: string | null;
-  readonly chain_signature: Buffer | null;
-  readonly chain_version: number | null;
-  readonly incident_id: string | null;
-  readonly occurred_at: string;
-  readonly occurrence_id: string | null;
-  readonly prev_link: Buffer | null;
-  readonly source: string;
-  readonly writer_identity: string;
 }
 
 type DeliveryState = {
@@ -39,7 +25,7 @@ interface QueryClient {
   ): Promise<QueryResult<T>>;
 }
 
-export interface FixagentDeliveryClient extends QueryClient {
+interface FixagentDeliveryClient extends QueryClient {
   connect(): Promise<unknown>;
   end(): Promise<void>;
   on(event: "notification", listener: (message: Notification) => void): unknown;
@@ -50,28 +36,25 @@ export interface FixagentDeliveryClient extends QueryClient {
   removeListener(event: "end", listener: () => void): unknown;
 }
 
+export interface FixagentDeliveryNotification {
+  readonly channel: string;
+  readonly payload?: string;
+}
+
 export interface FixagentDeliveryGeneration {
   connect(): Promise<void>;
   listen(): Promise<void>;
   tryLeadership(): Promise<boolean>;
   selectPending(): Promise<string | undefined>;
   withDelivery<T>(occurrenceId: string, callback: (transaction: FixagentDeliveryTransaction) => Promise<T>): Promise<T>;
-  onNotification(listener: (message: Notification) => void): void;
+  onNotification(listener: (message: FixagentDeliveryNotification) => void): void;
   onError(listener: (error: Error) => void): void;
   onEnd(listener: () => void): void;
-  removeNotification(listener: (message: Notification) => void): void;
+  removeNotification(listener: (message: FixagentDeliveryNotification) => void): void;
   removeError(listener: (error: Error) => void): void;
   removeEnd(listener: () => void): void;
   close(): Promise<void>;
 }
-
-type ActionOperation =
-  | Readonly<{ kind: "LOCK_ACTION_REF"; token: string }>
-  | Readonly<{ actionRef: string; expected: string; kind: "PROBE_ACTION" }>
-  | Readonly<{ kind: "READ_ACTIVATION" }>
-  | Readonly<{ kind: "LOCK_CHAIN_PARTITION"; token: string }>
-  | Readonly<{ kind: "ALLOCATE_ACTION" }>
-  | Readonly<{ kind: "INSERT_ACTION"; values: ActionInsertValues }>;
 
 const transactions = new WeakMap<object, DeliveryState>();
 
@@ -91,17 +74,20 @@ function state(transaction: FixagentDeliveryTransaction): DeliveryState {
 function createTransaction(client: QueryClient): FixagentDeliveryTransaction {
   const transaction = Object.freeze(Object.create(null)) as FixagentDeliveryTransaction;
   transactions.set(transaction as object, { active: true, client, rank: 1 });
+  registerFixagentActionTransaction(transaction, (operation) =>
+    executeFixagentActionOperation(transaction, operation));
   return transaction;
 }
 
 function invalidate(transaction: FixagentDeliveryTransaction): void {
   const value = transactions.get(transaction as object);
   if (value !== undefined) value.active = false;
+  invalidateFixagentActionTransaction(transaction);
 }
 
-export async function executeFixagentActionOperation<T extends QueryResultRow>(
+async function executeFixagentActionOperation<T extends QueryResultRow>(
   transaction: FixagentDeliveryTransaction,
-  operation: ActionOperation,
+  operation: FixagentActionOperation,
 ): Promise<QueryResult<T & Record<string, unknown>>> {
   const current = state(transaction);
   if (operation.kind === "LOCK_ACTION_REF") {
@@ -140,6 +126,13 @@ export async function executeFixagentActionOperation<T extends QueryResultRow>(
         nextval('obs.agent_action_seq'::regclass)::text AS action_seq,
         to_char(statement_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS occurred_at
     `) as Promise<QueryResult<T & Record<string, unknown>>>;
+  }
+  if (operation.kind === "READ_ACTION_HEAD") {
+    if (current.rank !== 3) fail("FIX09_DELIVERY_LOCK_ORDER");
+    return current.client.query(
+      "SELECT * FROM obs.audit_chain_action_head($1,$2)",
+      [operation.source,operation.writerIdentity],
+    ) as Promise<QueryResult<T & Record<string, unknown>>>;
   }
   if (operation.kind === "INSERT_ACTION") {
     if (current.rank !== 3) fail("FIX09_DELIVERY_LOCK_ORDER");
@@ -311,8 +304,12 @@ export async function advanceDeliveryCursor(transaction: FixagentDeliveryTransac
 }
 
 export function createFixagentDeliveryGeneration(
-  client: FixagentDeliveryClient,
+  databaseUrl: string,
 ): FixagentDeliveryGeneration {
+  if (typeof databaseUrl !== "string" || databaseUrl.length === 0) {
+    fail("FIX09_DELIVERY_DATABASE_URL");
+  }
+  const client: FixagentDeliveryClient = new pg.Client({ connectionString: databaseUrl });
   let activeTransaction=false;
   return Object.freeze({
     async connect(){await client.connect();},
@@ -343,61 +340,16 @@ export function createFixagentDeliveryGeneration(
       }catch(error){await client.query("ROLLBACK").catch(()=>undefined);throw error;}
       finally{invalidate(transaction);activeTransaction=false;}
     },
-    onNotification(listener:(message:Notification)=>void){client.on("notification",listener);},
+    onNotification(listener:(message:FixagentDeliveryNotification)=>void){
+      client.on("notification",listener as (message:Notification)=>void);
+    },
     onError(listener:(error:Error)=>void){client.on("error",listener);},
     onEnd(listener:()=>void){client.on("end",listener);},
-    removeNotification(listener:(message:Notification)=>void){client.removeListener("notification",listener);},
+    removeNotification(listener:(message:FixagentDeliveryNotification)=>void){
+      client.removeListener("notification",listener as (message:Notification)=>void);
+    },
     removeError(listener:(error:Error)=>void){client.removeListener("error",listener);},
     removeEnd(listener:()=>void){client.removeListener("end",listener);},
     async close(){await client.end();},
   });
-}
-
-export function createFixagentDeliveryGenerationForTest(
-  client: QueryClient,
-): FixagentDeliveryGeneration {
-  let active=false;
-  return Object.freeze({
-    connect:async()=>undefined,
-    listen:async()=>undefined,
-    tryLeadership:async()=>false,
-    selectPending:async()=>undefined,
-    async withDelivery<T>(occurrenceId:string,callback:(transaction:FixagentDeliveryTransaction)=>Promise<T>){
-      if(active)fail("FIX09_DELIVERY_TRANSACTION_NESTED");
-      active=true;
-      const transaction=createTransaction(client);
-      try{
-        await client.query("BEGIN");
-        await client.query(`SELECT pg_advisory_xact_lock(
-          hashtextextended('fixagent-daemon:occurrence:' || $1::uuid::text,0))`,[occurrenceId]);
-        const result=await callback(transaction);
-        await client.query("COMMIT");
-        return result;
-      }catch(error){await client.query("ROLLBACK").catch(()=>undefined);throw error;}
-      finally{invalidate(transaction);active=false;}
-    },
-    onNotification:()=>undefined,onError:()=>undefined,onEnd:()=>undefined,
-    removeNotification:()=>undefined,removeError:()=>undefined,removeEnd:()=>undefined,
-    close:async()=>undefined,
-  });
-}
-
-export async function withFixagentDeliveryTransactionForTest<T>(
-  pool: Pool,
-  callback: (transaction: FixagentDeliveryTransaction) => Promise<T>,
-): Promise<T> {
-  const client = await pool.connect();
-  const transaction = createTransaction(client);
-  try {
-    await client.query("BEGIN");
-    const result = await callback(transaction);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  } finally {
-    invalidate(transaction);
-    client.release();
-  }
 }

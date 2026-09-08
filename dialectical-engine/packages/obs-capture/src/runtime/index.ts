@@ -35,6 +35,7 @@ export type CaptureRuntimeName =
 
 export type FatalExitSink = () => void;
 
+// FIX-09 signer preparation is deliberately outside this frozen runtime ABI.
 export interface CaptureRuntimeStartOptions {
   readonly runtime: CaptureRuntimeName;
   readonly spoolFd: number | undefined;

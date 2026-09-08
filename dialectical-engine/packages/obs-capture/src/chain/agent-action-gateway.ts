@@ -1,17 +1,26 @@
 import { types as utilTypes } from "node:util";
 
-import { tagJsonb } from "./canonical.js";
 import {
+  canonicalRowBytes,
+  chainLink,
+  genesisLink,
+  signatureMessage,
+  tagJsonb,
+} from "./canonical.js";
+import type { FixagentDeliveryTransaction } from "./fixagent-delivery.js";
+import {
+  actionIdempotencyToken,
+  chainPartitionToken,
   executeFixagentActionOperation,
-  type ActionInsertValues,
-  type FixagentDeliveryTransaction,
-} from "./fixagent-delivery.js";
-import { actionIdempotencyToken, chainPartitionToken } from "./locks.js";
+  type FixagentActionInsertValues,
+} from "./locks.js";
+import { assertPreActivationSignerAbsent, getReleasedSigner } from "./signer.js";
 
 const ACTION_KEYS = Object.freeze([
   "source", "writer_identity", "actor", "action_kind", "occurrence_id",
   "incident_id", "action_ref", "action_payload",
 ] as const);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 export interface ChainedAgentActionInput {
   readonly source: "first_party" | "hatchet" | "ui_client" | "ops";
@@ -101,12 +110,34 @@ export function materializeAgentAction(input: ChainedAgentActionInput): ChainedA
 }
 
 function validate(input: ChainedAgentActionInput): void {
-  if (utilTypes.isProxy(input) || !Object.isFrozen(input) || Object.getPrototypeOf(input) !== null) {
+  if (input === null || typeof input !== "object" || utilTypes.isProxy(input) ||
+      !Object.isFrozen(input) || Object.getPrototypeOf(input) !== null) {
     fail("FIX09_ACTION_INPUT");
   }
-  if (Object.keys(input).some((key,index) => key !== ACTION_KEYS[index])) fail("FIX09_ACTION_INPUT");
+  if (Object.getOwnPropertySymbols(input).length !== 0) fail("FIX09_ACTION_INPUT");
+  const own = Object.getOwnPropertyDescriptors(input);
+  const keys = Object.keys(own);
+  if (keys.length !== ACTION_KEYS.length || keys.some((key,index) => key !== ACTION_KEYS[index]) ||
+      ACTION_KEYS.some((key) => {
+        const descriptor = own[key];
+        return descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable ||
+          descriptor.configurable || descriptor.writable;
+      })) fail("FIX09_ACTION_INPUT");
   if (!/^[a-z0-9][a-z0-9._-]{0,127}$/u.test(input.writer_identity)) fail("FIX09_WRITER_IDENTITY");
   if (!new Set(["first_party","hatchet","ui_client","ops"]).has(input.source)) fail("FIX09_ACTION_SOURCE");
+  if ((input.source === "ops") !== (input.writer_identity === "obsctl") ||
+      (input.source !== "ops" && input.writer_identity !== "fixagent-daemon")) {
+    fail("FIX09_ACTION_AUTHORIZATION");
+  }
+  for (const value of [input.actor, input.action_kind, input.action_ref]) {
+    if (typeof value !== "string" || value.length === 0 || value.trim() !== value || value.length > 1024) {
+      fail("FIX09_ACTION_INPUT");
+    }
+  }
+  for (const value of [input.occurrence_id, input.incident_id]) {
+    if (value !== null && (typeof value !== "string" || !UUID.test(value))) fail("FIX09_ACTION_INPUT");
+  }
+  clonePayload(input.action_payload);
   tagJsonb(input.action_payload);
 }
 
@@ -138,8 +169,11 @@ export async function appendChainedAgentAction(
     }
     return fail("FIX09_ACTION_CONFLICT");
   }
-  const activation = await executeFixagentActionOperation(transaction,{kind:"READ_ACTIVATION"});
-  if (activation.rowCount !== 0) fail("FIX09_SIGNER_REQUIRED");
+  const activation = await executeFixagentActionOperation<{activation_manifest_sha256:Buffer}>(
+    transaction,{kind:"READ_ACTIVATION"},
+  );
+  const activationDigest=activation.rows[0]?.activation_manifest_sha256;
+  if (activationDigest === undefined) assertPreActivationSignerAbsent();
   await executeFixagentActionOperation(transaction,{
     kind:"LOCK_CHAIN_PARTITION",token:chainPartitionToken("agent_action",input.source,input.writer_identity),
   });
@@ -148,12 +182,41 @@ export async function appendChainedAgentAction(
   }>(transaction,{kind:"ALLOCATE_ACTION"});
   const row = allocated.rows[0];
   if (row === undefined) fail("FIX09_ACTION_ALLOCATION");
-  const values:ActionInsertValues={
+  let chainKeyId:null|string=null;
+  let chainSequence:null|string=null;
+  let previousLink:null|Buffer=null;
+  let chainSignature:null|Buffer=null;
+  let link:null|Buffer=null;
+  if(activationDigest!==undefined){
+    const signer=getReleasedSigner(
+      "agent_action",input.source,input.writer_identity,activationDigest,
+    );
+    const head=await executeFixagentActionOperation<{
+      chain_seq:string;chain_link:Buffer;chain_key_id:string;
+    }>(transaction,{kind:"READ_ACTION_HEAD",source:input.source,writerIdentity:input.writer_identity});
+    const prior=head.rows[0];
+    chainSequence=prior===undefined?"1":(BigInt(prior.chain_seq)+1n).toString();
+    previousLink=prior===undefined
+      ?genesisLink("agent_action",input.source,input.writer_identity,activationDigest)
+      :prior.chain_link;
+    chainKeyId=signer.keyId;
+    const canonical=canonicalRowBytes("agent_action",Object.freeze(Object.assign(Object.create(null),{
+      chain_version:1,chain_key_id:chainKeyId,chain_seq:chainSequence,prev_link:previousLink,
+      agent_action_id:row.agent_action_id,action_seq:row.action_seq,source:input.source,
+      writer_identity:input.writer_identity,actor:input.actor,action_kind:input.action_kind,
+      occurrence_id:input.occurrence_id,incident_id:input.incident_id,action_ref:input.action_ref,
+      action_payload:input.action_payload,occurred_at:row.occurred_at,
+    })) as Readonly<Record<string,unknown>>);
+    chainSignature=signer.sign(signatureMessage(canonical));
+    link=chainLink(canonical,chainSignature);
+  }
+  const values:FixagentActionInsertValues={
     action_seq:row.action_seq,action_ref:input.action_ref,action_kind:input.action_kind,
     action_payload:JSON.stringify(input.action_payload),actor:input.actor,
-    agent_action_id:row.agent_action_id,chain_key_id:null,chain_link:null,chain_seq:null,
-    chain_signature:null,chain_version:null,incident_id:input.incident_id,occurred_at:row.occurred_at,
-    occurrence_id:input.occurrence_id,prev_link:null,source:input.source,
+    agent_action_id:row.agent_action_id,chain_key_id:chainKeyId,chain_link:link,chain_seq:chainSequence,
+    chain_signature:chainSignature,chain_version:activationDigest===undefined?null:1,
+    incident_id:input.incident_id,occurred_at:row.occurred_at,
+    occurrence_id:input.occurrence_id,prev_link:previousLink,source:input.source,
     writer_identity:input.writer_identity,
   };
   const inserted = await executeFixagentActionOperation<ChainedAgentActionResult>(transaction,{
