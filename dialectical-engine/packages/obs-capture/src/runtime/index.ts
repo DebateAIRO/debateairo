@@ -18,7 +18,7 @@ import {
   type CaptureHealth,
   type CaptureHealthCode,
 } from "../health.js";
-import { clampSpoolRecordLimit } from "../safe-metadata.js";
+import { clampSpoolRecordLimit, UNKNOWN_SOURCE_EVENT_REF } from "../safe-metadata.js";
 import { BoundedReferenceQueue } from "../queue.js";
 import { createSharedRedactor } from "../redactor.js";
 import { createPreopenedSpool, type SpoolWriter } from "../spool.js";
@@ -196,10 +196,9 @@ function createStartingState(
         1,
       );
     },
-    captureHandled(error: unknown, context: unknown): void {
+    captureHandled(error: unknown, context: unknown): string {
       if (state?.captureOff !== true) {
-        delegateEmitter.captureHandled(error, context);
-        return;
+        return delegateEmitter.captureHandled(error, context);
       }
       health.record(CAPTURE_HEALTH_CODES.DISABLED);
       captureGaps.recordLoss(
@@ -207,6 +206,7 @@ function createStartingState(
         CAPTURE_GAP_CLASSES.DISABLED,
         1,
       );
+      return UNKNOWN_SOURCE_EVENT_REF;
     },
   });
   const databaseSink = createPostgresCaptureSink({

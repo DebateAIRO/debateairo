@@ -184,7 +184,7 @@ describe("FIX-03 C2 artifact", () => {
         envelope = value;
         throw captureFailure;
       },
-      captureHandled() {},
+      captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; },
     }));
     const recordTerminalFailure = vi.fn(async () => {
       order.push("terminal");
@@ -336,7 +336,7 @@ describe("FIX-03 C2 artifact", () => {
         payload.error.code = "MUTATED_BY_CAPTURE";
         throw new Error("CAPTURE_SINK_FAILED");
       },
-      captureHandled() {},
+      captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; },
     }));
     const recordTerminalFailure = vi.fn<
       (value: TerminalFailureInput) => Promise<boolean>
@@ -363,7 +363,7 @@ describe("FIX-03 C2 artifact", () => {
   });
 
   it("keeps the terminal write and original error identity with capture off", async () => {
-    installCaptureEmitter(Object.freeze({ emit() {}, captureHandled() {} }));
+    installCaptureEmitter(Object.freeze({ emit() {}, captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; } }));
     const productFailure = new TypedDomainError(
       "JUDGEMENT_POLICY_UNRESOLVED",
       "private off-mode failure",
@@ -401,7 +401,7 @@ describe("FIX-03 C2 artifact", () => {
       { retryCount: () => 1 },
     );
 
-    installCaptureEmitter(Object.freeze({ emit() {}, captureHandled() {} }));
+    installCaptureEmitter(Object.freeze({ emit() {}, captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; } }));
     const offExecute = vi.fn<() => Promise<RunnerExecutionResult>>().mockResolvedValue(result);
     const offTerminal = vi.fn(async () => true);
     const offTask = taskFor({ executeWorkItem: offExecute, recordTerminalFailure: offTerminal });

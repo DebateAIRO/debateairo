@@ -61,7 +61,7 @@ function captureEntries(): CaptureQueueEntry[] {
 }
 
 function captureOff(): void {
-  installCaptureEmitter(Object.freeze({ emit() {}, captureHandled() {} }));
+  installCaptureEmitter(Object.freeze({ emit() {}, captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; } }));
 }
 
 function callInAmbientContext(
@@ -265,7 +265,7 @@ describe("FIX-05 C1 provider exhaustion capture", () => {
       } else {
         installCaptureEmitter(Object.freeze({
           emit() { throw new Error("capture unavailable"); },
-          captureHandled() {},
+          captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; },
         }));
       }
       const ledgerAttempts: string[] = [];
@@ -300,7 +300,7 @@ describe("FIX-05 C1 provider exhaustion capture", () => {
       } else {
         installCaptureEmitter(Object.freeze({
           emit() { throw new Error("capture unavailable"); },
-          captureHandled() {},
+          captureHandled() { return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE"; },
         }));
       }
       const ledgerAttempts: string[] = [];
