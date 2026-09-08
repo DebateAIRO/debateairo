@@ -31,7 +31,11 @@ export interface FallbackStatus {
   readonly capture_gaps: CaptureGapsStatus;
   readonly spool: null;
   readonly mutation: Readonly<{ configured: null; effective: "OFF"; reason: "FIX10_FORCED_OFF" }>;
-  readonly quick_arm: Readonly<{ configured: null; effective: "OFF"; reason: "FIX10_FORCED_OFF" }>;
+  readonly quick_arm: Readonly<{
+    configured: "OFF";
+    effective: "OFF";
+    reason: "FIX14_POLICY_DEFAULT_OFF";
+  }>;
   readonly policy_bundle_sha256: null;
   readonly activation_manifest_sha256: null;
   readonly keyring_sha256: null;
@@ -53,6 +57,11 @@ export interface CaptureGapsStatus {
 export function renderFallbackStatus(captureEffective: "ON" | "OFF", observedAtMs = Date.now()): FallbackStatus {
   if (!Number.isSafeInteger(observedAtMs) || observedAtMs <= 0) throw new TypeError("FIX10_STATUS_TIME");
   const forced = Object.freeze({ configured: null, effective: "OFF" as const, reason: "FIX10_FORCED_OFF" as const });
+  const quickArm = Object.freeze({
+    configured: "OFF" as const,
+    effective: "OFF" as const,
+    reason: "FIX14_POLICY_DEFAULT_OFF" as const,
+  });
   const captureRuntimes = Object.freeze(["api", "runner", "scheduler"].map((runtime) => Object.freeze({
     component: `capture:${runtime}`, state: null, heartbeat_age_ms: null, reason: "DB_UNAVAILABLE",
   })));
@@ -64,7 +73,7 @@ export function renderFallbackStatus(captureEffective: "ON" | "OFF", observedAtM
     database: null, cursor_lag: null, capture_gaps: Object.freeze({ open_rows: null, recent_rows: null,
       authority_proof_staleness_ms: null, refresh_interval_ms: null, skew_tolerance_ms: null,
       flush_interval_ms: null, quiet_window_ms: null, query_window_ms: null, reason: "TIMING_INVALID" as const }),
-    spool: null, outbox: null, v_journal: null, watchdog_journal: null, mutation: forced, quick_arm: forced,
+    spool: null, outbox: null, v_journal: null, watchdog_journal: null, mutation: forced, quick_arm: quickArm,
     policy_bundle_sha256: null, activation_manifest_sha256: null, keyring_sha256: null, custodian: "V",
   });
 }
@@ -93,6 +102,11 @@ export function renderLocalStatus(input: LocalStatusInput): Readonly<Record<stri
   const localState = deriveLocalAuthorityState({ rootValid: true, captureOff: input.captureOff, killed: input.killed,
     armed: input.armed.state === "VALID", proof: input.proof.state === "VALID" });
   const forced = Object.freeze({ configured: null, effective: "OFF", reason: "FIX10_FORCED_OFF" });
+  const quickArm = Object.freeze({
+    configured: "OFF",
+    effective: "OFF",
+    reason: "FIX14_POLICY_DEFAULT_OFF",
+  });
   return Object.freeze({
     schema: "obsctl-status/v3", observed_at_ms: String(input.observedAtMs), local_state: localState,
     markers: Object.freeze({ capture_off: input.captureOff ? "PRESENT" : "ABSENT", kill: input.killed ? "PRESENT" : "ABSENT" }),
@@ -107,7 +121,7 @@ export function renderLocalStatus(input: LocalStatusInput): Readonly<Record<stri
     spool: Object.freeze({ files: null, lines: null, reason: "UNAVAILABLE" }),
     outbox: Object.freeze({ pending: input.outboxPending, tail_hash: input.outboxTailHash }),
     v_journal: Object.freeze({ tail_hash: input.journalTailHash }), watchdog_journal: Object.freeze({ tail_hash: null }),
-    mutation: forced, quick_arm: forced, policy_bundle_sha256: input.policyBundleSha256,
+    mutation: forced, quick_arm: quickArm, policy_bundle_sha256: input.policyBundleSha256,
     activation_manifest_sha256: input.activationManifestSha256, keyring_sha256: input.keyringSha256, custodian: "V",
   });
 }
