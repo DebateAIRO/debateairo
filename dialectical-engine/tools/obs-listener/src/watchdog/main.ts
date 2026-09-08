@@ -106,7 +106,7 @@ interface RuntimeState {
 }
 
 function fail(code: string): never {
-  throw new TypeError(code);
+  throw { FIX09_WATCHDOG_FAILED: new TypeError(code) }.FIX09_WATCHDOG_FAILED;
 }
 
 function integer(value: string | undefined, pattern: RegExp, code: string): number {
@@ -226,7 +226,7 @@ function readPrivateKey(config: WatchdogConfig): KeyObject {
     const key = createPrivateKey({ key: bytes, format: "der", type: "pkcs8" });
     if (key.asymmetricKeyType !== "ed25519" || !(key.export({ format: "der", type: "pkcs8" }) as Buffer).equals(bytes)) fail("FIX09_WITNESS_KEY");
     return key;
-  } catch {
+  } catch (_error) {
     return fail("FIX09_WITNESS_KEY");
   } finally {
     bytes.fill(0);
@@ -247,7 +247,7 @@ function readKeyring(config: WatchdogConfig): Buffer {
       { owner: config.publicOwnerUid, group: config.publicGroupGid, mode: 0o440 },
       { owner: config.watchdogUid, group: config.watchdogGid, mode: 0o400 },
     ]), layout.chainDevice, MAX_PUBLIC_BYTES);
-  } catch {
+  } catch (_error) {
     return fail("FIX09_PUBLIC_MATERIAL");
   }
 }
@@ -338,12 +338,12 @@ export function createWatchdog(config: WatchdogConfig, ports: WatchdogPorts = {}
       activation = verifyActivationDocument(publicMaterial.activation, publicMaterial.root);
       snapshot = await database.readSnapshot();
       if (!activationMatchesDatabase(activation, snapshot)) throw new TypeError("FIX09_ACTIVATION_PARITY");
-    } catch {
+    } catch (_error) {
       throw new WatchdogColdStartError("ACTIVATION_INVALID_NO_WITNESS");
     }
     let journal: WitnessJournalState;
     try { journal = verifyWitnessJournal(readJournal(config), activation); }
-    catch { throw new WatchdogColdStartError("WITNESS_JOURNAL_INVALID_NO_APPEND"); }
+    catch (_error) { throw new WatchdogColdStartError("WITNESS_JOURNAL_INVALID_NO_APPEND"); }
     let privateKey: KeyObject;
     try {
       privateKey = readPrivateKey(config);
@@ -351,7 +351,7 @@ export function createWatchdog(config: WatchdogConfig, ports: WatchdogPorts = {}
       if (privateKeyId !== journal.witnessKeyId && (authorization === null || authorization.new_witness_key_id !== privateKeyId ||
           authorization.prior_witness_key_id !== journal.witnessKeyId || authorization.prior_witness_seq !== (BigInt(journal.nextSequence) - 1n).toString() ||
           authorization.prior_witness_hash !== journal.priorWitnessHash || authorization.min_witness_seq !== journal.nextSequence)) throw new TypeError("FIX09_WITNESS_KEY");
-    } catch {
+    } catch (_error) {
       throw new WatchdogColdStartError("WITNESS_KEY_UNAUTHORIZED_NO_APPEND");
     }
     const state: RuntimeState = { activation, activationBytes: publicMaterial.activation,
@@ -373,9 +373,9 @@ export function createWatchdog(config: WatchdogConfig, ports: WatchdogPorts = {}
       try {
         const current = readPublic(config);
         if (!current.root.equals(state.custodianRootBytes) || !current.activation.equals(state.activationBytes)) throw new TypeError("FIX09_ACTIVATION_REPLACED");
-      } catch { publicAvailable = false; }
+      } catch (_error) { publicAvailable = false; }
       try { snapshot = await database.readSnapshot(); }
-      catch { snapshot = undefined; }
+      catch (_error) { snapshot = undefined; }
       if (snapshot !== undefined && !activationMatchesDatabase(state.activation, snapshot)) publicAvailable = false;
     }
     let journal: WitnessJournalState;
@@ -448,7 +448,7 @@ export function createWatchdog(config: WatchdogConfig, ports: WatchdogPorts = {}
     let healthPersisted = false;
     if (snapshot !== undefined) {
       try { await database.writeHealth(health); healthPersisted = true; }
-      catch { healthPersisted = false; }
+      catch (_error) { healthPersisted = false; }
     }
     return Object.freeze({ chain: Object.freeze({ result: verification.result, reason: verification.reason }),
       heartbeat: heartbeatState, cursor: cursorState, health, health_persisted: healthPersisted,

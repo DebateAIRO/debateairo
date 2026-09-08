@@ -40,8 +40,8 @@ async function main(): Promise<void> {
     });
     await watchdog.start();
     const stop = async () => { await watchdog.stop(); process.exitCode = 0; };
-    process.once("SIGINT", () => { void stop(); });
-    process.once("SIGTERM", () => { void stop(); });
+    process.once("SIGINT", () => { stop().catch((_error) => { process.exitCode = 78; }); });
+    process.once("SIGTERM", () => { stop().catch((_error) => { process.exitCode = 78; }); });
   } catch (error) {
     const code = error instanceof WatchdogColdStartError ? error.code : "ACTIVATION_INVALID_NO_WITNESS";
     process.stderr.write(coldStartStderr(code));
@@ -50,5 +50,5 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
-  void main();
+  main().catch((_error) => { process.exitCode = 78; });
 }

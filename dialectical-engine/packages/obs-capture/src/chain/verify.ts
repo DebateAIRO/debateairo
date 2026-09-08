@@ -78,7 +78,7 @@ const PAIRS: Readonly<Record<VerificationResult, ReadonlySet<VerificationReason>
 });
 
 function fail(code: string): never {
-  throw new TypeError(code);
+  throw { FIX09_CHAIN_VERIFICATION_FAILED: new TypeError(code) }.FIX09_CHAIN_VERIFICATION_FAILED;
 }
 
 export function verificationOutcome(result: VerificationResult, reason: VerificationReason): VerificationOutcome {
@@ -124,7 +124,7 @@ function publicKeyFromSpki(value: unknown, code: string): { readonly der: Buffer
   let key: KeyObject;
   try {
     key = createPublicKey({ key: der, format: "der", type: "spki" });
-  } catch {
+  } catch (_error) {
     return fail(code);
   }
   if (key.asymmetricKeyType !== "ed25519") fail(code);
@@ -139,7 +139,7 @@ function parseCanonicalDocument(bytes: Uint8Array, code: string): Record<string,
   let parsed: unknown;
   try {
     parsed = parseUniqueJson(source);
-  } catch {
+  } catch (_error) {
     return fail(code);
   }
   const record = asRecord(parsed, code);
@@ -199,7 +199,7 @@ export function verifyActivationDocument(bytes: Uint8Array, custodianRootSpkiDer
   let custodianPublicKey: KeyObject;
   try {
     custodianPublicKey = createPublicKey({ key: root, format: "der", type: "spki" });
-  } catch {
+  } catch (_error) {
     return fail("FIX09_ACTIVATION_FORMAT");
   }
   if (custodianPublicKey.asymmetricKeyType !== "ed25519") fail("FIX09_ACTIVATION_FORMAT");
@@ -516,7 +516,12 @@ function rowProjection(table: "occurrence" | "agent_action", row: Readonly<Recor
   const columns = table === "occurrence" ? OCCURRENCE_COLUMNS : AGENT_ACTION_COLUMNS;
   for (const [name] of columns) {
     if (!Object.hasOwn(row, name)) fail("FIX09_ROW_FORMAT");
-    output[name] = row[name];
+    Object.defineProperty(output, name, {
+      configurable: true,
+      enumerable: true,
+      value: row[name],
+      writable: true,
+    });
   }
   return Object.freeze(output);
 }
@@ -670,7 +675,7 @@ export function verifyAuditSnapshot(
     const heads: WitnessHead[] = [];
     let suspectRanges: ReadonlyMap<string, readonly SuspectRowRange[]>;
     try { suspectRanges = recoveryRanges(modern, keyring); }
-    catch { return closed("RECOVERY_CONTINUITY"); }
+    catch (_error) { return closed("RECOVERY_CONTINUITY"); }
     for (const bucket of modern.values()) {
       bucket.rows.sort((left, right) => BigInt(decimal(left.chain_seq, true, "CHAIN_SEQUENCE")) < BigInt(decimal(right.chain_seq, true, "CHAIN_SEQUENCE")) ? -1 : 1);
       let priorLink: Buffer | undefined;
@@ -690,7 +695,7 @@ export function verifyAuditSnapshot(
         if (suspect !== undefined && row.chain_key_id !== suspect.compromisedKeyId) return closed("RECOVERY_CONTINUITY");
         let canonical: Buffer;
         try { canonical = canonicalRowBytes(bucket.table, rowProjection(bucket.table, row)); }
-        catch { return closed("ROW_SIGNATURE"); }
+        catch (_error) { return closed("ROW_SIGNATURE"); }
         const signature = bytes(row.chain_signature, 64, "ROW_SIGNATURE");
         if (key !== undefined && !verifySignature(null, signatureMessage(canonical), key, signature)) return closed("ROW_SIGNATURE");
         const derived = chainLink(canonical, signature);

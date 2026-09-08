@@ -120,7 +120,7 @@ export interface WitnessJournalState {
 }
 
 function fail(code: string): never {
-  throw new TypeError(code);
+  throw { FIX09_WITNESS_VERIFICATION_FAILED: new TypeError(code) }.FIX09_WITNESS_VERIFICATION_FAILED;
 }
 
 function sha256(value: Uint8Array): string {
@@ -271,7 +271,7 @@ function validateAuthorization(
   const der = base64(completed.new_witness_spki_der_base64, 44, "FIX09_WITNESS_CONTINUITY");
   let publicKey: KeyObject;
   try { publicKey = createPublicKey({ key: der, type: "spki", format: "der" }); }
-  catch { return fail("FIX09_WITNESS_CONTINUITY"); }
+  catch (_error) { return fail("FIX09_WITNESS_CONTINUITY"); }
   if (publicKey.asymmetricKeyType !== "ed25519" || keyIdFromPublicKey(publicKey) !== newKeyId) fail("FIX09_WITNESS_CONTINUITY");
   if (completed.reason === "PLANNED_ROTATION") {
     if (completed.recovery_id !== null || completed.recovery_checkpoint_sha256 !== null) fail("FIX09_WITNESS_CONTINUITY");
@@ -345,7 +345,7 @@ export function verifyWitnessJournal(
   for (const line of lines) {
     let parsed: unknown;
     try { parsed = parseUniqueJson(line); }
-    catch { return fail("FIX09_WITNESS_FORMAT"); }
+    catch (_error) { return fail("FIX09_WITNESS_FORMAT"); }
     const completed = record(parsed);
     exactKeys(completed, COMPLETED_KEYS);
     if (canonicalJson(completed) !== line) fail("FIX09_WITNESS_FORMAT");

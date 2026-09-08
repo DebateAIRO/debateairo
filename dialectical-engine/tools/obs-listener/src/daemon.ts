@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   let stopping: Promise<void> | undefined;
   const requestStop = () => {
     stopping ??= stop(daemon, heartbeat, timer, serial);
-    void stopping;
+    stopping.catch((_error) => { process.exitCode = 78; });
   };
   process.once("SIGINT", requestStop);
   process.once("SIGTERM", requestStop);
@@ -40,6 +40,6 @@ async function main(): Promise<void> {
   }
 }
 
-void main().catch(() => {
+main().catch((_error) => {
   process.exitCode = 78;
 });
