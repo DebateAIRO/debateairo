@@ -4,6 +4,7 @@ import {
   type FixagentDeliveryNotification,
 } from "@debateai/obs-capture/chain/fixagent-delivery";
 import { deliverOccurrence } from "./fold.js";
+import { readKillSwitch } from "../control/reader.js";
 
 export interface DaemonConfig {
   readonly databaseUrl: string;
@@ -16,12 +17,27 @@ export interface DaemonControl {
   stop(): Promise<void>;
 }
 
+export interface DaemonSafety {
+  killed(): Promise<boolean>;
+  abortLocal(): Promise<void>;
+  releaseLease?(): Promise<void>;
+}
+
 export type DeliveryGenerationFactory = (
   databaseUrl: string,
 ) => FixagentDeliveryGeneration;
 // Retained as an opaque compatibility seam for the frozen C3 adjacent test.
 // Non-generation values are never used as database capabilities.
 export type ClientFactory = (databaseUrl: string) => unknown;
+
+function environmentDaemonSafety(): DaemonSafety {
+  return Object.freeze({
+    killed: async () => readKillSwitch(process.env.OBS_CONTROL_DIR),
+    // The current delivery worker has no child process or local model executor;
+    // invalidating its generation is its complete local abort boundary.
+    abortLocal: async () => undefined,
+  });
+}
 
 interface ClientGeneration {
   readonly id: number;
@@ -58,6 +74,7 @@ export function readDaemonConfig(env: NodeJS.ProcessEnv): DaemonConfig {
 export function createDaemon(
   config: DaemonConfig,
   generations: ClientFactory = createFixagentDeliveryGeneration,
+  safety: DaemonSafety = environmentDaemonSafety(),
 ): DaemonControl {
   let running = false;
   let generationCounter = 0;
@@ -67,6 +84,20 @@ export function createDaemon(
   let connecting: Promise<void> | undefined;
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const stopForKill = async (): Promise<boolean> => {
+    if (!running || !await safety.killed()) return false;
+    if (!running) return true;
+    running = false;
+    if (pollTimer !== undefined) clearInterval(pollTimer);
+    if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
+    pollTimer = undefined;
+    reconnectTimer = undefined;
+    await safety.abortLocal();
+    if (safety.releaseLease !== undefined) await safety.releaseLease().catch(() => undefined);
+    wakeRequested = false;
+    return true;
+  };
 
   const generationIsCurrent = (generation: ClientGeneration): boolean =>
     running && current?.id === generation.id;
@@ -113,10 +144,22 @@ export function createDaemon(
         continue;
       }
       try {
+        if (await stopForKill()) {
+          invalidate(generation);
+          continue;
+        }
         if (!generation.leader && !await tryLeadership(generation)) continue;
         while (generationIsCurrent(generation) && generation.leader) {
+          if (await stopForKill()) {
+            invalidate(generation);
+            break;
+          }
           const occurrenceId = await selectPending(generation);
           if (occurrenceId === undefined) break;
+          if (await stopForKill()) {
+            invalidate(generation);
+            break;
+          }
           await deliverOccurrence(generation.client, occurrenceId);
         }
       } catch {
@@ -138,6 +181,7 @@ export function createDaemon(
   async function connectFresh(): Promise<void> {
     if (!running || current !== undefined || connecting !== undefined) return connecting;
     const attempt = (async () => {
+      if (await stopForKill()) return;
       const supplied = generations(config.databaseUrl);
       const client = supplied !== null && typeof supplied === "object"
         && "withDelivery" in supplied && "selectPending" in supplied
@@ -182,7 +226,12 @@ export function createDaemon(
     async start(): Promise<void> {
       if (running) return;
       running = true;
-      pollTimer = setInterval(kick, config.pollIntervalMs);
+      pollTimer = setInterval(() => {
+        void stopForKill().then((killed) => {
+          if (killed && current !== undefined) invalidate(current);
+          else if (!killed) kick();
+        });
+      }, config.pollIntervalMs);
       await connectFresh();
       while (serialLoop !== undefined) await serialLoop;
     },
