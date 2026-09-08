@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "apps/z-last.ts",
+      "line": 2,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/a-first.ts",
+      "line": 2,
+      "class": "throw_without_code"
+    }
+  ]
+}

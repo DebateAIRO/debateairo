@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "apps/example.ts",
+      "line": 2,
+      "class": "bare_catch"
+    }
+  ]
+}
