@@ -223,6 +223,39 @@ describe("FIX-04 API error boundary", () => {
     await api.close();
   });
 
+  it("records an excluded-zone failure without projecting its route template", async () => {
+    const entries = installProbe();
+    const zoneSessions = Object.freeze({
+      ...sessions(),
+      beginLogin: async () => {
+        throw new Error("login dependency unavailable");
+      },
+    });
+    const api = buildApi({
+      application: application(),
+      sessions: zoneSessions,
+      allowedOrigin: "https://app.debateai.test",
+    });
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/auth/login",
+      headers: { origin: "https://app.debateai.test" },
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({
+      error: "INTERNAL_ERROR",
+      correlation_id: EVENT_REF,
+    });
+    expect(entries).toHaveLength(1);
+    expect(redact(entries[0]!).component).toEqual({
+      process: "api",
+      package: "@debateai/api",
+    });
+    await api.close();
+  });
+
   it("offers the occurrence before destroying a response whose headers were sent", async () => {
     const order: string[] = [];
     const entries = installProbe(order);
