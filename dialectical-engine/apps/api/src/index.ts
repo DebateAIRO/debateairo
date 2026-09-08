@@ -61,7 +61,11 @@ import type {
   EvaluatorDevMenuView
 } from "@debateai/evaluator";
 import { Argon2InfrastructureError } from "@debateai/crypto";
-import { captureHandled } from "@debateai/obs-capture";
+import {
+  captureHandled,
+  declaredRef,
+  runWithObsContext,
+} from "@debateai/obs-capture";
 import {
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
@@ -166,6 +170,13 @@ function routePolicy(route: AuthorizationRoute): { readonly config: {
 function canonicalRoute(method: string, url: string): string {
   return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
 }
+
+const OBS_RUN_SCOPED_ROUTE_TEMPLATES = Object.freeze([
+  "/v1/runs/:id/events",
+  "/v1/runs/:id",
+  "/v1/runs/:id/answer",
+] as const);
+const EMPTY_OBS_REQUEST_CONTEXT = Object.freeze({});
 
 export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
@@ -336,6 +347,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
     exposeHeadRoutes: false
+  });
+  api.addHook("onRequest", (request, _reply, done) => {
+    const routeTemplate = request.routeOptions.url;
+    const params = typeof request.params === "object" && request.params !== null
+      ? request.params as Readonly<Record<string, unknown>>
+      : undefined;
+    const runId = params?.id;
+    const verifiedRunId = OBS_RUN_SCOPED_ROUTE_TEMPLATES.some(
+      (candidate) => candidate === routeTemplate,
+    ) && typeof runId === "string" && ResourceIdSchema.safeParse(runId).success
+      ? runId
+      : undefined;
+    const context = verifiedRunId === undefined
+      ? EMPTY_OBS_REQUEST_CONTEXT
+      : Object.freeze({ run_ref: declaredRef("run", verifiedRunId) });
+    runWithObsContext(context, done);
   });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
