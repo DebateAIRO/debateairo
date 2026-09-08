@@ -10,6 +10,9 @@ import { identityCanaryCase } from "./cases/identity-canary.js";
 import { schemaManifestCase } from "./cases/schema-manifest.js";
 import { CHAOS_CASES } from "./cases/chaos-common.js";
 import { installerGraphCase } from "./cases/installer-graph.js";
+import { grantsCase } from "./cases/grants.js";
+import { overheadCase } from "./cases/overhead.js";
+import { zoneTimingCase } from "./cases/zone-timing.js";
 import {
   OBS_G1_READBACK_MAX_ROWS,
   ObsReadbackFailure,
@@ -552,6 +555,9 @@ const DEFAULT_OBS_G1_CASES: readonly ObsAcceptanceCase[] = Object.freeze([
   schemaManifestCase,
   ...CHAOS_CASES,
   installerGraphCase,
+  grantsCase,
+  zoneTimingCase,
+  overheadCase,
 ]);
 
 export function parseObsG1Arguments(arguments_: readonly string[]): { readonly only?: readonly string[] } {
