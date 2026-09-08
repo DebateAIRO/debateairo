@@ -145,6 +145,37 @@ export type DevelopmentSynthesisRoleRefs = Readonly<{
 }>;
 
 /**
+ * WHICH role an unconfigured override named. Bounded by construction: two
+ * constants of this module. The override VALUE is an environment string the
+ * operator supplied — unbounded, and the only unbounded tail any DEV_ code in
+ * this corpus still carried — so it never rides the rejection. The role does,
+ * because naming the variable to re-check is all an operator needs and it is a
+ * closed set.
+ */
+export const DEVELOPMENT_SYNTHESIS_ROLE_NAMES = Object.freeze([
+  "synthesizer", "evaluator"
+] as const);
+export type DevelopmentSynthesisRoleName = typeof DEVELOPMENT_SYNTHESIS_ROLE_NAMES[number];
+const developmentSynthesisRoleNames = new Set<string>(DEVELOPMENT_SYNTHESIS_ROLE_NAMES);
+
+/**
+ * The role an unconfigured-override rejection named, or null for anything that
+ * is not one or whose cause is not one of the constants above. A log path reads
+ * the role through this function, so no caller reaches into `cause` and decides
+ * for itself what is safe to print (the packages/db/src/auth-risk.ts shape).
+ */
+export function developmentSynthesisRoleRefUnconfiguredRole(
+  error: unknown
+): DevelopmentSynthesisRoleName | null {
+  if (!(error instanceof TypeError)
+    || error.message !== "DEV_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED") return null;
+  const cause = (error as { readonly cause?: unknown }).cause;
+  return typeof cause === "string" && developmentSynthesisRoleNames.has(cause)
+    ? cause as DevelopmentSynthesisRoleName
+    : null;
+}
+
+/**
  * Goal 84-85 PERMITS identical synthesizer and evaluator refs (and requires a
  * warning when they are). An operator therefore needs a way to configure them;
  * without one the permitted case is unreachable and its warning is dead code.
@@ -157,16 +188,24 @@ export function resolveDevelopmentSynthesisRoleRefs(
 ): DevelopmentSynthesisRoleRefs {
   const derived = deriveSynthesisRoleRefs(providerPanel.configuredProviders);
   const configured = new Set(providerPanel.configuredProviders.map((provider) => provider.providerRef));
-  const resolve = (override: string | undefined, fallback: string): string => {
+  const resolve = (
+    override: string | undefined,
+    fallback: string,
+    role: DevelopmentSynthesisRoleName
+  ): string => {
     if (override === undefined || override.trim() === "") return fallback;
     if (!configured.has(override)) {
-      throw new TypeError(`DEV_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED:${override}`);
+      throw new TypeError("DEV_ALGORITHM_REGISTER_ROLE_REF_UNCONFIGURED", { cause: role });
     }
     return override;
   };
   return Object.freeze({
-    synthesizerRoleRef: resolve(source.DEBATEAI_DEV_SYNTHESIZER_ROLE_REF, derived.synthesizerRoleRef),
-    evaluatorRoleRef: resolve(source.DEBATEAI_DEV_EVALUATOR_ROLE_REF, derived.evaluatorRoleRef)
+    synthesizerRoleRef: resolve(
+      source.DEBATEAI_DEV_SYNTHESIZER_ROLE_REF, derived.synthesizerRoleRef, "synthesizer"
+    ),
+    evaluatorRoleRef: resolve(
+      source.DEBATEAI_DEV_EVALUATOR_ROLE_REF, derived.evaluatorRoleRef, "evaluator"
+    )
   });
 }
 

@@ -2341,3 +2341,32 @@ every record already stamped. Two re-takes in this lane, both avoidable by order
 - **zsh expands an unquoted `--include=*.ts` argument.** `grep -rn "x" . --include=*.ts`
   fails with `no matches found` before grep ever runs. Quote it: `--include='*.ts'`.
   (lane/flakes, 2026-09-07; two wasted probes.)
+
+## `ERR_UNHANDLED_REJECTION` is NOT what Node prints when an Error goes unhandled
+Found by lane/small-trio (F-T9-UNATTENDED-PROMISES, 2026-09-08). The positive control for the
+unattended-promise class asserted that a child killed by an unhandled rejection prints
+`ERR_UNHANDLED_REJECTION`. It does not. Under the default `--unhandled-rejections=throw`, Node
+RE-THROWS an Error-typed reason as an ordinary uncaught exception and prints the error and its
+stack; the `ERR_UNHANDLED_REJECTION` code appears only when the reason is NOT an Error (Node
+wraps a non-Error reason to have something to throw). Measured on node v25.7.0: rejecting with
+`new TypeError("X")` printed `TypeError: X` and exited 1, with the string
+`ERR_UNHANDLED_REJECTION` nowhere in stdout or stderr.
+**Rule: for "the process died of an unhandled rejection", assert the DEATH, not a code string —
+nonzero exit, the marker AFTER the join never printed, the join's own catch never printed, and
+the reason's text on stderr. Reserve the code assertion for reasons you know are not Errors.**
+Cost here: one red row and one debugging cycle, caught by the control itself — which is the
+argument for writing the positive control at all: a probe that cannot go red proves nothing, and
+this one went red for a reason that was mine, not the code's.
+
+## Node runs the TypeScript source of a test region verbatim, which turns a source-text check into a behavioural one
+Same lane and ticket. The defect being fixed lives inside a 22-second, database-backed
+integration window, so the obvious unit-sized test is a hand-written COPY of the loop's shape —
+which pins nothing, because the copy stays green whatever the real loop does. Instead the row
+slices the region's OWN text out of `tests/integration/registration-database.test.ts` between two
+stable anchors and runs it in `node --input-type=module-typescript -e <preamble + region>` against
+stubs. Type annotations, `!` non-null assertions and generic arrows are all erasable, so the
+region runs unmodified and unknown type names (`T9Score`, `ResendObservation`) cost nothing.
+**Rule: when the property is a SHAPE of a region you cannot execute in place, execute the region's
+text. Guard it: assert the anchors were found, assert the slice still contains the call the stubs
+replace, and ship a positive control that mutates the slice and requires the child to die — that
+control is the only thing standing between this and a check that passes on an empty string.**

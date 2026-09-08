@@ -94,18 +94,27 @@ describe("F-T9-UNATTENDED-PROMISES · the issuance loop attends every promise it
     const { status, output } = runChild(await extractRegion());
     expect(output).toContain("JOIN_REPORTED:T9_PROBE_INJECTED_REJECTION");
     expect(output).toContain("SURVIVED");
-    expect(output).not.toContain("ERR_UNHANDLED_REJECTION");
     expect(status).toBe(0);
   }, 90_000);
 
-  it("dies with ERR_UNHANDLED_REJECTION once the handler is detached (positive control)", async () => {
+  /**
+   * The observable is the child's DEATH, not a code string. Node's default
+   * `--unhandled-rejections=throw` re-throws an Error-typed reason as an
+   * ordinary uncaught exception and prints the error; it emits the
+   * `ERR_UNHANDLED_REJECTION` code only when the reason is not an Error. So the
+   * discriminator is: the process never reached the join's catch, never reached
+   * the line after it, and exited nonzero — with the injected reason on stderr
+   * as the thing that killed it.
+   */
+  it("dies before the join once the handler is detached (positive control)", async () => {
     const region = await extractRegion();
     const occurrences = region.split(ATTENDANCE).length - 1;
     expect(occurrences, "the region must attach exactly one rejection handler").toBe(1);
     const detached = region.replace(ATTENDANCE, "/* detached */");
     expect(detached).not.toContain(ATTENDANCE);
     const { status, output } = runChild(detached);
-    expect(output).toContain("ERR_UNHANDLED_REJECTION");
+    expect(output).toContain("T9_PROBE_INJECTED_REJECTION");
+    expect(output).not.toContain("JOIN_REPORTED");
     expect(output).not.toContain("SURVIVED");
     expect(status).not.toBe(0);
   }, 90_000);
