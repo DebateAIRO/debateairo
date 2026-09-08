@@ -45,7 +45,7 @@ function touchedPaths(patch: string): readonly string[] | null {
     const match = /^diff --git a\/([^ ]+) b\/([^ ]+)$/u.exec(line);
     if (match === null || match[1] !== match[2] || !REPO_PATH.test(match[1]!)) return null;
     if (paths.includes(match[1]!)) return null;
-    paths[paths.length] = match[1]!;
+    paths.push(match[1]!);
   }
   return paths.length === 0 ? null : Object.freeze(paths);
 }

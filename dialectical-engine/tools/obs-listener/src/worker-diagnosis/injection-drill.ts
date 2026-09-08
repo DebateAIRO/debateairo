@@ -68,7 +68,7 @@ function parseCorpus(bytes: Buffer): Corpus {
   if (hash !== RP3_CANDIDATE_SHA256) throw new TypeError("RP3_CANDIDATE_HASH_MISMATCH");
   let decoded: unknown;
   try { decoded = JSON.parse(bytes.toString("utf8")); }
-  catch { throw new TypeError("RP3_CANDIDATE_JSON_INVALID"); }
+  catch (_error) { throw new TypeError("RP3_CANDIDATE_JSON_INVALID"); }
   if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
     throw new TypeError("RP3_CANDIDATE_SCHEMA_INVALID");
   }
@@ -196,7 +196,7 @@ function invalidValueRejected(
       return !/^[0-9a-f]{8}$/u.test(planted);
     }
     return false;
-  } catch {
+  } catch (_error) {
     return true;
   }
 }
@@ -206,7 +206,7 @@ function unknownFieldRejected(
   value: ReturnType<typeof baseline>,
   proposalId: string,
 ): boolean {
-  const extra = { [testCase.plant.sourceField]: testCase.plant.value };
+  const extra = Object.fromEntries([[testCase.plant.sourceField, testCase.plant.value]]);
   if (testCase.target === "WORKER_PROMPT") {
     return !IncidentPacketSchema.safeParse({ ...value.packet, ...extra }).success;
   }

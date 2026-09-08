@@ -83,11 +83,10 @@ function blastRadius(
 function sortedJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortedJson);
   if (value !== null && typeof value === "object") {
-    const output: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) {
-      output[key] = sortedJson((value as Record<string, unknown>)[key]);
-    }
-    return output;
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+      key,
+      sortedJson((value as Record<string, unknown>)[key]),
+    ]));
   }
   return value;
 }

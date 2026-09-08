@@ -118,7 +118,7 @@ export async function beginApprovedMutation(input: Readonly<{
   }
   try {
     await input.spawn(Object.freeze({ ...input.candidate, proposal: validated }));
-  } catch {
+  } catch (_error) {
     await releaseMutationLease(input.stateDirectory, lease.leaseId);
     return Object.freeze({ ok: false, code: "WORKER_START_FAILED" });
   }
@@ -134,7 +134,7 @@ export async function readMutationLease(stateDirectory: string): Promise<Mutatio
     throw error;
   }
   let value: unknown;
-  try { value = JSON.parse(bytes); } catch { throw new TypeError("FIX13_LEASE_INVALID"); }
+  try { value = JSON.parse(bytes); } catch (_error) { throw new TypeError("FIX13_LEASE_INVALID"); }
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw new TypeError("FIX13_LEASE_INVALID");
   const row = value as Record<string, unknown>;
   if (row.schema !== "fixagent-mutation-lease/v1" || typeof row.leaseId !== "string" ||

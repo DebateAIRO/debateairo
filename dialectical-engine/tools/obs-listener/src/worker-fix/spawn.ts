@@ -90,11 +90,12 @@ export async function spawnFixWorker(input: Readonly<{
     };
     const killGroup = (): void => {
       if (child.pid !== undefined) {
-        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+        try { process.kill(-child.pid, "SIGKILL"); } catch (_error) { child.kill("SIGKILL"); }
       }
     };
     const abort = (): void => { killGroup(); settle(() => {
-      void input.appendAction(Object.freeze({ kind: "WORKER_KILL", code: "LEASE_REVOKED" }));
+      input.appendAction(Object.freeze({ kind: "WORKER_KILL", code: "LEASE_REVOKED" }))
+        .catch((_error) => undefined);
       reject(new TypeError("FIX13_WORKER_KILLED"));
     }); };
     const timer = setTimeout(() => { timedOut = true; killGroup(); }, input.deadlineMs);
@@ -106,23 +107,27 @@ export async function spawnFixWorker(input: Readonly<{
     });
     child.stderr?.resume();
     child.once("error", () => settle(() => {
-      void input.appendAction(Object.freeze({ kind: "WORKER_DENIAL", code: "SPAWN_FAILED" }));
+      input.appendAction(Object.freeze({ kind: "WORKER_DENIAL", code: "SPAWN_FAILED" }))
+        .catch((_error) => undefined);
       reject(new TypeError("FIX13_WORKER_SPAWN_FAILED"));
     }));
     child.once("close", (code) => settle(() => {
       if (timedOut) {
-        void input.appendAction(Object.freeze({ kind: "WORKER_DENIAL", code: "TIMEOUT" }));
+        input.appendAction(Object.freeze({ kind: "WORKER_DENIAL", code: "TIMEOUT" }))
+          .catch((_error) => undefined);
         reject(new TypeError("FIX13_WORKER_TIMEOUT"));
         return;
       }
       if (code !== 0 || stdoutBytes > PATCH_MAX_BYTES) {
-        void input.appendAction(Object.freeze({ kind: "WORKER_DENIAL", code: "PROCESS_FAILED" }));
+        input.appendAction(Object.freeze({ kind: "WORKER_DENIAL", code: "PROCESS_FAILED" }))
+          .catch((_error) => undefined);
         reject(new TypeError("FIX13_WORKER_PROCESS_FAILED"));
         return;
       }
       try {
         const patch = parsePatchOnlyOutput(Buffer.concat(stdout).toString("utf8"));
-        void input.appendAction(Object.freeze({ kind: "WORKER_OUTPUT", code: "PATCH_RETURNED" }));
+        input.appendAction(Object.freeze({ kind: "WORKER_OUTPUT", code: "PATCH_RETURNED" }))
+          .catch((_error) => undefined);
         resolve(patch);
       } catch (error) {
         reject(error);

@@ -33,7 +33,6 @@ const DEFAULT_COMMAND: DiagnosisCommand = Object.freeze({
   binary: "/Applications/ChatGPT.app/Contents/Resources/codex",
   prefixArguments: Object.freeze([]),
 });
-const CHILD_ENVIRONMENT_ALLOWLIST = Object.freeze(["HOME", "PATH", "TMPDIR", "LANG"] as const);
 const STDOUT_MAX_BYTES = 262_144;
 
 export function renderDiagnosisPrompt(packet: IncidentPacket): string {
@@ -48,10 +47,12 @@ export function renderDiagnosisPrompt(packet: IncidentPacket): string {
 }
 
 function childEnvironment(source: NodeJS.ProcessEnv, scratch: string): NodeJS.ProcessEnv {
-  const output: NodeJS.ProcessEnv = {};
-  for (const key of CHILD_ENVIRONMENT_ALLOWLIST) {
-    if (source[key] !== undefined) output[key] = source[key];
-  }
+  const output: NodeJS.ProcessEnv = {
+    ...(source.HOME === undefined ? {} : { HOME: source.HOME }),
+    ...(source.PATH === undefined ? {} : { PATH: source.PATH }),
+    ...(source.TMPDIR === undefined ? {} : { TMPDIR: source.TMPDIR }),
+    ...(source.LANG === undefined ? {} : { LANG: source.LANG }),
+  };
   output.PWD = scratch;
   output.OLDPWD = scratch;
   return output;
@@ -61,7 +62,7 @@ function parseResult(stdout: string): DiagnosisModelResult {
   let decoded: unknown;
   try {
     decoded = JSON.parse(stdout);
-  } catch {
+  } catch (_error) {
     throw new TypeError("DIAGNOSIS_OUTPUT_INVALID");
   }
   if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
@@ -121,7 +122,10 @@ export class CodexCliDiagnosisPort implements DiagnosisModelPort {
         if (settled) return;
         settled = true;
         clearTimeout(deadline);
-        void rm(scratch, { recursive: true, force: true }).catch(() => undefined).then(action);
+        rm(scratch, { recursive: true, force: true })
+          .catch((_error) => undefined)
+          .then(action)
+          .catch((_error) => undefined);
       };
       const deadline = setTimeout(() => {
         timedOut = true;

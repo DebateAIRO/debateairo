@@ -31,15 +31,15 @@ function outcome(sample: MarkerSample, intent: boolean, uncertain: boolean): Com
 export async function kill(port: KillPort): Promise<Readonly<{ exitCode: 0 | 1; output: string }>> {
   let intent = true;
   let uncertain = false;
-  try { await port.appendIntent(); } catch { intent = false; }
-  try { await port.ensureMarker("CAPTURE_OFF"); } catch { uncertain = true; }
-  try { await port.ensureMarker("KILL"); } catch { uncertain = true; }
-  try { await port.revokeMutationLease?.(); } catch { uncertain = true; }
+  try { await port.appendIntent(); } catch (_error) { intent = false; }
+  try { await port.ensureMarker("CAPTURE_OFF"); } catch (_error) { uncertain = true; }
+  try { await port.ensureMarker("KILL"); } catch (_error) { uncertain = true; }
+  try { await port.revokeMutationLease?.(); } catch (_error) { uncertain = true; }
   let sample: MarkerSample;
   try { sample = await port.sampleMarkers(); }
-  catch { sample = { captureOff: false, kill: false }; uncertain = true; }
+  catch (_error) { sample = { captureOff: false, kill: false }; uncertain = true; }
   const record = outcome(sample, intent, uncertain);
-  try { await port.appendResult(record); } catch { return Object.freeze({ exitCode: 1, output: "" }); }
+  try { await port.appendResult(record); } catch (_error) { return Object.freeze({ exitCode: 1, output: "" }); }
   const success = record.outcome === "KILL_APPLIED";
   return Object.freeze({ exitCode: success ? 0 : 1, output: success ? "KILLED\n" : "" });
 }

@@ -48,7 +48,7 @@ export function notifyProposal(options: ProposalNotifierOptions): ProposalNotifi
       for (const [channel, runner, command] of attempts) {
         try {
           await runner.run(command);
-        } catch {
+        } catch (_error) {
           await options.occurrence.record(Object.freeze({
             runtime: "listener",
             capturePoint: "self",
@@ -65,7 +65,7 @@ export function notifyProposal(options: ProposalNotifierOptions): ProposalNotifi
             value.incidentId,
             value.proposalId,
           ));
-        } catch {
+        } catch (_error) {
           await options.occurrence.record(Object.freeze({
             runtime: "listener",
             capturePoint: "self",

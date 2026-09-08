@@ -82,7 +82,7 @@ export async function provePatch(input: Readonly<{
   if (red.outcome !== "TEST_FAILURE") return Object.freeze({ ok: false, code: "REFUSED_RED_BROKEN", red });
   if (isAborted(input.signal)) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red });
   try { await applyPatch(input.prepared.path, input.patch); }
-  catch { return Object.freeze({ ok: false, code: "REFUSED_PATCH_APPLY", red }); }
+  catch (_error) { return Object.freeze({ ok: false, code: "REFUSED_PATCH_APPLY", red }); }
   const actualPaths = await changedPaths(input.prepared.path);
   if (actualPaths.join("\n") !== [...input.validation.touchedPaths].sort().join("\n")) {
     return Object.freeze({ ok: false, code: "REFUSED_PATCH_SCOPE_RUNTIME", red });
@@ -93,7 +93,7 @@ export async function provePatch(input: Readonly<{
   for (const gateCommand of input.gateCommands ?? []) {
     if (isAborted(input.signal)) return Object.freeze({ ok: false, code: "LEASE_REVOKED", red, green });
     const gate = await input.runner.run(parseCatalogCommand(gateCommand, input.prepared.path, input.signal));
-    gates[gates.length] = gate;
+    gates.push(gate);
     if (gate.outcome !== "PASS") return Object.freeze({ ok: false, code: "REFUSED_GATE_FAILED", red, green });
   }
   return Object.freeze({ ok: true, red, green, gates: Object.freeze(gates) });

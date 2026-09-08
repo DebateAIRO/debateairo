@@ -3202,11 +3202,24 @@ function defaultFileSystem(): ScanFileSystem {
   };
 }
 
+function mayContainInventoryCandidate(source: string, path: string): boolean {
+  if (source.includes("catch") || source.includes("throw") || source.includes("void")) {
+    return true;
+  }
+  if (!createZonePathClassifier(path).governed) return false;
+  return source.includes("import")
+    || source.includes("export")
+    || source.includes("require")
+    || source.includes("zone_path_prefixes")
+    || source.includes("compiled_alternate_prefixes");
+}
+
 export async function scan(rootDirectory: string, options: ScanOptions = {}): Promise<readonly InventoryFinding[]> {
   const limits = limitsFrom(options.limits);
   const fileSystem = options.fileSystem ?? defaultFileSystem();
   const budget: Budget = { nodes: 0, candidates: 0, files: 0 };
   const findings: InventoryFinding[] = [];
+  const pendingSources: Array<Readonly<{ path: string; source: string }>> = [];
 
   const walk = async (absoluteDirectory: string, relativeDirectory: string, productionRoot: boolean): Promise<void> => {
     const entries = [...await fileSystem.readdir(absoluteDirectory)]
@@ -3226,12 +3239,50 @@ export async function scan(rootDirectory: string, options: ScanOptions = {}): Pr
       if (!entry.isFile() || !SOURCE_EXTENSIONS.has(extname(entry.name).toLowerCase())) continue;
       bumpBudget(budget, "files", limits.maxFileCount, "OBS_INVENTORY_FILE_LIMIT");
       const source = await fileSystem.readFile(absolutePath);
-      findings.push(...scanSourceWithBudget(source, relativePath, limits, budget));
+      if (Buffer.byteLength(source, "utf8") > limits.maxFileBytes) {
+        throw new InventoryScanError("OBS_INVENTORY_FILE_SIZE_LIMIT", `${relativePath} exceeds ${limits.maxFileBytes} bytes`);
+      }
+      if (!mayContainInventoryCandidate(source, relativePath)) continue;
+      pendingSources.push(Object.freeze({ path: relativePath, source }));
     }
   };
 
   const rootEntries = await fileSystem.readdir(rootDirectory);
   const productionRoot = rootEntries.some((entry) => entry.isDirectory() && PRODUCTION_ROOTS.has(entry.name));
   await walk(rootDirectory, "", productionRoot);
+  if (pendingSources.length === 0) return findings;
+
+  const virtualRoot = "/__obs_inventory__";
+  const virtualFiles = Object.fromEntries(pendingSources.map(({ path, source }) => [
+    `${virtualRoot}/${path}`,
+    source,
+  ]));
+  const api = new API({
+    cwd: virtualRoot,
+    fs: createVirtualFileSystem(virtualFiles),
+  });
+  try {
+    const virtualPaths = pendingSources.map(({ path }) => `${virtualRoot}/${path}`);
+    const snapshot = api.updateSnapshot({ openFiles: virtualPaths });
+    for (let index = 0; index < pendingSources.length; index += 1) {
+      const pending = pendingSources[index]!;
+      const virtualPath = virtualPaths[index]!;
+      const project = snapshot.getDefaultProjectForFile(virtualPath);
+      if (project === undefined) {
+        throw new InventoryScanError("OBS_INVENTORY_PARSE_FAILED", `${pending.path}: project unresolved`);
+      }
+      const diagnostics = project.program.getSyntacticDiagnostics(virtualPath);
+      if (diagnostics.length > 0) {
+        throw new InventoryScanError("OBS_INVENTORY_PARSE_FAILED", `${pending.path}:${diagnostics[0]?.pos ?? 0}`);
+      }
+      const sourceFile = project.program.getSourceFile(virtualPath);
+      if (sourceFile === undefined) {
+        throw new InventoryScanError("OBS_INVENTORY_PARSE_FAILED", `${pending.path}: source unresolved`);
+      }
+      findings.push(...scanParsedSource(sourceFile, pending.path, project.checker, limits, budget));
+    }
+  } finally {
+    api.close();
+  }
   return findings.sort(compareFindings);
 }

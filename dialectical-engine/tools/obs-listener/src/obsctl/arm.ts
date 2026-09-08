@@ -52,15 +52,15 @@ function record(outcome: string, reason: string, sample: MarkerSample, durable =
 
 export async function arm(port: ArmPort): Promise<Readonly<{ exitCode: 0 | 1; output: string }>> {
   try { await port.authenticate(); }
-  catch {
+  catch (_error) {
     try {
       await port.appendIntent();
       await port.appendResult(Object.freeze({ outcome: "ARM_AUTH_REJECTED", reason: "AUTHENTICATION",
         effects: Object.freeze({ capture_off: "UNKNOWN", kill: "UNKNOWN", durability: "CONFIRMED" }) }));
-    } catch { /* rejection is emitted only through an already-valid local audit substrate */ }
+    } catch (_error) { /* rejection is emitted only through an already-valid local audit substrate */ }
     return Object.freeze({ exitCode: 1, output: "" });
   }
-  try { await port.appendIntent(); } catch { return Object.freeze({ exitCode: 1, output: "" }); }
+  try { await port.appendIntent(); } catch (_error) { return Object.freeze({ exitCode: 1, output: "" }); }
   let published = false;
   try {
     await port.publishArmed();
@@ -68,20 +68,20 @@ export async function arm(port: ArmPort): Promise<Readonly<{ exitCode: 0 | 1; ou
     await port.removeMarker("CAPTURE_OFF");
     await port.removeMarker("KILL");
     const sample = await port.sampleMarkers();
-    if (sample.captureOff || sample.kill) throw new Error("marker recheck");
+    if (sample.captureOff || sample.kill) throw new Error("FIX10_MARKER_RECHECK");
     await port.appendResult(record("ARM_APPLIED_PENDING_PROOF", "NONE", sample));
     return Object.freeze({ exitCode: 0, output: "ARMED_PENDING_PROOF\n" });
-  } catch {
+  } catch (_error) {
     if (!published) return Object.freeze({ exitCode: 1, output: "" });
-    try { await port.ensureMarker("CAPTURE_OFF"); } catch { /* report exact observed rollback */ }
-    try { await port.ensureMarker("KILL"); } catch { /* report exact observed rollback */ }
+    try { await port.ensureMarker("CAPTURE_OFF"); } catch (_error) { /* report exact observed rollback */ }
+    try { await port.ensureMarker("KILL"); } catch (_error) { /* report exact observed rollback */ }
     let sample: MarkerSample;
-    try { sample = await port.sampleMarkers(); } catch { sample = { captureOff: false, kill: false }; }
+    try { sample = await port.sampleMarkers(); } catch (_error) { sample = { captureOff: false, kill: false }; }
     const complete = sample.captureOff && sample.kill;
     try {
       await port.appendResult(record(complete ? "ARM_FAILED_ROLLED_BACK" : "ARM_ROLLBACK_INCOMPLETE",
         complete ? "ROLLBACK" : "ROOT_RECHECK", sample, complete));
-    } catch { /* never claim success */ }
+    } catch (_error) { /* never claim success */ }
     return Object.freeze({ exitCode: 1, output: "" });
   }
 }

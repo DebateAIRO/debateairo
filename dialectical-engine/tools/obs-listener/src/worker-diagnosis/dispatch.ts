@@ -105,7 +105,7 @@ export function createDiagnosisDispatcher(options: DiagnosisDispatcherOptions): 
         let result;
         try {
           result = await options.model.run(packet);
-        } catch {
+        } catch (_error) {
           await options.store.appendAction({ kind: "DIAGNOSIS_FAILED", incidentId: packet.incidentId });
           return Object.freeze({ kind: "DIAGNOSIS_FAILED" });
         }
