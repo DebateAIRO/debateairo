@@ -21,6 +21,26 @@
       "url": "https://localhost:3000"
     },
     {
+      "name": "consent-lane-ui",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": [
+        "-lc",
+        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4000 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
+      ],
+      "port": 4000,
+      "url": "http://localhost:4000"
+    },
+    {
+      "name": "consent-lane-full-stack",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": [
+        "-lc",
+        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/consent-s02/dialectical-engine && exec pnpm dev:auth:up"
+      ],
+      "port": 3000,
+      "url": "https://localhost:3000"
+    },
+    {
       "name": "design-ref",
       "runtimeExecutable": "sh",
       "runtimeArgs": [
@@ -28,6 +48,26 @@
         "cd /private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/04681aae-9136-40c1-a806-db68080ab2e1/scratchpad/designsrv && python3 -m http.server 4599"
       ],
       "port": 4599
+    },
+    {
+      "name": "tiers-s01-ui",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": [
+        "-lc",
+        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s01/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4010 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
+      ],
+      "port": 4010,
+      "url": "http://localhost:4010"
+    },
+    {
+      "name": "tiers-s02-ui",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": [
+        "-lc",
+        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4020 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
+      ],
+      "port": 4020,
+      "url": "http://localhost:4020"
     }
   ]
 }

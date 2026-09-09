@@ -1,0 +1,15 @@
+#!/bin/zsh
+# N3 (REQ-REV-p1): baselines for the three R19 suites with no recorded baseline — both lanes at 7f89f7b7
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+for lane in tiers-s01 tiers-s02; do
+  cwd=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/$lane/dialectical-engine
+  out=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/baseline-n3-$lane.log
+  : > "$out"
+  echo "lane=$lane HEAD=$(git -C $cwd rev-parse --short HEAD) dirty=$(git -C $cwd status --porcelain | wc -l | tr -d ' ') started=$(date '+%F %T')" >> "$out"
+  for suite in tests/render/sup-04-widget.test.tsx tests/architecture/sup-04-mounts.test.ts tests/unit/evaluator-dev-menu-ui.test.ts; do
+    echo "=== $suite ===" >> "$out"
+    ( cd "$cwd" && perl -e 'alarm 300; exec @ARGV' pnpm exec vitest run "$suite" >> "$out" 2>&1 ); echo "rc=$?" >> "$out"
+  done
+  echo "dirty_after=$(git -C $cwd status --porcelain | wc -l | tr -d ' ') finished=$(date '+%F %T')" >> "$out"
+done
+echo DONE > /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/baseline-n3.done
