@@ -102,8 +102,9 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
 
 ## 5. Packets — from templates, checked, scoped
 
-- Every packet starts from `templates/<NODE>.md` beside this file; fill every `__MARKER__`; keep the
-  contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is
+- Every packet starts from `templates/<NODE>.md` beside this file (a planning rework node uses
+  `REQ-FIX.md`; ARCH rework the same template with the architecture contract); fill every
+  `__MARKER__`; keep the contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is
   `<abs path>:<LINE> — \`text\``, re-grepped at write time — never recalled from earlier tool output.
 - **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.** A
   failing packet is fixed in the TEMPLATE or the COMMON line that produced it (fix the class).

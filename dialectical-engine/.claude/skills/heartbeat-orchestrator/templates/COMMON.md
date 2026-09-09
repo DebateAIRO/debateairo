@@ -27,7 +27,7 @@ Cite repo claims as `path:line`. Every recommendation or contested choice carrie
 > treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
 A case file, not a diary, at most ~1,500 words: name the CAUSE, not the symptom · PRICE each finding (wall-clock, tokens, retries) · say what you NEARLY got wrong · name DEAD ENDS · say where THIS packet was unclear, and exactly where. Rank your upgrades by tokens saved.
 
-## 6. Mission facts (measured by the orchestrator at intake, with the command that measured them; re-measure before you lean on one)
+## 6. Mission facts (measured by the orchestrator at intake, with the command that measured them; re-measure before you lean on one). A list the intake already carries is CITED by its intake line, never restated — one source, or the copies drift.
 | fact | value | command | measured |
 |---|---|---|---|
 | __FACT__ | __VALUE__ | __COMMAND__ | __WHEN__ |

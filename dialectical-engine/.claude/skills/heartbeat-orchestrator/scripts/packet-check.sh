@@ -40,7 +40,9 @@ grep -q 'treat it like a murder case. I want to get a nice report on what can be
 
 # 5. the self-report path sits inside the allowed block (the block runs from a line containing
 #    'allowed' to the next line containing 'forbidden' or starting a '## ' heading)
-sr=$(grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]*agent-reports/[A-Za-z0-9_.-]+\.md' "$P" | head -1)
+# the seat's OWN report is the one on the `self-report:` line — a predecessor's report named in the inputs is not it
+sr=$(grep -E '^- self-report:' "$P" | grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]*agent-reports/[A-Za-z0-9_.-]+\.md' | head -1)
+[ -n "$sr" ] || sr=$(grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]*agent-reports/[A-Za-z0-9_.-]+\.md' "$P" | head -1)
 if [ -z "$sr" ]; then fail "no self-report path (…/agent-reports/<SEAT>.md)"; else
   awk '/allowed/{inb=1} (/forbidden/||/^## /){if(inb && !/allowed/)inb=0} inb{print}' "$P" | grep -Fq -- "$sr" \
     || fail "self-report path is not inside the allowed block: $sr"
