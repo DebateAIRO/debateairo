@@ -33,8 +33,10 @@ Each slice gets a code (S01, S02…) and `docs/missions/<m>/slices/<code>/`:
 - **SPEC.md — WHAT is built. FROZEN at your READY marker.** First line under the title: `ui: yes`
   when the slice ADDS OR CHANGES a surface the user sees — something a mock can draw; a slice whose
   only browser step is watching existing components render stays `ui: no`. Edits before the marker are creation
-  and are declared in the handoff; after it, a change is `SPEC-v2.md` with a supersession header,
-  V-ratified — never an in-place edit. Every requirement numbered; the acceptance section numbered,
+  and are declared in the handoff; after it, a change is `SPEC-v<n>.md` with a supersession header —
+  written by a REQ-FIX node on a REWORK verdict and reviewed blind by the next REQ-REV pass, or
+  V-ratified when V moves the goal — never an in-place edit. The SPEC of record is the
+  highest-numbered version, and every later packet names it by that file name. Every requirement numbered; the acceptance section numbered,
   human-runnable, both modes on UI. A vertical slice has a beginning and an end V can exercise alone.
 - **PLAN.md — scaffold only.** The SPEC-trace skeleton, the quantifiability law, the cluster table
   headers; `heartbeat-architecture` fills it. WRONG: "improve error handling". RIGHT: "requests

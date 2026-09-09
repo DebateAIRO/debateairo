@@ -108,6 +108,8 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   `<abs path>:<LINE> — \`text\``, re-grepped at write time — never recalled from earlier tool output.
 - **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.** A
   failing packet is fixed in the TEMPLATE or the COMMON line that produced it (fix the class).
+- The SPEC of record for a slice is its highest-numbered `SPEC-v<n>.md` (`SPEC.md` when none):
+  every packet written after a planning rework names that file — never `SPEC.md` by habit.
 - Scope the reading: a BUILD packet quotes its cluster's step ids and line ranges; a REV packet
   points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
   range, never a bare directory (a 12,575-line directory named without a range was read by nobody).
