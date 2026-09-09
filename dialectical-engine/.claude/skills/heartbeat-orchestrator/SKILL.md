@@ -69,7 +69,7 @@ not loop — it appends `FIX(S)` and `REV(S)` pass r+1. A slice parked on a V ga
 
 Run it on every event (a seat's exit notification, a watchdog line, a V message), never on a timer:
 
-1. **Consume exits.** Per exited seat: verify `SKILLS LOADED` against the transcript BODY — grep a
+1. **Consume exits.** Per exited seat: verify `SKILLS LOADED` against the transcript BODY (`scripts/skills-check.sh <transcript> <skill>…` — one BODY phrase per skill, verified against the skill file at run time; a skill NAME echoes from packets and proves nothing) — grep a
    distinctive phrase of each floor skill (Claude subagents:
    `~/.claude/projects/<encoded-cwd>/<session>/subagents/agent-*.jsonl`; `claude -p`:
    `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`; Grok:
@@ -137,6 +137,9 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   a known-bad mutant before dispatch. A charge whose evidence is a verbatim frame ships the
   capture-first runner (full output to a log first, only `rc` and the summary lines to the transcript).
   The pointer prompt and the packet's line 3 name the SAME reading order: the packet, then COMMON.
+  A charge never restates a contract duty in a weaker form (per-assertion refutation once became
+  "one mutant per step") — it points at the section, and the handoff carries the duty's matrix
+  (property · mutant · target suite · neighbour · restore).
 - Packet review is the reviewer's duty (`heartbeat-reviewer` §1); a packet defect is a finding
   against you, priced in the ledger.
 
