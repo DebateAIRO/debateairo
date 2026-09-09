@@ -20,6 +20,7 @@ const ASK: AskRequest = {
   decision_scope: "test provider-double composition",
   as_of: "2026-08-13T00:00:00.000Z",
   steering_presets: [],
+  plan_tier: "free",
   steering_annotations: []
 };
 const RUN_REF = "11111111-1111-4111-8111-111111111111";
