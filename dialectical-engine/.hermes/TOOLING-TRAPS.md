@@ -3017,3 +3017,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 ## `renderToStaticMarkup` returns "" silently when a page calls a hook the `next-navigation` stub lacks (2026-09-09, MOCK-S01 F3)
 - `tests/render/stubs/next-navigation.ts` has no `useRouter` / `useSearchParams`; `apps/ui/app/new/page.tsx:65-66` calls both. The render does not throw — it yields the empty string, and a probe that only checks "no error" reads as green. Every render fixture asserts the markup is non-empty (and names the stub it extends) before anything else. Cost: one run + one debug round trip per seat that meets it.
 
+## `grep` on this Mac is ugrep 7.8.4 — a BRE `\|` alternation is LITERAL (2026-09-09, ARCH-FIX-S02 F-6)
+- The published S02 R13 ask-literal grep answered ZERO as written (rc=1) because ugrep reads the escaped pipe literally; a seat running it verbatim "passes" a requirement on an empty set. Use `grep -E 'a|b'` (or `-e a -e b`) and prove every published grep on a KNOWN hit before quoting its count. Same family as the earlier escaped-pipe entries.
+

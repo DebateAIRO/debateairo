@@ -193,6 +193,8 @@ The mission tree (`docs/missions/<m>`, `.hermes/planning/<m>`, `.hermes/reports/
 every freeze — REQ READY, each REQ-FIX / ARCH / MOCK READY, each verdict — as `docs(<m>): …`; an
 untracked tree has no history, and a seat's in-place edit of a frozen file is then unrecoverable.
 Each freeze commit goes into COMMON §6 (`freeze commits` row); every review packet diffs against it.
+A freeze commit EXCLUDES the paths a RUNNING seat may write (its packet's `allowed` list, as `:!` pathspecs)
+— a mid-run sweep records a half-written file under another node's name.
 Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
 how SKILLS LOADED was verified, self-report path, verdict — and a `Ruling:` line for every decision
 you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
