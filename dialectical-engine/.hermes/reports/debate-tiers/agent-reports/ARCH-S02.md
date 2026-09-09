@@ -204,3 +204,6 @@ changed the plan.
 - **Not unclear, and worth saying because it is rare:** the packet's charge 3 and charge 4 named the
   two decisions that actually shaped this plan (the S01 merge edge, and the migration's own cluster).
   Both were right. The plan's structure follows them.
+
+---
+**Orchestrator annotation (23:03, ARCH-REV-S02-p1 N5):** every `ADR-0023-plan-tier-storage-and-layering.md` / "ADR-0023" above names THIS slice's ADR under the number the packet pre-assigned; the file was renumbered by the orchestrator at 22:32 to `docs/architecture/01-decisions/ADR-0024-plan-tier-storage-and-layering.md` (0023 is ARCH(S01)'s `ADR-0023-globals-css-append-fence.md`). The text above is left verbatim as the record.

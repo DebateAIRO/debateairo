@@ -1,0 +1,10 @@
+20 it() blocks in tests/unit/api.test.ts
+
+  :124-145  ['admissionSettings', 'evaluateAskAdmission']
+      preserves MACHINE_DEFAULT provenance through admission without changing the effective tier
+  :146-187  ['admissionSettings', 'evaluateAskAdmission', 'fixtureDiscoveredPanel', 'resolveDiscoveredPanel']
+      marks only maker and envelope evaluation refusals for the 422 face
+  :283-405  ['admissionSettings', 'PostgresAskApplication', '.submit(']
+      refuses a saturated owner history before any run provision or partial output
+
+blocks touching the admission surface: 3 of 20

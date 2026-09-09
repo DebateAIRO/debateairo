@@ -30,3 +30,6 @@ READY — node ARCH(S02) pass 1 of 3.
 6. UNVERIFIED: (a) the names S01 exports (the roster export and the tier field) — S01 has not merged, so the plan refers to them by role and pins step S02-M4 to read them off the merged file verbatim rather than guessing; (b) SPEC acceptance steps 1-4 and 8-9 — row V-7 is unanswered and no seat edits .local/**; steps 5-7 are the whole acceptance today and need no preparation; (c) R5's maker-span half — see F-1/V-15, it is UNVERIFIABLE from repo data, not merely unbuilt; (d) the exact wall-clock of the C2 and C3 green verdicts — the new test files do not exist yet, so only their base halves are measured.
 7. Self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/ARCH-S02.md
 8. comments read through: 2
+
+---
+**Orchestrator annotation (23:03, ARCH-REV-S02-p1 N5):** every `ADR-0023-plan-tier-storage-and-layering.md` / "ADR-0023" above names THIS slice's ADR under the number the packet pre-assigned; the file was renumbered by the orchestrator at 22:32 to `docs/architecture/01-decisions/ADR-0024-plan-tier-storage-and-layering.md` (0023 is ARCH(S01)'s `ADR-0023-globals-css-append-fence.md`). The text above is left verbatim as the record.

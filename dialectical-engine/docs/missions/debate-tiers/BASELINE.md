@@ -121,3 +121,256 @@ Measured 2026-09-09 by the lane setup (`.hermes/reports/debate-tiers/logs/setup-
 
 ### Rule added (ARCH(S01) F4) — a slice's baseline covers every suite that READS a file the slice writes, not only the suites a requirement names; the rows below are the S01 read-surface sweep
 
+### Rows added 22:40 (ARCH(S01) F4 — the 17 suites that READ an S01 write surface; re-measured by the orchestrator with `logs/baseline-rs.sh`, both lanes at `7f89f7b7`, identical to the seat's handoff numbers; 7 of 17 carry failures at base, all inherited)
+
+#### Lane `tiers-s01` (lane=tiers-s01 HEAD=7f89f7b7 dirty=0; dirty after: 0)
+- `tests/render/bug02-debate-effects.test.tsx` → rc=0 · Tests  4 passed (4)
+- `tests/render/evaluator-dev-menu-controls.test.tsx` → rc=0 · Tests  1 passed (1)
+- `tests/render/load01-debate-page.test.tsx` → rc=0 · Tests  2 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "LOAD-01 real debate-page render > T21 renders HOLDING with its honest remaining time and no error ba" · "LOAD-01 real debate-page render > renders a mid-session run.terminal failure as failed with no live "
+- `tests/render/t1-canvas.test.tsx` → rc=0 · Tests  5 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "card anatomy > renders nested shell/core bezels and token-typed stance tabs for PRO and CON cards 27" · "card anatomy > keeps BASE, FINAL, and an accessible Details control on one card 27ms" · "card anatomy > maps all completed review outcomes and absence to four distinct compact states 30ms" (+2 more)
+- `tests/unit/s10-erasure-ui.test.ts` → rc=0 · Tests  3 passed (3)
+- `tests/unit/v2ui-ownership.test.ts` → rc=0 · Tests  3 passed (3)
+- `tests/architecture/s7-authorization-contract.test.ts` → rc=0 · Tests  1 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "Accounts S7 ownership architecture > hardens every immutable memory scope carrier and derives it fro"
+- `tests/architecture/s8-publication-contract.test.ts` → rc=? · Tests  1 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "Accounts S8 publication architecture > ships the deliberate controls and public-only reader in the U"
+- `"COMPONENTS_ONLY" ? "COMPONENTS_ONLY" : "COMPOSED"
++     };
++     const detail = debateDetailFromAnswer(projectable);
++     return {
++       // An answer-only publication carries no argument graph. The adapter would
++       // still synthesise a root from the question line, which would light up the
++       // reading-mode controls over a tree that was never published — so the tree
++       // is dropped and the workspace shows its own empty state instead.
++       detail: debate.answer.tree_included ` → rc=? · Tests  NO TESTS LINE
+- `true ? detail : { ...detail, tree: null },
++       nodesById: contractNodesById({ nodes: debate.answer.nodes ?? [] })
++     };
++   }, [debate]);
++
++   // S14's dual gate, public edition: the label must never outrun the bytes.
++   // buildPublicAnswerExport ships exactly what the public envelope carries, so
++   // the label says that and nothing more.
++   const publicExport = useMemo<AnswerExport>(() => {
++     const built = buildPublicAnswerExport(debate);
++     return {
++       available: true,
++       href: built.href,
++       filename: built.filename,
++       label: "Export the published snapshot",
++       toast: "Exported the published snapshot"
++     };
++   }, [debate]);
++
++   return (
++     <>
++       <DebatePageClient
++       id={debate.public_ref}
++       initialDebate={projection.detail}
++       initialAnswer={null}
++       initialError={null}
++       publicMode
++       publicNodesById={projection.nodesById}
++       publicExport={publicExport}
++       publicOverview={({ onDetails, onRead }) => (
++         <PublicDebateOverview debate={debate} onDetails={onDetails} onRead={onRead} />
++       )}
++       renderPublicHonesty={(close) => (
++         <PublicHonestyDrawer answer={debate.answer} onClose={close} />
++       )}
++       />
++       <SupportWidget />
++     </>
++   );
++ }
++
+
+ ❯ tests/architecture/s8-publication-contract.test.ts:169:20
+    167|     for (const page of [applicationPublic + applicationPublicClient]) {
+    168|       expect(page).toContain("readPublicDebate(id)");
+    169|       expect(page).toContain("PublicAnswerDisclosure");
+       |                    ^
+    170|       for (const forbidden of ["readInspection", "readLedgerDigest", "…
+    171|         expect(page).not.toContain(forbidden);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  22:38:52
+   Duration  128ms (transform 18ms, setup 0ms, import 26ms, tests 15ms, environment 0ms)
+
+MISSING-OR-FAILED
+rc=0
+` → rc=0 · Tests  1 failed | 4 passed (5)
+- `tests/architecture/role-token-map.test.ts` → rc=0 · Tests  3 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent'" · "R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agre" · "R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'di"
+- `tests/render/consent-bar.test.tsx` → rc=0 · Tests  7 passed (7)
+- `tests/render/consent-card.test.tsx` → rc=0 · Tests  11 passed (11)
+- `tests/render/consent-cross-slice.test.tsx` → rc=0 · Tests  7 passed (7)
+- `tests/render/consent-guards.test.tsx` → rc=0 · Tests  7 passed (7)
+- `tests/render/consent-policy-link.test.tsx` → rc=0 · Tests  14 passed (14)
+- `tests/render/t3-library.test.tsx` → rc=? · Tests  4 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "lists > renders recased native selectors and a live count for the four Your debates rows 50ms" · "lists > renders a live count for the three Public debates rows 42ms" · "lists > renders every library row as a shell/core bezel 37ms" (+1 more)
+- `"yours" ? 4 : 3);
+       |                           ^
+    375|       for (const row of rows) {
+    376|         const core = row.querySelector<HTMLElement>(':scope > [data-be…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/render/t3-library.test.tsx > lists > renders the public search-indexing disclosure once under the list and never on Yours
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/render/t3-library.test.tsx:397:94
+    395|
+    396|     expect(publicMatches.length).toBe(1);
+    397|     expect(publicList.querySelector(".recentList")?.nextElementSibling…
+       |                                                                                              ^
+    398|     expect(yoursMatches.length).toBe(0);
+    399|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 11 passed (15)
+   Start at  22:38:59
+   Duration  1.53s (transform 173ms, setup 0ms, import 95ms, tests 959ms, environment 384ms)
+
+MISSING-OR-FAILED
+rc=0
+` → rc=0 · Tests  4 failed | 11 passed (15)
+- `tests/unit/consent-s02-style-contract.test.ts` → rc=0 · Tests  10 passed (10)
+- `tests/unit/pda-s03-keyboard-accessibility.test.ts` → rc=0 · Tests  2 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "public debate navigation keyboard accessibility > computes a grouped control treatment and a non-col" · "public debate navigation keyboard accessibility > computes a grouped control treatment and a non-col"
+
+#### Lane `tiers-s02` (lane=tiers-s02 HEAD=7f89f7b7 dirty=0; dirty after: 0)
+- `tests/render/bug02-debate-effects.test.tsx` → rc=0 · Tests  4 passed (4)
+- `tests/render/evaluator-dev-menu-controls.test.tsx` → rc=0 · Tests  1 passed (1)
+- `tests/render/load01-debate-page.test.tsx` → rc=0 · Tests  2 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "LOAD-01 real debate-page render > T21 renders HOLDING with its honest remaining time and no error ba" · "LOAD-01 real debate-page render > renders a mid-session run.terminal failure as failed with no live "
+- `tests/render/t1-canvas.test.tsx` → rc=0 · Tests  5 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "card anatomy > renders nested shell/core bezels and token-typed stance tabs for PRO and CON cards 29" · "card anatomy > keeps BASE, FINAL, and an accessible Details control on one card 29ms" · "card anatomy > maps all completed review outcomes and absence to four distinct compact states 31ms" (+2 more)
+- `tests/unit/s10-erasure-ui.test.ts` → rc=0 · Tests  3 passed (3)
+- `tests/unit/v2ui-ownership.test.ts` → rc=0 · Tests  3 passed (3)
+- `tests/architecture/s7-authorization-contract.test.ts` → rc=0 · Tests  1 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "Accounts S7 ownership architecture > hardens every immutable memory scope carrier and derives it fro"
+- `tests/architecture/s8-publication-contract.test.ts` → rc=? · Tests  1 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "Accounts S8 publication architecture > ships the deliberate controls and public-only reader in the U"
+- `"COMPONENTS_ONLY" ? "COMPONENTS_ONLY" : "COMPOSED"
++     };
++     const detail = debateDetailFromAnswer(projectable);
++     return {
++       // An answer-only publication carries no argument graph. The adapter would
++       // still synthesise a root from the question line, which would light up the
++       // reading-mode controls over a tree that was never published — so the tree
++       // is dropped and the workspace shows its own empty state instead.
++       detail: debate.answer.tree_included ` → rc=? · Tests  NO TESTS LINE
+- `true ? detail : { ...detail, tree: null },
++       nodesById: contractNodesById({ nodes: debate.answer.nodes ?? [] })
++     };
++   }, [debate]);
++
++   // S14's dual gate, public edition: the label must never outrun the bytes.
++   // buildPublicAnswerExport ships exactly what the public envelope carries, so
++   // the label says that and nothing more.
++   const publicExport = useMemo<AnswerExport>(() => {
++     const built = buildPublicAnswerExport(debate);
++     return {
++       available: true,
++       href: built.href,
++       filename: built.filename,
++       label: "Export the published snapshot",
++       toast: "Exported the published snapshot"
++     };
++   }, [debate]);
++
++   return (
++     <>
++       <DebatePageClient
++       id={debate.public_ref}
++       initialDebate={projection.detail}
++       initialAnswer={null}
++       initialError={null}
++       publicMode
++       publicNodesById={projection.nodesById}
++       publicExport={publicExport}
++       publicOverview={({ onDetails, onRead }) => (
++         <PublicDebateOverview debate={debate} onDetails={onDetails} onRead={onRead} />
++       )}
++       renderPublicHonesty={(close) => (
++         <PublicHonestyDrawer answer={debate.answer} onClose={close} />
++       )}
++       />
++       <SupportWidget />
++     </>
++   );
++ }
++
+
+ ❯ tests/architecture/s8-publication-contract.test.ts:169:20
+    167|     for (const page of [applicationPublic + applicationPublicClient]) {
+    168|       expect(page).toContain("readPublicDebate(id)");
+    169|       expect(page).toContain("PublicAnswerDisclosure");
+       |                    ^
+    170|       for (const forbidden of ["readInspection", "readLedgerDigest", "…
+    171|         expect(page).not.toContain(forbidden);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  22:39:11
+   Duration  128ms (transform 18ms, setup 0ms, import 26ms, tests 14ms, environment 0ms)
+
+MISSING-OR-FAILED
+rc=0
+` → rc=0 · Tests  1 failed | 4 passed (5)
+- `tests/architecture/role-token-map.test.ts` → rc=0 · Tests  3 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "R2-C1 design-derived role to token-family oracle > 'DebateMap root hub' binds its 'reasoning accent'" · "R2-C1 design-derived role to token-family oracle > 'DebateCanvas agreed review mark' binds its 'agre" · "R2-C1 design-derived role to token-family oracle > 'DebateCanvas disputed review mark' binds its 'di"
+- `tests/render/consent-bar.test.tsx` → rc=0 · Tests  7 passed (7)
+- `tests/render/consent-card.test.tsx` → rc=0 · Tests  11 passed (11)
+- `tests/render/consent-cross-slice.test.tsx` → rc=0 · Tests  7 passed (7)
+- `tests/render/consent-guards.test.tsx` → rc=0 · Tests  7 passed (7)
+- `tests/render/consent-policy-link.test.tsx` → rc=0 · Tests  14 passed (14)
+- `tests/render/t3-library.test.tsx` → rc=? · Tests  4 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "lists > renders recased native selectors and a live count for the four Your debates rows 50ms" · "lists > renders a live count for the three Public debates rows 40ms" · "lists > renders every library row as a shell/core bezel 37ms" (+1 more)
+- `"yours" ? 4 : 3);
+       |                           ^
+    375|       for (const row of rows) {
+    376|         const core = row.querySelector<HTMLElement>(':scope > [data-be…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/render/t3-library.test.tsx > lists > renders the public search-indexing disclosure once under the list and never on Yours
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/render/t3-library.test.tsx:397:94
+    395|
+    396|     expect(publicMatches.length).toBe(1);
+    397|     expect(publicList.querySelector(".recentList")?.nextElementSibling…
+       |                                                                                              ^
+    398|     expect(yoursMatches.length).toBe(0);
+    399|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 11 passed (15)
+   Start at  22:39:18
+   Duration  1.52s (transform 176ms, setup 0ms, import 95ms, tests 961ms, environment 374ms)
+
+MISSING-OR-FAILED
+rc=0
+` → rc=0 · Tests  4 failed | 11 passed (15)
+- `tests/unit/consent-s02-style-contract.test.ts` → rc=0 · Tests  10 passed (10)
+- `tests/unit/pda-s03-keyboard-accessibility.test.ts` → rc=0 · Tests  2 ⎯⎯⎯⎯⎯⎯⎯ — RED at base, inherited: "public debate navigation keyboard accessibility > computes a grouped control treatment and a non-col" · "public debate navigation keyboard accessibility > computes a grouped control treatment and a non-col"
+
+### Rows added 23:04 (ARCH-REV-S02-p1 N10 — the remaining members of SPEC R13's `resolveDiscoveredPanel` grep class; measured by the orchestrator, both lanes at `7f89f7b7`, 0 dirty before and after; `logs/baseline-n10-<lane>.log`)
+- lane `tiers-s01`: `tests/unit/dr181-ceiling.test.ts` → rc=0 · Tests  3 passed (3) · `tests/unit/dr184-review-resilience.test.ts` → rc=0 · Tests  6 passed (6) · `tests/unit/register-s09.test.ts` → rc=0 · Tests  3 passed (3)
+- lane `tiers-s02`: `tests/unit/dr181-ceiling.test.ts` → rc=0 · Tests  3 passed (3) · `tests/unit/dr184-review-resilience.test.ts` → rc=0 · Tests  6 passed (6) · `tests/unit/register-s09.test.ts` → rc=0 · Tests  3 passed (3)

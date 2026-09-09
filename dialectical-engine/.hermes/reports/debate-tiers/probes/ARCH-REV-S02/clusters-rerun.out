@@ -1,0 +1,61 @@
+### lane HEAD: 7f89f7b7  branch: slice/tiers-s02
+### dirty BEFORE: 0
+### date: 2026-09-09 22:38:02 EEST
+
+===== C1 =====
+$ pnpm exec vitest run tests/integration/tiers-s02-run-plan-tier.test.ts tests/integration/evaluator-database.test.ts
+rc=0  wall=14s
+   Test Files  1 passed (1)
+        Tests  21 passed (21)
+     Duration  13.10s (transform 580ms, setup 0ms, import 1.38s, tests 11.62s, environment 0ms)
+--- failure titles (if any) ---
+
+===== C3 =====
+$ pnpm exec vitest run tests/architecture/tiers-s02-rosters.test.ts tests/architecture/s14-contract.test.ts
+rc=1  wall=1s
+   Test Files  1 failed (1)
+        Tests  3 failed | 2 passed (5)
+     Duration  260ms (transform 77ms, setup 0ms, import 145ms, tests 14ms, environment 0ms)
+--- failure titles (if any) ---
+   × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror 6ms
+   × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory 3ms
+   × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak 3ms
+   FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror
+   FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory
+   FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+
+===== C2 =====
+$ pnpm exec vitest run tests/unit/tiers-s02-admission.test.ts tests/unit/api.test.ts tests/integration/evaluator-database.test.ts
+rc=0  wall=15s
+   Test Files  2 passed (2)
+        Tests  45 passed (45)
+     Duration  14.30s (transform 616ms, setup 0ms, import 1.90s, tests 12.17s, environment 0ms)
+--- failure titles (if any) ---
+
+===== C4 =====
+$ pnpm exec vitest run tests/unit/tiers-s02-wire.test.ts tests/unit/load01-live-proof.test.ts tests/unit/s7-authorization.test.ts tests/unit/contract.test.ts
+rc=0  wall=2s
+   Test Files  3 passed (3)
+        Tests  39 passed (39)
+     Duration  1.78s (transform 413ms, setup 0ms, import 1.28s, tests 221ms, environment 0ms)
+--- failure titles (if any) ---
+
+===== P3 =====
+$ pnpm exec vitest run tests/unit/tiers-s02-admission.test.ts tests/unit/contract.test.ts
+rc=0  wall=1s
+   Test Files  1 passed (1)
+        Tests  7 passed (7)
+     Duration  202ms (transform 56ms, setup 0ms, import 102ms, tests 13ms, environment 0ms)
+--- failure titles (if any) ---
+
+===== P4 =====
+$ pnpm exec vitest run tests/integration/register-version-boundaries.test.ts
+rc=0  wall=1s
+   Test Files  1 passed (1)
+        Tests  6 passed (6)
+     Duration  991ms (transform 469ms, setup 0ms, import 894ms, tests 9ms, environment 0ms)
+--- failure titles (if any) ---
+
+### dirty AFTER: 0
+### lane HEAD AFTER: 7f89f7b7
+### done: 2026-09-09 22:38:37 EEST
