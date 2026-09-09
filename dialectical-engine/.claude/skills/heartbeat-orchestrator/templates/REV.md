@@ -1,0 +1,25 @@
+# PACKET __SEAT__ — REV(__SLICE__) lens __LENS__ (blind slice review, pass __PASS__) · mission `__MISSION__`
+
+Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-reviewer` · `superpowers:verification-before-completion` — then anything else in Superpowers that fits.
+
+## 1. Node
+- seat: __SEAT__ · node: REV(__SLICE__) lens __LENS__ (blind slice review, pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
+- ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
+- cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
+- inputs (read these and nothing else): the review package __REPORTS__/review-packages/__SLICE__-p__PASS__/ (diff vs base, every cluster command + three-run table, the cluster map, the acceptance oracle, the dev-stack recipe) · the slice head __SLICE_HEAD__ checked out READ-ONLY in your detached worktree __LANE__ · __ORACLE__
+- output (the ONE artifact this node produces): __MISSION_ROOT__/reviews/REV-__SLICE__-p__PASS__-__LENS__.md (new) + ONE verdict comment on __TICKET__
+- self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
+
+## 2. Contract
+- allowed (exhaustive): __MISSION_ROOT__/reviews/REV-__SLICE__-p__PASS__-__LENS__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/probes/ (new, promoted probes only) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- forbidden: everything else — in particular the slice's files, every other lens's output, git writes of any kind
+- verification: your OWN fixtures for the whole slice, both modes on UI · every cluster command re-run by you · one mount of every surface this slice shares with another slice or with the app shell · on UI: rendered DOM with the real compiled CSS measured against the oracle's artboards (geometry, colour, both modes)
+
+## 3. The work
+Review the packet FIRST (a packet defect is a finding against the orchestrator). Your lens is __LENS__ (correctness/tests · security/data-safety · product-truth); probe, never read — build from the CLAIM, exceed the author's parameters, refute. Number findings B/N with file:line and the concrete failure; every N gets a ticket through the orchestrator. Verdict PASS / REWORK / BLOCKED for THIS lens with the pass number; the orchestrator unions the lenses. End with one paragraph of predictions about the other lenses. A REWORK at pass 3 is a V row.
+
+## 4. Handoff
+`PASS | REWORK | BLOCKED` on __TICKET__, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Then stop: no push, no merge, no Done, no board mutation beyond your own comments, nothing opened on V's desktop.
