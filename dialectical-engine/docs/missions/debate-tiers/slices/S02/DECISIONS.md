@@ -199,3 +199,11 @@ owes the same treatment to a duplicated one — if V rules that way it is a new 
 warning mark, neither of which any S02 requirement names, so it is a slice of its own and not a step
 here.`
 
+## Orchestrator folds after ARCH-REV(S02) pass 2 PASS (2026-09-10 00:01) — S02 planning closed; PLAN.md Revision 2 stands
+
+- **N1 → REV(S02):** `S02-V1`'s expected total as published is off by two. Measured at base: `3 failed | 65 passed (68)` (the sum had dropped `s14-contract`'s two passes); the published post-rebase figure (68) is that pre-rebase value, one S01-delta out of phase. The REV(S02) packet states the expectation as base + delta, re-measured at S02-M3 after S01's merge; the gate that binds is the ZERO delta, never the absolute.
+- **N4 → the C2 BUILD packet:** R15's frame accounting: cases 1–5 and 8 of the C2 suite are R15's frames 1–6 (frame 7 is C1's cases 3–4); cases 6, 7 and 9 are extra guards for R6/R7/R4, not R15 frames. §3's R15 row (`PLAN.md:191`) is the numbering of record; `PLAN.md:228`, `:458-460` and `:496` use the older shorthand and are read with this correction.
+- **N5 → the C2 BUILD packet:** frozen `SPEC-v2.md:163-168` spells the all-members-missing test out in full; case 3 of the C2 suite asserts it in full — 422, `error: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"`, a message naming BOTH free roster members, the code is not `MAKER_INVENTORY_UNSATISFIED`, and no run row — in one `it()` block, not spread over cases 3/5/7.
+- **N2/N3 (TRAPS):** the receipt "answers 8 lines on `tests/unit/api.test.ts`" for the S02-M4 grep reproduces under neither grep binary (0 lines at base); the gate itself is sound (proved on a known-hit fixture: 2 lines). `grep` is TWO binaries on this Mac — inline in a harness call it is a shell function → ugrep 7.8.4; from a `.sh` (every seat's way) it is `/usr/bin/grep` (BSD). Every published grep is proved on a known hit under the binary the seat will use.
+- **N7:** the PLAN Revision 2 payload is in commit `e7350ee4` (the MOCK node's freeze — the sweep trap), not in `697ebf8a` whose subject claims it; COMMON §6's freeze row records both.
+

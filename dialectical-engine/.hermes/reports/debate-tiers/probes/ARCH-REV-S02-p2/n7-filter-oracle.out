@@ -1,0 +1,62 @@
+
+case 1 · free filter (panel = 2 free ids + sol)  (tier=free, roster=2, panel=3, complete=true)
+  pass-1 flatMap : n=2 panelSize=2 [gpt-5.6-luna@a, claude-sonnet-5@b]
+  Rev-2  map/find: n=2 panelSize=2 [gpt-5.6-luna@a, claude-sonnet-5@b]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = []  refuses=false
+
+case 2 · premium filter (panel = all five)  (tier=premium, roster=3, panel=5, complete=true)
+  pass-1 flatMap : n=3 panelSize=3 [gpt-5.6-sol@c, claude-opus-5@d, grok-4.6@e]
+  Rev-2  map/find: n=3 panelSize=3 [gpt-5.6-sol@c, claude-opus-5@d, grok-4.6@e]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = []  refuses=false
+
+case 2b · PROBE-ORDER: panel arrives in reverse roster order  (tier=premium, roster=3, panel=3, complete=true)
+  pass-1 flatMap : n=3 panelSize=3 [gpt-5.6-sol@c, claude-opus-5@d, grok-4.6@e]
+  Rev-2  map/find: n=3 panelSize=3 [gpt-5.6-sol@c, claude-opus-5@d, grok-4.6@e]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = []  refuses=false
+
+case 3 · all members missing (free)  (tier=free, roster=2, panel=2, complete=false)
+  pass-1 flatMap : n=0 panelSize=0 []
+  Rev-2  map/find: n=0 panelSize=0 []
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = ["gpt-5.6-luna","claude-sonnet-5"]  refuses=true
+
+case 4 · one member missing (premium)  (tier=premium, roster=3, panel=2, complete=false)
+  pass-1 flatMap : n=2 panelSize=2 [gpt-5.6-sol@c, claude-opus-5@d]
+  Rev-2  map/find: n=2 panelSize=2 [gpt-5.6-sol@c, claude-opus-5@d]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = ["grok-4.6"]  refuses=true
+
+case 5 · several members missing (premium)  (tier=premium, roster=3, panel=1, complete=false)
+  pass-1 flatMap : n=1 panelSize=1 [gpt-5.6-sol@c]
+  Rev-2  map/find: n=1 panelSize=1 [gpt-5.6-sol@c]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = ["claude-opus-5","grok-4.6"]  refuses=true
+
+case 6 · empty panel  (tier=free, roster=2, panel=0, complete=false)
+  pass-1 flatMap : n=0 panelSize=0 []
+  Rev-2  map/find: n=0 panelSize=0 []
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = ["gpt-5.6-luna","claude-sonnet-5"]  refuses=true
+
+case 9 · two providers serve grok-4.6 (the N7 case)  (tier=premium, roster=3, panel=4, complete=true)
+  pass-1 flatMap : n=4 panelSize=4 [gpt-5.6-sol@a, claude-opus-5@b, grok-4.6@c, grok-4.6@d]   <== VIOLATES R4
+  Rev-2  map/find: n=3 panelSize=3 [gpt-5.6-sol@a, claude-opus-5@b, grok-4.6@c]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = []  refuses=false
+
+EXTRA · THREE providers serve one id, and a second id doubled too  (tier=premium, roster=3, panel=6, complete=true)
+  pass-1 flatMap : n=6 panelSize=6 [gpt-5.6-sol@a, gpt-5.6-sol@a2, claude-opus-5@b, grok-4.6@c, grok-4.6@d, grok-4.6@e]   <== VIOLATES R4
+  Rev-2  map/find: n=3 panelSize=3 [gpt-5.6-sol@a, claude-opus-5@b, grok-4.6@c]
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = []  refuses=false
+
+EXTRA · duplicate on a MISSING id (dup of a non-roster model)  (tier=free, roster=2, panel=2, complete=false)
+  pass-1 flatMap : n=0 panelSize=0 []
+  Rev-2  map/find: n=0 panelSize=0 []
+  Rev-2 roster order held: true
+  R6 missing (from filteredPanel) = ["gpt-5.6-luna","claude-sonnet-5"]  refuses=true
+
+R4 violations — pass-1 shape: 2 · Revision-2 shape: 0

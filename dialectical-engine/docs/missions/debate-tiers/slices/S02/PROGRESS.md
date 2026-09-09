@@ -37,3 +37,8 @@
 - PLAN.md Revision 2 (1042 lines): tests before code in C1/C2, the B1 class detectable by RED-frame count, all eleven pass-1 findings addressed; the pass-1 parser reports no gaps. Row V-19 opened. F-6 (ugrep pipe) → TRAPS; F-7 (post-rebase figures as base + delta) → the BUILD packets.
 - Next: ARCH-REV(S02) pass 2 `t_1dc7049a` (blind, scoped). PASS releases BUILD(S02-C1) on Codex Sol.
 
+## 2026-09-10 23:58 EEST — ARCH-REV(S02) pass 2 consumed: PASS, S02 planning closed (orchestrator entry)
+
+- PLAN.md Revision 2 stands. BUILD(S02-C1) dispatched on Codex Sol in the S02 lane (steps S02-C1-S2→S3→S1→S4→S5→S6→S7→S8, tests first); C2/C3 blocked until S01 merges to dev (S02-M4); C4 after C1 ∧ C2. GATE(S02) fires when all four are done; REV(S02) lenses: correctness + security/data-safety + product-truth (HIGH risk — the migration).
+- Folds: N1 (S02-V1's expected total is `3 failed | 65 passed (68)` pre-rebase, restated as base + delta after S01's merge) → DECISIONS + the REV(S02) packet; N3 (two greps) → TRAPS; N7 (the Revision 2 payload is in `e7350ee4`, not `697ebf8a`) → COMMON §6 freeze row.
+

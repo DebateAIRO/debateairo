@@ -1,0 +1,42 @@
+### grep binary as this .sh sees it:
+grep (BSD grep, GNU compatible) 2.6.0-FreeBSD
+
+===== S02-M4's PUBLISHED form: BRE with an escaped pipe =====
+$ grep -n 'PLAN_TIER_ROSTERS\|PlanTier' fx/plan-tiers.ts
+1:export const PLAN_TIER_ROSTERS = Object.freeze({
+5:export type PlanTier = "free" | "premium";
+rc=0  lines=2
+GROUND TRUTH = 2 lines
+
+===== the same intent as an ERE =====
+$ grep -nE 'PLAN_TIER_ROSTERS|PlanTier' fx/plan-tiers.ts
+1:export const PLAN_TIER_ROSTERS = Object.freeze({
+5:export type PlanTier = "free" | "premium";
+rc=0
+
+===== does the escaped pipe match a LITERAL pipe instead? =====
+$ grep -n 'free\|premium' fx/plan-tiers.ts   (literal reading would need the chars free|premium)
+1:export const PLAN_TIER_ROSTERS = Object.freeze({
+2:  free: ["gpt-5.6-luna", "claude-sonnet-5"],
+3:  premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]
+5:export type PlanTier = "free" | "premium";
+rc=0
+
+===== F-6's two forms, on the REAL tree, from this .sh =====
+$ grep -rn ": AskRequest = {|as AskRequest" tests   (the pass-1 published form)
+rc=1  hits=0
+$ grep -rnE ": AskRequest = \{|as AskRequest" tests   (the Revision-2 corrected form)
+hits=6  rc=0
+$ grep -rnE ": AskRequest = {|as AskRequest" tests   (-E, UNESCAPED brace — plan says hard error)
+rc=0  stderr=[]  hits=6
+
+===== does tests/unit/api.test.ts carry PlanTier at base at all? =====
+PlanTier occurrences: 0
+0
+PLAN_TIER_ROSTERS occurrences: 0
+0
+planTier (lowercase p) occurrences: 0
+0
+plan_tier occurrences: 0
+0
+### dirty: 0
