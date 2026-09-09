@@ -73,3 +73,68 @@ in parallel, and only the clusters that touch the field wait.`
 ## Orchestrator folds after REQ-REV pass 2 PASS (2026-09-09 22:07) — SPEC-v2.md stays frozen; this is the record where it is silent
 
 - **N2 (REQ-REV-p2).** `tests/unit/api.test.ts` is 24 passed (24) at base on both lanes (`BASELINE.md`, end section). Under R3's roster filter three of its direct `evaluateAskAdmission` cases turn RED — `:137-143` (expects a resolve with a risk match against a fixture panel whose `model_id`s are not roster members), `:159-167` (expects `SINGLE-LINEAGE` from `fixtureDiscoveredPanel(1)`), `:169-177` (expects `STRUCTURAL_CEILING_INPUTS_UNRESOLVED` from `resolveEnvelopeBasis`, which R6's pinned order now precedes); `:179-186` is unaffected. These are EXPECTED and CAUSED by S02: the cluster that implements R3/R6 re-fixtures the three cases in the same cluster (roster-member `model_id`s in the fixture panel; the third case asserts `ASK_PLAN_TIER_MODEL_UNAVAILABLE`) and its command ends `24/24` — never "3 failed, pre-existing". The other R20-A suites have rows too: `contract` 7/7, `load01-live-proof` 1/1, `s7-authorization` 31/31, `evaluator-database` 21/21.
+
+## Decisions taken at ARCH(S02) pass 1 (2026-09-09, seat ARCH-S02, ticket `t_57d602a5`) — appended, never rewritten
+
+| Date | Question | Choice | Reason | Ruled by |
+|---|---|---|---|---|
+| 2026-09-09 | Does the migration DROP and re-create `core.create_encrypted_run`? | No — `CREATE OR REPLACE` with the signature unchanged, and no `DROP FUNCTION` line | `migrations/0040_account_erasure.sql:6366-6369` grants EXECUTE on `core.create_encrypted_run(jsonb,uuid,uuid,jsonb)` to `debateai_content_provision`. A DROP discards that grant and every server-principal run creation then fails on a permission error — and no embedded-postgres test catches it, because those run as the schema owner. `0040:4255` drops only the older THREE-argument signature, which is why grants survived there. | ARCH (D-A1) |
+| 2026-09-09 | Does the SQL function's key allow-list need the new key? | Yes — `'planTier'` joins the array at `migrations/0040_account_erasure.sql:4270-4275` | `p_run - ARRAY[…] <> '{}'::jsonb` returns false for ANY extra key. A payload carrying `planTier` against the old allow-list returns `created=false`, which `packages/db/src/index.ts:1214-1219` reports as `TypedDomainError("RUN_OWNER_INVALID", "The encrypted run intent is no longer active")` — an error that reads as an authorization fault and hides a schema fault. | ARCH (D-A2) |
+| 2026-09-09 | Which write paths carry the tier? | BOTH — the encrypted path (`packages/db/src/index.ts:1184-1207` → the SQL function) and the LEGACY direct insert (`packages/db/src/index.ts:1242-1252`) | Row V-11 and SPEC R11 name only `core.create_encrypted_run` (`packages/db/src/index.ts:1182`). There is a second writer: for a non-`server` principal, `contentEnvelope` is null and `startRun` inserts into `core.run` directly. A single-path build leaves every legacy run's `plan_tier` NULL, and `tests/integration/evaluator-database.test.ts:1378-1384` submits exactly such a run. | ARCH (D-A3) |
+| 2026-09-09 | Is the `plan_tier` column NOT NULL with a backfill, or nullable? | Nullable, no backfill, plus `CHECK (plan_tier IS NULL OR plan_tier IN ('free','premium'))` | `NOT NULL DEFAULT 'free'` would label every run already in the dev database as Free — a fabricated record in the one column billing is meant to read (C2 / row V-6), against the honesty law. Nullable also keeps cluster S02-C1 non-breaking for the 49 `startRun(` call sites measured at base. Routed to V as row **V-16** with this as the binding default. | ARCH (D-A4) |
+| 2026-09-09 | Is `StartRunInput.planTier` required or optional? | Optional (`readonly planTier?: "free" \| "premium"`) | Required costs an edit at every one of the 49 `startRun(` call sites measured at base (14 test files plus `acceptance/dual-maker-proof.ts:139`), most in suites with no `BASELINE.md` row, inside a HIGH-risk slice. The loudness is bought back at the boundary instead: `AskRequestSchema` makes `plan_tier` required on the wire (S01 R12), there is exactly ONE production caller of `RunRepository.startRun` (`apps/api/src/index.ts:1293`, measured), and step S02-C4-S3 asserts both facts mechanically. | ARCH (D-A5) |
+| 2026-09-09 | Does `packages/db` import the tier type from `@debateai/contract`? | No — an inline literal union in `StartRunInput`, and a test that compares it to the roster export | `packages/db/package.json` depends on `@debateai/crypto`, `@debateai/kernel`, `drizzle-orm` and `pg`; nothing in the repository points the store at the wire. The house seam for a shared value vocabulary is `@debateai/kernel` (`packages/kernel/src/index.ts:114-132` mints `RISK_TIERS`, `TIER_SOURCES`, `COMPOSITION_BUDGET_TIERS` with the comment "these vocabularies are minted once here"), and a kernel line is S01's to write, not S02's. Recorded durably as `ADR-0024`. | ARCH (D-A6) |
+| 2026-09-09 | Where does the `api.test.ts` re-fixture live? | A local helper inside `tests/unit/api.test.ts`; `tests/support/discoveredPanel.ts` is NOT edited | 23 test files import that fixture (measured in the lane at `7f89f7b7`). Changing its `model_id`s would reach 22 suites unrelated to tiers, most without a `BASELINE.md` row. | ARCH (D-A7) |
+| 2026-09-09 | Which cluster starts before S01 merges? | Exactly one — S02-C1, the migration and the store | It never reads `ask.plan_tier` and never names a model id, so it needs neither of S01's two exports. C2, C3 and C4 all do. Putting the longest, highest-risk cluster on the pre-merge path is what buys the parallelism row V-12's counter asks for. | ARCH (D-A8) |
+| 2026-09-09 | Who applies migration 0061 to the LIVE dev database? | Nobody, as a step — the dev stack applies it at boot (`apps/runner/src/dev-auth-data-plane.ts:100` runs `operations.migrate()`) | Row V-11's strongest counter: a migration on a shared dev database is the one step in this mission that reverting a branch cannot undo. No seat runs `pnpm db:migrate` against `:55432`; every cluster verifies against a fresh embedded Postgres (`tests/support/testDatabase.ts:31-38`), and `.hermes/TOOLING-TRAPS.md:1041` records that pointing an acceptance harness at 55432 migrates the live database. | ARCH (D-A9) |
+| 2026-09-09 | Does the third `api.test.ts` admission case change its assertion, as the N2 fold's parenthetical says? | No — it keeps `STRUCTURAL_CEILING_INPUTS_UNRESOLVED` and gains a complete roster panel; the new code is asserted in a NEW case instead | That case (`tests/unit/api.test.ts:169-177`) is the only test proving an ENVELOPE refusal reaches the 422 face. The fold's binding part — the cluster ends 24/24 and no seat dates these failures pre-existing — is met either way. Raised as finding **F-2** so `ARCH-REV` rules rather than a BUILD seat choosing in silence. | ARCH (D-A10) |
+
+## Alternatives rejected at ARCH (the brainstorming discharge — nobody re-derives these)
+
+| Rejected | Why |
+|---|---|
+| Filter inside `resolveDiscoveredPanel` (`apps/api/src/provider-discovery.ts:126-152`) instead of in `evaluateAskAdmission` | The resolver is memoised and shared across asks (`:155-165` keeps one in-flight promise), so it has no ask and therefore no tier. Filtering there would either break the sharing or filter every ask by the last ask's tier. |
+| Add `PLAN_TIERS` / `PlanTier` to `packages/kernel/src/index.ts` beside `COMPOSITION_BUDGET_TIERS` | It is the right long-term home and this is why `ADR-0024` records it — but the tier vocabulary is inseparable from the roster keys, S01 owns the declaration, and S01's `SPEC-v2.md` R11 is frozen. Moving it mid-mission is a supersession plus a V ratification for one saved import. |
+| Give `packages/db` a dependency on `@debateai/contract` so `StartRunInput` can import the tier type | It points the store at the wire; nothing in the repository does that today, and `contract` already depends on `kernel`, so the edge would be redundant as well as inverted. |
+| `ALTER TABLE core.run ADD COLUMN plan_tier text NOT NULL DEFAULT 'free'`, then `DROP DEFAULT` | It writes `free` onto every historical run. See D-A4. |
+| Edit `tests/support/discoveredPanel.ts` so its members are roster ids | 23 importers. See D-A7. |
+| Assert R5's maker span by reading `.local/dev-auth/api.env` | The file is V's, carries authorization headers, and no seat reads or prints it (row V-7, `INSTRUCTIONS.md` §no-touch surface). |
+| Compute the maker span from a model-id prefix (`gpt-*`, `claude-*`, `grok-*`) | It invents a mapping the repository does not have, and it would answer wrongly the first time one maker serves two families. See finding **F-1**. |
+| Fold cluster S02-C4 into S02-C2 to save a node | C4 needs `StartRunInput.planTier` from C1; folding it into C2 would make C2 depend on C1 and serialise the only cluster that starts before S01's merge. |
+| One cluster per SPEC requirement | R3, R4, R6, R7 and R8 are one control-flow change in one function verified by one command; splitting them would create five clusters that cannot each be green alone. |
+
+## Rows opened for V at ARCH(S02) pass 1 (routed through the orchestrator, never to V directly)
+
+`V-ROW: V-15 · S02 · How SPEC R5's "at least two distinct makers" is checked, given that the maker is
+environment data and the roster declaration is model ids only · Recommended default: S02 asserts the
+repo-side half (every roster has at least two members) beside the roster's consumer in
+`tests/architecture/tiers-s02-rosters.test.ts`, and records that the maker span is
+deployment-determined and already marked at runtime by `applyCriticUnavailableCap`
+(`packages/critique/src/index.ts:342-357`) rather than refused. Evidence:
+`packages/providers/src/index.ts:156-188` builds `providerRef → maker` from the configured target set
+and `apps/api/src/provider-discovery.ts:143-150` copies it onto the panel member — there is no
+model-id → maker map anywhere in `apps/` or `packages/`, so the check R5 places "next to the
+declaration" has no repo data to read. Smallest yes/no for V: "Is 'every roster has at least two
+members' the whole repo-side check?" · VERDICT build the repo-side half / CONFIDENCE high /
+STRONGEST COUNTER: if V wants the maker span guaranteed rather than observed, the roster declaration
+has to carry an expected maker per model id — that is S01's frozen R11, so a supersession plus a V
+ratification, never an S02 step.`
+
+`V-ROW: V-16 · S02 · What `plan_tier` says about the runs that already exist · Recommended default:
+the column is NULLABLE and no backfill value is written, so a run started before migration 0061
+answers empty rather than claiming a tier it never had. Evidence: the honesty law
+(`INSTRUCTIONS.md`) — `ADD COLUMN … NOT NULL DEFAULT 'free'` would label every historical run in the
+dev database as Free, a fabricated record in the one column billing is meant to read (C2 / row V-6).
+Smallest yes/no for V: "Should pre-tier runs read empty rather than 'free'?" · VERDICT nullable, no
+backfill / CONFIDENCE high / STRONGEST COUNTER: a nullable column cannot be enforced by the database
+for new rows either, so "every product run carries a tier" rests on `AskRequestSchema` making
+`plan_tier` required (S01 R12) plus the single-production-caller guard of PLAN step S02-C4-S3 — if V
+wants the database itself to refuse a tier-less run, that is `NOT NULL` plus a decision about what
+the existing rows are called, and it is a second migration.`
+
+## Orchestrator corrections to its own N2 fold (2026-09-09 22:32, after ARCH(S02) F-2/F-3) — appended, the fold above stands as written
+
+- **F-2.** The fold's parenthetical "the third case asserts `ASK_PLAN_TIER_MODEL_UNAVAILABLE`" was the orchestrator prescribing a remedy; it is WITHDRAWN. `tests/unit/api.test.ts:169-177` is the only test proving an envelope refusal reaches the 422 face; the plan keeps that assertion and puts the new code in a NEW case (PLAN.md §9 F-2). ARCH-REV(S02) rules on the design; the fold's binding part — `api.test.ts` ends 24/24 in the R3/R6 cluster with nothing dated "pre-existing" — is unchanged, with the count now 25 if a case is added.
+- **F-3.** The fold under-counted by one case: `tests/unit/api.test.ts:283-405` also turns RED under R3 — it calls the real `PostgresAskApplication.submit`, and the roster refusal fires at `apps/api/src/index.ts:1284`, before the admission lease at `:1289`, so `OWNER_PRIVATE_HISTORY_SCAN_SATURATED` never happens and the `connectCalls`/`leaseQueries` assertions at `:355-366` break. Same cause, same cluster, same default-panel change (PLAN.md §9 F-3).
+- **F-5 (packet defect, orchestrator).** ARCH-S02 charge 7's "roster-member `model_id`s in `fixtureDiscoveredPanel`" read as an order to edit `tests/support/discoveredPanel.ts`, imported by 23 test files; the plan keeps the helper local to `api.test.ts`. A packet relays a finding's facts; the remedy is the seat's.
+

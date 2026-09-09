@@ -5,9 +5,9 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 
 ## 1. Node
 - seat: ARCH-REV-S02 · node: ARCH-REV(S02) (blind review of the plan, pass 1) · pass: 1 of 3 · rework rounds: max 3 · model: claude-opus-5 · transport: Agent tool subagent, background, blind (resume: none offered)
-- ticket: t_08c8abe2 (slice ticket t_e4b4ab3a is V's) · comment cursor at dispatch: 0
+- ticket: t_08c8abe2 (slice ticket t_e4b4ab3a is V's) · comment cursor at dispatch: 1
 - cwd for every command: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine (read-only; run the plan's cluster commands there from a .sh file under your scratch dir; `git status --porcelain` stays empty) · branch: slice/tiers-s02 · base: 7f89f7b7
-- inputs (read these and nothing else): the ARCH packet /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/ARCH-S02.md (review it FIRST) · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/slices/S02/PLAN.md · SPEC-v2.md (the record; SPEC.md v1 beside it, frozen) · DECISIONS.md · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/debate-tiers` is exactly what the seat under review changed)
+- inputs (read these and nothing else): the ARCH packet /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/ARCH-S02.md (review it FIRST) · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/slices/S02/PLAN.md · SPEC-v2.md (the record; SPEC.md v1 beside it, frozen) · DECISIONS.md · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/debate-tiers` is exactly what the seat under review changed) · the ARCH seat's READY handoff /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/handoffs/ARCH-S02-handoff.md (its base measurements per cluster; its findings F-1…F-5) · the ADR it wrote, renumbered by the orchestrator: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/architecture/01-decisions/ADR-0024-plan-tier-storage-and-layering.md
 - output (the ONE artifact this node produces): /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/reviews/ARCH-REV-S02-p1.md (new) + ONE verdict comment on t_08c8abe2
 - self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/ARCH-REV-S02.md (new)
 
@@ -18,6 +18,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 
 ## 3. The work
 Find the step a stranger cannot check, the command that condemns correct input, the cluster that cannot go green, the screen the `## Screens` block forgot. Number findings B/N with file:line. Non-blocking findings fold into DECISIONS through the orchestrator; only blocking ones spawn a rework pass. Verdict PASS / REWORK / BLOCKED with the pass number; a REWORK at pass 3 is a V row.
+1. The ARCH seat's own findings (PLAN.md §9, handoff §5): rule on **F-2** (keep `tests/unit/api.test.ts:169-177`'s envelope assertion and add a NEW case for the roster refusal — the orchestrator's fold parenthetical was withdrawn in `DECISIONS.md`) and **F-3** (`api.test.ts:283-405` also turns RED — is it inside the R3/R6 cluster's command and re-fixture?); check rows **V-15/V-16** carry a default that binds a single build; confirm the ADR was renumbered consistently (`ADR-0024`, every reference); a packet defect against the orchestrator is a finding (three are already ticketed: F-5, the charge-1 range, the pre-assigned ADR number).
 
 ## 4. Handoff
 `PASS | REWORK | BLOCKED` on t_08c8abe2, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:

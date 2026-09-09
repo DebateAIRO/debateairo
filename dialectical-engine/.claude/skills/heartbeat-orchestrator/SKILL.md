@@ -112,6 +112,10 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   failing packet is fixed in the TEMPLATE or the COMMON line that produced it (fix the class).
 - The SPEC of record for a slice is its highest-numbered `SPEC-v<n>.md` (`SPEC.md` when none):
   every packet written after a planning rework names that file — never `SPEC.md` by habit.
+- A packet relays a finding's FACTS (file:line, the failing outcome) — never the remedy, which is
+  the seat's contract; a range in a packet is derived from the SPEC's own citations at write time
+  (every line the SPEC names sits inside one), and an ADR number is never pre-assigned — "the next
+  free number, measured at write time".
 - Scope the reading: a BUILD packet quotes its cluster's step ids and line ranges; a REV packet
   points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
   range, never a bare directory (a 12,575-line directory named without a range was read by nobody).

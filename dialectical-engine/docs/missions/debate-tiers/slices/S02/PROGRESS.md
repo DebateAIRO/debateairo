@@ -21,3 +21,9 @@
 - `reviews/REQ-REV-p2.md`: every pass-1 closure re-walked and confirmed; SPEC-v2.md is the record of this slice from here on. Orchestrator folds recorded in `slices/S01/DECISIONS.md` (N1, N3, N4) and `BASELINE.md` (N2, measuring).
 - Next node: ARCH(S02) `t_57d602a5` (Opus 5, background) → ARCH-REV(S02) `t_08c8abe2` → BUILD(S02-*) with the plan_tier clusters waiting for S01's contract commit (V-12).
 
+## 2026-09-09 22:32 EEST — ARCH(S02) consumed: READY (orchestrator entry)
+
+- PLAN.md filled (668 lines; clusters S02-C1 store side → S02-C3 roster discipline ∥ S02-C2 filter + refusal (after the S01 merge step S02-M4) → S02-C4 the wire). Base verdicts per cluster in PLAN §5/§6; the lane stayed byte-clean.
+- Rows V-15/V-16 opened (defaults bind). F-2/F-3 corrected the orchestrator's N2 fold (see DECISIONS.md); F-4 baselined (`register-version-boundaries` 6/6).
+- Next: ARCH-REV(S02) `t_08c8abe2` (blind). PASS releases BUILD(S02-C1) at once; C2/C3/C4 wait for S01's contract commit (V-12).
+

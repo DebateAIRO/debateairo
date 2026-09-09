@@ -12,7 +12,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/slices/__SLICE__/PLAN.md · __MISSION_ROOT__/slices/__SLICE__/DECISIONS.md · __REPO_ROOT__/docs/architecture/01-decisions/ADR-__ADR_NUMBER__-*.md (new, only if a decision outlives the mission) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- allowed (exhaustive): __MISSION_ROOT__/slices/__SLICE__/PLAN.md · __MISSION_ROOT__/slices/__SLICE__/DECISIONS.md · __REPO_ROOT__/docs/architecture/01-decisions/ADR-<the next free number, measured with `ls` at write time — never pre-assigned>-*.md (new, only if a decision outlives the mission) · __REPORTS__/agent-reports/__SEAT__.md (new)
 - forbidden: everything else — in particular SPEC.md, every product file, git
 - verification: every cluster command RUN at base from a `.sh` file and its verdict recorded (RED for TDD-red is expected; BROKEN is a defect) · the SPEC↔PLAN trace both ways with zero gaps · every step passes the stranger test · zero banned words
 

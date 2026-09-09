@@ -114,3 +114,8 @@ Measured 2026-09-09 by the lane setup (`.hermes/reports/debate-tiers/logs/setup-
 - `tests/unit/contract.test.ts` → rc=0 · Tests  7 passed (7)
 - `tests/unit/load01-live-proof.test.ts` → rc=0 · Tests  1 passed (1)
 - `tests/unit/s7-authorization.test.ts` → rc=0 · Tests  31 passed (31)
+
+### Rows added 22:32 (ARCH(S02) F-4 — inside SPEC R13's `resolveDiscoveredPanel` grep class; measured by the orchestrator, both lanes at `7f89f7b7`, 0 dirty before and after)
+- lane `tiers-s01`: `tests/integration/register-version-boundaries.test.ts` → rc=0 · Tests  6 passed (6) (`logs/baseline-f4-tiers-s01.log`)
+- lane `tiers-s02`: `tests/integration/register-version-boundaries.test.ts` → rc=0 · Tests  6 passed (6) (`logs/baseline-f4-tiers-s02.log`)
+
