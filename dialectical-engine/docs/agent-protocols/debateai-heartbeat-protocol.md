@@ -1803,7 +1803,9 @@ orchestrator's own case file naming its packets as the weapon.
    review unit" in v3.3.0 item 12 — clusters are BUILD units; the review unit is the slice.
 
 3. **THE UI GATE — MOCK(S) → V's DONE(S).** The requirements seat marks each slice `ui: yes|no`
-   (the first line under the SPEC title; yes when the acceptance steps run in a browser). For a
+   (the first line under the SPEC title; yes when the slice adds or changes a surface the user sees —
+   something a mock can draw; a slice whose only browser step is watching existing components render
+   stays `ui: no`). For a
    `ui: yes` slice, after ARCH-REV(S), a mock seat under `heartbeat-mock` loads
    `design-taste-frontend` (the `/taste` skill, dials pinned to redesign — preserve) and `design`
    (the Claude Design canvas inside Claude Code) and produces one canvas — one artboard per screen

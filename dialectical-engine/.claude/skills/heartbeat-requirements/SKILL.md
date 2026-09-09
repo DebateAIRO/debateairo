@@ -31,7 +31,8 @@ welcome and uncapped.
 Each slice gets a code (S01, S02…) and `docs/missions/<m>/slices/<code>/`:
 
 - **SPEC.md — WHAT is built. FROZEN at your READY marker.** First line under the title: `ui: yes`
-  when the acceptance steps run in a browser, else `ui: no`. Edits before the marker are creation
+  when the slice ADDS OR CHANGES a surface the user sees — something a mock can draw; a slice whose
+  only browser step is watching existing components render stays `ui: no`. Edits before the marker are creation
   and are declared in the handoff; after it, a change is `SPEC-v2.md` with a supersession header,
   V-ratified — never an in-place edit. Every requirement numbered; the acceptance section numbered,
   human-runnable, both modes on UI. A vertical slice has a beginning and an end V can exercise alone.

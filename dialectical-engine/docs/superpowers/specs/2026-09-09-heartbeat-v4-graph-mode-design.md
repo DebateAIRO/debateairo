@@ -131,8 +131,9 @@ park the others.
 
 ### 4.4 The UI gate — `MOCK(S)` and `DONE(S)`
 
-**Trigger.** `REQ` marks each slice `ui: yes|no` in its SPEC header: a slice is UI when its
-acceptance steps are exercised in a browser. Non-UI slices have no `MOCK`/`DONE` nodes; their
+**Trigger.** `REQ` marks each slice `ui: yes|no` in its SPEC header: a slice is UI when it adds or
+changes a surface the user sees — something a mock can draw; a slice whose only browser step is
+watching existing components render stays `ui: no`. Non-UI slices have no `MOCK`/`DONE` nodes; their
 acceptance oracle is the SPEC's acceptance section, and `BUILD` follows `ARCH-REV(S)` directly.
 
 **`MOCK(S)` — the mock seat** (`heartbeat-mock`, a Claude seat, Opus 5 unless the roster says
@@ -297,7 +298,7 @@ REQ ──► ARCH(S) ──► ARCH-REV(S) ──► MOCK(S) ──► DONE(S) 
    Claude Design canvas inside Claude Code) is the edit surface; a Claude Design app export under
    `ui_designs/` is the fallback.
 2. Planning reviews stay as one blind pass each with fold-don't-loop; V may strike them entirely.
-3. A slice is UI when its acceptance runs in a browser; `REQ` sets the flag.
+3. A slice is UI when it adds or changes a visible surface (something to draw); `REQ` sets the flag.
 4. `BUILD` on a UI slice waits for V's explicit yes on `DONE.md`; non-UI slices do not wait.
 5. The finished-element reviewer (Grok) exists only when the roster names one.
 6. The harness's in-app browser pane is harness PTY; V's desktop is never touched.
