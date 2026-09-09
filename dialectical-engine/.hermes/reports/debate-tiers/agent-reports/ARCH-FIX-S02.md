@@ -146,6 +146,7 @@ mismatch gate — belt and braces, because S01's plan is not frozen either.
 | One failed `Edit` — the S02-M3 block did not match because a closing parenthesis sat inside the sentence, not after it | 1 re-Read + 1 retry, ~4k tokens | I reconstructed a 17-line `old_string` from the earlier full-file Read instead of re-reading the eight lines I was about to replace. Over ~600 lines of context the eye normalises punctuation. | For an `old_string` longer than ~5 lines, re-Read that exact range first. One 300-token read beats one 4k-token failed edit, and the ratio gets worse as the block grows. |
 | Two rounds on the trace table's R4 attribution | ~3k tokens | I fixed §3b's ranges (what N1 asked for) and only then noticed §3's R4 row still pointed at `S02-C4-S3`, a step whose content I had just moved out. **A trace table is a JOIN, and editing one side without re-deriving the other leaves a dangling row that the parser cannot see** — the parser checks *existence*, not *truth*. | The parser answers "is every step named?"; nothing answers "does the named step still do that?". A second 15-line check — for each forward row, assert the named step's TEXT contains the requirement id — would close it. Worth adding to the probe kit. |
 | Writing the "Probes 8–12" block above the numbered list it belongs after | 1 corrective edit pair, ~3k tokens | I anchored the insert on the section header rather than on the last item of the list. | Anchor an append on the LAST line of the thing you are appending to, never on its first. |
+| **Three wrong line citations inside my own ticket comments — in the comments that close a citation-drift finding** | 2 correction comments, ~5k tokens, and one dent in the record | I generated the comments' line numbers from ONE grep of step headings and then **interpolated** the case ranges between them. Measured afterwards: case 7 is `:489-495`, case 8 `:496-503`, case 9 `:504-509`; I had each shifted one case down. **This is N4's exact shape, committed by the seat fixing N4, twenty minutes after writing that six of its eight members were "a right claim with a stale pointer".** | The remedy I had already written and then failed to apply to myself: **cite the thing by its NAME and let the line be an aid, not the claim** ("case 9, the duplicate-id case" survives any edit; `:504-509` does not). And never derive a citation from a neighbouring citation — measure the range you are about to quote. Corrected on `t_7a207605` and `t_44813002` rather than left standing. |
 
 **Nothing else was wasted.** What kept this run at 27 calls for a 668 → 1037-line revision, thirteen
 findings and eleven DECISIONS rows:
@@ -228,6 +229,17 @@ that states a law five times and checks it zero times is paying five times for n
 from this pass goes into the spine, it is that gates work and reminders do not — which this mission's
 own memory already records from 2026-08-29, and which B1 proves again on a fresh mission six weeks
 later.
+
+**(d bis) The sharpest single datum in this report is that I committed N4's defect while closing
+N4.** Not from haste — from the same mechanism I had just diagnosed in someone else: a pointer
+derived from a neighbouring pointer instead of measured. Two passes, two seats, two models, one
+shape. **That is not a seat problem and no amount of care fixes it**; it is what happens when a
+document format makes an unmeasured citation as easy to write as a measured one. The format change
+that removes it is small and total: *a bare `path:line` is illegal in a heartbeat artifact unless the
+line is quoted beside it.* `packages/db/src/index.ts:1250` proves nothing; `packages/db/src/index.ts:1250
+(jsonb_array_length($13::jsonb), $13::jsonb)` cannot drift silently, because the quote and the line
+disagree the moment either moves. Revision 2 does this in about a dozen places, and every one of
+those is a citation a later seat can falsify in one `awk` instead of trusting.
 
 **(e) On making it one prompt: the seam, not the seat, is where the cost is.** Nothing in this pass
 was hard because a seat lacked skill. B1, N7 and F-6 are one-line fixes. N4 is eight `awk` calls.

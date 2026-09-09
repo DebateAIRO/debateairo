@@ -32,3 +32,8 @@
 - B1 (blocking, a class over all four clusters): C1 creates migration 0061 before the test that must fail with the column absent (`migrate(pool)` reads the directory from disk, `packages/db/src/index.ts:767-796`); C2 authors cases 7–8 after the build steps. Remedy: author cases 7–8 inside S02-C2-S1; S02-C1-S2/S3 before S02-C1-S1. → ARCH-FIX(S02) `t_ffb56aba` (pass 2 of 3) → ARCH-REV(S02) pass 2 `t_1dc7049a`.
 - N1–N11 ticketed; N3/N5/N10 folded by the orchestrator (TRAPS cited by heading, not by main-tree line; the four stale ADR-0023 references; the F-4 class); the rest ride in the ARCH-FIX packet. The reviewer re-ran all six cluster commands at base: zero numeric disagreements.
 
+## 2026-09-09 23:38 EEST — ARCH-FIX(S02) consumed: READY (orchestrator entry)
+
+- PLAN.md Revision 2 (1042 lines): tests before code in C1/C2, the B1 class detectable by RED-frame count, all eleven pass-1 findings addressed; the pass-1 parser reports no gaps. Row V-19 opened. F-6 (ugrep pipe) → TRAPS; F-7 (post-rebase figures as base + delta) → the BUILD packets.
+- Next: ARCH-REV(S02) pass 2 `t_1dc7049a` (blind, scoped). PASS releases BUILD(S02-C1) on Codex Sol.
+
