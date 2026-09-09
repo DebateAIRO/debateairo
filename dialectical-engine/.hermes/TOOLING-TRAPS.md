@@ -3014,3 +3014,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 ## codex-cli 0.146 logs `failed to load models cache: missing field base_instructions` and still runs (2026-09-09)
 - Two ERROR lines from `codex_models_manager` at startup (load / renew cache TTL) come from a stale `~/.codex/models_cache.json` schema; the CLI rewrites the cache and answers normally. NOT a dead-transport signal — judge a Codex seat by its disk output and the board, never by that line. Do not delete or edit the cache on a seat's behalf; the CLI owns it.
 
+## `renderToStaticMarkup` returns "" silently when a page calls a hook the `next-navigation` stub lacks (2026-09-09, MOCK-S01 F3)
+- `tests/render/stubs/next-navigation.ts` has no `useRouter` / `useSearchParams`; `apps/ui/app/new/page.tsx:65-66` calls both. The render does not throw — it yields the empty string, and a probe that only checks "no error" reads as green. Every render fixture asserts the markup is non-empty (and names the stub it extends) before anything else. Cost: one run + one debug round trip per seat that meets it.
+
