@@ -47,6 +47,7 @@
     { "principalId": "obs-listener", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
     { "principalId": "obs-watchdog", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
     { "principalId": "obs-human", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
+    { "principalId": "observation-agent", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0057_observation_foundation.sql" },
     { "principalId": "support-config-operator", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
     { "principalId": "hatchet", "state": "EXTERNAL_COMPONENT", "source": "compose.dev.yaml" }
   ],
@@ -113,6 +114,7 @@
         "ledger",
         "memory",
         "obs",
+        "observation",
         "register",
         "scorecard",
         "serve",
@@ -824,6 +826,50 @@
       ]
     },
     {
+      "id": "observation-agent",
+      "roleName": "debateai_observation_agent",
+      "kind": "SERVICE",
+      "database": "debateai",
+      "login": true,
+      "inherit": false,
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "directMemberships": ["pg_monitor"],
+      "effectiveMemberships": ["pg_monitor"],
+      "forbiddenMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_content_provision",
+        "debateai_erasure_runtime",
+        "debateai_evaluator_api",
+        "debateai_evaluator_ddl",
+        "debateai_evaluator_reader",
+        "debateai_evaluator_worker",
+        "debateai_obs_view_owner",
+        "debateai_prod_*",
+        "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
+        "debateai_replay",
+        "debateai_runtime",
+        "debateai_settlement_watch",
+        "debateai_support",
+        "debateai_support_config_operator"
+      ],
+      "ownsDatabases": [],
+      "ownsSchemas": [],
+      "connectionPurposes": [
+        {
+          "component": "apps/observation-agent",
+          "sourceFile": "apps/observation-agent/src/main.ts",
+          "environmentKey": "OBSERVATION_DATABASE_URL",
+          "purpose": "OBSERVATION_AGENT_MONITORING",
+          "binding": "WIRED"
+        }
+      ]
+    },
+    {
       "id": "support-config-operator",
       "roleName": "debateai_prod_support_config_operator",
       "kind": "HUMAN_EXECUTE_ONLY",
@@ -936,6 +982,7 @@
     { "memberRole": "debateai_prod_evaluator_worker", "grantedRole": "debateai_evaluator_worker", "adminOption": false, "inheritOption": true, "setOption": true },
     { "memberRole": "debateai_prod_evaluator_api", "grantedRole": "debateai_evaluator_api", "adminOption": false, "inheritOption": true, "setOption": true },
     { "memberRole": "debateai_prod_evaluator_reader", "grantedRole": "debateai_evaluator_reader", "adminOption": false, "inheritOption": true, "setOption": true },
+    { "memberRole": "debateai_observation_agent", "grantedRole": "pg_monitor", "adminOption": false, "inheritOption": true, "setOption": true },
     { "memberRole": "debateai_prod_support_config_operator", "grantedRole": "debateai_support_config_operator", "adminOption": false, "inheritOption": true, "setOption": true }
   ],
   "credentialRequirements": [
@@ -957,6 +1004,7 @@
     { "principalId": "obs-listener", "credentialId": "credential:obs-listener", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
     { "principalId": "obs-watchdog", "credentialId": "credential:obs-watchdog", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
     { "principalId": "obs-human", "credentialId": "credential:obs-human-jit", "lifecycle": "JIT_SHORT_LIVED", "ownerTicket": "P3-02" },
+    { "principalId": "observation-agent", "credentialId": "credential:observation-agent", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0057_observation_foundation.sql", "ownerTicket": "P3-02" },
     { "principalId": "support-config-operator", "credentialId": "credential:support-config-operator-jit", "lifecycle": "JIT_SHORT_LIVED", "ownerTicket": "P3-02" },
     { "principalId": "hatchet", "credentialId": "credential:hatchet", "lifecycle": "EXTERNAL_COMPONENT", "ownerTicket": "P3-02" }
   ],
@@ -990,7 +1038,7 @@
     "SERVICE_PRINCIPALS_OWN_NO_DEBATEAI_DATABASE_OR_SCHEMA",
     "DIRECT_MEMBERSHIPS_EXACT_NO_GRANT_OPTION",
     "NO_SERVICE_TO_SERVICE_MEMBERSHIP",
-    "NO_PREDEFINED_PG_ROLE_MEMBERSHIP",
+    "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
     "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
     "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
   ]
