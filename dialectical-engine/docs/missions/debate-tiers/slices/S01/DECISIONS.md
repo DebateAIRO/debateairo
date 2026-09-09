@@ -195,3 +195,11 @@ the round trip is one line in DONE.md.
 - **MOCK F3 (repo, ticketed):** `tests/render/stubs/next-navigation.ts` has no `useRouter`/`useSearchParams` (both called at `page.tsx:65-66`); `renderToStaticMarkup` then returns the EMPTY STRING rather than throwing — the C4 render suite's first assertion is "markup is non-empty".
 - The canvas: https://claude.ai/code/artifact/e08c6b3b-60b1-4e8a-9c15-79ca43a16d22 · questions Q1–Q6 in `MOCK.md` (Q1 = V-9, Q2 = V-17/V-18, Q3 the locked treatment, Q4 raw model ids, Q5 the tier names, Q6 the two promises). Nothing on S01 proceeds until V's yes.
 
+
+## V's ruling at DONE(S01) — 2026-09-10 00:04 EEST (orchestrator transcription; the rows above stand as written)
+
+- V, verbatim, in chat: «well, I love it the way it is. go forward with implementation» — the canvas as `MOCK(S01)` published it (read back 00:06, 0 comments, 0 edits) is the definition of done. `DONE.md` is written from the artboards (`design/S01/`, 15 files, `MANIFEST.tsv`) and carries the fifteen measurements M1–M15.
+- The six defaults ratified as drawn: Q1 Free preselected (row V-9 — R2/R18 stand; S01-24's contingency and S01-38's extra `ready` condition are NOT triggered; screen 6 is not a product state) · Q2 the three Free-state lines (rows V-17/V-18 — DONE.md M9) · Q3 dim-only (M8) · Q4 raw ids with dots (M7) · Q5 `Free`/`Premium`, `aria-label="Plan tier"`, no visible label (M1) · Q6 the promises (M6).
+- **No SPEC supersession (S01-45).** No measurement contradicts SPEC-v2; the Q2 strings are named by no requirement.
+- **No new token (S01-42).** Every hex on the fourteen artboards resolves to a token in `globals.css:5-113` / `:115-178` at `7f89f7b7` (checked 2026-09-10; DONE.md M13). C4's minimum is the selector's rules plus the disabled treatment of `.ndSegItem`, `.ndSlider`, `.ndSteerInput` and the `.ndSelect` OUTER box (MOCK F1).
+- Scheduling: BUILD(S01-C1) READY now; C2 after C1; C3 and C4 together after C2 (the plan's designed pair, PLAN.md § "Single-writer"); C5 after C3 ∧ C4. C1 and C2 carry no pixel; C3/C4/C5 read DONE.md.

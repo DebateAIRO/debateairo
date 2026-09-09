@@ -37,3 +37,8 @@
 - Canvas: https://claude.ai/code/artifact/e08c6b3b-60b1-4e8a-9c15-79ca43a16d22 · MOCK.md with the questions (smallest yes/no, defaults). 14 artboards, 9 NEW rows. F1 (the invisible native select under `.ndSelect`) routed to the C4 BUILD packet: the locked treatment is drawn on the visible box.
 - V answers on the canvas (Save) or by an export under `ui_designs/`; the orchestrator extracts the final artboards into `design/S01/`, writes DONE.md, and BUILD(S01-*) becomes READY only on V's yes.
 
+
+## 2026-09-10 00:04 EEST — DONE(S01) consumed: V's yes (orchestrator entry)
+
+- V, verbatim: «well, I love it the way it is. go forward with implementation». Ticket `t_e82bc6b0` completed with those words. The canvas was read back (Artifact tool, 00:06; 0 comments, 0 edits) and its fourteen artboards + `canvas.json` extracted verbatim into `docs/missions/debate-tiers/design/S01/` (README.md = file → artboard → screen map; MANIFEST.tsv = bytes/lines/sha256). `DONE.md` written: §1 the six defaults ratified, §2 states 1–6 with numbered browser steps in both modes, §3 measurements M1–M15 (one assertion each at C5), §4 acceptance = SPEC-v2 §2 in both modes. Rows V-9/V-17/V-18 answered (V packet, end section); no SPEC supersession; no new token.
+- Board: BUILD(S01-C1) READY (Codex Sol) → C2 → C3 ∥ C4 → C5 (ids in `logs/tickets.env`). Next: the C1 packet, freeze, packet-check, launch.

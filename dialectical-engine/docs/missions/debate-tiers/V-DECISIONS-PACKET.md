@@ -40,3 +40,17 @@ Each row's DEFAULT binds every seat until V rules on that row. Rows are appended
 - 2026-09-09 23:09 · Ruling: row V-18 (ARCH-REV(S01) N1: the risk-tier hint "explicit asker selection" at `page.tsx:186` and the budget-tier hint "provisional default, editable" at `:197` read false under the Free lock) appended with its default binding — the mock proposes the Free-state wording for both hints together with V-17's line; V rules on the canvas through DONE.md; S01 changes no words on its own — cost if wrong: one copy step in S01.
 
 - 2026-09-09 23:38 · Ruling: row V-19 (ARCH-FIX(S02), "What happens when two providers serve the same model id") appended with its recommended default binding — cost if wrong: one FIX pass on the S02 cluster it names.
+
+## Rows V answered at the DONE(S01) gate — 2026-09-10 00:04 EEST (the rows above stand as written)
+
+V's words, verbatim, in chat, on the canvas https://claude.ai/code/artifact/e08c6b3b-60b1-4e8a-9c15-79ca43a16d22 as published (0 comments, 0 edits): «well, I love it the way it is. go forward with implementation».
+
+| Row | Answered as | Where it is recorded |
+|---|---|---|
+| V-9 | **Free preselected** when `/new` opens (the drawn default; SPEC-v2 R2 and R18 stand) | `slices/S01/DONE.md` §1 Q1 |
+| V-17 | **yes** — the intro line changes while Free is chosen, to the wording drawn on the Free artboards | `slices/S01/DONE.md` M9 |
+| V-18 | **yes** — the two gauge hints change while Free is chosen, to the wording drawn | `slices/S01/DONE.md` M9 |
+
+The three MOCK questions with no row (Q3 dim-only lock, Q4 raw ids, Q5 Free/Premium with no label, Q6 the promises) are answered by the same yes and recorded in `DONE.md` §1. Still pending: V-7 (fleet config — V's operation before TEST(S02)), V-10…V-16, V-19 (defaults binding).
+
+- 2026-09-10 00:04 · Ruling: V's «well, I love it the way it is. go forward with implementation» is read as the yes on DONE(S01) for the canvas as drawn, ratifying all six MOCK.md defaults — because the gate offered exactly two ways to answer (edit the canvas, or an export) and V chose neither, saying it stays as it is — cost if wrong: one of six defaults re-drawn at C3/C4 time and a DONE.md line rewritten.
