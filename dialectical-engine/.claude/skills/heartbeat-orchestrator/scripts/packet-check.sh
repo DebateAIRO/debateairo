@@ -46,6 +46,6 @@ if [ -z "$sr" ]; then fail "no self-report path (…/agent-reports/<SEAT>.md)"; 
     || fail "self-report path is not inside the allowed block: $sr"
 fi
 
-head=$(git -C "$(dirname "$P")" rev-parse --short HEAD 2>/dev/null || echo "?")
+head=$(git -C "$(cd "$(dirname "$P")" && pwd -P)" rev-parse --short HEAD 2>/dev/null); head="${head:-not in a repo}"
 [ $rc = 0 ] && echo "OK dispatchable: $P (main-tree HEAD at check time: $head — the packet's base is the LANE base; stamp both in the dispatch comment)"
 exit $rc
