@@ -754,6 +754,7 @@ describe("v2-ui data access over the V3 contract client", () => {
       "Question?",
       {
         risk_tier: "casual",
+        plan_tier: "free",
         tier_source: "MACHINE_DEFAULT",
         tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",
