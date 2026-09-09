@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — REQ-FIX (requirements rework after REQ-REV pass __PREV_PASS__) · mission `__MISSION__`
 
-Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus a named skill's own `references/*.md` when that skill sends you there, each listed in your `SKILLS LOADED` line. The spine (`docs/agent-protocols/…`) is the authority for a DISPUTE, not floor reading — open it only for a section a packet or a conflict names.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-requirements` · `superpowers:receiving-code-review` · `superpowers:brainstorming` (only where a finding opens a new alternative) — then anything else in Superpowers that fits.
 
 ## 1. Node
