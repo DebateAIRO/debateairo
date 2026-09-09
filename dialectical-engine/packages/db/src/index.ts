@@ -845,6 +845,7 @@ export interface StartRunInput {
   readonly tierSource: TierSource;
   readonly tierProvenanceRef: string;
   readonly compositionBudgetTier: CompositionBudgetTier;
+  readonly planTier?: "free" | "premium";
   readonly depthParams: Readonly<Record<string, unknown>>;
   readonly discoveredPanel: readonly DiscoveredPanelMember[];
   readonly strangerSampleRate: number;
@@ -1192,6 +1193,7 @@ export class RunRepository {
             tierSource: input.tierSource,
             tierProvenanceRef: input.tierProvenanceRef,
             compositionBudgetTier: input.compositionBudgetTier,
+            planTier: input.planTier ?? null,
             depthParams: input.depthParams,
             discoveredPanel: input.discoveredPanel,
             strangerSampleRate: input.strangerSampleRate,
@@ -1234,21 +1236,22 @@ export class RunRepository {
       const baseRunValues = [
         runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
-        input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
-        input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
+        input.compositionBudgetTier, input.planTier ?? null, JSON.stringify(input.depthParams),
+        JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
+        JSON.stringify(input.envelopeBasis), input.registerVersion,
         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
       ];
       await client.query(
         `INSERT INTO core.run (
           run_id, question_line, asker_id, session_id, caller_scope, as_of,
           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier, depth_params, agent_count, discovered_panel,
+          composition_budget_tier, plan_tier, depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
           battery_version, ask_contract, created_at_seq
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12::jsonb, jsonb_array_length($13::jsonb), $13::jsonb, $14,
-          $15::jsonb, $16, $17, $18::jsonb, $19
+          $11, $12, $13::jsonb, jsonb_array_length($14::jsonb), $14::jsonb, $15,
+          $16::jsonb, $17, $18, $19::jsonb, $20
         )`,
         baseRunValues
       );
