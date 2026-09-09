@@ -1851,7 +1851,7 @@ orchestrator's own case file naming its packets as the weapon.
    `heartbeat-protocol`, its role contract, its role floor, `INSTRUCTIONS.md`, its packet, and the
    files the packet names AT THE LINES IT NAMES: a BUILD node reads its cluster's steps, never the
    whole PLAN (PLAN.md stays uncapped); `TOOLING-TRAPS.md` is read as its index
-   (`grep -n '^## \|^- ' .hermes/TOOLING-TRAPS.md`) plus the headings the packet names. `COMMON.md`
+   (`grep -n '^## ' .hermes/TOOLING-TRAPS.md`) plus the headings the packet names. `COMMON.md`
    is at most 120 lines, and an amendment REPLACES the text that caused the defect — no append-only
    numbered list. Packets come from the templates in
    `.claude/skills/heartbeat-orchestrator/templates/` (fill markers `__UPPERCASE__`; a path the seat

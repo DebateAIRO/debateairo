@@ -1,9 +1,9 @@
-# COMMON — binding for every seat of mission `__MISSION__`. Read it in full (it is short by law), then your own packet.
+# COMMON — binding for every seat of mission `__MISSION__`. Your packet names it: read your packet first, then this file in full (it is short by law), then only what they name.
 
 - repo root, the cwd for every command: __REPO_ROOT__ (the git root is one level up)
 - mission root: __MISSION_ROOT__ · intake record: __MISSION_ROOT__/00-intake.md · V rows: __MISSION_ROOT__/V-DECISIONS-PACKET.md (each row's default binds until V rules)
 - spine v4.0.0: __REPO_ROOT__/docs/agent-protocols/debateai-heartbeat-protocol.md · role contracts: __REPO_ROOT__/.claude/skills/heartbeat-<role>/SKILL.md
-- packets: __PACKET_DIR__ · reports: __REPORTS__ (LEDGER.md, agent-reports/, probes/, review-packages/) · tooling traps index: `grep -n '^## \|^- ' __REPO_ROOT__/.hermes/TOOLING-TRAPS.md`
+- packets: __PACKET_DIR__ · reports: __REPORTS__ (LEDGER.md, agent-reports/, probes/, review-packages/) · tooling traps index: `grep -n '^## ' __REPO_ROOT__/.hermes/TOOLING-TRAPS.md`
 - base: `dev` @ __BASE__ · the main tree carries other missions' uncommitted work — never touch, revert, stash or "clean" it; slice lanes are __REPO_ROOT__/.worktrees/<slice>/
 
 ## 1. Skills — in this order, then anything else in Superpowers that fits

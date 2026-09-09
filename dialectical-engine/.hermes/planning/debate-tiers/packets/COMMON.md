@@ -1,9 +1,9 @@
-# COMMON — binding for every seat of mission `debate-tiers`. Read it in full (it is short by law), then your own packet.
+# COMMON — binding for every seat of mission `debate-tiers`. Your packet names it: read your packet first, then this file in full (it is short by law), then only what they name.
 
 - repo root, the cwd for every command: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine (the git root is one level up)
 - mission root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers · intake record: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/00-intake.md · V rows: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/V-DECISIONS-PACKET.md (each row's default binds until V rules)
 - spine v4.0.0: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/agent-protocols/debateai-heartbeat-protocol.md · role contracts: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-<role>/SKILL.md
-- packets: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets · reports: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers (LEDGER.md, agent-reports/, probes/, review-packages/) · tooling traps index: `grep -n '^## \|^- ' /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/TOOLING-TRAPS.md`
+- packets: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets · reports: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers (LEDGER.md, agent-reports/, probes/, review-packages/) · tooling traps index: `grep -n '^## ' /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/TOOLING-TRAPS.md`
 - base: `dev` @ 7f89f7b7 = the LANES' base (both worktrees). The MAIN tree's HEAD moves with protocol commits (1dfb7f03 at the time of writing) — measure `git rev-parse --short HEAD` where you stand, and never treat the two as one. The main tree carries other missions' uncommitted work — never touch, revert, stash or "clean" it; slice lanes are /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/<slice>/
 
 ## 1. Skills — in this order, then anything else in Superpowers that fits
