@@ -178,6 +178,9 @@ escalates to V after ONE failed workaround.
 
 ## 9. Ledger, reports, closure
 
+The mission tree (`docs/missions/<m>`, `.hermes/planning/<m>`, `.hermes/reports/<m>`) is COMMITTED at
+every freeze — REQ READY, each REQ-FIX / ARCH / MOCK READY, each verdict — as `docs(<m>): …`; an
+untracked tree has no history, and a seat's in-place edit of a frozen file is then unrecoverable.
 Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
 how SKILLS LOADED was verified, self-report path, verdict — and a `Ruling:` line for every decision
 you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
