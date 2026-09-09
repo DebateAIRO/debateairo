@@ -22,17 +22,66 @@ flowchart LR
   t_be1a11d7["(finding) REQ-FIX-p2 (b) — V-DECISIONS-PACKET.md V-12 cites BASELINE.m"]:::done
   t_43263b80["(finding) REQ-FIX-p2 (c) — tests/render/prov01-honesty-drawer.test.tsx"]:::done
   t_37a8e5c8["(finding) REQ-FIX-p2 packet defect (orchestrator) — REQ-FIX-p2.md §1/c"]:::done
-  t_dfd8f52d["(claude-opus-5) ARCH S01 — PLAN.md for the selector + Free locks slice"]:::ready
-  t_57d602a5["(claude-opus-5) ARCH S02 — PLAN.md for the tier-picks-the-fleet slice "]:::ready
-  t_0e278df0["(claude-opus-5) ARCH-REV S01 — blind review of PLAN.md + the ARCH pack"]:::todo
-  t_08c8abe2["(claude-opus-5) ARCH-REV S02 — blind review of PLAN.md + the ARCH pack"]:::todo
-  t_c1cf2c21["(finding) REQ-REV-p2 N1 — five binding sentences still say the 21:40 b"]:::ready
-  t_4a7ccb0c["(finding) REQ-REV-p2 N2 — six suites the requirements will turn RED ha"]:::ready
-  t_9e274b2d["(finding) REQ-REV-p2 N3 — S01/SPEC-v2 R20-B count sentence is off by o"]:::ready
-  t_98313d55["(finding) REQ-REV-p2 N4 — S01/DONE.md:9 and :29 still point at SPEC.md"]:::ready
-  t_fb6b20c7["(finding) REQ-REV-p2 P1 packet defect (orchestrator) — REQ-REV-p2 char"]:::ready
-  t_2db5d7c1["(finding) REQ-REV-p2 P2 packet defect (orchestrator) — the reviewer's "]:::ready
-  t_c6648f8a["(finding) REQ-REV-p2 P3 packet defect (orchestrator) — three different"]:::ready
+  t_dfd8f52d["(claude-opus-5) ARCH S01 — PLAN.md for the selector + Free locks slice"]:::done
+  t_57d602a5["(claude-opus-5) ARCH S02 — PLAN.md for the tier-picks-the-fleet slice "]:::done
+  t_0e278df0["(claude-opus-5) ARCH-REV S01 — blind review of PLAN.md + the ARCH pack"]:::done
+  t_08c8abe2["(claude-opus-5) ARCH-REV S02 — blind review of PLAN.md + the ARCH pack"]:::done
+  t_c1cf2c21["(finding) REQ-REV-p2 N1 — five binding sentences still say the 21:40 b"]:::done
+  t_4a7ccb0c["(finding) REQ-REV-p2 N2 — six suites the requirements will turn RED ha"]:::done
+  t_9e274b2d["(finding) REQ-REV-p2 N3 — S01/SPEC-v2 R20-B count sentence is off by o"]:::done
+  t_98313d55["(finding) REQ-REV-p2 N4 — S01/DONE.md:9 and :29 still point at SPEC.md"]:::done
+  t_fb6b20c7["(finding) REQ-REV-p2 P1 packet defect (orchestrator) — REQ-REV-p2 char"]:::done
+  t_2db5d7c1["(finding) REQ-REV-p2 P2 packet defect (orchestrator) — the reviewer's "]:::done
+  t_c6648f8a["(finding) REQ-REV-p2 P3 packet defect (orchestrator) — three different"]:::done
+  t_8eb3dcff["(finding) ARCH-S02 F-1 — SPEC R5's maker-span check is unbuildable fro"]:::ready
+  t_6fdb7da9["(finding) ARCH-S02 F-2 — the orchestrator's N2 fold parenthetical woul"]:::done
+  t_a5b998ff["(finding) ARCH-S02 F-3 — the N2 fold under-counts by one: api.test.ts:"]:::done
+  t_1b4420f7["(finding) ARCH-S02 F-4 — tests/integration/register-version-boundaries"]:::done
+  t_457e2e85["(finding) ARCH-S02 F-5 packet defect (orchestrator) — ARCH-S02 charge "]:::done
+  t_4fdfce80["(finding) ARCH-S02 P-A packet defect (orchestrator) — ARCH-S02 charge "]:::done
+  t_ac7da71c["(finding) ARCH-S02 P-B packet defect (orchestrator) — both ARCH packet"]:::done
+  t_38f2276c["(finding) ARCH-S01 F1 — tests/render/ux01-new-debate-form.test.tsx:57-"]:::ready
+  t_cc5fa2a7["(finding) ARCH-S01 F2 — tests/unit/v2ui-pages.test.ts:83 slices an EMP"]:::ready
+  t_1b8a5ad8["(finding) ARCH-S01 F3 — tests/unit/consent-s02-style-contract.test.ts:"]:::ready
+  t_db48537d["(finding) ARCH-S01 F4 — SPEC R19 and BASELINE.md index by 'suites a re"]:::done
+  t_68ce7adc["(finding) ARCH-S01 F5 packet defect (orchestrator) — ARCH-S01 charge 5"]:::done
+  t_e1d8ca6d["(finding) ARCH-S01 F6 packet defect (orchestrator) — packet §1 says 't"]:::done
+  t_06c7dc57["(finding) ARCH-S01 F7 packet/COMMON gap — nothing states whether an AR"]:::done
+  t_fcd13dd8["(finding) ARCH-S01 F8 (seat's own, caught) — vitest prints 'Tests 2 fa"]:::done
+  t_ffb56aba["(claude-opus-5) ARCH-FIX S02 — rework pass 2 of 3 after ARCH-REV p1: T"]:::ready
+  t_1dc7049a["(claude-opus-5) ARCH-REV S02 — pass 2 of 3, scoped: the B1 closure + t"]:::todo
+  t_7a207605["(finding) ARCH-REV-S02-p1 B1 — the step order writes code before tests"]:::ready
+  t_109ac1ed["(finding) ARCH-REV-S02-p1 N1 — S02-C2-S11, S02-C3-S5, S02-C3-S6 sit ou"]:::ready
+  t_6390ae3b["(finding) ARCH-REV-S02-p1 N2 — R15's forward trace row attributes RED "]:::ready
+  t_aa90e1c7["(finding) ARCH-REV-S02-p1 N3 — .hermes/TOOLING-TRAPS.md:1041 is cited "]:::done
+  t_591dd950["(finding) ARCH-REV-S02-p1 N4 — eight citation drifts in PLAN.md, each "]:::ready
+  t_532fa71f["(finding) ARCH-REV-S02-p1 N5 — the orchestrator's ADR renumber (0023→0"]:::ready
+  t_b911aa65["(finding) ARCH-REV-S02-p1 N6 — cluster S02-C3 has no RED frame and the"]:::ready
+  t_44813002["(finding) ARCH-REV-S02-p1 N7 — the filter's shape (roster.flatMap over"]:::ready
+  t_563ba267["(finding) ARCH-REV-S02-p1 N8 — the plan says it does not guess S01's e"]:::ready
+  t_5ea9b6b7["(finding) ARCH-REV-S02-p1 N9 — SPEC R10 says the /new error surface is"]:::ready
+  t_fe0efe7b["(finding) ARCH-REV-S02-p1 N10 — F-4 is a class (suites inside SPEC R13"]:::done
+  t_97d3cd5c["(finding) ARCH-REV-S02-p1 N11 — PLAN.md §5's header claims every comma"]:::ready
+  t_54027d98["(claude-opus-5) MOCK S01 — the Free/Premium selector on /new as a Clau"]:::done
+  t_484dffaa["(finding) ARCH-REV-S01-p1 N1 — the Free lock leaves TWO false claims o"]:::done
+  t_3fbece20["(finding) ARCH-REV-S01-p1 N2 — SPEC R17's 'no colour literal outside t"]:::ready
+  t_d20b1ffd["(finding) ARCH-REV-S01-p1 N3 — step S01-42 has no done-criterion, and "]:::ready
+  t_60e806a8["(finding) ARCH-REV-S01-p1 N4 — S01-24's done-criterion is false at bas"]:::ready
+  t_750a12c2["(finding) ARCH-REV-S01-p1 N5 — PLAN §8 credits C2 with a detection it "]:::done
+  t_8afd38d0["(finding) ARCH-REV-S01-p1 N6 — two of the six screens under-specify th"]:::ready
+  t_23cd2a0e["(finding) ARCH-REV-S01-p1 N7 — 'Eight are RED at base' is seven (the s"]:::done
+  t_b5bc6288["(finding) ARCH-REV-S01-p1 N8 — the R21 delta command writes a shared g"]:::ready
+  t_0cac29d7["(finding) ARCH-REV-S01-p1 N9 — 'globals.css styles :disabled for exact"]:::ready
+  t_251cd802["(finding) ARCH-REV-S01-p1 P1 packet defect (orchestrator) — ARCH-REV-S"]:::done
+  t_c3eeee2b["(finding) ARCH-REV-S01-p1 P2 packet defect (orchestrator) — the inputs"]:::done
+  t_64f2363d["(finding) ARCH-REV-S01-p1 P3 packet defect (orchestrator) — the exhaus"]:::done
+  t_f05c54bd["(V) DONE S01 — V defines done on the canvas: https://claude.ai/code/ar"]:::ready
+  t_e82bc6b0["(V) DONE S01 — define done on the canvas (https://claude.ai/code/artif"]:::ready
+  t_95c4c2ee["(finding) MOCK-S01 F1 (product) — .ndSelect draws the box while the na"]:::ready
+  t_4b5c0d2f["(finding) MOCK-S01 F2 packet defect (orchestrator) — MOCK-S01.md:24 na"]:::done
+  t_dc5c78a7["(finding) MOCK-S01 F3 (repo) — tests/render/stubs/next-navigation.ts l"]:::ready
+  t_68d0730a["(finding) MOCK-S01 F4 packet defect (orchestrator) — charge 3 enumerat"]:::done
+  t_337549e2["(finding) MOCK-S01 F5 packet defect (orchestrator, minor) — charge 3's"]:::done
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -40,6 +89,10 @@ flowchart LR
   t_485d6613 --> t_57d602a5
   t_dfd8f52d --> t_0e278df0
   t_57d602a5 --> t_08c8abe2
+  t_08c8abe2 --> t_ffb56aba
+  t_ffb56aba --> t_1dc7049a
+  t_0e278df0 --> t_54027d98
+  t_54027d98 --> t_e82bc6b0
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
@@ -50,4 +103,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-09 22:06 from board `debate-tiers` — 33 nodes, 7 edges_
+_rendered 2026-09-09 23:34 from board `debate-tiers` — 82 nodes, 11 edges_

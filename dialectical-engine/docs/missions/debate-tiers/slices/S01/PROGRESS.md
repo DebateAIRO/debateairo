@@ -32,3 +32,8 @@
 - PLAN.md stands (859 lines). The reviewer re-ran every cluster command at base (34/34 agree) and proved the replacement render instrument (sup-04-widget idiom renders /new: 5/5). Findings folded: N1 → row V-18 (labels on the pinned controls) drawn at the mock; N2/N3 → the C4 BUILD packet (a scoped colour-literal assertion; a done-criterion for S01-42); N4–N9 in DECISIONS.
 - Next: MOCK(S01) (Opus 5, the /taste + design canvas) → DONE(S01) = V's gate (canvas URL + the V-9 question + V-17/V-18 copy).
 
+## 2026-09-09 23:33 EEST — MOCK(S01) consumed: MOCK READY → DONE(S01) is V's (orchestrator entry)
+
+- Canvas: https://claude.ai/code/artifact/e08c6b3b-60b1-4e8a-9c15-79ca43a16d22 · MOCK.md with the questions (smallest yes/no, defaults). 14 artboards, 9 NEW rows. F1 (the invisible native select under `.ndSelect`) routed to the C4 BUILD packet: the locked treatment is drawn on the visible box.
+- V answers on the canvas (Save) or by an export under `ui_designs/`; the orchestrator extracts the final artboards into `design/S01/`, writes DONE.md, and BUILD(S01-*) becomes READY only on V's yes.
+

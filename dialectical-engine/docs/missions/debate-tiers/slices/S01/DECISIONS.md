@@ -189,3 +189,9 @@ the round trip is one line in DONE.md.
 - **N7 (fold):** "Eight are RED at base" (`DECISIONS.md:115`, the handoff) is seven — `BASELINE.md`'s end section carries the seven with their failure names.
 - **N8 → whichever BUILD packet owns S01-43:** the R21 delta command writes a shared global path and its base list has no extractor; the packet gives a per-seat output path and the extractor that produces BASELINE.md's pinned-file list.
 
+## Orchestrator folds after MOCK(S01) READY (2026-09-09 23:34) — routed, PLAN.md stands
+
+- **MOCK F1 → the C4 BUILD packet (the locked treatment):** `.ndSelect` draws the visible box while the native `<select>` lies over it at `opacity: 0` (`apps/ui/app/globals.css:6152-6166`); SPEC R4's `disabled` on `#depthMode` / `#scrutinyDepth` lands on the invisible element. The built rule reaches the OUTER box (e.g. `.ndSelect:has(select:disabled)`, or a class the page sets beside `disabled`) so the dim the canvas draws (artboards 9-14) is what renders; the second class member is the code field at `globals.css:6135-6137`. Acceptance step 6 is passed by looking only when the box dims.
+- **MOCK F3 (repo, ticketed):** `tests/render/stubs/next-navigation.ts` has no `useRouter`/`useSearchParams` (both called at `page.tsx:65-66`); `renderToStaticMarkup` then returns the EMPTY STRING rather than throwing — the C4 render suite's first assertion is "markup is non-empty".
+- The canvas: https://claude.ai/code/artifact/e08c6b3b-60b1-4e8a-9c15-79ca43a16d22 · questions Q1–Q6 in `MOCK.md` (Q1 = V-9, Q2 = V-17/V-18, Q3 the locked treatment, Q4 raw model ids, Q5 the tier names, Q6 the two promises). Nothing on S01 proceeds until V's yes.
+
