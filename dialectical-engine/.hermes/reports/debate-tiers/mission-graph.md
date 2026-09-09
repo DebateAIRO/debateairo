@@ -48,20 +48,20 @@ flowchart LR
   t_e1d8ca6d["(finding) ARCH-S01 F6 packet defect (orchestrator) — packet §1 says 't"]:::done
   t_06c7dc57["(finding) ARCH-S01 F7 packet/COMMON gap — nothing states whether an AR"]:::done
   t_fcd13dd8["(finding) ARCH-S01 F8 (seat's own, caught) — vitest prints 'Tests 2 fa"]:::done
-  t_ffb56aba["(claude-opus-5) ARCH-FIX S02 — rework pass 2 of 3 after ARCH-REV p1: T"]:::ready
-  t_1dc7049a["(claude-opus-5) ARCH-REV S02 — pass 2 of 3, scoped: the B1 closure + t"]:::todo
-  t_7a207605["(finding) ARCH-REV-S02-p1 B1 — the step order writes code before tests"]:::ready
-  t_109ac1ed["(finding) ARCH-REV-S02-p1 N1 — S02-C2-S11, S02-C3-S5, S02-C3-S6 sit ou"]:::ready
-  t_6390ae3b["(finding) ARCH-REV-S02-p1 N2 — R15's forward trace row attributes RED "]:::ready
+  t_ffb56aba["(claude-opus-5) ARCH-FIX S02 — rework pass 2 of 3 after ARCH-REV p1: T"]:::done
+  t_1dc7049a["(claude-opus-5) ARCH-REV S02 — pass 2 of 3, scoped: the B1 closure + t"]:::done
+  t_7a207605["(finding) ARCH-REV-S02-p1 B1 — the step order writes code before tests"]:::done
+  t_109ac1ed["(finding) ARCH-REV-S02-p1 N1 — S02-C2-S11, S02-C3-S5, S02-C3-S6 sit ou"]:::done
+  t_6390ae3b["(finding) ARCH-REV-S02-p1 N2 — R15's forward trace row attributes RED "]:::done
   t_aa90e1c7["(finding) ARCH-REV-S02-p1 N3 — .hermes/TOOLING-TRAPS.md:1041 is cited "]:::done
-  t_591dd950["(finding) ARCH-REV-S02-p1 N4 — eight citation drifts in PLAN.md, each "]:::ready
-  t_532fa71f["(finding) ARCH-REV-S02-p1 N5 — the orchestrator's ADR renumber (0023→0"]:::ready
-  t_b911aa65["(finding) ARCH-REV-S02-p1 N6 — cluster S02-C3 has no RED frame and the"]:::ready
-  t_44813002["(finding) ARCH-REV-S02-p1 N7 — the filter's shape (roster.flatMap over"]:::ready
-  t_563ba267["(finding) ARCH-REV-S02-p1 N8 — the plan says it does not guess S01's e"]:::ready
-  t_5ea9b6b7["(finding) ARCH-REV-S02-p1 N9 — SPEC R10 says the /new error surface is"]:::ready
+  t_591dd950["(finding) ARCH-REV-S02-p1 N4 — eight citation drifts in PLAN.md, each "]:::done
+  t_532fa71f["(finding) ARCH-REV-S02-p1 N5 — the orchestrator's ADR renumber (0023→0"]:::done
+  t_b911aa65["(finding) ARCH-REV-S02-p1 N6 — cluster S02-C3 has no RED frame and the"]:::done
+  t_44813002["(finding) ARCH-REV-S02-p1 N7 — the filter's shape (roster.flatMap over"]:::done
+  t_563ba267["(finding) ARCH-REV-S02-p1 N8 — the plan says it does not guess S01's e"]:::done
+  t_5ea9b6b7["(finding) ARCH-REV-S02-p1 N9 — SPEC R10 says the /new error surface is"]:::done
   t_fe0efe7b["(finding) ARCH-REV-S02-p1 N10 — F-4 is a class (suites inside SPEC R13"]:::done
-  t_97d3cd5c["(finding) ARCH-REV-S02-p1 N11 — PLAN.md §5's header claims every comma"]:::ready
+  t_97d3cd5c["(finding) ARCH-REV-S02-p1 N11 — PLAN.md §5's header claims every comma"]:::done
   t_54027d98["(claude-opus-5) MOCK S01 — the Free/Premium selector on /new as a Clau"]:::done
   t_484dffaa["(finding) ARCH-REV-S01-p1 N1 — the Free lock leaves TWO false claims o"]:::done
   t_3fbece20["(finding) ARCH-REV-S01-p1 N2 — SPEC R17's 'no colour literal outside t"]:::ready
@@ -76,12 +76,38 @@ flowchart LR
   t_c3eeee2b["(finding) ARCH-REV-S01-p1 P2 packet defect (orchestrator) — the inputs"]:::done
   t_64f2363d["(finding) ARCH-REV-S01-p1 P3 packet defect (orchestrator) — the exhaus"]:::done
   t_f05c54bd["(V) DONE S01 — V defines done on the canvas: https://claude.ai/code/ar"]:::ready
-  t_e82bc6b0["(V) DONE S01 — define done on the canvas (https://claude.ai/code/artif"]:::ready
+  t_e82bc6b0["(V) DONE S01 — define done on the canvas (https://claude.ai/code/artif"]:::done
   t_95c4c2ee["(finding) MOCK-S01 F1 (product) — .ndSelect draws the box while the na"]:::ready
   t_4b5c0d2f["(finding) MOCK-S01 F2 packet defect (orchestrator) — MOCK-S01.md:24 na"]:::done
   t_dc5c78a7["(finding) MOCK-S01 F3 (repo) — tests/render/stubs/next-navigation.ts l"]:::ready
   t_68d0730a["(finding) MOCK-S01 F4 packet defect (orchestrator) — charge 3 enumerat"]:::done
   t_337549e2["(finding) MOCK-S01 F5 packet defect (orchestrator, minor) — charge 3's"]:::done
+  t_fc4f384d["(finding) ARCH-FIX-S02 F-6 — the published R13 ask-literal grep answer"]:::done
+  t_853d7670["(finding) ARCH-FIX-S02 F-7 — C2/C3/C4's absolute green targets (53, 41"]:::ready
+  t_36b90c6f["(finding) ARCH-FIX-S02 seat's own defect, corrected on the record — th"]:::done
+  t_422678f3["(gpt-5.6-sol) BUILD S02-C1 — the run records its tier (store side): mi"]:::done
+  t_7273eea5["(gpt-5.6-sol) BUILD S02-C3 — roster read discipline (architecture guar"]:::blocked
+  t_1675b61f["(gpt-5.6-sol) BUILD S02-C2 — the filter and the typed refusal (evaluat"]:::blocked
+  t_05227ae2["(gpt-5.6-sol) BUILD S02-C4 — the wire: the ask's tier reaches the run "]:::todo
+  t_e407c049["(finding) ARCH-REV-S02-p2 N1 — S02-V1's published total is off by two:"]:::ready
+  t_2c90d113["(finding) ARCH-REV-S02-p2 N2 — the receipt that certifies F-6's blesse"]:::done
+  t_79bc55d3["(finding) ARCH-REV-S02-p2 N3 — grep is two binaries on this Mac: inlin"]:::done
+  t_b901849e["(finding) ARCH-REV-S02-p2 N4 — R15's frame numbering contradicts itsel"]:::ready
+  t_6c204de6["(finding) ARCH-REV-S02-p2 N5 — INHERITED, recorded not charged: SPEC-v"]:::ready
+  t_216c7104["(finding) ARCH-REV-S02-p2 N6 packet defect (orchestrator) — ARCH-REV-S"]:::done
+  t_cfd428dd["(finding) ARCH-REV-S02-p2 N7 packet defect (orchestrator) — the freeze"]:::done
+  t_8920309f["(finding) ARCH-REV-S02-p2 N8 packet defect (orchestrator) — the ARCH-F"]:::done
+  t_a682a931["(gpt-5.6-sol) BUILD S01-C1 — the contract: plan_tier on the ask, the t"]:::ready
+  t_085d4fa4["(gpt-5.6-sol) BUILD S01-C2 — the ask wire: the builder's tier + proven"]:::todo
+  t_d1dc1913["(gpt-5.6-sol) BUILD S01-C3 — the page: the selector, the fourteen lock"]:::todo
+  t_cd5642d0["(gpt-5.6-sol) BUILD S01-C4 — the stylesheet: the selector's rules + th"]:::todo
+  t_6e2413b7["(gpt-5.6-sol) BUILD S01-C5 — the DONE.md measurements: one assertion p"]:::todo
+  t_a02cca8b["(finding) BUILD-S02-C1 F1 (plan) — PLAN.md:267 case 2's UPDATE probe: "]:::ready
+  t_1a083e6e["(finding) BUILD-S02-C1 F2 (packet, orchestrator) — verbatim-frame char"]:::done
+  t_2e1b3dc2["(finding) BUILD-S02-C1 F3 (plan) — S02-C1-S4 (PLAN.md:318-321, the Dri"]:::ready
+  t_b97424de["(finding) BUILD-S02-C1 F4 (packet, orchestrator) — the 'byte-for-byte'"]:::ready
+  t_68b151cb["(finding) BUILD-S02-C1 F5 (tooling) — embedded-Postgres logs dominated"]:::ready
+  t_678be355["(finding) BUILD-S02-C1 F6 (packet defect, orchestrator) — reading orde"]:::ready
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -93,6 +119,17 @@ flowchart LR
   t_ffb56aba --> t_1dc7049a
   t_0e278df0 --> t_54027d98
   t_54027d98 --> t_e82bc6b0
+  t_1dc7049a --> t_422678f3
+  t_1dc7049a --> t_7273eea5
+  t_1dc7049a --> t_1675b61f
+  t_422678f3 --> t_05227ae2
+  t_1675b61f --> t_05227ae2
+  t_e82bc6b0 --> t_a682a931
+  t_a682a931 --> t_085d4fa4
+  t_085d4fa4 --> t_d1dc1913
+  t_085d4fa4 --> t_cd5642d0
+  t_d1dc1913 --> t_6e2413b7
+  t_cd5642d0 --> t_6e2413b7
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
@@ -103,4 +140,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-09 23:34 from board `debate-tiers` — 82 nodes, 11 edges_
+_rendered 2026-09-10 00:38 from board `debate-tiers` — 108 nodes, 22 edges_

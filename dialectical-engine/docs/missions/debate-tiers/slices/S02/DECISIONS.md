@@ -207,3 +207,8 @@ here.`
 - **N2/N3 (TRAPS):** the receipt "answers 8 lines on `tests/unit/api.test.ts`" for the S02-M4 grep reproduces under neither grep binary (0 lines at base); the gate itself is sound (proved on a known-hit fixture: 2 lines). `grep` is TWO binaries on this Mac — inline in a harness call it is a shell function → ugrep 7.8.4; from a `.sh` (every seat's way) it is `/usr/bin/grep` (BSD). Every published grep is proved on a known hit under the binary the seat will use.
 - **N7:** the PLAN Revision 2 payload is in commit `e7350ee4` (the MOCK node's freeze — the sweep trap), not in `697ebf8a` whose subject claims it; COMMON §6's freeze row records both.
 
+
+## Orchestrator folds after BUILD(S02-C1) READY (2026-09-10 00:36) — PLAN.md stands; the record where it is imprecise
+
+- **F1 (BUILD-S02-C1).** `PLAN.md:267` (case 2, the invalid UPDATE) does not say that `core.reject_mutation` rejects every UPDATE on `core.run` with SQLSTATE `55000` before the new CHECK can fire. The shipped case isolates the constraint inside a transaction with triggers suppressed, asserts `23514` + `run_plan_tier_vocabulary`, and rolls back (`tests/integration/tiers-s02-run-plan-tier.test.ts:141-151`). REV(S02) reads the case as the oracle for R12's vocabulary, the plan line as the intent.
+- **F3 (BUILD-S02-C1).** `PLAN.md:318-321` (S02-C1-S4, the Drizzle mapping) names no case that goes RED when the mapping is omitted; case 1 now pins the DB column and Drizzle's exported mapping in one literal result (`:112-125`). The class (every production step names its refutation) is an ARCH-REV charge from here on.

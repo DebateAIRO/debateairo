@@ -42,3 +42,8 @@
 - PLAN.md Revision 2 stands. BUILD(S02-C1) dispatched on Codex Sol in the S02 lane (steps S02-C1-S2→S3→S1→S4→S5→S6→S7→S8, tests first); C2/C3 blocked until S01 merges to dev (S02-M4); C4 after C1 ∧ C2. GATE(S02) fires when all four are done; REV(S02) lenses: correctness + security/data-safety + product-truth (HIGH risk — the migration).
 - Folds: N1 (S02-V1's expected total is `3 failed | 65 passed (68)` pre-rebase, restated as base + delta after S01's merge) → DECISIONS + the REV(S02) packet; N3 (two greps) → TRAPS; N7 (the Revision 2 payload is in `e7350ee4`, not `697ebf8a`) → COMMON §6 freeze row.
 
+
+## 2026-09-10 00:32 EEST — BUILD(S02-C1) consumed: READY (orchestrator entry)
+
+- Commit `d2a58e9a` on `slice/tiers-s02`: `migrations/0061_plan_tier_on_run.sql` (103 lines; `CREATE OR REPLACE` of `core.create_encrypted_run`, no `DROP`), `packages/db/src/schema.ts` (+1, `planTier`), `packages/db/src/index.ts` (both write paths; the `$13` pair shifted to `$14` together), `tests/integration/tiers-s02-run-plan-tier.test.ts` (4 cases). RED frame `4 failed` naming `plan_tier`; three runs `Test Files 2 passed (2)` / `Tests 25 passed (25)` (`evaluator-database` 21/21 + the new 4/4). Six mutants refuted. SKILLS 6/6 verified in the rollout. R12 live read-back left to V (`docker exec debateai-v3-postgres-1 psql … SELECT plan_tier FROM core.run WHERE run_id=…`).
+- Findings F1–F6 ticketed (two plan-precision items folded into DECISIONS.md; four packet/tooling classes fixed in the protocol). Next on S02: C4 waits for C2; C2/C3 wait for S01's merge (S02-M1…M4, row V-12). The lane idles at `d2a58e9a` until then.
