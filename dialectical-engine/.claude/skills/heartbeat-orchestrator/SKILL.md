@@ -107,6 +107,9 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   packet-write time from the name it cites, never copied from another packet; a packet generator
   computes them. An extractor a packet publishes (paths from diagnostics, members from a list) is
   anchored on the shape it parses and proved on a known-bad input before dispatch.
+  A charge that tells a seat to CALL a symbol quotes the symbol's signature line and the shape of its
+  argument (`path:LINE — text`), never a paraphrase of what a grep of its body suggested. A packet
+  that names a runner ships the runner variant that writes the captured output to the run's log.
 - Every packet starts from `templates/<NODE>.md` beside this file (planning rework nodes use
   `REQ-FIX.md` and `ARCH-FIX.md`); fill every
   `__MARKER__`; keep the contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is

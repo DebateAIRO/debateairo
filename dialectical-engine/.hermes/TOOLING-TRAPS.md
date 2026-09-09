@@ -3026,3 +3026,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 
 ## zsh expands `$VAR:A`, `$VAR:h`, `$VAR:t`, `$VAR:l` as PATH MODIFIERS inside double quotes (2026-09-10, orchestrator, BUILD-S02-C1 closures)
 - `"$F10_F1:ARCH.md …"` became `"<cwd>/t_a02cca8bRCH.md …"` (`:A` = absolute path), `"$F10_F4:heartbeat"` became `".eartbeat"` (`:h` = dirname), `:t` ate the `t` of "the", `:l` the `l` of "line" — five of six ticket ids were mangled and their `complete` calls hit "unknown task" while the loop printed "closed". Rule: a variable followed by a colon is ALWAYS braced (`"${VAR}:…"`), and a loop that mutates the board checks each command's exit before printing success. Same family as the unquoted-`$4` word-split trap (zsh does not split) — zsh's parameter syntax is not bash's.
+
+## Under `// @vitest-environment jsdom`, `fileURLToPath(import.meta.url)` fails collection with ERR_INVALID_URL_SCHEME (2026-09-10, BUILD-S01-C3)
+- A render suite that resolves a source file from its own location dies before any case runs. Read the file from the packet-pinned cwd (`readFile("apps/ui/app/new/page.tsx")` from the lane root, the `sup-04-widget` idiom) instead of from `import.meta.url`. Priced by the seat at one collection failure + one diagnosis round trip.
