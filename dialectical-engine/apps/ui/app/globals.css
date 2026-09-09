@@ -6205,6 +6205,70 @@ a:focus-visible {
 .ndActionsSpacer { flex: 1; }
 .ndKeyHint { font-size: 10.5px; color: var(--muted); }
 
+/* === debate-tiers S01 === */
+.ndTier {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+.ndTierOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--core);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ndTierOption[aria-checked="true"] {
+  border-color: var(--line-strong);
+  background: var(--shell);
+}
+.ndTierName {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.ndTierOption[aria-checked="true"] .ndTierName {
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 700;
+}
+.ndTierPromise {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.ndTierModels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ndTierModel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.ndSegItem:disabled,
+.ndSlider:disabled,
+.ndSteerInput:disabled,
+.ndSelect:has(select:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* === end debate-tiers S01 === */
+
 @media (prefers-reduced-motion: reduce) {
   .ndStart { transition: none; }
   .ndStart:hover:not(:disabled) { transform: none; }
