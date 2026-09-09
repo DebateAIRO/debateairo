@@ -7103,6 +7103,23 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         );
         const issued: Array<Promise<T9Score & ResendObservation>> = [];
         const issuedAtMs: number[] = [];
+        /**
+         * POL-03 shape (tests/support/poolFailureChild.ts). The join below is
+         * about 22 seconds after the first push, and the loop awaits its cadence
+         * in between — so a promise pushed without a rejection handler reaches
+         * Node's unhandled-rejection checkpoint unattended and ends the process,
+         * with a stack pointing at whatever TYPED the rejection rather than at
+         * this loop. Attaching the handler in the SAME synchronous turn the
+         * promise is created closes that window.
+         *
+         * It marks the promise attended; it does not swallow it. `issued` still
+         * holds the ORIGINAL promise, so `Promise.all` below still rejects with
+         * the first failure, at the same moment, exactly as before.
+         */
+        const attendedByJoin = <T>(promise: Promise<T>): Promise<T> => {
+          void promise.catch(() => undefined);
+          return promise;
+        };
         const arms = armsForOrder(order);
         for (let position = 0; position < samplesPerArm * 2; position += 1) {
           issuedAtMs.push(performance.now());
@@ -7111,7 +7128,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           const email = arm === "existing"
             ? registered.email
             : `${namespace}-missing-${slot}@example.test`;
-          issued.push(injectResend(
+          issued.push(attendedByJoin(injectResend(
             api,
             arm,
             slot,
@@ -7122,7 +7139,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
             slot,
             firstPosition: position % 2 === 0,
             score: observation.elapsedMs
-          })));
+          }))));
           await new Promise<void>((resolve) => setTimeout(resolve, windowCadenceMs));
         }
         // The delivered interval between the two members of each cadence slot, against the
