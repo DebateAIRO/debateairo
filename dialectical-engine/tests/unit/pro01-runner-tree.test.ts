@@ -196,7 +196,14 @@ describe("PRO-01 depth-driven pro/con expansion", () => {
       }),
       connect: vi.fn(async () => ({
         query: vi.fn(async (sql: string, values?: readonly unknown[]) => {
-          if (sql.includes("pg_advisory_lock")) return { rows: [] };
+          // `acquireRunContentLease` acquires with pg_TRY_advisory_lock and reads
+          // `acquired` off the row. That form is pinned by
+          // tests/architecture/s6-content-encryption-contract.test.ts, which also
+          // forbids the blocking `pg_advisory_lock(hashtextextended($1,0))` this
+          // stub used to answer. Answering with no row reads as CONTENTION and
+          // sends the lease into its unlock-and-retry loop instead of the
+          // envelope check this row is about.
+          if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
           if (sql.includes("run_private_content_is_live")) return {
             rows: [{ run_id: String((values?.[0] as readonly string[])[0]), live: true }]
           };

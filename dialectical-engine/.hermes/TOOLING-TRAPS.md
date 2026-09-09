@@ -2370,3 +2370,25 @@ region runs unmodified and unknown type names (`T9Score`, `ResendObservation`) c
 text. Guard it: assert the anchors were found, assert the slice still contains the call the stubs
 replace, and ship a positive control that mutates the slice and requires the child to die — that
 control is the only thing standing between this and a check that passes on an empty string.**
+
+## A `sql.includes("<query text>")` stub is pinned to a product STRING, and it rots silently
+Found by lane/known-reds (F-PRO01-RUNNER-TREE-RED, 2026-09-09). `acquireRunContentLease`
+acquired with `SELECT pg_advisory_lock(hashtextextended($1,0))` when the unit stubs around it
+were written (970870f3). Commit 7b3a3063 changed it to
+`SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired` plus an unlock-and-retry
+loop. `"pg_try_advisory_lock"` does NOT contain `"pg_advisory_lock"`, so every stub matching on
+the old substring stopped answering the lease's first query. Three unit rows broke at once and
+each broke DIFFERENTLY:
+- `tests/unit/pro01-runner-tree.test.ts` and `tests/unit/xrev01-node-review.test.ts` fell
+  through to their `throw new Error("UNEXPECTED_CLIENT_QUERY:" + sql)` — loud, correct, and
+  still unfixed 12 days later because a loud red in a known-red set is invisible.
+- `tests/unit/load01-run-projection.test.ts` returned `{ rows: [] }` from a branch that no
+  longer matched, which the try-lock reads as CONTENTION (`rows[0]?.acquired !== true`), so the
+  lease unlocked, slept 10 ms and retried FOREVER: 120005 ms, a timeout with no error text
+  naming the cause (`logs/dev-merge/16-full-suite-dev-169941c6.log:2639`).
+`tests/unit/evaluator-addon.test.ts` survived only because it happened to answer BOTH forms.
+**Rules: (1) when you change a query's text, `grep -rn 'includes("<the old text>")' tests/` in
+the same commit — the compiler cannot see a string match. (2) A stub branch that returns a shape
+the caller reads as "retry" turns a fixture defect into a hang, not a failure; prefer answering
+the real query and letting everything else throw loudly. (3) A red row inside an accepted
+known-red set stops being read — the set is a place defects go to be forgotten.**

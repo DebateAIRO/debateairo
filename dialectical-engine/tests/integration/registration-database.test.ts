@@ -7143,8 +7143,8 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           await new Promise<void>((resolve) => setTimeout(resolve, windowCadenceMs));
         }
         // The delivered interval between the two members of each cadence slot, against the
-        // cadence the design intended. This is the issuer's own clock and is recorded before
-        // any response is scored, so no arm difference can manufacture or hide it.
+        // cadence the design intended. They are intra-slot delay diagnostics measured on the
+        // same event loop the requests and their response mapping run on, and decide nothing.
         const intraSlotOvershootsMs = Array.from(
           { length: samplesPerArm },
           (_, slot) => issuedAtMs[slot * 2 + 1]! - issuedAtMs[slot * 2]! - windowCadenceMs
