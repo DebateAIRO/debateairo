@@ -7,7 +7,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - seat: __SEAT__ · node: REQ-REV (blind review of the requirements, pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
-- inputs (read these and nothing else): the REQ packet __PACKET_DIR__/REQ.md (review it FIRST) · __MISSION_ROOT__/INSTRUCTIONS.md · every __MISSION_ROOT__/slices/<S>/SPEC.md and PLAN.md scaffold · the intake record
+- inputs (read these and nothing else): the REQ packet __PACKET_DIR__/REQ.md (review it FIRST) · __MISSION_ROOT__/INSTRUCTIONS.md · every __MISSION_ROOT__/slices/<S>/SPEC.md and PLAN.md scaffold · the intake record · the product files the SPECs cite, at the lines they cite, read-only
 - output (the ONE artifact this node produces): __MISSION_ROOT__/reviews/REQ-REV-p__PASS__.md (new) + ONE verdict comment on __TICKET__
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 

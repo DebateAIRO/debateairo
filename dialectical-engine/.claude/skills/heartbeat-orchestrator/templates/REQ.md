@@ -7,7 +7,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - seat: __SEAT__ · node: REQ (requirements) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
-- inputs (read these and nothing else): the intake record (V's verbatim goal, contradiction check, measured state) · the design of record extracts at __DESIGN_DIR__ (if any) · __REPO_ROOT__/docs/architecture/ (read-only)
+- inputs (read these and nothing else): the intake record (V's verbatim goal, contradiction check, measured state) · the design of record extracts at __DESIGN_DIR__ (if any) · the product files the intake cites, at the lines it cites, read-only (a requirement is checkable only against the code it constrains) · __ARCH_DOCS__ (docs/architecture files WITH line ranges — never a bare directory)
 - output (the ONE artifact this node produces): __MISSION_ROOT__/INSTRUCTIONS.md (new, ≤ 100 lines) and, per slice, __MISSION_ROOT__/slices/<S>/SPEC.md (new, frozen at your READY; first line under the title: `ui: yes|no`), PLAN.md (new, scaffold only), DECISIONS.md (new, append-only), PROGRESS.md (new, empty — the orchestrator's), DONE.md (new, placeholder — UI slices only)
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
