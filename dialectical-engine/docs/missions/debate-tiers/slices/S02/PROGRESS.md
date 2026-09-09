@@ -15,3 +15,9 @@
 
 - Handoff `handoffs/REQ-FIX-p2-handoff.md`; SKILLS 5/5 verified; all 8 findings ADDRESSED; v1 SPEC.md untouched (checksum-verified). S02: SPEC-v2.md (221 lines) is the record — R6 pins the roster check BEFORE assertMakerAdmission, R15 gains the all-members-missing RED test, R5's mechanism corrected, R12/R13/step 9 name the BUILD seat's handoff + the review package (the orchestrator relays into this file).
 - Next: REQ-REV pass 2 `t_485d6613` (blind, scoped to the closures). PASS releases ARCH(S01) ∥ ARCH(S02).
+
+## 2026-09-09 22:05 EEST — REQ-REV pass 2 consumed: PASS, planning closed (orchestrator entry)
+
+- `reviews/REQ-REV-p2.md`: every pass-1 closure re-walked and confirmed; SPEC-v2.md is the record of this slice from here on. Orchestrator folds recorded in `slices/S01/DECISIONS.md` (N1, N3, N4) and `BASELINE.md` (N2, measuring).
+- Next node: ARCH(S02) `t_57d602a5` (Opus 5, background) → ARCH-REV(S02) `t_08c8abe2` → BUILD(S02-*) with the plan_tier clusters waiting for S01's contract commit (V-12).
+

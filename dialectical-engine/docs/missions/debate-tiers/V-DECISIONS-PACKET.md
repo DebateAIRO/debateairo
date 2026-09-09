@@ -26,3 +26,4 @@ Each row's DEFAULT binds every seat until V rules on that row. Rows are appended
 - 2026-09-09 · Ruling: rows V-10…V-13 opened by the REQ seat are appended with REQ's recommended defaults as the binding defaults (each has measured evidence in its DECISIONS.md) — cost if wrong: one FIX pass on the affected slice.
 
 - 2026-09-09 21:40 · Ruling: row V-14 (opened by REQ-FIX pass 2) is appended with its recommended default binding — S01 does not change the honesty drawer's phrase; the change is routed as its own slice if V rules for it — cost if wrong: one FIX pass on S01 plus the prov01 suite's assertion moving with the words.
+- 2026-09-09 22:04 · Note on V-14: the row's text says `prov01-honesty-drawer.test.tsx` has no BASELINE.md row; it has one since 21:40 (1 passed / 1, both lanes, end section) — the question to V is unchanged.

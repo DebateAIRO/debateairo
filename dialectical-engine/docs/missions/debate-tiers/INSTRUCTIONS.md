@@ -35,7 +35,7 @@ Three `REV(S)` passes per slice, then it is V's (`heartbeat-protocol` §3.3).
 | What | Where |
 |---|---|
 | V's verbatim goal, the measured state, contradictions C1–C9 | `docs/missions/debate-tiers/00-intake.md` |
-| Rows V-1…V-9 (each default binds until V rules) + the rows REQ opened, V-10…V-13 | `docs/missions/debate-tiers/V-DECISIONS-PACKET.md` · `slices/S01/DECISIONS.md` · `slices/S02/DECISIONS.md` |
+| Rows V-1…V-9 (each default binds until V rules) + the rows REQ opened, V-10…V-13, and V-14 (REQ-FIX pass 2) | `docs/missions/debate-tiers/V-DECISIONS-PACKET.md` · `slices/S01/DECISIONS.md` · `slices/S02/DECISIONS.md` |
 | Lane baselines — typecheck RED at base, and a row per suite any SPEC names | `docs/missions/debate-tiers/BASELINE.md` |
 | SPEC / PLAN / PROGRESS / DECISIONS / DONE per slice | `docs/missions/debate-tiers/slices/S01/` · `slices/S02/` |
 | Packets (one per seat), the mission LEDGER, agent self-reports | `.hermes/planning/debate-tiers/packets/` · `.hermes/reports/debate-tiers/` |
@@ -78,8 +78,8 @@ mission names are also RED at base**, and a seat that takes one for green will b
 | `tests/architecture/sup-04-mounts.test.ts` | **0/2** | inherited from the support-publication work |
 
 The green-at-base suites this mission names are `sup-04-widget` 8/8, `evaluator-dev-menu-ui` 2/2,
-`v2ui-data-layer` 57/57 and `pol01-policy` 8/8. `t9-mode-tokens` carries 2 pre-existing failures and
-has **no `BASELINE.md` row yet** — measure it in the lane before the first RED test that touches it.
+`v2ui-data-layer` 57/57 and `pol01-policy` 8/8. `t9-mode-tokens` is 2 failed | 7 passed (9) at base and
+`prov01-honesty-drawer` 1/1 — both rows in `BASELINE.md`'s end section since 21:40 [orchestrator fold 22:04, REQ-REV-p2 N1].
 `docs/missions/debate-tiers/BASELINE.md` is the only authority for every number above; read it there,
 never from memory. Every gate asserts the **delta**, names each failure, and dates it pre-existing or
 its own. Suites are reported as `passed/total`, three runs, worst run wins.

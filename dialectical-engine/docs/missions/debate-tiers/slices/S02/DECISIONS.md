@@ -69,3 +69,7 @@ in parallel, and only the clusters that touch the field wait.`
   `57/57` and `8/8` rather than a line range.
   *Still open, and not this seat's file:* `V-DECISIONS-PACKET.md:18` carries the same stale
   `BASELINE.md:7, 40` inside row V-12. Orchestrator's file, orchestrator's fix.
+
+## Orchestrator folds after REQ-REV pass 2 PASS (2026-09-09 22:07) — SPEC-v2.md stays frozen; this is the record where it is silent
+
+- **N2 (REQ-REV-p2).** `tests/unit/api.test.ts` is 24 passed (24) at base on both lanes (`BASELINE.md`, end section). Under R3's roster filter three of its direct `evaluateAskAdmission` cases turn RED — `:137-143` (expects a resolve with a risk match against a fixture panel whose `model_id`s are not roster members), `:159-167` (expects `SINGLE-LINEAGE` from `fixtureDiscoveredPanel(1)`), `:169-177` (expects `STRUCTURAL_CEILING_INPUTS_UNRESOLVED` from `resolveEnvelopeBasis`, which R6's pinned order now precedes); `:179-186` is unaffected. These are EXPECTED and CAUSED by S02: the cluster that implements R3/R6 re-fixtures the three cases in the same cluster (roster-member `model_id`s in the fixture panel; the third case asserts `ASK_PLAN_TIER_MODEL_UNAVAILABLE`) and its command ends `24/24` — never "3 failed, pre-existing". The other R20-A suites have rows too: `contract` 7/7, `load01-live-proof` 1/1, `s7-authorization` 31/31, `evaluator-database` 21/21.

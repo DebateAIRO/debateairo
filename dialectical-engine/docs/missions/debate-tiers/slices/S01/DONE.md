@@ -6,7 +6,7 @@ refines it, and V's words here become the oracle that `REV(S01)` measures agains
 (`heartbeat-requirements` §2). The REQ node does not define done for a UI slice and has written no
 judgement below.
 
-Until V fills this in, the floor is `SPEC.md` §2 Acceptance — a floor, never a ceiling.
+Until V fills this in, the floor is `SPEC-v2.md` §2 Acceptance — a floor, never a ceiling.
 
 ## The screens and states the SPEC implies (for the mock to draw and V to rule on)
 
@@ -26,7 +26,7 @@ One screen: `/new`, in **Terracotta** and in **Chamber**.
 ## Questions the canvas exists to answer (V's, not REQ's)
 
 - Which of the two readings of "the user gets to choose" is right: Free preselected (row V-9's
-  default, `SPEC.md` R2), or nothing chosen until the asker chooses. The canvas shows both.
+  default, `SPEC-v2.md` R2), or nothing chosen until the asker chooses. The canvas shows both.
 - How a locked gauge reads — dimmed, greyed, badged, or something the document has not used yet — so
   that "locked because this run is Free" is legible without a tooltip.
 - Whether the model names sit on the selector itself, under it, or somewhere else on the card.

@@ -98,3 +98,19 @@ Measured 2026-09-09 by the lane setup (`.hermes/reports/debate-tiers/logs/setup-
 ### Lane `tiers-s02`
 - `tests/unit/t9-mode-tokens.test.ts` → rc=1 · Tests  2 failed | 7 passed (9) — RED at base, inherited from the UI-overhaul T9 work: "renders one accessible toggle that reads the document mode, flips it, and persists it" and "leaves no mode-inert colour literal in the four Wave-0 product files"; a gate reports `7/9 pre-existing` and asserts no NEW failure — measured 21:40 (REQ-FIX-p2 (a); `logs/baseline-x-<lane>.log`)
 - `tests/render/prov01-honesty-drawer.test.tsx` → rc=0 · Tests  1 passed (1) — asserts the honesty phrase verbatim at `:41`; row V-14 decides whether the phrase moves — measured 21:40 (REQ-FIX-p2 (c))
+
+### Rows added 22:06 (REQ-REV-p2 N2 — the suites the requirements themselves will turn RED; measured by `logs/baseline-n2.sh`, both lanes at `7f89f7b7`)
+
+#### Lane `tiers-s01` (lane=tiers-s01 HEAD=7f89f7b7 dirty=0; dirty after: 0)
+- `tests/integration/evaluator-database.test.ts` → rc=0 · Tests  21 passed (21)
+- `tests/unit/api.test.ts` → rc=0 · Tests  24 passed (24)
+- `tests/unit/contract.test.ts` → rc=0 · Tests  7 passed (7)
+- `tests/unit/load01-live-proof.test.ts` → rc=0 · Tests  1 passed (1)
+- `tests/unit/s7-authorization.test.ts` → rc=0 · Tests  31 passed (31)
+
+#### Lane `tiers-s02` (lane=tiers-s02 HEAD=7f89f7b7 dirty=0; dirty after: 0)
+- `tests/integration/evaluator-database.test.ts` → rc=0 · Tests  21 passed (21)
+- `tests/unit/api.test.ts` → rc=0 · Tests  24 passed (24)
+- `tests/unit/contract.test.ts` → rc=0 · Tests  7 passed (7)
+- `tests/unit/load01-live-proof.test.ts` → rc=0 · Tests  1 passed (1)
+- `tests/unit/s7-authorization.test.ts` → rc=0 · Tests  31 passed (31)

@@ -89,3 +89,10 @@ and prov01's assertion moves with them.
   composer routes". The consequence is written into `SPEC-v2.md` §3 Out of scope: the day someone makes
   that direct call succeed it becomes a member of R20's class and the ask must carry a tier the asker
   chose. `00-intake.md:49` carries the same correction (the orchestrator's, made 2026-09-09).
+
+## Orchestrator folds after REQ-REV pass 2 PASS (2026-09-09 22:04) — SPEC-v2.md stays frozen; these lines are the record where it is stale
+
+- **N1 (REQ-REV-p2).** `SPEC-v2.md:182-186` and `:298-299` say `tests/unit/t9-mode-tokens.test.ts` and `tests/render/prov01-honesty-drawer.test.tsx` have no `BASELINE.md` row. Both have had one since 21:40 (`BASELINE.md` end section): `t9-mode-tokens` 2 failed | 7 passed (9) on both lanes, both failures named; `prov01-honesty-drawer` 1 passed (1). The rule the SPEC invokes ("measured before the first RED test") is already satisfied; BUILD(S01) asserts the delta against those rows and never re-measures them into the handoff.
+- **N3 (REQ-REV-p2).** R20 sub-class B's count sentence is off by one: `tests/render/ux01-new-debate-form.test.tsx:15, 72` is a `vi.fn()` mock of `createDebate`, not a call site (the reviewer's own sweep, verdict §3 N3; the member table is right, the arithmetic is not). BUILD(S01) sweeps by R20's member table, never by the count.
+- **N4 (REQ-REV-p2).** `DONE.md:9` and `:29` now point at `SPEC-v2.md` (the orchestrator writes DONE.md at the mock gate).
+- **N2 (REQ-REV-p2).** R20 sub-class A's five suites now have `BASELINE.md` rows (end section, 22:07): `api` 24/24 · `contract` 7/7 · `load01-live-proof` 1/1 · `s7-authorization` 31/31 · `evaluator-database` 21/21, both lanes. R19's floor rule applies to them; the one-line additions R20-A prices are asserted as the delta against these rows.

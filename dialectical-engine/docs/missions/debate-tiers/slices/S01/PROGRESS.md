@@ -15,3 +15,9 @@
 
 - Handoff `handoffs/REQ-FIX-p2-handoff.md`; SKILLS 5/5 verified; all 8 findings ADDRESSED; v1 SPEC.md untouched (checksum-verified). S01: SPEC-v2.md (301 lines) is the record — R7 pins the Free provenance pair (MACHINE_DEFAULT + machine:plan-tier-free), R13 makes the NewDebateAskDefaults member optional, R19 gains v2ui-data-layer 57/57 + pol01-policy 8/8, R20 names the ask-constructor class; §3 gains the composer's direct path; PLAN.md:31 says fourteen. Row V-14 opened (honesty-drawer phrase; default: unchanged in S01).
 - Next: REQ-REV pass 2 `t_485d6613` (blind, scoped to the closures). PASS releases ARCH(S01) ∥ ARCH(S02).
+
+## 2026-09-09 22:05 EEST — REQ-REV pass 2 consumed: PASS, planning closed (orchestrator entry)
+
+- `reviews/REQ-REV-p2.md`: every pass-1 closure re-walked and confirmed; SPEC-v2.md is the record of this slice from here on. Orchestrator folds recorded in `slices/S01/DECISIONS.md` (N1, N3, N4) and `BASELINE.md` (N2, measuring).
+- Next node: ARCH(S01) `t_dfd8f52d` (Opus 5, background) → ARCH-REV(S01) `t_0e278df0` → MOCK(S01) → DONE(S01), V's gate.
+
