@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — ARCH-FIX(__SLICE__) (architecture rework after ARCH-REV pass __PREV_PASS__) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-architecture` · `superpowers:receiving-code-review` · `superpowers:brainstorming` (the role floor — convergent here: used where a finding opens an alternative) · `superpowers:writing-plans` (the plan is re-issued, not patched by hand) — then anything else in Superpowers that fits.
 
 ## 1. Node

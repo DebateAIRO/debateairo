@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — FIX(__SLICE__) (rework after REV pass __PASS__) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
 
 ## 1. Node
@@ -14,7 +14,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 ## 2. Contract
 - allowed (exhaustive): __ALLOWED_FILES__ · __REPORTS__/agent-reports/__SEAT__.md (new)
 - forbidden: everything else — in particular every file outside the findings' surfaces, the main tree
-- verification: for each finding: the reviewer's probe reproduced RED against the pre-fix head, then GREEN · the affected clusters' commands THREE times, worst run wins · the previous pass's surviving mutants re-run
+- verification: for each finding: the reviewer's probe reproduced RED against the pre-fix head, then GREEN · the affected clusters' commands THREE times, worst run wins · the previous pass's surviving mutants re-run · every run from a `.sh` that writes the full output to a scratch log FIRST (`> <log> 2>&1`) and prints only `rc`, the failing case names and the `Test Files` / `Tests` lines — verbatim frames are pasted from that log, never re-run to be captured; the full log stays addressable until REV consumes the handoff
 
 ## 3. The work
 Reproduce first — the reviewer's probe, RED, against current code, before any edit. Fix the CLASS: name it, sweep every member, record the sweep member-by-member in the handoff. Contest with a measurement, never with an argument. Findings outside your assignment are named, not fixed.

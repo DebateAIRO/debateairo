@@ -132,6 +132,11 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   the paths (measured on debate-tiers: ~110k tokens per planning node spent re-deriving lines the
   intake had already read). A code quote is re-grepped at write time, never recalled. `COMMON.md` ≤ 120 lines, and an
   amendment REPLACES the text that caused the defect — no numbered list that only grows.
+- A charge that asks for an exact copy (byte-for-byte) or a repeated token (`$13` twice) ships the
+  command that proves it — a `diff` against the transformed source, a count of occurrences — proved on
+  a known-bad mutant before dispatch. A charge whose evidence is a verbatim frame ships the
+  capture-first runner (full output to a log first, only `rc` and the summary lines to the transcript).
+  The pointer prompt and the packet's line 3 name the SAME reading order: the packet, then COMMON.
 - Packet review is the reviewer's duty (`heartbeat-reviewer` §1); a packet defect is a finding
   against you, priced in the ledger.
 

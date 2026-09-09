@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — ARCH-REV(__SLICE__) (blind review of the plan, pass __PASS__) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-reviewer` · `superpowers:verification-before-completion` — then anything else in Superpowers that fits.
 
 ## 1. Node
@@ -17,7 +17,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - verification: every cluster command re-run by YOU at base from a `.sh` file, inline and scripted, with zero disagreements · your own both-ways trace parser · one step you cannot mark done without a judgement call = a finding
 
 ## 3. The work
-Find the step a stranger cannot check, the command that condemns correct input, the cluster that cannot go green, the screen the `## Screens` block forgot. Number findings B/N with file:line. Non-blocking findings fold into DECISIONS through the orchestrator; only blocking ones spawn a rework pass. Verdict PASS / REWORK / BLOCKED with the pass number; a REWORK at pass 3 is a V row.
+Find the step a stranger cannot check, the command that condemns correct input, the cluster that cannot go green, the screen the `## Screens` block forgot. Number findings B/N with file:line. Non-blocking findings fold into DECISIONS through the orchestrator; only blocking ones spawn a rework pass. Verdict PASS / REWORK / BLOCKED with the pass number; a REWORK at pass 3 is a V row. A production step with no named case that goes RED when the step is omitted is a finding; a rejection oracle that does not name the guard it expects, and the guards that fire before it, is a finding.
 
 ## 4. Handoff
 `PASS | REWORK | BLOCKED` on __TICKET__, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:

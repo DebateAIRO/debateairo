@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — BUILD(__SLICE__-__CLUSTER__) (coding) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:test-driven-development` · `superpowers:verification-before-completion` · `superpowers:systematic-debugging` (on any bug) — then anything else in Superpowers that fits.
 
 ## 1. Node
@@ -14,7 +14,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 ## 2. Contract
 - allowed (exhaustive): __ALLOWED_FILES__ · __REPORTS__/agent-reports/__SEAT__.md (new)
 - forbidden: everything else — in particular every other file in the lane, every other cluster's surface, the main tree
-- verification: the cluster command `__CLUSTER_COMMAND__` run THREE times, worst run is the verdict · gates the PLAN names for this cluster · `git status --porcelain` clean of everything outside `allowed`
+- verification: the cluster command `__CLUSTER_COMMAND__` run THREE times, worst run is the verdict · every run from a `.sh` that writes the full output to a scratch log FIRST (`> <log> 2>&1`) and prints only `rc`, the failing case names and the `Test Files` / `Tests` lines — verbatim frames are pasted from that log, never re-run to be captured; the full log stays addressable until REV consumes the handoff · gates the PLAN names for this cluster · `git status --porcelain` clean of everything outside `allowed`
 
 ## 3. The work
 RED first, on every step. Refutation duty (`heartbeat-worker` §2): property → mutant → RED → revert → GREEN → neighbouring mutant not caught; print `git status --porcelain` after every restore. Measure before you speculate. No review waits on this cluster: hand off on green and stop — the slice is reviewed once as a whole at `REV(__SLICE__)`. Out-of-contract findings are named with file:line, never fixed here.

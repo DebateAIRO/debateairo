@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — ELEMENT(__SLICE__) (finished-element review, roster-named seat) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-reviewer` (read as markdown if you are not a Claude seat) — then anything else in Superpowers that fits.
 
 ## 1. Node

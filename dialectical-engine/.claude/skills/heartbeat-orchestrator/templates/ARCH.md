@@ -1,6 +1,6 @@
 # PACKET __SEAT__ — ARCH(__SLICE__) (architecture) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus any file a named skill names as its own reading (a skill's `references/*.md`, the spine), each listed in your `SKILLS LOADED` line.
 Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-architecture` · `superpowers:brainstorming` · `superpowers:writing-plans` — then anything else in Superpowers that fits.
 
 ## 1. Node
@@ -17,7 +17,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - verification: every cluster command RUN at base from a `.sh` file and its verdict recorded (RED for TDD-red is expected; BROKEN is a defect) · the SPEC↔PLAN trace both ways with zero gaps · every step passes the stranger test · zero banned words · a test path a step CREATES is omitted from the base run and recorded per command (a missing path is BROKEN only when nothing in the plan creates it)
 
 ## 3. The work
-Brainstorm the direction, then plan. Steps are finite, categoric, quantifiable — as many as the slice has, no cap. Clusters are BUILD units; they are not reviewed one by one — write the slice-level verification list `REV(__SLICE__)` will run. Refute your own plan: per step, the failure its criterion catches and one it does not; per cluster, the mutant class its command detects. Contested product questions go up as V rows with your recommendation, never decided here.
+Brainstorm the direction, then plan. Steps are finite, categoric, quantifiable — as many as the slice has, no cap. Clusters are BUILD units; they are not reviewed one by one — write the slice-level verification list `REV(__SLICE__)` will run. Refute your own plan: per step, the failure its criterion catches and one it does not; per cluster, the mutant class its command detects. Contested product questions go up as V rows with your recommendation, never decided here. A step whose done-criterion is a rejection names the guard it expects (SQLSTATE, error code, constraint name) AND every guard that fires before it on the same operation — an older trigger or validator that rejects first makes the unqualified oracle observe a different invariant. Every production step names the case that goes RED when the step is omitted.
 
 ## 4. Handoff
 `READY` on __TICKET__, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:
