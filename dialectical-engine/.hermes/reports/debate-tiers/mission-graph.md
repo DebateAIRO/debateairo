@@ -99,9 +99,9 @@ flowchart LR
   t_8920309f["(finding) ARCH-REV-S02-p2 N8 packet defect (orchestrator) — the ARCH-F"]:::done
   t_a682a931["(gpt-5.6-sol) BUILD S01-C1 — the contract: plan_tier on the ask, the t"]:::done
   t_085d4fa4["(gpt-5.6-sol) BUILD S01-C2 — the ask wire: the builder's tier + proven"]:::done
-  t_d1dc1913["(gpt-5.6-sol) BUILD S01-C3 — the page: the selector, the fourteen lock"]:::ready
-  t_cd5642d0["(gpt-5.6-sol) BUILD S01-C4 — the stylesheet: the selector's rules + th"]:::ready
-  t_6e2413b7["(gpt-5.6-sol) BUILD S01-C5 — the DONE.md measurements: one assertion p"]:::todo
+  t_d1dc1913["(gpt-5.6-sol) BUILD S01-C3 — the page: the selector, the fourteen lock"]:::done
+  t_cd5642d0["(gpt-5.6-sol) BUILD S01-C4 — the stylesheet: the selector's rules + th"]:::done
+  t_6e2413b7["(gpt-5.6-sol) BUILD S01-C5 — the DONE.md measurements: one assertion p"]:::ready
   t_a02cca8b["(finding) BUILD-S02-C1 F1 (plan) — PLAN.md:267 case 2's UPDATE probe: "]:::done
   t_1a083e6e["(finding) BUILD-S02-C1 F2 (packet, orchestrator) — verbatim-frame char"]:::done
   t_2e1b3dc2["(finding) BUILD-S02-C1 F3 (plan) — S02-C1-S4 (PLAN.md:318-321, the Dri"]:::done
@@ -117,6 +117,13 @@ flowchart LR
   t_6d125d74["(finding) BUILD-S01-C2 F2 (packet defect, orchestrator, second occurre"]:::done
   t_7d8dc081["(finding) BUILD-S01-C2 F3 (protocol) — the TOOLING-TRAPS 'index' comma"]:::done
   t_64ee3061["(finding) BUILD-S01-C2 F4 (packet, orchestrator) — the compiler gate i"]:::done
+  t_35326f29["(finding) BUILD-S01-C3/C4 dispatch (packet defect, orchestrator) — lin"]:::done
+  t_78419e48["(finding) BUILD-S01-C4 F1 (packet, orchestrator) — the R21 delta extra"]:::done
+  t_8ec58290["(finding) BUILD-S01-C4 F2 (packet defect, orchestrator) — BASELINE.md "]:::done
+  t_5a25bccf["(finding) BUILD-S01-C4 F3 (protocol) — the pointer prompt says 'post y"]:::done
+  t_336f8159["(finding) BUILD-S01-C3 F1 (packet defect, orchestrator) — BASELINE.md "]:::done
+  t_9e50c4dd["(finding) BUILD-S01-C3 F2 (packet defect, orchestrator) — charge 3 sai"]:::done
+  t_05ce40c7["(finding) BUILD-S01-C3 F3 (packet, orchestrator) — the packet demanded"]:::done
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -149,4 +156,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-10 01:45 from board `debate-tiers` — 117 nodes, 22 edges_
+_rendered 2026-09-10 02:45 from board `debate-tiers` — 124 nodes, 22 edges_
