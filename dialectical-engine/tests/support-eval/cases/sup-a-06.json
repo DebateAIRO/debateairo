@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-06",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "What should I know before reading a public answer, and where can I view that public debate?" }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["public-answer-disclosure", "view-public-debate"],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

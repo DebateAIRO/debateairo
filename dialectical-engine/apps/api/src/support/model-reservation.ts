@@ -4,6 +4,7 @@ import type {
   SupportConfigurationPort,
   SupportConfigurationState
 } from "@debateai/register";
+import { SupportModelError,type SupportModelPort } from "./model.js";
 
 export type SupportSubmissionKind = "new" | "queued" | "retry" | "follow-on";
 
@@ -154,7 +155,12 @@ export class SupportModelReservationLedger {
 }
 
 export type SupportModelReservationResult =
-  | Readonly<{ kind: "RESERVED"; reservation: SupportModelReservation }>
+  | Readonly<{
+    kind: "RESERVED";
+    modelRef: string;
+    dailyCap: number;
+    reservation: SupportModelReservation;
+  }>
   | Readonly<{
     kind: "DISABLED";
     code: Extract<SupportConfigurationState, { kind: "DISABLED" }>["code"] | "SUPPORT_DISABLED";
@@ -165,8 +171,12 @@ export async function reserveSupportModelCall(input: Readonly<{
   ledger: SupportModelReservationLedger;
   kind: SupportSubmissionKind;
   nonce: string;
+  signal?: AbortSignal;
 }>): Promise<SupportModelReservationResult> {
-  const state = await input.configuration.current();
+  if (input.signal?.aborted === true) {
+    throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+  }
+  const state = await supportBoundary(input.configuration.current(),input.signal);
   const atMs = input.ledger.timestamp();
   if (state.kind === "DISABLED") {
     return Object.freeze({ kind: "DISABLED", code: state.code });
@@ -176,11 +186,104 @@ export async function reserveSupportModelCall(input: Readonly<{
   }
   return Object.freeze({
     kind: "RESERVED",
+    modelRef: state.snapshot.values.supportModelRef,
+    dailyCap: state.snapshot.values.supportDailyCallCap,
     reservation: input.ledger.reserve({
       kind: input.kind,
       nonce: input.nonce,
       supportRegisterVersion: state.snapshot.supportRegisterVersion,
       atMs
     })
+  });
+}
+
+function supportBoundary<T>(operation: Promise<T>,signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return operation;
+  if (signal.aborted) return Promise.reject(new SupportModelError("SUPPORT_MODEL_UNAVAILABLE"));
+  return new Promise<T>((resolve,reject) => {
+    let settled = false;
+    const abort = () => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort",abort);
+      reject(new SupportModelError("SUPPORT_MODEL_UNAVAILABLE"));
+    };
+    signal.addEventListener("abort",abort,{ once: true });
+    void operation.then((value) => {
+      if (settled) return;
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      settled = true;
+      signal.removeEventListener("abort",abort);
+      resolve(value);
+    },(error: unknown) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort",abort);
+      reject(error);
+    });
+  });
+}
+
+/**
+ * The only production path from SupportAgent orchestration to a provider.
+ * Configuration is refreshed after all earlier waits, then the immutable
+ * reservation is consumed immediately around exactly one provider attempt.
+ */
+export function createReservedSupportModelPort(input: Readonly<{
+  configuration: Pick<SupportConfigurationPort,"current">;
+  ledger: SupportModelReservationLedger;
+  durableCalls: Readonly<{
+    reserveModelCall(input: Readonly<{
+      at: Date;dailyCap: number;callId?: string;signal?: AbortSignal;
+    }>): Promise<Readonly<{ kind: "RECORDED" | "DAILY_CAP" }>>;
+  }>;
+  modelFor(modelRef: string): SupportModelPort | undefined;
+  kind?: () => SupportSubmissionKind;
+  nonce?: () => string;
+  clock?: () => Date;
+}>): SupportModelPort {
+  return Object.freeze({
+    complete: async (request: Parameters<SupportModelPort["complete"]>[0]) => {
+      if (request.signal?.aborted === true) {
+        throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+      }
+      const result = await reserveSupportModelCall({
+        configuration: input.configuration,
+        ledger: input.ledger,
+        kind: input.kind?.() ?? "new",
+        nonce: input.nonce?.() ?? randomUUID(),
+        ...(request.signal === undefined ? {} : { signal: request.signal })
+      });
+      if (result.kind !== "RESERVED") {
+        throw new SupportModelError(result.code === "SUPPORT_DISABLED"
+          ? "SUPPORT_DISABLED" : "SUPPORT_MODEL_UNAVAILABLE");
+      }
+      const model = input.modelFor(result.modelRef);
+      if (model === undefined) {
+        result.reservation.releaseBeforePost();
+        throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+      }
+      let durable: Readonly<{ kind: "RECORDED" | "DAILY_CAP" }>;
+      try {
+        durable = await supportBoundary(input.durableCalls.reserveModelCall({
+          at: input.clock?.() ?? new Date(),dailyCap: result.dailyCap,
+          callId: result.reservation.reservationId,
+          ...(request.signal === undefined ? {} : { signal: request.signal })
+        }),request.signal);
+      } catch {
+        result.reservation.releaseBeforePost();
+        throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+      }
+      if (durable.kind !== "RECORDED") {
+        result.reservation.releaseBeforePost();
+        throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+      }
+      return result.reservation.runOriginalAttempt(() => supportBoundary(
+        model.complete(request),request.signal
+      ));
+    }
   });
 }

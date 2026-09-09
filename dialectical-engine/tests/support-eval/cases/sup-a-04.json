@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-04",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "What happens after I submit a debate? Please explain the debate process." }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["guide-how-it-works"],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

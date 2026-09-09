@@ -46,7 +46,9 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     XDG_CONFIG_HOME: z.string().min(1).optional(),
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
-    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional()
+    DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
+    DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+    NODE_ENV: z.enum(["development", "test", "production"]).optional()
   });
   return Object.freeze(Object.fromEntries(
     Object.entries(environment).filter((entry): entry is [string, string] => (
@@ -82,6 +84,7 @@ const hatchetShape = {
 
 const apiEnvironmentShape = {
     KEK_PATH: kekPath,
+    SUPPORT_KEK_PATH: kekPath,
     BLIND_INDEX_KEY_PATH: z.string().min(1),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
@@ -106,6 +109,7 @@ const apiEnvironmentShape = {
     STRANGER_SAMPLE_RATE: boundedRate, REGISTER_VERSION: legacyRegisterVersion,
     BATTERY_VERSION: z.string().min(1), SETTLEMENT_WATCH_HANDLE: z.string().min(1),
     PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
+    SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
     PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
     EVALUATOR_DEV_MENU_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -172,6 +176,12 @@ function validateApiEnvironment(
   ];
   if (supportConflicts.includes(environment.SUPPORT_DATABASE_URL)) {
     throw new TypeError("SUPPORT_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  if (environment.SUPPORT_KEK_PATH === environment.KEK_PATH
+    || environment.SUPPORT_KEK_PATH === environment.CORPUS_KEK_PATH
+    || environment.SUPPORT_KEK_PATH === environment.BLIND_INDEX_KEY_PATH
+    || environment.SUPPORT_KEK_PATH === environment.AUDIT_SOURCE_IP_SALT_PATH) {
+    throw new TypeError("SUPPORT_KEK_PATH_MUST_BE_SEPARATE");
   }
   if (environment.PUBLICATION_ENABLED === "true"
     && (environment.CORPUS_KEK_PATH === environment.KEK_PATH

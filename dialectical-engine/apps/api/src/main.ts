@@ -13,7 +13,7 @@ import {
   loadSecretKey,
   PublicationCipher
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -43,6 +43,7 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
@@ -60,6 +61,18 @@ import {
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets
 } from "./provider-discovery.js";
+import { createSupportKeyPort } from "./support/keys.js";
+import { createSupportAnswerService } from "./support/answer.js";
+import { RelayAdapter,parseSupportModelTargetJson } from "./support/model.js";
+import {
+  SupportModelReservationLedger,createReservedSupportModelPort
+} from "./support/model-reservation.js";
+import { createAdvisorySummaryService,createSupportCaseAccessService,createSupportSummarySealer } from "./support/cases.js";
+import { createSupportOwnContextService } from "./support/own-context.js";
+import { PostgresSupportIncidentRepository } from "./support/incidents.js";
+import { readLimits } from "./support/limits.js";
+import { SupportRelayQueue } from "./support/queue.js";
+import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
 const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
@@ -151,12 +164,13 @@ if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
 }
 const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
 const probes = new ProviderProbeRepository(pool);
+const providerDiscoveryTargets = parseProviderDiscoveryTargets(
+  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
+  deploymentMakers.configuredProviders
+);
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
-  targets: parseProviderDiscoveryTargets(
-    environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-    deploymentMakers.configuredProviders
-  ),
+  targets: providerDiscoveryTargets,
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
@@ -344,8 +358,133 @@ const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
 const supportPool = createPool(environment.SUPPORT_DATABASE_URL);
+const supportRelayLeasePool = createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 });
+const supportKeys = await createSupportKeyPort({
+  supportKekPath: environment.SUPPORT_KEK_PATH,
+  protectedKeyPaths: [
+    environment.KEK_PATH,
+    environment.CORPUS_KEK_PATH,
+    environment.BLIND_INDEX_KEY_PATH,
+    environment.AUDIT_SOURCE_IP_SALT_PATH
+  ].filter((path): path is string => path !== undefined)
+});
+const supportSessions = new PostgresSupportSessionRepository(
+  supportPool,
+  createWrappedSupportSessionKey(supportKeys)
+);
+const supportMessages = createSupportMessageCipher(
+  supportKeys,
+  new PostgresSupportMessageRepository(supportPool)
+);
 const supportConfiguration = createSupportConfigurationPort(
   createSupportControlPlanePool(environment.DATABASE_URL)
+);
+const reportSupportDiagnostic = (diagnostic: Readonly<{ code: string }> | string): void => {
+  console.error({ code: typeof diagnostic === "string" ? diagnostic : diagnostic.code });
+};
+const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool);
+const supportRelayCallRecords = new PostgresSupportRelayReservationRepository(supportPool);
+const supportRelayQueue = new SupportRelayQueue({
+  readLimits: () => readLimits(supportConfiguration),
+  reservations: supportRelayReservations,
+  reportCleanupFailure: reportSupportDiagnostic
+});
+const supportDegraded = new SupportDegradedState();
+const supportModelTarget = environment.SUPPORT_MODEL_TARGET_JSON === undefined
+  ? undefined : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON);
+const supportModels = new Map<string,RelayAdapter>(supportModelTarget === undefined ? [] : [[
+  supportModelTarget.providerRef,
+  new RelayAdapter({
+    baseUrl: supportModelTarget.baseUrl,
+    authorizationHeader: supportModelTarget.authorizationHeader,
+    model: supportModelTarget.model,
+    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+  })
+] as const]);
+const supportModelReservations = new SupportModelReservationLedger({
+  processId: `support-api-${process.pid}`,
+  processPid: process.pid,
+  ordinaryPoolId: "support-runtime",
+  controlPoolId: "support-control"
+});
+const supportAdmittedModel = createReservedSupportModelPort({
+  configuration: supportConfiguration,
+  ledger: supportModelReservations,
+  durableCalls: supportRelayCallRecords,
+  modelFor: (modelRef) => supportModels.get(modelRef)
+});
+const supportCaseSummaries = new PostgresSupportCaseSummaryRepository(supportPool);
+const supportSummaryService = createAdvisorySummaryService({
+  complete: async (request) => {
+    return (await supportRelayQueue.execute({
+      modelBacked: true,language: request.language,signal: request.signal
+    },(signal) => supportAdmittedModel.complete({
+      ...request,...(signal === undefined ? {} : { signal })
+    }))).text;
+  },
+  seal: createSupportSummarySealer(
+    supportKeys,supportCaseSummaries.readCaseKey.bind(supportCaseSummaries)
+  ),
+  persist: supportCaseSummaries.updateCaseSummary.bind(supportCaseSummaries)
+});
+const supportCases = createSupportCaseService({
+  messages: supportMessages,
+  summaries: supportSummaryService,
+  reportSummaryFailure: reportSupportDiagnostic,
+  createOnce: async (input) => {
+    let snapshot: Uint8Array | undefined;
+    const repository = new PostgresSupportCaseRepository(
+      supportPool,
+      async (caseId) => {
+        if (snapshot === undefined) throw new TypeError("SUPPORT_CASE_SNAPSHOT_UNAVAILABLE");
+        return createSupportCaseMaterial(supportKeys,snapshot)(caseId);
+      }
+    );
+    return repository.createCaseOnce({
+      sessionId: input.sessionId,identityOwnerRef: input.identityOwnerRef,
+      language: input.language,createdAt: input.createdAt,
+      triggerPredicate: input.triggerPredicate,triggerGeneration: input.triggerGeneration,
+      toolCalls: input.toolCalls,kbVersion: input.kbVersion,slaHours: input.slaHours,
+      prepare: async () => {
+        const prepared = await input.prepare();
+        snapshot = prepared.transcriptSnapshot;
+        return Object.freeze({
+          caseId: prepared.caseId,token: prepared.token,tokenSha256: prepared.tokenSha256
+        });
+      }
+    });
+  },
+  create: async (input) => {
+    const repository = new PostgresSupportCaseRepository(
+      supportPool,
+      createSupportCaseMaterial(supportKeys,input.transcriptSnapshot)
+    );
+    return repository.createCase({
+      caseId: input.caseId,
+      tokenSha256: input.tokenSha256,
+      sessionId: input.sessionId,
+      language: input.language,
+      createdAt: input.createdAt,
+      identityOwnerRef: input.identityOwnerRef,
+      triggerPredicate: input.triggerPredicate,
+      toolCalls: input.toolCalls,
+      kbVersion: input.kbVersion,
+      slaHours: input.slaHours
+    });
+  }
+});
+const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
+const supportAnswers = createSupportAnswerService({
+  entries: supportKnowledge.entries,
+  messages: supportMessages,
+  incidents: supportIncidents,
+  queue: supportRelayQueue,
+  degraded: supportDegraded,
+  modelFor: () => supportAdmittedModel
+});
+const supportStatus = new PostgresSupportStatusRepository(supportPool);
+const supportOwnContext = createSupportOwnContextService(
+  new PostgresSupportOwnContextRepository(pool,supportPool)
 );
 const api = buildApi({
   application,
@@ -357,7 +496,26 @@ const api = buildApi({
   legacyRunClaim,
   support: {
     configuration: supportConfiguration,
-    sessions: new PostgresSupportRepository(supportPool),
+    sessions: Object.freeze({
+      create: supportSessions.create.bind(supportSessions),
+      read: supportSessions.read.bind(supportSessions),
+      setConsent: supportSessions.setConsent.bind(supportSessions),
+      admitMessage: supportSessions.admitMessage.bind(supportSessions),
+      admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
+      finalizeInjectionLock: supportSessions.finalizeInjectionLock.bind(supportSessions),
+      recordRateLimit: supportSessions.recordRateLimit.bind(supportSessions),
+      rateMessage: supportSessions.rateMessage.bind(supportSessions),
+      status: supportStatus.status.bind(supportStatus)
+    }),
+    messages: supportMessages,
+    cases: supportCases,
+    caseAccess: createSupportCaseAccessService({
+      repository: supportCaseSummaries,keys: supportKeys
+    }),
+    answer: supportAnswers,
+    ownContext: supportOwnContext,
+    incidents: supportIncidents,
+    reportDiagnostic: reportSupportDiagnostic,
     knowledge: {
       status: async () => Object.freeze({
         kbVersion: supportKnowledge.kbVersion,
@@ -401,11 +559,15 @@ const startup = installStartupResourceOwner({
       ? [] : [erasurePool]),
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
     supportPool,
+    supportRelayLeasePool,
+    { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() }
   ]
 });
 await startup.run("support-attestation", async () => {
   await assertSupportDatabaseRole(pool, supportPool);
+  await assertSupportDatabaseRole(pool, supportRelayLeasePool);
+  await assertSupportKeyCoverage(supportPool);
 });
 await startup.run("listen", async () => {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });

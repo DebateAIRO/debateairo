@@ -126,7 +126,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   }
 
   return (
-    <section className="card" aria-label="Publication controls">
+    <section className="card" data-support-primary-control aria-label="Publication controls">
       <h2>Visibility</h2>
       <p>
         {visibility === null

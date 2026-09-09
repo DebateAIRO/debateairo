@@ -25,10 +25,32 @@ export {
 } from "./legacy-claim.js";
 
 export {
+  assertSupportKeyCoverage,
   assertSupportDatabaseRole,
-  PostgresSupportRepository,
+  lockSupportOwners,
+  lockSupportSessions,
+  PostgresSupportCaseRepository,
+  PostgresSupportCaseSummaryRepository,
+  PostgresSupportMessageRepository,
+  PostgresSupportOwnContextRepository,
+  PostgresSupportRelayReservationRepository,
+  PostgresSupportShredRepository,
+  PostgresSupportSessionRepository,
+  PostgresSupportStatusRepository,
+  type CreateCaseMaterial,
+  type CreateWrappedSessionKey,
+  type SupportCaseRecord,
+  type SupportCreateKeyFactories,
+  type SupportMessageOutcome,
+  type SupportMessageRead,
+  type SupportMessageRole,
+  type SupportMessageWrite,
+  type SupportOwnRunStateRow,
   type SupportRepositoryRecord,
-  type SupportRepositoryStatus
+  type SupportRepositoryStatus,
+  type SupportRelayReservationResult,
+  type SupportShredCounts,
+  type SupportShredResult
 } from "./support.js";
 
 export {
@@ -663,8 +685,15 @@ function wrapClientQueries(client: PoolClient): PoolClient {
   return client;
 }
 
-export function createPool(connectionString: string): Pool {
-  const pool = new PgPool({ connectionString });
+export function createPool(
+  connectionString: string,
+  options: Readonly<{ max?: number }> = {}
+): Pool {
+  if (options.max !== undefined
+    && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
+    throw new TypeError("DATABASE_POOL_MAX_INVALID");
+  }
+  const pool = new PgPool({ connectionString,...options });
   let terminalFailure: TypedDomainError | undefined;
 
   pool.on("error", (error: Error) => {
@@ -726,7 +755,7 @@ export function createSupportControlPlanePool(connectionString: string): Pool {
     connectionString,
     max: 2,
     connectionTimeoutMillis: 200,
-    statement_timeout: 500,
+    statement_timeout: 700,
     query_timeout: 750
   });
   pool.on("error", (error: Error) => {

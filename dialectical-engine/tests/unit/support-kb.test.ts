@@ -73,19 +73,18 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
-  it("keeps the real unratified corpus entirely ignored and out of its version", () => {
-    // Catches intended product entries being served or included in the shipped manifest before V ratification.
+  it("loads the complete real V-ratified bilingual corpus into its byte-derived version", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
 
     const corpus = loadHelpCorpus(directory);
 
-    expect(corpus.entries).toEqual([]);
-    expect(corpus.shippedCount).toBe(0);
-    expect(corpus.ignoredCount).toBe(12);
-    expect(corpus.manifest).toBe("");
-    expect(corpus.kbVersion).toBe(sha256(""));
+    expect(corpus.entries).toHaveLength(24);
+    expect(corpus.shippedCount).toBe(12);
+    expect(corpus.ignoredCount).toBe(0);
+    expect(corpus.manifest.split("\n")).toHaveLength(24);
+    expect(corpus.kbVersion).toBe("9016371b38ca10c594e7209c34e51ffd6c4a9b883c47f7b87e70c9881b2b1eec");
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {

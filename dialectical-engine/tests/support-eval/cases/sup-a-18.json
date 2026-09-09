@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-18",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "Cum deschid o anumită dezbatere publică pe care mi-a distribuit-o cineva?" }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["view-public-debate"],
+  "expected_language": "ro",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

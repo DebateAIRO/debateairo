@@ -942,7 +942,7 @@ describe("isolated support control-plane pool", () => {
       expect(internalOptions(control)).toMatchObject({
         max: 2,
         connectionTimeoutMillis: 200,
-        statement_timeout: 500,
+        statement_timeout: 700,
         query_timeout: 750
       });
       expect(internalOptions(ordinary)).toMatchObject({
@@ -1075,11 +1075,11 @@ describe("isolated support control-plane pool", () => {
     }
   });
 
-  it("cancels a real slow statement at the 500ms server deadline", async () => {
+  it("cancels a real slow statement at the 700ms server deadline", async () => {
     const control = supportPoolFactory()(database.connectionString);
     try {
       const outcome = await elapsedRejection(control.query("SELECT pg_sleep(2)"));
-      expect(outcome.elapsedMs).toBeGreaterThanOrEqual(400);
+      expect(outcome.elapsedMs).toBeGreaterThanOrEqual(600);
       expect(outcome.elapsedMs).toBeLessThan(1_200);
       expect(String(outcome.error)).toMatch(/statement timeout|canceling statement/iu);
     } finally {

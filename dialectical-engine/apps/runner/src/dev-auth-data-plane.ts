@@ -8,6 +8,10 @@ import {
   parseDevelopmentDeploymentRegisterCliOutput,
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
+import { createSupportControlPlanePool } from "@debateai/db";
+import { createPostgresRegisterPublicationPort } from "@debateai/register";
+import { loadDevelopmentSupportConfigCliCredentials } from "./support-config-cli-credentials.js";
+import { initializeDevelopmentSupportConfiguration } from "./dev-support-config.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
 const LOCAL_MIGRATOR_DATABASE_URL =
@@ -20,6 +24,7 @@ export type DevelopmentAuthDataPlaneReceipt = Readonly<{
   migrations: "APPLIED";
   principals: "ATTESTED";
   register: DevelopmentDeploymentRegisterMachineReceiptV1;
+  supportConfiguration: "HERMES_GLM_5_3_FLASH";
   secrets: "ATTESTED";
   mailCapture: "ATTESTED";
 }>;
@@ -42,6 +47,9 @@ export type DevelopmentAuthDataPlaneOperations = Readonly<{
   migrate(): Promise<void>;
   provisionPrincipals(): Promise<void>;
   seedRegister(): Promise<DevelopmentDeploymentRegisterMachineReceiptV1>;
+  initializeSupportConfiguration(
+    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1
+  ): Promise<void>;
   generateSecrets(): Promise<void>;
   verifyMailCapture(): Promise<void>;
   stopDependencies(dockerExecutable: string, services: readonly string[]): Promise<void>;
@@ -98,6 +106,10 @@ export async function startDevelopmentAuthDataPlane(
       "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
       () => operations.seedRegister()
     );
+    await fixedStep(
+      "DEV_AUTH_DATA_PLANE_SUPPORT_CONFIG_FAILED",
+      () => operations.initializeSupportConfiguration(registerReceipt)
+    );
     await fixedStep("DEV_AUTH_DATA_PLANE_SECRET_FAILED", () => operations.generateSecrets());
     await fixedStep("DEV_AUTH_DATA_PLANE_MAIL_FAILED", () => operations.verifyMailCapture());
     const receipt = Object.freeze({
@@ -106,6 +118,7 @@ export async function startDevelopmentAuthDataPlane(
       migrations: "APPLIED",
       principals: "ATTESTED",
       register: registerReceipt,
+      supportConfiguration: "HERMES_GLM_5_3_FLASH",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     } as const);
@@ -367,6 +380,20 @@ export function createDevelopmentAuthDataPlaneOperations(
         }
       );
       return parseDevelopmentDeploymentRegisterCliOutput(output, cwd);
+    },
+    async initializeSupportConfiguration(registerReceipt) {
+      const credentials = await loadDevelopmentSupportConfigCliCredentials(
+        join(cwd,".local","dev-auth","database-principals.env")
+      );
+      const pool = createSupportControlPlanePool(credentials.databaseUrl);
+      try {
+        await initializeDevelopmentSupportConfiguration({
+          publication: createPostgresRegisterPublicationPort(pool),
+          baseRegisterVersion: registerReceipt.registerVersion
+        });
+      } finally {
+        await pool.end();
+      }
     },
     async generateSecrets() {
       await runPnpm(["dev:auth:generate-secrets"], "DEV_AUTH_DATA_PLANE_SECRET_FAILED");

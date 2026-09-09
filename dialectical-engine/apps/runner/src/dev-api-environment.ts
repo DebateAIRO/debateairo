@@ -16,6 +16,7 @@ import {
   serializeDevelopmentDeploymentRegisterReceipt,
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
+import { parseDevelopmentSupportModelTargetJson } from "./dev-support-model.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -27,6 +28,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
   "KEK_PATH",
+  "SUPPORT_KEK_PATH",
   "BLIND_INDEX_KEY_PATH",
   "AUDIT_KEY_STORE_PATH",
   "AUDIT_SOURCE_IP_SALT_PATH",
@@ -54,6 +56,7 @@ export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
   "BATTERY_VERSION",
   "SETTLEMENT_WATCH_HANDLE",
   "PROVIDER_DISCOVERY_TARGETS_JSON",
+  "SUPPORT_MODEL_TARGET_JSON",
   "PROVIDER_PROBE_TIMEOUT_MS",
   "NODE_ENV",
   "EVALUATOR_DEV_MENU_ENABLED",
@@ -76,6 +79,7 @@ type AssembleDevelopmentApiEnvironmentInput = Readonly<{
   repositoryRoot: string;
   providerPanel: DevelopmentProviderPanel;
   registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
+  supportModelTarget: string;
 }>;
 
 function currentUid(): number {
@@ -308,10 +312,11 @@ function isExactProviderRuntimeRefresh(existing: string, expected: string): bool
     const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
     const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
     for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
-      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON") continue;
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON" || key === "SUPPORT_MODEL_TARGET_JSON") continue;
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
     parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
     return true;
   } catch {
     return false;
@@ -329,6 +334,28 @@ function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
   return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected);
 }
 
+function isExactLegacyEnvironmentWithoutSupportModelTarget(
+  existing: string,
+  expected: string
+): boolean {
+  try {
+    const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
+      key !== "SUPPORT_MODEL_TARGET_JSON"
+    );
+    const existingValues = parseExactEnvironment(existing,legacyKeys);
+    const expectedValues = parseExactEnvironment(expected,DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    for (const key of legacyKeys) {
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON") continue;
+      if (existingValues.get(key) !== expectedValues.get(key)) return false;
+    }
+    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    parseDevelopmentSupportModelTargetJson(expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function assembleDevelopmentApiEnvironment(
   input: AssembleDevelopmentApiEnvironmentInput
 ): Promise<DevelopmentApiEnvironmentReceipt> {
@@ -344,6 +371,7 @@ export async function assembleDevelopmentApiEnvironment(
     assertPrivateDirectory(join(custodyRoot, "publication-keys")),
     assertPrivateDirectory(join(custodyRoot, "mail")),
     assertSecretFile(join(custodyRoot, "secrets", "kek.bin")),
+    assertSecretFile(join(custodyRoot, "secrets", "support-kek.bin")),
     assertSecretFile(join(custodyRoot, "secrets", "corpus-kek.bin")),
     assertSecretFile(join(custodyRoot, "secrets", "blind-index-key.bin")),
     assertSecretFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"))
@@ -358,6 +386,7 @@ export async function assembleDevelopmentApiEnvironment(
   const token = hatchet.get("HATCHET_CLIENT_TOKEN")!;
   const tenantId = tenantIdFromToken(token);
   const providerPanel = input.providerPanel;
+  const supportModelTarget = parseDevelopmentSupportModelTargetJson(input.supportModelTarget);
   const custodyRegisterReceipt = await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
   if (serializeDevelopmentDeploymentRegisterReceipt(custodyRegisterReceipt)
     !== serializeDevelopmentDeploymentRegisterReceipt(input.registerReceipt)) {
@@ -365,6 +394,7 @@ export async function assembleDevelopmentApiEnvironment(
   }
   const values = new Map<string, string>([
     ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
+    ["SUPPORT_KEK_PATH", join(custodyRoot, "secrets", "support-kek.bin")],
     ["BLIND_INDEX_KEY_PATH", join(custodyRoot, "secrets", "blind-index-key.bin")],
     ["AUDIT_KEY_STORE_PATH", join(custodyRoot, "audit-keys")],
     ["AUDIT_SOURCE_IP_SALT_PATH", join(custodyRoot, "secrets", "audit-source-ip-salt.bin")],
@@ -392,6 +422,7 @@ export async function assembleDevelopmentApiEnvironment(
     ["BATTERY_VERSION", "dev-auth-v1"],
     ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
     ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
+    ["SUPPORT_MODEL_TARGET_JSON", supportModelTarget.targetJson],
     ["PROVIDER_PROBE_TIMEOUT_MS", String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS)],
     ["NODE_ENV", "development"],
     ["EVALUATOR_DEV_MENU_ENABLED", "false"],
@@ -411,6 +442,7 @@ export async function assembleDevelopmentApiEnvironment(
     [],
     (existing) => isExactProviderRuntimeRefresh(existing, source)
       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
+      || isExactLegacyEnvironmentWithoutSupportModelTarget(existing,source)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }

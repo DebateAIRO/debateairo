@@ -26,6 +26,7 @@ function environment(
   const custodyRoot = join(root, ".local", "dev-auth");
   return Object.freeze({
     KEK_PATH: join(custodyRoot, "secrets", "kek.bin"),
+    SUPPORT_KEK_PATH: join(custodyRoot, "secrets", "support-kek.bin"),
     BLIND_INDEX_KEY_PATH: join(custodyRoot, "secrets", "blind-index-key.bin"),
     AUDIT_KEY_STORE_PATH: join(custodyRoot, "audit-keys"),
     AUDIT_SOURCE_IP_SALT_PATH: join(custodyRoot, "secrets", "audit-source-ip-salt.bin"),
@@ -43,6 +44,7 @@ function environment(
     MAIL_FROM: "noreply@localhost.test",
     PUBLIC_APP_URL: "https://localhost:3000",
     DATABASE_URL: "postgresql://debateai_dev_runtime:three@127.0.0.1:55432/debateai",
+    SUPPORT_DATABASE_URL: "postgresql://debateai_dev_support:support@127.0.0.1:55432/debateai",
     API_HOST: "127.0.0.1",
     API_PORT: "8790",
     STRANGER_SAMPLE_RATE: "0",
@@ -52,6 +54,12 @@ function environment(
     BATTERY_VERSION: "dev-auth-v1",
     SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+    SUPPORT_MODEL_TARGET_JSON: JSON.stringify({
+      provider_ref: "development:hermes-glm-5.3-flash",
+      base_url: "http://127.0.0.1:8794/v1",
+      model: "z-ai/glm-5.3-flash",
+      authorization_header: "Bearer support-test"
+    }),
     PROVIDER_PROBE_TIMEOUT_MS: "180000",
     NODE_ENV: "development",
     EVALUATOR_DEV_MENU_ENABLED: "false",
@@ -138,7 +146,11 @@ describe("DEV-10B production API host process", () => {
     ]);
     const process = await startDevelopmentApiProcess({
       repositoryRoot: test.root,
-      commandEnvironment: Object.freeze({ PATH: "/usr/bin", HOME: "/private/home" }),
+      commandEnvironment: Object.freeze({
+        PATH: "/usr/bin",
+        HOME: "/private/home",
+        SUPPORT_KEK_PATH: "/ambient/fallback-must-not-win"
+      }),
       operations: runtime
     });
 
@@ -151,6 +163,8 @@ describe("DEV-10B production API host process", () => {
       "PATH"
     ].sort());
     expect(passedEnvironment).not.toHaveProperty("AWS_SECRET_ACCESS_KEY");
+    expect(passedEnvironment.SUPPORT_KEK_PATH)
+      .toBe(join(test.root, ".local", "dev-auth", "secrets", "support-kek.bin"));
     await process.stop();
     expect(runtime.apiChild.terminate).toHaveBeenCalledTimes(1);
   });
@@ -191,6 +205,23 @@ describe("DEV-10B production API host process", () => {
       operations: aliasRuntime
     })).rejects.toThrow("DEV_API_PROCESS_CUSTODY_INVALID");
     expect(aliasRuntime.startApi).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing support KEK path before process start with no ambient fallback", async () => {
+    const test = await fixture();
+    const source = await readFile(test.envPath, "utf8");
+    await writeFile(
+      test.envPath,
+      source.split("\n").filter((row) => !row.startsWith("SUPPORT_KEK_PATH=")).join("\n"),
+      { mode: 0o600 }
+    );
+    const runtime = operations([null]);
+    await expect(startDevelopmentApiProcess({
+      repositoryRoot: test.root,
+      commandEnvironment: Object.freeze({ SUPPORT_KEK_PATH: "/ambient/support-kek.bin" }),
+      operations: runtime
+    })).rejects.toThrow("DEV_API_PROCESS_ENVIRONMENT_INVALID");
+    expect(runtime.startApi).not.toHaveBeenCalled();
   });
 
   it("rejects a dropped or mismatched deployment receipt before process start", async () => {

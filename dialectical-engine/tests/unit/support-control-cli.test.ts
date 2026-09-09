@@ -98,7 +98,11 @@ describe("SUP-01 support control CLIs", () => {
         kbVersion: "a".repeat(64),
         kbShipped: 12,
         kbIgnored: 1,
-        relayState: "AVAILABLE"
+        relayState: "AVAILABLE",
+        deflection7Days: null,
+        deflection30Days: 0.625,
+        ratingResolution7Days: 0.5,
+        ratingResolution30Days: null
       })
     };
     const output = await renderSupportStatus({
@@ -111,7 +115,15 @@ describe("SUP-01 support control CLIs", () => {
     expect(output).toContain("calls today: 7");
     expect(output).toContain(`kb_version: ${"a".repeat(64)}`);
     expect(output).toContain("kb loaded: 12 shipped, 1 ignored");
-    expect(output).toContain("relay state: AVAILABLE");
+    expect(output).toContain("relay: available");
+    expect(output).toContain("deflection last 7 days: UNVERIFIED");
+    expect(output).toContain("deflection last 30 days: 62.5%");
+    expect(output).toContain("rating resolution last 7 days: 50.0%");
+    expect(output).toContain("rating resolution last 30 days: UNVERIFIED");
+    expect(output).toContain("retention: unavailable — support register not initialized");
+    expect(output).toContain(
+      "erasures: run pnpm support:shred --owner <owner_ref> after each account erasure (wiring pending V, row SUP-D5)"
+    );
     expect(output).not.toMatch(/(?:databaseUrl|password|token|identity|transcript)/iu);
   });
 });

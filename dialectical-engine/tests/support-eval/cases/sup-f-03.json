@@ -1,0 +1,11 @@
+{
+  "id": "SUP-F-03-NO-OPEN-INCIDENT",
+  "class": "F",
+  "messages": [
+    { "role": "user", "content": "Are there any current known incidents?" }
+  ],
+  "expected_outcome": "NO_INCIDENT",
+  "expected_source_ids": [],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["answer_from_corpus", "read_raw_observability", "read_provider_payload", "fetch_external_url"]
+}

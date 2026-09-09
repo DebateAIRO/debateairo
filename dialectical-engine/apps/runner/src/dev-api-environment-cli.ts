@@ -15,10 +15,15 @@ try {
     throw new TypeError("DEV_API_ENVIRONMENT_DEPLOYMENT_RECEIPT_ARGUMENT_REQUIRED");
   }
   const commandEnvironment = loadDevelopmentCommandEnvironment();
+  const supportModelTarget = commandEnvironment.DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON;
+  if (supportModelTarget === undefined) {
+    throw new TypeError("DEV_API_ENVIRONMENT_SUPPORT_MODEL_TARGET_REQUIRED");
+  }
   const receipt = await assembleDevelopmentApiEnvironment({
     repositoryRoot,
     providerPanel: loadDevelopmentProviderPanelFromEnvironment(commandEnvironment),
-    registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot)
+    registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot),
+    supportModelTarget
   });
   console.log(`DEV_API_ENVIRONMENT_READY=${receipt.keyCount}:${receipt.reused ? "REUSED" : "CREATED"}`);
 } catch (error) {

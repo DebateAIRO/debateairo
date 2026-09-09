@@ -715,7 +715,7 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     ))).rejects.toThrow(/REGISTER_VERSION_ALLOCATION_EXHAUSTED/u);
   });
 
-  it("rejects forbidden operator membership drift and its effective support privilege", async () => {
+  it("rejects forbidden operator membership drift and its assumable support capability", async () => {
     const forbidden = await database.pool.query<{ rolname: string }>(`
       SELECT rolname FROM pg_catalog.pg_roles
       WHERE rolname=ANY(ARRAY['debateai_runtime','debateai_replay','debateai_support'])
@@ -738,15 +738,28 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
       await database.pool.query(
         `GRANT debateai_support_config_operator TO ${rolname}`
       );
-      const drift = await database.pool.query<{ is_member: boolean; can_publish: boolean }>(`
+      const drift = await database.pool.query<{
+        is_member: boolean;
+        can_publish: boolean;
+        can_set: boolean;
+        inherits: boolean;
+      }>(`
         SELECT pg_has_role($1,'debateai_support_config_operator','MEMBER') AS is_member,
+          pg_has_role($1,'debateai_support_config_operator','SET') AS can_set,
+          (SELECT rolinherit FROM pg_catalog.pg_roles WHERE rolname=$1) AS inherits,
           has_function_privilege(
             $1,
             'register.publish_support_configuration(uuid,character,bigint,bigint,integer,jsonb,text)',
             'EXECUTE'
           ) AS can_publish
       `, [rolname]);
-      expect(drift.rows[0]).toEqual({ is_member: true, can_publish: true });
+      const expectedInheritedPrivilege = rolname !== "debateai_support";
+      expect(drift.rows[0]).toEqual({
+        is_member: true,
+        can_publish: expectedInheritedPrivilege,
+        can_set: true,
+        inherits: expectedInheritedPrivilege
+      });
       await expect(database.pool.query(
         await readFile("migrations/0055_register_support_publication.sql", "utf8")
       )).rejects.toThrow(/SUPPORT_CONFIG_ROLE_INVALID/u);

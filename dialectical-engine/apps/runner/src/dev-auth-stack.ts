@@ -26,7 +26,14 @@ import {
   startDevelopmentCliProviderPanel,
   type DevelopmentCliProviderPanelHandle
 } from "./dev-cli-provider-panel.js";
-import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import {
+  DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+  type DevelopmentProviderPanel
+} from "./dev-provider-panel.js";
+import {
+  HERMES_SUPPORT_PORT,
+  startHermesSupportRelay
+} from "../../../acceptance/hermes-relay.js";
 import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
 import {
   createDevTlsReadinessOperations,
@@ -43,15 +50,21 @@ type DataPlaneHandle = Stoppable & Readonly<{
 type ApiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentApiChildExit> }>;
 type UiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentUiChildExit> }>;
 type RunnerHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentRunnerChildExit> }>;
+type SupportModelRelayHandle = Stoppable & Readonly<{
+  targetJson: string;
+  providerRef: "development:hermes-glm-5.3-flash";
+}>;
 
 export type DevelopmentAuthStackOperations = Readonly<{
   isPublicPortOccupied(): Promise<boolean>;
   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
+  startSupportModelRelay(): Promise<SupportModelRelayHandle>;
   startDataPlane(providerPanel: DevelopmentProviderPanel): Promise<DataPlaneHandle>;
   provisionHatchetToken(): Promise<void>;
   assembleApiEnvironment(
     providerPanel: DevelopmentProviderPanel,
-    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1
+    registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1,
+    supportModelTarget: string
   ): Promise<void>;
   startApi(): Promise<ApiHandle>;
   startRunner(): Promise<RunnerHandle>;
@@ -73,6 +86,7 @@ export type DevelopmentAuthStack = Readonly<{
     ui: "DENY_DEFAULT_PROXY";
     tls: "SYSTEM_TRUST";
     providers: "CLI_HANDSHAKE";
+    supportModel: "HERMES_GLM_5_3_FLASH";
     healthyProviderRefs: readonly string[];
     runner: "REGISTERED";
   }>;
@@ -134,6 +148,11 @@ export async function startDevelopmentAuthStack(
       () => operations.startProviderPanel()
     );
     owned.push(providerPanel);
+    const supportModelRelay = await fixedStage(
+      "DEV_AUTH_STACK_SUPPORT_MODEL_FAILED",
+      () => operations.startSupportModelRelay()
+    );
+    owned.push(supportModelRelay);
     const dataPlane = await fixedStage(
       "DEV_AUTH_STACK_DATA_FAILED",
       () => operations.startDataPlane(providerPanel.panel)
@@ -148,7 +167,9 @@ export async function startDevelopmentAuthStack(
     );
     await fixedStage(
       "DEV_AUTH_STACK_ENVIRONMENT_FAILED",
-      () => operations.assembleApiEnvironment(providerPanel.panel, dataPlane.receipt.register)
+      () => operations.assembleApiEnvironment(
+        providerPanel.panel,dataPlane.receipt.register,supportModelRelay.targetJson
+      )
     );
     const api = await fixedStage("DEV_AUTH_STACK_API_FAILED", () => operations.startApi());
     owned.push(api);
@@ -174,6 +195,7 @@ export async function startDevelopmentAuthStack(
         ui: "DENY_DEFAULT_PROXY",
         tls: "SYSTEM_TRUST",
         providers: "CLI_HANDSHAKE",
+        supportModel: "HERMES_GLM_5_3_FLASH",
         healthyProviderRefs: providerPanel.healthyProviderRefs,
         runner: "REGISTERED"
       }),
@@ -222,6 +244,17 @@ export function createDevelopmentAuthStackOperations(
   return Object.freeze({
     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
     startProviderPanel: () => startDevelopmentCliProviderPanel(),
+    async startSupportModelRelay() {
+      const relay = await startHermesSupportRelay({
+        port: HERMES_SUPPORT_PORT,
+        timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS
+      });
+      return Object.freeze({
+        targetJson: relay.targetJson,
+        providerRef: relay.providerRef,
+        stop: () => relay.close()
+      });
+    },
     startDataPlane: (providerPanel) => startDevelopmentAuthDataPlane(
       createDevelopmentAuthDataPlaneOperations(
         repositoryRoot,
@@ -235,8 +268,10 @@ export function createDevelopmentAuthStackOperations(
         operations: hatchetOperations
       });
     },
-    async assembleApiEnvironment(providerPanel, registerReceipt) {
-      await assembleDevelopmentApiEnvironment({ repositoryRoot, providerPanel, registerReceipt });
+    async assembleApiEnvironment(providerPanel, registerReceipt, supportModelTarget) {
+      await assembleDevelopmentApiEnvironment({
+        repositoryRoot,providerPanel,registerReceipt,supportModelTarget
+      });
     },
     startApi: () => startDevelopmentApiProcess({
       repositoryRoot,

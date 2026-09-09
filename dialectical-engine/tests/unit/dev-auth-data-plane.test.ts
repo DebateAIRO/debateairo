@@ -33,6 +33,7 @@ function operations(overrides: Partial<DevelopmentAuthDataPlaneOperations> = {})
     migrate: vi.fn(async () => { calls.push("migrate"); }),
     provisionPrincipals: vi.fn(async () => { calls.push("principals"); }),
     seedRegister: vi.fn(async () => { calls.push("register"); return REGISTER_RECEIPT; }),
+    initializeSupportConfiguration: vi.fn(async () => { calls.push("support-config"); }),
     generateSecrets: vi.fn(async () => { calls.push("secrets"); }),
     verifyMailCapture: vi.fn(async () => { calls.push("mail"); }),
     stopDependencies: vi.fn(async (_docker, services) => {
@@ -54,6 +55,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       migrations: "APPLIED",
       principals: "ATTESTED",
       register: REGISTER_RECEIPT,
+      supportConfiguration: "HERMES_GLM_5_3_FLASH",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     });
@@ -87,6 +89,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       migrations: "APPLIED",
       principals: "ATTESTED",
       register: REGISTER_RECEIPT,
+      supportConfiguration: "HERMES_GLM_5_3_FLASH",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     });
@@ -99,6 +102,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       "migrate",
       "principals",
       "register",
+      "support-config",
       "secrets",
       "mail"
     ]);

@@ -109,6 +109,7 @@ async function prepareCustodyRoot(): Promise<void> {
   ]);
   await Promise.all([
     writeFile(join(custodyRoot, "secrets", "kek.bin"), Buffer.alloc(32, 1), { mode: 0o600 }),
+    writeFile(join(custodyRoot, "secrets", "support-kek.bin"), Buffer.alloc(32, 5), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 3), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
@@ -184,6 +185,12 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     const receipt = await assembleDevelopmentApiEnvironment({
       repositoryRoot,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      supportModelTarget: JSON.stringify({
+        provider_ref: "development:hermes-glm-5.3-flash",
+        base_url: "http://127.0.0.1:8794/v1",
+        model: "z-ai/glm-5.3-flash",
+        authorization_header: "Bearer support-test"
+      }),
       registerReceipt: createDevelopmentDeploymentRegisterMachineReceipt({
         registerVersion: "424242" as never,
         rowCount: 32,

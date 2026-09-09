@@ -1,16 +1,45 @@
 export const OUTCOMES = Object.freeze([
   "ANSWER_GROUNDED", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION",
-  "REFUSE_SAFETY", "DEGRADED", "DISABLED", "RATE_LIMITED"
+  "REFUSE_SAFETY", "DEGRADED", "DISABLED", "RATE_LIMITED", "CASE_OPENED",
+  "CONSENT_NEEDED", "ANON_CONTEXT", "REFUSE_OTHER_USER", "ANSWER_OWN_STATE",
+  "ANSWER_INCIDENT", "NO_INCIDENT"
 ] as const);
 export type SupportOutcome = typeof OUTCOMES[number];
 
 export const SUPPORT_TEMPLATE_IDS = Object.freeze([
   "DISCLOSURE", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION", "REFUSE_SAFETY",
-  "DEGRADED", "DISABLED", "RATE_LIMITED", "RATING", "CASE_OPENED_MINIMAL", "SOURCE_LINE"
+  "DEGRADED", "DISABLED", "RATE_LIMITED", "RATING", "CASE_OPENED_MINIMAL", "CASE_OPENED",
+  "HUMAN_LABEL", "NOT_FOUND", "CLOSED_LABEL", "SUMMARY_LABEL", "SOURCE_LINE",
+  "CONSENT_TOGGLE", "CONSENT_NEEDED", "ANON_CONTEXT", "REFUSE_OTHER_USER", "STATE_SOURCE",
+  "INCIDENT_ACTIVE", "NO_INCIDENT", "INCIDENT_NOTICE", "QUEUED"
 ] as const);
 
 export type SupportTemplateId = typeof SUPPORT_TEMPLATE_IDS[number];
 export type SupportLanguage = "en" | "ro";
+
+export const SHREDDED_NOTICE = Object.freeze({
+  en: "This conversation was erased at the owner's request.",
+  ro: "Această conversație a fost ștearsă la cererea proprietarului."
+});
+
+export async function readSupportContent(input: Readonly<{
+  shreddedAt: Date | null;
+  destroyedAt: Date | null;
+  language: SupportLanguage;
+  read: () => Promise<string>;
+}>): Promise<
+  | Readonly<{ kind: "SHREDDED"; terminal: "[SHREDDED]"; notice: string }>
+  | Readonly<{ kind: "READABLE"; content: string }>
+> {
+  if (input.shreddedAt !== null || input.destroyedAt !== null) {
+    return Object.freeze({
+      kind: "SHREDDED",
+      terminal: "[SHREDDED]",
+      notice: SHREDDED_NOTICE[input.language]
+    });
+  }
+  return Object.freeze({ kind: "READABLE", content: await input.read() });
+}
 
 export const SUPPORT_TEMPLATES: Readonly<Record<SupportTemplateId, Readonly<Record<SupportLanguage, string>>>> =
   Object.freeze({
@@ -54,9 +83,65 @@ export const SUPPORT_TEMPLATES: Readonly<Record<SupportTemplateId, Readonly<Reco
       en: "I've saved this conversation for a person as case {token}. Keep the code; replies will appear here once a person has answered.",
       ro: "Am salvat această conversație pentru o persoană, cazul {token}. Păstrează codul; răspunsurile vor apărea aici după ce o persoană a răspuns."
     }),
+    CASE_OPENED: Object.freeze({
+      en: "I've opened case {token} for a person. Expected reply: within {sla} hours. Check replies at {link}. I can't promise an outcome.",
+      ro: "Am deschis cazul {token} pentru o persoană. Răspuns estimat: în {sla} ore. Vezi răspunsurile la {link}. Nu pot promite un rezultat."
+    }),
+    HUMAN_LABEL: Object.freeze({
+      en: "Support (a person)",
+      ro: "Suport (o persoană)"
+    }),
+    NOT_FOUND: Object.freeze({
+      en: "No case with that code.",
+      ro: "Nu există niciun caz cu acest cod."
+    }),
+    CLOSED_LABEL: Object.freeze({
+      en: "This case is closed. You can still reply to reopen it.",
+      ro: "Acest caz este închis. Poți răspunde pentru a-l redeschide."
+    }),
+    SUMMARY_LABEL: Object.freeze({
+      en: "Model-written summary — advisory",
+      ro: "Rezumat scris de model — orientativ"
+    }),
     SOURCE_LINE: Object.freeze({
       en: "Source: {title} ({id})",
       ro: "Sursă: {title} ({id})"
+    }),
+    CONSENT_TOGGLE: Object.freeze({
+      en: "Let the assistant see the status of my debates for this conversation (never their content).",
+      ro: "Permite asistentului să vadă starea dezbaterilor mele în această conversație (niciodată conținutul lor)."
+    }),
+    CONSENT_NEEDED: Object.freeze({
+      en: "I can look at your debates' status only if you switch on the consent toggle above.",
+      ro: "Pot vedea starea dezbaterilor tale doar dacă activezi comutatorul de consimțământ de mai sus."
+    }),
+    ANON_CONTEXT: Object.freeze({
+      en: "Sign in first, then switch on the consent toggle, and I can look at your debates' status.",
+      ro: "Autentifică-te mai întâi, apoi activează comutatorul de consimțământ, și pot vedea starea dezbaterilor tale."
+    }),
+    REFUSE_OTHER_USER: Object.freeze({
+      en: "I can only talk about your own debates, in your own signed-in session.",
+      ro: "Pot vorbi doar despre dezbaterile tale, în sesiunea ta autentificată."
+    }),
+    STATE_SOURCE: Object.freeze({
+      en: "Source: your debate {run_id_short} (status read at {time})",
+      ro: "Sursă: dezbaterea ta {run_id_short} (stare citită la {time})"
+    }),
+    INCIDENT_ACTIVE: Object.freeze({
+      en: "Known incident since {started_at}: {summary_en} (published by the team). If your problem matches, no need to report it; otherwise choose 'Talk to a human'.",
+      ro: "Incident cunoscut din {started_at}: {summary_ro} (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbește cu o persoană”."
+    }),
+    NO_INCIDENT: Object.freeze({
+      en: "I have no record of a current known incident. That doesn't rule one out — if something looks broken, choose 'Talk to a human' and describe it.",
+      ro: "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbește cu o persoană” și descrie problema."
+    }),
+    INCIDENT_NOTICE: Object.freeze({
+      en: "Note: there is a known incident affecting {surface} since {started_at}.",
+      ro: "Notă: există un incident cunoscut care afectează {surface} din {started_at}."
+    }),
+    QUEUED: Object.freeze({
+      en: "Waiting for the assistant's model… you are number {n} in line.",
+      ro: "Se așteaptă modelul asistentului… ești numărul {n} la rând."
     })
   });
 

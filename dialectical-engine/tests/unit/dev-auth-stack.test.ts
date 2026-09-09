@@ -15,6 +15,12 @@ const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
   rowCount: 32,
   snapshotSha256: "a".repeat(64)
 });
+const SUPPORT_MODEL_TARGET = JSON.stringify({
+  provider_ref: "development:hermes-glm-5.3-flash",
+  base_url: "http://127.0.0.1:8794/v1",
+  model: "z-ai/glm-5.3-flash",
+  authorization_header: "Bearer support-only"
+});
 
 type Exit = Readonly<{ code: number | null; signal: NodeJS.Signals | null }>;
 
@@ -26,7 +32,7 @@ function deferredExit() {
 
 function operations(input: Readonly<{
   occupied?: boolean;
-  failAt?: "provider_panel" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
+  failAt?: "provider_panel" | "support_model" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
 }> = {}): DevelopmentAuthStackOperations & Readonly<{
   calls: string[];
   apiExit: ReturnType<typeof deferredExit>;
@@ -56,6 +62,15 @@ function operations(input: Readonly<{
         panel: TEST_DEVELOPMENT_PROVIDER_PANEL,
         healthyProviderRefs: TEST_DEVELOPMENT_PROVIDER_PANEL.healthyProviderRefs,
         stop: vi.fn(async () => { calls.push("providers:stop"); })
+      });
+    }),
+    startSupportModelRelay: vi.fn(async () => {
+      calls.push("support:start");
+      fail("support_model");
+      return Object.freeze({
+        targetJson: SUPPORT_MODEL_TARGET,
+        providerRef: "development:hermes-glm-5.3-flash" as const,
+        stop: vi.fn(async () => { calls.push("support:stop"); })
       });
     }),
     startDataPlane: vi.fn(async () => {
@@ -126,23 +141,24 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       ui: "DENY_DEFAULT_PROXY",
       tls: "SYSTEM_TRUST",
       providers: "CLI_HANDSHAKE",
+      supportModel: "HERMES_GLM_5_3_FLASH",
       healthyProviderRefs: ["development:codex-cli", "development:claude-cli"],
       runner: "REGISTERED"
     });
     expect(runtime.calls).toEqual([
-      "preflight", "providers:start", "data:start", "token", "environment",
+      "preflight", "providers:start", "support:start", "data:start", "token", "environment",
       "api:start", "runner:start", "ui:start", "tls:start"
     ]);
     expect(runtime.startDataPlane).toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL);
     expect(runtime.assembleApiEnvironment)
-      .toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL, REGISTER_RECEIPT);
+      .toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL, REGISTER_RECEIPT, SUPPORT_MODEL_TARGET);
 
     await Promise.all([stack.stop(), stack.stop()]);
     await stack.stop();
     expect(runtime.calls).toEqual([
-      "preflight", "providers:start", "data:start", "token", "environment",
+      "preflight", "providers:start", "support:start", "data:start", "token", "environment",
       "api:start", "runner:start", "ui:start", "tls:start",
-      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "providers:stop"
+      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"
     ]);
   });
 
@@ -155,13 +171,14 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
 
   it.each([
     ["provider_panel", ["preflight", "providers:start"]],
-    ["data", ["preflight", "providers:start", "data:start", "providers:stop"]],
-    ["token", ["preflight", "providers:start", "data:start", "token", "data:stop", "providers:stop"]],
-    ["environment", ["preflight", "providers:start", "data:start", "token", "environment", "data:stop", "providers:stop"]],
-    ["api", ["preflight", "providers:start", "data:start", "token", "environment", "api:start", "data:stop", "providers:stop"]],
-    ["runner", ["preflight", "providers:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "providers:stop"]],
-    ["ui", ["preflight", "providers:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "providers:stop"]],
-    ["tls", ["preflight", "providers:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "providers:stop"]]
+    ["support_model", ["preflight", "providers:start", "support:start", "providers:stop"]],
+    ["data", ["preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+    ["token", ["preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+    ["environment", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+    ["api", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+    ["runner", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+    ["ui", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+    ["tls", ["preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
   ] as const)("unwinds only the started prefix when %s fails", async (failAt, expected) => {
     const runtime = operations({ failAt });
     await expect(startDevelopmentAuthStack(runtime))
@@ -204,8 +221,8 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     const signalStack = await startDevelopmentAuthStack(signalRuntime);
     await expect(superviseDevelopmentAuthStack(signalStack, Promise.resolve("SIGTERM")))
       .resolves.toBeUndefined();
-    expect(signalRuntime.calls.slice(-6)).toEqual([
-      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "providers:stop"
+    expect(signalRuntime.calls.slice(-7)).toEqual([
+      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"
     ]);
 
     const exitRuntime = operations();
@@ -213,8 +230,8 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     const exited = superviseDevelopmentAuthStack(exitStack, new Promise(() => undefined));
     exitRuntime.apiExit.resolveExit({ code: 1, signal: null });
     await expect(exited).rejects.toThrow("DEV_AUTH_STACK_API_EXITED");
-    expect(exitRuntime.calls.slice(-6)).toEqual([
-      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "providers:stop"
+    expect(exitRuntime.calls.slice(-7)).toEqual([
+      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"
     ]);
 
     const stop = vi.fn(async () => undefined);

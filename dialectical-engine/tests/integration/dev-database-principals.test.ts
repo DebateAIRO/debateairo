@@ -10,8 +10,9 @@ import {
   stat,
   writeFile
 } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertAccountErasureDatabaseRole,
@@ -53,7 +54,10 @@ async function runProvisioningCli(environment: NodeJS.ProcessEnv): Promise<Reado
 }>> {
   return new Promise((resolve, reject) => {
     const child = spawn(
-      join(process.cwd(), "node_modules", ".bin", "tsx"),
+      [
+        join(process.cwd(), "node_modules", ".bin", "tsx"),
+        resolvePath(process.cwd(), "../../../node_modules/.bin/tsx")
+      ].find((candidate) => existsSync(candidate)) ?? "tsx",
       [join(process.cwd(), "apps", "runner", "src", "dev-database-principals-cli.ts")], {
       cwd: secretRoot,
       env: environment,
@@ -259,6 +263,24 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       await expect(assertSupportDatabaseRole(runtimePool, supportPool))
         .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
       await database.pool.query("REVOKE SELECT ON support.session FROM debateai_dev_support");
+
+      await database.pool.query(
+        "GRANT UPDATE(state) ON support.session TO debateai_support"
+      );
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query(
+        "REVOKE UPDATE(state) ON support.session FROM debateai_support"
+      );
+
+      await database.pool.query(
+        "GRANT SELECT ON support._shred_integrity_guard TO debateai_support"
+      );
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query(
+        "REVOKE SELECT ON support._shred_integrity_guard FROM debateai_support"
+      );
     } finally {
       await database.pool.query("REVOKE debateai_support FROM debateai_dev_runtime")
         .catch(() => undefined);
@@ -266,6 +288,12 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         .catch(() => undefined);
       await database.pool.query("REVOKE SELECT ON support.session FROM debateai_dev_support")
         .catch(() => undefined);
+      await database.pool.query(
+        "REVOKE UPDATE(state) ON support.session FROM debateai_support"
+      ).catch(() => undefined);
+      await database.pool.query(
+        "REVOKE SELECT ON support._shred_integrity_guard FROM debateai_support"
+      ).catch(() => undefined);
       await Promise.all([runtimePool.end(), supportPool.end()]);
     }
   }, 120_000);

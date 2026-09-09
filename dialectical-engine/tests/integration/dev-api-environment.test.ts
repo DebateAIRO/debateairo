@@ -31,6 +31,12 @@ import {
 import { parseRegisterVersionText } from "../../packages/register/src/index.js";
 
 const roots: string[] = [];
+const TEST_SUPPORT_MODEL_TARGET = JSON.stringify({
+  provider_ref: "development:hermes-glm-5.3-flash",
+  base_url: "http://127.0.0.1:8794/v1",
+  model: "z-ai/glm-5.3-flash",
+  authorization_header: "Bearer support-test"
+});
 
 function testToken(tenantId = "11111111-1111-4111-8111-111111111111"): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -52,6 +58,7 @@ async function fixture() {
   await mkdir(join(custodyRoot, "mail"), { mode: 0o700 });
   await Promise.all([
     writeFile(join(custodyRoot, "secrets", "kek.bin"), Buffer.alloc(32, 1), { mode: 0o600 }),
+    writeFile(join(custodyRoot, "secrets", "support-kek.bin"), Buffer.alloc(32, 5), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 })
@@ -88,7 +95,8 @@ async function assemble(repositoryRoot: string) {
   return assembleDevelopmentApiEnvironment({
     repositoryRoot,
     providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
-    registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot)
+    registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot),
+    supportModelTarget: TEST_SUPPORT_MODEL_TARGET
   });
 }
 
@@ -129,6 +137,15 @@ describe("DEV-09 private local API environment", () => {
       .not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
     expect(await readFile(test.outputFilePath, "utf8")).not.toContain(supportOperatorUrl);
     expect(environment.get("DATABASE_URL")).toContain("debateai_dev_runtime");
+    expect(environment.get("SUPPORT_KEK_PATH"))
+      .toBe(join(test.custodyRoot, "secrets", "support-kek.bin"));
+    expect(new Set([
+      environment.get("SUPPORT_KEK_PATH"),
+      environment.get("KEK_PATH"),
+      environment.get("CORPUS_KEK_PATH"),
+      environment.get("BLIND_INDEX_KEY_PATH"),
+      environment.get("AUDIT_SOURCE_IP_SALT_PATH")
+    ])).toHaveLength(5);
     expect(environment.get("SUPPORT_DATABASE_URL")).toContain("debateai_dev_support");
     expect(environment.get("SUPPORT_DATABASE_URL")).toBe(supportUrl);
     expect(environment.get("SUPPORT_DATABASE_URL")).not.toBe(environment.get("DATABASE_URL"));
@@ -165,6 +182,12 @@ describe("DEV-09 private local API environment", () => {
           ? { authorization_header: provider.authorization_header } : {})
       }))
     );
+    expect(JSON.parse(environment.get("SUPPORT_MODEL_TARGET_JSON")!)).toEqual({
+      provider_ref: "development:hermes-glm-5.3-flash",
+      base_url: "http://127.0.0.1:8794/v1",
+      model: "z-ai/glm-5.3-flash",
+      authorization_header: "Bearer support-test"
+    });
     expect(environment.get("PROVIDER_PROBE_TIMEOUT_MS")).toBe("180000");
     const prior = new Map<string, string | undefined>();
     for (const [key, value] of environment) {
@@ -238,7 +261,8 @@ describe("DEV-09 private local API environment", () => {
     await expect(assembleDevelopmentApiEnvironment({
       repositoryRoot: test.repositoryRoot,
       providerPanel: refreshedPanel,
-      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot)
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET
     })).resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     const after = parseEnvironment(await readFile(test.outputFilePath, "utf8"));
     for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
@@ -281,6 +305,21 @@ describe("DEV-09 private local API environment", () => {
       .toContain("PROVIDER_PROBE_TIMEOUT_MS=180000\n");
   });
 
+  it("atomically adds the dedicated Support model target to the exact legacy environment",async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath,"utf8");
+    const legacy = current.split("\n")
+      .filter((row) => !row.startsWith("SUPPORT_MODEL_TARGET_JSON="))
+      .join("\n");
+    await writeFile(test.outputFilePath,legacy,{ mode: 0o600 });
+
+    await expect(assemble(test.repositoryRoot))
+      .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length,reused: false });
+    expect(await readFile(test.outputFilePath,"utf8"))
+      .toContain(`SUPPORT_MODEL_TARGET_JSON=${TEST_SUPPORT_MODEL_TARGET}\n`);
+  });
+
   it("rejects an earlier environment that drops a required field", async () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);
@@ -309,10 +348,16 @@ describe("DEV-09 private local API environment", () => {
   });
 
   it("rejects unsafe custody, malformed tokens, and aliased database principals", async () => {
+    const unsafeSupportKek = await fixture();
+    await chmod(join(unsafeSupportKek.custodyRoot, "secrets", "support-kek.bin"), 0o640);
+    await expect(assemble(unsafeSupportKek.repositoryRoot))
+      .rejects.toThrow("DEV_API_ENVIRONMENT_SECRET_CUSTODY_INVALID");
+
     const receiptMismatch = await fixture();
     await expect(assembleDevelopmentApiEnvironment({
       repositoryRoot: receiptMismatch.repositoryRoot,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET,
       registerReceipt: createDevelopmentDeploymentRegisterMachineReceipt({
         registerVersion: parseRegisterVersionText("424242"),
         rowCount: 32,

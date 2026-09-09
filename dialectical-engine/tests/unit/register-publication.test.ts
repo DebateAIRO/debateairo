@@ -291,6 +291,7 @@ describe("bigint-safe versions and separate publication hash domains", () => {
   it("validates external REGISTER_VERSION as decimal text before the existing API legacy boundary", () => {
     const environment = {
       KEK_PATH: "/run/secrets/kek",
+      SUPPORT_KEK_PATH: "/run/secrets/support-kek",
       BLIND_INDEX_KEY_PATH: "/run/secrets/blind",
       AUDIT_KEY_STORE_PATH: "/run/secrets/audit",
       AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-ip",
@@ -302,6 +303,7 @@ describe("bigint-safe versions and separate publication hash domains", () => {
       MAIL_FROM: "noreply@debateai.test",
       PUBLIC_APP_URL: "https://debateai.test",
       DATABASE_URL: "postgresql://runtime:test@127.0.0.1:5432/debateai",
+      SUPPORT_DATABASE_URL: "postgresql://support:test@127.0.0.1:5432/debateai",
       AUTHORIZATION_DATABASE_URL: "postgresql://authorization:test@127.0.0.1:5432/debateai",
       API_HOST: "127.0.0.1",
       API_PORT: "3000",

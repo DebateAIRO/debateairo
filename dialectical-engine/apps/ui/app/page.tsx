@@ -4,6 +4,7 @@ import { createServerContractClient, USER_TOKEN_COOKIE, listDebatesPageServer } 
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
+import { SupportWidget } from "@/components/support/SupportWidget";
 import type { ContractClient } from "@debateai/contract";
 import type { DebateSummary } from "@/lib/types";
 
@@ -18,7 +19,7 @@ export default async function HomePage({
   // cookie the list honestly stays empty with a sign-in hint — never an
   // anonymous global listing.
   const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
-  if (token === null) return <LandingPage />;
+  if (token === null) return <><LandingPage /><SupportWidget /></>;
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
     requestedTab === "yours" || requestedTab === "public"
@@ -78,7 +79,7 @@ export default async function HomePage({
         {/* The composer is the workspace and renders only for a confirmed
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
-          <section id="start-a-debate" aria-label="Start a debate">
+          <section data-support-primary-control id="start-a-debate" aria-label="Start a debate">
             <LibraryComposer />
           </section>
         ) : null}
@@ -121,6 +122,7 @@ export default async function HomePage({
           </>
         )}
       </div>
+      <SupportWidget />
     </div>
   );
 }

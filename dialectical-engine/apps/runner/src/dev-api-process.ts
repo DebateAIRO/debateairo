@@ -15,6 +15,7 @@ import {
   readDevelopmentDeploymentRegisterReceipt,
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
+import { parseDevelopmentSupportModelTargetJson } from "./dev-support-model.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -165,9 +166,13 @@ function validateExactEnvironment(
     const providerPanel = parseDevelopmentProviderPanelTargets(
       values.PROVIDER_DISCOVERY_TARGETS_JSON!
     );
+    const supportModelTarget = parseDevelopmentSupportModelTargetJson(
+      values.SUPPORT_MODEL_TARGET_JSON!
+    );
     const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
     const exact = new Map<string, string>([
       ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
+      ["SUPPORT_KEK_PATH", join(custodyRoot, "secrets", "support-kek.bin")],
       ["BLIND_INDEX_KEY_PATH", join(custodyRoot, "secrets", "blind-index-key.bin")],
       ["AUDIT_KEY_STORE_PATH", join(custodyRoot, "audit-keys")],
       ["AUDIT_SOURCE_IP_SALT_PATH", join(custodyRoot, "secrets", "audit-source-ip-salt.bin")],
@@ -190,6 +195,7 @@ function validateExactEnvironment(
       ["BATTERY_VERSION", "dev-auth-v1"],
       ["SETTLEMENT_WATCH_HANDLE", "dev-auth:settlement-watch"],
       ["PROVIDER_DISCOVERY_TARGETS_JSON", providerPanel.targetsJson],
+      ["SUPPORT_MODEL_TARGET_JSON", supportModelTarget.targetJson],
       ["PROVIDER_PROBE_TIMEOUT_MS", String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS)],
       ["NODE_ENV", "development"],
       ["EVALUATOR_DEV_MENU_ENABLED", "false"],

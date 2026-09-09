@@ -22,11 +22,41 @@ import {
 } from "../../apps/runner/src/dev-secret-files.js";
 
 const temporaryRoots: string[] = [];
+const LEGACY_SECRET_FILES = Object.freeze([
+  Object.freeze({ id: "kek", relativePath: "secrets/kek.bin" }),
+  Object.freeze({ id: "corpus-kek", relativePath: "secrets/corpus-kek.bin" }),
+  Object.freeze({ id: "blind-index", relativePath: "secrets/blind-index-key.bin" }),
+  Object.freeze({
+    id: "audit-source-ip-salt",
+    relativePath: "secrets/audit-source-ip-salt.bin"
+  })
+]);
 
 async function makeRepositoryRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "debateai-dev-secrets-"));
   temporaryRoots.push(root);
   return root;
+}
+
+async function makeLegacySecretCustody(repositoryRoot: string): Promise<Readonly<{
+  custodyRoot: string;
+  secrets: readonly Readonly<{
+    path: string;
+    material: Buffer;
+    dev: number;
+    ino: number;
+  }>[];
+}>> {
+  const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+  await mkdir(join(custodyRoot, "secrets"), { recursive: true, mode: 0o700 });
+  const secrets = await Promise.all(LEGACY_SECRET_FILES.map(async ({ relativePath }, index) => {
+    const path = join(custodyRoot, relativePath);
+    const material = Buffer.alloc(32, index + 1);
+    await writeFile(path, material, { mode: 0o600 });
+    const metadata = await lstat(path);
+    return { path, material, dev: metadata.dev, ino: metadata.ino };
+  }));
+  return Object.freeze({ custodyRoot, secrets });
 }
 
 async function runCli(repositoryRoot: string): Promise<Readonly<{
@@ -69,10 +99,14 @@ describe("DEV-04 persistent development secret custody", () => {
     const first = await generateDevelopmentSecretFiles({ repositoryRoot });
     expect(first).toEqual({
       custodyRoot: join(repositoryRoot, ".local", "dev-auth"),
-      generatedSecretCount: 4,
-      secretFileCount: 4,
+      generatedSecretCount: 5,
+      secretFileCount: 5,
       secretStoreCount: 3
     });
+    expect(DEVELOPMENT_SECRET_FILES).toEqual([
+      ...LEGACY_SECRET_FILES,
+      { id: "support-kek", relativePath: "secrets/support-kek.bin" }
+    ]);
 
     const directoryPaths = [
       first.custodyRoot,
@@ -97,13 +131,13 @@ describe("DEV-04 persistent development secret custody", () => {
       expect(metadata.mode & 0o777).toBe(0o600);
       return { path, material, dev: metadata.dev, ino: metadata.ino };
     }));
-    expect(new Set(before.map(({ material }) => material.toString("base64"))).size).toBe(4);
-    expect(new Set(before.map(({ dev, ino }) => `${dev}:${ino}`)).size).toBe(4);
+    expect(new Set(before.map(({ material }) => material.toString("base64"))).size).toBe(5);
+    expect(new Set(before.map(({ dev, ino }) => `${dev}:${ino}`)).size).toBe(5);
 
     await expect(generateDevelopmentSecretFiles({ repositoryRoot })).resolves.toEqual({
       custodyRoot: first.custodyRoot,
       generatedSecretCount: 0,
-      secretFileCount: 4,
+      secretFileCount: 5,
       secretStoreCount: 3
     });
     for (const preserved of before) {
@@ -113,6 +147,47 @@ describe("DEV-04 persistent development secret custody", () => {
       expect(material).toEqual(preserved.material);
       expect(metadata.dev).toBe(preserved.dev);
       expect(metadata.ino).toBe(preserved.ino);
+    }
+  });
+
+  it("upgrades four-file custody by appending only support-kek and preserving legacy bytes/inodes", async () => {
+    const repositoryRoot = await makeRepositoryRoot();
+    const legacy = await makeLegacySecretCustody(repositoryRoot);
+    await expect(generateDevelopmentSecretFiles({ repositoryRoot })).resolves.toEqual({
+      custodyRoot: legacy.custodyRoot,
+      generatedSecretCount: 1,
+      secretFileCount: 5,
+      secretStoreCount: 3
+    });
+    for (const before of legacy.secrets) {
+      const [material, metadata] = await Promise.all([readFile(before.path), lstat(before.path)]);
+      expect(material).toEqual(before.material);
+      expect(metadata.dev).toBe(before.dev);
+      expect(metadata.ino).toBe(before.ino);
+    }
+    const allSecrets = await Promise.all(DEVELOPMENT_SECRET_FILES.map(async ({ relativePath }) => {
+      const path = join(legacy.custodyRoot, relativePath);
+      const [material, metadata] = await Promise.all([readFile(path), lstat(path)]);
+      return { material, dev: metadata.dev, ino: metadata.ino };
+    }));
+    expect(new Set(allSecrets.map(({ material }) => material.toString("base64"))).size).toBe(5);
+    expect(new Set(allSecrets.map(({ dev, ino }) => `${dev}:${ino}`)).size).toBe(5);
+  });
+
+  it("fails a four-to-five upgrade closed when pre-existing support custody is unsafe", async () => {
+    const repositoryRoot = await makeRepositoryRoot();
+    const legacy = await makeLegacySecretCustody(repositoryRoot);
+    const supportKekPath = join(legacy.custodyRoot, "secrets", "support-kek.bin");
+    const unsafeMaterial = Buffer.alloc(31, 0x60);
+    await writeFile(supportKekPath, unsafeMaterial, { mode: 0o640 });
+    await expect(generateDevelopmentSecretFiles({ repositoryRoot }))
+      .rejects.toThrow("DEV_AUTH_SECRET_FILE_INVALID");
+    expect(await readFile(supportKekPath)).toEqual(unsafeMaterial);
+    expect((await lstat(supportKekPath)).mode & 0o777).toBe(0o640);
+    for (const before of legacy.secrets) {
+      const [material, metadata] = await Promise.all([readFile(before.path), lstat(before.path)]);
+      expect(material).toEqual(before.material);
+      expect(metadata.ino).toBe(before.ino);
     }
   });
 
@@ -180,7 +255,7 @@ describe("DEV-04 persistent development secret custody", () => {
     const receipts = await Promise.all(Array.from({ length: 16 }, () =>
       generateDevelopmentSecretFiles({ repositoryRoot })
     ));
-    expect(receipts.reduce((sum, receipt) => sum + receipt.generatedSecretCount, 0)).toBe(4);
+    expect(receipts.reduce((sum, receipt) => sum + receipt.generatedSecretCount, 0)).toBe(5);
     const secretsRoot = join(repositoryRoot, ".local", "dev-auth", "secrets");
     expect((await readdir(secretsRoot)).sort()).toEqual(
       DEVELOPMENT_SECRET_FILES.map(({ relativePath }) => relativePath.split("/").at(-1)!).sort()
@@ -189,7 +264,7 @@ describe("DEV-04 persistent development secret custody", () => {
       readFile(join(repositoryRoot, ".local", "dev-auth", relativePath))
     ));
     expect(materials.every((material) => material.byteLength === 32)).toBe(true);
-    expect(new Set(materials.map((material) => material.toString("base64"))).size).toBe(4);
+    expect(new Set(materials.map((material) => material.toString("base64"))).size).toBe(5);
   });
 
   it("runs the fixed-path CLI without printing or rotating secret material", async () => {
@@ -197,7 +272,7 @@ describe("DEV-04 persistent development secret custody", () => {
     const first = await runCli(repositoryRoot);
     expect(first).toEqual({
       exitCode: 0,
-      stdout: "DEV_AUTH_SECRETS_READY=4:3\n",
+      stdout: "DEV_AUTH_SECRETS_READY=5:3\n",
       stderr: ""
     });
     const custodyRoot = join(repositoryRoot, ".local", "dev-auth");

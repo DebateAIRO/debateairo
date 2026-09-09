@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { extname } from "node:path";
 import { promisify } from "node:util";
-import ts from "../../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/lib/typescript.js";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   AUTH_POLICY_REGISTER_ROWS,
@@ -270,7 +270,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(databaseSource).toContain("export function createSupportControlPlanePool(");
     for (const option of [
       "max: 2", "connectionTimeoutMillis: 200",
-      "statement_timeout: 500", "query_timeout: 750"
+      "statement_timeout: 700", "query_timeout: 750"
     ]) expect(databaseSource).toContain(option);
     expect(ordinaryPoolBody).not.toMatch(/SUPPORT|statement_timeout|query_timeout/iu);
     expect(supportSource).not.toContain("createPostgresRegisterPublicationPort");
