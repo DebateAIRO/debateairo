@@ -47,3 +47,8 @@
 
 - Commit `7658e997` on `slice/tiers-s01`: `packages/contract/src/plan-tiers.ts` (new: PlanTierSchema, PlanTier, PLAN_TIERS, PLAN_TIER_ROSTERS), `index.ts` (+2: import/re-export at :3, `plan_tier: PlanTierSchema` at :118), `tests/architecture/tier01-roster.test.ts` (new, pins existence/uniqueness/order of the two markers), `contract.test.ts` (8/8), `api.test.ts` (25/25), the 13 literals + `load01`, `s7-authorization`, `evaluator-database` unchanged pairs. RED frames posted at S01-1/2 and S01-6; three runs CLUSTER_GREEN; orchestrator re-run CLUSTER_GREEN. SKILLS 6/6.
 - Findings F1–F5 ticketed; F1–F3 folded (PLAN stands), F4 open as S01 residue, F5 fixed in the protocol. Next: BUILD(S01-C2) `t_085d4fa4` (Codex Sol, base `7658e997`) → C3 ∥ C4 → C5.
+
+## 2026-09-10 01:42 EEST — BUILD(S01-C2) consumed: READY (orchestrator entry)
+
+- Commit `b866191f` on `slice/tiers-s01`: `defaults.tsx` (`readonly planTier?: PlanTier`, `plan_tier: defaults.planTier`, the `false` provenance branch → `machine:plan-tier-free`), `api.ts` (`PLAN_TIERS_SET` + `requiredString(config, "plan_tier")` guard before `requireToken`/`submitAsk`), `tests/unit/tier01-ask-wire.test.ts` (3/3), one `plan_tier` line in `v2ui-data-layer` (57/57) and `pol01-policy` (8/8); `s14-contract` 2|3 inherited. RED frames posted; refutation matrix per assertion; three runs CLUSTER_GREEN; orchestrator re-run CLUSTER_GREEN; typecheck delta 0 in the allowed paths and ux01.
+- Findings F1–F4 ticketed (F1 folded below; F2–F4 protocol/packet classes fixed). Next: BUILD(S01-C3) `t_d1dc1913` ∥ BUILD(S01-C4) `t_cd5642d0` in the same lane (disjoint surfaces), base `b866191f`, oracle `DONE.md` M1–M15 → C5.
