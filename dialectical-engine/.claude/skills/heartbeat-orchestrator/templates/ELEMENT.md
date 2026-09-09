@@ -7,12 +7,12 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - seat: __SEAT__ · node: ELEMENT(__SLICE__) (finished-element review, roster-named seat) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
-- inputs (read these and nothing else): the slice at PASS: head __SLICE_HEAD__ in __LANE__ (read-only) · the acceptance oracle __ORACLE__ · the union verdict of the last REV pass · the dev-stack recipe in the review package __REPORTS__/review-packages/__SLICE__-p__PASS__/
+- inputs (read these and nothing else): the slice at PASS: head __SLICE_HEAD__ in __LANE__ (read-only) · the acceptance oracle __ORACLE__ · the union verdict of the last REV pass · the dev-stack recipe in the review package __REPORTS__/review-packages/__SLICE__-p__PASS__/ · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/__MISSION__` is exactly what the seat under review changed)
 - output (the ONE artifact this node produces): __MISSION_ROOT__/reviews/ELEMENT-__SLICE__.md (new) + ONE verdict comment on __TICKET__
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/ELEMENT-__SLICE__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/ELEMENT-__SLICE__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — `heartbeat-reviewer` §7 keeps every probe there)
 - forbidden: everything else — in particular the slice's files, git writes
 - verification: the element exercised end to end against the oracle by your own means; every step you cannot exercise listed under UNVERIFIED for V's test point — never assumed
 

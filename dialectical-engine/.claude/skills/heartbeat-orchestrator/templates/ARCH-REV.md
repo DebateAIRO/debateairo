@@ -7,12 +7,12 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - seat: __SEAT__ · node: ARCH-REV(__SLICE__) (blind review of the plan, pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
-- inputs (read these and nothing else): the ARCH packet __PACKET_DIR__/ARCH-__SLICE__.md (review it FIRST) · __MISSION_ROOT__/slices/__SLICE__/PLAN.md · SPEC.md · DECISIONS.md
+- inputs (read these and nothing else): the ARCH packet __PACKET_DIR__/ARCH-__SLICE__.md (review it FIRST) · __MISSION_ROOT__/slices/__SLICE__/PLAN.md · SPEC.md · DECISIONS.md · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/__MISSION__` is exactly what the seat under review changed)
 - output (the ONE artifact this node produces): __MISSION_ROOT__/reviews/ARCH-REV-__SLICE__-p__PASS__.md (new) + ONE verdict comment on __TICKET__
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/ARCH-REV-__SLICE__-p__PASS__.md (new) · a scratch dir under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/ARCH-REV-__SLICE__-p__PASS__.md (new) · a scratch dir under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — `heartbeat-reviewer` §7 keeps every probe there)
 - forbidden: everything else — in particular PLAN.md, SPEC.md, every product file; you edit nothing under review
 - verification: every cluster command re-run by YOU at base from a `.sh` file, inline and scripted, with zero disagreements · your own both-ways trace parser · one step you cannot mark done without a judgement call = a finding
 

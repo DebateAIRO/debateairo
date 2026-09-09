@@ -31,3 +31,4 @@ A case file, not a diary, at most ~1,500 words: name the CAUSE, not the symptom 
 | fact | value | command | measured |
 |---|---|---|---|
 | __FACT__ | __VALUE__ | __COMMAND__ | __WHEN__ |
+| freeze commits (updated at every freeze — orchestrator §9) | __FREEZE_COMMITS__ | `git log --oneline -- docs/missions/__MISSION__` | __WHEN__ |

@@ -7,7 +7,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - seat: __SEAT__ · node: REV(__SLICE__) lens __LENS__ (blind slice review, pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
-- inputs (read these and nothing else): the review package __REPORTS__/review-packages/__SLICE__-p__PASS__/ (diff vs base, every cluster command + three-run table, the cluster map, the acceptance oracle, the dev-stack recipe) · the slice head __SLICE_HEAD__ checked out READ-ONLY in your detached worktree __LANE__ · __ORACLE__
+- inputs (read these and nothing else): the review package __REPORTS__/review-packages/__SLICE__-p__PASS__/ (diff vs base, every cluster command + three-run table, the cluster map, the acceptance oracle, the dev-stack recipe) · the slice head __SLICE_HEAD__ checked out READ-ONLY in your detached worktree __LANE__ · __ORACLE__ · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/__MISSION__` is exactly what the seat under review changed)
 - output (the ONE artifact this node produces): __MISSION_ROOT__/reviews/REV-__SLICE__-p__PASS__-__LENS__.md (new) + ONE verdict comment on __TICKET__
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 

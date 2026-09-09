@@ -7,12 +7,12 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - seat: __SEAT__ · node: REQ-REV (blind review of the requirements, pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
-- inputs (read these and nothing else): the REQ packet __PACKET_DIR__/REQ.md (review it FIRST) · __MISSION_ROOT__/INSTRUCTIONS.md · every __MISSION_ROOT__/slices/<S>/SPEC.md and PLAN.md scaffold · the intake record · the product files the SPECs cite, at the lines they cite, read-only
+- inputs (read these and nothing else): the REQ packet __PACKET_DIR__/REQ.md (review it FIRST) · __MISSION_ROOT__/INSTRUCTIONS.md · every __MISSION_ROOT__/slices/<S>/SPEC.md and PLAN.md scaffold · the intake record · the product files the SPECs cite, at the lines they cite, read-only · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/__MISSION__` is exactly what the seat under review changed)
 - output (the ONE artifact this node produces): __MISSION_ROOT__/reviews/REQ-REV-p__PASS__.md (new) + ONE verdict comment on __TICKET__
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/REQ-REV-p__PASS__.md (new) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/REQ-REV-p__PASS__.md (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — `heartbeat-reviewer` §7 keeps every probe there)
 - forbidden: everything else — in particular every SPEC, PLAN, product file; you edit nothing under review
 - verification: each SPEC acceptance step executed as a stranger would (UNVERIFIED where the stack is not served) · each requirement tested for a second reading · `ui:` flags checked against the acceptance surface · your own contradiction sweep
 

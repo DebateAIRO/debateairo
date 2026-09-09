@@ -106,7 +106,9 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   `REQ-FIX.md`; ARCH rework the same template with the architecture contract); fill every
   `__MARKER__`; keep the contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is
   `<abs path>:<LINE> — \`text\``, re-grepped at write time — never recalled from earlier tool output.
-- **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.** A
+- **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.**
+  It runs AFTER the freeze commit (§9) and immediately before the DISPATCHED comment, which stamps
+  the HEAD the check printed — one HEAD across the whole dispatch record. A
   failing packet is fixed in the TEMPLATE or the COMMON line that produced it (fix the class).
 - The SPEC of record for a slice is its highest-numbered `SPEC-v<n>.md` (`SPEC.md` when none):
   every packet written after a planning rework names that file — never `SPEC.md` by habit.
@@ -181,6 +183,7 @@ escalates to V after ONE failed workaround.
 The mission tree (`docs/missions/<m>`, `.hermes/planning/<m>`, `.hermes/reports/<m>`) is COMMITTED at
 every freeze — REQ READY, each REQ-FIX / ARCH / MOCK READY, each verdict — as `docs(<m>): …`; an
 untracked tree has no history, and a seat's in-place edit of a frozen file is then unrecoverable.
+Each freeze commit goes into COMMON §6 (`freeze commits` row); every review packet diffs against it.
 Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
 how SKILLS LOADED was verified, self-report path, verdict — and a `Ruling:` line for every decision
 you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
