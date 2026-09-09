@@ -29,7 +29,8 @@ defect:
   READY exactly when V's test point is due. **The graph IS the board.** Titles carry the model tag
   and the node: `[claude-opus-5] BUILD S02-C3`.
 - One worktree per slice (`.worktrees/<slice>`, branch `slice/<m>-<s>`), node_modules cloned,
-  contracts generated, the baseline measured per lane.
+  contracts generated, the baseline measured per lane — every suite a SPEC names AND every suite that READS a file the
+  slice writes (`grep -rl` over `tests/` for each file of the plan's write list; ~2 s).
 - Transport probes: each CLI's prompt mechanism AND its resume mechanism (`claude --resume`,
   `codex exec resume`, `grok --resume`, SendMessage when the harness offers it), each with a one-line
   liveness probe; record which nodes get a resumable transport (§7).

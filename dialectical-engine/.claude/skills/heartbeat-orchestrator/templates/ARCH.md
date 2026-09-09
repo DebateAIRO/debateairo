@@ -14,7 +14,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 ## 2. Contract
 - allowed (exhaustive): __MISSION_ROOT__/slices/__SLICE__/PLAN.md · __MISSION_ROOT__/slices/__SLICE__/DECISIONS.md · __REPO_ROOT__/docs/architecture/01-decisions/ADR-<the next free number, measured with `ls` at write time — never pre-assigned>-*.md (new, only if a decision outlives the mission) · __REPORTS__/agent-reports/__SEAT__.md (new)
 - forbidden: everything else — in particular SPEC.md, every product file, git
-- verification: every cluster command RUN at base from a `.sh` file and its verdict recorded (RED for TDD-red is expected; BROKEN is a defect) · the SPEC↔PLAN trace both ways with zero gaps · every step passes the stranger test · zero banned words
+- verification: every cluster command RUN at base from a `.sh` file and its verdict recorded (RED for TDD-red is expected; BROKEN is a defect) · the SPEC↔PLAN trace both ways with zero gaps · every step passes the stranger test · zero banned words · a test path a step CREATES is omitted from the base run and recorded per command (a missing path is BROKEN only when nothing in the plan creates it)
 
 ## 3. The work
 Brainstorm the direction, then plan. Steps are finite, categoric, quantifiable — as many as the slice has, no cap. Clusters are BUILD units; they are not reviewed one by one — write the slice-level verification list `REV(__SLICE__)` will run. Refute your own plan: per step, the failure its criterion catches and one it does not; per cluster, the mutant class its command detects. Contested product questions go up as V rows with your recommendation, never decided here.
