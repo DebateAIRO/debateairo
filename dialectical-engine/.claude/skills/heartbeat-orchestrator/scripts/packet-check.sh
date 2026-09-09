@@ -2,7 +2,7 @@
 # packet-check.sh <packet.md> — the mechanical pre-dispatch check (heartbeat v4.0.0, spine v4 item 6).
 # Exit 0 = dispatchable. Exit 1 = every DEFECT listed on stdout. Never edits the packet.
 # Conventions it enforces (heartbeat-orchestrator §5): fill markers are __UPPERCASE__; a path the seat
-# will CREATE carries " (new)" on the same line; a code quote is `<abs path>:<LINE> — `<text>``.
+# will CREATE carries " (new)" — or "(new, <qualifier>)" — on the same line; a code quote is `<abs path>:<LINE> — `<text>``.
 set -u
 P="${1:?usage: packet-check.sh <packet.md>}"
 [ -f "$P" ] || { echo "DEFECT no such packet: $P"; exit 1; }
@@ -16,7 +16,7 @@ fi
 # 2. every absolute path resolves, unless the line marks it (new) or the path holds a <placeholder>
 out=$(grep -nEo '(/Users|/private|/tmp)[A-Za-z0-9_./~-]*' "$P" | while IFS=: read -r ln pth; do
   line=$(sed -n "${ln}p" "$P")
-  case "$line" in *"(new)"*) continue;; esac
+  case "$line" in *"(new"*) continue;; esac   # "(new)" or "(new, <qualifier>)" both mark a path the seat creates
   case "$pth" in *'<'*) continue;; esac
   p="${pth%%:[0-9]*}"; p="${p%.}"; p="${p%,}"
   [ -e "$p" ] || echo "DEFECT path does not resolve (line $ln): $p"
