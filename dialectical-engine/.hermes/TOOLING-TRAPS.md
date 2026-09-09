@@ -2392,3 +2392,44 @@ the same commit — the compiler cannot see a string match. (2) A stub branch th
 the caller reads as "retry" turns a fixture defect into a hang, not a failure; prefer answering
 the real query and letting everything else throw loudly. (3) A red row inside an accepted
 known-red set stops being read — the set is a place defects go to be forgotten.**
+
+## CORRECTION to "A `sql.includes(\"<query text>\")` stub is pinned to a product STRING" (:2374): load01 hung on the DEFAULT branch, not on a `{ rows: [] }` branch
+Filed by lane/stub-class (F-PG-STUB-QUERY-TEXT-CLASS, 2026-09-09), from codex known-reds r1
+N2/N4. The entry above says at `:2385-2386` that `tests/unit/load01-run-projection.test.ts`
+"returned `{ rows: [] }` from a branch that no longer matched". That is not the path the run
+took. Read from the file at dev `e2adf68ba4202d576246349e792463523e94449a`:
+`if (text.includes("pg_advisory_lock")) return { rows: [] };` sat at `:10`, and
+`"SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired"` does not contain
+`"pg_advisory_lock"` — so that branch did not run AT ALL. The try-lock text matched none of the
+four named branches (`:10`, `:11`, `:12`, `:15`) and fell THROUGH to the stub's catch-all
+DEFAULT at `:18-:26`, which returned a run row (`run_id`, `question_line`,
+`content_ciphertext`, `state`, `terminal_reason`) carrying no `acquired` field. The lease reads
+`result.rows[0]?.acquired !== true` (`packages/db/src/index.ts:305`), and `undefined !== true`,
+so it took the contention path, unlocked, slept 10 ms and retried without limit
+(`:311-:314`). The observable was `Test timed out in 120000ms.` at 120,010 ms
+(`logs/stub-class/02-RED-load01-mine.log`, gate `RED-load01-worker-at-base`, EXIT 1).
+The distinction is not cosmetic. A stale branch that RETURNS a wrong shape is a one-line fix
+at that branch. A stale branch that stops matching hands the query to whatever the stub does
+LAST — and a catch-all default is what converts a dead branch into a hang. xrev01 had no
+catch-all, so the same rot surfaced in 5 ms as `UNEXPECTED_CLIENT_QUERY:<sql>`; load01 had one,
+so it burned 120 seconds and named nothing.
+**Rule: a fake client's LAST branch decides what a rot looks like. Give a stub no catch-all
+default — dispatch every query it models by name and throw on the rest — or the next changed
+query text is answered plausibly instead of loudly.**
+
+## The lane worktree and the main checkout differ by ONE path segment, and an edit lands silently in the wrong one
+Found by lane/stub-class (2026-09-09). The engine lives at `<repo>/dialectical-engine` in the
+main checkout and at `<repo>/.worktrees/lane-<name>/dialectical-engine` in every lane, so the
+two paths differ only by `.worktrees/lane-<name>/`. A seat that sets `W=<repo>/dialectical-engine`
+for its read-only greps — which is legitimate when the main checkout sits at the same commit as
+the lane base — and then reuses `$W` for the edit writes the patch to the MAIN checkout, on
+`dev`. Nothing complains: the write succeeds, `git status` is only consulted in the lane, and the
+lane's own test run still shows the ORIGINAL red, which reads as "my fix did not work" rather
+than "my fix is not here". The cost is one full verification cycle plus the revert.
+Recovering is not automatic either: `git checkout -- <path>` may be refused by a harness that
+blocks destructive restores, so the reverse patch has to be applied textually and then proved
+byte-identical with `git diff --stat HEAD -- <paths>` returning empty.
+**Rule: bind the lane worktree path to ONE variable at the top of the session, never to the same
+name used for read-only work in another checkout, and make the first line of every edit script
+assert its own location (`assert os.getcwd().endswith("/.worktrees/lane-<name>/dialectical-engine")`).
+An edit script that cannot say where it is standing is one variable away from editing dev.**
