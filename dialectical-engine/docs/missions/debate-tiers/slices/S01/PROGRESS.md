@@ -42,3 +42,8 @@
 
 - V, verbatim: «well, I love it the way it is. go forward with implementation». Ticket `t_e82bc6b0` completed with those words. The canvas was read back (Artifact tool, 00:06; 0 comments, 0 edits) and its fourteen artboards + `canvas.json` extracted verbatim into `docs/missions/debate-tiers/design/S01/` (README.md = file → artboard → screen map; MANIFEST.tsv = bytes/lines/sha256). `DONE.md` written: §1 the six defaults ratified, §2 states 1–6 with numbered browser steps in both modes, §3 measurements M1–M15 (one assertion each at C5), §4 acceptance = SPEC-v2 §2 in both modes. Rows V-9/V-17/V-18 answered (V packet, end section); no SPEC supersession; no new token.
 - Board: BUILD(S01-C1) READY (Codex Sol) → C2 → C3 ∥ C4 → C5 (ids in `logs/tickets.env`). Next: the C1 packet, freeze, packet-check, launch.
+
+## 2026-09-10 01:02 EEST — BUILD(S01-C1) consumed: READY (orchestrator entry)
+
+- Commit `7658e997` on `slice/tiers-s01`: `packages/contract/src/plan-tiers.ts` (new: PlanTierSchema, PlanTier, PLAN_TIERS, PLAN_TIER_ROSTERS), `index.ts` (+2: import/re-export at :3, `plan_tier: PlanTierSchema` at :118), `tests/architecture/tier01-roster.test.ts` (new, pins existence/uniqueness/order of the two markers), `contract.test.ts` (8/8), `api.test.ts` (25/25), the 13 literals + `load01`, `s7-authorization`, `evaluator-database` unchanged pairs. RED frames posted at S01-1/2 and S01-6; three runs CLUSTER_GREEN; orchestrator re-run CLUSTER_GREEN. SKILLS 6/6.
+- Findings F1–F5 ticketed; F1–F3 folded (PLAN stands), F4 open as S01 residue, F5 fixed in the protocol. Next: BUILD(S01-C2) `t_085d4fa4` (Codex Sol, base `7658e997`) → C3 ∥ C4 → C5.

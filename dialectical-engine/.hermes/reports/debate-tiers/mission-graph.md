@@ -97,17 +97,22 @@ flowchart LR
   t_216c7104["(finding) ARCH-REV-S02-p2 N6 packet defect (orchestrator) — ARCH-REV-S"]:::done
   t_cfd428dd["(finding) ARCH-REV-S02-p2 N7 packet defect (orchestrator) — the freeze"]:::done
   t_8920309f["(finding) ARCH-REV-S02-p2 N8 packet defect (orchestrator) — the ARCH-F"]:::done
-  t_a682a931["(gpt-5.6-sol) BUILD S01-C1 — the contract: plan_tier on the ask, the t"]:::ready
-  t_085d4fa4["(gpt-5.6-sol) BUILD S01-C2 — the ask wire: the builder's tier + proven"]:::todo
+  t_a682a931["(gpt-5.6-sol) BUILD S01-C1 — the contract: plan_tier on the ask, the t"]:::done
+  t_085d4fa4["(gpt-5.6-sol) BUILD S01-C2 — the ask wire: the builder's tier + proven"]:::ready
   t_d1dc1913["(gpt-5.6-sol) BUILD S01-C3 — the page: the selector, the fourteen lock"]:::todo
   t_cd5642d0["(gpt-5.6-sol) BUILD S01-C4 — the stylesheet: the selector's rules + th"]:::todo
   t_6e2413b7["(gpt-5.6-sol) BUILD S01-C5 — the DONE.md measurements: one assertion p"]:::todo
-  t_a02cca8b["(finding) BUILD-S02-C1 F1 (plan) — PLAN.md:267 case 2's UPDATE probe: "]:::ready
+  t_a02cca8b["(finding) BUILD-S02-C1 F1 (plan) — PLAN.md:267 case 2's UPDATE probe: "]:::done
   t_1a083e6e["(finding) BUILD-S02-C1 F2 (packet, orchestrator) — verbatim-frame char"]:::done
-  t_2e1b3dc2["(finding) BUILD-S02-C1 F3 (plan) — S02-C1-S4 (PLAN.md:318-321, the Dri"]:::ready
-  t_b97424de["(finding) BUILD-S02-C1 F4 (packet, orchestrator) — the 'byte-for-byte'"]:::ready
-  t_68b151cb["(finding) BUILD-S02-C1 F5 (tooling) — embedded-Postgres logs dominated"]:::ready
-  t_678be355["(finding) BUILD-S02-C1 F6 (packet defect, orchestrator) — reading orde"]:::ready
+  t_2e1b3dc2["(finding) BUILD-S02-C1 F3 (plan) — S02-C1-S4 (PLAN.md:318-321, the Dri"]:::done
+  t_b97424de["(finding) BUILD-S02-C1 F4 (packet, orchestrator) — the 'byte-for-byte'"]:::done
+  t_68b151cb["(finding) BUILD-S02-C1 F5 (tooling) — embedded-Postgres logs dominated"]:::done
+  t_678be355["(finding) BUILD-S02-C1 F6 (packet defect, orchestrator) — reading orde"]:::done
+  t_fc968fd5["(finding) BUILD-S01-C1 F1 (plan) — S01-3's done-criterion needs S01-4'"]:::done
+  t_571b25a8["(finding) BUILD-S01-C1 F2 (plan) — S01-6's response body { error: MALF"]:::done
+  t_0ae63967["(finding) BUILD-S01-C1 F3 (plan) — S01-8's oracle 'grep -rc steering_a"]:::done
+  t_1e4fccc1["(finding) BUILD-S01-C1 F4 (repo, class) — unsafe source-region helpers"]:::ready
+  t_26f22a53["(finding) BUILD-S01-C1 F5 (packet defect, orchestrator) — the packet's"]:::done
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -140,4 +145,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-10 00:38 from board `debate-tiers` — 108 nodes, 22 edges_
+_rendered 2026-09-10 01:03 from board `debate-tiers` — 113 nodes, 22 edges_
