@@ -1,0 +1,7 @@
+{
+  "modules": {
+    "host-capacity": {
+      "disk_degraded_free_percent": 100
+    }
+  }
+}

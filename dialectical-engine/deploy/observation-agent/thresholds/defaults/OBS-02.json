@@ -1,0 +1,37 @@
+{
+  "routing": {
+    "INFRA_DOWN.dev_stack": "SEVERE",
+    "INFRA_DOWN.api": "SEVERE",
+    "INFRA_DOWN.ui": "SEVERE",
+    "INFRA_DOWN.tls_front_door": "SEVERE",
+    "INFRA_DOWN.runner": "SEVERE",
+    "INFRA_DOWN.kanban": "SEVERE",
+    "THROUGHPUT_ANOMALY.api": "DEGRADED",
+    "THROUGHPUT_ANOMALY.ui": "DEGRADED",
+    "THROUGHPUT_ANOMALY.tls_front_door": "DEGRADED",
+    "RESTART_WITNESSED": "INFO",
+    "EXPECTED_ABSENT": "SEVERE",
+    "SCHEDULE_MISSED": "SEVERE"
+  },
+  "modules": {
+    "product-liveness": {
+      "probe_interval_ms": 5000,
+      "probe_timeout_ms": 2000,
+      "kanban_probe_interval_ms": 30000,
+      "group_memory_ms": 600000,
+      "never_started_ms": 60000,
+      "latency_window_ms": 300000,
+      "api_latency_threshold_ms": 500,
+      "ui_latency_threshold_ms": 2000,
+      "tls_front_door_latency_threshold_ms": 2500,
+      "not_running_severity": "INFO"
+    },
+    "witness": {
+      "probe_interval_ms": 5000,
+      "never_started_ms": 60000
+    },
+    "job-witness": {
+      "detector_interval_ms": 15000
+    }
+  }
+}

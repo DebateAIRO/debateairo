@@ -59,6 +59,8 @@ export interface CliRelayAdapter {
   readonly failureCode: string;
   /** Loud code for a deadline kill (e.g. CODEX_CLI_TIMEOUT). */
   readonly timeoutCode: string;
+  /** Maker-specific fixed values applied after the ambient allowlist. */
+  childEnvironment?(scratchDirectory: string): Readonly<Record<string,string>>;
   buildArguments(prompt: string): readonly string[];
   /** Throws CliRelayFailure instead of ever inventing content or lineage. */
   parseCompletion(stdout: string, prompt: string): CliCompletion | Promise<CliCompletion>;
@@ -80,6 +82,13 @@ export function buildCliChildEnvironment(
   for (const key of allowedKeys) {
     const value = source[key];
     if (value !== undefined) environment[key] = value;
+  }
+  const fixed = adapter.childEnvironment?.(scratchDirectory) ?? {};
+  for (const [key,value] of Object.entries(fixed)) {
+    if (!/^[A-Z][A-Z0-9_]*$/u.test(key) || value.length === 0 || /[\u0000]/u.test(value)) {
+      throw new TypeError("CLI_RELAY_CHILD_ENVIRONMENT_INVALID");
+    }
+    environment[key] = value;
   }
   environment.PWD = scratchDirectory;
   environment.OLDPWD = scratchDirectory;

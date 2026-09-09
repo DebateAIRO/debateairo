@@ -18,8 +18,10 @@ import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
   assertBootstrapEquality,
   loadBootstrapRegister,
+  parseRegisterVersionText,
   persistBootstrapRegister,
-  readClaimTypeCompositionMap
+  readClaimTypeCompositionMap,
+  registerVersionToSafeLegacyNumber
 } from "@debateai/register";
 import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
@@ -47,6 +49,10 @@ import {
   TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
+import {
+  publishReplacementRegisterFixture,
+  registerFixtureRow
+} from "../support/registerFixtures.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -1519,19 +1525,24 @@ describe("FX-REG-01 — database/file equality over all five pins", () => {
 
 describe("FX-LG-16 / DR-128 — claim-type composition register carrier", () => {
   it("rejects the wrong member shape and reads a test-layer row through the canonical reader", async () => {
-    const registerVersion = 404_128;
-    await expect(database.pool.query(
-      `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-       VALUES ($1, $2, $3::jsonb, $4)`,
-      [registerVersion, CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, JSON.stringify({ kind: "CLAIM_TYPE_COMPOSITION_MAP", entries: { unknown: { branch: "EVIDENCE_AWARE" } } }), "test-layer:DR-128:invalid"]
-    )).rejects.toThrow();
+    await persistBootstrapRegister(database.pool, await loadBootstrapRegister());
+    await expect(publishReplacementRegisterFixture(database.pool, parseRegisterVersionText("1"), [
+      registerFixtureRow(
+        CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
+        { kind: "CLAIM_TYPE_COMPOSITION_MAP", entries: { unknown: { branch: "EVIDENCE_AWARE" } } },
+        "test-layer:DR-128:invalid"
+      )
+    ], "test-layer:DR-128:invalid-publication")).rejects.toThrow();
 
     const testLayerValue = runnerSettings().compositionRow!.value;
-    await database.pool.query(
-      `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-       VALUES ($1, $2, $3::jsonb, $4)`,
-      [registerVersion, CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, JSON.stringify(testLayerValue), "test-layer:DR-128:valid"]
-    );
+    const valid = await publishReplacementRegisterFixture(database.pool, parseRegisterVersionText("1"), [
+      registerFixtureRow(
+        CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
+        testLayerValue,
+        "test-layer:DR-128:valid"
+      )
+    ], "test-layer:DR-128:valid-publication");
+    const registerVersion = registerVersionToSafeLegacyNumber(valid.registerVersion);
     await expect(readClaimTypeCompositionMap(database.pool, registerVersion)).resolves.toMatchObject({
       rowKey: CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
       registerVersion,

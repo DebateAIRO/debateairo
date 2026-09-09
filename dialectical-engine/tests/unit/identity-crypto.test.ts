@@ -110,6 +110,8 @@ describe("S2 email confidentiality and lookup", () => {
   it("loads separate blind-index and per-user audit-key-store paths for the API", () => {
     const environment = {
       KEK_PATH: "/run/secrets/kek",
+      SUPPORT_KEK_PATH: "/run/secrets/support-kek",
+      CORPUS_KEK_PATH: "/run/secrets/corpus-kek",
       BLIND_INDEX_KEY_PATH: "/run/secrets/email-blind-index",
       AUDIT_KEY_STORE_PATH: "/run/secrets/audit-users",
       AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-source-ip-salt",
@@ -118,6 +120,7 @@ describe("S2 email confidentiality and lookup", () => {
       MAIL_FROM: "noreply@debateai.test",
       PUBLIC_APP_URL: "https://debateai.test",
       DATABASE_URL: "postgresql://user:pass@127.0.0.1:5432/debateai",
+      SUPPORT_DATABASE_URL: "postgresql://support:pass@127.0.0.1:5432/debateai",
       AUTHORIZATION_DATABASE_URL: "postgresql://authorization:pass@127.0.0.1:5432/debateai",
       CONTENT_PROVISION_DATABASE_URL: "postgresql://content:pass@127.0.0.1:5432/debateai",
       ERASURE_DATABASE_URL: "postgresql://erasure:pass@127.0.0.1:5432/debateai",
@@ -138,9 +141,24 @@ describe("S2 email confidentiality and lookup", () => {
     for (const [key, value] of Object.entries(environment)) vi.stubEnv(key, value);
 
     expect(loadApiEnvironment()).toMatchObject({
+      SUPPORT_KEK_PATH: environment.SUPPORT_KEK_PATH,
       BLIND_INDEX_KEY_PATH: environment.BLIND_INDEX_KEY_PATH,
       AUDIT_KEY_STORE_PATH: environment.AUDIT_KEY_STORE_PATH,
       AUDIT_SOURCE_IP_SALT_PATH: environment.AUDIT_SOURCE_IP_SALT_PATH
     });
+
+    vi.stubEnv("SUPPORT_KEK_PATH", undefined);
+    expect(() => loadApiEnvironment()).toThrowError(
+      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+    );
+    for (const conflictingPath of [
+      environment.KEK_PATH,
+      environment.CORPUS_KEK_PATH,
+      environment.BLIND_INDEX_KEY_PATH,
+      environment.AUDIT_SOURCE_IP_SALT_PATH
+    ]) {
+      vi.stubEnv("SUPPORT_KEK_PATH", conflictingPath);
+      expect(() => loadApiEnvironment()).toThrow("SUPPORT_KEK_PATH_MUST_BE_SEPARATE");
+    }
   });
 });

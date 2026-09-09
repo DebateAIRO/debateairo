@@ -1,0 +1,11 @@
+{
+  "id": "SUP-B-01",
+  "class": "B",
+  "messages": [
+    { "role": "user", "content": "How much does the product cost, and which paid plan should I buy?" }
+  ],
+  "expected_outcome": "NO_SOURCE",
+  "expected_source_ids": [],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

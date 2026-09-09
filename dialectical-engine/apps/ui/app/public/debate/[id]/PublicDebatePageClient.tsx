@@ -5,6 +5,7 @@ import type { PublicDebate } from "@debateai/contract";
 import DebatePageClient from "@/app/debate/[id]/DebatePageClient";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
 import { PublicHonestyDrawer } from "@/components/PublicHonestyDrawer";
+import { SupportWidget } from "@/components/support/SupportWidget";
 import {
   contractNodesById,
   debateDetailFromAnswer,
@@ -63,7 +64,8 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
   }, [debate]);
 
   return (
-    <DebatePageClient
+    <>
+      <DebatePageClient
       id={debate.public_ref}
       initialDebate={projection.detail}
       initialAnswer={null}
@@ -77,6 +79,8 @@ export function PublicDebatePageClient({ debate }: { debate: PublicDebate }) {
       renderPublicHonesty={(close) => (
         <PublicHonestyDrawer answer={debate.answer} onClose={close} />
       )}
-    />
+      />
+      <SupportWidget />
+    </>
   );
 }

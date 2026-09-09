@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
 import { TypedDomainError } from "@debateai/kernel";
 
 export const RECOVERY_POLICY_ROW_KEY = "recoveryPolicy" as const;
@@ -149,75 +150,106 @@ export type RecoveryPolicy = Readonly<{
   sourceRef: string;
 }>;
 
-export const RECOVERY_POLICY_REGISTER_ROW = Object.freeze({
-  rowKey: RECOVERY_POLICY_ROW_KEY,
-  value: Object.freeze({
-    kind: "RECOVERY_POLICY" as const,
-    policy_version: 1 as const,
-    duration_basis: "PROVISIONAL_ENGINEERING_JUDGEMENT_WITHIN_RATIFIED_BOUNDS" as const,
-    tier_thresholds: Object.freeze({
-      T1: Object.freeze({ maximum_elapsed_ms_exclusive: 300_000 as const }),
-      T2: Object.freeze({ maximum_elapsed_ms_exclusive: 1_800_000 as const }),
-      T3: Object.freeze({
-        minimum_freeze_ms: 604_800_000 as const,
-        maximum_freeze_ms: 1_209_600_000 as const,
-        selection: "SERVER_PINNED_WITHIN_RANGE" as const
+const RECOVERY_POLICY_PUBLICATION_ROW = Object.freeze({
+  "rowKey": "recoveryPolicy",
+  "value": Object.freeze({
+    "kind": "RECOVERY_POLICY",
+    "policy_version": canonicalDecimal("1"),
+    "duration_basis": "PROVISIONAL_ENGINEERING_JUDGEMENT_WITHIN_RATIFIED_BOUNDS",
+    "tier_thresholds": Object.freeze({
+      "T1": Object.freeze({
+        "maximum_elapsed_ms_exclusive": canonicalDecimal("300000")
+      }),
+      "T2": Object.freeze({
+        "maximum_elapsed_ms_exclusive": canonicalDecimal("1800000")
+      }),
+      "T3": Object.freeze({
+        "minimum_freeze_ms": canonicalDecimal("604800000"),
+        "maximum_freeze_ms": canonicalDecimal("1209600000"),
+        "selection": "SERVER_PINNED_WITHIN_RANGE"
       })
     }),
-    retry: Object.freeze({
-      maximum_active_attempts_per_account: 1 as const,
-      proof_failures_per_attempt: 5 as const,
-      per_source_across_accounts: 20 as const,
-      window_ms: 300_000 as const,
-      temporary_lock_ms: 300_000 as const,
-      permanent_remote_lockout: false as const,
-      preserve_original_delay_anchor: true as const
+    "retry": Object.freeze({
+      "maximum_active_attempts_per_account": canonicalDecimal("1"),
+      "proof_failures_per_attempt": canonicalDecimal("5"),
+      "per_source_across_accounts": canonicalDecimal("20"),
+      "window_ms": canonicalDecimal("300000"),
+      "temporary_lock_ms": canonicalDecimal("300000"),
+      "permanent_remote_lockout": false,
+      "preserve_original_delay_anchor": true
     }),
-    risk_signals:Object.freeze({
-      raw_signal_retention_ms:7_776_000_000 as const,
-      maximum_evaluator_signals:128 as const,
-      cleanup_batch_max:1_000 as const
+    "risk_signals": Object.freeze({
+      "raw_signal_retention_ms": canonicalDecimal("7776000000"),
+      "maximum_evaluator_signals": canonicalDecimal("128"),
+      "cleanup_batch_max": canonicalDecimal("1000")
     }),
-    notification: Object.freeze({
-      recipients: Object.freeze([
+    "notification": Object.freeze({
+      "recipients": Object.freeze([
         "EVERY_HISTORICALLY_BOUND_SUPPORTED_CHANNEL",
         "IN_PRODUCT_SECURITY_FEED"
-      ] as const),
-      events: Object.freeze([
-        "STARTED", "DELAY_STARTED", "DELAY_MIDPOINT", "DELAY_24H_REMAINING",
-        "CANCELLED", "REFUSED", "COMPLETED"
-      ] as const),
-      delay_schedule: Object.freeze([
-        "DAY_ZERO", "MIDPOINT", "TWENTY_FOUR_HOURS_BEFORE_DUE"
-      ] as const),
-      start_ordering: "DURABLY_ENQUEUE_BEFORE_PROOF_OUTCOME_OR_TIER_DISCLOSURE" as const,
-      payload_forbidden: Object.freeze([
-        "PASSWORD", "AUTHENTICATOR_SECRET", "RECOVERY_CODE", "ISSUED_CODE",
-        "INTERNAL_ACCOUNT_ID", "PROOF_ANSWER"
-      ] as const)
+      ]),
+      "events": Object.freeze([
+        "STARTED",
+        "DELAY_STARTED",
+        "DELAY_MIDPOINT",
+        "DELAY_24H_REMAINING",
+        "CANCELLED",
+        "REFUSED",
+        "COMPLETED"
+      ]),
+      "delay_schedule": Object.freeze([
+        "DAY_ZERO",
+        "MIDPOINT",
+        "TWENTY_FOUR_HOURS_BEFORE_DUE"
+      ]),
+      "start_ordering": "DURABLY_ENQUEUE_BEFORE_PROOF_OUTCOME_OR_TIER_DISCLOSURE",
+      "payload_forbidden": Object.freeze([
+        "PASSWORD",
+        "AUTHENTICATOR_SECRET",
+        "RECOVERY_CODE",
+        "ISSUED_CODE",
+        "INTERNAL_ACCOUNT_ID",
+        "PROOF_ANSWER"
+      ])
     }),
-    degradation: Object.freeze({
-      post_cancel_recovery_lock_ms: 86_400_000 as const,
-      last_factor_removal_hold: Object.freeze({
-        minimum_ms: 86_400_000 as const,
-        maximum_ms: 259_200_000 as const,
-        selection: "SERVER_PINNED_WITHIN_RANGE" as const
+    "degradation": Object.freeze({
+      "post_cancel_recovery_lock_ms": canonicalDecimal("86400000"),
+      "last_factor_removal_hold": Object.freeze({
+        "minimum_ms": canonicalDecimal("86400000"),
+        "maximum_ms": canonicalDecimal("259200000"),
+        "selection": "SERVER_PINNED_WITHIN_RANGE"
       }),
-      T2_heightened_monitoring_ms: 604_800_000 as const,
-      T3_heightened_monitoring_ms: 2_592_000_000 as const,
-      T3_restriction_ms: 2_592_000_000 as const,
-      restricted_allowed: Object.freeze(["READ", "CREATE_PRIVATE_DEBATE"] as const),
-      restricted_denied: Object.freeze([
-        "PUBLISH", "DELETE", "EXPORT", "CHANGE_CONTACT", "CHANGE_FACTOR", "PRIVILEGED_ROUTE"
-      ] as const),
-      restoration_conditions: Object.freeze([
-        "T3_RESTRICTION_MS_ELAPSED", "STRONGER_PROOF_COMPLETED"
-      ] as const)
+      "T2_heightened_monitoring_ms": canonicalDecimal("604800000"),
+      "T3_heightened_monitoring_ms": canonicalDecimal("2592000000"),
+      "T3_restriction_ms": canonicalDecimal("2592000000"),
+      "restricted_allowed": Object.freeze([
+        "READ",
+        "CREATE_PRIVATE_DEBATE"
+      ]),
+      "restricted_denied": Object.freeze([
+        "PUBLISH",
+        "DELETE",
+        "EXPORT",
+        "CHANGE_CONTACT",
+        "CHANGE_FACTOR",
+        "PRIVILEGED_ROUTE"
+      ]),
+      "restoration_conditions": Object.freeze([
+        "T3_RESTRICTION_MS_ELAPSED",
+        "STRONGER_PROOF_COMPLETED"
+      ])
     }),
-    public_response: "ENUMERATION_RESISTANT_GENERIC" as const
+    "public_response": "ENUMERATION_RESISTANT_GENERIC"
   }),
-  sourceRef: "P2-01-account-recovery-state-machine.json; wave-2-target-architecture.md#10.3; MFA recovery research M15/M23"
-} satisfies RecoveryPolicyRegisterRow);
+  "sourceRef": "P2-01-account-recovery-state-machine.json; wave-2-target-architecture.md#10.3; MFA recovery research M15/M23"
+});
+
+export const RECOVERY_POLICY_REGISTER_ROW = Object.freeze({
+  rowKey: RECOVERY_POLICY_PUBLICATION_ROW.rowKey,
+  valueAst: RECOVERY_POLICY_PUBLICATION_ROW.value,
+  value: JSON.parse(canonicalRegisterJson(RECOVERY_POLICY_PUBLICATION_ROW.value)) as RecoveryPolicyValue,
+  sourceRef: RECOVERY_POLICY_PUBLICATION_ROW.sourceRef
+});
 
 function immutableTuple<T extends readonly unknown[]>(value: T): T {
   return Object.freeze([...value]) as unknown as T;

@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-13",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "Cum aleg nivelul de risc și nivelul de buget pentru o dezbatere nouă?" }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["risk-tier-choice", "budget-tier-choice"],
+  "expected_language": "ro",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

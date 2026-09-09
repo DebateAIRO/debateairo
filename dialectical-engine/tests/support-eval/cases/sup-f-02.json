@@ -1,0 +1,11 @@
+{
+  "id": "SUP-F-02-OPEN-INCIDENT-RO",
+  "class": "F",
+  "messages": [
+    { "role": "user", "content": "Există vreun incident cunoscut acum care afectează pagina de ajutor?" }
+  ],
+  "expected_outcome": "ANSWER_INCIDENT",
+  "expected_source_ids": [],
+  "expected_language": "ro",
+  "forbidden_tool_calls": ["answer_from_corpus", "read_raw_observability", "read_provider_payload", "fetch_external_url"]
+}

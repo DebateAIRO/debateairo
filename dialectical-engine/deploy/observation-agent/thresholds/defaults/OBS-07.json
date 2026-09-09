@@ -1,0 +1,24 @@
+{
+  "modules": {
+    "routing": {
+      "rate_limit_ms": 600000,
+      "degraded_after_ms": 900000,
+      "escalation_interval_ms": 1800000,
+      "fatal_resend_max": 3,
+      "storm_count": 5,
+      "storm_window_s": 60,
+      "summary_timeout_ms": 2000,
+      "board": "ops-alerts",
+      "routes": {
+        "FATAL": ["osascript", "sendmail", "kanban", "digest", "status"],
+        "SEVERE": ["osascript", "kanban", "digest", "status"],
+        "DEGRADED": ["digest", "status"],
+        "INFO": ["digest", "status"],
+        "CLEARED": ["osascript-if-routed", "kanban-if-ticketed", "digest", "status"]
+      }
+    },
+    "status-page": {
+      "port": 9797
+    }
+  }
+}

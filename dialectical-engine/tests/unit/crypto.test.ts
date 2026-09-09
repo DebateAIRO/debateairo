@@ -136,6 +136,11 @@ describe("S1 crypto foundation", () => {
       readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8")
     ]);
     expect(apiMain).toContain("loadKek(environment.KEK_PATH)");
+    expect(apiMain).toContain("supportKekPath: environment.SUPPORT_KEK_PATH");
+    expect(apiMain).toContain("protectedKeyPaths:");
+    expect(apiMain).not.toContain(
+      "createSupportKeyPort({ supportKekPath: environment.KEK_PATH })"
+    );
     expect(runnerMain).toContain("loadKek(environment.KEK_PATH)");
   });
 });

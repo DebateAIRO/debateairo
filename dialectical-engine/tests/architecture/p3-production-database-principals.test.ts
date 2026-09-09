@@ -16,7 +16,8 @@ type ConnectionPurpose = Readonly<{
 type Principal = Readonly<{
   id: string;
   roleName: string;
-  kind: "PERSISTENT_MIGRATION_OWNER" | "SERVICE" | "HUMAN_READ_ONLY";
+  kind: "PERSISTENT_MIGRATION_OWNER" | "SERVICE" | "HUMAN_READ_ONLY"
+    | "HUMAN_EXECUTE_ONLY";
   database: "debateai" | "hatchet";
   login: boolean;
   inherit: boolean;
@@ -42,7 +43,7 @@ type Manifest = Readonly<{
     source: string;
     cliSource: string;
     runbook: string;
-    input: "STDIN_EXACT_JSON";
+    input: "STDIN_EXACT_JSON_AND_PRIVATE_FILE_ARG";
     managedPrincipalIds: readonly string[];
   }>;
   principalProvisioning: readonly Readonly<{
@@ -112,16 +113,25 @@ const capabilityRoles = [
   "debateai_publication_cleanup",
   "debateai_replay",
   "debateai_runtime",
-  "debateai_settlement_watch"
+  "debateai_settlement_watch",
+  "debateai_support",
+  "debateai_support_config_operator"
 ] as const;
 
-const ownershipRoles = ["debateai_evaluator_ddl", "debateai_obs_view_owner"] as const;
+const ownershipRoles = [
+  "debateai_evaluator_ddl",
+  "debateai_obs_view_owner",
+  "debateai_register_publication_owner"
+] as const;
 
-function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
+function exactForbidden(
+  effectiveMemberships: readonly string[],
+  options: Readonly<{ allowPgMonitor?: boolean }> = {}
+): readonly string[] {
   const governedRoles: string[] = [...capabilityRoles, ...ownershipRoles];
   return governedRoles
     .filter((role) => !effectiveMemberships.includes(role))
-    .concat("debateai_prod_*", "pg_*")
+    .concat("debateai_prod_*", ...(options.allowPgMonitor === true ? [] : ["pg_*"]))
     .sort();
 }
 
@@ -139,7 +149,7 @@ describe("P3-01 production database-principal manifest", () => {
   it("defines the exact capability, ownership, service, and connection-purpose inventory", async () => {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
 
-    expect(manifest.format).toBe("debateai.production-database-principals.v2");
+    expect(manifest.format).toBe("debateai.production-database-principals.v3");
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
     expect(manifest.capabilityRoles.map(({ roleName }) => roleName)).toEqual(capabilityRoles);
     expect(manifest.capabilityRoles.every(({ login }) => login === false)).toBe(true);
@@ -156,7 +166,9 @@ describe("P3-01 production database-principal manifest", () => {
       { roleName: "debateai_publication_cleanup", inherit: false, directMemberships: [] },
       { roleName: "debateai_replay", inherit: true, directMemberships: [] },
       { roleName: "debateai_runtime", inherit: true, directMemberships: [] },
-      { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] }
+      { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] },
+      { roleName: "debateai_support", inherit: false, directMemberships: [] },
+      { roleName: "debateai_support_config_operator", inherit: false, directMemberships: [] }
     ]);
     expect(manifest.ownershipRoles).toEqual([
       {
@@ -172,6 +184,13 @@ describe("P3-01 production database-principal manifest", () => {
         inherit: false,
         ownsSchemas: [],
         ownsRelations: ["obs.run_correlation_v"]
+      },
+      {
+        roleName: "debateai_register_publication_owner",
+        login: false,
+        inherit: false,
+        ownsSchemas: [],
+        ownsRelations: []
       }
     ]);
 
@@ -183,6 +202,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "api-erasure", roleName: "debateai_prod_api_erasure", kind: "SERVICE" },
         { id: "api-authorization", roleName: "debateai_prod_api_authorization", kind: "SERVICE" },
         { id: "api-publication-cleanup", roleName: "debateai_prod_api_publication_cleanup", kind: "SERVICE" },
+        { id: "api-support", roleName: "debateai_prod_api_support", kind: "SERVICE" },
         { id: "runner-runtime", roleName: "debateai_prod_runner_runtime", kind: "SERVICE" },
         { id: "scheduler-replay", roleName: "debateai_prod_scheduler_replay", kind: "SERVICE" },
         { id: "scheduler-liveness", roleName: "debateai_prod_scheduler_liveness", kind: "SERVICE" },
@@ -194,17 +214,28 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-listener", roleName: "debateai_obs_listener", kind: "SERVICE" },
         { id: "obs-watchdog", roleName: "debateai_obs_watchdog", kind: "SERVICE" },
         { id: "obs-human", roleName: "debateai_obs_human", kind: "HUMAN_READ_ONLY" },
+        {
+          id: "observation-agent",
+          roleName: "debateai_observation_agent",
+          kind: "SERVICE"
+        },
+        {
+          id: "support-config-operator",
+          roleName: "debateai_prod_support_config_operator",
+          kind: "HUMAN_EXECUTE_ONLY"
+        },
         { id: "hatchet", roleName: "debateai_prod_hatchet", kind: "SERVICE" }
       ]);
     expect(manifest.principalProvisioning.map(({ principalId, state, source }) => ({
       principalId, state, source
     }))).toEqual(manifest.principals.map(({ id }) => ({
       principalId: id,
-      state: id.startsWith("obs-")
+      state: id === "observation-agent" || id.startsWith("obs-")
         ? "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL"
         : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
-      source: id.startsWith("obs-")
-        ? "migrations/0034_obs_foundation.sql"
+      source: id === "observation-agent"
+        ? "migrations/0057_observation_foundation.sql"
+        : id.startsWith("obs-") ? "migrations/0034_obs_foundation.sql"
         : id === "hatchet" ? "compose.dev.yaml" : null
     })));
     expect(manifest.principals.map(({
@@ -217,6 +248,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "api-erasure", database: "debateai", inherit: true, directMemberships: ["debateai_erasure_runtime"], effectiveMemberships: ["debateai_erasure_runtime"] },
         { id: "api-authorization", database: "debateai", inherit: true, directMemberships: ["debateai_authorization_runtime"], effectiveMemberships: ["debateai_authorization_runtime", "debateai_runtime"] },
         { id: "api-publication-cleanup", database: "debateai", inherit: true, directMemberships: ["debateai_publication_cleanup"], effectiveMemberships: ["debateai_publication_cleanup"] },
+        { id: "api-support", database: "debateai", inherit: true, directMemberships: ["debateai_support"], effectiveMemberships: ["debateai_support"] },
         { id: "runner-runtime", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
         { id: "scheduler-replay", database: "debateai", inherit: true, directMemberships: ["debateai_replay"], effectiveMemberships: ["debateai_replay"] },
         { id: "scheduler-liveness", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
@@ -228,6 +260,8 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-listener", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-watchdog", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-human", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
+        { id: "observation-agent", database: "debateai", inherit: false, directMemberships: ["pg_monitor"], effectiveMemberships: ["pg_monitor"] },
+        { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
 
@@ -249,7 +283,7 @@ describe("P3-01 production database-principal manifest", () => {
           ownsDatabases: ["debateai"],
           ownsSchemas: [
             "audit_crypto_internal", "core", "evidence", "identity", "ledger",
-            "memory", "obs", "register", "scorecard", "serve"
+            "memory", "obs", "observation", "register", "scorecard", "serve", "support"
           ]
         });
         expect(principal.connectionPurposes).toEqual([
@@ -292,7 +326,9 @@ describe("P3-01 production database-principal manifest", () => {
       expect(principal.createRole).toBe(false);
       expect(principal.ownsSchemas).toEqual([]);
       expect(principal.forbiddenMemberships)
-        .toEqual(exactForbidden(principal.effectiveMemberships));
+        .toEqual(exactForbidden(principal.effectiveMemberships, {
+          allowPgMonitor: principal.id === "observation-agent"
+        }));
       if (principal.id === "hatchet") {
         expect(principal.ownsDatabases).toEqual(["hatchet"]);
       } else {
@@ -319,6 +355,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
         { component: "apps/api", environmentKey: "AUTHORIZATION_DATABASE_URL", purpose: "STEP_UP_SESSION_ROTATION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true" },
+        { component: "apps/api", environmentKey: "SUPPORT_DATABASE_URL", purpose: "SUPPORT_DATA_PLANE", binding: "WIRED" },
         { component: "apps/runner", environmentKey: "DATABASE_URL", purpose: "RUNNER_PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/scheduler:replay-self-test", environmentKey: "REPLAY_SELF_TEST_DATABASE_URL", purpose: "REPLAY_SELF_TEST", binding: "WIRED" },
         { component: "apps/scheduler:liveness", environmentKey: "LIVENESS_DATABASE_URL", purpose: "LIVENESS_SWEEP", binding: "WIRED" },
@@ -331,6 +368,9 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "obs-listener", environmentKey: "OBS_LISTENER_DATABASE_URL", purpose: "OBS_MACHINE_SAFE_LISTENER", binding: "REQUIRED_NOT_WIRED" },
         { component: "obs-watchdog", environmentKey: "OBS_WATCHDOG_DATABASE_URL", purpose: "OBS_WATCHDOG", binding: "REQUIRED_NOT_WIRED" },
         { component: "human:observability", environmentKey: null, purpose: "JIT_OBSERVABILITY_READ", binding: "JIT_HUMAN" },
+        { component: "apps/observation-agent", environmentKey: "OBSERVATION_DATABASE_URL", purpose: "OBSERVATION_AGENT_MONITORING", binding: "WIRED" },
+        { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
+        { component: "operator:support-status", environmentKey: null, purpose: "SUPPORT_STATUS_DATA", binding: "WIRED" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
       ].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
     expect(manifest.developmentOnlyPrincipalBindings).toEqual([{
@@ -370,12 +410,44 @@ describe("P3-01 production database-principal manifest", () => {
       .toMatchObject({ lifecycle: "EPHEMERAL_JIT" });
     expect(manifest.credentialRequirements.find(({ principalId }) => principalId === "obs-human"))
       .toMatchObject({
-        lifecycle: "MIGRATION_MINTED_UNMANAGED",
-        currentProvisioner: "migrations/0034_obs_foundation.sql",
+        lifecycle: "JIT_SHORT_LIVED",
         ownerTicket: "P3-02"
       });
+    expect(manifest.credentialRequirements.find(
+      ({ principalId }) => principalId === "observation-agent"
+    )).toMatchObject({
+      lifecycle: "MIGRATION_MINTED_UNMANAGED",
+      currentProvisioner: "migrations/0057_observation_foundation.sql",
+      ownerTicket: "P3-02"
+    });
+    expect(manifest.credentialRequirements.find(
+      ({ principalId }) => principalId === "api-support"
+    )).toMatchObject({ lifecycle: "ROTATED_SERVICE", ownerTicket: "P3-02" });
+    expect(manifest.credentialRequirements.find(
+      ({ principalId }) => principalId === "support-config-operator"
+    )).toMatchObject({ lifecycle: "JIT_SHORT_LIVED", ownerTicket: "P3-02" });
+    expect(manifest.principals
+      .filter(({ kind }) => kind === "HUMAN_READ_ONLY" || kind === "HUMAN_EXECUTE_ONLY")
+      .map(({ id, roleName, database, directMemberships, effectiveMemberships }) => ({
+        id, roleName, database, directMemberships, effectiveMemberships
+      }))).toEqual([
+        {
+          id: "obs-human",
+          roleName: "debateai_obs_human",
+          database: "debateai",
+          directMemberships: [],
+          effectiveMemberships: []
+        },
+        {
+          id: "support-config-operator",
+          roleName: "debateai_prod_support_config_operator",
+          database: "debateai",
+          directMemberships: ["debateai_support_config_operator"],
+          effectiveMemberships: ["debateai_support_config_operator"]
+        }
+      ]);
     expect(manifest.credentialRequirements
-      .filter(({ principalId }) => principalId.startsWith("obs-"))
+      .filter(({ principalId }) => /^(?:obs-writer|obs-listener|obs-watchdog)$/u.test(principalId))
       .every(({ lifecycle, currentProvisioner }) =>
         lifecycle === "MIGRATION_MINTED_UNMANAGED"
         && currentProvisioner === "migrations/0034_obs_foundation.sql")).toBe(true);
@@ -413,7 +485,7 @@ describe("P3-01 production database-principal manifest", () => {
       "SERVICE_PRINCIPALS_OWN_NO_DEBATEAI_DATABASE_OR_SCHEMA",
       "DIRECT_MEMBERSHIPS_EXACT_NO_GRANT_OPTION",
       "NO_SERVICE_TO_SERVICE_MEMBERSHIP",
-      "NO_PREDEFINED_PG_ROLE_MEMBERSHIP",
+      "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
       "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
       "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
     ]);
@@ -425,13 +497,22 @@ describe("P3-01 production database-principal manifest", () => {
       .filter((path) => path.endsWith(".sql"))
       .sort()
       .map((path) => `migrations/${path}`);
-    const [migrations, runtimeEnvironment, apiMain, runnerMain, schedulerCli, membershipProvisioner] = await Promise.all([
+    const [
+      migrations,
+      runtimeEnvironment,
+      apiMain,
+      runnerMain,
+      schedulerCli,
+      observationMain,
+      membershipProvisioner
+    ] = await Promise.all([
       Promise.all(migrationPaths.map((path) => readFile(path, "utf8")))
         .then((sources) => sources.join("\n")),
       readFile("packages/register/src/runtime-environment.ts", "utf8"),
       readFile("apps/api/src/main.ts", "utf8"),
       readFile("apps/runner/src/main.ts", "utf8"),
       readFile("apps/scheduler/src/cli.ts", "utf8"),
+      readFile("apps/observation-agent/src/main.ts", "utf8"),
       readFile("apps/runner/src/dev-database-principals.ts", "utf8")
     ]);
 
@@ -454,12 +535,14 @@ describe("P3-01 production database-principal manifest", () => {
       ...manifest.ownershipRoles.map(({ roleName }) => roleName),
       ...manifest.principals
         .map(({ roleName }) => roleName)
-        .filter((roleName) => /^debateai_obs_(?:writer|listener|watchdog|human)$/u.test(roleName))
+        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent)$/u.test(roleName))
     ].sort();
     expect(sourceCreatedRoles).toEqual(manifestMigrationRoles);
 
     const sourceDatabaseKeys = [...new Set([
-      ...runtimeEnvironment.matchAll(/\b(?:[A-Z][A-Z0-9_]*_)?DATABASE_URL\b/gu)
+      ...`${runtimeEnvironment}\n${observationMain}`.matchAll(
+        /\b(?:[A-Z][A-Z0-9_]*_)?DATABASE_URL\b/gu
+      )
     ].map(([key]) => key))].sort();
     const allConnectionPurposes = [
       ...manifest.principals.flatMap(({ connectionPurposes }) => connectionPurposes),
@@ -475,21 +558,27 @@ describe("P3-01 production database-principal manifest", () => {
       .filter((key): key is string => key !== null))].sort();
     expect(sourceDatabaseKeys).toEqual(executableManifestKeys);
 
-    const appSourceRoots = ["apps/api/src", "apps/runner/src", "apps/scheduler/src"];
+    const appSourceRoots = [
+      "apps/api/src",
+      "apps/runner/src",
+      "apps/scheduler/src"
+    ];
     const appSourcePaths = (await Promise.all(appSourceRoots.map(async (root) =>
       (await readdir(root, { recursive: true }))
         .filter((path) => path.endsWith(".ts"))
-        .map((path) => `${root}/${path}`)))).flat();
+        .map((path) => `${root}/${path}`)))).flat()
+      .concat("apps/observation-agent/src/main.ts");
     const sourceConnectionPairs: string[] = [];
     for (const sourceFile of appSourcePaths) {
       const source = await readFile(sourceFile, "utf8");
-      if (!source.includes("createPool")) continue;
+      if (!source.includes("createPool") && !source.includes("new pg.Pool")) continue;
       for (const [environmentKey] of source.matchAll(
         /\b(?:[A-Z][A-Z0-9_]*_)?DATABASE_URL\b/gu
       )) sourceConnectionPairs.push(`${sourceFile}::${environmentKey}`);
     }
     const manifestConnectionPairs = allConnectionPurposes
       .filter(({ binding }) => executableBindings.includes(binding))
+      .filter(({ environmentKey }) => environmentKey !== null)
       .map(({ sourceFile, environmentKey }) => `${String(sourceFile)}::${String(environmentKey)}`);
     expect([...new Set(sourceConnectionPairs)].sort())
       .toEqual([...new Set(manifestConnectionPairs)].sort());
@@ -499,11 +588,15 @@ describe("P3-01 production database-principal manifest", () => {
     expect(apiMain).toContain("createPool(environment.ERASURE_DATABASE_URL)");
     expect(apiMain).toContain("createPool(environment.AUTHORIZATION_DATABASE_URL!)");
     expect(apiMain).toContain("createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!)");
+    expect(apiMain).toContain("createPool(environment.SUPPORT_DATABASE_URL)");
     expect(apiMain).toContain("createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)");
     expect(runnerMain).toContain("createPool(environment.DATABASE_URL)");
     expect(schedulerCli).toContain("REPLAY_SELF_TEST_DATABASE_URL");
     expect(schedulerCli).toContain("LIVENESS_DATABASE_URL");
     expect(schedulerCli).toContain("SETTLEMENT_DATABASE_URL");
+    expect(observationMain).toContain(
+      "connectionString: environment.OBSERVATION_DATABASE_URL"
+    );
     expect(runtimeEnvironment).toContain(
       'environment.EVALUATOR_DEV_MENU_ENABLED === "true" && environment.NODE_ENV !== "development"'
     );

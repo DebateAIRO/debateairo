@@ -142,6 +142,7 @@ function stubEnvironment(values: Readonly<Record<string, string>>): void {
 function stubApiEnvironment(): void {
   stubEnvironment({
     KEK_PATH: "/run/secrets/kek",
+    SUPPORT_KEK_PATH: "/run/secrets/support-kek",
     BLIND_INDEX_KEY_PATH: "/run/secrets/email-blind-index",
     AUDIT_KEY_STORE_PATH: "/run/secrets/audit-users",
     AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-source-ip",
@@ -150,6 +151,7 @@ function stubApiEnvironment(): void {
     MAIL_FROM: "noreply@debateai.test",
     PUBLIC_APP_URL: "https://debateai.test",
     DATABASE_URL: "postgresql://user:pass@127.0.0.1:5432/debateai",
+    SUPPORT_DATABASE_URL: "postgresql://support:pass@127.0.0.1:5432/debateai",
     AUTHORIZATION_DATABASE_URL:
       "postgresql://authorization:pass@127.0.0.1:5432/debateai",
     ERASURE_DATABASE_URL: "postgresql://erasure:pass@127.0.0.1:5432/debateai",
@@ -176,6 +178,7 @@ function stubRunnerEnvironment(): void {
     KEK_PATH: "/run/secrets/kek",
     DATABASE_URL: "postgresql://user:pass@127.0.0.1:5432/debateai",
     RUNNER_WORKER_ID: "s6",
+    REGISTER_VERSION: "1",
     CLAIM_MS: "1000",
     CLAIM_MARGIN_MS: "100",
     JUDGE_MAX_ATTEMPTS: "2",

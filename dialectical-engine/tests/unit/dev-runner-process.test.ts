@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  DEVELOPMENT_REGISTER_VERSION
-} from "../../apps/runner/src/dev-deployment-register.js";
-import {
   startDevelopmentRunnerProcess,
   type DevelopmentRunnerChild,
   type DevelopmentRunnerProcessOperations
@@ -22,7 +19,9 @@ function deferred<T>() {
 function apiEnvironment(): Readonly<Record<string, string>> {
   return Object.freeze({
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
-    REGISTER_VERSION: String(DEVELOPMENT_REGISTER_VERSION),
+    REGISTER_VERSION: "424242",
+    REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
+    REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
     KEK_PATH: "/private/dev/kek.bin",
     DATABASE_URL: "postgresql://runtime:opaque@127.0.0.1:55432/debateai",
     CONTENT_ENCRYPTION_ENABLED: "true",
@@ -40,6 +39,7 @@ function operations(input: Readonly<{
   ready?: unknown;
   exitFirst?: boolean;
   startError?: Error;
+  apiEnvironment?: Readonly<Record<string, string>>;
 }> = {}): DevelopmentRunnerProcessOperations & Readonly<{
   terminate: ReturnType<typeof vi.fn>;
   environment: Readonly<Record<string, string>>[];
@@ -58,7 +58,7 @@ function operations(input: Readonly<{
   return {
     terminate,
     environment,
-    loadApiEnvironment: vi.fn(async () => apiEnvironment()),
+    loadApiEnvironment: vi.fn(async () => input.apiEnvironment ?? apiEnvironment()),
     startRunner: vi.fn((values) => {
       if (input.startError !== undefined) throw input.startError;
       environment.push(values);
@@ -68,7 +68,7 @@ function operations(input: Readonly<{
         ready.resolve(input.ready ?? Object.freeze({
           kind: "DEBATEAI_RUNNER_READY",
           worker: "debateai-dev-runner",
-          registerVersion: DEVELOPMENT_REGISTER_VERSION
+          registerVersion: "424242"
         }));
       }
       return child;
@@ -86,7 +86,7 @@ describe("development runner process lifecycle", () => {
     });
     expect(runner.receipt).toEqual({
       worker: "debateai-dev-runner",
-      registerVersion: DEVELOPMENT_REGISTER_VERSION,
+      registerVersion: "424242",
       state: "REGISTERED"
     });
     expect(runtime.environment).toHaveLength(1);
@@ -96,16 +96,20 @@ describe("development runner process lifecycle", () => {
       VLLM_MODEL: "gpt-test-real",
       VLLM_MAKER: "OpenAI",
       VLLM_AUTHORIZATION: "Bearer test-codex",
-      HATCHET_WORKER_NAME: "debateai-dev-runner"
+      HATCHET_WORKER_NAME: "debateai-dev-runner",
+      REGISTER_VERSION: "424242",
+      REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
+      REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json"
     });
     await Promise.all([runner.stop(), runner.stop()]);
     expect(runtime.terminate).toHaveBeenCalledTimes(1);
   });
 
   it.each([
-    ["wrong kind", { kind: "WRONG", worker: "debateai-dev-runner", registerVersion: DEVELOPMENT_REGISTER_VERSION }],
-    ["wrong worker", { kind: "DEBATEAI_RUNNER_READY", worker: "wrong", registerVersion: DEVELOPMENT_REGISTER_VERSION }],
-    ["wrong register", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: 999 }]
+    ["wrong kind", { kind: "WRONG", worker: "debateai-dev-runner", registerVersion: "424242" }],
+    ["wrong worker", { kind: "DEBATEAI_RUNNER_READY", worker: "wrong", registerVersion: "424242" }],
+    ["numeric reconstruction", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: 424242 }],
+    ["wrong register", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "999" }]
   ] as const)("terminates on %s readiness", async (_label, ready) => {
     const runtime = operations({ ready });
     await expect(startDevelopmentRunnerProcess({
@@ -128,5 +132,14 @@ describe("development runner process lifecycle", () => {
       repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
     })).rejects.toThrow("DEV_RUNNER_PROCESS_START_FAILED");
     expect(runtime.terminate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a dropped deployment receipt before spawning", async () => {
+    const { REGISTER_DEPLOYMENT_RECEIPT_SHA256: _dropped, ...withoutReceipt } = apiEnvironment();
+    const runtime = operations({ apiEnvironment: withoutReceipt });
+    await expect(startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+    })).rejects.toThrow("DEV_RUNNER_PROCESS_START_FAILED");
+    expect(runtime.environment).toEqual([]);
   });
 });

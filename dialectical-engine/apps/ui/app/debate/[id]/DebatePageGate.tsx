@@ -3,6 +3,7 @@
 import type { Answer } from "@debateai/contract";
 import DebatePageClient from "./DebatePageClient";
 import { AuthGate } from "@/components/AuthGate";
+import { SupportWidget } from "@/components/support/SupportWidget";
 import type { DebateDetail } from "@/lib/types";
 
 /**
@@ -24,7 +25,8 @@ export default function DebatePageGate({
   initialPending: boolean;
 }) {
   return (
-    <AuthGate>
+    <>
+      <AuthGate>
       {() => (
         <DebatePageClient
           id={id}
@@ -34,6 +36,8 @@ export default function DebatePageGate({
           initialPending={initialPending}
         />
       )}
-    </AuthGate>
+      </AuthGate>
+      <SupportWidget context={{ runId: id }} />
+    </>
   );
 }

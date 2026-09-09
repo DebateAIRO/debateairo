@@ -1,0 +1,7 @@
+{
+  "modules": {
+    "certificate-capacity": {
+      "expiry_degraded_days": 400
+    }
+  }
+}

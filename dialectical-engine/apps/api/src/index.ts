@@ -73,9 +73,15 @@ import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { RecoveryApplication } from "./recovery.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import {
+  installSupportRoutes,
+  type SupportApplication,
+  type SupportRoutePath
+} from "./support/index.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
+type RouteSessionPolicy = "optional";
 
 export function apiOperationalErrorDiagnostic(error: unknown): string {
   if (error instanceof TypedDomainError) return error.code;
@@ -117,6 +123,16 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  { route: "POST /v1/support/sessions", auth: "public", session: "optional", resource: "support-session", action: "create" },
+  { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
+  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", session: "optional", resource: "support-session", action: "consent" },
+  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", session: "optional", resource: "support-message", action: "create" },
+  { route: "POST /v1/support/messages/{id}/rating", auth: "public", session: "optional", resource: "support-message", action: "rate" },
+  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", session: "optional", resource: "support-case", action: "create" },
+  { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
+  { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
+  { route: "POST /v1/support/cases/{token}/messages", auth: "public", session: "optional", resource: "support-case", action: "reply" },
+  { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
@@ -139,7 +155,10 @@ export const authorizationPolicyInventory = Object.freeze([
   route: string;
   auth: RouteAuthPolicy;
   origin?: RouteOriginPolicy;
-  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" | "deployment" | "evaluator";
+  session?: RouteSessionPolicy;
+  resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
+    "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
+    "support-status";
   action: string;
 }>[]);
 
@@ -151,13 +170,15 @@ const authorizationPolicies = new Map<string, typeof authorizationPolicyInventor
 function routePolicy(route: AuthorizationRoute): { readonly config: {
   readonly auth: RouteAuthPolicy;
   readonly origin?: RouteOriginPolicy;
+  readonly session?: RouteSessionPolicy;
 } } {
   const policy = authorizationPolicies.get(route);
   if (policy === undefined) throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${route}`);
   return Object.freeze({
     config: Object.freeze({
       auth: policy.auth,
-      ...("origin" in policy ? { origin: policy.origin } : {})
+      ...("origin" in policy ? { origin: policy.origin } : {}),
+      ...("session" in policy ? { session: policy.session } : {})
     })
   });
 }
@@ -186,6 +207,7 @@ declare module "fastify" {
   interface FastifyContextConfig {
     auth?: RouteAuthPolicy;
     origin?: RouteOriginPolicy;
+    session?: RouteSessionPolicy;
   }
 
   interface FastifyRequest {
@@ -228,6 +250,7 @@ export interface ApiOptions {
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+  readonly support?: SupportApplication;
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -342,7 +365,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const policy = authorizationPolicies.get(key);
       if (policy === undefined
         || route.config?.auth !== policy.auth
-        || route.config?.origin !== ("origin" in policy ? policy.origin : undefined)) {
+        || route.config?.origin !== ("origin" in policy ? policy.origin : undefined)
+        || route.config?.session !== ("session" in policy ? policy.session : undefined)) {
         throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${key}`);
       }
     }
@@ -390,6 +414,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (request.routeOptions.config.origin === "trusted"
         && !exactOrigin(request.headers.origin, allowedOrigin)) {
         return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
+      }
+      if (request.routeOptions.config.session === "optional") {
+        const rawCookie = request.headers.cookie;
+        const sessionToken = exactCookie(rawCookie, SESSION_COOKIE_NAME);
+        if (sessionToken === null || options.sessions === undefined) return;
+        const authenticated = await options.sessions.authenticate(sessionToken, sourceFor(request));
+        if (authenticated === null) return;
+        request.authenticatedSession = authenticated;
+        request.session = authenticated.session;
+        const csrfCookieToken = exactCookie(rawCookie, CSRF_COOKIE_NAME);
+        if (MUTATING_METHODS.has(request.method)) {
+          const csrf = exactCsrfPair(request.headers["x-csrf-token"], csrfCookieToken);
+          if (!exactOrigin(request.headers.origin, allowedOrigin) || csrf === null
+            || !options.sessions.verifyCsrf(authenticated, csrf)) {
+            return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
+          }
+        }
+        request.cookieRefresh = Object.freeze({ sessionToken, csrfToken: csrfCookieToken });
       }
       return;
     }
@@ -1089,6 +1131,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" })
       : reply.send(unlinked);
   });
+  installSupportRoutes(api, options.support, (route: SupportRoutePath) => routePolicy(route));
   return api;
 }
 
@@ -1344,11 +1387,8 @@ export class PostgresAskApplication implements AskApplication {
   }
 
   async readDeployment(session: Session): Promise<Deployment> {
-    const version = await this.pool.query<{ register_version: string }>(
-      `SELECT register_version FROM register.register_version WHERE sealed ORDER BY register_version DESC LIMIT 1`
-    );
-    const registerVersion = Number(version.rows[0]?.register_version);
-    if (!Number.isInteger(registerVersion) || registerVersion < 1) {
+    const registerVersion = this.settings.registerVersion;
+    if (!Number.isSafeInteger(registerVersion) || registerVersion < 1) {
       throw new TypedDomainError("DEPLOYMENT_REGISTER_UNAVAILABLE", "No sealed V3 deployment register exists");
     }
     const [rows, scorecards, ledger] = await Promise.all([
