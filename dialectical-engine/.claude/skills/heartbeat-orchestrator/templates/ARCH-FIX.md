@@ -1,7 +1,7 @@
 # PACKET __SEAT__ — ARCH-FIX(__SLICE__) (architecture rework after ARCH-REV pass __PREV_PASS__) · mission `__MISSION__`
 
 Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
-Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-architecture` · `superpowers:receiving-code-review` · `superpowers:writing-plans` (the plan is re-issued, not patched by hand) — then anything else in Superpowers that fits.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-architecture` · `superpowers:receiving-code-review` · `superpowers:brainstorming` (the role floor — convergent here: used where a finding opens an alternative) · `superpowers:writing-plans` (the plan is re-issued, not patched by hand) — then anything else in Superpowers that fits.
 
 ## 1. Node
 - seat: __SEAT__ · node: ARCH-FIX(__SLICE__) (rework after ARCH-REV pass __PREV_PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)

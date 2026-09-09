@@ -120,7 +120,8 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   write time; every mission file a charge names is also on the `inputs` line (packet-check rule 8).
   A symbol a packet names (an export, a component, a test id) is a code quote in the checked
   `path:LINE — \`text\`` form, never prose from memory; a packet never restates a list the plan or the
-  intake carries (the Screens block, a test list) — it points at it.
+  intake carries (the Screens block, a test list) — it points at it. Every COUNT a packet quotes is re-derived from the file of
+  record at write time — a count carried from an earlier verdict is stale in both directions.
 - Scope the reading: a BUILD packet quotes its cluster's step ids and line ranges; a REV packet
   points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
   range, never a bare directory (a 12,575-line directory named without a range was read by nobody).

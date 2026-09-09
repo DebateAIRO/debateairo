@@ -3020,3 +3020,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 ## `grep` on this Mac is ugrep 7.8.4 — a BRE `\|` alternation is LITERAL (2026-09-09, ARCH-FIX-S02 F-6)
 - The published S02 R13 ask-literal grep answered ZERO as written (rc=1) because ugrep reads the escaped pipe literally; a seat running it verbatim "passes" a requirement on an empty set. Use `grep -E 'a|b'` (or `-e a -e b`) and prove every published grep on a KNOWN hit before quoting its count. Same family as the earlier escaped-pipe entries.
 
+## `grep` on this Mac is TWO binaries (2026-09-10, ARCH-REV-S02-p2 N2/N3 — refines the ugrep entry above)
+- Inline in a harness Bash call, `grep` is a Claude Code shell FUNCTION that runs ugrep 7.8.4 (a BRE `\|` is literal there). From a `.sh` file — the way every seat runs commands — it is `/usr/bin/grep`, BSD grep (a BRE `\|` alternates). The same command therefore answers differently by how it is run. Rule: every published grep names the binary it was proved under and is proved on a KNOWN hit (a fixture with one line per alternative) before its count is quoted; a receipt no run reproduces ("answers 8 lines") is a §3.6 defect even when the gate is sound.
+
