@@ -12,7 +12,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/ARCH-REV-__SLICE__-p__PASS__.md (new) · a scratch dir under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — `heartbeat-reviewer` §7 keeps every probe there)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/ARCH-REV-__SLICE__-p__PASS__.md (new) · a scratch dir under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — every probe AND render fixture lives there; a UI lens renders from there, never from the lane)
 - forbidden: everything else — in particular PLAN.md, SPEC.md, every product file; you edit nothing under review
 - verification: every cluster command re-run by YOU at base from a `.sh` file, inline and scripted, with zero disagreements · your own both-ways trace parser · one step you cannot mark done without a judgement call = a finding
 

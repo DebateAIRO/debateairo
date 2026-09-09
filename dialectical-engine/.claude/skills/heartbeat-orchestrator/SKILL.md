@@ -116,7 +116,8 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
 - A packet relays a finding's FACTS (file:line, the failing outcome) — never the remedy, which is
   the seat's contract; a range in a packet is derived from the SPEC's own citations at write time
   (every line the SPEC names sits inside one), and an ADR number is never pre-assigned — "the next
-  free number, measured at write time".
+  free number, measured at write time". A section a charge cites is named by its quoted heading, re-grepped at
+  write time; every mission file a charge names is also on the `inputs` line (packet-check rule 8).
 - Scope the reading: a BUILD packet quotes its cluster's step ids and line ranges; a REV packet
   points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
   range, never a bare directory (a 12,575-line directory named without a range was read by nobody).

@@ -176,3 +176,16 @@ the round trip is one line in DONE.md.
   packet names the seat's row ids and ADR number, as this packet already did for the ADR — never
   discovery at write time by a seat reading a file another seat is writing.
 - **Orchestrator, 22:38:** the row at `:141` is transcribed as **V-17** in `V-DECISIONS-PACKET.md`, default binding; the class fix is in COMMON §4 (`V-ROW: NEW`, numbered by the orchestrator at transcription).
+
+## Orchestrator folds after ARCH-REV(S01) pass 1 PASS (2026-09-09 23:09) — PLAN.md stands; these lines route the findings
+
+- **N1 → row V-18** (the two gauge hints at `page.tsx:186` / `:197` claim asker provenance under Free); with V-17, drawn at MOCK(S01) and ruled by V through DONE.md. The MOCK packet names both hints and `.ndIntro` on every Free screen row.
+- **N6 → the MOCK packet:** screen 3 (Premium chosen, OPTIONS collapsed) is drawn at the R7 values UNLOCKED — Standard / Low / depth 2 / steering empty — because the only reachable route to Premium is from Free (R2+R8), never "at rest" as today's page; screen 6 (no tier chosen, the V-9 alternative reading) is today's initial state — risk tier unselected, depth 1, `planTier` null, nothing disabled (S01-23's contingency, `PLAN.md:381-383`); `.ndIntro`'s sentence appears in screen rows 1, 2 and 5.
+- **N9 → the MOCK packet:** `globals.css` styles `:disabled` on 22 lines (`.btn`, `.startBtn`, `.authPrimary`, `.setBtn`, `.libStart`, `.consentBox`, `.policyPrimary`, …), not only `.ndStart` — the house convention is `opacity .45–.55` + `cursor: not-allowed`; the `nd*` vocabulary (`.ndSegItem`, `.ndSlider`, `.ndSteerInput`, `.ndSelect select`) has none. The mock reuses the convention rather than inventing a disabled look; `PLAN.md:476-477` / `:619-620` are read with that correction.
+- **N2 → the C4 BUILD packet:** SPEC R17's "no colour literal outside the two token blocks" has NO gate today (`t9-mode-tokens`' only such case is already red at base: 3 hits → 4 leaves the pair unchanged); C4's command gains one scoped assertion in the suite C4 creates. `PLAN.md:813-816` overstates the detection until then.
+- **N3 → the C4 BUILD packet:** S01-42 (the locked-control treatment, `PLAN.md:474-478`) gets its done-criterion from DONE.md once V writes it — the BUILD packet quotes it.
+- **N4 → the C3 BUILD packet:** S01-24's done-criterion (`PLAN.md:384-386`, `grep -c useEffect … is 1`) is false at base; the BUILD packet carries the corrected criterion measured in the lane.
+- **N5 (fold):** `PLAN.md:786` / `:807-808` credit C2 with catching a required `NewDebateAskDefaults` member through `ux01`; `vitest` does not typecheck, so that mutant is caught only by the R21 typecheck delta command (§7), never by C2's suite.
+- **N7 (fold):** "Eight are RED at base" (`DECISIONS.md:115`, the handoff) is seven — `BASELINE.md`'s end section carries the seven with their failure names.
+- **N8 → whichever BUILD packet owns S01-43:** the R21 delta command writes a shared global path and its base list has no extractor; the packet gives a per-seat output path and the extractor that produces BASELINE.md's pinned-file list.
+

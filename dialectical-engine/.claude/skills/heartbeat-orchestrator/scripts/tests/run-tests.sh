@@ -13,4 +13,5 @@ sed 's/murder case/diary/' "$D/packet-good.md" > "$tmp/verbatim.md";            
 sed 's#agent-protocols/debateai-heartbeat-protocol.md$#agent-protocols/nope.md#' "$D/packet-good.md" > "$tmp/path.md"; t missing-path 1 "$C" "$tmp/path.md"
 sed 's/`name: debateai-graph-spine`/`name: something-else`/' "$D/packet-good.md" > "$tmp/quote.md";           t stale-quote 1 "$C" "$tmp/quote.md"
 awk '/^- self-report:/{print "- inputs: your predecessor'"'"'s self-report /Users/nobody/reports/agent-reports/PREDECESSOR.md (new, predecessor)"}1' "$D/packet-good.md" > "$tmp/pred.md"; t predecessor-report-not-mine 0 "$C" "$tmp/pred.md"
+{ cat "$D/packet-good.md"; echo; echo "### Charges for THIS pass"; echo "1. Read docs/missions/consent-ui/NOT-AN-INPUT.md at the lines named."; } > "$tmp/charge.md"; t charge-names-file-not-in-inputs 1 "$C" "$tmp/charge.md"
 rm -rf "$tmp"; echo "passed=$pass failed=$fail"; [ "$fail" = 0 ]

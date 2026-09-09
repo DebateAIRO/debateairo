@@ -27,3 +27,8 @@
 - Row V-17 opened (the "Choose your risk tier…" sentence under Free; default: drawn at the mock, defined in DONE.md). F1: ux01 mocks React — the plan verifies rendered behaviour in a new suite; F3: CSS placement before :8188 (consent style contracts).
 - Next: ARCH-REV(S01) `t_0e278df0` (blind). PASS releases MOCK(S01) → DONE(S01), V's gate.
 
+## 2026-09-09 23:07 EEST — ARCH-REV(S01) pass 1 consumed: PASS (orchestrator entry)
+
+- PLAN.md stands (859 lines). The reviewer re-ran every cluster command at base (34/34 agree) and proved the replacement render instrument (sup-04-widget idiom renders /new: 5/5). Findings folded: N1 → row V-18 (labels on the pinned controls) drawn at the mock; N2/N3 → the C4 BUILD packet (a scoped colour-literal assertion; a done-criterion for S01-42); N4–N9 in DECISIONS.
+- Next: MOCK(S01) (Opus 5, the /taste + design canvas) → DONE(S01) = V's gate (canvas URL + the V-9 question + V-17/V-18 copy).
+

@@ -48,6 +48,15 @@ if [ -z "$sr" ]; then fail "no self-report path (…/agent-reports/<SEAT>.md)"; 
     || fail "self-report path is not inside the allowed block: $sr"
 fi
 
+
+# 8. every mission file a CHARGE names is also an input (ARCH-REV-S01 P2, 2026-09-09): after the first
+#    '### Charges' heading, each `docs/missions/…/*.md` or `slices/…/*.md` path must appear (by basename) on the '- inputs' line
+inputs_line=$(grep -m1 -E '^- inputs' "$P")
+for f in $(awk '/^### Charges/{c=1} c' "$P" | grep -oE '(docs/missions/[A-Za-z0-9_./-]+\.md|slices/[A-Za-z0-9_./-]+\.md)' | sort -u); do
+  b=$(basename "$f")
+  echo "$inputs_line" | grep -Fq -- "$b" || fail "charge names $f but the inputs line does not carry it"
+done
+
 head=$(git -C "$(cd "$(dirname "$P")" && pwd -P)" rev-parse --short HEAD 2>/dev/null); head="${head:-not in a repo}"
 [ $rc = 0 ] && echo "OK dispatchable: $P (main-tree HEAD at check time: $head — the packet's base is the LANE base; stamp both in the dispatch comment)"
 exit $rc

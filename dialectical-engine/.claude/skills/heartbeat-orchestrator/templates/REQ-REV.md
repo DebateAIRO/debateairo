@@ -12,7 +12,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/REQ-REV-p__PASS__.md (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — `heartbeat-reviewer` §7 keeps every probe there)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/REQ-REV-p__PASS__.md (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — every probe AND render fixture lives there; a UI lens renders from there, never from the lane)
 - forbidden: everything else — in particular every SPEC, PLAN, product file; you edit nothing under review
 - verification: each SPEC acceptance step executed as a stranger would (UNVERIFIED where the stack is not served) · each requirement tested for a second reading · `ui:` flags checked against the acceptance surface · your own contradiction sweep
 

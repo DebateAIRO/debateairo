@@ -12,7 +12,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/ELEMENT-__SLICE__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — `heartbeat-reviewer` §7 keeps every probe there)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/ELEMENT-__SLICE__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/agent-reports/__SEAT__.md (new) · __REPORTS__/probes/__SEAT__/ (new — every probe AND render fixture lives there; a UI lens renders from there, never from the lane)
 - forbidden: everything else — in particular the slice's files, git writes
 - verification: the element exercised end to end against the oracle by your own means; every step you cannot exercise listed under UNVERIFIED for V's test point — never assumed
 
