@@ -20,9 +20,12 @@ defect:
   seat's cost) · the measured state — base commit, dirty count, running stacks, every baseline with
   the command that measured it.
 - The board `<m>`: one ticket per TESTABLE VERTICAL SLICE first (V's tickets — they close only on
-  V's veto), then the nodes of §2 as sub-tickets linked under their slice with
-  `hermes kanban --board <m> link <parent> <child>`. **The graph IS the board.** Titles carry the
-  model tag and the node: `[claude-opus-5] BUILD S02-C3`.
+  V's veto), then the nodes of §2 as tickets chained in EXECUTION order with
+  `hermes kanban --board <m> link <parent> <child>` (the child waits on the parent). Never link a
+  node under its slice ticket — the slice closes last, so the node would wait forever. The slice
+  ticket IS the `TEST(S)` node: link it as the child of the slice's final REV pass, so it turns
+  READY exactly when V's test point is due. **The graph IS the board.** Titles carry the model tag
+  and the node: `[claude-opus-5] BUILD S02-C3`.
 - One worktree per slice (`.worktrees/<slice>`, branch `slice/<m>-<s>`), node_modules cloned,
   contracts generated, the baseline measured per lane.
 - Transport probes: each CLI's prompt mechanism AND its resume mechanism (`claude --resume`,
@@ -51,7 +54,7 @@ Never write a packet that narrows the library for a seat.
 | REV(S) pass r | reviewer lenses, blind, parallel | the package + the oracle | one verdict per lens → your union | GATE(S), or FIX(S) done |
 | FIX(S) | worker | the union verdict | code | REV(S) pass r = REWORK, r < 3 |
 | ELEMENT(S) | roster-named reviewer | the slice at PASS | verdict | REV PASS · only if the roster names one |
-| TEST(S) | **V** | the lane, served on V's word | veto = Done, or findings | REV PASS (+ ELEMENT PASS) |
+| TEST(S) = the slice ticket | **V** | the lane, served on V's word | veto = Done, or findings | REV PASS (+ ELEMENT PASS) — the board turns it READY |
 | MERGE(S) | you | the vetoed slice | local merge into `dev` + the integrated suite | V's veto |
 | WHOLE | **V** | merged `dev` | push authorization | every MERGE(S) |
 | CLOSE | you | everything | closure report, all self-reports | WHOLE |

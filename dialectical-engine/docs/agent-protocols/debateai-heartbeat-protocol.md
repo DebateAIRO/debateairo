@@ -1768,8 +1768,10 @@ orchestrator's own case file naming its packets as the weapon.
 
 1. **THE GRAPH, NOT LOOPS.** A mission is a DAG of board tickets. A node is one ticket with one
    job, typed inputs (absolute paths), one output artifact and one handoff marker; an edge is a
-   parent→child link (`hermes kanban --board <m> link <parent> <child>`); a node is READY when every
-   parent is done, and the board computes that (`list --status ready`). The orchestrator is a
+   parent→child link (`hermes kanban --board <m> link <parent> <child>`, the child waits on the parent);
+   a node is READY when every parent is done, and the board computes that (`list --status ready`).
+   Nodes are chained in execution order; a node is never linked under its slice ticket (the slice
+   closes last). The slice ticket is itself the TEST(S) node, a child of the slice's final REV pass. The orchestrator is a
    scheduler: on every event it consumes exits, dispatches every READY node in parallel, surfaces V
    gates once, and idles. Nothing loops — a REWORK appends a FIX node and the next REV pass; the cap
    is a node count. The vocabulary — REQ, REQ-REV, ARCH(S), ARCH-REV(S), MOCK(S), DONE(S),
