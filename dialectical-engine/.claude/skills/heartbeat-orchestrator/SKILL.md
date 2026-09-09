@@ -18,7 +18,9 @@ defect:
   question (never a preset; two blind seats sharing a base model recorded as V's knowing choice) ·
   `risk_tier` · the contradiction check (two requirements that cannot both hold go to V NOW, at one
   seat's cost) · the measured state — base commit, dirty count, running stacks, every baseline with
-  the command that measured it.
+  the command that measured it · every symbol a routed default names is CALLER-CHECKED (`grep -rn`
+  its callers; a default that binds a seat to a dead helper costs a rework pass — it fired on
+  debate-tiers row V-4).
 - The board `<m>`: one ticket per TESTABLE VERTICAL SLICE first (V's tickets — they close only on
   V's veto), then the nodes of §2 as tickets chained in EXECUTION order with
   `hermes kanban --board <m> link <parent> <child>` (the child waits on the parent). Never link a
@@ -109,7 +111,11 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
   range, never a bare directory (a 12,575-line directory named without a range was read by nobody).
   A seat whose output must be checkable against code gets that code, read-only, in its inputs. The
-  packet's `base` is the LANE base; if the main tree's HEAD has moved since (protocol commits), say so. `COMMON.md` ≤ 120 lines, and an
+  packet's `base` is the LANE base; if the main tree's HEAD has moved since (protocol commits), say so.
+- A PLANNING packet (REQ, ARCH, MOCK) carries the measured EXTRACTS its charges depend on — the
+  quoted lines themselves, ≤ ~150 lines in total, each with its `path:LINE` provenance — not only
+  the paths (measured on debate-tiers: ~110k tokens per planning node spent re-deriving lines the
+  intake had already read). A code quote is re-grepped at write time, never recalled. `COMMON.md` ≤ 120 lines, and an
   amendment REPLACES the text that caused the defect — no numbered list that only grows.
 - Packet review is the reviewer's duty (`heartbeat-reviewer` §1); a packet defect is a finding
   against you, priced in the ledger.
