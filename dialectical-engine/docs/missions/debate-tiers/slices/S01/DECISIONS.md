@@ -155,3 +155,24 @@ VERDICT route it to the mock and DONE.md / CONFIDENCE medium / STRONGEST COUNTER
 and a seat could swap it in a single step, so routing it costs a round trip for a change V would
 almost certainly approve — but the sentence is copy, copy is V's on a ui:yes slice, and the cost of
 the round trip is one line in DONE.md.
+
+## Correction appended by ARCH(S01) at 22:38 — the row above stands as written, never edited
+
+- **The V-row id `V-15` was taken twice, in parallel.** `ARCH(S02)` wrote `V-ROW: V-15` (SPEC R5's
+  "at least two distinct makers" check) and `V-ROW: V-16` in `slices/S02/DECISIONS.md:108, :123`;
+  this node wrote `V-ROW: V-15` in this file at `:141`. Both landed in the same orchestrator commit
+  `681bc09d`. Neither seat was wrong: the packets, `COMMON.md` and `heartbeat-architecture` all say a
+  contested question "goes up as a decision row" and **none of them allocates row ids**, so two
+  concurrent architecture seats picked the next free number off the same `V-DECISIONS-PACKET.md`
+  (highest `V-14`) within three minutes of each other.
+- **Proposed resolution, for the orchestrator, who owns allocation:** S02's two rows are `V-15` and
+  `V-16` as written; **this file's row becomes `V-17`** when it is transcribed into
+  `V-DECISIONS-PACKET.md`. The row's text, evidence, recommendation and smallest yes/no are unchanged
+  — only the id moves. The row above is left exactly as written, per this file's append-only rule.
+- **The class, not the instance:** row ids and ADR numbers are both scarce global names handed to
+  seats that run concurrently and cannot see each other. `ADR-0023` produced the same shape on the
+  same node in the same hour (orchestrator note 22:32; re-measured resolution in
+  `ADR-0023-globals-css-append-fence.md`'s numbering row). The remedy is allocation at dispatch — the
+  packet names the seat's row ids and ADR number, as this packet already did for the ADR — never
+  discovery at write time by a seat reading a file another seat is writing.
+- **Orchestrator, 22:38:** the row at `:141` is transcribed as **V-17** in `V-DECISIONS-PACKET.md`, default binding; the class fix is in COMMON §4 (`V-ROW: NEW`, numbered by the orchestrator at transcription).

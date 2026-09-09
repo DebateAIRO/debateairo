@@ -182,3 +182,35 @@ What this node actually needed that a single prompt could have supplied, in prio
 | Nothing anywhere | Neither the packet, COMMON, nor `heartbeat-architecture` says whether the ARCH seat may open a V row, what number to use, or which file to write it in. The role contract says contested questions "go up as decision rows with your recommendation" without naming a destination. | Followed the REQ seat's precedent: wrote row **V-15** in full in `slices/S01/DECISIONS.md`, backtick-free per REQ-REV-p1 finding N1, for the orchestrator to transcribe. Suggest COMMON §2 state it. |
 | Charge 3 | Asks the `## Screens` block to name "the locked state of every gauge" while `DONE.md` — which defines what locked looks like — does not exist yet. The line between "state the mock must draw" and "appearance V rules" is left to the seat. | Wrote the inventory (six screens × two modes, the components each reuses by path, the tokens each consumes) and a separate "what the app lacks" list, and made no appearance claim. Worth stating in the template. |
 | Not a defect, worth keeping | Charge 4's instruction to assert the DELTA per case and never the absolute is the single most useful line in this packet. It is what forced the per-suite `passed:failed` pair, which is what caught my own runner bug. | — |
+
+---
+
+## 9. Addendum, 22:38 — §8's third row stopped being hypothetical while this report was being written
+
+The gap I filed as "nothing says whether an ARCH seat may open a V row, at what number, in which
+file" produced a live collision within the hour, twice, in two different global namespaces:
+
+- **V-row ids.** `ARCH(S02)` wrote `V-ROW: V-15` and `V-16` (`slices/S02/DECISIONS.md:108, :123`);
+  this node wrote `V-ROW: V-15` (`slices/S01/DECISIONS.md:141`). Both landed in the same orchestrator
+  commit `681bc09d`. Neither seat did anything wrong: two concurrent architecture seats read the same
+  `V-DECISIONS-PACKET.md` (highest `V-14`) and took the next number. Resolution proposed in an
+  appended correction: S02 keeps `V-15`/`V-16`, S01's becomes `V-17`.
+- **ADR numbers.** The orchestrator's note at 22:32 reported `ADR-0023` "TAKEN twice". Re-measured, it
+  was not: `git log --all` for that path is empty, the file is untracked, its mtime is `22:29:08` —
+  three minutes *before* the note — and it carries this seat's own authorship row. **The orchestrator
+  was reading the file this seat had just written and counting it as a pre-existing occupant.**
+  `ARCH(S02)`'s ADR had meanwhile been renumbered to `0024`, so the only real effect was a
+  renumbering nobody needed.
+
+**The cause is one thing, and it is not carelessness:** row ids and ADR numbers are scarce *global*
+names, allocated by *discovery at write time*, by seats that run concurrently and cannot see each
+other. Discovery-at-write-time is a read-modify-write with no lock; concurrency makes collisions
+certain, not unlikely. This packet already got the ADR half right — it allocated `ADR-0023-*.md` at
+dispatch — and the failure was the orchestrator not trusting its own allocation once a file appeared
+at it.
+
+**Upgrade, and it belongs in §6 as item 5:** the packet allocates every global name the seat may
+need — its ADR number *and* its V-row ids — at dispatch, and a seat never scans a directory or a
+packet to pick one. Cost: two lines per packet. Cost of not doing it, measured today: one spurious
+renumber, one duplicate row id in a committed record, and one orchestrator note that had to be
+disproved with `git log` before it could be answered.

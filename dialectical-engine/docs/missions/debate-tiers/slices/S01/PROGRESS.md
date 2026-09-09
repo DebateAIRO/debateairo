@@ -21,3 +21,9 @@
 - `reviews/REQ-REV-p2.md`: every pass-1 closure re-walked and confirmed; SPEC-v2.md is the record of this slice from here on. Orchestrator folds recorded in `slices/S01/DECISIONS.md` (N1, N3, N4) and `BASELINE.md` (N2, measuring).
 - Next node: ARCH(S01) `t_dfd8f52d` (Opus 5, background) → ARCH-REV(S01) `t_0e278df0` → MOCK(S01) → DONE(S01), V's gate.
 
+## 2026-09-09 22:37 EEST — ARCH(S01) consumed: READY (orchestrator entry)
+
+- PLAN.md filled (859 lines; clusters S01-C1 contract first (TDD-RED start) → C2/C3/C4 green at base → C5 unfilled until V writes DONE.md). `## Screens` block present for the mock. ADR-0023 (globals.css closed tail, Proposed).
+- Row V-17 opened (the "Choose your risk tier…" sentence under Free; default: drawn at the mock, defined in DONE.md). F1: ux01 mocks React — the plan verifies rendered behaviour in a new suite; F3: CSS placement before :8188 (consent style contracts).
+- Next: ARCH-REV(S01) `t_0e278df0` (blind). PASS releases MOCK(S01) → DONE(S01), V's gate.
+

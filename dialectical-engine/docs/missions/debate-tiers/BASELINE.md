@@ -119,3 +119,5 @@ Measured 2026-09-09 by the lane setup (`.hermes/reports/debate-tiers/logs/setup-
 - lane `tiers-s01`: `tests/integration/register-version-boundaries.test.ts` → rc=0 · Tests  6 passed (6) (`logs/baseline-f4-tiers-s01.log`)
 - lane `tiers-s02`: `tests/integration/register-version-boundaries.test.ts` → rc=0 · Tests  6 passed (6) (`logs/baseline-f4-tiers-s02.log`)
 
+### Rule added (ARCH(S01) F4) — a slice's baseline covers every suite that READS a file the slice writes, not only the suites a requirement names; the rows below are the S01 read-surface sweep
+

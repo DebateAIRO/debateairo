@@ -18,6 +18,8 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 
 ## 3. The work
 Find the step a stranger cannot check, the command that condemns correct input, the cluster that cannot go green, the screen the `## Screens` block forgot. Number findings B/N with file:line. Non-blocking findings fold into DECISIONS through the orchestrator; only blocking ones spawn a rework pass. Verdict PASS / REWORK / BLOCKED with the pass number; a REWORK at pass 3 is a V row.
+
+### Charges for THIS pass (numbered; answer each or write UNVERIFIED)
 1. The ARCH seat's own findings (PLAN.md §9, handoff §5): rule on **F-2** (keep `tests/unit/api.test.ts:169-177`'s envelope assertion and add a NEW case for the roster refusal — the orchestrator's fold parenthetical was withdrawn in `DECISIONS.md`) and **F-3** (`api.test.ts:283-405` also turns RED — is it inside the R3/R6 cluster's command and re-fixture?); check rows **V-15/V-16** carry a default that binds a single build; confirm the ADR was renumbered consistently (`ADR-0024`, every reference); a packet defect against the orchestrator is a finding (three are already ticketed: F-5, the charge-1 range, the pre-assigned ADR number).
 
 ## 4. Handoff
