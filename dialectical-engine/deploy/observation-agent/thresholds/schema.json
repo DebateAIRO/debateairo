@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialectical-engine.local/observation-agent-thresholds-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "moduleValue": {
+      "anyOf": [
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9_@.:/+%=-]+$" },
+        { "type": "array", "items": { "$ref": "#/$defs/moduleValue" } },
+        {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$" },
+          "additionalProperties": { "$ref": "#/$defs/moduleValue" }
+        }
+      ]
+    }
+  },
+  "required": ["schema_version", "liveness", "notification", "resources", "routing"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "liveness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probe_interval_ms", "probe_timeout_ms", "open_after_failures", "clear_after_successes"],
+      "properties": {
+        "probe_interval_ms": { "type": "integer", "minimum": 5000 },
+        "probe_timeout_ms": { "type": "integer", "minimum": 1, "maximum": 2000 },
+        "open_after_failures": { "type": "integer", "minimum": 1 },
+        "clear_after_successes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rate_limit_ms", "degraded_after_ms", "timeout_ms"],
+      "properties": {
+        "rate_limit_ms": { "type": "integer", "minimum": 1 },
+        "degraded_after_ms": { "type": "integer", "minimum": 1 },
+        "timeout_ms": { "type": "integer", "minimum": 1, "maximum": 2000 }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu_percent_max", "rss_mb_max", "max_database_sessions", "statement_timeout_ms"],
+      "properties": {
+        "cpu_percent_max": { "type": "number", "exclusiveMinimum": 0, "maximum": 2 },
+        "rss_mb_max": { "type": "integer", "minimum": 1, "maximum": 150 },
+        "max_database_sessions": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "statement_timeout_ms": { "type": "integer", "minimum": 1, "maximum": 2000 }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*(\\.[a-z][a-z0-9_.-]*)?$" },
+      "required": ["INFRA_DOWN", "INFRA_NOT_READY", "INFRA_UNKNOWN", "AGENT_SELF"],
+      "properties": {
+        "INFRA_DOWN": { "const": "FATAL" },
+        "INFRA_NOT_READY": { "const": "DEGRADED" },
+        "INFRA_UNKNOWN": { "const": "SEVERE" },
+        "AGENT_SELF": { "const": "SEVERE" }
+      },
+      "additionalProperties": { "enum": ["INFO", "DEGRADED", "SEVERE", "FATAL"] }
+    },
+    "modules": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$" },
+        "additionalProperties": { "$ref": "#/$defs/moduleValue" }
+      }
+    }
+  }
+}

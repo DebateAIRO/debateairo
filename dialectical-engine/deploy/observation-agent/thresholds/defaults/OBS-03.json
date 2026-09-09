@@ -1,0 +1,27 @@
+{
+  "routing": {
+    "WORKER_LOST": "SEVERE",
+    "STALL": "SEVERE",
+    "QUEUE_NOT_DRAINING": "SEVERE",
+    "NO_PROGRESS": "SEVERE",
+    "SUSPICIOUS_SUCCESS": "SEVERE"
+  },
+  "modules": {
+    "stall-detectors": {
+      "worker_poll_ms": 10000,
+      "heartbeat_age_s": 30,
+      "detector_interval_ms": 15000,
+      "claim_grace_s": 15,
+      "ready_age_s": 120,
+      "no_progress_s": 300,
+      "worker_ref": "debateai-dev-runner",
+      "worker_list_url": "http://127.0.0.1:8888/api/v1/tenants/main/worker",
+      "defect_mappings": {
+        "STALL": "STALL_DETECTED",
+        "QUEUE_NOT_DRAINING": "STALL_DETECTED",
+        "NO_PROGRESS": "SILENT_NOOP",
+        "SUSPICIOUS_SUCCESS": "SUSPICIOUS_SUCCESS"
+      }
+    }
+  }
+}

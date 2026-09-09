@@ -233,3 +233,16 @@ export function loadRunnerEnvironment() {
   }
   return environment;
 }
+
+export function loadObservationAgentEnvironment() {
+  const observationEnvironment = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.startsWith("OBSERVATION_"))
+  );
+  const absolutePath = z.string().min(1).regex(/^\//u);
+  return Object.freeze(z.object({
+    OBSERVATION_DATABASE_URL: z.string().url(),
+    OBSERVATION_STATE_DIR: absolutePath,
+    OBSERVATION_TARGETS_PATH: absolutePath,
+    OBSERVATION_HATCHET_TOKEN_PATH: z.string().min(1).optional()
+  }).strict().parse(observationEnvironment));
+}

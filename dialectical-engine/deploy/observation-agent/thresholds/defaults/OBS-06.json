@@ -1,0 +1,30 @@
+{
+  "routing": {
+    "THROUGHPUT_ANOMALY": "SEVERE",
+    "PROVIDER_DEGRADED": "SEVERE"
+  },
+  "modules": {
+    "throughput": {
+      "sample_interval_ms": 30000,
+      "window_minutes": 5,
+      "run_failure_window_minutes": 60,
+      "run_failure_minimum": 4,
+      "run_failure_ratio": 0.5
+    },
+    "provider-health": {
+      "sample_interval_ms": 30000,
+      "window_minutes": 5,
+      "minimum_calls": 10,
+      "failure_ratio": 0.5
+    },
+    "hatchet-throughput": {
+      "sample_interval_ms": 30000,
+      "probe_timeout_ms": 2000,
+      "queue_depth": 10,
+      "queue_sustained_s": 300,
+      "dispatch_p95_s": 30,
+      "failed_tasks": 3,
+      "failed_window_minutes": 15
+    }
+  }
+}
