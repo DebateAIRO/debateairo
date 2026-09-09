@@ -20,8 +20,9 @@ import { describe, expect, it } from "vitest";
  * slot's `injectResend` rejecting. Node strips the type annotations
  * (--input-type=module-typescript), so the region runs verbatim.
  *
- * The child, not vitest, is the observer: an unattended rejection ends the
- * child with ERR_UNHANDLED_REJECTION, which no in-process assertion can catch.
+ * The child, not vitest, is the observer: an unattended rejection kills it before the
+ * join. The recorded child prints `TypeError: T9_PROBE_INJECTED_REJECTION` and exits
+ * nonzero, with no ERR_UNHANDLED_REJECTION code — the control below asserts that death.
  *
  * WHAT THIS DOES NOT PROVE. It runs the region's TEXT with stubs, not the T9
  * window against its database, so it cannot see anything the real

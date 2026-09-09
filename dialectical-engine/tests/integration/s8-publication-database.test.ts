@@ -1707,7 +1707,49 @@ describe("S8 publication on real PostgreSQL", () => {
         run_ref: runId,terminal: "SERVED",question_line: "ambiguous public question",
         verdict_state: "SUPPORTED",confidence_band: "moderate",
         composed_text: [{ text: "ambiguous public answer" }],badges: [],
-        residual_objections: [],reversal_point: "new evidence",as_of: asOf
+        residual_objections: [],reversal_point: "new evidence",as_of: asOf,
+        // `publish` maps `nodes` and `edges` into the public projection BEFORE it
+        // calls the repository, so a fixture without them dies in projection and
+        // never reaches the ambiguous commit this row exists to guard. The `as
+        // never` cast is what let the omission past the compiler. Both arrays
+        // carry the shapes `redactNodeForPublic`/`redactEdgeForPublic` read, so
+        // the projection, its PublicDebate parse and the readback at the end all
+        // run against real content.
+        nodes: [{
+          node_id: "node:ambiguous-1",claim: "ambiguous public claim",
+          way_of_knowing: "REASONING",
+          base_score: { value: 0.5,kind: "strength",source: "owner-only source",
+            producer: "test-producer",provenance_ref: "prov:node:ambiguous-1",
+            replay_handle: "replay:node:ambiguous-1" },
+          final_strength: null,provenance_ref: "prov:node:ambiguous-1",
+          maker_lineage: null,review: null,locator: null,
+          stranger_restatement: { check_status: "NOT_SAMPLED" },
+          defeater_refs: [],defeater_exhaustion_marked: false,disagreement: null,
+          condition_marks: [],abstention: null,staleness_state: "FRESH",
+          relevant_as_of: asOf
+        },{
+          node_id: "node:ambiguous-2",claim: "ambiguous supporting claim",
+          way_of_knowing: "LOOKED_UP",
+          base_score: { value: 0.75,kind: "strength",source: "owner-only source",
+            producer: "test-producer",provenance_ref: "prov:node:ambiguous-2",
+            replay_handle: "replay:node:ambiguous-2" },
+          final_strength: null,provenance_ref: "prov:node:ambiguous-2",
+          maker_lineage: null,review: null,locator: null,
+          stranger_restatement: { check_status: "NOT_SAMPLED" },
+          defeater_refs: [],defeater_exhaustion_marked: false,disagreement: null,
+          condition_marks: [],abstention: null,staleness_state: "FRESH",
+          relevant_as_of: asOf
+        }],
+        edges: [{
+          edge_id: "edge:ambiguous-1",from_node_ref: "node:ambiguous-2",
+          target_kind: "NODE",target_ref: "node:ambiguous-1",relation: "support",
+          strength: { status: "PRESENT",number: {
+            value: 0.25,kind: "strength",source: "edge source",
+            producer: "test-producer",provenance_ref: "prov:edge:ambiguous-1",
+            replay_handle: "replay:edge:ambiguous-1"
+          } },
+          provenance_ref: "prov:edge:ambiguous-1",placeholder: false
+        }]
       } as never
     })).rejects.toThrow("SIMULATED_AMBIGUOUS_COMMIT");
     const committed = await database.pool.query<{ publication_ref: string }>(`
