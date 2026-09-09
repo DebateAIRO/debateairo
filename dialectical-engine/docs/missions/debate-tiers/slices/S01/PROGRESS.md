@@ -52,3 +52,8 @@
 
 - Commit `b866191f` on `slice/tiers-s01`: `defaults.tsx` (`readonly planTier?: PlanTier`, `plan_tier: defaults.planTier`, the `false` provenance branch → `machine:plan-tier-free`), `api.ts` (`PLAN_TIERS_SET` + `requiredString(config, "plan_tier")` guard before `requireToken`/`submitAsk`), `tests/unit/tier01-ask-wire.test.ts` (3/3), one `plan_tier` line in `v2ui-data-layer` (57/57) and `pol01-policy` (8/8); `s14-contract` 2|3 inherited. RED frames posted; refutation matrix per assertion; three runs CLUSTER_GREEN; orchestrator re-run CLUSTER_GREEN; typecheck delta 0 in the allowed paths and ux01.
 - Findings F1–F4 ticketed (F1 folded below; F2–F4 protocol/packet classes fixed). Next: BUILD(S01-C3) `t_d1dc1913` ∥ BUILD(S01-C4) `t_cd5642d0` in the same lane (disjoint surfaces), base `b866191f`, oracle `DONE.md` M1–M15 → C5.
+
+## 2026-09-10 02:26 EEST — BUILD(S01-C4) consumed: READY (orchestrator entry; C3 still running)
+
+- Commit `5e3e4bcf`: `globals.css` gains one delimited block at `:6208-6270` (`.ndTier` grid, `.ndTierOption` two states, `.ndTierName`, `.ndTierPromise`, `.ndTierModels`/`.ndTierModel`, the four locks `.ndSegItem:disabled`, `.ndSlider:disabled`, `.ndSteerInput:disabled`, `.ndSelect:has(select:disabled)` at `opacity: .45; cursor: not-allowed`) with no colour literal and no new token; `tests/unit/tier01-style-contract.test.ts` 1/1 (placement, no-literal scan, geometry, the four locks). Three runs CLUSTER_GREEN; orchestrator re-run CLUSTER_GREEN with C3's files in flight; the nine `globals.css` readers at their pairs (`t9` 7|2, `t3-library` 11|4, `role-token-map` 46|3, `pda-s03` 3|2 inherited).
+- Findings F1–F3 (packet/protocol) fixed in `754d86c6`. C5 `t_6e2413b7` waits for C3 `t_d1dc1913` (running since 01:45).
