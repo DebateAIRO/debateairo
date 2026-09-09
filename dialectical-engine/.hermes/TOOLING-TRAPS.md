@@ -3011,3 +3011,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 - `Tests  2 failed (2)` has NO passed field when nothing passes; `Tests  8 passed (8)` has no failed field; `Tests  2 failed | 7 passed (9)` has both. A parser that defaults only one field reads a 0-passed suite as `passed=` (empty) and reports a correct tree as RED. Default both (`ap=${ap:-0}`, `af=${af:-0}`) and treat an EMPTY summary line as BROKEN, never as 0/0.
 - vitest silently DROPS a filter that matches no file and exits 0 with the remaining files — every green verdict pins the `Test Files` count as well as the test count (ARCH-S02, same day).
 
+## codex-cli 0.146 logs `failed to load models cache: missing field base_instructions` and still runs (2026-09-09)
+- Two ERROR lines from `codex_models_manager` at startup (load / renew cache TTL) come from a stale `~/.codex/models_cache.json` schema; the CLI rewrites the cache and answers normally. NOT a dead-transport signal — judge a Codex seat by its disk output and the board, never by that line. Do not delete or edit the cache on a seat's behalf; the CLI owns it.
+
