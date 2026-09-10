@@ -133,3 +133,7 @@
 ## 2026-09-10 18:0x EEST - login unblocked: S01 testable at https://localhost:3000 (orchestrator entry)
 
 - The 403 on login was the CSRF origin gate: the API only accepts Origin https://localhost:3000 (= PUBLIC_APP_URL), and the :4010 plan could never satisfy it (finding t_299adfae). Fixed with the product's own topology from the lane - UI :3001 + TLS front door :3000 + API :8790 - no code change. Verified: bad-password login returns 401, not 403. V tests at https://localhost:3000 (the :4010 preview is stopped). Processes: logs/serve-{ui-3001,frontdoor,api}.pid.
+
+## 2026-09-10 18:2x EEST - full restart on V's word; the ask path fixed before V hit it (orchestrator entry)
+
+- All app processes killed by PID, all app ports cleared, then restarted in the product's own order. Two things the earlier serve would have failed on: an EMPTY provider panel makes every ask throw MAKER_INVENTORY_UNSATISFIED (steps 11-12), and the relays rotate their authorization headers per start so api.env must be refreshed against the live panel (ENV_READY keys=41 REWRITTEN proved the rotation). Now: panel healthy=2 (codex-cli, claude-cli; grok still absent per V-7), API :8790 from the lane, UI :3001, TLS front door :3000. Verified: session 401, wrong-password login 401 not 403, /login and /new 200. V tests at https://localhost:3000.
