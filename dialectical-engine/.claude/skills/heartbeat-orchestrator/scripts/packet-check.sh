@@ -49,6 +49,11 @@ if [ -z "$sr" ]; then fail "no self-report path (…/agent-reports/<SEAT>.md)"; 
 fi
 
 
+# 9. a path appears at most once in the allowed block (BUILD-S01-C5 F3, 2026-09-10): a generator that
+#    re-adds the self-report the template already carries lists one file twice
+dups=$(awk '/allowed/{inb=1} (/forbidden/||/^## /){if(inb && !/allowed/)inb=0} inb{print}' "$P" | grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]+' | sort | uniq -d)
+[ -n "$dups" ] && fail "path listed more than once in the allowed block: $(echo "$dups" | tr '\n' ' ')"
+
 # 8. every mission file a CHARGE names is also an input (ARCH-REV-S01 P2, 2026-09-09): after the first
 #    '### Charges' heading, each `docs/missions/…/*.md` or `slices/…/*.md` path must appear (by basename) on the '- inputs' line
 inputs_line=$(grep -m1 -E '^- inputs' "$P")

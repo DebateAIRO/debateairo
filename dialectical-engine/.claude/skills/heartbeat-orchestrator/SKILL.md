@@ -147,6 +147,13 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   A charge never restates a contract duty in a weaker form (per-assertion refutation once became
   "one mutant per step") — it points at the section, and the handoff carries the duty's matrix
   (property · mutant · target suite · neighbour · restore).
+- A packet cites a ticket comment by its AUTHOR and its opening MARKER (`the READY comment by
+  BUILD-S01-C3`), never by position — the orchestrator's CONSUMED comments are always the last ones.
+  A path appears ONCE in `allowed`: the template already carries the self-report path, and a
+  generator that appends it again fails packet-check rule 9. The shared runner is
+  `scripts/run-suites.sh` beside this file, named by ABSOLUTE path (`LOG=<abs path>`; the printed
+  marker is the verdict; rc 0 only on `CLUSTER_GREEN`), proved on a wrong pair and a missing path
+  before the first packet names it, and never restated in a packet.
 - Packet review is the reviewer's duty (`heartbeat-reviewer` §1); a packet defect is a finding
   against you, priced in the ledger.
 
