@@ -129,3 +129,7 @@
 ## 2026-09-10 17:50 EEST — S01 SERVED: UI :4010 + the lane's API :8790 (orchestrator entry)
 
 - V renamed the stale custody file; the stack rebuilt it (41 keys) and then exposed a second cross-mission gap — `@debateai/support-kb` declared but never linked (`ERR_MODULE_NOT_FOUND`) — fixed in the lane with an offline install (lockfile restored, 0 dirty). Keepalive job removed under V's authority; restore line in RESUME-HERE §9. API READY in 4 s, 401 SESSION_REQUIRED on the probe and through the UI proxy. V tests SPEC-v2 §2 steps 1–12 at http://localhost:4010 (not :3000) with the 2026-08-28 account, both modes.
+
+## 2026-09-10 18:0x EEST - login unblocked: S01 testable at https://localhost:3000 (orchestrator entry)
+
+- The 403 on login was the CSRF origin gate: the API only accepts Origin https://localhost:3000 (= PUBLIC_APP_URL), and the :4010 plan could never satisfy it (finding t_299adfae). Fixed with the product's own topology from the lane - UI :3001 + TLS front door :3000 + API :8790 - no code change. Verified: bad-password login returns 401, not 403. V tests at https://localhost:3000 (the :4010 preview is stopped). Processes: logs/serve-{ui-3001,frontdoor,api}.pid.
