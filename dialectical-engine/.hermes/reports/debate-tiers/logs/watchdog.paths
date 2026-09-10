@@ -1,0 +1,8 @@
+# One path or glob per line — re-read by watchdog.sh every minute. Where the SEATS work: their transcripts,
+# their worktrees, their scratch dirs. A seat working outside the mission tree is not stagnation.
+/Users/vladmihaimiron/.claude/projects/-Users-vladmihaimiron-Documents-DebateAIRO/9b3e06e9-75fb-4fd0-8561-04ca8aec6886/subagents
+/Users/vladmihaimiron/.codex/sessions/2026/09/*
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s01-p1-*/dialectical-engine/apps
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s01-p1-*/dialectical-engine/packages
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s01-p1-*/dialectical-engine/tests
+/private/tmp/debate-tiers-*

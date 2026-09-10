@@ -90,7 +90,7 @@ Run it on every event (a seat's exit notification, a watchdog line, a V message)
 | Claude, resumable | `~/.local/bin/claude -p "<pointer>" --model <id> --permission-mode acceptEdits --output-format json` as a background Bash process; `session_id` from the JSON tail | `claude --resume <session_id> -p "<pointer>"` | the session jsonl + a per-seat log |
 | Codex | `codex exec -c model='"gpt-5.6-sol"' … "<pointer>" </dev/null > <log> 2>&1`, background | `codex exec resume <id>` | per-seat log |
 | Grok | `~/.grok/bin/grok -p "<pointer>" -m <model> --permission-mode bypassPermissions --cwd <lane> > <log> 2>&1`, background | `grok --resume <id>` | per-seat log + session jsonl |
-| watchdog | the harness's Monitor, or a background `until`/`while` loop writing `logs/watchdog.status` | — | `logs/watchdog.status` |
+| watchdog | the harness's Monitor, or a background `until`/`while` loop writing `logs/watchdog.status` — its change signature covers the SEATS' transcripts, worktrees and scratch dirs (`logs/watchdog.paths`, one glob per line, re-read every minute), not only the mission tree: a seat working outside the tree is not stagnation | — | `logs/watchdog.status` |
 | dev server for V | a `.claude/launch.json` entry, started only when V says "serve <S>" | — | preview logs |
 
 Forbidden: `osascript`, `open -a`, Terminal windows, browser windows, GUI apps, serving the Hermes
