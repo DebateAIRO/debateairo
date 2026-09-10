@@ -137,3 +137,8 @@
 ## 2026-09-10 18:2x EEST - full restart on V's word; the ask path fixed before V hit it (orchestrator entry)
 
 - All app processes killed by PID, all app ports cleared, then restarted in the product's own order. Two things the earlier serve would have failed on: an EMPTY provider panel makes every ask throw MAKER_INVENTORY_UNSATISFIED (steps 11-12), and the relays rotate their authorization headers per start so api.env must be refreshed against the live panel (ENV_READY keys=41 REWRITTEN proved the rotation). Now: panel healthy=2 (codex-cli, claude-cli; grok still absent per V-7), API :8790 from the lane, UI :3001, TLS front door :3000. Verified: session 401, wrong-password login 401 not 403, /login and /new 200. V tests at https://localhost:3000.
+
+## 2026-09-10 20:43 EEST — the server is back up for V's test point; MERGE(S01) pre-computed (orchestrator entry)
+
+- The UI stage behind the front door had died (:3000 = 502); restarted from the lane on :3001 through the product's own UI runner. https://localhost:3000/new serves the S01 lane at `9ddbb1ef` again.
+- Trial merge into `dev`: clean, 18 files, and the merged code is byte-identical to the lane head, because `dev` has no code change since the lane base. TEST(S01) still waits on V; S02 is unchanged (C1 only).
