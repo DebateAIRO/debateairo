@@ -93,3 +93,7 @@
 
 - F1: `modelMeta(modelId).dot` replaces the local adapter; `#maxTokens` step 32; every lock is `aria-disabled` + `aria-describedby` + an inline lock style (the stylesheet's `:disabled` rules are now unreached — the seam my file-surface split created, F21_P2, class fixed in `ce7677ba`, named as pass 2's first probe). Orchestrator re-run of all four cluster commands at `53b903d2`: CLUSTER_GREEN ×4 with pairs restated (render 22/0, style 8/0).
 - REV(S01) pass 2, scoped (`review-packages/S01-p2/README.md`): correctness/tests `t_f8494fff` (+ the security probes) and product-truth `t_4fcba563`, blind, in the lens worktrees moved to `53b903d2`. Pass 3 would be the last before V.
+
+## 2026-09-10 05:50 EEST — REV(S01) pass 2, correctness/tests consumed: REWORK (orchestrator entry; product-truth pending)
+
+- B1: after F1 the style contract pins `:disabled` rules nothing matches; three lock mechanisms across page, stylesheet and contract; the ratified DECISIONS rows were reversed by a FIX → row V-24 (default: the ratified native `disabled` stands; convergence in FIX pass 2, ONE node). N1–N4 test-strength findings for the same node; N5/N6/PD1–PD3 mine, fixed (`f55f771c`, COMMON:3, lane commit `16252e46`).

@@ -1,6 +1,6 @@
 # COMMON — binding for every seat of mission `debate-tiers`. Your packet names it: read your packet first, then this file in full (it is short by law), then only what they name.
 
-- repo root, the cwd for every command: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine (the git root is one level up)
+- repo root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine (the git root is one level up); the cwd for every command is the lane or worktree YOUR PACKET names — the packet wins
 - mission root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers · intake record: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/00-intake.md · V rows: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/V-DECISIONS-PACKET.md (each row's default binds until V rules)
 - spine v4.0.0: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/agent-protocols/debateai-heartbeat-protocol.md · role contracts: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-<role>/SKILL.md
 - packets: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets · reports: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers (LEDGER.md, agent-reports/, probes/, review-packages/) · tooling traps index: `grep -n '^## ' /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/TOOLING-TRAPS.md`

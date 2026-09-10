@@ -245,3 +245,10 @@ the round trip is one line in DONE.md.
 - **B1's value (ruling):** DONE.md M10's `800` is V's oracle and stands as drawn; the `#maxTokens` control must HOLD what the page prints and its assertion must bite outside jsdom — the mechanism (the step grid, the readout) is the FIX seat's. The control's `min/max/step` and the `800` state predate S01; S01's oracle and test surfaced the defect, and S01 owns the surface. Cost if wrong: a one-line step change.
 - **Security N2 vs product-truth (ruling):** the two lenses disagree on ONE finding (a Premium ask's `tier_provenance_ref: machine:plan-tier-free` — deliberate under frozen R7, or a durable falsehood); the disagreement is exactly row V-21's question, so no re-check node: V rules at TEST(S01); a SPEC-v3 + FIX follow a yes.
 - **Row V-23** (product N2): default = nothing changes; the honesty notice keeps the promise true enough until the V3 contract carries the five knobs.
+
+
+## REV(S01) pass 2 folds — 2026-09-10 05:50 EEST (orchestrator; the correctness lens consumed, product-truth pending)
+
+- **Row V-24 (the lock mechanism):** FIX F1 reversed the ratified row of 2026-09-09 ("How is a locked gauge locked? — the native `disabled` attribute", this file line 12) and the class-vocabulary ruling ("no page-side hook needed", line 217) without a decision row, to give the lock explanation keyboard reach (pass-1 product N3). Default binding: the ratified mechanism stands; page, stylesheet and contract converge on native `disabled` in FIX(S01) pass 2; V weighs keyboard reach against SPEC-v2 §2 step 6 in row V-24. The lens recommended the opposite; recorded.
+- **FIX(S01) pass 2 will be ONE node** (`heartbeat-orchestrator` §6 as amended in `ce7677ba`): the finding surface spans `page.tsx`, `globals.css`, the render suite and the style contract, so no split.
+- **The `.codex` mirrors in the S01 lane** are synced to v4.0.0 by the orchestrator's commit `16252e46` on `slice/tiers-s01` (REV-S01-p2 N6) — a Codex seat auto-loads them from the lane; the dev-side sync is `79fb2183`.
