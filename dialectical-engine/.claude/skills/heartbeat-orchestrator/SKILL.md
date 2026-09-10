@@ -173,7 +173,7 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   against DONE.md's artboards in both modes.
 - Union the lens verdicts into `reviews/REV-<S>-p<r>-UNION.md`: PASS only when every lens passed.
   Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
-- REWORK → FIX(S) nodes split by file surface (parallel), every finding of the pass assigned,
+- REWORK → FIX(S) nodes split by FINDING surface — every file a finding needs to change sits in ONE node, and two nodes whose files overlap run one after the other; parallel only when disjoint (FIX-S01-p1 split a lock's semantics from its appearance and the fix landed on one side), every finding of the pass assigned,
   returned to the author sessions when resumable → REV(S) pass r+1, scoped to the findings plus the
   previous pass's probes. A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
   ticketed residue, shown to V at the test point.
