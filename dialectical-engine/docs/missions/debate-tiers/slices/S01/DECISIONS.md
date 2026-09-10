@@ -269,3 +269,10 @@ the round trip is one line in DONE.md.
 
 - **REV(S01) pass 3 union (07:22 EEST): REWORK at the cap.** Product-truth confirms the lock in the real DOM in both modes (native `disabled` ×14, trusted click/keys/type-ahead refused, M8 "nothing else" true by enumeration, M1–M15 to DONE.md's values, SPEC-v2 §2 steps 1–12 PASS); its B1 `t_9740cdb4` is the provenance literal (row V-21, raised). Union: `reviews/REV-S01-p3-UNION.md`. Under V-26's default TEST(S01) proceeds now; one post-veto FIX carries V-21/V-24/V-25 before MERGE(S01).
 - **Board hygiene:** the six pass-2 findings closed on the two lenses' verification; product-p3 N2 `t_ec9ca195` (consent bar over `/new`'s action row) is consent-ui's surface, shown to V as residue.
+
+
+## V's word on the seats — 2026-09-10 21:06 EEST (orchestrator transcription; V's words verbatim)
+
+- V: «By the way: is GPT Coding this? if no, switch to GPT 5.6 SOL Coders. Also at the end of the vertical slice dont forget the reviewer that should be Opus 5».
+- Measured: every code commit on both lanes came from a `gpt-5.6-sol` Codex seat (S01: C1 `7658e997`, C2 `b866191f`, C4 `5e3e4bcf`, C3 `e57624a8`, C5 `f6c147cc`, F2 `f9b40d0f`, F1 `53b903d2`, FIX p2 `9ddbb1ef`; S02: C1 `d2a58e9a`); the one non-Codex lane commit is the orchestrator's `.codex` mirror sync `16252e46` (no product code, itself ticketed as a defect). Every review lens (S01 passes 1–3, seven seats) was `claude-opus-5`. No change of seats is needed.
+- **Ruling from V's word:** the slice ENDS with an Opus 5 review. The post-veto FIX(S01) (Codex Sol) is followed by REV(S01) post-veto — one Opus 5 lens scoped to that FIX — before MERGE(S01). The same shape closes S02: BUILD C2/C3/C4 on Codex Sol → GATE → three Opus 5 lenses → FIX → V's test → post-veto FIX → Opus 5 review → MERGE.

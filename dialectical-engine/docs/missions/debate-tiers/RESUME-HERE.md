@@ -105,6 +105,12 @@ no focus ring). **Serve only when V says "serve S01"**: the launch entry `tiers-
    child component never sees `planTier`. The S01-29 test was NOT deleted: it lives at
    `tests/render/tier01-new-plan-tier.test.tsx:297` and needs scripted-`change` assertions ADDED, not
    restored. One node, because the file surfaces overlap. RED before GREEN.
+2b. **REV(S01) post-veto — an Opus 5 lens, blind, own detached worktree at the FIX head, scoped to the
+   post-veto FIX's diff plus the promoted pass-1..3 probes.** V's word (2026-09-10 20:5x EEST): «at the end of
+   the vertical slice dont forget the reviewer that should be Opus 5». This is the end-of-slice review V's
+   goal names, not a fourth rework pass: PASS → MERGE(S01); REWORK → one more Codex Sol FIX and a re-check of
+   that diff, both under V's authority. Coding seats stay `gpt-5.6-sol` (V, same message: «if no, switch to
+   GPT 5.6 SOL Coders» — they already are; see the ledger row of this time).
 3. **MERGE(S01)** — local merge of `slice/tiers-s01` into `dev`, then the INTEGRATED suite on `dev`.
    A cross-slice defect there is a FIX on the owning slice plus a scoped REV pass against that
    slice's cap. Never push.
