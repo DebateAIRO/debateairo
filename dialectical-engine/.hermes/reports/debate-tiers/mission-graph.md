@@ -191,6 +191,7 @@ flowchart LR
   t_ec9ca195["(finding) REV-S01-p3 product-truth N2 (pre-existing, NOT S01's — conse"]:::ready
   t_5859ed3f["(finding) REV-S01-p3 product-truth N3 (orchestrator, package) — review"]:::done
   t_978dfce7["(finding) REV-S01-p3 product-truth P1 (the seat, self-reported) — used"]:::done
+  t_960275af["(finding) TEST(S01) gate (orchestrator, V-reported) — the gate message"]:::todo
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -279,6 +280,7 @@ flowchart LR
   t_19085d3f --> t_ec9ca195
   t_19085d3f --> t_5859ed3f
   t_19085d3f --> t_978dfce7
+  t_11abead2 --> t_960275af
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
@@ -289,4 +291,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-10 09:25 from board `debate-tiers` — 191 nodes, 88 edges_
+_rendered 2026-09-10 09:41 from board `debate-tiers` — 192 nodes, 89 edges_
