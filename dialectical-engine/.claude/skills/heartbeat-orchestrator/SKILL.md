@@ -206,8 +206,11 @@ escalates to V after ONE failed workaround.
   Then extract the final artboards verbatim into `docs/missions/<m>/design/<S>/`, write
   `slices/<S>/DONE.md` (per screen and state: the artboard reference, numbered browser steps in both
   modes, V's words quoted — no judgment of yours; the §3 measurements EXTRACTED from the artboards' declarations by a script — every declaration of every drawn class, never hand-picked: a hand transcription dropped `white-space: nowrap` on debate-tiers S01) and get V's yes. BUILD(S-*) is not READY before
-  that yes; there is no proceed-by-default on a UI slice. Attach the graph
-  (`scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md`).
+  that yes; there is no proceed-by-default on a UI slice. Attach the graph:
+  `scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md` also writes `mission-graph-nodes.mmd` (work
+  nodes, findings hidden) and `mission-graph-full.mmd` beside it — SEND both with SendUserFile (display:
+  render) in the gate message; a repo path in a message is not an attachment (V, 2026-09-10: "i cannot
+  see the flowchart").
 - **TEST(S)**: post the acceptance steps, the residue list and the one-line serve command; serve
   the lane only when V says so; the slice ticket closes only on V's veto. **WHOLE**: after every
   MERGE(S), post the integrated-suite result and the push command — V pushes. **V DECISIONS
@@ -234,7 +237,7 @@ CLAIMS ("the handoff claims …"), only what you measured (disk, board, your own
 (a consume comment once repeated a false "activation state unchanged") — and a `Ruling:` line for every decision
 you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
 a replacement re-elected or the waiver recorded. A phase report at each V gate, a closure report
-before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board at
+before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board AND sent to V (SendUserFile) at
 every gate. Close sub-tickets as verdicts are consumed — a board that only grows carries no state.
 
 ## 10. Version discipline
