@@ -113,3 +113,11 @@
 ## 2026-09-10 07:22 EEST — REV(S01) pass 3 UNION: REWORK at the cap → TEST(S01) surfaced to V (orchestrator entry)
 
 - Product-truth `t_19085d3f` REWORK on the provenance literal (V-21 raised); the lock confirmed in the real DOM, both modes. Correctness `t_479e4751` REWORK on the deleted guards (V-25). Both lenses: 12/12 CLUSTER_GREEN at `9ddbb1ef`; the six pass-2 findings verified and closed. Rows V-24/V-25/V-26 + V-21's escalation go to V in one message with the TEST(S01) steps, the residue and the serve command. Nothing pushed; the lane is 0 dirty at `9ddbb1ef`.
+
+
+## 2026-09-10 14:40 EEST — V: "serve the whole mission" → S01 served as far as V's custody root allows (orchestrator entry)
+
+- UI: the S01 lane's `apps/ui` on **http://localhost:4010** through the launch entry `tiers-s01-ui` (preview server, pid 20470). `/new` redirects to `/login` until the API is up.
+- API: cannot start yet — not the lane's fault. `.local/dev-auth/api.env` has 36 keys; the code at `dev` (lane and main) requires 41 since the support-agent merge `b300ee91`; the API's schema requires two of the missing five. V's own dev stack (launchd keepalive `com.debateairo.dev.stack`, 1118 runs) has crash-looped on `DEV_API_ENVIRONMENT_DRIFT` since then, re-seeding the register and spawning the codex/claude bridges every minute. Finding `t_73466447` (cross-mission; V's remedy: move the stale `api.env` aside; remove the keepalive job for the test window).
+- Row V-27 amended: symlink withdrawn (the custody loader rejects links); the two-root runner (`coverage/serve/serve-api.ts` in the lane, gitignored) reads custody in place from the main tree and spawns the API from the lane. a harness Monitor wakes the orchestrator once `api.env` has 41 keys and :8790 is free, and it launches the API (`logs/serve-api.sh`).
+- Test steps unchanged: `SPEC-v2.md` §2 (lines 232–266) in both modes; the one step: Free → `⚙ OPTIONS` → click `Fixed ▾` (nothing opens, no ring). Rows V-7, V-20…V-26 pending as posted. Nothing of V's touched; nothing pushed; no slice Done.
