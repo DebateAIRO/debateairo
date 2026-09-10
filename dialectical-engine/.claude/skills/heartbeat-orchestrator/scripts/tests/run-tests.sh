@@ -15,4 +15,8 @@ sed 's/`name: debateai-graph-spine`/`name: something-else`/' "$D/packet-good.md"
 awk '/^- self-report:/{print "- inputs: your predecessor'"'"'s self-report /Users/nobody/reports/agent-reports/PREDECESSOR.md (new, predecessor)"}1' "$D/packet-good.md" > "$tmp/pred.md"; t predecessor-report-not-mine 0 "$C" "$tmp/pred.md"
 { cat "$D/packet-good.md"; echo; echo "### Charges for THIS pass"; echo "1. Read docs/missions/consent-ui/NOT-AN-INPUT.md at the lines named."; } > "$tmp/charge.md"; t charge-names-file-not-in-inputs 1 "$C" "$tmp/charge.md"
 awk '/agent-reports\/PACKET-TEST.md \(new\)/{print; print "  - /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/consent-ui/agent-reports/PACKET-TEST.md (new)"}1' "$D/packet-good.md" > "$tmp/dup.md"; t duplicate-allowed-path 1 "$C" "$tmp/dup.md"
+x=$(mktemp -d /private/tmp/pc-range-XXXXXX); printf 'a\nb\n## H\nc\n' > "$x/x.md"
+{ cat "$D/packet-good.md"; echo; echo "See $x/x.md:1-3 for the cited range."; } > "$tmp/range-bad.md";  t cited-range-ends-on-heading 1 "$C" "$tmp/range-bad.md"
+{ cat "$D/packet-good.md"; echo; echo "See $x/x.md:1-2 for the cited range."; } > "$tmp/range-good.md"; t cited-range-inside-section 0 "$C" "$tmp/range-good.md"
+rm -rf "$x"
 rm -rf "$tmp"; echo "passed=$pass failed=$fail"; [ "$fail" = 0 ]

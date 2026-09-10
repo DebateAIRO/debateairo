@@ -54,6 +54,14 @@ fi
 dups=$(awk '/allowed/{inb=1} (/forbidden/||/^## /){if(inb && !/allowed/)inb=0} inb{print}' "$P" | grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]+' | sort | uniq -d)
 [ -n "$dups" ] && fail "path listed more than once in the allowed block: $(echo "$dups" | tr '\n' ' ')"
 
+# 10. a cited line range ends inside its section (REV-S01-p1 security P1, 2026-09-10): for `<abs>.md:A-B`, line B is
+#     never a heading — a range that runs onto the next section's heading was copied, not measured
+out=$(grep -nEo '(/Users|/private|/tmp)[A-Za-z0-9_./~-]*\.md:[0-9]+-[0-9]+' "$P" | while IFS=: read -r ln pth ab; do
+  f="$pth"; b="${ab#*-}"; [ -f "$f" ] || continue
+  sed -n "${b}p" "$f" | grep -Eq '^#{1,6} ' && echo "DEFECT cited range ends ON a heading (line $ln): $f:$ab — the section ends before line $b"
+done)
+[ -n "$out" ] && { echo "$out"; rc=1; }
+
 # 8. every mission file a CHARGE names is also an input (ARCH-REV-S01 P2, 2026-09-09): after the first
 #    '### Charges' heading, each `docs/missions/…/*.md` or `slices/…/*.md` path must appear (by basename) on the '- inputs' line
 inputs_line=$(grep -m1 -E '^- inputs' "$P")

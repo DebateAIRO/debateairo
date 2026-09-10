@@ -13,11 +13,11 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 
 ## 2. Contract
 - allowed (exhaustive): __MISSION_ROOT__/reviews/REV-__SLICE__-p__PASS__-__LENS__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/probes/ (new, promoted probes only) · __REPORTS__/agent-reports/__SEAT__.md (new)
-- forbidden: everything else — in particular the slice's files, every other lens's output, git writes of any kind
+- forbidden: everything else — in particular any change to the slice's files that outlives your session (a temporary mutant in YOUR worktree, restored before you hand off, is the refutation duty, not a write), every other lens's output, git writes of any kind
 - verification: your OWN fixtures for the whole slice, both modes on UI · every cluster command re-run by you · one mount of every surface this slice shares with another slice or with the app shell · on UI: rendered DOM with the real compiled CSS measured against the oracle's artboards (geometry, colour, both modes)
 
 ## 3. The work
-Review the packet FIRST (a packet defect is a finding against the orchestrator). Your lens is __LENS__ (correctness/tests · security/data-safety · product-truth); probe, never read — build from the CLAIM, exceed the author's parameters, refute. Number findings B/N with file:line and the concrete failure; every N gets a ticket through the orchestrator. Verdict PASS / REWORK / BLOCKED for THIS lens with the pass number; the orchestrator unions the lenses. End with one paragraph of predictions about the other lenses. A REWORK at pass 3 is a V row.
+Review the packet FIRST (a packet defect is a finding against the orchestrator). Your lens is __LENS__ and only that lens; probe, never read — build from the CLAIM, exceed the author's parameters, refute. Number findings B/N with file:line and the concrete failure; every N gets a ticket through the orchestrator. Verdict PASS / REWORK / BLOCKED for THIS lens with the pass number; the orchestrator unions the lenses. End with one paragraph of predictions about the other lenses. A REWORK at pass 3 is a V row. A row for V (`V-ROW: NEW` block) goes in the LAST section of your artifact — the orchestrator transcribes and numbers it; you never write DECISIONS.md.
 
 ## 4. Handoff
 `PASS | REWORK | BLOCKED` on __TICKET__, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:

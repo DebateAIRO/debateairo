@@ -3029,3 +3029,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 
 ## Under `// @vitest-environment jsdom`, `fileURLToPath(import.meta.url)` fails collection with ERR_INVALID_URL_SCHEME (2026-09-10, BUILD-S01-C3)
 - A render suite that resolves a source file from its own location dies before any case runs. Read the file from the packet-pinned cwd (`readFile("apps/ui/app/new/page.tsx")` from the lane root, the `sup-04-widget` idiom) instead of from `import.meta.url`. Priced by the seat at one collection failure + one diagnosis round trip.
+
+## Kill by port or PID, never `pkill -f` a filename every seat shares (2026-09-10, REV(S01) p1)
+- Three parallel lenses followed one dev-stack recipe and each ran a `stub-api.mjs`; one lens's teardown `pkill -f "stub-api.mjs"` could kill the others' stubs (the security lens's server vanished at 04:07 while it was still working). Name per-seat files `<seat>-stub-api.mjs`, record the PID at launch, kill that PID; `lsof -nP -iTCP:<port> -sTCP:LISTEN` proves a port is yours before any kill.

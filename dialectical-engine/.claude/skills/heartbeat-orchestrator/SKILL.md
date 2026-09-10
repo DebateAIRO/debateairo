@@ -162,7 +162,10 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
 - Workers hand off on cluster green; nothing waits on a cluster. `GATE(S)` fires when every
   BUILD(S-*) is done: assemble `.hermes/reports/<m>/review-packages/<S>-p<r>/` — the diff vs base,
   every cluster command with its three-run table, the cluster map, the acceptance oracle (DONE.md on
-  a UI slice, the SPEC acceptance otherwise), the dev-stack recipe. Re-verify every quoted commit
+  a UI slice, the SPEC acceptance otherwise), the dev-stack recipe — which gives every lens its OWN ports and process/file names
+  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares) and
+  records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
+  Re-verify every quoted commit
   and count at assembly time.
 - Lenses by `risk_tier`, in parallel, each a blind background seat in its own detached worktree at
   the slice head: low → correctness/tests · medium → + security/data-safety · high → + product-truth.
