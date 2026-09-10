@@ -101,3 +101,7 @@
 ## 2026-09-10 05:57 EEST — REV(S01) pass 2 = REWORK (union); FIX(S01) pass 2 dispatching as one node (orchestrator entry)
 
 - product-truth B1: under Free the two ⚙ OPTIONS dropdowns are live `<select>`s (a trusted click focuses one; SPEC-v2 §2 step 6 fails); correctness B1: three lock mechanisms, the contract pins dead CSS. One cause — F1's `aria-disabled`. FIX(S01) pass 2 `t_62644380` (Codex Sol, the S01 lane at `16252e46`) converges page, stylesheet and contract on the ratified native `disabled` (row V-24's default) and takes correctness N1–N3 and product N1 with it. Then REV(S01) pass 3 — the last — `t_479e4751` + `t_19085d3f`.
+
+## 2026-09-10 06:43 EEST — FIX(S01) pass 2 consumed: READY at `9ddbb1ef` (orchestrator entry)
+
+- Native `disabled` is the one lock mechanism again across page, stylesheet and contract (row V-24's default); the select overlay's cursor is fixed; the suites pin the four control families, the four slider grids and the five real roster ids. Orchestrator re-run of all four clusters at `9ddbb1ef`: CLUSTER_GREEN CLUSTER_GREEN CLUSTER_GREEN CLUSTER_GREEN . Next: REV(S01) pass 3 — the last — `t_479e4751` (correctness/tests + all probes) and `t_19085d3f` (product-truth, the real DOM in both modes, step 6 above all).
