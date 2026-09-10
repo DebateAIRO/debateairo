@@ -50,34 +50,8 @@
       "port": 4599
     },
     {
-      "name": "tiers-s01-ui",
-      "runtimeExecutable": "/bin/zsh",
-      "runtimeArgs": [
-        "-lc",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s01/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4010 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
-      ],
-      "port": 4010,
-      "url": "http://localhost:4010"
-    },
-    {
-      "name": "tiers-s02-ui",
-      "runtimeExecutable": "/bin/zsh",
-      "runtimeArgs": [
-        "-lc",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/apps/ui && DIALECTICAL_UI_HOST=127.0.0.1 PORT=4020 DIALECTICAL_API_BASE=http://127.0.0.1:8790 NEXT_PUBLIC_API_BASE=/api exec node server.mjs --dev"
-      ],
-      "port": 4020,
-      "url": "http://localhost:4020"
-    },
-    {
-      "name": "tiers-s01-front-door-ui",
-      "runtimeExecutable": "/bin/zsh",
-      "runtimeArgs": [
-        "-lc",
-        "cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s01/dialectical-engine && exec pnpm dev:auth:ui"
-      ],
-      "port": 3001,
-      "url": "http://localhost:3001"
+      "name": "tiers-s01-open",
+      "url": "https://localhost:3000"
     }
   ]
 }
