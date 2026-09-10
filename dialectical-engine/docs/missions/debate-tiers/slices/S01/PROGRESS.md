@@ -73,3 +73,9 @@
 
 - Re-verification at `f6c147cc`: every cluster `CLUSTER_GREEN` with C5's pairs restated (`review-packages/S01-p1/reverify-f6c147cc.log`). Package index: `.hermes/reports/debate-tiers/review-packages/S01-p1/README.md`.
 - Three blind lenses on Opus 5 (correctness/tests `t_df524f91` · security/data-safety `t_660e86e5` · product-truth `t_8ea6c036`), each in `.worktrees/rev-s01-p1-<lens>` at `f6c147cc`. Next: union → `reviews/REV-S01-p1-UNION.md`; PASS → TEST(S01) on `t_11abead2`; REWORK → FIX(S01) nodes split by file surface.
+
+## 2026-09-10 04:16 EEST — REV(S01) pass 1: correctness/tests PASS and security/data-safety PASS consumed (orchestrator entry)
+
+- correctness/tests (`t_df524f91`, `reviews/REV-S01-p1-correctness-tests.md`): every cluster command three times at `f6c147cc` (CLUSTER_GREEN ×4 each run), six mutants, DONE.md §3 measured in a real browser in both modes, SPEC §2 steps 7–12 pass. Non-blocking N1–N4 open for the union (t_6365fd82 t_318c1522 t_1c27e245 t_3c762b9f); N5/N6/R1 (packet/package) fixed at the class in `45294264`.
+- security/data-safety (`t_660e86e5`, `reviews/REV-S01-p1-security-data-safety.md`): 12/12 cluster re-runs green, two mutants RED, five refutation attempts failed (36 malformed tier shapes → 400), wire free/premium 202, M1–M8 in both modes. N1–N3 (t_9a1c95b4 t_b79ef27e t_2eded532) become rows V-20…V-22 (defaults binding until V rules at TEST(S01)); P1–P3 fixed in `45294264`; T4 (t_77100e37) pre-existing.
+- Waiting: the product-truth lens `t_8ea6c036` (running; its stub :8850 and UI :8851 up). Then the union → `reviews/REV-S01-p1-UNION.md`.

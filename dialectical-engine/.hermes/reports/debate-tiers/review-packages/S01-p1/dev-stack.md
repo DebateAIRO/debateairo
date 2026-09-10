@@ -2,6 +2,8 @@
 
 **Never:** the `:3000` https stack (V's — launch.json entries `ui`, `dev-stack`, `consent-lane-full-stack`), the API on `:8790`, the live dev database `127.0.0.1:55432`, `.local/**` (provider config with authorization headers — never print it), the S01/S02 lanes, ports 4000/4010/4020/4599 (other launch.json entries). Nothing opened on V's desktop: not the playwright plugin (`npx @playwright/mcp` launches a headed Chromium window), not `open`, not a Terminal.
 
+**Listener baseline at assembly** (2026-09-10 03:24, `lsof -nP -iTCP:3000 -sTCP:LISTEN` and the same for `:8790`): no process listened on either port — a lens that finds one at its exit did not inherit it, and a lens that finds none did not kill it.
+
 ## What `/new` needs before it renders (measured)
 1. `apps/ui/app/new/page.tsx:59` wraps the form in `<AuthGate>`; `apps/ui/components/AuthGate.tsx:12-23` awaits `validateSession()` on mount and, on rejection, runs `window.location.replace("/login")`.
 2. `apps/ui/lib/api.ts:122-123` — `validateSession` is `await client.readSession()`.
