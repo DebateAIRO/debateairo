@@ -163,7 +163,8 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   BUILD(S-*) is done: assemble `.hermes/reports/<m>/review-packages/<S>-p<r>/` — the diff vs base,
   every cluster command with its three-run table, the cluster map, the acceptance oracle (DONE.md on
   a UI slice, the SPEC acceptance otherwise), the dev-stack recipe — which gives every lens its OWN ports and process/file names
-  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares) and
+  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares — the launch line writes `$!` to
+  `logs/<seat>.<proc>.pid` and the kill line reads it) and
   records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
   Re-verify every quoted commit
   and count at assembly time. The package diff is the PRODUCT range only — housekeeping paths
@@ -179,7 +180,9 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
 - REWORK → FIX(S) nodes split by FINDING surface — every file a finding needs to change sits in ONE node, and two nodes whose files overlap run one after the other; parallel only when disjoint (FIX-S01-p1 split a lock's semantics from its appearance and the fix landed on one side), every finding of the pass assigned,
   returned to the author sessions when resumable → REV(S) pass r+1, scoped to the findings plus the
-  previous pass's probes. A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
+  previous pass's probes — the package README names each promoted probe's measurement and the head it
+  was written against, never an outcome a probe as promoted cannot produce (a mutant's direction inverts
+  between heads). A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
   ticketed residue, shown to V at the test point.
 - Planning reviews (REQ-REV, ARCH-REV) are one pass by default: you fold N-findings into
   DECISIONS.md and ticket comments; only B-findings spawn a rework node, in the same session when

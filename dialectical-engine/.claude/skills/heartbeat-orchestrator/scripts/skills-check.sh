@@ -26,6 +26,7 @@ phrase(){ case "$1" in
 file(){ case "$1" in heartbeat-*) echo "$REPO/.claude/skills/$1/SKILL.md";; *) echo "$SP/$1/SKILL.md";; esac; }
 rc=0
 for s in "$@"; do
+  s="${s#superpowers:}"; s="${s#dialectical-engine:}"
   p="$(phrase "$s")"; f="$(file "$s")"
   [ -n "$p" ] || { echo "UNKNOWN skill $s — add its body phrase to skills-check.sh"; rc=1; continue; }
   [ -f "$f" ] && /usr/bin/grep -qF -- "$p" "$f" || { echo "DRIFT $s — the phrase is not in $f"; rc=1; continue; }
