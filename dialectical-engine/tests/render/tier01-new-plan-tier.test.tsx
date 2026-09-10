@@ -213,6 +213,34 @@ describe("S01 /new plan tier", () => {
     ]);
   });
 
+  it("uses shared model metadata for every roster id shape", async () => {
+    vi.resetModules();
+    vi.doMock("@debateai/contract", () => ({
+      PLAN_TIER_ROSTERS: {
+        free: ["openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
+        premium: ["claude_opus", "grok/4.6", "gemini-3"]
+      }
+    }));
+    try {
+      const { default: PageWithProbeRoster } = await import("../../apps/ui/app/new/page.js");
+      await act(async () => root!.render(<PageWithProbeRoster />));
+      await settle();
+      expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
+        dot.style.getPropertyValue("--dot")
+      )).toEqual([
+        "var(--m-gpt)",
+        "var(--m-gpt)",
+        "var(--m-gpt)",
+        "var(--m-claude)",
+        "var(--m-grok)",
+        "var(--m-gemini)"
+      ]);
+    } finally {
+      vi.doUnmock("@debateai/contract");
+      vi.resetModules();
+    }
+  });
+
   it("S01-27 R4 locks all fourteen controls while Free is chosen", async () => {
     await renderPage();
     await click('.ndOptionsToggle');
@@ -233,20 +261,31 @@ describe("S01 /new plan tier", () => {
       "concurrency",
       "maxTokens"
     ];
-    const disabled = lockedIds.filter((id) =>
-      document.querySelector<HTMLElement>(`#${id}`)?.hasAttribute("disabled")
-    );
-    expect(disabled, `disabled ids: ${disabled.join(", ")}`).toHaveLength(14);
+    const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
+    expect(locked.filter((control) => control.getAttribute("aria-disabled") === "true")).toHaveLength(14);
+    expect(locked.filter((control) => control.hasAttribute("disabled"))).toEqual([]);
+    expect(locked.map((control) => {
+      const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
+      return [visualLock.style.opacity, visualLock.style.cursor];
+    })).toEqual(Array.from({ length: 14 }, () => ["0.45", "not-allowed"]));
   });
 
-  it("S01-28 R4 forwards the Free lock to every native control family", async () => {
+  it("S01-28 R4 keeps every Free lock reachable and described", async () => {
     await renderPage();
     await click('.ndOptionsToggle');
 
-    expect(document.querySelectorAll('.ndSegItem:disabled')).toHaveLength(6);
-    expect(document.querySelectorAll('.ndSlider:disabled')).toHaveLength(4);
-    expect(document.querySelectorAll('.ndSteerInput:disabled')).toHaveLength(2);
-    expect(document.querySelectorAll('.ndSelect select:disabled')).toHaveLength(2);
+    const locked = [...document.querySelectorAll<HTMLElement>(
+      '.ndSegItem[aria-disabled="true"],.ndSlider[aria-disabled="true"],.ndSteerInput[aria-disabled="true"],.ndSelect select[aria-disabled="true"]'
+    )];
+    expect([
+      document.querySelectorAll('.ndSegItem[aria-disabled="true"]').length,
+      document.querySelectorAll('.ndSlider[aria-disabled="true"]').length,
+      document.querySelectorAll('.ndSteerInput[aria-disabled="true"]').length,
+      document.querySelectorAll('.ndSelect select[aria-disabled="true"]').length
+    ]).toEqual([6, 4, 2, 2]);
+    expect(locked.every((control) => control.tabIndex >= 0)).toBe(true);
+    expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
+    expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
   });
 
   it("S01-29 R4 enforces the Free lock before submit", async () => {
@@ -255,6 +294,13 @@ describe("S01 /new plan tier", () => {
     await click('#riskTier-high-stakes');
     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("false");
+    await inputValue('#treeDepth', "4");
+    await inputValue('#steeringPresets', "Prefer primary sources");
+    await click('.ndOptionsToggle');
+    await selectValue('#depthMode', "adaptive");
+    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
+    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
+    expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("fixed");
     expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 
@@ -343,9 +389,12 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("standard");
     expect(document.querySelector<HTMLInputElement>('#branchingWidth')?.value).toBe("2");
     expect(document.querySelector<HTMLInputElement>('#concurrency')?.value).toBe("3");
-    expect(document.querySelector<HTMLInputElement>('#maxTokens')?.value).toBe("800");
+    const maxTokens = document.querySelector<HTMLInputElement>('#maxTokens')!;
+    expect(maxTokens.value).toBe("800");
+    expect((Number(maxTokens.value) - Number(maxTokens.min)) % Number(maxTokens.step)).toBe(0);
+    expect((Number(maxTokens.max) - Number(maxTokens.min)) % Number(maxTokens.step)).toBe(0);
     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
-    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(14);
+    expect(document.querySelectorAll('.ndSegItem[aria-disabled="true"],.ndSlider[aria-disabled="true"],.ndSteerInput[aria-disabled="true"],.ndSelect select[aria-disabled="true"]')).toHaveLength(14);
   });
 
   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
@@ -396,7 +445,10 @@ describe("S01 /new plan tier", () => {
       "concurrency",
       "maxTokens"
     ];
-    expect(gaugeIds.filter((id) => document.querySelector(`#${id}`)?.hasAttribute("disabled"))).toEqual([]);
+    expect(gaugeIds.filter((id) => {
+      const control = document.querySelector(`#${id}`);
+      return control?.hasAttribute("disabled") || control?.getAttribute("aria-disabled") === "true";
+    })).toEqual([]);
 
     await click('#riskTier-high-stakes');
     await click('#budgetTier-high');
