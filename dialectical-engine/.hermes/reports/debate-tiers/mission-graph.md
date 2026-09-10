@@ -128,10 +128,69 @@ flowchart LR
   t_a043c943["(finding) BUILD-S01-C5 F2 (packet defect, orchestrator) — 'the last co"]:::done
   t_844ba282["(finding) BUILD-S01-C5 F3 (packet defect, orchestrator) — the self-rep"]:::done
   t_9bec090b["(finding) BUILD-S01-C5 F4 (packet, orchestrator) — the runner's raw-lo"]:::done
-  t_7be7acf3["(orchestrator) GATE S01 — assemble review-packages/S01-p1 (mechanical:"]:::ready
-  t_df524f91["(claude-opus-5) REV S01 p1 — lens correctness/tests (blind, own detach"]:::todo
-  t_660e86e5["(claude-opus-5) REV S01 p1 — lens security/data-safety (blind, own det"]:::todo
-  t_8ea6c036["(claude-opus-5) REV S01 p1 — lens product-truth (blind, own detached w"]:::todo
+  t_7be7acf3["(orchestrator) GATE S01 — assemble review-packages/S01-p1 (mechanical:"]:::done
+  t_df524f91["(claude-opus-5) REV S01 p1 — lens correctness/tests (blind, own detach"]:::done
+  t_660e86e5["(claude-opus-5) REV S01 p1 — lens security/data-safety (blind, own det"]:::done
+  t_8ea6c036["(claude-opus-5) REV S01 p1 — lens product-truth (blind, own detached w"]:::done
+  t_6365fd82["(finding) REV-S01-p1 correctness N1 — tests/unit/tier01-style-contract"]:::done
+  t_318c1522["(finding) REV-S01-p1 correctness N2 — tests/render/tier01-new-plan-tie"]:::ready
+  t_1c27e245["(finding) REV-S01-p1 correctness N3 — apps/ui/app/new/page.tsx:65-70 +"]:::done
+  t_3c762b9f["(finding) REV-S01-p1 correctness N4 — tests/unit/tier01-style-contract"]:::done
+  t_75aa04a6["(finding) REV-S01-p1 correctness N5 (packet) — packets/REV-S01-p1-corr"]:::done
+  t_89f72ff6["(finding) REV-S01-p1 correctness N6 (packet) — packets/REV-S01-p1-corr"]:::done
+  t_f6b570a3["(finding) REV-S01-p1 correctness R1 (package) — dev-stack.md gave thre"]:::done
+  t_9a1c95b4["(finding) REV-S01-p1 security N1 — the Free gauge set is enforced only"]:::ready
+  t_b79ef27e["(finding) REV-S01-p1 security N2 — apps/ui/app/new/defaults.tsx:74: a "]:::ready
+  t_2eded532["(finding) REV-S01-p1 security N3 — apps/ui/app/new/page.tsx:207 the ti"]:::ready
+  t_0d2518e7["(finding) REV-S01-p1 security P1 (packet) — the three REV-S01-p1 packe"]:::done
+  t_b9bd6417["(finding) REV-S01-p1 security P2 (packet) — COMMON §4 orders V-ROW blo"]:::done
+  t_4786b961["(finding) REV-S01-p1 security P3 (package) — dev-stack.md's no-touch l"]:::done
+  t_77100e37["(finding) REV-S01-p1 security T4 (pre-existing, out of S01's diff) — P"]:::ready
+  t_1bf44393["(finding) REV-S01-p1 product-truth B1 (BLOCKING) — apps/ui/app/new/pag"]:::done
+  t_8f4927d4["(finding) REV-S01-p1 product-truth N1 — globals.css .ndTierModel (S01 "]:::done
+  t_15c43eda["(finding) REV-S01-p1 product-truth N2 — page.tsx:44 the Premium promis"]:::ready
+  t_7f4df45a["(finding) REV-S01-p1 product-truth N3 — page.tsx:449/:451 the lock exp"]:::ready
+  t_48de05b6["(finding) REV-S01-p1 product-truth N4 (packet) — COMMON.md:25 orders V"]:::done
+  t_dcf9531e["(finding) REV-S01-p1 orchestrator D1 — slices/S01/DONE.md M7 omitted t"]:::done
+  t_db4c7267["(gpt-5.6-sol) FIX S01 p1 — F1 page surface: product B1 (max-tokens val"]:::done
+  t_95c01e3d["(gpt-5.6-sol) FIX S01 p1 — F2 stylesheet surface: product N1 (.ndTierM"]:::done
+  t_f8494fff["(claude-opus-5) REV S01 p2 — lens correctness/tests (scoped: the pass-"]:::done
+  t_4fcba563["(claude-opus-5) REV S01 p2 — lens product-truth (scoped: B1/N1/N3 in t"]:::done
+  t_2e66b415["(finding) FIX-S01-p1-F2 P1 (packet) — the only-lines law named the fin"]:::done
+  t_e74b5bf1["(finding) FIX-S01-p1-F2 S1 (orchestrator, version skew) — the lane car"]:::done
+  t_a7cb6dad["(finding) FIX-S01-p1-F1 P1 (packet) — FIX.md §2 asks the reviewer's pr"]:::done
+  t_0b2afbff["(finding) FIX-S01-p1-F1 P2 (packet, class) — the union split FIX nodes"]:::done
+  t_83865b1b["(finding) FIX-S01-p1-F1 P3 (packet) — the pair-restatement line (becom"]:::done
+  t_cd86bced["(finding) REV-S01-p2 correctness B1 (BLOCKING) — tests/unit/tier01-sty"]:::done
+  t_16b00d0e["(finding) REV-S01-p2 correctness N1 — tests/render/tier01-new-plan-tie"]:::done
+  t_6312c7ca["(finding) REV-S01-p2 correctness N2 — tier01-new-plan-tier.test.tsx:39"]:::done
+  t_759ceb20["(finding) REV-S01-p2 correctness N3 — tier01-new-plan-tier.test.tsx:21"]:::done
+  t_2288b5e7["(finding) REV-S01-p2 correctness N4 — tier01-style-contract.test.ts:12"]:::ready
+  t_87a3aa3a["(finding) REV-S01-p2 correctness N5 (orchestrator) — promoted pass-1 p"]:::done
+  t_468fd7a4["(finding) REV-S01-p2 correctness N6 (orchestrator) — the F20_S1 remedy"]:::done
+  t_4ea89dd7["(finding) REV-S01-p2 correctness PD1 (packet) — REV.md:10 describes ev"]:::done
+  t_3ecd27f8["(finding) REV-S01-p2 correctness PD2 (packet) — REV.md:17 demands the "]:::done
+  t_dc7510a2["(finding) REV-S01-p2 correctness PD3 (packet) — packet:9 (cwd = the le"]:::done
+  t_07ba5757["(finding) REV-S01-p2 product-truth B1 (BLOCKING) — the Free lock is no"]:::done
+  t_5675766d["(finding) REV-S01-p2 product-truth N1 (pre-existing) — globals.css:616"]:::done
+  t_b82271c7["(finding) REV-S01-p2 product-truth N2 — only 2 of the 10 hints (riskTi"]:::ready
+  t_e352a782["(finding) REV-S01-p2 product-truth N3 — under Free the keyboard path t"]:::done
+  t_62644380["(gpt-5.6-sol) FIX S01 p2 — ONE node: converge the Free lock on the rat"]:::done
+  t_479e4751["(claude-opus-5) REV S01 p3 — lens correctness/tests (the LAST pass; sc"]:::done
+  t_19085d3f["(claude-opus-5) REV S01 p3 — lens product-truth (the LAST pass; scoped"]:::done
+  t_9b998d4e["(finding) FIX-S01-p2 P1 (pointer) — the launcher pointer said your wri"]:::done
+  t_552cb0b3["(finding) FIX-S01-p2 P4 (packet, cost) — read in FULL every file in al"]:::done
+  t_94f82f12["(finding) REV-S01-p3 correctness B1 (BLOCKING, at the cap → V row) — F"]:::ready
+  t_0d714096["(finding) REV-S01-p3 correctness N1 — tests/render/tier01-new-plan-tie"]:::ready
+  t_108a9322["(finding) REV-S01-p3 correctness N2 (orchestrator) — probes/REV-S01-p2"]:::done
+  t_e976fd9b["(finding) REV-S01-p3 correctness N3 (orchestrator) — a REV lens has no"]:::done
+  t_b152303d["(finding) REV-S01-p3 correctness PD1 (package) — review-packages/S01-p"]:::done
+  t_e268a842["(finding) REV-S01-p3 correctness PD2 (orchestrator) — the .codex mirro"]:::done
+  t_9740cdb4["(finding) REV-S01-p3 product-truth B1 (BLOCKING, at the cap → row V-21"]:::ready
+  t_1d72bc63["(finding) REV-S01-p3 product-truth N1 (orchestrator, probe hygiene) — "]:::done
+  t_ec9ca195["(finding) REV-S01-p3 product-truth N2 (pre-existing, NOT S01's — conse"]:::ready
+  t_5859ed3f["(finding) REV-S01-p3 product-truth N3 (orchestrator, package) — review"]:::done
+  t_978dfce7["(finding) REV-S01-p3 product-truth P1 (the seat, self-reported) — used"]:::done
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -158,6 +217,68 @@ flowchart LR
   t_7be7acf3 --> t_df524f91
   t_7be7acf3 --> t_660e86e5
   t_7be7acf3 --> t_8ea6c036
+  t_df524f91 --> t_6365fd82
+  t_df524f91 --> t_318c1522
+  t_df524f91 --> t_1c27e245
+  t_df524f91 --> t_3c762b9f
+  t_df524f91 --> t_75aa04a6
+  t_df524f91 --> t_89f72ff6
+  t_df524f91 --> t_f6b570a3
+  t_660e86e5 --> t_9a1c95b4
+  t_660e86e5 --> t_b79ef27e
+  t_660e86e5 --> t_2eded532
+  t_660e86e5 --> t_0d2518e7
+  t_660e86e5 --> t_b9bd6417
+  t_660e86e5 --> t_4786b961
+  t_660e86e5 --> t_77100e37
+  t_8ea6c036 --> t_1bf44393
+  t_8ea6c036 --> t_8f4927d4
+  t_8ea6c036 --> t_15c43eda
+  t_8ea6c036 --> t_7f4df45a
+  t_8ea6c036 --> t_48de05b6
+  t_8ea6c036 --> t_dcf9531e
+  t_8ea6c036 --> t_db4c7267
+  t_8ea6c036 --> t_95c01e3d
+  t_db4c7267 --> t_f8494fff
+  t_95c01e3d --> t_f8494fff
+  t_db4c7267 --> t_4fcba563
+  t_95c01e3d --> t_4fcba563
+  t_95c01e3d --> t_2e66b415
+  t_95c01e3d --> t_e74b5bf1
+  t_db4c7267 --> t_a7cb6dad
+  t_db4c7267 --> t_0b2afbff
+  t_db4c7267 --> t_83865b1b
+  t_f8494fff --> t_cd86bced
+  t_f8494fff --> t_16b00d0e
+  t_f8494fff --> t_6312c7ca
+  t_f8494fff --> t_759ceb20
+  t_f8494fff --> t_2288b5e7
+  t_f8494fff --> t_87a3aa3a
+  t_f8494fff --> t_468fd7a4
+  t_f8494fff --> t_4ea89dd7
+  t_f8494fff --> t_3ecd27f8
+  t_f8494fff --> t_dc7510a2
+  t_4fcba563 --> t_07ba5757
+  t_4fcba563 --> t_5675766d
+  t_4fcba563 --> t_b82271c7
+  t_4fcba563 --> t_e352a782
+  t_f8494fff --> t_62644380
+  t_4fcba563 --> t_62644380
+  t_62644380 --> t_479e4751
+  t_62644380 --> t_19085d3f
+  t_62644380 --> t_9b998d4e
+  t_62644380 --> t_552cb0b3
+  t_479e4751 --> t_94f82f12
+  t_479e4751 --> t_0d714096
+  t_479e4751 --> t_108a9322
+  t_479e4751 --> t_e976fd9b
+  t_479e4751 --> t_b152303d
+  t_479e4751 --> t_e268a842
+  t_19085d3f --> t_9740cdb4
+  t_19085d3f --> t_1d72bc63
+  t_19085d3f --> t_ec9ca195
+  t_19085d3f --> t_5859ed3f
+  t_19085d3f --> t_978dfce7
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
@@ -168,4 +289,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-10 03:40 from board `debate-tiers` — 132 nodes, 26 edges_
+_rendered 2026-09-10 07:22 from board `debate-tiers` — 191 nodes, 88 edges_
