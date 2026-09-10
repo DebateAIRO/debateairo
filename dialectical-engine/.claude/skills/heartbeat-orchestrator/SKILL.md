@@ -208,9 +208,10 @@ escalates to V after ONE failed workaround.
   modes, V's words quoted — no judgment of yours; the §3 measurements EXTRACTED from the artboards' declarations by a script — every declaration of every drawn class, never hand-picked: a hand transcription dropped `white-space: nowrap` on debate-tiers S01) and get V's yes. BUILD(S-*) is not READY before
   that yes; there is no proceed-by-default on a UI slice. Attach the graph:
   `scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md` also writes `mission-graph-nodes.mmd` (work
-  nodes, findings hidden) and `mission-graph-full.mmd` beside it — SEND both with SendUserFile (display:
-  render) in the gate message; a repo path in a message is not an attachment (V, 2026-09-10: "i cannot
-  see the flowchart").
+  nodes, findings hidden) and `mission-graph-full.mmd` beside it — then render them to PNG with `scripts/graph-png/`
+  (make-pages.py + serve.py; the harness's browser pane in a NEW tab renders and posts the PNGs back — headless
+  Chrome hangs here) and SEND the PNGs with SendUserFile (display: render) in the gate message; a repo path is
+  not an attachment and V cannot open `.mmd` (V, 2026-09-10: "i cannot see the flowchart" / "do a png").
 - **TEST(S)**: post the acceptance steps, the residue list and the one-line serve command; serve
   the lane only when V says so; the slice ticket closes only on V's veto. **WHOLE**: after every
   MERGE(S), post the integrated-suite result and the push command — V pushes. **V DECISIONS
