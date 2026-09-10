@@ -1,7 +1,7 @@
 # PACKET FIX-S01-p1-F1 — FIX(S01) (rework after REV pass 1) · mission `debate-tiers`
 
 Read FIRST, in full: this packet · then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/COMMON.md · then ONLY the files they name, at the lines they name — plus a named skill's own `references/*.md` when that skill sends you there, each listed in your `SKILLS LOADED` line. The spine (`docs/agent-protocols/…`) is the authority for a DISPUTE, not floor reading — open it only for a section a packet or a conflict names.
-Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:verification-before-completion` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
 
 ## 1. Node
 - seat: FIX-S01-p1-F1 · node: FIX(S01) (rework after REV pass 1) · pass: 1 of 3 · rework rounds: max 3 · model: gpt-5.6-sol · transport: codex exec (background, `-c sandbox_mode='"danger-full-access"'` inside the S01 lane only) (resume: `codex exec resume <your session id>` — quote the session id in your CLAIM comment)
