@@ -151,3 +151,12 @@ region-reader guard · the pre-existing 500 on asks over ~1 MB · the pass-1 sec
 Push · merge to the remote · mark a slice Done · re-ask a V gate V already answered · dispatch a seat
 without a packet-check · draw a conclusion from a running seat · touch another mission's files ·
 open anything on V's desktop.
+
+
+## 9. Resume tick — 2026-09-10 12:30 EEST (a fresh session took the seat; the state above still holds, with these corrections)
+
+- Main tree: `dev` @ `1acc38f8` (this file's own freeze `f7050555` and the pointer prompt `1acc38f8` sit past `481ea356`). Lanes unchanged: S01 `9ddbb1ef`, S02 `d2a58e9a`, both 0 dirty. No seat alive; the watchdog is down and nothing needs it.
+- V has not ruled on V-7 or V-20…V-26 as of this tick. TEST(S01) stays parked. Nothing on S02 is dispatchable (PLAN.md §2, row V-12).
+- Board hygiene: ten orchestrator-owned findings whose closing condition was already on disk are closed (ledger 12:20); 22 remain, all V's or waiting on the S02 C2/REV packets.
+- **Serve step correction (§4):** the S01 lane has no `.local/dev-auth/api.env`, and the API runner (`apps/runner/src/dev-api-process.ts:70,172`) resolves it from its cwd — `pnpm run dev:auth:api` cannot start from the lane as-is. The API is `tsx src/main.ts` (nothing to build). Row **V-27** (default binding): at "serve S01", symlink the lane's `.local` → the main tree's `.local` for V's test window only, start `dev:auth:api` from the lane on :8790 and `tiers-s01-ui` on :4010, remove the link before any seat runs in the lane. Finding `t_425ec2a9`. The same gap applies to the S02 lane at TEST(S02).
+- The `hermes kanban` CLI has no `in_progress` status; the running state is `running`. A zsh variable holding a multi-word command is ONE word — write board loops as a bash script file.
