@@ -95,7 +95,7 @@ Run it on every event (a seat's exit notification, a watchdog line, a V message)
 
 Forbidden: `osascript`, `open -a`, Terminal windows, browser windows, GUI apps, serving the Hermes
 dashboard unasked. The harness's browser pane is yours for verification. The launch law is
-unchanged: a short pointer prompt naming an ABSOLUTE packet path (big prompts stay off argv); the prompt's order is READ the ticket's comments, then CLAIM (the spine's comment-before-claim law), then the packet's steps;
+unchanged: a short pointer prompt naming an ABSOLUTE packet path (big prompts stay off argv) — it names "the paths the packet allows", never a count that the self-report line makes wrong; the prompt's order is READ the ticket's comments, then CLAIM (the spine's comment-before-claim law), then the packet's steps;
 launchers written fresh from a heredoc, read back and grepped for the values they must carry; the
 log appears within 2 minutes; per-seat log paths distinct; the watchdog armed AT launch; janitor
 between attempts — processes by PID, worktrees, untracked files, locks. A CLI whose stdout buffers
