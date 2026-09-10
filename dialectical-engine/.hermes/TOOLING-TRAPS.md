@@ -3035,3 +3035,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 
 ## A Codex seat measures a real browser with headless Chrome over CDP — no Playwright package is installed (2026-09-10, FIX-S01-p1-F2)
 - `node_modules` carries no `playwright`/`playwright-core`; a seat that needs a rendered DOM starts the installed Google Chrome headless (`--headless=new --remote-debugging-port=<free port>`) and drives it over CDP from a scratch script, logging to a file — never a headed window (heartbeat-protocol §3.9). The Claude lenses use the harness's in-app Browser pane instead.
+
+## A shell heredoc with lines over ~1,000 characters can split a multibyte character (2026-09-10)
+- A `python3 - <<'PY'` heredoc carrying 1,500-character lines with `→`/`·` died with "Non-UTF-8 code starting with '\xe2'" — the long line was cut mid-character before Python saw it. Write long generators to a file first, keep lines short (build long strings from a list), and `iconv -f utf-8 -t utf-8 file >/dev/null` before running.
