@@ -95,10 +95,16 @@ no focus ring). **Serve only when V says "serve S01"**: the launch entry `tiers-
    `slices/S01/DECISIONS.md` and the V-DECISIONS rows (append-only), and close `t_11abead2` ONLY on
    V's veto.
 2. **ONE post-veto FIX(S01)** — a Codex `gpt-5.6-sol` seat in the S01 lane, carrying whatever V ruled
-   on V-21 (the `tier_provenance_ref` expression at `apps/ui/app/new/defaults.tsx:74` plus the two
-   premium rows in `tests/unit/tier01-ask-wire.test.ts:63-68`), V-24 and V-25 (restore the four
-   `if (planTier === "free") return;` guards at `apps/ui/app/new/page.tsx:290,309,500,551` and the
-   three S01-29 assertions). One node, because the file surfaces overlap. RED before GREEN.
+   on V-21 (the `tier_provenance_ref` expression at `apps/ui/app/new/defaults.tsx:74`, verified there
+   at `9ddbb1ef`, plus the premium rows in `tests/unit/tier01-ask-wire.test.ts:57,66-72,84`), V-24 and
+   V-25. **V-25's real surface, measured 2026-09-10 15:40 at `9ddbb1ef` (the earlier "four identical
+   guards + the deleted S01-29 test" was wrong — finding `t_521a5d1a`):** FIVE guards in TWO shapes —
+   `if (planTier === "free") return;` at `apps/ui/app/new/page.tsx:290` and `:309` (the steering
+   textareas, inside `NewDebateForm`), and `if (!disabled) onChange(…)` in `SegmentedRow`, in
+   `SelectRow` (`:500`) and in `SliderRow` (`:551`), which guard on their `disabled` prop because a
+   child component never sees `planTier`. The S01-29 test was NOT deleted: it lives at
+   `tests/render/tier01-new-plan-tier.test.tsx:297` and needs scripted-`change` assertions ADDED, not
+   restored. One node, because the file surfaces overlap. RED before GREEN.
 3. **MERGE(S01)** — local merge of `slice/tiers-s01` into `dev`, then the INTEGRATED suite on `dev`.
    A cross-slice defect there is a FIX on the owning slice plus a scoped REV pass against that
    slice's cap. Never push.
