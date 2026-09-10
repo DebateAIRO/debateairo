@@ -1,7 +1,7 @@
 # PACKET __SEAT__ — FIX(__SLICE__) (rework after REV pass __PASS__) · mission `__MISSION__`
 
 Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus a named skill's own `references/*.md` when that skill sends you there, each listed in your `SKILLS LOADED` line. The spine (`docs/agent-protocols/…`) is the authority for a DISPUTE, not floor reading — open it only for a section a packet or a conflict names.
-Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:verification-before-completion` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
 
 ## 1. Node
 - seat: __SEAT__ · node: FIX(__SLICE__) (rework after REV pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
