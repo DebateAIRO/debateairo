@@ -237,3 +237,11 @@ the round trip is one line in DONE.md.
 
 - **Rows V-20 · V-21 · V-22** (security lens N1–N3; full `V-ROW: NEW` text in `reviews/REV-S01-p1-security-data-safety.md` §6): server-side Free enforcement (S02's, by a SPEC-v3 amendment before S02-C2) · the Premium `tier_provenance_ref` (a FIX(S01) after V's ruling at TEST(S01), before MERGE) · merge order (no push of S01 before S02 lands). Recommended defaults bind until V rules; V sees them at TEST(S01).
 - **Residue candidates for TEST(S01)** (correctness lens N1–N4, all non-blocking): the style contract pins token names, not values (`t_6365fd82`) · `#maxTokens` 800 vs the DOM's 768 under step 128 (`t_318c1522` — DONE.md M10 says 800; the product-truth lens measures it) · the `modelIdentity` adapter vs `modelMeta` (`t_1c27e245`) · two more unguarded region readers (`t_3c762b9f`, the `t_1e4fccc1` class). Their WHEN is a FIX(S01) N-sweep after V's ruling at TEST(S01), unless the union says REWORK.
+
+
+## REV(S01) pass 1 union folds — 2026-09-10 04:24 EEST (orchestrator)
+
+- **Union = REWORK** (`reviews/REV-S01-p1-UNION.md`): PASS + PASS + REWORK on product-truth B1. Every finding is assigned: FIX(S01) F1 (page surface) ∥ F2 (stylesheet surface) on Codex Sol in the S01 lane at `f6c147cc`; REV(S01) pass 2 = two scoped lenses (correctness/tests carrying the security probes; product-truth).
+- **B1's value (ruling):** DONE.md M10's `800` is V's oracle and stands as drawn; the `#maxTokens` control must HOLD what the page prints and its assertion must bite outside jsdom — the mechanism (the step grid, the readout) is the FIX seat's. The control's `min/max/step` and the `800` state predate S01; S01's oracle and test surfaced the defect, and S01 owns the surface. Cost if wrong: a one-line step change.
+- **Security N2 vs product-truth (ruling):** the two lenses disagree on ONE finding (a Premium ask's `tier_provenance_ref: machine:plan-tier-free` — deliberate under frozen R7, or a durable falsehood); the disagreement is exactly row V-21's question, so no re-check node: V rules at TEST(S01); a SPEC-v3 + FIX follow a yes.
+- **Row V-23** (product N2): default = nothing changes; the honesty notice keeps the promise true enough until the V3 contract carries the five knobs.

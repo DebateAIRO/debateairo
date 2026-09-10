@@ -126,6 +126,7 @@ unless named; the close-ups carry the same element without the page.
   hexes are identical in both modes). Order: Free = `gpt-5.6-luna`, `claude-sonnet-5`; Premium =
   `gpt-5.6-sol`, `claude-opus-5`, `grok-4.6`. The ids come from `PLAN_TIER_ROSTERS` (SPEC R3/R11),
   never from a literal in the page.
+- **M7 · correction (2026-09-10, orchestrator — a transcription omission found by REV(S01) p1 product-truth N1):** every model-id span on the 14 artboards carries `white-space: nowrap` (5 per page artboard, 15 per close-up); an id never breaks mid-token. Source: the artboards in `design/S01/`. `S01-44` gains one assertion for it.
 - **M8 · the lock.** `opacity: 0.45; cursor: not-allowed` on each locked control and nothing else —
   no glyph, no colour change, no border change. Locked while Free is chosen: the six pills of Risk
   tier and Composition budget tier, the Tree depth slider, both steering boxes (nine on the

@@ -79,3 +79,8 @@
 - correctness/tests (`t_df524f91`, `reviews/REV-S01-p1-correctness-tests.md`): every cluster command three times at `f6c147cc` (CLUSTER_GREEN ×4 each run), six mutants, DONE.md §3 measured in a real browser in both modes, SPEC §2 steps 7–12 pass. Non-blocking N1–N4 open for the union (t_6365fd82 t_318c1522 t_1c27e245 t_3c762b9f); N5/N6/R1 (packet/package) fixed at the class in `45294264`.
 - security/data-safety (`t_660e86e5`, `reviews/REV-S01-p1-security-data-safety.md`): 12/12 cluster re-runs green, two mutants RED, five refutation attempts failed (36 malformed tier shapes → 400), wire free/premium 202, M1–M8 in both modes. N1–N3 (t_9a1c95b4 t_b79ef27e t_2eded532) become rows V-20…V-22 (defaults binding until V rules at TEST(S01)); P1–P3 fixed in `45294264`; T4 (t_77100e37) pre-existing.
 - Waiting: the product-truth lens `t_8ea6c036` (running; its stub :8850 and UI :8851 up). Then the union → `reviews/REV-S01-p1-UNION.md`.
+
+## 2026-09-10 04:23 EEST — REV(S01) pass 1 = REWORK (union of three lenses); FIX(S01) F1 ∥ F2 dispatching (orchestrator entry)
+
+- product-truth (`t_8ea6c036`, `reviews/REV-S01-p1-product-truth.md`): REWORK on B1 — `#maxTokens` prints 800 but holds 768 (step 128; 4000 unreachable), its only assertion green solely in jsdom; N1 `.ndTierModel` lacks `white-space: nowrap` (DONE.md M7 corrected); N2 → row V-23; N3 keyboard reach of the lock explanation. Everything else exact in both modes; steps 1–12 pass twice.
+- Union `reviews/REV-S01-p1-UNION.md`: every finding assigned — F1 (page.tsx + render suite: B1, product N3, correctness N3) ∥ F2 (globals.css S01 block + style contract: product N1, correctness N1/N4); V rows V-20…V-23; T4 repo residue. Then REV(S01) pass 2 (two scoped lenses).
