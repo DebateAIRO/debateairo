@@ -19,19 +19,43 @@ classes(){
   echo '  classDef todo fill:#efe9e0,stroke:#6E675C'
   echo '  classDef scheduled fill:#efe9e0,stroke:#6E675C'
   echo '  classDef triage fill:#efe9e0,stroke:#6E675C'
+  echo '  classDef slice fill:#d6e4f5,stroke:#2F5D9E,stroke-width:2px'   # blue: the ticket that CLOSES a vertical slice (V's veto)
 }
 body(){  # the flowchart lines without the header
   sqlite3 -separator '|' "$U" "SELECT t.id, t.status, replace(replace(replace(replace(t.title,'\"',''),'|','/'),'[','('),']',')') FROM tasks t WHERE t.status != 'archived' ORDER BY t.created_at;" \
-    | while IFS='|' read -r id st title; do t="${title[1,70]}"; case "$title" in '(finding)'*) printf '  %s(["%s"]):::%s\n' "$id" "$t" "$st";; *) printf '  %s["%s"]:::%s\n' "$id" "$t" "$st";; esac; done
+    | while IFS='|' read -r id st title; do t="${title[1,70]}"; case "$title" in '(finding)'*) printf '  %s(["%s"]):::%s\n' "$id" "$t" "$st";; '(V) S'[0-9]*) printf '  %s[["%s"]]:::slice\n' "$id" "$t";; *) printf '  %s["%s"]:::%s\n' "$id" "$t" "$st";; esac; done
   sqlite3 -separator '|' "$U" "SELECT l.parent_id, l.child_id FROM task_links l JOIN tasks t ON t.id=l.child_id WHERE t.status != 'archived';" \
     | awk -F'|' '{ printf "  %s --> %s\n", $1, $2 }'
   classes
 }
-nodes_only(){  # work nodes: drop every "(finding)" ticket and the edges that touch one
-  awk '
-    /^  t_[0-9a-f]+[\[(]/ { id=$1; sub(/[\[(].*/,"",id); lab=$0; sub(/^[^"]*"/,"",lab); if (lab ~ /^\(finding\)/) next; keep[id]=1; print; next }
-    /^  t_[0-9a-f]+ --> t_[0-9a-f]+$/ { if (keep[$1] && keep[$3]) print; next }
-    { print }'
+nodes_only(){  # work nodes: drop every "(finding)" ticket; each slice's leaf nodes get a dotted "veto" edge to the slice ticket
+  python3 -c '
+import sys,re
+lines=sys.stdin.read().splitlines(); nodes={}; edges=[]; other=[]
+for l in lines:
+    m=re.match(r"  (t_[0-9a-f]+)(\[\[|\(\[|\[)\"(.*)\"(\]\]|\]\)|\])(:::\w+)$", l)
+    if m: nodes[m.group(1)]=(m.group(3),l); continue
+    m=re.match(r"  (t_[0-9a-f]+) --> (t_[0-9a-f]+)$", l)
+    if m: edges.append((m.group(1),m.group(2))); continue
+    other.append(l)
+keep={k:v for k,v in nodes.items() if not v[0].startswith("(finding)")}
+for k,(t,l) in keep.items(): print(l)
+kept=[(a,b) for a,b in edges if a in keep and b in keep]
+for a,b in kept: print(f"  {a} --> {b}")
+slices={k:re.match(r"\(V\) (S\d+)",t).group(1) for k,(t,l) in keep.items() if re.match(r"\(V\) S\d+ ",t)}
+parents={a for a,b in kept}
+depth={}
+def d(k):
+    if k in depth: return depth[k]
+    ps=[a for a,b in kept if b==k]; depth[k]=0 if not ps else 1+max(d(a) for a in ps); return depth[k]
+for sid,sname in slices.items():
+    leaves=[k for k,(t,l) in keep.items() if k not in slices and k not in parents and re.search(r"\b"+sname+r"\b|\b"+sname+r"-", t)]
+    if not leaves: continue
+    dm=max(d(k) for k in leaves)   # the slice ends at its DEEPEST leaves (the last pass), not at every dead end
+    for k in leaves:
+        if d(k)==dm: print(f"  {k} -. veto .-> {sid}")
+for l in other: print(l)
+'
 }
 render(){ echo '```mermaid'; echo 'flowchart LR'; body; echo '```'; echo; echo "_rendered $(date '+%Y-%m-%d %H:%M') from board \`$B\` — $(sqlite3 "$U" "SELECT count(*) FROM tasks WHERE status != 'archived';") nodes, $(sqlite3 "$U" "SELECT count(*) FROM task_links;") edges_"; }
 if [ -n "$OUT" ]; then
