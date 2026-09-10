@@ -109,3 +109,7 @@
 ## 2026-09-10 07:10 EEST — REV(S01) pass 3, correctness/tests consumed: REWORK at the cap → row V-25 (orchestrator entry; product-truth pending)
 
 - The six pass-2 findings are verified fixed; the FIX also removed the page's handler guards and the S01-29 assertions (B1 `t_94f82f12`). Pass 4 does not exist: row V-25 carries it to V with the default that TEST(S01) proceeds and the guards return in a post-veto FIX. Waiting: product-truth `t_19085d3f`.
+
+## 2026-09-10 07:22 EEST — REV(S01) pass 3 UNION: REWORK at the cap → TEST(S01) surfaced to V (orchestrator entry)
+
+- Product-truth `t_19085d3f` REWORK on the provenance literal (V-21 raised); the lock confirmed in the real DOM, both modes. Correctness `t_479e4751` REWORK on the deleted guards (V-25). Both lenses: 12/12 CLUSTER_GREEN at `9ddbb1ef`; the six pass-2 findings verified and closed. Rows V-24/V-25/V-26 + V-21's escalation go to V in one message with the TEST(S01) steps, the residue and the serve command. Nothing pushed; the lane is 0 dirty at `9ddbb1ef`.
