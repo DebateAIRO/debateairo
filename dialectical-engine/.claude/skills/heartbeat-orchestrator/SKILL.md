@@ -198,7 +198,7 @@ escalates to V after ONE failed workaround.
   you read back with the Artifact tool) or hand back a Claude Design export under `ui_designs/`.
   Then extract the final artboards verbatim into `docs/missions/<m>/design/<S>/`, write
   `slices/<S>/DONE.md` (per screen and state: the artboard reference, numbered browser steps in both
-  modes, V's words quoted — no judgment of yours) and get V's yes. BUILD(S-*) is not READY before
+  modes, V's words quoted — no judgment of yours; the §3 measurements EXTRACTED from the artboards' declarations by a script — every declaration of every drawn class, never hand-picked: a hand transcription dropped `white-space: nowrap` on debate-tiers S01) and get V's yes. BUILD(S-*) is not READY before
   that yes; there is no proceed-by-default on a UI slice. Attach the graph
   (`scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md`).
 - **TEST(S)**: post the acceptance steps, the residue list and the one-line serve command; serve
