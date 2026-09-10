@@ -22,21 +22,21 @@ classes(){
 }
 body(){  # the flowchart lines without the header
   sqlite3 -separator '|' "$U" "SELECT t.id, t.status, replace(replace(replace(replace(t.title,'\"',''),'|','/'),'[','('),']',')') FROM tasks t WHERE t.status != 'archived' ORDER BY t.created_at;" \
-    | while IFS='|' read -r id st title; do t="${title[1,70]}"; printf '  %s["%s"]:::%s\n' "$id" "$t" "$st"; done
+    | while IFS='|' read -r id st title; do t="${title[1,70]}"; case "$title" in '(finding)'*) printf '  %s(["%s"]):::%s\n' "$id" "$t" "$st";; *) printf '  %s["%s"]:::%s\n' "$id" "$t" "$st";; esac; done
   sqlite3 -separator '|' "$U" "SELECT l.parent_id, l.child_id FROM task_links l JOIN tasks t ON t.id=l.child_id WHERE t.status != 'archived';" \
     | awk -F'|' '{ printf "  %s --> %s\n", $1, $2 }'
   classes
 }
 nodes_only(){  # work nodes: drop every "(finding)" ticket and the edges that touch one
   awk '
-    /^  t_[0-9a-f]+\["/ { id=$1; sub(/\[.*/,"",id); lab=$0; sub(/^[^"]*"/,"",lab); if (lab ~ /^\(finding\)/) next; keep[id]=1; print; next }
+    /^  t_[0-9a-f]+[\[(]/ { id=$1; sub(/[\[(].*/,"",id); lab=$0; sub(/^[^"]*"/,"",lab); if (lab ~ /^\(finding\)/) next; keep[id]=1; print; next }
     /^  t_[0-9a-f]+ --> t_[0-9a-f]+$/ { if (keep[$1] && keep[$3]) print; next }
     { print }'
 }
 render(){ echo '```mermaid'; echo 'flowchart LR'; body; echo '```'; echo; echo "_rendered $(date '+%Y-%m-%d %H:%M') from board \`$B\` — $(sqlite3 "$U" "SELECT count(*) FROM tasks WHERE status != 'archived';") nodes, $(sqlite3 "$U" "SELECT count(*) FROM task_links;") edges_"; }
 if [ -n "$OUT" ]; then
   render > "$OUT"; D="${OUT:h}"
-  { echo 'flowchart LR'; body; } > "$D/mission-graph-full.mmd"
+  { echo 'flowchart LR'; body; } > "$D/mission-graph-full.mmd"   # LR: findings fan out downwards under their node
   { echo 'flowchart TB'; body | nodes_only; } > "$D/mission-graph-nodes.mmd"
   echo "wrote $OUT + $D/mission-graph-nodes.mmd ($(grep -c '^  t_[0-9a-f]*\[' "$D/mission-graph-nodes.mmd") work nodes) + $D/mission-graph-full.mmd"
 else render; fi

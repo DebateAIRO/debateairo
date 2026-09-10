@@ -24,7 +24,22 @@ const src = {mm!r};
     document.getElementById('g').innerHTML = svg;
     const s=document.querySelector('#g svg'); const r=s.getBoundingClientRect(); const W=Math.ceil(r.width), H=Math.ceil(r.height);
     s.setAttribute('width',W); s.setAttribute('height',H); s.setAttribute('xmlns','http://www.w3.org/2000/svg');
-    let xml=new XMLSerializer().serializeToString(s); xml=xml.replace(/@import[^;]*;/g,'').replace(/<foreignObject[\\s\\S]*?<\\/foreignObject>/g,'');
+    // mermaid draws labels as HTML in foreignObjects, which taint a canvas: turn each into wrapped SVG text
+    s.querySelectorAll('foreignObject').forEach(fo => {{
+      const x=+fo.getAttribute('x')||0, y=+fo.getAttribute('y')||0, w=+fo.getAttribute('width')||0, h=+fo.getAttribute('height')||0;
+      const txt=fo.textContent.replace(/\\s+/g,' ').trim();
+      let fs=13, lh=16, maxc=Math.max(8, Math.floor((w-10)/(fs*0.55)));
+      const wrap=(t,m)=>{{ const out=[]; let cur=''; for (const wd of t.split(' ')) {{ if ((cur+' '+wd).trim().length>m && cur) {{ out.push(cur); cur=wd; }} else cur=(cur+' '+wd).trim(); }} if (cur) out.push(cur); return out; }};
+      let lines=wrap(txt,maxc);
+      if (lines.length*lh > h-4) {{ fs=11; lh=13; maxc=Math.max(8, Math.floor((w-8)/(fs*0.55))); lines=wrap(txt,maxc); }}
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', x + w/2); t.setAttribute('text-anchor','middle'); t.setAttribute('font-size', fs+'px');
+      t.setAttribute('font-family','-apple-system, Helvetica, Arial, sans-serif'); t.setAttribute('fill','#29261f');
+      const y0 = y + h/2 - ((lines.length-1)*lh)/2 + fs*0.35;
+      lines.forEach((ln,i) => {{ const ts=document.createElementNS('http://www.w3.org/2000/svg','tspan'); ts.setAttribute('x', x + w/2); ts.setAttribute('y', y0 + i*lh); ts.textContent=ln; t.appendChild(ts); }});
+      fo.replaceWith(t);
+    }});
+    let xml=new XMLSerializer().serializeToString(s); xml=xml.replace(/@import[^;]*;/g,'');
     await fetch('http://127.0.0.1:{PORT}/mission-graph-{name}.svg',{{method:'POST',body:xml}});
     const sc = Math.max(W,H) > 6000 ? 1 : 2;
     const img=new Image(); const url=URL.createObjectURL(new Blob([xml],{{type:'image/svg+xml;charset=utf-8'}}));
