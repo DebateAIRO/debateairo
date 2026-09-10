@@ -3032,3 +3032,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 
 ## Kill by port or PID, never `pkill -f` a filename every seat shares (2026-09-10, REV(S01) p1)
 - Three parallel lenses followed one dev-stack recipe and each ran a `stub-api.mjs`; one lens's teardown `pkill -f "stub-api.mjs"` could kill the others' stubs (the security lens's server vanished at 04:07 while it was still working). Name per-seat files `<seat>-stub-api.mjs`, record the PID at launch, kill that PID; `lsof -nP -iTCP:<port> -sTCP:LISTEN` proves a port is yours before any kill.
+
+## A Codex seat measures a real browser with headless Chrome over CDP — no Playwright package is installed (2026-09-10, FIX-S01-p1-F2)
+- `node_modules` carries no `playwright`/`playwright-core`; a seat that needs a rendered DOM starts the installed Google Chrome headless (`--headless=new --remote-debugging-port=<free port>`) and drives it over CDP from a scratch script, logging to a file — never a headed window (heartbeat-protocol §3.9). The Claude lenses use the harness's in-app Browser pane instead.
