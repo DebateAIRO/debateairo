@@ -40,6 +40,19 @@ async function settle(): Promise<void> {
 describe("S01 /new plan tier", () => {
   let root: Root | null = null;
 
+  // DONE.md §3 / S01-44 map — M-line → assertion(s) → suite:
+  // M1 → S01-20, S01-22 → render/tier01-new-plan-tier.
+  // M4 → S01-25 → render/tier01-new-plan-tier.
+  // M5 → S01-25 → render/tier01-new-plan-tier.
+  // M6 → S01-25 → render/tier01-new-plan-tier.
+  // M7 → S01-25, S01-26 → render/tier01-new-plan-tier.
+  // M8 → S01-27–S01-30, S01-33, S01-36 → render/tier01-new-plan-tier.
+  // M9 → S01-23, S01-34, S01-35 → render/tier01-new-plan-tier.
+  // M10 → S01-23, S01-34, S01-35 → render/tier01-new-plan-tier.
+  // M11 → M11 below, S01-38 → render/tier01-new-plan-tier.
+  // M12 → S01-30 → render/tier01-new-plan-tier (plus style M12).
+  // M14 → S01-31–S01-33, S01-37 → render/tier01-new-plan-tier (plus style S01-40).
+
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
@@ -245,7 +258,7 @@ describe("S01 /new plan tier", () => {
     expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 
-  it("S01-30 R5 keeps the OPTIONS toggle operable in Free", async () => {
+  it("S01-30 R5 / M12 keeps the OPTIONS toggle and notice operable in Free", async () => {
     await renderPage();
 
     const toggle = document.querySelector<HTMLButtonElement>('.ndOptionsToggle')!;
@@ -254,6 +267,9 @@ describe("S01 /new plan tier", () => {
     await click('.ndOptionsToggle');
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(document.querySelector('#additionalRunOptions')).not.toBeNull();
+    expect(document.querySelector('.ndLegacyNotice')?.textContent?.replace(/\s+/g, " ").trim()).toBe(
+      "Depth mode, depth of scrutiny, branching width, concurrency, and max tokens are V2 controls the V3 run contract has no slot for — they are not sent."
+    );
   });
 
   it("S01-31 R16 inspects a non-empty submit region for retired V2 fields", () => {
@@ -413,6 +429,16 @@ describe("S01 /new plan tier", () => {
     expect(start.hasAttribute("disabled")).toBe(false);
     await click('#planTier-premium');
     expect(start.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("M11 · Start run stays disabled for an empty question in both tier states", async () => {
+    await renderPage();
+
+    const start = document.querySelector<HTMLButtonElement>('.ndStart')!;
+    const disabledWhileFree = start.disabled;
+    await click('#planTier-premium');
+
+    expect([disabledWhileFree, start.disabled]).toEqual([true, true]);
   });
 
   it("S01-39 R20-C sends the chosen plan tier in the ask config", async () => {
