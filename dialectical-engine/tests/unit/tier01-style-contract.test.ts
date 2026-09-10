@@ -161,6 +161,7 @@ describe("S01-C4 debate tier stylesheet contract", () => {
 
     // PROPERTY S01-42b: all four Free-locked control families share only the ratified dim-and-cursor treatment.
     expect(declarations(lockSelector)).toBe("opacity: 0.45; cursor: not-allowed;");
+    expect(declarations(".ndSelect select:disabled")).toBe("cursor: not-allowed;");
   });
 
   test("M2 · the chosen option's colour tokens match the measured values in both modes", () => {

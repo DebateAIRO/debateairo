@@ -6268,6 +6268,7 @@ a:focus-visible {
   opacity: 0.45;
   cursor: not-allowed;
 }
+.ndSelect select:disabled { cursor: not-allowed; }
 /* === end debate-tiers S01 === */
 
 @media (prefers-reduced-motion: reduce) {

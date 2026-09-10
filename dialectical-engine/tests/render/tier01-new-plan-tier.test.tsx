@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 
 const mocks = vi.hoisted(() => ({
   createDebate: vi.fn(),
@@ -193,15 +194,15 @@ describe("S01 /new plan tier", () => {
 
     const freeModels = [...document.querySelectorAll<HTMLElement>('#planTier-free .ndTierModel')];
     const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
-    expect(freeModels.map((model) => model.textContent?.trim())).toEqual([
-      "gpt-5.6-luna",
-      "claude-sonnet-5"
-    ]);
-    expect(premiumModels.map((model) => model.textContent?.trim())).toEqual([
-      "gpt-5.6-sol",
-      "claude-opus-5",
-      "grok-4.6"
-    ]);
+    const expectedRosters = {
+      free: ["gpt-5.6-luna", "claude-sonnet-5"],
+      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]
+    };
+    expect(PLAN_TIER_ROSTERS).toEqual(expectedRosters);
+    expect({
+      free: freeModels.map((model) => model.textContent?.trim()),
+      premium: premiumModels.map((model) => model.textContent?.trim())
+    }).toEqual(expectedRosters);
     expect([...freeModels, ...premiumModels].map((model) =>
       model.querySelector<HTMLElement>('.modelDot')?.style.getPropertyValue("--dot")
     )).toEqual([
@@ -213,12 +214,12 @@ describe("S01 /new plan tier", () => {
     ]);
   });
 
-  it("uses shared model metadata for every roster id shape", async () => {
+  it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
     vi.resetModules();
     vi.doMock("@debateai/contract", () => ({
       PLAN_TIER_ROSTERS: {
-        free: ["openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
-        premium: ["claude_opus", "grok/4.6", "gemini-3"]
+        free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
+        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6", "claude_opus", "grok/4.6", "gemini-3"]
       }
     }));
     try {
@@ -229,8 +230,13 @@ describe("S01 /new plan tier", () => {
         dot.style.getPropertyValue("--dot")
       )).toEqual([
         "var(--m-gpt)",
+        "var(--m-claude)",
         "var(--m-gpt)",
         "var(--m-gpt)",
+        "var(--m-gpt)",
+        "var(--m-gpt)",
+        "var(--m-claude)",
+        "var(--m-grok)",
         "var(--m-claude)",
         "var(--m-grok)",
         "var(--m-gemini)"
@@ -262,45 +268,51 @@ describe("S01 /new plan tier", () => {
       "maxTokens"
     ];
     const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
-    expect(locked.filter((control) => control.getAttribute("aria-disabled") === "true")).toHaveLength(14);
-    expect(locked.filter((control) => control.hasAttribute("disabled"))).toEqual([]);
+    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(14);
+    expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
     expect(locked.map((control) => {
       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
       return [visualLock.style.opacity, visualLock.style.cursor];
-    })).toEqual(Array.from({ length: 14 }, () => ["0.45", "not-allowed"]));
+    })).toEqual(Array.from({ length: 14 }, () => ["", ""]));
   });
 
-  it("S01-28 R4 keeps every Free lock reachable and described", async () => {
+  it("S01-28 R4 forwards the Free lock to every native control family and keeps its description", async () => {
     await renderPage();
     await click('.ndOptionsToggle');
 
     const locked = [...document.querySelectorAll<HTMLElement>(
-      '.ndSegItem[aria-disabled="true"],.ndSlider[aria-disabled="true"],.ndSteerInput[aria-disabled="true"],.ndSelect select[aria-disabled="true"]'
+      '.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled'
     )];
     expect([
-      document.querySelectorAll('.ndSegItem[aria-disabled="true"]').length,
-      document.querySelectorAll('.ndSlider[aria-disabled="true"]').length,
-      document.querySelectorAll('.ndSteerInput[aria-disabled="true"]').length,
-      document.querySelectorAll('.ndSelect select[aria-disabled="true"]').length
+      document.querySelectorAll('.ndSegItem:disabled').length,
+      document.querySelectorAll('.ndSlider:disabled').length,
+      document.querySelectorAll('.ndSteerInput:disabled').length,
+      document.querySelectorAll('.ndSelect select:disabled').length
     ]).toEqual([6, 4, 2, 2]);
-    expect(locked.every((control) => control.tabIndex >= 0)).toBe(true);
+    expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
     expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
     expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
   });
 
-  it("S01-29 R4 enforces the Free lock before submit", async () => {
+  it("S01-29 R4 rejects focus and activation at the native Free lock", async () => {
     await renderPage();
+    await click('.ndOptionsToggle');
 
     await click('#riskTier-high-stakes');
     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("false");
-    await inputValue('#treeDepth', "4");
-    await inputValue('#steeringPresets', "Prefer primary sources");
-    await click('.ndOptionsToggle');
-    await selectValue('#depthMode', "adaptive");
-    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
-    expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("fixed");
+    const lockedIds = [
+      "riskTier-casual", "riskTier-standard", "riskTier-high-stakes",
+      "budgetTier-low", "budgetTier-medium", "budgetTier-high",
+      "treeDepth", "steeringPresets", "steeringAnnotations",
+      "depthMode", "scrutinyDepth", "branchingWidth", "concurrency", "maxTokens"
+    ];
+    const focusAccepted = lockedIds.filter((id) => {
+      const control = document.querySelector<HTMLElement>(`#${id}`)!;
+      control.focus();
+      return document.activeElement === control;
+    });
+    expect(focusAccepted).toEqual([]);
     expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 
@@ -389,12 +401,22 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("standard");
     expect(document.querySelector<HTMLInputElement>('#branchingWidth')?.value).toBe("2");
     expect(document.querySelector<HTMLInputElement>('#concurrency')?.value).toBe("3");
-    const maxTokens = document.querySelector<HTMLInputElement>('#maxTokens')!;
-    expect(maxTokens.value).toBe("800");
-    expect((Number(maxTokens.value) - Number(maxTokens.min)) % Number(maxTokens.step)).toBe(0);
-    expect((Number(maxTokens.max) - Number(maxTokens.min)) % Number(maxTokens.step)).toBe(0);
+    const sliderGrid = ["treeDepth", "branchingWidth", "concurrency", "maxTokens"].map((id) => {
+      const slider = document.querySelector<HTMLInputElement>(`#${id}`)!;
+      return { id, min: slider.min, max: slider.max, step: slider.step, value: slider.value };
+    });
+    expect(sliderGrid).toEqual([
+      { id: "treeDepth", min: "1", max: "5", step: "1", value: "2" },
+      { id: "branchingWidth", min: "1", max: "4", step: "1", value: "2" },
+      { id: "concurrency", min: "1", max: "6", step: "1", value: "3" },
+      { id: "maxTokens", min: "128", max: "4000", step: "32", value: "800" }
+    ]);
+    expect(sliderGrid.every(({ min, max, step, value }) =>
+      (Number(value) - Number(min)) % Number(step) === 0 &&
+      (Number(max) - Number(min)) % Number(step) === 0
+    )).toBe(true);
     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
-    expect(document.querySelectorAll('.ndSegItem[aria-disabled="true"],.ndSlider[aria-disabled="true"],.ndSteerInput[aria-disabled="true"],.ndSelect select[aria-disabled="true"]')).toHaveLength(14);
+    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(14);
   });
 
   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {

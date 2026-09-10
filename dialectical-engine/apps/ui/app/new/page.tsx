@@ -43,7 +43,6 @@ const PLAN_TIER_OPTIONS = [
   { value: "free", name: "Free", promise: "Every gauge fixed. The question is yours." },
   { value: "premium", name: "Premium", promise: "Every gauge yours to set." }
 ] as const;
-const FREE_LOCK_STYLE = { opacity: 0.45, cursor: "not-allowed" } satisfies CSSProperties;
 
 type PlanTier = (typeof PLAN_TIER_OPTIONS)[number]["value"];
 
@@ -286,11 +285,9 @@ function NewDebateForm({ token }: { token: string }) {
                   ref={grow}
                   rows={2}
                   value={steeringPresets}
-                  aria-disabled={planTier === "free"}
+                  disabled={planTier === "free"}
                   aria-describedby="steeringPresets-hint"
-                  style={planTier === "free" ? FREE_LOCK_STYLE : undefined}
                   onChange={(event) => {
-                    if (planTier === "free") return;
                     setSteeringPresets(event.target.value);
                     grow(event.currentTarget);
                   }}
@@ -307,11 +304,9 @@ function NewDebateForm({ token }: { token: string }) {
                   ref={grow}
                   rows={2}
                   value={steeringAnnotations}
-                  aria-disabled={planTier === "free"}
+                  disabled={planTier === "free"}
                   aria-describedby="steeringAnnotations-hint"
-                  style={planTier === "free" ? FREE_LOCK_STYLE : undefined}
                   onChange={(event) => {
-                    if (planTier === "free") return;
                     setSteeringAnnotations(event.target.value);
                     grow(event.currentTarget);
                   }}
@@ -458,13 +453,10 @@ function SegmentedRow({
             data-field={field}
             data-value={option.value}
             aria-checked={value === option.value}
-            aria-disabled={disabled}
             aria-describedby={`${field}-hint`}
             className="ndSegItem"
-            style={disabled ? FREE_LOCK_STYLE : undefined}
-            onClick={() => {
-              if (!disabled) onChange(option.value);
-            }}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
           >
             {option.label}
           </button>
@@ -497,17 +489,15 @@ function SelectRow({
         <label className="ndLabel" htmlFor={id}>{label}</label>
         <div className="ndHint" id={`${id}-hint`}>{hint}</div>
       </div>
-      <span className="ndSelect" style={disabled ? FREE_LOCK_STYLE : undefined}>
+      <span className="ndSelect">
         <span aria-hidden>{options.find((option) => option.value === value)?.label ?? value}</span>
         <span className="ndSelectCaret" aria-hidden>▼</span>
         <select
           id={id}
           value={value}
-          aria-disabled={disabled}
+          disabled={disabled}
           aria-describedby={`${id}-hint`}
-          onChange={(event) => {
-            if (!disabled) onChange(event.target.value);
-          }}
+          onChange={(event) => onChange(event.target.value)}
           aria-label={label}
         >
           {options.map((option) => (
@@ -556,13 +546,11 @@ function SliderRow({
           max={max}
           step={step}
           value={value}
-          aria-disabled={disabled}
+          disabled={disabled}
           aria-describedby={`${id}-hint`}
-          onChange={(event) => {
-            if (!disabled) onChange(Number(event.target.value));
-          }}
+          onChange={(event) => onChange(Number(event.target.value))}
           aria-label={label}
-          style={{ "--nd-pct": `${pct}%`, ...(disabled ? FREE_LOCK_STYLE : {}) } as CSSProperties}
+          style={{ "--nd-pct": `${pct}%` } as CSSProperties}
         />
       </span>
       <span className="ndValue">{value}</span>
