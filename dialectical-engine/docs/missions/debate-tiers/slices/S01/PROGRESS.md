@@ -88,3 +88,8 @@
 ## 2026-09-10 05:06 EEST — FIX(S01) F2 consumed: READY at `f9b40d0f` (orchestrator entry; F1 still running)
 
 - `globals.css` `.ndTierModel` gains `white-space: nowrap` (product N1); the style contract pins the measured Terracotta/Chamber values for M2–M7 (correctness N1) and its region readers throw on a missing region (correctness N4). Three runs CLUSTER_GREEN; orchestrator re-run of S01-C4 CLUSTER_GREEN. SKILLS 6/7: the seat loaded the lane's stale `.codex/skills` protocol copy — an orchestrator skew, fixed in `79fb2183` (copies synced; COMMON §1 now says cite only the `.claude` path).
+
+## 2026-09-10 05:22 EEST — FIX(S01) F1 consumed READY at `53b903d2`; REV(S01) pass 2 dispatching (orchestrator entry)
+
+- F1: `modelMeta(modelId).dot` replaces the local adapter; `#maxTokens` step 32; every lock is `aria-disabled` + `aria-describedby` + an inline lock style (the stylesheet's `:disabled` rules are now unreached — the seam my file-surface split created, F21_P2, class fixed in `ce7677ba`, named as pass 2's first probe). Orchestrator re-run of all four cluster commands at `53b903d2`: CLUSTER_GREEN ×4 with pairs restated (render 22/0, style 8/0).
+- REV(S01) pass 2, scoped (`review-packages/S01-p2/README.md`): correctness/tests `t_f8494fff` (+ the security probes) and product-truth `t_4fcba563`, blind, in the lens worktrees moved to `53b903d2`. Pass 3 would be the last before V.
