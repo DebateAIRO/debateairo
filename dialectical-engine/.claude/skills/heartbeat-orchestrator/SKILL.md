@@ -91,7 +91,7 @@ Run it on every event (a seat's exit notification, a watchdog line, a V message)
 | Codex | `codex exec -c model='"gpt-5.6-sol"' … "<pointer>" </dev/null > <log> 2>&1`, background | `codex exec resume <id>` | per-seat log |
 | Grok | `~/.grok/bin/grok -p "<pointer>" -m <model> --permission-mode bypassPermissions --cwd <lane> > <log> 2>&1`, background | `grok --resume <id>` | per-seat log + session jsonl |
 | watchdog | the harness's Monitor, or a background `until`/`while` loop writing `logs/watchdog.status` — its change signature covers the SEATS' transcripts, worktrees and scratch dirs (`logs/watchdog.paths`, one glob per line, re-read every minute), not only the mission tree: a seat working outside the tree is not stagnation | — | `logs/watchdog.status` |
-| dev server for V | a `.claude/launch.json` entry, started only when V says "serve <S>" | — | preview logs |
+| dev server for V | the product's FULL stage list from the lane (panel, env, API, RUNNER, UI, TLS — read the product's own stack CLI for the list; a missing stage means asks are accepted and never executed), each long-lived stage a DETACHED process under a restart loop with a PID file, started only when V says "serve <S>"; never a harness preview server (the app stops it when the session idles) and never a bare dev server (a Next dev server OOMs after ~2 h of polling) | — | `logs/serve-*.log` + `logs/serve-*-supervisor.log` |
 
 Forbidden: `osascript`, `open -a`, Terminal windows, browser windows, GUI apps, serving the Hermes
 dashboard unasked. The harness's browser pane is yours for verification. The launch law is

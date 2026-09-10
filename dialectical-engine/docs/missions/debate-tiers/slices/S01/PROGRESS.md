@@ -142,3 +142,7 @@
 
 - The UI stage behind the front door had died (:3000 = 502); restarted from the lane on :3001 through the product's own UI runner. https://localhost:3000/new serves the S01 lane at `9ddbb1ef` again.
 - Trial merge into `dev`: clean, 18 files, and the merged code is byte-identical to the lane head, because `dev` has no code change since the lane base. TEST(S01) still waits on V; S02 is unchanged (C1 only).
+
+## 2026-09-10 23:16 EEST — "no workie": the serve lacked the runner stage; fixed, V's 18:24 debate now executing (orchestrator entry)
+
+- The UI behind the front door had died twice (OOM; preview server stopped by the app) and no runner process existed to execute accepted asks. All long-lived stages now run detached under supervisors; the runner stage runs from the lane. Findings `t_425a0357` (product: the runner's own readiness gate) and `t_efe7c2e3` (mine). S01's code untouched.
