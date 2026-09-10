@@ -10,20 +10,28 @@ const compactCss = css.replace(/\s+/g, " ").trim();
 
 function declarationsIn(source: string, selector: string): string {
   const start = source.indexOf(`${selector} {`);
-  if (start === -1) return "";
+  if (start === -1) throw new Error(`Missing CSS selector region: ${selector}`);
   const bodyStart = start + selector.length + 2;
-  return source.slice(bodyStart, source.indexOf("}", bodyStart)).trim();
+  const end = source.indexOf("}", bodyStart);
+  if (end === -1) throw new Error(`Unclosed CSS selector region: ${selector}`);
+  const body = source.slice(bodyStart, end).trim();
+  if (!body) throw new Error(`Empty CSS selector region: ${selector}`);
+  return body;
 }
 
 const terracottaTokens = declarationsIn(compactCss, ":root");
 const chamberTokens = declarationsIn(compactCss, 'html[data-mode="chamber"]');
 
-function modeTokenPresence(tokens: string[]): Record<string, [boolean, boolean]> {
+function modeTokenValues(tokens: string[]): Record<string, [string, string]> {
   const terracottaDeclarations = terracottaTokens.replace(/\/\*[\s\S]*?\*\//g, " ");
   const chamberDeclarations = chamberTokens.replace(/\/\*[\s\S]*?\*\//g, " ");
+  const valueOf = (declarations: string, token: string) => {
+    const value = declarations.match(new RegExp(`(?:^|;)\\s*${token}\\s*:\\s*([^;]+)`))?.[1]?.trim();
+    if (!value) throw new Error(`Missing CSS token declaration: ${token}`);
+    return value;
+  };
   return Object.fromEntries(tokens.map((token) => {
-    const declaration = new RegExp(`(?:^|;)\\s*${token}\\s*:`);
-    return [token, [declaration.test(terracottaDeclarations), declaration.test(chamberDeclarations)]];
+    return [token, [valueOf(terracottaDeclarations, token), valueOf(chamberDeclarations, token)]];
   }));
 }
 
@@ -72,9 +80,13 @@ describe("S01-C4 debate tier stylesheet contract", () => {
     const compactBlock = block.replace(/\s+/g, " ").trim();
     const declarations = (selector: string) => {
       const start = compactBlock.indexOf(`${selector} {`);
-      if (start === -1) return "";
+      if (start === -1) throw new Error(`Missing S01 CSS selector region: ${selector}`);
       const bodyStart = start + selector.length + 2;
-      return compactBlock.slice(bodyStart, compactBlock.indexOf("}", bodyStart)).trim();
+      const end = compactBlock.indexOf("}", bodyStart);
+      if (end === -1) throw new Error(`Unclosed S01 CSS selector region: ${selector}`);
+      const body = compactBlock.slice(bodyStart, end).trim();
+      if (!body) throw new Error(`Empty S01 CSS selector region: ${selector}`);
+      return body;
     };
     const carries = (selector: string, values: string[]) => {
       const body = declarations(selector);
@@ -131,6 +143,7 @@ describe("S01-C4 debate tier stylesheet contract", () => {
         "font-size: 10.5px;",
         "font-weight: 500;",
         "color: var(--text-3);",
+        "white-space: nowrap;",
       ]),
     }).toEqual({
       group: true,
@@ -150,41 +163,41 @@ describe("S01-C4 debate tier stylesheet contract", () => {
     expect(declarations(lockSelector)).toBe("opacity: 0.45; cursor: not-allowed;");
   });
 
-  test("M2 · the chosen option's colour tokens are declared in both modes", () => {
-    expect(modeTokenPresence(["--line-strong", "--shell"])).toEqual({
-      "--line-strong": [true, true],
-      "--shell": [true, true],
+  test("M2 · the chosen option's colour tokens match the measured values in both modes", () => {
+    expect(modeTokenValues(["--line-strong", "--shell"])).toEqual({
+      "--line-strong": ["rgba(41,38,31,.20)", "rgba(242,234,217,.18)"],
+      "--shell": ["#EFE9E0", "#221D17"],
     });
   });
 
-  test("M3 · the unchosen option's colour tokens are declared in both modes", () => {
-    expect(modeTokenPresence(["--line", "--core"])).toEqual({
-      "--line": [true, true],
-      "--core": [true, true],
+  test("M3 · the unchosen option's colour tokens match the measured values in both modes", () => {
+    expect(modeTokenValues(["--line", "--core"])).toEqual({
+      "--line": ["rgba(41,38,31,.10)", "rgba(242,234,217,.09)"],
+      "--core": ["#FDFBF6", "#181410"],
     });
   });
 
-  test("M4 · the chosen tier-name tokens are declared in both modes", () => {
-    expect(modeTokenPresence(["--ink", "--bg"])).toEqual({
-      "--ink": [true, true],
-      "--bg": [true, true],
+  test("M4 · the chosen tier-name tokens match the measured values in both modes", () => {
+    expect(modeTokenValues(["--ink", "--bg"])).toEqual({
+      "--ink": ["#29261F", "#F2EAD9"],
+      "--bg": ["#F9F6F1", "#14110E"],
     });
   });
 
-  test("M5 · the unchosen tier-name token is declared in both modes", () => {
-    expect(modeTokenPresence(["--muted"])).toEqual({ "--muted": [true, true] });
+  test("M5 · the unchosen tier-name token matches the measured values in both modes", () => {
+    expect(modeTokenValues(["--muted"])).toEqual({ "--muted": ["#6E675C", "#9C907A"] });
   });
 
-  test("M6 · the promise token is declared in both modes", () => {
-    expect(modeTokenPresence(["--text-2"])).toEqual({ "--text-2": [true, true] });
+  test("M6 · the promise token matches the measured values in both modes", () => {
+    expect(modeTokenValues(["--text-2"])).toEqual({ "--text-2": ["#555147", "#B5A88F"] });
   });
 
-  test("M7 · the model-id colour tokens are declared in both modes", () => {
-    expect(modeTokenPresence(["--text-3", "--m-gpt", "--m-claude", "--m-grok"])).toEqual({
-      "--text-3": [true, true],
-      "--m-gpt": [true, true],
-      "--m-claude": [true, true],
-      "--m-grok": [true, true],
+  test("M7 · the model-id colour tokens match the measured values in both modes", () => {
+    expect(modeTokenValues(["--text-3", "--m-gpt", "--m-claude", "--m-grok"])).toEqual({
+      "--text-3": ["#6E675C", "#9C907A"],
+      "--m-gpt": ["#B4552D", "#B4552D"],
+      "--m-claude": ["#8A63C9", "#8A63C9"],
+      "--m-grok": ["#5F6670", "#5F6670"],
     });
   });
 

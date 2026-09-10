@@ -6259,6 +6259,7 @@ a:focus-visible {
   font-size: 10.5px;
   font-weight: 500;
   color: var(--text-3);
+  white-space: nowrap;
 }
 .ndSegItem:disabled,
 .ndSlider:disabled,
