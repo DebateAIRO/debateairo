@@ -84,3 +84,7 @@
 
 - product-truth (`t_8ea6c036`, `reviews/REV-S01-p1-product-truth.md`): REWORK on B1 — `#maxTokens` prints 800 but holds 768 (step 128; 4000 unreachable), its only assertion green solely in jsdom; N1 `.ndTierModel` lacks `white-space: nowrap` (DONE.md M7 corrected); N2 → row V-23; N3 keyboard reach of the lock explanation. Everything else exact in both modes; steps 1–12 pass twice.
 - Union `reviews/REV-S01-p1-UNION.md`: every finding assigned — F1 (page.tsx + render suite: B1, product N3, correctness N3) ∥ F2 (globals.css S01 block + style contract: product N1, correctness N1/N4); V rows V-20…V-23; T4 repo residue. Then REV(S01) pass 2 (two scoped lenses).
+
+## 2026-09-10 05:06 EEST — FIX(S01) F2 consumed: READY at `f9b40d0f` (orchestrator entry; F1 still running)
+
+- `globals.css` `.ndTierModel` gains `white-space: nowrap` (product N1); the style contract pins the measured Terracotta/Chamber values for M2–M7 (correctness N1) and its region readers throw on a missing region (correctness N4). Three runs CLUSTER_GREEN; orchestrator re-run of S01-C4 CLUSTER_GREEN. SKILLS 6/7: the seat loaded the lane's stale `.codex/skills` protocol copy — an orchestrator skew, fixed in `79fb2183` (copies synced; COMMON §1 now says cite only the `.claude` path).
