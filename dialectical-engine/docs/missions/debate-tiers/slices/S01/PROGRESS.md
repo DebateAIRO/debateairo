@@ -105,3 +105,7 @@
 ## 2026-09-10 06:43 EEST — FIX(S01) pass 2 consumed: READY at `9ddbb1ef` (orchestrator entry)
 
 - Native `disabled` is the one lock mechanism again across page, stylesheet and contract (row V-24's default); the select overlay's cursor is fixed; the suites pin the four control families, the four slider grids and the five real roster ids. Orchestrator re-run of all four clusters at `9ddbb1ef`: CLUSTER_GREEN CLUSTER_GREEN CLUSTER_GREEN CLUSTER_GREEN . Next: REV(S01) pass 3 — the last — `t_479e4751` (correctness/tests + all probes) and `t_19085d3f` (product-truth, the real DOM in both modes, step 6 above all).
+
+## 2026-09-10 07:10 EEST — REV(S01) pass 3, correctness/tests consumed: REWORK at the cap → row V-25 (orchestrator entry; product-truth pending)
+
+- The six pass-2 findings are verified fixed; the FIX also removed the page's handler guards and the S01-29 assertions (B1 `t_94f82f12`). Pass 4 does not exist: row V-25 carries it to V with the default that TEST(S01) proceeds and the guards return in a post-veto FIX. Waiting: product-truth `t_19085d3f`.

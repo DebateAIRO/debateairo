@@ -259,3 +259,10 @@ the round trip is one line in DONE.md.
 - **Union = REWORK** (`reviews/REV-S01-p2-UNION.md`): both lenses blocked on the same cause — F1's `aria-disabled` remedy. FIX(S01) pass 2 is ONE node under row V-24's default: the ratified native `disabled` on every locked control, the stylesheet's `:disabled` selectors as the only paint, the inline `FREE_LOCK_STYLE` withdrawn; F1's other remedies (`modelMeta` dots, `#maxTokens` step 32) stay; the hint ids and `aria-describedby` may stay only where they change no mechanism.
 - **Product-p2 N1** (pre-existing, `globals.css:6160` `cursor: pointer` on the invisible select overlay) is fixed in the same node — M8's cursor reaches the pointer on the two dropdowns too.
 - **Residue for TEST(S01):** product-p2 N2 (hints), correctness-p2 N4 (recorded), security T4; rows V-20…V-24.
+
+
+## REV(S01) pass 3 folds — 2026-09-10 07:10 EEST (orchestrator; the correctness lens consumed, product-truth pending)
+
+- **Row V-25 (belt and braces; S01 at the cap):** FIX pass 2 removed the handler guards and the S01-29 assertions together with the `aria-disabled` remedy it was told to withdraw; V-24 settled the lock MECHANISM, not the guard. Default: TEST(S01) proceeds with B1 `t_94f82f12` as ticketed residue; the four guards and three assertions return in a FIX under V's authority after the veto, before MERGE(S01). Pass 4 does not exist.
+- **Record correction:** the FIX-S01-p2 consume relayed the seat's "activation state unchanged" as if verified; corrected on `t_62644380`; orchestrator §9 now quotes claims as claims (`27e24e24`).
+- **Housekeeping on a slice branch:** the `.codex` mirror sync `16252e46` re-billed the pass-3 reviewers ~25k tokens of churn (PD1/PD2); the package diff now excludes housekeeping paths and no such commit lands on a slice branch again (`27e24e24`).
