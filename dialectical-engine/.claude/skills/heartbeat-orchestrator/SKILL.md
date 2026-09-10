@@ -231,5 +231,8 @@ every gate. Close sub-tickets as verdicts are consumed — a board that only gro
 ## 10. Version discipline
 
 Fail closed on skew: a rule newer than the installed skill or the spine is not dispatched — amend
-the spine in the same commit. A seat charged with a rule it cannot discover from the repo is your
+the spine in the same commit. The `.codex/skills/<name>/SKILL.md` copies a Codex seat auto-loads from its
+working tree are byte-identical to `.claude/skills/<name>/SKILL.md` — `scripts/sync-codex-skills.sh` at every
+protocol commit, and a lane that predates a sync gets the pointer "cite only the `.claude` path" until it is
+rebased (a tracked pre-v4.0.0 copy was loaded by FIX-S01-p1-F2 and `skills-check.sh` caught it by phrase). A seat charged with a rule it cannot discover from the repo is your
 defect.
