@@ -101,7 +101,7 @@ flowchart LR
   t_085d4fa4["(gpt-5.6-sol) BUILD S01-C2 — the ask wire: the builder's tier + proven"]:::done
   t_d1dc1913["(gpt-5.6-sol) BUILD S01-C3 — the page: the selector, the fourteen lock"]:::done
   t_cd5642d0["(gpt-5.6-sol) BUILD S01-C4 — the stylesheet: the selector's rules + th"]:::done
-  t_6e2413b7["(gpt-5.6-sol) BUILD S01-C5 — the DONE.md measurements: one assertion p"]:::ready
+  t_6e2413b7["(gpt-5.6-sol) BUILD S01-C5 — the DONE.md measurements: one assertion p"]:::done
   t_a02cca8b["(finding) BUILD-S02-C1 F1 (plan) — PLAN.md:267 case 2's UPDATE probe: "]:::done
   t_1a083e6e["(finding) BUILD-S02-C1 F2 (packet, orchestrator) — verbatim-frame char"]:::done
   t_2e1b3dc2["(finding) BUILD-S02-C1 F3 (plan) — S02-C1-S4 (PLAN.md:318-321, the Dri"]:::done
@@ -124,6 +124,14 @@ flowchart LR
   t_336f8159["(finding) BUILD-S01-C3 F1 (packet defect, orchestrator) — BASELINE.md "]:::done
   t_9e50c4dd["(finding) BUILD-S01-C3 F2 (packet defect, orchestrator) — charge 3 sai"]:::done
   t_05ce40c7["(finding) BUILD-S01-C3 F3 (packet, orchestrator) — the packet demanded"]:::done
+  t_53805be6["(finding) BUILD-S01-C5 F1 (packet, orchestrator) — 'never a product ed"]:::done
+  t_a043c943["(finding) BUILD-S01-C5 F2 (packet defect, orchestrator) — 'the last co"]:::done
+  t_844ba282["(finding) BUILD-S01-C5 F3 (packet defect, orchestrator) — the self-rep"]:::done
+  t_9bec090b["(finding) BUILD-S01-C5 F4 (packet, orchestrator) — the runner's raw-lo"]:::done
+  t_7be7acf3["(orchestrator) GATE S01 — assemble review-packages/S01-p1 (mechanical:"]:::ready
+  t_df524f91["(claude-opus-5) REV S01 p1 — lens correctness/tests (blind, own detach"]:::todo
+  t_660e86e5["(claude-opus-5) REV S01 p1 — lens security/data-safety (blind, own det"]:::todo
+  t_8ea6c036["(claude-opus-5) REV S01 p1 — lens product-truth (blind, own detached w"]:::todo
   t_cb9482de --> t_e95f08a5
   t_e95f08a5 --> t_a4a6ea69
   t_a4a6ea69 --> t_485d6613
@@ -146,6 +154,10 @@ flowchart LR
   t_085d4fa4 --> t_cd5642d0
   t_d1dc1913 --> t_6e2413b7
   t_cd5642d0 --> t_6e2413b7
+  t_6e2413b7 --> t_7be7acf3
+  t_7be7acf3 --> t_df524f91
+  t_7be7acf3 --> t_660e86e5
+  t_7be7acf3 --> t_8ea6c036
   classDef done fill:#dfe9df,stroke:#3E7A4E
   classDef running fill:#f3ece0,stroke:#A8823E
   classDef ready fill:#fdfbf6,stroke:#6E675C
@@ -156,4 +168,4 @@ flowchart LR
   classDef triage fill:#efe9e0,stroke:#6E675C
 ```
 
-_rendered 2026-09-10 02:45 from board `debate-tiers` — 124 nodes, 22 edges_
+_rendered 2026-09-10 03:40 from board `debate-tiers` — 132 nodes, 26 edges_

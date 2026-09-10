@@ -62,3 +62,14 @@
 
 - Commit `e57624a8`: the selector (`.ndTier` radiogroup with `aria-label="Plan tier"`, two `role="radio"` buttons `#planTier-free` / `#planTier-premium`, the pill, the promise, the roster ids with `.modelDot`), the Free defaults (Standard / Low / 2 / empty), the fourteen `disabled` attributes, the Premium unlock, the R8 re-pin with no remembered state, the three Free-state lines (DONE.md M9), `planTier` into `buildNewDebateAskConfig`; `tests/render/tier01-new-plan-tier.test.tsx` 20/20; `v2ui-pages.test.ts:83` uses `region()` (36|5 unchanged). Three runs CLUSTER_GREEN; orchestrator re-run CLUSTER_GREEN.
 - Findings F1–F3 (packet) ticketed; F2's product consequence (a local `modelIdentity` adapter in `page.tsx` beside `modelMeta`) goes to REV(S01) as a probe. Next: BUILD(S01-C5) `t_6e2413b7` — one assertion per DONE.md M-line in the two new suites, C3/C4 commands re-run with pairs restated — then GATE(S01) → REV(S01).
+
+## 2026-09-10 03:29 EEST — BUILD(S01-C5) consumed: READY (orchestrator entry) — every S01 cluster is green
+
+- Commit `f6c147cc`: `tests/render/tier01-new-plan-tier.test.tsx` (21 cases) and `tests/unit/tier01-style-contract.test.ts` (8 cases) — one assertion per `DONE.md` M-line, the S01-44 matrix is in the READY comment on `t_6e2413b7`; no product file changed. Orchestrator re-run at `f6c147cc`: CLUSTER_GREEN ×2 (`logs/verify-S01-C5.log`).
+- The whole slice vs base `7f89f7b7`: 18 files, +1101/−10, five commits `7658e997 → b866191f → 5e3e4bcf → e57624a8 → f6c147cc`.
+- Findings F16_F1–F4 (packet/generator classes) ticketed and fixed in the protocol (the `fix(protocol)` commit is cited in LEDGER). Next: GATE(S01) — `review-packages/S01-p1/` assembled mechanically, then REV(S01) pass 1 on Opus 5 in three blind lenses (correctness/tests · security/data-safety · product-truth: `risk_tier` medium + `ui: yes`), each in its own detached worktree at `f6c147cc`. Carried to REV as probes: the `modelIdentity` adapter in `page.tsx` beside `modelMeta`, the F11_F4 residue (`t_1e4fccc1`). V-7 (fleet config) stays V's before TEST(S02).
+
+## 2026-09-10 03:40 EEST — GATE(S01) closed: review package S01-p1 assembled; REV(S01) pass 1 dispatching (orchestrator entry)
+
+- Re-verification at `f6c147cc`: every cluster `CLUSTER_GREEN` with C5's pairs restated (`review-packages/S01-p1/reverify-f6c147cc.log`). Package index: `.hermes/reports/debate-tiers/review-packages/S01-p1/README.md`.
+- Three blind lenses on Opus 5 (correctness/tests `t_df524f91` · security/data-safety `t_660e86e5` · product-truth `t_8ea6c036`), each in `.worktrees/rev-s01-p1-<lens>` at `f6c147cc`. Next: union → `reviews/REV-S01-p1-UNION.md`; PASS → TEST(S01) on `t_11abead2`; REWORK → FIX(S01) nodes split by file surface.
