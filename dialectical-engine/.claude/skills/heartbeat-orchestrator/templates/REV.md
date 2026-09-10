@@ -12,7 +12,7 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/reviews/REV-__SLICE__-p__PASS__-__LENS__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/probes/ (new, promoted probes only — runnable from ANY worktree: the root from `$WORKTREE` or argv, never hard-coded; logs and evidence text sit beside them, not as probes) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- allowed (exhaustive): __MISSION_ROOT__/reviews/REV-__SLICE__-p__PASS__-__LENS__.md (new) · probes under __SCRATCH__ (new) · __REPORTS__/probes/ (new, promoted probes only — runnable from ANY worktree: the root from `$WORKTREE` or argv, never hard-coded; logs and evidence text sit beside them, not as probes; a promoted vitest config's `include` matches the promoted SEAT-named files) · a temporary fixture under `tests/` in YOUR worktree, deleted before your handoff (never committed; the worktree ends byte-clean) · __REPORTS__/agent-reports/__SEAT__.md (new)
 - forbidden: everything else — in particular any change to the slice's files that outlives your session (a temporary mutant in YOUR worktree, restored before you hand off, is the refutation duty, not a write), every other lens's output, git writes of any kind
 - verification: your OWN fixtures for the whole slice, both modes on UI · every cluster command re-run by you · one mount of every surface this slice shares with another slice or with the app shell · on UI: rendered DOM with the real compiled CSS measured against the oracle's artboards (geometry, colour, both modes) — a scoped pass's README may narrow this line per lens, and wins where it narrows
 

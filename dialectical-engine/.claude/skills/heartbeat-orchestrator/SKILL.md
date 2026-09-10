@@ -166,7 +166,11 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares) and
   records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
   Re-verify every quoted commit
-  and count at assembly time.
+  and count at assembly time. The package diff is the PRODUCT range only — housekeeping paths
+  (`.codex/skills` mirrors, launchers) excluded with `git diff <a>..<b> -- . ':!.codex/skills'` — and the
+  README states the FIX commits' own stat. No housekeeping commit lands on a slice branch (a mirror
+  sync on `slice/tiers-s01` sat in every later review range and re-billed each reviewer ~25k tokens);
+  the pointer carries the `.claude` path instead.
 - Lenses by `risk_tier`, in parallel, each a blind background seat in its own detached worktree at
   the slice head: low → correctness/tests · medium → + security/data-safety · high → + product-truth.
   **A UI slice always carries product-truth**: rendered DOM with the real compiled CSS, measured
@@ -222,7 +226,9 @@ Each freeze commit goes into COMMON §6 (`freeze commits` row); every review pac
 A freeze commit EXCLUDES the paths a RUNNING seat may write (its packet's `allowed` list, as `:!` pathspecs)
 — a mid-run sweep records a half-written file under another node's name.
 Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
-how SKILLS LOADED was verified, self-report path, verdict — and a `Ruling:` line for every decision
+how SKILLS LOADED was verified, self-report path, verdict — a seat's verification claims quoted AS
+CLAIMS ("the handoff claims …"), only what you measured (disk, board, your own re-run) stated as fact
+(a consume comment once repeated a false "activation state unchanged") — and a `Ruling:` line for every decision
 you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
 a replacement re-elected or the waiver recorded. A phase report at each V gate, a closure report
 before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board at
