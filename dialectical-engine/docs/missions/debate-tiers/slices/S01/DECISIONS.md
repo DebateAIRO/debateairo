@@ -252,3 +252,10 @@ the round trip is one line in DONE.md.
 - **Row V-24 (the lock mechanism):** FIX F1 reversed the ratified row of 2026-09-09 ("How is a locked gauge locked? — the native `disabled` attribute", this file line 12) and the class-vocabulary ruling ("no page-side hook needed", line 217) without a decision row, to give the lock explanation keyboard reach (pass-1 product N3). Default binding: the ratified mechanism stands; page, stylesheet and contract converge on native `disabled` in FIX(S01) pass 2; V weighs keyboard reach against SPEC-v2 §2 step 6 in row V-24. The lens recommended the opposite; recorded.
 - **FIX(S01) pass 2 will be ONE node** (`heartbeat-orchestrator` §6 as amended in `ce7677ba`): the finding surface spans `page.tsx`, `globals.css`, the render suite and the style contract, so no split.
 - **The `.codex` mirrors in the S01 lane** are synced to v4.0.0 by the orchestrator's commit `16252e46` on `slice/tiers-s01` (REV-S01-p2 N6) — a Codex seat auto-loads them from the lane; the dev-side sync is `79fb2183`.
+
+
+## REV(S01) pass 2 union folds — 2026-09-10 05:57 EEST (orchestrator)
+
+- **Union = REWORK** (`reviews/REV-S01-p2-UNION.md`): both lenses blocked on the same cause — F1's `aria-disabled` remedy. FIX(S01) pass 2 is ONE node under row V-24's default: the ratified native `disabled` on every locked control, the stylesheet's `:disabled` selectors as the only paint, the inline `FREE_LOCK_STYLE` withdrawn; F1's other remedies (`modelMeta` dots, `#maxTokens` step 32) stay; the hint ids and `aria-describedby` may stay only where they change no mechanism.
+- **Product-p2 N1** (pre-existing, `globals.css:6160` `cursor: pointer` on the invisible select overlay) is fixed in the same node — M8's cursor reaches the pointer on the two dropdowns too.
+- **Residue for TEST(S01):** product-p2 N2 (hints), correctness-p2 N4 (recorded), security T4; rows V-20…V-24.

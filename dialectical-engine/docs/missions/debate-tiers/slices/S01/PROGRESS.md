@@ -97,3 +97,7 @@
 ## 2026-09-10 05:50 EEST — REV(S01) pass 2, correctness/tests consumed: REWORK (orchestrator entry; product-truth pending)
 
 - B1: after F1 the style contract pins `:disabled` rules nothing matches; three lock mechanisms across page, stylesheet and contract; the ratified DECISIONS rows were reversed by a FIX → row V-24 (default: the ratified native `disabled` stands; convergence in FIX pass 2, ONE node). N1–N4 test-strength findings for the same node; N5/N6/PD1–PD3 mine, fixed (`f55f771c`, COMMON:3, lane commit `16252e46`).
+
+## 2026-09-10 05:57 EEST — REV(S01) pass 2 = REWORK (union); FIX(S01) pass 2 dispatching as one node (orchestrator entry)
+
+- product-truth B1: under Free the two ⚙ OPTIONS dropdowns are live `<select>`s (a trusted click focuses one; SPEC-v2 §2 step 6 fails); correctness B1: three lock mechanisms, the contract pins dead CSS. One cause — F1's `aria-disabled`. FIX(S01) pass 2 `t_62644380` (Codex Sol, the S01 lane at `16252e46`) converges page, stylesheet and contract on the ratified native `disabled` (row V-24's default) and takes correctness N1–N3 and product N1 with it. Then REV(S01) pass 3 — the last — `t_479e4751` + `t_19085d3f`.
