@@ -98,3 +98,10 @@
 - At 88496931: C1 `27 passed (27)` · C2 `55 passed (55)` · C3 `3 failed | 6 passed (9)` (s14, pre-existing) · C4 `42 passed (42)`; the pre-0061 probe `76 passed (76)`, 0 hits; the fourth pair `2 failed | 70 passed (72)` (both pre-existing).
 - `t_ca11cffb` ADDRESSED (closes on REV p2). New: `t_d1df96d4` (packet defect, orchestrator), `t_35e0669f` (promoted-probe marker defect, the correctness lens's).
 - F2 (admission/API tests) dispatched at 88496931 — the last FIX node of pass 1; then the S02-p2 package and REV pass 2.
+
+## 2026-09-12 13:08 EEST — FIX(S02) p1 F2 DONE at 88f8a01f (the admission/API test surface) — pass 1's FIX nodes complete
+
+- `apps/api/src/index.ts` +9: the tier lookup is a fixed-key own-property projection; an out-of-vocabulary tier answers `AskRefusal/ASK_PLAN_TIER_INVALID` (new code; REV p2 judges it). `tests/unit/tiers-s02-admission.test.ts` +72 (9→12 cases: B1 members (a)–(d) pin the message; R8 distinguishes the tier refusal from any early throw; invalid-tier cases). `tests/integration/evaluator-database.test.ts` +11 (the raw panel is captured before filtering, so the isolation differential can fail). `tests/unit/tiers-s02-wire.test.ts` +13 (the guard walks all TS production under `apps/` and `packages/`).
+- At 88f8a01f (seat's three runs): C1 27/27 · C2 58/58 · C4 42/42; the correctness slice-probe 6/7 (its pre-fix TypeError observation inverted — expected).
+- Findings `t_cc661b9e`, `t_ca46998d`, `t_c38a3fdd`, `t_d86b98ce`, `t_51aa7ae5` ADDRESSED (close on REV p2). Packet defect `t_287da7fe` (orchestrator; restore rule) — template amended.
+- Next: the orchestrator's re-verification + every promoted probe at 88f8a01f → package `S02-p2` → REV(S02) pass 2 (correctness/tests + product-truth, Opus 5).

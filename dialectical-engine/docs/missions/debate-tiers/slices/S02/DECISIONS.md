@@ -262,3 +262,9 @@ here.`
 - **The tier write is capability-selected per writer, never unconditional** (`t_ca11cffb`): a pre-0061 table or a pre-0061 `core.create_encrypted_run` gets the C1-free write; a current schema records the tier (R11/R12 hold). SPEC-v2 never required an unconditional write; PLAN S02-C1's "add the column to the INSERT" reading is superseded. Deploy ordering (migration after code) is thereby safe.
 - **A promoted probe's green marker is the conjunction of its header's expected frame** (`t_35e0669f`): rc, file count, case count and hit count together — a detector on one of them can print green over a RED table. The p2 packages quote the summary lines, never a probe's own marker.
 - **A packet names every mutant's target path and whether it lies inside the seat's surface** (`t_d1df96d4`); an out-of-surface target is still a legal TEMPORARY mutant under the FIX template's §3 rule (restored byte-equal, never staged).
+
+## Orchestrator folds after FIX(S02) p1 F2 READY (2026-09-12 13:08)
+
+- **An out-of-vocabulary tier at the exported admission boundary is a TYPED refusal, code `ASK_PLAN_TIER_INVALID`, on the 422 face** (the seat's choice under SPEC-v2's silence; the strict route's 400 still precedes it). REV p2 (product-truth) rules whether the code and its message serve R6/R15 or must fold into the existing code; if V wants one code only, that is a V row.
+- **The restore proof (third amendment):** byte-equality with the saved copy + the mutated path's `git status --porcelain -- <path>` line identical before and after (`t_287da7fe`). Template `FIX.md` §3.
+- **The promoted correctness slice-probe's 7th case encodes the pre-fix TypeError** — at any fixed head it reads 6/7 by construction; the p2 package states the measured outcome and the p2 correctness lens re-promotes or retires the case.
