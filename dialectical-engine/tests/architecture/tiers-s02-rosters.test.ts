@@ -56,6 +56,34 @@ function sourceFilesContaining(needle: string): string[] {
   ).sort();
 }
 
+function sourceOccurrencesContaining(needle: string): Readonly<Record<string, number>> {
+  return Object.fromEntries(SOURCE_ROOTS.flatMap((sourceRoot) =>
+    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
+      const source = readFileSync(absolutePath, "utf8");
+      const count = source.split(needle).length - 1;
+      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
+      return count === 0 ? [] : [[projectPath, count] as const];
+    })
+  ).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function rosterSelectors(source: string): readonly string[] {
+  const selectors = ["PLAN_TIER_ROSTERS"];
+  const localRosterBinding = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;]+)?=\s*PLAN_TIER_ROSTERS\s*(?:\.|\[)/g;
+  for (const match of source.matchAll(localRosterBinding)) selectors.push(match[1]!);
+  return [...new Set(selectors)];
+}
+
+function selectsRoster(source: string, selectors: readonly string[]): boolean {
+  return selectors.some((selector) => new RegExp(
+    `(?:^|[^A-Za-z0-9_$])${escapeRegExp(selector)}(?:$|[^A-Za-z0-9_$])`
+  ).test(source));
+}
+
 function closingDelimiter(
   source: string,
   openingIndex: number,
@@ -135,6 +163,7 @@ function tierBranchLines(): string[] {
       if (projectPath === "packages/contract/src/plan-tiers.ts") return [];
 
       const source = readFileSync(absolutePath, "utf8");
+      const selectors = rosterSelectors(source);
       const hits: string[] = [];
       const location = (index: number) =>
         `${projectPath}:${source.slice(0, index).split("\n").length}`;
@@ -153,15 +182,15 @@ function tierBranchLines(): string[] {
             selectedBody += branchBody(source, afterConsequent + 4).body;
           }
         }
-        const selectsRoster = /\bPLAN_TIER_ROSTERS\b/.test(selectedBody);
+        const branchSelectsRoster = selectsRoster(selectedBody, selectors);
         const selectsTierCase = match[1] !== "switch" ||
           /\bcase\s+(?:"(?:free|premium)"|'(?:free|premium)')\s*:/.test(selectedBody);
-        if (selectsRoster && selectsTierCase) hits.push(location(match.index));
+        if (branchSelectsRoster && selectsTierCase) hits.push(location(match.index));
       }
 
-      const tierTernary = /\b(?:plan_tier|planTier)\b[^;?]*\?[^;]*\bPLAN_TIER_ROSTERS\b[^;]*;/gs;
+      const tierTernary = /\b(?:plan_tier|planTier)\b[^;?]*\?[^;]*;/gs;
       for (const match of source.matchAll(tierTernary)) {
-        hits.push(location(match.index));
+        if (selectsRoster(match[0], selectors)) hits.push(location(match.index));
       }
       return [...new Set(hits)];
     })
@@ -198,6 +227,9 @@ describe("S02 tier roster architecture", () => {
 
     for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {
       expect(sourceFilesContaining(modelId), modelId).toEqual(expectedPaths);
+      expect(sourceOccurrencesContaining(modelId), modelId).toEqual(Object.fromEntries(
+        expectedPaths.map((expectedPath) => [expectedPath, 1])
+      ));
     }
   });
 

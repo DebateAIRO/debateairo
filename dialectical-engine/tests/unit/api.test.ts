@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   AskRefusal,
   buildApi as buildApiBase,
@@ -15,6 +15,7 @@ import {
   type Session
 } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
+import { configureContentEncryption, RunRepository } from "@debateai/db";
 import {
   RETIRED_DEV_HEADER,
   TEST_APP_ORIGIN,
@@ -303,6 +304,76 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       body: { error: "MALFORMED_REQUEST" }
     });
     await api.close();
+  });
+
+  it("warns when a pre-0061 encrypted writer strips the run plan tier", async () => {
+    const dataPool = {
+      query: async () => {
+        throw new Error("UNEXPECTED_DATA_POOL_QUERY");
+      }
+    };
+    const provisionPool = {
+      query: async (statement: string) => {
+        if (statement.includes("prepare_run_key_provision")) {
+          return { rows: [{ execution_ref: "55555555-5555-4555-8555-555555555555" }] };
+        }
+        if (statement.includes("create_encrypted_run")) {
+          return { rows: [{ created: true, plan_tier_supported: false }] };
+        }
+        throw new Error(`UNEXPECTED_PROVISION_QUERY:${statement}`);
+      }
+    };
+    configureContentEncryption(dataPool as never, {
+      provisionRun: async () => undefined,
+      destroyRunKey: async () => undefined,
+      prepareRun: async () => ({
+        encrypt: () => ({
+          v: 1,
+          alg: "A256GCM",
+          nonce: "AA==",
+          ct: "AA==",
+          tag: "AA=="
+        }),
+        attestEnvelope: () => Buffer.alloc(32),
+        databaseAttestationSecret: () => Buffer.alloc(32),
+        close: () => undefined
+      })
+    } as never);
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      await new RunRepository(dataPool as never, provisionPool as never).startRun({
+        questionLine: "Does the deploy gap remain visible?",
+        principal: {
+          kind: "server",
+          userId: "66666666-6666-4666-8666-666666666666",
+          ownerRef: "77777777-7777-4777-8777-777777777777"
+        },
+        sessionId: "88888888-8888-4888-8888-888888888888",
+        callerScope: "ASKER",
+        asOf: new Date("2026-09-12T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: "test:pre-0061-warning",
+        compositionBudgetTier: "low",
+        planTier: "free",
+        depthParams: { depth: 1 },
+        discoveredPanel: rosterPanel("free"),
+        strangerSampleRate: 0,
+        envelopeBasis: { max_model_attempts: 1 },
+        registerVersion: 1,
+        batteryVersion: "battery:test",
+        batteryRows: []
+      });
+
+      expect(warning).toHaveBeenCalledOnce();
+      expect(warning).toHaveBeenCalledWith(
+        "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
+      );
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("maps ask-boundary domain refusals to 422 with their real code and message", async () => {

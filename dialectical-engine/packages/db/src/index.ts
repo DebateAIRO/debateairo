@@ -1194,16 +1194,25 @@ export class RunRepository {
         }
         commitAttempted = true;
         const provisionExecutor=admissionClient ?? this.provisionPool;
-        const created = await provisionExecutor.query<{ created: boolean }>(
-          `SELECT core.create_encrypted_run(
-             CASE WHEN COALESCE(
+        const created = await provisionExecutor.query<{
+          created: boolean;
+          plan_tier_supported: boolean;
+        }>(
+          `WITH capability AS (
+             SELECT COALESCE(
                pg_get_functiondef(
                  to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
                ) LIKE '%''planTier''%',
                false
-             ) THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
+             ) AS plan_tier_supported
+           )
+           SELECT core.create_encrypted_run(
+             CASE WHEN capability.plan_tier_supported
+               THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
              $2,$3,$4::jsonb
-           ) AS created`,
+           ) AS created,
+           capability.plan_tier_supported
+           FROM capability`,
           [JSON.stringify({
             runId,
             questionLine: storedQuestionLine,
@@ -1236,6 +1245,13 @@ export class RunRepository {
             skipEvidence:row.skipEvidence
           })))]
         );
+        if (created.rows[0]?.created === true
+          && created.rows[0].plan_tier_supported === false
+          && input.planTier !== undefined) {
+          console.warn(
+            "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
+          );
+        }
         if (created.rows[0]?.created !== true) {
           commitAttempted = false;
           throw new TypedDomainError(

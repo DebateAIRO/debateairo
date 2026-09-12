@@ -169,7 +169,7 @@ describe("S02 tier roster admission", () => {
 
     expect(error).toMatchObject({
       code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: expect.stringContaining("grok-4.6")
+      message: "The premium plan needs grok-4.6, and it is not available right now"
     });
   });
 
@@ -225,7 +225,7 @@ describe("S02 tier roster admission", () => {
     await api.close();
   });
 
-  it("returns typed refusals for out-of-vocabulary tiers at the exported boundary", async () => {
+  it("returns fixed typed refusals for out-of-vocabulary tiers at the exported boundary", async () => {
     for (const planTier of ["constructor", "gold"]) {
       const error = await rejectedAdmission(
         [],
@@ -235,12 +235,57 @@ describe("S02 tier roster admission", () => {
       expect(error).toMatchObject({
         name: "AskRefusal",
         code: "ASK_PLAN_TIER_INVALID",
-        message: `The ${planTier} plan tier is invalid`
+        message: "The plan tier must be free or premium"
       });
     }
   });
 
-  it("maps an invalid-tier boundary refusal to the HTTP 422 face", async () => {
+  it("refuses an invalid tier before resolving the discovered panel", async () => {
+    let panelResolutions = 0;
+    const error = await evaluateAskAdmission({
+      ...settingsFor([]),
+      resolveDiscoveredPanel: async () => {
+        panelResolutions += 1;
+        return [];
+      }
+    }, { ...ask("free"), plan_tier: "gold" } as unknown as AskRequest).catch(
+      (caught: unknown) => caught
+    );
+
+    expect(error).toMatchObject({
+      name: "AskRefusal",
+      code: "ASK_PLAN_TIER_INVALID",
+      message: "The plan tier must be free or premium"
+    });
+    expect(panelResolutions).toBe(0);
+  });
+
+  it("keeps an out-of-vocabulary tier on the reachable HTTP 400 malformed-request face", async () => {
+    let submitCalls = 0;
+    const application = applicationWithSubmit(async () => {
+      submitCalls += 1;
+      return { run_ref: RUN_ID, status: "QUEUED" };
+    });
+    const api = buildApi({
+      application,
+      sessions: testSessionApplication([HTTP_IDENTITY]),
+      allowedOrigin: TEST_APP_ORIGIN
+    });
+
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: HTTP_HEADERS,
+      payload: { ...ask("free"), plan_tier: "gold" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: "MALFORMED_REQUEST" });
+    expect(submitCalls).toBe(0);
+    await api.close();
+  });
+
+  it("maps an injected invalid tier at the exported application boundary to HTTP 422", async () => {
     const application = applicationWithSubmit(async (submittedAsk) => {
       await evaluateAskAdmission(
         settingsFor([]),
@@ -264,7 +309,7 @@ describe("S02 tier roster admission", () => {
     expect(response.statusCode).toBe(422);
     expect(response.json()).toEqual({
       error: "ASK_PLAN_TIER_INVALID",
-      message: "The gold plan tier is invalid"
+      message: "The plan tier must be free or premium"
     });
     await api.close();
   });
