@@ -47,3 +47,9 @@
 
 - Commit `d2a58e9a` on `slice/tiers-s02`: `migrations/0061_plan_tier_on_run.sql` (103 lines; `CREATE OR REPLACE` of `core.create_encrypted_run`, no `DROP`), `packages/db/src/schema.ts` (+1, `planTier`), `packages/db/src/index.ts` (both write paths; the `$13` pair shifted to `$14` together), `tests/integration/tiers-s02-run-plan-tier.test.ts` (4 cases). RED frame `4 failed` naming `plan_tier`; three runs `Test Files 2 passed (2)` / `Tests 25 passed (25)` (`evaluator-database` 21/21 + the new 4/4). Six mutants refuted. SKILLS 6/6 verified in the rollout. R12 live read-back left to V (`docker exec debateai-v3-postgres-1 psql … SELECT plan_tier FROM core.run WHERE run_id=…`).
 - Findings F1–F6 ticketed (two plan-precision items folded into DECISIONS.md; four packet/tooling classes fixed in the protocol). Next on S02: C4 waits for C2; C2/C3 wait for S01's merge (S02-M1…M4, row V-12). The lane idles at `d2a58e9a` until then.
+
+
+## 2026-09-12 10:12 EEST — S02-M done under V's word; C2 and C3 unblocked (orchestrator entry)
+
+- V: «continue the implementation where it was left off. use /heartbeat if needed (Same as before). If I well remember, we needed to implement S02» — row V-12 answered no-wait. `slice/tiers-s02` merged dev @ e97953c8 (835d6ce9) and slice/tiers-s01 @ 9ddbb1ef (**3bf54957**), 0 dirty; product tree = S01 head + C1.
+- M3/M4 done and posted on the cluster tickets; bases re-measured at 3bf54957 (C2 46/46 in 2 files, C3 3F|2P in 1 file, C4 40/40 in 3 files). Next: BUILD S02-C2 + S02-C3 in parallel on Codex Sol; C4 after C2. S01 still at V's test point (V-7, V-20…V-26 unruled).
