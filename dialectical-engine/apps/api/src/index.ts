@@ -1322,6 +1322,7 @@ export class PostgresAskApplication implements AskApplication {
           tierSource: risk.tierSource,
           tierProvenanceRef: risk.tierProvenanceRef,
           compositionBudgetTier: ask.composition_budget_tier,
+          planTier: ask.plan_tier,
           depthParams: ask.depth_params,
           discoveredPanel,
           strangerSampleRate: this.settings.strangerSampleRate,
