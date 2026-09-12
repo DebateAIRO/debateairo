@@ -53,3 +53,9 @@
 
 - V: «continue the implementation where it was left off. use /heartbeat if needed (Same as before). If I well remember, we needed to implement S02» — row V-12 answered no-wait. `slice/tiers-s02` merged dev @ e97953c8 (835d6ce9) and slice/tiers-s01 @ 9ddbb1ef (**3bf54957**), 0 dirty; product tree = S01 head + C1.
 - M3/M4 done and posted on the cluster tickets; bases re-measured at 3bf54957 (C2 46/46 in 2 files, C3 3F|2P in 1 file, C4 40/40 in 3 files). Next: BUILD S02-C2 + S02-C3 in parallel on Codex Sol; C4 after C2. S01 still at V's test point (V-7, V-20…V-26 unruled).
+
+
+## 2026-09-12 10:46 EEST — BUILD(S02-C2) consumed: READY (orchestrator entry)
+
+- Commit `86bfa432` on `slice/tiers-s02`: the roster filter (`PLAN_TIER_ROSTERS[ask.plan_tier]`, `find` per roster id → roster order, one member per id), the typed refusal `ASK_PLAN_TIER_MODEL_UNAVAILABLE` before `assertMakerAdmission`, the R7 message, `api.test.ts` re-fixtured (25/25), `evaluator-database` re-seeded (21/21), nine new cases. Seat's three runs 55/55 in 3 files (claimed); orchestrator re-run 55/55 (measured). Findings F1/F2 ticketed (PLAN precision), folded above.
+- Next: C4 (the wire) READY → packet + launch; C3 still to launch (classifier); then GATE(S02) → REV(S02) three Opus lenses.
