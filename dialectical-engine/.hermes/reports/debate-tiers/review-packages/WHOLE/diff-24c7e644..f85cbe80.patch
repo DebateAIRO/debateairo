@@ -1,0 +1,3389 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index 21f75fe2..86e52755 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -20,6 +20,7 @@ import {
+   NodeSchema,
+   PrivateDebateErasureRequestSchema,
+   PrivateDebateErasureStatusSchema,
++  PLAN_TIER_ROSTERS,
+   PublicationTransitionSchema,
+   PublicDebateListSchema,
+   PublicDebateSchema,
+@@ -1202,15 +1203,37 @@ export async function evaluateAskAdmission(
+   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
+ }> {
+   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
++  const planTier = ask.plan_tier as string;
++  if (!Object.hasOwn(PLAN_TIER_ROSTERS, planTier)) {
++    markAskRefusal(new TypedDomainError(
++      "ASK_PLAN_TIER_INVALID",
++      "The plan tier must be free or premium"
++    ));
++  }
+   const discoveredPanel = await settings.resolveDiscoveredPanel();
+-  const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);
++  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
++  const filteredPanel = roster
++    .map((modelId) => discoveredPanel.find((member) => member.model_id === modelId))
++    .filter((member): member is typeof discoveredPanel[number] => member !== undefined);
++  const missing = roster.filter((modelId) =>
++    !filteredPanel.some((member) => member.model_id === modelId)
++  );
++  if (missing.length > 0) {
++    markAskRefusal(new TypedDomainError(
++      "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      `The ${ask.plan_tier} plan needs ${missing.join(", ")}, and ${
++        missing.length === 1 ? "it is" : "they are"
++      } not available right now`
++    ));
++  }
++  const makers = Object.freeze([...new Set(filteredPanel.map((member) => member.maker))]);
+   const makerAvailability = Object.freeze({
+     deploymentMakerCapability: makers.length > 0,
+     runMakerReachability: makers.length >= 2,
+     classification: makers.length >= 2 ? "CAPABLE" as const : "TRANSIENT_OUTAGE" as const,
+     configuredMakers: makers,
+     reachedMakers: makers,
+-    registerRef: discoveredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
++    registerRef: filteredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
+   });
+   try {
+     assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
+@@ -1222,12 +1245,17 @@ export async function evaluateAskAdmission(
+     envelopeBasis = await settings.resolveEnvelopeBasis({
+       depthParams: ask.depth_params,
+       riskTier: risk.effectiveRiskTier,
+-      panelSize: discoveredPanel.length
++      panelSize: filteredPanel.length
+     });
+   } catch (error) {
+     markAskRefusal(error);
+   }
+-  return { risk, envelopeBasis, discoveredPanel, criticUnavailableCap: applyCriticUnavailableCap(makerAvailability) };
++  return {
++    risk,
++    envelopeBasis,
++    discoveredPanel: filteredPanel,
++    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability)
++  };
+ }
+ 
+ export class PostgresAskApplication implements AskApplication {
+@@ -1301,6 +1329,7 @@ export class PostgresAskApplication implements AskApplication {
+           tierSource: risk.tierSource,
+           tierProvenanceRef: risk.tierProvenanceRef,
+           compositionBudgetTier: ask.composition_budget_tier,
++          planTier: ask.plan_tier,
+           depthParams: ask.depth_params,
+           discoveredPanel,
+           strangerSampleRate: this.settings.strangerSampleRate,
+diff --git a/dialectical-engine/apps/ui/app/globals.css b/dialectical-engine/apps/ui/app/globals.css
+index 24f09024..2ff9640e 100644
+--- a/dialectical-engine/apps/ui/app/globals.css
++++ b/dialectical-engine/apps/ui/app/globals.css
+@@ -6308,6 +6308,72 @@ a:focus-visible {
+ .ndActionsSpacer { flex: 1; }
+ .ndKeyHint { font-size: 10.5px; color: var(--muted); }
+ 
++/* === debate-tiers S01 === */
++.ndTier {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 10px;
++  margin-top: 20px;
++}
++.ndTierOption {
++  display: flex;
++  flex-direction: column;
++  align-items: flex-start;
++  gap: 9px;
++  padding: 13px 14px;
++  border: 1px solid var(--line);
++  border-radius: 12px;
++  background: var(--core);
++  font-family: inherit;
++  text-align: left;
++  cursor: pointer;
++}
++.ndTierOption[aria-checked="true"] {
++  border-color: var(--line-strong);
++  background: var(--shell);
++}
++.ndTierName {
++  padding: 4px 12px;
++  border-radius: 999px;
++  background: transparent;
++  color: var(--muted);
++  font-size: 10.5px;
++  font-weight: 600;
++}
++.ndTierOption[aria-checked="true"] .ndTierName {
++  background: var(--ink);
++  color: var(--bg);
++  font-weight: 700;
++}
++.ndTierPromise {
++  font-size: 11.5px;
++  color: var(--text-2);
++}
++.ndTierModels {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 10px;
++}
++.ndTierModel {
++  display: inline-flex;
++  align-items: center;
++  gap: 5px;
++  font-family: var(--font-mono);
++  font-size: 10.5px;
++  font-weight: 500;
++  color: var(--text-3);
++  white-space: nowrap;
++}
++.ndSegItem:disabled,
++.ndSlider:disabled,
++.ndSteerInput:disabled,
++.ndSelect:has(select:disabled) {
++  opacity: 0.45;
++  cursor: not-allowed;
++}
++.ndSelect select:disabled { cursor: not-allowed; }
++/* === end debate-tiers S01 === */
++
+ @media (prefers-reduced-motion: reduce) {
+   .ndStart { transition: none; }
+   .ndStart:hover:not(:disabled) { transform: none; }
+diff --git a/dialectical-engine/apps/ui/app/new/defaults.tsx b/dialectical-engine/apps/ui/app/new/defaults.tsx
+index d2349bfc..0e8d6467 100644
+--- a/dialectical-engine/apps/ui/app/new/defaults.tsx
++++ b/dialectical-engine/apps/ui/app/new/defaults.tsx
+@@ -1,4 +1,4 @@
+-import type { Deployment, Session } from "@debateai/contract";
++import type { Deployment, PlanTier, Session } from "@debateai/contract";
+ import { TypedDomainError } from "@debateai/kernel";
+ 
+ export type RiskTier = "casual" | "standard" | "high-stakes";
+@@ -49,6 +49,7 @@ export type NewDebateAskDefaults = {
+   readonly asOf: string;
+   readonly depth: number;
+   readonly asOfWasEdited: boolean;
++  readonly planTier?: PlanTier;
+   readonly riskTierWasEdited?: boolean;
+   readonly steeringPresets?: string;
+   readonly steeringAnnotations?: string;
+@@ -67,9 +68,10 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
+     throw new TypedDomainError("ASK_AS_OF_INVALID", "As of must be a valid date and time.");
+   }
+   return {
++    plan_tier: defaults.planTier,
+     risk_tier: defaults.riskTier,
+     tier_source: defaults.riskTierWasEdited ? "ASKER" : "MACHINE_DEFAULT",
+-    tier_provenance_ref: defaults.riskTierWasEdited ? "asker:ui-selection" : "machine:deployment-floor",
++    tier_provenance_ref: defaults.riskTierWasEdited ? "asker:ui-selection" : "machine:plan-tier-free",
+     composition_budget_tier: defaults.budgetTier,
+     depth: defaults.depth,
+     decision_scope: defaults.decisionScope.trim(),
+diff --git a/dialectical-engine/apps/ui/app/new/page.tsx b/dialectical-engine/apps/ui/app/new/page.tsx
+index 7f5408a6..f3a0a1a7 100755
+--- a/dialectical-engine/apps/ui/app/new/page.tsx
++++ b/dialectical-engine/apps/ui/app/new/page.tsx
+@@ -3,9 +3,11 @@
+ import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
+ import { useRouter, useSearchParams } from "next/navigation";
+ import { createDebate, contractClient } from "@/lib/api";
++import { modelMeta } from "@/lib/models";
+ import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
+ import { AuthGate } from "@/components/AuthGate";
+ import { SupportWidget } from "@/components/support/SupportWidget";
++import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+ import {
+   buildNewDebateAskConfig,
+   DECISION_SCOPE_DEFAULT,
+@@ -37,6 +39,13 @@ const BUDGET_TIER_OPTIONS: ReadonlyArray<{ value: CompositionBudgetTier; label:
+   { value: "high", label: "High" }
+ ];
+ 
++const PLAN_TIER_OPTIONS = [
++  { value: "free", name: "Free", promise: "Every gauge fixed. The question is yours." },
++  { value: "premium", name: "Premium", promise: "Every gauge yours to set." }
++] as const;
++
++type PlanTier = (typeof PLAN_TIER_OPTIONS)[number]["value"];
++
+ const DEPTH_MIN = 1;
+ const DEPTH_MAX = 5;
+ 
+@@ -65,14 +74,15 @@ function NewDebateForm({ token }: { token: string }) {
+   const router = useRouter();
+   const searchParams = useSearchParams();
+   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
++  const [planTier, setPlanTier] = useState<PlanTier>("free");
+   const [optionsOpen, setOptionsOpen] = useState(false);
+   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
+   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
+-  const [depth, setDepth] = useState(1);
++  const [depth, setDepth] = useState(2);
+   const [branching, setBranching] = useState(2);
+   const [concurrency, setConcurrency] = useState(3);
+   const [maxTokens, setMaxTokens] = useState(800);
+-  const [riskTier, setRiskTier] = useState("");
++  const [riskTier, setRiskTier] = useState("standard");
+   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
+   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
+   const [steeringPresets, setSteeringPresets] = useState("");
+@@ -98,6 +108,22 @@ function NewDebateForm({ token }: { token: string }) {
+     return () => { active = false; };
+   }, [token]);
+ 
++  function choosePlanTier(value: PlanTier): void {
++    setPlanTier(value);
++    if (value !== "free") return;
++    setRiskTier("standard");
++    setRiskTierWasEdited(false);
++    setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
++    setDepth(2);
++    setSteeringPresets("");
++    setSteeringAnnotations("");
++    setDepthMode("fixed");
++    setScrutiny("standard");
++    setBranching(2);
++    setConcurrency(3);
++    setMaxTokens(800);
++  }
++
+   const askAsOf = new Date(asOf);
+   // The button becomes ready only for the complete ask that will be submitted.
+   // UX-01 makes machine-derived values visible and editable rather than hidden.
+@@ -119,6 +145,7 @@ function NewDebateForm({ token }: { token: string }) {
+       const submitTime = new Date();
+       setAsOf(dateTimeLocalValue(submitTime));
+       const config = buildNewDebateAskConfig({
++        planTier,
+         riskTier: riskTier as RiskTier,
+         budgetTier: budgetTier as CompositionBudgetTier,
+         decisionScope,
+@@ -154,6 +181,37 @@ function NewDebateForm({ token }: { token: string }) {
+         <form onSubmit={submit} onKeyDown={onKeyDown}>
+           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
+ 
++          <div className="ndTier" role="radiogroup" aria-label="Plan tier">
++            {PLAN_TIER_OPTIONS.map((option) => (
++              <button
++                key={option.value}
++                type="button"
++                role="radio"
++                id={`planTier-${option.value}`}
++                data-field="planTier"
++                data-value={option.value}
++                aria-checked={planTier === option.value}
++                className="ndTierOption"
++                onClick={() => choosePlanTier(option.value)}
++              >
++                <span className="ndTierName">{option.name}</span>
++                <span className="ndTierPromise">{option.promise}</span>
++                <span className="ndTierModels">
++                  {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
++                    <span key={modelId} className="ndTierModel">
++                      <span
++                        className="modelDot"
++                        style={{ "--dot": modelMeta(modelId).dot } as CSSProperties}
++                        aria-hidden
++                      />
++                      {modelId}
++                    </span>
++                  ))}
++                </span>
++              </button>
++            ))}
++          </div>
++
+           <label className="srOnly" htmlFor="topic">
+             Topic
+           </label>
+@@ -178,14 +236,19 @@ function NewDebateForm({ token }: { token: string }) {
+ 
+           <div className="ndCard">
+             <p className="ndIntro">
+-              Choose your risk tier, composition budget tier, and depth, then click Start.
++              {planTier === "free"
++                ? "Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself."
++                : "Choose your risk tier, composition budget tier, and depth, then click Start."}
+             </p>
+             <SegmentedRow
+               field="riskTier"
+               label="Risk tier"
+-              hint="How much is riding on the answer · explicit asker selection"
++              hint={planTier === "free"
++                ? "How much is riding on the answer · fixed by the Free plan"
++                : "How much is riding on the answer · explicit asker selection"}
+               options={RISK_TIER_OPTIONS}
+               value={riskTier}
++              disabled={planTier === "free"}
+               onChange={(value) => {
+                 setRiskTier(value);
+                 setRiskTierWasEdited(true);
+@@ -194,9 +257,12 @@ function NewDebateForm({ token }: { token: string }) {
+             <SegmentedRow
+               field="budgetTier"
+               label="Composition budget tier"
+-              hint="How much work the composition may spend · provisional default, editable"
++              hint={planTier === "free"
++                ? "How much work the composition may spend · fixed by the Free plan"
++                : "How much work the composition may spend · provisional default, editable"}
+               options={BUDGET_TIER_OPTIONS}
+               value={budgetTier}
++              disabled={planTier === "free"}
+               onChange={(value) => setBudgetTier(value as CompositionBudgetTier)}
+             />
+             <SliderRow
+@@ -206,18 +272,21 @@ function NewDebateForm({ token }: { token: string }) {
+               min={DEPTH_MIN}
+               max={DEPTH_MAX}
+               value={depth}
++              disabled={planTier === "free"}
+               onChange={setDepth}
+             />
+             <div className="ndRow ndRowSteering">
+               <div className="ndSteerField">
+                 <label className="ndLabel" htmlFor="steeringPresets">Steering menu selections</label>
+-                <div className="ndHint">One per line</div>
++                <div className="ndHint" id="steeringPresets-hint">One per line</div>
+                 <textarea
+                   id="steeringPresets"
+                   className="ndSteerInput"
+                   ref={grow}
+                   rows={2}
+                   value={steeringPresets}
++                  disabled={planTier === "free"}
++                  aria-describedby="steeringPresets-hint"
+                   onChange={(event) => {
+                     setSteeringPresets(event.target.value);
+                     grow(event.currentTarget);
+@@ -227,7 +296,7 @@ function NewDebateForm({ token }: { token: string }) {
+               </div>
+               <div className="ndSteerField">
+                 <label className="ndLabel" htmlFor="steeringAnnotations">Steering annotations</label>
+-                <div className="ndHint">Free text · logged verbatim, one per line</div>
++                <div className="ndHint" id="steeringAnnotations-hint">Free text · logged verbatim, one per line</div>
+                 <textarea
+                   id="steeringAnnotations"
+                   className="ndSteerInput"
+@@ -235,6 +304,8 @@ function NewDebateForm({ token }: { token: string }) {
+                   ref={grow}
+                   rows={2}
+                   value={steeringAnnotations}
++                  disabled={planTier === "free"}
++                  aria-describedby="steeringAnnotations-hint"
+                   onChange={(event) => {
+                     setSteeringAnnotations(event.target.value);
+                     grow(event.currentTarget);
+@@ -277,6 +348,7 @@ function NewDebateForm({ token }: { token: string }) {
+                 label="Depth mode"
+                 hint="Selection strategy"
+                 value={depthMode}
++                disabled={planTier === "free"}
+                 onChange={(value) => setDepthMode(value as AdaptiveDepthMode)}
+                 options={depthModeOptions}
+               />
+@@ -285,6 +357,7 @@ function NewDebateForm({ token }: { token: string }) {
+                 label="Depth of scrutiny"
+                 hint={SCRUTINY_DEPTH_OPTIONS.find((option) => option.value === scrutiny)?.hint ?? ""}
+                 value={scrutiny}
++                disabled={planTier === "free"}
+                 onChange={(value) => setScrutiny(value as ScrutinyDepth)}
+                 options={SCRUTINY_DEPTH_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+               />
+@@ -295,6 +368,7 @@ function NewDebateForm({ token }: { token: string }) {
+                 min={1}
+                 max={4}
+                 value={branching}
++                disabled={planTier === "free"}
+                 onChange={setBranching}
+               />
+               <SliderRow
+@@ -304,6 +378,7 @@ function NewDebateForm({ token }: { token: string }) {
+                 min={1}
+                 max={6}
+                 value={concurrency}
++                disabled={planTier === "free"}
+                 onChange={setConcurrency}
+               />
+               <SliderRow
+@@ -312,8 +387,9 @@ function NewDebateForm({ token }: { token: string }) {
+                 hint="Per generated argument"
+                 min={128}
+                 max={4000}
+-                step={128}
++                step={32}
+                 value={maxTokens}
++                disabled={planTier === "free"}
+                 onChange={setMaxTokens}
+               />
+               <p className="ndProvenance">
+@@ -350,6 +426,7 @@ function SegmentedRow({
+   hint,
+   options,
+   value,
++  disabled = false,
+   onChange
+ }: {
+   field: string;
+@@ -357,15 +434,16 @@ function SegmentedRow({
+   hint: string;
+   options: ReadonlyArray<{ value: string; label: string }>;
+   value: string;
++  disabled?: boolean;
+   onChange: (value: string) => void;
+ }) {
+   return (
+     <div className="ndRow">
+       <div className="ndRowText">
+         <div className="ndLabel" id={`${field}-label`}>{label}</div>
+-        <div className="ndHint">{hint}</div>
++        <div className="ndHint" id={`${field}-hint`}>{hint}</div>
+       </div>
+-      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`}>
++      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`} aria-describedby={`${field}-hint`}>
+         {options.map((option) => (
+           <button
+             key={option.value}
+@@ -375,7 +453,9 @@ function SegmentedRow({
+             data-field={field}
+             data-value={option.value}
+             aria-checked={value === option.value}
++            aria-describedby={`${field}-hint`}
+             className="ndSegItem"
++            disabled={disabled}
+             onClick={() => onChange(option.value)}
+           >
+             {option.label}
+@@ -391,6 +471,7 @@ function SelectRow({
+   label,
+   hint,
+   value,
++  disabled = false,
+   onChange,
+   options
+ }: {
+@@ -398,6 +479,7 @@ function SelectRow({
+   label: string;
+   hint: string;
+   value: string;
++  disabled?: boolean;
+   onChange: (value: string) => void;
+   options: ReadonlyArray<{ value: string; label: string }>;
+ }) {
+@@ -405,12 +487,19 @@ function SelectRow({
+     <div className="ndRow">
+       <div className="ndRowText">
+         <label className="ndLabel" htmlFor={id}>{label}</label>
+-        <div className="ndHint">{hint}</div>
++        <div className="ndHint" id={`${id}-hint`}>{hint}</div>
+       </div>
+       <span className="ndSelect">
+         <span aria-hidden>{options.find((option) => option.value === value)?.label ?? value}</span>
+         <span className="ndSelectCaret" aria-hidden>▼</span>
+-        <select id={id} value={value} onChange={(event) => onChange(event.target.value)} aria-label={label}>
++        <select
++          id={id}
++          value={value}
++          disabled={disabled}
++          aria-describedby={`${id}-hint`}
++          onChange={(event) => onChange(event.target.value)}
++          aria-label={label}
++        >
+           {options.map((option) => (
+             <option key={option.value} value={option.value}>{option.label}</option>
+           ))}
+@@ -428,6 +517,7 @@ function SliderRow({
+   max,
+   step = 1,
+   value,
++  disabled = false,
+   onChange
+ }: {
+   id: string;
+@@ -437,6 +527,7 @@ function SliderRow({
+   max: number;
+   step?: number;
+   value: number;
++  disabled?: boolean;
+   onChange: (value: number) => void;
+ }) {
+   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+@@ -444,7 +535,7 @@ function SliderRow({
+     <div className="ndRow ndRowSlider">
+       <div className="ndRowText">
+         <label className="ndLabel" htmlFor={id}>{label}</label>
+-        <div className="ndHint">{hint}</div>
++        <div className="ndHint" id={`${id}-hint`}>{hint}</div>
+       </div>
+       <span className="ndSliderWrap">
+         <input
+@@ -455,6 +546,8 @@ function SliderRow({
+           max={max}
+           step={step}
+           value={value}
++          disabled={disabled}
++          aria-describedby={`${id}-hint`}
+           onChange={(event) => onChange(Number(event.target.value))}
+           aria-label={label}
+           style={{ "--nd-pct": `${pct}%` } as CSSProperties}
+diff --git a/dialectical-engine/apps/ui/lib/api.ts b/dialectical-engine/apps/ui/lib/api.ts
+index 3878d6f3..4f2acece 100644
+--- a/dialectical-engine/apps/ui/lib/api.ts
++++ b/dialectical-engine/apps/ui/lib/api.ts
+@@ -1,6 +1,7 @@
+ import {
+   ContractHttpError,
+   createContractClient,
++  PLAN_TIERS,
+   type Answer,
+   type AskRequest,
+   type ContractClient,
+@@ -356,6 +357,7 @@ function optionalLines(config: AskConfig, key: string): string[] {
+ 
+ const RISK_TIERS = new Set(["casual", "standard", "high-stakes"]);
+ const BUDGET_TIERS = new Set(["low", "medium", "high"]);
++const PLAN_TIERS_SET: ReadonlySet<string> = new Set(PLAN_TIERS);
+ 
+ /**
+  * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
+@@ -370,6 +372,8 @@ export async function createDebate(
+ ): Promise<{ id: string }> {
+   const riskTier = requiredString(config, "risk_tier");
+   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
++  const planTier = requiredString(config, "plan_tier");
++  if (!PLAN_TIERS_SET.has(planTier)) throw new Error("ASK_FIELD_REQUIRED: plan_tier must be free or premium.");
+   const tierSource = requiredString(config, "tier_source");
+   if (tierSource !== "ASKER" && tierSource !== "MACHINE_DEFAULT") {
+     throw new Error("ASK_FIELD_REQUIRED: tier_source must identify an asker choice or machine default.");
+@@ -381,6 +385,7 @@ export async function createDebate(
+   if (Number.isNaN(asOf.valueOf())) throw new Error("ASK_FIELD_REQUIRED: as_of must be an explicit date and time.");
+   const ask: AskRequest = {
+     question_line: topic,
++    plan_tier: planTier as AskRequest["plan_tier"],
+     risk_tier: riskTier as AskRequest["risk_tier"],
+     tier_source: tierSource,
+     tier_provenance_ref: tierProvenanceRef,
+diff --git a/dialectical-engine/migrations/0061_plan_tier_on_run.sql b/dialectical-engine/migrations/0061_plan_tier_on_run.sql
+new file mode 100644
+index 00000000..75937019
+--- /dev/null
++++ b/dialectical-engine/migrations/0061_plan_tier_on_run.sql
+@@ -0,0 +1,103 @@
++ALTER TABLE core.run ADD COLUMN IF NOT EXISTS plan_tier text;
++
++ALTER TABLE core.run DROP CONSTRAINT IF EXISTS run_plan_tier_vocabulary;
++ALTER TABLE core.run ADD CONSTRAINT run_plan_tier_vocabulary
++  CHECK (plan_tier IS NULL OR plan_tier IN ('free','premium'));
++
++CREATE OR REPLACE FUNCTION core.create_encrypted_run(
++  p_run jsonb,p_user_id uuid,p_owner_ref uuid,p_battery_rows jsonb
++)
++RETURNS boolean
++LANGUAGE plpgsql
++VOLATILE
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  v_run_id uuid;
++  v_execution_ref uuid;
++  v_battery_row jsonb;
++BEGIN
++  IF jsonb_typeof(p_run)<>'object' OR p_run-ARRAY[
++    'runId','questionLine','askerId','executionRef','callerScope','asOf',
++    'askerRiskTier','riskTier','tierSource','tierProvenanceRef',
++    'compositionBudgetTier','planTier','depthParams','discoveredPanel','strangerSampleRate',
++    'envelopeBasis','registerVersion','batteryVersion','askContract',
++    'contentCiphertext','contentAttestation','contentAttestationSecret'
++  ]::text[]<>'{}'::jsonb
++    OR jsonb_typeof(p_battery_rows)<>'array'
++    OR jsonb_array_length(p_battery_rows)>100 THEN
++    RETURN false;
++  END IF;
++  v_run_id := (p_run->>'runId')::uuid;
++  v_execution_ref := (p_run->>'executionRef')::uuid;
++  IF p_run->>'questionLine'<>'⟦DEBATEAI:CIPHERTEXT:V1⟧'
++    OR p_run->>'askerId'<>'owner:'||p_owner_ref::text
++    OR p_run->'askContract'<>'{"ciphertext":true,"v":1}'::jsonb
++    OR NOT core.lock_run_key_provision_for_commit(
++      v_run_id,p_user_id,p_owner_ref,v_execution_ref
++    ) THEN
++    RETURN false;
++  END IF;
++  IF octet_length(decode(p_run->>'contentAttestationSecret','base64'))<>32
++    OR octet_length(decode(p_run->>'contentAttestation','base64'))<>32 THEN
++    RETURN false;
++  END IF;
++  FOR v_battery_row IN SELECT value FROM jsonb_array_elements(p_battery_rows)
++  LOOP
++    IF jsonb_typeof(v_battery_row)<>'object' OR v_battery_row-ARRAY[
++      'batteryRowId','predicateRef','openingState','predicateInputs','skipEvidence'
++    ]::text[]<>'{}'::jsonb THEN
++      RETURN false;
++    END IF;
++  END LOOP;
++  INSERT INTO core.run_content_attestation_secret(run_id,secret,created_at)
++  VALUES (v_run_id,decode(p_run->>'contentAttestationSecret','base64'),clock_timestamp());
++  INSERT INTO core.run(
++    run_id,question_line,asker_id,session_id,caller_scope,as_of,
++    asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,
++    composition_budget_tier,plan_tier,depth_params,agent_count,discovered_panel,
++    stranger_sample_rate,envelope_basis,register_version,battery_version,
++    ask_contract,created_at_seq,content_encryption_version,
++    question_blind_index_version,question_blind_index,content_ciphertext,content_attestation
++  ) VALUES (
++    v_run_id,p_run->>'questionLine',p_run->>'askerId',v_execution_ref::text,
++    p_run->>'callerScope',(p_run->>'asOf')::timestamptz,
++    p_run->>'askerRiskTier',p_run->>'riskTier',p_run->>'tierSource',
++    p_run->>'tierProvenanceRef',p_run->>'compositionBudgetTier',p_run->>'planTier',
++    p_run->'depthParams',jsonb_array_length(p_run->'discoveredPanel'),
++    p_run->'discoveredPanel',(p_run->>'strangerSampleRate')::double precision,
++    p_run->'envelopeBasis',(p_run->>'registerVersion')::bigint,
++    p_run->>'batteryVersion',p_run->'askContract',ledger.allocate_sequence(),
++    1,2,NULL,p_run->'contentCiphertext',decode(p_run->>'contentAttestation','base64')
++  );
++  PERFORM core.append_run_ownership_event(v_run_id,p_owner_ref);
++  INSERT INTO core.question_liveness_event(run_id,kind,occurred_at,at_seq)
++  VALUES (v_run_id,'QUERY',clock_timestamp(),ledger.allocate_sequence());
++  INSERT INTO core.run_progress_event(run_id,at_seq,kind,value_json) VALUES
++    (v_run_id,ledger.allocate_sequence(),'PHASE',to_jsonb('EMPIRICAL'::text)),
++    (v_run_id,ledger.allocate_sequence(),'ENVELOPE_STATE',to_jsonb('WITHIN'::text)),
++    (v_run_id,ledger.allocate_sequence(),'ENVELOPE_CONSUMED',to_jsonb(0));
++  FOR v_battery_row IN SELECT value FROM jsonb_array_elements(p_battery_rows)
++  LOOP
++    INSERT INTO core.run_row_activation(run_id,battery_row_id,predicate_ref)
++    VALUES (v_run_id,v_battery_row->>'batteryRowId',v_battery_row->>'predicateRef');
++    INSERT INTO core.run_row_activation_event(
++      run_id,battery_row_id,at_seq,state,predicate_inputs,skip_evidence
++    ) VALUES (
++      v_run_id,v_battery_row->>'batteryRowId',ledger.allocate_sequence(),
++      v_battery_row->>'openingState',v_battery_row->'predicateInputs',
++      CASE WHEN jsonb_typeof(v_battery_row->'skipEvidence')='null'
++        THEN NULL ELSE v_battery_row->'skipEvidence' END
++    );
++  END LOOP;
++  IF NOT core.complete_run_key_provision(
++    v_run_id,p_user_id,p_owner_ref,v_execution_ref
++  ) THEN
++    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='RUN_KEY_PROVISION_INTENT_INCOMPLETE';
++  END IF;
++  RETURN true;
++EXCEPTION WHEN invalid_text_representation OR check_violation OR not_null_violation THEN
++  RETURN false;
++END;
++$$;
+diff --git a/dialectical-engine/packages/contract/src/index.ts b/dialectical-engine/packages/contract/src/index.ts
+index 74b2250c..071ca3a2 100644
+--- a/dialectical-engine/packages/contract/src/index.ts
++++ b/dialectical-engine/packages/contract/src/index.ts
+@@ -1,5 +1,6 @@
+ import { z } from "zod";
+ import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, TIER_SOURCES } from "@debateai/kernel";
++import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
+ 
+ export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
+ export const TierSourceSchema = z.enum(TIER_SOURCES);
+@@ -114,6 +115,7 @@ export const AskRequestSchema = z.object({
+   decision_scope: z.string().trim().min(1),
+   as_of: z.iso.datetime(),
+   steering_presets: z.array(z.string().trim().min(1)),
++  plan_tier: PlanTierSchema,
+   steering_annotations: z.array(z.string().min(1))
+ }).strict();
+ export type AskRequest = z.infer<typeof AskRequestSchema>;
+diff --git a/dialectical-engine/packages/contract/src/plan-tiers.ts b/dialectical-engine/packages/contract/src/plan-tiers.ts
+new file mode 100644
+index 00000000..42b29fd3
+--- /dev/null
++++ b/dialectical-engine/packages/contract/src/plan-tiers.ts
+@@ -0,0 +1,11 @@
++import { z } from "zod";
++
++export const PlanTierSchema = z.enum(["free", "premium"]);
++export type PlanTier = z.infer<typeof PlanTierSchema>;
++
++export const PLAN_TIERS = Object.freeze(["free", "premium"] as const);
++
++export const PLAN_TIER_ROSTERS = Object.freeze({
++  free: Object.freeze(["gpt-5.6-luna", "claude-sonnet-5"]),
++  premium: Object.freeze(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"])
++} satisfies Readonly<Record<PlanTier, readonly string[]>>);
+diff --git a/dialectical-engine/packages/db/src/index.ts b/dialectical-engine/packages/db/src/index.ts
+index e8bcb261..e59f1af9 100644
+--- a/dialectical-engine/packages/db/src/index.ts
++++ b/dialectical-engine/packages/db/src/index.ts
+@@ -632,6 +632,19 @@ async function contentEncryptionSchemaIsApplied(pool: Pool): Promise<boolean> {
+   return result.rows[0]?.applied === true;
+ }
+ 
++async function planTierColumnIsApplied(
++  executor: Pick<Pool, "query"> | PoolClient
++): Promise<boolean> {
++  const result = await executor.query<{ applied: boolean }>(
++    `SELECT EXISTS (
++       SELECT 1 FROM information_schema.columns
++       WHERE table_schema='core' AND table_name='run'
++         AND column_name='plan_tier'
++     ) AS applied`
++  );
++  return result.rows[0]?.applied === true;
++}
++
+ type UntypedMethod = (...args: unknown[]) => unknown;
+ 
+ function typedPoolFailure(error: unknown): TypedDomainError {
+@@ -845,6 +858,7 @@ export interface StartRunInput {
+   readonly tierSource: TierSource;
+   readonly tierProvenanceRef: string;
+   readonly compositionBudgetTier: CompositionBudgetTier;
++  readonly planTier?: "free" | "premium";
+   readonly depthParams: Readonly<Record<string, unknown>>;
+   readonly discoveredPanel: readonly DiscoveredPanelMember[];
+   readonly strangerSampleRate: number;
+@@ -1121,6 +1135,8 @@ export class RunRepository {
+     } else if (!UUID_V4.test(input.principal.ownerRef)) {
+       throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
+     }
++    const planTierColumnApplied = input.principal.kind === "legacy"
++      && await planTierColumnIsApplied(this.pool);
+     const askContract = input.askContract ?? {};
+     let storedQuestionLine = input.questionLine;
+     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
+@@ -1178,8 +1194,25 @@ export class RunRepository {
+         }
+         commitAttempted = true;
+         const provisionExecutor=admissionClient ?? this.provisionPool;
+-        const created = await provisionExecutor.query<{ created: boolean }>(
+-          "SELECT core.create_encrypted_run($1::jsonb,$2,$3,$4::jsonb) AS created",
++        const created = await provisionExecutor.query<{
++          created: boolean;
++          plan_tier_supported: boolean;
++        }>(
++          `WITH capability AS (
++             SELECT COALESCE(
++               pg_get_functiondef(
++                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
++               ) LIKE '%''planTier''%',
++               false
++             ) AS plan_tier_supported
++           )
++           SELECT core.create_encrypted_run(
++             CASE WHEN capability.plan_tier_supported
++               THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
++             $2,$3,$4::jsonb
++           ) AS created,
++           capability.plan_tier_supported
++           FROM capability`,
+           [JSON.stringify({
+             runId,
+             questionLine: storedQuestionLine,
+@@ -1192,6 +1225,7 @@ export class RunRepository {
+             tierSource: input.tierSource,
+             tierProvenanceRef: input.tierProvenanceRef,
+             compositionBudgetTier: input.compositionBudgetTier,
++            planTier: input.planTier ?? null,
+             depthParams: input.depthParams,
+             discoveredPanel: input.discoveredPanel,
+             strangerSampleRate: input.strangerSampleRate,
+@@ -1211,6 +1245,13 @@ export class RunRepository {
+             skipEvidence:row.skipEvidence
+           })))]
+         );
++        if (created.rows[0]?.created === true
++          && created.rows[0].plan_tier_supported === false
++          && input.planTier !== undefined) {
++          console.warn(
++            "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
++          );
++        }
+         if (created.rows[0]?.created !== true) {
+           commitAttempted = false;
+           throw new TypedDomainError(
+@@ -1234,21 +1275,30 @@ export class RunRepository {
+       const baseRunValues = [
+         runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
+         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
+-        input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
+-        input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
++        input.compositionBudgetTier,
++        ...(planTierColumnApplied ? [input.planTier ?? null] : []),
++        JSON.stringify(input.depthParams),
++        JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
++        JSON.stringify(input.envelopeBasis), input.registerVersion,
+         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
+       ];
++      const bindOffset = planTierColumnApplied ? 1 : 0;
+       await client.query(
+         `INSERT INTO core.run (
+           run_id, question_line, asker_id, session_id, caller_scope, as_of,
+           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+-          composition_budget_tier, depth_params, agent_count, discovered_panel,
++          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
++          depth_params, agent_count, discovered_panel,
+           stranger_sample_rate, envelope_basis, register_version,
+           battery_version, ask_contract, created_at_seq
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+-          $11, $12::jsonb, jsonb_array_length($13::jsonb), $13::jsonb, $14,
+-          $15::jsonb, $16, $17, $18::jsonb, $19
++          $11${planTierColumnApplied ? ", $12" : ""},
++          $${12 + bindOffset}::jsonb,
++          jsonb_array_length($${13 + bindOffset}::jsonb),
++          $${13 + bindOffset}::jsonb, $${14 + bindOffset},
++          $${15 + bindOffset}::jsonb, $${16 + bindOffset},
++          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}
+         )`,
+         baseRunValues
+       );
+diff --git a/dialectical-engine/packages/db/src/schema.ts b/dialectical-engine/packages/db/src/schema.ts
+index 81b66c0f..ba56e700 100644
+--- a/dialectical-engine/packages/db/src/schema.ts
++++ b/dialectical-engine/packages/db/src/schema.ts
+@@ -118,6 +118,7 @@ export const run = core.table("run", {
+   tierSource: text("tier_source").notNull(),
+   tierProvenanceRef: text("tier_provenance_ref").notNull(),
+   compositionBudgetTier: text("composition_budget_tier").notNull(),
++  planTier: text("plan_tier"),
+   depthParams: jsonb("depth_params").notNull(),
+   agentCount: integer("agent_count").notNull(),
+   discoveredPanel: jsonb("discovered_panel").notNull(),
+diff --git a/dialectical-engine/tests/architecture/tier01-roster.test.ts b/dialectical-engine/tests/architecture/tier01-roster.test.ts
+new file mode 100644
+index 00000000..23ac6405
+--- /dev/null
++++ b/dialectical-engine/tests/architecture/tier01-roster.test.ts
+@@ -0,0 +1,63 @@
++import { execFileSync } from "node:child_process";
++import { readFileSync } from "node:fs";
++import { resolve } from "node:path";
++
++import * as contract from "@debateai/contract";
++import { describe, expect, it } from "vitest";
++
++const MODEL_IDS = [
++  "gpt-5.6-luna",
++  "claude-sonnet-5",
++  "gpt-5.6-sol",
++  "claude-opus-5",
++  "grok-4.6"
++] as const;
++
++function productionFiles(): string[] {
++  return execFileSync(
++    "git",
++    ["ls-files", "--cached", "--others", "--exclude-standard", "apps", "packages"],
++    { encoding: "utf8" }
++  )
++    .trim()
++    .split("\n")
++    .filter(Boolean)
++    .filter((file) => !file.includes("/node_modules/"))
++    .filter((file) => !file.startsWith("packages/contract/generated/"))
++    .filter((file) => !/\.test\.[^/]+$/.test(file));
++}
++
++describe("R11 plan-tier roster architecture", () => {
++  it("R11 declares each tier's ordered roster exactly once in the repo", () => {
++    const rosters = (contract as Record<string, unknown>).PLAN_TIER_ROSTERS as
++      | { free: readonly string[]; premium: readonly string[] }
++      | undefined;
++
++    expect(
++      rosters,
++      "PLAN_TIER_ROSTERS is not exported from @debateai/contract"
++    ).toBeDefined();
++    expect(rosters!.free).toEqual(["gpt-5.6-luna", "claude-sonnet-5"]);
++    expect(rosters!.premium).toEqual(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]);
++
++    const files = productionFiles();
++    for (const modelId of MODEL_IDS) {
++      const quotedExact = JSON.stringify(modelId);
++      const declarations = files.filter((file) =>
++        readFileSync(resolve(file), "utf8").includes(quotedExact)
++      );
++      expect(declarations, `${modelId} quoted-exact declarations`).toEqual([
++        "packages/contract/src/plan-tiers.ts"
++      ]);
++    }
++
++    const contractSource = readFileSync(resolve("packages/contract/src/index.ts"), "utf8");
++    const askSchema = contractSource.indexOf("export const AskRequestSchema");
++    const askTypes = [...contractSource.matchAll(/^export type AskRequest =/gm)].map(
++      (match) => match.index
++    );
++    expect(askSchema).toBeGreaterThanOrEqual(0);
++    expect(askTypes).toHaveLength(1);
++    expect(askTypes[0]).toBeGreaterThan(askSchema);
++  });
++});
+diff --git a/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts b/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
+new file mode 100644
+index 00000000..481276b1
+--- /dev/null
++++ b/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
+@@ -0,0 +1,245 @@
++import { readdirSync, readFileSync } from "node:fs";
++import { extname, join, relative, sep } from "node:path";
++
++import { describe, expect, it } from "vitest";
++
++import { PLAN_TIER_ROSTERS } from "@debateai/contract";
++
++const PROJECT_ROOT = process.cwd();
++const SOURCE_ROOTS = ["apps", "packages"] as const;
++const EXCLUDED_DIRECTORIES = new Set([
++  "node_modules",
++  "dist",
++  "generated",
++  ".next"
++]);
++const SOURCE_EXTENSIONS = new Set([
++  ".cjs",
++  ".cts",
++  ".js",
++  ".json",
++  ".jsx",
++  ".mjs",
++  ".mts",
++  ".ts",
++  ".tsx"
++]);
++
++function sourceFiles(directory: string): string[] {
++  return readdirSync(directory, { withFileTypes: true })
++    .sort((left, right) => left.name.localeCompare(right.name))
++    .flatMap((entry) => {
++      const absolutePath = join(directory, entry.name);
++      if (entry.isDirectory()) {
++        return EXCLUDED_DIRECTORIES.has(entry.name)
++          ? []
++          : sourceFiles(absolutePath);
++      }
++      if (!entry.isFile()) return [];
++
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      return projectPath.includes(".test.") ||
++        !SOURCE_EXTENSIONS.has(extname(entry.name))
++        ? []
++        : [absolutePath];
++    });
++}
++
++function sourceFilesContaining(needle: string): string[] {
++  return SOURCE_ROOTS.flatMap((sourceRoot) =>
++    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      return readFileSync(absolutePath, "utf8").includes(needle)
++        ? [projectPath]
++        : [];
++    })
++  ).sort();
++}
++
++function sourceOccurrencesContaining(needle: string): Readonly<Record<string, number>> {
++  return Object.fromEntries(SOURCE_ROOTS.flatMap((sourceRoot) =>
++    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
++      const source = readFileSync(absolutePath, "utf8");
++      const count = source.split(needle).length - 1;
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      return count === 0 ? [] : [[projectPath, count] as const];
++    })
++  ).sort(([left], [right]) => left.localeCompare(right)));
++}
++
++function escapeRegExp(value: string): string {
++  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
++}
++
++function rosterSelectors(source: string): readonly string[] {
++  const selectors = ["PLAN_TIER_ROSTERS"];
++  const localRosterBinding = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;]+)?=\s*PLAN_TIER_ROSTERS\s*(?:\.|\[)/g;
++  for (const match of source.matchAll(localRosterBinding)) selectors.push(match[1]!);
++  return [...new Set(selectors)];
++}
++
++function selectsRoster(source: string, selectors: readonly string[]): boolean {
++  return selectors.some((selector) => new RegExp(
++    `(?:^|[^A-Za-z0-9_$])${escapeRegExp(selector)}(?:$|[^A-Za-z0-9_$])`
++  ).test(source));
++}
++
++function closingDelimiter(
++  source: string,
++  openingIndex: number,
++  opening: "(" | "{",
++  closing: ")" | "}"
++): number {
++  let depth = 0;
++  let quote: '"' | "'" | "`" | undefined;
++
++  for (let index = openingIndex; index < source.length; index += 1) {
++    const character = source[index]!;
++    const next = source[index + 1];
++    if (quote) {
++      if (character === "\\") index += 1;
++      else if (character === quote) quote = undefined;
++      continue;
++    }
++    if (character === "/" && next === "/") {
++      index = source.indexOf("\n", index + 2);
++      if (index === -1) return source.length;
++      continue;
++    }
++    if (character === "/" && next === "*") {
++      index = source.indexOf("*/", index + 2);
++      if (index === -1) return source.length;
++      index += 1;
++      continue;
++    }
++    if (character === '"' || character === "'" || character === "`") {
++      quote = character;
++      continue;
++    }
++    if (character === opening) depth += 1;
++    if (character === closing) {
++      depth -= 1;
++      if (depth === 0) return index;
++    }
++  }
++
++  return source.length;
++}
++
++function skipTrivia(source: string, start: number): number {
++  let index = start;
++  while (index < source.length) {
++    if (/\s/.test(source[index]!)) {
++      index += 1;
++    } else if (source.startsWith("//", index)) {
++      const newline = source.indexOf("\n", index + 2);
++      index = newline === -1 ? source.length : newline + 1;
++    } else if (source.startsWith("/*", index)) {
++      const end = source.indexOf("*/", index + 2);
++      index = end === -1 ? source.length : end + 2;
++    } else {
++      break;
++    }
++  }
++  return index;
++}
++
++function branchBody(source: string, start: number): { body: string; end: number } {
++  const bodyStart = skipTrivia(source, start);
++  if (source[bodyStart] === "{") {
++    const end = closingDelimiter(source, bodyStart, "{", "}");
++    return { body: source.slice(bodyStart + 1, end), end: end + 1 };
++  }
++
++  const end = source.indexOf(";", bodyStart);
++  const statementEnd = end === -1 ? source.length : end + 1;
++  return { body: source.slice(bodyStart, statementEnd), end: statementEnd };
++}
++
++function tierBranchLines(): string[] {
++  return SOURCE_ROOTS.flatMap((sourceRoot) =>
++    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      if (projectPath === "packages/contract/src/plan-tiers.ts") return [];
++
++      const source = readFileSync(absolutePath, "utf8");
++      const selectors = rosterSelectors(source);
++      const hits: string[] = [];
++      const location = (index: number) =>
++        `${projectPath}:${source.slice(0, index).split("\n").length}`;
++      const controlFlow = /\b(if|switch)\s*\(/g;
++      for (const match of source.matchAll(controlFlow)) {
++        const opening = source.indexOf("(", match.index);
++        const closing = closingDelimiter(source, opening, "(", ")");
++        const condition = source.slice(opening + 1, closing);
++        if (!/\b(?:plan_tier|planTier)\b/.test(condition)) continue;
++
++        const consequent = branchBody(source, closing + 1);
++        let selectedBody = consequent.body;
++        if (match[1] === "if") {
++          const afterConsequent = skipTrivia(source, consequent.end);
++          if (source.startsWith("else", afterConsequent)) {
++            selectedBody += branchBody(source, afterConsequent + 4).body;
++          }
++        }
++        const branchSelectsRoster = selectsRoster(selectedBody, selectors);
++        const selectsTierCase = match[1] !== "switch" ||
++          /\bcase\s+(?:"(?:free|premium)"|'(?:free|premium)')\s*:/.test(selectedBody);
++        if (branchSelectsRoster && selectsTierCase) hits.push(location(match.index));
++      }
++
++      const tierTernary = /\b(?:plan_tier|planTier)\b[^;?]*\?[^;]*;/gs;
++      for (const match of source.matchAll(tierTernary)) {
++        if (selectsRoster(match[0], selectors)) hits.push(location(match.index));
++      }
++      return [...new Set(hits)];
++    })
++  ).sort();
++}
++
++describe("S02 tier roster architecture", () => {
++  it("keeps the exact ordered model roster for each plan tier", () => {
++    expect(PLAN_TIER_ROSTERS.free).toEqual([
++      "gpt-5.6-luna",
++      "claude-sonnet-5"
++    ]);
++    expect(PLAN_TIER_ROSTERS.premium).toEqual([
++      "gpt-5.6-sol",
++      "claude-opus-5",
++      "grok-4.6"
++    ]);
++  });
++
++  it("keeps every roster model id in one canonical declaration", () => {
++    const expectedFiles: Record<string, string[]> = {
++      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts"],
++      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts"],
++      "gpt-5.6-sol": [
++        "apps/ui/components/landing/cards.ts",
++        "packages/contract/src/plan-tiers.ts"
++      ],
++      "claude-opus-5": [
++        "apps/ui/components/landing/cards.ts",
++        "packages/contract/src/plan-tiers.ts"
++      ],
++      "grok-4.6": ["packages/contract/src/plan-tiers.ts"]
++    };
++
++    for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {
++      expect(sourceFilesContaining(modelId), modelId).toEqual(expectedPaths);
++      expect(sourceOccurrencesContaining(modelId), modelId).toEqual(Object.fromEntries(
++        expectedPaths.map((expectedPath) => [expectedPath, 1])
++      ));
++    }
++  });
++
++  it("keeps plan-tier model selection out of if and case branches", () => {
++    expect(tierBranchLines()).toEqual([]);
++  });
++
++  it("keeps at least two members in every tier roster", () => {
++    for (const roster of Object.values(PLAN_TIER_ROSTERS)) {
++      expect(roster.length).toBeGreaterThanOrEqual(2);
++    }
++  });
++});
+diff --git a/dialectical-engine/tests/integration/evaluator-database.test.ts b/dialectical-engine/tests/integration/evaluator-database.test.ts
+index c609ae14..73e88eb4 100644
+--- a/dialectical-engine/tests/integration/evaluator-database.test.ts
++++ b/dialectical-engine/tests/integration/evaluator-database.test.ts
+@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
+ import { afterAll, beforeAll, describe, expect, it } from "vitest";
+ import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
+ import type { AskRequest, Session } from "@debateai/contract";
+-import { migrate, ProviderProbeRepository } from "@debateai/db";
++import { migrate, ProviderProbeRepository, type DiscoveredPanelMember } from "@debateai/db";
+ import { readDeploymentMakerCapability } from "@debateai/critique";
+ import {
+   DomainRegistryRepository,
+@@ -1327,6 +1327,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+     decision_scope: "test",
+     as_of: "2026-08-14T00:00:00.000Z",
+     steering_presets: [],
++    plan_tier: "free",
+     steering_annotations: []
+   };
+   const session = {
+@@ -1344,10 +1345,12 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+   async function admitAndReadPersistedRun(registerVersion: number): Promise<{
+     readonly panelBytes: string;
+     readonly discoveredPanel: readonly { readonly provider_ref: string; readonly maker: string }[];
++    readonly resolvedPanel: readonly DiscoveredPanelMember[];
+     readonly agentCount: number;
+   }> {
+     const deploymentMakers = await readDeploymentMakerCapability(database.pool, registerVersion);
+     const probes = new ProviderProbeRepository(database.pool);
++    let resolvedPanel: readonly DiscoveredPanelMember[] = [];
+     const settings: RunCreationSettings = {
+       strangerSampleRate: 0,
+       registerVersion,
+@@ -1358,7 +1361,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+           deploymentMakers.configuredProviders.map((provider) => provider.providerRef)
+         );
+         const now = Date.now();
+-        return Object.freeze(latest.flatMap((record) =>
++        resolvedPanel = Object.freeze(latest.flatMap((record) =>
+           record.state === "HEALTHY" && record.modelId !== null
+             && now - record.probedAt.getTime() <= 60_000
+             ? [Object.freeze({
+@@ -1370,6 +1373,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+               })]
+             : []
+         ));
++        return resolvedPanel;
+       },
+       resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 2),
+       resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+@@ -1400,6 +1404,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+     return Object.freeze({
+       panelBytes: row.panel_bytes,
+       discoveredPanel: row.discovered_panel,
++      resolvedPanel,
+       agentCount: row.agent_count
+     });
+   }
+@@ -1442,8 +1447,8 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+       ) VALUES ($1, 'AVAILABLE', NULL, $2, $2, ledger.allocate_sequence())
+     `, [EVALUATOR_PROVIDER_REF, probedAt]);
+     for (const probe of [
+-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "model:product-a" },
+-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "model:product-b" },
++      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "gpt-5.6-luna" },
++      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "claude-sonnet-5" },
+       { probeEvidenceRef: "00000000-0000-4000-8000-000000000203", providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER, modelId: "model:evaluator-local" }
+     ]) {
+       await probes.record({ ...probe, state: "HEALTHY", failureCode: null, probedAt });
+@@ -1452,6 +1457,9 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+     const absent = await admitAndReadPersistedRun(absentVersion);
+     const healthy = await admitAndReadPersistedRun(healthyVersion);
+ 
++    expect(healthy.resolvedPanel.some((member) =>
++      member.provider_ref === EVALUATOR_PROVIDER_REF || member.maker === EVALUATOR_MAKER
++    )).toBe(false);
+     expect(healthy.panelBytes).toBe(absent.panelBytes);
+     expect(healthy.agentCount).toBe(absent.agentCount);
+     expect(healthy.discoveredPanel.some((member) =>
+diff --git a/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts b/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts
+new file mode 100644
+index 00000000..18cf0753
+--- /dev/null
++++ b/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts
+@@ -0,0 +1,309 @@
++import { randomBytes, randomUUID } from "node:crypto";
++import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import {
++  ContentCipher,
++  FileRunContentKeyStore,
++  FileUserDekStore,
++  generateDek,
++  loadKek
++} from "../../packages/crypto/src/index.js";
++import {
++  CONTENT_CIPHERTEXT_SENTINEL,
++  configureContentEncryption,
++  migrate,
++  RunRepository
++} from "@debateai/db";
++import { run as runSchema } from "../../packages/db/src/schema.js";
++import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
++import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
++
++type RunInput = Parameters<RunRepository["startRun"]>[0] & {
++  readonly planTier: "free" | "premium";
++};
++
++let database: TestDatabase;
++let prePlanTierDatabase: TestDatabase;
++let secretRoot: string;
++let prePlanTierSecretRoot: string;
++let userId: string;
++let ownerRef: string;
++let sessionId: string;
++let prePlanTierUserId: string;
++let prePlanTierOwnerRef: string;
++let prePlanTierSessionId: string;
++
++function runInput(
++  planTier: "free" | "premium",
++  principal: RunInput["principal"]
++): RunInput {
++  return {
++    questionLine: `S02 plan tier ${randomUUID()}`,
++    askContract: { audience: "tiers-s02-integration" },
++    principal,
++    sessionId,
++    callerScope: "ASKER",
++    asOf: new Date("2026-09-09T00:00:00.000Z"),
++    askerRiskTier: "casual",
++    effectiveRiskTier: "casual",
++    tierSource: "ASKER",
++    tierProvenanceRef: "tiers-s02:integration",
++    compositionBudgetTier: "low",
++    planTier,
++    depthParams: { depth: 1 },
++    discoveredPanel: fixtureDiscoveredPanel(1),
++    strangerSampleRate: 1,
++    envelopeBasis: { source: "tiers-s02:integration" },
++    registerVersion: 1,
++    batteryVersion: "tiers-s02:integration",
++    batteryRows: []
++  };
++}
++
++async function migrateBeforePlanTier(target: TestDatabase): Promise<void> {
++  const directory = new URL("../../migrations/", import.meta.url);
++  const migrations = (await readdir(directory))
++    .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0061_plan_tier_on_run.sql")
++    .sort();
++  const client = await target.pool.connect();
++  try {
++    await client.query("BEGIN");
++    for (const name of migrations) {
++      await client.query(await readFile(new URL(name, directory), "utf8"));
++    }
++    await client.query("COMMIT");
++  } catch (error) {
++    await client.query("ROLLBACK");
++    throw error;
++  } finally {
++    client.release();
++  }
++}
++
++async function createActiveUser(): Promise<void> {
++  userId = randomUUID();
++  ownerRef = randomUUID();
++  sessionId = randomUUID();
++  await database.pool.query(
++    `INSERT INTO identity."user" (
++       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
++       adult_affirmed_at,created_at
++     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
++    [userId, Buffer.alloc(32, 0x73), `tiers-s02-${randomUUID()}`, randomUUID(), ownerRef]
++  );
++  await database.pool.query(
++    `INSERT INTO identity.session(
++       session_id,user_id,token_hash,csrf_token_hash,binding_context,
++       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
++     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
++       now()+interval '2 hours',now())`,
++    [
++      sessionId,
++      userId,
++      `sha256:${randomBytes(32).toString("hex")}`,
++      `sha256:${randomBytes(32).toString("hex")}`
++    ]
++  );
++}
++
++async function createPrePlanTierActiveUser(): Promise<void> {
++  prePlanTierUserId = randomUUID();
++  prePlanTierOwnerRef = randomUUID();
++  prePlanTierSessionId = randomUUID();
++  await prePlanTierDatabase.pool.query(
++    `INSERT INTO identity."user" (
++       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
++       adult_affirmed_at,created_at
++     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
++    [
++      prePlanTierUserId,
++      Buffer.alloc(32, 0x73),
++      `tiers-s02-${randomUUID()}`,
++      randomUUID(),
++      prePlanTierOwnerRef
++    ]
++  );
++  await prePlanTierDatabase.pool.query(
++    `INSERT INTO identity.session(
++       session_id,user_id,token_hash,csrf_token_hash,binding_context,
++       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
++     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
++       now()+interval '2 hours',now())`,
++    [
++      prePlanTierSessionId,
++      prePlanTierUserId,
++      `sha256:${randomBytes(32).toString("hex")}`,
++      `sha256:${randomBytes(32).toString("hex")}`
++    ]
++  );
++}
++
++beforeAll(async () => {
++  database = await startTestDatabase();
++  await migrate(database.pool);
++  await createActiveUser();
++  secretRoot = await mkdtemp(join(tmpdir(), "debateai-tiers-s02-"));
++  const users = new FileUserDekStore(secretRoot, loadKek(generateDek()));
++  await users.store(userId, generateDek());
++  const keys = new FileRunContentKeyStore(secretRoot, users, async (candidate) => {
++    const result = await database.pool.query<{ user_id: string }>(
++      `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
++      [candidate]
++    );
++    const resolved = result.rows[0]?.user_id;
++    if (resolved === undefined) throw new Error("OWNER_REF_UNRESOLVED");
++    return resolved;
++  });
++  configureContentEncryption(database.pool, new ContentCipher(keys));
++
++  prePlanTierDatabase = await startTestDatabase();
++  await migrateBeforePlanTier(prePlanTierDatabase);
++  await createPrePlanTierActiveUser();
++  prePlanTierSecretRoot = await mkdtemp(join(tmpdir(), "debateai-tiers-s02-pre-0061-"));
++  const prePlanTierUsers = new FileUserDekStore(
++    prePlanTierSecretRoot,
++    loadKek(generateDek())
++  );
++  await prePlanTierUsers.store(prePlanTierUserId, generateDek());
++  const prePlanTierKeys = new FileRunContentKeyStore(
++    prePlanTierSecretRoot,
++    prePlanTierUsers,
++    async (candidate) => {
++      const result = await prePlanTierDatabase.pool.query<{ user_id: string }>(
++        `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
++        [candidate]
++      );
++      const resolved = result.rows[0]?.user_id;
++      if (resolved === undefined) throw new Error("OWNER_REF_UNRESOLVED");
++      return resolved;
++    }
++  );
++  configureContentEncryption(
++    prePlanTierDatabase.pool,
++    new ContentCipher(prePlanTierKeys)
++  );
++}, 120_000);
++
++afterAll(async () => {
++  await database?.stop();
++  await prePlanTierDatabase?.stop();
++  if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
++  if (prePlanTierSecretRoot !== undefined) {
++    await rm(prePlanTierSecretRoot, { recursive: true, force: true });
++  }
++});
++
++describe("S02 plan tier run storage", () => {
++  it("migrates core.run.plan_tier as nullable text", async () => {
++    const result = await database.pool.query<{ data_type: string; is_nullable: string }>(`
++      SELECT data_type,is_nullable
++      FROM information_schema.columns
++      WHERE table_schema='core' AND table_name='run' AND column_name='plan_tier'
++    `);
++    const schemaColumn = (runSchema as unknown as {
++      readonly planTier?: { readonly name?: unknown };
++    }).planTier?.name;
++
++    expect({ databaseColumns: result.rows, schemaColumn }).toEqual({
++      databaseColumns: [{ data_type: "text", is_nullable: "YES" }],
++      schemaColumn: "plan_tier"
++    });
++  });
++
++  it("creates run_plan_tier_vocabulary and rejects an invalid plan_tier", async () => {
++    const constraints = await database.pool.query<{ constraint_name: string }>(`
++      SELECT constraint_name
++      FROM information_schema.table_constraints
++      WHERE table_schema='core' AND table_name='run'
++        AND constraint_name='run_plan_tier_vocabulary'
++    `);
++
++    expect(constraints.rows).toEqual([{ constraint_name: "run_plan_tier_vocabulary" }]);
++
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput("premium", { kind: "legacy", legacyAskerId: `tiers-s02-${randomUUID()}` })
++    );
++    const client = await database.pool.connect();
++    try {
++      await client.query("BEGIN");
++      await client.query("SET LOCAL session_replication_role = replica");
++      await expect(
++        client.query("UPDATE core.run SET plan_tier='gold' WHERE run_id=$1", [runId])
++      ).rejects.toMatchObject({ code: "23514", constraint: "run_plan_tier_vocabulary" });
++    } finally {
++      await client.query("ROLLBACK");
++      client.release();
++    }
++  });
++
++  it("persists premium through the legacy-principal plan_tier write path", async () => {
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput("premium", { kind: "legacy", legacyAskerId: `tiers-s02-${randomUUID()}` })
++    );
++    const result = await database.pool.query<{ plan_tier: string | null }>(
++      "SELECT plan_tier FROM core.run WHERE run_id=$1",
++      [runId]
++    );
++
++    expect(result.rows[0]?.plan_tier).toBe("premium");
++  });
++
++  it("persists plaintext free beside encrypted content through the server-principal plan_tier path", async () => {
++    const runId = await new RunRepository(database.pool).startRun(
++      runInput("free", { kind: "server", userId, ownerRef })
++    );
++    const result = await database.pool.query<{ plan_tier: string | null; question_line: string }>(
++      "SELECT plan_tier,question_line FROM core.run WHERE run_id=$1",
++      [runId]
++    );
++
++    expect(result.rows[0]).toEqual({
++      plan_tier: "free",
++      question_line: CONTENT_CIPHERTEXT_SENTINEL
++    });
++  });
++
++  it("starts a legacy-principal run before migration 0061", async () => {
++    const input = runInput(
++      "premium",
++      { kind: "legacy", legacyAskerId: `tiers-s02-${randomUUID()}` }
++    );
++    const runId = await new RunRepository(prePlanTierDatabase.pool).startRun({
++      ...input,
++      sessionId: prePlanTierSessionId
++    });
++    const result = await prePlanTierDatabase.pool.query<{ question_line: string }>(
++      "SELECT question_line FROM core.run WHERE run_id=$1",
++      [runId]
++    );
++
++    expect(result.rows).toEqual([{ question_line: input.questionLine }]);
++  });
++
++  it("starts an encrypted server-principal run before migration 0061", async () => {
++    const runId = await new RunRepository(prePlanTierDatabase.pool).startRun({
++      ...runInput("free", {
++        kind: "server",
++        userId: prePlanTierUserId,
++        ownerRef: prePlanTierOwnerRef
++      }),
++      sessionId: prePlanTierSessionId
++    });
++    const result = await prePlanTierDatabase.pool.query<{
++      question_line: string;
++      content_encryption_version: number;
++    }>(
++      "SELECT question_line,content_encryption_version FROM core.run WHERE run_id=$1",
++      [runId]
++    );
++
++    expect(result.rows).toEqual([{
++      question_line: CONTENT_CIPHERTEXT_SENTINEL,
++      content_encryption_version: 1
++    }]);
++  });
++});
+diff --git a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+new file mode 100644
+index 00000000..8f437c96
+--- /dev/null
++++ b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+@@ -0,0 +1,532 @@
++// @vitest-environment jsdom
++
++import { readFileSync } from "node:fs";
++import { act } from "react";
++import { createRoot, type Root } from "react-dom/client";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { PLAN_TIER_ROSTERS } from "@debateai/contract";
++
++const mocks = vi.hoisted(() => ({
++  createDebate: vi.fn(),
++  push: vi.fn(),
++  readSession: vi.fn()
++}));
++
++vi.mock("next/navigation", () => ({
++  useRouter: () => ({ push: mocks.push }),
++  useSearchParams: () => new URLSearchParams()
++}));
++
++vi.mock("@/components/AuthGate", () => ({
++  AuthGate: ({ children }: { children: (token: string) => unknown }) => children("test-token")
++}));
++
++vi.mock("@/lib/api", () => ({
++  createDebate: mocks.createDebate,
++  contractClient: { readSession: mocks.readSession }
++}));
++
++import NewDebatePage from "../../apps/ui/app/new/page.js";
++
++const pageSource = readFileSync("apps/ui/app/new/page.tsx", "utf8");
++
++async function settle(): Promise<void> {
++  await act(async () => {
++    await Promise.resolve();
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++}
++
++describe("S01 /new plan tier", () => {
++  let root: Root | null = null;
++
++  // DONE.md §3 / S01-44 map — M-line → assertion(s) → suite:
++  // M1 → S01-20, S01-22 → render/tier01-new-plan-tier.
++  // M4 → S01-25 → render/tier01-new-plan-tier.
++  // M5 → S01-25 → render/tier01-new-plan-tier.
++  // M6 → S01-25 → render/tier01-new-plan-tier.
++  // M7 → S01-25, S01-26 → render/tier01-new-plan-tier.
++  // M8 → S01-27–S01-30, S01-33, S01-36 → render/tier01-new-plan-tier.
++  // M9 → S01-23, S01-34, S01-35 → render/tier01-new-plan-tier.
++  // M10 → S01-23, S01-34, S01-35 → render/tier01-new-plan-tier.
++  // M11 → M11 below, S01-38 → render/tier01-new-plan-tier.
++  // M12 → S01-30 → render/tier01-new-plan-tier (plus style M12).
++  // M14 → S01-31–S01-33, S01-37 → render/tier01-new-plan-tier (plus style S01-40).
++
++  beforeEach(() => {
++    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
++    mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
++    mocks.push.mockReset();
++    mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
++    const container = document.createElement("div");
++    document.body.append(container);
++    root = createRoot(container);
++  });
++
++  afterEach(async () => {
++    if (root !== null) await act(async () => root!.unmount());
++    root = null;
++    document.body.replaceChildren();
++    vi.unstubAllGlobals();
++  });
++
++  async function renderPage(): Promise<void> {
++    await act(async () => root!.render(<NewDebatePage />));
++    await settle();
++  }
++
++  async function click(selector: string): Promise<void> {
++    await act(async () => document.querySelector<HTMLElement>(selector)!.click());
++    await settle();
++  }
++
++  async function inputValue(selector: string, value: string): Promise<void> {
++    const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;
++    const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")?.set;
++    await act(async () => {
++      setter!.call(field, value);
++      field.dispatchEvent(new Event("input", { bubbles: true }));
++    });
++    await settle();
++  }
++
++  async function selectValue(selector: string, value: string): Promise<void> {
++    const field = document.querySelector<HTMLSelectElement>(selector)!;
++    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
++    await act(async () => {
++      setter!.call(field, value);
++      field.dispatchEvent(new Event("change", { bubbles: true }));
++    });
++    await settle();
++  }
++
++  async function submitForm(): Promise<void> {
++    await act(async () => {
++      document.querySelector<HTMLFormElement>('form')!.dispatchEvent(
++        new Event("submit", { bubbles: true, cancelable: true })
++      );
++    });
++    await settle();
++  }
++
++  it("S01-20 R1 offers exactly two mutually exclusive tier options", async () => {
++    await renderPage();
++
++    expect(document.body.innerHTML).not.toBe("");
++    const options = [...document.querySelectorAll<HTMLElement>('[data-field="planTier"]')];
++    expect(options).toHaveLength(2);
++    expect(options.map((option) => option.dataset.value)).toEqual(["free", "premium"]);
++    expect(options.every((option) => option.closest('[role="radiogroup"]') !== null)).toBe(true);
++    expect(new Set(options.map((option) => option.closest('[role="radiogroup"]'))).size).toBe(1);
++    expect(options[0]?.closest('[role="radiogroup"]')?.getAttribute("aria-label")).toBe("Plan tier");
++    expect(options.filter((option) => option.getAttribute("aria-checked") === "true")).toHaveLength(1);
++  });
++
++  it("S01-21 R1 gives each tier option the segmented-radio attribute contract", async () => {
++    await renderPage();
++
++    const free = document.querySelector<HTMLButtonElement>('#planTier-free');
++    const premium = document.querySelector<HTMLButtonElement>('#planTier-premium');
++    expect(free).toMatchObject({ type: "button" });
++    expect(premium).toMatchObject({ type: "button" });
++    expect(free?.getAttribute("role")).toBe("radio");
++    expect(premium?.getAttribute("role")).toBe("radio");
++  });
++
++  it("S01-22 R1 places the tier selector above the question bezel", async () => {
++    await renderPage();
++
++    const markup = document.body.innerHTML;
++    expect(markup.indexOf('class="ndTier"')).toBeGreaterThanOrEqual(0);
++    expect(markup.indexOf('class="ndTier"')).toBeLessThan(markup.indexOf('class="ndTopicBezel"'));
++  });
++
++  it("S01-23 R2 opens on Free with the R7 values already pinned", async () => {
++    await renderPage();
++
++    expect(document.querySelector('#planTier-free')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("");
++    expect(document.querySelector('.ndIntro')?.textContent?.trim()).toBe(
++      "Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself."
++    );
++    expect(document.querySelector('#riskTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
++      "How much is riding on the answer · fixed by the Free plan"
++    );
++    expect(document.querySelector('#budgetTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
++      "How much work the composition may spend · fixed by the Free plan"
++    );
++  });
++
++  it("S01-24 R2 does not key the session-defaults effect on plan tier", async () => {
++    await renderPage();
++
++    expect(mocks.readSession).toHaveBeenCalledTimes(1);
++    await click('#planTier-premium');
++    await click('#planTier-free');
++    expect(mocks.readSession).toHaveBeenCalledTimes(1);
++  });
++
++  it("S01-25 R3 names each tier's models from the roster declaration", async () => {
++    await renderPage();
++
++    expect(document.querySelector('#planTier-free')?.textContent).toContain("gpt-5.6-luna");
++    expect(document.querySelector('#planTier-free')?.textContent).toContain("claude-sonnet-5");
++    expect(document.querySelector('#planTier-premium')?.textContent).toContain("gpt-5.6-sol");
++    expect(document.querySelector('#planTier-premium')?.textContent).toContain("claude-opus-5");
++    expect(document.querySelector('#planTier-premium')?.textContent).toContain("grok-4.6");
++    expect(document.querySelector('#planTier-free .ndTierName')?.textContent).toBe("Free");
++    expect(document.querySelector('#planTier-premium .ndTierName')?.textContent).toBe("Premium");
++    expect(document.querySelector('#planTier-free .ndTierPromise')?.textContent).toBe(
++      "Every gauge fixed. The question is yours."
++    );
++    expect(document.querySelector('#planTier-premium .ndTierPromise')?.textContent).toBe(
++      "Every gauge yours to set."
++    );
++  });
++
++  it("S01-26 R3 renders ordered roster ids with their existing family dots", async () => {
++    await renderPage();
++
++    const freeModels = [...document.querySelectorAll<HTMLElement>('#planTier-free .ndTierModel')];
++    const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
++    const expectedRosters = {
++      free: ["gpt-5.6-luna", "claude-sonnet-5"],
++      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]
++    };
++    expect(PLAN_TIER_ROSTERS).toEqual(expectedRosters);
++    expect({
++      free: freeModels.map((model) => model.textContent?.trim()),
++      premium: premiumModels.map((model) => model.textContent?.trim())
++    }).toEqual(expectedRosters);
++    expect([...freeModels, ...premiumModels].map((model) =>
++      model.querySelector<HTMLElement>('.modelDot')?.style.getPropertyValue("--dot")
++    )).toEqual([
++      "var(--m-gpt)",
++      "var(--m-claude)",
++      "var(--m-gpt)",
++      "var(--m-claude)",
++      "var(--m-grok)"
++    ]);
++  });
++
++  it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
++    vi.resetModules();
++    vi.doMock("@debateai/contract", () => ({
++      PLAN_TIER_ROSTERS: {
++        free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
++        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6", "claude_opus", "grok/4.6", "gemini-3"]
++      }
++    }));
++    try {
++      const { default: PageWithProbeRoster } = await import("../../apps/ui/app/new/page.js");
++      await act(async () => root!.render(<PageWithProbeRoster />));
++      await settle();
++      expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
++        dot.style.getPropertyValue("--dot")
++      )).toEqual([
++        "var(--m-gpt)",
++        "var(--m-claude)",
++        "var(--m-gpt)",
++        "var(--m-gpt)",
++        "var(--m-gpt)",
++        "var(--m-gpt)",
++        "var(--m-claude)",
++        "var(--m-grok)",
++        "var(--m-claude)",
++        "var(--m-grok)",
++        "var(--m-gemini)"
++      ]);
++    } finally {
++      vi.doUnmock("@debateai/contract");
++      vi.resetModules();
++    }
++  });
++
++  it("S01-27 R4 locks all fourteen controls while Free is chosen", async () => {
++    await renderPage();
++    await click('.ndOptionsToggle');
++
++    const lockedIds = [
++      "riskTier-casual",
++      "riskTier-standard",
++      "riskTier-high-stakes",
++      "budgetTier-low",
++      "budgetTier-medium",
++      "budgetTier-high",
++      "treeDepth",
++      "steeringPresets",
++      "steeringAnnotations",
++      "depthMode",
++      "scrutinyDepth",
++      "branchingWidth",
++      "concurrency",
++      "maxTokens"
++    ];
++    const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
++    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(14);
++    expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
++    expect(locked.map((control) => {
++      const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
++      return [visualLock.style.opacity, visualLock.style.cursor];
++    })).toEqual(Array.from({ length: 14 }, () => ["", ""]));
++  });
++
++  it("S01-28 R4 forwards the Free lock to every native control family and keeps its description", async () => {
++    await renderPage();
++    await click('.ndOptionsToggle');
++
++    const locked = [...document.querySelectorAll<HTMLElement>(
++      '.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled'
++    )];
++    expect([
++      document.querySelectorAll('.ndSegItem:disabled').length,
++      document.querySelectorAll('.ndSlider:disabled').length,
++      document.querySelectorAll('.ndSteerInput:disabled').length,
++      document.querySelectorAll('.ndSelect select:disabled').length
++    ]).toEqual([6, 4, 2, 2]);
++    expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
++    expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
++    expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
++  });
++
++  it("S01-29 R4 rejects focus and activation at the native Free lock", async () => {
++    await renderPage();
++    await click('.ndOptionsToggle');
++
++    await click('#riskTier-high-stakes');
++    expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("false");
++    const lockedIds = [
++      "riskTier-casual", "riskTier-standard", "riskTier-high-stakes",
++      "budgetTier-low", "budgetTier-medium", "budgetTier-high",
++      "treeDepth", "steeringPresets", "steeringAnnotations",
++      "depthMode", "scrutinyDepth", "branchingWidth", "concurrency", "maxTokens"
++    ];
++    const focusAccepted = lockedIds.filter((id) => {
++      const control = document.querySelector<HTMLElement>(`#${id}`)!;
++      control.focus();
++      return document.activeElement === control;
++    });
++    expect(focusAccepted).toEqual([]);
++    expect(mocks.createDebate).not.toHaveBeenCalled();
++  });
++
++  it("S01-30 R5 / M12 keeps the OPTIONS toggle and notice operable in Free", async () => {
++    await renderPage();
++
++    const toggle = document.querySelector<HTMLButtonElement>('.ndOptionsToggle')!;
++    expect(toggle.hasAttribute("disabled")).toBe(false);
++    expect(toggle.getAttribute("aria-expanded")).toBe("false");
++    await click('.ndOptionsToggle');
++    expect(toggle.getAttribute("aria-expanded")).toBe("true");
++    expect(document.querySelector('#additionalRunOptions')).not.toBeNull();
++    expect(document.querySelector('.ndLegacyNotice')?.textContent?.replace(/\s+/g, " ").trim()).toBe(
++      "Depth mode, depth of scrutiny, branching width, concurrency, and max tokens are V2 controls the V3 run contract has no slot for — they are not sent."
++    );
++  });
++
++  it("S01-31 R16 inspects a non-empty submit region for retired V2 fields", () => {
++    const start = pageSource.indexOf("async function submit");
++    const end = pageSource.indexOf("return (", start + "async function submit".length);
++    expect(start).toBeGreaterThanOrEqual(0);
++    expect(end).toBeGreaterThan(start);
++    const submitBlock = pageSource.slice(start, end);
++    for (const dropped of ["branching", "concurrency", "maxTokens", "role_overrides", "adaptive_expansion"]) {
++      expect(submitBlock).not.toContain(dropped);
++    }
++  });
++
++  it("S01-32 R16 keeps depth bounds and controlled risk/budget bindings", async () => {
++    await renderPage();
++
++    const depth = document.querySelector<HTMLInputElement>('#treeDepth')!;
++    expect([depth.min, depth.max]).toEqual(["1", "5"]);
++    expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
++  });
++
++  it("S01-33 R6 keeps the question typeable in both tiers", async () => {
++    await renderPage();
++
++    const topic = document.querySelector<HTMLTextAreaElement>('#topic')!;
++    expect(topic.hasAttribute("disabled")).toBe(false);
++    expect(topic.hasAttribute("readonly")).toBe(false);
++    await inputValue('#topic', "a debatable claim");
++    await click('#planTier-premium');
++    expect(topic.value).toBe("a debatable claim");
++    expect(topic.hasAttribute("disabled")).toBe(false);
++    expect(topic.hasAttribute("readonly")).toBe(false);
++    await inputValue('#topic', "another debatable claim");
++    expect(topic.value).toBe("another debatable claim");
++  });
++
++  it("S01-34 R8 re-pins every Free value on choosing Free, whatever was on screen", async () => {
++    await renderPage();
++    await inputValue('#topic', "a debatable claim");
++    await click('#planTier-premium');
++    await click('#riskTier-high-stakes');
++    await click('#budgetTier-high');
++    await inputValue('#treeDepth', "4");
++    await inputValue('#steeringPresets', "Prefer primary sources");
++    await inputValue('#steeringAnnotations', "Flag unsupported claims");
++    await click('.ndOptionsToggle');
++    await selectValue('#depthMode', "adaptive");
++    await selectValue('#scrutinyDepth', "deep");
++    await inputValue('#branchingWidth', "4");
++    await inputValue('#concurrency', "6");
++    await inputValue('#maxTokens', "4000");
++
++    await click('#planTier-free');
++
++    expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("");
++    expect(document.querySelector('.ndIntro')?.textContent?.trim()).toBe(
++      "Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself."
++    );
++    expect(document.querySelector('#riskTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
++      "How much is riding on the answer · fixed by the Free plan"
++    );
++    expect(document.querySelector('#budgetTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
++      "How much work the composition may spend · fixed by the Free plan"
++    );
++    expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("fixed");
++    expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("standard");
++    expect(document.querySelector<HTMLInputElement>('#branchingWidth')?.value).toBe("2");
++    expect(document.querySelector<HTMLInputElement>('#concurrency')?.value).toBe("3");
++    const sliderGrid = ["treeDepth", "branchingWidth", "concurrency", "maxTokens"].map((id) => {
++      const slider = document.querySelector<HTMLInputElement>(`#${id}`)!;
++      return { id, min: slider.min, max: slider.max, step: slider.step, value: slider.value };
++    });
++    expect(sliderGrid).toEqual([
++      { id: "treeDepth", min: "1", max: "5", step: "1", value: "2" },
++      { id: "branchingWidth", min: "1", max: "4", step: "1", value: "2" },
++      { id: "concurrency", min: "1", max: "6", step: "1", value: "3" },
++      { id: "maxTokens", min: "128", max: "4000", step: "32", value: "800" }
++    ]);
++    expect(sliderGrid.every(({ min, max, step, value }) =>
++      (Number(value) - Number(min)) % Number(step) === 0 &&
++      (Number(max) - Number(min)) % Number(step) === 0
++    )).toBe(true);
++    expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
++    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(14);
++  });
++
++  it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
++    await renderPage();
++    await click('#planTier-premium');
++    await click('#riskTier-high-stakes');
++    await click('#budgetTier-high');
++    await inputValue('#treeDepth', "4");
++    await inputValue('#steeringPresets', "Prefer primary sources");
++    await inputValue('#steeringAnnotations', "Flag unsupported claims");
++    await click('#planTier-free');
++    await click('#planTier-premium');
++
++    expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("");
++    expect(document.querySelector('.ndIntro')?.textContent?.trim()).toBe(
++      "Choose your risk tier, composition budget tier, and depth, then click Start."
++    );
++    expect(document.querySelector('#riskTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
++      "How much is riding on the answer · explicit asker selection"
++    );
++    expect(document.querySelector('#budgetTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
++      "How much work the composition may spend · provisional default, editable"
++    );
++  });
++
++  it("S01-36 R9 unlocks every gauge in Premium and each control family accepts a change", async () => {
++    await renderPage();
++    await click('#planTier-premium');
++    await click('.ndOptionsToggle');
++
++    const gaugeIds = [
++      "riskTier-casual",
++      "riskTier-standard",
++      "riskTier-high-stakes",
++      "budgetTier-low",
++      "budgetTier-medium",
++      "budgetTier-high",
++      "treeDepth",
++      "steeringPresets",
++      "steeringAnnotations",
++      "depthMode",
++      "scrutinyDepth",
++      "branchingWidth",
++      "concurrency",
++      "maxTokens"
++    ];
++    expect(gaugeIds.filter((id) => {
++      const control = document.querySelector(`#${id}`);
++      return control?.hasAttribute("disabled") || control?.getAttribute("aria-disabled") === "true";
++    })).toEqual([]);
++
++    await click('#riskTier-high-stakes');
++    await click('#budgetTier-high');
++    await inputValue('#treeDepth', "4");
++    await inputValue('#steeringPresets', "Prefer primary sources");
++    await inputValue('#steeringAnnotations', "Flag unsupported claims");
++    await selectValue('#scrutinyDepth', "deep");
++    expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector('#budgetTier-high')?.getAttribute("aria-checked")).toBe("true");
++    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("4");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("Prefer primary sources");
++    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("Flag unsupported claims");
++    expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("deep");
++  });
++
++  it("S01-37 R10 keeps the tree-depth range at 1 through 5 in both tiers", async () => {
++    await renderPage();
++
++    const depth = document.querySelector<HTMLInputElement>('#treeDepth')!;
++    expect([depth.min, depth.max, depth.value]).toEqual(["1", "5", "2"]);
++    await click('#planTier-premium');
++    expect([depth.min, depth.max, depth.value]).toEqual(["1", "5", "2"]);
++  });
++
++  it("S01-38 R18 never disables Start run for the tier", async () => {
++    await renderPage();
++    await inputValue('#topic', "a debatable claim");
++
++    const start = document.querySelector<HTMLButtonElement>('.ndStart')!;
++    expect(start.hasAttribute("disabled")).toBe(false);
++    await click('#planTier-premium');
++    expect(start.hasAttribute("disabled")).toBe(false);
++  });
++
++  it("M11 · Start run stays disabled for an empty question in both tier states", async () => {
++    await renderPage();
++
++    const start = document.querySelector<HTMLButtonElement>('.ndStart')!;
++    const disabledWhileFree = start.disabled;
++    await click('#planTier-premium');
++
++    expect([disabledWhileFree, start.disabled]).toEqual([true, true]);
++  });
++
++  it("S01-39 R20-C sends the chosen plan tier in the ask config", async () => {
++    await renderPage();
++    await inputValue('#topic', "a debatable claim");
++
++    await submitForm();
++    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
++    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "free" });
++
++    mocks.createDebate.mockClear();
++    await click('#planTier-premium');
++    await submitForm();
++    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
++    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });
++  });
++});
+diff --git a/dialectical-engine/tests/unit/api.test.ts b/dialectical-engine/tests/unit/api.test.ts
+index 12785ca9..bd7a06ef 100644
+--- a/dialectical-engine/tests/unit/api.test.ts
++++ b/dialectical-engine/tests/unit/api.test.ts
+@@ -1,4 +1,4 @@
+-import { describe, expect, it } from "vitest";
++import { describe, expect, it, vi } from "vitest";
+ import {
+   AskRefusal,
+   buildApi as buildApiBase,
+@@ -8,9 +8,14 @@ import {
+   type AskApplication,
+   type RunCreationSettings
+ } from "@debateai/api";
+-import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
++import {
++  PLAN_TIER_ROSTERS,
++  createContractClient,
++  type AskRequest,
++  type Session
++} from "@debateai/contract";
+ import { TypedDomainError } from "@debateai/kernel";
+-import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
++import { configureContentEncryption, RunRepository } from "@debateai/db";
+ import {
+   RETIRED_DEV_HEADER,
+   TEST_APP_ORIGIN,
+@@ -28,6 +33,19 @@ const USER_IDENTITY = testHttpIdentity("api-user");
+ const USER_HEADERS = testSessionHeaders(USER_IDENTITY);
+ const USER_MUTATION_HEADERS = testSessionHeaders(USER_IDENTITY, true);
+ 
++function rosterPanel(
++  tier: AskRequest["plan_tier"],
++  makers: readonly string[] = []
++) {
++  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
++    provider_ref: `provider:${tier}:${index + 1}`,
++    maker: makers[index] ?? `maker:${tier}:${index + 1}`,
++    model_id: modelId,
++    probe_evidence_ref: `probe:${tier}:${index + 1}`,
++    probed_at: "2026-09-12T00:00:00.000Z"
++  }));
++}
++
+ function buildApi(options: Parameters<typeof buildApiBase>[0]) {
+   return buildApiBase({
+     ...options,
+@@ -81,7 +99,7 @@ function admissionSettings(
+     registerVersion: 1,
+     batteryVersion: "battery:test",
+     settlementWatchHandle: "watch:test",
+-    resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
++    resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:2"]),
+     resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
+     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+       effectiveRiskTier,
+@@ -132,6 +150,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+       decision_scope: "test-layer scope",
+       as_of: "2026-08-07T00:00:00.000Z",
+       steering_presets: [],
++      plan_tier: "free",
+       steering_annotations: []
+     };
+     await expect(evaluateAskAdmission(admissionSettings(), ask)).resolves.toMatchObject({
+@@ -154,10 +173,11 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+       decision_scope: "test-layer scope",
+       as_of: "2026-08-07T00:00:00.000Z",
+       steering_presets: [],
++      plan_tier: "free",
+       steering_annotations: []
+     };
+     await expect(evaluateAskAdmission(admissionSettings({
+-      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(1)
++      resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:1"])
+     }), ask)).resolves.toMatchObject({
+       criticUnavailableCap: {
+         serves: true,
+@@ -167,6 +187,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+     });
+ 
+     await expect(evaluateAskAdmission(admissionSettings({
++      resolveDiscoveredPanel: async () => rosterPanel("free"),
+       resolveEnvelopeBasis: async () => {
+         throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "No computed structural ceiling");
+       }
+@@ -236,6 +257,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+         decision_scope: "test-layer scope",
+         as_of: "2026-08-07T00:00:00.000Z",
+         steering_presets: [],
++        plan_tier: "free",
+         steering_annotations: []
+       }
+     });
+@@ -245,6 +267,115 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+     await api.close();
+   });
+ 
++  it("R14 answers 202 for each plan tier and 400 MALFORMED_REQUEST for a bad or absent one", async () => {
++    const api = buildApi({ application: fixtureApplication() });
++    const validPayload = {
++      question_line: "What follows from this evidence?",
++      risk_tier: "casual",
++      tier_source: "ASKER",
++      tier_provenance_ref: "asker-declaration:test",
++      composition_budget_tier: "low",
++      depth_params: { depth: 1 },
++      decision_scope: "test-layer scope",
++      as_of: "2026-08-07T00:00:00.000Z",
++      steering_presets: [],
++      steering_annotations: []
++    };
++
++    const injectAsk = (payload: Record<string, unknown>) => api.inject({
++      method: "POST",
++      url: "/v1/asks",
++      headers: USER_MUTATION_HEADERS,
++      payload
++    });
++    const free = await injectAsk({ ...validPayload, plan_tier: "free" });
++    const premium = await injectAsk({ ...validPayload, plan_tier: "premium" });
++    const bad = await injectAsk({ ...validPayload, plan_tier: "gold" });
++    const absent = await injectAsk(validPayload);
++
++    expect(free.statusCode).toBe(202);
++    expect(premium.statusCode).toBe(202);
++    expect({ statusCode: bad.statusCode, body: bad.json() }).toMatchObject({
++      statusCode: 400,
++      body: { error: "MALFORMED_REQUEST" }
++    });
++    expect({ statusCode: absent.statusCode, body: absent.json() }).toMatchObject({
++      statusCode: 400,
++      body: { error: "MALFORMED_REQUEST" }
++    });
++    await api.close();
++  });
++
++  it("warns when a pre-0061 encrypted writer strips the run plan tier", async () => {
++    const dataPool = {
++      query: async () => {
++        throw new Error("UNEXPECTED_DATA_POOL_QUERY");
++      }
++    };
++    const provisionPool = {
++      query: async (statement: string) => {
++        if (statement.includes("prepare_run_key_provision")) {
++          return { rows: [{ execution_ref: "55555555-5555-4555-8555-555555555555" }] };
++        }
++        if (statement.includes("create_encrypted_run")) {
++          return { rows: [{ created: true, plan_tier_supported: false }] };
++        }
++        throw new Error(`UNEXPECTED_PROVISION_QUERY:${statement}`);
++      }
++    };
++    configureContentEncryption(dataPool as never, {
++      provisionRun: async () => undefined,
++      destroyRunKey: async () => undefined,
++      prepareRun: async () => ({
++        encrypt: () => ({
++          v: 1,
++          alg: "A256GCM",
++          nonce: "AA==",
++          ct: "AA==",
++          tag: "AA=="
++        }),
++        attestEnvelope: () => Buffer.alloc(32),
++        databaseAttestationSecret: () => Buffer.alloc(32),
++        close: () => undefined
++      })
++    } as never);
++    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
++
++    try {
++      await new RunRepository(dataPool as never, provisionPool as never).startRun({
++        questionLine: "Does the deploy gap remain visible?",
++        principal: {
++          kind: "server",
++          userId: "66666666-6666-4666-8666-666666666666",
++          ownerRef: "77777777-7777-4777-8777-777777777777"
++        },
++        sessionId: "88888888-8888-4888-8888-888888888888",
++        callerScope: "ASKER",
++        asOf: new Date("2026-09-12T00:00:00.000Z"),
++        askerRiskTier: "casual",
++        effectiveRiskTier: "casual",
++        tierSource: "ASKER",
++        tierProvenanceRef: "test:pre-0061-warning",
++        compositionBudgetTier: "low",
++        planTier: "free",
++        depthParams: { depth: 1 },
++        discoveredPanel: rosterPanel("free"),
++        strangerSampleRate: 0,
++        envelopeBasis: { max_model_attempts: 1 },
++        registerVersion: 1,
++        batteryVersion: "battery:test",
++        batteryRows: []
++      });
++
++      expect(warning).toHaveBeenCalledOnce();
++      expect(warning).toHaveBeenCalledWith(
++        "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
++      );
++    } finally {
++      warning.mockRestore();
++    }
++  });
++
+   it("maps ask-boundary domain refusals to 422 with their real code and message", async () => {
+     const application = fixtureApplication();
+     application.submit = async () => {
+@@ -268,6 +399,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+         decision_scope: "test-layer scope",
+         as_of: "2026-08-07T00:00:00.000Z",
+         steering_presets: [],
++        plan_tier: "free",
+         steering_annotations: []
+       }
+     });
+@@ -334,6 +466,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+       decision_scope: "bounded-history",
+       as_of: "2026-08-25T00:00:00.000Z",
+       steering_presets: [],
++      plan_tier: "free",
+       steering_annotations: []
+     };
+     const session: Session = {
+@@ -426,6 +559,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+         decision_scope: "test-layer scope",
+         as_of: "2026-08-07T00:00:00.000Z",
+         steering_presets: [],
++        plan_tier: "free",
+         steering_annotations: []
+       }
+     });
+@@ -498,6 +632,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+         decision_scope: "test-layer scope",
+         as_of: "2026-08-07T00:00:00.000Z",
+         steering_presets: [],
++        plan_tier: "free",
+         steering_annotations: []
+       }
+     });
+diff --git a/dialectical-engine/tests/unit/contract.test.ts b/dialectical-engine/tests/unit/contract.test.ts
+index 66cc8a00..9d67b0d9 100644
+--- a/dialectical-engine/tests/unit/contract.test.ts
++++ b/dialectical-engine/tests/unit/contract.test.ts
+@@ -68,6 +68,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
+       decision_scope: "test-layer scope",
+       as_of: "2026-08-07T00:00:00.000Z",
+       steering_presets: [],
++      plan_tier: "free",
+       steering_annotations: []
+     }).question_line).toContain("evidence");
+     expect(AskRequestSchema.parse({
+@@ -80,6 +81,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
+       decision_scope: "test-layer scope",
+       as_of: "2026-08-07T00:00:00.000Z",
+       steering_presets: [],
++      plan_tier: "free",
+       steering_annotations: []
+     }).tier_source).toBe("MACHINE_DEFAULT");
+     expect(TierSourceSchema.options).toEqual(["ASKER", "MACHINE_DEFAULT", "DEPLOYMENT_POLICY"]);
+@@ -87,11 +89,38 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
+       question_line: "Forged scope", risk_tier: "casual", tier_source: "ASKER",
+       tier_provenance_ref: "test", composition_budget_tier: "low", depth_params: { depth: 1 },
+       decision_scope: "test", as_of: "2026-08-07T00:00:00.000Z",
+-      steering_presets: [], steering_annotations: [], caller_scope: "OPERATOR"
++      steering_presets: [],
++      plan_tier: "free",
++      steering_annotations: [], caller_scope: "OPERATOR"
+     })).toThrow();
+     expect(() => AskRequestSchema.parse({ question_line: "missing ruled fields" })).toThrow();
+   });
+ 
++  it("R12 admits plan_tier free and premium and refuses anything else", () => {
++    const validAsk = {
++      question_line: "What follows from this evidence?",
++      risk_tier: "casual",
++      tier_source: "ASKER",
++      tier_provenance_ref: "asker-declaration:test",
++      composition_budget_tier: "low",
++      depth_params: { depth: 1 },
++      decision_scope: "test-layer scope",
++      as_of: "2026-08-07T00:00:00.000Z",
++      steering_presets: [],
++      steering_annotations: []
++    };
++
++    expect(AskRequestSchema.parse({ ...validAsk, plan_tier: "free" }).plan_tier).toBe("free");
++    expect(AskRequestSchema.parse({ ...validAsk, plan_tier: "premium" }).plan_tier).toBe("premium");
++    expect(() => AskRequestSchema.parse({ ...validAsk, plan_tier: "gold" })).toThrow();
++    expect(() => AskRequestSchema.parse(validAsk)).toThrow();
++    expect(() => AskRequestSchema.parse({
++      ...validAsk,
++      plan_tier: "free",
++      caller_scope: "OPERATOR"
++    })).toThrow();
++  });
++
+   it("generates runtime-validatable accepted/session/answer/node resources", () => {
+     expect(AskAcceptedSchema.parse({ run_ref: "run:test", status: "QUEUED" }).status).toBe("QUEUED");
+     expect(SessionSchema.parse({
+diff --git a/dialectical-engine/tests/unit/load01-live-proof.test.ts b/dialectical-engine/tests/unit/load01-live-proof.test.ts
+index b3cf13aa..ee4c1a36 100644
+--- a/dialectical-engine/tests/unit/load01-live-proof.test.ts
++++ b/dialectical-engine/tests/unit/load01-live-proof.test.ts
+@@ -20,6 +20,7 @@ const ASK: AskRequest = {
+   decision_scope: "test provider-double composition",
+   as_of: "2026-08-13T00:00:00.000Z",
+   steering_presets: [],
++  plan_tier: "free",
+   steering_annotations: []
+ };
+ const RUN_REF = "11111111-1111-4111-8111-111111111111";
+diff --git a/dialectical-engine/tests/unit/pol01-policy.test.ts b/dialectical-engine/tests/unit/pol01-policy.test.ts
+index 7921f0c9..db6143b3 100644
+--- a/dialectical-engine/tests/unit/pol01-policy.test.ts
++++ b/dialectical-engine/tests/unit/pol01-policy.test.ts
+@@ -48,6 +48,7 @@ describe("POL-01 register-owned deployment floor", () => {
+ 
+     await expect(createDebate("What follows from this evidence?", {
+       risk_tier: "casual",
++      plan_tier: "free",
+       tier_source: "ASKER",
+       tier_provenance_ref: "asker:ui-selection",
+       composition_budget_tier: "low",
+diff --git a/dialectical-engine/tests/unit/s7-authorization.test.ts b/dialectical-engine/tests/unit/s7-authorization.test.ts
+index 9b09eca2..b21ee4c2 100644
+--- a/dialectical-engine/tests/unit/s7-authorization.test.ts
++++ b/dialectical-engine/tests/unit/s7-authorization.test.ts
+@@ -76,6 +76,7 @@ const validAskPayload = () => ({
+   decision_scope: "test",
+   as_of: "2026-08-07T00:00:00.000Z",
+   steering_presets: [],
++  plan_tier: "free",
+   steering_annotations: []
+ });
+ 
+diff --git a/dialectical-engine/tests/unit/tier01-ask-wire.test.ts b/dialectical-engine/tests/unit/tier01-ask-wire.test.ts
+new file mode 100644
+index 00000000..9aa62fed
+--- /dev/null
++++ b/dialectical-engine/tests/unit/tier01-ask-wire.test.ts
+@@ -0,0 +1,117 @@
++import type { ContractClient } from "@debateai/contract";
++import { describe, expect, it, vi } from "vitest";
++
++// @ts-expect-error -- the root test compiler has no JSX mode; Vitest transpiles this TSX module.
++import { buildNewDebateAskConfig } from "../../apps/ui/app/new/defaults.js";
++import { createDebate } from "../../apps/ui/lib/api.js";
++
++describe("S01 tier ask wire", () => {
++  it("R13 puts the chosen tier in the ask config", () => {
++    const submitTime = new Date("2026-09-10T00:00:00.000Z");
++    const configs = (["premium", "free"] as const).map((planTier) =>
++      buildNewDebateAskConfig({
++        riskTier: "standard",
++        budgetTier: "low",
++        decisionScope: "tier wire",
++        asOf: "2026-09-09T00:00:00.000Z",
++        depth: 2,
++        asOfWasEdited: false,
++        planTier
++      }, submitTime)
++    );
++
++    expect(configs).toMatchObject([
++      { plan_tier: "premium" },
++      { plan_tier: "free" }
++    ]);
++  });
++
++  it("R7 names the mechanism that set an unedited risk tier", () => {
++    const submitTime = new Date("2026-09-10T00:00:00.000Z");
++    const provenance = (["free", "premium"] as const).flatMap((planTier) =>
++      [false, true].map((riskTierWasEdited) => {
++        const config = buildNewDebateAskConfig({
++          riskTier: "standard",
++          budgetTier: "low",
++          decisionScope: "tier provenance",
++          asOf: "2026-09-09T00:00:00.000Z",
++          depth: 2,
++          asOfWasEdited: false,
++          planTier,
++          riskTierWasEdited
++        }, submitTime);
++        return {
++          planTier,
++          riskTierWasEdited,
++          tierSource: config.tier_source,
++          tierProvenanceRef: config.tier_provenance_ref
++        };
++      })
++    );
++
++    expect(provenance).toEqual([
++      {
++        planTier: "free",
++        riskTierWasEdited: false,
++        tierSource: "MACHINE_DEFAULT",
++        tierProvenanceRef: "machine:plan-tier-free"
++      },
++      {
++        planTier: "free",
++        riskTierWasEdited: true,
++        tierSource: "ASKER",
++        tierProvenanceRef: "asker:ui-selection"
++      },
++      {
++        planTier: "premium",
++        riskTierWasEdited: false,
++        tierSource: "MACHINE_DEFAULT",
++        tierProvenanceRef: "machine:plan-tier-free"
++      },
++      {
++        planTier: "premium",
++        riskTierWasEdited: true,
++        tierSource: "ASKER",
++        tierProvenanceRef: "asker:ui-selection"
++      }
++    ]);
++  });
++
++  it("R13 refuses an ask with no tier or an unknown tier before any network call", async () => {
++    const completeConfig = {
++      risk_tier: "standard",
++      tier_source: "MACHINE_DEFAULT",
++      tier_provenance_ref: "machine:plan-tier-free",
++      composition_budget_tier: "low",
++      depth: 2,
++      decision_scope: "tier refusal",
++      as_of: "2026-09-10T00:00:00.000Z",
++      steering_presets: [],
++      steering_annotations: []
++    };
++    const refusals = [];
++
++    for (const config of [completeConfig, { ...completeConfig, plan_tier: "gold" }]) {
++      const submitAsk = vi.fn().mockResolvedValue({ run_ref: "run:new", status: "QUEUED" as const });
++      const client = { submitAsk } as unknown as ContractClient;
++      let message = "";
++      try {
++        await createDebate("Which tier is valid?", config, "token", client);
++      } catch (error) {
++        message = error instanceof Error ? error.message : String(error);
++      }
++      refusals.push({ message, submitAskCalls: submitAsk.mock.calls.length });
++    }
++
++    expect(refusals).toEqual([
++      {
++        message: expect.stringMatching(/^ASK_FIELD_REQUIRED:/),
++        submitAskCalls: 0
++      },
++      {
++        message: expect.stringMatching(/^ASK_FIELD_REQUIRED: plan_tier/),
++        submitAskCalls: 0
++      }
++    ]);
++  });
++});
+diff --git a/dialectical-engine/tests/unit/tier01-style-contract.test.ts b/dialectical-engine/tests/unit/tier01-style-contract.test.ts
+new file mode 100644
+index 00000000..1317883d
+--- /dev/null
++++ b/dialectical-engine/tests/unit/tier01-style-contract.test.ts
+@@ -0,0 +1,214 @@
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++
++import { describe, expect, test } from "vitest";
++
++const css = readFileSync(join(process.cwd(), "apps/ui/app/globals.css"), "utf8");
++const OPEN_MARKER = "/* === debate-tiers S01 === */";
++const CLOSE_MARKER = "/* === end debate-tiers S01 === */";
++const compactCss = css.replace(/\s+/g, " ").trim();
++
++function declarationsIn(source: string, selector: string): string {
++  const start = source.indexOf(`${selector} {`);
++  if (start === -1) throw new Error(`Missing CSS selector region: ${selector}`);
++  const bodyStart = start + selector.length + 2;
++  const end = source.indexOf("}", bodyStart);
++  if (end === -1) throw new Error(`Unclosed CSS selector region: ${selector}`);
++  const body = source.slice(bodyStart, end).trim();
++  if (!body) throw new Error(`Empty CSS selector region: ${selector}`);
++  return body;
++}
++
++const terracottaTokens = declarationsIn(compactCss, ":root");
++const chamberTokens = declarationsIn(compactCss, 'html[data-mode="chamber"]');
++
++function modeTokenValues(tokens: string[]): Record<string, [string, string]> {
++  const terracottaDeclarations = terracottaTokens.replace(/\/\*[\s\S]*?\*\//g, " ");
++  const chamberDeclarations = chamberTokens.replace(/\/\*[\s\S]*?\*\//g, " ");
++  const valueOf = (declarations: string, token: string) => {
++    const value = declarations.match(new RegExp(`(?:^|;)\\s*${token}\\s*:\\s*([^;]+)`))?.[1]?.trim();
++    if (!value) throw new Error(`Missing CSS token declaration: ${token}`);
++    return value;
++  };
++  return Object.fromEntries(tokens.map((token) => {
++    return [token, [valueOf(terracottaDeclarations, token), valueOf(chamberDeclarations, token)]];
++  }));
++}
++
++describe("S01-C4 debate tier stylesheet contract", () => {
++  // DONE.md §3 / S01-44 map — M-line → assertion(s) → suite:
++  // M1 → S01-42a group → unit/tier01-style-contract (plus render S01-20, S01-22).
++  // M2 → S01-42a card/chosenCard, M2 below → unit/tier01-style-contract.
++  // M3 → S01-42a card, M3 below → unit/tier01-style-contract.
++  // M4 → S01-42a tierName/chosenTierName, M4 below → unit/tier01-style-contract.
++  // M5 → S01-42a tierName, M5 below → unit/tier01-style-contract.
++  // M6 → S01-42a promise, M6 below → unit/tier01-style-contract (plus render S01-25).
++  // M7 → S01-42a modelRow/model, M7 below → unit/tier01-style-contract (plus render S01-25, S01-26).
++  // M8 → S01-42b → unit/tier01-style-contract (plus render S01-27–S01-30, S01-33, S01-36).
++  // M12 → M12 below → unit/tier01-style-contract (plus render S01-30).
++  // M13 → S01-41 → unit/tier01-style-contract.
++  // M14 → S01-40 delimited placement → unit/tier01-style-contract (plus render S01-31–S01-33, S01-37).
++  // M15 → S01-42a tierName/promise/model → unit/tier01-style-contract.
++  test("keeps the selector contract scoped beside the existing /new rules", () => {
++    const keyHintAt = css.indexOf(".ndKeyHint {");
++    const openAt = css.indexOf(OPEN_MARKER);
++    const closeAt = css.indexOf(CLOSE_MARKER);
++    const reducedMotionAt = css.indexOf("@media (prefers-reduced-motion: reduce)", keyHintAt);
++
++    // PROPERTY S01-40: one delimited S01 block sits after .ndKeyHint and before its next rule.
++    expect({
++      openCount: css.split(OPEN_MARKER).length - 1,
++      closeCount: css.split(CLOSE_MARKER).length - 1,
++      ordered: keyHintAt < openAt && openAt < closeAt && closeAt < reducedMotionAt,
++    }).toEqual({ openCount: 1, closeCount: 1, ordered: true });
++
++    const block = css.slice(openAt + OPEN_MARKER.length, closeAt);
++    const colourDeclarations = Array.from(
++      block.matchAll(/(?:^|\n)\s*(color|background|border(?:-color)?)\s*:\s*([^;]+);/g),
++      (match) => ({ property: match[1] ?? "", value: match[2]?.trim() ?? "" }),
++    );
++
++    // PROPERTY S01-41: the scoped S01 rules contain no literal colour and source every colour from a token.
++    expect({
++      literalColours: block.match(/#[\da-f]{3,8}\b|rgba?\(|hsla?\(/gi) ?? [],
++      nonTokenColours: colourDeclarations.filter(
++        ({ property, value }) =>
++          !value.includes("var(--") && !(property === "background" && value === "transparent"),
++      ),
++    }).toEqual({ literalColours: [], nonTokenColours: [] });
++
++    const compactBlock = block.replace(/\s+/g, " ").trim();
++    const declarations = (selector: string) => {
++      const start = compactBlock.indexOf(`${selector} {`);
++      if (start === -1) throw new Error(`Missing S01 CSS selector region: ${selector}`);
++      const bodyStart = start + selector.length + 2;
++      const end = compactBlock.indexOf("}", bodyStart);
++      if (end === -1) throw new Error(`Unclosed S01 CSS selector region: ${selector}`);
++      const body = compactBlock.slice(bodyStart, end).trim();
++      if (!body) throw new Error(`Empty S01 CSS selector region: ${selector}`);
++      return body;
++    };
++    const carries = (selector: string, values: string[]) => {
++      const body = declarations(selector);
++      return values.every((value) => body.includes(value));
++    };
++
++    // PROPERTY S01-42a: the selector rules carry DONE.md M1-M7 and M15 geometry and token roles.
++    expect({
++      group: carries(".ndTier", [
++        "display: grid;",
++        "grid-template-columns: repeat(2, minmax(0, 1fr));",
++        "gap: 10px;",
++        "margin-top: 20px;",
++      ]),
++      card: carries(".ndTierOption", [
++        "display: flex;",
++        "flex-direction: column;",
++        "gap: 9px;",
++        "padding: 13px 14px;",
++        "border: 1px solid var(--line);",
++        "border-radius: 12px;",
++        "background: var(--core);",
++        "font-family: inherit;",
++        "cursor: pointer;",
++      ]),
++      chosenCard: carries('.ndTierOption[aria-checked="true"]', [
++        "border-color: var(--line-strong);",
++        "background: var(--shell);",
++      ]),
++      tierName: carries(".ndTierName", [
++        "padding: 4px 12px;",
++        "border-radius: 999px;",
++        "background: transparent;",
++        "color: var(--muted);",
++        "font-size: 10.5px;",
++        "font-weight: 600;",
++      ]),
++      chosenTierName: carries('.ndTierOption[aria-checked="true"] .ndTierName', [
++        "background: var(--ink);",
++        "color: var(--bg);",
++        "font-weight: 700;",
++      ]),
++      promise: carries(".ndTierPromise", ["font-size: 11.5px;", "color: var(--text-2);"]),
++      modelRow: carries(".ndTierModels", [
++        "display: flex;",
++        "flex-wrap: wrap;",
++        "gap: 10px;",
++      ]),
++      model: carries(".ndTierModel", [
++        "display: inline-flex;",
++        "align-items: center;",
++        "gap: 5px;",
++        "font-family: var(--font-mono);",
++        "font-size: 10.5px;",
++        "font-weight: 500;",
++        "color: var(--text-3);",
++        "white-space: nowrap;",
++      ]),
++    }).toEqual({
++      group: true,
++      card: true,
++      chosenCard: true,
++      tierName: true,
++      chosenTierName: true,
++      promise: true,
++      modelRow: true,
++      model: true,
++    });
++
++    const lockSelector =
++      ".ndSegItem:disabled, .ndSlider:disabled, .ndSteerInput:disabled, .ndSelect:has(select:disabled)";
++
++    // PROPERTY S01-42b: all four Free-locked control families share only the ratified dim-and-cursor treatment.
++    expect(declarations(lockSelector)).toBe("opacity: 0.45; cursor: not-allowed;");
++    expect(declarations(".ndSelect select:disabled")).toBe("cursor: not-allowed;");
++  });
++
++  test("M2 · the chosen option's colour tokens match the measured values in both modes", () => {
++    expect(modeTokenValues(["--line-strong", "--shell"])).toEqual({
++      "--line-strong": ["rgba(41,38,31,.20)", "rgba(242,234,217,.18)"],
++      "--shell": ["#EFE9E0", "#221D17"],
++    });
++  });
++
++  test("M3 · the unchosen option's colour tokens match the measured values in both modes", () => {
++    expect(modeTokenValues(["--line", "--core"])).toEqual({
++      "--line": ["rgba(41,38,31,.10)", "rgba(242,234,217,.09)"],
++      "--core": ["#FDFBF6", "#181410"],
++    });
++  });
++
++  test("M4 · the chosen tier-name tokens match the measured values in both modes", () => {
++    expect(modeTokenValues(["--ink", "--bg"])).toEqual({
++      "--ink": ["#29261F", "#F2EAD9"],
++      "--bg": ["#F9F6F1", "#14110E"],
++    });
++  });
++
++  test("M5 · the unchosen tier-name token matches the measured values in both modes", () => {
++    expect(modeTokenValues(["--muted"])).toEqual({ "--muted": ["#6E675C", "#9C907A"] });
++  });
++
++  test("M6 · the promise token matches the measured values in both modes", () => {
++    expect(modeTokenValues(["--text-2"])).toEqual({ "--text-2": ["#555147", "#B5A88F"] });
++  });
++
++  test("M7 · the model-id colour tokens match the measured values in both modes", () => {
++    expect(modeTokenValues(["--text-3", "--m-gpt", "--m-claude", "--m-grok"])).toEqual({
++      "--text-3": ["#6E675C", "#9C907A"],
++      "--m-gpt": ["#B4552D", "#B4552D"],
++      "--m-claude": ["#8A63C9", "#8A63C9"],
++      "--m-grok": ["#5F6670", "#5F6670"],
++    });
++  });
++
++  test("M12 · the OPTIONS panel keeps its one-pixel dashed strong-line frame", () => {
++    expect({
++      onePixelFrame: declarationsIn(compactCss, ".ndCard").includes("border: 1px solid var(--line);"),
++      legacyOverrides: declarationsIn(compactCss, ".ndLegacy"),
++    }).toEqual({
++      onePixelFrame: true,
++      legacyOverrides: "margin-top: 14px; border-style: dashed; border-color: var(--line-strong); opacity: 0.88;",
++    });
++  });
++});
+diff --git a/dialectical-engine/tests/unit/tiers-s02-admission.test.ts b/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
+new file mode 100644
+index 00000000..20a43e26
+--- /dev/null
++++ b/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
+@@ -0,0 +1,397 @@
++import { describe, expect, it } from "vitest";
++import {
++  buildApi,
++  evaluateAskAdmission,
++  PostgresAskApplication,
++  type AskApplication,
++  type RunCreationSettings
++} from "@debateai/api";
++import type { AskRequest, Session } from "@debateai/contract";
++import {
++  TEST_APP_ORIGIN,
++  testHttpIdentity,
++  testSessionApplication,
++  testSessionHeaders
++} from "../support/httpSession.js";
++
++const RUN_ID = "11111111-1111-4111-8111-111111111111";
++const HTTP_IDENTITY = testHttpIdentity("tiers-s02-admission");
++const HTTP_HEADERS = testSessionHeaders(HTTP_IDENTITY, true);
++
++function ask(planTier: AskRequest["plan_tier"]): AskRequest {
++  return {
++    question_line: "Which models should debate this question?",
++    risk_tier: "casual",
++    tier_source: "ASKER",
++    tier_provenance_ref: "asker:test",
++    composition_budget_tier: "low",
++    depth_params: { depth: 1 },
++    decision_scope: "tier admission test",
++    as_of: "2026-09-12T00:00:00.000Z",
++    steering_presets: [],
++    plan_tier: planTier,
++    steering_annotations: []
++  };
++}
++
++function member(modelId: string, provider: string) {
++  return Object.freeze({
++    provider_ref: `provider:${provider}`,
++    maker: `maker:${provider}`,
++    model_id: modelId,
++    probe_evidence_ref: `probe:${provider}`,
++    probed_at: "2026-09-12T00:00:00.000Z"
++  });
++}
++
++function settingsFor(
++  discoveredPanel: readonly ReturnType<typeof member>[],
++  observedPanelSizes: number[] = []
++): RunCreationSettings {
++  return {
++    strangerSampleRate: 0,
++    registerVersion: 1,
++    batteryVersion: "battery:test",
++    settlementWatchHandle: "watch:test",
++    resolveDiscoveredPanel: async () => discoveredPanel,
++    resolveEnvelopeBasis: async ({ panelSize }) => {
++      observedPanelSizes.push(panelSize);
++      return { max_model_attempts: 1 };
++    },
++    resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
++      effectiveRiskTier,
++      tierSource,
++      tierProvenanceRef
++    })
++  };
++}
++
++function applicationWithSubmit(submit: AskApplication["submit"]): AskApplication {
++  return {
++    withContentLease: async (_runId, use) => use(),
++    submit,
++    readAnswer: async () => null,
++    readRunAnswer: async () => null,
++    readRun: async () => null,
++    readAnswerIndex: async (_session, limit, offset) => ({
++      items: [], open_runs: [], limit, offset, total: 0
++    }),
++    readInspection: async () => null,
++    readLedgerDigest: async () => null,
++    readNode: async () => null,
++    recordInvestigation: async () => null,
++    unlinkMemoryLink: async () => null,
++    readDeployment: async () => ({
++      register: { register_version: 1, rows: [] },
++      scorecards: [],
++      model_ledger: [],
++      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
++    }),
++    events: async function* () {}
++  };
++}
++
++async function rejectedAdmission(
++  discoveredPanel: readonly ReturnType<typeof member>[],
++  planTier: AskRequest["plan_tier"]
++): Promise<unknown> {
++  try {
++    await evaluateAskAdmission(settingsFor(discoveredPanel), ask(planTier));
++    return null;
++  } catch (error) {
++    return error;
++  }
++}
++
++describe("S02 tier roster admission", () => {
++  it("filters Free admission to its two models in roster order and sizes the envelope to two", async () => {
++    const panelSizes: number[] = [];
++    const result = await evaluateAskAdmission(settingsFor([
++      member("gpt-5.6-sol", "sol"),
++      member("claude-sonnet-5", "sonnet"),
++      member("gpt-5.6-luna", "luna")
++    ], panelSizes), ask("free"));
++
++    expect(result.discoveredPanel.map(({ model_id }) => model_id)).toEqual([
++      "gpt-5.6-luna",
++      "claude-sonnet-5"
++    ]);
++    expect(panelSizes).toEqual([2]);
++  });
++
++  it("filters Premium admission to its three models in roster order and sizes the envelope to three", async () => {
++    const panelSizes: number[] = [];
++    const result = await evaluateAskAdmission(settingsFor([
++      member("gpt-5.6-luna", "luna"),
++      member("grok-4.6", "grok"),
++      member("claude-opus-5", "opus"),
++      member("claude-sonnet-5", "sonnet"),
++      member("gpt-5.6-sol", "sol")
++    ], panelSizes), ask("premium"));
++
++    expect(result.discoveredPanel.map(({ model_id }) => model_id)).toEqual([
++      "gpt-5.6-sol",
++      "claude-opus-5",
++      "grok-4.6"
++    ]);
++    expect(panelSizes).toEqual([3]);
++  });
++
++  it("refuses Free admission with the tier-unavailable code when every roster member is missing", async () => {
++    const error = await rejectedAdmission([
++      member("gpt-5.6-sol", "sol"),
++      member("claude-opus-5", "opus")
++    ], "free");
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
++    });
++    expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
++  });
++
++  it("refuses Premium admission with every missing roster member named", async () => {
++    const error = await rejectedAdmission([], "premium");
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The premium plan needs gpt-5.6-sol, claude-opus-5, grok-4.6, and they are not available right now"
++    });
++  });
++
++  it("names the one missing Premium roster member in the tier-unavailable refusal", async () => {
++    const error = await rejectedAdmission([
++      member("gpt-5.6-sol", "sol"),
++      member("claude-opus-5", "opus")
++    ], "premium");
++
++    expect(error).toMatchObject({
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The premium plan needs grok-4.6, and it is not available right now"
++    });
++  });
++
++  it("names every missing Premium roster member and the tier in one refusal", async () => {
++    const error = await rejectedAdmission([
++      member("gpt-5.6-sol", "sol")
++    ], "premium");
++
++    expect(error).toMatchObject({ code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
++    expect(error).toMatchObject({ message: expect.stringContaining("claude-opus-5") });
++    expect(error).toMatchObject({ message: expect.stringContaining("grok-4.6") });
++    expect(error).toMatchObject({ message: expect.stringContaining("premium") });
++  });
++
++  it("refuses an empty panel with the tier-unavailable code before maker or envelope errors", async () => {
++    const error = await rejectedAdmission([], "free");
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
++    });
++    expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
++    expect(error).not.toMatchObject({ code: "STRUCTURAL_CEILING_PANELSIZE_INVALID" });
++  });
++
++  it("maps a real tier-unavailable admission refusal to the HTTP 422 face", async () => {
++    const application = applicationWithSubmit(async (submittedAsk) => {
++      await evaluateAskAdmission(settingsFor([
++        member("gpt-5.6-sol", "sol"),
++        member("claude-opus-5", "opus")
++      ]), submittedAsk);
++      return { run_ref: RUN_ID, status: "QUEUED" };
++    });
++    const api = buildApi({
++      application,
++      sessions: testSessionApplication([HTTP_IDENTITY]),
++      allowedOrigin: TEST_APP_ORIGIN
++    });
++
++    const response = await api.inject({
++      method: "POST",
++      url: "/v1/asks",
++      headers: HTTP_HEADERS,
++      payload: ask("free")
++    });
++
++    expect(response.statusCode).toBe(422);
++    expect(response.json()).toEqual({
++      error: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
++    });
++    await api.close();
++  });
++
++  it("returns fixed typed refusals for out-of-vocabulary tiers at the exported boundary", async () => {
++    for (const planTier of ["constructor", "gold"]) {
++      const error = await rejectedAdmission(
++        [],
++        planTier as AskRequest["plan_tier"]
++      );
++
++      expect(error).toMatchObject({
++        name: "AskRefusal",
++        code: "ASK_PLAN_TIER_INVALID",
++        message: "The plan tier must be free or premium"
++      });
++    }
++  });
++
++  it("refuses an invalid tier before resolving the discovered panel", async () => {
++    let panelResolutions = 0;
++    const error = await evaluateAskAdmission({
++      ...settingsFor([]),
++      resolveDiscoveredPanel: async () => {
++        panelResolutions += 1;
++        return [];
++      }
++    }, { ...ask("free"), plan_tier: "gold" } as unknown as AskRequest).catch(
++      (caught: unknown) => caught
++    );
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_INVALID",
++      message: "The plan tier must be free or premium"
++    });
++    expect(panelResolutions).toBe(0);
++  });
++
++  it("keeps an out-of-vocabulary tier on the reachable HTTP 400 malformed-request face", async () => {
++    let submitCalls = 0;
++    const application = applicationWithSubmit(async () => {
++      submitCalls += 1;
++      return { run_ref: RUN_ID, status: "QUEUED" };
++    });
++    const api = buildApi({
++      application,
++      sessions: testSessionApplication([HTTP_IDENTITY]),
++      allowedOrigin: TEST_APP_ORIGIN
++    });
++
++    const response = await api.inject({
++      method: "POST",
++      url: "/v1/asks",
++      headers: HTTP_HEADERS,
++      payload: { ...ask("free"), plan_tier: "gold" }
++    });
++
++    expect(response.statusCode).toBe(400);
++    expect(response.json()).toMatchObject({ error: "MALFORMED_REQUEST" });
++    expect(submitCalls).toBe(0);
++    await api.close();
++  });
++
++  it("maps an injected invalid tier at the exported application boundary to HTTP 422", async () => {
++    const application = applicationWithSubmit(async (submittedAsk) => {
++      await evaluateAskAdmission(
++        settingsFor([]),
++        { ...submittedAsk, plan_tier: "gold" } as unknown as AskRequest
++      );
++      return { run_ref: RUN_ID, status: "QUEUED" };
++    });
++    const api = buildApi({
++      application,
++      sessions: testSessionApplication([HTTP_IDENTITY]),
++      allowedOrigin: TEST_APP_ORIGIN
++    });
++
++    const response = await api.inject({
++      method: "POST",
++      url: "/v1/asks",
++      headers: HTTP_HEADERS,
++      payload: ask("free")
++    });
++
++    expect(response.statusCode).toBe(422);
++    expect(response.json()).toEqual({
++      error: "ASK_PLAN_TIER_INVALID",
++      message: "The plan tier must be free or premium"
++    });
++    await api.close();
++  });
++
++  it("refuses before taking an admission lease or issuing any run-provision query", async () => {
++    const queries: string[] = [];
++    let connectCalls = 0;
++    const pool = {
++      async query(statement: string) {
++        queries.push(statement);
++        return { rows: [] };
++      },
++      async connect() {
++        connectCalls += 1;
++        return {
++          async query(statement: string) {
++            queries.push(statement);
++            return { rows: [] };
++          },
++          on() { return this; },
++          removeListener() { return this; },
++          release() {}
++        };
++      }
++    };
++    const serverAdmissionPool = new Proxy(pool, {});
++    const legacyAdmissionPool = new Proxy(pool, {});
++    const application = new PostgresAskApplication(
++      pool as never,
++      { dispatch: async () => undefined },
++      settingsFor([
++        member("gpt-5.6-sol", "sol"),
++        member("claude-opus-5", "opus")
++      ]),
++      undefined,
++      pool as never,
++      {
++        server: serverAdmissionPool as never,
++        legacy: legacyAdmissionPool as never
++      }
++    );
++    const session: Session = {
++      asker_id: "owner:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++      session_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++      caller_scope: "ASKER",
++      ownership_provenance: "server_session",
++      provisional_identity_model: false
++    };
++
++    await expect(application.submit(ask("free"), session, {
++      kind: "server",
++      userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
++      ownerRef: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
++    })).rejects.toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
++    });
++
++    expect(connectCalls).toBe(0);
++    expect(queries.join("\n")).not.toMatch(
++      /prepare_run_key_provision|create_encrypted_run|INSERT INTO core\.run/i
++    );
++  });
++
++  it("keeps one provider per roster model id and sizes the envelope to the roster", async () => {
++    const panelSizes: number[] = [];
++    const result = await evaluateAskAdmission(settingsFor([
++      member("gpt-5.6-sol", "a"),
++      member("claude-opus-5", "b"),
++      member("grok-4.6", "c"),
++      member("grok-4.6", "d")
++    ], panelSizes), ask("premium"));
++
++    expect(result.discoveredPanel.map(({ model_id, provider_ref }) => ({
++      model_id,
++      provider_ref
++    }))).toEqual([
++      { model_id: "gpt-5.6-sol", provider_ref: "provider:a" },
++      { model_id: "claude-opus-5", provider_ref: "provider:b" },
++      { model_id: "grok-4.6", provider_ref: "provider:c" }
++    ]);
++    expect(result.discoveredPanel).toHaveLength(3);
++    expect(panelSizes).toEqual([3]);
++  });
++});
+diff --git a/dialectical-engine/tests/unit/tiers-s02-wire.test.ts b/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
+new file mode 100644
+index 00000000..f12efa7b
+--- /dev/null
++++ b/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
+@@ -0,0 +1,168 @@
++import { EventEmitter } from "node:events";
++import { existsSync, readFileSync, readdirSync } from "node:fs";
++import { join, relative, resolve } from "node:path";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
++import { WorkItemRepository } from "@debateai/battery";
++import {
++  PLAN_TIER_ROSTERS,
++  type AskRequest,
++  type PlanTier,
++  type Session
++} from "@debateai/contract";
++import { RunRepository, type StartRunInput } from "@debateai/db";
++import { LivenessRepository } from "@debateai/liveness";
++import { ServeRepository } from "@debateai/serve";
++import type { Pool, PoolClient, QueryResult } from "pg";
++
++const RUN_ID = "11111111-1111-4111-8111-111111111111";
++const WORK_ITEM_ID = "22222222-2222-4222-8222-222222222222";
++const OWNER_REF = "44444444-4444-4444-8444-444444444444";
++
++function rosterPanel(tier: PlanTier) {
++  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
++    provider_ref: `provider:${tier}:${index + 1}`,
++    maker: `maker:${tier}:${index + 1}`,
++    model_id: modelId,
++    probe_evidence_ref: `probe:${tier}:${index + 1}`,
++    probed_at: "2026-09-12T00:00:00.000Z"
++  }));
++}
++
++function stubPool(): Pool {
++  const query = vi.fn(async () => ({
++    rows: [{ locked: true, unlocked: true }],
++    rowCount: 1
++  } as unknown as QueryResult));
++  const client = Object.assign(new EventEmitter(), {
++    query,
++    release: vi.fn()
++  }) as unknown as PoolClient;
++  return {
++    connect: vi.fn(async () => client),
++    query
++  } as unknown as Pool;
++}
++
++function askFor(planTier: PlanTier): AskRequest {
++  return {
++    question_line: `Should the ${planTier} tier be selected?`,
++    as_of: "2026-09-12T00:00:00.000Z",
++    risk_tier: "R1",
++    tier_source: "ASKER",
++    tier_provenance_ref: `test:${planTier}`,
++    composition_budget_tier: "STANDARD",
++    depth_params: {},
++    decision_scope: {},
++    steering_presets: [],
++    steering_annotations: [],
++    plan_tier: planTier
++  } as unknown as AskRequest;
++}
++
++function session(): Session {
++  return {
++    session_id: "33333333-3333-4333-8333-333333333333",
++    asker_id: `owner:${OWNER_REF}`,
++    caller_scope: "ASKER",
++    ownership_provenance: "server_session",
++    provisional_identity_model: false
++  };
++}
++
++function settingsFor(tier: PlanTier): RunCreationSettings {
++  return {
++    strangerSampleRate: 0,
++    registerVersion: 1,
++    batteryVersion: "tiers-s02-wire",
++    settlementWatchHandle: "tiers-s02-wire",
++    resolveDiscoveredPanel: async () => rosterPanel(tier),
++    resolveEnvelopeBasis: async () => Object.freeze({}),
++    resolveRisk: (askerRiskTier, tierSource, tierProvenanceRef) => ({
++      effectiveRiskTier: askerRiskTier,
++      tierSource: tierSource as never,
++      tierProvenanceRef
++    })
++  };
++}
++
++function productionSourceFiles(repoRoot: string): readonly string[] {
++  const excludedDirectories = new Set([
++    ".next", "coverage", "dist", "generated", "node_modules", "test", "tests"
++  ]);
++  const files: string[] = [];
++
++  function walk(directory: string): void {
++    for (const entry of readdirSync(directory, { withFileTypes: true })) {
++      const entryPath = join(directory, entry.name);
++      if (entry.isDirectory()) {
++        if (!excludedDirectories.has(entry.name)) walk(entryPath);
++      } else if (/\.tsx?$/u.test(entry.name) && !/\.(?:spec|test)\./u.test(entry.name)) {
++        files.push(entryPath);
++      }
++    }
++  }
++
++  for (const workspaceName of ["apps", "packages"]) {
++    const workspaceRoot = resolve(repoRoot, workspaceName);
++    if (existsSync(workspaceRoot)) walk(workspaceRoot);
++  }
++  return files;
++}
++
++afterEach(() => {
++  vi.restoreAllMocks();
++});
++
++describe("S02 plan-tier run wiring", () => {
++  // Property: each accepted ask carries its selected plan tier into the real run-start boundary.
++  // Production break: remove the planTier member from PostgresAskApplication's startRun input.
++  it("forwards both ask plan tiers to StartRunInput.planTier", async () => {
++    const capturedInputs: StartRunInput[] = [];
++    vi.spyOn(RunRepository.prototype, "startRun").mockImplementation(async (input) => {
++      capturedInputs.push(input);
++      return RUN_ID;
++    });
++    vi.spyOn(LivenessRepository.prototype, "recordQuery").mockResolvedValue(1);
++    vi.spyOn(ServeRepository.prototype, "recordMemoryQuestion").mockResolvedValue(undefined);
++    vi.spyOn(WorkItemRepository.prototype, "enqueue").mockResolvedValue(WORK_ITEM_ID);
++
++    for (const tier of ["free", "premium"] as const) {
++      const primaryPool = stubPool();
++      const application = new PostgresAskApplication(
++        primaryPool,
++        { dispatch: vi.fn(async () => undefined) },
++        settingsFor(tier),
++        { read: async () => [] },
++        stubPool(),
++        { server: stubPool(), legacy: stubPool() }
++      );
++      const ask = askFor(tier);
++      await application.submit(
++        ask,
++        session(),
++        { kind: "server", userId: "tiers-s02-wire-user", ownerRef: OWNER_REF }
++      );
++    }
++
++    expect(capturedInputs.map((input) => input.planTier)).toEqual(["free", "premium"]);
++  });
++
++  // Property: one production startRun caller exists, and that caller supplies planTier.
++  // Production break: remove planTier from the sole call or add another production .startRun call.
++  it("keeps one production startRun caller and wires planTier at that call", () => {
++    const repoRoot = process.cwd();
++    const calls = productionSourceFiles(repoRoot).flatMap((file) => {
++      const source = readFileSync(file, "utf8");
++      return [...source.matchAll(/\.startRun\(/gu)].map((match) => ({
++        file: relative(repoRoot, file),
++        source,
++        offset: match.index
++      }));
++    });
++
++    expect(calls.map((call) => call.file)).toEqual(["apps/api/src/index.ts"]);
++    const callSite = calls[0]!.source.slice(calls[0]!.offset, calls[0]!.offset + 1_200);
++    expect(callSite).toMatch(/\.startRun\(\{[\s\S]*?\bplanTier\s*:/u);
++  });
++});
+diff --git a/dialectical-engine/tests/unit/v2ui-data-layer.test.ts b/dialectical-engine/tests/unit/v2ui-data-layer.test.ts
+index 1e0458c2..acf579e3 100644
+--- a/dialectical-engine/tests/unit/v2ui-data-layer.test.ts
++++ b/dialectical-engine/tests/unit/v2ui-data-layer.test.ts
+@@ -754,6 +754,7 @@ describe("v2-ui data access over the V3 contract client", () => {
+       "Question?",
+       {
+         risk_tier: "casual",
++        plan_tier: "free",
+         tier_source: "MACHINE_DEFAULT",
+         tier_provenance_ref: "machine:deployment-floor",
+         composition_budget_tier: "low",
+diff --git a/dialectical-engine/tests/unit/v2ui-pages.test.ts b/dialectical-engine/tests/unit/v2ui-pages.test.ts
+index fc92f51d..e8653a55 100644
+--- a/dialectical-engine/tests/unit/v2ui-pages.test.ts
++++ b/dialectical-engine/tests/unit/v2ui-pages.test.ts
+@@ -80,7 +80,7 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
+     // V2's branching / concurrency / max-token / role-override knobs have no
+     // slot in the V3 ask. They may stay on screen (design authority) but must
+     // not be packed into a config the ask builder will drop on the floor.
+-    const submitBlock = newPage.slice(newPage.indexOf("async function submit"), newPage.indexOf("return ("));
++    const submitBlock = region(newPage, "async function submit", "return (");
+     for (const dropped of ["branching", "concurrency", "maxTokens", "role_overrides", "adaptive_expansion"]) {
+       expect(submitBlock).not.toContain(dropped);
+     }
