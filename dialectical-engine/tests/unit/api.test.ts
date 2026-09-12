@@ -8,9 +8,13 @@ import {
   type AskApplication,
   type RunCreationSettings
 } from "@debateai/api";
-import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
+import {
+  PLAN_TIER_ROSTERS,
+  createContractClient,
+  type AskRequest,
+  type Session
+} from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   RETIRED_DEV_HEADER,
   TEST_APP_ORIGIN,
@@ -27,6 +31,19 @@ const ANSWER_ID = "44444444-4444-4444-8444-444444444444";
 const USER_IDENTITY = testHttpIdentity("api-user");
 const USER_HEADERS = testSessionHeaders(USER_IDENTITY);
 const USER_MUTATION_HEADERS = testSessionHeaders(USER_IDENTITY, true);
+
+function rosterPanel(
+  tier: AskRequest["plan_tier"],
+  makers: readonly string[] = []
+) {
+  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
+    provider_ref: `provider:${tier}:${index + 1}`,
+    maker: makers[index] ?? `maker:${tier}:${index + 1}`,
+    model_id: modelId,
+    probe_evidence_ref: `probe:${tier}:${index + 1}`,
+    probed_at: "2026-09-12T00:00:00.000Z"
+  }));
+}
 
 function buildApi(options: Parameters<typeof buildApiBase>[0]) {
   return buildApiBase({
@@ -81,7 +98,7 @@ function admissionSettings(
     registerVersion: 1,
     batteryVersion: "battery:test",
     settlementWatchHandle: "watch:test",
-    resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
+    resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:2"]),
     resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
       effectiveRiskTier,
@@ -159,7 +176,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       steering_annotations: []
     };
     await expect(evaluateAskAdmission(admissionSettings({
-      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(1)
+      resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:1"])
     }), ask)).resolves.toMatchObject({
       criticUnavailableCap: {
         serves: true,
@@ -169,6 +186,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     });
 
     await expect(evaluateAskAdmission(admissionSettings({
+      resolveDiscoveredPanel: async () => rosterPanel("free"),
       resolveEnvelopeBasis: async () => {
         throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "No computed structural ceiling");
       }

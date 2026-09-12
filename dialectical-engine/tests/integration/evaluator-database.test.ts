@@ -1443,8 +1443,8 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
       ) VALUES ($1, 'AVAILABLE', NULL, $2, $2, ledger.allocate_sequence())
     `, [EVALUATOR_PROVIDER_REF, probedAt]);
     for (const probe of [
-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "model:product-a" },
-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "model:product-b" },
+      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "gpt-5.6-luna" },
+      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "claude-sonnet-5" },
       { probeEvidenceRef: "00000000-0000-4000-8000-000000000203", providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER, modelId: "model:evaluator-local" }
     ]) {
       await probes.record({ ...probe, state: "HEALTHY", failureCode: null, probedAt });
