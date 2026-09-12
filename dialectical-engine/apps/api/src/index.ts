@@ -20,6 +20,7 @@ import {
   NodeSchema,
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
+  PLAN_TIER_ROSTERS,
   PublicationTransitionSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -1202,15 +1203,37 @@ export async function evaluateAskAdmission(
   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
 }> {
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
+  const planTier = ask.plan_tier as string;
+  if (!Object.hasOwn(PLAN_TIER_ROSTERS, planTier)) {
+    markAskRefusal(new TypedDomainError(
+      "ASK_PLAN_TIER_INVALID",
+      "The plan tier must be free or premium"
+    ));
+  }
   const discoveredPanel = await settings.resolveDiscoveredPanel();
-  const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);
+  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
+  const filteredPanel = roster
+    .map((modelId) => discoveredPanel.find((member) => member.model_id === modelId))
+    .filter((member): member is typeof discoveredPanel[number] => member !== undefined);
+  const missing = roster.filter((modelId) =>
+    !filteredPanel.some((member) => member.model_id === modelId)
+  );
+  if (missing.length > 0) {
+    markAskRefusal(new TypedDomainError(
+      "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+      `The ${ask.plan_tier} plan needs ${missing.join(", ")}, and ${
+        missing.length === 1 ? "it is" : "they are"
+      } not available right now`
+    ));
+  }
+  const makers = Object.freeze([...new Set(filteredPanel.map((member) => member.maker))]);
   const makerAvailability = Object.freeze({
     deploymentMakerCapability: makers.length > 0,
     runMakerReachability: makers.length >= 2,
     classification: makers.length >= 2 ? "CAPABLE" as const : "TRANSIENT_OUTAGE" as const,
     configuredMakers: makers,
     reachedMakers: makers,
-    registerRef: discoveredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
+    registerRef: filteredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
   });
   try {
     assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
@@ -1222,12 +1245,17 @@ export async function evaluateAskAdmission(
     envelopeBasis = await settings.resolveEnvelopeBasis({
       depthParams: ask.depth_params,
       riskTier: risk.effectiveRiskTier,
-      panelSize: discoveredPanel.length
+      panelSize: filteredPanel.length
     });
   } catch (error) {
     markAskRefusal(error);
   }
-  return { risk, envelopeBasis, discoveredPanel, criticUnavailableCap: applyCriticUnavailableCap(makerAvailability) };
+  return {
+    risk,
+    envelopeBasis,
+    discoveredPanel: filteredPanel,
+    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability)
+  };
 }
 
 export class PostgresAskApplication implements AskApplication {
@@ -1301,6 +1329,7 @@ export class PostgresAskApplication implements AskApplication {
           tierSource: risk.tierSource,
           tierProvenanceRef: risk.tierProvenanceRef,
           compositionBudgetTier: ask.composition_budget_tier,
+          planTier: ask.plan_tier,
           depthParams: ask.depth_params,
           discoveredPanel,
           strangerSampleRate: this.settings.strangerSampleRate,
