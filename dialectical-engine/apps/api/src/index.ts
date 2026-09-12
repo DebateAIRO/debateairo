@@ -1204,7 +1204,14 @@ export async function evaluateAskAdmission(
 }> {
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
   const discoveredPanel = await settings.resolveDiscoveredPanel();
-  const roster = PLAN_TIER_ROSTERS[ask.plan_tier];
+  const planTier = ask.plan_tier as string;
+  if (!Object.hasOwn(PLAN_TIER_ROSTERS, planTier)) {
+    markAskRefusal(new TypedDomainError(
+      "ASK_PLAN_TIER_INVALID",
+      `The ${planTier} plan tier is invalid`
+    ));
+  }
+  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
   const filteredPanel = roster
     .map((modelId) => discoveredPanel.find((member) => member.model_id === modelId))
     .filter((member): member is typeof discoveredPanel[number] => member !== undefined);

@@ -87,8 +87,10 @@ function settingsFor(tier: PlanTier): RunCreationSettings {
 }
 
 function productionSourceFiles(repoRoot: string): readonly string[] {
-  const excludedDirectories = new Set(["dist", "generated", "node_modules"]);
-  const files: string[] = [resolve(repoRoot, "apps/api/src/index.ts")];
+  const excludedDirectories = new Set([
+    ".next", "coverage", "dist", "generated", "node_modules", "test", "tests"
+  ]);
+  const files: string[] = [];
 
   function walk(directory: string): void {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -101,10 +103,9 @@ function productionSourceFiles(repoRoot: string): readonly string[] {
     }
   }
 
-  for (const packageEntry of readdirSync(resolve(repoRoot, "packages"), { withFileTypes: true })) {
-    if (!packageEntry.isDirectory()) continue;
-    const sourceRoot = resolve(repoRoot, "packages", packageEntry.name, "src");
-    if (existsSync(sourceRoot)) walk(sourceRoot);
+  for (const workspaceName of ["apps", "packages"]) {
+    const workspaceRoot = resolve(repoRoot, workspaceName);
+    if (existsSync(workspaceRoot)) walk(workspaceRoot);
   }
   return files;
 }

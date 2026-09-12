@@ -145,9 +145,20 @@ describe("S02 tier roster admission", () => {
 
     expect(error).toMatchObject({
       name: "AskRefusal",
-      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
+      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
     });
     expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
+  });
+
+  it("refuses Premium admission with every missing roster member named", async () => {
+    const error = await rejectedAdmission([], "premium");
+
+    expect(error).toMatchObject({
+      name: "AskRefusal",
+      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+      message: "The premium plan needs gpt-5.6-sol, claude-opus-5, grok-4.6, and they are not available right now"
+    });
   });
 
   it("names the one missing Premium roster member in the tier-unavailable refusal", async () => {
@@ -178,7 +189,8 @@ describe("S02 tier roster admission", () => {
 
     expect(error).toMatchObject({
       name: "AskRefusal",
-      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
+      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
     });
     expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
     expect(error).not.toMatchObject({ code: "STRUCTURAL_CEILING_PANELSIZE_INVALID" });
@@ -206,7 +218,54 @@ describe("S02 tier roster admission", () => {
     });
 
     expect(response.statusCode).toBe(422);
-    expect(response.json().error).toBe("ASK_PLAN_TIER_MODEL_UNAVAILABLE");
+    expect(response.json()).toEqual({
+      error: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
+    });
+    await api.close();
+  });
+
+  it("returns typed refusals for out-of-vocabulary tiers at the exported boundary", async () => {
+    for (const planTier of ["constructor", "gold"]) {
+      const error = await rejectedAdmission(
+        [],
+        planTier as AskRequest["plan_tier"]
+      );
+
+      expect(error).toMatchObject({
+        name: "AskRefusal",
+        code: "ASK_PLAN_TIER_INVALID",
+        message: `The ${planTier} plan tier is invalid`
+      });
+    }
+  });
+
+  it("maps an invalid-tier boundary refusal to the HTTP 422 face", async () => {
+    const application = applicationWithSubmit(async (submittedAsk) => {
+      await evaluateAskAdmission(
+        settingsFor([]),
+        { ...submittedAsk, plan_tier: "gold" } as unknown as AskRequest
+      );
+      return { run_ref: RUN_ID, status: "QUEUED" };
+    });
+    const api = buildApi({
+      application,
+      sessions: testSessionApplication([HTTP_IDENTITY]),
+      allowedOrigin: TEST_APP_ORIGIN
+    });
+
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: HTTP_HEADERS,
+      payload: ask("free")
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: "ASK_PLAN_TIER_INVALID",
+      message: "The gold plan tier is invalid"
+    });
     await api.close();
   });
 
@@ -255,11 +314,14 @@ describe("S02 tier roster admission", () => {
       provisional_identity_model: false
     };
 
-    await application.submit(ask("free"), session, {
+    await expect(application.submit(ask("free"), session, {
       kind: "server",
       userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       ownerRef: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-    }).catch(() => undefined);
+    })).rejects.toMatchObject({
+      name: "AskRefusal",
+      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
+    });
 
     expect(connectCalls).toBe(0);
     expect(queries.join("\n")).not.toMatch(

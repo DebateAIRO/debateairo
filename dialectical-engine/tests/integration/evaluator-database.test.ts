@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest, Session } from "@debateai/contract";
-import { migrate, ProviderProbeRepository } from "@debateai/db";
+import { migrate, ProviderProbeRepository, type DiscoveredPanelMember } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   DomainRegistryRepository,
@@ -1345,10 +1345,12 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
   async function admitAndReadPersistedRun(registerVersion: number): Promise<{
     readonly panelBytes: string;
     readonly discoveredPanel: readonly { readonly provider_ref: string; readonly maker: string }[];
+    readonly resolvedPanel: readonly DiscoveredPanelMember[];
     readonly agentCount: number;
   }> {
     const deploymentMakers = await readDeploymentMakerCapability(database.pool, registerVersion);
     const probes = new ProviderProbeRepository(database.pool);
+    let resolvedPanel: readonly DiscoveredPanelMember[] = [];
     const settings: RunCreationSettings = {
       strangerSampleRate: 0,
       registerVersion,
@@ -1359,7 +1361,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
           deploymentMakers.configuredProviders.map((provider) => provider.providerRef)
         );
         const now = Date.now();
-        return Object.freeze(latest.flatMap((record) =>
+        resolvedPanel = Object.freeze(latest.flatMap((record) =>
           record.state === "HEALTHY" && record.modelId !== null
             && now - record.probedAt.getTime() <= 60_000
             ? [Object.freeze({
@@ -1371,6 +1373,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
               })]
             : []
         ));
+        return resolvedPanel;
       },
       resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 2),
       resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
@@ -1401,6 +1404,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     return Object.freeze({
       panelBytes: row.panel_bytes,
       discoveredPanel: row.discovered_panel,
+      resolvedPanel,
       agentCount: row.agent_count
     });
   }
@@ -1453,6 +1457,9 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     const absent = await admitAndReadPersistedRun(absentVersion);
     const healthy = await admitAndReadPersistedRun(healthyVersion);
 
+    expect(healthy.resolvedPanel.some((member) =>
+      member.provider_ref === EVALUATOR_PROVIDER_REF || member.maker === EVALUATOR_MAKER
+    )).toBe(false);
     expect(healthy.panelBytes).toBe(absent.panelBytes);
     expect(healthy.agentCount).toBe(absent.agentCount);
     expect(healthy.discoveredPanel.some((member) =>
