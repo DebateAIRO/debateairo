@@ -85,3 +85,9 @@
 - From BUILD-S02-C1's READY handoff (`review-packages/S02-p1/board/BUILD-S02-C1.t_422678f3.txt:279`), the command V runs at acceptance step 9, unchanged:
   `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT plan_tier FROM core.run WHERE run_id='<the run id from the URL>'"`
 - REV(S02) pass 1 unioned REWORK (2026-09-12 11:55): FIX F1 (db write) ∥ F3 (architecture guard), then F2 (admission/API tests); REV p2 correctness + product-truth. Union: `reviews/REV-S02-p1-UNION.md`.
+
+## 2026-09-12 12:16 EEST — FIX(S02) p1 F3 DONE at e8a7ad1a (the architecture guard)
+
+- `tests/architecture/tiers-s02-rosters.test.ts` +116/−21: case 3 binds tier-aware `if`/`switch` bodies and ternaries to an actual `PLAN_TIER_ROSTERS` access (M9b, M15, M6 now caught; copy-only tier branching accepted); case 2 compares file sets, never `path:line` (M14 accepted). Cases 4→4. C3 at e8a7ad1a: `1 failed | 1 passed (2)` · `3 failed | 6 passed (9)` — s14-contract's three, pre-existing.
+- Findings `t_bd8e3b18`, `t_f2da2b9a` ADDRESSED (close on REV p2). Packet defect `t_8f1eba25` against the orchestrator (restore proof must be path-partitioned) — fixed in the FIX template.
+- F1 (db write path) still running; F2 (admission/API tests) waits on F1's head.
