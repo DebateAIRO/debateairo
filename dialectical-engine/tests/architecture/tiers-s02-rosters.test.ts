@@ -45,17 +45,87 @@ function sourceFiles(directory: string): string[] {
     });
 }
 
-function sourceLinesContaining(needle: string): string[] {
+function sourceFilesContaining(needle: string): string[] {
   return SOURCE_ROOTS.flatMap((sourceRoot) =>
     sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
       const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
-      return readFileSync(absolutePath, "utf8")
-        .split("\n")
-        .flatMap((line, index) =>
-          line.includes(needle) ? [`${projectPath}:${index + 1}`] : []
-        );
+      return readFileSync(absolutePath, "utf8").includes(needle)
+        ? [projectPath]
+        : [];
     })
   ).sort();
+}
+
+function closingDelimiter(
+  source: string,
+  openingIndex: number,
+  opening: "(" | "{",
+  closing: ")" | "}"
+): number {
+  let depth = 0;
+  let quote: '"' | "'" | "`" | undefined;
+
+  for (let index = openingIndex; index < source.length; index += 1) {
+    const character = source[index]!;
+    const next = source[index + 1];
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === "/" && next === "/") {
+      index = source.indexOf("\n", index + 2);
+      if (index === -1) return source.length;
+      continue;
+    }
+    if (character === "/" && next === "*") {
+      index = source.indexOf("*/", index + 2);
+      if (index === -1) return source.length;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === opening) depth += 1;
+    if (character === closing) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+
+  return source.length;
+}
+
+function skipTrivia(source: string, start: number): number {
+  let index = start;
+  while (index < source.length) {
+    if (/\s/.test(source[index]!)) {
+      index += 1;
+    } else if (source.startsWith("//", index)) {
+      const newline = source.indexOf("\n", index + 2);
+      index = newline === -1 ? source.length : newline + 1;
+    } else if (source.startsWith("/*", index)) {
+      const end = source.indexOf("*/", index + 2);
+      index = end === -1 ? source.length : end + 2;
+    } else {
+      break;
+    }
+  }
+  return index;
+}
+
+function branchBody(source: string, start: number): { body: string; end: number } {
+  const bodyStart = skipTrivia(source, start);
+  if (source[bodyStart] === "{") {
+    const end = closingDelimiter(source, bodyStart, "{", "}");
+    return { body: source.slice(bodyStart + 1, end), end: end + 1 };
+  }
+
+  const end = source.indexOf(";", bodyStart);
+  const statementEnd = end === -1 ? source.length : end + 1;
+  return { body: source.slice(bodyStart, statementEnd), end: statementEnd };
 }
 
 function tierBranchLines(): string[] {
@@ -64,11 +134,36 @@ function tierBranchLines(): string[] {
       const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
       if (projectPath === "packages/contract/src/plan-tiers.ts") return [];
 
-      return readFileSync(absolutePath, "utf8").split("\n").flatMap((line, index) => {
-        const namesBothTiers = line.includes("free") && line.includes("premium");
-        const branches = line.includes("===") || /\bcase\s+/.test(line);
-        return namesBothTiers && branches ? [`${projectPath}:${index + 1}`] : [];
-      });
+      const source = readFileSync(absolutePath, "utf8");
+      const hits: string[] = [];
+      const location = (index: number) =>
+        `${projectPath}:${source.slice(0, index).split("\n").length}`;
+      const controlFlow = /\b(if|switch)\s*\(/g;
+      for (const match of source.matchAll(controlFlow)) {
+        const opening = source.indexOf("(", match.index);
+        const closing = closingDelimiter(source, opening, "(", ")");
+        const condition = source.slice(opening + 1, closing);
+        if (!/\b(?:plan_tier|planTier)\b/.test(condition)) continue;
+
+        const consequent = branchBody(source, closing + 1);
+        let selectedBody = consequent.body;
+        if (match[1] === "if") {
+          const afterConsequent = skipTrivia(source, consequent.end);
+          if (source.startsWith("else", afterConsequent)) {
+            selectedBody += branchBody(source, afterConsequent + 4).body;
+          }
+        }
+        const selectsRoster = /\bPLAN_TIER_ROSTERS\b/.test(selectedBody);
+        const selectsTierCase = match[1] !== "switch" ||
+          /\bcase\s+(?:"(?:free|premium)"|'(?:free|premium)')\s*:/.test(selectedBody);
+        if (selectsRoster && selectsTierCase) hits.push(location(match.index));
+      }
+
+      const tierTernary = /\b(?:plan_tier|planTier)\b[^;?]*\?[^;]*\bPLAN_TIER_ROSTERS\b[^;]*;/gs;
+      for (const match of source.matchAll(tierTernary)) {
+        hits.push(location(match.index));
+      }
+      return [...new Set(hits)];
     })
   ).sort();
 }
@@ -87,22 +182,22 @@ describe("S02 tier roster architecture", () => {
   });
 
   it("keeps every roster model id in one canonical declaration", () => {
-    const expectedOccurrences: Record<string, string[]> = {
-      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts:9"],
-      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts:9"],
+    const expectedFiles: Record<string, string[]> = {
+      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts"],
+      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts"],
       "gpt-5.6-sol": [
-        "apps/ui/components/landing/cards.ts:28",
-        "packages/contract/src/plan-tiers.ts:10"
+        "apps/ui/components/landing/cards.ts",
+        "packages/contract/src/plan-tiers.ts"
       ],
       "claude-opus-5": [
-        "apps/ui/components/landing/cards.ts:27",
-        "packages/contract/src/plan-tiers.ts:10"
+        "apps/ui/components/landing/cards.ts",
+        "packages/contract/src/plan-tiers.ts"
       ],
-      "grok-4.6": ["packages/contract/src/plan-tiers.ts:10"]
+      "grok-4.6": ["packages/contract/src/plan-tiers.ts"]
     };
 
-    for (const [modelId, expectedLines] of Object.entries(expectedOccurrences)) {
-      expect(sourceLinesContaining(modelId), modelId).toEqual(expectedLines);
+    for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {
+      expect(sourceFilesContaining(modelId), modelId).toEqual(expectedPaths);
     }
   });
 
