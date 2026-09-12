@@ -121,3 +121,8 @@ V, verbatim, in chat (the session goal): «continue the implementation where it 
 - **Card:** `packages/db/src/index.ts:1195-1209` — the encrypted write strips the `planTier` key when the installed `core.create_encrypted_run` predates 0061 (F1's compatibility guard). On a stack where the column exists but the function is not yet replaced, a signed-in run is created with `plan_tier` NULL — no error, no log (measured by the lens's half-applied fixture, Cell A). Billing (row V-6) is the stated reason the tier is recorded.
 - **Default (binds until you rule):** keep the silent drop (the run must not fail on a deploy-ordering window) and add a warning log at the strip site — ticket `t_3be5462f`, assigned to FIX(S02) p2-residue if it fits its surface.
 - **Smallest yes/no:** *Is it acceptable that a run started while migration 0061 is only half-deployed records no plan tier, silently (with a warning in the log)?*
+
+### V-31 — the refusal names the tier by its schema value, not its display word (raised by WHOLE-REV hermes-glm-5.3-flash, 2026-09-12 15:24)
+- **Card:** the asker-facing refusal reads "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now" — `free`/`premium` is `ask.plan_tier`, the schema value (also the roster declaration's key and the selector's `data-value`), stable under renaming and asserted verbatim by three suites and the reviewer's probe.
+- **Default (binds until you rule):** keep the message exactly as built.
+- **Smallest yes/no:** *May the refusal say the lowercase tier name ("The free plan needs …"), or must it carry the display word ("The Free plan needs …")?*
