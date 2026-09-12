@@ -80,7 +80,7 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
     // V2's branching / concurrency / max-token / role-override knobs have no
     // slot in the V3 ask. They may stay on screen (design authority) but must
     // not be packed into a config the ask builder will drop on the floor.
-    const submitBlock = newPage.slice(newPage.indexOf("async function submit"), newPage.indexOf("return ("));
+    const submitBlock = region(newPage, "async function submit", "return (");
     for (const dropped of ["branching", "concurrency", "maxTokens", "role_overrides", "adaptive_expansion"]) {
       expect(submitBlock).not.toContain(dropped);
     }

@@ -76,6 +76,7 @@ const validAskPayload = () => ({
   decision_scope: "test",
   as_of: "2026-08-07T00:00:00.000Z",
   steering_presets: [],
+  plan_tier: "free",
   steering_annotations: []
 });
 

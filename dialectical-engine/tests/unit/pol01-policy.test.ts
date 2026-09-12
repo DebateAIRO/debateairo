@@ -48,6 +48,7 @@ describe("POL-01 register-owned deployment floor", () => {
 
     await expect(createDebate("What follows from this evidence?", {
       risk_tier: "casual",
+      plan_tier: "free",
       tier_source: "ASKER",
       tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: "low",

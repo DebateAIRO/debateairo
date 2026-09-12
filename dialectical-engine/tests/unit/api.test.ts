@@ -132,6 +132,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       decision_scope: "test-layer scope",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     };
     await expect(evaluateAskAdmission(admissionSettings(), ask)).resolves.toMatchObject({
@@ -154,6 +155,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       decision_scope: "test-layer scope",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     };
     await expect(evaluateAskAdmission(admissionSettings({
@@ -236,12 +238,52 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
     expect(response.statusCode).toBe(202);
     expect(response.json()).toEqual({ run_ref: RUN_ID, status: "QUEUED" });
     expect(observedAsker).toBe(USER_IDENTITY.authenticated.session.asker_id);
+    await api.close();
+  });
+
+  it("R14 answers 202 for each plan tier and 400 MALFORMED_REQUEST for a bad or absent one", async () => {
+    const api = buildApi({ application: fixtureApplication() });
+    const validPayload = {
+      question_line: "What follows from this evidence?",
+      risk_tier: "casual",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker-declaration:test",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      decision_scope: "test-layer scope",
+      as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    };
+
+    const injectAsk = (payload: Record<string, unknown>) => api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: USER_MUTATION_HEADERS,
+      payload
+    });
+    const free = await injectAsk({ ...validPayload, plan_tier: "free" });
+    const premium = await injectAsk({ ...validPayload, plan_tier: "premium" });
+    const bad = await injectAsk({ ...validPayload, plan_tier: "gold" });
+    const absent = await injectAsk(validPayload);
+
+    expect(free.statusCode).toBe(202);
+    expect(premium.statusCode).toBe(202);
+    expect({ statusCode: bad.statusCode, body: bad.json() }).toMatchObject({
+      statusCode: 400,
+      body: { error: "MALFORMED_REQUEST" }
+    });
+    expect({ statusCode: absent.statusCode, body: absent.json() }).toMatchObject({
+      statusCode: 400,
+      body: { error: "MALFORMED_REQUEST" }
+    });
     await api.close();
   });
 
@@ -268,6 +310,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
@@ -334,6 +377,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       decision_scope: "bounded-history",
       as_of: "2026-08-25T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     };
     const session: Session = {
@@ -426,6 +470,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
@@ -498,6 +543,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
