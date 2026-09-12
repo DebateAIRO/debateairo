@@ -81,9 +81,26 @@ const DISCLOSURE = Object.freeze({
 });
 
 const WORDS = Object.freeze({
-  en: Object.freeze({ label: "Message",send: "Send",human: "Talk to a human",yes: "Yes",no: "No" }),
-  ro: Object.freeze({ label: "Mesaj",send: "Trimite",human: "Vorbește cu o persoană",yes: "Da",no: "Nu" })
+  en: Object.freeze({
+    label: "Message",send: "Send",human: "Talk to a human",yes: "Yes",no: "No",
+    close: "Close help"
+  }),
+  ro: Object.freeze({
+    label: "Mesaj",send: "Trimite",human: "Vorbește cu o persoană",yes: "Da",no: "Nu",
+    close: "Închide ajutorul"
+  })
 });
+
+// Points inward, back toward the dock corner the panel folds into.
+const CLOSE_ARROW = <svg
+  width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+  strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+><path d="M3 8h10" /><path d="M9 4l4 4-4 4" /></svg>;
+
+const PERSON_MARK = <svg
+  width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+  strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+><circle cx="8" cy="5.4" r="2.6" /><path d="M3 13.6c.6-2.6 2.6-4.1 5-4.1s4.4 1.5 5 4.1" /></svg>;
 
 const HELP_TOPICS = Object.freeze([
   Object.freeze({ key: "getting-started",label: "Getting started",count: 6,tone: "gold",
@@ -278,7 +295,7 @@ function readStoredConversation(): StoredConversation | null {
 
 export function Assistant({
   client = supportAssistantClient,signedIn,onLanguageChange,initialContext,
-  fullPage = false,auxiliaryContent
+  fullPage = false,auxiliaryContent,onClose
 }: Readonly<{
   client?: SupportAssistantClient;
   signedIn?: boolean;
@@ -286,6 +303,7 @@ export function Assistant({
   initialContext?: Readonly<{ runId: string }>;
   fullPage?: boolean;
   auxiliaryContent?: ReactNode;
+  onClose?: () => void;
 }>) {
   const persistent = client === supportAssistantClient;
   const [stored] = useState(() => persistent ? readStoredConversation() : null);
@@ -572,16 +590,31 @@ export function Assistant({
       >⌁ <span>Attach a debate</span></button>
       <span className="supportComposerHint">Your session and device details are attached automatically.</span>
       <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
-    </div> : <button type="submit" disabled={busy}>{WORDS[language].send}</button>}
+    </div> : <div className="supportComposerBar supportComposerBar--compact">
+      <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
+    </div>}
   </form>;
 
   if (!fullPage) return (
     <section className="supportAssistantCompact" aria-label="Dialectical Engine support assistant">
-      {languageControls}
+      <div className="supportCompactHeader">
+        {onClose === undefined ? null : <button
+          type="button"
+          className="supportCompactClose"
+          aria-label={WORDS[language].close}
+          onClick={onClose}
+        >{CLOSE_ARROW}</button>}
+        {languageControls}
+      </div>
       {conversation}
       {contextControls}
       {ratingControls}
-      <button type="button" disabled={busy} onClick={() => void escalate()}>{WORDS[language].human}</button>
+      <button
+        type="button"
+        className="supportEscalateCompact"
+        disabled={busy}
+        onClick={() => void escalate()}
+      >{PERSON_MARK}<span>{WORDS[language].human}</span></button>
       {composer}
     </section>
   );
