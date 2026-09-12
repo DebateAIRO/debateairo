@@ -59,3 +59,9 @@
 
 - Commit `86bfa432` on `slice/tiers-s02`: the roster filter (`PLAN_TIER_ROSTERS[ask.plan_tier]`, `find` per roster id → roster order, one member per id), the typed refusal `ASK_PLAN_TIER_MODEL_UNAVAILABLE` before `assertMakerAdmission`, the R7 message, `api.test.ts` re-fixtured (25/25), `evaluator-database` re-seeded (21/21), nine new cases. Seat's three runs 55/55 in 3 files (claimed); orchestrator re-run 55/55 (measured). Findings F1/F2 ticketed (PLAN precision), folded above.
 - Next: C4 (the wire) READY → packet + launch; C3 still to launch (classifier); then GATE(S02) → REV(S02) three Opus lenses.
+
+
+## 2026-09-12 11:04 EEST — BUILD(S02-C3) consumed: READY (orchestrator entry)
+
+- Commit `267c4584`: the four roster guards (`tests/architecture/tiers-s02-rosters.test.ts`) — exact ordered rosters, one canonical declaration per id (cards.ts:27-28 allow-listed), no `if`/`case` tier branching, ≥2 members. 3 runs `1F|1P (2)` · `3F|6P (9)` (claimed); orchestrator re-run identical (measured). Finding F1 (predicate wording; my packet restated it) ticketed and folded.
+- C4 still running (committed 9ef275aa, handoff pending). On its READY: GATE(S02) → REV(S02) p1.
