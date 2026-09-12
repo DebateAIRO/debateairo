@@ -71,3 +71,17 @@
 
 - C4 `9ef275aa`: `planTier: ask.plan_tier,` at `apps/api/src/index.ts:1325` + the wire/single-caller suite (2 cases). Seat's three runs 42/42 in 4 files (claimed); orchestrator re-run identical (measured). Two defects of the C4 packet (mine) ticketed: `t_5983f27a`, `t_dbbb615b`.
 - Slice head 9ef275aa re-verified: C1 25/25 · C2 55/55 · C3 3F|6P (s14 pre-existing) · C4 42/42. Package `review-packages/S02-p1` (README, two diffs, board exports, probes, oracle, dev-stack, listener baseline). Three blind Opus 5 lenses running (risk_tier high).
+
+
+## 2026-09-12 11:52 EEST — R12 read-back relay, verbatim (repairs the elided line above; REV-S02-p1 correctness N6 `t_42d46edd`)
+
+- From BUILD-S02-C1's READY handoff (`review-packages/S02-p1/board/BUILD-S02-C1.t_422678f3.txt:279`), the command V runs at acceptance step 9, unchanged:
+  `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT plan_tier FROM core.run WHERE run_id='<the run id from the URL>'"`
+- REV(S02) pass 1 unioned REWORK (2026-09-12 11:52): FIX F1 (db write) ∥ F3 (architecture guard), then F2 (admission/API tests); REV p2 correctness + product-truth. Union: `reviews/REV-S02-p1-UNION.md`.
+
+
+## 2026-09-12 11:55 EEST — R12 read-back relay, verbatim (repairs the elided line above; REV-S02-p1 correctness N6 `t_42d46edd`)
+
+- From BUILD-S02-C1's READY handoff (`review-packages/S02-p1/board/BUILD-S02-C1.t_422678f3.txt:279`), the command V runs at acceptance step 9, unchanged:
+  `docker exec debateai-v3-postgres-1 psql -U debateai -d debateai -At -c "SELECT plan_tier FROM core.run WHERE run_id='<the run id from the URL>'"`
+- REV(S02) pass 1 unioned REWORK (2026-09-12 11:55): FIX F1 (db write) ∥ F3 (architecture guard), then F2 (admission/API tests); REV p2 correctness + product-truth. Union: `reviews/REV-S02-p1-UNION.md`.
