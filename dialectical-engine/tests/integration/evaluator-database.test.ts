@@ -1327,6 +1327,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     decision_scope: "test",
     as_of: "2026-08-14T00:00:00.000Z",
     steering_presets: [],
+    plan_tier: "free",
     steering_annotations: []
   };
   const session = {

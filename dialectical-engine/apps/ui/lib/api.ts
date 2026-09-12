@@ -1,6 +1,7 @@
 import {
   ContractHttpError,
   createContractClient,
+  PLAN_TIERS,
   type Answer,
   type AskRequest,
   type ContractClient,
@@ -356,6 +357,7 @@ function optionalLines(config: AskConfig, key: string): string[] {
 
 const RISK_TIERS = new Set(["casual", "standard", "high-stakes"]);
 const BUDGET_TIERS = new Set(["low", "medium", "high"]);
+const PLAN_TIERS_SET: ReadonlySet<string> = new Set(PLAN_TIERS);
 
 /**
  * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
@@ -370,6 +372,8 @@ export async function createDebate(
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
+  const planTier = requiredString(config, "plan_tier");
+  if (!PLAN_TIERS_SET.has(planTier)) throw new Error("ASK_FIELD_REQUIRED: plan_tier must be free or premium.");
   const tierSource = requiredString(config, "tier_source");
   if (tierSource !== "ASKER" && tierSource !== "MACHINE_DEFAULT") {
     throw new Error("ASK_FIELD_REQUIRED: tier_source must identify an asker choice or machine default.");
@@ -381,6 +385,7 @@ export async function createDebate(
   if (Number.isNaN(asOf.valueOf())) throw new Error("ASK_FIELD_REQUIRED: as_of must be an explicit date and time.");
   const ask: AskRequest = {
     question_line: topic,
+    plan_tier: planTier as AskRequest["plan_tier"],
     risk_tier: riskTier as AskRequest["risk_tier"],
     tier_source: tierSource,
     tier_provenance_ref: tierProvenanceRef,
