@@ -4,6 +4,7 @@
 # The change signature covers the mission tree, the BUILD lanes, the board AND every path in watchdog.paths (seats' transcripts/worktrees/scratch).
 # Exit 3 on 20 min of no change (the orchestrator decides HUNG vs PARKED: live seats + open V rows first); exit 0 at the hard cap.
 set -u
+setopt null_glob   # a stale glob in watchdog.paths must never kill the watchdog (2026-09-12: `/private/tmp/debate-tiers-*` matched nothing and zsh exited 1)
 REPO="/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine"
 MISSION="$REPO/docs/missions/debate-tiers"
 REPORTS="$REPO/.hermes/reports/debate-tiers"
