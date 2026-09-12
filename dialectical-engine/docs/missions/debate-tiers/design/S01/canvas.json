@@ -1,0 +1,170 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 700,
+      "h": 520,
+      "title": "S01-tier-element-closeup-terracotta"
+    },
+    {
+      "file": "S01-tier-element-chamber.dc.html",
+      "x": 800,
+      "y": 0,
+      "w": 700,
+      "h": 520,
+      "title": "S01-tier-element-closeup-chamber"
+    },
+    {
+      "file": "S01-new-free-collapsed-terracotta.dc.html",
+      "x": 0,
+      "y": 850,
+      "w": 772,
+      "h": 1010,
+      "title": "S01-new-free-collapsed-terracotta"
+    },
+    {
+      "file": "S01-new-free-collapsed-chamber.dc.html",
+      "x": 872,
+      "y": 850,
+      "w": 772,
+      "h": 1010,
+      "title": "S01-new-free-collapsed-chamber"
+    },
+    {
+      "file": "S01-new-premium-collapsed-terracotta.dc.html",
+      "x": 1744,
+      "y": 850,
+      "w": 772,
+      "h": 1010,
+      "title": "S01-new-premium-collapsed-terracotta"
+    },
+    {
+      "file": "S01-new-premium-collapsed-chamber.dc.html",
+      "x": 2616,
+      "y": 850,
+      "w": 772,
+      "h": 1010,
+      "title": "S01-new-premium-collapsed-chamber"
+    },
+    {
+      "file": "S01-new-no-tier-terracotta.dc.html",
+      "x": 3488,
+      "y": 850,
+      "w": 772,
+      "h": 1010,
+      "title": "S01-new-no-tier-terracotta"
+    },
+    {
+      "file": "S01-new-no-tier-chamber.dc.html",
+      "x": 4360,
+      "y": 850,
+      "w": 772,
+      "h": 1010,
+      "title": "S01-new-no-tier-chamber"
+    },
+    {
+      "file": "S01-new-free-expanded-terracotta.dc.html",
+      "x": 0,
+      "y": 2240,
+      "w": 772,
+      "h": 1500,
+      "title": "S01-new-free-expanded-terracotta"
+    },
+    {
+      "file": "S01-new-free-expanded-chamber.dc.html",
+      "x": 872,
+      "y": 2240,
+      "w": 772,
+      "h": 1500,
+      "title": "S01-new-free-expanded-chamber"
+    },
+    {
+      "file": "S01-new-premium-moved-terracotta.dc.html",
+      "x": 1744,
+      "y": 2240,
+      "w": 772,
+      "h": 1500,
+      "title": "S01-new-premium-moved-terracotta"
+    },
+    {
+      "file": "S01-new-premium-moved-chamber.dc.html",
+      "x": 2616,
+      "y": 2240,
+      "w": 772,
+      "h": 1500,
+      "title": "S01-new-premium-moved-chamber"
+    },
+    {
+      "file": "S01-new-free-again-terracotta.dc.html",
+      "x": 3488,
+      "y": 2240,
+      "w": 772,
+      "h": 1500,
+      "title": "S01-new-free-again-terracotta"
+    },
+    {
+      "file": "S01-new-free-again-chamber.dc.html",
+      "x": 4360,
+      "y": 2240,
+      "w": 772,
+      "h": 1500,
+      "title": "S01-new-free-again-chamber"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "how-to-read",
+      "x": 1600,
+      "y": 0,
+      "w": 340,
+      "text": "S01 — the Free/Premium tier selector on /new.\n\nTop row: the element alone, both modes.\nRow 2 (screens 1, 3, 6) and row 3 (screens 2, 4, 5): the whole page, each state in Terracotta then Chamber.\n\nEvery value traces to apps/ui/app/globals.css or to the 4a New debate artboard. The app top bar is out of frame.\n\nOpen questions, each a yes/no, are in docs/missions/debate-tiers/slices/S01/MOCK.md."
+    },
+    {
+      "id": "q-v9",
+      "x": 0,
+      "y": 700,
+      "w": 1644,
+      "text": "Q1 (row V-9) — the form's initial tier. Screen 1 opens with Free already chosen; screen 6 (far right of this row) opens with neither chosen and Start run disabled until one is picked.\nSmallest yes/no: \"Does /new open with Free already chosen?\"  Recommended default: YES (Free preselected) — it is SPEC R2, it keeps Start run's disabled reason unchanged, and it makes the locks visible the moment the page opens.\nIf V says no, SPEC R2 and R18 are superseded in DONE.md and screen 6 becomes the opening state."
+    },
+    {
+      "id": "q-copy",
+      "x": 1744,
+      "y": 700,
+      "w": 1644,
+      "text": "Q2 (rows V-17, V-18) — the three lines that read false while Free is chosen. The Free screens here show the PROPOSED wording; below is what the page says today.\n\nTODAY  page.tsx:181  \"Choose your risk tier, composition budget tier, and depth, then click Start.\"\nPROPOSED  \"Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself.\"\n\nTODAY  page.tsx:186  \"How much is riding on the answer · explicit asker selection\"\nPROPOSED  \"How much is riding on the answer · fixed by the Free plan\"\n\nTODAY  page.tsx:197  \"How much work the composition may spend · provisional default, editable\"\nPROPOSED  \"How much work the composition may spend · fixed by the Free plan\"\n\nSmallest yes/no: \"Do the three lines change to the proposed wording while Free is chosen?\"  Recommended default: YES. Premium and the no-tier state keep today's wording, which is true there."
+    },
+    {
+      "id": "q-locked",
+      "x": 3488,
+      "y": 700,
+      "w": 1644,
+      "text": "Q3 — the locked treatment. Nine gauges (and five more behind OPTIONS) are drawn at opacity 0.45 with cursor not-allowed. That is the house :disabled convention, measured across 22 lines of globals.css, and .ndStart:disabled (globals.css:6193) is the one nd* member of it, at exactly 0.45.\nSmallest yes/no: \"Is dimming to 0.45 the whole locked treatment, with the copy carrying the reason?\"  Recommended default: YES — no padlock glyph, no new colour, no strikethrough. The Free copy in Q2 is what explains WHY they are locked."
+    },
+    {
+      "id": "n-select",
+      "x": 0,
+      "y": 2280,
+      "w": 1644,
+      "text": "Screens 2, 4 and 5 have OPTIONS expanded. Note for BUILD, not a question for V: the two dropdown rows are drawn dimmed on the OUTER .ndSelect box, not on the <select>. The real <select> is transparent and overlaid (globals.css:6152-6166), so putting the disabled attribute on it alone (SPEC R4) changes nothing anyone can see. The rule has to reach the drawn box."
+    },
+    {
+      "id": "n-premium",
+      "x": 1744,
+      "y": 2280,
+      "w": 1644,
+      "text": "Screen 4 is acceptance step 8: High stakes, High, depth 4, one line in each steering box, Depth of scrutiny moved to Deep. Screen 5 is step 9 — Free chosen again: every gauge back to Standard / Low / 2 / empty / Fixed / Standard / 2 / 3 / 800 and locked, the question untouched.\nThe steering lines here are sample copy. \"Prefer primary sources\" is the field's own placeholder (page.tsx:225)."
+    },
+    {
+      "id": "n-models",
+      "x": 3488,
+      "y": 2280,
+      "w": 1644,
+      "text": "The model ids come from the roster declaration (SPEC R3, R11), never from literals in the page: free = gpt-5.6-luna, claude-sonnet-5; premium = gpt-5.6-sol, claude-opus-5, grok-4.6. The dot beside each is the house identity colour for its family (--m-gpt, --m-claude, --m-grok).\nSmallest yes/no (Q4): \"Do the options show the raw model ids rather than friendly names?\"  Recommended default: YES — the raw id is what the run will actually name, and row V-7 says three of these five are not configured yet."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

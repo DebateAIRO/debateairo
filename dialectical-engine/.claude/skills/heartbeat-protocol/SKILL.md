@@ -85,8 +85,9 @@ UNVERIFIED is always a legal answer; a guess presented as a result is the most e
 
 **3.8 The reading floor.** You read: `using-superpowers`, this file, your contract, your floor,
 `INSTRUCTIONS.md`, your packet, and the files your packet names AT THE LINES IT NAMES. A BUILD node
-reads its cluster's steps, never the whole PLAN. `TOOLING-TRAPS.md` is read as its index
-(`grep -n '^## \|^- ' .hermes/TOOLING-TRAPS.md`) plus the headings your packet names. A packet that
+reads its cluster's steps, never the whole PLAN. `TOOLING-TRAPS.md` is read as its index of HEADINGS
+(`grep -n '^## ' .hermes/TOOLING-TRAPS.md`) plus the bullets under the headings your packet names —
+never the whole bullet list. A packet that
 makes you read more is a packet defect — report it (3.7), do not absorb it.
 
 **3.9 The no-terminal law (V, 2026-09-09).** Nothing is opened on V's desktop: no `osascript`, no

@@ -2,7 +2,7 @@
 # packet-check.sh <packet.md> — the mechanical pre-dispatch check (heartbeat v4.0.0, spine v4 item 6).
 # Exit 0 = dispatchable. Exit 1 = every DEFECT listed on stdout. Never edits the packet.
 # Conventions it enforces (heartbeat-orchestrator §5): fill markers are __UPPERCASE__; a path the seat
-# will CREATE carries " (new)" on the same line; a code quote is `<abs path>:<LINE> — `<text>``.
+# will CREATE carries " (new)" — or "(new, <qualifier>)" — on the same line; a code quote is `<abs path>:<LINE> — `<text>``.
 set -u
 P="${1:?usage: packet-check.sh <packet.md>}"
 [ -f "$P" ] || { echo "DEFECT no such packet: $P"; exit 1; }
@@ -16,7 +16,7 @@ fi
 # 2. every absolute path resolves, unless the line marks it (new) or the path holds a <placeholder>
 out=$(grep -nEo '(/Users|/private|/tmp)[A-Za-z0-9_./~-]*' "$P" | while IFS=: read -r ln pth; do
   line=$(sed -n "${ln}p" "$P")
-  case "$line" in *"(new)"*) continue;; esac
+  case "$line" in *"(new"*) continue;; esac   # "(new)" or "(new, <qualifier>)" both mark a path the seat creates
   case "$pth" in *'<'*) continue;; esac
   p="${pth%%:[0-9]*}"; p="${p%.}"; p="${p%,}"
   [ -e "$p" ] || echo "DEFECT path does not resolve (line $ln): $p"
@@ -39,12 +39,38 @@ grep -q 'treat it like a murder case. I want to get a nice report on what can be
   || fail "the self-report instruction is not verbatim (it must sit on ONE line)"
 
 # 5. the self-report path sits inside the allowed block (the block runs from a line containing
-#    'allowed' to the next line containing 'forbidden' or starting a '## ' heading)
-sr=$(grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]*agent-reports/[A-Za-z0-9_.-]+\.md' "$P" | head -1)
+#    '- allowed' to the next top-level '- ' bullet or '## ' heading — a later line that merely MENTIONS `allowed`
+#    (the verification line does) is not the block; FIX-S01-p1 packets were rejected for a runner path named twice there)
+# the seat's OWN report is the one on the `self-report:` line — a predecessor's report named in the inputs is not it
+sr=$(grep -E '^- self-report:' "$P" | grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]*agent-reports/[A-Za-z0-9_.-]+\.md' | head -1)
+[ -n "$sr" ] || sr=$(grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]*agent-reports/[A-Za-z0-9_.-]+\.md' "$P" | head -1)
 if [ -z "$sr" ]; then fail "no self-report path (…/agent-reports/<SEAT>.md)"; else
-  awk '/allowed/{inb=1} (/forbidden/||/^## /){if(inb && !/allowed/)inb=0} inb{print}' "$P" | grep -Fq -- "$sr" \
+  awk '/^- allowed/{inb=1; print; next} (/^- /||/^## /){inb=0} inb{print}' "$P" | grep -Fq -- "$sr" \
     || fail "self-report path is not inside the allowed block: $sr"
 fi
 
-[ $rc = 0 ] && echo "OK dispatchable: $P"
+
+# 9. a path appears at most once in the allowed block (BUILD-S01-C5 F3, 2026-09-10): a generator that
+#    re-adds the self-report the template already carries lists one file twice
+dups=$(awk '/^- allowed/{inb=1; print; next} (/^- /||/^## /){inb=0} inb{print}' "$P" | grep -Eo '(/Users|/private)[A-Za-z0-9_./~-]+' | sort | uniq -d)
+[ -n "$dups" ] && fail "path listed more than once in the allowed block: $(echo "$dups" | tr '\n' ' ')"
+
+# 10. a cited line range ends inside its section (REV-S01-p1 security P1, 2026-09-10): for `<abs>.md:A-B`, line B is
+#     never a heading — a range that runs onto the next section's heading was copied, not measured
+out=$(grep -nEo '(/Users|/private|/tmp)[A-Za-z0-9_./~-]*\.md:[0-9]+-[0-9]+' "$P" | while IFS=: read -r ln pth ab; do
+  f="$pth"; b="${ab#*-}"; [ -f "$f" ] || continue
+  sed -n "${b}p" "$f" | grep -Eq '^#{1,6} ' && echo "DEFECT cited range ends ON a heading (line $ln): $f:$ab — the section ends before line $b"
+done)
+[ -n "$out" ] && { echo "$out"; rc=1; }
+
+# 8. every mission file a CHARGE names is also an input (ARCH-REV-S01 P2, 2026-09-09): after the first
+#    '### Charges' heading, each `docs/missions/…/*.md` or `slices/…/*.md` path must appear (by basename) on the '- inputs' line
+inputs_line=$(grep -m1 -E '^- inputs' "$P")
+for f in $(awk '/^### Charges/{c=1} c' "$P" | grep -oE '(docs/missions/[A-Za-z0-9_./-]+\.md|slices/[A-Za-z0-9_./-]+\.md)' | sort -u); do
+  b=$(basename "$f")
+  echo "$inputs_line" | grep -Fq -- "$b" || fail "charge names $f but the inputs line does not carry it"
+done
+
+head=$(git -C "$(cd "$(dirname "$P")" && pwd -P)" rev-parse --short HEAD 2>/dev/null); head="${head:-not in a repo}"
+[ $rc = 0 ] && echo "OK dispatchable: $P (main-tree HEAD at check time: $head — the packet's base is the LANE base; stamp both in the dispatch comment)"
 exit $rc

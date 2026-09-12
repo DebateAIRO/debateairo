@@ -1,0 +1,7 @@
+ .../.codex/skills/heartbeat-orchestrator/SKILL.md  | 356 ++++++++++++++-------
+ .../.codex/skills/heartbeat-protocol/SKILL.md      | 331 +++++++------------
+ dialectical-engine/apps/ui/app/globals.css         |   1 +
+ dialectical-engine/apps/ui/app/new/page.tsx        |  32 +-
+ .../tests/render/tier01-new-plan-tier.test.tsx     |  92 ++++--
+ .../tests/unit/tier01-style-contract.test.ts       |   1 +
+ 6 files changed, 422 insertions(+), 391 deletions(-)

@@ -1,0 +1,40 @@
+SPEC requirements defined  : 15  ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15']
+PLAN steps defined (§4)    : 36
+    M:  0  []
+   C1:  8  ['S02-C1-S1', 'S02-C1-S2', 'S02-C1-S3', 'S02-C1-S4', 'S02-C1-S5', 'S02-C1-S6', 'S02-C1-S7', 'S02-C1-S8']
+   C3:  6  ['S02-C3-S1', 'S02-C3-S2', 'S02-C3-S3', 'S02-C3-S4', 'S02-C3-S5', 'S02-C3-S6']
+   C2: 11  ['S02-C2-S1', 'S02-C2-S2', 'S02-C2-S3', 'S02-C2-S4', 'S02-C2-S5', 'S02-C2-S6', 'S02-C2-S7', 'S02-C2-S8', 'S02-C2-S9', 'S02-C2-S10', 'S02-C2-S11']
+   C4:  4  ['S02-C4-S1', 'S02-C4-S2', 'S02-C4-S3', 'S02-C4-S4']
+   V : 7  ['S02-V1', 'S02-V2', 'S02-V3', 'S02-V4', 'S02-V5', 'S02-V6', 'S02-V7']  (§7)
+
+--- FORWARD: a requirement with no steps ---
+  none — every R has at least one step
+
+--- FORWARD: a step NAMED in §3 that §4 never defines ---
+  S02-M3
+
+--- BACKWARD: a step DEFINED in §4 that §3b's table never covers ---
+  S02-C3-S5, S02-C3-S6, S02-C2-S11
+
+--- BACKWARD: a step defined in §4 that NO forward row names either ---
+  S02-C3-S5, S02-C3-S6, S02-C2-S11
+
+--- CROSS: steps outside BOTH tables (the PLAN claims zero at PLAN.md:164) ---
+  S02-C2-S11, S02-C3-S5, S02-C3-S6
+
+--- per requirement, the steps the forward table names ---
+   R1: ['S02-C3-S1', 'S02-C3-S3', 'S02-M3']
+   R2: ['S02-C2-S3', 'S02-C3-S2']
+   R3: ['S02-C2-S2', 'S02-C2-S3']
+   R4: ['S02-C2-S3', 'S02-C2-S8', 'S02-C4-S3']
+   R5: ['S02-C3-S4']
+   R6: ['S02-C2-S1', 'S02-C2-S4', 'S02-C2-S5']
+   R7: ['S02-C2-S5', 'S02-C2-S6']
+   R8: ['S02-C2-S7']
+   R9: ['S02-C2-S9']
+  R10: ['S02-V5']
+  R11: ['S02-C1-S1', 'S02-C1-S2', 'S02-C1-S3', 'S02-C1-S4', 'S02-C1-S5', 'S02-C1-S6', 'S02-C1-S7', 'S02-C4-S2']
+  R12: ['S02-C1-S8', 'S02-C4-S4']
+  R13: ['S02-C2-S10', 'S02-V1', 'S02-V2']
+  R14: ['S02-V3']
+  R15: ['S02-C1-S2', 'S02-C2-S1', 'S02-C2-S4', 'S02-C2-S5', 'S02-C2-S6', 'S02-C2-S7']

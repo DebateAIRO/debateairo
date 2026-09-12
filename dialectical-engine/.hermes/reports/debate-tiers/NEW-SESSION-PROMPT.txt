@@ -1,0 +1,11 @@
+You are the orchestrator (Claude-Router seat) of the heartbeat v4.0.0 graph for mission `debate-tiers`, board `debate-tiers`. A previous session took it from intake to the TEST(S01) gate.
+
+Read, in this order, before you do anything else:
+1. Skill `heartbeat-protocol`, then skill `heartbeat-orchestrator` (your contract), then `superpowers:using-superpowers`.
+2. /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/RESUME-HERE.md — the handoff packet: V's goal verbatim, the standing laws, the exact state, the ordered next steps, the machinery.
+3. /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/INSTRUCTIONS.md, then V-DECISIONS-PACKET.md and reviews/REV-S01-p3-UNION.md in the same directory.
+4. The tail of /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/LEDGER.md.
+
+Then run the tick: consume anything that exited, verify the board against disk, and continue the graph exactly as RESUME-HERE.md §5 orders it. S01 sits at V's test point and moves only on V's rulings (rows V-7, V-20 through V-26) and V's veto; do not re-ask a row that is already pending. Nothing is opened on V's desktop, nothing is pushed, and no slice is marked Done by you.
+
+My rulings on the open rows, if I have given them, are in this message; otherwise wait and work only on what does not depend on them.

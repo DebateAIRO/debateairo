@@ -1,0 +1,25 @@
+# PACKET REV-S01-p1-product-truth — REV(S01) lens product-truth (blind slice review, pass 1) · mission `debate-tiers`
+
+Read FIRST, in full: this packet · then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/COMMON.md · then ONLY the files they name, at the lines they name — plus a named skill's own `references/*.md` when that skill sends you there, each listed in your `SKILLS LOADED` line. The spine (`docs/agent-protocols/…`) is the authority for a DISPUTE, not floor reading — open it only for a section a packet or a conflict names.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-reviewer` · `superpowers:verification-before-completion` — then anything else in Superpowers that fits.
+
+## 1. Node
+- seat: REV-S01-p1-product-truth · node: REV(S01) lens product-truth (blind slice review, pass 1) · pass: 1 of 3 · rework rounds: max 3 · model: claude-opus-5 · transport: Agent tool (Claude subagent, background, blind, fresh session) (resume: none — this harness offers no SendMessage; a rework goes to a fresh session carrying your handoff and self-report (orchestrator §7))
+- ticket: t_8ea6c036 (slice ticket t_11abead2 is V's) · comment cursor at dispatch: 1
+- cwd for every command: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s01-p1-product/dialectical-engine · branch: detached HEAD at f6c147cc (= the `slice/tiers-s01` head; READ-ONLY — no git write of any kind) · base: 7f89f7b7
+- inputs (read these and nothing else): the review package /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/review-packages/S01-p1/ (diff vs base, every cluster command + three-run table, the cluster map, the acceptance oracle, the dev-stack recipe) · the slice head f6c147cc checked out READ-ONLY in your detached worktree /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s01-p1-product/dialectical-engine · the acceptance oracle — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/slices/S01/DONE.md:1-167 (V's yes; §2 states 1–6, §3 M1–M15, §4 acceptance) · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/design/S01/README.md:1-33 then the 14 artboards + canvas.json it maps · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/slices/S01/SPEC-v2.md:232-268 (§2 steps 1–12, both modes) · the freeze commits (COMMON §6 row `freeze commits`; `git diff --stat <previous>..<latest> -- docs/missions/debate-tiers` is exactly what the seat under review changed)
+- output (the ONE artifact this node produces): /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/reviews/REV-S01-p1-product-truth.md (new) + ONE verdict comment on t_8ea6c036
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/REV-S01-p1-product-truth.md (new)
+
+## 2. Contract
+- allowed (exhaustive): /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/debate-tiers/reviews/REV-S01-p1-product-truth.md (new) · probes under /private/tmp/debate-tiers-REV-S01-p1-product-truth (new) · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/probes/ (new, promoted probes only) · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/REV-S01-p1-product-truth.md (new)
+- forbidden: everything else — in particular the slice's files, every other lens's output, git writes of any kind
+- verification: your OWN fixtures for the whole slice, both modes on UI · every cluster command re-run by you · one mount of every surface this slice shares with another slice or with the app shell · on UI: rendered DOM with the real compiled CSS measured against the oracle's artboards (geometry, colour, both modes)
+
+## 3. The work
+Review the packet FIRST (a packet defect is a finding against the orchestrator). Your lens is product-truth (correctness/tests · security/data-safety · product-truth); probe, never read — build from the CLAIM, exceed the author's parameters, refute. Number findings B/N with file:line and the concrete failure; every N gets a ticket through the orchestrator. Verdict PASS / REWORK / BLOCKED for THIS lens with the pass number; the orchestrator unions the lenses. End with one paragraph of predictions about the other lenses. A REWORK at pass 3 is a V row.
+
+## 4. Handoff
+`PASS | REWORK | BLOCKED` on t_8ea6c036, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Then stop: no push, no merge, no Done, no board mutation beyond your own comments, nothing opened on V's desktop.

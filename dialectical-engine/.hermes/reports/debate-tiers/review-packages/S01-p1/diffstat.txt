@@ -1,0 +1,19 @@
+ dialectical-engine/apps/ui/app/globals.css         |  64 +++
+ dialectical-engine/apps/ui/app/new/defaults.tsx    |   6 +-
+ dialectical-engine/apps/ui/app/new/page.tsx        | 101 ++++-
+ dialectical-engine/apps/ui/lib/api.ts              |   5 +
+ dialectical-engine/packages/contract/src/index.ts  |   2 +
+ .../packages/contract/src/plan-tiers.ts            |  11 +
+ .../tests/architecture/tier01-roster.test.ts       |  63 +++
+ .../tests/integration/evaluator-database.test.ts   |   1 +
+ .../tests/render/tier01-new-plan-tier.test.tsx     | 458 +++++++++++++++++++++
+ dialectical-engine/tests/unit/api.test.ts          |  46 +++
+ dialectical-engine/tests/unit/contract.test.ts     |  31 +-
+ .../tests/unit/load01-live-proof.test.ts           |   1 +
+ dialectical-engine/tests/unit/pol01-policy.test.ts |   1 +
+ .../tests/unit/s7-authorization.test.ts            |   1 +
+ .../tests/unit/tier01-ask-wire.test.ts             | 117 ++++++
+ .../tests/unit/tier01-style-contract.test.ts       | 200 +++++++++
+ .../tests/unit/v2ui-data-layer.test.ts             |   1 +
+ dialectical-engine/tests/unit/v2ui-pages.test.ts   |   2 +-
+ 18 files changed, 1101 insertions(+), 10 deletions(-)

@@ -1,7 +1,7 @@
 # PACKET __SEAT__ — FIX(__SLICE__) (rework after REV pass __PASS__) · mission `__MISSION__`
 
-Read FIRST, in full: __PACKET_DIR__/COMMON.md · then this packet · then ONLY the files it names, at the lines it names.
-Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus a named skill's own `references/*.md` when that skill sends you there, each listed in your `SKILLS LOADED` line. The spine (`docs/agent-protocols/…`) is the authority for a DISPUTE, not floor reading — open it only for a section a packet or a conflict names.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-worker` · `superpowers:receiving-code-review` · `superpowers:test-driven-development` · `superpowers:verification-before-completion` · `superpowers:systematic-debugging` — then anything else in Superpowers that fits.
 
 ## 1. Node
 - seat: __SEAT__ · node: FIX(__SLICE__) (rework after REV pass __PASS__) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
@@ -13,11 +13,12 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 
 ## 2. Contract
 - allowed (exhaustive): __ALLOWED_FILES__ · __REPORTS__/agent-reports/__SEAT__.md (new)
+- read in FULL: every file in `allowed` (your own write surface — the line law binds only files outside it), except a file allowed as a NAMED BLOCK, which you read as that block plus the ranges the packet names
 - forbidden: everything else — in particular every file outside the findings' surfaces, the main tree
-- verification: for each finding: the reviewer's probe reproduced RED against the pre-fix head, then GREEN · the affected clusters' commands THREE times, worst run wins · the previous pass's surviving mutants re-run
+- verification: for each finding: the reviewer's probe reproduced RED against the pre-fix head, then GREEN (a probe that hard-codes the pre-fix state cannot turn GREEN — re-derive its expectation and name the difference in the handoff) · the affected clusters' commands THREE times, worst run wins · the previous pass's surviving mutants re-run · every run from a `.sh` that writes the full output to a scratch log FIRST (`> <log> 2>&1`) and prints only `rc`, the failing case names and the `Test Files` / `Tests` lines — verbatim frames are pasted from that log, never re-run to be captured; the full log stays addressable until REV consumes the handoff · the runner's printed marker (`CLUSTER_GREEN` / `CLUSTER_RED` / `BROKEN`) is the verdict — a runner's own `rc` is not a signal · `pnpm typecheck` gains no diagnostic in any path of `allowed` (its rc is inherited) · one log per run, named by step and attempt, never overwritten · `run_suites` IS `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-suites.sh` called from the lane as `LOG=<abs log path> zsh /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-suites.sh <suite>:<passed>:<failed> …` — one file per run; a packet points at it by absolute path and never restates its body · a suite gains cases as TDD requires, and the handoff restates every pair you changed
 
 ## 3. The work
-Reproduce first — the reviewer's probe, RED, against current code, before any edit. Fix the CLASS: name it, sweep every member, record the sweep member-by-member in the handoff. Contest with a measurement, never with an argument. Findings outside your assignment are named, not fixed.
+Reproduce first — the reviewer's probe, RED, against current code, before any edit. Fix the CLASS: name it, sweep every member, record the sweep member-by-member in the handoff. A mutant is a TEMPORARY, reverted change to a product file made to prove an assertion bites — it is never committed and never counts against `allowed`: the exhaustive write list bounds what you COMMIT, and `git status --porcelain` after every restore proves the mutant is gone. Contest with a measurement, never with an argument. Findings outside your assignment are named, not fixed.
 
 ## 4. Handoff
 `READY` on __TICKET__, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:
