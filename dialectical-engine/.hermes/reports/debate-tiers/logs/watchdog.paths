@@ -12,3 +12,9 @@
 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-p1-*/dialectical-engine/packages
 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-p1-*/dialectical-engine/tests
 /private/tmp/debate-tiers-REV-S02-p1-*
+# FIX(S02) p1 seats, added 2026-09-12 11:58: the S02 lane's product + test trees and the Codex seats' scratch dirs
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/apps
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/packages
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/tests
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/migrations
+/private/tmp/FIX-S02-p1-*

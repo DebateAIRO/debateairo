@@ -91,3 +91,10 @@
 - `tests/architecture/tiers-s02-rosters.test.ts` +116/−21: case 3 binds tier-aware `if`/`switch` bodies and ternaries to an actual `PLAN_TIER_ROSTERS` access (M9b, M15, M6 now caught; copy-only tier branching accepted); case 2 compares file sets, never `path:line` (M14 accepted). Cases 4→4. C3 at e8a7ad1a: `1 failed | 1 passed (2)` · `3 failed | 6 passed (9)` — s14-contract's three, pre-existing.
 - Findings `t_bd8e3b18`, `t_f2da2b9a` ADDRESSED (close on REV p2). Packet defect `t_8f1eba25` against the orchestrator (restore proof must be path-partitioned) — fixed in the FIX template.
 - F1 (db write path) still running; F2 (admission/API tests) waits on F1's head.
+
+## 2026-09-12 12:35 EEST — FIX(S02) p1 F1 DONE at 88496931 (the run-write surface)
+
+- `packages/db/src/index.ts` +41: both `startRun` writers succeed against a schema that predates 0061 and persist `plan_tier` when the column/function carry it — the capability is selected per writer (plaintext: the column; encrypted: the installed `core.create_encrypted_run` tested inside the same mutation-bearing statement). `tests/integration/tiers-s02-run-plan-tier.test.ts` +131: two pre-0061 cases on the embedded Postgres (cases 4→6).
+- At 88496931: C1 `27 passed (27)` · C2 `55 passed (55)` · C3 `3 failed | 6 passed (9)` (s14, pre-existing) · C4 `42 passed (42)`; the pre-0061 probe `76 passed (76)`, 0 hits; the fourth pair `2 failed | 70 passed (72)` (both pre-existing).
+- `t_ca11cffb` ADDRESSED (closes on REV p2). New: `t_d1df96d4` (packet defect, orchestrator), `t_35e0669f` (promoted-probe marker defect, the correctness lens's).
+- F2 (admission/API tests) dispatched at 88496931 — the last FIX node of pass 1; then the S02-p2 package and REV pass 2.

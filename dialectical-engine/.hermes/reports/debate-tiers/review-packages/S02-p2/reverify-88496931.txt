@@ -1,0 +1,24 @@
+# Orchestrator re-verification at the lane head 88496931 — 2026-09-12 12:33 EEST, lane .worktrees/tiers-s02 (0 dirty before). Full vitest output: reverify-C{1,2,3,4}-88496931.log beside this file.
+
+## C1 (rc=0)
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+
+## C2 (rc=0)
+ Test Files  3 passed (3)
+      Tests  55 passed (55)
+
+## C3 (rc=1)
+ Test Files  1 failed | 1 passed (2)
+      Tests  3 failed | 6 passed (9)
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror 5ms
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory 2ms
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak 3ms
+ FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror
+ FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory
+ FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+
+## C4 (rc=0)
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+dirty after: 0
