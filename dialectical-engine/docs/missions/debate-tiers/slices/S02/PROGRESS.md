@@ -65,3 +65,9 @@
 
 - Commit `267c4584`: the four roster guards (`tests/architecture/tiers-s02-rosters.test.ts`) — exact ordered rosters, one canonical declaration per id (cards.ts:27-28 allow-listed), no `if`/`case` tier branching, ≥2 members. 3 runs `1F|1P (2)` · `3F|6P (9)` (claimed); orchestrator re-run identical (measured). Finding F1 (predicate wording; my packet restated it) ticketed and folded.
 - C4 still running (committed 9ef275aa, handoff pending). On its READY: GATE(S02) → REV(S02) p1.
+
+
+## 2026-09-12 11:15 EEST — BUILD(S02-C4) consumed READY; GATE(S02) assembled; REV(S02) pass 1 dispatched (orchestrator entry)
+
+- C4 `9ef275aa`: `planTier: ask.plan_tier,` at `apps/api/src/index.ts:1325` + the wire/single-caller suite (2 cases). Seat's three runs 42/42 in 4 files (claimed); orchestrator re-run identical (measured). Two defects of the C4 packet (mine) ticketed: `t_5983f27a`, `t_dbbb615b`.
+- Slice head 9ef275aa re-verified: C1 25/25 · C2 55/55 · C3 3F|6P (s14 pre-existing) · C4 42/42. Package `review-packages/S02-p1` (README, two diffs, board exports, probes, oracle, dev-stack, listener baseline). Three blind Opus 5 lenses running (risk_tier high).
