@@ -234,3 +234,10 @@ here.`
 
 - **F1 (BUILD-S02-C3, `t_2e74f402`).** S02-C3-S3's predicate (PLAN.md:423-426) is line-local: a line carrying BOTH `free` and `premium` AND (`===` | `case `). The C3 packet's charge 5 gave `if (tier === "free")` as the case-3 mutant — a line with only `free`, which the predicate as written does not match. The seat read the PLAN (correctly), hit one dead end on a file-level reading, and recorded both. Nothing in the product changes; the guard as committed (`tests/architecture/tiers-s02-rosters.test.ts`, case 3) implements PLAN.md:425. The orchestrator's class fix: a packet charge points at the PLAN step for any predicate and names a mutant by its effect on the assertion, never by a literal the packet author has not run against the predicate.
 - **Recorded, no decision needed:** the case-2 known gap (an equivalent alias id spelled differently is not caught — no alias table exists) and the R5 half repo data cannot express (distinct makers) stand as PLAN S02-C3-S2/S4 state them; both are UNVERIFIED lines in the handoff, not findings.
+
+
+## Rows opened at REV(S02) pass 1 (2026-09-12 11:40 EEST; product-truth lens; transcribed and numbered by the orchestrator in V-DECISIONS-PACKET.md)
+
+- **V-28** — the `ASK_PLAN_TIER_MODEL_UNAVAILABLE:` prefix on the asker-facing refusal (`packages/contract/src/client.ts:88-91`); the note at line 159 above recorded the prefix as the client's standing behaviour, and the lens contests that R10's "unchanged" is thereby false as built. Default: leave S02, route the copy change.
+- **V-29** — the runner may shrink an admitted tier panel at claim time (`apps/runner/src/index.ts:1366-1421`) and marks it by `provider_ref`. Default: leave S02, open a slice.
+- Both defaults bind until V rules; the union verdict of pass 1 treats neither as a REWORK item.
