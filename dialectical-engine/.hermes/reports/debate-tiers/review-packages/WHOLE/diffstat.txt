@@ -1,0 +1,27 @@
+ dialectical-engine/apps/api/src/index.ts           |  37 +-
+ dialectical-engine/apps/ui/app/globals.css         |  66 +++
+ dialectical-engine/apps/ui/app/new/defaults.tsx    |   6 +-
+ dialectical-engine/apps/ui/app/new/page.tsx        | 119 ++++-
+ dialectical-engine/apps/ui/lib/api.ts              |   5 +
+ .../migrations/0061_plan_tier_on_run.sql           | 103 ++++
+ dialectical-engine/packages/contract/src/index.ts  |   2 +
+ .../packages/contract/src/plan-tiers.ts            |  11 +
+ dialectical-engine/packages/db/src/index.ts        |  64 ++-
+ dialectical-engine/packages/db/src/schema.ts       |   1 +
+ .../tests/architecture/tier01-roster.test.ts       |  63 +++
+ .../tests/architecture/tiers-s02-rosters.test.ts   | 245 ++++++++++
+ .../tests/integration/evaluator-database.test.ts   |  16 +-
+ .../integration/tiers-s02-run-plan-tier.test.ts    | 309 ++++++++++++
+ .../tests/render/tier01-new-plan-tier.test.tsx     | 532 +++++++++++++++++++++
+ dialectical-engine/tests/unit/api.test.ts          | 145 +++++-
+ dialectical-engine/tests/unit/contract.test.ts     |  31 +-
+ .../tests/unit/load01-live-proof.test.ts           |   1 +
+ dialectical-engine/tests/unit/pol01-policy.test.ts |   1 +
+ .../tests/unit/s7-authorization.test.ts            |   1 +
+ .../tests/unit/tier01-ask-wire.test.ts             | 117 +++++
+ .../tests/unit/tier01-style-contract.test.ts       | 214 +++++++++
+ .../tests/unit/tiers-s02-admission.test.ts         | 397 +++++++++++++++
+ .../tests/unit/tiers-s02-wire.test.ts              | 168 +++++++
+ .../tests/unit/v2ui-data-layer.test.ts             |   1 +
+ dialectical-engine/tests/unit/v2ui-pages.test.ts   |   2 +-
+ 26 files changed, 2620 insertions(+), 37 deletions(-)

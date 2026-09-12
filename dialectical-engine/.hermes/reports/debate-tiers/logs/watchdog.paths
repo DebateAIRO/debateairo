@@ -18,3 +18,18 @@
 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/tests
 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/migrations
 /private/tmp/FIX-S02-p1-*
+# REV(S02) pass 2 lenses, added 2026-09-12 13:09: their detached worktrees and scratch dirs; the integration worktree for the whole-feature nodes
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-p2-*/dialectical-engine/apps
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-p2-*/dialectical-engine/packages
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s02-p2-*/dialectical-engine/tests
+/private/tmp/debate-tiers-REV-S02-p2-*
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/integration-debate-tiers/dialectical-engine/apps
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/integration-debate-tiers/dialectical-engine/packages
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/integration-debate-tiers/dialectical-engine/tests
+/private/tmp/debate-tiers-WHOLE-REV-*
+# WHOLE-REV reviewers, added 2026-09-12 14:16: their detached worktrees, the grok/hermes session stores
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/whole-rev-*/dialectical-engine/apps
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/whole-rev-*/dialectical-engine/packages
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/whole-rev-*/dialectical-engine/tests
+/Users/vladmihaimiron/.grok/sessions
+/Users/vladmihaimiron/.hermes/sessions

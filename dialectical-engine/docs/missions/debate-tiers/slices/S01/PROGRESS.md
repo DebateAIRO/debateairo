@@ -146,3 +146,8 @@
 ## 2026-09-10 23:16 EEST — "no workie": the serve lacked the runner stage; fixed, V's 18:24 debate now executing (orchestrator entry)
 
 - The UI behind the front door had died twice (OOM; preview server stopped by the app) and no runner process existed to execute accepted asks. All long-lived stages now run detached under supervisors; the runner stage runs from the lane. Findings `t_425a0357` (product: the runner's own readiness gate) and `t_efe7c2e3` (mine). S01's code untouched.
+
+## 2026-09-12 12:47 EEST — DONE on V's veto · MERGE(S01) local
+
+- V, verbatim: «S01 was tested by me. its fine». Slice ticket `t_11abead2` closed. Rows V-20…V-26 stand on their built defaults; no post-veto FIX (no finding raised).
+- MERGE(S01): `integration/debate-tiers` @ **608f53f9** = dev 24c7e644 + slice/tiers-s01 9ddbb1ef (no-ff, 18 files, globals.css auto-merged). The integrated suite runs in `.worktrees/integration-debate-tiers` (`review-packages/WHOLE/integrated-608f53f9/`). `dev` fast-forwards on V's push word (main-tree overlap with another session's uncommitted `tests/unit/v2ui-data-layer.test.ts`).
