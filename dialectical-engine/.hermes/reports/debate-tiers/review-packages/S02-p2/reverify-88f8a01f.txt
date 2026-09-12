@@ -1,0 +1,57 @@
+# Orchestrator re-verification at the lane head 88f8a01f — 2026-09-12 13:08 EEST, lane .worktrees/tiers-s02 (0 dirty before). Full outputs: reverify-*-88f8a01f.log beside this file.
+
+## C1 (rc=0)
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+
+## C2 (rc=0)
+ Test Files  3 passed (3)
+      Tests  58 passed (58)
+
+## C3 (rc=1)
+ Test Files  1 failed | 1 passed (2)
+      Tests  3 failed | 6 passed (9)
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror 5ms
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory 2ms
+ × tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak 3ms
+ FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > uses the generated contract client for both browser and SSR with no V2 wire mirror
+ FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory
+ FAIL  tests/architecture/s14-contract.test.ts > S14 / AC-59..61 / W19 — native UI contract > carries the S04 orphan-audit wording fix and deterministic locale tiebreak
+
+## C4 (rc=0)
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+
+## probe REV-S02-p1-correctness-tests-pre-0061-schema.sh (rc=0) — written against 9ef275aa; dirty after: 0
+PROBE pre-0061-schema · root /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine · head 88f8a01f
+ Test Files  3 passed (3)
+      Tests  76 passed (76)
+rc=0 · 42703 hits=0 · full log /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s02/dialectical-engine/.probe-pre-0061-schema.log
+
+## probe REV-S02-p1-correctness-tests-slice-probe.sh (rc=1) — written against 9ef275aa; dirty after: 0
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+
+## probe REV-S02-p1-security-data-safety--run.sh (rc=0) — written against 9ef275aa; dirty after: 0
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+
+## probe REV-S02-p1-security-data-safety--mutant-evaluator-vacuity.sh (rc=0) — written against 9ef275aa; dirty after: 0
+MUTANT-LEAK applied
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+cellA rc=1   (measured at 9ef275aa: rc=0, Tests 1 passed | 20 skipped -> the assertion is VACUOUS)
+MUTANT-NOFILTER applied (the pre-S02 return restored)
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+
+## probe REV-S02-p1-product-truth.refusal-face.test.ts at tests/unit/REV-S02-p1-product-truth.refusal-face.test.ts (rc=0) — written against 9ef275aa; dirty after: 0
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+
+## probe REV-S02-p1-product-truth.r12-readback.test.ts at tests/integration/REV-S02-p1-product-truth.r12-readback.test.ts (rc=0) — written against 9ef275aa; dirty after: 0
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+dirty at the end: 0
