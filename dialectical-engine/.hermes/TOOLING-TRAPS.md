@@ -3038,3 +3038,6 @@ Injecting `apps/ui/app/globals.css` as a `<style>` in the test's own document (C
 
 ## A shell heredoc with lines over ~1,000 characters can split a multibyte character (2026-09-10)
 - A `python3 - <<'PY'` heredoc carrying 1,500-character lines with `→`/`·` died with "Non-UTF-8 code starting with '\xe2'" — the long line was cut mid-character before Python saw it. Write long generators to a file first, keep lines short (build long strings from a list), and `iconv -f utf-8 -t utf-8 file >/dev/null` before running.
+
+## zsh arrays are 1-INDEXED — `${IDS[0]}` is empty and every later slot is off by one (2026-09-12, orchestrator, debate-tiers)
+- A `declare -a IDS; IDS+=(…)` loop then `printf … "${IDS[0]}" "${IDS[1]}" "${IDS[2]}"` wrote the S02 lens ids into `tickets.env` one slot late (CORRECTNESS empty, SECURITY holding correctness's id). Caught by reading the file back against the `create` output; cost one fix line. Rule: in zsh use `${IDS[1]}`…, or `${IDS[@]}` positionally, or write the registry line inside the loop from the command's own output — never index a zsh array from 0.
