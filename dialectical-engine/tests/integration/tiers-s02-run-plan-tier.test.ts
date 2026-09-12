@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -25,10 +25,15 @@ type RunInput = Parameters<RunRepository["startRun"]>[0] & {
 };
 
 let database: TestDatabase;
+let prePlanTierDatabase: TestDatabase;
 let secretRoot: string;
+let prePlanTierSecretRoot: string;
 let userId: string;
 let ownerRef: string;
 let sessionId: string;
+let prePlanTierUserId: string;
+let prePlanTierOwnerRef: string;
+let prePlanTierSessionId: string;
 
 function runInput(
   planTier: "free" | "premium",
@@ -55,6 +60,26 @@ function runInput(
     batteryVersion: "tiers-s02:integration",
     batteryRows: []
   };
+}
+
+async function migrateBeforePlanTier(target: TestDatabase): Promise<void> {
+  const directory = new URL("../../migrations/", import.meta.url);
+  const migrations = (await readdir(directory))
+    .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0061_plan_tier_on_run.sql")
+    .sort();
+  const client = await target.pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const name of migrations) {
+      await client.query(await readFile(new URL(name, directory), "utf8"));
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function createActiveUser(): Promise<void> {
@@ -84,6 +109,39 @@ async function createActiveUser(): Promise<void> {
   );
 }
 
+async function createPrePlanTierActiveUser(): Promise<void> {
+  prePlanTierUserId = randomUUID();
+  prePlanTierOwnerRef = randomUUID();
+  prePlanTierSessionId = randomUUID();
+  await prePlanTierDatabase.pool.query(
+    `INSERT INTO identity."user" (
+       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+       adult_affirmed_at,created_at
+     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+    [
+      prePlanTierUserId,
+      Buffer.alloc(32, 0x73),
+      `tiers-s02-${randomUUID()}`,
+      randomUUID(),
+      prePlanTierOwnerRef
+    ]
+  );
+  await prePlanTierDatabase.pool.query(
+    `INSERT INTO identity.session(
+       session_id,user_id,token_hash,csrf_token_hash,binding_context,
+       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
+       now()+interval '2 hours',now())`,
+    [
+      prePlanTierSessionId,
+      prePlanTierUserId,
+      `sha256:${randomBytes(32).toString("hex")}`,
+      `sha256:${randomBytes(32).toString("hex")}`
+    ]
+  );
+}
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
@@ -101,11 +159,42 @@ beforeAll(async () => {
     return resolved;
   });
   configureContentEncryption(database.pool, new ContentCipher(keys));
+
+  prePlanTierDatabase = await startTestDatabase();
+  await migrateBeforePlanTier(prePlanTierDatabase);
+  await createPrePlanTierActiveUser();
+  prePlanTierSecretRoot = await mkdtemp(join(tmpdir(), "debateai-tiers-s02-pre-0061-"));
+  const prePlanTierUsers = new FileUserDekStore(
+    prePlanTierSecretRoot,
+    loadKek(generateDek())
+  );
+  await prePlanTierUsers.store(prePlanTierUserId, generateDek());
+  const prePlanTierKeys = new FileRunContentKeyStore(
+    prePlanTierSecretRoot,
+    prePlanTierUsers,
+    async (candidate) => {
+      const result = await prePlanTierDatabase.pool.query<{ user_id: string }>(
+        `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
+        [candidate]
+      );
+      const resolved = result.rows[0]?.user_id;
+      if (resolved === undefined) throw new Error("OWNER_REF_UNRESOLVED");
+      return resolved;
+    }
+  );
+  configureContentEncryption(
+    prePlanTierDatabase.pool,
+    new ContentCipher(prePlanTierKeys)
+  );
 }, 120_000);
 
 afterAll(async () => {
   await database?.stop();
+  await prePlanTierDatabase?.stop();
   if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
+  if (prePlanTierSecretRoot !== undefined) {
+    await rm(prePlanTierSecretRoot, { recursive: true, force: true });
+  }
 });
 
 describe("S02 plan tier run storage", () => {
@@ -176,5 +265,45 @@ describe("S02 plan tier run storage", () => {
       plan_tier: "free",
       question_line: CONTENT_CIPHERTEXT_SENTINEL
     });
+  });
+
+  it("starts a legacy-principal run before migration 0061", async () => {
+    const input = runInput(
+      "premium",
+      { kind: "legacy", legacyAskerId: `tiers-s02-${randomUUID()}` }
+    );
+    const runId = await new RunRepository(prePlanTierDatabase.pool).startRun({
+      ...input,
+      sessionId: prePlanTierSessionId
+    });
+    const result = await prePlanTierDatabase.pool.query<{ question_line: string }>(
+      "SELECT question_line FROM core.run WHERE run_id=$1",
+      [runId]
+    );
+
+    expect(result.rows).toEqual([{ question_line: input.questionLine }]);
+  });
+
+  it("starts an encrypted server-principal run before migration 0061", async () => {
+    const runId = await new RunRepository(prePlanTierDatabase.pool).startRun({
+      ...runInput("free", {
+        kind: "server",
+        userId: prePlanTierUserId,
+        ownerRef: prePlanTierOwnerRef
+      }),
+      sessionId: prePlanTierSessionId
+    });
+    const result = await prePlanTierDatabase.pool.query<{
+      question_line: string;
+      content_encryption_version: number;
+    }>(
+      "SELECT question_line,content_encryption_version FROM core.run WHERE run_id=$1",
+      [runId]
+    );
+
+    expect(result.rows).toEqual([{
+      question_line: CONTENT_CIPHERTEXT_SENTINEL,
+      content_encryption_version: 1
+    }]);
   });
 });

@@ -632,6 +632,19 @@ async function contentEncryptionSchemaIsApplied(pool: Pool): Promise<boolean> {
   return result.rows[0]?.applied === true;
 }
 
+async function planTierColumnIsApplied(
+  executor: Pick<Pool, "query"> | PoolClient
+): Promise<boolean> {
+  const result = await executor.query<{ applied: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='core' AND table_name='run'
+         AND column_name='plan_tier'
+     ) AS applied`
+  );
+  return result.rows[0]?.applied === true;
+}
+
 type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
@@ -1122,6 +1135,8 @@ export class RunRepository {
     } else if (!UUID_V4.test(input.principal.ownerRef)) {
       throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
     }
+    const planTierColumnApplied = input.principal.kind === "legacy"
+      && await planTierColumnIsApplied(this.pool);
     const askContract = input.askContract ?? {};
     let storedQuestionLine = input.questionLine;
     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
@@ -1180,7 +1195,15 @@ export class RunRepository {
         commitAttempted = true;
         const provisionExecutor=admissionClient ?? this.provisionPool;
         const created = await provisionExecutor.query<{ created: boolean }>(
-          "SELECT core.create_encrypted_run($1::jsonb,$2,$3,$4::jsonb) AS created",
+          `SELECT core.create_encrypted_run(
+             CASE WHEN COALESCE(
+               pg_get_functiondef(
+                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
+               ) LIKE '%''planTier''%',
+               false
+             ) THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
+             $2,$3,$4::jsonb
+           ) AS created`,
           [JSON.stringify({
             runId,
             questionLine: storedQuestionLine,
@@ -1236,22 +1259,30 @@ export class RunRepository {
       const baseRunValues = [
         runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
-        input.compositionBudgetTier, input.planTier ?? null, JSON.stringify(input.depthParams),
+        input.compositionBudgetTier,
+        ...(planTierColumnApplied ? [input.planTier ?? null] : []),
+        JSON.stringify(input.depthParams),
         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
         JSON.stringify(input.envelopeBasis), input.registerVersion,
         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
       ];
+      const bindOffset = planTierColumnApplied ? 1 : 0;
       await client.query(
         `INSERT INTO core.run (
           run_id, question_line, asker_id, session_id, caller_scope, as_of,
           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier, plan_tier, depth_params, agent_count, discovered_panel,
+          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
+          depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
           battery_version, ask_contract, created_at_seq
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13::jsonb, jsonb_array_length($14::jsonb), $14::jsonb, $15,
-          $16::jsonb, $17, $18, $19::jsonb, $20
+          $11${planTierColumnApplied ? ", $12" : ""},
+          $${12 + bindOffset}::jsonb,
+          jsonb_array_length($${13 + bindOffset}::jsonb),
+          $${13 + bindOffset}::jsonb, $${14 + bindOffset},
+          $${15 + bindOffset}::jsonb, $${16 + bindOffset},
+          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}
         )`,
         baseRunValues
       );
