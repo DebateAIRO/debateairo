@@ -110,3 +110,9 @@ V, verbatim, in chat (the session goal): «continue the implementation where it 
 
 - 2026-09-12 11:40 · Ruling: rows V-28 and V-29 appended with the lens's recommended defaults as the binding defaults (both say "leave S02 as built, route the question to its own slice"); neither is a REWORK item under the frozen SPEC-v2 — cost if wrong: one copy-rule line in `/new` (V-28) or a runner slice (V-29), neither on S02's critical path.
 - 2026-09-12 11:40 · Correction to row V-19's evidence (REV-S02-p1 security N3 `t_8f8520e6`): where V-19 cites `migrations/0040_account_erasure.sql:4317` as the live `agent_count` derivation, C1 superseded that function; the live line is `migrations/0061_plan_tier_on_run.sql:68`. The row's default (de-duplicate, first match) is unchanged and was built as `find` in C2 (`apps/api/src/index.ts:1208-1210`); the security lens measured the de-duplication deterministic at its source.
+
+## 2026-09-12 12:47 — S01 vetoed by V; the whole-feature gate (V's word)
+
+- V: «S01 was tested by me. its fine» → S01 Done. **Rows V-20…V-26 close on their built defaults** (V tested the built behaviour and raised nothing); any of them can be reopened at the whole-feature QA.
+- V: the feature is done only when (a) S02 passes its review, (b) a **Grok 4.6** reviewer and a **Hermes GLM 5.3 Flash** reviewer each return exactly `YES, ALL AC ARE CORRECT` for the whole feature (otherwise the coding seats change what they demand and they re-review), and (c) V's manual QA answers **"Yes, It's good, push"** (→ push) or **"No, changes requested"** (→ fix, re-review). TEST(S02) is no longer a separate gate.
+- Still pending for V at QA time: **V-7** (the fleet: no target reports Luna/Sonnet 5, grok bridge down — steps 1–4/8–9 of SPEC-v2 §2 need it), **V-28**, **V-29** (defaults built).
