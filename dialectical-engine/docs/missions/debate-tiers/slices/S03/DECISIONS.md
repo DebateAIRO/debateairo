@@ -272,3 +272,6 @@ simpler to read, and V may never edit a base URL again after V-35 is settled.
   R30, R32 · the pass-2 verdict closed B1/B2/B3 and found no defect in them; re-opening a frozen
   requirement without a finding is scope. `ui: no` stands, re-checked by the reviewer against the skill
   body · REQ-FIX-S03.
+
+---
+**Fold by the orchestrator, 2026-09-13 18:50 (REQ-REV-S03 pass 3 = PASS, the cap; verdict `reviews/REQ-REV-S03-p3.md`). SPEC-v3.md is the SPEC of record; planning closed.** B1(p2) closed on both members (Build A confirmed at the call site `dev-api-environment.ts:493` — `isExactProviderRuntimeRefresh` is the FIRST predicate of the reuse chain); R33 ruled IN (an observable: `fetchImplementation` is injected at `provider-discovery.ts:125`); N1–N3(p2) retired. Folds: **N1(p3)** the R33 test asserts per uncredentialed SLOT, never per host (ARCH packet charge 2e) · **N2(p3)** INSTRUCTIONS.md:18's S01/S02 prose stays; every S03 packet names SPEC-v3.md. The reviewer's first ARCH-REV check is carried into the ARCH packet (charge 2b): a one-line `model:` edit on a keyed slot must not become a different `provider_ref`. No V row.
