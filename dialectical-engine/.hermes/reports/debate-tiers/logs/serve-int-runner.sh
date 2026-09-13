@@ -4,7 +4,7 @@
 # it no accepted ask is ever executed. Stop: kill $(cat serve-runner-supervised.pid), then the child in
 # serve-runner.pid. Written fresh 2026-09-10 23:2x.
 set -u
-LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/integration-debate-tiers/dialectical-engine
+LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine
 LOGDIR=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs
 cd "$LANE" || exit 1
 supervise() {
