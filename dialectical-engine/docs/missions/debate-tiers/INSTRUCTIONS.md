@@ -13,6 +13,7 @@ and for testing purposes"* (`00-intake.md:11`, C2 / row V-6).
 |---|---|---|---|---|
 | S01 | `t_11abead2` | The tier selector on `/new`: the Free locks, the Premium unlock, the tier's models named, and the ask carrying `plan_tier` | **yes** | `slices/S01/DONE.md`, written by V at the mock gate (`MOCK(S01)` → `DONE(S01)`). The SPEC acceptance is the floor, not the ceiling. |
 | S02 | `t_e4b4ab3a` | The tier picks the fleet: rosters as configuration, filtered against the healthy panel; the typed refusal naming a missing model; panel size = roster size; the run records its tier | no | `slices/S02/SPEC-v2.md` §Acceptance, run by V |
+| S03 | `t_f14b0ca0` | The fleets move into one editable file, `config/models.yaml`: Free = `gpt-5.6-luna` + `glm-5.3-flash` reached over API keys, Premium unchanged on its three CLIs, applied by one restart that checks the file and refuses without touching the running configuration | no | `slices/S03/SPEC.md` §Acceptance, run by V |
 
 **Each slice's binding spec is `slices/<S>/SPEC-v2.md`**, re-frozen at REQ-FIX pass 2 (2026-09-09)
 under the verdict `reviews/REQ-REV-p1.md`; the supersession block on line 4 of each names every
@@ -83,3 +84,12 @@ The green-at-base suites this mission names are `sup-04-widget` 8/8, `evaluator-
 `docs/missions/debate-tiers/BASELINE.md` is the only authority for every number above; read it there,
 never from memory. Every gate asserts the **delta**, names each failure, and dates it pre-existing or
 its own. Suites are reported as `passed/total`, three runs, worst run wins.
+
+## S03 — appended by REQ-S03, 2026-09-13
+
+- S03's binding spec is `slices/S03/SPEC.md`, frozen at REQ's READY. The `SPEC-v2.md` rule above records what happened to S01 and S02; it is not a naming law.
+- S03's own intake record — V's goal, C10–C15, F1–F12, rulings R-S03-1…4 — is `docs/missions/debate-tiers/00-intake-S03.md`; the 2026-09-09 `00-intake.md` still binds for everything it says.
+- Slice files: `slices/S03/` (SPEC, PLAN, PROGRESS, DECISIONS; no `DONE.md`, `ui: no`). Lane: `.worktrees/tiers-s03/dialectical-engine`, branch `slice/tiers-s03` @ `7188b167`; the lane baseline per suite is `.hermes/reports/debate-tiers/logs/setup-tiers-s03.log`.
+- Rows **V-34** (an OpenAI key placed in `.local/dev-auth/provider-keys.env`) and **V-35** (the Z.ai balance, or the coding endpoint) block the acceptance steps flagged P1/P2 and block nothing else.
+- **Cite LANE line numbers.** The main tree carries another mission's uncommitted `+13` lines in `apps/api/src/index.ts`, so its numbers for that one file run 13 ahead of the lane BUILD works in.
+- This slice's no-touch surface gains `.local/dev-auth/provider-keys.env`: V places the keys, and no seat reads, writes, prints or tests against their values.
