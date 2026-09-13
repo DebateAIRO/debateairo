@@ -12,6 +12,7 @@ import {
   SESSION_POLICY_REGISTER_ROW,
   canonicalDecimal,
   canonicalRegisterJson,
+  computeRegisterSnapshotSha256,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
@@ -19,6 +20,8 @@ import {
   persistBootstrapRegister,
   type BootstrapRegister,
   type CanonicalJsonAst,
+  type GeneralRegisterPublication,
+  type RegisterPublicationReceipt,
   type RegisterPublicationRow,
   type RegisterVersionText
 } from "@debateai/register";
@@ -568,6 +571,86 @@ async function persistOrAcceptSealedHistoricalBootstrap(
     }
     await assertSealedHistoricalBootstrap(pool, bootstrap.registerVersion);
   }
+}
+
+/**
+ * Source of the deployment's provider set when it is published rather than bootstrapped.
+ */
+export const DEVELOPMENT_PROVIDER_SET_SOURCE_REF =
+  "DEV-01-local-auth-topology.md#configured-provider-set:published" as const;
+
+export type DevelopmentProviderSetPublicationOperations = Readonly<{
+  publishGeneral(input: GeneralRegisterPublication): Promise<RegisterPublicationReceipt>;
+}>;
+
+/**
+ * A deterministic publication id, so republishing the same provider set on the same base
+ * replays the existing version instead of allocating a second one.
+ */
+export function developmentProviderSetPublicationId(
+  baseRegisterVersion: RegisterVersionText,
+  snapshotSha256: string
+): string {
+  const bytes = createHash("sha256")
+    .update(`debateai:dev-provider-set:${baseRegisterVersion}:${snapshotSha256}`)
+    .digest()
+    .subarray(0, 16);
+  const octets = Uint8Array.from(bytes);
+  octets[6] = (octets[6]! & 0x0f) | 0x40;
+  octets[8] = (octets[8]! & 0x3f) | 0x80;
+  const hex = Buffer.from(octets).toString("hex");
+  return [
+    hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)
+  ].join("-");
+}
+
+/**
+ * Publishes the running panel's configured provider set as a NEW register version.
+ *
+ * The historical bootstrap (versions 1-4) is how the set is first written, and it is
+ * sealed: `register.register_row` rejects UPDATE and DELETE outright, and the historical
+ * import is capped at version 4 in both TypeScript and SQL. So a deployment that grows a
+ * provider - a second model for a maker, which discovery needs because targets are 1:1
+ * with the configured set - supersedes the old set by publication, exactly as the support
+ * configuration does. The receipt on disk moves to the published version, which is what
+ * puts REGISTER_VERSION in `api.env`.
+ */
+export async function publishDevelopmentDeploymentRegisterProviderSet(
+  input: Readonly<{
+    adminPool: Pool;
+    providerPanel: DevelopmentProviderPanel;
+    repositoryRoot: string;
+    baseRegisterVersion: RegisterVersionText;
+    operations?: DevelopmentProviderSetPublicationOperations;
+  }>
+): Promise<DevelopmentDeploymentRegisterReceipt> {
+  if (!isAbsolute(input.repositoryRoot)) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PATH_INVALID");
+  }
+  const bootstrap = await loadBootstrapRegister();
+  const rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+    bootstrap,
+    input.providerPanel
+  );
+  const snapshotSha256 = computeRegisterSnapshotSha256(rows);
+  const operations = input.operations
+    ?? createPostgresRegisterPublicationPort(input.adminPool);
+  const published = await operations.publishGeneral({
+    publicationId: developmentProviderSetPublicationId(input.baseRegisterVersion, snapshotSha256),
+    baseRegisterVersion: input.baseRegisterVersion,
+    rows,
+    sourceRef: DEVELOPMENT_PROVIDER_SET_SOURCE_REF
+  });
+  if (published.snapshotSha256 !== snapshotSha256 || published.rowCount !== rows.length) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
+  }
+  const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: published.registerVersion,
+    rowCount: published.rowCount,
+    snapshotSha256: published.snapshotSha256
+  });
+  await writeDevelopmentDeploymentRegisterReceipt(resolve(input.repositoryRoot), receipt);
+  return receipt;
 }
 
 export async function seedDevelopmentDeploymentRegister(

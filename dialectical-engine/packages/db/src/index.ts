@@ -292,6 +292,16 @@ export interface RunContentLease {
   release(): Promise<void>;
 }
 
+/**
+ * Takes the run content lease in SHARED mode. The lease keeps account erasure - the only
+ * exclusive holder (withErasureContentLeases in account-erasure.ts) - from shredding a run's
+ * keys while anything still uses that run's content; it is not a mutex between users. When
+ * users took it exclusively, the runner held a run's lease for the whole debate and every
+ * reader of that run spun below until the debate ended (2026-09-13: a slow Premium debate
+ * froze the debate page, its event stream and the home list for half an hour). Postgres
+ * queues a new shared request behind a waiting exclusive one, so readers cannot starve an
+ * erasure that is already waiting; the retry below is only ever contended by erasure.
+ */
 export async function acquireRunContentLease(
   pool: Pool,
   requestedRunIds: readonly string[]
@@ -309,8 +319,9 @@ export async function acquireRunContentLease(
       let failure: unknown = invalidated;
       for (const runId of [...acquired].reverse()) {
         try {
+          // A shared hold is released only by the shared unlock; the exclusive one returns false.
           const result = await client.query<{ unlocked: boolean }>(
-            "SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked",
+            "SELECT pg_advisory_unlock_shared(hashtextextended($1,0)) AS unlocked",
             [`${CONTENT_LEASE_NAMESPACE}${runId}`]
           );
           if (result.rows[0]?.unlocked !== true) {
@@ -328,7 +339,7 @@ export async function acquireRunContentLease(
       let contended = false;
       for (const runId of runIds) {
         const result = await client.query<{ acquired: boolean }>(
-          "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired",
+          "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired",
           [`${CONTENT_LEASE_NAMESPACE}${runId}`]
         );
         if (result.rows[0]?.acquired !== true) {

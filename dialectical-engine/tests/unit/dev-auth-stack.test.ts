@@ -142,7 +142,12 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       tls: "SYSTEM_TRUST",
       providers: "CLI_HANDSHAKE",
       supportModel: "HERMES_GLM_5_3_FLASH",
-      healthyProviderRefs: ["development:codex-cli", "development:claude-cli"],
+      healthyProviderRefs: [
+        "development:codex-cli",
+        "development:codex-premium-cli",
+        "development:claude-cli",
+        "development:claude-premium-cli"
+      ],
       runner: "REGISTERED"
     });
     expect(runtime.calls).toEqual([

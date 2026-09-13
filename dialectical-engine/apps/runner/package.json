@@ -8,6 +8,7 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
+    "@debateai/contract": "workspace:*",
     "@debateai/crypto": "workspace:*",
     "@debateai/critique": "workspace:*",
     "@debateai/kernel": "workspace:*",

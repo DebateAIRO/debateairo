@@ -25,7 +25,9 @@ describe("development debate provider boundary", () => {
     expect(cliPanel).toContain("Promise.allSettled");
     expect(cliPanel).not.toMatch(/renderDevelopmentProviderContent|createServer/iu);
     expect(panel).toContain("development:codex-cli");
+    expect(panel).toContain("development:codex-premium-cli");
     expect(panel).toContain("development:claude-cli");
+    expect(panel).toContain("development:claude-premium-cli");
     expect(panel).toContain("development:grok-cli");
     expect(panel).toContain("DEVELOPMENT_MINIMUM_DISTINCT_MAKERS = 1");
     expect(panel).toContain("qa-deterministic-v1");

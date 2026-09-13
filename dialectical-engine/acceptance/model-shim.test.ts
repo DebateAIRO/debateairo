@@ -219,6 +219,51 @@ describe("ACC-01 model shim", () => {
     expect(completion.choices[0]!.message.content).not.toContain("Return strict JSON.\n[user]");
   });
 
+  it("pins the requested model through codex -c model=... and still reports the rollout's lineage", async () => {
+    const shim = await startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "gpt-5.6-sol",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    });
+    handles.push(shim);
+    expect(shim.model).toBe("gpt-5.6-sol");
+    const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({ model: "ignored-by-shim", messages: [{ role: "user", content: "Assess this claim." }] })
+    });
+    expect(response.status).toBe(200);
+    const completion = await response.json() as {
+      model: string; choices: readonly { message: { content: string } }[];
+    };
+    expect(completion.model).toBe("gpt-5.6-sol");
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    expect(relayed.arguments).toEqual([
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox", "read-only",
+      "--ignore-rules",
+      "--ignore-user-config",
+      "--json",
+      "-c", 'model="gpt-5.6-sol"',
+      relayed.prompt
+    ]);
+  });
+
+  it("refuses to start when the rollout's lineage is not the pinned model", async () => {
+    await expect(startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "gpt-5.6-luna",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    })).rejects.toThrow("CODEX_CLI_MODEL_MISMATCH");
+  });
+
   it("propagates a nonzero CLI exit as an HTTP 5xx without fabricating choices", async () => {
     const shim = await start();
     const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {

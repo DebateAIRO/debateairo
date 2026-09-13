@@ -408,7 +408,9 @@ describe("DEV-05 complete development deployment register", () => {
       configuredMakers: ["Anthropic", "OpenAI", "xAI"],
       configuredProviders: [
         { providerRef: "development:codex-cli", maker: "OpenAI" },
+        { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
         { providerRef: "development:claude-cli", maker: "Anthropic" },
+        { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
         { providerRef: "development:grok-cli", maker: "xAI" }
       ]
     });

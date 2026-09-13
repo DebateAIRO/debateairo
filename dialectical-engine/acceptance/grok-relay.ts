@@ -72,7 +72,17 @@ function parseGrokEnvelope(stdout: string): {
   });
 }
 
-const grokAdapter: CliRelayAdapter = {
+/**
+ * The CLI's own sandbox profile. `read-only` is the ceremony default. A host running
+ * Docker Desktop turns /var/run/docker.sock into a symlink, and grok 1.0.30 then refuses
+ * to apply `read-only` ("runtime-socket deny path … is a symlink") and exits before the
+ * handshake; the development panel opts out with `none`. The relay's own isolation does
+ * not depend on it: tools off, no subagents, no web search, scratch cwd, scrubbed env.
+ */
+export type GrokSandboxProfile = "read-only" | "none";
+
+function createGrokAdapter(sandboxProfile: GrokSandboxProfile): CliRelayAdapter {
+  return {
   maker: XAI_MAKER,
   authEnvironmentKeys: ["XAI_API_KEY"],
   testEnvironmentKeys: [
@@ -87,20 +97,23 @@ const grokAdapter: CliRelayAdapter = {
     "--single", prompt,
     "--output-format", "json",
     "--verbatim",
-    "--sandbox", "read-only",
+    "--sandbox", sandboxProfile,
     "--no-memory",
     "--no-subagents",
     "--disable-web-search",
     "--tools", ""
   ],
   parseCompletion: (stdout) => parseGrokEnvelope(stdout)
-};
+  };
+}
 
 export interface GrokRelayOptions {
   readonly port: number;
   readonly timeoutMs: number;
   /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
   readonly testOnlyCommand?: CommandSpec;
+  /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
+  readonly sandboxProfile?: GrokSandboxProfile;
 }
 
 export interface GrokRelayHandle extends CliRelayHandle {
@@ -115,9 +128,10 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );
+  const adapter = createGrokAdapter(options.sandboxProfile ?? "read-only");
   const handshake = await invokeCli(
     command,
-    grokAdapter,
+    adapter,
     GROK_HANDSHAKE_PROMPT,
     options.timeoutMs
   ) as ReturnType<typeof parseGrokEnvelope>;
@@ -125,7 +139,7 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     port: options.port,
     timeoutMs: options.timeoutMs,
     command,
-    adapter: grokAdapter
+    adapter
   });
   return Object.freeze({
     port: server.port,

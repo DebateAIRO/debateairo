@@ -354,7 +354,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
       .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");
     expect(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256)
-      .toBe("120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96");
+      .toBe("42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb");
   });
 
   it("preserves the exact legacy hashes while the actual port input owns all 248 policy decimals", async () => {

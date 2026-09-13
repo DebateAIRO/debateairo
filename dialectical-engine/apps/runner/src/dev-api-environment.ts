@@ -323,6 +323,56 @@ function isExactProviderRuntimeRefresh(existing: string, expected: string): bool
   }
 }
 
+/**
+ * Accepts an environment that differs only in the provider targets AND the three keys that
+ * move with the deployment register receipt. A register version is never edited in place
+ * (`register.register_row` rejects UPDATE and DELETE), so a deployment that grows its
+ * configured provider set publishes a NEW version and the custody receipt follows it; the
+ * assembler has already asserted that the receipt it was handed is the one on disk, so the
+ * only environment this admits is the one this stack just produced. Everything else -
+ * credentials, database URLs, ports - must still match exactly, which is what keeps the
+ * drift guard meaningful.
+ */
+function isExactPublishedRegisterRefresh(existing: string, expected: string): boolean {
+  const receiptKeys = new Set([
+    "REGISTER_VERSION",
+    "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
+    "REGISTER_DEPLOYMENT_RECEIPT_FILE"
+  ]);
+  try {
+    const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    // A publication only ever moves the version FORWARD; a file naming an older version is
+    // a reconstruction, not this stack's output.
+    if (BigInt(expectedValues.get("REGISTER_VERSION")!)
+      <= BigInt(existingValues.get("REGISTER_VERSION")!)) return false;
+    for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON" || key === "SUPPORT_MODEL_TARGET_JSON"
+        || receiptKeys.has(key)) continue;
+      if (existingValues.get(key) !== expectedValues.get(key)) return false;
+    }
+    // The OUTGOING targets cannot be re-parsed against the new configured set - that set is
+    // precisely what changed - so they are held to the rule a publication actually obeys:
+    // slots are ADDED, never removed or renamed. An environment naming a provider the
+    // deployment does not configure (the retired local-vllm scaffold, say) stays drift.
+    const incoming = parseDevelopmentProviderPanelTargets(
+      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!
+    );
+    const configuredRefs = new Set(incoming.targets.map((target) => target.providerRef));
+    const outgoing: unknown = JSON.parse(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    if (!Array.isArray(outgoing) || outgoing.length < 1) return false;
+    for (const row of outgoing) {
+      if (typeof row !== "object" || row === null) return false;
+      const providerRef = (row as Readonly<Record<string, unknown>>).provider_ref;
+      if (typeof providerRef !== "string" || !configuredRefs.has(providerRef)) return false;
+    }
+    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
   existing: string,
   expected: string
@@ -442,6 +492,7 @@ export async function assembleDevelopmentApiEnvironment(
     [],
     (existing) => isExactProviderRuntimeRefresh(existing, source)
       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
+      || isExactPublishedRegisterRefresh(existing, source)
       || isExactLegacyEnvironmentWithoutSupportModelTarget(existing,source)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });

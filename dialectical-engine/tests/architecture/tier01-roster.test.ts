@@ -10,7 +10,7 @@ const MODEL_IDS = [
   "claude-sonnet-5",
   "gpt-5.6-sol",
   "claude-opus-5",
-  "grok-4.6"
+  "grok-4.6-build"
 ] as const;
 
 function productionFiles(): string[] {
@@ -38,7 +38,7 @@ describe("R11 plan-tier roster architecture", () => {
       "PLAN_TIER_ROSTERS is not exported from @debateai/contract"
     ).toBeDefined();
     expect(rosters!.free).toEqual(["gpt-5.6-luna", "claude-sonnet-5"]);
-    expect(rosters!.premium).toEqual(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]);
+    expect(rosters!.premium).toEqual(["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]);
 
     const files = productionFiles();
     for (const modelId of MODEL_IDS) {

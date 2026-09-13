@@ -7,5 +7,5 @@ export const PLAN_TIERS = Object.freeze(["free", "premium"] as const);
 
 export const PLAN_TIER_ROSTERS = Object.freeze({
   free: Object.freeze(["gpt-5.6-luna", "claude-sonnet-5"]),
-  premium: Object.freeze(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"])
+  premium: Object.freeze(["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"])
 } satisfies Readonly<Record<PlanTier, readonly string[]>>);

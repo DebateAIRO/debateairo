@@ -31,7 +31,10 @@ function sourceFiles(directory: string): string[] {
     .flatMap((entry) => {
       const absolutePath = join(directory, entry.name);
       if (entry.isDirectory()) {
-        return EXCLUDED_DIRECTORIES.has(entry.name)
+        // `.next-dev` / `.next-build` are the dev server's own output trees, gitignored
+        // like `.next`; they mirror every roster id compiled into a page and would count
+        // as a second declaration of it.
+        return EXCLUDED_DIRECTORIES.has(entry.name) || entry.name.startsWith(".next")
           ? []
           : sourceFiles(absolutePath);
       }
@@ -206,7 +209,7 @@ describe("S02 tier roster architecture", () => {
     expect(PLAN_TIER_ROSTERS.premium).toEqual([
       "gpt-5.6-sol",
       "claude-opus-5",
-      "grok-4.6"
+      "grok-4.6-build"
     ]);
   });
 
@@ -222,7 +225,7 @@ describe("S02 tier roster architecture", () => {
         "apps/ui/components/landing/cards.ts",
         "packages/contract/src/plan-tiers.ts"
       ],
-      "grok-4.6": ["packages/contract/src/plan-tiers.ts"]
+      "grok-4.6-build": ["packages/contract/src/plan-tiers.ts"]
     };
 
     for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {

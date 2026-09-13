@@ -15,6 +15,13 @@ export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
   model: REMOVED_SCAFFOLD_MODEL
 }]);
 
+/**
+ * One slot per plan-tier roster member (V, 2026-09-12: "Both free and premium need to be
+ * accessible at the same time"). Discovery is 1:1 with the configured provider set — one
+ * target per provider_ref, checked in parseProviderDiscoveryTargets — so a maker that
+ * serves two tiers needs two slots. The order is the order of the discovery targets and
+ * of the sealed configuredProviderSet row; appending is safe, reordering is not.
+ */
 export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
   Object.freeze({
     providerRef: "development:codex-cli",
@@ -23,10 +30,22 @@ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
     port: 8_791
   }),
   Object.freeze({
+    providerRef: "development:codex-premium-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "OpenAI",
+    port: 8_795
+  }),
+  Object.freeze({
     providerRef: "development:claude-cli",
     adapterKind: "openai-compatible-http" as const,
     maker: "Anthropic",
     port: 8_792
+  }),
+  Object.freeze({
+    providerRef: "development:claude-premium-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "Anthropic",
+    port: 8_796
   }),
   Object.freeze({
     providerRef: "development:grok-cli",
@@ -108,6 +127,22 @@ export function buildDevelopmentProviderPanel(
     targets,
     targetsJson
   });
+}
+
+/**
+ * The deployment's CONFIGURED provider set, straight from the roster: refs, makers and
+ * adapter kinds, with every slot marked unavailable. Health is not part of the register
+ * row - only which providers the deployment is allowed to discover - so this is the
+ * honest input when publishing the set without standing the CLIs up first.
+ */
+export function developmentConfiguredProviderPanel(): DevelopmentProviderPanel {
+  return buildDevelopmentProviderPanel(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) =>
+    Object.freeze({
+      providerRef: provider.providerRef,
+      baseUrl: expectedBaseUrl(provider.port),
+      model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+    })
+  ));
 }
 
 export function parseDevelopmentProviderPanelTargets(source: string): DevelopmentProviderPanel {

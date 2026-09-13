@@ -178,7 +178,7 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector('#planTier-free')?.textContent).toContain("claude-sonnet-5");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("gpt-5.6-sol");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("claude-opus-5");
-    expect(document.querySelector('#planTier-premium')?.textContent).toContain("grok-4.6");
+    expect(document.querySelector('#planTier-premium')?.textContent).toContain("grok-4.6-build");
     expect(document.querySelector('#planTier-free .ndTierName')?.textContent).toBe("Free");
     expect(document.querySelector('#planTier-premium .ndTierName')?.textContent).toBe("Premium");
     expect(document.querySelector('#planTier-free .ndTierPromise')?.textContent).toBe(
@@ -196,7 +196,7 @@ describe("S01 /new plan tier", () => {
     const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
     const expectedRosters = {
       free: ["gpt-5.6-luna", "claude-sonnet-5"],
-      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]
+      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
     };
     expect(PLAN_TIER_ROSTERS).toEqual(expectedRosters);
     expect({
@@ -219,7 +219,7 @@ describe("S01 /new plan tier", () => {
     vi.doMock("@debateai/contract", () => ({
       PLAN_TIER_ROSTERS: {
         free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
-        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6", "claude_opus", "grok/4.6", "gemini-3"]
+        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
       }
     }));
     try {

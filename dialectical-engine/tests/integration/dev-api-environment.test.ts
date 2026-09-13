@@ -172,7 +172,11 @@ describe("DEV-09 private local API environment", () => {
       .toContain("debateai_dev_evaluator_api");
     expect(environment.get("EVALUATOR_DEV_MENU_DATABASE_URL"))
       .not.toBe(environment.get("DATABASE_URL"));
-    expect(environment.get("EVALUATOR_DEV_MENU_ENABLED")).toBe("false");
+    expect(environment.get("EVALUATOR_DATABASE_URL"))
+      .toContain("debateai_dev_evaluator_worker");
+    expect(environment.get("EVALUATOR_DATABASE_URL"))
+      .not.toBe(environment.get("DATABASE_URL"));
+    expect(environment.get("EVALUATOR_DEV_MENU_ENABLED")).toBe("true");
     expect(JSON.parse(environment.get("PROVIDER_DISCOVERY_TARGETS_JSON")!)).toEqual(
       TEST_DEVELOPMENT_PROVIDER_DOCUMENT.providers.map((provider) => ({
         provider_ref: provider.provider_ref,
@@ -245,10 +249,22 @@ describe("DEV-09 private local API environment", () => {
         authorizationHeader: "Bearer codex-relay-refreshed"
       },
       {
+        providerRef: "development:codex-premium-cli",
+        baseUrl: "http://127.0.0.1:8795/v1",
+        model: "codex-premium-live-model-refreshed",
+        authorizationHeader: "Bearer codex-premium-relay-refreshed"
+      },
+      {
         providerRef: "development:claude-cli",
         baseUrl: "http://127.0.0.1:8792/v1",
         model: "claude-live-model-refreshed",
         authorizationHeader: "Bearer claude-relay-refreshed"
+      },
+      {
+        providerRef: "development:claude-premium-cli",
+        baseUrl: "http://127.0.0.1:8796/v1",
+        model: "claude-premium-live-model-refreshed",
+        authorizationHeader: "Bearer claude-premium-relay-refreshed"
       },
       {
         providerRef: "development:grok-cli",

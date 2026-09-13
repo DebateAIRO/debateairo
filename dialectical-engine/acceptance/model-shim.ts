@@ -24,6 +24,13 @@ export interface ModelShimOptions {
   readonly testOnlyCommand?: CommandSpec;
   /** Test-only mirror of Codex's persisted rollout tree. */
   readonly testOnlySessionsRoot?: string;
+  /**
+   * Model id asked of the CLI via `-c model="…"` (config overrides survive
+   * `--ignore-user-config`). Without it the CLI's own default answers. The relayed
+   * lineage is still only ever the rollout-recorded id (DR-115); a handshake whose
+   * rollout names a different model refuses to start (CODEX_CLI_MODEL_MISMATCH).
+   */
+  readonly model?: string;
 }
 
 export interface ModelShimHandle extends CliRelayHandle {
@@ -138,7 +145,12 @@ export async function parseCodexCompletion(
   return Object.freeze({ content: parsed.content, model, usage: null });
 }
 
-function createCodexAdapter(sessionsRoot: string): CliRelayAdapter {
+const CODEX_MODEL_PIN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+
+function createCodexAdapter(sessionsRoot: string, model?: string): CliRelayAdapter {
+  if (model !== undefined && !CODEX_MODEL_PIN_PATTERN.test(model)) {
+    throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_PIN_INVALID");
+  }
   return {
     maker: ACCEPTANCE_MAKER,
     authEnvironmentKeys: ["CODEX_HOME", "OPENAI_API_KEY"],
@@ -152,6 +164,7 @@ function createCodexAdapter(sessionsRoot: string): CliRelayAdapter {
       "--ignore-rules",
       "--ignore-user-config",
       "--json",
+      ...(model === undefined ? [] : ["-c", `model="${model}"`]),
       prompt
     ],
     parseCompletion: (stdout) => parseCodexCompletion(stdout, sessionsRoot)
@@ -169,8 +182,11 @@ export async function startModelShim(options: ModelShimOptions): Promise<ModelSh
   if (options.testOnlySessionsRoot !== undefined && process.env.NODE_ENV !== "test") {
     throw new Error("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
   }
-  const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot());
+  const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot(), options.model);
   const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs);
+  if (options.model !== undefined && handshake.model !== options.model) {
+    throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_MISMATCH");
+  }
   const server = await startCliRelayServer({
     port: options.port,
     timeoutMs: options.timeoutMs,

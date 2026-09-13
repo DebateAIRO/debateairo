@@ -57,25 +57,27 @@ const observedTokenUsageSchema = z.object({
   canonicalModel: z.string().trim().min(1).optional()
 }).passthrough();
 
-function matchesRequestedModelFamily(model: string, usage: unknown): boolean {
+const CLAUDE_MODEL_ALIAS_PATTERN = /^[a-z0-9]+$/u;
+
+function matchesRequestedModelFamily(model: string, usage: unknown, alias: string): boolean {
   const observed = observedTokenUsageSchema.safeParse(usage);
   const identities = [model, ...(observed.success && observed.data.canonicalModel !== undefined
     ? [observed.data.canonicalModel]
     : [])];
   return identities.some((identity) => identity.toLocaleLowerCase("en-US")
     .split(/[^a-z0-9]+/u)
-    .includes(CLAUDE_MODEL_ALIAS));
+    .includes(alias));
 }
 
-function resolveClaudeModel(modelUsage: Readonly<Record<string, unknown>>): string {
+function resolveClaudeModel(modelUsage: Readonly<Record<string, unknown>>, alias: string): string {
   const entries = Object.entries(modelUsage);
   if (entries.length === 1) return entries[0]![0];
-  const requested = entries.filter(([model, usage]) => matchesRequestedModelFamily(model, usage));
+  const requested = entries.filter(([model, usage]) => matchesRequestedModelFamily(model, usage, alias));
   if (requested.length === 1) return requested[0]![0];
   throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_UNRESOLVED");
 }
 
-function parseClaudeEnvelope(stdout: string) {
+function parseClaudeEnvelope(stdout: string, alias: string) {
   let decoded: unknown;
   try {
     decoded = JSON.parse(stdout);
@@ -87,7 +89,7 @@ function parseClaudeEnvelope(stdout: string) {
   if (envelope.data.is_error !== false) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
   const content = envelope.data.result.trim();
   if (content.length === 0) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
-  const model = resolveClaudeModel(envelope.data.modelUsage);
+  const model = resolveClaudeModel(envelope.data.modelUsage, alias);
   const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
   const inputTokens = observed.success
     ? observed.data.input_tokens ?? observed.data.inputTokens
@@ -111,7 +113,11 @@ function parseClaudeEnvelope(stdout: string) {
   });
 }
 
-const claudeAdapter: CliRelayAdapter = {
+function createClaudeAdapter(alias: string): CliRelayAdapter {
+  if (!CLAUDE_MODEL_ALIAS_PATTERN.test(alias)) {
+    throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_ALIAS_INVALID");
+  }
+  return {
   maker: ANTHROPIC_MAKER,
   // Claude Code's macOS credential lookup is keyed by the login identity.
   // USER/LOGNAME are non-secret locators; without them an authenticated CLI
@@ -133,16 +139,19 @@ const claudeAdapter: CliRelayAdapter = {
     "--strict-mcp-config",
     "--no-session-persistence",
     "--tools", "",
-    "--model", CLAUDE_MODEL_ALIAS
+    "--model", alias
   ],
-  parseCompletion: (stdout) => parseClaudeEnvelope(stdout)
-};
+  parseCompletion: (stdout) => parseClaudeEnvelope(stdout, alias)
+  };
+}
 
 export interface ClaudeRelayOptions {
   readonly port: number;
   readonly timeoutMs: number;
   /** Test-only process seam. It is rejected outside NODE_ENV=test and is never read from acceptance config. */
   readonly testOnlyCommand?: CommandSpec;
+  /** The alias asked of the CLI (`--model`); defaults to CLAUDE_MODEL_ALIAS. Lineage stays CLI-reported. */
+  readonly modelAlias?: string;
 }
 
 export interface ClaudeRelayHandle extends CliRelayHandle {
@@ -164,6 +173,7 @@ export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<Cla
     options.testOnlyCommand,
     "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
   );
+  const claudeAdapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
   const handshake = await invokeCli(command, claudeAdapter, CLAUDE_HANDSHAKE_PROMPT, options.timeoutMs);
   const server = await startCliRelayServer({
     port: options.port,
