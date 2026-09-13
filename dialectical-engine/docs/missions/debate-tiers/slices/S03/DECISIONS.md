@@ -107,3 +107,92 @@ simpler to read, and V may never edit a base URL again after V-35 is settled.
 
 ---
 **Fold by the orchestrator, 2026-09-13 16:45 (REQ-REV-S03 pass 1 = REWORK; verdict `reviews/REQ-REV-S03-p1.md`).** B1 `t_1292cc86`, B2 `t_748b2433`, B3 `t_d502e39f` go to REQ-FIX(S03) `t_9ee87d3d` (SPEC-v2). N-findings folded here, closed on the board: **N1** the lane constant is `9a000c37` (SPEC-v2 states it) · **N2** the 9/10 row — see the 15:35 fold; `setup-tiers-s03.log` carries a dated correction line · **N3** the refusal list has six members, not five (SPEC-v2 counts them) · **N4** R14's entry→slot mapping is undefined — SPEC-v2 states its observables (one slot per entry, refs stable across restarts, an explicit order rule; the runner's first-slot pin `apps/runner/src/main.ts:65-71` makes the order load-bearing); the mechanism stays ARCH's · **N5** SPEC-v2(S02):36-39 still spells `grok-4.6` — S02's document is history; SPEC-v2(S03) §0 names what it supersedes · **N6** packet wording (orchestrator), template fixed `cdaf24aa`; the seat's slice-table insert was inside the contract · **N7** a CLAIM's "session id" from an Agent-tool subagent is the parent's — template edit pending (name the transcript file instead). **V rows in force for the rework:** V-35 answered (subscription endpoint), V-36 default (four-line Free entry), V-37 default (`glm-5.3-flash`), V-38 default (a missing key or a failing probe starts the stack with the slot absent + a named warning).
+
+---
+
+## Ruled at REQ-FIX, pass 2 (2026-09-13, seat REQ-FIX-S03) — under the verdict `reviews/REQ-REV-S03-p1.md` and V's 16:05 update. Output: `SPEC-v2.md`; `SPEC.md` is untouched.
+
+- 2026-09-13 · **Requirement numbering across v1→v2** · **R1–R29 keep their ids and meanings; the new
+  requirements are R30, R31, R32** · every "SPEC Rn" reference already written in this file, in
+  PLAN.md and in the folds above keeps resolving, and a BUILD seat reading a pass-1 ticket comment is
+  not sent to a renumbered requirement. Rejected: renumbering into a clean R1…R32 — tidier to read
+  once, and it silently invalidates every citation made by three nodes before it · REQ-FIX-S03.
+- 2026-09-13 · **B1 — what "declaration" means** · **a string literal that IS the id (quoted-exact),
+  the oracle `tests/architecture/tier01-roster.test.ts:43-52` already uses; `tiers-s02-rosters.test.ts`
+  changes its matcher from bare-substring to match** · measured this pass in the lane at `9a000c37`
+  for all six ids plus V-37's alternative: under the bare matcher `glm-5.3-flash` **and** `glm-5.3`
+  each hit the same three support files (`apps/api/src/support/model.ts`,
+  `apps/runner/src/dev-support-model.ts`, `apps/runner/src/dev-auth-stack.ts`), because the id is a
+  substring of `"development:hermes-glm-5.3-flash"` and `"z-ai/glm-5.3-flash"` — and `glm-5.3` is in
+  turn a substring of `glm-5.3-flash`, so **no id V can choose makes the bare oracle true.** Under
+  quoted-exact, all three support files and both `cards.ts` hits fall away and every id's expectation
+  is `[]`. Rejected: allow-listing the three support files — R8 said "exactly one allow-list", the
+  occurrence counts would have to become 2/1/2, and the allow-list would grow again the next time a
+  provider ref embeds a model id. Rejected: deleting the id from the support files — R26 forbids it
+  and it breaks V's live support widget. The third exit is the one taken, and it is not silent: R27
+  names the suite, the matcher, the deleted allow-list and the new total · REQ-FIX-S03.
+- 2026-09-13 · **The `cards.ts` allow-list** · **deleted as unnecessary** · measured:
+  `apps/ui/components/landing/cards.ts:27-28` are `"Anthropic · Claude · claude-opus-5"` and
+  `"OpenAI · GPT · gpt-5.6-sol"` — display copy that contains the id and never was a quoted-exact
+  declaration. The allow-list existed only to hold the bare matcher off marketing prose; the matcher
+  change removes its reason. (The verdict did not state this; it is this pass's own measurement.)
+  · REQ-FIX-S03.
+- 2026-09-13 · **R8 needs a positive limb** · **a suite reads `config/models.yaml` and asserts each
+  tier's ids against the lists the product exposes at runtime** · with only the negative limb ("no
+  file declares these ids") R8 is satisfied by a build that deletes the ids entirely. Neither scan
+  reaches the file — both are rooted at `apps`+`packages` (`tier01-roster.test.ts:17-27`,
+  `tiers-s02-rosters.test.ts:8-9`) and `.yaml` is not in `SOURCE_EXTENSIONS` — so the limb is a new
+  case, not a widened scan, and `tiers-s02-rosters` becomes 5/5. Rejected: widening a scan root to the
+  repo root, which would drag every root-level file into two architecture suites · REQ-FIX-S03.
+- 2026-09-13 · **V's "Switch the 5.3 to GLM 4.7"** · **the file names `glm-5.3-flash`, not `glm-4.7`,
+  and V's subscription is what it calls** · F13, measured 16:05: on the subscription endpoint a
+  request for `glm-4.7` is answered with `model: "glm-5.3-flash"`; `glm-4.6` and `glm-5-turbo` the
+  same; `glm-5` → `glm-5.3`; only `glm-5.3` and `glm-5.3-flash` answer under their own id. The probe
+  demands an exact echo (`apps/api/src/provider-discovery.ts:77-79`) and DR-115 says the app records
+  the id the maker reports, so naming `glm-4.7` would either fail the probe or make the app claim a
+  model the maker never served. V gets the subscription V asked for; the id is the one it answers as
+  (row V-37's default, one line to change). Rejected: naming `glm-4.7` and letting the panel relabel
+  it — that is precisely the silent substitution the honesty law forbids · REQ-FIX-S03, on V-37's
+  binding default.
+- 2026-09-13 · **The Z.ai base URL** · **`https://api.z.ai/api/coding/paas/v4` in R7 at merge** ·
+  row V-35 is ANSWERED by V's words *"we got a subscription, use them API_TOKENS"*; the token on this
+  Mac answers 200 there while the pay-as-you-go base still answers 429. v1 pinned the pay-as-you-go
+  URL, which would have made V's first act after merge an edit of the file the slice just shipped ·
+  REQ-FIX-S03.
+- 2026-09-13 · **B2/B3 — what the restart does when a key is missing or a model does not answer** ·
+  **row V-38's default: shape refuses, availability starts with the slot absent and a named warning**
+  (R20 vs R31/R32) · under v1, R20.5 made a failing probe a refusal and R21 rolled everything back, so
+  acceptance step 8 could never produce the refusal it demanded (the old stack kept serving), and the
+  merged file — naming two keys nobody has — made `pnpm dev:auth:up` refuse on any machine but V's.
+  The split keeps every class V named as a refusal (*"typos, a CLI that isn't installed"*,
+  `00-intake-S03.md:22`) and moves only the two classes that are about the world being absent rather
+  than the file being wrong. Rejected: weakening R20 — the verdict is right that the defect was in the
+  step, not the rule. Rejected: leaving step 8 UNVERIFIED until V rules — it is the only acceptance of
+  R15, the honesty law this mission is built on, and V-38's default makes it the cheapest step there
+  is. R31 carries one sentence saying exactly what moves if V rules the other way · REQ-FIX-S03, on
+  V-38's binding default.
+- 2026-09-13 · **N4 — the slot order** · **Premium's `cli:` entries first, in file order, then Free's**
+  · the runner copies slot 0's `authorizationHeader` into the api.env primary triple
+  (`apps/runner/src/main.ts:65-71`), so a Free `api:` entry at slot 0 would put V's paid API key there.
+  Keeping slot 0 a local relay costs nothing and keeps the key out. The verdict's counter is recorded:
+  order is what REQ was told to leave to ARCH — but slot 0's identity is an observable with a custody
+  consequence, and R14 pins the observable while the derivation mechanism stays ARCH's · REQ-FIX-S03,
+  adopting the verdict's N4 recommendation.
+- 2026-09-13 · **N3 — the refusal count** · **six, enumerated** (username, password, query, fragment,
+  non-`http(s)` scheme — the five conditions of `packages/providers/src/index.ts:113-126` that survive
+  — plus the `cli:`-slot loopback-port rule of `dev-provider-panel.ts:87-89`) · v1 listed six and then
+  wrote "five" twice, so a seat would have written five RED tests or six · REQ-FIX-S03.
+- 2026-09-13 · **N1/N2 — the lane constant and the stale baseline row** · **lane is `9a000c37`;
+  `tests/integration/dev-api-environment.test.ts` is 10/10 there** · re-measured this pass:
+  `git show --stat 9a000c37` is one test file, +1/−5, so no product line moved and all sixteen of v1's
+  cited ranges still land (spot-checked seven, all OK). SPEC-v2 §0, PLAN.md and INSTRUCTIONS.md carry
+  the corrected constant, and R27 carries 10/10 with the warning that reporting 9/10 as pre-existing
+  is reporting a regression · REQ-FIX-S03.
+- 2026-09-13 · **N5 — the S02 supersession trace** · **SPEC-v2 §0 states that S03 R8 replaces S02
+  SPEC-v2 R1** (`slices/S02/SPEC-v2.md:36-39`, which also still spells `grok-4.6` where the fleet is
+  `grok-4.6-build`), and that S02 R3–R10 stay live, carried by R15 · without it a later REV lens reads
+  a stale sentence as a live contradiction · REQ-FIX-S03.
+- 2026-09-13 · **What was NOT changed** · R1–R6, R9, R10, R12, R15–R18, R22, R24, R25, R29 are
+  byte-equivalent in meaning to v1 · the verdict found no defect in them and re-opening a frozen
+  requirement without a finding is scope. In particular the `ui: no` ruling stands — the verdict
+  checked the skill body itself and recorded the quote as real and correctly applied · REQ-FIX-S03.

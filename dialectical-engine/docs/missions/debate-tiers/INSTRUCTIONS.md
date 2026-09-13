@@ -13,7 +13,7 @@ and for testing purposes"* (`00-intake.md:11`, C2 / row V-6).
 |---|---|---|---|---|
 | S01 | `t_11abead2` | The tier selector on `/new`: the Free locks, the Premium unlock, the tier's models named, and the ask carrying `plan_tier` | **yes** | `slices/S01/DONE.md`, written by V at the mock gate (`MOCK(S01)` → `DONE(S01)`). The SPEC acceptance is the floor, not the ceiling. |
 | S02 | `t_e4b4ab3a` | The tier picks the fleet: rosters as configuration, filtered against the healthy panel; the typed refusal naming a missing model; panel size = roster size; the run records its tier | no | `slices/S02/SPEC-v2.md` §Acceptance, run by V |
-| S03 | `t_f14b0ca0` | The fleets move into one editable file, `config/models.yaml`: Free = `gpt-5.6-luna` + `glm-5.3-flash` reached over API keys, Premium unchanged on its three CLIs, applied by one restart that checks the file and refuses without touching the running configuration | no | `slices/S03/SPEC.md` §Acceptance, run by V |
+| S03 | `t_f14b0ca0` | The fleets move into one editable file, `config/models.yaml`: Free = `gpt-5.6-luna` + `glm-5.3-flash` over API keys on V's Z.ai subscription, Premium unchanged on its three CLIs; one restart checks the file, refuses a bad SHAPE without touching the running configuration, and — when a key is missing or a model does not answer — starts with that slot absent and a named warning, the tier then refusing asks by name | no | `slices/S03/SPEC-v2.md` §Acceptance, run by V |
 
 **Each slice's binding spec is `slices/<S>/SPEC-v2.md`**, re-frozen at REQ-FIX pass 2 (2026-09-09)
 under the verdict `reviews/REQ-REV-p1.md`; the supersession block on line 4 of each names every
@@ -87,9 +87,9 @@ its own. Suites are reported as `passed/total`, three runs, worst run wins.
 
 ## S03 — appended by REQ-S03, 2026-09-13
 
-- S03's binding spec is `slices/S03/SPEC.md`, frozen at REQ's READY. The `SPEC-v2.md` rule above records what happened to S01 and S02; it is not a naming law.
+- S03's binding spec is **`slices/S03/SPEC-v2.md`**, frozen at REQ-FIX's READY (pass 2, verdict `reviews/REQ-REV-S03-p1.md` + V's 16:05 update); `SPEC.md` beside it is v1, byte-identical, history only. Requirement ids R1–R29 are stable across v1→v2; R30–R32 are new.
 - S03's own intake record — V's goal, C10–C15, F1–F12, rulings R-S03-1…4 — is `docs/missions/debate-tiers/00-intake-S03.md`; the 2026-09-09 `00-intake.md` still binds for everything it says.
-- Slice files: `slices/S03/` (SPEC, PLAN, PROGRESS, DECISIONS; no `DONE.md`, `ui: no`). Lane: `.worktrees/tiers-s03/dialectical-engine`, branch `slice/tiers-s03` @ `7188b167`; the lane baseline per suite is `.hermes/reports/debate-tiers/logs/setup-tiers-s03.log`.
-- Rows **V-34** (an OpenAI key placed in `.local/dev-auth/provider-keys.env`) and **V-35** (the Z.ai balance, or the coding endpoint) block the acceptance steps flagged P1/P2 and block nothing else.
+- Slice files: `slices/S03/` (SPEC-v2, SPEC, PLAN, PROGRESS, DECISIONS; no `DONE.md`, `ui: no`). Lane: `.worktrees/tiers-s03/dialectical-engine`, branch `slice/tiers-s03` @ **`9a000c37`** (v1 said `7188b167`; the cherry-pick moved one test file only); the lane baseline per suite is `.hermes/reports/debate-tiers/logs/setup-tiers-s03.log`, **as corrected at its line 28** (`dev-api-environment` is 10/10, not 9/10).
+- Rows in force: **V-34** (an OpenAI key placed in `.local/dev-auth/provider-keys.env`) blocks acceptance steps 3, 4 and 10b only · **V-35 ANSWERED** (the Z.ai subscription endpoint) · **V-36** (four-line Free entry) · **V-37** (`glm-5.3-flash`) · **V-38** (a missing key or a failing probe starts the stack with that slot absent and a named warning) — each default binding until V rules.
 - **Cite LANE line numbers.** The main tree carries another mission's uncommitted `+13` lines in `apps/api/src/index.ts`, so its numbers for that one file run 13 ahead of the lane BUILD works in.
 - This slice's no-touch surface gains `.local/dev-auth/provider-keys.env`: V places the keys, and no seat reads, writes, prints or tests against their values.

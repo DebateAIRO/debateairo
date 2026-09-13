@@ -4,8 +4,11 @@
 below the headers.** REQ owns nothing here but the trace skeleton and the laws restated at the top.
 There is **no line cap on this file** (V, 2026-08-28): a slice gets as many steps as it has.
 
-Binding SPEC: `docs/missions/debate-tiers/slices/S03/SPEC.md`, frozen at REQ-S03's READY marker.
-`ui: no` — this slice passes through no MOCK gate and no `DONE.md`; its done oracle is the SPEC's
+Binding SPEC: **`docs/missions/debate-tiers/slices/S03/SPEC-v2.md`**, frozen at REQ-FIX-S03's READY
+marker (pass 2, under the verdict `reviews/REQ-REV-S03-p1.md` and V's 16:05 update). `SPEC.md` beside
+it is v1, byte-identical to its freeze and kept as the historical record — read v2, and never a memory
+of v1.
+`ui: no` — this slice passes through no MOCK gate and no `DONE.md`; its done oracle is SPEC-v2's
 `## 2. Acceptance`, run by V.
 
 ## The quantifiability law — every step below obeys it
@@ -14,9 +17,9 @@ A step is finite, categoric and mechanically checkable: a stranger can mark it d
 its author what it meant. WRONG: "improve error handling". RIGHT: "requests with a missing id return
 400 with a message, and the test asserting this passes". Banned in any step or criterion: improve,
 better, robust, handle, appropriate. Every pinned number carries its derivation in the same sentence.
-Line citations are re-measured in the LANE (`.worktrees/tiers-s03/dialectical-engine` @ `7188b167`)
-at the moment they are written — the main tree's `apps/api/src/index.ts` is 13 lines ahead
-(SPEC §0, DECISIONS 2026-09-13).
+Line citations are re-measured in the LANE (`.worktrees/tiers-s03/dialectical-engine` @ **`9a000c37`**
+— corrected from `7188b167` at pass 2, finding N1) at the moment they are written; the main tree's
+`apps/api/src/index.ts` is 13 lines ahead (SPEC-v2 §0, DECISIONS 2026-09-13).
 
 ## 1. Steps
 
@@ -50,27 +53,30 @@ to no requirement is scope.)*
 | R4 | API entry = `api` + `model` + `base_url` + `key` | | |
 | R5 | `key:` is a variable NAME; no secret in the file | | |
 | R6 | ≥ 2 entries, ≥ 2 makers, ≤ 1 entry per maker, per tier | | |
-| R7 | the exact content at merge, with V's comments carried over | | |
-| R8 | the file is the ONLY declaration of the tier lists | | |
+| R7 | the exact content at merge (Z.ai = the subscription endpoint), V's comments carried over | | |
+| R8 | the file is the ONLY declaration — **quoted-exact oracle, no allow-list** — plus the positive limb reading `config/models.yaml` | | |
+| R30 | a key-based entry's `model` is an id its endpoint ECHOES exactly (F13) | | |
 | R9 | a `cli:` entry is served by its local relay, unchanged | | |
 | R10 | an `api:` entry is called directly over HTTPS with a bearer from the key file | | |
-| R11 | a remote HTTPS base URL is admitted; five refusals still refuse | | |
+| R11 | a remote HTTPS base URL is admitted; **six** refusals still refuse | | |
 | R12 | key-file custody (0600, owner, no symlink, nlink 1); never read, never printed by a seat | | |
-| R13 | HEALTHY probe record whose `modelId` is the entry's id exactly | | |
-| R14 | slot set = the union of the entries; a removal removes its slot | | |
+| R13 | HEALTHY probe record whose `modelId` is the entry's id exactly (mechanism measured: F14) | | |
+| R14 | one slot per entry · refs stable across restarts · **order: Premium's `cli:` first** | | |
 | R15 | admission unchanged from S02 R3–R10 with the new lists | | |
 | R16 | `/new` shows the lists after edit + restart, no UI rebuild | | |
 | R17 | every id renders with a non-empty name and a visible dot | | |
 | R18 | CLI pins are full ids from the file; alias derivation removed | | |
 | R19 | `pnpm dev:auth:up` checks the file before it changes anything | | |
-| R20 | seven named failure classes, one refused fixture each | | |
-| R21 | on refusal nothing is rewritten and nothing is stopped | | |
+| R20 | **six SHAPE classes — refuse, always**; one refused fixture each | | |
+| R21 | on a SHAPE refusal nothing is rewritten and nothing is stopped | | |
 | R22 | the refusal names tier + model + class, and no key value | | |
-| R23 | on a passing check the new lists are live everywhere | | |
+| R31 | **availability (missing key · no answer) → the stack STARTS, the slot is absent, the reason is named** | | |
+| R32 | the post-merge start on a machine with NO keys: Premium healthy, Free refused by name | | |
+| R23 | on a run with no shape refusal the file's entries are live everywhere | | |
 | R24 | a smaller entry set publishes a NEW register version | | |
 | R25 | api.env follows a real removal and still refuses a reconstruction | | |
-| R26 | the support seam (ref, port 8794, credential) is untouched | | |
-| R27 | the twelve baseline suites keep `passed/total` or the delta is named | | |
+| R26 | the support seam (ref, port 8794, credential) is untouched — no file of it edited | | |
+| R27 | the twelve baseline suites keep `passed/total` or the delta is named (`dev-api-environment` = **10/10**; `tiers-s02-rosters` **→ 5/5**) | | |
 | R28 | a RED test per listed behaviour, shown failing first | | |
 | R29 | `pnpm typecheck` gains no diagnostic outside BASELINE.md's pins | | |
 
@@ -83,7 +89,8 @@ from a stale api.env reconstruction — C14, SPEC R25.)*
 
 ## 5. Verification list for the slice
 
-*(ARCH fills: the commands `REV(S03)` runs, the suites of SPEC R27 with their baseline rows, and the
-three-run table shape. `tests/integration/dev-api-environment.test.ts` is 9/10 RED at base in the
-LANE only and `tests/architecture/register-support-publication.test.ts` is 12/14 RED at base in both
-trees — a seat that takes either for green will blame its own diff.)*
+*(ARCH fills: the commands `REV(S03)` runs, the suites of SPEC-v2 R27 with their baseline rows, and
+the three-run table shape. At lane HEAD `9a000c37`, `tests/integration/dev-api-environment.test.ts` is
+**10/10** — v1's 9/10 row was measured at `7188b167` against a swept foreign hunk and is corrected at
+`setup-tiers-s03.log:28`; a seat reporting 9/10 as "pre-existing" is reporting a regression. Only
+`tests/architecture/register-support-publication.test.ts` is RED at base, 12/14 in both trees.)*
