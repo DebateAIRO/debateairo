@@ -1,0 +1,48 @@
+
+### gpt-5.6-luna
+  A) bare-substring (tiers-s02-rosters matcher): 
+       packages/contract/src/plan-tiers.ts x1
+  B) quoted-exact  (tier01-roster matcher):      
+       packages/contract/src/plan-tiers.ts
+
+### glm-5.3-flash
+  A) bare-substring (tiers-s02-rosters matcher): 
+       apps/api/src/support/model.ts x2
+       apps/runner/src/dev-auth-stack.ts x1
+       apps/runner/src/dev-support-model.ts x2
+  B) quoted-exact  (tier01-roster matcher):      (none)
+
+### glm-5.3
+  A) bare-substring (tiers-s02-rosters matcher): 
+       apps/api/src/support/model.ts x2
+       apps/runner/src/dev-auth-stack.ts x1
+       apps/runner/src/dev-support-model.ts x2
+  B) quoted-exact  (tier01-roster matcher):      (none)
+
+### gpt-5.6-sol
+  A) bare-substring (tiers-s02-rosters matcher): 
+       apps/ui/components/landing/cards.ts x1
+       packages/contract/src/plan-tiers.ts x1
+  B) quoted-exact  (tier01-roster matcher):      
+       packages/contract/src/plan-tiers.ts
+
+### claude-opus-5
+  A) bare-substring (tiers-s02-rosters matcher): 
+       apps/ui/components/landing/cards.ts x1
+       packages/contract/src/plan-tiers.ts x1
+  B) quoted-exact  (tier01-roster matcher):      
+       packages/contract/src/plan-tiers.ts
+
+### grok-4.6-build
+  A) bare-substring (tiers-s02-rosters matcher): 
+       packages/contract/src/plan-tiers.ts x1
+  B) quoted-exact  (tier01-roster matcher):      
+       packages/contract/src/plan-tiers.ts
+
+### claude-sonnet-5
+  A) bare-substring (tiers-s02-rosters matcher): 
+       packages/contract/src/plan-tiers.ts x1
+  B) quoted-exact  (tier01-roster matcher):      
+       packages/contract/src/plan-tiers.ts
+
+files scanned: 413

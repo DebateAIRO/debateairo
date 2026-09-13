@@ -1,0 +1,29 @@
+=== v2 R8 claim: cards.ts:27-28 are display copy, never quoted-exact ===
+const A_CLAUDE = "Anthropic · Claude · claude-opus-5";
+const A_GPT = "OpenAI · GPT · gpt-5.6-sol";
+
+=== v2 R27 claim: setup-tiers-s03.log line 28 carries the 10/10 correction ===
+2026-09-13 16:45 CORRECTION (orchestrator): the dev-api-environment.test.ts 9/10 row above was measured at 7188b167 and was the orchestrator's swept foreign hunk (LEDGER 15:05); at lane HEAD 9a000c37 the file is 10/10 (re-run 2026-09-13 15:00).
+
+=== v2 R8 claim: tiers-s02-rosters.test.ts:8-9 is the apps+packages root ===
+const PROJECT_ROOT = process.cwd();
+const SOURCE_ROOTS = ["apps", "packages"] as const;
+
+=== how many test cases in tiers-s02-rosters.test.ts (v2 says 4/4 -> 5/5) ===
+4
+204:  it("keeps the exact ordered model roster for each plan tier", () => {
+216:  it("keeps every roster model id in one canonical declaration", () => {
+239:  it("keeps plan-tier model selection out of if and case branches", () => {
+243:  it("keeps at least two members in every tier roster", () => {
+
+=== R3 claim: a CLI entry has no base_url -> can R20 class 6 (= R11's SIX refusals) be fixtured from the file? ===
+(R11 refusal 6 is a cli slot's OBSERVED base url, not a file field — see v2:157)
+
+=== R14.3 order rule derivation: the runner's slot-0 pin, re-read at this HEAD ===
+if (providerTopology.primary.providerRef !== environment.PROVIDER_REF
+  || providerTopology.primary.maker !== environment.VLLM_MAKER
+  || providerTargets[0]?.baseUrl !== environment.VLLM_BASE_URL.replace(/\/$/u, "")
+  || providerTargets[0]?.model !== environment.VLLM_MODEL
+  || providerTargets[0]?.authorizationHeader !== environment.VLLM_AUTHORIZATION) {
+  throw new TypeError("RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT");
+}
