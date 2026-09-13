@@ -13,7 +13,7 @@
 - your ticket: `~/.local/bin/hermes kanban --board __MISSION__ show <ticket> --json` (long text truncates: slice the JSON)
 - comment: `~/.local/bin/hermes kanban --board __MISSION__ comment <ticket> "<body>" --author <SEAT>` (body is positional; add `--max-len 80000` above ~20k)
 - never `boards switch`; never change a ticket's status, assignee or links — the orchestrator moves tickets, you comment on YOUR ticket only
-- markers, each carrying `comments read through: <n>`: CLAIM (first comment: seat, node, start time, session id, HEAD + dirty count) · HEARTBEAT · BLOCKED · READY (your handoff) · MOCK READY · PASS / REWORK / BLOCKED (verdicts)
+- markers, each carrying `comments read through: <n>`: CLAIM (first comment: seat, node, start time, the TRANSCRIPT path — an Agent-tool seat names its `subagents/agent-<id>.jsonl`, a CLI seat its session-store file; never the orchestrator's session id, which every seat shares and proves nothing about blindness — HEAD + dirty count) · HEARTBEAT · BLOCKED · READY (your handoff) · MOCK READY · PASS / REWORK / BLOCKED (verdicts)
 
 ## 3. Laws (text: `heartbeat-protocol` §3, spine v4.0.0 amendments)
 No self-review · a finding is a finding and you fix the CLASS (file:line, ticketed the same day; non-blocking sets WHEN, never WHETHER) · three REV passes per slice, then it is V's · the board is the state · reproduce first, RED before GREEN on every pass · verbatim means verbatim · say what you cannot do (UNVERIFIED is always legal) · the reading floor · the no-terminal law.
