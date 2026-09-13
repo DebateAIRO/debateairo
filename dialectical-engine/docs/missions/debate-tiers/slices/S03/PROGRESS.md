@@ -15,3 +15,4 @@ Created empty by REQ-S03, 2026-09-13.
 - 2026-09-13 18:08 EEST · BUILD(S03-C1) BLOCKED 18:05 (my packet's install-first ordering; the root manifest must depend on the new package) → ruled + resumed in the same codex session (`launch-BUILD-S03-C1-resume.sh`); C2 still building.
 - 2026-09-13 18:18 EEST · BUILD(S03-C2) READY — commit `a9179644`, 26/26 ×3, relay gates unchanged; consumed.
 - 2026-09-13 18:48 EEST · BUILD(S03-C1) READY — commit `62a4c367`, 24/24 ×3, config/models.yaml + @debateai/model-config + generated rosters; S13 pinned-inventory form (C4 flips); consumed.
+- 2026-09-13 18:53:09 EEST · BUILD(S03-C3) DISPATCHED on 62a4c367 (pid 55300, freeze 47b3f2fd); C4 waits.
