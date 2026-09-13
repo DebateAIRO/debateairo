@@ -12,6 +12,7 @@ import {
   LegacyRunClaimRequestSchema,
   LegacyRunClaimResultSchema,
   NodeSchema,
+  PlanTierRostersSchema,
   PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
   PublicDebateListSchema,
@@ -32,6 +33,7 @@ import {
   type InvestigationAccepted,
   type InvestigationRequest,
   type Node,
+  type PlanTierRosters,
   type PublicDebate,
   type RunEvent,
   type RunProjection,
@@ -285,6 +287,7 @@ export interface ContractClient {
   }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   readSession(): Promise<Session>;
+  readPlanTiers(): Promise<PlanTierRosters>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
   readAnswer(answerId: string, version?: number): Promise<Answer>;
@@ -503,6 +506,7 @@ export function createContractClient(
     ),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     readSession: () => request("/v1/session", SessionSchema),
+    readPlanTiers: () => request("/v1/plan-tiers", PlanTierRostersSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),
     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),

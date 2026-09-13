@@ -66,6 +66,10 @@ function fixtureApplication(): AskApplication {
     readRunAnswer: async () => null,
     readRun: async () => null,
     readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
+    readPlanTierRosters: async () => ({
+      free: [...PLAN_TIER_ROSTERS.free],
+      premium: [...PLAN_TIER_ROSTERS.premium]
+    }),
     readDeployment: async () => ({
       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
@@ -233,6 +237,81 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "OPERATOR_REQUIRED" });
     await api.close();
+  });
+
+  // Property: an ordinary authenticated user receives exactly the application's sealed roster row.
+  // Production break: omit GET /v1/plan-tiers or answer it from a compiled roster constant.
+  it("serves the register's plan-tier roster row to an ordinary user", async () => {
+    const application = fixtureApplication() as AskApplication & {
+      readPlanTierRosters(session: Session): Promise<Readonly<{
+        free: readonly string[];
+        premium: readonly string[];
+      }>>;
+    };
+    application.readPlanTierRosters = async () => ({
+      free: ["free-register-model-a", "free-register-model-b"],
+      premium: ["premium-register-model-a", "premium-register-model-b", "premium-register-model-c"]
+    });
+    const api = buildApi({ application });
+    const response = await api.inject({
+      method: "GET", url: "/v1/plan-tiers", headers: USER_HEADERS
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      free: ["free-register-model-a", "free-register-model-b"],
+      premium: ["premium-register-model-a", "premium-register-model-b", "premium-register-model-c"]
+    });
+    await api.close();
+  });
+
+  // Property: the roster surface is unavailable without an authenticated cookie session.
+  // Production break: declare GET /v1/plan-tiers public or omit it from the governed route table.
+  it("requires a session for the plan-tier roster route", async () => {
+    const api = buildApi({ application: fixtureApplication() });
+    const response = await api.inject({ method: "GET", url: "/v1/plan-tiers" });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
+    await api.close();
+  });
+
+  // Property: the production application projects the planTierRosters row from its sealed deployment.
+  // Production break: return PLAN_TIER_ROSTERS or any source other than register.register_row.
+  it("reads plan-tier rosters from the sealed deployment register row", async () => {
+    const pool = {
+      query: async (statement: string) => {
+        if (statement.includes("FROM register.register_row")) {
+          return { rows: [{
+            row_key: "planTierRosters",
+            value_json: {
+              free: ["free-register-a", "free-register-b"],
+              premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
+            },
+            source_ref: "config/models.yaml"
+          }] };
+        }
+        if (statement.includes("FROM scorecard.scorecard_cell") ||
+          statement.includes("FROM identity.run_execution_binding")) {
+          return { rows: [] };
+        }
+        throw new Error(`UNEXPECTED_QUERY:${statement}`);
+      }
+    };
+    const application = new PostgresAskApplication(
+      pool as never,
+      { dispatch: async () => undefined },
+      admissionSettings({ registerVersion: 7 }),
+      undefined,
+      {} as never,
+      { server: {} as never, legacy: {} as never }
+    );
+    const rosters = await application.readPlanTierRosters(USER_IDENTITY.authenticated.session);
+
+    expect(rosters).toEqual({
+      free: ["free-register-a", "free-register-b"],
+      premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
+    });
   });
 
   it("validates POST /v1/asks against the contract and forwards the resolved principal", async () => {

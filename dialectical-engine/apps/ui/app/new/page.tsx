@@ -96,6 +96,7 @@ function NewDebateForm({ token }: { token: string }) {
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
+  const [planTierRostersError, setPlanTierRostersError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -111,16 +112,19 @@ function NewDebateForm({ token }: { token: string }) {
       if (!active) return;
       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
     });
-    void contractClient.readDeployment().then((deployment) => {
+    void contractClient.readPlanTiers().then((rosters) => {
       if (!active) return;
-      const rosterRow = deployment.register.rows.find((row) => row.row_key === "planTierRosters");
-      const rosters = rosterRow?.value as Partial<Record<PlanTier, unknown>> | undefined;
-      if (!Array.isArray(rosters?.free) || !rosters.free.every((modelId) => typeof modelId === "string") ||
-        !Array.isArray(rosters.premium) || !rosters.premium.every((modelId) => typeof modelId === "string")) {
-        return;
-      }
       setPlanTierRosters({ free: rosters.free, premium: rosters.premium });
-    }).catch(() => undefined);
+      setPlanTierRostersError(null);
+    }).catch((failure: unknown) => {
+      if (!active) return;
+      setPlanTierRosters(EMPTY_PLAN_TIER_ROSTERS);
+      setPlanTierRostersError(
+        `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: ${
+          failure instanceof Error ? failure.message : "Plan tier roster read failed"
+        }`
+      );
+    });
     return () => { active = false; };
   }, [token]);
 
@@ -336,6 +340,7 @@ function NewDebateForm({ token }: { token: string }) {
           </div>
 
           {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
+          {planTierRostersError ? <div className="error" style={{ marginTop: 14 }}>{planTierRostersError}</div> : null}
 
           <button
             type="button"

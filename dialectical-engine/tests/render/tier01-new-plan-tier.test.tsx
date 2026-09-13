@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createDebate: vi.fn(),
   push: vi.fn(),
   readDeployment: vi.fn(),
+  readPlanTiers: vi.fn(),
   readSession: vi.fn()
 }));
 
@@ -53,6 +54,7 @@ vi.mock("@/lib/api", () => ({
   createDebate: mocks.createDebate,
   contractClient: {
     readDeployment: mocks.readDeployment,
+    readPlanTiers: mocks.readPlanTiers,
     readSession: mocks.readSession
   }
 }));
@@ -90,6 +92,10 @@ describe("S01 /new plan tier", () => {
     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
     mocks.push.mockReset();
     mocks.readDeployment.mockReset().mockResolvedValue(deploymentFixture);
+    mocks.readPlanTiers.mockReset().mockResolvedValue({
+      free: deploymentFixture.register.rows[0]!.value.free,
+      premium: deploymentFixture.register.rows[0]!.value.premium
+    });
     mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
     const container = document.createElement("div");
     document.body.append(container);
@@ -203,9 +209,43 @@ describe("S01 /new plan tier", () => {
     expect(mocks.readSession).toHaveBeenCalledTimes(1);
   });
 
+  // Property: a refused roster read is visible and no stale/default model id is rendered.
+  // Production break: swallow readPlanTiers rejection and retain EMPTY_PLAN_TIER_ROSTERS.
+  it("S03-25 R31 names an unavailable plan-tier roster read and renders no ids", async () => {
+    mocks.readSession.mockResolvedValue({
+      session_id: "00000000-0000-4000-8000-000000000000",
+      asker_id: "probe-asker"
+    });
+    mocks.readPlanTiers.mockRejectedValue(new Error("PLAN_TIER_ROSTERS_OFFLINE"));
+    await renderPage();
+
+    expect([...document.querySelectorAll('.ndTierModel')]).toEqual([]);
+    expect(document.querySelector('.error')?.textContent).toBe(
+      "ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: PLAN_TIER_ROSTERS_OFFLINE"
+    );
+  });
+
+  // Property: the cards render all five ids returned by the user-readable roster surface.
+  // Production break: keep reading the operator-only deployment surface instead of readPlanTiers.
+  it("S03-26 R16 renders both tier lists from the user-readable roster response", async () => {
+    mocks.readDeployment.mockRejectedValue(new Error("OPERATOR_REQUIRED"));
+    await renderPage();
+
+    expect([...document.querySelectorAll<HTMLElement>('.ndTierModel')].map((model) =>
+      model.textContent?.trim()
+    )).toEqual([
+      "gpt-5.6-luna",
+      "glm-5.3-flash",
+      "gpt-5.6-sol",
+      "claude-opus-5",
+      "grok-4.6-build"
+    ]);
+    expect(document.body.textContent).not.toContain("OPERATOR_REQUIRED");
+  });
+
   // Property: the Free card renders the file-fed deployment roster and no retired model id.
   // Production break: keep rendering the compiled PLAN_TIER_ROSTERS export instead of the register row.
-  it("S03-24 R16 renders the Free card from the deployment roster row", async () => {
+  it("S03-24 R16 renders the Free card from the plan-tier roster response", async () => {
     vi.resetModules();
     vi.doMock("@debateai/contract", () => ({
       PLAN_TIER_ROSTERS: {
@@ -228,7 +268,7 @@ describe("S01 /new plan tier", () => {
     }
   });
 
-  it("S01-25 R3 names each tier's models from the deployment roster row", async () => {
+  it("S01-25 R3 names each tier's models from the plan-tier roster response", async () => {
     await renderPage();
 
     expect(document.querySelector('#planTier-free')?.textContent).toContain("gpt-5.6-luna");
@@ -271,10 +311,10 @@ describe("S01 /new plan tier", () => {
   });
 
   it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
-    mocks.readDeployment.mockResolvedValueOnce(deploymentWithRosters({
+    mocks.readPlanTiers.mockResolvedValueOnce({
       free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
       premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
-    }));
+    });
     await renderPage();
 
     expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
