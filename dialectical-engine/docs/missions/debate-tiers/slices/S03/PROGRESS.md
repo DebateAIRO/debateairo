@@ -17,3 +17,4 @@ Created empty by REQ-S03, 2026-09-13.
 - 2026-09-13 18:48 EEST · BUILD(S03-C1) READY — commit `62a4c367`, 24/24 ×3, config/models.yaml + @debateai/model-config + generated rosters; S13 pinned-inventory form (C4 flips); consumed.
 - 2026-09-13 18:53:09 EEST · BUILD(S03-C3) DISPATCHED on 62a4c367 (pid 55300, freeze 47b3f2fd); C4 waits.
 - 2026-09-13 20:06 EEST · BUILD(S03-C3) READY — commit `43efdb1a`, 88 passed | 2 inherited ×3, CLUSTER_GREEN; consumed. C4 next.
+- 2026-09-13 20:08:56 EEST · BUILD(S03-C4) DISPATCHED on 43efdb1a (pid 1156, freeze 57e3060f) — the last cluster.
