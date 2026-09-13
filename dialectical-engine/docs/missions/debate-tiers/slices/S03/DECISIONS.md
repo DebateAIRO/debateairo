@@ -145,7 +145,7 @@ simpler to read, and V may never edit a base URL again after V-35 is settled.
   case, not a widened scan, and `tiers-s02-rosters` becomes 5/5. Rejected: widening a scan root to the
   repo root, which would drag every root-level file into two architecture suites · REQ-FIX-S03.
 - 2026-09-13 · **V's "Switch the 5.3 to GLM 4.7"** · **the file names `glm-5.3-flash`, not `glm-4.7`,
-  and V's subscription is what it calls** · F13, measured 16:05: on the subscription endpoint a
+  and V's subscription is what it calls** · F13, measured ≈14:35 (this stamp was first written "16:05", an estimate — corrected 17:02): on the subscription endpoint a
   request for `glm-4.7` is answered with `model: "glm-5.3-flash"`; `glm-4.6` and `glm-5-turbo` the
   same; `glm-5` → `glm-5.3`; only `glm-5.3` and `glm-5.3-flash` answer under their own id. The probe
   demands an exact echo (`apps/api/src/provider-discovery.ts:77-79`) and DR-115 says the app records
@@ -426,4 +426,72 @@ ever have to move.
 block is the one the orchestrator transcribes.)*
 
 ---
-**Fold by the orchestrator, 2026-09-13 20:35 (ARCH-REV-S03 pass 1 = REWORK; verdict `reviews/ARCH-REV-S03-p1.md`).** B1 `t_492abb53` (S21's threading of `configuredProviders` unnamed at four of five call sites; S28's second input likewise), B2 `t_32e0064f` (three cluster surfaces omit files their steps edit — `page.tsx` in C4, four `apps/runner/src/*-cli.ts` broken by S21's signature, the ADR in C1), B3 `t_3642e0f1` (S19's "no new register version" is false once S23's `planTierRosters` row is in the snapshot; the ruling at :328-332 above is SUPERSEDED — a `model:` edit keeps the ref and the configured set and DOES publish a new version, which acceptance step 6 needs; R14.2 forbids republication only for a key appearing) → ARCH-FIX(S03) `t_f14aab0f` (PLAN Revision 2, same session). N folds, closed on the board and carried into the ARCH-FIX packet: **N1** seven "(re-)measured at" citations that were not measured (three out of range) — re-grep in the LANE or drop the annotation · **N2** three JSON examples unlabelled (S17's ABSENT record is CONTAINS) · **N3** S19's `DEV_PROVIDER_SLOT_UNRESOLVED` unreachable past S4's class 2 — S18's RED case hand-builds a `ModelConfig` · **N4** C3's surface says seven suites, the command names eight · **N5** S14's self-contradicting edit instruction · **N6** S12's comment text has no case. **P1** (orchestrator): the R25 pin is at `tests/integration/dev-api-environment.test.ts:348` in the LANE (main-tree :352 is four lines off after 4df0b2b5) — the same class as REQ-S03 F2; every S03 packet cites lane lines. Refuted and sound (verdict §6, not re-argued at pass 2): S28 is NOT a false-green (the first predicate compares REGISTER_VERSION); the maker-keyed probe extension; R33 per slot; both base-URL gates; no key-leak path; "nothing rewritten" structural from the stage list; the boundary; the ADR; C3 cannot be split (S21 and S26 straddle both halves); V-39's default safe. No V row.
+**Fold by the orchestrator, 2026-09-13 16:42 (stamp CORRECTED 16:50 from an estimated "20:35" — the freeze commit `cd04f1e9` is 16:42 +0300; ARCH-REV-S03 pass 1 = REWORK; verdict `reviews/ARCH-REV-S03-p1.md`).** B1 `t_492abb53` (S21's threading of `configuredProviders` unnamed at four of five call sites; S28's second input likewise), B2 `t_32e0064f` (three cluster surfaces omit files their steps edit — `page.tsx` in C4, four `apps/runner/src/*-cli.ts` broken by S21's signature, the ADR in C1), B3 `t_3642e0f1` (S19's "no new register version" is false once S23's `planTierRosters` row is in the snapshot; the ruling at :328-332 above is SUPERSEDED — a `model:` edit keeps the ref and the configured set and DOES publish a new version, which acceptance step 6 needs; R14.2 forbids republication only for a key appearing) → ARCH-FIX(S03) `t_f14aab0f` (PLAN Revision 2, same session). N folds, closed on the board and carried into the ARCH-FIX packet: **N1** seven "(re-)measured at" citations that were not measured (three out of range) — re-grep in the LANE or drop the annotation · **N2** three JSON examples unlabelled (S17's ABSENT record is CONTAINS) · **N3** S19's `DEV_PROVIDER_SLOT_UNRESOLVED` unreachable past S4's class 2 — S18's RED case hand-builds a `ModelConfig` · **N4** C3's surface says seven suites, the command names eight · **N5** S14's self-contradicting edit instruction · **N6** S12's comment text has no case. **P1** (orchestrator): the R25 pin is at `tests/integration/dev-api-environment.test.ts:348` in the LANE (main-tree :352 is four lines off after 4df0b2b5) — the same class as REQ-S03 F2; every S03 packet cites lane lines. Refuted and sound (verdict §6, not re-argued at pass 2): S28 is NOT a false-green (the first predicate compares REGISTER_VERSION); the maker-keyed probe extension; R33 per slot; both base-URL gates; no key-leak path; "nothing rewritten" structural from the stage list; the boundary; the ADR; C3 cannot be split (S21 and S26 straddle both halves); V-39's default safe. No V row.
+
+---
+
+## Ruled at ARCH-FIX (2026-09-13, seat ARCH-FIX-S03, ticket `t_f14aab0f`, pass 2 of 3) — under the REWORK verdict `reviews/ARCH-REV-S03-p1.md`. PLAN.md is revised in place as Revision 2; nothing above this line is edited.
+
+- 2026-09-13 · **SUPERSEDES the ruling at `:328-332` above** (*"…and therefore no new register
+  version"*) · **a one-line `model:` edit keeps the `provider_ref` and keeps the
+  `configuredProviderSet` row byte-identical, and it DOES publish a new register version** · the
+  superseded clause was true only before S23. Measured in the lane at `9a000c37`: the version is a
+  function of the rows — `apps/runner/src/dev-deployment-register.ts:635`
+  `computeRegisterSnapshotSha256(rows)` feeds `:639`
+  `developmentProviderSetPublicationId(input.baseRegisterVersion, snapshotSha256)` — and S23's
+  `planTierRosters` row carries the file's model ids, so a `model:` edit moves the row, the digest and
+  the version. **Acceptance step 6 requires exactly that**: `/new` shows the edited id after a restart,
+  which it can only do if the row carrying the ids moved. What R14.2 forbids stays true and is narrower:
+  **a key appearing publishes no version**, because a key changes neither `configuredProviderSet` nor
+  `planTierRosters` (the latter is built from the FILE, never from the panel's targets, so a sentinel
+  model never reaches it) and is confined to `PROVIDER_DISCOVERY_TARGETS_JSON` — the same-version
+  runtime-refresh path. Pinned by S19 case (2) (the `configuredProviderSet` row byte-identical across a
+  `model:` edit **and** the `planTierRosters` row not) and by S29 (the key-arrival deep-equal).
+  The earlier ruling's OTHER two clauses — the ref is a function of `(tier, maker word)`, and the static
+  catalogue — are unchanged and still binding · ARCH-FIX-S03, under B3 `t_3642e0f1`.
+- 2026-09-13 · **How a new input reaches a module-scope function** · **it is threaded as an explicit
+  parameter and the plan writes the resulting signature line, site by site** · B1 was right and the
+  measurement is unambiguous: `isExactProviderRuntimeRefresh` (`dev-api-environment.ts:310`),
+  `isExactPublishedRegisterRefresh` (`:336`) and `isExactLegacyEnvironmentWithoutSupportModelTarget`
+  (`:387`) are module-scope functions taking two strings — `input` exists only inside
+  `assembleDevelopmentApiEnvironment` (`:409`), whose closure at `:493` calls them — and
+  `createRunnerEnvironment` (`dev-runner-process.ts:55`) takes `(commandEnvironment, apiEnvironment)`
+  with no `repositoryRoot`. Only `dev-api-process.ts:159` `validateExactEnvironment` already has one.
+  Rejected: capturing the value in a module-level mutable set at stage 0 — no signature changes, and it
+  makes a pure predicate depend on load order, so a test importing the module alone reads an empty set.
+  Rejected: turning the predicates into closures built inside `assembleDevelopmentApiEnvironment` —
+  fewer parameters, and it moves four tested functions out of module scope where the suite reaches
+  them. **The rule this leaves behind: a plan that adds an input to a function names the signature, not
+  the source** · ARCH-FIX-S03, under B1 `t_492abb53`.
+- 2026-09-13 · **Cluster surfaces are DERIVED from the steps, never written by hand** ·
+  **`scratchpad/seats/ARCH-S03/surfaces.mjs` parses §1, takes only paths following a `Create:`/`Modify:`
+  marker, maps step → cluster, and prints the column plus a disjointness check; its output IS §2's
+  column** · B2 was three omissions, and the hand-written column is why: disjointness is what the table
+  invites you to check, and an omission does not show up in that check. Running the derivation found
+  **four** omissions, one of them created by B1's own fix — S21 re-signs functions in
+  `dev-api-process.ts` and `dev-runner-process.ts` and its pass-1 `Files` line named neither. Result at
+  Revision 2: 17 / 5 / 23 / 5 paths, `none — every file sits in exactly one cluster` · ARCH-FIX-S03,
+  under B2 `t_32e0064f`.
+- 2026-09-13 · **The pinned deterministic v4 snapshot moves with the new register row** · **recompute
+  `DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256` (`tests/support/registerFixtures.ts:22`) and sweep its
+  four assertions across three suites** · found at this pass (F-ARCH-4), reached by neither pass-1 me
+  nor the verdict. Adding `planTierRosters` changes the publication digest; leaving the constant takes
+  `tests/architecture/register-support-publication.test.ts` from 12/14 to **11/14**, against SPEC-v3
+  R27's *delta zero* for that suite. It is not a SPEC contradiction and not a V row: that constant's own
+  comment records S02 moving it on 2026-09-12 for the identical reason, so moving it is the documented
+  practice. `LEGACY_REGISTER_V1_SNAPSHOT_SHA256` and the 14-row historical count do not move; a change
+  to either is a defect of S23. Rejected: keeping the tier lists out of the register and adding a
+  `GET /v1/plan-tiers` route to dodge the digest — it re-opens a question settled at pass 1 on other
+  grounds, and it would leave the deployment record silent about which models each tier claims ·
+  ARCH-FIX-S03.
+- 2026-09-13 · **The citation class behind N1** · **a `path:line` is quoted only from the SOURCE FILE,
+  never from a measurement log** · all seven N1 misses share one mechanism: my `sed -n 'X,Yp'` runners
+  print the excerpt WITHOUT line numbers, so when I annotated *"(re-)measured at `:NN`"* I read the
+  number off the log's own line position. Three of the seven pointed past the end of the file
+  (`main.ts:207-213` in a 150-line file; `hermes-relay.ts:248-258` in 168; `dev-real-provider-only.test.ts:218-222`
+  in 54) — which is the tell, and which nothing in my own process checked. **The rule: every measurement
+  runner prints `grep -n` or `sed -n` output that carries the line number, and a citation with no
+  numbered line in a log is not a measurement.** Applied at Revision 2 to all seven, plus the R25 pin at
+  `tests/integration/dev-api-environment.test.ts:348` (the LANE's line; SPEC-v3 R25 and the ARCH packet
+  both say `:352`, the main tree's number, four lines off after `4df0b2b5` — orchestrator finding P1) ·
+  ARCH-FIX-S03, under N1 `t_9c8bed6b`.

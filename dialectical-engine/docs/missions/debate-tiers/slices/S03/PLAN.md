@@ -1,5 +1,22 @@
 # PLAN — slice S03
 
+**Revision 2 — `ARCH-FIX(S03)` (seat ARCH-FIX-S03, ticket `t_f14aab0f`), 2026-09-13, pass 2 of 3,
+under the REWORK verdict `docs/missions/debate-tiers/reviews/ARCH-REV-S03-p1.md`.**
+Changed by this revision: **S12** (N6 — the comment text gains a case) · **S14** (N5 — one edit
+instruction) · **S17** (N2 — the ABSENT record labelled CONTAINS) · **S18** (N3 — the RED case
+hand-builds a `ModelConfig`; N1 — `HERMES_SUPPORT_PORT` at `:19`) · **S19** (**B1/B3** — the
+"no new register version" clause deleted and replaced by the true behaviour; N3; N1) · **S20**
+(N1 — `main.ts:65-71`) · **S21** (**B1** — the threading named as a signature line per call site) ·
+**S23** (**B3** — `planTierRosters` is built from the file, its threading named, and the pinned
+deterministic v4 snapshot swept across four assertions in three suites: a break this plan missed at
+pass 1 and the verdict did not reach) · **S24** (**B2** — the page enters C4's surface) · **S27**
+(N1 — `hermes-relay.ts:33-54`) · **S28** (**B1** — the second input's arrival named) · **S34**
+(N1 — `dev-real-provider-only.test.ts:27-31, :41-42`) · **§2's table** (**B2** — every file a step
+edits now sits in exactly one column, re-derived mechanically by
+`scratchpad/seats/ARCH-S03/surfaces.mjs`; N4 — eight test files, not seven) · **§5** (the three
+suites that pin the v4 snapshot digest) · **§6** (F-ARCH-4, new) · **§7** (rows for the changed steps).
+Unchanged and not re-argued: everything the verdict's §6 verified and did not find.
+
 **Filled by `ARCH(S03)` (seat ARCH-S03, ticket `t_6b7afd11`), 2026-09-13.** REQ owns the trace
 skeleton and the laws restated below; every word under §1–§6 is ARCH's.
 There is **no line cap on this file** (V, 2026-08-28): a slice gets as many steps as it has.
@@ -80,8 +97,10 @@ later oracle names its members.
 
 **S1. Create the package `@debateai/model-config`.**
 Files — Create: `packages/model-config/package.json`, `packages/model-config/tsconfig.json`,
-`packages/model-config/src/index.ts`. Modify: the root `package.json` only if the workspace glob does
-not already cover `packages/*`.
+`packages/model-config/src/index.ts`, `docs/architecture/01-decisions/ADR-NNNN-tier-fleet-configuration-file.md`
+(**`NNNN` measured with `ls docs/architecture/01-decisions/` at write time — never pre-assigned**; §4
+carries its subject, and B2.3 put it in this cluster's surface). Modify: `package.json` (the repository
+root's) only if the workspace glob does not already cover `packages/*`.
 Done when: `pnpm --filter @debateai/model-config exec tsc --noEmit` exits 0, and
 `packages/model-config/package.json` names `yaml` as a dependency at the version already in the
 workspace store — `yaml@2.9.0` (F11: it is in `node_modules/.pnpm` and is no package's dependency;
@@ -170,7 +189,9 @@ tier with a literal union, and a test compares that union to the wire's declarat
 RED if omitted: nothing catches a future `PLAN_TIERS` gaining a third value.
 
 **S8. The generator writes the roster module.**
-Files — Create: `packages/model-config/src/generate-plan-tier-rosters.ts`.
+Files — Create: `packages/model-config/src/generate-plan-tier-rosters.ts`,
+`packages/contract/generated/plan-tier-rosters.ts` (its output — gitignored by `.gitignore:7`, and
+excluded from both roster oracles, M3).
 It imports `@debateai/model-config` **only** — never `@debateai/contract` — and writes
 `packages/contract/generated/plan-tier-rosters.ts` exporting
 `export const GENERATED_PLAN_TIER_ROSTERS = Object.freeze({ free: Object.freeze([...]), premium: Object.freeze([...]) });`
@@ -184,7 +205,7 @@ would deadlock on a fresh checkout. A separate entry has no cycle.
 RED if omitted: S9's import of `../generated/plan-tier-rosters.js` fails to resolve.
 
 **S9. `PLAN_TIER_ROSTERS` keeps its name, its home and its main-index export, and loses its literals (R8, R27).**
-Files — Modify: `packages/contract/src/plan-tiers.ts`.
+Files — Modify: `packages/contract/src/plan-tiers.ts`, `tests/architecture/tier01-roster.test.ts`.
 It becomes
 `import { GENERATED_PLAN_TIER_ROSTERS } from "../generated/plan-tier-rosters.js";` plus
 `export const PLAN_TIER_ROSTERS = GENERATED_PLAN_TIER_ROSTERS satisfies Readonly<Record<PlanTier, readonly string[]>>;`
@@ -198,7 +219,7 @@ declarations are `[]` over the same file list.
 RED if omitted: the suite reports `["packages/contract/src/plan-tiers.ts"]` where `[]` is expected.
 
 **S10. The generator runs before anything that imports contract.**
-Files — Modify: root `package.json`.
+Files — Modify: `package.json` (the repository root's), `tests/architecture/dev-deployment-register.test.ts`.
 `"generate:contract"` becomes
 `"tsx packages/model-config/src/generate-plan-tier-rosters.ts && tsx packages/contract/src/generate.ts"`.
 Done when: in a tree with `packages/contract/generated/` deleted, `pnpm run generate:contract` exits 0
@@ -234,8 +255,14 @@ Content EXACTLY R7's block (`SPEC-v3.md:56-74`), preceded by the header comments
 (`00-intake-S03.md:26-29`) with the `# CLIs:` line extended to name the `api:` form, and followed by
 the *"Put Grok in Free too:"* block carried over **verbatim** (`00-intake-S03.md:45-48`).
 Done when: `tests/architecture/model-config-no-secret.test.ts` passes; `loadModelConfig(repoRoot)`
-returns the five entries of S2's criterion; and a case asserts the file contains
-`claude-sonnet-5` zero times.
+returns the five entries of S2's criterion; a case asserts the file contains `claude-sonnet-5` zero
+times; **and a case asserts the comment text mechanically (N6 — the pass-1 plan left a human as the
+oracle for a checkable property).** That case asserts the committed file contains, as exact
+substrings: `"# config/models.yaml"`, `"# Which models debate in each tier."`,
+`"# Edit, then restart the stack."`, a line beginning `"# CLIs:"` that contains both `"codex"` and
+`"api:"`, and the four-line block `"# Put Grok in Free too:"` / `"#   add under free:"` /
+`"#   - cli: grok"` / `"#     model: grok-4.6-build"` (CONTAINS — the file also holds the entries).
+The five comment strings are R7's requirement carried from `00-intake-S03.md:26-29` and `:45-48`.
 RED if omitted: S11's case 5 fails with `ENOENT config/models.yaml`.
 
 **S13. `PLAN_TIER_ROSTERS`' remaining consumers are the server and the suites (N2(p2)).**
@@ -252,9 +279,16 @@ beside the register row S23 publishes, and nothing says so.
 **S14. A remote HTTPS base URL is admitted; the five URL refusals still refuse (R10, R11a).**
 Files — Modify: `packages/providers/src/index.ts:127-130`; Create:
 `tests/unit/provider-base-url-admission.test.ts`.
-Delete the two lines `parsed.pathname = parsed.pathname.replace(/\/+$/u, "")` +
-`if (!parsed.pathname.endsWith("/v1")) throw` (`:127-130`) and keep the trailing-slash normalisation
-without the `/v1` demand, so `normalizedProviderBaseUrl` returns the URL with no trailing slash.
+**One instruction (corrected at Revision 2 under N5; the pass-1 text said both "delete" and "keep"
+of the same line).** Delete ONLY the `/v1` demand — lane `:128-130`,
+`if (!parsed.pathname.endsWith("/v1")) { throw … }`. **KEEP** lane `:127`
+`parsed.pathname = parsed.pathname.replace(/\/+$/u, "")`. The two readings diverge on exactly one
+input, which is why the choice must be written down: for `https://api.z.ai/api/coding/paas/v4//`,
+keeping `:127` collapses every trailing slash and returns `…/paas/v4`, while deleting it leaves `:131`
+`return parsed.toString().replace(/\/$/u, "")` to strip one slash only and return `…/paas/v4/` — a
+base URL that yields `…/paas/v4//chat/completions` at call time.
+Done additionally: a case asserts `normalizedProviderBaseUrl("https://api.z.ai/api/coding/paas/v4//")`
+returns `"https://api.z.ai/api/coding/paas/v4"` EXACTLY.
 Done when: `normalizedProviderBaseUrl("https://api.z.ai/api/coding/paas/v4")` returns that string
 EXACTLY; `("https://api.openai.com/v1")` returns that string EXACTLY;
 `("http://127.0.0.1:8795/v1")` returns that string EXACTLY; and five cases each throw
@@ -298,7 +332,10 @@ Files — Modify: `apps/api/src/provider-discovery.ts:131-142`; Create:
 `tests/unit/provider-discovery-uncredentialed.test.ts`.
 In `resolve`'s map, a target with `authorizationHeader === undefined` is **not** passed to
 `probeTarget`. It records, through `input.probes.record`, an ABSENT observation
-`{ state: "ABSENT", modelId: null, failureCode: "PROVIDER_PROBE_SKIPPED_UNCREDENTIALED" }`, and
+`{ state: "ABSENT", modelId: null, failureCode: "PROVIDER_PROBE_SKIPPED_UNCREDENTIALED" }`
+(**CONTAINS** — `probes.record` takes a full `ProviderProbeRecord`, so the observation also carries
+`probeEvidenceRef`, `providerRef`, `maker` and `probedAt`; a seat reading this as EXACT writes an
+assertion that cannot pass), and
 `fetchImplementation` is never called for it.
 `authorizationHeader === undefined` is the discriminator rather than the sentinel model because
 `apps/api` must not import `DEVELOPMENT_UNAVAILABLE_CLI_MODEL` from `apps/runner`, and because
@@ -349,19 +386,43 @@ of **ten** rows — the full cross product of the grammar: tiers `{free, premium
 removed or renamed"), and R24's subject is two refs REMOVED and two added, not five renamed.
 Done when: a case asserts the catalogue has exactly 10 rows; that its `providerRef` values are
 unique; that its six CLI ports are `[8791,8792,8793,8795,8796,8797]` sorted; that **no catalogue port
-equals `HERMES_SUPPORT_PORT`** (8794, `acceptance/hermes-relay.ts:34`) — the one collision that would
+equals `HERMES_SUPPORT_PORT`** (8794, `acceptance/hermes-relay.ts:19`, re-measured at Revision 2
+under N1) — the one collision that would
 take V's support widget down (R26); and that for every `(tier, word)` the grammar admits there is
 exactly one row (a cross-product assertion, not a count).
-RED if omitted: S19's derivation throws `DEV_PROVIDER_SLOT_UNRESOLVED` for `api: zai` in `free`.
+RED if omitted: the derivation throws `DEV_PROVIDER_SLOT_UNRESOLVED` for `api: zai` in `free`.
+**The case hand-builds a `ModelConfig` value, or deletes a catalogue row, and never uses a fixture
+file** (N3): because this catalogue is the complete cross product of the grammar, `loadModelConfig`'s
+class 2 rejects every unrepresentable word first, so no YAML can reach this throw. See S19's guard-order
+paragraph.
 
 **S19. Entry → slot: the ref is a function of `(tier, word)`, and a `model:` edit cannot move it (R14.1, R14.2).**
 Files — Modify: `apps/runner/src/dev-provider-panel.ts`; Modify: `tests/unit/dev-cli-provider-panel.test.ts`.
 `developmentProviderSlots(config: ModelConfig)` maps each entry to the catalogue row whose `tier` and
 `word` it matches (`word` = the entry's `cli:` or `api:` value) and throws
 `DEV_PROVIDER_SLOT_UNRESOLVED` when no row matches.
+**Guard order, and the guard that makes this one unreachable from a file (N3):**
+`loadModelConfig`'s class 2 (`MODEL_CONFIG_ENTRY_TRANSPORT_UNKNOWN`, S4) fires first on the same
+operation and rejects every `cli:`/`api:` word outside the grammar. Because S18's catalogue is the
+**complete** 10-row cross product of that grammar, no file that passes the shape check can reach
+`DEV_PROVIDER_SLOT_UNRESOLVED` — it is a total-function assertion, not a file-reachable refusal.
+**S18's and this step's RED case for it therefore hand-build a `ModelConfig` value in the test (or
+delete a catalogue row), never a fixture file.** A seat that tries to reach it from YAML will observe
+class 2 instead and conclude the code is dead.
 **This is the answer to the ARCH-REV check the pass-3 verdict named** (`REQ-REV-S03-p3.md` §8):
 `model` is not an input to the ref. A one-line `model:` edit on a keyed slot therefore yields the same
-`provider_ref`, the same configured set, and no new register version.
+`provider_ref` and the same `configuredProviderSet` row.
+**It DOES publish a new register version, and that is the intended behaviour** (corrected at Revision 2
+under B1/B3; the pass-1 text claimed the opposite). The version is a function of every publication row
+(`apps/runner/src/dev-deployment-register.ts:635` `computeRegisterSnapshotSha256(rows)` feeding `:639`
+`developmentProviderSetPublicationId(input.baseRegisterVersion, snapshotSha256)`), and S23 adds
+`planTierRosters`, whose value **is** the file's model ids — so a `model:` edit moves that row, moves
+the digest, and publishes. **Acceptance step 6 requires exactly this**: `/new` shows the edited id
+after a restart, which it can only do if the row that carries the ids moved.
+What R14.2 forbids is narrower and still holds: **a key appearing publishes no version** — a key
+changes neither `configuredProviderSet` nor `planTierRosters` (S23 builds the latter from the FILE, not
+from the panel's targets, so a sentinel model never reaches it), and is confined to
+`PROVIDER_DISCOVERY_TARGETS_JSON`, the same-version runtime-refresh path. S29 is the case that pins it.
 Done when: three cases — (1) **one slot per entry**: R7's file yields 5 slots, adding the commented
 grok-under-free entry yields 6, removing the premium grok entry yields 4, and two entries never share
 a `provider_ref`; (2) **stability under a `model:` edit**: loading R7's file and loading it with the
@@ -369,7 +430,10 @@ Z.ai entry's `model:` changed to `glm-5.3` yields slot lists whose `providerRef`
 deep-equal while the `model` at the zai slot differs — and the `configuredProviders` projections
 (`providerRef` + `maker` + `adapterKind`) are deep-equal, which is the exact input
 `buildDevelopmentDeploymentRegisterRows` puts in the `configuredProviderSet` row
-(`apps/runner/src/dev-deployment-register.ts:318-322`); (3) **duplicate models are admissible**:
+(`apps/runner/src/dev-deployment-register.ts:322-335`, the row object; `providers:` at `:331`).
+**Case (2) asserts the `configuredProviderSet` row is byte-identical across the edit AND that the
+`planTierRosters` row is NOT** — the two halves of the corrected sentence, pinned together so neither
+can be built alone; (3) **duplicate models are admissible**:
 a file with `grok-4.6-build` in both tiers yields two slots with distinct refs and equal `model`
 (which is what makes acceptance step 10a parseable), refused by nothing, because
 `packages/providers/src/index.ts:175-177` uniques on `provider_ref` only.
@@ -382,7 +446,9 @@ in file order, then free's).
 Derivation: `apps/runner/src/main.ts:65-71` copies slot 0's `baseUrl`/`model`/`authorizationHeader`
 into the api.env primary triple `VLLM_BASE_URL`/`VLLM_MODEL`/`VLLM_AUTHORIZATION` and throws
 `RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT` otherwise (re-measured this pass at
-`apps/runner/src/main.ts:207-213` in the lane — the drift check; the assignment is the same triple).
+`apps/runner/src/main.ts:65-71` in the lane — re-measured at Revision 2 under N1: the file is 150
+lines and the drift check is at `:65-71`; the pass-1 citation `:207-213` was a line number read off my
+own measurement LOG, not off the source).
 Keeping slot 0 a loopback relay keeps V's paid API key out of that triple.
 Done when: a case asserts R7's file yields the ref order
 `["development:codex-premium-cli","development:claude-premium-cli","development:grok-cli","development:openai-free-api","development:zai-free-api"]`
@@ -394,18 +460,49 @@ order rule above stands and the case is recorded UNVERIFIED in §5.
 RED if omitted: the ref order case reports the two Free api slots first.
 
 **S21. The panel builder takes its configured set as an argument (R23.1–3).**
-Files — Modify: `apps/runner/src/dev-provider-panel.ts:79-85, 91-101, 119, 138-166`.
+Files — Modify: `apps/runner/src/dev-provider-panel.ts:79-85, 91-101, 119, 138-166`,
+`apps/runner/src/dev-api-environment.ts:310, 336, 376, 387, 493`,
+`apps/runner/src/dev-api-process.ts:166`, `apps/runner/src/dev-runner-process.ts:55, 59, 62, 133`,
+`apps/runner/src/dev-deployment-register-cli.ts:13`, `apps/runner/src/dev-auth-data-plane-cli.ts:15`,
+`apps/runner/src/dev-api-environment-cli.ts:24`, `apps/runner/src/dev-provider-set-publish-cli.ts:18`,
+`tests/integration/dev-provider-panel.test.ts`.
+**The four `*-cli.ts` files are in this list because S21's signature change breaks them** (B2.2,
+measured in the lane): `dev-deployment-register-cli.ts:13`, `dev-auth-data-plane-cli.ts:15` and
+`dev-api-environment-cli.ts:24` each call `loadDevelopmentProviderPanelFromEnvironment(...)` with ONE
+argument, and `dev-provider-set-publish-cli.ts:18` calls `developmentConfiguredProviderPanel()` with
+none. Each gains the configured set from `loadModelConfigConfiguredProviders(process.cwd())`, and
+`dev-provider-set-publish-cli.ts` additionally passes `planTierRosters` for S23. Left out, they are
+exactly the diagnostics S36 forbids, with no cluster permitted to fix them.
 The module-level `const configuredProviders` (`:79-85`, derived from the static roster) becomes a
 function of the loaded config. `buildDevelopmentProviderPanel(observations, configuredProviders)`
 gains the set as a second parameter; `parseDevelopmentProviderPanelTargets(source, configuredProviders)`
 likewise; `developmentConfiguredProviderPanel(config)` and
 `loadDevelopmentProviderPanelFromEnvironment(source, configuredProviders)` pass it through.
-The five call sites measured this pass (`m04-register-stack.log`) each supply it:
-`dev-api-environment.ts:318, 358, 401` from `input.providerPanel.configuredProviders`;
-`dev-api-process.ts:166` and `dev-runner-process.ts:59` from `loadModelConfig(repositoryRoot)`, both
-being Node processes started in the repository root.
-Done when: `tsc --noEmit` reports no diagnostic at those five call sites, and
-`tests/integration/dev-provider-panel.test.ts` passes each fixture its own configured set.
+**How the value REACHES each call site — one signature line per site, so two seats cannot build it
+two ways** (corrected at Revision 2 under B1; the pass-1 text named a source that is out of scope at
+four of the five sites). Measured in the lane at `9a000c37`: the three predicates at
+`dev-api-environment.ts:310`, `:336` and `:387` are **module-scope functions taking two strings** —
+there is no `input` in any of them — and `createRunnerEnvironment` (`dev-runner-process.ts:55`) takes
+`(commandEnvironment, apiEnvironment)` with no `repositoryRoot`. So the value is threaded as an
+explicit parameter, and each new signature is written here:
+
+| Site | New signature (the text BUILD writes) | Where its argument comes from |
+|---|---|---|
+| `apps/runner/src/dev-api-environment.ts:310` | `function isExactProviderRuntimeRefresh(existing: string, expected: string, configuredProviders: readonly DevelopmentConfiguredProvider[]): boolean` | the `:493` closure |
+| `apps/runner/src/dev-api-environment.ts:336` | `function isExactPublishedRegisterRefresh(existing: string, expected: string, configuredProviders: readonly DevelopmentConfiguredProvider[], heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>): boolean` | the `:493` closure (both values) |
+| `apps/runner/src/dev-api-environment.ts:376` | `function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing: string, expected: string, configuredProviders: readonly DevelopmentConfiguredProvider[]): boolean` | the `:493` closure; it forwards to `isExactProviderRuntimeRefresh` |
+| `apps/runner/src/dev-api-environment.ts:387` | `function isExactLegacyEnvironmentWithoutSupportModelTarget(existing: string, expected: string, configuredProviders: readonly DevelopmentConfiguredProvider[]): boolean` | the `:493` closure |
+| `apps/runner/src/dev-api-environment.ts:493` (the closure inside `assembleDevelopmentApiEnvironment`, `:409`) | `(existing) => isExactProviderRuntimeRefresh(existing, source, input.providerPanel.configuredProviders) \|\| … \|\| isExactPublishedRegisterRefresh(existing, source, input.providerPanel.configuredProviders, input.heldConfiguredProviderSets) \|\| …` | `input` — the ONLY scope in this file that has it |
+| `apps/runner/src/dev-api-process.ts:159` | `function validateExactEnvironment(values, repositoryRoot: string, registerReceipt): void` — **unchanged**; `:166` becomes `parseDevelopmentProviderPanelTargets(values.PROVIDER_DISCOVERY_TARGETS_JSON!, loadModelConfigConfiguredProviders(repositoryRoot))` | `repositoryRoot`, already its second parameter |
+| `apps/runner/src/dev-runner-process.ts:55` | `function createRunnerEnvironment(commandEnvironment, apiEnvironment, repositoryRoot: string)` — **gains a third parameter**; `:59` and `:62` both take the derived set | its one caller, `:133` `input.operations.startRunner(createRunnerEnvironment(…))`, inside `startDevelopmentRunnerProcess` (`:125`), whose `input` carries `repositoryRoot` |
+
+`loadModelConfigConfiguredProviders(repositoryRoot)` is one exported helper in
+`@debateai/model-config` returning the `configuredProviders` projection for the committed file, so the
+two process entry points do not each re-derive it.
+Done when: `tsc --noEmit` reports no diagnostic in the four files above, **and** a case asserts that
+`isExactProviderRuntimeRefresh` called with a configured set that does NOT contain the outgoing file's
+refs returns `false` — which is only expressible once the parameter exists, and is what proves the
+threading is real rather than a defaulted module constant.
 RED if omitted: `dev-api-environment.ts:318` validates the OUTGOING api.env against a **static**
 five-slot set, so after an entry-set edit the drift predicate answers about a set the deployment no
 longer configures — the silent-wrong-answer failure, caught by S34's legitimate-removal case.
@@ -425,19 +522,72 @@ asserts that starting a panel over R7's file calls exactly **three** starts, and
 RED if omitted: the Claude case reports `modelAlias: "opus"`.
 
 **S23. The tier lists become a register row (R16, R24).**
-Files — Modify: `apps/runner/src/dev-deployment-register.ts:315-330`; Modify:
-`tests/integration/dev-deployment-register.test.ts`; Modify: `tests/support/registerFixtures.ts`.
+Files — Modify: `apps/runner/src/dev-deployment-register.ts:322, :472, :498, :509, :618, :656`;
+Modify: `tests/integration/dev-deployment-register.test.ts`; Modify: `tests/support/registerFixtures.ts`;
+Modify: `tests/architecture/register-support-publication.test.ts`; Modify:
+`tests/integration/register-support-publication.test.ts`; Modify:
+`tests/integration/production-database-principals.test.ts`.
 `buildDevelopmentDeploymentRegisterRows` gains a second row beside `configuredProviderSet`:
-`{ rowKey: "planTierRosters", value: { kind: "PLAN_TIER_ROSTERS", free: [...], premium: [...] }, sourceRef: DEVELOPMENT_SOURCE_REF }`,
-taking the ids in file order.
-Done when: the publication row count moves from 32 to **33** (32 is the live count,
-`00-intake-S03.md:89` *"v9, 32 rows"*; the new count is asserted, not recalled — the step's criterion
-is that `buildDevelopmentDeploymentRegisterPublicationRows(...)` returns a list whose length is
+`{ rowKey: "planTierRosters", value: { kind: "PLAN_TIER_ROSTERS", free: [...], premium: [...] }, sourceRef: DEVELOPMENT_SOURCE_REF }`
+(**CONTAINS** — the row object's shape beside the existing `configuredProviderSet` row; the surrounding
+list also carries `DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS`), taking the ids in file order.
+
+**The value is built from the FILE, never from the panel's targets.** A keyless slot's target carries
+the sentinel model (R31), so a `planTierRosters` derived from `providerPanel.targets` would change the
+moment V placed a key — republishing the register on an event that is not a file edit, which is exactly
+what R14.2 forbids and what S29 pins. The source is the `ModelConfig`.
+
+**How it reaches the row builder — one signature line per function** (the same discipline B1 forced on
+S21; without it this step re-creates B1's defect in a new file). `buildDevelopmentDeploymentRegisterRows`
+takes only `providerPanel` today, and the four functions above it pass only `(bootstrap, providerPanel)`:
+
+| Function | New signature |
+|---|---|
+| `dev-deployment-register.ts:322` | `buildDevelopmentDeploymentRegisterRows(providerPanel, planTierRosters: Readonly<Record<PlanTierWord, readonly string[]>>)` |
+| `:472` | `developmentRows(bootstrap, providerPanel, planTierRosters)` — forwards at `:490` |
+| `:498` | `expectedRunnerRows(bootstrap, providerPanel, planTierRosters)` — forwards at `:502` |
+| `:509` | `buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, providerPanel, planTierRosters)` — forwards at `:513` |
+| `:618` | `publishDevelopmentDeploymentRegisterProviderSet({ …, planTierRosters })` — forwards at `:631` |
+| `:656` | `seedDevelopmentDeploymentRegister({ …, planTierRosters })` — forwards at `:673` |
+
+The two entry points take it in their input object, supplied by their CLIs from `loadModelConfig`
+(`dev-provider-set-publish-cli.ts:18`, `dev-deployment-register-cli.ts:13` — both in C3's surface).
+
+**The pinned deterministic v4 snapshot moves, and the sweep is four assertions in three suites**
+(F-ARCH-4 — a break this plan missed at pass 1 and the verdict did not reach). The publication digest
+is a function of the rows, so a new row changes it. `tests/support/registerFixtures.ts:22` declares
+`DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 = "42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb"`,
+and its own comment records that S02 moved it on 2026-09-12 for precisely this kind of change (*"Moved
+2026-09-12 when the development provider set grew from one slot per maker to one per plan-tier roster
+member … The previous three-slot snapshot was 120bdfea9776cff5…"*) — so moving it is the established,
+documented practice, not a new liberty. Every member:
+
+1. `tests/support/registerFixtures.ts:22` — the constant itself, recomputed, with a new dated comment
+   naming the previous value (the convention the existing comment set).
+2. `tests/architecture/register-support-publication.test.ts:356-357` — asserts the constant equals a
+   **literal** hash; the literal moves with it. (Case *"pins the exact pre-migration legacy v1 and
+   deterministic test-panel v4 snapshots"*.)
+3. `tests/architecture/register-support-publication.test.ts:368` — `expect(developmentRows).toHaveLength(32)` → **33**;
+   `:370-371` re-compares the digest. (Case *"preserves the exact legacy hashes while the actual port
+   input owns all 248 policy decimals"*.)
+4. `tests/integration/register-support-publication.test.ts:322` and `:337` (the latter seeds a row
+   `{ register_version: "4", snapshot_sha256: … }`), and
+   `tests/integration/production-database-principals.test.ts:2754`.
+
+`LEGACY_REGISTER_V1_SNAPSHOT_SHA256` (`registerFixtures.ts:16`) and the 14-row historical count do
+**not** move: they pin the pre-migration bootstrap, which this slice does not touch. A change to that
+constant is a defect of this step.
+**`tests/architecture/register-support-publication.test.ts` keeps its `12/14`** — SPEC R27 says delta
+zero for it, and delta zero holds only because members 2 and 3 move in the same change; a seat that
+adds the row and leaves the constant takes that suite to 11/14 and has caused a regression.
+Done when: the publication row count moves from 32 to **33** — asserted, not recalled: the criterion is
+that `buildDevelopmentDeploymentRegisterPublicationRows(...)` returns a list whose length is
 `previousLength + 1` and whose row keys contain `planTierRosters` exactly once, which
-`dev-deployment-register.ts:506-509` already guards against duplication via
-`DEV_RUNNER_REGISTER_DEFINITION_INVALID`); and a case asserts the row's `free`/`premium` arrays
-deep-equal the file's.
-RED if omitted: S24's `/new` fetch finds no `planTierRosters` row and renders an empty tier list.
+`dev-deployment-register.ts:503-505` already guards against duplication via
+`DEV_RUNNER_REGISTER_DEFINITION_INVALID`; a case asserts the row's `free`/`premium` arrays deep-equal
+the file's; and all four sweep members above are updated in the same change.
+RED if omitted: S24's `/new` fetch finds no `planTierRosters` row and renders an empty tier list; and
+if the row is added without the sweep, `register-support-publication.test.ts` drops to 11/14.
 
 **S24. `/new` reads the lists from the deployment payload (R16, R23.5).**
 Files — Modify: `apps/ui/app/new/page.tsx:10, 199-210`; Modify:
@@ -511,8 +661,9 @@ RED if omitted: the class-(a) case reports a thrown `DEV_CLI_PROVIDER_PANEL_TARG
 **S27. Key custody, read once, never printed (R12).**
 Files — Create: `apps/runner/src/dev-provider-keys.ts`; Modify: `tests/unit/dev-auth-stack.test.ts`.
 `readProviderKeys(repositoryRoot)` reads `.local/dev-auth/provider-keys.env` under the custody shape
-`readGlmCredential` already asserts for the Hermes store (`acceptance/hermes-relay.ts:33-40`,
-re-measured this pass at `:248-258`): the directory is not a symlink, is owned by the running uid and
+`readGlmCredential` already asserts for the Hermes store (`acceptance/hermes-relay.ts:33-54`,
+re-measured at Revision 2 under N1 — the file is 168 lines and the pass-1 citation `:248-258` was read
+off a measurement log): the directory is not a symlink, is owned by the running uid and
 is mode `0700`; the file is not a symlink, is owned by the running uid, is mode `0600`, and has
 `nlink === 1`. A missing file returns an empty map (class 31(a)), not a throw. Wrong custody throws
 `DEV_PROVIDER_KEYS_CUSTODY_INVALID`.
@@ -531,7 +682,17 @@ Files — Modify: `apps/runner/src/dev-api-environment.ts:336-374, 409-411, 489-
 `assembleDevelopmentApiEnvironment` gains one optional input,
 `heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>` — register version text → the
 `provider_ref` values that version's `configuredProviderSet` row names, supplied by the publication
-stage, which is the only code with the pool. `isExactPublishedRegisterRefresh` keeps its
+stage, which is the only code with the pool.
+**How it reaches the predicate (corrected at Revision 2 under B1):** `isExactPublishedRegisterRefresh`
+is a module-scope function taking two strings (`dev-api-environment.ts:336`) and cannot see `input`.
+It takes the map as its **fourth parameter**, and the closure at `:493` — the only scope in the file
+that holds `input` — supplies `input.heldConfiguredProviderSets` alongside S21's
+`input.providerPanel.configuredProviders`. The full signature is the one written in S21's table; the
+two steps edit the same four signatures and **S21 is the single writer of those lines**, with S28
+adding only the fourth parameter's use inside the body.
+The map arrives at `assembleDevelopmentApiEnvironment` from `dev-auth-stack.ts:271-275`
+`assembleApiEnvironment(providerPanel, registerReceipt, supportModelTarget)`, which gains a fourth
+argument from the publication stage that just ran. `isExactPublishedRegisterRefresh` keeps its
 additive-only rule and gains **one** further admission: the outgoing environment's `REGISTER_VERSION`
 is a key of that map **and** the outgoing file's `provider_ref` set, as a set, equals that version's
 refs exactly.
@@ -543,9 +704,13 @@ refs exactly.
 green cases need a database.
 The map is bounded: the publication stage reads at most the newest 64 `configuredProviderSet` rows.
 Done when: (1) the pin `rejects v4 reconstruction and removed-provider fallback`
-(`:352-360`) **keeps its case and its assertion text** — it passes no map, so the outgoing version `4`
+(`tests/integration/dev-api-environment.test.ts:348-360` — **`:348` is the LANE's line**; SPEC-v3 R25
+and the ARCH packet both say `:352`, which is the MAIN tree's number and four lines off after
+`4df0b2b5`, re-measured at Revision 2 under N1/P1) **keeps its case and its assertion text** — it
+passes no map, so the outgoing version `4`
 is in no map and the refusal is unchanged; (2) a **new** case passes a map
-`{ "424241": [the five current refs] }`, writes an outgoing env at version `424241` naming exactly
+`{ "424241": [the five current refs] }` (**EXACT** — the map passed to the call has this one entry
+and no other), writes an outgoing env at version `424241` naming exactly
 those five, assembles an incoming env at `424242` naming four of them, and asserts the result is
 `reused: false` with no throw; (3) a **new** case passes the same map but an outgoing env whose ref
 set is the five **plus** `development:local-vllm`, and asserts `DEV_API_ENVIRONMENT_DRIFT`.
@@ -613,7 +778,7 @@ Done when: the suite's fixture is the five live slots of S20's order and it repo
 RED if omitted: the cluster command stays `Tests 1 failed | 55 passed (56)`.
 
 **S33. `tests/support/developmentProviderPanel.ts` and `tests/support/registerFixtures.ts` move with the provider set.**
-Files — Modify: both.
+Files — Modify: `tests/support/developmentProviderPanel.ts`, `tests/support/registerFixtures.ts`.
 Done when: `TEST_DEVELOPMENT_PROVIDER_PANEL` is built over the five live slots in S20's order and
 every suite importing it (`tests/integration/dev-api-environment.test.ts:23-24` and the register
 suites) passes; the pinned dev-register snapshot takes the 33-row count of S23.
@@ -622,8 +787,9 @@ RED if omitted: `dev-api-environment.test.ts` fails at import with
 
 **S34. `dev-real-provider-only` keeps its seam assertions under the new slot set (R26, R27).**
 Files — Modify: `tests/architecture/dev-real-provider-only.test.ts:27-41`.
-Done when: the five `toContain` ref assertions (`:218-222` as measured) become the five **live** refs
-of S20's order; the GLM case (`:227-236`) keeps `expect(panel).not.toContain("hermes-glm-5.3-flash")`
+Done when: the five `toContain` ref assertions (`:27-31`, re-measured at Revision 2 under N1 — the
+file is 54 lines; the pass-1 citations `:218-222` / `:227-236` were read off a measurement log) become
+the five **live** refs of S20's order; the GLM case (`:41-42`) keeps `expect(panel).not.toContain("hermes-glm-5.3-flash")`
 and `not.toContain("startHermesSupportRelay")` **unchanged** and gains one sentence of intent: a
 `glm-5.3-flash` **debate** entry now exists under its own ref (`development:zai-free-api`), on a
 different port, from a different credential, and this slice edits none of the support seam's files
@@ -675,16 +841,27 @@ packet's verification rule.
 
 | Cluster | Steps | Files it may touch | Verification command (one) | Base verdict (measured, 3 runs not needed at base — a single run is the record of the START state) | Depends on |
 |---|---|---|---|---|---|
-| `S03-C1` | S1–S13 | `config/models.yaml` · `packages/model-config/**` · `packages/contract/src/plan-tiers.ts` · `packages/contract/package.json` · root `package.json` (the `generate:contract` value + the `yaml` dependency) · `tests/architecture/tier01-roster.test.ts` · `tests/architecture/tiers-s02-rosters.test.ts` · `tests/unit/model-config-*.test.ts` (new) · `tests/architecture/model-config-no-secret.test.ts` (new) | `LANG=en_US.UTF-8 npx vitest run tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/model-config-file.test.ts tests/unit/model-config-shape.test.ts tests/unit/model-config-tiers.test.ts tests/architecture/model-config-no-secret.test.ts` | **GREEN at base over the two existing paths**: `Test Files 2 passed (2)` · `Tests 5 passed (5)` · rc=0. New paths omitted at base: `tests/unit/model-config-file.test.ts`, `tests/unit/model-config-shape.test.ts`, `tests/unit/model-config-tiers.test.ts`, `tests/architecture/model-config-no-secret.test.ts` — all four are created by S2/S4/S6/S7. | — |
-| `S03-C2` | S14, S16, S17 | `packages/providers/src/index.ts` · `apps/api/src/provider-discovery.ts` · `tests/unit/api-provider-discovery.test.ts` · `tests/unit/provider.test.ts` · `tests/unit/provider-base-url-admission.test.ts` (new) · `tests/unit/provider-discovery-uncredentialed.test.ts` (new) | `LANG=en_US.UTF-8 npx vitest run tests/unit/api-provider-discovery.test.ts tests/unit/provider.test.ts tests/unit/provider-base-url-admission.test.ts tests/unit/provider-discovery-uncredentialed.test.ts` | **GREEN at base over the two existing paths**: `Test Files 2 passed (2)` · `Tests 14 passed (14)` · rc=0. New paths omitted at base: `tests/unit/provider-base-url-admission.test.ts` (S14), `tests/unit/provider-discovery-uncredentialed.test.ts` (S17). | — |
-| `S03-C3` | S18–S23, S25–S34 | `apps/runner/src/dev-provider-panel.ts` · `dev-cli-provider-panel.ts` · `dev-auth-stack.ts` · `dev-api-environment.ts` · `dev-deployment-register.ts` · `dev-api-process.ts` · `dev-runner-process.ts` · `dev-provider-keys.ts` (new) · `tests/support/developmentProviderPanel.ts` · `tests/support/registerFixtures.ts` · the seven suites in the command | `LANG=en_US.UTF-8 npx vitest run tests/unit/dev-cli-provider-panel.test.ts tests/unit/dev-auth-stack.test.ts tests/integration/dev-provider-panel.test.ts tests/integration/dev-deployment-register.test.ts tests/integration/dev-api-environment.test.ts tests/architecture/dev-real-provider-only.test.ts tests/architecture/dev-deployment-register.test.ts tests/architecture/dev-runner-provider-set.test.ts` | **RED at base, 1 failure, pre-existing**: `Test Files 1 failed \| 7 passed (8)` · `Tests 1 failed \| 55 passed (56)` · rc=1. The single failure is `tests/integration/dev-provider-panel.test.ts` → *"loads the exact live CLI targets without changing the fixed maker order"*, dated **pre-existing 2026-09-13 (`6a05a0d0`)**, closed by **S32**. No path in this command is new. | `S03-C1` (S21 and S25 call `loadModelConfig`) |
-| `S03-C4` | S35, S36 | `tests/unit/tiers-s02-admission.test.ts` · `tests/unit/tiers-s02-wire.test.ts` · `tests/unit/api.test.ts` · `tests/render/tier01-new-plan-tier.test.tsx` | `LANG=en_US.UTF-8 npx vitest run tests/render/tier01-new-plan-tier.test.tsx tests/unit/tiers-s02-admission.test.ts tests/unit/tiers-s02-wire.test.ts tests/unit/api.test.ts` | **GREEN at base**: `Test Files 4 passed (4)` · `Tests 64 passed (64)` · rc=0. No path is new. | `S03-C1` (the new ids arrive through `PLAN_TIER_ROSTERS`) |
+| `S03-C1` | S1–S13 | `config/models.yaml` · `packages/model-config/{package.json,tsconfig.json,src/index.ts,src/load.ts,src/shape.ts,src/generate-plan-tier-rosters.ts}` · `packages/contract/src/plan-tiers.ts` · `packages/contract/generated/plan-tier-rosters.ts` (generated, gitignored) · `package.json` (repo root) · `docs/architecture/01-decisions/ADR-NNNN-tier-fleet-configuration-file.md` (number measured at write time) · `tests/architecture/tier01-roster.test.ts` · `tests/architecture/tiers-s02-rosters.test.ts` · `tests/architecture/dev-deployment-register.test.ts` · `tests/architecture/model-config-no-secret.test.ts` (new) · `tests/unit/model-config-{file,shape,tiers}.test.ts` (new) — **17 paths** | `LANG=en_US.UTF-8 npx vitest run tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/architecture/dev-deployment-register.test.ts tests/unit/model-config-file.test.ts tests/unit/model-config-shape.test.ts tests/unit/model-config-tiers.test.ts tests/architecture/model-config-no-secret.test.ts` | **GREEN at base over the three existing paths** (re-run at Revision 2): `Test Files 3 passed (3)` · `Tests 8 passed (8)` · rc=0. New paths omitted at base and created by S2/S4/S6/S7: `model-config-file`, `model-config-shape`, `model-config-tiers`, `model-config-no-secret`. | — |
+| `S03-C2` | S14, S16, S17 | `packages/providers/src/index.ts` · `apps/api/src/provider-discovery.ts` · `tests/unit/api-provider-discovery.test.ts` · `tests/unit/provider-base-url-admission.test.ts` (new) · `tests/unit/provider-discovery-uncredentialed.test.ts` (new) — **5 paths** | `LANG=en_US.UTF-8 npx vitest run tests/unit/api-provider-discovery.test.ts tests/unit/provider.test.ts tests/unit/provider-base-url-admission.test.ts tests/unit/provider-discovery-uncredentialed.test.ts` | **GREEN at base over the two existing paths** (re-run at Revision 2): `Test Files 2 passed (2)` · `Tests 14 passed (14)` · rc=0. New paths omitted at base: `provider-base-url-admission` (S14), `provider-discovery-uncredentialed` (S17). | — |
+| `S03-C3` | S18–S23, S25–S34 | `apps/runner/src/{dev-provider-panel,dev-cli-provider-panel,dev-auth-stack,dev-api-environment,dev-deployment-register,dev-api-process,dev-runner-process}.ts` · `apps/runner/src/dev-provider-keys.ts` (new) · **the four CLIs S21's signature change breaks** — `apps/runner/src/{dev-deployment-register-cli,dev-auth-data-plane-cli,dev-api-environment-cli,dev-provider-set-publish-cli}.ts` · `tests/support/{developmentProviderPanel,registerFixtures}.ts` · the **eight** test files in the command · **plus the three suites that pin the v4 snapshot digest (S23/F-ARCH-4)** — `tests/architecture/register-support-publication.test.ts`, `tests/integration/register-support-publication.test.ts`, `tests/integration/production-database-principals.test.ts` — **23 paths** | `LANG=en_US.UTF-8 npx vitest run tests/unit/dev-cli-provider-panel.test.ts tests/unit/dev-auth-stack.test.ts tests/integration/dev-provider-panel.test.ts tests/integration/dev-deployment-register.test.ts tests/integration/dev-api-environment.test.ts tests/architecture/dev-real-provider-only.test.ts tests/architecture/dev-deployment-register.test.ts tests/architecture/dev-runner-provider-set.test.ts tests/architecture/register-support-publication.test.ts` | **RED at base, 3 failures, all pre-existing** (re-run at Revision 2 with `register-support-publication.test.ts` ADDED so S23's digest sweep is caught at cluster time): `Test Files 2 failed \| 7 passed (9)` · `Tests 3 failed \| 67 passed (70)` · rc=1. The three: `tests/integration/dev-provider-panel.test.ts` → *"loads the exact live CLI targets without changing the fixed maker order"* (pre-existing 2026-09-13 `6a05a0d0`, closed by **S32**), and the two `register-support-publication.test.ts` failures dated 2026-09-12 (SPEC R27, delta zero — **S23 must keep this suite at 12/14, not 11/14**). No path in this command is new. | `S03-C1` (S21 and S25 call `loadModelConfig`) |
+| `S03-C4` | S24, S35, S36 | `apps/ui/app/new/page.tsx` (**added at Revision 2 under B2.1** — S24 modifies it and the destination row never received it) · `tests/render/tier01-new-plan-tier.test.tsx` · `tests/unit/tiers-s02-admission.test.ts` · `tests/unit/tiers-s02-wire.test.ts` · `tests/unit/api.test.ts` — **5 paths** | `LANG=en_US.UTF-8 npx vitest run tests/render/tier01-new-plan-tier.test.tsx tests/unit/tiers-s02-admission.test.ts tests/unit/tiers-s02-wire.test.ts tests/unit/api.test.ts` | **GREEN at base** (re-run at Revision 2): `Test Files 4 passed (4)` · `Tests 64 passed (64)` · rc=0. No path is new. | `S03-C1` (the new ids arrive through `PLAN_TIER_ROSTERS`) |
 
-**S24 is the one step whose file surface crosses a cluster boundary.** It edits
+**Every column above is DERIVED, not written by hand** (Revision 2, under B2).
+`scratchpad/seats/ARCH-S03/surfaces.mjs` parses §1, takes only the paths that follow a `Create:` or
+`Modify:` marker in each step's `Files` line — a path a step merely *cites* is not a write — maps each
+step to its cluster, and prints the column plus a disjointness check. Its output is
+`surfaces.log`: **17 / 5 / 23 / 5 paths and `none — every file sits in exactly one cluster`.**
+Re-run it after any step edit; a column that disagrees with it is the defect, not the script.
+Running it is what found four omissions this revision fixed, three of them mine from pass 1 and one
+introduced by B1's own fix — **S21 re-signs functions in `dev-api-process.ts` and
+`dev-runner-process.ts` and its pass-1 `Files` line named neither**, which is B2's class recurring
+inside B2's remedy. That is the reason the derivation is mechanical rather than a re-check.
+
+**S24 crosses a cluster boundary and is assigned to one cluster.** It edits
 `apps/ui/app/new/page.tsx` and `tests/render/tier01-new-plan-tier.test.tsx`, and it depends on S23's
 register row, which is C3's. The single-writer rule decides it: **S24 is built in `S03-C4`**, whose
 command already owns the render suite, and `S03-C4` therefore depends on `S03-C3` as well as `S03-C1`.
-No other file is written by two clusters — checked surface by surface across the four rows above.
+Both of its files are in C4's column above.
 
 **Parallelism.** `S03-C1` and `S03-C2` have disjoint surfaces and run at once. `S03-C3` waits on
 `S03-C1`. `S03-C4` waits on `S03-C1` and `S03-C3`. The critical path is C1 → C3 → C4.
@@ -806,7 +983,7 @@ boundary (S24) is assigned to one cluster in §2 and the dependency is stated.
   supersession this slice has no finding to justify. Recorded in `DECISIONS.md` so the next seat does
   not re-derive it.
 - No other standing ADR changes. ADR-0011 (register mechanism) is relied on, not amended: S23 adds a
-  row to an existing publication, and `dev-deployment-register.ts:506-509` already refuses a duplicate
+  row to an existing publication, and `dev-deployment-register.ts:503-505` already refuses a duplicate
   row key.
 
 ---
@@ -855,6 +1032,21 @@ with the rest (`TOOLING-TRAPS.md:3012`). Expected `Test Files` count: **17**.
 | `tests/architecture/dev-runner-provider-set.test.ts` | included in the 8-file C3 run — R27 omits it | delta zero unless S21 moves it | **measured by me this pass**, `c-base-v3.log` |
 | `tests/unit/provider.test.ts` | included in the 2-file C2 run (14 total with api-provider-discovery's 5 → 9) — R27 omits it | delta zero unless S14 moves it | **measured by me this pass**, `c-base-v3.log` |
 | `tests/unit/api-provider-discovery.test.ts` | 5/5 | **5/5** or more (S16, S17) | **measured by me this pass**, `c-base-v2.log` |
+
+**1b — the three suites that pin the deterministic v4 publication snapshot (S23 / F-ARCH-4).**
+`tests/architecture/register-support-publication.test.ts` is inside `S03-C3`'s command, so it is caught
+at cluster time. The two heavy ones need embedded postgres and are slice-level only:
+
+```
+LANG=en_US.UTF-8 npx vitest run \
+  tests/integration/register-support-publication.test.ts \
+  tests/integration/production-database-principals.test.ts
+```
+
+Both assert `DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256`; both move with `registerFixtures.ts:22`.
+Their base `passed/total` is measured by the seat that first runs them — **not recorded here, because I
+did not run them** (they are outside the four cluster commands my packet named): **UNVERIFIED at
+Revision 2**, and the REV(S03) lens records them.
 
 **2 — the cross-cluster mounts** (a cluster can be green and the slice still wrong):
 - `pnpm run generate:contract` from a tree with `packages/contract/generated/` **deleted** exits 0 and
@@ -911,6 +1103,23 @@ UNVERIFIED, not passed.
   `tests/architecture/dev-runner-provider-set.test.ts` (green within my C3 run),
   `tests/unit/provider.test.ts` (green within my C2 run). All four are added to §5's run and to the
   cluster commands, so the sweep is mechanical rather than a claim.
+- **F-ARCH-4 (blocking for R27's "delta zero", found at Revision 2 — neither pass-1 me nor the
+  ARCH-REV verdict reached it).** S23's `planTierRosters` row changes the development publication
+  snapshot digest, and that digest is **pinned as a constant asserted in four places across three
+  suites**: `tests/support/registerFixtures.ts:22`
+  (`DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 = "42b90bca…"`),
+  `tests/architecture/register-support-publication.test.ts:356-357` (the literal) and `:368` + `:370-371`
+  (`toHaveLength(32)` and the digest compare), `tests/integration/register-support-publication.test.ts:322`
+  and `:337`, and `tests/integration/production-database-principals.test.ts:2754`. Adding the row without
+  moving them takes `register-support-publication.test.ts` from **12/14 to 11/14** — a regression **S03
+  would have caused**, against a suite SPEC-v3 R27 pins at *delta zero*. Not a SPEC contradiction and not
+  a V row: `registerFixtures.ts:22`'s own comment records S02 moving the same constant on 2026-09-12 for
+  the same reason (*"the development provider set grew from one slot per maker to one per plan-tier
+  roster member … The previous three-slot snapshot was 120bdfea9776cff5…"*), so the move is the
+  documented practice and the sweep is named in S23. `LEGACY_REGISTER_V1_SNAPSHOT_SHA256` and the 14-row
+  historical count do NOT move. **Root cause of the miss at pass 1:** I checked the two register suites
+  the SPEC named and never asked who else consumes the publication rows — the same one-hop-short habit
+  that produced N1 and B1.
 - **F-ARCH-3 (non-blocking, a packet/SPEC ambiguity worth one line).** SPEC-v3 R13 ends *"Whatever is
   chosen applies to `gpt-5.6-luna` too."* Read as "send the same body to both", it would put an
   unknown `thinking` field in an OpenAI request, which OpenAI answers 400 — turning every Luna probe
@@ -925,8 +1134,8 @@ runner's primary provider triple.** `config/models.yaml` may legally declare bot
 `api:` entries — R2–R6 admit it, and none of R20's six shape classes refuses it. The runner copies
 **slot 0's** `baseUrl`/`model`/`authorizationHeader` into `api.env`'s
 `VLLM_BASE_URL`/`VLLM_MODEL`/`VLLM_AUTHORIZATION` and throws
-`RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT` otherwise (`apps/runner/src/main.ts:65-71`, drift check
-re-measured at `:207-213`). S20's order rule puts every `cli:` entry ahead of every `api:` entry, so
+`RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT` otherwise (`apps/runner/src/main.ts:65-71`, re-measured
+at Revision 2 under N1 — the file is 150 lines, so `:207-213` does not exist). S20's order rule puts every `cli:` entry ahead of every `api:` entry, so
 slot 0 is a loopback relay **whenever the file has at least one `cli:` entry** — which R7's merge
 content does. With none, V's paid bearer lands in that triple.
 Recommended default: **leave it as it is for this slice.** The merged file has three `cli:` entries,
@@ -973,6 +1182,9 @@ moment it will ever have to move.
 | S27 | a `0644` or hard-linked key file | a key file that is correctly custodied and contains a malformed line, which returns an empty variable and is then class 31(a) — indistinguishable from "absent" in the warning text |
 | S28 | a reconstruction admitted, and a legitimate removal refused | a legitimate removal admitted for the **wrong reason** — if the chain's first predicate `isExactProviderRuntimeRefresh` happened to admit it, the new admission would never run and the case would still be green. **The step names this explicitly as the slice's likeliest false-green**; the guard is that the removal case moves `REGISTER_VERSION`, a key the first predicate compares |
 | S29 | a key arrival that republishes the register | a key arrival that changes the register row's *order* without changing its content, since the assertion is a deep-equal on a list |
+| S21 (Rev 2) | a predicate that keeps a module-level configured set, since the new case passes a set the outgoing refs are absent from and demands `false` | a call site that threads the *wrong* set (incoming where outgoing is meant) — type-correct and silently wrong |
+| S23 (Rev 2) | a `planTierRosters` built from `providerPanel.targets` (it would carry a sentinel on a keyless machine, and S29's deep-equal case fails), and the digest sweep left undone (the suite drops to 11/14) | a row built from the file but placed in a publication path the `/v1/deployment` reader never sees — only acceptance step 6 observes that |
+| S19 (Rev 2) | a build that keeps `planTierRosters` out of the versioned snapshot, which case (2)'s "the `planTierRosters` row is NOT byte-identical" half now forbids | whether the new version is *published* rather than merely *computed* — that needs the real publication path, which acceptance step 6 exercises |
 | S32 | the stale two-slot fixture | any further drift between that suite and the panel introduced after S32 lands |
 | S35 | a refusal naming one missing id where two are missing | a refusal that names both ids and *also* creates a run, unless the case asserts run-creation separately — it does |
 
