@@ -19,3 +19,4 @@ Created empty by REQ-S03, 2026-09-13.
 - 2026-09-13 20:06 EEST · BUILD(S03-C3) READY — commit `43efdb1a`, 88 passed | 2 inherited ×3, CLUSTER_GREEN; consumed. C4 next.
 - 2026-09-13 20:08:56 EEST · BUILD(S03-C4) DISPATCHED on 43efdb1a (pid 1156, freeze 57e3060f) — the last cluster.
 - 2026-09-13 21:32 EEST · BUILD(S03-C4) READY — commit `cc014550`, 73/73 ×3; consumed. ALL FOUR CLUSTERS DONE; GATE(S03) running.
+- 2026-09-13 22:40 EEST · FIX-S03-p1-F2 READY — `b678f336`, /new reads GET /v1/plan-tiers, refusal shown; consumed. FIX-F1 next.
