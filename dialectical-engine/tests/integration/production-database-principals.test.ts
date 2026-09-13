@@ -39,7 +39,10 @@ import {
 } from "../../apps/runner/src/support-config-cli-credentials.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
-import { DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 } from "../support/registerFixtures.js";
+import {
+  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
+  TEST_PLAN_TIER_ROSTERS
+} from "../support/registerFixtures.js";
 
 const MANIFEST_PATH =
   "docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json";
@@ -2748,7 +2751,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     const adminRegister = createPostgresRegisterPublicationPort(adminPool);
     const deterministicV4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
       await loadBootstrapRegister(),
-      TEST_DEVELOPMENT_PROVIDER_PANEL
+      TEST_DEVELOPMENT_PROVIDER_PANEL,
+      TEST_PLAN_TIER_ROSTERS
     );
     expect(computeRegisterSnapshotSha256(deterministicV4Rows))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);

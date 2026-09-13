@@ -8,6 +8,7 @@ import { parseApiEnvironment } from "@debateai/register";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "./dev-api-environment.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+  loadModelConfigConfiguredProviders,
   parseDevelopmentProviderPanelTargets
 } from "./dev-provider-panel.js";
 import {
@@ -164,7 +165,8 @@ function validateExactEnvironment(
   try {
     parseApiEnvironment(values);
     const providerPanel = parseDevelopmentProviderPanelTargets(
-      values.PROVIDER_DISCOVERY_TARGETS_JSON!
+      values.PROVIDER_DISCOVERY_TARGETS_JSON!,
+      loadModelConfigConfiguredProviders(repositoryRoot)
     );
     const supportModelTarget = parseDevelopmentSupportModelTargetJson(
       values.SUPPORT_MODEL_TARGET_JSON!

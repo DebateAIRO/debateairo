@@ -5,10 +5,12 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { loadModelConfig } from "@debateai/model-config";
 import { readDeploymentMakerCapability } from "../../packages/critique/src/index.js";
 import { createPool, migrate, type Pool } from "../../packages/db/src/index.js";
 import {
   assertBootstrapEquality,
+  computeRegisterSnapshotSha256,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
@@ -27,12 +29,16 @@ import {
 } from "../../packages/register/src/index.js";
 import {
   buildDevelopmentDeploymentRegisterRows,
+  buildDevelopmentDeploymentRegisterPublicationRows,
   createDevelopmentDeploymentRegisterMachineReceipt,
   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
   DEVELOPMENT_REGISTER_VERSION,
+  DEVELOPMENT_SOURCE_REF,
+  developmentPlanTierRosters,
   developmentDeploymentRegisterReceiptPath,
   parseDevelopmentDeploymentRegisterCliOutput,
   readDevelopmentDeploymentRegisterReceipt,
+  publishDevelopmentDeploymentRegisterProviderSet,
   seedDevelopmentDeploymentRegister,
   serializeDevelopmentDeploymentRegisterReceipt,
   writeDevelopmentDeploymentRegisterReceipt
@@ -44,8 +50,15 @@ import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-po
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
+  buildDevelopmentProviderPanel,
+  DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+  developmentProviderSlots,
+  loadModelConfigConfiguredProviders
+} from "../../apps/runner/src/dev-provider-panel.js";
+import {
   importHistoricalRegisterFixture,
-  registerFixtureRow
+  registerFixtureRow,
+  TEST_PLAN_TIER_ROSTERS
 } from "../support/registerFixtures.js";
 
 let database: TestDatabase;
@@ -93,6 +106,26 @@ async function runCli(environment: NodeJS.ProcessEnv): Promise<Readonly<{
   const cwd = await mkdtemp(join(tmpdir(), "debateai-dev-register-cli-"));
   temporaryRoots.push(cwd);
   await mkdir(join(cwd, ".local", "dev-auth"), { recursive: true, mode: 0o700 });
+  await mkdir(join(cwd, "config"), { mode: 0o700 });
+  await writeFile(join(cwd, "config", "models.yaml"), [
+    "free:",
+    "  - api: openai",
+    "    model: gpt-5.6-luna",
+    "    base_url: https://api.openai.com/v1",
+    "    key: OPENAI_API_KEY",
+    "  - api: zai",
+    "    model: glm-5.3-flash",
+    "    base_url: https://api.z.ai/api/coding/paas/v4",
+    "    key: ZAI_API_KEY",
+    "premium:",
+    "  - cli: codex",
+    "    model: gpt-5.6-sol",
+    "  - cli: claude",
+    "    model: claude-opus-5",
+    "  - cli: grok",
+    "    model: grok-4.6-build",
+    ""
+  ].join("\n"), { mode: 0o600 });
   const childEnvironment: NodeJS.ProcessEnv = {
     ...environment,
     DEBATEAI_DEV_PROVIDER_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson
@@ -130,9 +163,133 @@ afterEach(async () => {
 });
 
 describe("DEV-05 complete development deployment register", () => {
+  it("adds exactly one plan-tier roster row from the file model ids", () => {
+    const config = loadModelConfig(process.cwd());
+    const planTierRosters = Object.freeze({
+      free: Object.freeze(config.free.map(({ model }) => model)),
+      premium: Object.freeze(config.premium.map(({ model }) => model))
+    });
+    const rows = buildDevelopmentDeploymentRegisterRows(
+      TEST_DEVELOPMENT_PROVIDER_PANEL,
+      planTierRosters
+    );
+    expect(rows).toHaveLength(
+      rows.filter(({ rowKey }) => rowKey !== "planTierRosters").length + 1
+    );
+    expect(rows.filter(({ rowKey }) => rowKey === "planTierRosters")).toEqual([{
+      rowKey: "planTierRosters",
+      value: {
+        kind: "PLAN_TIER_ROSTERS",
+        free: planTierRosters.free,
+        premium: planTierRosters.premium
+      },
+      sourceRef: DEVELOPMENT_SOURCE_REF
+    }]);
+  });
+
+  it("keeps publication rows byte-identical when API keys appear", async () => {
+    const config = loadModelConfig(process.cwd());
+    const configuredProviders = loadModelConfigConfiguredProviders(process.cwd());
+    const withoutKeys = buildDevelopmentProviderPanel(
+      developmentProviderSlots(config).map((slot) => ({
+        providerRef: slot.providerRef,
+        baseUrl: slot.transport === "cli"
+          ? `http://127.0.0.1:${slot.port}/v1`
+          : slot.baseUrl!,
+        model: slot.transport === "cli" ? slot.model : DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+        ...(slot.transport === "cli" ? { authorizationHeader: "test-cli-header" } : {})
+      })),
+      configuredProviders
+    );
+    const withKeys = buildDevelopmentProviderPanel(
+      developmentProviderSlots(config).map((slot) => ({
+        providerRef: slot.providerRef,
+        baseUrl: slot.transport === "cli"
+          ? `http://127.0.0.1:${slot.port}/v1`
+          : slot.baseUrl!,
+        model: slot.model,
+        authorizationHeader: slot.transport === "cli" ? "test-cli-header" : "Bearer test-api-key"
+      })),
+      configuredProviders
+    );
+    const bootstrap = await loadBootstrapRegister();
+    const planTierRosters = developmentPlanTierRosters(config);
+    await expect(buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap,
+      withoutKeys,
+      planTierRosters
+    )).resolves.toEqual(await buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap,
+      withKeys,
+      planTierRosters
+    ));
+  });
+
+  it("publishes a smaller configured provider set after a file entry is removed", async () => {
+    const config = loadModelConfig(process.cwd());
+    const smallerConfig = {
+      ...config,
+      premium: config.premium.filter((entry) =>
+        entry.transport !== "cli" || entry.cli !== "grok"
+      )
+    } as typeof config;
+    const panelFor = (selected: typeof config) => {
+      const slots = developmentProviderSlots(selected);
+      return buildDevelopmentProviderPanel(slots.map((slot) => ({
+        providerRef: slot.providerRef,
+        baseUrl: slot.transport === "cli"
+          ? `http://127.0.0.1:${slot.port}/v1`
+          : slot.baseUrl!,
+        model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+      })), slots.map(({ providerRef, adapterKind, maker }) => ({
+        providerRef, adapterKind, maker
+      })));
+    };
+    const currentPanel = panelFor(config);
+    const smallerPanel = panelFor(smallerConfig);
+    const currentRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      await loadBootstrapRegister(),
+      currentPanel,
+      developmentPlanTierRosters(config)
+    );
+    const smallerRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      await loadBootstrapRegister(),
+      smallerPanel,
+      developmentPlanTierRosters(smallerConfig)
+    );
+    const configuredRow = (rows: typeof currentRows) => rows.find(
+      ({ rowKey }) => rowKey === "configuredProviderSet"
+    )!;
+    expect(configuredRow(smallerRows)).not.toEqual(configuredRow(currentRows));
+    expect((JSON.parse(configuredRow(smallerRows).valueJsonText) as {
+      providers: unknown[];
+    }).providers).toHaveLength(4);
+
+    await expect(publishDevelopmentDeploymentRegisterProviderSet({
+      adminPool: undefined as never,
+      planTierRosters: developmentPlanTierRosters(smallerConfig),
+      providerPanel: smallerPanel,
+      repositoryRoot,
+      baseRegisterVersion: parseRegisterVersionText("4"),
+      operations: {
+        publishGeneral: async (input) => ({
+          registerVersion: parseRegisterVersionText("5"),
+          baseRegisterVersion: input.baseRegisterVersion,
+          publicationId: input.publicationId,
+          publicationKind: "GENERAL",
+          requestSha256: "0".repeat(64),
+          snapshotSha256: computeRegisterSnapshotSha256(input.rows),
+          rowCount: input.rows.length,
+          recordedAt: new Date(0)
+        })
+      }
+    })).resolves.toMatchObject({ registerVersion: "5" });
+  });
+
   it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
     const deployed = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     });
@@ -301,6 +458,7 @@ describe("DEV-05 complete development deployment register", () => {
 
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     })).resolves.toMatchObject({ registerVersion: String(DEVELOPMENT_REGISTER_VERSION) });
@@ -369,12 +527,16 @@ describe("DEV-05 complete development deployment register", () => {
     const bootstrap = await loadBootstrapRegister();
     const first = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     });
     expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
     expect(first.rowCount).toBeGreaterThan(
-      buildDevelopmentDeploymentRegisterRows(TEST_DEVELOPMENT_PROVIDER_PANEL).length
+      buildDevelopmentDeploymentRegisterRows(
+        TEST_DEVELOPMENT_PROVIDER_PANEL,
+        TEST_PLAN_TIER_ROSTERS
+      ).length
     );
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
@@ -405,13 +567,13 @@ describe("DEV-05 complete development deployment register", () => {
     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
-      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+      configuredMakers: ["Anthropic", "OpenAI", "Z.AI", "xAI"],
       configuredProviders: [
-        { providerRef: "development:codex-cli", maker: "OpenAI" },
         { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
-        { providerRef: "development:claude-cli", maker: "Anthropic" },
         { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
-        { providerRef: "development:grok-cli", maker: "xAI" }
+        { providerRef: "development:grok-cli", maker: "xAI" },
+        { providerRef: "development:openai-free-api", maker: "OpenAI" },
+        { providerRef: "development:zai-free-api", maker: "Z.AI" }
       ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
@@ -451,6 +613,7 @@ describe("DEV-05 complete development deployment register", () => {
     `,[first.registerVersion]);
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     }))
@@ -525,6 +688,7 @@ describe("DEV-05 complete development deployment register", () => {
     )).rows).toEqual([{ row_key: "riskTier" }]);
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     }))
@@ -553,6 +717,7 @@ describe("DEV-05 complete development deployment register", () => {
     try {
       await expect(seedDevelopmentDeploymentRegister({
         adminPool: attackerPool,
+        planTierRosters: TEST_PLAN_TIER_ROSTERS,
         providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
         repositoryRoot
       }))
@@ -567,6 +732,7 @@ describe("DEV-05 complete development deployment register", () => {
     const receipts = await Promise.all(Array.from({ length: 12 }, () =>
       seedDevelopmentDeploymentRegister({
         adminPool: database.pool,
+        planTierRosters: TEST_PLAN_TIER_ROSTERS,
         providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
         repositoryRoot
       })

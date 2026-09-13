@@ -12,13 +12,18 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { loadModelConfig } from "@debateai/model-config";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
 import { loadApiEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   DEVELOPMENT_API_ENVIRONMENT_KEYS,
   assembleDevelopmentApiEnvironment
 } from "../../apps/runner/src/dev-api-environment.js";
-import { buildDevelopmentProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
+import {
+  buildDevelopmentProviderPanel,
+  DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
+  developmentProviderSlots
+} from "../../apps/runner/src/dev-provider-panel.js";
 import {
   TEST_DEVELOPMENT_PROVIDER_DOCUMENT,
   TEST_DEVELOPMENT_PROVIDER_PANEL
@@ -239,22 +244,10 @@ describe("DEV-09 private local API environment", () => {
     const before = parseEnvironment(await readFile(test.outputFilePath, "utf8"));
     const refreshedPanel = buildDevelopmentProviderPanel([
       {
-        providerRef: "development:codex-cli",
-        baseUrl: "http://127.0.0.1:8791/v1",
-        model: "codex-live-model-refreshed",
-        authorizationHeader: "Bearer codex-relay-refreshed"
-      },
-      {
         providerRef: "development:codex-premium-cli",
         baseUrl: "http://127.0.0.1:8795/v1",
         model: "codex-premium-live-model-refreshed",
         authorizationHeader: "Bearer codex-premium-relay-refreshed"
-      },
-      {
-        providerRef: "development:claude-cli",
-        baseUrl: "http://127.0.0.1:8792/v1",
-        model: "claude-live-model-refreshed",
-        authorizationHeader: "Bearer claude-relay-refreshed"
       },
       {
         providerRef: "development:claude-premium-cli",
@@ -267,8 +260,20 @@ describe("DEV-09 private local API environment", () => {
         baseUrl: "http://127.0.0.1:8793/v1",
         model: "grok-live-model-refreshed",
         authorizationHeader: "Bearer grok-relay-refreshed"
+      },
+      {
+        providerRef: "development:openai-free-api",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-5.6-luna",
+        authorizationHeader: "Bearer test-openai-api"
+      },
+      {
+        providerRef: "development:zai-free-api",
+        baseUrl: "https://api.z.ai/api/coding/paas/v4",
+        model: "glm-5.3-flash",
+        authorizationHeader: "Bearer test-zai-api"
       }
-    ]);
+    ], TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders);
 
     await expect(assembleDevelopmentApiEnvironment({
       repositoryRoot: test.repositoryRoot,
@@ -282,6 +287,61 @@ describe("DEV-09 private local API environment", () => {
       expect(after.get(key), key).toBe(before.get(key));
     }
     expect(after.get("PROVIDER_DISCOVERY_TARGETS_JSON")).toBe(refreshedPanel.targetsJson);
+
+    const mismatchBefore = await readFile(test.outputFilePath, "utf8");
+    const refreshedRows = JSON.parse(refreshedPanel.targetsJson) as
+      readonly Readonly<Record<string, unknown>>[];
+    const refreshedTargetsJson = JSON.stringify(refreshedRows.map((row, index) => index === 0
+      ? { ...row, model: "different-model" }
+      : row));
+    const mismatchedConfiguredSet = Object.freeze({
+      ...refreshedPanel,
+      configuredProviders: Object.freeze([]),
+      targetsJson: refreshedTargetsJson
+    });
+    await expect(assembleDevelopmentApiEnvironment({
+      repositoryRoot: test.repositoryRoot,
+      providerPanel: mismatchedConfiguredSet,
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET
+    })).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(mismatchBefore);
+
+    const apiRefresh = await fixture();
+    const config = loadModelConfig(process.cwd());
+    const slots = developmentProviderSlots(config);
+    const configuredProviders = slots.map(({ providerRef, adapterKind, maker }) => ({
+      providerRef, adapterKind, maker
+    }));
+    const panel = (apiHealthy: boolean) => buildDevelopmentProviderPanel(slots.map((slot) => ({
+      providerRef: slot.providerRef,
+      baseUrl: slot.transport === "cli"
+        ? `http://127.0.0.1:${slot.port}/v1`
+        : slot.baseUrl!,
+      model: slot.transport === "api" && !apiHealthy
+        ? DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+        : slot.model,
+      ...(slot.transport === "cli" || apiHealthy
+        ? { authorizationHeader: slot.transport === "cli" ? "test-cli-header" : "Bearer test-api-key" }
+        : {})
+    })), configuredProviders);
+    await expect(assembleDevelopmentApiEnvironment({
+      repositoryRoot: apiRefresh.repositoryRoot,
+      providerPanel: panel(false),
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(apiRefresh.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET
+    })).resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+    const beforeKeyArrival = parseEnvironment(await readFile(apiRefresh.outputFilePath, "utf8"));
+    await expect(assembleDevelopmentApiEnvironment({
+      repositoryRoot: apiRefresh.repositoryRoot,
+      providerPanel: panel(true),
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(apiRefresh.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET
+    })).resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+    const afterKeyArrival = parseEnvironment(await readFile(apiRefresh.outputFilePath, "utf8"));
+    expect(afterKeyArrival.get("REGISTER_VERSION")).toBe(beforeKeyArrival.get("REGISTER_VERSION"));
+    expect(afterKeyArrival.get("PROVIDER_DISCOVERY_TARGETS_JSON"))
+      .toBe(panel(true).targetsJson);
   });
 
   it("rejects the removed publication-disabled fallback without overwriting it", async () => {
@@ -351,12 +411,91 @@ describe("DEV-09 private local API environment", () => {
     const current = await readFile(test.outputFilePath, "utf8");
     const legacy = current
       .replace("REGISTER_VERSION=424242\n", "REGISTER_VERSION=4\n")
-      .replace("development:codex-cli", "development:local-vllm")
-      .replace("gpt-test-real", "qa-deterministic-v1");
+      .replace("development:codex-premium-cli", "development:local-vllm")
+      .replace("gpt-5.6-sol", "qa-deterministic-v1");
     await writeFile(test.outputFilePath, legacy, { mode: 0o600 });
 
     await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
     expect(await readFile(test.outputFilePath, "utf8")).toBe(legacy);
+  });
+
+  it("admits a published removal when the held version owns the outgoing provider set", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const outgoing = current.replace("REGISTER_VERSION=424242\n", "REGISTER_VERSION=424241\n");
+    await writeFile(test.outputFilePath, outgoing, { mode: 0o600 });
+    const currentProviders = TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders;
+    const removedRef = currentProviders[0]!.providerRef;
+    const incomingProviders = currentProviders.filter(({ providerRef }) => providerRef !== removedRef);
+    const incomingTargets = TEST_DEVELOPMENT_PROVIDER_PANEL.targets.filter(
+      ({ providerRef }) => providerRef !== removedRef
+    );
+    const incomingPanel = buildDevelopmentProviderPanel(incomingTargets.map((target) => ({
+      providerRef: target.providerRef,
+      baseUrl: target.baseUrl,
+      model: target.model,
+      ...(target.authorizationHeader === undefined
+        ? {} : { authorizationHeader: target.authorizationHeader })
+    })), incomingProviders);
+    const heldConfiguredProviderSets = new Map([[
+      "424241",
+      currentProviders.map(({ providerRef }) => providerRef)
+    ]]);
+
+    await expect(assembleDevelopmentApiEnvironment({
+      repositoryRoot: test.repositoryRoot,
+      providerPanel: incomingPanel,
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET,
+      heldConfiguredProviderSets
+    })).resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+  });
+
+  it("rejects a removal fallback whose outgoing refs exceed the held version", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const environment = parseEnvironment(current);
+    const targets = JSON.parse(environment.get("PROVIDER_DISCOVERY_TARGETS_JSON")!) as unknown[];
+    const expandedTargets = JSON.stringify([...targets, {
+      provider_ref: "development:local-vllm",
+      base_url: "http://127.0.0.1:8789/v1",
+      model: "qa-deterministic-v1",
+      authorization_header: "test-local-header"
+    }]);
+    const outgoing = current
+      .replace("REGISTER_VERSION=424242\n", "REGISTER_VERSION=424241\n")
+      .replace(
+        `PROVIDER_DISCOVERY_TARGETS_JSON=${environment.get("PROVIDER_DISCOVERY_TARGETS_JSON")}\n`,
+        `PROVIDER_DISCOVERY_TARGETS_JSON=${expandedTargets}\n`
+      );
+    await writeFile(test.outputFilePath, outgoing, { mode: 0o600 });
+    const currentProviders = TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders;
+    const removedRef = currentProviders[0]!.providerRef;
+    const incomingProviders = currentProviders.filter(({ providerRef }) => providerRef !== removedRef);
+    const incomingTargets = TEST_DEVELOPMENT_PROVIDER_PANEL.targets.filter(
+      ({ providerRef }) => providerRef !== removedRef
+    );
+    const incomingPanel = buildDevelopmentProviderPanel(incomingTargets.map((target) => ({
+      providerRef: target.providerRef,
+      baseUrl: target.baseUrl,
+      model: target.model,
+      ...(target.authorizationHeader === undefined
+        ? {} : { authorizationHeader: target.authorizationHeader })
+    })), incomingProviders);
+
+    await expect(assembleDevelopmentApiEnvironment({
+      repositoryRoot: test.repositoryRoot,
+      providerPanel: incomingPanel,
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET,
+      heldConfiguredProviderSets: new Map([[
+        "424241",
+        currentProviders.map(({ providerRef }) => providerRef)
+      ]])
+    })).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(outgoing);
   });
 
   it("rejects unsafe custody, malformed tokens, and aliased database principals", async () => {

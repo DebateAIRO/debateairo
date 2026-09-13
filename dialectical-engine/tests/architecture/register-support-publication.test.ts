@@ -21,7 +21,8 @@ import { buildDevelopmentDeploymentRegisterPublicationRows } from
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
-  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
+  LEGACY_REGISTER_V1_SNAPSHOT_SHA256,
+  TEST_PLAN_TIER_ROSTERS
 } from "../support/registerFixtures.js";
 
 const migrationPath = "migrations/0055_register_support_publication.sql";
@@ -354,7 +355,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
       .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");
     expect(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256)
-      .toBe("42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb");
+      .toBe("f02c8c003c75c2513672fc4380d4302d5dd18e576fcb498d968c61ba5cb32cf9");
   });
 
   it("preserves the exact legacy hashes while the actual port input owns all 248 policy decimals", async () => {
@@ -362,10 +363,11 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     const historicalRows = buildBootstrapRegisterPublicationRows(bootstrap);
     const developmentRows = await buildDevelopmentDeploymentRegisterPublicationRows(
       bootstrap,
-      TEST_DEVELOPMENT_PROVIDER_PANEL
+      TEST_DEVELOPMENT_PROVIDER_PANEL,
+      TEST_PLAN_TIER_ROSTERS
     );
     expect(historicalRows).toHaveLength(14);
-    expect(developmentRows).toHaveLength(32);
+    expect(developmentRows).toHaveLength(33);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
     expect(computeRegisterSnapshotSha256(developmentRows))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);

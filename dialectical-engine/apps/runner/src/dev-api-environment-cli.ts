@@ -1,5 +1,8 @@
 import { assembleDevelopmentApiEnvironment } from "./dev-api-environment.js";
-import { loadDevelopmentProviderPanelFromEnvironment } from "./dev-provider-panel.js";
+import {
+  loadDevelopmentProviderPanelFromEnvironment,
+  loadModelConfigConfiguredProviders
+} from "./dev-provider-panel.js";
 import { loadDevelopmentCommandEnvironment } from "@debateai/register";
 import {
   developmentDeploymentRegisterReceiptPath,
@@ -21,7 +24,7 @@ try {
   }
   const receipt = await assembleDevelopmentApiEnvironment({
     repositoryRoot,
-    providerPanel: loadDevelopmentProviderPanelFromEnvironment(commandEnvironment),
+    providerPanel: loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(repositoryRoot)),
     registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot),
     supportModelTarget
   });

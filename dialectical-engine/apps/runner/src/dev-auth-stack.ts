@@ -28,8 +28,12 @@ import {
 } from "./dev-cli-provider-panel.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+  resolveDevelopmentApiProviderSlots,
+  type DevelopmentApiProviderProbe,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
+import { loadModelConfig, ModelConfigShapeError, type ModelConfig } from "@debateai/model-config";
+import { readProviderKeys } from "./dev-provider-keys.js";
 import {
   HERMES_SUPPORT_PORT,
   startHermesSupportRelay
@@ -45,6 +49,7 @@ type DataPlaneHandle = Stoppable & Readonly<{
   receipt: Readonly<{
     mailCapture: "ATTESTED";
     register: DevelopmentDeploymentRegisterMachineReceiptV1;
+    heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>;
   }>;
 }>;
 type ApiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentApiChildExit> }>;
@@ -55,7 +60,14 @@ type SupportModelRelayHandle = Stoppable & Readonly<{
   providerRef: "development:hermes-glm-5.3-flash";
 }>;
 
+export type DevelopmentApiProviderAvailabilityOperations = Readonly<{
+  readProviderKeys(repositoryRoot: string): Promise<ReadonlyMap<string, string>>;
+  probe: DevelopmentApiProviderProbe;
+  warning(line: string): void;
+}>;
+
 export type DevelopmentAuthStackOperations = Readonly<{
+  checkModelConfig(): Promise<void>;
   isPublicPortOccupied(): Promise<boolean>;
   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
   startSupportModelRelay(): Promise<SupportModelRelayHandle>;
@@ -64,7 +76,8 @@ export type DevelopmentAuthStackOperations = Readonly<{
   assembleApiEnvironment(
     providerPanel: DevelopmentProviderPanel,
     registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1,
-    supportModelTarget: string
+    supportModelTarget: string,
+    heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>
   ): Promise<void>;
   startApi(): Promise<ApiHandle>;
   startRunner(): Promise<RunnerHandle>;
@@ -136,6 +149,10 @@ async function stopOwned(resources: readonly Stoppable[]): Promise<void> {
 export async function startDevelopmentAuthStack(
   operations: DevelopmentAuthStackOperations
 ): Promise<DevelopmentAuthStack> {
+  await fixedStage(
+    "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
+    () => operations.checkModelConfig()
+  );
   const occupied = await fixedStage(
     "DEV_AUTH_STACK_PREFLIGHT_FAILED",
     () => operations.isPublicPortOccupied()
@@ -168,7 +185,10 @@ export async function startDevelopmentAuthStack(
     await fixedStage(
       "DEV_AUTH_STACK_ENVIRONMENT_FAILED",
       () => operations.assembleApiEnvironment(
-        providerPanel.panel,dataPlane.receipt.register,supportModelRelay.targetJson
+        providerPanel.panel,
+        dataPlane.receipt.register,
+        supportModelRelay.targetJson,
+        dataPlane.receipt.heldConfiguredProviderSets
       )
     );
     const api = await fixedStage("DEV_AUTH_STACK_API_FAILED", () => operations.startApi());
@@ -234,16 +254,71 @@ export async function superviseDevelopmentAuthStack(
 
 export function createDevelopmentAuthStackOperations(
   repositoryRoot: string,
-  commandEnvironment: Readonly<Record<string, string>>
+  commandEnvironment: Readonly<Record<string, string>>,
+  apiProviderOperations: DevelopmentApiProviderAvailabilityOperations = Object.freeze({
+    readProviderKeys,
+    async probe(input) {
+      const response = await fetch(`${input.baseUrl.replace(/\/$/u, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${input.keyValue}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          model: input.model,
+          messages: [{ role: "user", content: "Reply with OK." }],
+          max_tokens: 64
+        })
+      });
+      if (!response.ok) throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+      const body = await response.json() as Readonly<{ model?: unknown }>;
+      if (typeof body.model !== "string") throw new TypeError("DEV_PROVIDER_SLOT_PROBE_FAILED");
+      return Object.freeze({ model: body.model });
+    },
+    warning: (line) => console.warn(line)
+  })
 ): DevelopmentAuthStackOperations {
   const hatchetOperations = createDevelopmentHatchetTokenOperations(
     repositoryRoot,
     commandEnvironment
   );
   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
+  let checkedModelConfig: ModelConfig | undefined;
   return Object.freeze({
+    async checkModelConfig() {
+      try {
+        checkedModelConfig = loadModelConfig(repositoryRoot);
+      } catch (error) {
+        if (error instanceof ModelConfigShapeError) {
+          console.error(
+            `DEV_AUTH_STACK_MODEL_CONFIG_INVALID tier=${error.tier} model=${error.model} class ${error.classNumber}`
+          );
+        }
+        throw error;
+      }
+    },
     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
-    startProviderPanel: () => startDevelopmentCliProviderPanel(),
+    async startProviderPanel() {
+      const config = checkedModelConfig ?? loadModelConfig(repositoryRoot);
+      const cliHandle = await startDevelopmentCliProviderPanel(config);
+      try {
+        const panel = await resolveDevelopmentApiProviderSlots(
+          config,
+          cliHandle.panel,
+          await apiProviderOperations.readProviderKeys(repositoryRoot),
+          apiProviderOperations.probe,
+          apiProviderOperations.warning
+        );
+        return Object.freeze({
+          panel,
+          healthyProviderRefs: panel.healthyProviderRefs,
+          stop: () => cliHandle.stop()
+        });
+      } catch (error) {
+        await cliHandle.stop().catch(() => undefined);
+        throw error;
+      }
+    },
     async startSupportModelRelay() {
       const relay = await startHermesSupportRelay({
         port: HERMES_SUPPORT_PORT,
@@ -268,9 +343,18 @@ export function createDevelopmentAuthStackOperations(
         operations: hatchetOperations
       });
     },
-    async assembleApiEnvironment(providerPanel, registerReceipt, supportModelTarget) {
+    async assembleApiEnvironment(
+      providerPanel,
+      registerReceipt,
+      supportModelTarget,
+      heldConfiguredProviderSets
+    ) {
       await assembleDevelopmentApiEnvironment({
-        repositoryRoot,providerPanel,registerReceipt,supportModelTarget
+        repositoryRoot,
+        providerPanel,
+        registerReceipt,
+        supportModelTarget,
+        ...(heldConfiguredProviderSets === undefined ? {} : { heldConfiguredProviderSets })
       });
     },
     startApi: () => startDevelopmentApiProcess({
