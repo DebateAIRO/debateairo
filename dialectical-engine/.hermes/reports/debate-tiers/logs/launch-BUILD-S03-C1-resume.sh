@@ -1,0 +1,7 @@
+#!/bin/zsh
+# resume launcher for seat BUILD-S03-C1 (Codex Sol) after its BLOCKED at 18:05 — started DETACHED from python
+cd "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/tiers-s03/dialectical-engine" || exit 9
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+echo $$ > "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/BUILD-S03-C1.pid"
+echo "resume $(date '+%F %T') lane=$(pwd) HEAD=$(git rev-parse --short HEAD) dirty=$(git status --porcelain | wc -l | tr -d ' ')"
+exec codex exec -c model='"gpt-5.6-sol"' -c sandbox_mode='"danger-full-access"' resume 01a09b42-74f8-72f2-880b-cedf57d512f2 "UNBLOCKED by the orchestrator — read the RULING comment on t_77c0cb5f first (~/.local/bin/hermes kanban --board debate-tiers show t_77c0cb5f; comments 5–7 are new since your BLOCKED: the N2-p3 fold, the tier01-roster 2/2 ruling, and the RULING). In one sentence: add \"@debateai/model-config\": \"workspace:*\" to the repo-root package.json dependencies (your file), run ONE more pnpm install now (authorized — my packet's install-first ordering was the defect), confirm node_modules/@debateai/model-config links, then continue from S2 exactly in the packet's order, RED on assertions before GREEN, and finish with your READY handoff on t_77c0cb5f. Everything else in your packet stands: git add only your allowed paths (pnpm-lock.yaml included), never touch BUILD-S03-C2's files beside yours, no push, no main tree, nothing on V's desktop." </dev/null
