@@ -4,6 +4,7 @@ import { extname, join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import { loadModelConfig } from "@debateai/model-config";
 
 const PROJECT_ROOT = process.cwd();
 const SOURCE_ROOTS = ["apps", "packages"] as const;
@@ -48,7 +49,8 @@ function sourceFiles(directory: string): string[] {
     });
 }
 
-function sourceFilesContaining(needle: string): string[] {
+function sourceFilesContaining(modelId: string): string[] {
+  const needle = JSON.stringify(modelId);
   return SOURCE_ROOTS.flatMap((sourceRoot) =>
     sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
       const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
@@ -59,7 +61,8 @@ function sourceFilesContaining(needle: string): string[] {
   ).sort();
 }
 
-function sourceOccurrencesContaining(needle: string): Readonly<Record<string, number>> {
+function sourceOccurrencesContaining(modelId: string): Readonly<Record<string, number>> {
+  const needle = JSON.stringify(modelId);
   return Object.fromEntries(SOURCE_ROOTS.flatMap((sourceRoot) =>
     sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
       const source = readFileSync(absolutePath, "utf8");
@@ -200,11 +203,28 @@ function tierBranchLines(): string[] {
   ).sort();
 }
 
+function rosterSelectingFiles(): string[] {
+  return SOURCE_ROOTS.flatMap((sourceRoot) =>
+    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
+      const source = readFileSync(absolutePath, "utf8");
+      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
+      if (projectPath === "packages/contract/src/plan-tiers.ts") {
+        return [];
+      }
+      if (!selectsRoster(source, rosterSelectors(source))) {
+        return [];
+      }
+
+      return [projectPath];
+    })
+  ).sort();
+}
+
 describe("S02 tier roster architecture", () => {
   it("keeps the exact ordered model roster for each plan tier", () => {
     expect(PLAN_TIER_ROSTERS.free).toEqual([
       "gpt-5.6-luna",
-      "claude-sonnet-5"
+      "glm-5.3-flash"
     ]);
     expect(PLAN_TIER_ROSTERS.premium).toEqual([
       "gpt-5.6-sol",
@@ -215,17 +235,12 @@ describe("S02 tier roster architecture", () => {
 
   it("keeps every roster model id in one canonical declaration", () => {
     const expectedFiles: Record<string, string[]> = {
-      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts"],
-      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts"],
-      "gpt-5.6-sol": [
-        "apps/ui/components/landing/cards.ts",
-        "packages/contract/src/plan-tiers.ts"
-      ],
-      "claude-opus-5": [
-        "apps/ui/components/landing/cards.ts",
-        "packages/contract/src/plan-tiers.ts"
-      ],
-      "grok-4.6-build": ["packages/contract/src/plan-tiers.ts"]
+      "gpt-5.6-luna": [],
+      "glm-5.3-flash": [],
+      "gpt-5.6-sol": [],
+      "claude-opus-5": [],
+      "grok-4.6-build": [],
+      "claude-sonnet-5": []
     };
 
     for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {
@@ -244,5 +259,27 @@ describe("S02 tier roster architecture", () => {
     for (const roster of Object.values(PLAN_TIER_ROSTERS)) {
       expect(roster.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("keeps generated rosters equal to the configured file order", () => {
+    const config = loadModelConfig(PROJECT_ROOT, {
+      isCliInstalled: () => true
+    });
+
+    expect(config.free.map((entry) => entry.model)).toEqual(
+      PLAN_TIER_ROSTERS.free
+    );
+    expect(config.premium.map((entry) => entry.model)).toEqual(
+      PLAN_TIER_ROSTERS.premium
+    );
+  });
+
+  it("keeps plan-tier roster selection in server production files only", () => {
+    expect(rosterSelectingFiles()).toEqual([
+      "apps/api/src/index.ts",
+      "apps/runner/src/dev-cli-provider-panel.ts",
+      // removed by S24 (C4): S13's final form drops this entry and asserts no apps/ui consumer
+      "apps/ui/app/new/page.tsx"
+    ]);
   });
 });

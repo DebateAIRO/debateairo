@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const MODEL_IDS = [
   "gpt-5.6-luna",
-  "claude-sonnet-5",
+  "glm-5.3-flash",
   "gpt-5.6-sol",
   "claude-opus-5",
   "grok-4.6-build"
@@ -37,7 +37,7 @@ describe("R11 plan-tier roster architecture", () => {
       rosters,
       "PLAN_TIER_ROSTERS is not exported from @debateai/contract"
     ).toBeDefined();
-    expect(rosters!.free).toEqual(["gpt-5.6-luna", "claude-sonnet-5"]);
+    expect(rosters!.free).toEqual(["gpt-5.6-luna", "glm-5.3-flash"]);
     expect(rosters!.premium).toEqual(["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]);
 
     const files = productionFiles();
@@ -46,10 +46,13 @@ describe("R11 plan-tier roster architecture", () => {
       const declarations = files.filter((file) =>
         readFileSync(resolve(file), "utf8").includes(quotedExact)
       );
-      expect(declarations, `${modelId} quoted-exact declarations`).toEqual([
-        "packages/contract/src/plan-tiers.ts"
-      ]);
+      expect(declarations, `${modelId} quoted-exact declarations`).toEqual([]);
     }
+
+    const retiredDeclarations = files.filter((file) =>
+      readFileSync(resolve(file), "utf8").includes(JSON.stringify("claude-sonnet-5"))
+    );
+    expect(retiredDeclarations, "claude-sonnet-5 quoted-exact declarations").toEqual([]);
 
     const contractSource = readFileSync(resolve("packages/contract/src/index.ts"), "utf8");
     const askSchema = contractSource.indexOf("export const AskRequestSchema");
@@ -59,5 +62,21 @@ describe("R11 plan-tier roster architecture", () => {
     expect(askSchema).toBeGreaterThanOrEqual(0);
     expect(askTypes).toHaveLength(1);
     expect(askTypes[0]).toBeGreaterThan(askSchema);
+  });
+
+  it("generates plan-tier rosters before importing the contract generator", () => {
+    const manifest = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+    };
+    const generateContract = manifest.scripts["generate:contract"] ?? "";
+    const rosterGenerator = generateContract.indexOf(
+      "packages/model-config/src/generate-plan-tier-rosters.ts"
+    );
+    const contractGenerator = generateContract.indexOf(
+      "packages/contract/src/generate.ts"
+    );
+
+    expect(rosterGenerator).toBeGreaterThanOrEqual(0);
+    expect(contractGenerator).toBeGreaterThan(rosterGenerator);
   });
 });
