@@ -125,9 +125,6 @@ function normalizedProviderBaseUrl(value: unknown): string {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   parsed.pathname = parsed.pathname.replace(/\/+$/u, "");
-  if (!parsed.pathname.endsWith("/v1")) {
-    throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
-  }
   return parsed.toString().replace(/\/$/u, "");
 }
 
