@@ -498,3 +498,76 @@ block is the one the orchestrator transcribes.)*
 
 ---
 **Fold by the orchestrator, 2026-09-13 17:24 (ARCH-REV-S03 pass 2 = REWORK, scoped; verdict `reviews/ARCH-REV-S03-p2.md`).** B1–B3 of pass 1 verified closed (§3–§5), all six N folds retired (§8), F-ARCH-4 `t_4fdd4c5a` verified — closed by S23 as written, three forced edits (`registerFixtures.ts:23`, `architecture/register-support-publication.test.ts:357`, `:368` 32→33), NO V row. **B1-p2 `t_21cf2dc8`** (blocking, C3-scoped): `tests/architecture/dev-deployment-register.test.ts` is written by S10 (C1) and broken by S21 (C3) at its `:14` source-text assertion, and owned by no cluster because `surfaces.mjs`'s marker-walk stops at S10's parenthetical (PLAN :222) — the mechanical guarantee is void for exactly the file that needs it, and a fold cannot fix it because :854 makes the script authoritative → ARCH-FIX(S03) pass 3 `t_06759d41` (the last; a REWORK at ARCH-REV p3 `t_3fe3198c` is a V row). N folds, closed on the board and carried into the ARCH-FIX p3 packet: **N1-p2** `t_75d81376` S21's done-criterion calls a module-private predicate (exports are :29/:73/:409) — name ONE build (drive it through `assembleDevelopmentApiEnvironment`) · **N2-p2** `t_c1f10e3c` nothing measures the three CLIs pass their new argument — the updated `:14` assertion is that case · **N3-p2** `t_b59af9e4` C3's row names the base failures, not the expected AFTER set · **N4-p2** `t_112df324` two harmless command-vs-surface gaps; C3 prose "eight" vs nine in the command, seven in the surface · **N5-p2** `t_7e3dcc6b` PACKET DEFECT against the orchestrator: charge 5 compared BASELINE's typecheck-diagnostic count (15) with a test count — the class: a number quoted without the heading it sits under · **N6-p2** `t_4d657ee9` (orchestrator, unread by the reviewer — its handoff read comments through 2): `pnpm-lock.yaml` is tracked and in no surface while S1/S2 add `yaml` and a workspace package — C1's column, single writer C1. **Orchestrator ruling (scheduling, not product): BUILD(S03-C1) `t_77c0cb5f` ∥ BUILD(S03-C2) `t_6a2ba493` start on PLAN Revision 2 in parallel with ARCH-FIX pass 3**, on the reviewer's charge-8 answer ("neither cluster touches the defect"); the fix keeps §1 :98-362 line-count-stable so the C1/C2 packets' anchors hold, and the BUILD seats are launched after the fix's READY with the anchors re-measured. C3 waits for ARCH-REV p3 PASS; C4 behind it. No V row.
+
+---
+
+## Ruled at ARCH-FIX (2026-09-13, seat ARCH-FIX-S03, ticket `t_06759d41`, pass 3 of 3 — THE LAST) — under the REWORK verdict `reviews/ARCH-REV-S03-p2.md`. PLAN.md becomes Revision 3 in place; nothing above this line is edited.
+
+- 2026-09-13 · **Who owns `tests/architecture/dev-deployment-register.test.ts`** · **C3, and only C3** ·
+  B1-p2 is correct and reproduces: `:14` is
+  `expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment())")`
+  (measured in the lane at `9a000c37`), and S21 gives `dev-deployment-register-cli.ts:13` a second
+  argument, so that exact substring stops occurring and the assertion fails. C3 owns it because **S21 is
+  the breaking change and C3 runs after C1**. What S10 (C1) does instead: **its ordering case moves into
+  `tests/architecture/tier01-roster.test.ts`**, which C1 already owns through S9 — same cluster, same
+  command, no new file. Rejected: C1 writes it and C3 re-writes it — two clusters, one file, which is the
+  single-writer rule broken in the name of keeping a line. Rejected: C1 keeps it and S21 stops touching
+  the CLI — that abandons B2.2 · ARCH-FIX-S03, under B1-p2 `t_21cf2dc8`.
+- 2026-09-13 · **A derivation may not report "none" over a set it never proved complete** ·
+  **`surfaces.mjs` gains the completeness assertion from the reviewer's `p2-dropped-paths.mjs`: every
+  path-shaped token in a `Files —` paragraph is CAPTURED or explicitly CLASSIFIED a citation in a
+  reviewed, step-keyed table, the script prints its denominator, and it exits non-zero otherwise** ·
+  Revision 2's disjointness verdict was computed over a set that silently omitted a declared write, so
+  the mechanical guarantee was void for exactly the file that needed it. Denominator at Revision 3:
+  **123 seen = 78 captured + 45 classified, 0 unclassified**, then `PASS`. Rejected: fixing only the C3
+  column — `PLAN.md` makes the script authoritative, so the next run would drop the file again and the
+  fix would silently revert (the reviewer's own first pass-3 prediction). **The classification is
+  step-keyed, not global**, so a path that is a citation in one step and a write in another cannot be
+  waved through · ARCH-FIX-S03, under B1-p2.
+- 2026-09-13 · **The completeness checker was validated on known-GOOD input before its verdict was
+  quoted** · **the path predicate accepts only repo-rooted paths and the four repo-root files, never
+  package specifiers, model ids, URLs, regexes or property accessors** · the first predicate (anything
+  with a dot or slash) flagged **80** tokens, of which ~70 were phantoms — `yaml@2.9.0`, `gpt-5.6-luna`,
+  `rosters!.free`, `/^[A-Z][A-Z0-9_]*$/u`. A checker that cries wolf 70 times trains its reader to skip
+  it, which is how the original defect survived. `TOOLING-TRAPS.md:214` names this exact discipline and I
+  re-derived it rather than read it. After tightening: 10 candidates, each judged against the sentence it
+  sits in, **all 10 genuine citations and zero new declared writes** — reported rather than suppressed,
+  because the reviewer predicted the assertion would surface more writes and it did not · ARCH-FIX-S03.
+- 2026-09-13 · **How the module-private predicate is measured** · **driven through
+  `assembleDevelopmentApiEnvironment` (`:409`), never by exporting it** · measured:
+  `apps/runner/src/dev-api-environment.ts` exports exactly `:29` `DEVELOPMENT_API_ENVIRONMENT_KEYS`,
+  `:73` the receipt type and `:409` the assembler, so all four predicates are module-private and no test
+  can import one. The case writes an outgoing `api.env` naming the five current refs, calls the assembler
+  with a `configuredProviders` that does not contain them, and asserts the OUTCOME —
+  `DEV_API_ENVIRONMENT_DRIFT` thrown and the file byte-identical. Rejected: exporting the predicate —
+  it widens a module's public surface this plan does not authorise, to make one assertion convenient.
+  **And the honest limit is written into §7**: this case catches a predicate that IGNORES its parameter,
+  not one that keeps a module-level set as a DEFAULT; the default is caught by the source-text case over
+  the four CLI call sites and by S25's module-load ban · ARCH-FIX-S03, under N1-p2 `t_75d81376`.
+- 2026-09-13 · **What measures that the CLIs pass their new argument** · **the updated `:14` for
+  `dev-deployment-register-cli.ts`, plus ONE new case over all four CLIs in
+  `tests/architecture/dev-real-provider-only.test.ts` (C3's, S34's)** · measured: no source-text case
+  asserts the other three CLIs' CALL text today — `tests/unit/dev-auth-data-plane.test.ts:157-160`,
+  `tests/architecture/dev-auth-data-plane.test.ts:9,23` and
+  `tests/integration/dev-api-environment.test.ts:429,440` read those files but assert only the
+  `package.json` script string (`.toBe("tsx apps/runner/src/…-cli.ts")`), which S21 does not change, and
+  `dev-provider-set-publish-cli.ts` has no source-text case at all. The new case lives in a file C3
+  already owns, so no cluster gains a path. Rejected: adding cases to each CLI's own suite — three files
+  enter C3's surface, one of them (`dev-auth-data-plane.test.ts`) in neither cluster's command ·
+  ARCH-FIX-S03, under N2-p2 `t_c1f10e3c`.
+- 2026-09-13 · **`pnpm-lock.yaml` is a declared write of S1; `pnpm-workspace.yaml` is not** · measured:
+  `git ls-files pnpm-lock.yaml` returns it (tracked), and `pnpm-workspace.yaml:2-3` already globs
+  `apps/*` and `packages/*`, so S1's new package needs no workspace edit. `pnpm install` rewrites the
+  lockfile when the package and its `yaml` dependency appear, so the write is S1's and the single writer
+  is C1 — the only cluster that adds a dependency or a package. S1's Done-when now says `pnpm install`
+  leaves `git status --porcelain` listing exactly C1's column · ARCH-FIX-S03, under N6-p2 `t_4d657ee9`
+  (the orchestrator's; the reviewer did not read it).
+- 2026-09-13 · **An aggregate `N failed` is not a verdict unless its members are named** ·
+  **C3's §2 row names the expected AFTER set BY TITLE** — exactly `2 failed`, the two
+  `register-support-publication` titles, with `dev-provider-panel`'s title GONE · base and after are both
+  `3 failed`-shaped if S32 is done and S23's digest sweep is not, or vice versa, so the count alone
+  cannot tell a finished cluster from a half-finished one. A seat reading `3 failed` after C3 is RED
+  whichever title remains · ARCH-FIX-S03, under N3-p2 `t_b59af9e4`.
+
+---
+**Fold by the orchestrator, 2026-09-13 17:50 (ARCH-FIX-S03 pass 3 = READY, consumed; the pass-3 rulings are `## Ruled at ARCH-FIX … pass 3` :504-570 above).** B1-p2 `t_21cf2dc8` ADDRESSED with all four remedies; **single writer for `tests/architecture/dev-deployment-register.test.ts` = C3** — S10's ordering case moves to `tier01-roster.test.ts` (C1-owned via S9), C1's command DROPS the suite (base `Test Files 2 passed (2)` · `Tests 5 passed (5)`), `pnpm-lock.yaml` is a declared write of S1 (N6-p2), counts 18 / 5 / 24 / 5; `surfaces.mjs` carries the completeness assertion and prints its denominator (123 = 78 + 45 + 0). N1-p2…N4-p2, N6-p2 retired (the seat's lines). **Two findings against the orchestrator's packet, accepted:** (1) "a Revision 3 line under the title" conflicts with "S1 unchanged" — the seat held the header height by compressing the Revision 2 block; a frozen-anchor packet freezes the header or anchors by content (TRAPS entry); (2) "S18 moved by the lines you added" presupposed contiguity — S18 stayed at :363. **Scheduling:** BUILD(S03-C1) `t_77c0cb5f` and BUILD(S03-C2) `t_6a2ba493` launch on PLAN Revision 3 (the C1 packet re-issued: six suites, 18 paths, `tier01-roster` 1/1 → 2/2) in parallel with ARCH-REV p3 `t_3fe3198c` (the cap; a REWORK is a V row; the reviewer runs no cluster command in the lane while the seats build). C3 waits on ARCH-REV p3 PASS and C1's READY; C4 behind C3. No V row.
