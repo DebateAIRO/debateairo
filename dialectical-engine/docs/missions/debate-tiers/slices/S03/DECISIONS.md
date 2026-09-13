@@ -199,3 +199,76 @@ simpler to read, and V may never edit a base URL again after V-35 is settled.
 
 ---
 **Fold by the orchestrator, 2026-09-13 17:55 (REQ-REV-S03 pass 2 = REWORK; verdict `reviews/REQ-REV-S03-p2.md`).** Pass-1 B1/B2/B3 CLOSED by the reviewer (tickets closed). **B1(p2)** `t_d8d52693` → REQ-FIX(S03) pass 3 `t_19ed95ac` (SPEC-v3): R23's "minus any slot absent under R31" distributes over five surfaces — `/new` must keep the FILE's lists (R16/R31/step 8), and the register/api.env/discovery set needs ONE build: the verdict's Build A (five targets always; a keyless Free slot configured but absent from the HEALTHY panel; `authorization_header` already optional, `packages/providers/src/index.ts:171-177`) unless contested with a measurement. **The positive limb of R8 stays** (ruled IN, §5: without it a build that never reads `config/models.yaml` passes every suite — the file would be decorative). N folds: **N1(p2)** R20 class 6 vs R11's sixth refusal (an observed base URL no file fixture can produce) — the class list and R28's fixture count must agree · **N2(p2)** R27's `tiers-s02-rosters` row is silent on the suite's first case; 5/5 holds only if `PLAN_TIER_ROSTERS` survives fed from the file at runtime — say so · **N3(p2)** R8 names one suite for the positive limb, R27 gives it to both — one suite · **N4(p2)** the handoff said 430 lines, `wc -l` says 454 — counts are measured at write time · **N5(p2)** `COMMON.md:7` still said base 7188b167 — fixed (orchestrator). Rows for V: none new (the reviewer's §9). Pass 3 is the last rework: a REWORK at REQ-REV pass 3 becomes a V row ("does the published register set follow the file, or the entries that could start?").
+
+---
+
+## Ruled at REQ-FIX, pass 3 of 3 (2026-09-13, seat REQ-FIX-S03) — under the verdict `reviews/REQ-REV-S03-p2.md`. Output: `SPEC-v3.md`; `SPEC.md` and `SPEC-v2.md` untouched.
+
+- 2026-09-13 · **B1(p2) member (i) — does `/new` lose an absent slot?** · **no: `/new` always shows the
+  FILE's entries** (SPEC-v3 R23.5, R16) · three sentences of v2 already said so (R16 `:213-214`, R31
+  `:269`, step 8 `:413`) and only R23's blanket clause disagreed. The clause was mine and it was
+  wrong: written to carry R31's absent slot, it attached to a list of five surfaces and emptied the
+  Free card on exactly the machine R32 describes. v3 replaces the one clause with five numbered
+  surfaces, so the subtraction can only be read where it belongs — the healthy panel · REQ-FIX-S03.
+- 2026-09-13 · **B1(p2) member (ii) — does the published register set follow the file, or only the
+  entries that could start?** · **the FILE (the verdict's Build A): five slots on every machine,
+  keyed or not** · not contested — and the measurement that decides it is stronger than the
+  verdict's own argument. `isExactProviderRuntimeRefresh`
+  (`apps/runner/src/dev-api-environment.ts:310-318`) already admits a change confined to
+  `PROVIDER_DISCOVERY_TARGETS_JSON` at the **same** register version. Under Build A, V placing a key
+  later changes only that target's model and authorization header → a same-version runtime refresh →
+  R14.2 ("a register version is not republished by restarting alone") is TRUE. Under Build B the
+  configured set itself would change, so a key appearing would publish a new register version with no
+  file edit at all — which makes R14.2 false and forces R24 to admit a cause whose subject is not an
+  entry-set change. **Build A is the build the product's existing refresh seam already implements;
+  Build B would need two requirements rewritten to accommodate it.** Rejected: Build B (fewer wasted
+  slots on a keyless machine, but it moves a register publication onto an event that is not a file
+  edit) · REQ-FIX-S03.
+- 2026-09-13 · **The verdict's counter to Build A — unauthenticated probes to OpenAI and Z.ai every
+  freshness window — is closed by a requirement, not accepted** · **R33: no request leaves the machine
+  for a slot with no credential** · measured this pass: the resolver probes every configured target
+  with no exemption (`apps/api/src/provider-discovery.ts:131-141`) and sets an authorization header
+  only when the target has one (`:44-47`), so the counter is real and its exact shape is an
+  unauthenticated `POST /chat/completions` to two third parties. R33 states the observable (zero
+  outbound connections to either host on a keyless machine) and leaves the mechanism to ARCH. With it,
+  Build A's only disadvantage against Build B is gone, and the tie is not merely broken — it is
+  broken without a cost to carry · REQ-FIX-S03.
+- 2026-09-13 · **How a configured-but-keyless slot is SHAPED** · **the product's existing
+  unavailable-slot convention: the sentinel model and no authorization header** · measured, and it is
+  not a choice: `apps/runner/src/dev-provider-panel.ts:103-108` throws
+  `DEV_CLI_PROVIDER_PANEL_TARGET_INVALID` unless a target is either (healthy AND credentialed) or
+  (sentinel-model AND uncredentialed), and `:120-122` builds `healthyProviderRefs` by excluding exactly
+  the sentinel-model targets. So "configured but absent from the healthy panel" is a shape the product
+  already has and already enforces. v2's R31 wording ("every other entry's slot is configured and
+  served") was what made a reader infer Build B; v3 says configured, and names what is lost as the
+  healthy-panel place only. The constant is spelled `DEVELOPMENT_UNAVAILABLE_CLI_MODEL`; generalising
+  that name is ARCH's and is listed out of scope · REQ-FIX-S03.
+- 2026-09-13 · **N1(p2) — R20 class 6 against R28's fixture count** · **class 6 is R11's FIRST FIVE
+  refusals; R11's sixth gets a panel-build test, not a file fixture** · R11's sixth is a `cli:` slot
+  whose OBSERVED base URL is not its loopback port, and an R3 CLI entry has exactly the keys `cli` and
+  `model` — no file value can produce it. R28 now reads "six file fixtures, one per shape class, plus
+  one panel-build case for R11's sixth": seven tests for six classes, and the seventh is named as not
+  a file fixture. Rejected: dropping the sixth refusal from R11 — it is a live guard
+  (`dev-provider-panel.ts:100`) and S03 is the slice that changes the rule around it · REQ-FIX-S03.
+- 2026-09-13 · **N2(p2) — does `PLAN_TIER_ROSTERS` survive?** · **yes, as an export of
+  `@debateai/contract` taking its values from `config/models.yaml` at load time; what R8 removes is the
+  id literals in its source, not the export** · measured: `tiers-s02-rosters.test.ts` imports it at `:6`,
+  asserts on it at `:205`/`:209`, and scans for its NAME as a selector at `:78`, so deleting the export
+  would silently gut three of that suite's four cases. R27's row now states case 1's fate explicitly
+  (kept, re-fixtured to the new Free pair) so the arithmetic is 4 kept + 1 new = 5/5 and not 3+1. Note
+  for ARCH, already implied by R16: `apps/ui/app/new/page.tsx` stops importing it — a browser bundle
+  cannot read the file — so the export's consumers after this slice are the server and the suites ·
+  REQ-FIX-S03.
+- 2026-09-13 · **N3(p2) — which suite carries R8's positive limb** · **exactly one:
+  `tests/architecture/tiers-s02-rosters.test.ts`, as its fifth case** · v2 said "R27 names which suite"
+  and then described both. R8 and R27 now name the one suite, and `tier01-roster`'s row says in as many
+  words that it does NOT carry the limb, so neither seat can assume the other suite has it ·
+  REQ-FIX-S03.
+- 2026-09-13 · **N4(p2) — a handoff's own counts** · **every count in this pass's handoff is measured at
+  write time with `wc -l` / `grep -c` and pasted, never recalled** · at pass 2 I reported SPEC-v2 as
+  430 lines; `wc -l` says 454. Nothing depended on it, which is exactly why it was easy to get wrong —
+  and a handoff's measurable facts are what a reviewer is asked to trust · REQ-FIX-S03.
+- 2026-09-13 · **What was NOT changed at pass 3** · R1–R7, R9–R13, R15–R19, R21, R22, R25, R26, R29,
+  R30, R32 · the pass-2 verdict closed B1/B2/B3 and found no defect in them; re-opening a frozen
+  requirement without a finding is scope. `ui: no` stands, re-checked by the reviewer against the skill
+  body · REQ-FIX-S03.
