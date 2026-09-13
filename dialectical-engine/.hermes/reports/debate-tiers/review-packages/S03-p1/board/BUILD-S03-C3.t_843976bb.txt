@@ -1,0 +1,96 @@
+Task t_843976bb: BUILD(S03-C3) — slots, register row, api.env predicates, restart command, key custody (S18–S23, S25–S34)
+  status:    done
+  assignee:  -
+  workspace: scratch @ /Users/vladmihaimiron/.hermes/kanban/boards/debate-tiers/workspaces/t_843976bb
+  max-retries: 2 (default)
+  created:   2026-09-13 18:01 by Claude-Router
+  started:   2026-09-13 18:52
+  completed: 2026-09-13 20:05
+  parents:   t_3fe3198c, t_77c0cb5f
+  children:  t_f0797f95
+
+Body:
+Codex Sol, lane .worktrees/tiers-s03, after BUILD(S03-C1) READY and ARCH-REV p3 PASS (parent t_3fe3198c is the gate). 24 paths, nine-suite command; AFTER set = exactly the two register-support-publication titles.
+
+Result:
+READY: commit 43efdb1a — file-owned five-slot provider set drives CLI starts, discovery set, api.env, register row planTierRosters, restart check; nine suites 88 passed | 2 inherited; CLUSTER_GREEN ×3
+
+Comments (5):
+  [2026-09-13 18:52] Claude-Router: DISPATCHED 2026-09-13 18:52:11 EEST by Claude-Router — BUILD(S03-C3) pass 1 of 3, seat BUILD-S03-C3 (Codex Sol, codex exec, danger-full-access inside the lane). Packet: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S03-C3.md (packet-check OK). Main-tree freeze HEAD 47b3f2fd (records only — never your base). Lane base: slice/tiers-s03 @ 62a4c367 = 9a000c37 + C2 a9179644 + C1 62a4c367; lane porcelain must be empty when you arrive (you work alone). Your base measured by me at 62a4c367: Test Files 4 failed | 5 passed (9) · Tests 3 failed | 46 passed (49) — two suites BROKEN at module load (DEV_CLI_MODEL_PIN_UNRESOLVED, dev-cli-provider-panel.ts:101 from :125): charge 6 names it and rules S22-pre as your step zero. Comment cursor at dispatch: 1 (this one).
+  [2026-09-13 18:56] BUILD-S03-C3: CLAIM
+seat: BUILD-S03-C3
+node: BUILD(S03-C3) pass 1 of 3
+start time: 2026-09-13 18:53:31 EEST
+session id: 01a09b78-6a4d-7d83-9062-fd59100e32b9
+session file: /Users/vladmihaimiron/.codex/sessions/2026/09/13/rollout-2026-09-13T18-52-35-01a09b78-6a4d-7d83-9062-fd59100e32b9.jsonl
+lane: slice/tiers-s03 HEAD 62a4c367; dirty count 0
+comments read through: 1
+
+C1 landing measured before first edit (log: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/build-s03-c3-base-claim.log):
+FAIL  tests/unit/dev-auth-stack.test.ts [ tests/unit/dev-auth-stack.test.ts ]
+TypeError: DEV_CLI_MODEL_PIN_UNRESOLVED
+ ❯ rosterModel apps/runner/src/dev-cli-provider-panel.ts:101:36
+     99| function rosterModel(models: readonly string[], prefix: string): strin…
+    100|   const modelId = models.find((candidate) => candidate.startsWith(pref…
+    101|   if (modelId === undefined) throw new TypeError("DEV_CLI_MODEL_PIN_UN…
+       |                                    ^
+ ❯ apps/runner/src/dev-cli-provider-panel.ts:125:32
+ ❯ apps/runner/src/dev-auth-stack.ts:25:1
+
+FAIL  tests/unit/dev-cli-provider-panel.test.ts [ tests/unit/dev-cli-provider-panel.test.ts ]
+TypeError: DEV_CLI_MODEL_PIN_UNRESOLVED
+ ❯ rosterModel apps/runner/src/dev-cli-provider-panel.ts:101:36
+ ❯ apps/runner/src/dev-cli-provider-panel.ts:125:32
+
+Test Files  4 failed | 5 passed (9)
+     Tests  3 failed | 46 passed (49)
+  [2026-09-13 19:02] BUILD-S03-C3: HEARTBEAT — S25 cluster RED captured before S18 product work
+comments read through: 1
+log: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/build-s03-c3-s25-cluster-red.log
+
+FAIL  tests/unit/dev-auth-stack.test.ts > DEV-10F bounded local auth stack supervisor > refuses a class-2 model config before rewriting api.env or starting resources
+AssertionError: expected { exitCode: +0, …(1) } to deeply equal { exitCode: 1, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "digest": "2b92ea252be0fbc26f70317cdaa7b6411ea634b50d55338cd8c495e4dbf25d1d",
+-   "exitCode": 1,
++   "digest": "7f8b1dfc466b6249f06cbe55c9174df2578e7754da793fded244ef5cba2a38f1",
++   "exitCode": 0,
+  }
+
+ ❯ tests/unit/dev-auth-stack.test.ts:171:23
+    169|       }, async () => ({ exitCode: 1, digest: await digest() }));
+    170|
+    171|       expect(outcome).toEqual({ exitCode: 1, digest: beforeDigest });
+       |                       ^
+
+Test Files  1 failed (1)
+Tests  1 failed | 15 skipped (16)
+  [2026-09-13 20:02] BUILD-S03-C3: SKILLS LOADED: /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md
+READY — BUILD(S03-C3) pass 1 of 3 · ticket t_843976bb · seat BUILD-S03-C3 · session 01a09b78-6a4d-7d83-9062-fd59100e32b9 · session file /Users/vladmihaimiron/.codex/sessions/2026/09/13/rollout-2026-09-13T18-52-35-01a09b78-6a4d-7d83-9062-fd59100e32b9.jsonl
+Branch/commit: slice/tiers-s03 · 43efdb1a feat(tiers S03-C3): apply file-owned development providers · 24 allowed paths only · porcelain clean · no push/merge/rebase.
+Verification: base /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/build-s03-c3-base-claim.log = 4 failed | 5 passed files, 3 failed | 46 passed tests with the two C1-landing module-load breaks; S22-pre /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/build-s03-c3-s22-pre-red.log changed those to assertion RED; required S25 pre-product frame /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/build-s03-c3-s25-cluster-red.log = expected exit 1/digest 2b92ea252be0fbc26f70317cdaa7b6411ea634b50d55338cd8c495e4dbf25d1, received exit 0/digest 7f8b1dfc466b6249f06cbe55c9174df2578e7754da793fded244ef5cba2a38f1; final three-run table: final-1 / final-2 / final-3 each Test Files 1 failed | 8 passed (9), Tests 2 failed | 88 passed (90), only inherited titles “recognizes hostile static SQL concatenation, interpolation, and tagged builders” and “classifies every register relation access and bans open writers, latest selection, and unsafe version coercion”; logs /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs/build-s03-c3-cluster-final-{1,2,3}.log; per-suite pairs 11/0, 24/0, 3/0, 14/0, 12/0, 4/0, 3/0, 5/0, 12/2 and CLUSTER_GREEN in build-s03-c3-run-suites-final.log; embedded before→after register 25/25→25/25 and principals 32/32→32/32; pnpm typecheck inherited rc=1 and adds no diagnostic outside the recorded register-support baseline in build-s03-c3-typecheck-post-cluster.log; v4 = 33 rows, f02c8c003c75c2513672fc4380d4302d5dd18e576fcb498d968c61ba5cb32cf9, legacy digest/14 rows unchanged; refutations killed: S18 port 8794, S19 model in ref, S20 API-first, S21 ignored parameter and zero-argument publication, S22 short Claude alias, S23/S29 target-derived tier row, S25 late config stage, S26 credentialed sentinel, S27 accepted 0644, S28 disabled held-set admission, S30 minimum-five guard, S31 appended API /v1; all restored and green, with logs listed in the self-report. S21 publication call is exactly developmentConfiguredProviderPanel(loadModelConfigConfiguredProviders(repositoryRoot)) and the zero-argument substring is absent. Acceptance step 4 readback command, verbatim: db_url="$(sed -n 's/^DATABASE_URL=//p' .local/dev-auth/api.env)"; relation="$(psql "$db_url" -XAt -v ON_ERROR_STOP=1 -c "SELECT format('%I.%I',table_schema,table_name) FROM information_schema.columns WHERE column_name='discovered_panel' ORDER BY table_schema,table_name LIMIT 1")"; psql "$db_url" -X -v ON_ERROR_STOP=1 -v run_ref='<RUN_REF_FROM_DEBATE_URL>' -c "SELECT discovered_panel::text FROM ${relation} WHERE run_ref = :'run_ref';"; unset relation db_url
+Findings: apps/runner/src/dev-cli-provider-panel.ts:122-129 needs boundary casts because the read-only relay option types lag S22's full-model contract; PLAN.md:663-704 orders S26's key-reading behavior before S27 creates its reader while requiring each step green; PLAN.md:707-733 names a newest-64 held-set producer outside C3's authorized surface; tests/integration/dev-deployment-register.test.ts:92-137 needed an explicit temp-root model fixture after S21 made cwd configuration a dependency. Detailed costs, dead ends, packet defects, and one-prompt-machine upgrades are in the self-report.
+UNVERIFIED: real OpenAI/Z.AI calls and model echo; real Claude/Grok full-id relay boundary; browser/:3000 acceptance; live producer/population of S28's newest-64 held-version map. No provider, live database, live stack, acceptance file, main tree, or V desktop was touched.
+Self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S03-C3.md
+Comments read through: 3
+  [2026-09-13 20:05] Claude-Router: CONSUMED by the orchestrator 2026-09-13 20:05 EEST: SKILLS LOADED 6/6 verified on the rollout; commit 43efdb1a = 24 files, every one inside the 24 allowed paths; lane porcelain empty; my own re-run of the nine-suite command at 43efdb1a: rc=1 · Test Files 1 failed | 8 passed (9) · Tests 2 failed | 88 passed (90) — exactly the two inherited register-support-publication titles, the provider-panel title gone (S32). Your seven findings are accepted: F1 S26/S27 order (PLAN defect, folded), F2 the relay option types lag S22's full-id contract → boundary casts at dev-cli-provider-panel.ts:122-129 (acceptance/** is another slice's; recorded as the first follow-up before live acceptance), F3 S28's newest-64 producer outside the surface (folded: TEST(S03) cannot prove live population — a V row), F4 fixture cwd dependency, F5 line anchors vs symbols (packet law from C4 on), F6 the fourth run of the embedded suite (kept as the variance sample for S03; template note), F7 new-case vs added-assertion per step (packet law). Your base/evidence logs under .hermes/reports/debate-tiers/logs/build-s03-c3-*.log sit in the main tree untracked — kept as evidence, named in the LEDGER. Acceptance step 4 readback command relayed verbatim to V's packet. comments read through: 5
+
+Events (10):
+  [2026-09-13 18:01] created {'assignee': None, 'status': 'todo', 'parents': ['t_3fe3198c'], 'tenant': None, 'branch_name': None, 'skills': None, 'goal_mode': None}
+  [2026-09-13 18:01] linked {'parent': 't_77c0cb5f', 'child': 't_843976bb'}
+  [2026-09-13 18:45] promoted
+  [2026-09-13 18:52] commented {'author': 'Claude-Router', 'len': 821}
+  [2026-09-13 18:52] [run 268] claimed {'lock': 'Vlads-MacBook-Pro.local:55293', 'expires': 1789336354, 'run_id': 268}
+  [2026-09-13 18:56] commented {'author': 'BUILD-S03-C3', 'len': 1414}
+  [2026-09-13 19:02] commented {'author': 'BUILD-S03-C3', 'len': 1006}
+  [2026-09-13 20:02] commented {'author': 'BUILD-S03-C3', 'len': 5207}
+  [2026-09-13 20:05] commented {'author': 'Claude-Router', 'len': 1269}
+  [2026-09-13 20:05] [run 268] completed {'result_len': 200, 'summary': 'READY: commit 43efdb1a — file-owned five-slot provider set drives CLI starts, discovery set, api.env, register row planTierRosters, restart check; nine suites 88 passed | 2 inherited; CLUSTER_GREEN ×3'}
+
+Runs (1):
+  #268 completed    @-  4403s  2026-09-13 18:52
+        → READY: commit 43efdb1a — file-owned five-slot provider set drives CLI starts, discovery set, api.env, register row planTierRosters, restart check; nine suites 8

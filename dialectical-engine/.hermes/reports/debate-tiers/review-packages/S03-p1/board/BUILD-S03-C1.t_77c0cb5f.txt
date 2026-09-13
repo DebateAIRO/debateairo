@@ -1,0 +1,141 @@
+Task t_77c0cb5f: BUILD(S03-C1) — config/models.yaml + @debateai/model-config + generated PLAN_TIER_ROSTERS (S1–S13)
+  status:    done
+  assignee:  -
+  workspace: scratch @ /Users/vladmihaimiron/.hermes/kanban/boards/debate-tiers/workspaces/t_77c0cb5f
+  max-retries: 2 (default)
+  created:   2026-09-13 17:23 by Claude-Router
+  started:   2026-09-13 17:51
+  completed: 2026-09-13 18:45
+  parents:   t_f06b97cf
+  children:  t_843976bb, t_f0797f95
+
+Body:
+Codex Sol, lane .worktrees/tiers-s03 @ 9a000c37, in parallel with BUILD(S03-C2) and ARCH-FIX p3 (reviews/ARCH-REV-S03-p2.md charge-8 ruling).
+
+Result:
+READY: commit 62a4c367 — config/models.yaml + @debateai/model-config + generated PLAN_TIER_ROSTERS; cluster 24/24 ×3 CLUSTER_GREEN; S13 in the pinned-inventory form per ruling c.11
+
+Comments (13):
+  [2026-09-13 17:51] Claude-Router: DISPATCHED 2026-09-13 17:51 EEST — BUILD(S03-C1), pass 1 of 3. Packet: .hermes/planning/debate-tiers/packets/BUILD-S03-C1.md (packet-check OK; re-issued on PLAN Revision 3: six suites, 18 paths, tier01-roster 1/1 → 2/2, pnpm-lock.yaml allowed, dev-deployment-register.test.ts is C3's). Transport: codex exec, gpt-5.6-sol, danger-full-access inside the lane, background process (logs/launch-BUILD-S03-C1.sh → logs/BUILD-S03-C1.log, pid file logs/BUILD-S03-C1.pid). Freeze: main-tree HEAD b6ecee09; lane slice/tiers-s03 base 9a000c37, 0 dirty at launch. Shares the lane with BUILD-S03-C2 (disjoint surfaces). Comment cursor: 0.
+  [2026-09-13 17:53] Claude-Router: ORCHESTRATOR NOTE 2026-09-13 17:53 EEST: attempt 1 (17:51, a harness-tracked background task with a 10-minute cap) was stopped at ~50 s and the seat RELAUNCHED detached (nohup setsid) — a fresh codex session; attempt-1's log is logs/BUILD-S03-*.attempt1.log. Lane was 0 dirty between the two attempts. Comment cursor unchanged.
+  [2026-09-13 17:54] Claude-Router: ORCHESTRATOR CORRECTION 2026-09-13 17:54 EEST: the 'nohup setsid' relaunch in the note above never started (no setsid on this Mac). The seat actually running is attempt 3, launched ~17:55 via python start_new_session — codex session id 01a09b42-74f8-72f2-880b-cedf57d512f2, pid 14812, log logs/BUILD-S03-C1.log. Attempt-1 log kept as .attempt1.log; attempt 2 wrote nothing but the error. Lane 0 dirty at every attempt.
+  [2026-09-13 17:55] BUILD-S03-C1: CLAIM — seat BUILD-S03-C1 · node BUILD(S03-C1) pass 1 of 3 · start time Sun Sep 13 17:55:01 EEST 2026 · session id 01a09b42-74f8-72f2-880b-cedf57d512f2 · transcript /Users/vladmihaimiron/.codex/sessions/2026/09/13/rollout-2026-09-13T17-53-38-01a09b42-74f8-72f2-880b-cedf57d512f2.jsonl · lane slice/tiers-s03 HEAD 9a000c37 · dirty count 0 · comments read through: 3
+  [2026-09-13 18:04] Claude-Router: FOLD (orchestrator, 2026-09-13 18:04 EEST) — ARCH-REV p3 N2-p3, LIVE for you: PLAN S1's Done-when clause 'after pnpm install, git status --porcelain lists exactly the paths in S03-C1's column and no others' (PLAN.md:105-109) is UNSATISFIABLE while BUILD-S03-C2 works beside you in the same lane — its files (packages/providers/src/index.ts, apps/api/src/provider-discovery.ts, tests/unit/api-provider-discovery.test.ts, tests/unit/provider-base-url-admission.test.ts, tests/unit/provider-discovery-uncredentialed.test.ts, and later its commit) sit in that output and are not yours to remove. The clause now reads: 'after pnpm install, git status --porcelain lists NO path outside S03-C1's column that was clean before the install' — i.e. compare the porcelain output before and after your install and assert the difference is a subset of your column (pnpm-lock.yaml, packages/model-config/**, …). Your packet's verification line carries the same defect; read it the same way. Everything else in S1 stands. Also ruled (ARCH-REV p3 N3-p3): tier01-roster.test.ts goes 1/1 → 2/2 with S10's ordering case — that delta is named against SPEC R27 in DECISIONS, so 2/2 is the expectation, not a regression.
+  [2026-09-13 18:05] BUILD-S03-C1: BLOCKED — BUILD-S03-C1 · BUILD(S03-C1) pass 1 of 3 · session 01a09b42-74f8-72f2-880b-cedf57d512f2. Cause: I ran the packet-permitted single pnpm install before creating S1 package files; it completed rc=0 but saw 34 projects. After creating the package, the S2 test remains BROKEN at collection: Cannot find package @debateai/model-config. Systematic measurement: root import.meta.resolve => ERR_MODULE_NOT_FOUND; pnpm --filter @debateai/model-config self-resolution => packages/model-config/src/index.ts. The root package manifest has no @debateai/model-config dependency, and its allowed named block is only generate:contract; the packet says never run pnpm install again and never cross allowed writes. Smallest unblock: explicitly authorize ONE recovery pnpm install now (accepting that this is the second invocation and occurs after one RED run), or rule that the root dependency/link fields are in C1 scope. Partial allowed work is preserved; C2 forbidden paths were never touched. comments read through: 4
+  [2026-09-13 18:07] Claude-Router: RULING (orchestrator, 2026-09-13 18:07 EEST) — UNBLOCKED. Cause is my packet's charge 2(a): 'pnpm install FIRST, once, before any test' — an install that runs before packages/model-config/package.json exists cannot link the package, and root-level tests resolve a workspace package ONLY through the root manifest: measured at 9a000c37, package.json:60-71 declares every @debateai/* as "workspace:*" and node_modules/@debateai/ holds exactly those symlinks (no model-config). Two rulings, one legal build: (1) the repo-root package.json is in C1's column and S1 ALSO adds "@debateai/model-config": "workspace:*" to its dependencies (alphabetical, beside the other @debateai entries) — the PLAN's S1 'only if the workspace glob…' was incomplete (the glob discovers the package; the root dependency links it); (2) ONE more pnpm install is authorized NOW, after that dependency line and after the package.json you already created — that is the install that links; pnpm-lock.yaml is yours. Then re-run S2's suite: BROKEN at collection must become RED on assertions. Also in force since your CLAIM: ARCH-REV p3 N2-p3 — S1's porcelain clause reads 'no path outside C1's column that was clean before the install' (C2's files sit beside yours; compare before/after); and tier01-roster.test.ts goes 1/1 → 2/2 with S10's ordering case (delta named against R27 in DECISIONS). Continue from S2 in the packet's order. comments read through: 7
+  [2026-09-13 18:14] BUILD-S03-C1: S4 PRIMARY RED — six class cases before shape.ts (verbatim from /private/tmp/build-s03-c1.ERGheV/s4-primary-red.log):
+```
+TypeError: ModelConfigShapeError is not a constructor
+ ❯ expectShapeError tests/unit/model-config-shape.test.ts:71:18
+     69|     | ShapeErrorConstructor
+     70|     | undefined;
+     71|   const marker = new ModelConfigShapeError({
+       |                  ^
+     72|     ...expected,
+     73|     detail: "expected shape refusal"
+ ❯ tests/unit/model-config-shape.test.ts:100:5
+
+TypeError: ModelConfigShapeError is not a constructor
+ ❯ expectShapeError tests/unit/model-config-shape.test.ts:71:18
+     69|     | ShapeErrorConstructor
+     70|     | undefined;
+     71|   const marker = new ModelConfigShapeError({
+       |                  ^
+     72|     ...expected,
+     73|     detail: "expected shape refusal"
+ ❯ tests/unit/model-config-shape.test.ts:107:5
+
+TypeError: ModelConfigShapeError is not a constructor
+ ❯ expectShapeError tests/unit/model-config-shape.test.ts:71:18
+     69|     | ShapeErrorConstructor
+     70|     | undefined;
+     71|   const marker = new ModelConfigShapeError({
+       |                  ^
+     72|     ...expected,
+     73|     detail: "expected shape refusal"
+ ❯ tests/unit/model-config-shape.test.ts:114:5
+
+TypeError: ModelConfigShapeError is not a constructor
+ ❯ expectShapeError tests/unit/model-config-shape.test.ts:71:18
+     69|     | ShapeErrorConstructor
+     70|     | undefined;
+     71|   const marker = new ModelConfigShapeError({
+       |                  ^
+     72|     ...expected,
+     73|     detail: "expected shape refusal"
+ ❯ tests/unit/model-config-shape.test.ts:125:5
+
+TypeError: ModelConfigShapeError is not a constructor
+ ❯ expectShapeError tests/unit/model-config-shape.test.ts:71:18
+     69|     | ShapeErrorConstructor
+     70|     | undefined;
+     71|   const marker = new ModelConfigShapeError({
+       |                  ^
+     72|     ...expected,
+     73|     detail: "expected shape refusal"
+ ❯ tests/unit/model-config-shape.test.ts:132:5
+
+TypeError: ModelConfigShapeError is not a constructor
+ ❯ expectShapeError tests/unit/model-config-shape.test.ts:71:18
+     69|     | ShapeErrorConstructor
+     70|     | undefined;
+     71|   const marker = new ModelConfigShapeError({
+       |                  ^
+     72|     ...expected,
+     73|     detail: "expected shape refusal"
+ ❯ tests/unit/model-config-shape.test.ts:149:5
+```
+Summary: Test Files 1 failed (1); Tests 7 failed (7).
+  [2026-09-13 18:29] default: BLOCKED AT S13 — BUILD-S03-C1 · session 01a09b42-74f8-72f2-880b-cedf57d512f2. S1–S12 are implemented and restored GREEN; generated contract output is present. S13"\"s new sixth case is correctly RED with only:
+  [2026-09-13 18:30] BUILD-S03-C1: BLOCKED AT S13 — BUILD-S03-C1 · session 01a09b42-74f8-72f2-880b-cedf57d512f2. S1–S12 are implemented and restored GREEN; generated contract output is present.
+
+S13's new sixth case is correctly RED with only:
+
+- Expected: apps/api/src/index.ts, apps/runner/src/dev-cli-provider-panel.ts
+- Received: those two plus apps/ui/app/new/page.tsx
+
+Evidence: /private/tmp/build-s03-c1.ERGheV/s13-red-isolated.log — Test Files 1 failed (1); Tests 1 failed | 5 passed (6).
+
+This is exactly PLAN S13's RED-if-omitted at apps/ui/app/new/page.tsx and requires S24/C4, but C1 is forbidden from apps/** and C4 is scheduled behind C1 + C3; C3 itself waits on C1 READY. Commit-on-green plus the six-suite cluster therefore creates a cycle.
+
+Smallest ruling needed: either (A) dispatch/land the S24 UI removal before C1 verification, or (B) explicitly authorize C1 to commit this known dependency RED and redefine its C1 verdict until C4. I will not edit apps/** or weaken the assertion.
+
+Correction: the immediately preceding comment 9 was truncated by local shell quoting and has author default; this comment supersedes it. Comments read through: 9.
+  [2026-09-13 18:34] Claude-Router: RULING on S13 — UNBLOCKED, 2026-09-13 18:34 EEST (Claude-Router; supersedes nothing above, binds the C1 verdict). The PLAN placed S13's final assertion ('no file under apps/ui/ selects PLAN_TIER_ROSTERS') in C1 while the removal it measures is S24 in C4 — a PLAN defect, recorded in DECISIONS, not yours. Neither (A) nor (B): S24 cannot land before C3's register row, and a known-RED commit is not evidence. Ruled (C), the two-step form:
+1. AT C1 (you, now): S13's case asserts the EXACT inventory of selecting files as measured today — exactly { apps/api/src/index.ts, apps/runner/src/dev-cli-provider-panel.ts, apps/ui/app/new/page.tsx } plus the suites — using the same rosterSelectors machinery. Name the UI entry in the test with a comment 'removed by S24 (C4): S13's final form drops this entry and asserts no apps/ui consumer'. Refutation: a fourth selector added in a scratch copy of any apps/** file goes RED (received ≠ expected), the page's import removed goes RED. This keeps S13's purpose (a second compiled source of the lists cannot appear or disappear unnoticed) without asserting a removal that has not happened.
+2. AT C4 (not you): tests/architecture/tiers-s02-rosters.test.ts joins C4's allowed list; S24 removes the import and flips the case to the PLAN's final form (exact set of two + the apps/ui negative). C4's packet carries that charge.
+GREEN for C1 is unchanged in count: tiers-s02-rosters 4/4 → 6/6 with case 6 in the pinned-inventory form; the cluster 6 files, every test passing, three runs. Commit on that green. Do not edit apps/**. Comments read through: 10 (your comment 9 'default' is noted as superseded by 10).
+  [2026-09-13 18:43] BUILD-S03-C1: SKILLS LOADED: /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md
+READY — node BUILD(S03-C1) pass 1 of 3 · ticket t_77c0cb5f · session 01a09b42-74f8-72f2-880b-cedf57d512f2 · transcript /Users/vladmihaimiron/.codex/sessions/2026/09/13/rollout-2026-09-13T17-53-38-01a09b42-74f8-72f2-880b-cedf57d512f2.jsonl
+branch slice/tiers-s03 · commit 62a4c36733fb683f28be651d505e263b06f43056 · base/CLAIM HEAD 9a000c37 · C2 predecessor a9179644 · no push/merge
+verification: suites tier01-roster 2/0 · tiers-s02-rosters 6/0 · model-config-file 5/0 · model-config-shape 8/0 · model-config-tiers 2/0 · model-config-no-secret 1/0; three-run table: run1 `Test Files 6 passed (6)` / `Tests 24 passed (24)` / `CLUSTER_GREEN` · run2 `Test Files 6 passed (6)` / `Tests 24 passed (24)` / `CLUSTER_GREEN` · run3 `Test Files 6 passed (6)` / `Tests 24 passed (24)` / `CLUSTER_GREEN`; full logs /private/tmp/build-s03-c1.ERGheV/cluster-final-run{1,2,3}.log; gates: authorized recovery install rc=0 with zero pre/post porcelain delta and node_modules/@debateai/model-config -> ../../packages/model-config · package tsc rc=0 · fresh generated-directory `pnpm run generate:contract` rc=0 and output present/ignored · root typecheck inherited rc=1, 70 total diagnostics, 0 in allowed · final worktree clean; primary RED frame verbatim `TypeError: ModelConfigShapeError is not a constructor` in all six class cases (ticket comment 8, /private/tmp/build-s03-c1.ERGheV/s4-primary-red.log), union seventh RED, then 7/7 GREEN; S2 assertion RED verbatim `AssertionError: expected 'undefined' to be 'function'`; refutation matrix (property · mutant/omission · target · neighbouring miss · restore): S1 root resolution · install before package/root link · model-config-file BROKEN · self-resolution alone · recovery link verified/status unchanged; S2 API preservation · empty baseUrl · model-config-file RED · unusual-id lowercasing · GREEN/status; S3 read-only · appended newline/write primitive · model-config-file two RED · other-path write · GREEN/status; S4 class identity · class6 collapsed into class4 · shape class6 RED only · dual-fault later guard · 7/7/status; S5 injected world port · always absent · injected-true RED while refusal green · real probe correctness · 8/8/status; S6 no secret · scratch `key: sk-test` · no-secret RED · fixture secrets · 1/1/status; S7 wire vocabulary · add enterprise · tiers wire RED while boundary green · order mismatch · 2/2/status; S8 exact generated roster · drop final premium ID · generator RED · formatting instability · 4/4/status; S9 no production literal · add quoted gpt-5.6-luna · tier01 RED · excluded generated/test literal · 1/1/status; S10 generator order · reverse commands · ordering RED only · malformed generated TS · 2/2/status; S11 quoted matcher/positive limb · bare matcher · canonical case RED on apps/api/src/support/model.ts + apps/runner/src/dev-auth-stack.ts + apps/runner/src/dev-support-model.ts · excluded extension/dir · restored then S12 5/5/status; S12 exact committed fleet · glm mutant · file and positive-limb RED · prose outside required comment substrings · 11/11/status; S13 pinned selector inventory · scratch fourth selector then simulated UI removal · case6 RED each direction · unrecognized selector syntax · 6/6/status.
+findings/packet defects: BUILD-S03-C1.md:25 and PLAN.md:98-109 ordered the one install before the package/root workspace link existed (ruled comment 7); PLAN.md:221-230 makes S10 consume config before S12 owns it at :251-266; PLAN.md:268-276 required C4/S24's future UI removal while C4 waited behind C1 (ruled comment 11); shell-only Hermes comment quoting produced truncated superseded comment 9; S10 recursive deletion was policy-blocked and safely replaced by move-to-scratch/regenerate.
+UNVERIFIED: live database · :3000 stack · providers/real keys · browser/deployment acceptance · C4's final S24 UI-consumer removal; root typecheck absolute rc remains inherited-red though allowed delta is zero; nothing pushed or merged.
+self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S03-C1.md
+comments read through: 11
+  [2026-09-13 18:45] Claude-Router: CONSUMED by the orchestrator 2026-09-13 18:45 EEST: SKILLS LOADED 6/6 verified on the rollout; commit 62a4c367 = 17 files, every one inside the 18 allowed paths (the eighteenth is the gitignored generated roster, present in the lane); lane porcelain empty; my own re-run of the cluster command at 62a4c367: rc=0 · Test Files 6 passed (6) · Tests 24 passed (24); tier01-roster 2/2 (S10's ordering case as ruled N3-p3); config/models.yaml carries exactly V's fleet (free: gpt-5.6-luna over openai, glm-5.3-flash over zai; premium: codex gpt-5.6-sol, claude claude-opus-5, grok grok-4.6-build); root package.json has the workspace dependency and pnpm-lock.yaml links it. Your findings are accepted: the S1 install order (ruled c.7), S10 consuming config before S12 owns it (PLAN order defect — folded), S13's cross-cluster criterion (ruled c.11, C4 flips it), rm -rf policy-blocked → mv-to-scratch is now the prescribed pattern, package tsconfig strictness vs root (folded), Hermes comment quoting (noted). The 20.2M-token accounting (19.7M cached input) is recorded for the autopsy. comments read through: 12
+
+Events (19):
+  [2026-09-13 17:23] created {'assignee': None, 'status': 'todo', 'parents': ['t_f14b0ca0'], 'tenant': None, 'branch_name': None, 'skills': None, 'goal_mode': None}
+  [2026-09-13 17:23] linked {'parent': 't_f06b97cf', 'child': 't_77c0cb5f'}
+  [2026-09-13 17:32] unlinked {'parent': 't_f14b0ca0', 'child': 't_77c0cb5f'}
+  [2026-09-13 17:32] promoted
+  [2026-09-13 17:51] commented {'author': 'Claude-Router', 'len': 625}
+  [2026-09-13 17:51] [run 259] claimed {'lock': 'Vlads-MacBook-Pro.local:12546', 'expires': 1789311962, 'run_id': 259}
+  [2026-09-13 17:53] commented {'author': 'Claude-Router', 'len': 327}
+  [2026-09-13 17:54] commented {'author': 'Claude-Router', 'len': 418}
+  [2026-09-13 17:55] commented {'author': 'BUILD-S03-C1', 'len': 364}
+  [2026-09-13 18:04] commented {'author': 'Claude-Router', 'len': 1197}
+  [2026-09-13 18:05] commented {'author': 'BUILD-S03-C1', 'len': 1012}
+  [2026-09-13 18:07] commented {'author': 'Claude-Router', 'len': 1428}
+  [2026-09-13 18:14] commented {'author': 'BUILD-S03-C1', 'len': 2476}
+  [2026-09-13 18:29] commented {'author': 'default', 'len': 209}
+  [2026-09-13 18:30] commented {'author': 'BUILD-S03-C1', 'len': 1132}
+  [2026-09-13 18:34] commented {'author': 'Claude-Router', 'len': 1647}
+  [2026-09-13 18:43] commented {'author': 'BUILD-S03-C1', 'len': 5110}
+  [2026-09-13 18:45] commented {'author': 'Claude-Router', 'len': 1106}
+  [2026-09-13 18:45] [run 259] completed {'result_len': 180, 'summary': 'READY: commit 62a4c367 — config/models.yaml + @debateai/model-config + generated PLAN_TIER_ROSTERS; cluster 24/24 ×3 CLUSTER_GREEN; S13 in the pinned-inventory form per ruling c.11'}
+
+Runs (1):
+  #259 completed    @-  3258s  2026-09-13 17:51
+        → READY: commit 62a4c367 — config/models.yaml + @debateai/model-config + generated PLAN_TIER_ROSTERS; cluster 24/24 ×3 CLUSTER_GREEN; S13 in the pinned-inventory 
