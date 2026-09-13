@@ -275,11 +275,11 @@ describe("S02 tier roster architecture", () => {
   });
 
   it("keeps plan-tier roster selection in server production files only", () => {
-    expect(rosterSelectingFiles()).toEqual([
+    const selectingFiles = rosterSelectingFiles();
+    expect.soft(selectingFiles).toEqual([
       "apps/api/src/index.ts",
-      "apps/runner/src/dev-cli-provider-panel.ts",
-      // removed by S24 (C4): S13's final form drops this entry and asserts no apps/ui consumer
-      "apps/ui/app/new/page.tsx"
+      "apps/runner/src/dev-deployment-register.ts"
     ]);
+    expect(selectingFiles.filter((file) => file.startsWith("apps/ui/"))).toEqual([]);
   });
 });

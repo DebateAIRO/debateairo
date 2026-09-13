@@ -4,13 +4,41 @@ import { readFileSync } from "node:fs";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 
 const mocks = vi.hoisted(() => ({
   createDebate: vi.fn(),
   push: vi.fn(),
+  readDeployment: vi.fn(),
   readSession: vi.fn()
 }));
+
+function deploymentWithRosters(rosters: Readonly<{
+  free: readonly string[];
+  premium: readonly string[];
+}>) {
+  return Object.freeze({
+    register: {
+      register_version: 1,
+      rows: [{
+        row_key: "planTierRosters",
+        value: {
+          kind: "PLAN_TIER_ROSTERS",
+          free: rosters.free,
+          premium: rosters.premium
+        },
+        source_ref: "config/models.yaml"
+      }]
+    },
+    scorecards: [],
+    model_ledger: [],
+    fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
+  });
+}
+
+const deploymentFixture = deploymentWithRosters({
+  free: ["gpt-5.6-luna", "glm-5.3-flash"],
+  premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
@@ -23,7 +51,10 @@ vi.mock("@/components/AuthGate", () => ({
 
 vi.mock("@/lib/api", () => ({
   createDebate: mocks.createDebate,
-  contractClient: { readSession: mocks.readSession }
+  contractClient: {
+    readDeployment: mocks.readDeployment,
+    readSession: mocks.readSession
+  }
 }));
 
 import NewDebatePage from "../../apps/ui/app/new/page.js";
@@ -58,6 +89,7 @@ describe("S01 /new plan tier", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
     mocks.push.mockReset();
+    mocks.readDeployment.mockReset().mockResolvedValue(deploymentFixture);
     mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
     const container = document.createElement("div");
     document.body.append(container);
@@ -171,11 +203,36 @@ describe("S01 /new plan tier", () => {
     expect(mocks.readSession).toHaveBeenCalledTimes(1);
   });
 
-  it("S01-25 R3 names each tier's models from the roster declaration", async () => {
+  // Property: the Free card renders the file-fed deployment roster and no retired model id.
+  // Production break: keep rendering the compiled PLAN_TIER_ROSTERS export instead of the register row.
+  it("S03-24 R16 renders the Free card from the deployment roster row", async () => {
+    vi.resetModules();
+    vi.doMock("@debateai/contract", () => ({
+      PLAN_TIER_ROSTERS: {
+        free: ["gpt-5.6-luna", "claude-sonnet-5"],
+        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
+      }
+    }));
+    try {
+      const { default: PageWithStaleCompiledRoster } = await import("../../apps/ui/app/new/page.js");
+      await act(async () => root!.render(<PageWithStaleCompiledRoster />));
+      await settle();
+
+      const freeCard = document.querySelector('#planTier-free')?.textContent ?? "";
+      expect(freeCard).toContain("gpt-5.6-luna");
+      expect(freeCard).toContain("glm-5.3-flash");
+      expect(document.body.innerHTML).not.toContain("claude-sonnet-5");
+    } finally {
+      vi.doUnmock("@debateai/contract");
+      vi.resetModules();
+    }
+  });
+
+  it("S01-25 R3 names each tier's models from the deployment roster row", async () => {
     await renderPage();
 
     expect(document.querySelector('#planTier-free')?.textContent).toContain("gpt-5.6-luna");
-    expect(document.querySelector('#planTier-free')?.textContent).toContain("claude-sonnet-5");
+    expect(document.querySelector('#planTier-free')?.textContent).toContain("glm-5.3-flash");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("gpt-5.6-sol");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("claude-opus-5");
     expect(document.querySelector('#planTier-premium')?.textContent).toContain("grok-4.6-build");
@@ -195,10 +252,9 @@ describe("S01 /new plan tier", () => {
     const freeModels = [...document.querySelectorAll<HTMLElement>('#planTier-free .ndTierModel')];
     const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
     const expectedRosters = {
-      free: ["gpt-5.6-luna", "claude-sonnet-5"],
+      free: ["gpt-5.6-luna", "glm-5.3-flash"],
       premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"]
     };
-    expect(PLAN_TIER_ROSTERS).toEqual(expectedRosters);
     expect({
       free: freeModels.map((model) => model.textContent?.trim()),
       premium: premiumModels.map((model) => model.textContent?.trim())
@@ -207,7 +263,7 @@ describe("S01 /new plan tier", () => {
       model.querySelector<HTMLElement>('.modelDot')?.style.getPropertyValue("--dot")
     )).toEqual([
       "var(--m-gpt)",
-      "var(--m-claude)",
+      "var(--m-default)",
       "var(--m-gpt)",
       "var(--m-claude)",
       "var(--m-grok)"
@@ -215,36 +271,45 @@ describe("S01 /new plan tier", () => {
   });
 
   it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
-    vi.resetModules();
-    vi.doMock("@debateai/contract", () => ({
-      PLAN_TIER_ROSTERS: {
-        free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
-        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
-      }
+    mocks.readDeployment.mockResolvedValueOnce(deploymentWithRosters({
+      free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
+      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
     }));
-    try {
-      const { default: PageWithProbeRoster } = await import("../../apps/ui/app/new/page.js");
-      await act(async () => root!.render(<PageWithProbeRoster />));
-      await settle();
-      expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
-        dot.style.getPropertyValue("--dot")
-      )).toEqual([
-        "var(--m-gpt)",
-        "var(--m-claude)",
-        "var(--m-gpt)",
-        "var(--m-gpt)",
-        "var(--m-gpt)",
-        "var(--m-gpt)",
-        "var(--m-claude)",
-        "var(--m-grok)",
-        "var(--m-claude)",
-        "var(--m-grok)",
-        "var(--m-gemini)"
-      ]);
-    } finally {
-      vi.doUnmock("@debateai/contract");
-      vi.resetModules();
-    }
+    await renderPage();
+
+    expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
+      dot.style.getPropertyValue("--dot")
+    )).toEqual([
+      "var(--m-gpt)",
+      "var(--m-claude)",
+      "var(--m-gpt)",
+      "var(--m-gpt)",
+      "var(--m-gpt)",
+      "var(--m-gpt)",
+      "var(--m-claude)",
+      "var(--m-grok)",
+      "var(--m-claude)",
+      "var(--m-grok)",
+      "var(--m-gemini)"
+    ]);
+  });
+
+  // Property: every file-fed model id renders a non-empty name and identity dot.
+  // Production break: omit the --dot style for glm-5.3-flash while rendering the roster row.
+  it("S03-24 R17 gives all five file-fed model ids a name and identity dot", async () => {
+    await renderPage();
+
+    const models = [...document.querySelectorAll<HTMLElement>('.ndTierModel')];
+    expect(models.map((model) => ({
+      name: model.textContent?.trim(),
+      dot: model.querySelector<HTMLElement>('.modelDot')?.style.getPropertyValue("--dot")
+    }))).toEqual([
+      { name: "gpt-5.6-luna", dot: "var(--m-gpt)" },
+      { name: "glm-5.3-flash", dot: "var(--m-default)" },
+      { name: "gpt-5.6-sol", dot: "var(--m-gpt)" },
+      { name: "claude-opus-5", dot: "var(--m-claude)" },
+      { name: "grok-4.6-build", dot: "var(--m-grok)" }
+    ]);
   });
 
   it("S01-27 R4 locks all fourteen controls while Free is chosen", async () => {
