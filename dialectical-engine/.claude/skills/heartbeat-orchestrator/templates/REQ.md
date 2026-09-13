@@ -8,13 +8,13 @@ Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-pro
 - ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
 - cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
 - inputs (read these and nothing else): the intake record (V's verbatim goal, contradiction check, measured state) · the design of record extracts at __DESIGN_DIR__ (if any) · the product files the intake cites, at the lines it cites, read-only (a requirement is checkable only against the code it constrains) · __ARCH_DOCS__ (docs/architecture files WITH line ranges — never a bare directory)
-- output (the ONE artifact this node produces): __MISSION_ROOT__/INSTRUCTIONS.md (new, ≤ 100 lines) and, per slice, __MISSION_ROOT__/slices/<S>/SPEC.md (new, frozen at your READY; first line under the title: `ui: yes|no`), PLAN.md (new, scaffold only), DECISIONS.md (new, append-only), PROGRESS.md (new, empty — the orchestrator's), DONE.md (new, placeholder — UI slices only)
+- output (the ONE artifact this node produces): __MISSION_ROOT__/INSTRUCTIONS.md (new, ≤ 100 lines — on a LATER slice of a running mission it already exists and the edit is ADDITIVE: insert the slice's row in the slice table, append the rest, alter no existing line, stay ≤ 100) and, per slice, __MISSION_ROOT__/slices/<S>/SPEC.md (new, frozen at your READY; first line under the title: `ui: yes|no`), PLAN.md (new, scaffold only), DECISIONS.md (new, append-only), PROGRESS.md (new, empty — the orchestrator's), DONE.md (new, placeholder — UI slices only)
 - self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
 
 ## 2. Contract
-- allowed (exhaustive): __MISSION_ROOT__/INSTRUCTIONS.md (new) · __MISSION_ROOT__/slices/** (new) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- allowed (exhaustive): __MISSION_ROOT__/INSTRUCTIONS.md (new, or additive on a later slice: the slice-table row inserted, everything else appended) · __MISSION_ROOT__/slices/** (new) · __REPORTS__/agent-reports/__SEAT__.md (new)
 - forbidden: everything else — in particular every product file, every other mission's docs, git
-- verification: `wc -l` on INSTRUCTIONS.md ≤ 100 · every SPEC requirement numbered and mechanically checkable · every acceptance step a numbered human-runnable browser step in BOTH modes on UI slices · zero banned words · SPEC↔PLAN trace skeleton present · contradictions: zero, or routed as V rows through the orchestrator
+- verification: `wc -l` on INSTRUCTIONS.md ≤ 100 · every SPEC requirement numbered and mechanically checkable · every acceptance step a numbered human-runnable browser step — in BOTH display modes when the slice adds or changes any element or token (`ui: yes`), once otherwise (`ui: no`), and the SPEC says which · zero banned words · SPEC↔PLAN trace skeleton present · contradictions: zero, or routed as V rows through the orchestrator
 
 ## 3. The work
 One testable vertical slice per SPEC — a beginning and an end V can exercise alone. `ui: yes` when the acceptance runs in a browser (then DONE.md is a placeholder that V fills through the mock gate; you do not define done for a UI slice). Record every alternative you rejected in DECISIONS.md. Clusters are BUILD units (one verification command each); the review unit is the whole slice.
