@@ -275,3 +275,152 @@ simpler to read, and V may never edit a base URL again after V-35 is settled.
 
 ---
 **Fold by the orchestrator, 2026-09-13 18:50 (REQ-REV-S03 pass 3 = PASS, the cap; verdict `reviews/REQ-REV-S03-p3.md`). SPEC-v3.md is the SPEC of record; planning closed.** B1(p2) closed on both members (Build A confirmed at the call site `dev-api-environment.ts:493` — `isExactProviderRuntimeRefresh` is the FIRST predicate of the reuse chain); R33 ruled IN (an observable: `fetchImplementation` is injected at `provider-discovery.ts:125`); N1–N3(p2) retired. Folds: **N1(p3)** the R33 test asserts per uncredentialed SLOT, never per host (ARCH packet charge 2e) · **N2(p3)** INSTRUCTIONS.md:18's S01/S02 prose stays; every S03 packet names SPEC-v3.md. The reviewer's first ARCH-REV check is carried into the ARCH packet (charge 2b): a one-line `model:` edit on a keyed slot must not become a different `provider_ref`. No V row.
+
+---
+
+## Ruled at ARCH (2026-09-13, seat ARCH-S03, ticket `t_6b7afd11`) — `superpowers:brainstorming` before `superpowers:writing-plans`; the rejected directions are recorded because a fleet seat has no human to say yes to
+
+- 2026-09-13 · **Where the YAML read lives** · **a new Node-only package `@debateai/model-config`;
+  never `packages/contract`** · measured in the lane at `9a000c37`:
+  `apps/ui/components/LoginFlow.tsx:5` and `apps/ui/components/PublicationControl.tsx:6` are **value**
+  imports of `@debateai/contract`, and `packages/contract/src/index.ts:3` is
+  `export * from "./plan-tiers.js"`, so contract's index is evaluated inside the browser bundle that
+  `apps/ui/next.config.mjs:15` transpiles. A `node:fs` import at the top of `plan-tiers.ts` therefore
+  enters the client graph, where a node builtin does not resolve. Rejected: reading the file inside
+  `packages/contract` — one fewer package, and it breaks the UI build. Rejected: putting the loader in
+  `apps/runner` — the runner is the biggest consumer, but `packages/contract`'s generator and the
+  suites would then depend on an app · ARCH-S03.
+- 2026-09-13 · **How `PLAN_TIER_ROSTERS` keeps its name and its main-index export while losing its
+  literals** · **a generated, gitignored data module at `packages/contract/generated/plan-tier-rosters.ts`,
+  imported by `plan-tiers.ts`** · three measurements make this the only seam that satisfies every pin
+  at once: (1) `tests/architecture/tier01-roster.test.ts:33-40` reads the value off
+  `import * as contract from "@debateai/contract"` and fails with *"PLAN_TIER_ROSTERS is not exported
+  from @debateai/contract"*, so a subpath-only export is refused; (2) `tier01-roster.test.ts:27` already
+  filters `!file.startsWith("packages/contract/generated/")` and
+  `tiers-s02-rosters.test.ts:76-81` already puts `generated` in `EXCLUDED_DIRECTORIES`, so **no oracle
+  filter is edited**; (3) `packages/contract/generated/` is gitignored (`.gitignore:7`) and produced by
+  `pnpm run generate:contract` (`package.json:21`), which the lane setup already runs
+  (`setup-tiers-s03.log`) and which `TOOLING-TRAPS.md:294` already states as law for a fresh worktree —
+  so the fresh-checkout cost is one the repository already pays. Rejected: a **committed** generated
+  module — it would leave V's config edit showing as a dirty source file, which is half of what this
+  slice exists to remove. Rejected: a lazy getter or a guarded dynamic `import("node:fs")` — the
+  bundler still resolves the specifier, and the mechanism fails the stranger test · ARCH-S03.
+- 2026-09-13 · **Which generator writes it** · **a separate entry
+  `packages/model-config/src/generate-plan-tier-rosters.ts`, run BEFORE
+  `packages/contract/src/generate.ts`** · `packages/contract/src/generate.ts:3` is
+  `import { contractInventory } from "./index.js"`, so contract's own generator depends on contract's
+  index; putting the roster write there would make index → plan-tiers → a not-yet-written generated
+  module a bootstrap deadlock on a fresh checkout. Rejected: extending `generate.ts` — one fewer
+  script, and it cannot run · ARCH-S03.
+- 2026-09-13 · **How `/new` gets the lists at runtime (C15, R16)** · **one more register row,
+  `planTierRosters`, read out of the deployment payload the page already has access to** · measured:
+  `GET /v1/deployment` exists (`apps/api/src/index.ts:867`), the contract client already exposes it
+  (`packages/contract/src/client.ts:506`), and `/new`'s own defaults module already reads register rows
+  by key (`apps/ui/app/new/defaults.tsx:27`, `riskTier`). No new route, no new client method, and
+  `DeploymentSchema` is unchanged. It also puts the tier lists inside the sealed deployment record,
+  which is where this repository keeps the rest of its configuration. Rejected: a new
+  `GET /v1/plan-tiers` route — a smaller blast radius on the register suites, and it leaves the
+  deployment record silent about which models each tier claims. Rejected: a generated module the UI
+  imports — that is the compiled-in roster R16 exists to remove · ARCH-S03.
+- 2026-09-13 · **The entry→slot derivation, and the ARCH-REV check the pass-3 verdict named** ·
+  **the `provider_ref` is a function of `(tier, maker word)` and never of the `model` id; the ten
+  slots the file's grammar can express live in a static catalogue in
+  `apps/runner/src/dev-provider-panel.ts`** · this is what makes R14.2 true for the *rename* case the
+  verdict asked about (`reviews/REQ-REV-S03-p3.md` §8): a one-line `model:` edit on a keyed slot yields
+  the same ref, the same `configuredProviderSet` row
+  (`apps/runner/src/dev-deployment-register.ts:318-322` puts only `providerRef` + `maker` +
+  `adapterKind` in it), and therefore no new register version. A static catalogue also keeps the ref
+  literals in the panel source, which is the oracle
+  `tests/architecture/dev-real-provider-only.test.ts:218-222` uses. **The five live refs keep their
+  exact spelling** — `apps/runner/src/dev-api-environment.ts:354-357` names a rename as the thing the
+  drift guard refuses, and R24's subject is two refs removed and two added, not five renamed.
+  Rejected: deriving the ref string and allocating ports by index — fewer literals, and a file edit
+  would move a running relay's port and strip the panel source of the refs its own suite greps for ·
+  ARCH-S03.
+- 2026-09-13 · **Slot order** · **every `cli:` entry first (premium's, then free's), then every `api:`
+  entry** · `apps/runner/src/main.ts:65-71` copies slot 0's `authorizationHeader` into api.env's
+  primary triple, so keeping slot 0 a loopback relay keeps V's paid key out of it (R14.3, N4). The
+  residue — a file with **no** `cli:` entry at all — is legal under R2–R6, is not one of R20's six
+  classes, and goes to V as the row below rather than being closed by a seventh class this seat may
+  not add · ARCH-S03.
+- 2026-09-13 · **R33's mechanism** · **skip the probe when `target.authorizationHeader === undefined`,
+  and record an ABSENT observation with `failureCode: "PROVIDER_PROBE_SKIPPED_UNCREDENTIALED"`** ·
+  `authorizationHeader` is the discriminator rather than the sentinel model because `apps/api` must not
+  import `DEVELOPMENT_UNAVAILABLE_CLI_MODEL` from `apps/runner`, and because
+  `apps/runner/src/dev-provider-panel.ts:103-108` already forces the two to coincide. No migration is
+  needed: `migrations/0022_dr181_discovery.sql:7` constrains `failure_code` only to non-empty, and
+  `:10` requires ABSENT ⟹ non-null, which the new code satisfies (measured this pass). Recording rather
+  than staying silent keeps the probe store honest about why a slot is absent, at the same write volume
+  as today's failed local probe. Rejected: skipping silently — the slot would read as never probed ·
+  ARCH-S03.
+- 2026-09-13 · **R13's probe change** · **`max_tokens: 64` for every target, plus a frozen per-maker
+  body extension `{ "Z.AI": { thinking: { type: "disabled" } } }`** · F14 measured that exact pair
+  returning `"OK"` on every try; `max_tokens: 8` failed in either mode. **`max_tokens: 64` alone is
+  UNVERIFIED** — it was never measured, and no seat may call a provider to settle it. The extension is
+  keyed by maker rather than carried in the file because R4 fixes an API entry's key set at exactly
+  four keys. Sending `thinking` to OpenAI would be answered 400 and would turn every Luna probe ABSENT,
+  so R13's closing sentence *"Whatever is chosen applies to `gpt-5.6-luna` too"* is read as "one probe
+  budget for both", not "one body for both" — recorded as finding F-ARCH-3 so a reviewer checks the
+  reading. Rejected: a larger budget with no extension — it rests on a measurement nobody took ·
+  ARCH-S03.
+- 2026-09-13 · **R25 — how a legitimate removal is told from a stale reconstruction (C14)** · **the
+  caller passes `heldConfiguredProviderSets`, a bounded map of register version → the refs that
+  version's `configuredProviderSet` row names; a removal is admitted only when the outgoing
+  environment's version is a key of that map and its ref set equals that version's exactly** ·
+  measured: the eleven cases of `tests/integration/dev-api-environment.test.ts` are filesystem fixtures
+  with no pool (`:1-30`), and `publishExactFile`'s `acceptPreviousSource` is a **synchronous**
+  predicate (`apps/runner/src/dev-api-environment.ts:269-270`) — so a database read inside the guard
+  would make eleven green cases need a database. A map is data the publication stage already holds.
+  With no map passed, the predicate is byte-for-byte today's additive-only rule, which is why the pin
+  `rejects v4 reconstruction and removed-provider fallback` (`:352-360`) **keeps its case and its
+  assertion text**. Rejected: an async predicate plus a pool — truer to "ask the register", and it
+  rewrites a suite that has nothing to do with this slice. Rejected: extending the custody receipt —
+  its key set is asserted byte-exact at `apps/runner/src/dev-deployment-register.ts:122` and `:193`,
+  so adding a field breaks the receipt contract · ARCH-S03.
+- 2026-09-13 · **ADR-0024's open invitation is NOT taken** · **`PLAN_TIERS` stays in
+  `@debateai/contract`; `@debateai/model-config` declares its two tier words as a literal union and a
+  test cross-checks them** · ADR-0024's rejected-alternatives table says minting `PLAN_TIERS` in
+  `@debateai/kernel` is "the right long-term home … Revisit when the roster declaration is next
+  touched", and this slice touches it. It is still not taken: `SPEC-v3.md:459-468` does not put it in
+  scope, the cross-check test buys the same guarantee for one `it`, and moving a vocabulary a frozen
+  SPEC declares is a supersession with no finding behind it. Recorded so the next seat does not
+  re-derive the question · ARCH-S03.
+- 2026-09-13 · **One new ADR, numbered at write time** ·
+  **`ADR-<next free>-tier-fleet-configuration-file.md`** · the decision that outlives the mission is
+  *a deployment's model fleet is declared in one committed file, read by exactly one Node-only module,
+  and reaches a browser only as a register row* — plus the rule that a `provider_ref` is a function of
+  `(tier, maker word)` and never of a model id. Measured this pass, the highest existing is
+  **ADR-0024**, so the next free is **0025** — **re-measure with `ls docs/architecture/01-decisions/`
+  at write time and never pre-assign it**, because another mission may take it first. The ADR is
+  written by the cluster that lands the loader (`S03-C1`), not by this seat · ARCH-S03.
+- 2026-09-13 · **What this plan does NOT change** · `evaluateAskAdmission`
+  (`apps/api/src/index.ts:1196-1259`) gets **no product edit** — it already filters in list order,
+  names every missing id before `assertMakerAdmission`, sizes the panel from the filtered list and
+  persists exactly those members; it reads `PLAN_TIER_ROSTERS`, which becomes file-fed, so the new
+  lists arrive with no code change (R15). `DEVELOPMENT_UNAVAILABLE_CLI_MODEL` keeps its spelling
+  (`SPEC-v3.md:466-468`). The support seam's files are edited by no step (R26) · ARCH-S03.
+
+### Rows for V (numbered by the orchestrator at transcription — never by a seat)
+
+V-ROW: NEW · S03 · slice ticket `t_f14b0ca0` · **A models file with no `cli:` entry puts V's API key
+into the runner's primary provider triple.** `config/models.yaml` may legally declare both tiers
+entirely with `api:` entries — R2–R6 admit it, and none of R20's six shape classes refuses it. The
+runner copies **slot 0's** `baseUrl`/`model`/`authorizationHeader` into `api.env`'s
+`VLLM_BASE_URL`/`VLLM_MODEL`/`VLLM_AUTHORIZATION`, throwing
+`RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT` otherwise (`apps/runner/src/main.ts:65-71`; the drift
+check re-measured this pass at `:207-213`). The plan's order rule (PLAN §1 S20) puts every `cli:`
+entry ahead of every `api:` entry, so slot 0 is a loopback relay **whenever the file has at least one
+`cli:` entry** — which R7's merge content does. With none, V's paid bearer lands in that triple.
+Recommended default: **ship S03 without a check for it.** The merged file has three `cli:` entries and
+the order rule keeps slot 0 local; closing the hole means a seventh shape class, which moves R20's
+class list and R28's fixture count — both frozen, and neither is a seat's to move.
+Smallest yes/no for V: "If you ever write a models file with no CLI entry at all, your API key ends up
+in the runner's primary provider slot. Ship S03 without a check for that, and add it later if you ever
+write such a file?"
+VERDICT ship without the check / CONFIDENCE medium / STRONGEST COUNTER: this slice exists so V can edit
+the file freely, and "freely" is exactly when the un-refused case gets written; a seventh class costs
+one fixture and one `it`, and a SPEC being read by ARCH-REV this week is the cheapest moment it will
+ever have to move.
+
+*(The same text is carried in `PLAN.md` §6 so a reader of the plan alone sees the open question; this
+block is the one the orchestrator transcribes.)*
