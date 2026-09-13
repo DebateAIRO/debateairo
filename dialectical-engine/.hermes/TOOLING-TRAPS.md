@@ -3075,3 +3075,9 @@ The S10 "deleted generated directory" gate tried `rm -rf packages/contract/gener
 
 ## A cluster's base moves when its predecessor lands — measure it AFTER, not from the PLAN row (2026-09-13, S03 C1 → C3)
 PLAN §2 stated C3's base as `3 failed | 67 passed (70)` at 9a000c37. After C1's commit the same command printed `4 failed | 5 passed (9)` files · `3 failed | 46 passed (49)` tests: two suites BROKEN at module load because C1 changed what `PLAN_TIER_ROSTERS.free` holds. Before dispatching a dependent cluster, the orchestrator runs its command at the new base (`run-capture.sh`) and writes the measured frame into the packet as the START state — never "C1's commit must not have moved any of it".
+
+## A seat-exit Monitor must not anchor on `^READY —` — the eight-line handoff prints `2 READY ·` (2026-09-13, BUILD-S03-C4, one hour lost)
+The C1–C3 seats printed `READY — node …` as their first line; the C4 seat printed the numbered shape `2 READY · node …`. The Monitor `grep -E '^READY —|^BLOCKED —'` stayed silent and the orchestrator noticed the exit on the next goal check-in. Law: match `^.{0,8}(READY|BLOCKED)\b` and, in parallel, a single-shot wait on the PID (`until ! kill -0 $pid`), which fires on every exit shape including a crash.
+
+## `run-suites.sh` takes fuzzy Vitest filters — pass exact repository paths (2026-09-13, BUILD-S03-C4 F2)
+`api:26:0` matched seven files (`tests/integration/dev-api-process.test.ts` among them) and printed a false `CLUSTER_RED` (59 passed / 5 failed). `tests/unit/api.test.ts:26:0` matched one and printed `CLUSTER_GREEN`. Every packet spells the pair with the exact path; the runner should refuse a selector that yields other than one `Test Files` entry.

@@ -1,0 +1,4 @@
+C1: 62a4c367 feat(tiers S03-C1): load rosters from model config
+C2: a9179644 feat(tiers S03-C2): admit remote discovery safely
+C3: 43efdb1a feat(tiers S03-C3): apply file-owned development providers
+C4: cc014550 feat(tiers S03-C4): read plan rosters from deployment

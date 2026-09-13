@@ -1,0 +1,12 @@
+2026-09-13 21:40:45 EEST
+COMMAND     PID           USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+com.docke  2537 vladmihaimiron  150u  IPv4 0x7bac402480550f68      0t0  TCP 127.0.0.1:55432 (LISTEN)
+node      33667 vladmihaimiron   22u  IPv4 0x5248b3b893ebb1ca      0t0  TCP 127.0.0.1:3001 (LISTEN)
+node      45309 vladmihaimiron   18u  IPv4 0xc7b44d2ddabb148d      0t0  TCP 127.0.0.1:8795 (LISTEN)
+node      45309 vladmihaimiron   22u  IPv4  0x1ed9e2045d88a92      0t0  TCP 127.0.0.1:8796 (LISTEN)
+node      45309 vladmihaimiron   23u  IPv4 0xf8659096c45be58d      0t0  TCP 127.0.0.1:8791 (LISTEN)
+node      45309 vladmihaimiron   24u  IPv4 0xaa49dcc435396aaf      0t0  TCP 127.0.0.1:8793 (LISTEN)
+node      45309 vladmihaimiron   25u  IPv4 0xf6c86fbca1597448      0t0  TCP 127.0.0.1:8794 (LISTEN)
+node      45309 vladmihaimiron   26u  IPv4 0x5c752f4ad5b1da36      0t0  TCP 127.0.0.1:8792 (LISTEN)
+node      45592 vladmihaimiron   52u  IPv4 0x15384ebc1c6fc41a      0t0  TCP 127.0.0.1:8790 (LISTEN)
+(end of listener list — every line above is V's stack or a relay: never touched by a lens)
