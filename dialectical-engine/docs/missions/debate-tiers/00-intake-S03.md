@@ -50,6 +50,15 @@ premium:
 
 The goal changes the Free half of that preview: Free = `gpt-5.6-luna` and `glm-5.3-flash`, both reached over an API key rather than a CLI, so a Free entry names a key-based transport where the preview says `cli:`. Premium's three entries stay `cli:`. REQ freezes the exact shape.
 
+## V's update (verbatim, chat, 2026-09-13 16:05 EEST) — folds into REQ-FIX(S03) with the REQ-REV verdict
+
+> Update: Switch the 5.3 to GLM 4.7. we got a subscription, use them API_TOKENS. or idk how can we connect to GLM 4.7
+
+Measured the same hour (scratchpad `probe-zai-47.mjs`, `probe-zai-47b.mjs`, `probe-zai-echo.mjs`; the key already on this Mac, read from the Hermes store, never printed):
+- **F13 — the subscription endpoint routes old ids to its two live models.** `GET https://api.z.ai/api/coding/paas/v4/models` lists `glm-4.5, glm-4.5-air, glm-4.6, glm-4.7, glm-5, glm-5-turbo, glm-5.1, glm-5.2, glm-5.3, glm-5.3-flash`, but a chat request for `glm-4.7` (or `GLM-4.7`, `glm-4.6`, `glm-5-turbo`) is ANSWERED with `model: "glm-5.3-flash"`, and `glm-5` with `model: "glm-5.3"`. Only `glm-5.3` and `glm-5.3-flash` answer under their own id. Under DR-115 (lineage is what the maker reports, never a guessed literal) and the probe's exact-echo rule (F5), the app cannot claim GLM 4.7 on this subscription — row V-37.
+- **F14 — the probe passes on GLM with a larger budget and thinking off.** `max_tokens: 64` + `thinking: { type: "disabled" }` → content `"OK"` on every try (reasoning tokens still reported, 12–18); `max_tokens: 8` fails in either mode. The pay-as-you-go endpoint still answers 429 for `glm-4.7` (balance).
+- **V-35 is ANSWERED by V's words ("we got a subscription, use them API_TOKENS"):** the Free GLM entry targets the subscription endpoint `https://api.z.ai/api/coding/paas/v4` with a bearer; the token already in `~/.hermes/auth.json` (`credential_pool.zai`, also `custom:zai`) answers 200 there. If V's subscription came with a different token, V writes it to `.local/dev-auth/provider-keys.env` as `ZAI_API_KEY=…` (R-S03-1). The plan's terms name coding tools; V's account, V's call — recorded, not re-raised.
+
 ## Classification (set once)
 
 ```yaml
