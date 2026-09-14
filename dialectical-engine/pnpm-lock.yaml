@@ -452,6 +452,9 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../obs-capture
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.21.0)(pg@8.22.0)
