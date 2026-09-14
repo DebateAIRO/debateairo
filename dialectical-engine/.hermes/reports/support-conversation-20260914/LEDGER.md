@@ -76,3 +76,7 @@ Ruling: ARCHCHECK’s secure/fail-closed wording only describes recognized synta
 |PRODDELTA|t_546a8c82|gpt-5.6-sol /root/baseline|43cf9386|PRODUCT_DELTA_CONSUMED|amended2reports+6receipts+2frozenUI hashes verified; native transcript BODY skills-check4/4|agent-reports/PRODDELTA.md|priorUIscopesresolved with syntheticlimit; no newclass; finalREV3pending|
 
 Native transcript index recovered by matching this root’s parent_thread_id metadata. Repository skills-check passed ARCHCHECK5/5,SECDELTA5/5,PRODDELTA4/4,LIVE3workerfloor6/6 against exact same-session BODY phrases and current skill files. No raw transcript/runtime content copied. Receipt SKILLS-completed-assessments.json; this replaces earlier inherited-read-only bookkeeping uncertainty.
+
+|FIX4|t_8b9a007d|gpt-5.6-sol /root/requirements|6e5ab5fc41acebbff4264efc7d481df3db8dce44|AUTHOR_HANDOFF_CONSUMED|11scopedpaths,22declaredrefs+2attempts,99inventorypaths andnativeBODY9/9 verified|agent-reports/FIX4.md|author277currentfocusedpasses;5restoredmutants;exactinherited76typecheck;LIVE4/reviews pending|
+
+Ruling: Normalize the author manifest’s Git-root dialectical-engine/ prefix into a separate lane manifest, preserving the original and checking every path; no filtering. The full base-to-head inventory remains99paths. LIVE4 requires all20oldmembers plusnewcredential-suite and exactfinaltestmembership. No general safety or live-quality conclusion from authorGREEN.

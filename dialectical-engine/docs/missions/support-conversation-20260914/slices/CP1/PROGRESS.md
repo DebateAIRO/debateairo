@@ -2,13 +2,13 @@
 
 Current status: **BLOCKED — actual guidance failures and missing owner destination.** CP1 is not ready for verification, not accepted, and cannot unlock CP2/CP3.
 
-Product: `codex/support-conversation-cp1` at `43cf9386ea3c9e7c79523ec38debe63271d19292`, clean when LIVE3 was consumed. Intended baseline `b7ca2c413bf3242ce18e29a397dc9a3aa9228893`; all 97 changed paths match the layered receipt inventory. The original dirty source is preserved.
+Product: `codex/support-conversation-cp1` at `6e5ab5fc41acebbff4264efc7d481df3db8dce44`, clean at FIX4 consumption. Intended baseline `b7ca2c413bf3242ce18e29a397dc9a3aa9228893`; all 99 changed paths match the layered receipt inventory. The original dirty source is preserved.
 
 Latest automated integration: 20 test files, 776 passed, one Forgot-password TODO, rc 0. Latest actual demonstration: seven questions sent once, four grounded, three refused, only three clean manual passes. English creation and English/Romanian Settings fail. Compact Romanian creation exposes internal `start-debate` in prose. Exact rejected-output causes remain partly unknown; aggregate diagnostics are not request attribution.
 
 Preview: supported `https://localhost:3100`, loaded revision `43cf9386`, detached PID/PGID 40443 and PPID 1. The worker captured normal TLS 200 after browser exit and ten seconds idle with original listeners preserved. The first launch at the same revision failed at the Support-model stage; its inner cause remains unknown.
 
-Active work: Sol FIX4 (`t_8b9a007d`, `/root/requirements`) implements the architecture-backed boundary correction from the completed ARCHCHECK and SECDELTA assessments. FIX4 owns the sole heavy and product Git leases. PRODDELTA (`t_546a8c82`, `/root/baseline`) completed its stable frozen UI review: shortcuts and synthetic signed-in rendering are resolved for their stated scope, with no new distinct issue. LIVE4, GATE and final REV1/REV2/REV3 remain pending.
+Current work: FIX4 (`t_8b9a007d`, `/root/requirements`) is consumed at6e5ab5fc. LIVE4 is being prepared for the exact21-file integration and finite actual demonstration. No author is active; product/Git and heavy leases are released. PRODDELTA (`t_546a8c82`, `/root/baseline`) completed its stable frozen UI review: shortcuts and synthetic signed-in rendering are resolved for their stated scope, with no new distinct issue. LIVE4, GATE and final REV1/REV2/REV3 remain pending.
 
 Owner input: the existing Forgot password flow is confirmed, but its exact destination/opener remains unknown. The original specific question is still pending; do not guess, repeat searches, claim absence, or substitute Settings/MFA. Its eventual connection needs actual navigation evidence and scoped independent review.
 
@@ -60,3 +60,5 @@ LIVE3 consumed as FUNCTIONAL_BLOCKER at43cf9386: root verified34immutable refere
 ARCHCHECK and SECDELTA consumed at43cf9386:14declared hashes checked and5additional logs frozen. Concrete shared-normalization/redaction, plural/negation output, cross-sentence falsepositive and internal-ID classes remain open. FIX4t_8b9a007d is the architecture-backed fourth preparation correction (finalreviewpass0), followed by LIVE4t_d69a47ed. New findings t_db79b682 credentialpolicy and t_f9e289db safediagnosticcorrelation; prior P1/P2 partialfixes remainopen. See CP1-BOUNDARY-CORRECTION ruling. No checkpoint readiness, broader response contract or model change.
 
 PRODDELTAconsumed at43: amendedreport242391af/selfea75e089,8receipt+2frozenUIhashes verified andnativeBODYskills4/4. Originalhrefprefixes/settings#privacy,/settings#cookies confirmed;401classification doesnotproveorigin/harmlessness. FIX4reports focusedRED23failed/65passed/21skipped plusnewlexer-absenceRED, thenfirstboundary4unitfiles105pass; integration/mutations/typecheck/commit stillpending. These are authorinterimclaims, not finalconsumption.
+
+FIX4consumed at6e5ab5fc:11scopedpaths,22declaredrefs+2extraattempts and99/99inventory/currentbytes verified; nativeBODY9/9.277currentfocusedpasses;mutants11/2/8/7/1fail restored;final2typecheck byte-identicalinherited76. Final design0abb9f97 provides fixedUUID/predicateprojection and sequentialwindowambiguityprotocol. Previewlastrecorded40443still43runtime; LIVE4mustmeasure/reload. FinalreviewsandownerForgot remainpending.

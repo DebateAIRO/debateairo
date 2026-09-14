@@ -23,3 +23,8 @@ Freeze commits: planning65f71d79d571db9a0a8de3923a87fc8ac59db466; completed CP1 
 Completed FIX2 evidence freeze: bc52996f968f6a9251e937c3a714f86eb47f4163 on administrative mission branch;15 exact files verified, active LIVE2 output excluded; source/index/product ref unchanged. Product revision82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0 remains the correction under actual verification.
 LIVE2 rework and FIX3 contract freeze: be2201d4278c2d14ee8d559369536048ad45c555;14files verified with private index, unchanged source/index/productref; frozen before FIX3 packet-check and dispatch.
 Completed FIX3/exact LIVE3 contract freeze:1d6249b1a3eaa853354cad9e8c484f1e5e3acd76;12files verified and source/index/productref unchanged, before LIVE3 packet-check/dispatch. Product43cf9386 is under actual verification; no checkpoint acceptance.
+
+LIVE3 failed-run evidence and read-only assessment contracts freeze:95292edad48e479f69a8024a6ade921ef0356b0f;14files, source/index/productref preserved. LIVE3 at43cf9386 did not pass.
+Completed ARCHCHECK/SECDELTA and FIX4 contract freeze:15ab51dab76be4c7c57ea109120b2bef541c6733;17files, before FIX4 packet-check/dispatch; unchanged source/index/productref. Final review pass1 still pending.
+Stable PRODDELTA packet freeze:4bf7f1849b6c8bf520eec22c46808152316232af;4root-ownedfiles, activeFIX4outputs excluded, before packet-check/dispatch.
+Completed amended PRODDELTA and native skill-body evidence freeze:bb9d2c1c92184defc0747aaaf22b50d4e65c07fc;9files, activeFIX4outputs excluded; unchanged source/index/productref. Current FIX4 remains an unconsumed author node until its exact final evidence arrives.
