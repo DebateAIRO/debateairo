@@ -30,3 +30,5 @@ Stable PRODDELTA packet freeze:4bf7f1849b6c8bf520eec22c46808152316232af;4root-ow
 Completed amended PRODDELTA and native skill-body evidence freeze:bb9d2c1c92184defc0747aaaf22b50d4e65c07fc;9files, activeFIX4outputs excluded; unchanged source/index/productref. Current FIX4 remains an unconsumed author node until its exact final evidence arrives.
 
 Completed FIX4 and exact LIVE4 contract freeze:6f703e8b927a7d5b9affa17b156ec77992dbc3e2;14files, source/index/productref unchanged; product6e5ab5fc. LIVE4 evidence is consumed separately after worker exit.
+
+Completed LIVE4 known-failed evidence and final review package freeze:096638486c4f2eab450055c4b1d25ecd58a1ca54;18files, source before/afterdc9workingdiff unchanged but historical intake drift disclosed. GATE is evidence packaging only, not PASS.

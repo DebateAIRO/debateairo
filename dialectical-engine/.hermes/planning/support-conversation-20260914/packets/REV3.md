@@ -32,3 +32,5 @@ Reuse completed PRODDELTA for stable UIFIX1 bytes. Inspect final kernel/server/c
 Also perform the bounded source-custody provenance check in CP1-SOURCE-DRIFT.md using your retained baseline receipts. This is read-only and requires no broad audit or restoration. Report the exact evidence/limits separately from product content findings.
 
 Assigned related finding t_e582c85f may be read. The source-custody limitation is independent of exact isolated product bytes.
+
+Administrative evidence freeze pair: 65f71d79d571db9a0a8de3923a87fc8ac59db466..096638486c4f2eab450055c4b1d25ecd58a1ca54. This is mission history, not the product diff. Reuse retained preparation; check newly named exact artifacts instead of rereading the whole history. All product review uses b7ca2c41..6e5ab5fc from GATE.
