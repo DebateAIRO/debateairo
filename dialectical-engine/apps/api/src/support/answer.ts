@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import type { HelpCorpusEntry } from "@debateai/support-kb";
+import type {
+  HelpCorpusEntry,HelpCorpusSnapshotLookup
+} from "@debateai/support-kb";
+import {
+  SUPPORT_CAPABILITIES,type SupportAction
+} from "@debateai/support-kb/catalog";
+import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
+import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
 import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
 import { supportTemplate, type SupportLanguage } from "./templates.js";
@@ -10,6 +17,7 @@ import {
 } from "./incidents.js";
 import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
 import type { SupportDegradedPort } from "./degraded.js";
+import { parseSupportDraft,validateSupportDraft } from "./response-policy.js";
 
 const MAX_RETRIEVED_ENTRIES = 3;
 const MAX_SYSTEM_CODE_POINTS = 12_000;
@@ -39,9 +47,11 @@ const INTENT_SIGNALS: Readonly<Record<string,readonly RegExp[]>> = Object.freeze
 
 export type SupportAnswerResult = Readonly<{
   messageId: string;
-  outcome: "ANSWER_GROUNDED" | "NO_SOURCE" | "DEGRADED" | "DISABLED";
+  outcome: "ANSWER_GROUNDED" | "NO_SOURCE" | "REFUSE_SAFETY" | "DEGRADED" | "DISABLED";
   text: string;
   canEscalate: true;
+  sources?: readonly Readonly<{ id: string;label: string }>[];
+  actions?: readonly SupportAction[];
   usage?: SupportModelUsage;
 }>;
 
@@ -53,6 +63,8 @@ export interface SupportAnswerPort {
     detectedLanguage: SupportLanguage;
     overrideLanguage: SupportLanguage | null;
     modelRef: string;
+    kbVersion?: string;
+    signedIn?: boolean;
     receivedAt: Date;
     onQueueProgress?: (notice: string) => void;
   }>): Promise<SupportAnswerResult>;
@@ -110,6 +122,13 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
   return [...`${preamble}\n\n${joined}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
 }
 
+function boundedStructuredSystem(context: string,language: SupportLanguage): string {
+  const instruction = language === "ro"
+    ? "Returnează numai JSON cu exact cheile kind, text, sourceIds și actionIds. kind trebuie să fie answer. Citează cel puțin un sourceId furnizat și folosește numai actionIds solicitate. Nu include URL-uri, HTML, Markdown, parole, coduri ori afirmații despre resetări."
+    : "Return only JSON with exactly the keys kind, text, sourceIds, and actionIds. kind must be answer. Cite at least one supplied sourceId and use only requested actionIds. Include no URLs, HTML, Markdown, passwords, codes, or reset claims.";
+  return [...`${instruction}\n\n${context}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
+}
+
 function withoutModelSources(text: string): string {
   return text.replace(SERVER_SOURCE_LINE,"").replace(/\n{3,}/gu,"\n\n").trim();
 }
@@ -147,6 +166,7 @@ async function completeWithoutQueue<T>(
 
 export function createSupportAnswerService(input: Readonly<{
   entries: readonly HelpCorpusEntry[];
+  snapshots?: HelpCorpusSnapshotLookup;
   messages: SupportMessageCipherPort;
   modelFor: (modelRef: string) => SupportModelPort;
   queue?: Pick<SupportRelayQueue,"execute">;
@@ -158,7 +178,22 @@ export function createSupportAnswerService(input: Readonly<{
   return Object.freeze({
     respond: async (request: Parameters<SupportAnswerPort["respond"]>[0]) => {
       const prepared = redactSupportMessage(request.text);
-      const entries = retrieve(input.entries,prepared.text,request.language);
+      const snapshot = request.kbVersion === undefined
+        ? undefined : input.snapshots?.get(request.kbVersion);
+      const structured = input.snapshots !== undefined;
+      const eligibleEntries = structured ? snapshot?.entries ?? [] : input.entries;
+      const context = structured ? buildSupportKnowledgeContext({
+        entries: eligibleEntries,
+        capabilities: SUPPORT_CAPABILITIES,
+        language: request.language,
+        query: prepared.text,
+        historyText: "",
+        maxCodePoints: MAX_SYSTEM_CODE_POINTS - 800
+      }) : undefined;
+      const entries = structured
+        ? eligibleEntries.filter((entry) => entry.lang === request.language
+          && context!.sourceIds.includes(entry.id))
+        : retrieve(eligibleEntries,prepared.text,request.language);
       if (entries.length === 0) {
         const completedAt = strictAfter(request.receivedAt,clock);
         const text = supportTemplate("NO_SOURCE",request.language);
@@ -169,13 +204,16 @@ export function createSupportAnswerService(input: Readonly<{
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
           receivedAt: request.receivedAt,firstTokenAt: null,completedAt
         });
-        await input.messages.write({
+        const stored = await input.messages.write({
           messageId,sessionId: request.sessionId,role: "assistant",
           text,outcome: "NO_SOURCE",language: request.language,
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
           receivedAt: request.receivedAt,firstTokenAt: null,completedAt
         });
-        return Object.freeze({ messageId,outcome: "NO_SOURCE",text,canEscalate: true as const });
+        return Object.freeze({
+          messageId,outcome: "NO_SOURCE",text: stored.text,canEscalate: true as const,
+          sources: Object.freeze([]),actions: Object.freeze([])
+        });
       }
 
       let completion: Awaited<ReturnType<SupportModelPort["complete"]>> | undefined;
@@ -201,7 +239,9 @@ export function createSupportAnswerService(input: Readonly<{
           const complete = (signal?: AbortSignal) => {
             modelCalled = true;
             return input.modelFor(request.modelRef).complete({
-              system: boundedSystem(entries,request.language),
+              system: structured
+                ? boundedStructuredSystem(context!.text,request.language)
+                : boundedSystem(entries,request.language),
               messages: [{ role: "user",content: safeText }],language: request.language,
               ...(signal === undefined ? {} : { signal })
             });
@@ -220,18 +260,36 @@ export function createSupportAnswerService(input: Readonly<{
         if (completion === undefined || firstTokenAt === undefined || completedAt === undefined) {
           throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         }
-        const modelText = withoutModelSources(completion.text);
+        const parsed = structured ? parseSupportDraft(completion.text) : undefined;
+        const draft = !structured ? undefined
+          : parsed === null || parsed === undefined ? null
+          : validateSupportDraft(
+            parsed,context!.sourceIds,context!.requestedActionIds
+          );
+        const rejected = structured && draft === null;
+        const modelText = structured
+          ? rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
+          : withoutModelSources(completion.text);
         if (modelText === "") throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         input.degraded?.markAvailable();
-        const groundedText = `${modelText}\n${sourceLines(entries,request.language)}`;
-        const text = input.incidents === undefined ? groundedText : applyIncidentNotice(
+        const groundedText = structured ? modelText
+          : `${modelText}\n${sourceLines(entries,request.language)}`;
+        const text = rejected || input.incidents === undefined ? groundedText : applyIncidentNotice(
           groundedText,supportIntentSurface(request.text),
           await input.incidents.readActiveIncidents(),request.language
         );
+        const outcome = rejected ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
+        const sources = rejected ? Object.freeze([]) : Object.freeze(entries
+          .filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true)
+          .map((entry) => Object.freeze({ id: entry.id,label: entry.title })));
+        const actions = rejected || !structured ? Object.freeze([]) : resolveSupportActions(
+          draft!.actionIds,
+          { signedIn: request.signedIn === true,language: request.language }
+        );
         const messageId = randomUUID();
-        await input.messages.write({
+        const stored = await input.messages.write({
           messageId,sessionId: request.sessionId,role: "assistant",
-          text,outcome: "ANSWER_GROUNDED",language: request.language,
+          text,outcome,language: request.language,
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
           receivedAt: request.receivedAt,firstTokenAt,completedAt,modelCalled: true,
           ...(completion.usage?.input_tokens === undefined
@@ -242,7 +300,7 @@ export function createSupportAnswerService(input: Readonly<{
             ? {} : { costUsd: completion.usage.cost_usd })
         });
         return Object.freeze({
-          messageId,outcome: "ANSWER_GROUNDED",text,canEscalate: true as const,
+          messageId,outcome,text: stored.text,canEscalate: true as const,sources,actions,
           ...(completion.usage === undefined ? {} : { usage: completion.usage })
         });
       } catch (error) {
@@ -256,14 +314,17 @@ export function createSupportAnswerService(input: Readonly<{
           const disabledAt = strictAfter(request.receivedAt,clock);
           const text = supportTemplate("DISABLED",request.language);
           const messageId = randomUUID();
-          await input.messages.write({
+          const stored = await input.messages.write({
             messageId,sessionId: request.sessionId,role: "assistant",
             text,outcome: "DISABLED",language: request.language,
             detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
             receivedAt: request.receivedAt,firstTokenAt: null,completedAt: disabledAt,
             modelCalled: false
           });
-          return Object.freeze({ messageId,outcome: "DISABLED",text,canEscalate: true as const });
+          return Object.freeze({
+            messageId,outcome: "DISABLED",text: stored.text,canEscalate: true as const,
+            sources: Object.freeze([]),actions: Object.freeze([])
+          });
         }
         const degradedAt = strictAfter(request.receivedAt,clock);
         if (error instanceof SupportModelError && !circuitShortCircuited) {
@@ -279,7 +340,7 @@ export function createSupportAnswerService(input: Readonly<{
           : error.code === "SUPPORT_DAILY_CAP" ? "cap" as const : undefined;
         const text = supportTemplate("DEGRADED",request.language);
         const messageId = randomUUID();
-        await input.messages.write({
+        const stored = await input.messages.write({
           messageId,sessionId: request.sessionId,role: "assistant",
           text,outcome: "DEGRADED",language: request.language,
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
@@ -287,7 +348,10 @@ export function createSupportAnswerService(input: Readonly<{
           modelCalled,
           ...(degradedReason === undefined ? {} : { degradedReason })
         });
-        return Object.freeze({ messageId,outcome: "DEGRADED",text,canEscalate: true as const });
+        return Object.freeze({
+          messageId,outcome: "DEGRADED",text: stored.text,canEscalate: true as const,
+          sources: Object.freeze([]),actions: Object.freeze([])
+        });
       }
     }
   });

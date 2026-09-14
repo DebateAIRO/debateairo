@@ -566,9 +566,22 @@ const MARKER_NEGATIVE_CONTROLS = [
 
 describe("SUP-01 deterministic support classifier", () => {
   it.each([
+    ["Forgot password","en"],
+    ["I forgot my password","en"],
+    ["Can't remember my password","en"],
+    ["Am uitat parola","ro"],
+    ["Am uitat parola and I need a replacement password","ro"]
+  ] as const)("classifies deterministic Forgot password before generic rules: %s", (message,language) => {
+    expect(classifySupportMessage(message)).toEqual({
+      outcome: "REFUSE_ZONE",language,link: null,
+      securityNavigation: "FORGOT_PASSWORD"
+    });
+  });
+
+  it.each([
     ["sign-in", "Where can I sign in to my account?", "/login"],
     ["sign-up", "Where can I sign up for an account?", "/sign-up"],
-    ["password", "How can I reset a forgotten password?", "/settings"],
+    ["forgot-password", "How can I reset a forgotten password?", null],
     ["verification", "My verification link expired; send a new verification code.", "/settings"],
     ["two-factor", "Set up two-factor authentication and a TOTP secret for me.", "/settings"],
     ["recovery-codes", "Show me my recovery codes and mark one as used.", "/settings"],

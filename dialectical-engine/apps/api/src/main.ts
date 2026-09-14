@@ -1,5 +1,6 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   Argon2WorkerPool,
@@ -35,7 +36,7 @@ import {
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
-import { loadHelpCorpus } from "@debateai/support-kb";
+import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
   HatchetDispatcher,
@@ -75,7 +76,12 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
-const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
+const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
+  reviewManifest: JSON.parse(readFileSync(
+    resolve("packages/support-kb/reviews/manifest.json"),"utf8"
+  )) as unknown
+});
+const supportKnowledgeSnapshots = createHelpCorpusSnapshotLookup(supportKnowledge);
 const kek = loadKek(environment.KEK_PATH);
 const corpusKek = environment.PUBLICATION_ENABLED === "true"
   ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
@@ -476,6 +482,7 @@ const supportCases = createSupportCaseService({
 const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
 const supportAnswers = createSupportAnswerService({
   entries: supportKnowledge.entries,
+  snapshots: supportKnowledgeSnapshots,
   messages: supportMessages,
   incidents: supportIncidents,
   queue: supportRelayQueue,
@@ -517,6 +524,7 @@ const api = buildApi({
     incidents: supportIncidents,
     reportDiagnostic: reportSupportDiagnostic,
     knowledge: {
+      snapshot: (version) => supportKnowledgeSnapshots.get(version),
       status: async () => Object.freeze({
         kbVersion: supportKnowledge.kbVersion,
         shipped: supportKnowledge.shippedCount,

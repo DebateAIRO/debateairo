@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { TypedDomainError } from "@debateai/kernel";
+import {
+  createHelpCorpusSnapshotLookup,type HelpCorpusEntry,type LoadedHelpCorpus
+} from "../../packages/support-kb/src/index.js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
 import type {
@@ -150,8 +153,13 @@ function unavailableConfiguration(
 }
 
 const knowledge: SupportKnowledgeStatusPort = Object.freeze({
-  status: async () => Object.freeze({ kbVersion: KB_VERSION, shipped: 12, ignored: 1 })
+  status: async () => Object.freeze({ kbVersion: KB_VERSION, shipped: 12, ignored: 1 }),
+  snapshot: (version: string) => version === KB_VERSION ? Object.freeze({}) as never : undefined
 });
+
+function corpus(entries: readonly HelpCorpusEntry[],kbVersion = KB_VERSION): LoadedHelpCorpus {
+  return Object.freeze({ entries:Object.freeze([...entries]),kbVersion }) as LoadedHelpCorpus;
+}
 
 describe("SUP-01 support routes", () => {
   let database: TestDatabase;
@@ -258,6 +266,7 @@ describe("SUP-01 support routes", () => {
       casePort?: SupportCasePort;
       caseAccessPort?: SupportCaseAccessPort;
       answerPort?: SupportAnswerPort;
+      knowledgePort?: SupportKnowledgeStatusPort;
       reportDiagnostic?: (diagnostic: string) => void;
     }> = {}
   ) {
@@ -271,7 +280,7 @@ describe("SUP-01 support routes", () => {
         messages: options.messagePort ?? messageCipher,
         cases: options.casePort ?? cases,
         caseAccess: options.caseAccessPort ?? caseAccess,
-        knowledge,
+        knowledge: options.knowledgePort ?? knowledge,
         ...(options.answerPort === undefined ? {} : { answer: options.answerPort }),
         ...(options.clock === undefined ? {} : { clock: options.clock }),
         ...(options.reportDiagnostic === undefined
@@ -1855,14 +1864,166 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it("returns 409 before admission, model work, or message writes when session snapshot A is unavailable", async () => {
+    const VERSION_B = "b".repeat(64);
+    let currentVersion = KB_VERSION;
+    const snapshots = new Map<string,LoadedHelpCorpus>([[KB_VERSION,corpus([],KB_VERSION)]]);
+    const respond = vi.fn<SupportAnswerPort["respond"]>();
+    const write = vi.fn<SupportMessageCipherPort["write"]>();
+    const admitMessage = vi.fn((input: Parameters<SupportSessionPort["admitMessage"]>[0]) =>
+      sessions.admitMessage(input));
+    const server = api(true,{
+      answerPort: Object.freeze({ respond }),
+      sessionPort: sessionPort({ admitMessage }),
+      messagePort: Object.freeze({
+        write,
+        writeAndTransit: vi.fn(),
+        read: vi.fn(async () => null),
+        listSession: vi.fn(async () => [])
+      }) as never,
+      knowledgePort: Object.freeze({
+        status: async () => ({ kbVersion: currentVersion,shipped: 1,ignored: 0 }),
+        snapshot: (version: string) => snapshots.get(version)
+      })
+    });
+    const opened = await openSession(server,"203.0.113.210");
+    expect(opened.response.json().session.kb_version).toBe(KB_VERSION);
+    currentVersion = VERSION_B;
+    snapshots.clear();
+    snapshots.set(VERSION_B,corpus([],VERSION_B));
+
+    const response = await sendMessage(
+      server,opened.body,"How do I start a debate?","203.0.113.210"
+    );
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true
+    });
+    expect(admitMessage).not.toHaveBeenCalled();
+    expect(respond).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it.each([
+    ["Forgot password","en"],
+    ["Am uitat parola","ro"]
+  ] as const)("returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
+    requestText,language
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>();
+    const write = vi.fn(async (input: Parameters<SupportMessageCipherPort["write"]>[0]) =>
+      Object.freeze({ ...input,text: input.role === "assistant" ? `canonical:${input.text}` : input.text,redacted: input.role === "assistant" }));
+    const server = api(true,{
+      answerPort: Object.freeze({ respond }),
+      messagePort: Object.freeze({
+        write,
+        writeAndTransit: vi.fn(),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
+      }) as never
+    });
+    const opened = await openSession(server,language === "en" ? "203.0.113.211" : "203.0.113.212");
+    const response = await sendMessage(
+      server,opened.body,requestText,language === "en" ? "203.0.113.211" : "203.0.113.212"
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome: "REFUSE_ZONE",
+      text: expect.stringContaining("canonical:"),
+      sources: [],actions: []
+    });
+    expect(respond).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
+  it("replaces a rejected model draft before storage and HTTP while retaining usage and relay health", async () => {
+    const policyClockMs = CLOCK_BASE_MS + 20_000_000;
+    const article = Object.freeze({
+      id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
+      status: "shipped" as const,sources: Object.freeze(["test"]),
+      verifiedAgainst: "test",ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
+      body: "Open the new debate page to start your first debate."
+    });
+    const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
+    const unsafe = "Type your password and verification code here; I reset it successfully.";
+    const complete = vi.fn(async () => Object.freeze({
+      text: JSON.stringify({
+        kind: "answer",text: unsafe,
+        sourceIds: ["getting-started-debate"],actionIds: ["start-debate"]
+      }),
+      usage: Object.freeze({ input_tokens: 13,output_tokens: 7,cost_usd: 0.002 })
+    }));
+    const answer = createSupportAnswerService({
+      entries: [article],snapshots,messages: messageCipher,
+      modelFor: () => Object.freeze({ complete }),
+      clock: (() => {
+        let at = policyClockMs;
+        return () => new Date(++at);
+      })()
+    });
+    const server = api(true,{ clock: () => new Date(policyClockMs),answerPort: answer });
+    const opened = await openSession(server,"203.0.113.213");
+    const response = await sendMessage(
+      server,opened.body,"How do I start my first debate?","203.0.113.213"
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome: "REFUSE_SAFETY",sources: [],actions: []
+    });
+    expect(JSON.stringify(response.json())).not.toContain(unsafe);
+    expect(response.json()).not.toHaveProperty("case_token");
+    expect(complete).toHaveBeenCalledTimes(1);
+    const assistant = (await database.pool.query<{
+      message_id: string;outcome: string;model_called: boolean;
+      input_tokens: string;output_tokens: string;cost_usd: string
+    }>(`SELECT message_id,outcome,model_called,input_tokens::text,output_tokens::text,
+        cost_usd::text FROM support.message
+        WHERE session_id=$1 AND role='assistant'`,[opened.body.session_id])).rows[0]!;
+    expect(assistant).toMatchObject({
+      outcome: "REFUSE_SAFETY",model_called: true,
+      input_tokens: "13",output_tokens: "7",cost_usd: "0.002000"
+    });
+    const stored = await messageCipher.read({
+      sessionId: opened.body.session_id,messageId: assistant.message_id
+    });
+    expect(stored?.text).toBe(response.json().text);
+    expect(stored?.text).not.toContain(unsafe);
+    expect((await new PostgresSupportStatusRepository(database.pool).status()).relayState)
+      .toBe("AVAILABLE");
+    const rating = await server.inject({
+      method: "POST",url: `/v1/support/messages/${assistant.message_id}/rating`,
+      headers: { "x-support-session-token": opened.body.session_token },
+      payload: { session_id: opened.body.session_id,rating: "yes" }
+    });
+    expect(rating.statusCode).toBe(404);
+    await server.close();
+  });
+
   it("returns a grounded relay answer with server-owned sources, redacted transit, strict timestamps, and encrypted persistence", async () => {
     const relayInputs: string[] = [];
     const rawSecretLike = "A".repeat(40);
+    const article = Object.freeze({
+      id: "getting-started-debate",
+      lang: "en" as const,
+      title: "Start a debate",
+      status: "shipped" as const,
+      sources: Object.freeze(["apps/api/src/index.ts:1"]),
+      verifiedAgainst: "2b670d30",
+      ratifiedBy: "V" as const,
+      ratifiedOn: "2026-09-04",
+      body: "Open the new debate page to start your first debate."
+    });
+    const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
     const model: SupportModelPort = Object.freeze({
       complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
         relayInputs.push(input.messages[0]!.content);
         return Object.freeze({
-          text: "Open the debate page as its owner and complete re-authentication.\nSource: forged (not-shipped)",
+          text: JSON.stringify({
+            kind: "answer",
+            text: "Open the new debate page to start.",
+            sourceIds: ["getting-started-debate"],
+            actionIds: ["start-debate"]
+          }),
           usage: Object.freeze({ input_tokens: 9,output_tokens: 11,cost_usd: 0.001 })
         });
       }
@@ -1872,17 +2033,7 @@ describe("SUP-01 support routes", () => {
       new Date(CLOCK_BASE_MS + 20)
     ];
     const answer = createSupportAnswerService({
-      entries: [Object.freeze({
-        id: "publish-a-debate",
-        lang: "en" as const,
-        title: "Publish a debate",
-        status: "shipped" as const,
-        sources: Object.freeze(["apps/api/src/index.ts:1"]),
-        verifiedAgainst: "2b670d30",
-        ratifiedBy: "V" as const,
-        ratifiedOn: "2026-09-04",
-        body: "Owners publish from the debate page and complete re-authentication."
-      })],
+      entries: [article],snapshots,
       messages: messageCipher,
       modelFor: () => model,
       clock: () => instants.shift() ?? new Date(CLOCK_BASE_MS + 30)
@@ -1892,14 +2043,17 @@ describe("SUP-01 support routes", () => {
     const response = await sendMessage(
       server,
       opened.body,
-      `How do I publish a debate with ${rawSecretLike}?`,
+      `How do I start my first debate with ${rawSecretLike}?`,
       "203.0.113.91"
     );
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ outcome: "ANSWER_GROUNDED" });
-    expect(response.json().text.endsWith("Source: Publish a debate (publish-a-debate)")).toBe(true);
-    expect(response.json().text).not.toContain("not-shipped");
+    expect(response.json()).toMatchObject({
+      sources: [{ id: "getting-started-debate",label: "Start a debate" }],
+      actions: [{ id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" }]
+    });
+    expect(response.json().text).toBe("Open the new debate page to start.");
     expect(relayInputs).toHaveLength(1);
     expect(relayInputs[0]).toContain("[REDACTED_SECRET_LIKE]");
     expect(relayInputs[0]).not.toContain(rawSecretLike);

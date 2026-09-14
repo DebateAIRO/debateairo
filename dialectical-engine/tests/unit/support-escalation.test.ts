@@ -82,6 +82,18 @@ describe("SUP-02 deterministic escalation", () => {
     expect(evaluateEscalation({ ...base,classification: "REFUSE_INJECTION" })).toBeNull();
   });
 
+  it("does not treat model-output REFUSE_SAFETY as E2 or repeated NO_SOURCE", () => {
+    expect(evaluateEscalation({
+      ...base,classification: null,
+      outcomes: ["REFUSE_SAFETY","REFUSE_SAFETY"],
+      previousOutcomes: ["REFUSE_SAFETY"]
+    })).toBeNull();
+    expect(evaluateEscalation({
+      ...base,message: "Talk to a human",classification: null,
+      outcomes: ["REFUSE_SAFETY"],previousOutcomes: []
+    })).toEqual({ predicate: "E1" });
+  });
+
   it("fires E5 only for two consecutive no ratings", () => {
     expect(evaluateEscalation({ ...base,ratings: ["yes","no"] })).toBeNull();
     expect(evaluateEscalation({ ...base,ratings: ["no"] })).toBeNull();

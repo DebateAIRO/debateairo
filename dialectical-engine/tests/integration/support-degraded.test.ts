@@ -5,6 +5,9 @@ import { SupportModelError } from "../../apps/api/src/support/model.js";
 import { SUPPORT_LIMIT_DEFAULTS } from "../../apps/api/src/support/limits.js";
 import { SupportRelayQueue } from "../../apps/api/src/support/queue.js";
 import { formatRelayState } from "../../apps/runner/src/support-status-cli.js";
+import {
+  createHelpCorpusSnapshotLookup,type LoadedHelpCorpus
+} from "../../packages/support-kb/src/index.js";
 
 function messages() {
   return {
@@ -25,6 +28,44 @@ const ENTRY = Object.freeze({
 });
 
 describe("SUP-06 automatic degraded state", () => {
+  it("treats a screened model draft as successful relay transport", async () => {
+    const degraded = new SupportDegradedState();
+    const base = Date.parse("2026-09-08T12:00:00.000Z");
+    degraded.markUnavailable(new Date(base),"relay");
+    const stored = messages();
+    const snapshot = Object.freeze({
+      entries: Object.freeze([ENTRY]),kbVersion: "a".repeat(64)
+    }) as unknown as LoadedHelpCorpus;
+    const answer = createSupportAnswerService({
+      entries: [ENTRY],
+      snapshots: createHelpCorpusSnapshotLookup(snapshot),
+      messages: stored,
+      degraded,
+      modelFor: () => ({ complete: async () => ({
+        text: JSON.stringify({
+          kind: "answer",text: "Type your password here.",
+          sourceIds: [ENTRY.id],actionIds: []
+        }),
+        usage: { input_tokens: 3,output_tokens: 4,cost_usd: 0.001 }
+      }) })
+    });
+
+    await expect(answer.respond({
+      sessionId: "screened",text: "How do I start my first debate?",language: "en",
+      detectedLanguage: "en",overrideLanguage: null,modelRef: "relay",
+      kbVersion: snapshot.kbVersion,signedIn: false,receivedAt: new Date(base + 1_001)
+    })).resolves.toMatchObject({
+      outcome: "REFUSE_SAFETY",
+      usage: { input_tokens: 3,output_tokens: 4,cost_usd: 0.001 }
+    });
+    expect(degraded.isDegraded()).toEqual({ degraded: false });
+    expect((stored as unknown as { write: ReturnType<typeof vi.fn> }).write)
+      .toHaveBeenLastCalledWith(expect.objectContaining({
+        role: "assistant",outcome: "REFUSE_SAFETY",modelCalled: true,
+        inputTokens: 3,outputTokens: 4,costUsd: 0.001
+      }));
+  });
+
   it("returns the exact deterministic DISABLED notice without degrading when the final gate observes OFF", async () => {
     const degraded = new SupportDegradedState();
     const stored = messages();

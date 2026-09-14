@@ -14,6 +14,8 @@ async function seedSession(input: Readonly<{
   ageMs: number;
   rating?: "yes" | "no" | "human";
   openedCase?: boolean;
+  outcome?: "ANSWER_GROUNDED" | "REFUSE_SAFETY";
+  modelCalled?: boolean;
 }>): Promise<void> {
   const sessionId = randomUUID();
   const userId = randomUUID();
@@ -34,11 +36,11 @@ async function seedSession(input: Readonly<{
     await client.query(`
     INSERT INTO support.message(
       message_id,session_id,role,content_ciphertext,outcome,language,
-      detected_language,redacted,received_at,completed_at
+      detected_language,redacted,received_at,completed_at,model_called
     ) VALUES
-      ($2,$1,'user',$4,'ANSWER_GROUNDED','en','en',false,$5,$5),
-      ($3,$1,'assistant',$4,'ANSWER_GROUNDED','en','en',false,$5,$5)
-  `,[sessionId,userId,answerId,v2(),at]);
+      ($2,$1,'user',$4,$6,'en','en',false,$5,$5,false),
+      ($3,$1,'assistant',$4,$6,'en','en',false,$5,$5,$7)
+  `,[sessionId,userId,answerId,v2(),at,input.outcome ?? "ANSWER_GROUNDED",input.modelCalled ?? false]);
     if (input.rating !== undefined) {
       await client.query(`INSERT INTO support.rating(
         rating_id,message_id,session_id,rating,at
@@ -82,16 +84,23 @@ describe("support outcome metrics", () => {
     });
 
     await seedSession({ ageMs: 1,rating: "yes" });
+    await seedSession({ ageMs: 3,outcome: "REFUSE_SAFETY",modelCalled: true });
     await seedSession({ ageMs: 2,rating: "no",openedCase: true });
     await seedSession({ ageMs: 10*24*60*60*1_000 });
     await seedSession({ ageMs: 30*24*60*60*1_000,rating: "yes" });
     await seedSession({ ageMs: 30*24*60*60*1_000+1,rating: "yes" });
 
     await expect(repository.status()).resolves.toMatchObject({
-      deflection7Days: 0.5,
-      deflection30Days: 0.75,
+      deflection7Days: 1/3,
+      deflection30Days: 3/5,
       ratingResolution7Days: 0.5,
       ratingResolution30Days: 2/3
     });
+    const status = await repository.status();
+    expect(status.relayState).toBe("AVAILABLE");
+    expect(status.callsToday).toBe(1);
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM support.rating AS rating JOIN support.message AS message ON message.message_id=rating.message_id WHERE message.outcome='REFUSE_SAFETY'"
+    )).rows).toEqual([{ count: 0 }]);
   });
 });

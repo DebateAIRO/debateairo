@@ -1,10 +1,12 @@
 import type { SupportLanguage, SupportOutcome } from "./templates.js";
+import { classifySecurityNavigationViews } from "./security-guidance.js";
 
 export type SupportClassification = Readonly<{
   outcome: Extract<SupportOutcome,
     "REFUSE_ZONE" | "REFUSE_INJECTION" | "REFUSE_SAFETY"> | "INCIDENT" | null;
   language: SupportLanguage;
   link: "/login" | "/sign-up" | "/settings" | null;
+  securityNavigation?: "FORGOT_PASSWORD";
 }>;
 
 type ZoneLink = Exclude<SupportClassification["link"], null>;
@@ -354,6 +356,15 @@ export function classifySupportMessage(message: string): SupportClassification {
   const prepared = prepareMessage(message);
   const views = prepared.ordinaryViews;
   const language = detectPreparedLanguage(prepared);
+  const securityNavigation = classifySecurityNavigationViews(views);
+  if (securityNavigation !== null) {
+    return Object.freeze({
+      outcome: "REFUSE_ZONE",
+      language: securityNavigation.language,
+      link: null,
+      securityNavigation: securityNavigation.kind
+    });
+  }
   const zone = ZONE_RULES.find((rule) => views.some((text) => rule.pattern.test(text)));
   if (zone !== undefined) {
     return Object.freeze({ outcome: "REFUSE_ZONE", language, link: zone.link });

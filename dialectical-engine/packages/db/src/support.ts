@@ -2067,7 +2067,7 @@ export class PostgresSupportStatusRepository {
       input_tokens_last_7_days: string | null;
       output_tokens_last_7_days: string | null;
       cost_usd_last_7_days: string | null;
-      relay_outcome: "ANSWER_GROUNDED" | "DEGRADED" | null;
+      relay_outcome: "ANSWER_GROUNDED" | "REFUSE_SAFETY" | "DEGRADED" | null;
       relay_at: Date | null;
       deflection_7_days: string | null;
       deflection_30_days: string | null;
@@ -2086,7 +2086,9 @@ export class PostgresSupportStatusRepository {
         SELECT message.outcome,message.completed_at
         FROM support.message AS message,bounds
         WHERE role='assistant' AND (
-          outcome='ANSWER_GROUNDED' OR (outcome='DEGRADED' AND degraded_reason='relay')
+          outcome='ANSWER_GROUNDED'
+          OR (outcome='REFUSE_SAFETY' AND model_called)
+          OR (outcome='DEGRADED' AND degraded_reason='relay')
         ) AND message.completed_at<=bounds.observed_at
         ORDER BY completed_at DESC NULLS LAST,message_id DESC
         LIMIT 1

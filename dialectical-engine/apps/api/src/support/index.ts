@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
+import type { LoadedHelpCorpus } from "@debateai/support-kb";
+import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
@@ -23,6 +25,7 @@ import {
   type SupportSessionRecord
 } from "./session.js";
 import { SHREDDED_NOTICE,supportTemplate,type SupportLanguage } from "./templates.js";
+import { forgotPasswordGuidance } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
   "POST /v1/support/sessions",
@@ -41,6 +44,7 @@ export type SupportRoutePath = typeof SUPPORT_ROUTE_PATHS[number];
 
 export interface SupportKnowledgeStatusPort {
   status(): Promise<Readonly<{ kbVersion: string; shipped: number; ignored: number }>>;
+  snapshot?(version: string): LoadedHelpCorpus | undefined;
 }
 
 export type SupportDiagnostic = "SUPPORT_RATE_LIMIT_EVIDENCE_WRITE_FAILED";
@@ -353,6 +357,14 @@ export function installSupportRoutes(
         return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
       }
       const responseLanguage = overrideLanguage ?? classification.language;
+      const knowledgeSnapshot = application.answer === undefined
+        ? undefined : application.knowledge.snapshot?.(found.kbVersion);
+      if (application.answer !== undefined && knowledgeSnapshot === undefined) {
+        return reply.status(409).send({
+          error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",
+          restart_session: true
+        });
+      }
       if (now.getTime() < found.createdAt.getTime()
         || now.getTime() - found.createdAt.getTime() > 24 * 60 * 60 * 1_000
         || [...body.text].length > state.snapshot.values.supportLimitMessageCharacters) {
@@ -387,6 +399,29 @@ export function installSupportRoutes(
           at: now
         });
         return rateLimited(reply, responseLanguage);
+      }
+      if (classification.securityNavigation === "FORGOT_PASSWORD") {
+        const text = forgotPasswordGuidance(responseLanguage);
+        await application.messages.write({
+          messageId: randomUUID(),sessionId: found.sessionId,role: "user",
+          text: body.text,outcome: "REFUSE_ZONE",language: responseLanguage,
+          detectedLanguage: classification.language,overrideLanguage,
+          receivedAt: now,firstTokenAt: null,completedAt: now
+        });
+        const messageId = randomUUID();
+        const stored = await application.messages.write({
+          messageId,sessionId: found.sessionId,role: "assistant",
+          text,outcome: "REFUSE_ZONE",language: responseLanguage,
+          detectedLanguage: classification.language,overrideLanguage,
+          receivedAt: now,firstTokenAt: null,completedAt: now
+        });
+        return reply.send({
+          message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
+          sources: Object.freeze([]),
+          actions: resolveSupportActions(["forgot-password"],{
+            signedIn: found.identityOwnerRef !== null,language: responseLanguage
+          })
+        });
       }
       const previousMessages = application.cases === undefined
         ? []
@@ -729,6 +764,8 @@ export function installSupportRoutes(
           detectedLanguage: classification.language,
           overrideLanguage,
           modelRef: state.snapshot.values.supportModelRef,
+          kbVersion: found.kbVersion,
+          signedIn: found.identityOwnerRef !== null,
           receivedAt: now
         });
         const escalationAfterAnswer = escalationBeforeAnswer ?? evaluateEscalation({
@@ -749,6 +786,8 @@ export function installSupportRoutes(
           outcome: result.outcome,
           text: result.text,
           can_escalate: result.canEscalate,
+          sources: result.sources ?? Object.freeze([]),
+          actions: result.actions ?? Object.freeze([]),
           ...openedCaseReceipt(opened,responseLanguage)
         });
       }
