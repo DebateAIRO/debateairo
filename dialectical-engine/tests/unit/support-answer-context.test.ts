@@ -68,6 +68,35 @@ describe("CP1 composed answer context", () => {
     expect(system).toContain("The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds");
     expect(system).toContain("sourceIds=crosscap-alpha,crosscap-beta,crosscap-gamma");
     expect(system).toContain("actionIds=none");
+    expect(system).toContain('{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source id>"],"actionIds":[]}');
+  });
+
+  it("filters unavailable actions before the model sees the output contract", async () => {
+    const snapshot = corpus([entry("export-json","export JSON served answer ledger")],"d".repeat(64));
+    let system = "";
+    const service = createSupportAnswerService({
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelFor: () => Object.freeze({
+        complete: async (input: Readonly<{ system: string }>) => {
+          system = input.system;
+          return Object.freeze({ text: JSON.stringify({
+            kind: "answer",text: "JSON export requires a served answer and readable ledger.",
+            sourceIds: ["export-json"],actionIds: []
+          }) });
+        }
+      }) as never,
+      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond({
+      ...request(snapshot),text: "How does JSON export work?",signedIn: false
+    });
+
+    expect(result.outcome).toBe("ANSWER_GROUNDED");
+    expect(system).toContain("actionIds=none");
+    expect(system).toContain("Never write source IDs, action IDs, capability IDs, routes, or paths inside text");
+    expect(system).toContain("owner-debate:");
+    expect(system).toContain("availability=owner | actions=none");
   });
 
   it("uses the exact immutable snapshot object already resolved by the route", async () => {

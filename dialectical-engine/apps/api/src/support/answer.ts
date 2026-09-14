@@ -4,7 +4,7 @@ import type {
   HelpCorpusEntry,HelpCorpusSnapshotLookup,LoadedHelpCorpus
 } from "@debateai/support-kb";
 import {
-  SUPPORT_CAPABILITIES,type SupportAction
+  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportAction
 } from "@debateai/support-kb/catalog";
 import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
@@ -126,9 +126,10 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
 }
 
 function structuredInstruction(language: SupportLanguage): string {
+  const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source id>"],"actionIds":[]}';
   return language === "ro"
-    ? "Returnează numai JSON cu exact cheile kind, text, sourceIds și actionIds. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; copiază identificatorii exact și citează cel puțin un sourceId. Nu copia rute sau căi în text; exprimă navigarea numai prin actionIds. Nu include URL-uri, HTML, Markdown, parole, coduri ori afirmații despre resetări."
-    : "Return only JSON with exactly the keys kind, text, sourceIds, and actionIds. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; copy identifiers exactly and cite at least one sourceId. Do not copy routes or paths into text; express navigation only through actionIds. Include no URLs, HTML, Markdown, passwords, codes, or reset claims.";
+    ? `Returnează numai un singur obiect JSON, fără alte chei și fără text înainte sau după: ${shape}. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; înlocuiește exemplele și copiază identificatorii exact, citând cel puțin un sourceId. Nu scrie niciodată identificatori de surse, acțiuni sau capabilități, rute ori căi în text; exprimă navigarea numai prin actionIds. Poți explica limite și condiții despre setările de securitate, dar nu solicita, primi, transforma, verifica sau repeta niciodată parole, coduri ori alte date de autentificare și nu afirma că ai efectuat o schimbare de securitate.`
+    : `Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
 }
 
 function boundedStructuredSystem(context: string,language: SupportLanguage): string {
@@ -197,12 +198,16 @@ export function createSupportAnswerService(input: Readonly<{
         ? undefined : input.snapshots?.get(request.kbVersion));
       const structured = input.requireStructuredDraft === true || input.snapshots !== undefined;
       const eligibleEntries = structured ? snapshot?.entries ?? [] : input.entries;
+      const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+        signedIn: request.signedIn === true,language: request.language
+      }).map(({ id }) => id);
       const context = structured ? buildSupportKnowledgeContext({
         entries: eligibleEntries,
         capabilities: SUPPORT_CAPABILITIES,
         language: request.language,
         query: prepared.text,
         historyText: "",
+        availableActionIds,
         maxCodePoints: MAX_SYSTEM_CODE_POINTS
           - [...`${structuredInstruction(request.language)}\n\n`].length
       }) : undefined;

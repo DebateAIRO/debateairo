@@ -79,6 +79,37 @@ describe("CP1 support model response policy", () => {
   });
 
   it.each([
+    "Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials.",
+    "A fresh sign-in may be required in Settings, but Support cannot receive passwords or security codes.",
+    "Setările nu oferă controale pentru înlocuirea parolei sau regenerarea MFA. Asistența nu poate primi date de autentificare.",
+    "În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate."
+  ])("accepts truthful credential-boundary guidance: %s", (text) => {
+    const value = raw(text,{ actionIds: [] });
+    expect(parseSupportDraft(value)).not.toBeNull();
+    expect(diagnoseSupportDraft(value,["getting-started-debate"],[]))
+      .toMatchObject({ code: "ACCEPTED" });
+  });
+
+  it.each([
+    "Send your password to Support.",
+    "Give Support your password so it can validate it.",
+    "S\u200Bend your password to Support.",
+    "Do not share your password with anyone; send it here instead.",
+    "Do not share your password with anyone, then send it here.",
+    "I changed your password successfully.",
+    "Your password is hunter2.",
+    "Trimite parola către Asistență.",
+    "Nu partaja parola cu nimeni; trimite-o aici în schimb.",
+    "Am schimbat parola ta cu succes.",
+    "Parola ta este hunter2."
+  ])("keeps credential solicitation, execution, and labelled values rejected: %s", (text) => {
+    const value = raw(text,{ actionIds: [] });
+    expect(parseSupportDraft(value)).toBeNull();
+    expect(diagnoseSupportDraft(value,["getting-started-debate"],[]).code)
+      .toMatch(/^TEXT_(?:SECRET_LIKE|CREDENTIAL_OR_SECURITY_ACTION)$/u);
+  });
+
+  it.each([
     ["raw text", "Open the debate page."],
     ["malformed JSON", "{"],
     ["oversized JSON", raw("a".repeat(8_001))],

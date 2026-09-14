@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
 import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
 
@@ -36,6 +36,7 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries,
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "en",
       query: "unrelated greeting",
       historyText: "",
@@ -53,6 +54,7 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries,
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "en",
       query: "Can I download the ledger result as JSON?",
       historyText: "",
@@ -70,6 +72,7 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries,
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "ro",
       query: "Cum descarc răspunsul JSON?",
       historyText: "",
@@ -89,6 +92,7 @@ describe("Support knowledge context", () => {
     const base = buildSupportKnowledgeContext({
       entries: [],
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "en",
       query: "export",
       historyText: "",
@@ -98,6 +102,7 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries: [short, long],
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "en",
       query: "export note distinct long marker",
       historyText: "",
@@ -117,6 +122,7 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries: manyEntries,
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "en",
       query: "export JSON debate settings public help",
       historyText: "",
@@ -144,6 +150,7 @@ describe("Support knowledge context", () => {
       const result = buildSupportKnowledgeContext({
         entries: capabilityEntries,
         capabilities: SUPPORT_CAPABILITIES,
+        availableActionIds: SUPPORT_ACTION_IDS,
         language,
         query,
         historyText: "",
@@ -159,6 +166,7 @@ describe("Support knowledge context", () => {
     const result = buildSupportKnowledgeContext({
       entries,
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language: "en",
       query: "download the ledger result as JSON",
       historyText: "",
@@ -182,6 +190,7 @@ describe("Support knowledge context", () => {
         entry("view-public-debate",language,"Public reference","Reviewed public viewing behavior."),
       ],
       capabilities: SUPPORT_CAPABILITIES,
+      availableActionIds: SUPPORT_ACTION_IDS,
       language,
       query,
       historyText: "",
@@ -190,5 +199,25 @@ describe("Support knowledge context", () => {
 
     expect(result.sourceIds[0]).toBe("getting-started-debate");
     expect(result.requestedActionIds).toEqual(["start-debate"]);
+  });
+
+  it("advertises only action ids resolved by the trusted caller before generation", () => {
+    const result = buildSupportKnowledgeContext({
+      entries: [entry(
+        "export-json","ro","Exportă un răspuns",
+        "Exportul este disponibil după un răspuns servit și un registru lizibil."
+      )],
+      capabilities: SUPPORT_CAPABILITIES,
+      language: "ro",
+      query: "Cum funcționează exportul JSON?",
+      historyText: "",
+      maxCodePoints: 24_000,
+      availableActionIds: ["home","sign-in"],
+    });
+
+    expect(result.requestedActionIds).toEqual([]);
+    expect(result.text).toContain("- owner-debate: Spațiul de lucru al proprietarului");
+    expect(result.text).toContain("availability=owner | actions=none");
+    expect(result.text).toContain("actionIds=none");
   });
 });

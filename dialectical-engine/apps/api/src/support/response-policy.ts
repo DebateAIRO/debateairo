@@ -62,8 +62,10 @@ export type SupportDraftDiagnostic = Readonly<{
 }>;
 
 const MARKUP_OR_LINK = /(?:https?:\/\/|www\.|\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>|(?:^|\s)\/\/?(?:[a-z0-9][^\s]*))/iu;
-const SECRET_LIKE = /(?:\b(?:sk|pk|api)[_-][a-z0-9_-]{8,}\b|\bbearer\s+[a-z0-9._~-]{8,}\b|\b[a-z0-9_-]{32,}\b|\b(?:password|parol[ăa]?)\s*[:=]\s*\S+)/iu;
-const CREDENTIAL_OR_SECURITY_ACTION = /(?:\b(?:password|passcode|otp|totp|mfa|authenticator|recovery\s+code|verification\s+code|reset\s+token)\b|\b(?:parol[ăa]|cod(?:ul)?\s+de\s+(?:recuperare|verificare|autentificare)|autentificator|token(?:ul)?\s+de\s+resetare)\b)/iu;
+const SECRET_LIKE = /(?:\b(?:sk|pk|api)[_-][a-z0-9_-]{8,}\b|\bbearer\s+[a-z0-9._~-]{8,}\b|\b[a-z0-9_-]{32,}\b|\b(?:password|parol[ăa]?)(?:\s+(?:ta|dvs|dumneavoastră))?\s*(?::|=|\bis\b|\beste\b)\s*\S+)/iu;
+const CREDENTIAL_TERM = /(?:\b(?:password|passcode|otp|totp|mfa|authenticator|credentials?|recovery\s+code|verification\s+code|security\s+code|reset\s+token)\b|\b(?:parol[ăa]|date\s+de\s+autentificare|cod(?:ul|uri|urile)?\s+de\s+(?:recuperare|verificare|autentificare|securitate)|autentificator|token(?:ul)?\s+de\s+resetare)\b)/iu;
+const SECURITY_OPERATION = /\b(?:send(?:ing)?|sent|shar(?:e|es|ed|ing)|provid(?:e|es|ed|ing)|giv(?:e|es|en|ing)|suppl(?:y|ies|ied|ying)|request(?:s|ed|ing)?|ask(?:s|ed|ing)?|submit(?:s|ted|ting)?|enter(?:s|ed|ing)?|typ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|upload(?:s|ed|ing)?|tell(?:s|ing)?|told|show(?:s|ed|ing)?|receiv(?:e|es|ed|ing)|accept(?:s|ed|ing)?|repeat(?:s|ed|ing)?|transform(?:s|ed|ing)?|validat(?:e|es|ed|ing)|decod(?:e|es|ed|ing)|encod(?:e|es|ed|ing)|reset(?:s|ting)?|chang(?:e|es|ed|ing)|replac(?:e|es|ed|ing)|regenerat(?:e|es|ed|ing)|enroll(?:s|ed|ing)?|disabl(?:e|es|ed|ing)|remov(?:e|es|ed|ing)|revok(?:e|es|ed|ing)|recover(?:s|ed|ing)?|verif(?:y|ies|ied|ying)|check(?:s|ed|ing)?|us(?:e|es|ed|ing)|solicit\p{L}*|trimit\p{L}*|partaj\p{L}*|furniz\p{L}*|introduc\p{L}*|lip\p{L}*|incarc\p{L}*|spun\p{L}*|arat\p{L}*|prim\p{L}*|accept\p{L}*|repet\p{L}*|transform\p{L}*|valid\p{L}*|decod\p{L}*|encod\p{L}*|reset\p{L}*|schimb\p{L}*|inlocu\p{L}*|regener\p{L}*|inscri\p{L}*|dezactiv\p{L}*|elimin\p{L}*|revoc\p{L}*|recuper\p{L}*|verific\p{L}*|folos\p{L}*)\b/giu;
+const NEGATED_OPERATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can't|must\s+not|will\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/iu;
 const SIX_DIGIT_CODE = /\b\d{6}\b/u;
 const GROUPED_SECURITY_CODE = /\b\d{3,8}(?:[- ]\d{3,8})+\b/u;
 const REDACTION_ECHO = /\[REDACTED_(?:SECRET_LIKE|CONTACT|URL_QUERY)\]/u;
@@ -80,6 +82,22 @@ function normalizedForScreening(value: string): readonly string[] {
   return Object.freeze(values);
 }
 
+function containsCredentialOrSecurityAction(value: string): boolean {
+  return normalizedForScreening(value).some((candidate) => {
+    if (!CREDENTIAL_TERM.test(candidate)) return false;
+    const folded = candidate.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
+    const clauses = folded.split(/(?:[.!?;\n]+|\b(?:but|however|instead|except|unless|then|dar|insa|apoi|in\s+schimb)\b)/u);
+    return clauses.some((clause) => {
+      SECURITY_OPERATION.lastIndex = 0;
+      for (const operation of clause.matchAll(SECURITY_OPERATION)) {
+        const before = clause.slice(0,operation.index);
+        if (!NEGATED_OPERATION.test(before)) return true;
+      }
+      return false;
+    });
+  });
+}
+
 function screenCategory(value: string): SupportDraftDiagnosticCode | null {
   if ([...value].length > MAX_TEXT_CODE_POINTS) return "TEXT_TOO_LONG";
   const normalized = normalizedForScreening(value);
@@ -88,7 +106,7 @@ function screenCategory(value: string): SupportDraftDiagnosticCode | null {
     return "TEXT_LINK_OR_MARKUP";
   }
   if (normalized.some((candidate) => SECRET_LIKE.test(candidate))) return "TEXT_SECRET_LIKE";
-  if (normalized.some((candidate) => CREDENTIAL_OR_SECURITY_ACTION.test(candidate))) {
+  if (containsCredentialOrSecurityAction(value)) {
     return "TEXT_CREDENTIAL_OR_SECURITY_ACTION";
   }
   if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) return "TEXT_SIX_DIGIT_CODE";

@@ -60,10 +60,15 @@ function inflectedMatch(left: string,right: string): boolean {
   return common >= 4 && common / shorter >= 0.75;
 }
 
-function baseSection(capabilities: readonly SupportCapability[], language: SupportLanguage): string {
+function baseSection(
+  capabilities: readonly SupportCapability[],
+  language: SupportLanguage,
+  availableActionIds: ReadonlySet<SupportActionId>,
+): string {
   const policy = POLICY[language].map((line) => `- ${line}`).join("\n");
   const catalog = capabilities.map((item) => {
-    const actions = item.actionIds.length === 0 ? "none" : item.actionIds.join(", ");
+    const available = item.actionIds.filter((id) => availableActionIds.has(id));
+    const actions = available.length === 0 ? "none" : available.join(", ");
     return `- ${item.id}: ${item.labels[language]} | route=${item.route} | availability=${item.availability} | actions=${actions}`;
   }).join("\n");
   return `SUPPORT POLICY\n${policy}\n\nCAPABILITY CATALOG\n${catalog}`;
@@ -90,9 +95,11 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   query: string;
   historyText: "";
   maxCodePoints: number;
+  availableActionIds: readonly SupportActionId[];
 }>): SupportKnowledgeContext {
   if (input.historyText !== "") throw new Error("SUPPORT_KB_HISTORY_NOT_AVAILABLE_IN_CP1");
-  const base = baseSection(input.capabilities, input.language);
+  const availableActionIds = new Set(input.availableActionIds);
+  const base = baseSection(input.capabilities,input.language,availableActionIds);
 
   const queryWords = normalizeWords(input.query);
   const matchedCapabilities = input.capabilities
@@ -111,7 +118,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   for (const { item,score } of matchedCapabilities) {
     if (score !== bestCapabilityScore) break;
     for (const actionId of item.actionIds) {
-      if (seen.has(actionId)) continue;
+      if (seen.has(actionId) || !availableActionIds.has(actionId)) continue;
       seen.add(actionId);
       actionIds.push(actionId);
       if (actionIds.length === 3) break;

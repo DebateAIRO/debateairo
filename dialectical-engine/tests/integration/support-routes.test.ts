@@ -2127,6 +2127,53 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it("advertises no owner-only action to an anonymous export model request", async () => {
+    const article = Object.freeze({
+      id: "export-json",lang: "en" as const,title: "Export a debate as JSON",
+      status: "shipped" as const,sources: Object.freeze(["test"]),
+      verifiedAgainst: "test",ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
+      body: "JSON export is available after a served answer and a readable ledger digest."
+    });
+    const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
+    let system = "";
+    const answer = createSupportAnswerService({
+      entries: [article],snapshots,messages: messageCipher,
+      modelFor: () => Object.freeze({
+        complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
+          system = input.system;
+          return Object.freeze({ text: JSON.stringify({
+            kind: "answer",
+            text: "JSON export requires a served answer and readable ledger digest.",
+            sourceIds: ["export-json"],actionIds: []
+          }) });
+        }
+      }),
+      clock: (() => {
+        let at = CLOCK_BASE_MS + 30_000_000;
+        return () => new Date(++at);
+      })()
+    });
+    const server = api(true,{
+      clock: () => new Date(CLOCK_BASE_MS + 30_000_000),answerPort: answer
+    });
+    const opened = await openSession(server,"203.0.113.214");
+
+    const response = await sendMessage(
+      server,opened.body,"How does JSON export work?","203.0.113.214"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      outcome: "ANSWER_GROUNDED",
+      sources: [{ id: "export-json",label: "Export a debate as JSON" }],
+      actions: []
+    });
+    expect(system).toContain("- owner-debate: Owner debate workspace");
+    expect(system).toContain("availability=owner | actions=none");
+    expect(system).toContain("actionIds=none");
+    await server.close();
+  });
+
   it("returns fixed NO_SOURCE without invoking the relay and persists only encrypted outcome rows", async () => {
     let relayCalls = 0;
     const answer = createSupportAnswerService({
