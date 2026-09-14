@@ -71,7 +71,11 @@
     "LIVE3": "t_8a5cf2e8",
     "LIVE2_ACTION_ID": "t_67a569fe",
     "ARCHCHECK": "t_d44075a6",
-    "SECDELTA": "t_29866275"
+    "SECDELTA": "t_29866275",
+    "SEC_CREDENTIAL_POLICY": "t_db79b682",
+    "OBS_CORRELATION": "t_f9e289db",
+    "FIX4": "t_8b9a007d",
+    "LIVE4": "t_d69a47ed"
   },
   "edges": [
     [
@@ -348,6 +352,22 @@
     ],
     [
       "SECDELTA",
+      "GATE"
+    ],
+    [
+      "ARCHCHECK",
+      "FIX4"
+    ],
+    [
+      "FIX4",
+      "LIVE4"
+    ],
+    [
+      "SECDELTA",
+      "FIX4"
+    ],
+    [
+      "LIVE4",
       "GATE"
     ]
   ]

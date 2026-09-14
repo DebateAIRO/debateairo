@@ -1,5 +1,21 @@
 # CP1 progress
 
+Current status: **BLOCKED — actual guidance failures and missing owner destination.** CP1 is not ready for verification, not accepted, and cannot unlock CP2/CP3.
+
+Product: `codex/support-conversation-cp1` at `43cf9386ea3c9e7c79523ec38debe63271d19292`, clean when LIVE3 was consumed. Intended baseline `b7ca2c413bf3242ce18e29a397dc9a3aa9228893`; all 97 changed paths match the layered receipt inventory. The original dirty source is preserved.
+
+Latest automated integration: 20 test files, 776 passed, one Forgot-password TODO, rc 0. Latest actual demonstration: seven questions sent once, four grounded, three refused, only three clean manual passes. English creation and English/Romanian Settings fail. Compact Romanian creation exposes internal `start-debate` in prose. Exact rejected-output causes remain partly unknown; aggregate diagnostics are not request attribution.
+
+Preview: supported `https://localhost:3100`, loaded revision `43cf9386`, detached PID/PGID 40443 and PPID 1. The worker captured normal TLS 200 after browser exit and ten seconds idle with original listeners preserved. The first launch at the same revision failed at the Support-model stage; its inner cause remains unknown.
+
+Completed assessment context: separate Sol ARCHCHECK (`t_d44075a6`, `/root/plan_review`) assesses the response architecture; SECDELTA (`t_29866275`, `/root/forgot_destination`) validates the changed credential boundary and earlier sink findings using synthetic probes. SECDELTA owns the sole heavy lease. Both are read-only and precede any further correction. GATE and final REV1/REV2/REV3 remain pending. These assessments are not a fourth speculative fix or a final review PASS.
+
+Owner input: the existing Forgot password flow is confirmed, but its exact destination/opener remains unknown. The original specific question is still pending; do not guess, repeat searches, claim absence, or substitute Settings/MFA. Its eventual connection needs actual navigation evidence and scoped independent review.
+
+Review evidence is indexed in `.hermes/reports/support-conversation-20260914/review-packages/CP1-p1/inputs-43cf9386-draft.json`. The package is explicitly blocked and not dispatchable. Historical counts, versions and runtime custody below describe their original events, not the latest state.
+
+## Historical record
+
 Product lane: codex/support-conversation-cp1 at43cf9386ea3c9e7c79523ec38debe63271d19292, clean at integrated inventory. Intended-product baseline b7ca2c413bf3242ce18e29a397dc9a3aa9228893. Latest97/97 changed committed paths match layered author receipts in GATE-pre-LIVE3-inventory.json. Original source remains integration/debate-tiers at446c685e; freshly checked source HEAD, staged hash and complete tracked working-diff hash match intake (GATE-source-preservation.json).
 
 Planning: SPEC-v2/PLAN frozen at administrative65f71d79; separate PLANREV2 PASS. CP1 only; no owner acceptance or CP2/CP3 work.
@@ -40,3 +56,5 @@ FIX3 consumed at43cf9386:7exact paths,97/97inventory,4handoff+15reference hashes
 LIVE3 t_8a5cf2e8 active in /root/preview, soleheavy lease, no productwrites. Frozenpacket1d6249b1 and clean43cf9386 exact20-file suite plus supported reload/finite7question actualmatrix. GATE/REV1/REV2/REV3 and ownerForgotdestination remainpending; CP1notready/notaccepted.
 
 LIVE3 consumed as FUNCTIONAL_BLOCKER at43cf9386: root verified34immutable references and clean HEAD.20files/776pass+1TODO, but7actual questions once yielded4grounded,3refused,only3cleanmanualpasses. ENcreation/ENSettings/ROSettings refused; compactROcreation exposes start-debate. Fixed counts TEXT_LINK_OR_MARKUP1 and TEXT_CREDENTIAL_OR_SECURITY_ACTION2 lack prompt attribution. Console fixed counts401=11,others0. Persistent preview40443; first launch37935 failed at Support-model stage with inner causeUNKNOWN. ARCHCHECKt_d44075a6 and SECDELTAt_29866275 are read-only architecture/security assessments before further correction; final GATE/reviews and owner destination remainpending. No fourth speculative correction, CP1ready or acceptance.
+
+ARCHCHECK and SECDELTA consumed at43cf9386:14declared hashes checked and5additional logs frozen. Concrete shared-normalization/redaction, plural/negation output, cross-sentence falsepositive and internal-ID classes remain open. FIX4t_8b9a007d is the architecture-backed fourth preparation correction (finalreviewpass0), followed by LIVE4t_d69a47ed. New findings t_db79b682 credentialpolicy and t_f9e289db safediagnosticcorrelation; prior P1/P2 partialfixes remainopen. See CP1-BOUNDARY-CORRECTION ruling. No checkpoint readiness, broader response contract or model change.

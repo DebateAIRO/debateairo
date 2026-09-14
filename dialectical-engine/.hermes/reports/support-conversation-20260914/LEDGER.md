@@ -67,3 +67,8 @@ Same Sol server author /root/requirements, exact7-file clean commit,97/97 layere
 | LIVE3 | t_8a5cf2e8 | gpt-5.6-sol /root/preview | exact43cf9386 | FUNCTIONAL_BLOCKER evidence consumed |34manifestrefs and cleanHEAD mechanically checked; inherited session floor reads retained, self-report lists actual skills | agent-reports/LIVE3.md | worker reports20files/776pass+1TODO,3clean of7actual,3refusals and internalIDprose |
 
 Ruling: Stop speculative product corrections after repeated actual failures. Schedule read-only independent architecture assessment and security delta validation at frozen43cf9386, reusing prior preparation. This does not consume or bypass a final review pass and cannot make CP1 ready. Cost if wrong: bounded additional assessment; no product/model/security-policy changes.
+
+| ARCHCHECK | t_d44075a6 | gpt-5.6-sol /root/plan_review |43cf9386 |ASSESSMENT_COMPLETE|report/self hashes verified; actual skill list in completed session|agent-reports/ARCHCHECK.md|static A1-A5; no fullPASS|
+| SECDELTA |t_29866275|gpt-5.6-sol /root/forgot_destination|43cf9386|ASSESSMENT_COMPLETE|report/self+5probe+5final-log hashes matched;5additional attempts preserved|agent-reports/SECDELTA.md|B1/B2/B3/N1; actual imported modules,in-memory ports; no realHTTP/database/relay|
+
+Ruling: ARCHCHECK’s secure/fail-closed wording only describes recognized syntactic/policy rejections; SECDELTA actual accepted solicitations disprove a general security claim. Three failed demonstrations are retained. Owner-authorized autonomous CP1 implementation covers the recommended internal correction, with no model/contract substitution. Explicit FIX4 preparation is not final review pass4; final review pass1 has not started. Do not extend to another speculative prompt loop.

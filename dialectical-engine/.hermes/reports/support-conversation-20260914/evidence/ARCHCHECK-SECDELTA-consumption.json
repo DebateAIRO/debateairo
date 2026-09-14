@@ -1,0 +1,107 @@
+{
+  "at": "2026-09-14T15:15:23.719909+00:00",
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "product_clean": true,
+  "files": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/ARCHCHECK.md",
+      "sha256": "00eb8a2df56c6a3caef2e568ef19e301e6f470e722507af58b432c41c7043e99",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ARCHCHECK.md",
+      "sha256": "521f4e280451e6c90d245dfc498e7cd8328ae59be548ded45b1b75b66d870417",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/SECDELTA.md",
+      "sha256": "c9cc465a563d6642db223580223182fc6421ac0a01a73865172017fc6f2f09c2",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/SECDELTA.md",
+      "sha256": "44d5c0f32b8630fbcb6f52e46fc1fd6f82332fd8b539e8b64fe20e3395f93dd1",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-redaction-probe-node-import.log",
+      "sha256": "a556099d6fdce1079cb82cd79dd86a5c0ee035152ba7250e0efb8a0967c40a2a",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-policy-probe-v2.log",
+      "sha256": "cea1150a1fa307a0bf102e1133178bc32bbe90f508e833dea4f6fae2c0f28c48",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-redaction-transit-probe.log",
+      "sha256": "ae861e9d75cfb4dd58c44ebcb10bb2b4403a58004e5c1e9635c7ff43e6a6d46d",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-answer-sink-probe-node-import.log",
+      "sha256": "e8834c79db012c8a6cbc27679c6d8cfb996d551e4b7e4abb134beb11a24bcfb4",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-summary-sink-probe-node-import.log",
+      "sha256": "da6472b8e329c74704c0c0bd4a9f347fc2cbcc98dbab9688eaf0bd753a116a85",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/redaction-probe.ts",
+      "sha256": "6b4faf1e5e9be17d84d93e43a189c28366109d01601d2d06c71a29f291c2739e",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/policy-probe.ts",
+      "sha256": "4c50fd7f86e8ab56e642f000b1bbf50b4c4773d17b49477d8c26d6f1e67f904e",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/redaction-transit-probe.ts",
+      "sha256": "95c17d59961bcd5cc1a3f425d2569a9c4e9136a28e2e3fd8ac9717d230373b70",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/answer-sink-probe.ts",
+      "sha256": "188244624d4bddb938aae457afc785db161195d3d3cd8536fe321c248ad4e4d0",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SECDELTA/summary-sink-probe.ts",
+      "sha256": "e3138249b085bfb23355775821fb12856927a667c6f944889c6b2654fc91fd0f",
+      "expected_hash_checked": true
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-answer-sink-probe.log",
+      "sha256": "276933ab6ce1c831c54e576a829ba5c75bf86365cf2f5658cb53aa4cdecaf917",
+      "expected_hash_checked": false
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-policy-probe-node-import.log",
+      "sha256": "70b77186c8c96b1a6a26f85647339f4813a60cffec6fb0c6e28e38a2aa3a5ae4",
+      "expected_hash_checked": false
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-policy-probe.log",
+      "sha256": "3ffdb6efdc48bf82e853a90ed632b6cd5aad7eaede004eccb1f96e6f7d51e932",
+      "expected_hash_checked": false
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-redaction-probe.log",
+      "sha256": "60bce1a7e629efe4f742252f6461dc08e2119712cbaf355e19d514d73aa37c3d",
+      "expected_hash_checked": false
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SECDELTA-summary-sink-probe.log",
+      "sha256": "72c71dcab1f112e6eb29c3f5c0bc0369264aaa81bdbc5332d3aa2c423e501549",
+      "expected_hash_checked": false
+    }
+  ],
+  "result": "ASSESSMENTS_CONSUMED; multiple blockers remain",
+  "scope": "Root mechanically verified reports/probe/log hashes and clean revision. Reviewer executed in-memory imported-module probes, not real database/HTTP/relay. ARCHCHECK static findings and SECDELTA actual results retain separate provenance.",
+  "wording_correction": "ARCHCHECK strong/secure fail-closed wording is limited to rejecting recognized schema/policy violations. SECDELTA demonstrates forbidden credential solicitations are accepted, so no general credential-safety or secure-boundary claim is warranted.",
+  "parser": "Initial single regex missed two-column probe rows and failed count assertion; corrected bounded2or3column parser rejects malformed-hash fixture. No partial consumption receipt written.",
+  "pending": "GATE/finalreviews and exact Forgot destination; no CP1 approval"
+}
