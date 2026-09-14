@@ -95,7 +95,8 @@
     "GATE_P3": "t_6449e771",
     "REV1_P3": "t_88683868",
     "REV2_P3": "t_fa16515a",
-    "REV3_P3": "t_689d8959"
+    "REV3_P3": "t_689d8959",
+    "HARNESS_P2": "t_02141be3"
   },
   "edges": [
     [
@@ -509,6 +510,14 @@
     [
       "REV3_P3",
       "CP1"
+    ],
+    [
+      "PLAN_P2",
+      "HARNESS_P2"
+    ],
+    [
+      "HARNESS_P2",
+      "LIVE_P2"
     ]
   ]
 }
