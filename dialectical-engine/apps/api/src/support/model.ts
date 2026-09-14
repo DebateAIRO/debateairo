@@ -52,12 +52,18 @@ export function parseSupportModelTargetJson(source: string): SupportModelTarget 
     throw new SupportModelError("SUPPORT_MODEL_PATH_NOT_RATIFIED");
   }
   if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)
-    || Object.getPrototypeOf(decoded) !== Object.prototype
-    || Object.keys(decoded).sort().join("\0")
-      !== ["provider_ref","base_url","model","authorization_header"].sort().join("\0")) {
+    || Object.getPrototypeOf(decoded) !== Object.prototype) {
     throw new SupportModelError("SUPPORT_MODEL_PATH_NOT_RATIFIED");
   }
   const row = decoded as Readonly<Record<string,unknown>>;
+  const supportPreview = row.development_stack_profile === "support-preview";
+  const expectedKeys = [
+    "provider_ref","base_url","model","authorization_header",
+    ...(supportPreview ? ["development_stack_profile"] : [])
+  ];
+  if (Object.keys(row).sort().join("\0") !== expectedKeys.sort().join("\0")) {
+    throw new SupportModelError("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+  }
   if (row.provider_ref !== SUPPORT_HERMES_PROVIDER_REF
     || row.model !== SUPPORT_HERMES_MODEL
     || typeof row.base_url !== "string"
@@ -72,7 +78,7 @@ export function parseSupportModelTargetJson(source: string): SupportModelTarget 
   }
   if (url.protocol !== "http:"
     || url.hostname !== "127.0.0.1"
-    || url.port !== "8794"
+    || url.port !== (supportPreview ? "8894" : "8794")
     || url.username !== ""
     || url.password !== ""
     || url.search !== ""
