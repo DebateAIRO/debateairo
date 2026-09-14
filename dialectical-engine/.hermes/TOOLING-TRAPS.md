@@ -3081,3 +3081,6 @@ The C1–C3 seats printed `READY — node …` as their first line; the C4 seat 
 
 ## `run-suites.sh` takes fuzzy Vitest filters — pass exact repository paths (2026-09-13, BUILD-S03-C4 F2)
 `api:26:0` matched seven files (`tests/integration/dev-api-process.test.ts` among them) and printed a false `CLUSTER_RED` (59 passed / 5 failed). `tests/unit/api.test.ts:26:0` matched one and printed `CLUSTER_GREEN`. Every packet spells the pair with the exact path; the runner should refuse a selector that yields other than one `Test Files` entry.
+
+## A detached Codex seat does not keep the Mac awake — clamshell sleep suspends its runs and looks like a stall (2026-09-14, FIX-S03-p1-F1, ~10 h wall for ~3 h of work)
+The seat's embedded-Postgres timestamps showed multi-hour suspend gaps; two three-run attempts were BROKEN (not verdicts) and the seat re-ran them under `caffeinate -s -i <cmd>`. Law: every seat launcher runs `exec caffeinate -s -i codex exec …` (the assertion dies with the seat), and a stall diagnosis first asks `pmset -g log | grep -i sleep` for the window.
