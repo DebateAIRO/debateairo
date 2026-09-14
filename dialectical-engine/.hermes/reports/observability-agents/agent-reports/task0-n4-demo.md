@@ -1,0 +1,25 @@
+# Task 0 N4 demo request — worker report
+
+- I worked only on the Task 0.4 N4 evidence and request.
+- The request is at `.superpowers/sdd/PLAN-FixAgent/task0-n4-demo-request.md`.
+- I did not edit the custodian-owned demo.
+- I did not change the board and did not commit.
+- I read the named plan, heartbeat worker rules, Codex adapter, Superpowers rules, and `.hermes/TOOLING-TRAPS.md`.
+- I read audit §D, the stage-16 loop, the demo README, and ticket `t_40c2cc1b`.
+- Fresh stage-16 check: exit 1; 0 passed, 1 failed, 0 skipped.
+- The failure names only `packages/obs-capture/src/zone/manifest.ts`.
+- The run kept the working-tree entry count at 6 and reported zero zone-guard refusals.
+- Root cause: a broad text rule scans a file whose job is to store the same strings as data.
+- The reviewed regex proposal and the later hand lexer were replaced with a bounded TypeScript AST scanner for the manifest; the broad rule remains in force for every other file.
+- The scanner covers static import/export declarations, import-equals external module references, dynamic `import()`, and only Identifier `require()` calls. Its first operand may be a string literal or no-substitution template and later options arguments do not hide it; only the four ruled zone-module basenames are rejected.
+- AST shape prevents regex/division text from becoming fictitious imports and keeps `loader?.require(...)` as a member call, while the nearby free optional call `require?.(...)` is rejected.
+- The request gives eighteen exact positives spanning every form, both quote styles, escaped string content, string/no-substitution-template operands, and calls with options, plus seven exact negatives including the two round-three false-positive fixtures.
+- Three identical local harness rounds left the real manifest green, rejected all 18 positives, and accepted all 7 negatives. A neighboring division-expression negative also stayed green.
+- Fail-closed probes returned exit 2 for a parse diagnostic, a file over 1 MiB, a tree over 100000 AST nodes, and an unavailable parser. The same scanner accepted the real manifest when launched from `/tmp` with the explicit product-root argument.
+- The request keeps the runtime half of D6 marked not covered.
+- `OBS_DEMO_DATABASE_URL` was unset. I did not guess it or print any secret.
+- Stage 02 and post-edit stage 16 remain unmeasured; the request gives a guarded rerun command.
+- Round three was test-first: the two review negatives and nearby optional free-require positive failed against the hand lexer before the TypeScript AST scanner was installed, then passed the three-run matrix after the replacement.
+- One broad `rg` over reports pulled unrelated log text and cost one tool call. Future searches should stay inside the named mission paths.
+- I did not append that trap to the shared tooling file because this packet gives me only the request and report write surface.
+- No other unexpected finding was found.
