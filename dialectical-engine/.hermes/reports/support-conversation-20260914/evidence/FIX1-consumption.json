@@ -1,0 +1,52 @@
+{
+  "revision": "1bd15cff4fd0d2d73e1ce872b2f0d2e70bf46b21",
+  "exactFilesChecked": 12,
+  "logsChecked": 14,
+  "resolvedLogFiles": {
+    "red": [
+      "FIX1-red.log"
+    ],
+    "green1": [
+      "FIX1-green1.log"
+    ],
+    "green2": [
+      "FIX1-green2.log"
+    ],
+    "routeRestored": [
+      "FIX1-route-restored.log"
+    ],
+    "answerContextRestored": [
+      "FIX1-answer-context-restored.log"
+    ],
+    "routeCredentials": [
+      "FIX1-route-credentials.log"
+    ],
+    "finalFocused": [
+      "FIX1-final-focused.log"
+    ],
+    "typecheckInitial": [
+      "FIX1-typecheck.log"
+    ],
+    "typecheckFinal": [
+      "FIX1-typecheck-final.log"
+    ],
+    "mutantContextCap": [
+      "FIX1-mutant-context-cap.log"
+    ],
+    "mutantSnapshotIdentity": [
+      "FIX1-mutant-snapshot-identity.log"
+    ],
+    "mutantLabelledRedaction": [
+      "FIX1-mutant-labelled-redaction.log"
+    ],
+    "mutantSummaryScreen": [
+      "FIX1-mutant-summary-screen.log"
+    ],
+    "mutantEncodedLink": [
+      "FIX1-mutant-encoded-link.log"
+    ]
+  },
+  "typecheckExactByteMatch": "UI-root-typecheck.log; already mechanically attributed76 inherited,73exact+3moved,0introduced",
+  "priorTypecheckComparison": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/UI-typecheck-comparison.json",
+  "ownerAcceptance": false
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "ticket": "t_9e40cdeb",
+  "session": "/root/preview",
+  "frozen_ui_input": "1ed6c29d327db535259bb428eb181e1e97081c99",
+  "integrated_parent": "1bd15cff4fd0d2d73e1ce872b2f0d2e70bf46b21",
+  "commit": "085fff68f8b22743978d1efafd7ad9fd204e5a6f",
+  "product_files": [
+    {
+      "path": "dialectical-engine/apps/ui/components/support/Assistant.tsx",
+      "blob": "1639b18786ccc1b2fc97585c8112f8a99c7481e5"
+    },
+    {
+      "path": "dialectical-engine/tests/render/sup-01-help.test.tsx",
+      "blob": "14acf4421fc8b6ed310f4a13744cfc42f7c0659e"
+    }
+  ],
+  "artifacts": {
+    "evidence/UIFIX1.md": "2afcb7cc6b716360bcfdaacc3e28828e381679f7c03c8fbd69e27250deede776",
+    "agent-reports/UIFIX1.md": "b16e282d26a211e6ec7fe519f1eed084f11f11dfa68e1101c8dc387fa022240c",
+    "evidence/UIFIX1-browser-receipt.json": "8f3220bef01ccf42a9f2bb718d3ed65b69403e96b4082b31441277c8d57079dc",
+    "evidence/UIFIX1-signed-in-full-en.png": "f16ee8770ecd5bf21b50d185b4561257e700f0f8076d187d57c85fd91e328162",
+    "evidence/UIFIX1-signed-in-full-ro.png": "5aa6217eba3020e6b9ff72e05a06d8081677dc10a192e6167400c1df3d9b7aed",
+    "evidence/UIFIX1-signed-in-compact-en.png": "72f325bcfb9d7752986e95406662a8f7c2947058280d31ba16632fb4ae56a495",
+    "evidence/UIFIX1-signed-in-compact-ro.png": "68bac7b9881015d74b114cb60f0a357abfe051ff20de01601794b0a5423f435c",
+    "evidence/UIFIX1-login-destination.json": "ee4ca6fc35ceaebd6085166e59e2a6e31f8db79a566a462fc9aeb6b1e650e634",
+    "evidence/UIFIX1-login-destination.png": "ed6fe40bd90fde7cb75064b3a99fa3d1bdf07f26cbd23705b2080ee1a3431a09",
+    "evidence/UIFIX1-stack-custody.json": "8cc26330f329916db85c2ba3baa893ff80aa915b3f6af41b806aa3cf24c933d3",
+    "evidence/UIFIX1-stack-receipt.json": "dc3298bb1266a523254511ec4ffa4af7d9a7039a08d9af80452890c6a73668e8",
+    "evidence/UIFIX1-stack-at-handoff.log": "14c0c07a1cb7ca31572bbe9fda07b0c42058612b56d06d2eed4dc5f482ef8cef",
+    "probes/UIFIX1/capture-signed-in.mjs": "74d388e2577f94bfa15d2573a502f1867313ad57c42b5a3cd851f51a7efeac44",
+    "probes/UIFIX1/inspect-login.mjs": "27c36f6f17d3bd5b60645286066634b956ce6d9c561bd6de9a9df1274e52da20",
+    "probes/UIFIX1/start-preview-detached.mjs": "72f28c096379bd9cc4f48db1cd5bc0583e99cec51dde768c5554188a5d48d5b2",
+    "evidence/UIFIX1-stack-idle-check.log": "39c4324bda92f4c1666a4c4ffd468f145eb7c93eb626f17965558aa3eb4a834e"
+  },
+  "logs": {
+    "UIFIX1-red-shortcuts-r3.log": "4de41efcae492fde88421962fb2dd17a38ffa62c995ce26b074059748b8e18f2",
+    "UIFIX1-green-shortcuts.log": "fb20f63f08e17a5a9286c4c2bbc94281a617ee3bc022d31a7702f835447b26af",
+    "UIFIX1-green-render-final.log": "4cfd74d9a449ebb299373e2931679914ff951da3ebe04f60b308749ac99e0055",
+    "UIFIX1-tsx-typecheck.log": "70685b4df7789c854b9e1ceab7d78a6d0f9a0831c11eb0010b7b5fdbe0e50c39",
+    "UIFIX1-browser-capture-final.log": "8f3220bef01ccf42a9f2bb718d3ed65b69403e96b4082b31441277c8d57079dc",
+    "UIFIX1-login-inspection.log": "ee4ca6fc35ceaebd6085166e59e2a6e31f8db79a566a462fc9aeb6b1e650e634"
+  },
+  "limitations": [
+    "Signed-in identity, account projection, and Support API responses are synthetic.",
+    "Live-relay answer quality and real authorization/private-data behavior are not established.",
+    "The live login surface exposes no Forgot/reset/recovery control; exact Forgot destination and click remain UNKNOWN and UNVERIFIED.",
+    "The prior preview exit cause remains UNKNOWN because its historical log has no exit or cleanup marker."
+  ]
+}

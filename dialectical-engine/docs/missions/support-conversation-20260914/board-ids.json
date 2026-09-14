@@ -23,7 +23,50 @@
     "PREVIEW": "t_984d15e6",
     "FREEZE": "t_31897858",
     "EDITORIAL": "t_48916645",
-    "UI": "t_36e6e01e"
+    "UI": "t_36e6e01e",
+    "PROCESS_BASE_ARGV": "t_5dd205be",
+    "PROCESS_DEPS": "t_b10da192",
+    "PROCESS_SANDBOX": "t_7e860ce3",
+    "PROCESS_ROLES": "t_33a60630",
+    "PROCESS_STATE": "t_57ed8ba1",
+    "PROCESS_READ_FLOOR": "t_4e74c4fd",
+    "PROCESS_DESTINATION": "t_e7595197",
+    "PROCESS_RUNTIME_RECEIPT": "t_dae27653",
+    "PROCESS_FREEZE_PACKET": "t_99106fa9",
+    "PROCESS_SHELL_NAMES": "t_243f03aa",
+    "PROCESS_PACKET_RESULT": "t_ae0376f9",
+    "REQFIX1": "t_b2b3741c",
+    "PLANREV2": "t_4efed856",
+    "PLAN_B1": "t_00d473aa",
+    "PLAN_B2": "t_fb664804",
+    "PLAN_B3": "t_237fe384",
+    "PLAN_N1": "t_bcd6b59d",
+    "RUNTIME_BASE": "t_6612154e",
+    "PREVIEW_INIT": "t_1997183c",
+    "PREVIEW_WRITE_BUDGET": "t_db9a4abf",
+    "PREVIEW_API": "t_8d34a9c1",
+    "EDITFIX1": "t_1bb89697",
+    "EDITREV2": "t_fcd71150",
+    "TYPEBASE": "t_cc2dfcbd",
+    "ATTEST": "t_956edf50",
+    "UIPREP": "t_60c153c6",
+    "SECPREP": "t_d1aa2fa8",
+    "CORPREP": "t_2d2d5043",
+    "COR_C1": "t_32281522",
+    "COR_C2": "t_4f43d8c1",
+    "COR_C3": "t_e248c7cc",
+    "SEC_P1": "t_4bccb334",
+    "SEC_P2": "t_18646f0a",
+    "SEC_P3": "t_55cc12ff",
+    "FIX1": "t_2ebd85d4",
+    "PRODPREP": "t_bee73d8c",
+    "PROD_LINKS": "t_60f2ec16",
+    "PROD_SIGNEDIN": "t_e5e62435",
+    "UIFIX1": "t_9e40cdeb",
+    "LIVE": "t_3fd09b62",
+    "LIVE_GUIDANCE": "t_8596ccbc",
+    "FIX2": "t_5bea68d5",
+    "LIVE2": "t_48f43282"
   },
   "edges": [
     [
@@ -103,10 +146,6 @@
       "WHOLE"
     ],
     [
-      "DEST",
-      "GATE"
-    ],
-    [
       "PREVIEW",
       "GATE"
     ],
@@ -132,6 +171,150 @@
     ],
     [
       "UI",
+      "GATE"
+    ],
+    [
+      "PLANREV",
+      "REQFIX1"
+    ],
+    [
+      "REQFIX1",
+      "PLANREV2"
+    ],
+    [
+      "PLANREV2",
+      "NAV"
+    ],
+    [
+      "PLANREV2",
+      "GATE"
+    ],
+    [
+      "RUNTIME_BASE",
+      "GATE"
+    ],
+    [
+      "PREVIEW_INIT",
+      "GATE"
+    ],
+    [
+      "PREVIEW_WRITE_BUDGET",
+      "GATE"
+    ],
+    [
+      "PREVIEW_API",
+      "NAV"
+    ],
+    [
+      "EDITORIAL",
+      "EDITFIX1"
+    ],
+    [
+      "EDITFIX1",
+      "EDITREV2"
+    ],
+    [
+      "EDITREV2",
+      "UI"
+    ],
+    [
+      "TYPEBASE",
+      "GATE"
+    ],
+    [
+      "EDITREV2",
+      "ATTEST"
+    ],
+    [
+      "ATTEST",
+      "UI"
+    ],
+    [
+      "UIPREP",
+      "UI"
+    ],
+    [
+      "DEST",
+      "CP1"
+    ],
+    [
+      "NAV",
+      "SECPREP"
+    ],
+    [
+      "PREVIEW",
+      "SECPREP"
+    ],
+    [
+      "ATTEST",
+      "SECPREP"
+    ],
+    [
+      "SECPREP",
+      "REV2"
+    ],
+    [
+      "NAV",
+      "CORPREP"
+    ],
+    [
+      "PREVIEW",
+      "CORPREP"
+    ],
+    [
+      "ATTEST",
+      "CORPREP"
+    ],
+    [
+      "CORPREP",
+      "REV1"
+    ],
+    [
+      "CORPREP",
+      "FIX1"
+    ],
+    [
+      "FIX1",
+      "GATE"
+    ],
+    [
+      "UI",
+      "PRODPREP"
+    ],
+    [
+      "PRODPREP",
+      "REV3"
+    ],
+    [
+      "UI",
+      "UIFIX1"
+    ],
+    [
+      "UIFIX1",
+      "GATE"
+    ],
+    [
+      "FIX1",
+      "LIVE"
+    ],
+    [
+      "UIFIX1",
+      "LIVE"
+    ],
+    [
+      "LIVE",
+      "GATE"
+    ],
+    [
+      "LIVE",
+      "FIX2"
+    ],
+    [
+      "FIX2",
+      "LIVE2"
+    ],
+    [
+      "LIVE2",
       "GATE"
     ]
   ]
