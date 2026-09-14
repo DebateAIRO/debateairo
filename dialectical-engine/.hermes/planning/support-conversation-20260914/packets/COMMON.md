@@ -34,3 +34,5 @@ Completed FIX4 and exact LIVE4 contract freeze:6f703e8b927a7d5b9affa17b156ec7799
 Completed LIVE4 known-failed evidence and final review package freeze:096638486c4f2eab450055c4b1d25ecd58a1ca54;18files, source before/afterdc9workingdiff unchanged but historical intake drift disclosed. GATE is evidence packaging only, not PASS.
 
 Final pass1 contract freeze:de7138ffddff8109003d8b4617c509cae5fd8dd2. All three final lenses now returned REWORK at6e5ab5fc; exact union and internal R14 alias amendment govern FIX_P1. No fifth preparation patch or owner acceptance. Board operations use only the existing Hermes CLI; external issue connectors are outside this mission. Use full revisions from manifests, never reconstructed hashes.
+
+Final pass1 union and FIX_P1 dispatch freeze:0aa00488d326ba7054eeaa9b32e86e56ae0a14d9;19 completed administrative files verified before packet-check/dispatch. Active author outputs excluded. Current-state source preservation was verified for that operation; intake-wide continuity remains qualified by CP1-SOURCE-DRIFT.md.

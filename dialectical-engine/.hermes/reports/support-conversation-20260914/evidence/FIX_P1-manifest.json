@@ -1,0 +1,23 @@
+{
+  "algorithm": "sha256",
+  "productBase": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "productCommit": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "files": {
+    "dialectical-engine/apps/api/src/support/answer.ts": "a124a60a4637140f1cc07f8462412ac8c6606ddde5369a57c79a8c45f30c643c",
+    "dialectical-engine/apps/api/src/support/model-references.ts": "b1738b971f9096e555eb7603d64b25f7ce4d26e79689d28d801bb697bc6dd1b3",
+    "dialectical-engine/apps/api/src/support/response-policy.ts": "20db230a974897e3ea70d75bab0af1e76a56760e4f6ecd30e910c8b8e1ab3923",
+    "dialectical-engine/packages/kernel/src/index.ts": "206c7eb204dc28bbb507892f87a431198f6ef98c03de75dc1cff04d3fcc3cc11",
+    "dialectical-engine/packages/kernel/src/support-credentials.ts": "ce1019f1156833642592d21a03cfb6b758142ebc43766c201128bea5c075492b",
+    "dialectical-engine/packages/kernel/src/support-text-views.ts": "e43bf7e2c6c745617877155aeb96ad4e27da4b0e9b7f99d9299a0594c0d551c9",
+    "dialectical-engine/packages/support-kb/src/context.ts": "b7d3a231f0c7ddca9fcc5f756cd6a2ccead7211dc9d2eddc32bb6417d386d288",
+    "dialectical-engine/tests/integration/support-cases.test.ts": "ebc8ca1dc015342b2a7f5e6e96302323453471851dc6e05362ed94d0c1fe9084",
+    "dialectical-engine/tests/integration/support-routes.test.ts": "e4364a8b31aa19f015e7b0e6d3305e0212343482da8913dbfc325d82dd079ced",
+    "dialectical-engine/tests/unit/support-answer-context.test.ts": "565958e25e9e3df95d416548b4a39ae01d1a7350b63bc1415cf8d64c5196208e",
+    "dialectical-engine/tests/unit/support-context.test.ts": "6146f12a64e34aa756a541e39d5de436130b2b931d587cfdb49215c3b51bbcb4",
+    "dialectical-engine/tests/unit/support-credentials.test.ts": "0bef2f5500d00dbe7b50617093a0e792a847b6bd4676479ee59e464fa316e659",
+    "dialectical-engine/tests/unit/support-model-references.test.ts": "63c0aa1363f1c06bd751d4d9f7f32d553be566611b56350524ff4ae70fe7b293",
+    "dialectical-engine/tests/unit/support-redaction.test.ts": "cff02c030d013dbfb5e083bfe29b64d92dd04b77c32c37961f9c5e99c4732228",
+    "dialectical-engine/tests/unit/support-response-policy.test.ts": "9bc2d7af3b4d738514066ccbcad8fa42178f60158c65a832864ec2ea780b8bce",
+    "dialectical-engine/tests/unit/support-text-views.test.ts": "3f048c405f84f7365fe605d831c461ea7401f14f286975f740733ea90f305937"
+  }
+}

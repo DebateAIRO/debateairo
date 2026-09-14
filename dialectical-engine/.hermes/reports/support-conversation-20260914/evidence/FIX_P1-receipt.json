@@ -1,0 +1,17 @@
+{
+  "algorithm": "sha256",
+  "productBase": "6e5ab5fc41acebbff4264efc7d481df3db8dce44",
+  "productCommit": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "artifacts": {
+    "docs/missions/support-conversation-20260914/reviews/FIX_P1-IMPLEMENTATION.md": "5ba43ff1d1c4a39a668be3a354eac2828c89bc5a99ed4a8a891ef61823a8d477",
+    ".hermes/reports/support-conversation-20260914/agent-reports/FIX_P1.md": "d6df292e89f9d4b7e41b9753cd5852ac0ddc2f803f1e2bd58f589695cb9a5cee",
+    ".hermes/reports/support-conversation-20260914/evidence/FIX_P1-manifest.json": "e449c6371b348c455f1ae0be64284106d9c3c0b4d977e176e9c9efbf806c5540",
+    ".hermes/reports/support-conversation-20260914/evidence/FIX_P1.md": "8169b9081c950cdc01ce1c28ab548f1ad4ee832f548506f58d8135da0d491a0a"
+  },
+  "finalVerification": {
+    "focusedLogSha256": "cc3588a9272f877b982b265526de7e6ed2d276b04e276da7c4f3732773fb421e",
+    "focusedResult": "10 files passed; 381 tests passed",
+    "typecheckLogSha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "typecheckAttribution": "byte-identical to the attributed 76-diagnostic UI-root baseline"
+  }
+}

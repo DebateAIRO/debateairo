@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-14T17:23:05.131240+00:00",
+  "referencePath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ROOT-source-custody-forward.json",
+  "referenceSha256": "6139f048a541cecb74b1ad6bd654ee8c969f7fe637f3fce6170149d28c549caa",
+  "pathCount": 56,
+  "checks": {
+    "sourceHead": true,
+    "indexFullDiff": true,
+    "worktreeFullDiff": true,
+    "allTrackedDirtyPathShapesAndBytes": true
+  },
+  "allMatch": true,
+  "scope": "Forward comparison from 17:04 custody snapshot only; does not fill missing intake evidence. No source mutation or raw contents retained."
+}
