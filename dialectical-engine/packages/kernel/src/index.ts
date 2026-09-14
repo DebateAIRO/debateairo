@@ -283,6 +283,7 @@ export function exhaustive(value: never): never {
 }
 
 export * from "./support-credentials.js";
+export * from "./support-text-views.js";
 
 export class TypedDomainError extends Error {
   constructor(readonly code: string, message: string) {

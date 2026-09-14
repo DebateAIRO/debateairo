@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { analyzeSupportCredentialText } from "@debateai/kernel";
+import { analyzeSupportCredentialText,canonicalSupportTextViews } from "@debateai/kernel";
 import {
   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
 } from "@debateai/support-kb/catalog";
@@ -24,7 +24,7 @@ export type SupportDraft = Readonly<{
   kind: "answer";
   text: string;
   sourceIds: readonly string[];
-  actionIds: readonly SupportActionId[];
+  actionIds: readonly string[];
 }>;
 export type SupportCaseSummaryDraft = Readonly<{
   kind: "case_summary";
@@ -127,25 +127,10 @@ const SIX_DIGIT_CODE = /\b\d{6}\b/u;
 const GROUPED_SECURITY_CODE = /\b\d{3,8}(?:[- ]\d{3,8})+\b/u;
 const REDACTION_ECHO = /\[REDACTED_(?:SECRET_LIKE|CONTACT|URL_QUERY)\]/u;
 const NARRATIVE_ID = /\b[a-z0-9]+(?:-[a-z0-9]+)+\b/giu;
-const AMBIGUOUS_HUMAN_IDS = new Set([
-  "forgot-password","privacy-preferences","sign-in","support-status"
-]);
 const CLOSED_NARRATIVE_IDS = new Set<string>([
   ...SUPPORT_ACTION_IDS,...SUPPORT_CAPABILITIES.map(({ id }) => id),
   ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
-].filter((id) => id.includes("-") && !AMBIGUOUS_HUMAN_IDS.has(id)));
-
-function normalizedForScreening(value: string): readonly string[] {
-  const values = [value.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu,"")];
-  for (let pass = 0; pass < 2; pass += 1) {
-    try {
-      const decoded = decodeURIComponent(values.at(-1)!);
-      if (decoded === values.at(-1)) break;
-      values.push(decoded.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu,""));
-    } catch { break; }
-  }
-  return Object.freeze(values);
-}
+].filter((id) => id.includes("-")));
 
 function containsCredentialOrSecurityAction(value: string): boolean {
   const facts = analyzeSupportCredentialText(value);
@@ -169,10 +154,12 @@ function result(
   code: SupportDraftDiagnosticCode,predicate: SupportDraftPredicate
 ): TextScreenResult { return Object.freeze({ code,predicate }); }
 
-function linkPredicate(normalized: readonly string[]): SupportDraftPredicate | null {
-  for (const candidate of normalized) {
+function linkPredicate(value: string): SupportDraftPredicate | null {
+  const canonical = canonicalSupportTextViews(value);
+  if (canonical.unsafeEncoding) return "ENCODED_LINK_OR_PATH";
+  for (const candidate of canonical.views) {
     if (!MARKUP_OR_LINK.test(candidate)) continue;
-    if (candidate !== normalized[0]) return "ENCODED_LINK_OR_PATH";
+    if (candidate !== canonical.views[0]) return "ENCODED_LINK_OR_PATH";
     if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
     if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";
     return "PATH_OR_ROUTE";
@@ -185,7 +172,7 @@ function containsInternalIdentifier(
 ): boolean {
   const ids = new Set(CLOSED_NARRATIVE_IDS);
   for (const id of additionalIds) if (id.includes("-")) ids.add(id.toLocaleLowerCase("en-US"));
-  return normalizedForScreening(value).some((candidate) => {
+  return canonicalSupportTextViews(value).views.some((candidate) => {
     NARRATIVE_ID.lastIndex = 0;
     return [...candidate.toLocaleLowerCase("en-US").matchAll(NARRATIVE_ID)]
       .some(([id]) => ids.has(id));
@@ -194,15 +181,17 @@ function containsInternalIdentifier(
 
 function screenCategory(value: string,internalIds: readonly string[] = []): TextScreenResult | null {
   if ([...value].length > MAX_TEXT_CODE_POINTS) return result("TEXT_TOO_LONG","TEXT_LENGTH");
-  const normalized = normalizedForScreening(value);
+  const canonical = canonicalSupportTextViews(value);
+  const normalized = canonical.views;
   if (normalized[0]!.trim() === "") return result("TEXT_EMPTY","TEXT_EMPTY");
-  const unsafeLink = linkPredicate(normalized);
+  const unsafeLink = linkPredicate(value);
   if (unsafeLink !== null) return result("TEXT_LINK_OR_MARKUP",unsafeLink);
-  if (analyzeSupportCredentialText(value).credentialValueSpans.length > 0
+  if (normalized.some((candidate) =>
+    analyzeSupportCredentialText(candidate).credentialValueSpans.length > 0)
     || normalized.some((candidate) => SECRET_LIKE.test(candidate))) {
     return result("TEXT_SECRET_LIKE","LABELLED_OR_TOKEN_SECRET");
   }
-  if (containsCredentialOrSecurityAction(value)) {
+  if (normalized.some(containsCredentialOrSecurityAction)) {
     return result("TEXT_CREDENTIAL_OR_SECURITY_ACTION","CREDENTIAL_OPERATION");
   }
   if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) {
@@ -229,7 +218,8 @@ const ANSWER_KEYS = Object.freeze(["actionIds","kind","sourceIds","text"]);
 export function diagnoseSupportDraft(
   raw: string,
   allowedSourceIds: readonly string[],
-  allowedActionIds: readonly SupportActionId[]
+  allowedActionIds: readonly string[],
+  narrativeInternalIds: readonly string[] = [...allowedSourceIds,...allowedActionIds]
 ): SupportDraftDiagnostic {
   const fenced = raw.trimStart().startsWith("```") || raw.trimEnd().endsWith("```");
   const base: Omit<SupportDraftDiagnostic,"code" | "predicate"> = {
@@ -272,7 +262,7 @@ export function diagnoseSupportDraft(
   if (!kindValid) return result("KIND_INVALID","KIND",values);
   const parsed = schema.safeParse(decoded);
   if (!parsed.success) return result("SCHEMA_INVALID","SCHEMA",values);
-  const unsafeText = screenCategory(parsed.data.text,allowedSourceIds);
+  const unsafeText = screenCategory(parsed.data.text,narrativeInternalIds);
   if (unsafeText !== null) return result(unsafeText.code,unsafeText.predicate,values);
   if (parsed.data.sourceIds.length === 0
     || new Set(parsed.data.sourceIds).size !== parsed.data.sourceIds.length
@@ -295,7 +285,7 @@ export function parseSupportDraft(raw: string,internalIds: readonly string[] = [
       kind: parsed.data.kind,
       text: parsed.data.text,
       sourceIds: Object.freeze([...parsed.data.sourceIds]),
-      actionIds: Object.freeze([...parsed.data.actionIds] as SupportActionId[])
+      actionIds: Object.freeze([...parsed.data.actionIds])
     });
   } catch {
     return null;

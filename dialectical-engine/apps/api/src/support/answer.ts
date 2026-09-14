@@ -20,6 +20,10 @@ import type { SupportDegradedPort } from "./degraded.js";
 import {
   diagnoseSupportDraft,parseSupportDraft,type SupportDraftReport,validateSupportDraft
 } from "./response-policy.js";
+import {
+  createSupportModelReferenceFactory,translateSupportDraftReferences,
+  type SupportModelReferenceFactory
+} from "./model-references.js";
 
 const MAX_RETRIEVED_ENTRIES = 3;
 const MAX_SYSTEM_CODE_POINTS = 24_000;
@@ -126,7 +130,7 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
 }
 
 function structuredInstruction(language: SupportLanguage): string {
-  const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source id>"],"actionIds":[]}';
+  const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source reference>"],"actionIds":[]}';
   return language === "ro"
     ? `Returnează numai un singur obiect JSON, fără alte chei și fără text înainte sau după: ${shape}. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; înlocuiește exemplele și copiază identificatorii exact, citând cel puțin un sourceId. Nu scrie niciodată identificatori de surse, acțiuni sau capabilități, rute ori căi în text; exprimă navigarea numai prin actionIds. Poți explica limite și condiții despre setările de securitate, dar nu solicita, primi, transforma, verifica sau repeta niciodată parole, coduri ori alte date de autentificare și nu afirma că ai efectuat o schimbare de securitate.`
     : `Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
@@ -185,6 +189,7 @@ export function createSupportAnswerService(input: Readonly<{
   degraded?: SupportDegradedPort;
   incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
   reportDraftDiagnostic?: (diagnostic: SupportDraftReport) => void;
+  modelReferenceFactory?: () => SupportModelReferenceFactory;
   clock?: () => Date;
 }>): SupportAnswerPort {
   const clock = input.clock ?? (() => new Date());
@@ -201,6 +206,8 @@ export function createSupportAnswerService(input: Readonly<{
       const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
         signedIn: request.signedIn === true,language: request.language
       }).map(({ id }) => id);
+      const modelReferenceFactory = structured
+        ? (input.modelReferenceFactory ?? createSupportModelReferenceFactory)() : undefined;
       const context = structured ? buildSupportKnowledgeContext({
         entries: eligibleEntries,
         capabilities: SUPPORT_CAPABILITIES,
@@ -208,6 +215,7 @@ export function createSupportAnswerService(input: Readonly<{
         query: prepared.text,
         historyText: "",
         availableActionIds,
+        referenceFor: modelReferenceFactory!.referenceFor,
         maxCodePoints: MAX_SYSTEM_CODE_POINTS
           - [...`${structuredInstruction(request.language)}\n\n`].length
       }) : undefined;
@@ -283,18 +291,36 @@ export function createSupportAnswerService(input: Readonly<{
           throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         }
         const diagnostic = structured ? diagnoseSupportDraft(
-          completion.text,context!.sourceIds,context!.requestedActionIds
+          completion.text,
+          context!.sourceReferences.map(({ reference }) => reference),
+          context!.actionReferences.map(({ reference }) => reference),
+          [
+            ...context!.sourceIds,...context!.requestedActionIds,
+            ...context!.sourceReferences.map(({ reference }) => reference),
+            ...context!.actionReferences.map(({ reference }) => reference)
+          ]
         ) : undefined;
         if (diagnostic !== undefined && diagnostic.code !== "ACCEPTED") {
           input.reportDraftDiagnostic?.(Object.freeze({ attemptId,...diagnostic }));
         }
         const parsed = structured
-          ? parseSupportDraft(completion.text,context!.sourceIds) : undefined;
-        const draft = !structured ? undefined
+          ? parseSupportDraft(completion.text,[
+            ...context!.sourceIds,...context!.requestedActionIds,
+            ...context!.sourceReferences.map(({ reference }) => reference),
+            ...context!.actionReferences.map(({ reference }) => reference)
+          ]) : undefined;
+        const referenceDraft = !structured ? undefined
           : parsed === null || parsed === undefined ? null
           : validateSupportDraft(
-            parsed,context!.sourceIds,context!.requestedActionIds
+            parsed,
+            context!.sourceReferences.map(({ reference }) => reference),
+            context!.actionReferences.map(({ reference }) => reference)
           );
+        const draft = !structured ? undefined
+          : referenceDraft === null || referenceDraft === undefined ? null
+          : translateSupportDraftReferences(referenceDraft,{
+            sources:context!.sourceReferences,actions:context!.actionReferences
+          });
         const rejected = structured && draft === null;
         const modelText = structured
           ? rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text

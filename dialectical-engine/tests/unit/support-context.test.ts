@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
-import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
+import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
 import type { HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+
+type ContextInput = Parameters<typeof buildContext>[0];
+function buildSupportKnowledgeContext(
+  input: Omit<ContextInput,"referenceFor"> & Partial<Pick<ContextInput,"referenceFor">>
+) {
+  return buildContext({
+    ...input,
+    referenceFor: input.referenceFor ?? ((kind,index) =>
+      `${kind === "source" ? "s" : "a"}-10000000000040008000000000000001-${index + 1}`)
+  });
+}
 
 function entry(
   id: string,
@@ -106,7 +117,7 @@ describe("Support knowledge context", () => {
       language: "en",
       query: "export note distinct long marker",
       historyText: "",
-      maxCodePoints: base.text.length + 120,
+      maxCodePoints: base.text.length + 200,
     });
 
     expect(result.sourceIds).toEqual(["short"]);
@@ -174,8 +185,8 @@ describe("Support knowledge context", () => {
     });
 
     expect(result.text).toContain("OUTPUT CONTRACT");
-    expect(result.text).toContain(`sourceIds=${result.sourceIds.join(",")}`);
-    expect(result.text).toContain(`actionIds=${result.requestedActionIds.join(",") || "none"}`);
+    expect(result.text).toContain(`sourceIds=${result.sourceReferences.map(({ reference }) => reference).join(",")}`);
+    expect(result.text).toContain(`actionIds=${result.actionReferences.map(({ reference }) => reference).join(",") || "none"}`);
     expect(result.sourceIds).toHaveLength(1);
   });
 
@@ -216,8 +227,42 @@ describe("Support knowledge context", () => {
     });
 
     expect(result.requestedActionIds).toEqual([]);
-    expect(result.text).toContain("- owner-debate: Spațiul de lucru al proprietarului");
-    expect(result.text).toContain("availability=owner | actions=none");
+    expect(result.text).toContain("- Spațiul de lucru al proprietarului");
+    expect(result.text).toContain("disponibilă numai într-un context verificat de proprietar | actions=none");
     expect(result.text).toContain("actionIds=none");
+  });
+
+  it("projects only request-local references and human labels to the model", () => {
+    const result = buildSupportKnowledgeContext({
+      entries: [entry(
+        "getting-started-debate","en","Start a debate",
+        "Choose the topic and plan controls before starting."
+      )],
+      capabilities: SUPPORT_CAPABILITIES,
+      language: "en",query: "How do I create a debate?",historyText: "",
+      maxCodePoints: 24_000,availableActionIds: SUPPORT_ACTION_IDS,
+      referenceFor: (kind: "source" | "action",index: number) =>
+        `${kind === "source" ? "s" : "a"}-10000000000040008000000000000001-${index + 1}`
+    } as never);
+
+    expect(result).toMatchObject({
+      sourceIds: ["getting-started-debate"],requestedActionIds: ["start-debate"],
+      sourceReferences: [{
+        reference: "s-10000000000040008000000000000001-1",
+        canonicalId: "getting-started-debate"
+      }],
+      actionReferences: [{
+        reference: "a-10000000000040008000000000000001-1",
+        canonicalId: "start-debate"
+      }]
+    });
+    expect(result.text).toContain("SOURCE s-10000000000040008000000000000001-1");
+    expect(result.text).toContain("actionIds=a-10000000000040008000000000000001-1");
+    for (const forbidden of ["getting-started-debate","start-debate","new-debate","/new","route="]) {
+      expect(result.text).not.toContain(forbidden);
+    }
+    expect(result.text).toContain("Create a debate with plan controls");
+    expect(result.text).toContain("Start a debate");
+    expect(result.text).toContain("signed-in visitors");
   });
 });

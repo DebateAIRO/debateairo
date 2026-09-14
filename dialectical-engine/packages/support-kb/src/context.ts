@@ -1,10 +1,19 @@
 import type { HelpCorpusEntry } from "./index.js";
-import type { SupportActionId, SupportCapability, SupportLanguage } from "./catalog.js";
+import {
+  SUPPORT_ACTION_CATALOG,type SupportActionId,type SupportCapability,type SupportLanguage
+} from "./catalog.js";
+
+export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
+  reference: string;
+  canonicalId: CanonicalId;
+}>;
 
 export type SupportKnowledgeContext = Readonly<{
   text: string;
   sourceIds: readonly string[];
   requestedActionIds: readonly SupportActionId[];
+  sourceReferences: readonly SupportKnowledgeReference[];
+  actionReferences: readonly SupportKnowledgeReference<SupportActionId>[];
 }>;
 
 const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.freeze({
@@ -12,14 +21,14 @@ const POLICY: Readonly<Record<SupportLanguage, readonly string[]>> = Object.free
     "Use only the reviewed sources and capability catalog below.",
     "Never request, receive, repeat, or submit credentials or security codes.",
     "Never claim that Support changed account or security state.",
-    "Name actions only by their closed action id; never invent a URL.",
+    "Use only the request references listed in the output contract; never invent a URL.",
     "Describe unavailable, local-only, conditional, and owner-only behavior honestly.",
   ]),
   ro: Object.freeze([
     "Folosește numai sursele verificate și catalogul de capabilități de mai jos.",
     "Nu solicita, primi, repeta sau trimite niciodată parole ori coduri de securitate.",
     "Nu afirma niciodată că Asistența a schimbat starea contului sau a securității.",
-    "Numește acțiunile numai prin identificatorul lor închis; nu inventa un URL.",
+    "Folosește numai referințele cererii enumerate în contractul de ieșire; nu inventa un URL.",
     "Descrie corect comportamentele indisponibile, locale, condiționate și rezervate proprietarului.",
   ]),
 });
@@ -66,20 +75,32 @@ function baseSection(
   availableActionIds: ReadonlySet<SupportActionId>,
 ): string {
   const policy = POLICY[language].map((line) => `- ${line}`).join("\n");
+  const actionById = new Map(SUPPORT_ACTION_CATALOG.map((action) => [action.id,action]));
+  const availability: Readonly<Record<SupportCapability["availability"],Readonly<Record<SupportLanguage,string>>>> = {
+    public: { en:"available to all visitors",ro:"disponibilă tuturor vizitatorilor" },
+    "signed-out": { en:"available to signed-out visitors",ro:"disponibilă vizitatorilor neautentificați" },
+    "signed-in": { en:"available to signed-in visitors",ro:"disponibilă vizitatorilor autentificați" },
+    owner: { en:"available only in verified owner context",ro:"disponibilă numai într-un context verificat de proprietar" },
+    "public-reference": { en:"available with a verified public debate reference",ro:"disponibilă cu o referință verificată la o dezbatere publică" },
+    unresolved: { en:"destination not yet verified",ro:"destinație încă neverificată" },
+    excluded: { en:"not available through Support",ro:"indisponibilă prin Asistență" }
+  };
   const catalog = capabilities.map((item) => {
     const available = item.actionIds.filter((id) => availableActionIds.has(id));
-    const actions = available.length === 0 ? "none" : available.join(", ");
-    return `- ${item.id}: ${item.labels[language]} | route=${item.route} | availability=${item.availability} | actions=${actions}`;
+    const actions = available.length === 0 ? "none" : available
+      .map((id) => actionById.get(id)?.labels[language])
+      .filter((label): label is string => label !== undefined).join(", ");
+    return `- ${item.labels[language]} | ${availability[item.availability][language]} | actions=${actions}`;
   }).join("\n");
   return `SUPPORT POLICY\n${policy}\n\nCAPABILITY CATALOG\n${catalog}`;
 }
 
-function articleSection(entry: HelpCorpusEntry): string {
-  return `\n\nSOURCE ${entry.id}\nTITLE: ${entry.title}\n${entry.body}`;
+function articleSection(entry: HelpCorpusEntry,reference: string): string {
+  return `\n\nSOURCE ${reference}\nTITLE: ${entry.title}\n${entry.body}`;
 }
 
 function outputContract(
-  sourceIds: readonly string[],actionIds: readonly SupportActionId[]
+  sourceIds: readonly string[],actionIds: readonly string[]
 ): string {
   return [
     "\n\nOUTPUT CONTRACT",
@@ -96,6 +117,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   historyText: "";
   maxCodePoints: number;
   availableActionIds: readonly SupportActionId[];
+  referenceFor(kind: "source" | "action",index: number): string;
 }>): SupportKnowledgeContext {
   if (input.historyText !== "") throw new Error("SUPPORT_KB_HISTORY_NOT_AVAILABLE_IN_CP1");
   const availableActionIds = new Set(input.availableActionIds);
@@ -125,7 +147,11 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     }
     if (actionIds.length === 3) break;
   }
-  if ([...`${base}${outputContract([],actionIds)}`].length > input.maxCodePoints) {
+  const actionReferences = actionIds.map((canonicalId,index) => Object.freeze({
+    reference:input.referenceFor("action",index),canonicalId
+  }));
+  if ([...`${base}${outputContract([],actionReferences.map(({ reference }) => reference))}`].length
+    > input.maxCodePoints) {
     throw new Error("SUPPORT_KB_CONTEXT_LIMIT_TOO_SMALL");
   }
 
@@ -148,19 +174,42 @@ export function buildSupportKnowledgeContext(input: Readonly<{
 
   let text = base;
   const sourceIds: string[] = [];
+  const sourceReferences: SupportKnowledgeReference[] = [];
   for (const { entry } of ranked) {
     if (sourceIds.length >= 3) break;
-    const section = articleSection(entry);
-    if ([...`${text}${section}${outputContract([...sourceIds,entry.id],actionIds)}`].length
+    const reference = input.referenceFor("source",sourceIds.length);
+    const section = articleSection(entry,reference);
+    if ([...`${text}${section}${outputContract(
+      [...sourceReferences.map((item) => item.reference),reference],
+      actionReferences.map((item) => item.reference)
+    )}`].length
       > input.maxCodePoints) continue;
     text += section;
     sourceIds.push(entry.id);
+    sourceReferences.push(Object.freeze({ reference,canonicalId:entry.id }));
   }
-  text += outputContract(sourceIds,actionIds);
+  text += outputContract(
+    sourceReferences.map(({ reference }) => reference),
+    actionReferences.map(({ reference }) => reference)
+  );
+
+  const aliases = [...sourceReferences,...actionReferences].map(({ reference }) => reference);
+  const canonicalIds = new Set([
+    ...input.capabilities.map(({ id }) => id),
+    ...input.capabilities.flatMap(({ articleIds }) => articleIds),
+    ...SUPPORT_ACTION_CATALOG.map(({ id }) => id)
+  ]);
+  if (new Set(aliases).size !== aliases.length
+    || aliases.some((alias) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(alias)
+      || canonicalIds.has(alias))) {
+    throw new Error("SUPPORT_KB_MODEL_REFERENCE_INVALID");
+  }
 
   return Object.freeze({
     text,
     sourceIds: Object.freeze(sourceIds),
     requestedActionIds: Object.freeze(actionIds),
+    sourceReferences: Object.freeze(sourceReferences),
+    actionReferences: Object.freeze(actionReferences)
   });
 }

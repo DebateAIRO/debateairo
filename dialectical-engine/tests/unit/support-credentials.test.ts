@@ -36,6 +36,29 @@ describe("Support credential lexical facts", () => {
       .toEqual([secret]);
   });
 
+  it.each([
+    ['My password is "inert horse battery".',"inert horse battery"],
+    ["Parola mea este „inert cal albastru”.","inert cal albastru"],
+    ["My recovery code is inert horse battery; keep it private.","inert horse battery"],
+    ["Codul de verificare este inert cal albastru, păstrează-l privat.","inert cal albastru"]
+  ])("maps a complete bounded multiword supplied value: %s", (text,secret) => {
+    const facts = analyzeSupportCredentialText(text);
+    expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
+      .toContain(secret);
+  });
+
+  it.each([
+    ["Support does not receive passwords and also asks you to send them here.","solicit"],
+    ["Support does not receive passwords, so send them here.","solicit"],
+    ["Asistența nu primește parole și de asemenea îți cere să le trimiți aici.","solicit"],
+    ["Asistența nu primește parole, așa că trimite-le aici.","solicit"],
+    ["Support does not receive passwords while it asks you to send them here.","solicit"],
+    ["Support does not receive passwords and generally asks you to send them here.","solicit"]
+  ])("does not carry negation into a later coordinated operation: %s", (text,kind) => {
+    const operations = analyzeSupportCredentialText(text).operations.filter((row) => row.kind === kind);
+    expect(operations.some(({ negated }) => negated === false)).toBe(true);
+  });
+
   it("emits only closed lexical facts and numeric spans", () => {
     const hostile = "Send your passwords and then validate them.";
     const serialized = JSON.stringify(analyzeSupportCredentialText(hostile));

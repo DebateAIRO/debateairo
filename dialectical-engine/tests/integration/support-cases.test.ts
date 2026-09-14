@@ -413,6 +413,16 @@ describe("SUP-02 cases", () => {
       "The advisory summary was omitted because it did not pass Support safety checks."],
     ["en","The visitor should use start-debate to continue.",
       "The advisory summary was omitted because it did not pass Support safety checks."]
+    ,["en","Support does not receive passwords and also asks the visitor to send them here.",
+      "The advisory summary was omitted because it did not pass Support safety checks."]
+    ,["ro","Asistența nu primește parole, așa că cere vizitatorului să le trimită aici.",
+      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
+    ,["en","Send the visitor p%61ssword to Support.",
+      "The advisory summary was omitted because it did not pass Support safety checks."]
+    ,["en","Open https%25253A%25252F%25252Fexample.test/reset.",
+      "The advisory summary was omitted because it did not pass Support safety checks."]
+    ,["en","The visitor should use forgot-password to continue.",
+      "The advisory summary was omitted because it did not pass Support safety checks."]
   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
     language,hostile,fallback
   ) => {
@@ -439,7 +449,7 @@ describe("SUP-02 cases", () => {
 
   it("screens legacy transcript, reply, and summary plaintext during case access", async () => {
     const caseId = randomUUID();
-    const legacy = "legacyvalue7";
+    const legacy = "legacy inert value";
     const fallback = "The advisory summary was omitted because it did not pass Support safety checks.";
     const access = createSupportCaseAccessService({
       repository: {
@@ -460,10 +470,10 @@ describe("SUP-02 cases", () => {
         unwrapDataKey: vi.fn(async () => Buffer.alloc(32,1)),
         openContent: vi.fn((description: Readonly<{ kind: string }>) => {
           if (description.kind === "case-snapshot") return Buffer.from(JSON.stringify([{
-            messageId: randomUUID(),role: "user",text: `My password is ${legacy}`
+            messageId: randomUUID(),role: "user",text: `My password is "${legacy}".`
           }]));
-          if (description.kind === "case-message") return Buffer.from(`Parola mea este ${legacy}`);
-          return Buffer.from(`Open //invalid.example/reset with password ${legacy}.`);
+          if (description.kind === "case-message") return Buffer.from(`Parola mea este „${legacy}”.`);
+          return Buffer.from(`Open //invalid.example/reset with password "${legacy}".`);
         }),
         sealContent: vi.fn()
       } as never

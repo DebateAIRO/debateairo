@@ -67,7 +67,7 @@ const TERM_PATTERNS: readonly Readonly<{
 const OPERATION_PATTERNS: readonly Readonly<{
   kind: SupportSecurityOperationKind;pattern: RegExp;
 }>[] = Object.freeze([
-  { kind: "solicit",pattern: /\b(?:send(?:ing)?|sent|shar(?:e|es|ed|ing)|provid(?:e|es|ed|ing)|giv(?:e|es|en|ing)|suppl(?:y|ies|ied|ying)|request(?:s|ed|ing)?|ask(?:s|ed|ing)?|submit(?:s|ted|ting)?|enter(?:s|ed|ing)?|typ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|upload(?:s|ed|ing)?|tell(?:s|ing)?|told|show(?:s|ed|ing)?|solicit\p{L}*|trimit\p{L}*|partaj\p{L}*|furniz\p{L}*|introduc\p{L}*|lip\p{L}*|incarc\p{L}*|spun\p{L}*|arat\p{L}*)\b/giu },
+  { kind: "solicit",pattern: /\b(?:send(?:ing)?|sent|shar(?:e|es|ed|ing)|provid(?:e|es|ed|ing)|giv(?:e|es|en|ing)|suppl(?:y|ies|ied|ying)|request(?:s|ed|ing)?|ask(?:s|ed|ing)?|submit(?:s|ted|ting)?|enter(?:s|ed|ing)?|typ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|upload(?:s|ed|ing)?|tell(?:s|ing)?|told|show(?:s|ed|ing)?|solicit\p{L}*|cer\p{L}*|trimit\p{L}*|partaj\p{L}*|furniz\p{L}*|introduc\p{L}*|lip\p{L}*|incarc\p{L}*|spun\p{L}*|arat\p{L}*)\b/giu },
   { kind: "receive",pattern: /\b(?:receiv(?:e|es|ed|ing)|accept(?:s|ed|ing)?|prim\p{L}*|accept\p{L}*)\b/giu },
   { kind: "repeat",pattern: /\b(?:repeat(?:s|ed|ing)?|repet\p{L}*)\b/giu },
   { kind: "transform",pattern: /\b(?:transform(?:s|ed|ing)?|decod(?:e|es|ed|ing)|encod(?:e|es|ed|ing)|transform\p{L}*|decod\p{L}*|encod\p{L}*)\b/giu },
@@ -77,10 +77,18 @@ const OPERATION_PATTERNS: readonly Readonly<{
 ]);
 
 const NEGATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can\s+not|can't|must\s+not|will\s+not|should\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/giu;
-const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora)\b|-o\b|-le\b)/giu;
-const SCOPE_BOUNDARY = /(?:[.!?;\n]+|\b(?:but|however|instead|except|unless|then|dar|insa|apoi|in\s+schimb)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|should|must|will|can|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|trebuie|poti|vei|va|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|decod|encod|reset|schimb|inlocu|regener)))/giu;
+const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|le|lor)\b|-o\b|-le\b)/giu;
+const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|should|must|will|can|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|trebuie|poti|vei|va|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|decod|encod|reset|schimb|inlocu|regener)))/giu;
 const SENTENCE_BOUNDARY = /[.!?;\n]+/gu;
-const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*([^\s,;.!?]+)/iu;
+const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
+const VALUE_TOKEN = /^[^\s,;.!?]+/u;
+const VALUE_STOP_WORDS = new Set([
+  "and","but","because","keep","please","so","then","therefore","which","while",
+  "asa","apoi","dar","deci","iar","pastreaza","pentru","si"
+]);
+const QUOTE_PAIRS = new Map([["\"","\""],["'","'"],["„","”"],["“","”"],["«","»"]]);
+const MAX_VALUE_WORDS = 6;
+const MAX_VALUE_CODE_UNITS = 160;
 const NON_VALUE_WORDS = new Set([
   "available","disponibil","disponibile","encrypted","forgotten","invalid","missing","never","not","private","protected",
   "required","safe","secure","unavailable","unknown","niciodata","nu","necesara",
@@ -148,6 +156,27 @@ function uniqueSpans(spans: readonly SupportTextSpan[]): readonly SupportTextSpa
     }));
 }
 
+function labelledValueSpan(text: string,start: number): Readonly<{ start: number;end: number }> | null {
+  const first = text[start];
+  const closing = first === undefined ? undefined : QUOTE_PAIRS.get(first);
+  if (closing !== undefined) {
+    const end = text.indexOf(closing,start + 1);
+    if (end <= start + 1 || end - start > MAX_VALUE_CODE_UNITS) return null;
+    return Object.freeze({ start:start + 1,end });
+  }
+  let cursor = start;
+  let end = start;
+  for (let count = 0;count < MAX_VALUE_WORDS;count += 1) {
+    const spacing = /^\s*/u.exec(text.slice(cursor))?.[0] ?? "";
+    const tokenStart = cursor + spacing.length;
+    const token = VALUE_TOKEN.exec(text.slice(tokenStart))?.[0];
+    if (token === undefined || VALUE_STOP_WORDS.has(token) || tokenStart - start > MAX_VALUE_CODE_UNITS) break;
+    end = tokenStart + token.length;
+    cursor = end;
+  }
+  return end > start ? Object.freeze({ start,end }) : null;
+}
+
 export function analyzeSupportCredentialText(source: string): SupportCredentialFacts {
   const normalized = normalizeWithMap(source);
   const scopes = scopesFor(normalized.text);
@@ -172,10 +201,13 @@ export function analyzeSupportCredentialText(source: string): SupportCredentialF
   for (const term of normalizedTerms) {
     const suffix = normalized.text.slice(term.end,term.end + 120);
     const connector = LABEL_CONNECTOR.exec(suffix);
-    const value = connector?.[1];
-    if (connector === null || value === undefined || NON_VALUE_WORDS.has(value)) continue;
-    const relative = connector[0].lastIndexOf(value);
-    values.push(originalSpan(normalized,term.end + relative,term.end + relative + value.length));
+    if (connector === null) continue;
+    const valueStart = term.end + connector[0].length;
+    const span = labelledValueSpan(normalized.text,valueStart);
+    if (span === null) continue;
+    const firstWord = normalized.text.slice(span.start,span.end).split(/\s+/u)[0]!;
+    if (NON_VALUE_WORDS.has(firstWord)) continue;
+    values.push(originalSpan(normalized,span.start,span.end));
   }
 
   const negations: SupportScopedFact[] = [];

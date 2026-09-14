@@ -17,6 +17,7 @@ import {
   createSupportAnswerService,
   type SupportAnswerPort
 } from "../../apps/api/src/support/answer.js";
+import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 import { createSupportCaseAccessService,type SupportCaseAccessPort } from "../../apps/api/src/support/cases.js";
 import {
   KeyBasedAdapter,
@@ -65,6 +66,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 const KB_VERSION = "a".repeat(64);
 const IDENTITY = testHttpIdentity("support-routes");
 const CLOCK_BASE_MS = Date.parse("2026-09-06T12:00:00.000Z");
+const MODEL_REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
+const MODEL_SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
+const MODEL_ACTION_REFERENCE = "a-10000000000040008000000000000001-1";
+const modelReferenceFactory = () => createSupportModelReferenceFactory(MODEL_REFERENCE_REQUEST_ID);
 const INVALID_CLOCK_OBSERVATIONS = Object.freeze([
   ["NaN", Number.NaN],
   ["positive infinity", Number.POSITIVE_INFINITY],
@@ -2053,8 +2058,8 @@ describe("SUP-01 support routes", () => {
           text: JSON.stringify({
             kind: "answer",
             text: "Open the new debate page to start.",
-            sourceIds: ["getting-started-debate"],
-            actionIds: ["start-debate"]
+            sourceIds: [MODEL_SOURCE_REFERENCE],
+            actionIds: [MODEL_ACTION_REFERENCE]
           }),
           usage: Object.freeze({ input_tokens: 9,output_tokens: 11,cost_usd: 0.001 })
         });
@@ -2067,7 +2072,7 @@ describe("SUP-01 support routes", () => {
     const answer = createSupportAnswerService({
       entries: [article],snapshots,
       messages: messageCipher,
-      modelFor: () => model,
+      modelFor: () => model,modelReferenceFactory,
       clock: () => instants.shift() ?? new Date(CLOCK_BASE_MS + 30)
     });
     const server = api(true,{ clock: () => new Date(CLOCK_BASE_MS),answerPort: answer });
@@ -2148,10 +2153,10 @@ describe("SUP-01 support routes", () => {
           return Object.freeze({ text: JSON.stringify({
             kind: "answer",
             text: "JSON export requires a served answer and readable ledger digest.",
-            sourceIds: ["export-json"],actionIds: []
+            sourceIds: [MODEL_SOURCE_REFERENCE],actionIds: []
           }) });
         }
-      }),
+      }),modelReferenceFactory,
       clock: (() => {
         let at = CLOCK_BASE_MS + 30_000_000;
         return () => new Date(++at);
@@ -2172,8 +2177,10 @@ describe("SUP-01 support routes", () => {
       sources: [{ id: "export-json",label: "Export a debate as JSON" }],
       actions: []
     });
-    expect(system).toContain("- owner-debate: Owner debate workspace");
-    expect(system).toContain("availability=owner | actions=none");
+    expect(system).toContain("- Owner debate workspace");
+    expect(system).toContain("available only in verified owner context | actions=none");
+    expect(system).not.toContain("owner-debate:");
+    expect(system).not.toContain("route=");
     expect(system).toContain("actionIds=none");
     await server.close();
   });
@@ -2710,10 +2717,12 @@ describe("SUP-01 support routes", () => {
   });
 
   it.each([
-    ["en","My password is routevalue7","My password is routevalue8","203.0.113.231"],
-    ["ro","Parola mea este rutavalue7","Parola mea este rutavalue8","203.0.113.232"]
+    ["en",'My password is "route inert seven".','My password is "route inert eight".',
+      /route inert (?:seven|eight)/u,"203.0.113.231"],
+    ["ro","Parola mea este „rută inertă șapte”.","Parola mea este „rută inertă opt” .",
+      /rută inertă (?:șapte|opt)/u,"203.0.113.232"]
   ] as const)("redacts supplied %s credentials before session storage and the E3 case snapshot", async (
-    _language,first,second,ip
+    _language,first,second,forbidden,ip
   ) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>();
     const server = api(true,{ answerPort: Object.freeze({ respond }) });
@@ -2730,7 +2739,7 @@ describe("SUP-01 support routes", () => {
     expect(respond).not.toHaveBeenCalled();
     const sessionMessages = await messageCipher.listSession({ sessionId: opened.body.session_id });
     const projected = sessionMessages.map(({ text }) => text).join(" ");
-    expect(projected).not.toMatch(/routevalue[78]|rutavalue[78]/u);
+    expect(projected).not.toMatch(forbidden);
     expect(sessionMessages.filter(({ role }) => role === "user")
       .every(({ redacted,text }) => redacted && text.includes("[REDACTED_SECRET_LIKE]")))
       .toBe(true);
@@ -2747,7 +2756,7 @@ describe("SUP-01 support routes", () => {
     );
     try {
       const snapshot = plaintext.toString("utf8");
-      expect(snapshot).not.toMatch(/routevalue[78]|rutavalue[78]/u);
+      expect(snapshot).not.toMatch(forbidden);
       expect(snapshot).toContain("[REDACTED_SECRET_LIKE]");
     } finally { dataKey.fill(0);plaintext.fill(0); }
     await server.close();

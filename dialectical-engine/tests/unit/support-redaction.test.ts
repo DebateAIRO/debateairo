@@ -28,11 +28,21 @@ describe("CP1 Support credential redaction", () => {
     ["Paro\u200Bla mea este inert-fag-7","inert-fag-7"],
     ["Codurile de recuperare sunt INERTRECOVERY","INERTRECOVERY"],
     ["Datele de autentificare sunt INERTAUTH","INERTAUTH"]
+    ,['My password is "inert horse battery".',"inert horse battery"]
+    ,["Parola mea este „inert cal albastru”.","inert cal albastru"]
+    ,["Recovery code is inert maple river; keep it private.","inert maple river"]
+    ,["Codul de securitate este inert arțar râu, păstrează-l privat.","inert arțar râu"]
+    ,["My ｐａｓｓｗｏｒｄ is inert compatibility value; keep it private.","inert compatibility value"]
   ])("redacts every declared labelled credential class before transit: %s", (text,secret) => {
     const result = redactSupportText(text);
     expect(result).toMatchObject({ redacted: true });
     expect(result.text).not.toContain(secret);
     expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+  });
+
+  it("stops an unquoted value at a declared coordinator without consuming benign prose", () => {
+    const result = redactSupportText("My password is inert horse battery and I need help.");
+    expect(result.text).toBe("My password is [REDACTED_SECRET_LIKE] and I need help.");
   });
 
   it.each([
@@ -45,7 +55,9 @@ describe("CP1 Support credential redaction", () => {
 
   it.each([
     ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
-    ["OTP is INERTABC","INERTABC"]
+    ["OTP is INERTABC","INERTABC"],
+    ['My password is "inert horse battery".',"inert horse battery"],
+    ["Parola mea este „inert cal albastru”.","inert cal albastru"]
   ])("keeps a supplied credential out of canonical seal, persistence, and model transit: %s", async (
     text,secret
   ) => {

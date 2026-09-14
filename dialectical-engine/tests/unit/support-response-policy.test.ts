@@ -6,6 +6,7 @@ import {
   projectSupportDraftReport,
   validateSupportDraft
 } from "../../apps/api/src/support/response-policy.js";
+import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 
 function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
   return JSON.stringify({
@@ -103,12 +104,12 @@ describe("CP1 support model response policy", () => {
 
   it.each([
     "Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials.",
-    "A fresh sign-in may be required in Settings, but Support cannot receive passwords or security codes.",
+    "A fresh sign in may be required in Settings, but Support cannot receive passwords or security codes.",
     "Setările nu oferă controale pentru înlocuirea parolei sau regenerarea MFA. Asistența nu poate primi date de autentificare.",
     "În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate.",
     "You can change your account name in Settings. Support cannot receive your password.",
     "Poți schimba numele contului în Setări. Asistența nu poate primi parola.",
-    "Recovery codes are available only after sign-in.",
+    "Recovery codes are available only after sign in.",
     "Codurile de recuperare sunt disponibile după autentificare.",
     "Reset tokens expire and must remain private.",
     "Codul de verificare este necesar pentru autentificare."
@@ -138,6 +139,17 @@ describe("CP1 support model response policy", () => {
     "Asistența nu primește parole și trebuie să trimiți parola aici.",
     "Support cannot receive your password. Send it here instead.",
     "Asistența nu poate primi parola. Trimite-o aici în schimb."
+    ,"Support does not receive passwords and also asks you to send them here."
+    ,"Support does not receive passwords, so send them here."
+    ,"Support does not receive passwords and then asks you to send them here."
+    ,"Asistența nu primește parole și de asemenea îți cere să le trimiți aici."
+    ,"Asistența nu primește parole, așa că trimite-le aici."
+    ,"Send your p%61ssword to Support."
+    ,"Trimite p%2561rola către Asistență."
+    ,"Support does not receive passwords while it asks you to send them here."
+    ,"Support does not receive passwords and generally asks you to send them here."
+    ,"Send your %EF%BD%90%EF%BD%81%EF%BD%93%EF%BD%93%EF%BD%97%EF%BD%8F%EF%BD%92%EF%BD%84 to Support."
+    ,"Send your pass%E2%80%8Bword to Support."
   ])("keeps credential solicitation, execution, and labelled values rejected: %s", (text) => {
     const value = raw(text,{ actionIds: [] });
     expect(parseSupportDraft(value)).toBeNull();
@@ -150,6 +162,10 @@ describe("CP1 support model response policy", () => {
     ["capability","Use owner-debate to export.",["export-json"]],
     ["selected source","Read getting-started-debate for details.",["getting-started-debate"]],
     ["control-obfuscated action","Select start-\u200Bdebate to continue.",["getting-started-debate"]]
+    ,["formerly excepted action","Select forgot-password to continue.",["account-access"]]
+    ,["formerly excepted action","Select privacy-preferences to continue.",["privacy-consent"]]
+    ,["formerly excepted action","Select sign-in to continue.",["account-access"]]
+    ,["formerly excepted action","Read support-status for details.",["support-status-limits"]]
   ])("rejects a closed internal %s identifier in visitor prose", (_kind,text,sourceIds) => {
     const value = raw(text,{ sourceIds,actionIds: [] });
     expect(parseSupportDraft(value,sourceIds)).toBeNull();
@@ -158,10 +174,24 @@ describe("CP1 support model response policy", () => {
     });
   });
 
+  it.each([...new Set([
+    ...SUPPORT_ACTION_IDS,
+    ...SUPPORT_CAPABILITIES.map(({ id }) => id),
+    ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
+  ])].filter((id) => id.includes("-")))(
+    "rejects exact catalog machine id %s in narrative prose",(id) => {
+      expect(parseSupportDraft(raw(`Select ${id} to continue.`,{ actionIds: [] }))).toBeNull();
+    }
+  );
+
   it.each([
     "Open Settings to review the ordinary feature name.",
     "Deschide Setări pentru a vedea numele obișnuit al funcției.",
     "Return home after reading Help."
+    ,"Select Forgot password to continue."
+    ,"Alege Preferințe de confidențialitate pentru a continua."
+    ,"Choose Sign in to continue."
+    ,"Read Support status for details."
   ])("keeps ambiguous human-facing feature names usable: %s", (text) => {
     const value = raw(text,{ actionIds: [] });
     expect(parseSupportDraft(value)).not.toBeNull();
@@ -178,6 +208,9 @@ describe("CP1 support model response policy", () => {
     ["percent-encoded HTTPS URL", raw("Open https%3A%2F%2Fexample.test/reset")],
     ["percent-encoded path", raw("Open %2Fsettings")],
     ["double-encoded path", raw("Open %252Fsettings")],
+    ["triple-encoded URL", raw("Open https%25253A%25252F%25252Fexample.test/reset")],
+    ["deeper encoded path", raw("Open %2525252Fsettings")],
+    ["malformed structural escape", raw("Open https%3")],
     ["path instruction", raw("Go to /settings to continue")],
     ["Markdown link", raw("Use [this link](/new)")],
     ["HTML", raw("Choose <a href='/new'>Start</a>")],
@@ -189,6 +222,14 @@ describe("CP1 support model response policy", () => {
     ["false reset claim", raw("I reset your password successfully")]
   ])("rejects %s before validation", (_name,value) => {
     expect(parseSupportDraft(value)).toBeNull();
+  });
+
+  it.each([
+    "Progress is 50% complete.",
+    "The 100% local export remains available.",
+    "Progresul este 50% finalizat."
+  ])("keeps benign percentage text usable: %s", (text) => {
+    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
   });
 
   it("accepts only the exact purpose-specific advisory summary envelope", () => {
@@ -219,6 +260,10 @@ describe("CP1 support model response policy", () => {
     "The visitor should use start-debate to continue.",
     "The visitor should read getting-started-debate for details.",
     "Support does not receive passwords and the visitor should send a password here."
+    ,"Support does not receive passwords and also asks the visitor to send them here."
+    ,"Send the visitor p%61ssword to Support."
+    ,"Open https%25253A%25252F%25252Fexample.test/reset"
+    ,"The visitor should use forgot-password to continue."
   ])("rejects unsafe advisory summary text before sealing: %s", (text) => {
     expect(parseSupportCaseSummaryDraft(JSON.stringify({
       kind: "case_summary",text,sourceIds: [],actionIds: []
