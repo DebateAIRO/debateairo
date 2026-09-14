@@ -64,6 +64,7 @@ import {
 } from "./provider-discovery.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
+import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
 import { RelayAdapter,parseSupportModelTargetJson } from "./support/model.js";
 import {
   SupportModelReservationLedger,createReservedSupportModelPort
@@ -388,6 +389,9 @@ const supportConfiguration = createSupportConfigurationPort(
 const reportSupportDiagnostic = (diagnostic: Readonly<{ code: string }> | string): void => {
   console.error({ code: typeof diagnostic === "string" ? diagnostic : diagnostic.code });
 };
+const reportSupportDraftDiagnostic = (diagnostic: SupportDraftReport): void => {
+  console.error(projectSupportDraftReport(diagnostic));
+};
 const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool);
 const supportRelayCallRecords = new PostgresSupportRelayReservationRepository(supportPool);
 const supportRelayQueue = new SupportRelayQueue({
@@ -485,9 +489,7 @@ const supportAnswers = createSupportAnswerService({
   requireStructuredDraft: true,
   messages: supportMessages,
   incidents: supportIncidents,
-  reportDraftDiagnostic: (diagnostic) => reportSupportDiagnostic({
-    code: `SUPPORT_DRAFT_${diagnostic.code}`
-  }),
+  reportDraftDiagnostic: reportSupportDraftDiagnostic,
   queue: supportRelayQueue,
   degraded: supportDegraded,
   modelFor: () => supportAdmittedModel

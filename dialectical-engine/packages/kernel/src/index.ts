@@ -1,3 +1,5 @@
+import { analyzeSupportCredentialText } from "./support-credentials.js";
+
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 
 export type RunId = Brand<string, "RunId">;
@@ -280,6 +282,8 @@ export function exhaustive(value: never): never {
   throw new TypeError(`Unknown closed-vocabulary member: ${String(value)}`);
 }
 
+export * from "./support-credentials.js";
+
 export class TypedDomainError extends Error {
   constructor(readonly code: string, message: string) {
     super(message);
@@ -294,7 +298,15 @@ const SUPPORT_LABELLED_SECRET_PATTERN =
 
 /** Browser-safe and server-safe canonical support-message redaction. */
 export function redactSupportText(text: string): Readonly<{ text: string;redacted: boolean }> {
-  const labelled = text.replace(
+  const spans = analyzeSupportCredentialText(text).credentialValueSpans;
+  let labelled = "";
+  let cursor = 0;
+  for (const { start,end } of spans) {
+    labelled += `${text.slice(cursor,start)}[REDACTED_SECRET_LIKE]`;
+    cursor = end;
+  }
+  labelled += text.slice(cursor);
+  labelled = labelled.replace(
     SUPPORT_LABELLED_SECRET_PATTERN,
     (_match,prefix: string) => `${prefix}[REDACTED_SECRET_LIKE]`
   );

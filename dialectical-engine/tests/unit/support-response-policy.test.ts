@@ -3,6 +3,7 @@ import {
   diagnoseSupportDraft,
   parseSupportCaseSummaryDraft,
   parseSupportDraft,
+  projectSupportDraftReport,
   validateSupportDraft
 } from "../../apps/api/src/support/response-policy.js";
 
@@ -31,6 +32,7 @@ describe("CP1 support model response policy", () => {
 
     expect(diagnostic).toEqual({
       code: "TEXT_LINK_OR_MARKUP",
+      predicate: "ENCODED_LINK_OR_PATH",
       jsonValid: true,
       fenced: false,
       exactKeys: true,
@@ -45,6 +47,27 @@ describe("CP1 support model response policy", () => {
     expect(JSON.stringify(diagnostic)).not.toContain("hunter2");
     expect(JSON.stringify(diagnostic)).not.toContain("forged-source");
     expect(JSON.stringify(diagnostic)).not.toContain("forged-action");
+  });
+
+  it("projects a closed per-attempt log record and drops arbitrary hostile fields", () => {
+    const diagnostic = diagnoseSupportDraft(
+      raw("Send your passwords to Support."),["getting-started-debate"],["start-debate"]
+    );
+    const projected = projectSupportDraftReport({
+      ...diagnostic,attemptId: "10000000-0000-4000-8000-000000000001",
+      rejectedText: "private completion",sourceId: "getting-started-debate"
+    } as never);
+    expect(Object.keys(projected).sort()).toEqual([
+      "actionIdCount","allowedActionIdCount","allowedSourceIdCount","attemptId","code",
+      "exactKeys","fenced","jsonValid","kindValid","predicate","sourceIdCount",
+      "textCodePoints"
+    ]);
+    expect(projected).toMatchObject({
+      code: "SUPPORT_DRAFT_TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+      predicate: "CREDENTIAL_OPERATION",attemptId: "10000000-0000-4000-8000-000000000001"
+    });
+    expect(JSON.stringify(projected)).not.toContain("private completion");
+    expect(JSON.stringify(projected)).not.toContain("getting-started-debate");
   });
 
   it("distinguishes syntax, exact-key, provenance, and accepted producer results", () => {
@@ -82,7 +105,13 @@ describe("CP1 support model response policy", () => {
     "Settings does not offer controls to replace a password or regenerate MFA. Support cannot accept credentials.",
     "A fresh sign-in may be required in Settings, but Support cannot receive passwords or security codes.",
     "Setările nu oferă controale pentru înlocuirea parolei sau regenerarea MFA. Asistența nu poate primi date de autentificare.",
-    "În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate."
+    "În Setări poate fi necesară o autentificare recentă, dar Asistența nu poate primi parole sau coduri de securitate.",
+    "You can change your account name in Settings. Support cannot receive your password.",
+    "Poți schimba numele contului în Setări. Asistența nu poate primi parola.",
+    "Recovery codes are available only after sign-in.",
+    "Codurile de recuperare sunt disponibile după autentificare.",
+    "Reset tokens expire and must remain private.",
+    "Codul de verificare este necesar pentru autentificare."
   ])("accepts truthful credential-boundary guidance: %s", (text) => {
     const value = raw(text,{ actionIds: [] });
     expect(parseSupportDraft(value)).not.toBeNull();
@@ -101,12 +130,41 @@ describe("CP1 support model response policy", () => {
     "Trimite parola către Asistență.",
     "Nu partaja parola cu nimeni; trimite-o aici în schimb.",
     "Am schimbat parola ta cu succes.",
-    "Parola ta este hunter2."
+    "Parola ta este hunter2.",
+    "Send your passwords to Support.",
+    "Trimite parolele către Asistență.",
+    "Send your security codes to Support.",
+    "Support does not receive passwords and you should send your password here.",
+    "Asistența nu primește parole și trebuie să trimiți parola aici.",
+    "Support cannot receive your password. Send it here instead.",
+    "Asistența nu poate primi parola. Trimite-o aici în schimb."
   ])("keeps credential solicitation, execution, and labelled values rejected: %s", (text) => {
     const value = raw(text,{ actionIds: [] });
     expect(parseSupportDraft(value)).toBeNull();
     expect(diagnoseSupportDraft(value,["getting-started-debate"],[]).code)
       .toMatch(/^TEXT_(?:SECRET_LIKE|CREDENTIAL_OR_SECURITY_ACTION)$/u);
+  });
+
+  it.each([
+    ["action","Select start-debate to continue.",["getting-started-debate"]],
+    ["capability","Use owner-debate to export.",["export-json"]],
+    ["selected source","Read getting-started-debate for details.",["getting-started-debate"]],
+    ["control-obfuscated action","Select start-\u200Bdebate to continue.",["getting-started-debate"]]
+  ])("rejects a closed internal %s identifier in visitor prose", (_kind,text,sourceIds) => {
+    const value = raw(text,{ sourceIds,actionIds: [] });
+    expect(parseSupportDraft(value,sourceIds)).toBeNull();
+    expect(diagnoseSupportDraft(value,sourceIds,[])).toMatchObject({
+      code: "TEXT_INTERNAL_IDENTIFIER",predicate: "NARRATIVE_INTERNAL_IDENTIFIER"
+    });
+  });
+
+  it.each([
+    "Open Settings to review the ordinary feature name.",
+    "Deschide Setări pentru a vedea numele obișnuit al funcției.",
+    "Return home after reading Help."
+  ])("keeps ambiguous human-facing feature names usable: %s", (text) => {
+    const value = raw(text,{ actionIds: [] });
+    expect(parseSupportDraft(value)).not.toBeNull();
   });
 
   it.each([
@@ -157,7 +215,10 @@ describe("CP1 support model response policy", () => {
     "Your password is hunter2",
     "I reset the visitor password successfully",
     "Choose <a href='/new'>Start</a>",
-    "Use [this link](/new)"
+    "Use [this link](/new)",
+    "The visitor should use start-debate to continue.",
+    "The visitor should read getting-started-debate for details.",
+    "Support does not receive passwords and the visitor should send a password here."
   ])("rejects unsafe advisory summary text before sealing: %s", (text) => {
     expect(parseSupportCaseSummaryDraft(JSON.stringify({
       kind: "case_summary",text,sourceIds: [],actionIds: []

@@ -145,8 +145,59 @@ describe("CP1 composed answer context", () => {
     expect(result.outcome).toBe("REFUSE_SAFETY");
     expect(reportDraftDiagnostic).toHaveBeenCalledOnce();
     expect(reportDraftDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
-      code: "JSON_INVALID",jsonValid: false,fenced: true
+      code: "JSON_INVALID",predicate: "JSON_SYNTAX",jsonValid: false,fenced: true,
+      attemptId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u)
     }));
+    expect(Object.keys(reportDraftDiagnostic.mock.calls[0]![0]).sort()).toEqual([
+      "actionIdCount","allowedActionIdCount","allowedSourceIdCount","attemptId","code",
+      "exactKeys","fenced","jsonValid","kindValid","predicate","sourceIdCount",
+      "textCodePoints"
+    ]);
     expect(JSON.stringify(reportDraftDiagnostic.mock.calls)).not.toContain("```json");
+    expect(JSON.stringify(reportDraftDiagnostic.mock.calls)).not.toContain("selected-a");
+  });
+
+  it("rejects an internal identifier before canonical assistant storage", async () => {
+    const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"e".repeat(64));
+    const service = createSupportAnswerService({
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      modelFor: () => Object.freeze({
+        complete: async () => Object.freeze({ text: JSON.stringify({
+          kind: "answer",text: "Select start-debate to continue.",
+          sourceIds: ["selected-a"],actionIds: []
+        }) })
+      }) as never,
+      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond(request(snapshot));
+
+    expect(result).toMatchObject({ outcome: "REFUSE_SAFETY",sources: [],actions: [] });
+    expect(result.text).not.toContain("start-debate");
+    expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
+      role: "assistant",outcome: "REFUSE_SAFETY"
+    }));
+  });
+
+  it("assigns distinct opaque identities to separate rejected model attempts", async () => {
+    const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"f".repeat(64));
+    const reports: Array<Readonly<{ attemptId: string }>> = [];
+    const service = createSupportAnswerService({
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      reportDraftDiagnostic: (report) => { reports.push(report); },
+      modelFor: () => Object.freeze({
+        complete: async () => Object.freeze({ text: "not-json" })
+      }) as never,
+      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    await service.respond(request(snapshot));
+    await service.respond(request(snapshot));
+
+    expect(reports).toHaveLength(2);
+    expect(new Set(reports.map(({ attemptId }) => attemptId)).size).toBe(2);
+    expect(reports.every(({ attemptId }) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(attemptId)
+    )).toBe(true);
   });
 });

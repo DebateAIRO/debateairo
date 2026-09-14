@@ -18,7 +18,7 @@ import {
 import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
 import type { SupportDegradedPort } from "./degraded.js";
 import {
-  diagnoseSupportDraft,parseSupportDraft,type SupportDraftDiagnostic,validateSupportDraft
+  diagnoseSupportDraft,parseSupportDraft,type SupportDraftReport,validateSupportDraft
 } from "./response-policy.js";
 
 const MAX_RETRIEVED_ENTRIES = 3;
@@ -184,7 +184,7 @@ export function createSupportAnswerService(input: Readonly<{
   queue?: Pick<SupportRelayQueue,"execute">;
   degraded?: SupportDegradedPort;
   incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
-  reportDraftDiagnostic?: (diagnostic: SupportDraftDiagnostic) => void;
+  reportDraftDiagnostic?: (diagnostic: SupportDraftReport) => void;
   clock?: () => Date;
 }>): SupportAnswerPort {
   const clock = input.clock ?? (() => new Date());
@@ -243,6 +243,7 @@ export function createSupportAnswerService(input: Readonly<{
       let modelCalled = false;
       let circuitShortCircuited = false;
       let halfOpenProbe = false;
+      const attemptId = randomUUID();
       try {
         await input.messages.writeAndTransit({
           messageId: randomUUID(),sessionId: request.sessionId,role: "user",
@@ -285,9 +286,10 @@ export function createSupportAnswerService(input: Readonly<{
           completion.text,context!.sourceIds,context!.requestedActionIds
         ) : undefined;
         if (diagnostic !== undefined && diagnostic.code !== "ACCEPTED") {
-          input.reportDraftDiagnostic?.(diagnostic);
+          input.reportDraftDiagnostic?.(Object.freeze({ attemptId,...diagnostic }));
         }
-        const parsed = structured ? parseSupportDraft(completion.text) : undefined;
+        const parsed = structured
+          ? parseSupportDraft(completion.text,context!.sourceIds) : undefined;
         const draft = !structured ? undefined
           : parsed === null || parsed === undefined ? null
           : validateSupportDraft(

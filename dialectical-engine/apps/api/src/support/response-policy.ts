@@ -1,5 +1,8 @@
 import { z } from "zod";
-import type { SupportActionId } from "@debateai/support-kb/catalog";
+import { analyzeSupportCredentialText } from "@debateai/kernel";
+import {
+  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
+} from "@debateai/support-kb/catalog";
 
 const MAX_RAW_CODE_POINTS = 8_192;
 const MAX_TEXT_CODE_POINTS = 4_000;
@@ -44,12 +47,36 @@ export type SupportDraftDiagnosticCode =
   | "TEXT_SIX_DIGIT_CODE"
   | "TEXT_GROUPED_SECURITY_CODE"
   | "TEXT_REDACTION_ECHO"
+  | "TEXT_INTERNAL_IDENTIFIER"
   | "SOURCE_MEMBERSHIP_INVALID"
   | "ACTION_MEMBERSHIP_INVALID"
   | "ACCEPTED";
 
+export type SupportDraftPredicate =
+  | "RAW_LENGTH"
+  | "JSON_SYNTAX"
+  | "EXACT_KEY_SET"
+  | "KIND"
+  | "SCHEMA"
+  | "TEXT_EMPTY"
+  | "TEXT_LENGTH"
+  | "RAW_LINK_OR_PROTOCOL"
+  | "ENCODED_LINK_OR_PATH"
+  | "MARKUP"
+  | "PATH_OR_ROUTE"
+  | "LABELLED_OR_TOKEN_SECRET"
+  | "CREDENTIAL_OPERATION"
+  | "SIX_DIGIT_CODE"
+  | "GROUPED_SECURITY_CODE"
+  | "REDACTION_ECHO"
+  | "NARRATIVE_INTERNAL_IDENTIFIER"
+  | "SOURCE_MEMBERSHIP"
+  | "ACTION_MEMBERSHIP"
+  | "ACCEPTED";
+
 export type SupportDraftDiagnostic = Readonly<{
   code: SupportDraftDiagnosticCode;
+  predicate: SupportDraftPredicate;
   jsonValid: boolean;
   fenced: boolean;
   exactKeys: boolean;
@@ -61,14 +88,52 @@ export type SupportDraftDiagnostic = Readonly<{
   allowedActionIdCount: number;
 }>;
 
+export type SupportDraftReport = SupportDraftDiagnostic & Readonly<{ attemptId: string }>;
+export type SupportDraftLogRecord = Readonly<{
+  code: `SUPPORT_DRAFT_${SupportDraftDiagnosticCode}`;
+  attemptId: string;
+  predicate: SupportDraftPredicate;
+  jsonValid: boolean;
+  fenced: boolean;
+  exactKeys: boolean;
+  kindValid: boolean;
+  textCodePoints: number | null;
+  sourceIdCount: number;
+  allowedSourceIdCount: number;
+  actionIdCount: number;
+  allowedActionIdCount: number;
+}>;
+
+export function projectSupportDraftReport(diagnostic: SupportDraftReport): SupportDraftLogRecord {
+  return Object.freeze({
+    code: `SUPPORT_DRAFT_${diagnostic.code}`,
+    attemptId: diagnostic.attemptId,
+    predicate: diagnostic.predicate,
+    jsonValid: diagnostic.jsonValid,
+    fenced: diagnostic.fenced,
+    exactKeys: diagnostic.exactKeys,
+    kindValid: diagnostic.kindValid,
+    textCodePoints: diagnostic.textCodePoints,
+    sourceIdCount: diagnostic.sourceIdCount,
+    allowedSourceIdCount: diagnostic.allowedSourceIdCount,
+    actionIdCount: diagnostic.actionIdCount,
+    allowedActionIdCount: diagnostic.allowedActionIdCount
+  });
+}
+
 const MARKUP_OR_LINK = /(?:https?:\/\/|www\.|\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>|(?:^|\s)\/\/?(?:[a-z0-9][^\s]*))/iu;
-const SECRET_LIKE = /(?:\b(?:sk|pk|api)[_-][a-z0-9_-]{8,}\b|\bbearer\s+[a-z0-9._~-]{8,}\b|\b[a-z0-9_-]{32,}\b|\b(?:password|parol[ăa]?)(?:\s+(?:ta|dvs|dumneavoastră))?\s*(?::|=|\bis\b|\beste\b)\s*\S+)/iu;
-const CREDENTIAL_TERM = /(?:\b(?:password|passcode|otp|totp|mfa|authenticator|credentials?|recovery\s+code|verification\s+code|security\s+code|reset\s+token)\b|\b(?:parol[ăa]|date\s+de\s+autentificare|cod(?:ul|uri|urile)?\s+de\s+(?:recuperare|verificare|autentificare|securitate)|autentificator|token(?:ul)?\s+de\s+resetare)\b)/iu;
-const SECURITY_OPERATION = /\b(?:send(?:ing)?|sent|shar(?:e|es|ed|ing)|provid(?:e|es|ed|ing)|giv(?:e|es|en|ing)|suppl(?:y|ies|ied|ying)|request(?:s|ed|ing)?|ask(?:s|ed|ing)?|submit(?:s|ted|ting)?|enter(?:s|ed|ing)?|typ(?:e|es|ed|ing)|past(?:e|es|ed|ing)|upload(?:s|ed|ing)?|tell(?:s|ing)?|told|show(?:s|ed|ing)?|receiv(?:e|es|ed|ing)|accept(?:s|ed|ing)?|repeat(?:s|ed|ing)?|transform(?:s|ed|ing)?|validat(?:e|es|ed|ing)|decod(?:e|es|ed|ing)|encod(?:e|es|ed|ing)|reset(?:s|ting)?|chang(?:e|es|ed|ing)|replac(?:e|es|ed|ing)|regenerat(?:e|es|ed|ing)|enroll(?:s|ed|ing)?|disabl(?:e|es|ed|ing)|remov(?:e|es|ed|ing)|revok(?:e|es|ed|ing)|recover(?:s|ed|ing)?|verif(?:y|ies|ied|ying)|check(?:s|ed|ing)?|us(?:e|es|ed|ing)|solicit\p{L}*|trimit\p{L}*|partaj\p{L}*|furniz\p{L}*|introduc\p{L}*|lip\p{L}*|incarc\p{L}*|spun\p{L}*|arat\p{L}*|prim\p{L}*|accept\p{L}*|repet\p{L}*|transform\p{L}*|valid\p{L}*|decod\p{L}*|encod\p{L}*|reset\p{L}*|schimb\p{L}*|inlocu\p{L}*|regener\p{L}*|inscri\p{L}*|dezactiv\p{L}*|elimin\p{L}*|revoc\p{L}*|recuper\p{L}*|verific\p{L}*|folos\p{L}*)\b/giu;
-const NEGATED_OPERATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can't|must\s+not|will\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/iu;
+const SECRET_LIKE = /(?:\b(?:sk|pk|api)[_-][a-z0-9_-]{8,}\b|\bbearer\s+[a-z0-9._~-]{8,}\b|\b[a-z0-9_-]{32,}\b)/iu;
 const SIX_DIGIT_CODE = /\b\d{6}\b/u;
 const GROUPED_SECURITY_CODE = /\b\d{3,8}(?:[- ]\d{3,8})+\b/u;
 const REDACTION_ECHO = /\[REDACTED_(?:SECRET_LIKE|CONTACT|URL_QUERY)\]/u;
+const NARRATIVE_ID = /\b[a-z0-9]+(?:-[a-z0-9]+)+\b/giu;
+const AMBIGUOUS_HUMAN_IDS = new Set([
+  "forgot-password","privacy-preferences","sign-in","support-status"
+]);
+const CLOSED_NARRATIVE_IDS = new Set<string>([
+  ...SUPPORT_ACTION_IDS,...SUPPORT_CAPABILITIES.map(({ id }) => id),
+  ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
+].filter((id) => id.includes("-") && !AMBIGUOUS_HUMAN_IDS.has(id)));
 
 function normalizedForScreening(value: string): readonly string[] {
   const values = [value.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu,"")];
@@ -83,42 +148,80 @@ function normalizedForScreening(value: string): readonly string[] {
 }
 
 function containsCredentialOrSecurityAction(value: string): boolean {
-  return normalizedForScreening(value).some((candidate) => {
-    if (!CREDENTIAL_TERM.test(candidate)) return false;
-    const folded = candidate.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
-    const clauses = folded.split(/(?:[.!?;\n]+|\b(?:but|however|instead|except|unless|then|dar|insa|apoi|in\s+schimb)\b)/u);
-    return clauses.some((clause) => {
-      SECURITY_OPERATION.lastIndex = 0;
-      for (const operation of clause.matchAll(SECURITY_OPERATION)) {
-        const before = clause.slice(0,operation.index);
-        if (!NEGATED_OPERATION.test(before)) return true;
-      }
-      return false;
-    });
+  const facts = analyzeSupportCredentialText(value);
+  return facts.operations.some((operation) => {
+    if (operation.negated) return false;
+    if (facts.credentialTerms.some((term) => term.scope === operation.scope)) return true;
+    const reference = facts.references.some((candidate) => candidate.scope === operation.scope);
+    if (!reference) return false;
+    return facts.credentialTerms.some((term) =>
+      term.scope < operation.scope && operation.scope - term.scope <= 1
+      && operation.sentence - term.sentence <= 1
+    );
   });
 }
 
-function screenCategory(value: string): SupportDraftDiagnosticCode | null {
-  if ([...value].length > MAX_TEXT_CODE_POINTS) return "TEXT_TOO_LONG";
-  const normalized = normalizedForScreening(value);
-  if (normalized[0]!.trim() === "") return "TEXT_EMPTY";
-  if (normalized.some((candidate) => MARKUP_OR_LINK.test(candidate))) {
-    return "TEXT_LINK_OR_MARKUP";
+type TextScreenResult = Readonly<{
+  code: SupportDraftDiagnosticCode;predicate: SupportDraftPredicate;
+}>;
+
+function result(
+  code: SupportDraftDiagnosticCode,predicate: SupportDraftPredicate
+): TextScreenResult { return Object.freeze({ code,predicate }); }
+
+function linkPredicate(normalized: readonly string[]): SupportDraftPredicate | null {
+  for (const candidate of normalized) {
+    if (!MARKUP_OR_LINK.test(candidate)) continue;
+    if (candidate !== normalized[0]) return "ENCODED_LINK_OR_PATH";
+    if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
+    if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";
+    return "PATH_OR_ROUTE";
   }
-  if (normalized.some((candidate) => SECRET_LIKE.test(candidate))) return "TEXT_SECRET_LIKE";
-  if (containsCredentialOrSecurityAction(value)) {
-    return "TEXT_CREDENTIAL_OR_SECURITY_ACTION";
-  }
-  if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) return "TEXT_SIX_DIGIT_CODE";
-  if (normalized.some((candidate) => GROUPED_SECURITY_CODE.test(candidate))) {
-    return "TEXT_GROUPED_SECURITY_CODE";
-  }
-  if (normalized.some((candidate) => REDACTION_ECHO.test(candidate))) return "TEXT_REDACTION_ECHO";
   return null;
 }
 
-export function screenSupportModelText(value: string): boolean {
-  return screenCategory(value) === null;
+function containsInternalIdentifier(
+  value: string,additionalIds: readonly string[]
+): boolean {
+  const ids = new Set(CLOSED_NARRATIVE_IDS);
+  for (const id of additionalIds) if (id.includes("-")) ids.add(id.toLocaleLowerCase("en-US"));
+  return normalizedForScreening(value).some((candidate) => {
+    NARRATIVE_ID.lastIndex = 0;
+    return [...candidate.toLocaleLowerCase("en-US").matchAll(NARRATIVE_ID)]
+      .some(([id]) => ids.has(id));
+  });
+}
+
+function screenCategory(value: string,internalIds: readonly string[] = []): TextScreenResult | null {
+  if ([...value].length > MAX_TEXT_CODE_POINTS) return result("TEXT_TOO_LONG","TEXT_LENGTH");
+  const normalized = normalizedForScreening(value);
+  if (normalized[0]!.trim() === "") return result("TEXT_EMPTY","TEXT_EMPTY");
+  const unsafeLink = linkPredicate(normalized);
+  if (unsafeLink !== null) return result("TEXT_LINK_OR_MARKUP",unsafeLink);
+  if (analyzeSupportCredentialText(value).credentialValueSpans.length > 0
+    || normalized.some((candidate) => SECRET_LIKE.test(candidate))) {
+    return result("TEXT_SECRET_LIKE","LABELLED_OR_TOKEN_SECRET");
+  }
+  if (containsCredentialOrSecurityAction(value)) {
+    return result("TEXT_CREDENTIAL_OR_SECURITY_ACTION","CREDENTIAL_OPERATION");
+  }
+  if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) {
+    return result("TEXT_SIX_DIGIT_CODE","SIX_DIGIT_CODE");
+  }
+  if (normalized.some((candidate) => GROUPED_SECURITY_CODE.test(candidate))) {
+    return result("TEXT_GROUPED_SECURITY_CODE","GROUPED_SECURITY_CODE");
+  }
+  if (normalized.some((candidate) => REDACTION_ECHO.test(candidate))) {
+    return result("TEXT_REDACTION_ECHO","REDACTION_ECHO");
+  }
+  if (containsInternalIdentifier(value,internalIds)) {
+    return result("TEXT_INTERNAL_IDENTIFIER","NARRATIVE_INTERNAL_IDENTIFIER");
+  }
+  return null;
+}
+
+export function screenSupportModelText(value: string,internalIds: readonly string[] = []): boolean {
+  return screenCategory(value,internalIds) === null;
 }
 
 const ANSWER_KEYS = Object.freeze(["actionIds","kind","sourceIds","text"]);
@@ -129,22 +232,22 @@ export function diagnoseSupportDraft(
   allowedActionIds: readonly SupportActionId[]
 ): SupportDraftDiagnostic {
   const fenced = raw.trimStart().startsWith("```") || raw.trimEnd().endsWith("```");
-  const base: Omit<SupportDraftDiagnostic,"code"> = {
+  const base: Omit<SupportDraftDiagnostic,"code" | "predicate"> = {
     jsonValid: false,fenced,exactKeys: false,kindValid: false,
     textCodePoints: null,sourceIdCount: 0,allowedSourceIdCount: 0,
     actionIdCount: 0,allowedActionIdCount: 0
   };
   const result = (
-    code: SupportDraftDiagnosticCode,
-    values: Omit<SupportDraftDiagnostic,"code"> = base
+    code: SupportDraftDiagnosticCode,predicate: SupportDraftPredicate,
+    values: Omit<SupportDraftDiagnostic,"code" | "predicate"> = base
   ): SupportDraftDiagnostic =>
-    Object.freeze({ code,...values });
-  if ([...raw].length > MAX_RAW_CODE_POINTS) return result("RAW_TOO_LONG");
+    Object.freeze({ code,predicate,...values });
+  if ([...raw].length > MAX_RAW_CODE_POINTS) return result("RAW_TOO_LONG","RAW_LENGTH");
   let decoded: unknown;
   try { decoded = JSON.parse(raw) as unknown; }
-  catch { return result("JSON_INVALID"); }
+  catch { return result("JSON_INVALID","JSON_SYNTAX"); }
   if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
-    return result("SCHEMA_INVALID",{ ...base,jsonValid: true });
+    return result("SCHEMA_INVALID","SCHEMA",{ ...base,jsonValid: true });
   }
   const row = decoded as Readonly<Record<string,unknown>>;
   const exactKeys = Object.keys(row).sort().join("\0") === ANSWER_KEYS.join("\0");
@@ -165,29 +268,29 @@ export function diagnoseSupportDraft(
       (id): id is string => typeof id === "string" && actionSet.has(id)
     ).length
   };
-  if (!exactKeys) return result("KEY_SET_INVALID",values);
-  if (!kindValid) return result("KIND_INVALID",values);
+  if (!exactKeys) return result("KEY_SET_INVALID","EXACT_KEY_SET",values);
+  if (!kindValid) return result("KIND_INVALID","KIND",values);
   const parsed = schema.safeParse(decoded);
-  if (!parsed.success) return result("SCHEMA_INVALID",values);
-  const unsafeText = screenCategory(parsed.data.text);
-  if (unsafeText !== null) return result(unsafeText,values);
+  if (!parsed.success) return result("SCHEMA_INVALID","SCHEMA",values);
+  const unsafeText = screenCategory(parsed.data.text,allowedSourceIds);
+  if (unsafeText !== null) return result(unsafeText.code,unsafeText.predicate,values);
   if (parsed.data.sourceIds.length === 0
     || new Set(parsed.data.sourceIds).size !== parsed.data.sourceIds.length
     || values.allowedSourceIdCount !== parsed.data.sourceIds.length) {
-    return result("SOURCE_MEMBERSHIP_INVALID",values);
+    return result("SOURCE_MEMBERSHIP_INVALID","SOURCE_MEMBERSHIP",values);
   }
   if (new Set(parsed.data.actionIds).size !== parsed.data.actionIds.length
     || values.allowedActionIdCount !== parsed.data.actionIds.length) {
-    return result("ACTION_MEMBERSHIP_INVALID",values);
+    return result("ACTION_MEMBERSHIP_INVALID","ACTION_MEMBERSHIP",values);
   }
-  return result("ACCEPTED",values);
+  return result("ACCEPTED","ACCEPTED",values);
 }
 
-export function parseSupportDraft(raw: string): SupportDraft | null {
+export function parseSupportDraft(raw: string,internalIds: readonly string[] = []): SupportDraft | null {
   if ([...raw].length > MAX_RAW_CODE_POINTS) return null;
   try {
     const parsed = schema.safeParse(JSON.parse(raw) as unknown);
-    if (!parsed.success || !screenSupportModelText(parsed.data.text)) return null;
+    if (!parsed.success || !screenSupportModelText(parsed.data.text,internalIds)) return null;
     return Object.freeze({
       kind: parsed.data.kind,
       text: parsed.data.text,

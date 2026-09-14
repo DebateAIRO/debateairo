@@ -20,11 +20,63 @@ describe("CP1 Support credential redaction", () => {
   });
 
   it.each([
+    ["Passwordul meu este inert-stejar-7","inert-stejar-7"],
+    ["My passcode is inert-maple-7","inert-maple-7"],
+    ["OTP is INERTABC","INERTABC"],
+    ["Reset token is inert-reset-7","inert-reset-7"],
+    ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
+    ["Paro\u200Bla mea este inert-fag-7","inert-fag-7"],
+    ["Codurile de recuperare sunt INERTRECOVERY","INERTRECOVERY"],
+    ["Datele de autentificare sunt INERTAUTH","INERTAUTH"]
+  ])("redacts every declared labelled credential class before transit: %s", (text,secret) => {
+    const result = redactSupportText(text);
+    expect(result).toMatchObject({ redacted: true });
+    expect(result.text).not.toContain(secret);
+    expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+  });
+
+  it.each([
     "I forgot my password",
     "Am uitat parola",
     "Try again at 14:30 on 2026-09-14 with public error SUPPORT_MODEL_UNAVAILABLE."
   ])("preserves benign guidance, dates, times, and public error IDs: %s", (text) => {
     expect(redactSupportText(text)).toEqual({ text,redacted: false });
+  });
+
+  it.each([
+    ["My pass\u200Bword is inert-birch-7","inert-birch-7"],
+    ["OTP is INERTABC","INERTABC"]
+  ])("keeps a supplied credential out of canonical seal, persistence, and model transit: %s", async (
+    text,secret
+  ) => {
+    let sealed = "";
+    let persisted = "";
+    let transit = "";
+    const cipher = createSupportMessageCipher({
+      unwrapDataKey: vi.fn(async () => Buffer.alloc(32,1)),
+      sealContent: vi.fn((_aad: unknown,_key: Uint8Array,plaintext: Uint8Array) => {
+        sealed = Buffer.from(plaintext).toString("utf8");
+        return Buffer.from(plaintext);
+      }),openContent: vi.fn()
+    } as never,{
+      readSessionKey: vi.fn(async () => Buffer.from("wrapped")),
+      write: vi.fn(async (input) => { persisted = Buffer.from(input.contentCiphertext).toString("utf8"); }),
+      read: vi.fn(async () => null),listSession: vi.fn(async () => [])
+    });
+
+    const stored = await cipher.writeAndTransit({
+      messageId: "40000000-0000-4000-8000-000000000001",
+      sessionId: "40000000-0000-4000-8000-000000000002",
+      role: "user",text,outcome: "REFUSE_ZONE",language: "en",detectedLanguage: "en",
+      overrideLanguage: null,receivedAt: new Date("2026-09-14T10:00:00.000Z"),
+      firstTokenAt: null,completedAt: null
+    },async (safeText) => { transit = safeText; });
+
+    for (const observed of [stored.text,sealed,persisted,transit]) {
+      expect(observed).not.toContain(secret);
+      expect(observed).toContain("[REDACTED_SECRET_LIKE]");
+    }
+    expect(stored.redacted).toBe(true);
   });
 
   it("screens a legacy labelled credential when an existing encrypted message is read", async () => {
@@ -59,7 +111,7 @@ describe("CP1 Support credential redaction", () => {
   });
 
   it("keeps a legacy labelled credential out of the case snapshot and advisory transit", async () => {
-    const legacy = "My password is replayvalue7";
+    const legacy = "My pass\u200Bword is replayvalue7";
     const encrypted: SupportEncryptedMessageRead = Object.freeze({
       messageId: "30000000-0000-4000-8000-000000000001",
       sessionId: "30000000-0000-4000-8000-000000000002",

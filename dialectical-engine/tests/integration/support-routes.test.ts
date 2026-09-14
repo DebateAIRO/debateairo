@@ -1964,7 +1964,12 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
-  it("replaces a rejected model draft before storage and HTTP while retaining usage and relay health", async () => {
+  it.each([
+    ["encoded link","Open https%3A%2F%2Finvalid.example/reset"],
+    ["internal identifier","Select start-debate to continue."]
+  ])("replaces a rejected %s draft before storage and HTTP while retaining usage and relay health", async (
+    _kind,unsafe
+  ) => {
     const policyClockMs = CLOCK_BASE_MS + 20_000_000;
     const article = Object.freeze({
       id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
@@ -1973,7 +1978,6 @@ describe("SUP-01 support routes", () => {
       body: "Open the new debate page to start your first debate."
     });
     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
-    const unsafe = "Open https%3A%2F%2Finvalid.example/reset";
     const complete = vi.fn(async () => Object.freeze({
       text: JSON.stringify({
         kind: "answer",text: unsafe,

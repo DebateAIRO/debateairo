@@ -408,7 +408,11 @@ describe("SUP-02 cases", () => {
     ["en","Open //invalid.example/reset and use password syntheticvalue7.",
       "The advisory summary was omitted because it did not pass Support safety checks."],
     ["ro","Deschide https%3A%2F%2Finvalid.example/reset cu parola syntheticvalue7.",
-      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
+      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."],
+    ["en","Support does not receive passwords and the visitor should send a password here.",
+      "The advisory summary was omitted because it did not pass Support safety checks."],
+    ["en","The visitor should use start-debate to continue.",
+      "The advisory summary was omitted because it did not pass Support safety checks."]
   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
     language,hostile,fallback
   ) => {
