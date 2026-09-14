@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "node": "FIX3",
+  "status": "READY_FOR_SEPARATE_REVIEW",
+  "ticket": "t_e697cad1",
+  "findings": ["t_8596ccbc", "t_67a569fe"],
+  "session": "/root/requirements",
+  "inputRevision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "commit": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "files": {
+    "apps/api/src/support/answer.ts": "3307948ff023d3d723f4314805ec6e4e6d2900640fe1ffa7e6048e2ae23ffa36",
+    "apps/api/src/support/response-policy.ts": "0d7c59ac814244e975f9267b8387ee90d82f4295350979936204b9c69e89942e",
+    "packages/support-kb/src/context.ts": "14869243b30906138eb8f425f11e0f46655ed8a84a99c9583e8d4f238d6e84ea",
+    "tests/integration/support-routes.test.ts": "689266e48e0c69ef43b6a3a694ad6ef8054fad5a76da90aacff73eabc8187924",
+    "tests/unit/support-answer-context.test.ts": "00b79cbdd2ba321a87451a6f9b540f43358302706da2c1ca29f54e9fa48a7e22",
+    "tests/unit/support-context.test.ts": "175423c1a12f5957da66916a0579af4dd4cb8c688fcc7c2469a2d1591d0e27b5",
+    "tests/unit/support-response-policy.test.ts": "d1f434e4df4a74adabb22cd4f3c70c01e634b01bff510158f72313385343d35d"
+  },
+  "evidence": {
+    "report": "de39311cf0e53b9a91a3f2c00c9d43d90f4a77720572a759d795c7a05359f6df",
+    "stackCustody": "f372be2481ddd1eec7e7632b6bf0778bb601ddc75282710b100d2ea8831e2731",
+    "authorReport": "de302d374d6c1c44ca4026ca653563255c0badeb9aac5ff158d4dca858dab4ff"
+  },
+  "logs": {
+    "contractRed": "a994101cdf5462c49e900b9802c64300fa3f0a537bff06a4e72c8241efcd0aed",
+    "contractGreen": "2fd9d2b3062501e0227c35fac74cd12c8020cf725b78cdb4c7e2d92b13613e24",
+    "affectedGreenBeforeFinalPolicyTightening": "f18990a3911912aba5d31ce6b67ee208db14fe53bda142bd9bb112e3033ce66c",
+    "modelPreserved": "ec0ca14b8285731892c7919d47e7626d06f1fe1d57b3f410e9c6dbf6189fb375",
+    "mutantActionAvailability": "7bb92472fd7682df78e24cfc031b37f194b3baa0d8774f0232d582b2a09694c3",
+    "mutantPolicyBroad": "4ca414b030c886cdce0151b38894227ddcb357a844c6d57def408e3a6bde7586",
+    "mutantsRestored": "b6d96be0f024ad6ca79d15b11b3e0618e06df9fb1b66dbe30173a2b442131444",
+    "policyIntermediate": "08bc63decce0c0bc543dd9af91d199b0867973e7d3a9f6dc1153c40538797a0b",
+    "policyFinal": "db6bb04f3321ab75f06ff0f5362cd3e265afaeecd660141316d8437e6a924b46",
+    "typecheckBeforeFinalPolicyTightening": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "typecheckIntermediate": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+    "typecheckFinal": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0"
+  },
+  "tests": {
+    "contractRed": { "filesFailed": 3, "testsFailed": 5, "testsPassed": 77 },
+    "contractGreen": { "filesPassed": 3, "testsPassed": 82 },
+    "affectedGreenBeforeFinalPolicyTightening": { "filesPassed": 4, "testsPassed": 184 },
+    "policyFinalOnCommittedBytes": { "filesPassed": 1, "testsPassed": 49 },
+    "modelPreserved": { "filesPassed": 1, "testsPassed": 4 },
+    "mutantsRestoredBeforeFinalPolicyTightening": { "filesPassed": 3, "testsPassed": 15, "testsSkipped": 67 }
+  },
+  "mutations": {
+    "actionAvailability": { "filesFailed": 1, "filesSkipped": 1, "testsFailed": 1, "testsSkipped": 34 },
+    "nounWidePolicy": { "filesFailed": 1, "testsFailed": 3, "testsPassed": 1, "testsSkipped": 43 },
+    "restored": { "filesPassed": 3, "testsPassed": 15, "testsSkipped": 67 }
+  },
+  "live2DiagnosticCounts": {
+    "KEY_SET_INVALID": 1,
+    "TEXT_CREDENTIAL_OR_SECURITY_ACTION": 2,
+    "promptAttribution": "UNKNOWN"
+  },
+  "nativeSchemaEnforcement": {
+    "implemented": false,
+    "reason": "CURRENT_RELAY_FORWARDS_MESSAGES_ONLY_TO_HERMES_CLI"
+  },
+  "actualRequestsByFix3": 0,
+  "typecheck": {
+    "repositoryPassed": false,
+    "inheritedDiagnostics": 76,
+    "introducedDiagnostics": 0,
+    "byteIdenticalToAttributedBaseline": true
+  },
+  "runtimeLoadedRevision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "live3ReloadRequired": true,
+  "forgotPasswordDestinationVerified": false,
+  "ownerAcceptance": false,
+  "actualUsage": "UNAVAILABLE"
+}
