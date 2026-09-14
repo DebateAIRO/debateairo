@@ -259,24 +259,114 @@ describe("development CLI full-id starts", () => {
     });
   });
 
-  it("passes the full Claude model id without a modelAlias key", async () => {
+  it("starts the Claude relay with `--model claude-opus-5`", async () => {
+    relayStarts.claude.mockClear();
+    const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
+    await operations.starts[1]!(8796);
+    const panelOptions = relayStarts.claude.mock.calls[0]?.[0];
+    expect(panelOptions).toBeDefined();
+
+    const { startClaudeRelay } = await vi.importActual<
+      typeof import("../../acceptance/claude-relay.js")
+    >("../../acceptance/claude-relay.js");
+    const capturedEnvelopeScript = [
+      'console.log(JSON.stringify({',
+      '  is_error: false,',
+      '  result: JSON.stringify({ argumentList: process.argv }),',
+      '  modelUsage: { "claude-opus-5": {} }',
+      '}));'
+    ].join("");
+    const relay = await startClaudeRelay({
+      ...panelOptions!,
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
+      }
+    });
+    try {
+      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+        body: JSON.stringify({
+          model: "ignored-by-relay",
+          messages: [{ role: "user", content: "Assert argv." }]
+        })
+      });
+      expect(response.status).toBe(200);
+      const completion = await response.json() as {
+        choices: readonly { message: { content: string } }[];
+      };
+      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+        argumentList: readonly string[];
+      };
+      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+        .toBe("claude-opus-5");
+    } finally {
+      await relay.close();
+    }
+  });
+
+  it("passes the configured Claude id through the typed model option", async () => {
     relayStarts.claude.mockClear();
     const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
     await operations.starts[1]!(8796);
     expect(relayStarts.claude).toHaveBeenCalledWith({
       port: 8796, timeoutMs: 180000, model: "claude-opus-5"
     });
-    expect(relayStarts.claude.mock.calls[0]?.[0]).not.toHaveProperty("modelAlias");
   });
 
-  it("passes the full Grok model id without allocating a start to either API entry", async () => {
+  it("starts the Grok relay with `--model grok-4.6-build`", async () => {
     relayStarts.grok.mockClear();
     const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
     expect(operations.starts).toHaveLength(3);
     await operations.starts[2]!(8793);
-    expect(relayStarts.grok).toHaveBeenCalledWith({
+    const panelOptions = relayStarts.grok.mock.calls[0]?.[0];
+    expect(panelOptions).toEqual({
       port: 8793, timeoutMs: 180000, model: "grok-4.6-build", sandboxProfile: "none"
     });
+
+    const { startGrokRelay } = await vi.importActual<
+      typeof import("../../acceptance/grok-relay.js")
+    >("../../acceptance/grok-relay.js");
+    const capturedEnvelopeScript = [
+      'console.log(JSON.stringify({',
+      '  text: JSON.stringify({ argumentList: process.argv }),',
+      '  stopReason: "end_turn",',
+      '  modelUsage: { "grok-4.6-build": {} }',
+      '}));'
+    ].join("");
+    const relay = await startGrokRelay({
+      ...panelOptions!,
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
+      }
+    });
+    try {
+      const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+        body: JSON.stringify({
+          model: "ignored-by-relay",
+          messages: [{ role: "user", content: "Assert argv." }]
+        })
+      });
+      expect(response.status).toBe(200);
+      const completion = await response.json() as {
+        choices: readonly { message: { content: string } }[];
+      };
+      const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+        argumentList: readonly string[];
+      };
+      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+        .toBe("grok-4.6-build");
+    } finally {
+      await relay.close();
+    }
   });
 });
 

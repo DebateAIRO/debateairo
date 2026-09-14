@@ -133,6 +133,27 @@ describe("GROK-01 Grok Build CLI relay", () => {
     expect(relayed.argumentList).not.toContain("read-only");
   });
 
+  it("asks the CLI for the caller's full model id", async () => {
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "grok-4.6-build",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    handles.push(relay);
+
+    const response = await postCompletion(relay, "Assess this claim.");
+    expect(response.status).toBe(200);
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+      .toBe("grok-4.6-build");
+  });
+
   it("maps the OpenAI-compatible transcript to a single, verbatim, tool-less Grok call", async () => {
     const environmentKeys = [
       "HOME", "PATH", "TMPDIR", "LANG", "XAI_API_KEY",

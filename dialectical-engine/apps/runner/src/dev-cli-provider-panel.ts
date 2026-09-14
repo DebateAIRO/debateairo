@@ -120,13 +120,13 @@ export function createDevelopmentCliProviderPanelOperations(
       });
       if (slot.word === "claude") return (port) => startClaudeRelay({
         port, timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS, model: slot.model
-      } as unknown as Parameters<typeof startClaudeRelay>[0]);
+      });
       return (port) => startGrokRelay({
         port,
         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
         model: slot.model,
         sandboxProfile: "none"
-      } as unknown as Parameters<typeof startGrokRelay>[0]);
+      });
     }))
   });
 }

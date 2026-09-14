@@ -153,6 +153,79 @@ describe("FAIR-02 Claude Code CLI relay", () => {
     expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1]).toBe("sonnet");
   });
 
+  it("asks the CLI for the caller's full model id", async () => {
+    const capturedEnvelopeScript = [
+      'console.log(JSON.stringify({',
+      '  is_error: false, result: JSON.stringify({ argumentList: process.argv }),',
+      '  modelUsage: { "claude-opus-5": {} }',
+      '}));'
+    ].join("");
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "claude-opus-5",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
+    });
+    handles.push(relay);
+
+    const response = await postCompletion(relay, "Assess this claim.");
+    expect(response.status).toBe(200);
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+      .toBe("claude-opus-5");
+  });
+
+  it("gives the full model id precedence over a model alias", async () => {
+    const capturedEnvelopeScript = [
+      'console.log(JSON.stringify({',
+      '  is_error: false, result: JSON.stringify({ argumentList: process.argv }),',
+      '  modelUsage: {',
+      '    "claude-sonnet-5": { canonicalModel: "claude-sonnet-5" },',
+      '    "claude-opus-5": { canonicalModel: "claude-opus-5" }',
+      '  }',
+      '}));'
+    ].join("");
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "claude-opus-5",
+      modelAlias: "sonnet",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
+    });
+    handles.push(relay);
+
+    expect(relay.model).toBe("claude-opus-5");
+    const response = await postCompletion(relay, "Assess this claim.");
+    expect(response.status).toBe(200);
+    const completion = await response.json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      argumentList: readonly string[];
+    };
+    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
+      .toBe("claude-opus-5");
+  });
+
+  it("refuses a non-full id on the model path", async () => {
+    const result = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "opus",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    }).then((relay) => {
+      handles.push(relay);
+      return "NO_THROW";
+    }, (error: unknown) => String(error));
+
+    expect(result).toContain("CLAUDE_CLI_MODEL_INVALID");
+  });
+
   it("maps an OpenAI request to claude -p --output-format json with closed stdin and reports true lineage", async () => {
     const environmentKeys = [
       "HOME", "PATH", "TMPDIR", "LANG", "USER", "LOGNAME",
