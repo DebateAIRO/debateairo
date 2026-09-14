@@ -75,7 +75,8 @@
     "SEC_CREDENTIAL_POLICY": "t_db79b682",
     "OBS_CORRELATION": "t_f9e289db",
     "FIX4": "t_8b9a007d",
-    "LIVE4": "t_d69a47ed"
+    "LIVE4": "t_d69a47ed",
+    "PRODDELTA": "t_546a8c82"
   },
   "edges": [
     [
@@ -368,6 +369,14 @@
     ],
     [
       "LIVE4",
+      "GATE"
+    ],
+    [
+      "LIVE3",
+      "PRODDELTA"
+    ],
+    [
+      "PRODDELTA",
       "GATE"
     ]
   ]

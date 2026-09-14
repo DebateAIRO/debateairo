@@ -8,7 +8,7 @@ Latest automated integration: 20 test files, 776 passed, one Forgot-password TOD
 
 Preview: supported `https://localhost:3100`, loaded revision `43cf9386`, detached PID/PGID 40443 and PPID 1. The worker captured normal TLS 200 after browser exit and ten seconds idle with original listeners preserved. The first launch at the same revision failed at the Support-model stage; its inner cause remains unknown.
 
-Completed assessment context: separate Sol ARCHCHECK (`t_d44075a6`, `/root/plan_review`) assesses the response architecture; SECDELTA (`t_29866275`, `/root/forgot_destination`) validates the changed credential boundary and earlier sink findings using synthetic probes. SECDELTA owns the sole heavy lease. Both are read-only and precede any further correction. GATE and final REV1/REV2/REV3 remain pending. These assessments are not a fourth speculative fix or a final review PASS.
+Active work: Sol FIX4 (`t_8b9a007d`, `/root/requirements`) implements the architecture-backed boundary correction from the completed ARCHCHECK and SECDELTA assessments. FIX4 owns the sole heavy and product Git leases. PRODDELTA (`t_546a8c82`, `/root/baseline`) reviews only stable frozen UI corrections and existing screenshots while implementation proceeds. LIVE4, GATE and final REV1/REV2/REV3 remain pending.
 
 Owner input: the existing Forgot password flow is confirmed, but its exact destination/opener remains unknown. The original specific question is still pending; do not guess, repeat searches, claim absence, or substitute Settings/MFA. Its eventual connection needs actual navigation evidence and scoped independent review.
 
