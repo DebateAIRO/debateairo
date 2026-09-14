@@ -2,6 +2,12 @@
 
 import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { redactSupportText } from "@debateai/kernel";
+import {
+  SUPPORT_CAPABILITIES,
+  type SupportAction,
+  type SupportActionId
+} from "@debateai/support-kb/catalog";
+import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
 import { ConsentToggle } from "./ConsentToggle.js";
@@ -46,11 +52,14 @@ export type SupportCaseAcknowledgement = Readonly<{
   slaHours: number;
   link: string;
 }>;
+type SupportSource = Readonly<{ id: string;label: string }>;
 type SupportReply = Readonly<{
   messageId: string;
   outcome: SupportAssistantOutcome;
   text: string;
   link?: string;
+  sources?: readonly SupportSource[];
+  actions?: readonly SupportAction[];
   caseAcknowledgement?: SupportCaseAcknowledgement;
 }>;
 type SupportSessionStart = SupportSession | SupportReply;
@@ -134,6 +143,11 @@ const REQUEST_UNAVAILABLE = Object.freeze({
   ro: "Serviciul de suport nu este disponibil acum. Încearcă din nou sau alege „Vorbește cu o persoană”."
 });
 
+const MAX_RESPONSE_DECORATIONS = 3;
+const SUPPORT_SOURCE_IDS = new Set(
+  SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
+);
+
 const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
 const SUPPORT_CASE = /^\/help[?]case=[A-Za-z0-9_-]{43}$/u;
@@ -154,11 +168,64 @@ function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCas
   });
 }
 
-function replyFrom(body: Readonly<Record<string,unknown>>): SupportReply | null {
+function hasExactKeys(value: Readonly<Record<string,unknown>>,keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value,key));
+}
+
+function sourcesFrom(value: unknown): readonly SupportSource[] | null {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value) || value.length > MAX_RESPONSE_DECORATIONS) return null;
+  const seen = new Set<string>();
+  const sources: SupportSource[] = [];
+  for (const member of value) {
+    if (member === null || typeof member !== "object" || Array.isArray(member)) return null;
+    const source = member as Readonly<Record<string,unknown>>;
+    if (!hasExactKeys(source,["id","label"])
+      || typeof source.id !== "string" || !SUPPORT_SOURCE_IDS.has(source.id)
+      || typeof source.label !== "string" || source.label.length === 0
+      || seen.has(source.id)) return null;
+    seen.add(source.id);
+    sources.push(Object.freeze({ id: source.id,label: source.label }));
+  }
+  return Object.freeze(sources);
+}
+
+function actionsFrom(
+  value: unknown,
+  context: Readonly<{ signedIn: boolean;language: SupportAssistantLanguage }> | undefined
+): readonly SupportAction[] | null {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value) || value.length > MAX_RESPONSE_DECORATIONS) return null;
+  if (value.length > 0 && context === undefined) return null;
+  const seen = new Set<string>();
+  const actions: SupportAction[] = [];
+  for (const member of value) {
+    if (member === null || typeof member !== "object" || Array.isArray(member)) return null;
+    const action = member as Readonly<Record<string,unknown>>;
+    if (!hasExactKeys(action,["id","label","href"])
+      || typeof action.id !== "string" || typeof action.label !== "string"
+      || typeof action.href !== "string" || seen.has(action.id)) return null;
+    const canonical = resolveSupportActions([action.id as SupportActionId],context!);
+    if (canonical.length !== 1 || canonical[0]!.id !== action.id
+      || canonical[0]!.label !== action.label || canonical[0]!.href !== action.href) return null;
+    seen.add(action.id);
+    actions.push(canonical[0]!);
+  }
+  return Object.freeze(actions);
+}
+
+function replyFrom(
+  body: Readonly<Record<string,unknown>>,
+  context?: Readonly<{ signedIn: boolean;language: SupportAssistantLanguage }>
+): SupportReply | null {
   if (typeof body.outcome !== "string"
     || !SUPPORT_ASSISTANT_OUTCOMES.has(body.outcome as SupportAssistantOutcome)
     || typeof body.text !== "string") return null;
   const acknowledgement = caseAcknowledgement(body);
+  const sources = sourcesFrom(body.sources);
+  const actions = actionsFrom(body.actions,context);
+  if (sources === null || actions === null) return null;
   const responseLink = typeof body.refusal_link === "string"
     ? body.refusal_link
     : acknowledgement === null && typeof body.link === "string" ? body.link : undefined;
@@ -166,6 +233,8 @@ function replyFrom(body: Readonly<Record<string,unknown>>): SupportReply | null 
     messageId: String(body.message_id ?? ""),
     outcome: body.outcome as SupportAssistantOutcome,
     text: body.text,
+    sources,
+    actions,
     ...(responseLink === undefined ? {} : { link: responseLink }),
     ...(acknowledgement === null ? {} : { caseAcknowledgement: acknowledgement })
   });
@@ -178,8 +247,21 @@ function isSupportReply(value: unknown): value is SupportReply {
     && "text" in value && typeof value.text === "string";
 }
 
+class SupportSnapshotUnavailableError extends Error {
+  constructor() {
+    super("SUPPORT_KB_SNAPSHOT_UNAVAILABLE");
+    this.name = "SupportSnapshotUnavailableError";
+  }
+}
+
 async function readJson(response: Response): Promise<Record<string,unknown>> {
-  const body = await response.json() as Record<string,unknown>;
+  const value = await response.json() as unknown;
+  const body = value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string,unknown> : {};
+  if (response.status === 409 && hasExactKeys(body,["error","restart_session"])
+    && body.error === "SUPPORT_KB_SNAPSHOT_UNAVAILABLE" && body.restart_session === true) {
+    throw new SupportSnapshotUnavailableError();
+  }
   if (!response.ok
     && (typeof body.outcome !== "string" || typeof body.text !== "string")) {
     throw new Error("SUPPORT_REQUEST_UNAVAILABLE");
@@ -217,7 +299,7 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
         ...(context !== undefined && "latest" in context ? { latest: true } : {})
       },session.token
     ));
-    const reply = replyFrom(body);
+    const reply = replyFrom(body,{ signedIn: session.identityBound,language });
     if (reply === null) throw new Error("SUPPORT_RESPONSE_INVALID");
     return reply;
   },
@@ -240,7 +322,7 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/escalate`,
       { language },session.token
     ));
-    const terminal = replyFrom(body);
+    const terminal = replyFrom(body,{ signedIn: session.identityBound,language });
     if (terminal !== null) return terminal;
     if (typeof body.case_token !== "string" || typeof body.text !== "string") {
       throw new Error("SUPPORT_RESPONSE_INVALID");
@@ -255,6 +337,9 @@ type ConversationMessage = Readonly<{
   text: string;
   link?: string;
   outcome?: SupportAssistantOutcome;
+  language?: SupportAssistantLanguage;
+  sources?: readonly SupportSource[];
+  actions?: readonly SupportAction[];
 }>;
 
 export const SUPPORT_CONVERSATION_STORAGE_KEY = "debateai.support.conversation.v1";
@@ -273,20 +358,44 @@ function readStoredConversation(): StoredConversation | null {
     if (raw === null) return null;
     const value = JSON.parse(raw) as Partial<StoredConversation>;
     if ((value.language !== "en" && value.language !== "ro")
-      || !Array.isArray(value.messages)
-      || !value.messages.every((message) => message !== null && typeof message === "object"
-        && typeof message.id === "string" && typeof message.text === "string"
-        && (message.role === "assistant" || message.role === "user"))) return null;
+      || !Array.isArray(value.messages)) return null;
+    const storedLanguage = value.language;
     const session = value.session === null ? null
       : value.session !== undefined && typeof value.session.sessionId === "string"
         && typeof value.session.token === "string"
         && typeof value.session.identityBound === "boolean" ? value.session : null;
+    const messages = value.messages.map((message): ConversationMessage | null => {
+      if (message === null || typeof message !== "object" || Array.isArray(message)) return null;
+      const record = message as Readonly<Record<string,unknown>>;
+      if (typeof record.id !== "string" || typeof record.text !== "string"
+        || (record.role !== "assistant" && record.role !== "user")) return null;
+      if (record.role === "user") {
+        return Object.freeze({ id: record.id,role: "user" as const,text: record.text });
+      }
+      const messageLanguage = record.language === "en" || record.language === "ro"
+        ? record.language : storedLanguage;
+      const sources = sourcesFrom(record.sources);
+      const actions = actionsFrom(record.actions,{
+        signedIn: session?.identityBound ?? false,language: messageLanguage
+      });
+      if (sources === null || actions === null
+        || (record.outcome !== undefined && (typeof record.outcome !== "string"
+          || !SUPPORT_ASSISTANT_OUTCOMES.has(record.outcome as SupportAssistantOutcome)))
+        || (record.link !== undefined && typeof record.link !== "string")) return null;
+      return Object.freeze({
+        id: record.id,role: "assistant" as const,text: record.text,language: messageLanguage,
+        sources,actions,
+        ...(record.outcome === undefined ? {} : { outcome: record.outcome as SupportAssistantOutcome }),
+        ...(record.link === undefined ? {} : { link: record.link })
+      });
+    });
+    if (messages.some((message) => message === null)) return null;
     const ownContext = value.ownContext !== undefined && "runId" in value.ownContext
       && typeof value.ownContext.runId === "string"
       ? { runId: value.ownContext.runId } as const : { latest: true } as const;
     return Object.freeze({
-      language: value.language,session,
-      messages: Object.freeze(value.messages as ConversationMessage[]),ownContext
+      language: storedLanguage,session,
+      messages: Object.freeze(messages as ConversationMessage[]),ownContext
     });
   } catch {
     return null;
@@ -411,7 +520,10 @@ export function Assistant({
       {
         id: response.messageId || `assistant-${current.length}`,
         role: "assistant",text: redactSupportText(response.text).text,
-        outcome: response.outcome,...(response.link === undefined ? {} : { link: response.link })
+        outcome: response.outcome,language,
+        sources: response.sources ?? Object.freeze([]),
+        actions: response.actions ?? Object.freeze([]),
+        ...(response.link === undefined ? {} : { link: response.link })
       },
       ...(response.caseAcknowledgement === undefined ? [] : [{
         id: `case-${response.caseAcknowledgement.token}`,role: "assistant" as const,
@@ -454,9 +566,37 @@ export function Assistant({
     try {
       const active = await activeSession();
       if (active === null) return;
-      const response = isOwnContextRequest(request)
-        ? await client.sendMessage(active,request,language,ownContext)
-        : await client.sendMessage(active,request,language);
+      let response: SupportReply;
+      try {
+        response = isOwnContextRequest(request)
+          ? await client.sendMessage(active,request,language,ownContext)
+          : await client.sendMessage(active,request,language);
+      } catch (error) {
+        if (!(error instanceof SupportSnapshotUnavailableError)) throw error;
+        setSession(null);
+        if (persistent && typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
+        }
+        const restarted = await client.createSession(language);
+        if (isSupportReply(restarted)) {
+          appendReply(restarted);
+          return;
+        }
+        setSession(restarted);
+        try {
+          response = isOwnContextRequest(request)
+            ? await client.sendMessage(restarted,request,language,ownContext)
+            : await client.sendMessage(restarted,request,language);
+        } catch (retryError) {
+          if (retryError instanceof SupportSnapshotUnavailableError) {
+            setSession(null);
+            if (persistent && typeof sessionStorage !== "undefined") {
+              sessionStorage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
+            }
+          }
+          throw retryError;
+        }
+      }
       appendReply(response);
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
@@ -535,14 +675,25 @@ export function Assistant({
   const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
     {messages.map((message) => {
       const link = safeFirstPartyLink(message.link);
+      const sources = message.sources ?? Object.freeze([]);
+      const actions = message.actions ?? Object.freeze([]);
+      const hasFooter = link !== null || sources.length > 0 || actions.length > 0;
       return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}>
         {message.role === "assistant" ? <div className="supportMessageShell">
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
             <p>{message.text}</p>
-            {link === null ? null : <footer className="supportCitation">
-              <span>DOCS · PRODUCT GUIDE</span>
-              <a href={link}>View source →</a>
+            {!hasFooter ? null : <footer className="supportCitation">
+              {sources.length === 0 ? null : <div role="list" aria-label={language === "en" ? "Sources" : "Surse"}>
+                {sources.map((source) => <span role="listitem" key={source.id}>{source.label}</span>)}
+              </div>}
+              {actions.length === 0 ? null : <nav aria-label={language === "en" ? "Actions" : "Acțiuni"}>
+                {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
+              </nav>}
+              {link === null ? null : <>
+                <span>DOCS · PRODUCT GUIDE</span>
+                <a href={link}>View source →</a>
+              </>}
             </footer>}
           </div>
         </div> : <p>{message.text}</p>}
