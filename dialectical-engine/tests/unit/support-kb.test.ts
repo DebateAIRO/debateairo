@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -104,6 +104,28 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
+  it("loads the exact separate editorial manifest for preview eligibility", () => {
+    const directory = fileURLToPath(
+      new URL("../../packages/support-kb/content/", import.meta.url),
+    );
+    const manifestPath = fileURLToPath(
+      new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
+    );
+    const corpus = loadHelpCorpus(directory, {
+      reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
+    });
+
+    expect(corpus).toMatchObject({
+      shippedCount: 18,
+      ignoredCount: 0,
+      previewReviewedCount: 12,
+      ownerRatifiedCount: 6,
+      kbVersion: "b6f48a593b500f108e0eed11e0ceccfe8654e684fcdf0bb8284c1ded179867ca",
+    });
+    expect(corpus.reviewManifest.articles).toHaveLength(24);
+    expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(24);
+  });
+
   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
