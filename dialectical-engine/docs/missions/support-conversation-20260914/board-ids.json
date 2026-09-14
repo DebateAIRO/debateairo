@@ -76,7 +76,9 @@
     "OBS_CORRELATION": "t_f9e289db",
     "FIX4": "t_8b9a007d",
     "LIVE4": "t_d69a47ed",
-    "PRODDELTA": "t_546a8c82"
+    "PRODDELTA": "t_546a8c82",
+    "SOURCE_CUSTODY": "t_e582c85f",
+    "LIVE4_EVIDENCE_SCOPE": "t_685b00c5"
   },
   "edges": [
     [
@@ -378,6 +380,14 @@
     [
       "PRODDELTA",
       "GATE"
+    ],
+    [
+      "SOURCE_CUSTODY",
+      "CP1"
+    ],
+    [
+      "LIVE4_EVIDENCE_SCOPE",
+      "CP1"
     ]
   ]
 }

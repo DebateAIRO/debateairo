@@ -28,3 +28,5 @@ LIVE3 failed-run evidence and read-only assessment contracts freeze:95292edad48e
 Completed ARCHCHECK/SECDELTA and FIX4 contract freeze:15ab51dab76be4c7c57ea109120b2bef541c6733;17files, before FIX4 packet-check/dispatch; unchanged source/index/productref. Final review pass1 still pending.
 Stable PRODDELTA packet freeze:4bf7f1849b6c8bf520eec22c46808152316232af;4root-ownedfiles, activeFIX4outputs excluded, before packet-check/dispatch.
 Completed amended PRODDELTA and native skill-body evidence freeze:bb9d2c1c92184defc0747aaaf22b50d4e65c07fc;9files, activeFIX4outputs excluded; unchanged source/index/productref. Current FIX4 remains an unconsumed author node until its exact final evidence arrives.
+
+Completed FIX4 and exact LIVE4 contract freeze:6f703e8b927a7d5b9affa17b156ec77992dbc3e2;14files, source/index/productref unchanged; product6e5ab5fc. LIVE4 evidence is consumed separately after worker exit.
