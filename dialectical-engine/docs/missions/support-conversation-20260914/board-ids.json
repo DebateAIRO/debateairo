@@ -78,7 +78,15 @@
     "LIVE4": "t_d69a47ed",
     "PRODDELTA": "t_546a8c82",
     "SOURCE_CUSTODY": "t_e582c85f",
-    "LIVE4_EVIDENCE_SCOPE": "t_685b00c5"
+    "LIVE4_EVIDENCE_SCOPE": "t_685b00c5",
+    "SEC_ENCODED_CREDENTIAL": "t_f2ecb7e7",
+    "FIX_P1": "t_ad0185b6",
+    "LIVE_P1": "t_6dda2423",
+    "GATE_P2": "t_c453b06a",
+    "REV1_P2": "t_b600a319",
+    "REV2_P2": "t_4c7f2bc4",
+    "REV3_P2": "t_ddd853bf",
+    "PROC_REV1_HANDOFF": "t_aea64ed1"
   },
   "edges": [
     [
@@ -387,6 +395,54 @@
     ],
     [
       "LIVE4_EVIDENCE_SCOPE",
+      "CP1"
+    ],
+    [
+      "SEC_ENCODED_CREDENTIAL",
+      "CP1"
+    ],
+    [
+      "REV1",
+      "FIX_P1"
+    ],
+    [
+      "FIX_P1",
+      "LIVE_P1"
+    ],
+    [
+      "LIVE_P1",
+      "GATE_P2"
+    ],
+    [
+      "GATE_P2",
+      "REV1_P2"
+    ],
+    [
+      "GATE_P2",
+      "REV2_P2"
+    ],
+    [
+      "GATE_P2",
+      "REV3_P2"
+    ],
+    [
+      "REV2",
+      "FIX_P1"
+    ],
+    [
+      "REV3",
+      "FIX_P1"
+    ],
+    [
+      "REV1_P2",
+      "CP1"
+    ],
+    [
+      "REV2_P2",
+      "CP1"
+    ],
+    [
+      "REV3_P2",
       "CP1"
     ]
   ]

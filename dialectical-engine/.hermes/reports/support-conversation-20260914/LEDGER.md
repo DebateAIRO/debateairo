@@ -91,3 +91,17 @@ Ruling: GATE packages this complete known-failed revision for final review pass1
 
 ## 2026-09-14T16:19:58.866475+00:00 — LIVE4 corrected evidence consumed; GATE assembled
 Root verified45current immutable refs, all6preserved superseded original hashes via manifest,6native skillBODY reads and99/99product paths atclean6e5ab5fc. Corrected strict-sevenconsumer10/10controls are retrospective evidence, no newrequest. All7actualresults unchanged(6useful/1refusal), no strongerattribution. Packet contains114exactimmutableinputs and current source-drift qualification. LIVE4 worknode mayclose asFUNCTIONAL_BLOCKER; findingclosureawaitsreview. GATE marker PACKAGED_WITH_KNOWN_BLOCKER ismechanical, noPASS.
+
+Final Sol REV1/REV2/REV3 pass1 dispatched in separate existing reviewer sessions after each packet-checkPASS atsource446/product6e. Evidencefreeze09663848, finalcontractfreezede7138ff. REV2soleheavy syntheticprobes; REV1/3staticread-only. Allknownfailures, sourcecustodygap, retrospectiveprojection andForgotpendingretained. No productauthoractive ornewactualrequestauthorized.
+
+REV3-p1 exited REWORK, report52ca1fe4/self228dc61b; rootreverified114inputs99paths4floorBODYreads. ExistingLIVE_GUIDANCEcoversREV3-P1-F1; Help-linksandsignedin-syntheticscopeindependentlyresolved. Sourceprooflimitedtodiffserialization,12selectedhashesintact; causeUNVERIFIED. Fullunionstillpending.
+
+REV2-p1 exitedREWORK,reportd8973d38/self54ece413; rootverified114inputs99paths6nativeBODYskills plus probe4ca2fc17/log9ffc1b19. Fiveclassesremainopen,mappedretainedticketsplusnewSEC_ENCODED_CREDENTIAL. LIVE4evidencecorrectionindependentlyboundedandclosedwithhistoricalnoncomplianceretained. ResolvedPROD_LINKS/PROD_SIGNEDINtriagecompletecommandreturnedrc0butrefused; correctlyarchivedafterexplicitreviewerresolution. FullunionawaitsREV1.
+
+## 2026-09-14T16:53:26.895027+00:00 — final pass1 union and architectural decision
+
+All separate Sol verdicts REWORK consumed. REV1 final amended report e9f3e31c/self9a50ba83, REV2 d8973d38/self54ece413, REV3 52ca1fe4/self228dc61b; each114inputs and99productpaths reverified, nativeBODY5/6/4 respectively. REV2 direct-import35cases probe/log hashes verified. C1/C2/C3 and priorUIfindings resolved within stated scope; five security classes, liveguidance, Forgot and sourceevidencelimit retained.
+
+Ruling: adopt REV1's request-bound opaque references with server canonical mapping as an explicit internal R14 representation amendment. It changes no owner-facing product requirement, model, publicshape or privacy/accounting; existing owner authorization covers it. Aliases and canonical IDs remain forbidden in prose; cross-request references must actually fail, not merely reuse S1/A1. Union routes security F2–F6 with the architecture F1 to one original author in20allowedpaths, no new modelcall. Costifwrong: actualmatrix or finalpass2 mustreturnREWORK; no hiddenloop or acceptance.
+
+Registered FIX_P1→LIVE_P1→GATE_P2→REV1_P2/REV2_P2/REV3_P2→CP1 before completinglastpass1parent. Threefinalpasscapunchanged. Registration first attempt had an else1 syntax error and parsed nothing; corrected script compiled and ran once. REV1 unrelatedLinearread was interrupted after~10minutes; noresultreceived/used. WrongfullGitref/sourcecleanclaimcorrected; PROC_REV1_HANDOFF recordsprocessresidue.

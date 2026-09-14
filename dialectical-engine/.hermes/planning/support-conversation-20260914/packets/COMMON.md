@@ -32,3 +32,5 @@ Completed amended PRODDELTA and native skill-body evidence freeze:bb9d2c1c92184d
 Completed FIX4 and exact LIVE4 contract freeze:6f703e8b927a7d5b9affa17b156ec77992dbc3e2;14files, source/index/productref unchanged; product6e5ab5fc. LIVE4 evidence is consumed separately after worker exit.
 
 Completed LIVE4 known-failed evidence and final review package freeze:096638486c4f2eab450055c4b1d25ecd58a1ca54;18files, source before/afterdc9workingdiff unchanged but historical intake drift disclosed. GATE is evidence packaging only, not PASS.
+
+Final pass1 contract freeze:de7138ffddff8109003d8b4617c509cae5fd8dd2. All three final lenses now returned REWORK at6e5ab5fc; exact union and internal R14 alias amendment govern FIX_P1. No fifth preparation patch or owner acceptance. Board operations use only the existing Hermes CLI; external issue connectors are outside this mission. Use full revisions from manifests, never reconstructed hashes.
