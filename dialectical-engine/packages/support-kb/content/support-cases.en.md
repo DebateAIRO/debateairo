@@ -11,4 +11,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Use **Talk to a human** in Support to create an asynchronous case. A case is not a telephone call. The current server receipt states a response target of 48 hours. Keep the case receipt private because it controls access to that case. Support does not verify inbox delivery or promise a shorter response time.
+Use **Talk to a human** in Support to create an asynchronous case. A case is not a telephone call. The server case receipt states a response target of 48 hours, while another Support panel currently says replies arrive within one working day on weekdays. Rely on the case receipt until that wording is aligned. Keep the case receipt private because it controls access to that case. Support does not verify inbox delivery.

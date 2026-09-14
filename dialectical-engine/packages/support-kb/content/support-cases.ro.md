@@ -11,4 +11,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Folosește **Talk to a human** în Asistență pentru a crea un caz asincron. Cazul nu este un apel telefonic. Confirmarea curentă a serverului indică un termen țintă de răspuns de 48 de ore. Păstrează confirmarea cazului privată deoarece ea controlează accesul la caz. Asistența nu verifică livrarea în inbox și nu promite un răspuns mai rapid.
+Folosește **Talk to a human** în Asistență pentru a crea un caz asincron. Cazul nu este un apel telefonic. Confirmarea serverului pentru caz indică un termen țintă de răspuns de 48 de ore, iar un alt panou din Asistență spune în prezent că răspunsurile sosesc într-o zi lucrătoare, în zilele lucrătoare. Bazează-te pe confirmarea cazului până când textele sunt aliniate. Păstrează confirmarea cazului privată deoarece ea controlează accesul la caz. Asistența nu verifică livrarea în inbox.
