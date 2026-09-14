@@ -1,0 +1,612 @@
+{
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "substrate": "actual TypeScript modules; in-memory model and cipher/message ports; no socket, HTTP, database, browser, preview, relay, provider, or account traffic",
+  "redaction": [
+    {
+      "input": "My recovery code is «inert amber fern».",
+      "text": "My recovery code is «[REDACTED_SECRET_LIKE]».",
+      "redacted": true
+    },
+    {
+      "input": "My recovery code is \"inert amber fern",
+      "text": "My recovery code is \"inert amber fern",
+      "redacted": false
+    },
+    {
+      "input": "My recovery code is amber birch cedar dogwood elm fir grove; keep it private.",
+      "text": "My recovery code is [REDACTED_SECRET_LIKE] grove; keep it private.",
+      "redacted": true
+    },
+    {
+      "input": "My reset token is inert.alpha.beta; keep it private.",
+      "text": "My reset token is [REDACTED_SECRET_LIKE].alpha.beta; keep it private.",
+      "redacted": true
+    },
+    {
+      "input": "I forgot my password and need the ordinary recovery instructions.",
+      "text": "I forgot my password and need the ordinary recovery instructions.",
+      "redacted": false
+    },
+    {
+      "input": "Am uitat parola și am nevoie de instrucțiuni obișnuite.",
+      "text": "Am uitat parola și am nevoie de instrucțiuni obișnuite.",
+      "redacted": false
+    }
+  ],
+  "policy": [
+    {
+      "text": "Support does not request or receive passwords.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Support cannot receive passwords. You can change your display name in Settings.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Support cannot receive passwords. You can change this display name in Settings.",
+      "accepted": false,
+      "code": "TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+      "predicate": "CREDENTIAL_OPERATION"
+    },
+    {
+      "text": "Support cannot receive passwords. Send those here.",
+      "accepted": false,
+      "code": "TEXT_CREDENTIAL_OR_SECURITY_ACTION",
+      "predicate": "CREDENTIAL_OPERATION"
+    },
+    {
+      "text": "Support does not ask for passwords and may receive them.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Support does not ask for passwords, plus it may receive them.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Asistența nu cere parole și poate primi acestea.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Send your %2525252570assword to Support.",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    },
+    {
+      "text": "Open https%252525253A%252525252F%252525252Fexample.test/reset",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    },
+    {
+      "text": "Open %5Csettings to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Open https%3G%2F%2Fexample.test/reset",
+      "accepted": false,
+      "code": "TEXT_LINK_OR_MARKUP",
+      "predicate": "ENCODED_LINK_OR_PATH"
+    },
+    {
+      "text": "Progress is 87.5% complete.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    },
+    {
+      "text": "Select start%2Ddebate to continue.",
+      "accepted": false,
+      "code": "TEXT_INTERNAL_IDENTIFIER",
+      "predicate": "NARRATIVE_INTERNAL_IDENTIFIER"
+    },
+    {
+      "text": "Select Forgot password to continue.",
+      "accepted": true,
+      "code": "ACCEPTED",
+      "predicate": "ACCEPTED"
+    }
+  ],
+  "identifiers": {
+    "exactHyphenatedCount": 35,
+    "exactAccepted": [],
+    "transformed": [
+      {
+        "text": "Select START-DEBATE to continue.",
+        "accepted": false
+      },
+      {
+        "text": "Select start%2Ddebate to continue.",
+        "accepted": false
+      },
+      {
+        "text": "Select start-​debate to continue.",
+        "accepted": false
+      }
+    ],
+    "labelCount": 52,
+    "labelRejected": [
+      {
+        "label": "Autentificare și recuperare MFA salvată",
+        "accepted": false
+      },
+      {
+        "label": "Starea înscrierii MFA",
+        "accepted": false
+      }
+    ]
+  },
+  "mapping": {
+    "requestA": {
+      "source": "s-10000000000040008000000000000001-1",
+      "action": "a-10000000000040008000000000000001-1"
+    },
+    "requestB": {
+      "source": "s-20000000000040008000000000000002-1",
+      "action": "a-20000000000040008000000000000002-1"
+    },
+    "valid": {
+      "kind": "answer",
+      "text": "Choose Start a debate to continue.",
+      "sourceIds": [
+        "getting-started-debate"
+      ],
+      "actionIds": [
+        "start-debate"
+      ]
+    },
+    "stale": null,
+    "unknown": null,
+    "duplicate": null
+  },
+  "context": {
+    "codePoints": 2286,
+    "leaks": []
+  },
+  "answerCases": [
+    {
+      "id": "valid-current-map",
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Choose Start a debate to continue.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Choose Start a debate to continue."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "stale-cross-request",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_SOURCE_MEMBERSHIP_INVALID",
+          "attemptId": "d2a8789b-b42a-499b-a772-b563e4977908",
+          "predicate": "SOURCE_MEMBERSHIP",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 34,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 0,
+          "actionIdCount": 1,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "unknown-reference",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_SOURCE_MEMBERSHIP_INVALID",
+          "attemptId": "b6769330-6170-4c74-83c4-a1320afd0f9f",
+          "predicate": "SOURCE_MEMBERSHIP",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 34,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 0,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "duplicate-reference",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_SOURCE_MEMBERSHIP_INVALID",
+          "attemptId": "a96cb06a-2a63-4f11-9fe5-8db603a1efc5",
+          "predicate": "SOURCE_MEMBERSHIP",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 34,
+          "sourceIdCount": 2,
+          "allowedSourceIdCount": 2,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "current-alias-in-prose",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_SECRET_LIKE",
+          "attemptId": "b2137c2f-9ff3-4de7-884b-227783ba12cd",
+          "predicate": "LABELLED_OR_TOKEN_SECRET",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 53,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "canonical-id-in-prose",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_INTERNAL_IDENTIFIER",
+          "attemptId": "50a32416-56b7-47bb-9b2f-26728159f61d",
+          "predicate": "NARRATIVE_INTERNAL_IDENTIFIER",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 39,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "transformed-coordinator",
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Support does not ask for passwords and may receive them.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Support does not ask for passwords and may receive them."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "encoded-backslash",
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Open %5Csettings to continue.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "Open %5Csettings to continue."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "bounded-deep-credential",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_LINK_OR_MARKUP",
+          "attemptId": "7e7c8c17-3887-4b52-8daf-15b5b8fd2eb9",
+          "predicate": "ENCODED_LINK_OR_PATH",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 40,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "bounded-deep-link",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_LINK_OR_MARKUP",
+          "attemptId": "c476fbf1-7702-48e7-aeb1-8d60f5ba4197",
+          "predicate": "ENCODED_LINK_OR_PATH",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 61,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "encoded-exact-id",
+      "outcome": "REFUSE_SAFETY",
+      "returnedText": "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+      "sources": [],
+      "actions": [],
+      "userStored": [
+        "How do I create a debate?"
+      ],
+      "assistantStored": [
+        "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message."
+      ],
+      "transit": [
+        "How do I create a debate?"
+      ],
+      "diagnostics": [
+        {
+          "code": "SUPPORT_DRAFT_TEXT_INTERNAL_IDENTIFIER",
+          "attemptId": "de35d07e-66df-4907-8984-a6a214afcf4e",
+          "predicate": "NARRATIVE_INTERNAL_IDENTIFIER",
+          "jsonValid": true,
+          "fenced": false,
+          "exactKeys": true,
+          "kindValid": true,
+          "textCodePoints": 34,
+          "sourceIdCount": 1,
+          "allowedSourceIdCount": 1,
+          "actionIdCount": 0,
+          "allowedActionIdCount": 0
+        }
+      ],
+      "systemCodePoints": 2286
+    },
+    {
+      "id": "input-redaction-sink",
+      "outcome": "ANSWER_GROUNDED",
+      "returnedText": "Choose Start a debate to continue.",
+      "sources": [
+        {
+          "id": "getting-started-debate",
+          "label": "Start a debate"
+        }
+      ],
+      "actions": [
+        {
+          "id": "start-debate",
+          "label": "Start a debate",
+          "href": "/login?next=%2Fnew"
+        }
+      ],
+      "userStored": [
+        "How do I create a debate? My recovery code is \"inert amber fern"
+      ],
+      "assistantStored": [
+        "Choose Start a debate to continue."
+      ],
+      "transit": [
+        "How do I create a debate? My recovery code is \"inert amber fern"
+      ],
+      "diagnostics": [],
+      "systemCodePoints": 2323
+    }
+  ],
+  "summary": [
+    {
+      "text": "Support cannot receive passwords. You can change your display name in Settings.",
+      "accepted": true
+    },
+    {
+      "text": "Support cannot receive passwords. You can change this display name in Settings.",
+      "accepted": false
+    },
+    {
+      "text": "Support does not ask for passwords and may receive them.",
+      "accepted": true
+    },
+    {
+      "text": "Open %5Csettings to continue.",
+      "accepted": true
+    },
+    {
+      "text": "Send your %2525252570assword to Support.",
+      "accepted": false
+    },
+    {
+      "text": "Open https%252525253A%252525252F%252525252Fexample.test/reset",
+      "accepted": false
+    },
+    {
+      "text": "Select start%2Ddebate to continue.",
+      "accepted": false
+    },
+    {
+      "text": "Select Forgot password to continue.",
+      "accepted": true
+    }
+  ],
+  "diagnosticProjection": {
+    "keys": [
+      "actionIdCount",
+      "allowedActionIdCount",
+      "allowedSourceIdCount",
+      "attemptId",
+      "code",
+      "exactKeys",
+      "fenced",
+      "jsonValid",
+      "kindValid",
+      "predicate",
+      "sourceIdCount",
+      "textCodePoints"
+    ],
+    "value": {
+      "code": "SUPPORT_DRAFT_TEXT_LINK_OR_MARKUP",
+      "attemptId": "10000000-0000-4000-8000-000000000001",
+      "predicate": "ENCODED_LINK_OR_PATH",
+      "jsonValid": true,
+      "fenced": false,
+      "exactKeys": true,
+      "kindValid": true,
+      "textCodePoints": 40,
+      "sourceIdCount": 1,
+      "allowedSourceIdCount": 1,
+      "actionIdCount": 0,
+      "allowedActionIdCount": 0
+    }
+  }
+}

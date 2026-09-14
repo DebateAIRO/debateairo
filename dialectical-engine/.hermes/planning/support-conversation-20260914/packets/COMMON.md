@@ -38,3 +38,5 @@ Final pass1 contract freeze:de7138ffddff8109003d8b4617c509cae5fd8dd2. All three 
 Final pass1 union and FIX_P1 dispatch freeze:0aa00488d326ba7054eeaa9b32e86e56ae0a14d9;19 completed administrative files verified before packet-check/dispatch. Active author outputs excluded. Current-state source preservation was verified for that operation; intake-wide continuity remains qualified by CP1-SOURCE-DRIFT.md.
 
 Completed FIX_P1 and LIVE_P1 contract freeze:b8430af8487ae57d117fa4782033265fe74daa22;17completedfiles, private index and exact current-state source/103product custody. LIVE_P1 subsequently failed3/7useful at e0dcfe77; final pass2 packages this complete failure, no readiness or acceptance.
+
+Completed GATE_P2 contract freeze:bb933856a4d8ca6781988a6cc548785da635fcff;22 exact administrative files with current-state source custody preserved. All final pass2 lenses consumed REWORK at e0dcfe77. The new CP1-REVIEWED-RECOVERY amendment and SPEC-v3 govern the final correction; old server-replacement prohibition is superseded. Third final review is the cap, Forgot remains owner-blocked.

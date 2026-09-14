@@ -1,24 +1,18 @@
-Latest 2026-09-14T16:53:26.895027+00:00: all final pass1 reviews consumed as REWORK. Union F1–F6 and explicit internal R14 alias amendment are ready for the original author FIX_P1 t_ad0185b6. Then LIVE_P1 t_6dda2423 → GATE_P2 t_c453b06a → separate final pass2 reviews. Current product remains clean6e5ab5fc (99paths), actual6/7useful, one ENcreationrefusal. No checkpoint ready/accepted; Forgot stillunverified. Source onlydiffrepresentationgap proved, selected12sourcehashes match.
-
-Latest 2026-09-14T16:19:58.866475+00:00: LIVE4 corrected evidence consumed45refs; exact6e product99/99. GATE assembled114inputs with knownfailure and source-drift limitation. Finalreviewpass1 next; no further implementation or ownerreadiness.
-
-Current event 2026-09-14T16:18:15.486170+00:00: exact LIVE4 failed6/7useful at6e5ab5fc;21files831pass+1ForgotTODO. Evidence-only seven-key consumer correction active; no more actualrequests. Finalreviewpass1 package being assembled with knownfailure, notfunctionalPASS. Historicalsourceworkingdiffdriftdisclosed(SOURCE_CUSTODY), intake-widepreservationUNVERIFIED; isolatedproduct99/99clean. ForgotdestinationstillUNVERIFIED.
-
 # CP1 progress
 
-Current status: **BLOCKED — actual guidance failures and missing owner destination.** CP1 is not ready for verification, not accepted, and cannot unlock CP2/CP3.
+Current status: **BLOCKED — final correction underway; existing Forgot destination still needs owner input.** CP1 is not ready, not accepted, and cannot unlock CP2/CP3.
 
-Product: `codex/support-conversation-cp1` at `6e5ab5fc41acebbff4264efc7d481df3db8dce44`, clean at FIX4 consumption. Intended baseline `b7ca2c413bf3242ce18e29a397dc9a3aa9228893`; all 99 changed paths match the layered receipt inventory. The original dirty source is preserved.
+Product is clean `codex/support-conversation-cp1` at `e0dcfe77f49655bea774bdfacf988b911be4ff06`, with 103 changed paths verified against the layered receipts. LIVE_P1 passed 935 tests plus one Forgot TODO across 23 suites; the actual seven-question matrix produced three useful answers and four safety refusals. API/DOM equality was 7/7; compact RO keyboard navigation passed, EN pointer navigation remains unverified. No causal comparison across separate model samples is claimed.
 
-Latest automated integration: 20 test files, 776 passed, one Forgot-password TODO, rc 0. Latest actual demonstration: seven questions sent once, four grounded, three refused, only three clean manual passes. English creation and English/Romanian Settings fail. Compact Romanian creation exposes internal `start-debate` in prose. Exact rejected-output causes remain partly unknown; aggregate diagnostics are not request attribution.
+All three separate Sol final pass2 reviews returned REWORK. Consumed reports and receipts identify incomplete model-facing corpus projection, remaining credential redaction/operation/path defects and display-label compatibility. The adopted final correction is complete separately reviewed projections and exact reviewed fallback after one rejected ordinary-knowledge model attempt, plus the security repairs. SPEC-v3 and CP1-REVIEWED-RECOVERY.md are current authority.
 
-Preview: supported `https://localhost:3100`, loaded revision `43cf9386`, detached PID/PGID 40443 and PPID 1. The worker captured normal TLS 200 after browser exit and ten seconds idle with original listeners preserved. The first launch at the same revision failed at the Support-model stage; its inner cause remains unknown.
+Next graph: PLAN_P2 → FIX_P2 → separate EDIT_P2 → ATTEST_P2 → LIVE_P2 → GATE_P3 → three final pass3 lenses. These are the last bounded correction and final reviews, with no hidden preparation or model sampling loop. No author or heavy command is currently active; PLAN_P2 is being dispatched documentation-only.
 
-Current work: FIX4 (`t_8b9a007d`, `/root/requirements`) is consumed at6e5ab5fc. LIVE4 is being prepared for the exact21-file integration and finite actual demonstration. No author is active; product/Git and heavy leases are released. PRODDELTA (`t_546a8c82`, `/root/baseline`) completed its stable frozen UI review: shortcuts and synthetic signed-in rendering are resolved for their stated scope, with no new distinct issue. LIVE4, GATE and final REV1/REV2/REV3 remain pending.
+Last preview custody receipt: `https://localhost:3100`, PID/PGID 45639, loaded e0dcfe77, ordinary TLS 200 after browser exit and ten seconds idle. This is historical at capture; next lifecycle owner must measure before reload. Other services remain no-touch.
 
-Owner input: the existing Forgot password flow is confirmed, but its exact destination/opener remains unknown. The original specific question is still pending; do not guess, repeat searches, claim absence, or substitute Settings/MFA. Its eventual connection needs actual navigation evidence and scoped independent review.
+Owner input: the existing Forgot password flow is confirmed, but its exact destination/opener remains unknown. The original specific question remains pending. No guessed destination or replacement is permitted.
 
-Review evidence is indexed in `.hermes/reports/support-conversation-20260914/review-packages/CP1-p1/inputs-43cf9386-draft.json`. The package is explicitly blocked and not dispatchable. Historical counts, versions and runtime custody below describe their original events, not the latest state.
+Source custody: current forward 56-path/index/full-index checks match. An earlier serialized-diff fingerprint gap lacks a full intake inventory; underlying file-byte change, cause and actor are unverified. No historical whole-tree preservation claim is made.
 
 ## Historical record
 

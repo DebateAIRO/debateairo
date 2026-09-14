@@ -86,7 +86,16 @@
     "REV1_P2": "t_b600a319",
     "REV2_P2": "t_4c7f2bc4",
     "REV3_P2": "t_ddd853bf",
-    "PROC_REV1_HANDOFF": "t_aea64ed1"
+    "PROC_REV1_HANDOFF": "t_aea64ed1",
+    "PLAN_P2": "t_302f2087",
+    "FIX_P2": "t_5ab3cfa2",
+    "EDIT_P2": "t_1bce517f",
+    "ATTEST_P2": "t_51e73096",
+    "LIVE_P2": "t_f60b27a3",
+    "GATE_P3": "t_6449e771",
+    "REV1_P3": "t_88683868",
+    "REV2_P3": "t_fa16515a",
+    "REV3_P3": "t_689d8959"
   },
   "edges": [
     [
@@ -443,6 +452,62 @@
     ],
     [
       "REV3_P2",
+      "CP1"
+    ],
+    [
+      "REV1_P2",
+      "PLAN_P2"
+    ],
+    [
+      "PLAN_P2",
+      "FIX_P2"
+    ],
+    [
+      "FIX_P2",
+      "EDIT_P2"
+    ],
+    [
+      "EDIT_P2",
+      "ATTEST_P2"
+    ],
+    [
+      "ATTEST_P2",
+      "LIVE_P2"
+    ],
+    [
+      "LIVE_P2",
+      "GATE_P3"
+    ],
+    [
+      "GATE_P3",
+      "REV1_P3"
+    ],
+    [
+      "GATE_P3",
+      "REV2_P3"
+    ],
+    [
+      "GATE_P3",
+      "REV3_P3"
+    ],
+    [
+      "REV2_P2",
+      "PLAN_P2"
+    ],
+    [
+      "REV3_P2",
+      "PLAN_P2"
+    ],
+    [
+      "REV1_P3",
+      "CP1"
+    ],
+    [
+      "REV2_P3",
+      "CP1"
+    ],
+    [
+      "REV3_P3",
       "CP1"
     ]
   ]

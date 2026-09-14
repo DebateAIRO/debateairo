@@ -1,0 +1,190 @@
+{
+  "root_thread": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "agents": {
+    "BASE": {
+      "session": "/root/baseline",
+      "status": "completed"
+    },
+    "REQ": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "FIND": {
+      "session": "/root/forgot_destination",
+      "status": "completed"
+    },
+    "PREVIEW": {
+      "session": "/root/preview",
+      "status": "completed"
+    },
+    "PLANREV": {
+      "session": "/root/plan_review",
+      "status": "completed_rework"
+    },
+    "FREEZE": {
+      "session": "/root/baseline",
+      "status": "completed"
+    },
+    "REQFIX1": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "KB": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "PLANREV2": {
+      "session": "/root/plan_review",
+      "status": "completed_pass"
+    },
+    "EDITORIAL": {
+      "session": "/root/plan_review",
+      "status": "completed_rework"
+    },
+    "NAV": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "EDITFIX1": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "EDITREV2": {
+      "session": "/root/plan_review",
+      "status": "completed_pass"
+    },
+    "TYPEBASE": {
+      "session": "/root/baseline",
+      "status": "completed"
+    },
+    "ATTEST": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "UIPREP": {
+      "session": "/root/preview",
+      "status": "completed"
+    },
+    "UI": {
+      "session": "/root/preview",
+      "status": "completed"
+    },
+    "SECPREP": {
+      "session": "/root/forgot_destination",
+      "status": "completed"
+    },
+    "CORPREP": {
+      "session": "/root/plan_review",
+      "status": "completed"
+    },
+    "FIX1": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "PRODPREP": {
+      "session": "/root/baseline",
+      "status": "completed"
+    },
+    "UIFIX1": {
+      "session": "/root/preview",
+      "status": "completed"
+    },
+    "LIVE": {
+      "session": "/root/preview",
+      "status": "completed_rework"
+    },
+    "FIX2": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "LIVE2": {
+      "session": "/root/preview",
+      "status": "completed_rework"
+    },
+    "FIX3": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "LIVE3": {
+      "session": "/root/preview",
+      "status": "completed_rework"
+    },
+    "ARCHCHECK": {
+      "session": "/root/plan_review",
+      "status": "completed_assessment"
+    },
+    "SECDELTA": {
+      "session": "/root/forgot_destination",
+      "status": "completed_assessment"
+    },
+    "FIX4": {
+      "session": "/root/requirements",
+      "status": "completed"
+    },
+    "LIVE4": {
+      "session": "/root/preview",
+      "status": "completed_functional_blocker_evidence_corrected"
+    },
+    "PRODDELTA": {
+      "session": "/root/baseline",
+      "status": "completed_assessment"
+    },
+    "GATE": {
+      "session": "/root",
+      "status": "completed_package_known_blocker"
+    },
+    "REV1": {
+      "session": "/root/plan_review",
+      "status": "completed_rework_amended"
+    },
+    "REV2": {
+      "session": "/root/forgot_destination",
+      "status": "completed_rework"
+    },
+    "REV3": {
+      "session": "/root/baseline",
+      "status": "completed_rework"
+    },
+    "FIX_P1": {
+      "session": "/root/requirements",
+      "status": "completed_author_consumed",
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06"
+    },
+    "LIVE_P1": {
+      "session": "/root/preview",
+      "status": "completed_functional_blocker",
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06"
+    },
+    "REV1_P2": {
+      "session": "/root/plan_review",
+      "status": "completed_rework_consumed",
+      "reviewPass": 2,
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06"
+    },
+    "REV2_P2": {
+      "session": "/root/forgot_destination",
+      "status": "completed_rework_consumed",
+      "reviewPass": 2,
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06"
+    },
+    "REV3_P2": {
+      "session": "/root/baseline",
+      "status": "completed_rework_consumed",
+      "reviewPass": 2,
+      "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06"
+    },
+    "PLAN_P2": {
+      "session": "/root/requirements",
+      "status": "ready_packet_pending"
+    }
+  },
+  "heavy_lease": null,
+  "state": "CP1_FINAL_CORRECTION_BLUEPRINT",
+  "last_event": "2026-09-14T18:20:14.131572+00:00",
+  "pending_owner_decision": "V-1 forgot-password destination",
+  "lane": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+  "baseline_claim": "b7ca2c41",
+  "git_slot": null,
+  "source_preservation": "Forward56-path/index/full-index custody verified; intake serialized-diff gap remains unverified, no underlying file-byte/cause inference.",
+  "last_review_interim": "All final pass2 lenses consumed REWORK; selected complete reviewed projections plus exact reviewed recovery and security U3-U6 under SPEC-v3."
+}
