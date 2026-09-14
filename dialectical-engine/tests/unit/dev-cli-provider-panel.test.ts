@@ -11,6 +11,7 @@ import {
   type DevelopmentCliProviderPanelOperations,
   type DevelopmentCliRelay
 } from "../../apps/runner/src/dev-cli-provider-panel.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 function relay(port: number, maker: string, model: string): DevelopmentCliRelay & {
   close: ReturnType<typeof vi.fn>;
@@ -96,6 +97,25 @@ describe("development real CLI provider panel", () => {
       new Error("logged out"), new Error("logged out"), new Error("logged out"),
       new Error("logged out"), new Error("logged out")
     ]))).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+  });
+
+  it("starts every relay on the selected support-preview port", async () => {
+    const ports = SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts;
+    const runtime = operations([
+      relay(ports[0], "OpenAI", "gpt-real"),
+      relay(ports[1], "OpenAI", "gpt-premium-real"),
+      relay(ports[2], "Anthropic", "claude-real"),
+      relay(ports[3], "Anthropic", "claude-premium-real"),
+      relay(ports[4], "xAI", "grok-real")
+    ]);
+    const handle = await startDevelopmentCliProviderPanel(
+      runtime,
+      SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
+    );
+    for (const [index, start] of runtime.starts.entries()) {
+      expect(start).toHaveBeenCalledWith(ports[index]);
+    }
+    await handle.stop();
   });
 });
 

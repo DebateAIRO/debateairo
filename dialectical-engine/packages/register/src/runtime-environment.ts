@@ -46,6 +46,7 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     XDG_CONFIG_HOME: z.string().min(1).optional(),
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
+    DEBATEAI_DEV_AUTH_STACK_PROFILE: z.enum(["default", "support-preview"]).optional(),
     DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
     DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).optional()

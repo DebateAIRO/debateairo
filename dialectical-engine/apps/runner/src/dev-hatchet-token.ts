@@ -6,16 +6,16 @@ import { access, lstat, open, rename, unlink } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { HatchetClient } from "@hatchet-dev/typescript-sdk/v1/client/client.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_TOKEN_BYTES = 16 * 1024;
 const MAX_CHILD_OUTPUT_BYTES = 16 * 1024;
 const MIN_REMAINING_TOKEN_SECONDS = 30 * 24 * 60 * 60;
-const LOCAL_SERVER_URL = "http://localhost:8888";
-const LOCAL_API_URL = "http://127.0.0.1:8888";
-const LOCAL_GRPC_BROADCAST_ADDRESS = "localhost:7077";
-const LOCAL_GRPC_HOST_PORT = "127.0.0.1:7077";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u;
 const TOKEN_COMMAND = Object.freeze([
@@ -37,6 +37,7 @@ export type DevelopmentHatchetTokenOperations = Readonly<{
 export type ProvisionDevelopmentHatchetTokenInput = Readonly<{
   repositoryRoot: string;
   operations: DevelopmentHatchetTokenOperations;
+  profile?: DevelopmentAuthStackProfile;
 }>;
 
 export class DevelopmentHatchetTokenError extends Error {
@@ -116,7 +117,11 @@ function decodeJsonPart(part: string): Readonly<Record<string, unknown>> {
   return parsed as Readonly<Record<string, unknown>>;
 }
 
-function tenantIdFromToken(token: string, now: Date = new Date()): string {
+function tenantIdFromToken(
+  token: string,
+  profile: DevelopmentAuthStackProfile,
+  now: Date = new Date()
+): string {
   if (Buffer.byteLength(token, "utf8") > MAX_TOKEN_BYTES || !TOKEN_PATTERN.test(token)) {
     throw new DevelopmentHatchetTokenError("DEV_HATCHET_TOKEN_INVALID");
   }
@@ -132,10 +137,10 @@ function tenantIdFromToken(token: string, now: Date = new Date()): string {
       || !UUID_PATTERN.test(payload.sub)
       || typeof payload.token_id !== "string"
       || !UUID_PATTERN.test(payload.token_id)
-      || payload.aud !== LOCAL_SERVER_URL
-      || payload.iss !== LOCAL_SERVER_URL
-      || payload.server_url !== LOCAL_SERVER_URL
-      || payload.grpc_broadcast_address !== LOCAL_GRPC_BROADCAST_ADDRESS
+      || payload.aud !== `http://localhost:${profile.hatchetApiPort}`
+      || payload.iss !== `http://localhost:${profile.hatchetApiPort}`
+      || payload.server_url !== `http://localhost:${profile.hatchetApiPort}`
+      || payload.grpc_broadcast_address !== `localhost:${profile.hatchetGrpcPort}`
       || typeof payload.iat !== "number"
       || !Number.isInteger(payload.iat)
       || payload.iat > nowSeconds + 300
@@ -198,6 +203,7 @@ async function fixedStep<T>(code: string, operation: () => Promise<T>): Promise<
 export async function provisionDevelopmentHatchetToken(
   input: ProvisionDevelopmentHatchetTokenInput
 ): Promise<DevelopmentHatchetTokenReceipt> {
+  const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const repositoryRoot = resolve(input.repositoryRoot);
   const localRoot = join(repositoryRoot, ".local");
   const custodyRoot = join(localRoot, "dev-auth");
@@ -232,7 +238,7 @@ export async function provisionDevelopmentHatchetToken(
     const token = reused
       ? parseTokenFile(existingSource)
       : await fixedStep("DEV_HATCHET_TOKEN_ISSUE_FAILED", () => input.operations.issueToken());
-    const tenantId = tenantIdFromToken(token);
+    const tenantId = tenantIdFromToken(token, profile);
     await fixedStep(
       "DEV_HATCHET_TOKEN_ATTESTATION_FAILED",
       () => input.operations.attestToken(token, tenantId)
@@ -347,9 +353,17 @@ function composeArguments(...arguments_: readonly string[]): readonly string[] {
 
 export function createDevelopmentHatchetTokenOperations(
   repositoryRoot: string,
-  commandEnvironment: Readonly<Record<string, string>>
+  commandEnvironment: Readonly<Record<string, string>>,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentHatchetTokenOperations {
   const cwd = resolve(repositoryRoot);
+  const composeEnvironment = Object.freeze({
+    VLLM_MODEL: "dev-auth-not-started",
+    DEBATEAI_DEV_COMPOSE_PROJECT_NAME: profile.composeProjectName,
+    DEBATEAI_DEV_POSTGRES_PORT: String(profile.postgresPort),
+    DEBATEAI_DEV_HATCHET_GRPC_PORT: String(profile.hatchetGrpcPort),
+    DEBATEAI_DEV_HATCHET_API_PORT: String(profile.hatchetApiPort)
+  });
   let dockerExecutable: string | undefined;
   const docker = async (): Promise<string> => {
     if (dockerExecutable !== undefined) return dockerExecutable;
@@ -376,7 +390,7 @@ export function createDevelopmentHatchetTokenOperations(
         arguments: composeArguments("ps", "--status", "running", "--services"),
         cwd,
         baseEnvironment: commandEnvironment,
-        environment: { VLLM_MODEL: "dev-auth-not-started" },
+        environment: composeEnvironment,
         failureCode: "DEV_HATCHET_TOKEN_SERVICE_UNAVAILABLE"
       });
       if (!running.split(/\r?\n/u).includes("hatchet-lite")) {
@@ -387,15 +401,15 @@ export function createDevelopmentHatchetTokenOperations(
         arguments: composeArguments("exec", "-T", "hatchet-lite", ...TOKEN_COMMAND),
         cwd,
         baseEnvironment: commandEnvironment,
-        environment: { VLLM_MODEL: "dev-auth-not-started" },
+        environment: composeEnvironment,
         failureCode: "DEV_HATCHET_TOKEN_ISSUE_FAILED"
       });
     },
     async attestToken(token, tenantId) {
       const client = new HatchetClient({
         token,
-        host_port: LOCAL_GRPC_HOST_PORT,
-        api_url: LOCAL_API_URL,
+        host_port: `127.0.0.1:${profile.hatchetGrpcPort}`,
+        api_url: `http://127.0.0.1:${profile.hatchetApiPort}`,
         tenant_id: tenantId,
         tls_config: { tls_strategy: "none" }
       });

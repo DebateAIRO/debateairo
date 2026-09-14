@@ -13,18 +13,30 @@ describe("DEV-02 loopback-only development PostgreSQL", () => {
     });
     expect(source).toContain("postgres-data:/var/lib/postgresql");
     expect(source).not.toContain("postgres-data:/var/lib/postgresql/data");
+    expect(source).toContain("name: ${DEBATEAI_DEV_COMPOSE_PROJECT_NAME:-debateai-v3}");
+    expect(source).toContain('"127.0.0.1:${DEBATEAI_DEV_HATCHET_API_PORT:-8888}:8888"');
+    expect(source).toContain('"127.0.0.1:${DEBATEAI_DEV_HATCHET_GRPC_PORT:-7077}:7077"');
   });
 
   it("rejects absent, wildcard, and non-loopback PostgreSQL publications", async () => {
     const source = await readFile("compose.dev.yaml", "utf8");
     expect(() => validateDevPostgresCompose(
-      source.replace('"127.0.0.1:55432:5432"', '"55432:5432"')
+      source.replace(
+        '"127.0.0.1:${DEBATEAI_DEV_POSTGRES_PORT:-55432}:5432"',
+        '"${DEBATEAI_DEV_POSTGRES_PORT:-55432}:5432"'
+      )
     )).toThrow("DEV_POSTGRES_LOOPBACK_PORT_REQUIRED");
     expect(() => validateDevPostgresCompose(
-      source.replace('"127.0.0.1:55432:5432"', '"0.0.0.0:55432:5432"')
+      source.replace(
+        '"127.0.0.1:${DEBATEAI_DEV_POSTGRES_PORT:-55432}:5432"',
+        '"0.0.0.0:${DEBATEAI_DEV_POSTGRES_PORT:-55432}:5432"'
+      )
     )).toThrow("DEV_POSTGRES_LOOPBACK_PORT_REQUIRED");
     expect(() => validateDevPostgresCompose(
-      source.replace('      - "127.0.0.1:55432:5432"\n', "")
+      source.replace(
+        '      - "127.0.0.1:${DEBATEAI_DEV_POSTGRES_PORT:-55432}:5432"\n',
+        ""
+      )
     )).toThrow("DEV_POSTGRES_LOOPBACK_PORT_REQUIRED");
     for (const networkMode of ["host", '"host"', "'host'"]) {
       expect(() => validateDevPostgresCompose(

@@ -118,6 +118,7 @@ function createHermesAdapter(glmApiKey: string): CliRelayAdapter {
 export type HermesSupportRelayOptions = Readonly<{
   port: number;
   timeoutMs: number;
+  developmentStackProfile?: "support-preview";
   testOnlyCommand?: CommandSpec;
   testOnlyGlmApiKey?: string;
 }>;
@@ -153,7 +154,10 @@ export async function startHermesSupportRelay(
     provider_ref: HERMES_SUPPORT_PROVIDER_REF,
     base_url: `${server.baseUrl}/v1`,
     model: HERMES_GLM_MODEL,
-    authorization_header: server.authorizationHeader
+    authorization_header: server.authorizationHeader,
+    ...(options.developmentStackProfile === "support-preview"
+      ? { development_stack_profile: "support-preview" }
+      : {})
   });
   return Object.freeze({
     port: server.port,

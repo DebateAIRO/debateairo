@@ -2,6 +2,11 @@ import {
   parseProviderDiscoveryTargets,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  loadDevelopmentAuthStackProfile,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const REMOVED_SCAFFOLD_PROVIDER_REF = "development:local-vllm";
 const REMOVED_SCAFFOLD_MODEL = "qa-deterministic-v1";
@@ -55,6 +60,20 @@ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
   })
 ] as const);
 
+type DevelopmentCliProvider = Omit<(typeof DEVELOPMENT_CLI_PROVIDER_ROSTER)[number], "port"> &
+  Readonly<{ port: number }>;
+
+export function developmentCliProviderRoster(
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): readonly DevelopmentCliProvider[] {
+  return Object.freeze(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider, index) => Object.freeze({
+    providerRef: provider.providerRef,
+    adapterKind: provider.adapterKind,
+    maker: provider.maker,
+    port: profile.providerPorts[index]!
+  })));
+}
+
 export type DevelopmentConfiguredProvider = Readonly<{
   providerRef: string;
   adapterKind: "openai-compatible-http";
@@ -76,26 +95,33 @@ type DevelopmentCliTargetObservation = Readonly<{
   authorizationHeader?: string;
 }>;
 
-const configuredProviders = Object.freeze(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) =>
+function configuredProvidersFor(
+  roster: readonly DevelopmentCliProvider[]
+): readonly DevelopmentConfiguredProvider[] {
+  return Object.freeze(roster.map((provider) =>
   Object.freeze({
     providerRef: provider.providerRef,
     adapterKind: provider.adapterKind,
     maker: provider.maker
   })
-));
+  ));
+}
 
 function expectedBaseUrl(port: number): string {
   return `http://127.0.0.1:${port}/v1`;
 }
 
 export function buildDevelopmentProviderPanel(
-  observations: readonly DevelopmentCliTargetObservation[]
+  observations: readonly DevelopmentCliTargetObservation[],
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentProviderPanel {
+  const roster = developmentCliProviderRoster(profile);
+  const configuredProviders = configuredProvidersFor(roster);
   const byRef = new Map(observations.map((observation) => [observation.providerRef, observation] as const));
-  if (byRef.size !== DEVELOPMENT_CLI_PROVIDER_ROSTER.length) {
+  if (byRef.size !== roster.length) {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
   }
-  const rows = DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) => {
+  const rows = roster.map((provider) => {
     const observation = byRef.get(provider.providerRef);
     if (observation === undefined || observation.baseUrl !== expectedBaseUrl(provider.port)) {
       throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
@@ -135,17 +161,24 @@ export function buildDevelopmentProviderPanel(
  * row - only which providers the deployment is allowed to discover - so this is the
  * honest input when publishing the set without standing the CLIs up first.
  */
-export function developmentConfiguredProviderPanel(): DevelopmentProviderPanel {
-  return buildDevelopmentProviderPanel(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) =>
+export function developmentConfiguredProviderPanel(
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): DevelopmentProviderPanel {
+  const roster = developmentCliProviderRoster(profile);
+  return buildDevelopmentProviderPanel(roster.map((provider) =>
     Object.freeze({
       providerRef: provider.providerRef,
       baseUrl: expectedBaseUrl(provider.port),
       model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
     })
-  ));
+  ), profile);
 }
 
-export function parseDevelopmentProviderPanelTargets(source: string): DevelopmentProviderPanel {
+export function parseDevelopmentProviderPanelTargets(
+  source: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): DevelopmentProviderPanel {
+  const configuredProviders = configuredProvidersFor(developmentCliProviderRoster(profile));
   const targets = parseProviderDiscoveryTargets(source, configuredProviders);
   return buildDevelopmentProviderPanel(targets.map((target) => Object.freeze({
     providerRef: target.providerRef,
@@ -153,7 +186,7 @@ export function parseDevelopmentProviderPanelTargets(source: string): Developmen
     model: target.model,
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader })
-  })));
+  })), profile);
 }
 
 export function loadDevelopmentProviderPanelFromEnvironment(
@@ -163,5 +196,8 @@ export function loadDevelopmentProviderPanelFromEnvironment(
   if (targetsJson === undefined || targetsJson.trim() === "") {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_REQUIRED");
   }
-  return parseDevelopmentProviderPanelTargets(targetsJson);
+  return parseDevelopmentProviderPanelTargets(
+    targetsJson,
+    loadDevelopmentAuthStackProfile(source)
+  );
 }

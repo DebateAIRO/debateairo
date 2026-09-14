@@ -16,14 +16,23 @@ import {
 } from "../../apps/runner/src/dev-deployment-register.js";
 import { parseRegisterVersionText } from "../../packages/register/src/index.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "../../apps/runner/src/dev-auth-stack-profile.js";
+import { developmentConfiguredProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
 
 const roots: string[] = [];
 
 function environment(
   root: string,
-  receiptSha256: string
+  receiptSha256: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): Readonly<Record<string, string>> {
   const custodyRoot = join(root, ".local", "dev-auth");
+  const database = (user: string, password: string) =>
+    `postgresql://${user}:${password}@127.0.0.1:${profile.postgresPort}/debateai`;
   return Object.freeze({
     KEK_PATH: join(custodyRoot, "secrets", "kek.bin"),
     SUPPORT_KEK_PATH: join(custodyRoot, "secrets", "support-kek.bin"),
@@ -34,40 +43,45 @@ function environment(
     CORPUS_KEK_PATH: join(custodyRoot, "secrets", "corpus-kek.bin"),
     PUBLICATION_KEY_STORE_PATH: join(custodyRoot, "publication-keys"),
     CONTENT_ENCRYPTION_ENABLED: "true",
-    CONTENT_PROVISION_DATABASE_URL: "postgresql://debateai_dev_content_provision:one@127.0.0.1:55432/debateai",
-    AUTHORIZATION_DATABASE_URL: "postgresql://debateai_dev_authorization:auth@127.0.0.1:55432/debateai",
+    CONTENT_PROVISION_DATABASE_URL: database("debateai_dev_content_provision", "one"),
+    AUTHORIZATION_DATABASE_URL: database("debateai_dev_authorization", "auth"),
     PUBLICATION_ENABLED: "true",
-    PUBLICATION_CLEANUP_DATABASE_URL: "postgresql://debateai_dev_publication_cleanup:pub@127.0.0.1:55432/debateai",
-    ERASURE_DATABASE_URL: "postgresql://debateai_dev_erasure:two@127.0.0.1:55432/debateai",
+    PUBLICATION_CLEANUP_DATABASE_URL: database("debateai_dev_publication_cleanup", "pub"),
+    ERASURE_DATABASE_URL: database("debateai_dev_erasure", "two"),
     ACCOUNT_ERASURE_GRACE_MS: "604800000",
     MAIL_SENDMAIL_PATH: join(root, "deploy", "dev-auth", "sendmail-capture.mjs"),
     MAIL_FROM: "noreply@localhost.test",
-    PUBLIC_APP_URL: "https://localhost:3000",
-    DATABASE_URL: "postgresql://debateai_dev_runtime:three@127.0.0.1:55432/debateai",
-    SUPPORT_DATABASE_URL: "postgresql://debateai_dev_support:support@127.0.0.1:55432/debateai",
+    PUBLIC_APP_URL: profile.publicOrigin,
+    DATABASE_URL: database("debateai_dev_runtime", "three"),
+    SUPPORT_DATABASE_URL: database("debateai_dev_support", "support"),
     API_HOST: "127.0.0.1",
-    API_PORT: "8790",
+    API_PORT: String(profile.apiPort),
     STRANGER_SAMPLE_RATE: "0",
     REGISTER_VERSION: "424242",
     REGISTER_DEPLOYMENT_RECEIPT_SHA256: receiptSha256,
     REGISTER_DEPLOYMENT_RECEIPT_FILE: developmentDeploymentRegisterReceiptPath(root),
     BATTERY_VERSION: "dev-auth-v1",
     SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
-    PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+    PROVIDER_DISCOVERY_TARGETS_JSON: profile.name === "default"
+      ? TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson
+      : developmentConfiguredProviderPanel(profile).targetsJson,
     SUPPORT_MODEL_TARGET_JSON: JSON.stringify({
       provider_ref: "development:hermes-glm-5.3-flash",
-      base_url: "http://127.0.0.1:8794/v1",
+      base_url: `http://127.0.0.1:${profile.supportModelPort}/v1`,
       model: "z-ai/glm-5.3-flash",
-      authorization_header: "Bearer support-test"
+      authorization_header: "Bearer support-test",
+      ...(profile.name === "support-preview"
+        ? { development_stack_profile: "support-preview" }
+        : {})
     }),
     PROVIDER_PROBE_TIMEOUT_MS: "180000",
     NODE_ENV: "development",
-    EVALUATOR_DEV_MENU_ENABLED: "true",
-    EVALUATOR_DEV_MENU_DATABASE_URL: "postgresql://debateai_dev_evaluator_api:evaluator@127.0.0.1:55432/debateai",
-    EVALUATOR_DATABASE_URL: "postgresql://debateai_dev_evaluator_worker:worker@127.0.0.1:55432/debateai",
+    EVALUATOR_DEV_MENU_ENABLED: profile.name === "default" ? "true" : "false",
+    EVALUATOR_DEV_MENU_DATABASE_URL: database("debateai_dev_evaluator_api", "evaluator"),
+    EVALUATOR_DATABASE_URL: database("debateai_dev_evaluator_worker", "worker"),
     HATCHET_CLIENT_TOKEN: "header.payload.signature",
-    HATCHET_HOST_PORT: "127.0.0.1:7077",
-    HATCHET_API_URL: "http://127.0.0.1:8888",
+    HATCHET_HOST_PORT: `127.0.0.1:${profile.hatchetGrpcPort}`,
+    HATCHET_API_URL: `http://127.0.0.1:${profile.hatchetApiPort}`,
     HATCHET_TENANT_ID: "11111111-1111-4111-8111-111111111111",
     HATCHET_WORKFLOW_NAME: "debateai-dev",
     HATCHET_TLS_STRATEGY: "none",
@@ -75,7 +89,9 @@ function environment(
   });
 }
 
-async function fixture(): Promise<Readonly<{ root: string; envPath: string }>> {
+async function fixture(
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): Promise<Readonly<{ root: string; envPath: string }>> {
   const root = await mkdtemp(join(tmpdir(), "debateai-dev-api-process-"));
   roots.push(root);
   await mkdir(join(root, ".local"), { mode: 0o700 });
@@ -87,7 +103,7 @@ async function fixture(): Promise<Readonly<{ root: string; envPath: string }>> {
   });
   await writeDevelopmentDeploymentRegisterReceipt(root, registerReceipt);
   const envPath = join(root, ".local", "dev-auth", "api.env");
-  const values = environment(root, registerReceipt.receiptSha256);
+  const values = environment(root, registerReceipt.receiptSha256, profile);
   await writeFile(
     envPath,
     `${DEVELOPMENT_API_ENVIRONMENT_KEYS.map((key) => `${key}=${values[key]}`).join("\n")}\n`,
@@ -187,6 +203,29 @@ describe("DEV-10B production API host process", () => {
       })).rejects.toThrow("DEV_API_PROCESS_PORT_OCCUPIED");
       expect(runtime.startApi).not.toHaveBeenCalled();
     }
+  });
+
+  it("accepts and reports the exact support-preview runtime topology", async () => {
+    const profile = SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE;
+    const test = await fixture(profile);
+    const runtime = operations([
+      null,
+      { statusCode: 401, contentType: "application/json", body: '{"error":"SESSION_REQUIRED"}' }
+    ]);
+    const apiProcess = await startDevelopmentApiProcess({
+      repositoryRoot: test.root,
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations: runtime,
+      profile
+    });
+    expect(apiProcess.receipt.port).toBe(8890);
+    expect(runtime.startApi).toHaveBeenCalledWith(expect.objectContaining({
+      PUBLIC_APP_URL: "https://localhost:3100",
+      API_PORT: "8890",
+      HATCHET_HOST_PORT: "127.0.0.1:7177",
+      HATCHET_API_URL: "http://127.0.0.1:8988"
+    }));
+    await apiProcess.stop();
   });
 
   it("rejects unsafe or aliased environment custody before process start", async () => {

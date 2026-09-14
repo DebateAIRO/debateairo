@@ -4,12 +4,17 @@ import { startGrokRelay } from "../../../acceptance/grok-relay.js";
 import { startModelShim } from "../../../acceptance/model-shim.js";
 import {
   buildDevelopmentProviderPanel,
+  developmentCliProviderRoster,
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   DEVELOPMENT_CLI_PROVIDER_ROSTER,
   DEVELOPMENT_MINIMUM_DISTINCT_MAKERS,
   DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 export { DEVELOPMENT_CLI_PROVIDER_ROSTER } from "./dev-provider-panel.js";
 
@@ -47,15 +52,17 @@ async function closeRelays(relays: readonly DevelopmentCliRelay[]): Promise<void
 }
 
 export async function startDevelopmentCliProviderPanel(
-  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations()
+  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(),
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): Promise<DevelopmentCliProviderPanelHandle> {
+  const roster = developmentCliProviderRoster(profile);
   const settled = await Promise.allSettled(operations.starts.map((start, index) =>
-    start(DEVELOPMENT_CLI_PROVIDER_ROSTER[index]!.port)
+    start(roster[index]!.port)
   ));
   const relays = settled.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
   let panel: DevelopmentProviderPanel;
   try {
-    const observations = DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider, index) => {
+    const observations = roster.map((provider, index) => {
       const outcome = settled[index];
       if (outcome?.status === "fulfilled") {
         if (outcome.value.port !== provider.port
@@ -77,7 +84,7 @@ export async function startDevelopmentCliProviderPanel(
         model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
       });
     });
-    panel = buildDevelopmentProviderPanel(observations);
+    panel = buildDevelopmentProviderPanel(observations, profile);
     if (panel.healthyProviderRefs.length < DEVELOPMENT_MINIMUM_DISTINCT_MAKERS) {
       throw new TypeError("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
     }

@@ -296,7 +296,10 @@ export async function startAttestedDevTlsFrontDoor(input) {
         }
         let stopped = false;
         return Object.freeze({
-          receipt: Object.freeze({ origin: "https://localhost:3000", trust: "SYSTEM" }),
+          receipt: Object.freeze({
+            origin: `https://localhost:${frontDoor.port}`,
+            trust: "SYSTEM"
+          }),
           async stop() {
             if (stopped) return;
             stopped = true;
@@ -313,26 +316,39 @@ export async function startAttestedDevTlsFrontDoor(input) {
   }
 }
 
-export function createDevTlsReadinessOperations(repositoryRoot = ".") {
+export function createDevTlsReadinessOperations(
+  repositoryRoot = ".",
+  endpoints = Object.freeze({ publicPort: DEFAULT_OPTIONS.listenPort, uiPort: DEFAULT_OPTIONS.upstreamPort })
+) {
+  if (!Number.isInteger(endpoints.publicPort)
+    || endpoints.publicPort < 1
+    || endpoints.publicPort > 65_535
+    || !Number.isInteger(endpoints.uiPort)
+    || endpoints.uiPort < 1
+    || endpoints.uiPort > 65_535) {
+    throw new DevTlsFrontDoorError("DEV_TLS_ENDPOINT_INVALID");
+  }
   setDefaultCACertificates([
     ...getCACertificates("default"),
     ...getCACertificates("system")
   ]);
   const root = resolve(repositoryRoot, ".local/dev-auth/tls");
   return Object.freeze({
-    isPublicPortOccupied: () => isTcpPortOccupied("127.0.0.1", 3_000),
+    isPublicPortOccupied: () => isTcpPortOccupied("127.0.0.1", endpoints.publicPort),
     probePrivateUi: () => probeUi(
       httpRequest,
-      { host: "127.0.0.1", port: 3_001 },
+      { host: "127.0.0.1", port: endpoints.uiPort },
       "DEV_TLS_PRIVATE_PROBE_FAILED"
     ),
     startFrontDoor: () => startDevTlsFrontDoor({
       certificatePath: resolve(root, "localhost.pem"),
-      privateKeyPath: resolve(root, "localhost-key.pem")
+      privateKeyPath: resolve(root, "localhost-key.pem"),
+      listenPort: endpoints.publicPort,
+      upstreamPort: endpoints.uiPort
     }),
     probePublicUi: () => probeUi(
       httpsRequest,
-      { host: "localhost", port: 3_000, servername: "localhost" },
+      { host: "localhost", port: endpoints.publicPort, servername: "localhost" },
       "DEV_TLS_PUBLIC_PROBE_FAILED"
     ),
     delay: (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds))
