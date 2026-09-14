@@ -1,0 +1,99 @@
+{
+  "at": "2026-09-14T13:46:47.734235+00:00",
+  "revision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "handoffHashes": {
+    "evidence/FIX2.md": "5825a75ccbc11e3c0562219642709d075a73df7dec36455f199dc16fc5b0b9c4",
+    "evidence/FIX2-manifest.json": "4162dc4e32c8e2d7690d8e74015fb91c8a82d84f1b0bf9e336f23e6f643c3a60",
+    "evidence/FIX2-stack-custody.json": "6c15845f2500e76ac4298f285d5bf8abf2ad1d7ff8064b183906bd848023b0ef",
+    "agent-reports/FIX2.md": "996eff4ed551b74d74f6f568a00d808127a07b664e4961c127dc02cc55a31482"
+  },
+  "resolvedManifestReferences": {
+    "logs.contextSandboxEnvironmental": [
+      "logs/FIX2-context-contract.log"
+    ],
+    "logs.contextBeforeCorrection": [
+      "logs/FIX2-context-contract-escalated.log"
+    ],
+    "logs.diagnosticRed": [
+      "logs/FIX2-diagnostic-red.log"
+    ],
+    "logs.diagnosticIntermediate": [
+      "logs/FIX2-diagnostic-green.log"
+    ],
+    "logs.diagnosticGreen": [
+      "logs/FIX2-diagnostic-green2.log"
+    ],
+    "logs.reporterRed": [
+      "logs/FIX2-reporter-red.log"
+    ],
+    "logs.reporterGreen": [
+      "logs/FIX2-reporter-green.log"
+    ],
+    "logs.actualOne": [
+      "logs/FIX2-actual-one.log"
+    ],
+    "logs.producerRed": [
+      "logs/FIX2-producer-red.log"
+    ],
+    "logs.producerGreen": [
+      "logs/FIX2-producer-green1.log"
+    ],
+    "logs.actionContractRed": [
+      "logs/FIX2-action-contract-red.log"
+    ],
+    "logs.actionContractGreen": [
+      "logs/FIX2-action-contract-green.log"
+    ],
+    "logs.focusedIntermediate": [
+      "logs/FIX2-focused-green.log"
+    ],
+    "logs.focusedGreen": [
+      "logs/FIX2-focused-green2.log"
+    ],
+    "logs.contextCorrected": [
+      "logs/FIX2-context-corrected-final.log"
+    ],
+    "logs.typecheckIntroducedFailure": [
+      "logs/FIX2-typecheck-final.log"
+    ],
+    "logs.typecheckFinal": [
+      "logs/FIX2-typecheck-final2.log"
+    ],
+    "logs.mutantCapabilitySelection": [
+      "logs/FIX2-mutant-capability-selection.log"
+    ],
+    "logs.mutantOutputContract": [
+      "logs/FIX2-mutant-output-contract.log"
+    ],
+    "logs.mutantDiagnosticReporter": [
+      "logs/FIX2-mutant-diagnostic-reporter.log"
+    ],
+    "logs.mutantsRestored": [
+      "logs/FIX2-mutants-restored.log"
+    ],
+    "probes.contextContract": [
+      "probes/FIX2/context-contract.ts"
+    ],
+    "probes.actualOne": [
+      "probes/FIX2/actual-one.mjs"
+    ],
+    "evidence.report": [
+      "evidence/FIX2.md"
+    ],
+    "evidence.stackCustody": [
+      "evidence/FIX2-stack-custody.json"
+    ],
+    "evidence.actualDiagnostic": [
+      "evidence/FIX2-actual-diagnostic.json"
+    ],
+    "evidence.authorReport": [
+      "agent-reports/FIX2.md"
+    ]
+  },
+  "manifestReferencesVerified": 27,
+  "focusedFrame": "4 files / 101 tests passed",
+  "typecheckExactAttributedOutputMatch": true,
+  "livePredicatesStillUnknown": true,
+  "previewRunningAtHandoff": "UNVERIFIED; failed connection reported; process inspection unavailable",
+  "ownerAcceptance": "PENDING"
+}

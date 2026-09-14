@@ -1,6 +1,6 @@
 # CP1 progress
 
-Product lane: codex/support-conversation-cp1 at085fff68f8b22743978d1efafd7ad9fd204e5a6f, clean at integrated inventory. Intended-product baseline b7ca2c413bf3242ce18e29a397dc9a3aa9228893. Latest97/97 changed committed paths match layered author receipts in GATE-pre-LIVE-inventory.json. Original source remains integration/debate-tiers at446c685e; freshly checked source HEAD, staged hash and complete tracked working-diff hash match intake (GATE-source-preservation.json).
+Product lane: codex/support-conversation-cp1 at82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0, clean at integrated inventory. Intended-product baseline b7ca2c413bf3242ce18e29a397dc9a3aa9228893. Latest97/97 changed committed paths match layered author receipts in GATE-pre-LIVE2-inventory.json. Original source remains integration/debate-tiers at446c685e; freshly checked source HEAD, staged hash and complete tracked working-diff hash match intake (GATE-source-preservation.json).
 
 Planning: SPEC-v2/PLAN frozen at administrative65f71d79; separate PLANREV2 PASS. CP1 only; no owner acceptance or CP2/CP3 work.
 
@@ -26,3 +26,9 @@ Forgot password: owner confirms it exists. Early source/target search and a newl
 
 ## Live failure and next correction
 At085fff68,20/20 integrated files passed (730tests+1ForgotTODO), but actual UI/API/relay answered only1/7 required questions with grounding. Six REFUSE_SAFETY results failCP1-A09; action navigation could not run. Same server author FIX2 diagnosis will preserve strict validation and existing model, followed by LIVE2 and separate final reviews. Exact Forgot destination remains owner-blocked.
+
+FIX2 interim: safe diagnostic tests preceded one additional unchanged-behavior EN creation request. That attempt grounded with1source/0actions and no rejection callback, so the earlier rejection predicate remainsUNKNOWN. Author is correcting the separately reproducible source-selection and allowed-ID instruction defects; no model adapter change or validation relaxation. No additional diagnostic request authorized.
+
+FIX2 author checkpoint (not consumed final handoff):101/101 focused tests and restored mutation probes reported. Typecheck still inherited76 diagnostics; exact attribution pending final receipt. Corrected capability context selects creation guide/start action in ENRO. Preview supervisor95978 still serves diagnostic-only bytes; LIVE2 must reload supported stack after final correction commit. No further actual call made.
+
+FIX2 consumed at82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0:7exact paths,97/97 inventory,4handoff+27reference hashes checked,101focused passes, byte-identical inherited typecheck. LIVE2 t_48f43282 is now active in /root/preview, sole heavy lease. It runs the integrated20-file suite then restores exact committed preview and repeats the finite7-question actual matrix once with safe rejection categories. Final reviews and owner destination remain pending.
