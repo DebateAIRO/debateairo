@@ -20,3 +20,4 @@ Read packet first, this file second, then named inputs. Derived from heartbeat C
 - Main source base: 446c685e977104ecf2b0b5ee0519f7123968429f; freeze reference will be recorded after baseline completes. No other mission files may be swept into a commit.
 
 Freeze commits: planning65f71d79d571db9a0a8de3923a87fc8ac59db466; completed CP1 evidence and LIVE rework6241d226b59050eb62aaa911b7b6708d5cba021f on administrative codex/support-conversation-mission. Private-index freeze verified36 exact files and unchanged source/index/productref; excludes running FIX2 outputs. Product085fff68 remains the actual failing LIVE baseline.
+Completed FIX2 evidence freeze: bc52996f968f6a9251e937c3a714f86eb47f4163 on administrative mission branch;15 exact files verified, active LIVE2 output excluded; source/index/product ref unchanged. Product revision82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0 remains the correction under actual verification.

@@ -66,7 +66,10 @@
     "LIVE": "t_3fd09b62",
     "LIVE_GUIDANCE": "t_8596ccbc",
     "FIX2": "t_5bea68d5",
-    "LIVE2": "t_48f43282"
+    "LIVE2": "t_48f43282",
+    "FIX3": "t_e697cad1",
+    "LIVE3": "t_8a5cf2e8",
+    "LIVE2_ACTION_ID": "t_67a569fe"
   },
   "edges": [
     [
@@ -315,6 +318,18 @@
     ],
     [
       "LIVE2",
+      "GATE"
+    ],
+    [
+      "LIVE2",
+      "FIX3"
+    ],
+    [
+      "FIX3",
+      "LIVE3"
+    ],
+    [
+      "LIVE3",
       "GATE"
     ]
   ]

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "revision": "82f57f1ebaaf59a9ee0ea81d3084c4d57f7557b0",
+  "profile": "support-preview",
+  "supported_start": "DEBATEAI_DEV_AUTH_STACK_PROFILE=support-preview pnpm dev:auth:up",
+  "supported_stop": "SIGTERM to the recorded owned supervisor PID",
+  "predecessor": {
+    "pid": 95978,
+    "process_group": 95978,
+    "parent_pid": 1,
+    "preflight_present": true,
+    "ordinary_tls_help_status": 200,
+    "producer_revision_state": "pre-correction",
+    "stopped_by_live2": true,
+    "exit_cause_of_the_earlier_failed_connection": "UNKNOWN"
+  },
+  "reload": {
+    "old_supervisor_absent_before_start": true,
+    "all_preview_listeners_absent_before_start": true,
+    "all_original_listeners_preserved_before_start": true,
+    "fixed_ready_marker_present": true
+  },
+  "final": {
+    "pid": 12958,
+    "process_group": 12958,
+    "parent_pid": 1,
+    "detached": true,
+    "ordinary_tls_help_status": 200,
+    "preview_listeners": [3100, 3101, 8890, 8891, 8892, 8893, 8894, 8895, 8896],
+    "preserved_original_listeners": [8790, 8791, 8792, 8793, 8794, 8795, 8796],
+    "survived_browser_exit_and_idle_boundary": true,
+    "active_for_follow_up": true
+  },
+  "existing_services_stopped": false,
+  "tls_bypass_used": false,
+  "global_ca_trust_changed": false,
+  "live_log_not_copied_or_hashed": "Credential-bearing runtime logs remain private and mutable; only fixed stage and rejection-category projections were retained."
+}
