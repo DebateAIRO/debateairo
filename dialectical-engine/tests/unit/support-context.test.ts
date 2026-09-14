@@ -128,4 +128,67 @@ describe("Support knowledge context", () => {
     expect(Object.isFrozen(result.sourceIds)).toBe(true);
     expect(Object.isFrozen(result.requestedActionIds)).toBe(true);
   });
+
+  it.each(SUPPORT_CAPABILITIES.flatMap((capability) =>
+    capability.articleIds.length === 0 ? [] : (["en","ro"] as const).map((language) => ({
+      capability,language,
+      query: `${capability.labels[language]} ${capability.searchTerms[language].join(" ")}`
+    }))))(
+    "keeps reviewed capability articles reachable for $capability.id in $language",
+    ({ capability,language,query }) => {
+      const articleIds = [...new Set(SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds))];
+      const capabilityEntries = articleIds.map((id) => entry(
+        id,language,`Reference ${id}`,"Reviewed product behavior and limitations."
+      ));
+
+      const result = buildSupportKnowledgeContext({
+        entries: capabilityEntries,
+        capabilities: SUPPORT_CAPABILITIES,
+        language,
+        query,
+        historyText: "",
+        maxCodePoints: 24_000,
+      });
+
+      expect(result.sourceIds).toEqual(expect.arrayContaining(capability.articleIds.slice(0,3)));
+      expect(result.sourceIds.length).toBeLessThanOrEqual(3);
+    }
+  );
+
+  it("states the exact bounded source and action sets in the final output contract", () => {
+    const result = buildSupportKnowledgeContext({
+      entries,
+      capabilities: SUPPORT_CAPABILITIES,
+      language: "en",
+      query: "download the ledger result as JSON",
+      historyText: "",
+      maxCodePoints: 24_000,
+    });
+
+    expect(result.text).toContain("OUTPUT CONTRACT");
+    expect(result.text).toContain(`sourceIds=${result.sourceIds.join(",")}`);
+    expect(result.text).toContain(`actionIds=${result.requestedActionIds.join(",") || "none"}`);
+    expect(result.sourceIds).toHaveLength(1);
+  });
+
+  it.each([
+    ["en" as const,"How do I create a debate?"],
+    ["ro" as const,"Cum creez o dezbatere?"],
+  ])("matches ordinary inflected creation language in %s", (language,query) => {
+    const result = buildSupportKnowledgeContext({
+      entries: [
+        entry("getting-started-debate",language,"Start reference","Reviewed creation requirements."),
+        entry("browse-public-debates",language,"Browse reference","Reviewed public browsing behavior."),
+        entry("view-public-debate",language,"Public reference","Reviewed public viewing behavior."),
+      ],
+      capabilities: SUPPORT_CAPABILITIES,
+      language,
+      query,
+      historyText: "",
+      maxCodePoints: 24_000,
+    });
+
+    expect(result.sourceIds[0]).toBe("getting-started-debate");
+    expect(result.requestedActionIds).toEqual(["start-debate"]);
+  });
 });

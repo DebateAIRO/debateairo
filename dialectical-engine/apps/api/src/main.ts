@@ -485,6 +485,9 @@ const supportAnswers = createSupportAnswerService({
   requireStructuredDraft: true,
   messages: supportMessages,
   incidents: supportIncidents,
+  reportDraftDiagnostic: (diagnostic) => reportSupportDiagnostic({
+    code: `SUPPORT_DRAFT_${diagnostic.code}`
+  }),
   queue: supportRelayQueue,
   degraded: supportDegraded,
   modelFor: () => supportAdmittedModel

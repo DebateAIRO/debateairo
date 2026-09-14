@@ -1,5 +1,6 @@
 import { describe,expect,it } from "vitest";
 import {
+  diagnoseSupportDraft,
   parseSupportCaseSummaryDraft,
   parseSupportDraft,
   validateSupportDraft
@@ -16,6 +17,52 @@ function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): st
 }
 
 describe("CP1 support model response policy", () => {
+  it("reports a closed secret-safe rejection shape without completion bytes or identifiers", () => {
+    const completion = JSON.stringify({
+      kind: "answer",
+      text: "Open https%3A%2F%2Finvalid.example with password hunter2",
+      sourceIds: ["forged-source"],
+      actionIds: ["forged-action"]
+    });
+
+    const diagnostic = diagnoseSupportDraft(
+      completion,["getting-started-debate"],["start-debate"]
+    );
+
+    expect(diagnostic).toEqual({
+      code: "TEXT_LINK_OR_MARKUP",
+      jsonValid: true,
+      fenced: false,
+      exactKeys: true,
+      kindValid: true,
+      textCodePoints: 56,
+      sourceIdCount: 1,
+      allowedSourceIdCount: 0,
+      actionIdCount: 1,
+      allowedActionIdCount: 0
+    });
+    expect(Object.isFrozen(diagnostic)).toBe(true);
+    expect(JSON.stringify(diagnostic)).not.toContain("hunter2");
+    expect(JSON.stringify(diagnostic)).not.toContain("forged-source");
+    expect(JSON.stringify(diagnostic)).not.toContain("forged-action");
+  });
+
+  it("distinguishes syntax, exact-key, provenance, and accepted producer results", () => {
+    const allowedSources = ["getting-started-debate"];
+    const allowedActions = ["start-debate"] as const;
+    expect(diagnoseSupportDraft("```json\n{}\n```",allowedSources,allowedActions))
+      .toMatchObject({ code: "JSON_INVALID",jsonValid: false,fenced: true });
+    expect(diagnoseSupportDraft(raw("Open the debate page.",{ extra: true }),allowedSources,allowedActions))
+      .toMatchObject({ code: "KEY_SET_INVALID",jsonValid: true,exactKeys: false });
+    expect(diagnoseSupportDraft(raw("Open the debate page.",{
+      sourceIds: ["forged-source"]
+    }),allowedSources,allowedActions)).toMatchObject({
+      code: "SOURCE_MEMBERSHIP_INVALID",allowedSourceIdCount: 0
+    });
+    expect(diagnoseSupportDraft(raw("Open the debate page."),allowedSources,allowedActions))
+      .toMatchObject({ code: "ACCEPTED",allowedSourceIdCount: 1,allowedActionIdCount: 1 });
+  });
+
   it("accepts an exact bounded draft and preserves benign public identifiers", () => {
     const parsed = parseSupportDraft(raw(
       "Try again at 14:30 on 2026-09-14 and quote public error SUPPORT_MODEL_UNAVAILABLE."

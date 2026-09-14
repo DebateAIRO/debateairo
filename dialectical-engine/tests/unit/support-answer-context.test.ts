@@ -65,6 +65,9 @@ describe("CP1 composed answer context", () => {
     expect(system).toContain("alpha-end-marker");
     expect(system).toContain("beta-end-marker");
     expect(system).toContain("gamma-end-marker");
+    expect(system).toContain("The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds");
+    expect(system).toContain("sourceIds=crosscap-alpha,crosscap-beta,crosscap-gamma");
+    expect(system).toContain("actionIds=none");
   });
 
   it("uses the exact immutable snapshot object already resolved by the route", async () => {
@@ -94,5 +97,27 @@ describe("CP1 composed answer context", () => {
     expect(result.outcome).toBe("ANSWER_GROUNDED");
     expect(system).toContain("selected-a-end");
     expect(system).not.toContain("stale-b-end");
+  });
+
+  it("reports only the closed diagnostic shape for a rejected completion", async () => {
+    const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"c".repeat(64));
+    const reportDraftDiagnostic = vi.fn();
+    const service = createSupportAnswerService({
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      reportDraftDiagnostic,
+      modelFor: () => Object.freeze({
+        complete: async () => Object.freeze({ text: "```json\n{}\n```" })
+      }) as never,
+      clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+    });
+
+    const result = await service.respond(request(snapshot));
+
+    expect(result.outcome).toBe("REFUSE_SAFETY");
+    expect(reportDraftDiagnostic).toHaveBeenCalledOnce();
+    expect(reportDraftDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+      code: "JSON_INVALID",jsonValid: false,fenced: true
+    }));
+    expect(JSON.stringify(reportDraftDiagnostic.mock.calls)).not.toContain("```json");
   });
 });

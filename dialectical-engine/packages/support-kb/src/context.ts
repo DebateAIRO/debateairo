@@ -43,8 +43,21 @@ function normalizeWords(value: string): Set<string> {
 function overlapScore(query: Set<string>, value: string): number {
   const words = normalizeWords(value);
   let score = 0;
-  for (const word of query) if (words.has(word)) score += 1;
+  for (const queryWord of query) {
+    if ([...words].some((candidate) => candidate === queryWord
+      || inflectedMatch(candidate,queryWord))) {
+      score += 1;
+    }
+  }
   return score;
+}
+
+function inflectedMatch(left: string,right: string): boolean {
+  const shorter = Math.min(left.length,right.length);
+  if (shorter < 4) return false;
+  let common = 0;
+  while (common < shorter && left[common] === right[common]) common += 1;
+  return common >= 4 && common / shorter >= 0.75;
 }
 
 function baseSection(capabilities: readonly SupportCapability[], language: SupportLanguage): string {
@@ -60,6 +73,16 @@ function articleSection(entry: HelpCorpusEntry): string {
   return `\n\nSOURCE ${entry.id}\nTITLE: ${entry.title}\n${entry.body}`;
 }
 
+function outputContract(
+  sourceIds: readonly string[],actionIds: readonly SupportActionId[]
+): string {
+  return [
+    "\n\nOUTPUT CONTRACT",
+    `sourceIds=${sourceIds.join(",") || "none"}`,
+    `actionIds=${actionIds.join(",") || "none"}`,
+  ].join("\n");
+}
+
 export function buildSupportKnowledgeContext(input: Readonly<{
   entries: readonly HelpCorpusEntry[];
   capabilities: readonly SupportCapability[];
@@ -70,35 +93,23 @@ export function buildSupportKnowledgeContext(input: Readonly<{
 }>): SupportKnowledgeContext {
   if (input.historyText !== "") throw new Error("SUPPORT_KB_HISTORY_NOT_AVAILABLE_IN_CP1");
   const base = baseSection(input.capabilities, input.language);
-  if ([...base].length > input.maxCodePoints) throw new Error("SUPPORT_KB_CONTEXT_LIMIT_TOO_SMALL");
 
   const queryWords = normalizeWords(input.query);
-  const ranked = input.entries
-    .filter(({ lang }) => lang === input.language)
-    .map((entry) => ({ entry, score: overlapScore(queryWords, `${entry.title}\n${entry.body}`) }))
-    .filter(({ score }) => score > 0)
-    .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id, "en"));
-
-  let text = base;
-  const sourceIds: string[] = [];
-  for (const { entry } of ranked) {
-    if (sourceIds.length >= 3) break;
-    const section = articleSection(entry);
-    if ([...text, ...section].length > input.maxCodePoints) continue;
-    text += section;
-    sourceIds.push(entry.id);
-  }
-
-  const actionIds: SupportActionId[] = [];
-  const seen = new Set<SupportActionId>();
   const matchedCapabilities = input.capabilities
     .map((item) => ({
       item,
-      score: overlapScore(queryWords, `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`),
+      score: overlapScore(
+        queryWords,
+        `${item.labels[input.language]} ${item.searchTerms[input.language].join(" ")}`,
+      ),
     }))
     .filter(({ score }) => score > 0)
     .sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id, "en"));
-  for (const { item } of matchedCapabilities) {
+  const actionIds: SupportActionId[] = [];
+  const seen = new Set<SupportActionId>();
+  const bestCapabilityScore = matchedCapabilities[0]?.score ?? 0;
+  for (const { item,score } of matchedCapabilities) {
+    if (score !== bestCapabilityScore) break;
     for (const actionId of item.actionIds) {
       if (seen.has(actionId)) continue;
       seen.add(actionId);
@@ -107,6 +118,38 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     }
     if (actionIds.length === 3) break;
   }
+  if ([...`${base}${outputContract([],actionIds)}`].length > input.maxCodePoints) {
+    throw new Error("SUPPORT_KB_CONTEXT_LIMIT_TOO_SMALL");
+  }
+
+  const capabilityArticleScore = new Map<string,number>();
+  for (const { item,score } of matchedCapabilities) {
+    item.articleIds.forEach((id,index) => {
+      const weighted = score * 1_000 + item.articleIds.length - index;
+      capabilityArticleScore.set(id,Math.max(capabilityArticleScore.get(id) ?? 0,weighted));
+    });
+  }
+  const ranked = input.entries
+    .filter(({ lang }) => lang === input.language)
+    .map((entry) => ({
+      entry,
+      score: (capabilityArticleScore.get(entry.id) ?? 0)
+        + overlapScore(queryWords, `${entry.title}\n${entry.body}`),
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id, "en"));
+
+  let text = base;
+  const sourceIds: string[] = [];
+  for (const { entry } of ranked) {
+    if (sourceIds.length >= 3) break;
+    const section = articleSection(entry);
+    if ([...`${text}${section}${outputContract([...sourceIds,entry.id],actionIds)}`].length
+      > input.maxCodePoints) continue;
+    text += section;
+    sourceIds.push(entry.id);
+  }
+  text += outputContract(sourceIds,actionIds);
 
   return Object.freeze({
     text,

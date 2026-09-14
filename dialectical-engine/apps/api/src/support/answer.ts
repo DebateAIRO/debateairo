@@ -17,7 +17,9 @@ import {
 } from "./incidents.js";
 import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
 import type { SupportDegradedPort } from "./degraded.js";
-import { parseSupportDraft,validateSupportDraft } from "./response-policy.js";
+import {
+  diagnoseSupportDraft,parseSupportDraft,type SupportDraftDiagnostic,validateSupportDraft
+} from "./response-policy.js";
 
 const MAX_RETRIEVED_ENTRIES = 3;
 const MAX_SYSTEM_CODE_POINTS = 24_000;
@@ -125,8 +127,8 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
 
 function structuredInstruction(language: SupportLanguage): string {
   return language === "ro"
-    ? "Returnează numai JSON cu exact cheile kind, text, sourceIds și actionIds. kind trebuie să fie answer. Citează cel puțin un sourceId furnizat și folosește numai actionIds solicitate. Nu include URL-uri, HTML, Markdown, parole, coduri ori afirmații despre resetări."
-    : "Return only JSON with exactly the keys kind, text, sourceIds, and actionIds. kind must be answer. Cite at least one supplied sourceId and use only requested actionIds. Include no URLs, HTML, Markdown, passwords, codes, or reset claims.";
+    ? "Returnează numai JSON cu exact cheile kind, text, sourceIds și actionIds. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; copiază identificatorii exact și citează cel puțin un sourceId. Nu copia rute sau căi în text; exprimă navigarea numai prin actionIds. Nu include URL-uri, HTML, Markdown, parole, coduri ori afirmații despre resetări."
+    : "Return only JSON with exactly the keys kind, text, sourceIds, and actionIds. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; copy identifiers exactly and cite at least one sourceId. Do not copy routes or paths into text; express navigation only through actionIds. Include no URLs, HTML, Markdown, passwords, codes, or reset claims.";
 }
 
 function boundedStructuredSystem(context: string,language: SupportLanguage): string {
@@ -181,6 +183,7 @@ export function createSupportAnswerService(input: Readonly<{
   queue?: Pick<SupportRelayQueue,"execute">;
   degraded?: SupportDegradedPort;
   incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
+  reportDraftDiagnostic?: (diagnostic: SupportDraftDiagnostic) => void;
   clock?: () => Date;
 }>): SupportAnswerPort {
   const clock = input.clock ?? (() => new Date());
@@ -272,6 +275,12 @@ export function createSupportAnswerService(input: Readonly<{
         });
         if (completion === undefined || firstTokenAt === undefined || completedAt === undefined) {
           throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+        }
+        const diagnostic = structured ? diagnoseSupportDraft(
+          completion.text,context!.sourceIds,context!.requestedActionIds
+        ) : undefined;
+        if (diagnostic !== undefined && diagnostic.code !== "ACCEPTED") {
+          input.reportDraftDiagnostic?.(diagnostic);
         }
         const parsed = structured ? parseSupportDraft(completion.text) : undefined;
         const draft = !structured ? undefined
