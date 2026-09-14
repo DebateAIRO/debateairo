@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "productRevision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "corpusEntries": 36,
+  "logicalIds": 18,
+  "english": 18,
+  "romanian": 18,
+  "articleDigestsVerified": 36,
+  "fixP2ProductPaths": 21,
+  "attestP2ProductPaths": 2,
+  "retainedTests": 23,
+  "newTests": 2,
+  "finalIntegratedTests": 25,
+  "ownershipOverlap": 0
+}
