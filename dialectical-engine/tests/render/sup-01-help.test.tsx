@@ -10,6 +10,7 @@ import {
   supportAssistantClient,
   type SupportAssistantClient
 } from "../../apps/ui/components/support/Assistant.js";
+import { subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
 
 const SESSION = Object.freeze({ sessionId: "session-1",token: "token-1",identityBound: false });
 let root: Root | null = null;
@@ -90,10 +91,52 @@ describe("SUP-01 /help assistant", () => {
     expect(parsed.querySelector('[aria-label="Conversation details"]')?.textContent)
       .toContain("This conversation");
     expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
-      .toContain("Privacy policy");
+      .toContain("Cookie preferences");
     expect(parsed.body.textContent).toContain("New conversation");
     expect(parsed.body.textContent).toContain("Attach a debate");
     expect(parsed.body.textContent).toContain("Escalate to a human");
+  });
+
+  it("offers only verified full-page shortcuts and uses the existing cookie opener", async () => {
+    const signedOut = new DOMParser().parseFromString(renderToStaticMarkup(
+      <Assistant fullPage signedIn={false} client={client({
+        messageId: "signed-out-shortcuts",outcome: "NO_SOURCE",text: "No source."
+      })} />
+    ),"text/html");
+    const signedOutShortcuts = signedOut.querySelector('[aria-label="Support shortcuts"]')!;
+    expect([...signedOutShortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
+      .not.toContain("/settings#privacy");
+    expect(signedOutShortcuts.querySelector('a[href="/settings#consent-privacy-heading"]'))
+      .toBeNull();
+    expect([...signedOutShortcuts.querySelectorAll("button")].map((button) => button.textContent?.trim()))
+      .toContain("Cookie preferences ↗");
+
+    await render(<Assistant fullPage signedIn client={client({
+      messageId: "signed-in-shortcuts",outcome: "NO_SOURCE",text: "No source."
+    })} />);
+    const shortcuts = document.querySelector('[aria-label="Support shortcuts"]')!;
+    const privacy = shortcuts.querySelector<HTMLAnchorElement>(
+      'a[href="/settings#consent-privacy-heading"]'
+    );
+    expect(privacy?.textContent?.trim()).toBe("Privacy preferences ↗");
+    expect([...shortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
+      .not.toContain("/settings#cookies");
+
+    const cookie = [...shortcuts.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent?.includes("Cookie preferences"))!;
+    const requests: Array<HTMLElement | null> = [];
+    const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
+    try {
+      await act(async () => cookie.click());
+      expect(requests).toEqual([cookie]);
+    } finally {
+      unsubscribe();
+    }
+
+    await act(async () => ([...document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "RO")!).click());
+    expect(privacy?.textContent?.trim()).toBe("Preferințe de confidențialitate ↗");
+    expect(cookie.textContent?.trim()).toBe("Cookie preferences ↗");
   });
 
   it("submits a Turn 11 suggestion immediately without priming the composer", async () => {

@@ -8,6 +8,7 @@ import {
   type SupportActionId
 } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
+import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
 import { ConsentToggle } from "./ConsentToggle.js";
@@ -774,6 +775,9 @@ export function Assistant({
     ? "UNAVAILABLE" : pageStatus === null ? "CHECKING" : "ONLINE";
   const reference = session === null ? "HLP—NEW" : `HLP-${session.sessionId.slice(0,4).toUpperCase()}`;
   const debateContext = "runId" in ownContext ? `Run ${ownContext.runId.slice(0,12)}` : "Latest debate when requested";
+  const privacyShortcut = resolveSupportActions(["privacy-preferences"],{
+    signedIn: identityAvailable,language
+  }).at(0);
 
   return <div className="supportDesk" data-support-desk>
     <header className="supportHeader" data-support-header>
@@ -878,8 +882,12 @@ export function Assistant({
         <section className="supportSideCard" aria-label="Support shortcuts">
           <p className="supportEyebrow">Shortcuts</p>
           <ul className="supportShortcuts">
-            <li><a href="/settings#privacy">Privacy policy <span>↗</span></a></li>
-            <li><a href="/settings#cookies">Cookie preferences <span>↗</span></a></li>
+            {privacyShortcut === undefined ? null : <li>
+              <a href={privacyShortcut.href}>{privacyShortcut.label} <span>↗</span></a>
+            </li>}
+            <li><button type="button" onClick={(event) => requestPreferences(event.currentTarget)}>
+              Cookie preferences <span>↗</span>
+            </button></li>
             <li><a href="#service-status">Model fleet status <span>↗</span></a></li>
             <li><button type="button" onClick={() => primeComposer("Report a bug in this debate")}>Report a bug <span>→</span></button></li>
           </ul>
