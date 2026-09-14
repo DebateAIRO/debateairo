@@ -1,0 +1,138 @@
+{
+  "board": "support-conversation-20260914",
+  "tickets": {
+    "CP1": "t_e584e488",
+    "CP2": "t_62ab0612",
+    "CP3": "t_097856d3",
+    "BASE": "t_5717be70",
+    "REQ": "t_7a8d2d0e",
+    "FIND": "t_863e74a7",
+    "PLANREV": "t_c3b600c6",
+    "KB": "t_3e878484",
+    "NAV": "t_a7eb5e1f",
+    "GATE": "t_a130d88c",
+    "REV1": "t_9cd91ee7",
+    "REV2": "t_5a88b1e1",
+    "REV3": "t_3699c305",
+    "CP2BUILD": "t_ef0fd667",
+    "CP2REV": "t_bd11d606",
+    "CP3BUILD": "t_4ff71ef3",
+    "CP3REV": "t_eed64533",
+    "WHOLE": "t_0e3c6101",
+    "DEST": "t_979fe293",
+    "PREVIEW": "t_984d15e6",
+    "FREEZE": "t_31897858",
+    "EDITORIAL": "t_48916645",
+    "UI": "t_36e6e01e"
+  },
+  "edges": [
+    [
+      "REQ",
+      "PLANREV"
+    ],
+    [
+      "BASE",
+      "KB"
+    ],
+    [
+      "PLANREV",
+      "KB"
+    ],
+    [
+      "KB",
+      "NAV"
+    ],
+    [
+      "FIND",
+      "NAV"
+    ],
+    [
+      "NAV",
+      "GATE"
+    ],
+    [
+      "GATE",
+      "REV1"
+    ],
+    [
+      "GATE",
+      "REV2"
+    ],
+    [
+      "GATE",
+      "REV3"
+    ],
+    [
+      "REV1",
+      "CP1"
+    ],
+    [
+      "REV2",
+      "CP1"
+    ],
+    [
+      "REV3",
+      "CP1"
+    ],
+    [
+      "CP1",
+      "CP2BUILD"
+    ],
+    [
+      "CP2BUILD",
+      "CP2REV"
+    ],
+    [
+      "CP2REV",
+      "CP2"
+    ],
+    [
+      "CP2",
+      "CP3BUILD"
+    ],
+    [
+      "CP3BUILD",
+      "CP3REV"
+    ],
+    [
+      "CP3REV",
+      "CP3"
+    ],
+    [
+      "CP3",
+      "WHOLE"
+    ],
+    [
+      "DEST",
+      "GATE"
+    ],
+    [
+      "PREVIEW",
+      "GATE"
+    ],
+    [
+      "REQ",
+      "FREEZE"
+    ],
+    [
+      "FREEZE",
+      "PLANREV"
+    ],
+    [
+      "KB",
+      "EDITORIAL"
+    ],
+    [
+      "NAV",
+      "UI"
+    ],
+    [
+      "EDITORIAL",
+      "UI"
+    ],
+    [
+      "UI",
+      "GATE"
+    ]
+  ]
+}

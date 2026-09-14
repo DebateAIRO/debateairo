@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "mission": "support-conversation-20260914",
+  "node": "BASE",
+  "ticket": "t_5717be70",
+  "created_at": "2026-09-14T08:21:26Z",
+  "agent": "/root/baseline",
+  "codex_thread_id": "01a09ef7-e096-7c31-9b35-806840028cf0",
+  "codex_session_id": "01a09ef2-30b5-7ee2-b12d-0599616d139a",
+  "source": {
+    "git_root": "/Users/vladmihaimiron/Documents/DebateAIRO",
+    "project": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine",
+    "branch": "integration/debate-tiers",
+    "head": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "status_entries_before": 157,
+    "status_entries_after": 157,
+    "tracked_unstaged_paths_before": 56,
+    "tracked_unstaged_paths_after": 56,
+    "staged_paths_before": 0,
+    "staged_paths_after": 0,
+    "staged_binary_diff_sha256_before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "staged_binary_diff_sha256_after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unstaged_binary_diff_sha256_before": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "unstaged_binary_diff_sha256_after": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e"
+  },
+  "lane": {
+    "worktree": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1",
+    "project": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
+    "branch": "codex/support-conversation-cp1",
+    "base": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "baseline_commit": "b7ca2c413bf3242ce18e29a397dc9a3aa9228893",
+    "porcelain_after_verification": "",
+    "commit_files": 12,
+    "insertions": 478,
+    "deletions": 48
+  },
+  "included": [
+    {"path":"dialectical-engine/apps/api/src/index.ts","attribution":"tracked_current_product_change","bytes":74358,"sha256":"09fb43043584e1d5a13bbd29a804e161ebbbe4c955381c48b6c6b6e6c494dbee"},
+    {"path":"dialectical-engine/apps/ui/components/NodeDetailDrawer.tsx","attribution":"tracked_current_product_change","bytes":23887,"sha256":"f98af10f5f434ba80a55dff52e759f3b3be8ba713d28d98e5ac0d1b8bbe66888"},
+    {"path":"dialectical-engine/apps/ui/lib/v3/adapter.ts","attribution":"tracked_current_product_change","bytes":29253,"sha256":"39151432de933de782e77b94a130427ac49760c2c78e0a3fa97c9f2f1cf72966"},
+    {"path":"dialectical-engine/tests/architecture/dev-database-principals.test.ts","attribution":"tracked_current_test_change","bytes":2932,"sha256":"b024de41b0f2ba289040e9a66b550f1f31177fe38e9ca3c667a420ae96617ec7"},
+    {"path":"dialectical-engine/tests/integration/dev-api-environment.test.ts","attribution":"tracked_current_test_change","bytes":20912,"sha256":"bfab7d8cd289a521dac5c0b67c26efc74a6b78c287a1cf28257c75d87dfc2dce"},
+    {"path":"dialectical-engine/tests/integration/dev-api-process.test.ts","attribution":"tracked_current_test_change","bytes":14412,"sha256":"09b8fd6eb1c8f9c88ec0be9df49f5ae42d5dd223fd133120e9180504c5dcd398"},
+    {"path":"dialectical-engine/tests/integration/dev-database-principals.test.ts","attribution":"tracked_current_test_change","bytes":30982,"sha256":"3e73802ef33212ac0acb953c71a705ddb8d42ab9737b049f4a7e3fa535a3c9e8"},
+    {"path":"dialectical-engine/tests/integration/dev-ui-process.test.ts","attribution":"tracked_current_test_change","bytes":6952,"sha256":"999888473bd9bc4525fe21552ab8e0cbddc2633773ec0b068a6c5dd1dfe650b5"},
+    {"path":"dialectical-engine/tests/unit/evaluator-profiles.test.ts","attribution":"tracked_current_test_change","bytes":9516,"sha256":"786d4ed842d237ae6060dd26716ea16112b1575227cb8e658477c29d97517a1e"},
+    {"path":"dialectical-engine/tests/unit/v2ui-data-layer.test.ts","attribution":"tracked_current_test_change","bytes":41570,"sha256":"4193cca4eeac410f5c0d918c1ae8095a1d43fe1f539da2e2d097a1e27e1366e4"},
+    {"path":"dialectical-engine/tests/unit/dev-evaluator-process.test.ts","attribution":"untracked_current_evaluator_test","bytes":5066,"sha256":"339e4af41868a298522e845f81d77415cacfe87ce68d4ca40de1da1994859f3f"},
+    {"path":"dialectical-engine/tests/unit/evaluator-rankings-api.test.ts","attribution":"untracked_current_evaluator_test","bytes":3200,"sha256":"43e9ac5830f6c08bd04c7e8e49d5c4ea23b8770870b589ca2f8b3250c8b35aa8"}
+  ],
+  "excluded": [
+    "secret, credential, token and .env files",
+    "logs, PIDs, sockets and runtime process state",
+    ".hermes/** and all mission state",
+    "docs/** and ui_designs/**",
+    "all unrelated working-tree paths",
+    "all untracked files except the two named evaluator tests",
+    "node_modules from the Git commit"
+  ],
+  "readonly_main_inputs": [
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/superpowers/research/2026-09-14-support-agent-audit.md",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/superpowers/research/2026-09-14-support-agent-product-map.md",
+    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/superpowers/plans/2026-09-14-support-agent-conversation.md"
+  ],
+  "verification": {
+    "contract_generation": [
+      {"attempt":1,"rc":1,"result":"sandbox_listen_eperm","log":"logs/BASE-generate-contract.log","bytes":1286,"sha256":"892f12ff9923dc4c1a84b63a990aba97a1a4658ae6ac53573b1f82aa0dc05785"},
+      {"attempt":2,"rc":0,"result":"passed_with_normal_elevation","log":"logs/BASE-generate-contract-r2.log","bytes":40,"sha256":"ee43ade02b5f5ab5b6a138f1b0cd6fc2cc6e017dc453cbaaed69718d78767893"}
+    ],
+    "focused_support_baseline": {
+      "files": 6,
+      "tests": 432,
+      "runs": [
+        {"run":1,"rc":0,"passed_files":6,"total_files":6,"passed_tests":432,"total_tests":432,"duration_seconds":2.51,"log":"logs/BASE-support-baseline-run1.log","bytes":66129,"sha256":"1fe182be6646ed84868740fe0f4a2f528d97111f957e00beead0b01c3124e3ea"},
+        {"run":2,"rc":0,"passed_files":6,"total_files":6,"passed_tests":432,"total_tests":432,"duration_seconds":2.27,"log":"logs/BASE-support-baseline-run2.log","bytes":66128,"sha256":"30f7b775dfe1ab556ac3bdcafed77647a7f3f9f0b8dbd2148427fc64882cf4e1"},
+        {"run":3,"rc":0,"passed_files":6,"total_files":6,"passed_tests":432,"total_tests":432,"duration_seconds":2.15,"log":"logs/BASE-support-baseline-run3.log","bytes":66128,"sha256":"43916373ba3ff671aeeacd9070a62f979cdff085a3431f4f34f51d22af866557"}
+      ]
+    },
+    "dependency_copy": {"root_node_modules_megabytes":923,"workspace_node_modules":31,"method":"cp -cR","log":"logs/BASE-node-modules-copy.log","bytes":161,"sha256":"c912db560bbf52847b88d9cc358f0f07075f085502db3fe9f2817ca20c81887c"}
+  },
+  "reports": [
+    {"path":"evidence/BASE.md","bytes":8018,"sha256":"b739336e30087e2855be7ebe4bf463a05c0a139c6f59d888aa87f7f6dbed8802"},
+    {"path":"agent-reports/BASE.md","bytes":6236,"sha256":"9a618eed0a0faac2ce669050f9035e1a02d5c3b19707ec6f500aaeda9cce7455"}
+  ]
+}

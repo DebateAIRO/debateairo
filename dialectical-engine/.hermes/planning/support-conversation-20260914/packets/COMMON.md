@@ -1,0 +1,20 @@
+# COMMON — mission support-conversation-20260914
+Read packet first, this file second, then named inputs. Derived from heartbeat COMMON template; owner instructions override older roster/process defaults.
+- Source repo: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine; git root is its parent. Board: support-conversation-20260914; always pass --board explicitly, never switch the active board.
+- Owner authority: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md and /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/00-intake.md. The owner authorized this implementation, scoped worktrees and local review stack. Existing Support design approved.
+- Skills: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md then the role contract; current v4 role contracts override older .agents/.codex copies. Superpowers location: /Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/<name>/SKILL.md. Whole library remains available.
+- Do not reread the full archival spine. Consult its v4.0.0 amendments only for a concrete dispute. Do not repeat the whole audit.
+- Model: gpt-5.6-sol for every child, separate author/reviewer sessions; no model-family independence claim. No further subdelegation.
+- Native collaboration transport supports followup_task for rework. Before work, read your ticket/comments with hermes kanban --board support-conversation-20260914 show <ticket> --json. Only your assigned ticket and explicit upstream tickets may be read. Never list the board.
+- Post WORKER CLAIM with your actual agent/session id, base, dirty count and comments cursor. Board writes may request normal tool escalation; never use unsafe bypass modes. If board mutation is unavailable, send exact marker to orchestrator for persistence and keep independent read-only work moving.
+- Only orchestrator changes dependencies/status; your own comments are allowed. No self-Done or self-review. No push, remote merge, deployment, product/database deletion or secret disclosure.
+- File contract is exhaustive. Original dirty source, unrelated missions and existing services are no-touch. Baseline lane may include authorized product copies but never mutate the original index/files.
+- Heavy semaphore is ONE. Only BASE initially has the lease. Others may read and write their own docs, but request a lease before tests/build/install/stack work. Use repository run-capture.sh for captured checks.
+- Rework rounds: max 3; resume same author. Findings return to orchestrator, with evidence. No model substitution.
+- Every output carries evidence paths and real measurements. SKILLS LOADED must list actual reads. Report actual usage only if exposed; otherwise UNAVAILABLE. No token budget.
+- Forgotten password entry is owner-confirmed but its destination is unknown at intake. Never guess or substitute; navigate only, no credential/reset submissions.
+- Runtime support model unchanged. Preserve privacy, ownership, encrypted storage/shredding, queue/spend, degraded and human handoff behavior.
+- Checkpoint gates: only CP1 authorized to progress now. CP2 and CP3 await explicit predecessor acceptance. READY FOR USER VERIFICATION / WAITING_FOR_USER_VERIFICATION is not accepted.
+- Evidence root: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914; your self-report path is in your packet. File receipts before handoff; report eight-line heartbeat shape.
+- Board first STATE comment is canonical and replaced in place by the orchestrator with a scoped compare-and-swap helper; native status/dependencies drive readiness and authorized route comments carry dispatch. Do not append competing STATE objects.
+- Main source base: 446c685e977104ecf2b0b5ee0519f7123968429f; freeze reference will be recorded after baseline completes. No other mission files may be swept into a commit.

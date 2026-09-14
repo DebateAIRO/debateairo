@@ -1,0 +1,25 @@
+# PACKET REQ — requirements · mission support-conversation-20260914
+
+Read FIRST this packet, then /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/support-conversation-20260914/packets/COMMON.md in full, then the named inputs. Derived from heartbeat templates/REQ.md, specialized to this bounded node.
+Skills: using-superpowers; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md; the requirements role where applicable; role floor per COMMON. Owner-approved design and implementation supersede repeat approval prompts.
+
+## 1. Node
+- seat: REQ · pass: 1 of 3 · rework rounds: max 3 · model: gpt-5.6-sol · transport: native collaboration (resume: followup_task)
+- ticket: t_7a8d2d0e · slice ticket: t_e584e488 · authority_epoch: 1 · comment cursor: read current before claim
+- cwd: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine · source branch integration/debate-tiers · source base 446c685e977104ecf2b0b5ee0519f7123968429f
+- inputs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/00-intake.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/superpowers/plans/2026-09-14-support-agent-conversation.md:1-226; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/superpowers/research/2026-09-14-support-agent-product-map.md:1-125; source product files cited there may be read only for targeted current revalidation
+- output: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REQ.md (new)
+- self-report: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REQ.md (new)
+
+## 2. Contract
+- allowed: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/PLAN.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DECISIONS.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DONE.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP2/SPEC.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP3/SPEC.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REQ.md; /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/REQ.md (new)
+- forbidden: everything else; no product/runtime changes in the original source, no other mission state; no credential submissions or provider calls.
+- verification: record exact commands and evidence, SHA256 for changed/new artifacts; source findings need path:line. No empty test-run success, no reconstructed evidence. No tests/build without the heavy lease.
+
+## 3. Work
+Use the approved implementation plan as the design, not a new audit. Freeze precise functional requirements for all three checkpoints; CP2/3 specification only, no implementation. CP1 PLAN is a trace/dependency adaptation of the existing approved plan, including exact current file surfaces and verification suites. Bring forward minimum server response safety, deterministic navigation outcome and UI actions needed to make CP1 functional, without broad history work. Identify shared-file dependencies. Explain peer-reviewed versus owner-ratified content and a real loader provenance design; no fabricated ratifier. DONE records the owner's already-approved existing interface plus manual steps, not a new approval request. Do not rewrite INSTRUCTIONS or orchestrator PROGRESS. Read brainstorming and writing-plans for craft, with owner authorization already supplied. Distinguish the unresolved Forgot password location from absence. Record remaining uncertainty; do not guess.
+
+## 4. Handoff
+Write self-report first. Its question, verbatim:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Return READY FOR PEER REVIEW (REQ/BASE) or INVESTIGATION COMPLETE / BLOCKED (FIND), opening SKILLS LOADED: actual list. Include ticket/session, artifact+revision, measurements, findings, UNVERIFIED limitations, self-report and comments read through cursor. Return control at a spine handoff, a genuine blocker, or an IMPORTANT OPERATION; keep the session resumable. No push or self-acceptance.
