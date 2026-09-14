@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { TextDecoder } from "node:util";
 
 import { TypedDomainError } from "@debateai/kernel";
+import { SUPPORT_CATALOG_CANONICAL } from "./catalog.js";
 
 export type HelpCorpusLanguage = "en" | "ro";
 export type HelpCorpusStatus = "shipped" | "intended";
@@ -20,10 +21,33 @@ export type HelpCorpusEntry = Readonly<{
   body: string;
 }>;
 
+export type SupportReviewDetails = Readonly<{
+  reviewedBy: "SOL";
+  reviewerSession: string;
+  reviewedOn: string;
+  evidence: string;
+}>;
+
+export type SupportArticleReview = SupportReviewDetails & Readonly<{
+  id: string;
+  lang: HelpCorpusLanguage;
+  sha256: string;
+}>;
+
+export type SupportReviewManifest = Readonly<{
+  schemaVersion: 1;
+  catalog: SupportReviewDetails & Readonly<{ sha256: string }>;
+  articles: readonly SupportArticleReview[];
+}>;
+
 export type LoadedHelpCorpus = Readonly<{
   entries: readonly HelpCorpusEntry[];
   shippedCount: number;
   ignoredCount: number;
+  previewReviewedCount: number;
+  ownerRatifiedCount: number;
+  catalogDigest: string;
+  reviewManifest: SupportReviewManifest;
   /**
    * Canonical form: ids sorted by code point; within each id, `en` then `ro`;
    * each line is `<id>.<lang>.md:<sha256 of exact file bytes>`, joined by LF
@@ -31,6 +55,11 @@ export type LoadedHelpCorpus = Readonly<{
    */
   manifest: string;
   kbVersion: string;
+}>;
+
+export type HelpCorpusSnapshotLookup = Readonly<{
+  currentVersion: string;
+  get(version: string): LoadedHelpCorpus | undefined;
 }>;
 
 export class SupportKbError extends TypedDomainError {}
@@ -51,6 +80,7 @@ const LANGUAGES = ["en", "ro"] as const;
 const ENTRY_FILENAME = /^([a-z0-9]+(?:-[a-z0-9]+)*)\.(en|ro)\.md$/u;
 const ENTRY_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const RATIFIED_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const SHA256 = /^[0-9a-f]{64}$/u;
 const INSTRUCTION_LIKE_PATTERNS = [
   /\bignore\s+(?:(?:all|any)\s+)?(?:(?:of\s+)?(?:your|the)\s+)?previous\b/iu,
   /\bsystem\s*:/iu,
@@ -243,7 +273,105 @@ function sha256(bytes: string | Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function loadHelpCorpus(directory: string): LoadedHelpCorpus {
+const EMPTY_REVIEW_MANIFEST: SupportReviewManifest = Object.freeze({
+  schemaVersion: 1,
+  catalog: Object.freeze({
+    sha256: "",
+    reviewedBy: "SOL",
+    reviewerSession: "",
+    reviewedOn: "",
+    evidence: "",
+  }),
+  articles: Object.freeze([]),
+});
+
+function reviewManifestError(detail: string): never {
+  throw new SupportKbError("SUPPORT_KB_REVIEW_MANIFEST_INVALID", detail);
+}
+
+function parseReviewDetails(value: unknown, subject: string): SupportReviewDetails {
+  if (typeof value !== "object" || value === null) reviewManifestError(`${subject} must be an object`);
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  const allowed = subject === "catalog"
+    ? ["evidence", "reviewedBy", "reviewedOn", "reviewerSession", "sha256"]
+    : ["evidence", "id", "lang", "reviewedBy", "reviewedOn", "reviewerSession", "sha256"];
+  if (keys.length !== allowed.length || keys.some((key, index) => key !== allowed[index])) {
+    reviewManifestError(`${subject} has unexpected or missing keys`);
+  }
+  if (record.reviewedBy !== "SOL") reviewManifestError(`${subject}.reviewedBy must identify the Sol editorial role`);
+  if (typeof record.reviewerSession !== "string" || record.reviewerSession.trim() === "") {
+    reviewManifestError(`${subject}.reviewerSession must identify the actual review session`);
+  }
+  if (typeof record.reviewedOn !== "string" || !isIsoDate(record.reviewedOn)) {
+    reviewManifestError(`${subject}.reviewedOn must be an ISO date`);
+  }
+  if (typeof record.evidence !== "string" || record.evidence.trim() === "") {
+    reviewManifestError(`${subject}.evidence must locate durable review evidence`);
+  }
+  return Object.freeze({
+    reviewedBy: "SOL",
+    reviewerSession: record.reviewerSession,
+    reviewedOn: record.reviewedOn,
+    evidence: record.evidence,
+  });
+}
+
+function parseReviewManifest(value: unknown): SupportReviewManifest {
+  if (value === undefined) return EMPTY_REVIEW_MANIFEST;
+  if (typeof value !== "object" || value === null) reviewManifestError("manifest must be an object");
+  const record = value as Record<string, unknown>;
+  if (
+    record.schemaVersion !== 1
+    || !Array.isArray(record.articles)
+    || typeof record.catalog !== "object"
+    || record.catalog === null
+    || Object.keys(record).sort().join(",") !== "articles,catalog,schemaVersion"
+  ) {
+    reviewManifestError("manifest must contain exactly schemaVersion, catalog and articles");
+  }
+  const catalogRecord = record.catalog as Record<string, unknown>;
+  const catalogDetails = parseReviewDetails(catalogRecord, "catalog");
+  if (typeof catalogRecord.sha256 !== "string" || !SHA256.test(catalogRecord.sha256)) {
+    reviewManifestError("catalog.sha256 must be lowercase SHA256");
+  }
+  const seen = new Set<string>();
+  const articles = record.articles.map((value, index) => {
+    const subject = `articles[${index}]`;
+    const details = parseReviewDetails(value, subject);
+    const article = value as Record<string, unknown>;
+    if (typeof article.id !== "string" || !ENTRY_ID.test(article.id)) {
+      reviewManifestError(`${subject}.id must be a lowercase slug`);
+    }
+    if (article.lang !== "en" && article.lang !== "ro") {
+      reviewManifestError(`${subject}.lang must be en or ro`);
+    }
+    if (typeof article.sha256 !== "string" || !SHA256.test(article.sha256)) {
+      reviewManifestError(`${subject}.sha256 must be lowercase SHA256`);
+    }
+    const key = `${article.id}.${article.lang}`;
+    if (seen.has(key)) reviewManifestError(`${subject} duplicates ${key}`);
+    seen.add(key);
+    return Object.freeze({
+      id: article.id,
+      lang: article.lang,
+      sha256: article.sha256,
+      ...details,
+    });
+  });
+  return Object.freeze({
+    schemaVersion: 1,
+    catalog: Object.freeze({ sha256: catalogRecord.sha256, ...catalogDetails }),
+    articles: Object.freeze(articles),
+  });
+}
+
+export function loadHelpCorpus(
+  directory: string,
+  options: Readonly<{ reviewManifest?: unknown }> = {},
+): LoadedHelpCorpus {
+  const reviewManifest = parseReviewManifest(options.reviewManifest);
+  const catalogDigest = sha256(SUPPORT_CATALOG_CANONICAL);
   const directoryEntries = (() => {
     try {
       return readdirSync(directory, { withFileTypes: true, encoding: "utf8" });
@@ -311,33 +439,74 @@ export function loadHelpCorpus(directory: string): LoadedHelpCorpus {
   }
 
   const shippedFiles: ParsedFile[] = [];
+  const selectedReviewLines: string[] = [];
+  let previewReviewedCount = 0;
+  let ownerRatifiedCount = 0;
+  const reviewsByLogicalKey = new Map(
+    reviewManifest.articles.map((review) => [`${review.id}.${review.lang}`, review]),
+  );
+  const catalogReviewed = reviewManifest.catalog.sha256 === catalogDigest;
   for (const id of [...byId.keys()].sort()) {
     const pair = byId.get(id);
     if (pair === undefined) continue;
     const en = pair.get("en");
     const ro = pair.get("ro");
-    if (
-      en !== undefined
-      && ro !== undefined
-      && en.entry.status === "shipped"
-      && ro.entry.status === "shipped"
-      && en.entry.ratifiedBy === "V"
-      && ro.entry.ratifiedBy === "V"
-    ) {
-      shippedFiles.push(en, ro);
+    if (en === undefined || ro === undefined || en.entry.status !== "shipped" || ro.entry.status !== "shipped") continue;
+    const ownerRatified = en.entry.ratifiedBy === "V" && ro.entry.ratifiedBy === "V";
+    const enReview = reviewsByLogicalKey.get(`${id}.en`);
+    const roReview = reviewsByLogicalKey.get(`${id}.ro`);
+    const peerReviewed = catalogReviewed
+      && enReview?.sha256 === sha256(en.bytes)
+      && roReview?.sha256 === sha256(ro.bytes);
+    if (!ownerRatified && !peerReviewed) continue;
+    shippedFiles.push(en, ro);
+    if (ownerRatified) ownerRatifiedCount += 1;
+    if (peerReviewed) {
+      previewReviewedCount += 1;
+      for (const review of [enReview, roReview] as const) {
+        if (review === undefined) continue;
+        selectedReviewLines.push(
+          `review:${review.id}.${review.lang}:${review.sha256}:${review.reviewedBy}:${review.reviewerSession}:${review.reviewedOn}:${review.evidence}`,
+        );
+      }
+    } else {
+      selectedReviewLines.push(
+        `ratification:${id}.en:V:${en.entry.ratifiedOn}`,
+        `ratification:${id}.ro:V:${ro.entry.ratifiedOn}`,
+      );
     }
   }
 
-  const manifest = shippedFiles
-    .map(({ filename, bytes }) => `${filename}:${sha256(bytes)}`)
-    .join("\n");
+  const manifest = [
+    `catalog:${catalogDigest}`,
+    ...shippedFiles.map(({ filename, bytes }) => `${filename}:${sha256(bytes)}`),
+    ...selectedReviewLines,
+  ].join("\n");
   const shippedCount = shippedFiles.length / LANGUAGES.length;
 
   return Object.freeze({
     entries: Object.freeze(shippedFiles.map(({ entry }) => entry)),
     shippedCount,
     ignoredCount: byId.size - shippedCount,
+    previewReviewedCount,
+    ownerRatifiedCount,
+    catalogDigest,
+    reviewManifest,
     manifest,
     kbVersion: sha256(manifest),
+  });
+}
+
+export function createHelpCorpusSnapshotLookup(
+  current: LoadedHelpCorpus,
+  retained: readonly LoadedHelpCorpus[] = [],
+): HelpCorpusSnapshotLookup {
+  const snapshots = new Map<string, LoadedHelpCorpus>();
+  for (const snapshot of [...retained, current]) snapshots.set(snapshot.kbVersion, snapshot);
+  return Object.freeze({
+    currentVersion: current.kbVersion,
+    get(version: string): LoadedHelpCorpus | undefined {
+      return snapshots.get(version);
+    },
   });
 }

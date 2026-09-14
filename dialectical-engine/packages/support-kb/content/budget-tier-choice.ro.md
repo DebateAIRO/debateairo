@@ -4,14 +4,12 @@ lang: ro
 title: "Alege nivelul bugetului de compoziție"
 status: shipped
 sources:
-  - apps/ui/app/new/page.tsx:33
-  - apps/ui/app/new/page.tsx:34
-  - apps/ui/app/new/page.tsx:35
-  - apps/ui/app/new/page.tsx:36
-  - apps/ui/app/new/page.tsx:196
-verified_against: "2b670d30"
-ratified_by: V
-ratified_on: "2026-09-04"
+  - apps/ui/app/new/page.tsx:87
+  - apps/ui/app/new/page.tsx:111
+  - apps/ui/app/new/page.tsx:257
+verified_against: "b7ca2c41"
+ratified_by: ""
+ratified_on: ""
 ---
 
-Nivelul bugetului de compoziție controlează câtă muncă poate aloca procesul de compoziție. Alege **Low**, **Medium** sau **High**. Pagina oferă o valoare implicită provizorie, pe care o poți schimba înainte de pornirea rulării.
+Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul de compoziție. Planul Free păstrează valoarea implicită curentă fixă. Cu planul Premium selectat, poți alege **Low**, **Medium** sau **High** înainte să pornești rularea. Acest control nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a modelelor.
