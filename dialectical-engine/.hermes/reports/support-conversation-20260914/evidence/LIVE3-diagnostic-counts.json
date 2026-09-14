@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "revision": "43cf9386ea3c9e7c79523ec38debe63271d19292",
+  "byte_offset_start": 722,
+  "byte_offset_end": 890,
+  "actual_finite_requests": 7,
+  "rejected_outcomes": 3,
+  "fixed_enum_events": 3,
+  "counts": {
+    "TEXT_LINK_OR_MARKUP": 1,
+    "TEXT_CREDENTIAL_OR_SECURITY_ACTION": 2
+  },
+  "correlation_limit": "Events are isolated to the finite-matrix byte window. The reporter emits no request identifier, so exact category-to-prompt attribution is not claimed.",
+  "raw_completion_or_log_lines_retained": false
+}

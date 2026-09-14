@@ -69,7 +69,9 @@
     "LIVE2": "t_48f43282",
     "FIX3": "t_e697cad1",
     "LIVE3": "t_8a5cf2e8",
-    "LIVE2_ACTION_ID": "t_67a569fe"
+    "LIVE2_ACTION_ID": "t_67a569fe",
+    "ARCHCHECK": "t_d44075a6",
+    "SECDELTA": "t_29866275"
   },
   "edges": [
     [
@@ -330,6 +332,22 @@
     ],
     [
       "LIVE3",
+      "GATE"
+    ],
+    [
+      "LIVE3",
+      "ARCHCHECK"
+    ],
+    [
+      "ARCHCHECK",
+      "GATE"
+    ],
+    [
+      "LIVE3",
+      "SECDELTA"
+    ],
+    [
+      "SECDELTA",
       "GATE"
     ]
   ]
