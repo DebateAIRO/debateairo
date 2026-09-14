@@ -8,6 +8,7 @@ import {
   DEVELOPMENT_RUN_DEATH_POLICY
 } from "./dev-deployment-register.js";
 import {
+  loadModelConfigConfiguredProviders,
   parseDevelopmentProviderPanelTargets
 } from "./dev-provider-panel.js";
 
@@ -54,10 +55,13 @@ export class DevelopmentRunnerProcessError extends Error {
 
 function createRunnerEnvironment(
   commandEnvironment: Readonly<Record<string, string>>,
-  apiEnvironment: Readonly<Record<string, string>>
+  apiEnvironment: Readonly<Record<string, string>>,
+  repositoryRoot: string
 ): Readonly<Record<string, string>> {
+  const configuredProviders = loadModelConfigConfiguredProviders(repositoryRoot);
   const providerPanel = parseDevelopmentProviderPanelTargets(
-    apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!
+    apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+    configuredProviders
   );
   const targets = parseProviderDiscoveryTargets(
     apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
@@ -132,7 +136,8 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
   try {
     child = input.operations.startRunner(createRunnerEnvironment(
       input.commandEnvironment,
-      apiEnvironment
+      apiEnvironment,
+      input.repositoryRoot
     ));
   } catch (error) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);

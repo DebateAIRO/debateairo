@@ -108,13 +108,13 @@ describe("S02 tier roster admission", () => {
     const panelSizes: number[] = [];
     const result = await evaluateAskAdmission(settingsFor([
       member("gpt-5.6-sol", "sol"),
-      member("claude-sonnet-5", "sonnet"),
+      member("glm-5.3-flash", "glm"),
       member("gpt-5.6-luna", "luna")
     ], panelSizes), ask("free"));
 
     expect(result.discoveredPanel.map(({ model_id }) => model_id)).toEqual([
       "gpt-5.6-luna",
-      "claude-sonnet-5"
+      "glm-5.3-flash"
     ]);
     expect(panelSizes).toEqual([2]);
   });
@@ -125,7 +125,7 @@ describe("S02 tier roster admission", () => {
       member("gpt-5.6-luna", "luna"),
       member("grok-4.6-build", "grok"),
       member("claude-opus-5", "opus"),
-      member("claude-sonnet-5", "sonnet"),
+      member("glm-5.3-flash", "glm"),
       member("gpt-5.6-sol", "sol")
     ], panelSizes), ask("premium"));
 
@@ -146,9 +146,40 @@ describe("S02 tier roster admission", () => {
     expect(error).toMatchObject({
       name: "AskRefusal",
       code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
+      message: "The free plan needs gpt-5.6-luna, glm-5.3-flash, and they are not available right now"
     });
     expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
+  });
+
+  // Property: a valid Free ask missing both file-fed ids names both before any run is created.
+  // Production break: keep the retired model member in the Free roster.
+  it("refuses a Free ask missing both file-fed ids before creating a run", async () => {
+    let runCreations = 0;
+    const application = applicationWithSubmit(async (submittedAsk) => {
+      await evaluateAskAdmission(settingsFor([]), submittedAsk);
+      runCreations += 1;
+      return { run_ref: RUN_ID, status: "QUEUED" };
+    });
+    const api = buildApi({
+      application,
+      sessions: testSessionApplication([HTTP_IDENTITY]),
+      allowedOrigin: TEST_APP_ORIGIN
+    });
+
+    const response = await api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: HTTP_HEADERS,
+      payload: ask("free")
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+      message: "The free plan needs gpt-5.6-luna, glm-5.3-flash, and they are not available right now"
+    });
+    expect(runCreations).toBe(0);
+    await api.close();
   });
 
   it("refuses Premium admission with every missing roster member named", async () => {
@@ -190,7 +221,7 @@ describe("S02 tier roster admission", () => {
     expect(error).toMatchObject({
       name: "AskRefusal",
       code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
+      message: "The free plan needs gpt-5.6-luna, glm-5.3-flash, and they are not available right now"
     });
     expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
     expect(error).not.toMatchObject({ code: "STRUCTURAL_CEILING_PANELSIZE_INVALID" });
@@ -220,7 +251,7 @@ describe("S02 tier roster admission", () => {
     expect(response.statusCode).toBe(422);
     expect(response.json()).toEqual({
       error: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
+      message: "The free plan needs gpt-5.6-luna, glm-5.3-flash, and they are not available right now"
     });
     await api.close();
   });

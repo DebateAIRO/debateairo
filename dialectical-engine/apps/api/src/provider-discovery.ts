@@ -51,14 +51,21 @@ async function probeTarget(input: Readonly<{
         method: "POST",
         headers,
         signal: AbortSignal.timeout(input.timeoutMs),
-        body: JSON.stringify({
-          model: input.target.model,
-          max_tokens: 8,
-          messages: [{
-            role: "user",
-            content: "DR-181 discovery health probe. Reply exactly: OK"
-          }]
-        })
+        body: (() => {
+          const PROBE_BODY_EXTENSIONS: Readonly<Record<string, Readonly<Record<string, unknown>>>>
+            = Object.freeze({
+              "Z.AI": Object.freeze({ thinking: Object.freeze({ type: "disabled" }) })
+            });
+          return JSON.stringify({
+            model: input.target.model,
+            max_tokens: 64,
+            messages: [{
+              role: "user",
+              content: "DR-181 discovery health probe. Reply exactly: OK"
+            }],
+            ...(PROBE_BODY_EXTENSIONS[input.target.maker] ?? {})
+          });
+        })()
       }
     );
     const raw = await response.text();
@@ -130,15 +137,27 @@ export function createProviderDiscoveryResolver(input: Readonly<{
     const latestByRef = new Map(latest.map((record) => [record.providerRef, record] as const));
     const observations = await Promise.all(input.targets.map(async (target) => {
       const record = latestByRef.get(target.providerRef);
-      return isFreshMatchingRecord(record, target, now, input.probeFreshnessMs)
-        ? record
-        : probeTarget({
-            target,
-            probes: input.probes,
-            timeoutMs: input.probeTimeoutMs,
-            fetchImplementation,
-            clock
-          });
+      if (isFreshMatchingRecord(record, target, now, input.probeFreshnessMs)) return record;
+      if (target.authorizationHeader === undefined) {
+        const observation = Object.freeze({
+          probeEvidenceRef: randomUUID(),
+          providerRef: target.providerRef,
+          maker: target.maker,
+          state: "ABSENT" as const,
+          modelId: null,
+          failureCode: "PROVIDER_PROBE_SKIPPED_UNCREDENTIALED",
+          probedAt: now
+        });
+        await input.probes.record(observation);
+        return observation;
+      }
+      return probeTarget({
+        target,
+        probes: input.probes,
+        timeoutMs: input.probeTimeoutMs,
+        fetchImplementation,
+        clock
+      });
     }));
     return Object.freeze(observations.flatMap((record) => (
       record.state === "HEALTHY" && record.modelId !== null

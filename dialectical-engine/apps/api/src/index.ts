@@ -18,6 +18,7 @@ import {
   LegacyRunClaimRequestSchema,
   LegacyRunClaimResultSchema,
   NodeSchema,
+  PlanTierRostersSchema,
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
   PLAN_TIER_ROSTERS,
@@ -39,6 +40,7 @@ import {
   type Inspection,
   type InvestigationAccepted,
   type Node,
+  type PlanTierRosters,
   type RunProjection,
   type Session
 } from "@debateai/contract";
@@ -136,6 +138,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
@@ -158,7 +161,7 @@ export const authorizationPolicyInventory = Object.freeze([
   origin?: RouteOriginPolicy;
   session?: RouteSessionPolicy;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
-    "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
+    "deployment" | "plan-tier-rosters" | "evaluator" | "support-session" | "support-message" | "support-case" |
     "support-status";
   action: string;
 }>[]);
@@ -230,6 +233,7 @@ export interface AskApplication {
   readNode(answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess): Promise<Node | null>;
   recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session, ownership: RunOwnershipAccess): Promise<InvestigationAccepted | null>;
   unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null>;
+  readPlanTierRosters?(session: Session): Promise<PlanTierRosters>;
   readDeployment(session: Session): Promise<Deployment>;
   events(runId: string, session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown>;
 }
@@ -864,6 +868,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(request.session);
   });
 
+  api.get("/v1/plan-tiers", routePolicy("GET /v1/plan-tiers"), async (request, reply) => {
+    if (options.application.readPlanTierRosters === undefined) {
+      throw new TypedDomainError(
+        "DEPLOYMENT_REGISTER_UNAVAILABLE",
+        "No sealed plan-tier roster row exists"
+      );
+    }
+    return reply.send(PlanTierRostersSchema.parse(
+      await options.application.readPlanTierRosters(request.session)
+    ));
+  });
+
   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
   });
@@ -1466,6 +1482,12 @@ export class PostgresAskApplication implements AskApplication {
       })),
       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
     });
+  }
+
+  async readPlanTierRosters(session: Session): Promise<PlanTierRosters> {
+    const deployment = await this.readDeployment(session);
+    const row = deployment.register.rows.find(({ row_key }) => row_key === "planTierRosters");
+    return PlanTierRostersSchema.parse(row?.value);
   }
 
   async *events(runId: string, _session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown> {

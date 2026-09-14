@@ -4,6 +4,7 @@ import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
 import { CLAIM_TYPES } from "@debateai/kernel";
+import type { ModelConfig } from "@debateai/model-config";
 import {
   AUTH_POLICY_REGISTER_ROWS,
   MFA_POLICY_REGISTER_ROW,
@@ -32,6 +33,12 @@ export type DevelopmentDeploymentRegisterRow = Readonly<{
   value: unknown;
   sourceRef: string;
 }>;
+
+type PlanTierWord = "free" | "premium";
+
+export type DevelopmentPlanTierRosters = Readonly<
+  Record<PlanTierWord, readonly string[]>
+>;
 
 export const DEVELOPMENT_SOURCE_REF =
   "DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05" as const;
@@ -320,7 +327,8 @@ const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
 ] satisfies readonly DevelopmentDeploymentRegisterRow[]);
 
 export function buildDevelopmentDeploymentRegisterRows(
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  planTierRosters: DevelopmentPlanTierRosters
 ): readonly DevelopmentDeploymentRegisterRow[] {
   return Object.freeze([
     Object.freeze({
@@ -332,8 +340,26 @@ export function buildDevelopmentDeploymentRegisterRows(
       }),
       sourceRef: DEVELOPMENT_SOURCE_REF
     }),
+    Object.freeze({
+      rowKey: "planTierRosters",
+      value: Object.freeze({
+        kind: "PLAN_TIER_ROSTERS" as const,
+        free: Object.freeze([...planTierRosters.free]),
+        premium: Object.freeze([...planTierRosters.premium])
+      }),
+      sourceRef: DEVELOPMENT_SOURCE_REF
+    }),
     ...DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS
   ]);
+}
+
+export function developmentPlanTierRosters(
+  config: ModelConfig
+): DevelopmentPlanTierRosters {
+  return Object.freeze({
+    free: Object.freeze(config.free.map(({ model }) => model)),
+    premium: Object.freeze(config.premium.map(({ model }) => model))
+  });
 }
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
@@ -449,6 +475,7 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
 
 type SeedDevelopmentDeploymentRegisterInput = Readonly<{
   adminPool: Pool;
+  planTierRosters: DevelopmentPlanTierRosters;
   providerPanel: DevelopmentProviderPanel;
   repositoryRoot: string;
 }>;
@@ -471,7 +498,8 @@ function developmentValueAst(value: unknown): CanonicalJsonAst {
 
 function developmentRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  planTierRosters: DevelopmentPlanTierRosters
 ): readonly DevelopmentDeploymentRegisterRow[] {
   const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
     Object.freeze({
@@ -487,7 +515,7 @@ function developmentRows(
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
-    ...buildDevelopmentDeploymentRegisterRows(providerPanel)
+    ...buildDevelopmentDeploymentRegisterRows(providerPanel, planTierRosters)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
@@ -497,9 +525,13 @@ function developmentRows(
 
 async function expectedRunnerRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  planTierRosters: DevelopmentPlanTierRosters
 ): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  const rows = [...developmentRows(bootstrap, providerPanel), ...await buildDevelopmentRunnerRegisterRows()];
+  const rows = [
+    ...developmentRows(bootstrap, providerPanel, planTierRosters),
+    ...await buildDevelopmentRunnerRegisterRows()
+  ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_RUNNER_REGISTER_DEFINITION_INVALID");
   }
@@ -508,9 +540,10 @@ async function expectedRunnerRows(
 
 export async function buildDevelopmentDeploymentRegisterPublicationRows(
   bootstrap: BootstrapRegister,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  planTierRosters: DevelopmentPlanTierRosters
 ): Promise<readonly RegisterPublicationRow[]> {
-  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel)).map((row) =>
+  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel, planTierRosters)).map((row) =>
     Object.freeze({
       rowKey: row.rowKey,
       valueJsonText: canonicalRegisterJson(
@@ -619,6 +652,7 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
   input: Readonly<{
     adminPool: Pool;
     providerPanel: DevelopmentProviderPanel;
+    planTierRosters: DevelopmentPlanTierRosters;
     repositoryRoot: string;
     baseRegisterVersion: RegisterVersionText;
     operations?: DevelopmentProviderSetPublicationOperations;
@@ -630,7 +664,8 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
   const bootstrap = await loadBootstrapRegister();
   const rows = await buildDevelopmentDeploymentRegisterPublicationRows(
     bootstrap,
-    input.providerPanel
+    input.providerPanel,
+    input.planTierRosters
   );
   const snapshotSha256 = computeRegisterSnapshotSha256(rows);
   const operations = input.operations
@@ -672,7 +707,8 @@ export async function seedDevelopmentDeploymentRegister(
   }
   const publicationRows = await buildDevelopmentDeploymentRegisterPublicationRows(
     bootstrap,
-    input.providerPanel
+    input.providerPanel,
+    input.planTierRosters
   );
   const imported = await createPostgresRegisterPublicationPort(input.adminPool).importHistorical({
     registerVersion: parseRegisterVersionText(String(DEVELOPMENT_REGISTER_VERSION)),

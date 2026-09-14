@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@debateai/model-config':
+        specifier: workspace:*
+        version: link:packages/model-config
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.21.0)(pg@8.22.0)
@@ -583,6 +586,12 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+
+  packages/model-config:
+    dependencies:
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
   packages/obs-capture:
     dependencies:

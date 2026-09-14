@@ -20,7 +20,8 @@ import { buildDevelopmentDeploymentRegisterPublicationRows } from
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
-  LEGACY_REGISTER_V1_SNAPSHOT_SHA256
+  LEGACY_REGISTER_V1_SNAPSHOT_SHA256,
+  TEST_PLAN_TIER_ROSTERS
 } from "../support/registerFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -315,7 +316,8 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     const v1Rows = buildBootstrapRegisterPublicationRows(bootstrap);
     const v4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
       bootstrap,
-      TEST_DEVELOPMENT_PROVIDER_PANEL
+      TEST_DEVELOPMENT_PROVIDER_PANEL,
+      TEST_PLAN_TIER_ROSTERS
     );
     expect(computeRegisterSnapshotSha256(v1Rows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
     expect(computeRegisterSnapshotSha256(v4Rows))

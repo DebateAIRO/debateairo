@@ -4,7 +4,10 @@ import {
   DevelopmentAuthDataPlaneError
 } from "./dev-auth-data-plane.js";
 import { loadDevelopmentCommandEnvironment } from "@debateai/register";
-import { loadDevelopmentProviderPanelFromEnvironment } from "./dev-provider-panel.js";
+import {
+  loadDevelopmentProviderPanelFromEnvironment,
+  loadModelConfigConfiguredProviders
+} from "./dev-provider-panel.js";
 
 try {
   const commandEnvironment = loadDevelopmentCommandEnvironment();
@@ -12,7 +15,7 @@ try {
     createDevelopmentAuthDataPlaneOperations(
       process.cwd(),
       commandEnvironment,
-      loadDevelopmentProviderPanelFromEnvironment(commandEnvironment)
+      loadDevelopmentProviderPanelFromEnvironment(commandEnvironment, loadModelConfigConfiguredProviders(process.cwd()))
     )
   );
   console.log(

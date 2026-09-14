@@ -18,8 +18,42 @@ function targets(size: number): string {
     provider_ref: `provider-${index + 1}`,
     base_url: `http://127.0.0.1:${9100 + index}/v1`,
     model: `model-${index + 1}`,
-    ...(index === 2 ? { authorization_header: "Bearer provider-three-secret" } : {})
+    authorization_header: index === 2
+      ? "Bearer provider-three-secret"
+      : `Bearer provider-${index + 1}-secret`
   })));
+}
+
+async function capturedProbeBody(maker: string): Promise<Record<string, unknown>> {
+  let capturedBody: Record<string, unknown> | undefined;
+  const provider = Object.freeze({ providerRef: "provider-1", maker });
+  const resolver = createProviderDiscoveryResolver({
+    configuredProviders: [provider],
+    targets: [Object.freeze({
+      ...provider,
+      baseUrl: "http://127.0.0.1:9100/v1",
+      model: "model-1",
+      authorizationHeader: "Bearer local-probe"
+    })],
+    probes: {
+      readLatest: vi.fn(async () => []),
+      record: vi.fn(async () => undefined)
+    },
+    probeFreshnessMs: 600_000,
+    probeTimeoutMs: 1_000,
+    fetchImplementation: vi.fn(async (_input, init) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        model: "model-1",
+        choices: [{ message: { content: "OK" } }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch,
+    clock: () => new Date("2026-09-13T12:00:00.000Z")
+  });
+
+  await resolver();
+  if (capturedBody === undefined) throw new TypeError("PROBE_BODY_NOT_CAPTURED");
+  return capturedBody;
 }
 
 describe("production provider discovery", () => {
@@ -168,5 +202,20 @@ describe("production provider discovery", () => {
     expect(panels.every((panel) => panel.length === 1)).toBe(true);
     expect(store.readLatest).toHaveBeenCalledTimes(1);
     expect(store.record).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the measured budget and disables thinking for Z.AI probes", async () => {
+    await expect(capturedProbeBody("Z.AI")).resolves.toEqual(expect.objectContaining({
+      model: "model-1",
+      max_tokens: 64,
+      thinking: { type: "disabled" }
+    }));
+  });
+
+  it("uses the shared budget without sending the Z.AI extension to OpenAI", async () => {
+    const body = await capturedProbeBody("OpenAI");
+
+    expect(body).toEqual(expect.objectContaining({ model: "model-1", max_tokens: 64 }));
+    expect(Object.hasOwn(body, "thinking")).toBe(false);
   });
 });

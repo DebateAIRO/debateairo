@@ -10,6 +10,7 @@ import {
   NumberSlotSchema,
   RunProjectionSchema,
   TierSourceSchema,
+  createContractClient,
   contractInventory
 } from "@debateai/contract";
 
@@ -51,6 +52,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
     expect(contractInventory.routes).toEqual(expect.arrayContaining([
       "POST /v1/asks",
       "GET /v1/session",
+      "GET /v1/plan-tiers",
       "GET /v1/deployment",
       "GET /v1/answers/{id}",
       "GET /v1/answers/{id}/inspection",
@@ -94,6 +96,48 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       steering_annotations: [], caller_scope: "OPERATOR"
     })).toThrow();
     expect(() => AskRequestSchema.parse({ question_line: "missing ruled fields" })).toThrow();
+  });
+
+  // Property: the roster resource admits exactly free/premium arrays of non-empty model ids.
+  // Production break: omit PlanTierRostersSchema or allow a blank/unknown-key payload.
+  it("validates the closed plan-tier roster response", () => {
+    const schema = (contractInventory.resources as unknown as Record<string, {
+      parse(value: unknown): unknown;
+    }>).PlanTierRostersSchema;
+    expect(schema).toBeDefined();
+    if (schema === undefined) throw new TypeError("PlanTierRostersSchema is missing");
+    expect(schema.parse({
+      free: ["free-a", "free-b"],
+      premium: ["premium-a", "premium-b", "premium-c"]
+    })).toEqual({
+      free: ["free-a", "free-b"],
+      premium: ["premium-a", "premium-b", "premium-c"]
+    });
+    expect(() => schema.parse({ free: [""], premium: ["premium-a"] })).toThrow();
+    expect(() => schema.parse({
+      free: ["free-a"], premium: ["premium-a"], hidden: ["secret-model"]
+    })).toThrow();
+  });
+
+  // Property: readPlanTiers GETs the governed route and validates its response schema.
+  // Production break: point the client at /v1/deployment or return unvalidated JSON.
+  it("reads plan-tier rosters through the contract client", async () => {
+    const observedUrls: string[] = [];
+    const client = createContractClient("http://api.test", (async (input) => {
+      observedUrls.push(String(input));
+      return new Response(JSON.stringify({
+        free: ["free-a", "free-b"],
+        premium: ["premium-a", "premium-b", "premium-c"]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch) as ReturnType<typeof createContractClient> & {
+      readPlanTiers(): Promise<Readonly<{ free: readonly string[]; premium: readonly string[] }>>;
+    };
+
+    await expect(Promise.resolve().then(() => client.readPlanTiers())).resolves.toEqual({
+      free: ["free-a", "free-b"],
+      premium: ["premium-a", "premium-b", "premium-c"]
+    });
+    expect(observedUrls).toEqual(["http://api.test/v1/plan-tiers"]);
   });
 
   it("R12 admits plan_tier free and premium and refuses anything else", () => {

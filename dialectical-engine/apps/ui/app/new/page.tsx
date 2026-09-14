@@ -7,7 +7,6 @@ import { modelMeta } from "@/lib/models";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
-import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import {
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
@@ -45,6 +44,12 @@ const PLAN_TIER_OPTIONS = [
 ] as const;
 
 type PlanTier = (typeof PLAN_TIER_OPTIONS)[number]["value"];
+type PlanTierRosters = Readonly<Record<PlanTier, readonly string[]>>;
+
+const EMPTY_PLAN_TIER_ROSTERS: PlanTierRosters = Object.freeze({
+  free: [],
+  premium: []
+});
 
 const DEPTH_MIN = 1;
 const DEPTH_MAX = 5;
@@ -75,6 +80,7 @@ function NewDebateForm({ token }: { token: string }) {
   const searchParams = useSearchParams();
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [planTier, setPlanTier] = useState<PlanTier>("free");
+  const [planTierRosters, setPlanTierRosters] = useState<PlanTierRosters>(EMPTY_PLAN_TIER_ROSTERS);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
@@ -90,6 +96,7 @@ function NewDebateForm({ token }: { token: string }) {
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
+  const [planTierRostersError, setPlanTierRostersError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -104,6 +111,19 @@ function NewDebateForm({ token }: { token: string }) {
     }).catch((failure: unknown) => {
       if (!active) return;
       setSessionDefaultsError(`ASK_SESSION_DEFAULTS_UNAVAILABLE: ${failure instanceof Error ? failure.message : "Session read failed"}`);
+    });
+    void contractClient.readPlanTiers().then((rosters) => {
+      if (!active) return;
+      setPlanTierRosters({ free: rosters.free, premium: rosters.premium });
+      setPlanTierRostersError(null);
+    }).catch((failure: unknown) => {
+      if (!active) return;
+      setPlanTierRosters(EMPTY_PLAN_TIER_ROSTERS);
+      setPlanTierRostersError(
+        `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: ${
+          failure instanceof Error ? failure.message : "Plan tier roster read failed"
+        }`
+      );
     });
     return () => { active = false; };
   }, [token]);
@@ -197,7 +217,7 @@ function NewDebateForm({ token }: { token: string }) {
                 <span className="ndTierName">{option.name}</span>
                 <span className="ndTierPromise">{option.promise}</span>
                 <span className="ndTierModels">
-                  {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
+                  {planTierRosters[option.value].map((modelId) => (
                     <span key={modelId} className="ndTierModel">
                       <span
                         className="modelDot"
@@ -320,6 +340,7 @@ function NewDebateForm({ token }: { token: string }) {
           </div>
 
           {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
+          {planTierRostersError ? <div className="error" style={{ marginTop: 14 }}>{planTierRostersError}</div> : null}
 
           <button
             type="button"

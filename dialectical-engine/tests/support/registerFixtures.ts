@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { randomUUID } from "node:crypto";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import {
   canonicalDecimal,
   canonicalRegisterJson,
@@ -16,11 +17,12 @@ import type { CanonicalJsonAst, RegisterVersionText } from "../../packages/regis
 export const LEGACY_REGISTER_V1_SNAPSHOT_SHA256 =
   "8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b" as const;
 
-// Moved 2026-09-12 when the development provider set grew from one slot per maker to one
-// per plan-tier roster member (V: "Both free and premium need to be accessible at the same
-// time"). The previous three-slot snapshot was 120bdfea9776cff5...
+export const TEST_PLAN_TIER_ROSTERS = PLAN_TIER_ROSTERS;
+
+// Moved 2026-09-13 when the five live slots and file-owned plan-tier rosters reached v4.
+// The previous intermediate snapshot was 1f3c42c4eeb5588e144aff775ef59fd15bdf50b4f5c5064e6bc806333fa14457.
 export const DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 =
-  "42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb" as const;
+  "f02c8c003c75c2513672fc4380d4302d5dd18e576fcb498d968c61ba5cb32cf9" as const;
 
 function fixtureValueAst(value: unknown): CanonicalJsonAst {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;

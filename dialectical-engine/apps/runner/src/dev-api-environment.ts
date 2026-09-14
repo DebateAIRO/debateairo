@@ -8,6 +8,7 @@ import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets,
+  type DevelopmentConfiguredProvider,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
 import {
@@ -80,6 +81,7 @@ type AssembleDevelopmentApiEnvironmentInput = Readonly<{
   providerPanel: DevelopmentProviderPanel;
   registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
   supportModelTarget: string;
+  heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>;
 }>;
 
 function currentUid(): number {
@@ -307,7 +309,11 @@ async function publishExactFile(
   }
 }
 
-function isExactProviderRuntimeRefresh(existing: string, expected: string): boolean {
+function isExactProviderRuntimeRefresh(
+  existing: string,
+  expected: string,
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
+): boolean {
   try {
     const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
     const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
@@ -315,7 +321,9 @@ function isExactProviderRuntimeRefresh(existing: string, expected: string): bool
       if (key === "PROVIDER_DISCOVERY_TARGETS_JSON" || key === "SUPPORT_MODEL_TARGET_JSON") continue;
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
-    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    parseDevelopmentProviderPanelTargets(
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+    );
     parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
     return true;
   } catch {
@@ -333,7 +341,12 @@ function isExactProviderRuntimeRefresh(existing: string, expected: string): bool
  * credentials, database URLs, ports - must still match exactly, which is what keeps the
  * drift guard meaningful.
  */
-function isExactPublishedRegisterRefresh(existing: string, expected: string): boolean {
+function isExactPublishedRegisterRefresh(
+  existing: string,
+  expected: string,
+  configuredProviders: readonly DevelopmentConfiguredProvider[],
+  heldConfiguredProviderSets?: ReadonlyMap<string, readonly string[]>
+): boolean {
   const receiptKeys = new Set([
     "REGISTER_VERSION",
     "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
@@ -351,21 +364,31 @@ function isExactPublishedRegisterRefresh(existing: string, expected: string): bo
         || receiptKeys.has(key)) continue;
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
-    // The OUTGOING targets cannot be re-parsed against the new configured set - that set is
-    // precisely what changed - so they are held to the rule a publication actually obeys:
-    // slots are ADDED, never removed or renamed. An environment naming a provider the
-    // deployment does not configure (the retired local-vllm scaffold, say) stays drift.
+    // The OUTGOING targets cannot be re-parsed against the new configured set because that
+    // set is precisely what changed. An additive publication is admitted directly. A removal
+    // is admitted only when the caller proves the exact outgoing set was held by its version.
     const incoming = parseDevelopmentProviderPanelTargets(
-      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!
+      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
     );
     const configuredRefs = new Set(incoming.targets.map((target) => target.providerRef));
     const outgoing: unknown = JSON.parse(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
     if (!Array.isArray(outgoing) || outgoing.length < 1) return false;
+    const outgoingRefs: string[] = [];
     for (const row of outgoing) {
       if (typeof row !== "object" || row === null) return false;
       const providerRef = (row as Readonly<Record<string, unknown>>).provider_ref;
-      if (typeof providerRef !== "string" || !configuredRefs.has(providerRef)) return false;
+      if (typeof providerRef !== "string") return false;
+      outgoingRefs.push(providerRef);
     }
+    const additive = outgoingRefs.every((providerRef) => configuredRefs.has(providerRef));
+    const heldRefs = heldConfiguredProviderSets?.get(existingValues.get("REGISTER_VERSION")!);
+    const heldSet = heldRefs === undefined ? undefined : new Set(heldRefs);
+    const exactHeldSet = heldSet !== undefined
+      && heldSet.size === heldRefs!.length
+      && new Set(outgoingRefs).size === outgoingRefs.length
+      && outgoingRefs.length === heldSet.size
+      && outgoingRefs.every((providerRef) => heldSet.has(providerRef));
+    if (!additive && !exactHeldSet) return false;
     parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
     return true;
   } catch {
@@ -375,18 +398,21 @@ function isExactPublishedRegisterRefresh(existing: string, expected: string): bo
 
 function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
   existing: string,
-  expected: string
+  expected: string,
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
 ): boolean {
   const upgraded = existing.replace(
     "PROVIDER_PROBE_TIMEOUT_MS=5000\n",
     `PROVIDER_PROBE_TIMEOUT_MS=${DEVELOPMENT_CLI_CALL_TIMEOUT_MS}\n`
   );
-  return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected);
+  return upgraded !== existing
+    && isExactProviderRuntimeRefresh(upgraded, expected, configuredProviders);
 }
 
 function isExactLegacyEnvironmentWithoutSupportModelTarget(
   existing: string,
-  expected: string
+  expected: string,
+  configuredProviders: readonly DevelopmentConfiguredProvider[]
 ): boolean {
   try {
     const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
@@ -398,7 +424,9 @@ function isExactLegacyEnvironmentWithoutSupportModelTarget(
       if (key === "PROVIDER_DISCOVERY_TARGETS_JSON") continue;
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
-    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    parseDevelopmentProviderPanelTargets(
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!, configuredProviders
+    );
     parseDevelopmentSupportModelTargetJson(expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!);
     return true;
   } catch {
@@ -490,10 +518,21 @@ export async function assembleDevelopmentApiEnvironment(
     join(custodyRoot, "api.env"),
     source,
     [],
-    (existing) => isExactProviderRuntimeRefresh(existing, source)
-      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
-      || isExactPublishedRegisterRefresh(existing, source)
-      || isExactLegacyEnvironmentWithoutSupportModelTarget(existing,source)
+    (existing) => isExactProviderRuntimeRefresh(
+      existing, source, input.providerPanel.configuredProviders
+    )
+      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+        existing, source, input.providerPanel.configuredProviders
+      )
+      || isExactPublishedRegisterRefresh(
+        existing,
+        source,
+        input.providerPanel.configuredProviders,
+        input.heldConfiguredProviderSets
+      )
+      || isExactLegacyEnvironmentWithoutSupportModelTarget(
+        existing, source, input.providerPanel.configuredProviders
+      )
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }

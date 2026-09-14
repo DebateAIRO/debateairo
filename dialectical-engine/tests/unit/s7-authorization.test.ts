@@ -48,6 +48,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
+  { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
@@ -108,6 +109,10 @@ function fixtureApplication(): AskApplication {
     readNode: async () => null,
     recordInvestigation: async () => null,
     unlinkMemoryLink: async () => ({ memory_link_id: "memory:test", state: "UNLINKED" }),
+    readPlanTierRosters: async () => ({
+      free: ["free-a", "free-b"],
+      premium: ["premium-a", "premium-b", "premium-c"]
+    }),
     readDeployment: async () => ({
       register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
       fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }

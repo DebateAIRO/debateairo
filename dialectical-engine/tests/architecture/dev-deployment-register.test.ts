@@ -11,7 +11,7 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(packageJson.scripts?.["dev:auth:seed-register"])
       .toBe("tsx apps/runner/src/dev-deployment-register-cli.ts");
     expect(cli).toContain("loadMigrationEnvironment()");
-    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment())");
+    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment(), loadModelConfigConfiguredProviders(process.cwd()))");
     expect(cli).toContain("seedDevelopmentDeploymentRegister({");
     expect(cli).toContain("repositoryRoot: process.cwd()");
     expect(cli).toContain("DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX");

@@ -305,6 +305,12 @@ export const DeploymentSchema = z.object({
 }).strict();
 export type Deployment = z.infer<typeof DeploymentSchema>;
 
+export const PlanTierRostersSchema = z.object({
+  free: z.array(z.string().trim().min(1)),
+  premium: z.array(z.string().trim().min(1))
+}).strict();
+export type PlanTierRosters = z.infer<typeof PlanTierRostersSchema>;
+
 export const LabeledNumberSchema = z.object({
   value: z.number().finite(),
   kind: z.string().min(1),
@@ -676,6 +682,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/support/status",
     "POST /v1/asks",
     "GET /v1/session",
+    "GET /v1/plan-tiers",
     "GET /v1/deployment",
     "GET /v1/dev/evaluator",
     "POST /v1/dev/evaluator/consumer-selection",
@@ -703,7 +710,7 @@ export const contractInventory = Object.freeze({
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
-    DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
+    DeploymentSchema, PlanTierRostersSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
