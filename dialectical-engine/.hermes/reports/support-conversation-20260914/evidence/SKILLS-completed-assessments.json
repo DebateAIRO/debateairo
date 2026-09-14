@@ -1,0 +1,66 @@
+{
+  "at": "2026-09-14T15:37:24.351650+00:00",
+  "checks": [
+    {
+      "node": "ARCHCHECK",
+      "agent": "/root/plan_review",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-38-35-01a09f11-6f5f-74b2-9bba-1442a15308ef.jsonl",
+      "skills": [
+        "using-superpowers",
+        "heartbeat-protocol",
+        "heartbeat-reviewer",
+        "verification-before-completion",
+        "systematic-debugging"
+      ],
+      "rc": 0,
+      "output": "ok   using-superpowers (2)\nok   heartbeat-protocol (2)\nok   heartbeat-reviewer (2)\nok   verification-before-completion (2)\nok   systematic-debugging (2)\nSKILLS LOADED verified: 5 / 5\n",
+      "stderr": ""
+    },
+    {
+      "node": "SECDELTA",
+      "agent": "/root/forgot_destination",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-55-01a09ef8-1b81-7cb1-9a2d-015a5e8346b6.jsonl",
+      "skills": [
+        "using-superpowers",
+        "heartbeat-protocol",
+        "heartbeat-reviewer",
+        "verification-before-completion",
+        "systematic-debugging"
+      ],
+      "rc": 0,
+      "output": "ok   using-superpowers (5)\nok   heartbeat-protocol (9)\nok   heartbeat-reviewer (7)\nok   verification-before-completion (3)\nok   systematic-debugging (3)\nSKILLS LOADED verified: 5 / 5\n",
+      "stderr": ""
+    },
+    {
+      "node": "PRODDELTA",
+      "agent": "/root/baseline",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-10-40-01a09ef7-e096-7c31-9b35-806840028cf0.jsonl",
+      "skills": [
+        "using-superpowers",
+        "heartbeat-protocol",
+        "heartbeat-reviewer",
+        "verification-before-completion"
+      ],
+      "rc": 0,
+      "output": "ok   using-superpowers (2)\nok   heartbeat-protocol (4)\nok   heartbeat-reviewer (2)\nok   verification-before-completion (2)\nSKILLS LOADED verified: 4 / 4\n",
+      "stderr": ""
+    },
+    {
+      "node": "LIVE3",
+      "agent": "/root/preview",
+      "transcript": "/Users/vladmihaimiron/.codex/sessions/2026/09/14/rollout-2026-09-14T11-21-56-01a09f02-346a-7fb0-aa70-0424f1fdd21e.jsonl",
+      "skills": [
+        "using-superpowers",
+        "heartbeat-protocol",
+        "heartbeat-worker",
+        "test-driven-development",
+        "verification-before-completion",
+        "systematic-debugging"
+      ],
+      "rc": 0,
+      "output": "ok   using-superpowers (4)\nok   heartbeat-protocol (6)\nok   heartbeat-worker (7)\nok   test-driven-development (5)\nok   verification-before-completion (5)\nok   systematic-debugging (4)\nSKILLS LOADED verified: 6 / 6\n",
+      "stderr": ""
+    }
+  ],
+  "scope": "Repository checker verifies distinctive actual skill-body phrases against current skill files and same native session transcripts. Historical reads within each resumed session qualify; no transcript/raw runtime content copied."
+}

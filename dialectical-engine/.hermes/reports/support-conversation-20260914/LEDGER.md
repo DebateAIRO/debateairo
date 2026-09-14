@@ -72,3 +72,7 @@ Ruling: Stop speculative product corrections after repeated actual failures. Sch
 | SECDELTA |t_29866275|gpt-5.6-sol /root/forgot_destination|43cf9386|ASSESSMENT_COMPLETE|report/self+5probe+5final-log hashes matched;5additional attempts preserved|agent-reports/SECDELTA.md|B1/B2/B3/N1; actual imported modules,in-memory ports; no realHTTP/database/relay|
 
 Ruling: ARCHCHECK’s secure/fail-closed wording only describes recognized syntactic/policy rejections; SECDELTA actual accepted solicitations disprove a general security claim. Three failed demonstrations are retained. Owner-authorized autonomous CP1 implementation covers the recommended internal correction, with no model/contract substitution. Explicit FIX4 preparation is not final review pass4; final review pass1 has not started. Do not extend to another speculative prompt loop.
+
+|PRODDELTA|t_546a8c82|gpt-5.6-sol /root/baseline|43cf9386|PRODUCT_DELTA_CONSUMED|amended2reports+6receipts+2frozenUI hashes verified; native transcript BODY skills-check4/4|agent-reports/PRODDELTA.md|priorUIscopesresolved with syntheticlimit; no newclass; finalREV3pending|
+
+Native transcript index recovered by matching this root’s parent_thread_id metadata. Repository skills-check passed ARCHCHECK5/5,SECDELTA5/5,PRODDELTA4/4,LIVE3workerfloor6/6 against exact same-session BODY phrases and current skill files. No raw transcript/runtime content copied. Receipt SKILLS-completed-assessments.json; this replaces earlier inherited-read-only bookkeeping uncertainty.
