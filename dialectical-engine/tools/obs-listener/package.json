@@ -1,0 +1,26 @@
+{
+  "name": "@debateai/obs-listener",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "obsctl": "./bin/obsctl.mjs"
+  },
+  "exports": {
+    "./daemon": "./src/daemon/main.ts",
+    "./obsctl": "./src/obsctl/cli.ts",
+    "./watchdog": "./src/watchdog.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@debateai/obs-capture": "workspace:*",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@types/pg": "8.21.0",
+    "typescript": "7.0.2"
+  }
+}

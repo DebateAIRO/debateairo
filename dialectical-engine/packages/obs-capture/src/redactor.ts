@@ -1,16 +1,39 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  CAUSE_PARENT_NOT_CAPTURED,
+  CAUSE_RELATION_WRAPS,
+  causeChainWrapperCode,
+  EMPTY_CAUSE_CHAIN_CODES,
+  projectCauseChainCodes,
+} from "./cause-chain.js";
 import type { CaptureQueueEntry } from "./emit.js";
+import {
+  projectDeclaredRefs,
+  type ProjectedDeclaredRefs,
+} from "./kinds.js";
+import {
+  normalizeSafeEnvelopeMetadata,
+  normalizeSourceEventRef,
+  UNKNOWN_DECLARED_KIND,
+} from "./safe-metadata.js";
+import {
+  projectTraceFrames,
+  type CapturedTraceFrame,
+} from "./trace-frames.js";
 import {
   resolveSafeTemplate,
   resolveTaxonomyClass,
   severity,
+  validateTemplateParameters,
   type Severity,
   type TaxonomyClass,
 } from "./registry/index.js";
 
+export * from "./kinds.js";
+export { UNKNOWN_DECLARED_KIND } from "./safe-metadata.js";
+
 const POST_REDACTION_BRAND: unique symbol = Symbol("POST_REDACTION_ENVELOPE");
-const UNKNOWN_DECLARED_KIND = "UNKNOWN:DECLARED_KIND_REQUIRED";
 
 const CAPTURE_POINTS = Object.freeze([
   "process",
@@ -48,6 +71,16 @@ const INPUT_ALLOWLIST: ReadonlySet<string> = new Set([
   "source",
   "zone_context",
   "attempt_index",
+  "template_parameters",
+]);
+const LIFECYCLE_INPUT_ALLOWLIST: ReadonlySet<string> = new Set([
+  "code",
+  "error",
+  "taxonomy_class",
+  "capture_point",
+  "disposition",
+  "source",
+  "template_parameters",
 ]);
 
 export interface PostRedactionEnvelope {
@@ -65,7 +98,11 @@ export interface PostRedactionEnvelope {
     | "listener"
     | "watchdog"
     | "ingest";
-  readonly component: Readonly<{ readonly process: string; readonly package: string }>;
+  readonly component: Readonly<{
+    readonly process: string;
+    readonly package: string;
+    readonly route_template?: string;
+  }>;
   readonly capture_point: CapturePoint;
   readonly code: string;
   readonly taxonomy_class: TaxonomyClass;
@@ -77,17 +114,20 @@ export interface PostRedactionEnvelope {
   readonly redaction_policy_version: string;
   readonly allowlist_set_id: string;
   readonly fallback_minimized: boolean;
-  readonly run_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly work_item_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly node_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly attempt_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly ledger_ref: typeof UNKNOWN_DECLARED_KIND;
-  readonly parent_occurrence_ref: "NO_CAUSE";
-  readonly cause_relation: null;
-  readonly at_seq_watermark: typeof UNKNOWN_DECLARED_KIND;
-  readonly frames: readonly [];
+  readonly run_ref: ProjectedDeclaredRefs["run_ref"];
+  readonly work_item_ref: ProjectedDeclaredRefs["work_item_ref"];
+  readonly node_ref: ProjectedDeclaredRefs["node_ref"];
+  readonly attempt_ref: ProjectedDeclaredRefs["attempt_ref"];
+  readonly ledger_ref: ProjectedDeclaredRefs["ledger_ref"];
+  readonly parent_occurrence_ref:
+    | "NO_CAUSE"
+    | "CAUSE_NOT_CAPTURED:NOT_SEPARATELY_CAPTURED";
+  readonly cause_relation: null | "WRAPS";
+  readonly cause_chain_codes: readonly string[];
+  readonly at_seq_watermark: ProjectedDeclaredRefs["at_seq_watermark"];
+  readonly frames: readonly CapturedTraceFrame[];
   readonly safe_template_id: string;
-  readonly template_parameters: Readonly<Record<string, never>>;
+  readonly template_parameters: Readonly<Record<string, string | number>>;
   readonly source: DurableSource;
   readonly source_event_ref: string;
   readonly zone_context: boolean;
@@ -110,10 +150,25 @@ export interface SharedRedactorConfig {
   readonly allowlist_set_id: string;
   readonly now?: () => Date;
   readonly sourceEventRef?: () => string;
+  readonly repoRoot?: string;
+  readonly causeDepthMax?: number;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null;
+}
+
+function isParameterRecord(
+  value: unknown,
+): value is Readonly<Record<string, unknown>> {
+  return isRecord(value) && !Array.isArray(value);
+}
+
+function hasOwn(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
 }
 
 function ownValue(
@@ -123,6 +178,20 @@ function ownValue(
   return Object.prototype.hasOwnProperty.call(record, key)
     ? record[key]
     : undefined;
+}
+
+function ownDataValue(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+): unknown {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(record, key);
+    return descriptor !== undefined && Object.hasOwn(descriptor, "value")
+      ? descriptor.value
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function stringMember<T extends string>(
@@ -138,6 +207,45 @@ function stringMember<T extends string>(
     : undefined;
 }
 
+const ROUTE_TEMPLATE = /^\/[a-z0-9-]+(?:\/(?:[a-z0-9-]+|:[A-Za-z][A-Za-z0-9_]*))*$/u;
+const ROUTE_TEMPLATE_MAX_LENGTH = 192;
+
+interface HandledCaptureProjection {
+  readonly capturePoint: CapturePoint;
+  readonly routeTemplate: string | undefined;
+}
+
+function snapshotHandledCaptureContext(value: unknown): HandledCaptureProjection {
+  if (!isRecord(value)) {
+    return Object.freeze({ capturePoint: "boundary", routeTemplate: undefined });
+  }
+  try {
+    const capturePointDescriptor = Object.getOwnPropertyDescriptor(value, "capture_point");
+    const routeTemplateDescriptor = Object.getOwnPropertyDescriptor(value, "route_template");
+    const capturePointValue = capturePointDescriptor !== undefined
+      && Object.prototype.hasOwnProperty.call(capturePointDescriptor, "value")
+      ? capturePointDescriptor.value
+      : undefined;
+    const routeTemplateValue = routeTemplateDescriptor !== undefined
+      && Object.prototype.hasOwnProperty.call(routeTemplateDescriptor, "value")
+      ? routeTemplateDescriptor.value
+      : undefined;
+    const capturePoint = stringMember<CapturePoint>(
+      capturePointValue,
+      CAPTURE_POINT_SET,
+      "boundary",
+    ) ?? "boundary";
+    const routeTemplate = typeof routeTemplateValue === "string"
+      && routeTemplateValue.length <= ROUTE_TEMPLATE_MAX_LENGTH
+      && ROUTE_TEMPLATE.test(routeTemplateValue)
+      ? routeTemplateValue
+      : undefined;
+    return Object.freeze({ capturePoint, routeTemplate });
+  } catch {
+    return Object.freeze({ capturePoint: "boundary", routeTemplate: undefined });
+  }
+}
+
 export function isPostRedactionEnvelope(
   value: unknown,
 ): value is PostRedactionEnvelope {
@@ -151,12 +259,27 @@ export function isPostRedactionEnvelope(
 export function createSharedRedactor(
   config: SharedRedactorConfig,
 ): SharedRedactor {
-  const component = Object.freeze({
-    process: config.component.process,
-    package: config.component.package,
+  const metadata = normalizeSafeEnvelopeMetadata({
+    environment: config.environment,
+    build_ref: config.build_ref,
+    runtime: config.runtime,
+    component: config.component,
+    writer_identity: config.writer_identity,
+    redaction_policy_version: config.redaction_policy_version,
+    allowlist_set_id: config.allowlist_set_id,
   });
+  const component = metadata.component;
   const now = config.now ?? (() => new Date());
   const sourceEventRef = config.sourceEventRef ?? randomUUID;
+  const ambientProjectionFields = Object.freeze([
+    "run_ref",
+    "work_item_ref",
+    "node_ref",
+    "attempt_ref",
+    "ledger_ref",
+    "at_seq_watermark",
+    "zone_context",
+  ] as const);
 
   function safeNow(): Date {
     try {
@@ -167,14 +290,17 @@ export function createSharedRedactor(
     }
   }
 
-  function safeSourceEventRef(): string {
+  function safeSourceEventRef(reservedValue?: unknown): Readonly<{
+    readonly value: string;
+    readonly minimized: boolean;
+  }> {
+    if (reservedValue !== undefined) {
+      return normalizeSourceEventRef(reservedValue);
+    }
     try {
-      const value = sourceEventRef();
-      return typeof value === "string" && value.length > 0
-        ? value
-        : "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE";
+      return normalizeSourceEventRef(sourceEventRef());
     } catch {
-      return "UNKNOWN:SOURCE_EVENT_REF_UNAVAILABLE";
+      return normalizeSourceEventRef(undefined);
     }
   }
 
@@ -187,6 +313,12 @@ export function createSharedRedactor(
     readonly zoneContext: boolean;
     readonly attemptIndex: number | null;
     readonly fallbackMinimized: boolean;
+    readonly ambientContext: CaptureQueueEntry["ambient_context_ref"];
+    readonly templateParameters: Readonly<Record<string, string | number>>;
+    readonly causeChainCodes?: unknown;
+    readonly routeTemplate?: string;
+    readonly sourceEventRef?: unknown;
+    readonly traceFrames: readonly CapturedTraceFrame[];
   }): PostRedactionEnvelope {
     const template = resolveSafeTemplate(options.code);
     const fallbackTemplate = resolveSafeTemplate("OBS_CAPTURE_SELF");
@@ -198,73 +330,209 @@ export function createSharedRedactor(
       throw new Error("OBS_CAPTURE_SELF_TEMPLATE_MISSING");
     }
     const safeCode = safeTemplate.code;
-    const safeTaxonomy = template === undefined ? "CAPTURE_SELF" : options.taxonomyClass;
+    const binding = safeTemplate.binding;
+    const safeTaxonomy = template === undefined
+      ? "CAPTURE_SELF"
+      : (binding?.taxonomy_class ?? options.taxonomyClass);
+    const sourceRef = safeSourceEventRef(options.sourceEventRef);
+    const eventComponent = options.routeTemplate === undefined
+      ? component
+      : Object.freeze({ ...component, route_template: options.routeTemplate });
     const fingerprint = createHash("sha256")
-      .update(`v1\u0000${safeCode}\u0000${safeTaxonomy}\u0000${config.runtime}\u0000${component.package}`)
+      .update(`v1\u0000${safeCode}\u0000${safeTaxonomy}\u0000${metadata.runtime}\u0000${component.package}`)
       .digest("hex");
+    const declaredRefs = projectDeclaredRefs(
+      options.ambientContext,
+      options.zoneContext,
+    );
+    const fallbackMinimized = options.fallbackMinimized
+      || template === undefined
+      || metadata.fallback_minimized
+      || sourceRef.minimized;
+    const causeChainCodes = fallbackMinimized
+      ? EMPTY_CAUSE_CHAIN_CODES
+      : projectCauseChainCodes(options.causeChainCodes, safeCode);
+    const hasCauseChain = causeChainCodes.length >= 2;
     return Object.freeze({
       [POST_REDACTION_BRAND]: true as const,
       occurred_at: safeNow().toISOString(),
-      environment: config.environment,
-      build_ref: config.build_ref,
+      environment: metadata.environment,
+      build_ref: metadata.build_ref,
       build_dirty: config.build_dirty,
-      runtime: config.runtime,
-      component,
-      capture_point: template === undefined ? "self" : options.capturePoint,
+      runtime: metadata.runtime,
+      component: eventComponent,
+      capture_point: template === undefined
+        ? "self"
+        : (binding?.capture_point ?? options.capturePoint),
       code: safeCode,
       taxonomy_class: safeTaxonomy,
       severity: severity(safeCode),
       condition_mark: null,
-      disposition: template === undefined ? "SELF" : options.disposition,
+      disposition: template === undefined
+        ? "SELF"
+        : (binding?.disposition ?? options.disposition),
       fingerprint,
       fingerprint_version: 1 as const,
-      redaction_policy_version: config.redaction_policy_version,
-      allowlist_set_id: config.allowlist_set_id,
-      fallback_minimized: options.fallbackMinimized || template === undefined,
-      run_ref: UNKNOWN_DECLARED_KIND,
-      work_item_ref: UNKNOWN_DECLARED_KIND,
-      node_ref: UNKNOWN_DECLARED_KIND,
-      attempt_ref: UNKNOWN_DECLARED_KIND,
-      ledger_ref: UNKNOWN_DECLARED_KIND,
-      parent_occurrence_ref: "NO_CAUSE" as const,
-      cause_relation: null,
-      at_seq_watermark: UNKNOWN_DECLARED_KIND,
-      frames: Object.freeze([]) as readonly [],
+      redaction_policy_version: metadata.redaction_policy_version,
+      allowlist_set_id: metadata.allowlist_set_id,
+      fallback_minimized: fallbackMinimized,
+      run_ref: declaredRefs.run_ref,
+      work_item_ref: declaredRefs.work_item_ref,
+      node_ref: declaredRefs.node_ref,
+      attempt_ref: declaredRefs.attempt_ref,
+      ledger_ref: declaredRefs.ledger_ref,
+      parent_occurrence_ref: hasCauseChain
+        ? CAUSE_PARENT_NOT_CAPTURED
+        : "NO_CAUSE" as const,
+      cause_relation: hasCauseChain ? CAUSE_RELATION_WRAPS : null,
+      cause_chain_codes: causeChainCodes,
+      at_seq_watermark: declaredRefs.at_seq_watermark,
+      frames: options.traceFrames,
       safe_template_id: safeTemplate.id,
-      template_parameters: Object.freeze({}) as Readonly<Record<string, never>>,
-      source: template === undefined ? "first_party" : options.source,
-      source_event_ref: safeSourceEventRef(),
+      template_parameters: template === undefined
+        ? Object.freeze({})
+        : options.templateParameters,
+      source: template === undefined
+        ? "first_party"
+        : (binding?.source ?? options.source),
+      source_event_ref: sourceRef.value,
       zone_context: template === undefined ? false : options.zoneContext,
       attempt_index: template === undefined ? null : options.attemptIndex,
-      writer_identity: config.writer_identity,
+      writer_identity: metadata.writer_identity,
     });
   }
 
-  function fallback(): PostRedactionEnvelope {
+  function fallback(
+    ambientContext: CaptureQueueEntry["ambient_context_ref"],
+    zoneContext: boolean,
+    captureProjection: HandledCaptureProjection = Object.freeze({
+      capturePoint: "self",
+      routeTemplate: undefined,
+    }),
+    reservedSourceEventRef?: unknown,
+  ): PostRedactionEnvelope {
     return build({
       code: "OBS_CAPTURE_SELF",
       taxonomyClass: "CAPTURE_SELF",
-      capturePoint: "self",
+      capturePoint: captureProjection.capturePoint,
       disposition: "SELF",
       source: "first_party",
-      zoneContext: false,
+      zoneContext,
       attemptIndex: null,
       fallbackMinimized: true,
+      ambientContext,
+      templateParameters: Object.freeze({}),
+      ...(captureProjection.routeTemplate === undefined
+        ? {} : { routeTemplate: captureProjection.routeTemplate }),
+      ...(reservedSourceEventRef === undefined
+        ? {} : { sourceEventRef: reservedSourceEventRef }),
+      traceFrames: Object.freeze([]),
     });
+  }
+
+  function snapshotAmbientContext(
+    ambientContext: CaptureQueueEntry["ambient_context_ref"],
+  ): Readonly<{
+    ambientContext: CaptureQueueEntry["ambient_context_ref"];
+    zoneContext: boolean;
+    safe: boolean;
+  }> {
+    if (!isRecord(ambientContext)) {
+      return Object.freeze({
+        ambientContext: undefined,
+        zoneContext: false,
+        safe: true,
+      });
+    }
+    try {
+      const snapshot: Record<string, unknown> = Object.create(null) as Record<
+        string,
+        unknown
+      >;
+      let zoneContext = false;
+      for (const field of ambientProjectionFields) {
+        const descriptor = Object.getOwnPropertyDescriptor(ambientContext, field);
+        if (descriptor === undefined) {
+          continue;
+        }
+        if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+          return Object.freeze({
+            ambientContext: undefined,
+            zoneContext: true,
+            safe: false,
+          });
+        }
+        if (field === "zone_context") {
+          if (typeof descriptor.value !== "boolean") {
+            return Object.freeze({
+              ambientContext: undefined,
+              zoneContext: true,
+              safe: false,
+            });
+          }
+          zoneContext = descriptor.value;
+        }
+        snapshot[field] = descriptor.value;
+      }
+      return Object.freeze({
+        ambientContext: Object.freeze(
+          snapshot,
+        ) as CaptureQueueEntry["ambient_context_ref"],
+        zoneContext,
+        safe: true,
+      });
+    } catch {
+      return Object.freeze({
+        ambientContext: undefined,
+        zoneContext: true,
+        safe: false,
+      });
+    }
   }
 
   return Object.freeze({
     redact(entry: CaptureQueueEntry): PostRedactionEnvelope {
+      let rawAmbientContext: CaptureQueueEntry["ambient_context_ref"];
       try {
+        rawAmbientContext = entry?.ambient_context_ref;
+      } catch {
+        return fallback(undefined, true);
+      }
+      const ambientSnapshot = snapshotAmbientContext(rawAmbientContext);
+      if (!ambientSnapshot.safe) {
+        return fallback(undefined, true);
+      }
+      const ambientContext = ambientSnapshot.ambientContext;
+      let zoneContext = ambientSnapshot.zoneContext;
+
+      try {
+        const captureProjection = entry.kind === "handled_error"
+          ? snapshotHandledCaptureContext(entry.handled_context_ref)
+          : Object.freeze({ capturePoint: "self" as const, routeTemplate: undefined });
+        const reservedSourceEventRef = entry.source_event_ref;
+        const fallbackEntry = (): PostRedactionEnvelope => fallback(
+          ambientContext,
+          zoneContext,
+          captureProjection,
+          reservedSourceEventRef,
+        );
         let payload: Readonly<Record<string, unknown>> | undefined;
         let codeValue: unknown;
         if (entry.kind === "envelope") {
           if (!isRecord(entry.payload_ref)) {
-            return fallback();
+            return fallbackEntry();
           }
           payload = entry.payload_ref;
+          const payloadZoneValue = ownValue(payload, "zone_context");
+          if (
+            payloadZoneValue !== undefined &&
+            typeof payloadZoneValue !== "boolean"
+          ) {
+            return fallback(ambientContext, true, captureProjection, reservedSourceEventRef);
+          }
+          zoneContext = zoneContext || payloadZoneValue === true;
           if (Object.keys(payload).some((key) => !INPUT_ALLOWLIST.has(key))) {
-            return fallback();
+            return fallbackEntry();
           }
           codeValue = ownValue(payload, "code");
           if (codeValue === undefined) {
@@ -272,49 +540,78 @@ export function createSharedRedactor(
             codeValue = isRecord(errorValue) ? ownValue(errorValue, "code") : undefined;
           }
         } else {
-          codeValue = isRecord(entry.payload_ref)
-            ? ownValue(entry.payload_ref, "code")
-            : undefined;
+          codeValue = causeChainWrapperCode(entry.cause_chain_codes_ref);
         }
 
-        if (typeof codeValue !== "string" || resolveSafeTemplate(codeValue) === undefined) {
-          return fallback();
+        if (typeof codeValue !== "string") {
+          return fallbackEntry();
         }
-        const taxonomyValue = payload === undefined
+        const safeTemplate = resolveSafeTemplate(codeValue);
+        if (safeTemplate === undefined) {
+          return fallbackEntry();
+        }
+        const parameterValue = payload === undefined
+          ? undefined
+          : ownValue(payload, "template_parameters");
+        if (parameterValue !== undefined && !isParameterRecord(parameterValue)) {
+          return fallbackEntry();
+        }
+        const validatedParameters = validateTemplateParameters(
+          safeTemplate.parameters,
+          parameterValue ?? Object.freeze({}),
+        );
+        if (validatedParameters.fallback_minimized) {
+          return fallbackEntry();
+        }
+        const binding = safeTemplate.binding;
+        if (binding !== undefined) {
+          if (
+            payload === undefined
+            || Object.keys(payload).some((key) => !LIFECYCLE_INPUT_ALLOWLIST.has(key))
+          ) {
+            return fallbackEntry();
+          }
+          const hasError = hasOwn(payload, "error");
+          if (
+            (codeValue === "OBS_SCHEDULER_JOB_FAILED" && !hasError)
+            || (codeValue !== "OBS_SCHEDULER_JOB_FAILED" && hasError)
+          ) {
+            return fallbackEntry();
+          }
+          for (const [field, expected] of Object.entries(binding)) {
+            if (hasOwn(payload, field) && ownValue(payload, field) !== expected) {
+              return fallbackEntry();
+            }
+          }
+        }
+        const taxonomyValue = binding?.taxonomy_class ?? (payload === undefined
           ? "ORIGIN_UNKNOWN"
-          : (ownValue(payload, "taxonomy_class") ?? "ORIGIN_UNKNOWN");
+          : (ownValue(payload, "taxonomy_class") ?? "ORIGIN_UNKNOWN"));
         const taxonomy = typeof taxonomyValue === "string"
           ? resolveTaxonomyClass(taxonomyValue)?.taxonomy_class
           : undefined;
-        if (taxonomy === undefined) {
-          return fallback();
-        }
+        if (taxonomy === undefined) return fallbackEntry();
         const capturePoint = stringMember<CapturePoint>(
-          payload === undefined ? undefined : ownValue(payload, "capture_point"),
+          binding?.capture_point
+            ?? (payload === undefined ? undefined : ownValue(payload, "capture_point")),
           CAPTURE_POINT_SET,
-          entry.kind === "handled_error" ? "boundary" : "self",
+          entry.kind === "handled_error" ? captureProjection.capturePoint : "self",
         );
         const disposition = stringMember<CaptureDisposition>(
-          payload === undefined ? undefined : ownValue(payload, "disposition"),
+          binding?.disposition
+            ?? (payload === undefined ? undefined : ownValue(payload, "disposition")),
           DISPOSITION_SET,
           entry.kind === "handled_error" ? "HANDLED" : "THROWN",
         );
         const source = stringMember<DurableSource>(
-          payload === undefined ? undefined : ownValue(payload, "source"),
+          binding?.source
+            ?? (payload === undefined ? undefined : ownValue(payload, "source")),
           SOURCE_SET,
           "first_party",
         );
         if (capturePoint === undefined || disposition === undefined || source === undefined) {
-          return fallback();
+          return fallbackEntry();
         }
-        const zoneValue = payload === undefined
-          ? undefined
-          : ownValue(payload, "zone_context");
-        if (zoneValue !== undefined && typeof zoneValue !== "boolean") {
-          return fallback();
-        }
-        const contextZone = entry.ambient_context_ref?.zone_context;
-        const zoneContext = zoneValue ?? (typeof contextZone === "boolean" && contextZone);
         const attemptValue = payload === undefined
           ? undefined
           : ownValue(payload, "attempt_index");
@@ -322,7 +619,7 @@ export function createSharedRedactor(
           attemptValue !== undefined &&
           (!Number.isSafeInteger(attemptValue) || (attemptValue as number) < 0)
         ) {
-          return fallback();
+          return fallbackEntry();
         }
         return build({
           code: codeValue,
@@ -333,9 +630,23 @@ export function createSharedRedactor(
           zoneContext,
           attemptIndex: attemptValue === undefined ? null : (attemptValue as number),
           fallbackMinimized: false,
+          ambientContext,
+          templateParameters: validatedParameters.parameters,
+          causeChainCodes: entry.cause_chain_codes_ref,
+          ...(captureProjection.routeTemplate === undefined
+            ? {} : { routeTemplate: captureProjection.routeTemplate }),
+          ...(reservedSourceEventRef === undefined
+            ? {} : { sourceEventRef: reservedSourceEventRef }),
+          traceFrames: projectTraceFrames(
+            entry.kind === "handled_error"
+              ? entry.payload_ref
+              : (payload === undefined ? undefined : ownDataValue(payload, "error")),
+            config.repoRoot ?? "",
+            config.causeDepthMax ?? 64,
+          ),
         });
       } catch {
-        return fallback();
+        return fallback(ambientContext, true);
       }
     },
   });

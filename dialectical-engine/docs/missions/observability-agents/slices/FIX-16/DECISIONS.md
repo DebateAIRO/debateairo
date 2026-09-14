@@ -16,3 +16,4 @@
 - 2026-09-01 · Is S13 (build repoint) still work? · NO — root `build` already runs `pnpm --filter dialectical-engine-v2ui build`; `web/` deleted 2026-09-01 · `package.json` read 2026-09-01 · REQ-FIX seat
 - 2026-09-01 · Does the zone manifest path list violate D6? · NO — human-owned path-string data, exempt by construction; the D12 stage-16 rule is the suspect (AUDIT-STATE charge D rules) · predecessor GLOBAL-FORBID text · REQ-FIX seat, pending AUDIT-STATE
 - 2026-09-01 · When is the baseline snapshotted? · After FIX-02/03/04/05 merge; commit recorded here · H5-05 · predecessor ARCH
+- 2026-09-08 · Which commit is the authoritative FIX-16 inventory baseline? · `f6e93e25019eb4d0d4d709b86edbcfbcd32ca421` — version 1, 534 entries, SHA-256 `a049af21fc90be6ba64ccee6948fcd55f5f08bf76d046cd6a0399dbe8e609713` · exact reviewed FIX-02/03/04/05 tips were ancestors and the unchanged generator completed below the 30,000 ms ceiling · V

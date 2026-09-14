@@ -13,8 +13,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:s00": "vitest run tests/unit tests/integration tests/architecture",
-    "lint": "pnpm run audit:architecture && pnpm run audit:source",
+    "lint": "pnpm run audit:architecture && pnpm run audit:obs-inventory && pnpm run audit:source",
     "audit:architecture": "tsx tools/orphan-audit/src/cli.ts architecture",
+    "audit:obs-inventory": "tsx tools/obs-inventory/src/index.ts",
     "audit:source": "tsx tools/orphan-audit/src/cli.ts source",
     "audit:text-bytes": "tsx tools/check-text-control-bytes.ts",
     "audit:orphans": "tsx tools/orphan-audit/src/cli.ts orphans",
@@ -48,7 +49,8 @@
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",
     "job:settlement-watch": "tsx apps/scheduler/src/cli.ts settlement-watch",
     "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
-    "replay:ceremony": "tsx apps/replay/src/cli.ts"
+    "replay:ceremony": "tsx apps/replay/src/cli.ts",
+    "obsctl": "node tools/obs-listener/bin/obsctl.mjs"
   },
   "dependencies": {
     "@debateai/model-config": "workspace:*",

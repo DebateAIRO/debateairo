@@ -1,0 +1,2675 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "acceptance/ceremony.test.ts",
+      "line": 44,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/claude-relay.ts",
+      "line": 75,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/claude-relay.ts",
+      "line": 82,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/claude-relay.ts",
+      "line": 83,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/claude-relay.ts",
+      "line": 86,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/claude-relay.ts",
+      "line": 87,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/claude-relay.ts",
+      "line": 89,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/discovery.ts",
+      "line": 78,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/discovery.ts",
+      "line": 123,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/grok-relay.ts",
+      "line": 43,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/grok-relay.ts",
+      "line": 44,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/grok-relay.ts",
+      "line": 47,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/grok-relay.ts",
+      "line": 49,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/grok-relay.ts",
+      "line": 53,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/main.ts",
+      "line": 120,
+      "class": "void_promise"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 46,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 59,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 60,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 70,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 80,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 88,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 89,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 97,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 105,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 115,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/model-shim.ts",
+      "line": 136,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/obs/cases/chaos-support.ts",
+      "line": 24,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/corpus.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/grants.ts",
+      "line": 126,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/identity-canary.ts",
+      "line": 83,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/installer-graph.ts",
+      "line": 69,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/installer-graph.ts",
+      "line": 90,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/overhead.ts",
+      "line": 40,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/schema-manifest.ts",
+      "line": 73,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/zone-timing.ts",
+      "line": 59,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/cases/zone-timing.ts",
+      "line": 69,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/obs/index.ts",
+      "line": 195,
+      "class": "zone_import"
+    },
+    {
+      "path": "acceptance/obs/index.ts",
+      "line": 320,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/obs/readback.ts",
+      "line": 67,
+      "class": "void_promise"
+    },
+    {
+      "path": "acceptance/obs/readback.ts",
+      "line": 86,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/relay-core.ts",
+      "line": 106,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "acceptance/relay-core.ts",
+      "line": 168,
+      "class": "void_promise"
+    },
+    {
+      "path": "acceptance/review-catch-up.ts",
+      "line": 39,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/review-catch-up.ts",
+      "line": 99,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/run-acceptance.ts",
+      "line": 399,
+      "class": "void_promise"
+    },
+    {
+      "path": "acceptance/run-acceptance.ts",
+      "line": 400,
+      "class": "void_promise"
+    },
+    {
+      "path": "acceptance/standing-db.ts",
+      "line": 27,
+      "class": "bare_catch"
+    },
+    {
+      "path": "acceptance/standing-db.ts",
+      "line": 43,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/account-erasure.ts",
+      "line": 129,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/api/src/account-erasure.ts",
+      "line": 192,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 61,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 112,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 163,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 190,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 207,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 214,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 221,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/graceful-shutdown.ts",
+      "line": 249,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/index.ts",
+      "line": 292,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/index.ts",
+      "line": 293,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/index.ts",
+      "line": 495,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/index.ts",
+      "line": 498,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/index.ts",
+      "line": 1153,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/api/src/main.ts",
+      "line": 282,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/api/src/provider-discovery.ts",
+      "line": 89,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/publications.ts",
+      "line": 353,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/publications.ts",
+      "line": 373,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/publications.ts",
+      "line": 401,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/recovery.ts",
+      "line": 84,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/sessions.ts",
+      "line": 132,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/sessions.ts",
+      "line": 277,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/sessions.ts",
+      "line": 399,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/api/src/sessions.ts",
+      "line": 439,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/evaluator-worker/src/index.ts",
+      "line": 237,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/evaluator-worker/src/index.ts",
+      "line": 252,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/evaluator-worker/src/index.ts",
+      "line": 338,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/evaluator-worker/src/index.ts",
+      "line": 355,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/replay/src/cli.ts",
+      "line": 7,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-api-environment.ts",
+      "line": 122,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/dev-api-environment.ts",
+      "line": 172,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/dev-api-environment.ts",
+      "line": 305,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/dev-auth-data-plane.ts",
+      "line": 57,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-auth-data-plane.ts",
+      "line": 211,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/dev-auth-data-plane.ts",
+      "line": 336,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/dev-auth-stack-cli.ts",
+      "line": 22,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/runner/src/dev-auth-stack.ts",
+      "line": 97,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-cli-provider-panel.ts",
+      "line": 43,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-hatchet-token.ts",
+      "line": 114,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-hatchet-token.ts",
+      "line": 146,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-hatchet-token.ts",
+      "line": 194,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/dev-hatchet-token.ts",
+      "line": 314,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/dev-secret-files.ts",
+      "line": 75,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 872,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 872,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 913,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 913,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 1126,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 1126,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 1291,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 1358,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 1837,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2532,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2584,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2607,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2619,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2645,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2651,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2670,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2690,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2717,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2732,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/index.ts",
+      "line": 2755,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/runner/src/production-database-principals.ts",
+      "line": 106,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/scheduler/src/cli.ts",
+      "line": 52,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/scheduler/src/cli.ts",
+      "line": 79,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/scheduler/src/index.ts",
+      "line": 158,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/api/[...path]/route.ts",
+      "line": 49,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/api/[...path]/route.ts",
+      "line": 148,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 154,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 197,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 568,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 653,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 664,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 667,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/debate/[id]/DebatePageClient.tsx",
+      "line": 677,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/enroll-mfa/page.tsx",
+      "line": 37,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/error.tsx",
+      "line": 12,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/global-error.tsx",
+      "line": 12,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/login/page.tsx",
+      "line": 14,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/new/page.tsx",
+      "line": 87,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/new/page.tsx",
+      "line": 145,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/app/page.tsx",
+      "line": 36,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/page.tsx",
+      "line": 47,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/app/public/debate/[id]/page.tsx",
+      "line": 12,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/AccountErasureControls.tsx",
+      "line": 44,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/AccountErasureControls.tsx",
+      "line": 45,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/AccountErasureControls.tsx",
+      "line": 83,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/AuthGate.tsx",
+      "line": 14,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/authRoutes.source-test.mjs",
+      "line": 8,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/CanvasViewport.tsx",
+      "line": 332,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/EvaluatorDevMenu.tsx",
+      "line": 25,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/LibraryComposer.tsx",
+      "line": 34,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/LoginFlow.tsx",
+      "line": 74,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/ModeToggle.tsx",
+      "line": 25,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/modeTransition.test.mjs",
+      "line": 117,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/ui/components/modeTransition.ts",
+      "line": 91,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/modeTransition.ts",
+      "line": 92,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/PublicationControl.tsx",
+      "line": 40,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/PublicationControl.tsx",
+      "line": 69,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/ScoringErrorBoundary.tsx",
+      "line": 27,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/SessionControls.tsx",
+      "line": 84,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/components/SignUpFlow.tsx",
+      "line": 76,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/components/SignUpFlow.tsx",
+      "line": 90,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/lib/api.ts",
+      "line": 54,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/lib/api.ts",
+      "line": 62,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/lib/api.ts",
+      "line": 310,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/ui/lib/mfaEnrollment.ts",
+      "line": 26,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/ui/lib/obs/reporter.ts",
+      "line": 83,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/lib/obs/reporter.ts",
+      "line": 92,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/lib/obs/reporter.ts",
+      "line": 95,
+      "class": "void_promise"
+    },
+    {
+      "path": "apps/ui/lib/observability/logger.ts",
+      "line": 241,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/lib/observability/suspiciousScoring.ts",
+      "line": 139,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/lib/scoringResponse.test.mjs",
+      "line": 900,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/ui/lib/scoringResponse.test.mjs",
+      "line": 921,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/ui/lib/serverApi.ts",
+      "line": 62,
+      "class": "bare_catch"
+    },
+    {
+      "path": "apps/ui/scripts/run-node-tests.mjs",
+      "line": 20,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "apps/ui/server.mjs",
+      "line": 30,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/battery/src/index.ts",
+      "line": 202,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/battery/src/index.ts",
+      "line": 261,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/battery/src/index.ts",
+      "line": 295,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/battery/src/index.ts",
+      "line": 343,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/battery/src/index.ts",
+      "line": 428,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 85,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 122,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 160,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 199,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 203,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 303,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 305,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 338,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 384,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 386,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 392,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 394,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/contract/src/client.ts",
+      "line": 420,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 528,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 637,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 644,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 665,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 904,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 1019,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker-pool.ts",
+      "line": 1068,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker.ts",
+      "line": 236,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/crypto/src/argon2-worker.ts",
+      "line": 253,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 160,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 255,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 257,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 297,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 303,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 312,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 323,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 328,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 336,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 341,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 360,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 453,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1013,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1238,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1240,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1245,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1251,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1259,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1374,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1380,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1386,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1427,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1436,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1441,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1462,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1467,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1473,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1478,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1591,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1596,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1602,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1607,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1618,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1623,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1631,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1636,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1643,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1648,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1656,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1689,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1704,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1714,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1723,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1833,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1845,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1870,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1876,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1882,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1905,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 1921,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2029,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2038,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2079,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2090,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2096,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2114,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2126,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/crypto/src/index.ts",
+      "line": 2140,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 159,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 352,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 571,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 572,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 746,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 761,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 871,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 872,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/db/src/account-erasure.ts",
+      "line": 966,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/auth-risk.ts",
+      "line": 212,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 302,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 622,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 898,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 1082,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 1260,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 1269,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 1276,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "line": 1281,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/db/src/publication-lease.ts",
+      "line": 52,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/db/src/publication.ts",
+      "line": 248,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/db/src/publication.ts",
+      "line": 249,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/evaluator/src/consumer.ts",
+      "line": 244,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/evaluator/src/consumer.ts",
+      "line": 331,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/consumer.ts",
+      "line": 402,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/consumer.ts",
+      "line": 421,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 374,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 433,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 447,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 466,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 475,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 510,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 556,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 623,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1016,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1436,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1489,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1512,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1523,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1529,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 1565,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 2081,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 3574,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/index.ts",
+      "line": 3625,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/public-aggregate-provider.ts",
+      "line": 36,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/public-aggregate-provider.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/evaluator/src/public-aggregate-provider.ts",
+      "line": 144,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/evaluator/src/public-aggregate-provider.ts",
+      "line": 149,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/evidence/src/index.ts",
+      "line": 22,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/graph/src/index.ts",
+      "line": 353,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/judgement/src/index.ts",
+      "line": 176,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/judgement/src/index.ts",
+      "line": 190,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/judgement/src/index.ts",
+      "line": 255,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/judgement/src/index.ts",
+      "line": 384,
+      "class": "wrapper_without_cause"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 21,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 23,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 80,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 143,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 146,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 150,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 166,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 169,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 204,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 315,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/judgement/src/s04.ts",
+      "line": 316,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/kernel/src/index.ts",
+      "line": 271,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/kernel/src/index.ts",
+      "line": 274,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/kernel/src/index.ts",
+      "line": 280,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/install/api.ts",
+      "line": 67,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/api.ts",
+      "line": 110,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/api.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/api.ts",
+      "line": 209,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/api.ts",
+      "line": 214,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/api.ts",
+      "line": 228,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/obs-capture/install/evaluator-lib.ts",
+      "line": 8,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/obs-capture/install/runner.ts",
+      "line": 67,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/runner.ts",
+      "line": 110,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/runner.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/runner.ts",
+      "line": 209,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/runner.ts",
+      "line": 214,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/runner.ts",
+      "line": 228,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/obs-capture/install/scheduler.ts",
+      "line": 67,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/scheduler.ts",
+      "line": 110,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/scheduler.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/scheduler.ts",
+      "line": 209,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/scheduler.ts",
+      "line": 214,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/install/scheduler.ts",
+      "line": 230,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/obs-capture/install/ui-client.ts",
+      "line": 8,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/obs-capture/scripts/verify-fix09-native-wipe.mjs",
+      "line": 29,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/scripts/verify-fix09-native-wipe.mjs",
+      "line": 92,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/cause-chain.ts",
+      "line": 33,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/cause-chain.ts",
+      "line": 44,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/cause-chain.ts",
+      "line": 158,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/cause-chain.ts",
+      "line": 176,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/agent-action-gateway.ts",
+      "line": 42,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/canonical.ts",
+      "line": 60,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/fixagent-delivery.ts",
+      "line": 62,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/locks.ts",
+      "line": 41,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/occurrence-gateway.ts",
+      "line": 84,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/private-key-helper.ts",
+      "line": 44,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/private-key-helper.ts",
+      "line": 81,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/private-key-helper.ts",
+      "line": 82,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/private-key-helper.ts",
+      "line": 108,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/private-key-helper.ts",
+      "line": 132,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/signer.ts",
+      "line": 120,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/unique-json.ts",
+      "line": 4,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/chain/unique-json.ts",
+      "line": 97,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 55,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 75,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 85,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 99,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 114,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 163,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/emit.ts",
+      "line": 171,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/envelope-contract.ts",
+      "line": 121,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/envelope-contract.ts",
+      "line": 124,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/envelope-contract.ts",
+      "line": 177,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/envelope-contract.ts",
+      "line": 186,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/envelope-contract.ts",
+      "line": 385,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/envelope-contract.ts",
+      "line": 399,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/flusher.ts",
+      "line": 46,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/flusher.ts",
+      "line": 55,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/flusher.ts",
+      "line": 84,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/flusher.ts",
+      "line": 109,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/health.ts",
+      "line": 64,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/health.ts",
+      "line": 67,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/health.ts",
+      "line": 193,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/health.ts",
+      "line": 222,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/health.ts",
+      "line": 229,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/kinds.ts",
+      "line": 183,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/queue.ts",
+      "line": 30,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/queue.ts",
+      "line": 40,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 192,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 244,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 254,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 288,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 302,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 357,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 475,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 484,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 498,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/redactor.ts",
+      "line": 648,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/registry/index.ts",
+      "line": 394,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/registry/index.ts",
+      "line": 398,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/registry/index.ts",
+      "line": 691,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/obs-capture/src/registry/index.ts",
+      "line": 704,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/control.ts",
+      "line": 14,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/drain.ts",
+      "line": 63,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/drain.ts",
+      "line": 188,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/drain.ts",
+      "line": 213,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/drain.ts",
+      "line": 332,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/drain.ts",
+      "line": 425,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/drain.ts",
+      "line": 568,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/index.ts",
+      "line": 282,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/index.ts",
+      "line": 353,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/index.ts",
+      "line": 414,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/runtime/index.ts",
+      "line": 530,
+      "class": "void_promise"
+    },
+    {
+      "path": "packages/obs-capture/src/spool-index.ts",
+      "line": 164,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/spool-index.ts",
+      "line": 174,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/spool-index.ts",
+      "line": 549,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/spool-index.ts",
+      "line": 567,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/spool-index.ts",
+      "line": 684,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/spool-index.ts",
+      "line": 1058,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/spool.ts",
+      "line": 63,
+      "class": "zone_import"
+    },
+    {
+      "path": "packages/obs-capture/src/trace-frames.ts",
+      "line": 19,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/trace-frames.ts",
+      "line": 30,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/classifier.ts",
+      "line": 84,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/classifier.ts",
+      "line": 159,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/classifier.ts",
+      "line": 317,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/counter.ts",
+      "line": 33,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/counter.ts",
+      "line": 69,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/counter.ts",
+      "line": 95,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/counter.ts",
+      "line": 132,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/obs-capture/src/zone/counter.ts",
+      "line": 157,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 110,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 123,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 150,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 226,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 228,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 302,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 343,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 358,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 400,
+      "class": "bare_catch"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 540,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/providers/src/index.ts",
+      "line": 554,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/published-arithmetic/src/index.ts",
+      "line": 12,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/auth-policy.ts",
+      "line": 1133,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 76,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 134,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 281,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 330,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 405,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 454,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 460,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 464,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 512,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 521,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 556,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/index.ts",
+      "line": 560,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/mfa-policy.ts",
+      "line": 139,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/product-role-policy.ts",
+      "line": 251,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/recovery-policy.ts",
+      "line": 301,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/register/src/runtime-environment.ts",
+      "line": 27,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/serve/src/index.ts",
+      "line": 221,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "packages/valuation/src/index.ts",
+      "line": 113,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/fix09-capture-gate.mjs",
+      "line": 26,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/fix09-capture-gate.mjs",
+      "line": 89,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/fix10-capture-gate.mjs",
+      "line": 6,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-inventory/src/scan.ts",
+      "line": 189,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/policy/canonical.ts",
+      "line": 278,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/custodian.ts",
+      "line": 75,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/custodian.ts",
+      "line": 158,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/custodian.ts",
+      "line": 166,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/custodian.ts",
+      "line": 167,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/policy/custodian.ts",
+      "line": 197,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/policy/custodian.ts",
+      "line": 201,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/policy/loader.ts",
+      "line": 201,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/loader.ts",
+      "line": 591,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/loader.ts",
+      "line": 602,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/policy/loader.ts",
+      "line": 1306,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/control/reader.ts",
+      "line": 24,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/daemon/main.ts",
+      "line": 117,
+      "class": "void_promise"
+    },
+    {
+      "path": "tools/obs-listener/src/daemon/main.ts",
+      "line": 127,
+      "class": "void_promise"
+    },
+    {
+      "path": "tools/obs-listener/src/daemon/main.ts",
+      "line": 174,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/daemon/main.ts",
+      "line": 226,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/daemon/main.ts",
+      "line": 239,
+      "class": "void_promise"
+    },
+    {
+      "path": "tools/obs-listener/src/daemon/tier-gate.ts",
+      "line": 288,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/ingest-hatchet/poll.ts",
+      "line": 137,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/ingest-hatchet/poll.ts",
+      "line": 145,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/ingest-hatchet/poll.ts",
+      "line": 149,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/action-wire.ts",
+      "line": 11,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/action-wire.ts",
+      "line": 148,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 23,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 28,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 31,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 39,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 42,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 44,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 45,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 47,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/arm.ts",
+      "line": 52,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/armed-token.ts",
+      "line": 18,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/authority-proof.ts",
+      "line": 8,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/control-root.ts",
+      "line": 40,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/control-root.ts",
+      "line": 203,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/control-root.ts",
+      "line": 208,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/kill.ts",
+      "line": 33,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/kill.ts",
+      "line": 34,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/kill.ts",
+      "line": 35,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/kill.ts",
+      "line": 38,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/kill.ts",
+      "line": 40,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/local-history.ts",
+      "line": 96,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/local-history.ts",
+      "line": 153,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/reconcile.ts",
+      "line": 29,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/reconcile.ts",
+      "line": 52,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/status-entry.ts",
+      "line": 79,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/status-entry.ts",
+      "line": 128,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/status-entry.ts",
+      "line": 138,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/obsctl/status-entry.ts",
+      "line": 217,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-listener/src/trace/hook.ts",
+      "line": 22,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-spool-launch-gate.ts",
+      "line": 90,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-spool-launch-gate.ts",
+      "line": 119,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-launch-gate.ts",
+      "line": 184,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-launch-gate.ts",
+      "line": 269,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-spool-launch-gate.ts",
+      "line": 337,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 97,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 193,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 210,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 260,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 363,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 431,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 446,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 468,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 487,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 1001,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 1066,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 1169,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/obs-spool-release-admission.ts",
+      "line": 1606,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/orphan-audit/src/cli.ts",
+      "line": 12,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/orphan-audit/src/index.ts",
+      "line": 367,
+      "class": "bare_catch"
+    },
+    {
+      "path": "tools/orphan-audit/src/index.ts",
+      "line": 590,
+      "class": "throw_without_code"
+    },
+    {
+      "path": "tools/orphan-audit/src/index.ts",
+      "line": 750,
+      "class": "throw_without_code"
+    }
+  ]
+}

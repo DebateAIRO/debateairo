@@ -619,6 +619,9 @@ importers:
       '@debateai/ledger':
         specifier: workspace:*
         version: link:../ledger
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../obs-capture
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
@@ -738,6 +741,25 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
+
+  tools/obs-listener:
+    dependencies:
+      '@debateai/obs-capture':
+        specifier: workspace:*
+        version: link:../../packages/obs-capture
+      pg:
+        specifier: 8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      '@types/pg':
+        specifier: 8.21.0
+        version: 8.21.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
 
   tools/orphan-audit:
     dependencies:

@@ -41,6 +41,7 @@ import {
   validateRegistryCode,
   validateTemplateParameters,
   type RegistryCode,
+  type SafeEnvelopeBinding,
   type SafeTemplateId,
   type TemplateParameterDeclaration,
   type TemplateParameterType,
@@ -71,6 +72,17 @@ const PARAMETER_TYPE_UNION_IS_EXACT: Equal<
 const SAFE_TEMPLATE_ID_REJECTS_ARBITRARY_TEXT: "tpl.NOT_A_REGISTRY_CODE" extends SafeTemplateId
   ? false
   : true = true;
+const LIFECYCLE_CODES = Object.freeze([
+  "OBS_SCHEDULER_JOB_STARTED",
+  "OBS_SCHEDULER_JOB_SUCCEEDED",
+  "OBS_SCHEDULER_JOB_FAILED",
+  "OBS_SCHEDULER_JOB_NOOP",
+] as const);
+const JOBS = Object.freeze([
+  "replay-self-test",
+  "liveness-sweep",
+  "settlement-watch",
+] as const);
 
 function canonicalLines(values: readonly string[]): string {
   const sorted = [...new Set(values)].sort((left, right) =>
@@ -191,15 +203,76 @@ describe("S02 safe templates", () => {
     expect(resolveSafeTemplateId("tpl.NOT_A_REGISTRY_CODE")).toBeUndefined();
   });
 
-  it("seeds every template with an empty parameter list and no taxonomy binding", () => {
-    expect(SAFE_TEMPLATES.every((template) => template.parameters.length === 0)).toBe(
-      true,
-    );
-    expect(
-      SAFE_TEMPLATES.every(
-        (template) => !Object.prototype.hasOwnProperty.call(template, "taxonomy_class"),
-      ),
-    ).toBe(true);
+  it("keeps lifecycle templates exact and leaves every other template unbound and empty", () => {
+    const expected = Object.freeze({
+      OBS_SCHEDULER_JOB_STARTED: Object.freeze({
+        parameters: Object.freeze([
+          Object.freeze({ name: "job", type: "closed_enum", members: JOBS }),
+        ]),
+        binding: Object.freeze({
+          taxonomy_class: "JOB_LIFECYCLE",
+          capture_point: "job",
+          disposition: "DETECTED",
+          source: "first_party",
+        }),
+      }),
+      OBS_SCHEDULER_JOB_SUCCEEDED: Object.freeze({
+        parameters: Object.freeze([
+          Object.freeze({ name: "job", type: "closed_enum", members: JOBS }),
+        ]),
+        binding: Object.freeze({
+          taxonomy_class: "JOB_LIFECYCLE",
+          capture_point: "job",
+          disposition: "DETECTED",
+          source: "first_party",
+        }),
+      }),
+      OBS_SCHEDULER_JOB_FAILED: Object.freeze({
+        parameters: Object.freeze([
+          Object.freeze({ name: "job", type: "closed_enum", members: JOBS }),
+        ]),
+        binding: Object.freeze({
+          taxonomy_class: "JOB_FAILURE",
+          capture_point: "job",
+          disposition: "THROWN",
+          source: "first_party",
+        }),
+      }),
+      OBS_SCHEDULER_JOB_NOOP: Object.freeze({
+        parameters: Object.freeze([
+          Object.freeze({ name: "job", type: "closed_enum", members: JOBS }),
+          Object.freeze({
+            name: "count",
+            type: "bounded_int",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          }),
+        ]),
+        binding: Object.freeze({
+          taxonomy_class: "JOB_LIFECYCLE",
+          capture_point: "job",
+          disposition: "DETECTED",
+          source: "first_party",
+        }),
+      }),
+    } as const);
+
+    for (const code of LIFECYCLE_CODES) {
+      const template = resolveSafeTemplate(code);
+      expect(template).toEqual({
+        code,
+        id: `tpl.${code}`,
+        ...expected[code],
+      });
+      const binding: SafeEnvelopeBinding | undefined = template?.binding;
+      expect(binding).toEqual(expected[code].binding);
+    }
+    expect(SAFE_TEMPLATES.filter((template) =>
+      !LIFECYCLE_CODES.includes(template.code as typeof LIFECYCLE_CODES[number]))
+      .every((template) =>
+        template.parameters.length === 0
+        && !Object.prototype.hasOwnProperty.call(template, "binding")))
+      .toBe(true);
   });
 });
 
@@ -392,7 +465,7 @@ describe("S02 typed parameter injection wall", () => {
 });
 
 describe("S02 severity and unordered condition marks", () => {
-  it("is total over every registry code with the empty override table", () => {
+  it("is total over every registry code with only the lifecycle overrides", () => {
     const allCodes = [
       ...REGISTRY.derived,
       ...REGISTRY.declared_gap,
@@ -401,8 +474,15 @@ describe("S02 severity and unordered condition marks", () => {
 
     expect(SEVERITY_LADDER).toEqual(["INFO", "DEGRADED", "SEVERE", "FATAL"]);
     expect(SEVERITY_DEFAULT).toBe("DEGRADED");
-    expect(Object.keys(SEVERITY_OVERRIDES)).toEqual([]);
-    expect(allCodes.every((code) => severity(code) === "DEGRADED")).toBe(true);
+    expect(SEVERITY_OVERRIDES).toEqual({
+      OBS_SCHEDULER_JOB_STARTED: "INFO",
+      OBS_SCHEDULER_JOB_SUCCEEDED: "INFO",
+      OBS_SCHEDULER_JOB_FAILED: "SEVERE",
+      OBS_SCHEDULER_JOB_NOOP: "INFO",
+    });
+    expect(allCodes.filter((code) => !LIFECYCLE_CODES.includes(
+      code as typeof LIFECYCLE_CODES[number],
+    )).every((code) => severity(code) === "DEGRADED")).toBe(true);
     expect(allCodes.every((code) => SEVERITY_LADDER.includes(severity(code)))).toBe(
       true,
     );
@@ -423,7 +503,7 @@ describe("S02 severity and unordered condition marks", () => {
 });
 
 describe("S02 closed taxonomy", () => {
-  it("resolves all twelve classes and the three suspicious-success subclasses", () => {
+  it("preserves all twelve old classes and adds JOB_LIFECYCLE", () => {
     const expectedClasses = new Set([
       "PROCESS_DEATH",
       "HTTP_FAILURE",
@@ -437,6 +517,7 @@ describe("S02 closed taxonomy", () => {
       "CLIENT_FAILURE",
       "CAPTURE_SELF",
       "ORIGIN_UNKNOWN",
+      "JOB_LIFECYCLE",
     ]);
     const expectedSubclasses = new Set([
       "empty_output",
@@ -444,7 +525,7 @@ describe("S02 closed taxonomy", () => {
       "missing_artifact_chain",
     ]);
 
-    expect(TAXONOMY_CLASSES).toHaveLength(12);
+    expect(TAXONOMY_CLASSES).toHaveLength(13);
     expect(new Set(TAXONOMY_CLASSES)).toEqual(expectedClasses);
     expect(TAXONOMY_CLASSES.every((value) => resolveTaxonomyClass(value) !== undefined)).toBe(
       true,
