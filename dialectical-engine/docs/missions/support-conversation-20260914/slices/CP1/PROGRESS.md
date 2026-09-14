@@ -70,3 +70,5 @@ PRODDELTAconsumed at43: amendedreport242391af/selfea75e089,8receipt+2frozenUIhas
 FIX4consumed at6e5ab5fc:11scopedpaths,22declaredrefs+2extraattempts and99/99inventory/currentbytes verified; nativeBODY9/9.277currentfocusedpasses;mutants11/2/8/7/1fail restored;final2typecheck byte-identicalinherited76. Final design0abb9f97 provides fixedUUID/predicateprojection and sequentialwindowambiguityprotocol. Previewlastrecorded40443still43runtime; LIVE4mustmeasure/reload. FinalreviewsandownerForgot remainpending.
 
 - 2026-09-14T17:28:41.914449+00:00: FIX_P1 author correction consumed at `e0dcfe77f49655bea774bdfacf988b911be4ff06` (16paths;381focusedpasses;103exact layered files). LIVE_P1 exact23-suite/seven-actual matrix prepared; separate final pass2 and owner Forgot destination still required. CP1 not ready or accepted.
+
+- 2026-09-14T17:49:00.931847+00:00: LIVE_P1 consumed FUNCTIONAL_BLOCKER at `e0dcfe77f49655bea774bdfacf988b911be4ff06`:935pass+1TODO; actual3/7useful,4refused. GATE_P2 packaged current evidence for separate finalpass2; Forgot/sourcequalification unchanged.

@@ -1,0 +1,219 @@
+{
+  "status": "EXACT FINAL PASS2 LENS INDEX",
+  "lens": "REV2",
+  "revision": "e0dcfe77f49655bea774bdfacf988b911be4ff06",
+  "focus": "F2-F6 security classes and F1 mapping trust boundary, canonical answer/summary sinks; independently transformed inert fixtures.",
+  "inputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/INSTRUCTIONS.md",
+      "sha256": "4582bc82bdcdef28ac4e06b4a4eb1a413fee84e8e07bc4374049a9c0ca451bf9"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/SPEC-v2.md",
+      "sha256": "a692cc55515a2a581330aaaf8a5549e844f64e848c1d620234aff2d5c362d029"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/slices/CP1/DONE.md",
+      "sha256": "7481c49de9d86da03dc4cd5107dbe8057a456950acb24bcd46c7f78ccbdb3456"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV-CP1-p1-UNION.md",
+      "sha256": "b3ddf9b92daf517c851472842feffb6a543056d86e96e70808d64e84de070349"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-R14-ALIASES.md",
+      "sha256": "6110e1b51b8aea6ca671409b74dc4421ee336a8d7e872edd29e2c55e9a8da5e9"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/CP1-SOURCE-DRIFT.md",
+      "sha256": "f092e0898c0b23a2e9ef38098741e365c79e5ac6520ce6562f745d8f8b61304f"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P1.md",
+      "sha256": "8169b9081c950cdc01ce1c28ab548f1ad4ee832f548506f58d8135da0d491a0a"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P1-manifest.json",
+      "sha256": "e449c6371b348c455f1ae0be64284106d9c3c0b4d977e176e9c9efbf806c5540"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P1-consumption.json",
+      "sha256": "c2033deb3afd14b79a0d1216ce50a169b14738c1e2463173b78cb93c16128f8d"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1.md",
+      "sha256": "9ea008867e15118f8d481aee0fcaf0d63da30726dff43a7659ab4150e92b6f23"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1-consumption.json",
+      "sha256": "911f10618b9c1c4d129465f2900a7935b70c6b97883d98d219b7e0e3dfa27759"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P2.md",
+      "sha256": "8d8db6280c4b068e96ad46dace431e1ab1389906e8d5922941f0558f0f6c3d3b"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE_P2-manifest.json",
+      "sha256": "656c3390c7e65de70f3708eb38ac24e89efcbfaf7a0426e48686abe291b44949"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/REV2-p1.md",
+      "sha256": "d8973d38dd7cdd5014197c2e70316023ff95d1a700939a84cd8ed3b7615021f5"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/REV2-p1-consumption.json",
+      "sha256": "99a957b3e82d7c449844b00981a321f36a9ef6e7be89780269212a0ba8a6b88f"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/FIX_P1-IMPLEMENTATION.md",
+      "sha256": "5ba43ff1d1c4a39a668be3a354eac2828c89bc5a99ed4a8a891ef61823a8d477"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/REV2/final-boundary-probe.ts",
+      "sha256": "4ca2fc17eaedf992cd1f6ad7bde0e50f1f3992654acaf33e0ad065f06069cbb2"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/REV2-final-boundary-probe.log",
+      "sha256": "9ffc1b192d32245d5f1221dc5033c7f3d69e20176efc4b17d0782db1f4e5b88d"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/README.md",
+      "sha256": "37555a5c2dc544dccfa4e48dfcca397e7404f3bfff41b0a04d4592ddbb9f2335"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/review-packages/CP1-p2/CP1-pass1-correction-e0dcfe77.patch",
+      "sha256": "e408f9a3b14204f5459f106ab74f28637774ae60bf85c6fa2259f8c92361cb9b"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GATE-pre-LIVE_P1-inventory.json",
+      "sha256": "516e60c9da0174bf0ab0bd519544eb8fcd25a85f40513760a81ab36d4b6af06e"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/LIVE_P1-actual-relay-receipt.json",
+      "sha256": "b2cc1d4c31ab873f9119b8c580adc4ae69bdb5276dbc5837480f0bec01cd64f4"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/FIX_P1.md",
+      "sha256": "d6df292e89f9d4b7e41b9753cd5852ac0ddc2f803f1e2bd58f589695cb9a5cee"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/LIVE_P1-strict-seven-consumer-control-final.log",
+      "sha256": "fb8fc45838fc8f7dcccb00cf54a5abe600c69176c3ec1d9a1cd70206e9404a38"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P1/diagnostic-consumer.mjs",
+      "sha256": "6b53275c0e621e1925c300b0024674c942f72782b31c1ecadde29c9a04c9295f"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P1/verify-diagnostic-consumer.mjs",
+      "sha256": "84d9cd01085e9e7ab30857cefa207018a06b21c9040eb7c44822b7e4541f9a04"
+    }
+  ],
+  "productPaths": [
+    {
+      "path": "apps/api/src/support/answer.ts",
+      "sha256": "a124a60a4637140f1cc07f8462412ac8c6606ddde5369a57c79a8c45f30c643c",
+      "changedInCorrection": true
+    },
+    {
+      "path": "apps/api/src/support/model-references.ts",
+      "sha256": "b1738b971f9096e555eb7603d64b25f7ce4d26e79689d28d801bb697bc6dd1b3",
+      "changedInCorrection": true
+    },
+    {
+      "path": "apps/api/src/support/response-policy.ts",
+      "sha256": "20db230a974897e3ea70d75bab0af1e76a56760e4f6ecd30e910c8b8e1ab3923",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/kernel/src/index.ts",
+      "sha256": "206c7eb204dc28bbb507892f87a431198f6ef98c03de75dc1cff04d3fcc3cc11",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/kernel/src/support-credentials.ts",
+      "sha256": "ce1019f1156833642592d21a03cfb6b758142ebc43766c201128bea5c075492b",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/kernel/src/support-text-views.ts",
+      "sha256": "e43bf7e2c6c745617877155aeb96ad4e27da4b0e9b7f99d9299a0594c0d551c9",
+      "changedInCorrection": true
+    },
+    {
+      "path": "packages/support-kb/src/context.ts",
+      "sha256": "b7d3a231f0c7ddca9fcc5f756cd6a2ccead7211dc9d2eddc32bb6417d386d288",
+      "changedInCorrection": true
+    },
+    {
+      "path": "apps/api/src/support/cases.ts",
+      "sha256": "7bcb12bcf6c5930194c047a300b22be2e2331bdbc6ad5d0b650f4d1fdc1dbcfe",
+      "changedInCorrection": false
+    },
+    {
+      "path": "apps/api/src/support/session.ts",
+      "sha256": "d312e3b0f56e85b318d05336223bc3beebd80a67b8a13b507edfd0442d569836",
+      "changedInCorrection": false
+    },
+    {
+      "path": "apps/api/src/support/index.ts",
+      "sha256": "2248e2a8a025670915cd97802c61513539ab6798780f589088ddb4c301149852",
+      "changedInCorrection": false
+    },
+    {
+      "path": "apps/api/src/main.ts",
+      "sha256": "82b56c6b73eb414c6db5abb9813831284232cc491d360ccc7c4a246891113270",
+      "changedInCorrection": false
+    },
+    {
+      "path": "tests/unit/support-credentials.test.ts",
+      "sha256": "0bef2f5500d00dbe7b50617093a0e792a847b6bd4676479ee59e464fa316e659",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/unit/support-text-views.test.ts",
+      "sha256": "3f048c405f84f7365fe605d831c461ea7401f14f286975f740733ea90f305937",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/unit/support-redaction.test.ts",
+      "sha256": "cff02c030d013dbfb5e083bfe29b64d92dd04b77c32c37961f9c5e99c4732228",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/unit/support-response-policy.test.ts",
+      "sha256": "9bc2d7af3b4d738514066ccbcad8fa42178f60158c65a832864ec2ea780b8bce",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/integration/support-routes.test.ts",
+      "sha256": "e4364a8b31aa19f015e7b0e6d3305e0212343482da8913dbfc325d82dd079ced",
+      "changedInCorrection": true
+    },
+    {
+      "path": "tests/integration/support-cases.test.ts",
+      "sha256": "ebc8ca1dc015342b2a7f5e6e96302323453471851dc6e05362ed94d0c1fe9084",
+      "changedInCorrection": true
+    }
+  ],
+  "allChangedPaths": [
+    "apps/api/src/support/answer.ts",
+    "apps/api/src/support/model-references.ts",
+    "apps/api/src/support/response-policy.ts",
+    "packages/kernel/src/index.ts",
+    "packages/kernel/src/support-credentials.ts",
+    "packages/kernel/src/support-text-views.ts",
+    "packages/support-kb/src/context.ts",
+    "tests/integration/support-cases.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-model-references.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-text-views.test.ts"
+  ],
+  "historicalReuse": "Prior pass1 package immutable evidence retained by reference; no wholesale reread required. Current full product inventory must still be verified mechanically.",
+  "mechanicalFloor": "Verify GATE_P2 manifest hash, full103current product hashes, and own index input hashes; read contents only as needed for this lens."
+}
