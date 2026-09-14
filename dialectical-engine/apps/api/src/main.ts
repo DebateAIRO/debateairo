@@ -482,7 +482,7 @@ const supportCases = createSupportCaseService({
 const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
 const supportAnswers = createSupportAnswerService({
   entries: supportKnowledge.entries,
-  snapshots: supportKnowledgeSnapshots,
+  requireStructuredDraft: true,
   messages: supportMessages,
   incidents: supportIncidents,
   queue: supportRelayQueue,

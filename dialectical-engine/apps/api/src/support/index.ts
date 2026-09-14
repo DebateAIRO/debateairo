@@ -765,6 +765,7 @@ export function installSupportRoutes(
           overrideLanguage,
           modelRef: state.snapshot.values.supportModelRef,
           kbVersion: found.kbVersion,
+          ...(knowledgeSnapshot === undefined ? {} : { snapshot: knowledgeSnapshot }),
           signedIn: found.identityOwnerRef !== null,
           receivedAt: now
         });

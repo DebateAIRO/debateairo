@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it,vi } from "vitest";
 import {
   migrate,
   PostgresSupportCaseRepository,
@@ -12,7 +12,8 @@ import {
   createAdvisorySummaryService,
   createSupportCaseAccessService,
   createSupportCasesService,
-  SupportCaseError
+  SupportCaseError,
+  type SupportCaseSummaryRecord
 } from "../../apps/api/src/support/cases.js";
 import { SupportModelError } from "../../apps/api/src/support/model.js";
 import { createSupportCaseService } from "../../apps/api/src/support/session.js";
@@ -379,12 +380,8 @@ describe("SUP-02 cases", () => {
     const summary = Array.from({ length: 40 },(_,index) => `word${index}`).join(" ") + ".";
     const service = createAdvisorySummaryService({
       complete: async (request) => {
-        expect(request.system).toBe(
-          "Summarize the user's problem in one paragraph of at most 80 words. "
-          + "Do not state or guess who the user is, whether they are the account owner, "
-          + "or whether their request is legitimate."
-        );
-        return summary;
+        expect(request.system).toContain("exactly kind, text, sourceIds, and actionIds");
+        return JSON.stringify({ kind: "case_summary",text: summary,sourceIds: [],actionIds: [] });
       },
       seal: async (_caseId,text) => Buffer.from(text,"utf8"),
       persist: async (record) => { persisted.push(Object.freeze({
@@ -405,6 +402,76 @@ describe("SUP-02 cases", () => {
     });
     expect(Buffer.from(persisted[0]!.summaryCiphertext as Uint8Array).toString("utf8"))
       .toBe(summary);
+  });
+
+  it.each([
+    ["en","Open //invalid.example/reset and use password syntheticvalue7.",
+      "The advisory summary was omitted because it did not pass Support safety checks."],
+    ["ro","Deschide https%3A%2F%2Finvalid.example/reset cu parola syntheticvalue7.",
+      "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."]
+  ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
+    language,hostile,fallback
+  ) => {
+    const sealed: string[] = [];
+    const persisted: SupportCaseSummaryRecord[] = [];
+    const complete = vi.fn(async () => JSON.stringify({
+      kind: "case_summary",text: hostile,sourceIds: [],actionIds: []
+    }));
+    const summaries = createAdvisorySummaryService({
+      complete,
+      seal: async (_caseId,text) => { sealed.push(text);return Buffer.from(text,"utf8"); },
+      persist: async (record) => { persisted.push(record); },
+      clock: () => new Date(createdAt.getTime() + 1),timeoutMs: 60_000
+    });
+
+    await summaries.summarize({ caseId: randomUUID(),language,transcript: "USER> Help",createdAt });
+
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(sealed).toEqual([fallback]);
+    expect(sealed[0]).not.toContain(hostile);
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({ status: "DONE",summaryAuthoritative: false });
+  });
+
+  it("screens legacy transcript, reply, and summary plaintext during case access", async () => {
+    const caseId = randomUUID();
+    const legacy = "legacyvalue7";
+    const fallback = "The advisory summary was omitted because it did not pass Support safety checks.";
+    const access = createSupportCaseAccessService({
+      repository: {
+        listOwnCases: vi.fn(async () => []),
+        readCaseEncrypted: vi.fn(async () => ({
+          case_id: caseId,language: "en",state: "NEW",sla_hours: 48,
+          shredded_at: null,destroyed_at: null,wrapped_key: Buffer.from("wrapped"),
+          transcript_snapshot_ciphertext: Buffer.from("transcript"),
+          summary_ciphertext: Buffer.from("summary"),case_message_next_cursor: null,
+          case_messages: [{
+            id: randomUUID(),role: "user",
+            content_ciphertext: Buffer.from("reply").toString("base64")
+          }]
+        })),
+        appendCaseMessage: vi.fn()
+      },
+      keys: {
+        unwrapDataKey: vi.fn(async () => Buffer.alloc(32,1)),
+        openContent: vi.fn((description: Readonly<{ kind: string }>) => {
+          if (description.kind === "case-snapshot") return Buffer.from(JSON.stringify([{
+            messageId: randomUUID(),role: "user",text: `My password is ${legacy}`
+          }]));
+          if (description.kind === "case-message") return Buffer.from(`Parola mea este ${legacy}`);
+          return Buffer.from(`Open //invalid.example/reset with password ${legacy}.`);
+        }),
+        sealContent: vi.fn()
+      } as never
+    });
+
+    const view = await access.readByToken("f".repeat(64),{ limit: 20 });
+
+    expect(view?.kind).toBe("READABLE");
+    if (view?.kind !== "READABLE") throw new Error("expected readable case");
+    expect(view.messages.map(({ text }) => text).join(" ")).not.toContain(legacy);
+    expect(view.messages.every(({ text }) => text.includes("[REDACTED_SECRET_LIKE]"))).toBe(true);
+    expect(view.summary).toBe(fallback);
   });
 
   it("marks a relay miss TIMED_OUT without summary bytes and keeps the case in the inbox", async () => {

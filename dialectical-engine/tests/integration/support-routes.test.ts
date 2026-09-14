@@ -1905,6 +1905,34 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  it("passes the exact route-resolved immutable snapshot object to answer work", async () => {
+    const snapshot = corpus([],KB_VERSION);
+    const respond = vi.fn<SupportAnswerPort["respond"]>(async (input) => {
+      expect(input.snapshot).toBe(snapshot);
+      expect(input.snapshot?.kbVersion).toBe(KB_VERSION);
+      return Object.freeze({
+        messageId: randomUUID(),outcome: "NO_SOURCE",text: "No reviewed source matched.",
+        canEscalate: true,sources: Object.freeze([]),actions: Object.freeze([])
+      });
+    });
+    const server = api(true,{
+      answerPort: Object.freeze({ respond }),
+      knowledgePort: Object.freeze({
+        status: async () => ({ kbVersion: KB_VERSION,shipped: 1,ignored: 0 }),
+        snapshot: (version: string) => version === KB_VERSION ? snapshot : undefined
+      })
+    });
+    const opened = await openSession(server,"203.0.113.209");
+
+    const response = await sendMessage(
+      server,opened.body,"How do I start a debate?","203.0.113.209"
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(respond).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
   it.each([
     ["Forgot password","en"],
     ["Am uitat parola","ro"]
@@ -1945,7 +1973,7 @@ describe("SUP-01 support routes", () => {
       body: "Open the new debate page to start your first debate."
     });
     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
-    const unsafe = "Type your password and verification code here; I reset it successfully.";
+    const unsafe = "Open https%3A%2F%2Finvalid.example/reset";
     const complete = vi.fn(async () => Object.freeze({
       text: JSON.stringify({
         kind: "answer",text: unsafe,
@@ -2374,7 +2402,7 @@ describe("SUP-01 support routes", () => {
       payload: { language: "en" }
     });
     const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
-    const secretLike = "keep 123456 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature sk-live-secret";
+    const secretLike = "My password is hunter2; keep 123456 sk-live-secret";
     expect(Buffer.byteLength(secretLike,"utf8")).toBeLessThanOrEqual(80);
     const reply = await server.inject({
       method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
@@ -2404,9 +2432,9 @@ describe("SUP-01 support routes", () => {
       );
       expect(stored.redacted).toBe(true);
       expect(plaintext.toString("utf8")).toBe(
-        "keep [REDACTED_SECRET_LIKE] [REDACTED_SECRET_LIKE] [REDACTED_SECRET_LIKE]"
+        "My password is [REDACTED_SECRET_LIKE]; keep [REDACTED_SECRET_LIKE] [REDACTED_SECRET_LIKE]"
       );
-      expect(plaintext.toString("utf8")).not.toMatch(/123456|eyJhbGci|sk-live/u);
+      expect(plaintext.toString("utf8")).not.toMatch(/hunter2|123456|sk-live/u);
     } finally {
       dataKey?.fill(0);
       plaintext?.fill(0);
@@ -2628,6 +2656,50 @@ describe("SUP-01 support routes", () => {
       WHERE session_id=$1 GROUP BY trigger_predicate
     `,[degradedSession.body.session_id])).rows).toEqual([{ trigger_predicate: "E7",count: 1 }]);
     await degradedServer.close();
+  });
+
+  it.each([
+    ["en","My password is routevalue7","My password is routevalue8","203.0.113.231"],
+    ["ro","Parola mea este rutavalue7","Parola mea este rutavalue8","203.0.113.232"]
+  ] as const)("redacts supplied %s credentials before session storage and the E3 case snapshot", async (
+    _language,first,second,ip
+  ) => {
+    const respond = vi.fn<SupportAnswerPort["respond"]>();
+    const server = api(true,{ answerPort: Object.freeze({ respond }) });
+    const opened = await openSession(server,ip);
+
+    const firstResponse = await sendMessage(server,opened.body,first,ip);
+    const secondResponse = await sendMessage(server,opened.body,second,ip);
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(secondResponse.statusCode).toBe(200);
+    expect(secondResponse.json()).toMatchObject({
+      outcome: "REFUSE_ZONE",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u)
+    });
+    expect(respond).not.toHaveBeenCalled();
+    const sessionMessages = await messageCipher.listSession({ sessionId: opened.body.session_id });
+    const projected = sessionMessages.map(({ text }) => text).join(" ");
+    expect(projected).not.toMatch(/routevalue[78]|rutavalue[78]/u);
+    expect(sessionMessages.filter(({ role }) => role === "user")
+      .every(({ redacted,text }) => redacted && text.includes("[REDACTED_SECRET_LIKE]")))
+      .toBe(true);
+
+    const row = (await database.pool.query<{
+      case_id: string;wrapped_key: Buffer;transcript_snapshot_ciphertext: Buffer;
+    }>(`SELECT opened.case_id,key.wrapped_key,opened.transcript_snapshot_ciphertext
+        FROM support."case" AS opened JOIN support.case_key AS key USING(case_id)
+        WHERE opened.session_id=$1`,[opened.body.session_id])).rows[0]!;
+    const dataKey = await supportKeys.unwrapDataKey({ kind: "case",ref: row.case_id },row.wrapped_key);
+    const plaintext = supportKeys.openContent(
+      { kind: "case-snapshot",caseId: row.case_id,purpose: "transcript" },
+      dataKey,row.transcript_snapshot_ciphertext
+    );
+    try {
+      const snapshot = plaintext.toString("utf8");
+      expect(snapshot).not.toMatch(/routevalue[78]|rutavalue[78]/u);
+      expect(snapshot).toContain("[REDACTED_SECRET_LIKE]");
+    } finally { dataKey.fill(0);plaintext.fill(0); }
+    await server.close();
   });
 
   it("records authenticated message ratings and opens E5 after two consecutive no ratings", async () => {

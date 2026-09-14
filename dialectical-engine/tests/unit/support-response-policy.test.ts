@@ -1,5 +1,6 @@
 import { describe,expect,it } from "vitest";
 import {
+  parseSupportCaseSummaryDraft,
   parseSupportDraft,
   validateSupportDraft
 } from "../../apps/api/src/support/response-policy.js";
@@ -37,6 +38,10 @@ describe("CP1 support model response policy", () => {
     ["extra key", raw("Open the debate page.",{ href: "/new" })],
     ["wrong kind", raw("Open the debate page.",{ kind: "tool" })],
     ["raw URL", raw("Open https://example.test/reset")],
+    ["protocol-relative URL", raw("Open //example.test/reset")],
+    ["percent-encoded HTTPS URL", raw("Open https%3A%2F%2Fexample.test/reset")],
+    ["percent-encoded path", raw("Open %2Fsettings")],
+    ["double-encoded path", raw("Open %252Fsettings")],
     ["path instruction", raw("Go to /settings to continue")],
     ["Markdown link", raw("Use [this link](/new)")],
     ["HTML", raw("Choose <a href='/new'>Start</a>")],
@@ -48,6 +53,37 @@ describe("CP1 support model response policy", () => {
     ["false reset claim", raw("I reset your password successfully")]
   ])("rejects %s before validation", (_name,value) => {
     expect(parseSupportDraft(value)).toBeNull();
+  });
+
+  it("accepts only the exact purpose-specific advisory summary envelope", () => {
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text: "The visitor needs help understanding debate creation.",
+      sourceIds: [],actionIds: []
+    }))).toEqual({
+      kind: "case_summary",text: "The visitor needs help understanding debate creation.",
+      sourceIds: [],actionIds: []
+    });
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text: "The visitor needs help.",sourceIds: [],actionIds: [],extra: true
+    }))).toBeNull();
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text: "The visitor needs help.",
+      sourceIds: ["getting-started-debate"],actionIds: []
+    }))).toBeNull();
+  });
+
+  it.each([
+    "Open //example.test/reset",
+    "Open https%3A%2F%2Fexample.test/reset",
+    "Open %2Fsettings",
+    "Your password is hunter2",
+    "I reset the visitor password successfully",
+    "Choose <a href='/new'>Start</a>",
+    "Use [this link](/new)"
+  ])("rejects unsafe advisory summary text before sealing: %s", (text) => {
+    expect(parseSupportCaseSummaryDraft(JSON.stringify({
+      kind: "case_summary",text,sourceIds: [],actionIds: []
+    }))).toBeNull();
   });
 
   it.each([

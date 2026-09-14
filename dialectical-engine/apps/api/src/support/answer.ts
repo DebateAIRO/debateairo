@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type {
-  HelpCorpusEntry,HelpCorpusSnapshotLookup
+  HelpCorpusEntry,HelpCorpusSnapshotLookup,LoadedHelpCorpus
 } from "@debateai/support-kb";
 import {
   SUPPORT_CAPABILITIES,type SupportAction
@@ -20,7 +20,7 @@ import type { SupportDegradedPort } from "./degraded.js";
 import { parseSupportDraft,validateSupportDraft } from "./response-policy.js";
 
 const MAX_RETRIEVED_ENTRIES = 3;
-const MAX_SYSTEM_CODE_POINTS = 12_000;
+const MAX_SYSTEM_CODE_POINTS = 24_000;
 // Leave explicit time for queue/durable cleanup inside the frozen one-second
 // caller-visible half-open budget.
 const HALF_OPEN_PROBE_TIMEOUT_MS = 850;
@@ -64,6 +64,7 @@ export interface SupportAnswerPort {
     overrideLanguage: SupportLanguage | null;
     modelRef: string;
     kbVersion?: string;
+    snapshot?: LoadedHelpCorpus;
     signedIn?: boolean;
     receivedAt: Date;
     onQueueProgress?: (notice: string) => void;
@@ -122,11 +123,18 @@ function boundedSystem(entries: readonly HelpCorpusEntry[], language: SupportLan
   return [...`${preamble}\n\n${joined}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
 }
 
-function boundedStructuredSystem(context: string,language: SupportLanguage): string {
-  const instruction = language === "ro"
+function structuredInstruction(language: SupportLanguage): string {
+  return language === "ro"
     ? "Returnează numai JSON cu exact cheile kind, text, sourceIds și actionIds. kind trebuie să fie answer. Citează cel puțin un sourceId furnizat și folosește numai actionIds solicitate. Nu include URL-uri, HTML, Markdown, parole, coduri ori afirmații despre resetări."
     : "Return only JSON with exactly the keys kind, text, sourceIds, and actionIds. kind must be answer. Cite at least one supplied sourceId and use only requested actionIds. Include no URLs, HTML, Markdown, passwords, codes, or reset claims.";
-  return [...`${instruction}\n\n${context}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
+}
+
+function boundedStructuredSystem(context: string,language: SupportLanguage): string {
+  const system = `${structuredInstruction(language)}\n\n${context}`;
+  if ([...system].length > MAX_SYSTEM_CODE_POINTS) {
+    throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+  }
+  return system;
 }
 
 function withoutModelSources(text: string): string {
@@ -167,6 +175,7 @@ async function completeWithoutQueue<T>(
 export function createSupportAnswerService(input: Readonly<{
   entries: readonly HelpCorpusEntry[];
   snapshots?: HelpCorpusSnapshotLookup;
+  requireStructuredDraft?: true;
   messages: SupportMessageCipherPort;
   modelFor: (modelRef: string) => SupportModelPort;
   queue?: Pick<SupportRelayQueue,"execute">;
@@ -178,9 +187,12 @@ export function createSupportAnswerService(input: Readonly<{
   return Object.freeze({
     respond: async (request: Parameters<SupportAnswerPort["respond"]>[0]) => {
       const prepared = redactSupportMessage(request.text);
-      const snapshot = request.kbVersion === undefined
-        ? undefined : input.snapshots?.get(request.kbVersion);
-      const structured = input.snapshots !== undefined;
+      const routeSnapshot = request.snapshot !== undefined
+        && typeof request.snapshot.kbVersion === "string"
+        && Array.isArray(request.snapshot.entries) ? request.snapshot : undefined;
+      const snapshot = routeSnapshot ?? (request.kbVersion === undefined
+        ? undefined : input.snapshots?.get(request.kbVersion));
+      const structured = input.requireStructuredDraft === true || input.snapshots !== undefined;
       const eligibleEntries = structured ? snapshot?.entries ?? [] : input.entries;
       const context = structured ? buildSupportKnowledgeContext({
         entries: eligibleEntries,
@@ -188,7 +200,8 @@ export function createSupportAnswerService(input: Readonly<{
         language: request.language,
         query: prepared.text,
         historyText: "",
-        maxCodePoints: MAX_SYSTEM_CODE_POINTS - 800
+        maxCodePoints: MAX_SYSTEM_CODE_POINTS
+          - [...`${structuredInstruction(request.language)}\n\n`].length
       }) : undefined;
       const entries = structured
         ? eligibleEntries.filter((entry) => entry.lang === request.language

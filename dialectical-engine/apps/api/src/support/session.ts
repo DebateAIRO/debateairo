@@ -206,7 +206,10 @@ export function createSupportMessageCipher(
         ciphertext
       );
       const { contentCiphertext: _ciphertext,wrappedKey: _wrapped,...metadata } = encrypted;
-      return Object.freeze({ ...metadata,text: plaintext.toString("utf8") });
+      const prepared = redactSupportMessage(plaintext.toString("utf8"));
+      return Object.freeze({
+        ...metadata,text: prepared.text,redacted: metadata.redacted || prepared.redacted
+      });
     } catch (error) {
       if (error instanceof TypedDomainError) throw error;
       throw new SupportSessionError(
