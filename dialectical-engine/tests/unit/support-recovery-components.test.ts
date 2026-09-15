@@ -119,7 +119,7 @@ describe("reviewed Support recovery components", () => {
     const bytes = Buffer.from(`${JSON.stringify(document,null,2)}\n`);
     const review = structuredClone(first.reviewManifest);
     review.recovery.componentFileSha256 = sha256(bytes);
-    review.recovery.components[0].fallbackSha256 = sha256(document.components[0].fallback);
+    review.recovery.components[0]!.fallbackSha256 = sha256(document.components[0].fallback);
     const corpusB = loadHelpCorpus(first.directory,{
       reviewManifest: review,recoveryComponents: bytes,
       requireReviewedRecovery: true
