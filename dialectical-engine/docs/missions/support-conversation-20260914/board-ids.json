@@ -96,7 +96,13 @@
     "REV1_P3": "t_88683868",
     "REV2_P3": "t_fa16515a",
     "REV3_P3": "t_689d8959",
-    "HARNESS_P2": "t_02141be3"
+    "HARNESS_P2": "t_02141be3",
+    "PROC_HARNESS_LEASE": "t_e0627403",
+    "EDITFIX_P2": "t_8edac644",
+    "EDITREV_P2": "t_e5a78438",
+    "EDIT_ACCOUNT_PREREQ": "t_a34fc97b",
+    "EDIT_VISITOR_METADATA": "t_cb565a63",
+    "PROC_EDIT_ID": "t_8175c38e"
   },
   "edges": [
     [
@@ -518,6 +524,34 @@
     [
       "HARNESS_P2",
       "LIVE_P2"
+    ],
+    [
+      "EDIT_P2",
+      "EDITFIX_P2"
+    ],
+    [
+      "EDITFIX_P2",
+      "EDITREV_P2"
+    ],
+    [
+      "EDITREV_P2",
+      "EDIT_ACCOUNT_PREREQ"
+    ],
+    [
+      "EDITREV_P2",
+      "EDIT_VISITOR_METADATA"
+    ],
+    [
+      "EDITREV_P2",
+      "ATTEST_P2"
+    ],
+    [
+      "EDIT_ACCOUNT_PREREQ",
+      "CP1"
+    ],
+    [
+      "EDIT_VISITOR_METADATA",
+      "CP1"
     ]
   ]
 }

@@ -1,12 +1,12 @@
 # CP1 progress
 
-Current status: **BLOCKED — final correction editorial review pending; existing Forgot destination still needs owner input.** CP1 is not ready or accepted and cannot unlock CP2/CP3.
+Current status: **BLOCKED — two account-access recovery records need editorial correction; existing Forgot destination still needs owner input.** CP1 is not ready or accepted and cannot unlock CP2/CP3.
 
 Product is clean `codex/support-conversation-cp1` at `f440287179f71e18a4b4b93607951c1e5f862cc1`. FIX_P2 author evidence consumed: 21 authorized changed paths, 107 cumulative committed/current paths, 37 artifact references, 36 article/projection/fallback bindings and 7 native skill BODY reads verified. Captured final committed-byte affected tests pass 448/448 across 11 files. This is author verification; separate review remains.
 
 All 36 new guidance records require separate Sol editorial review and actual manifest attestation. Strict API/status intentionally cannot load the current v1 manifest. No new text is owner-ratified. SPEC-v3 and CP1-REVIEWED-RECOVERY.md govern this final correction.
 
-Next graph: EDIT_P2 → ATTEST_P2 → LIVE_P2 → GATE_P3 → three final pass3 lenses. PLAN_P2, FIX_P2 and disjoint HARNESS_P2 evidence have been consumed. HARNESS_P2 passes 27/27 inert controls; the final snapshot adapter must be proved before any LIVE_P2 traffic. The final 25-file integrated union retains all 23 prior members and adds two recovery suites. No hidden sampling loop or fourth final review.
+Separate EDIT_P2 returned REWORK:34 records pass both strings; account-access EN/RO projections/fallbacks need explicit prerequisites and removal of visitor-facing internal verification prose. Next graph: EDITFIX_P2 → EDITREV_P2 → ATTEST_P2 → LIVE_P2 → GATE_P3 → three final pass3 lenses. PLAN_P2, FIX_P2 and disjoint HARNESS_P2 evidence have been consumed. HARNESS_P2 passes 27/27 inert controls; the final snapshot adapter must be proved before any LIVE_P2 traffic. The final 25-file integrated union retains all 23 prior members and adds two recovery suites. No hidden sampling loop or fourth final review.
 
 Historical LIVE_P1 at e0dcfe77: 935 tests passed plus one Forgot TODO; same seven actual questions once produced three useful answers and four safety refusals. API/DOM equality was 7/7, compact RO keyboard navigation passed, EN pointer unverified. These outcomes do not measure the new revision.
 
