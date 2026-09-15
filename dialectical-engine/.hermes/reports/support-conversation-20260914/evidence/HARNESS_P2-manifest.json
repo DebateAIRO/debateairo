@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "node": "HARNESS_P2",
+  "product_revision_inspected": false,
+  "immutable_sha256": {
+    "probes/HARNESS_P2/diagnostic-consumer.mjs": "6f60ecfca6622517a032be204773c572584dd48b949ffe0eccdf2e399cb91db5",
+    "probes/HARNESS_P2/response-evidence.mjs": "4c26d1b9125703db664959ad4b8395eee7c5a171ea79dc3df744ba5f3ffcf182",
+    "probes/HARNESS_P2/verify-diagnostic-consumer.mjs": "d1c805399b178d819fa1f1eb385b2de03fb60c3283f57ef6cc1c2109b0116dc2",
+    "logs/HARNESS_P2-red.log": "e011b14181b32bbf445f253543aa6cbdc5cadb2adf8fd39c79bf12a6352ce3e4",
+    "logs/HARNESS_P2-green.log": "250d2deed2b426ba65954dd656c275416adbb4d67f6103c7b9f0432726e76aaf",
+    "evidence/HARNESS_P2.md": "7e93e57330a78d0aa9ac4cf868b1abfd7abf4ffcf3e8034e56fb54092c06aa02",
+    "evidence/HARNESS_P2-control-receipt.json": "e963aad4fa7270dec467a0b0a411cf6ab10bd7f4496927f9cad0125a81b4a9d4",
+    "agent-reports/HARNESS_P2.md": "7fc9f24b0039d6e6fd520c7b19abd87bb133756c662d3ca0425d4a00ee394e78"
+  },
+  "red": {
+    "rc": 1,
+    "actual": "AMBIGUOUS",
+    "expected": "ATTRIBUTED_RECOVERY"
+  },
+  "green": {
+    "rc": 0,
+    "response_evidence_properties": 9,
+    "transition_and_ambiguity_fixtures": 18,
+    "total_controls": 27,
+    "producer_record_keys": 7
+  },
+  "real_traffic": false,
+  "heavy_lease_released": true
+}

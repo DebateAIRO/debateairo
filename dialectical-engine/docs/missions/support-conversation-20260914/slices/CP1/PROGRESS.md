@@ -1,18 +1,18 @@
 # CP1 progress
 
-Current status: **BLOCKED — final correction underway; existing Forgot destination still needs owner input.** CP1 is not ready, not accepted, and cannot unlock CP2/CP3.
+Current status: **BLOCKED — final correction editorial review pending; existing Forgot destination still needs owner input.** CP1 is not ready or accepted and cannot unlock CP2/CP3.
 
-Product is clean `codex/support-conversation-cp1` at `e0dcfe77f49655bea774bdfacf988b911be4ff06`, with 103 changed paths verified against the layered receipts. LIVE_P1 passed 935 tests plus one Forgot TODO across 23 suites; the actual seven-question matrix produced three useful answers and four safety refusals. API/DOM equality was 7/7; compact RO keyboard navigation passed, EN pointer navigation remains unverified. No causal comparison across separate model samples is claimed.
+Product is clean `codex/support-conversation-cp1` at `f440287179f71e18a4b4b93607951c1e5f862cc1`. FIX_P2 author evidence consumed: 21 authorized changed paths, 107 cumulative committed/current paths, 37 artifact references, 36 article/projection/fallback bindings and 7 native skill BODY reads verified. Captured final committed-byte affected tests pass 448/448 across 11 files. This is author verification; separate review remains.
 
-All three separate Sol final pass2 reviews returned REWORK. Consumed reports and receipts identify incomplete model-facing corpus projection, remaining credential redaction/operation/path defects and display-label compatibility. The adopted final correction is complete separately reviewed projections and exact reviewed fallback after one rejected ordinary-knowledge model attempt, plus the security repairs. SPEC-v3 and CP1-REVIEWED-RECOVERY.md are current authority.
+All 36 new guidance records require separate Sol editorial review and actual manifest attestation. Strict API/status intentionally cannot load the current v1 manifest. No new text is owner-ratified. SPEC-v3 and CP1-REVIEWED-RECOVERY.md govern this final correction.
 
-Next graph: PLAN_P2 → FIX_P2 → separate EDIT_P2 → ATTEST_P2 → LIVE_P2 → GATE_P3 → three final pass3 lenses. These are the last bounded correction and final reviews, with no hidden preparation or model sampling loop. No author or heavy command is currently active; PLAN_P2 is being dispatched documentation-only.
+Next graph: EDIT_P2 → ATTEST_P2 → LIVE_P2 → GATE_P3 → three final pass3 lenses. PLAN_P2, FIX_P2 and disjoint HARNESS_P2 evidence have been consumed. HARNESS_P2 passes 27/27 inert controls; the final snapshot adapter must be proved before any LIVE_P2 traffic. The final 25-file integrated union retains all 23 prior members and adds two recovery suites. No hidden sampling loop or fourth final review.
 
-Last preview custody receipt: `https://localhost:3100`, PID/PGID 45639, loaded e0dcfe77, ordinary TLS 200 after browser exit and ten seconds idle. This is historical at capture; next lifecycle owner must measure before reload. Other services remain no-touch.
+Historical LIVE_P1 at e0dcfe77: 935 tests passed plus one Forgot TODO; same seven actual questions once produced three useful answers and four safety refusals. API/DOM equality was 7/7, compact RO keyboard navigation passed, EN pointer unverified. These outcomes do not measure the new revision.
 
-Owner input: the existing Forgot password flow is confirmed, but its exact destination/opener remains unknown. The original specific question remains pending. No guessed destination or replacement is permitted.
+Last preview custody receipt is historical: https://localhost:3100, PID/PGID 45639, loaded e0dcfe77, ordinary TLS 200 after browser exit and ten seconds idle. LIVE_P2 must measure exact owned lifecycle before reload. Other services remain no-touch.
 
-Source custody: current forward 56-path/index/full-index checks match. An earlier serialized-diff fingerprint gap lacks a full intake inventory; underlying file-byte change, cause and actor are unverified. No historical whole-tree preservation claim is made.
+The original specific Forgot destination/opener question remains pending. No guess, replacement or repeated question. Source custody: forward 56-path/index/full-index checks match; earlier serialized-diff fingerprint gap does not establish underlying file-byte change, cause or actor.
 
 ## Historical record
 

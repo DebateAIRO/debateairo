@@ -1,0 +1,35 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > admits a complete exact-hash bilingual component set into an immutable snapshot 26ms
+ × tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > fails strict loading when recovery review is missing, malformed, stale, or tampered 4ms
+   → expected [Function] to throw error matching /SUPPORT_KB_RECOVERY_REVIEW_REQUIRED/u but got 'recovery review attestation is requir…'
+ ✓ tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > changes snapshot identity when exact admitted component bytes change 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-recovery-components.test.ts > reviewed Support recovery components > fails strict loading when recovery review is missing, malformed, stale, or tampered
+AssertionError: expected [Function] to throw error matching /SUPPORT_KB_RECOVERY_REVIEW_REQUIRED/u but got 'recovery review attestation is requir…'
+
+- Expected:
+/SUPPORT_KB_RECOVERY_REVIEW_REQUIRED/u
+
++ Received:
+"recovery review attestation is required"
+
+ ❯ tests/unit/support-recovery-components.test.ts:87:18
+     85|     expect(() => loadHelpCorpus(data.directory,{
+     86|       recoveryComponents: data.componentBytes,requireReviewedRecovery:…
+     87|     } as never)).toThrowError(/SUPPORT_KB_RECOVERY_REVIEW_REQUIRED/u);
+       |                  ^
+     88|
+     89|     const stale = structuredClone(data.reviewManifest);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  08:29:10
+   Duration  213ms (transform 59ms, setup 0ms, import 79ms, tests 34ms, environment 0ms)
+

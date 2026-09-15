@@ -1,0 +1,65 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > decodes valid transformations to a fixed point: p%61ssword 2ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > decodes valid transformations to a fixed point: p%2561ssword 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > decodes valid transformations to a fixed point: %EF%BD%90%EF%BD%81%EF%BD%93%EF%BD%93%EF%BD%97%EF%BD%8F%EF%BD%92%EF%BD%84 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > decodes valid transformations to a fixed point: pass%E2%80%8Bword 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > decodes valid transformations to a fixed point: https%253A%252F%252Fexample.test/reset 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > flags dangerous encoding that remains at or beyond the bound: https%252525253A%252525252F%252525252Fexample.test/reset 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > flags dangerous encoding that remains at or beyond the bound: %2525252570assword 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > flags dangerous encoding that remains at or beyond the bound: %252525252Fsettings 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > flags dangerous encoding that remains at or beyond the bound: https%3 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > preserves a benign percentage: Progress is 50% complete. 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > preserves a benign percentage: The export is 100% local. 0ms
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: /settings 3ms
+   → expected false to be true // Object.is equality
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: ../settings 0ms
+   → expected false to be true // Object.is equality
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: .\settings 0ms
+   → expected false to be true // Object.is equality
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: C:\Users\visitor\secret.txt 0ms
+   → expected false to be true // Object.is equality
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: \\server\share\secret.txt 0ms
+   → expected false to be true // Object.is equality
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: %2Fsettings 0ms
+   → expected false to be true // Object.is equality
+ × tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: ..%2Fsettings 0ms
+   → expected false to be true // Object.is equality
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > does not classify ordinary prose as a path: Progress is 50% complete. 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > does not classify ordinary prose as a path: Choose Settings from the account page. 0ms
+ ✓ tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > does not classify ordinary prose as a path: The ratio is 3/4 when four observations are available. 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: /settings
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: ../settings
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: .\settings
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: C:\Users\visitor\secret.txt
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: \\server\share\secret.txt
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: %2Fsettings
+ FAIL  tests/unit/support-text-views.test.ts > CP1 bounded canonical Support text views > recognizes every canonical filesystem and route path form: ..%2Fsettings
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/unit/support-text-views.test.ts:39:45
+     37|     "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings"
+     38|   ])("recognizes every canonical filesystem and route path form: %s",(…
+     39|     expect(supportTextHasUnsafePath(input)).toBe(true);
+       |                                             ^
+     40|   });
+     41|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 14 passed (21)
+   Start at  18:48:27
+   Duration  132ms (transform 16ms, setup 0ms, import 25ms, tests 9ms, environment 0ms)
+

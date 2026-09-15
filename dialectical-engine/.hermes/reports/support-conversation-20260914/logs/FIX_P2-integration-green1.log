@@ -1,0 +1,151 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous NaN session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated NaN session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous positive infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated positive infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative infinity session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous unsafe session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated unsafe session creation before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous NaN message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated NaN message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous positive infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated positive infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative infinity message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous negative message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated negative message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons anonymous unsafe message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects and permanently poisons authenticated unsafe message admission before mutation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous NaN session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated NaN session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous positive infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated positive infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous negative infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated negative infinity session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous negative session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated negative session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL anonymous unsafe session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects real-PostgreSQL authenticated unsafe session creation without a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > does not persist RATE_LIMIT evidence or transcript bytes for invalid real-PostgreSQL messages
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > poisons regressing anonymous creation observations before later mutations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > poisons regressing authenticated creation observations before later mutations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects regressing authenticated creation with real PostgreSQL and keeps later time poisoned
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects regressing anonymous messages without persistent admission or rate evidence
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rejects regressing authenticated messages without persistent admission or rate evidence
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time anonymous creation observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time authenticated creation observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time anonymous message observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows concurrent equal-time authenticated message observations
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves one-hour anonymous creation expiry before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves ten-minute message expiry before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves twenty-four-hour message expiry before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > records only the session-closed decision before a rewind poisons the route
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > creates an anonymous capability session without storing the raw token
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > rolls back the session row when key material creation fails
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > stores only redacted ciphertext through the API boundary and becomes undecryptable after shred
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > zeroes transient message DEK and plaintext buffers on success and failures
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > treats an invalid identity cookie as anonymous
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > requires trusted origin and CSRF only when a mutating request binds a valid identity cookie
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > makes nullable session-owner mismatches indistinguishable and side-effect free
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > applies the 2,000-character boundary to authenticated support sessions
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > applies session counts universally while anonymous IP limits remain anonymous-only
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns DISABLED without a model-call reservation or transcript row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves an exact final-gate DISABLED answer through the route contract
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > fails closed on SUPPORT_CONFIG_UNINITIALIZED creation and reads without creating a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > fails closed on SUPPORT_CONFIG_REFRESH_DEADLINE creation and reads without creating a row
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns fixed DISABLED creation without rows or anonymous admission consumption
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > still derives the effective lock when an available snapshot turns support off
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > does not lock after three repeats of a benign dangerous-noun product question
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > refuses injection before relay admission and stores only exact message and IP hashes
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > persists zone and safety refusals as fixed encrypted assistant output without model transit
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > derives an effective lock from three immutable injection rows and refuses the fourth
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > serializes concurrent third and fourth injection admission at the immutable event boundary
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > applies the 24-hour two-lock IP cooldown window and records no raw IP or content
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns 429 on the 21st anonymous message inside the configured ten-minute window
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > shares ordinary admission counters across API instances and restart
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > allows 2,000 characters and returns 429 for 2,001 using the register snapshot
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > uses injected register limits for messages, characters, sessions, and injection lock
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps the ten-minute cutoff inclusive and excludes an event one millisecond beyond it
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves a local-limit 429 and reports only a safe diagnostic when evidence fails
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > preserves a locked-session 429 and safe diagnostic when rate evidence fails
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > coalesces concurrent and long repeated rate limits to the immutable first event
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > composes public status from register, KB, and support repository ports
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > projects exact nullable deflection and rating-resolution status fields
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns 409 before admission, model work, or message writes when session snapshot A is unavailable
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > passes the exact route-resolved immutable snapshot object to answer work
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Forgot password
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns canonical deterministic unresolved Forgot password guidance without a model: Am uitat parola
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > recovers a rejected encoded link draft from the pinned top source before storage and HTTP
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > recovers a rejected internal identifier draft from the pinned top source before storage and HTTP
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns a grounded relay answer with server-owned sources, redacted transit, strict timestamps, and encrypted persistence
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > advertises no owner-only action to an anonymous export model request
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns fixed NO_SOURCE without invoking the relay and persists only encrypted outcome rows
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay 502 failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay 504 failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay timeout failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > maps relay connection failure to fixed encrypted DEGRADED while escalation remains available
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens a minimal encrypted case with a distinct opaque capability and exact Romanian receipt
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns typed already-opened without a capability for concurrent manual escalation
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > redacts case replies before encryption and enforces the UTF-8 byte limit
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > serializes concurrent case-reply limits and pages replies with a SQL cursor
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens and commits an E2 case before returning the deterministic safety refusal
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens E8 for account erasure without a model or tool call: Delete my account
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens E8 for account erasure without a model or tool call: Erase my account
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > opens E8 for account erasure without a model or tool call: Șterge contul meu
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns opaque SLA/link receipts for newly opened E3, E6, E7, and E8 cases
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > redacts supplied en credentials before session storage and the E3 case snapshot
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > redacts supplied ro credentials before session storage and the E3 case snapshot
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > records authenticated message ratings and opens E5 after two consecutive no ratings
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > lists only identity-bound case metadata to the authenticated owner
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > returns SHREDDED without quota or mutation for every session write surface
+ ↓ tests/integration/support-routes.test.ts > SUP-01 support routes > keeps the key-based adapter seam nonfunctional
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > opens one case for concurrent attempts at the same trigger generation
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replays the owning migration without duplicating named constraints
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > persists a complete case and its initial system transition before returning
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > rejects future v1 content inserts and ciphertext updates without rewriting legacy rows
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > rejects debateai_support case INSERTs with either v1 snapshot or v1 summary
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > returns a shredded case discriminator without unwrapping and preserves ciphertext bytes
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > atomically rejects a case reply when shred wins after the liveness read
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > enforces the closed state graph and never removes a row
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > rejects an illegal transition with a typed error
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > stores a non-authoritative one-paragraph advisory summary within the bound
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe ro advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > replaces an unsafe en advisory summary before seal and persistence
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > screens legacy transcript, reply, and summary plaintext during case access
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > marks a relay miss TIMED_OUT without summary bytes and keeps the case in the inbox
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > persists the authoritative deadline despite real timer slippage and rejects late DONE
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > propagates immediate typed summary failure SUPPORT_MODEL_UNAVAILABLE instead of recording a timeout
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > propagates immediate typed summary failure SUPPORT_DISABLED instead of recording a timeout
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > aborts at the deadline, persists one timeout, and rejects a late DONE write
+ ↓ tests/integration/support-cases.test.ts > SUP-02 cases > reports a typed background summary failure through the case-service seam
+ ↓ tests/integration/support-metrics.test.ts > support outcome metrics > returns null for zero denominators and exact 7/30-day bounded ratios
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/support-cases.test.ts [ tests/integration/support-cases.test.ts ]
+ FAIL  tests/integration/support-metrics.test.ts [ tests/integration/support-metrics.test.ts ]
+ FAIL  tests/integration/support-routes.test.ts > SUP-01 support routes
+Error: listen EPERM: operation not permitted 127.0.0.1
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '127.0.0.1' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  131 skipped (131)
+   Start at  18:45:02
+   Duration  2.50s (transform 530ms, setup 0ms, import 2.23s, tests 19ms, environment 0ms)
+

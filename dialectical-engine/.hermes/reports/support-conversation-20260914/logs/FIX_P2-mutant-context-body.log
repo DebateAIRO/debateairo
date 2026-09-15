@@ -1,0 +1,90 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > always includes the complete compact policy and capability catalog 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > selects newly reviewed knowledge lexically without a hard-coded intent list 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > uses only the selected language and preserves Romanian visitor text 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > adds article sections whole and skips a section that would cross the cap 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > caps selected sources and requested actions at three 8ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'home-library' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'new-debate' in 'ro' 2ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'owner-debate' in 'ro' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'public-debate' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'help-desk' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-in' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'sign-up' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'settings' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'verify-email' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'en' 1ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'enroll-mfa' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'en' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > keeps reviewed capability articles reachable for 'operator-workers' in 'ro' 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > states the exact bounded source and action sets in the final output contract 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in en 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > matches ordinary inflected creation language in ro 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > advertises only action ids resolved by the trusted caller before generation 0ms
+ ✓ tests/unit/support-context.test.ts > Support knowledge context > projects only request-local references and human labels to the model 1ms
+ × tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body 8ms
+   → expected 'SUPPORT POLICY\n- Use only the review…' to contain 'Choose a topic longer than six charac…'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-context.test.ts > Support knowledge context > uses the admitted projection and never exposes the raw title or article body
+AssertionError: expected 'SUPPORT POLICY\n- Use only the review…' to contain 'Choose a topic longer than six charac…'
+
+- Expected
++ Received
+
+- Choose a topic longer than six characters before starting.
++ SUPPORT POLICY
++ - Use only the reviewed sources and capability catalog below.
++ - Never request, receive, repeat, or submit credentials or security codes.
++ - Never claim that Support changed account or security state.
++ - Use only the request references listed in the output contract; never invent a URL.
++ - Describe unavailable, local-only, conditional, and owner-only behavior honestly.
++
++ CAPABILITY CATALOG
++ - Home and debate library | available to all visitors | actions=Home, Public debates, Your debates, How it works, Sample debate
++ - Create a debate with plan controls | available to signed-in visitors | actions=Start a debate
++ - Owner debate workspace | available only in verified owner context | actions=Open your debate
++ - Published debate | available with a verified public debate reference | actions=Open public debate
++ - Support conversations and human cases | available to all visitors | actions=Help desk, Support status
++ - Sign in and saved MFA recovery | available to signed-out visitors | actions=Sign in, Forgot password
++ - Create an account | available to signed-out visitors | actions=Create account
++ - Account settings | available to signed-in visitors | actions=Settings, Privacy preferences
++ - Email verification state | not available through Support | actions=none
++ - MFA enrollment state | not available through Support | actions=none
++ - Operator-only worker view | not available through Support | actions=none
++
++ SOURCE s-10000000000040008000000000000001-1
++ RAW BODY /new packages/private/source.ts
++
++ OUTPUT CONTRACT
++ sourceIds=s-10000000000040008000000000000001-1
++ actionIds=a-10000000000040008000000000000001-1
+
+ ❯ tests/unit/support-context.test.ts:282:25
+    280|       availableActionIds: SUPPORT_ACTION_IDS
+    281|     });
+    282|     expect(result.text).toContain(candidate.modelProjection);
+       |                         ^
+    283|     expect(result.text).not.toContain(candidate.title);
+    284|     expect(result.text).not.toContain(candidate.body);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 32 passed (33)
+   Start at  18:48:25
+   Duration  161ms (transform 32ms, setup 0ms, import 44ms, tests 32ms, environment 0ms)
+

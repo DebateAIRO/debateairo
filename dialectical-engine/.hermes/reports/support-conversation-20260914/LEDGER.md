@@ -113,3 +113,14 @@ Author e0dcfe77 final16 paths consumed:103/103 full layered product bytes,27 imm
 
 ## 2026-09-14T17:49:00.931847+00:00 — LIVE_P1 consumed; GATE_P2 complete failed-evidence package
 Exacte0dcfe77:23files935pass+1TODO;7actualonce3useful4refused. Fourstrict7records, PATH_OR_ROUTE3/CREDENTIAL_OPERATION1; nativeconsumer12controlreturned17:31:27 beforeactualbrowser17:35:17.27immutableLIVErefs,103currentbytes,5nativeBODYskills verified. PID45639 ordinaryTLS200/browserexit10sidle is author custody, notlaterrootliveness. GATE_P2 82currentimmutableinputs plus inherited114hashesverified; compact lens indexes prepared. No guesseddiscardedtext, falsepositive claim, retries, source restoration, modelchange or CP1acceptance.
+
+Finalpass2 REV1_P2/REV2_P2/REV3_P2 dispatched in existing Sol sessions after each packet-checkPASS atsource446/producte0.22-file freezebb933856a4d8ca6781988a6cc548785da635fcff. GATE_P2 DONE packagingonly; REV2 soleheavy inertfixtures, othersstatic. Compact indexes21/26/24 inputs. No authoractive, extraactualrequest, owncodeapproval or CP2 advancement.
+
+
+## 2026-09-15T16:06:00.304928+00:00 — final correction author evidence consumed; editorial prerequisite prepared
+
+PLAN_P2 t_302f2087, original Sol requirements session: consumed blueprint with36 article hashes,21/2 disjoint author/attestation paths,23+2 suite union and6 native skill BODY reads (PLAN_P2-consumption.json). HARNESS_P2 t_02141be3, Sol preview session: consumed8 immutable references,6 native BODY reads and captured27/27 inert controls (HARNESS_P2-consumption.json); native DONE. Helpers do not prove the final snapshot adapter, which LIVE must establish before traffic.
+
+FIX_P2 t_5ab3cfa2, original Sol requirements session, exit received: clean f440287179f71e18a4b4b93607951c1e5f862cc1. Root mechanically verified37 artifact hashes, exact21 authorized changed paths,107 cumulative current/committed files,36 article and decoded projection/fallback digest pairs, retained25 suite union,7 native skill BODY reads and captured448/448 final summary across11 files. Root did not rerun tests or issue a content/code verdict. Self-report: agent-reports/FIX_P2.md; final consumer41e580a63b5be31f6ca408277db8b50c70719907ea36f46b5d415b420eb31183. Heavy/Git leases released.
+
+Ruling: hand exact36 new records to separate Sol baseline editorial seat. Existing article provenance does not ratify new strings; manifest remains v1 and strict production admission intentionally blocked until actual editorial PASS then ATTEST. Cost if wrong: separate editorial/final pass3 returns REWORK, never fabricate provenance or model quality. Forgot remains unresolved; no CP1 readiness/acceptance or CP2 work.
