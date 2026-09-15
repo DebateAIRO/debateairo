@@ -24,7 +24,8 @@ const ENTRY = Object.freeze({
   id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
   status: "shipped" as const,sources: ["test"],verifiedAgainst: "test",
   ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
-  body: "Open the new debate page to start your first debate."
+  body: "Open the new debate page to start your first debate.",
+  modelProjection: "Open the new debate page to start your first debate."
 });
 
 describe("SUP-06 automatic degraded state", () => {
