@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "status": "ATTEST_P2 OUTPUT CUSTODY",
+  "node": "ATTEST_P2",
+  "ticket": "t_51e73096",
+  "baseRevision": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+  "finalCommit": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "artifactCount": 15,
+  "artifacts": [
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/ATTEST_P2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/ATTEST_P2.md",
+      "sha256": "5dfa3a8bff9eda8d6b1e3442dacc5003568903ee16336105d4874398c11457b5",
+      "bytes": 6461
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-product-manifest.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-product-manifest.json",
+      "sha256": "38a9b3f2f5a71c2137a4fe878d2704b55abeecf67777ea69afdd967c1e777fee",
+      "bytes": 8876
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-snapshot-receipt.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-snapshot-receipt.json",
+      "sha256": "cfdaf33e1fc4e5e303d00764be509829e6631e36a60aece79813b6fb42163de2",
+      "bytes": 42877
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/ATTEST_P2.md",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/ATTEST_P2.md",
+      "sha256": "46b4d668051b40c875ec13d64a48ae26bf21fa7a5e8be672c229adb899af55cf",
+      "bytes": 5226
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final.log",
+      "sha256": "7416a0a9b922982ce48e4e30f02e3411e02f9c2acae4dc5717bb7329fc37b77f",
+      "bytes": 95015
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final2.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final2.log",
+      "sha256": "2d4c2d82733972cfd4e958caf40768ee489a2efd95e7db3106e17538190d7ccd",
+      "bytes": 93292
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-recovery-components-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-recovery-components-green.log",
+      "sha256": "57d14d6342df8c507fe65cc64514d63bb5b330ec30bba164f4173681f2e86740",
+      "bytes": 823
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-snapshot-build.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-snapshot-build.log",
+      "sha256": "95ab676fe43f06bf497758fc3e028c1c71b629c061e8c0a7fe6d62c441180e6c",
+      "bytes": 477
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-green.log",
+      "sha256": "a414254fbde65eb055f0c8a3674edb04a4783a2f4cbf3e89b51ed30ed3fd7196",
+      "bytes": 492
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-red.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-red.log",
+      "sha256": "8ec79c86af438d041dfd9f11f645957fef71c71f6746ee6c6be2c0fd8b2d6601",
+      "bytes": 1503
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-transition-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-transition-green.log",
+      "sha256": "e2d12aa1f74e35cfffd3a322edd2c08c49a65dd0500d6b1fac52fa4b94622a69",
+      "bytes": 5060
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-attribution.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-attribution.log",
+      "sha256": "7b8c1da79bda518bb3c6ea2670b80472f6ed448d77065a82ae088b635cdb382d",
+      "bytes": 1394
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final.log",
+      "sha256": "1a5be748d82132c33b239ccfbb3fc728159002a2dbb4f6ef97084a73e2bc6dea",
+      "bytes": 39712
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611
+    },
+    {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/ATTEST_P2/build-snapshot-receipt.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/ATTEST_P2/build-snapshot-receipt.ts",
+      "sha256": "066e4bb168965bebfa8302052b3bdae3050636a9c585c1d1b18c406889a3e208",
+      "bytes": 9324
+    }
+  ],
+  "excluded": [
+    ".hermes/reports/support-conversation-20260914/evidence/ATTEST_P2-inputs.json (frozen input)",
+    "this receipt itself"
+  ],
+  "limits": [
+    "No checkpoint acceptance.",
+    "LIVE_P2 and final pass3 remain.",
+    "Owner recovery ratification remains blank."
+  ]
+}

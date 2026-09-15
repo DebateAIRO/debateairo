@@ -1,0 +1,29 @@
+
+ RUN  v4.1.10 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine
+
+ × tests/unit/support-recovery-attestation.test.ts > production Support recovery attestation > admits the exact separately reviewed 36-record corpus as a deterministic immutable snapshot 53ms
+   → recovery review attestation is required
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/support-recovery-attestation.test.ts > production Support recovery attestation > admits the exact separately reviewed 36-record corpus as a deterministic immutable snapshot
+TypedDomainError: recovery review attestation is required
+ ❯ loadHelpCorpus packages/support-kb/src/index.ts:573:11
+    571|   }
+    572|   if (options.requireReviewedRecovery === true && reviewManifest.recov…
+    573|     throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_REQUIRED","re…
+       |           ^
+    574|   }
+    575|   const expectedRecoveryKeys = shippedFiles.map(({ entry }) => `${entr…
+ ❯ tests/unit/support-recovery-attestation.test.ts:88:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'SUPPORT_KB_RECOVERY_REVIEW_REQUIRED' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  19:49:44
+   Duration  228ms (transform 59ms, setup 0ms, import 79ms, tests 54ms, environment 0ms)
+

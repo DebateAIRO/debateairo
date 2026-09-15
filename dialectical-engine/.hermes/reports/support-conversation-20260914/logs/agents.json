@@ -206,11 +206,25 @@
       "status": "completed_editorial_pass_consumed",
       "ticket": "t_e5a78438",
       "revision": "dfeb7eef93de31e19367760d87c09ca1ef76544e"
+    },
+    "ATTEST_P2": {
+      "session": "/root/requirements",
+      "status": "completed_author_attestation_consumed",
+      "ticket": "t_51e73096",
+      "base": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+      "scope_amendment": "Four paths across preserved attestation commit and separate fixture typing correction; author reports 449 tests at c7, then focused3 and exact76 baseline typecheck after test-only change; final receipts pending.",
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77"
+    },
+    "SOURCE_SERIALIZATION": {
+      "session": "/root/forgot_destination",
+      "status": "completed_no_match_consumed",
+      "ticket": "t_851668bc",
+      "heavy_lease": false
     }
   },
   "heavy_lease": null,
-  "state": "CP1_RECOVERY_ATTESTATION_PENDING",
-  "last_event": "2026-09-15T16:42:58.143991+00:00",
+  "state": "CP1_FINAL_LIVE_PREPARATION",
+  "last_event": "2026-09-15T17:21:13.743815+00:00",
   "pending_owner_decision": "V-1 forgot-password destination",
   "lane": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
   "baseline_claim": "b7ca2c41",
@@ -218,7 +232,7 @@
   "source_preservation": "Forward56-path/index/full-index custody verified; intake serialized-diff gap remains unverified, no underlying file-byte/cause inference.",
   "last_review_interim": "All final pass2 lenses consumed REWORK; selected complete reviewed projections plus exact reviewed recovery and security U3-U6 under SPEC-v3.",
   "last_blueprint_milestone": "PLAN_P2 consumed;36 corpus records,21/2 disjoint paths,25 final suites.",
-  "last_author_milestone": "FIX_P2 clean f440287179f71e18a4b4b93607951c1e5f862cc1 consumed;37 refs,21 changed paths,107 cumulative,36 new unreviewed records;captured448/448 across11files. Editorial/attestation/live/final review pending.",
+  "last_author_milestone": "ATTEST_P2 consumed: clean 606b2eab; 108 exact cumulative files; 36 separate editorial bindings; 449 tests at c7, final delta 3, attributed 76 typecheck errors.",
   "last_transport_recovery": "FIX_P2 same Sol resumed after explicit network response decoding error; no active command; edits/RED preserved.",
   "last_editorial_milestone": "EDITREV_P2 all36projection/fallbackPASS consumed atdfeb7eef;108hashes,4changed/34retained;correct native childidentity."
 }

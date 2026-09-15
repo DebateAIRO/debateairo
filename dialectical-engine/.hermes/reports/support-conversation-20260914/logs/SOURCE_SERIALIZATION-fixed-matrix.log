@@ -1,0 +1,774 @@
+{
+  "after": {
+    "argv": {
+      "cachedBinaryFullIndex": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--cached",
+        "--binary",
+        "--full-index"
+      ],
+      "head": [
+        "git",
+        "--no-optional-locks",
+        "rev-parse",
+        "HEAD"
+      ],
+      "trackedDirtyPaths": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--name-only",
+        "-z",
+        "HEAD"
+      ],
+      "workingBinaryFullIndex": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index"
+      ]
+    },
+    "cachedBinaryFullIndexSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "trackedDirtyPathCount": 56,
+    "workingBinaryFullIndexSha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b"
+  },
+  "allCustodyEqual": true,
+  "before": {
+    "argv": {
+      "cachedBinaryFullIndex": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--cached",
+        "--binary",
+        "--full-index"
+      ],
+      "head": [
+        "git",
+        "--no-optional-locks",
+        "rev-parse",
+        "HEAD"
+      ],
+      "trackedDirtyPaths": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--name-only",
+        "-z",
+        "HEAD"
+      ],
+      "workingBinaryFullIndex": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index"
+      ]
+    },
+    "cachedBinaryFullIndexSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "trackedDirtyPathCount": 56,
+    "workingBinaryFullIndexSha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b"
+  },
+  "controls": {
+    "cachedBinaryFullIndex": {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--cached",
+        "--binary",
+        "--full-index"
+      ],
+      "equalsEmpty": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "defaultBinary": {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": true,
+      "sha256": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813"
+    },
+    "workingBinaryFullIndex": {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index"
+      ],
+      "equalsForwardFullIndex": true,
+      "equalsIntake": false,
+      "sha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b"
+    }
+  },
+  "coreAbbrev": "UNSET",
+  "custodyEqual": {
+    "cachedBinaryFullIndexSha256": true,
+    "sourceHead": true,
+    "trackedDirtyPathCount": true,
+    "workingBinaryFullIndexSha256": true
+  },
+  "gitVersion": "git version 2.50.1 (Apple Git-155)",
+  "knownFingerprints": {
+    "emptySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "forwardWorkingBinaryFullIndexSha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b",
+    "intakeDefaultBinarySha256": "606ad70f5e8b852724469816ca922d5685a4117668daeeed1a4d740b8988035e",
+    "laterDefaultBinarySha256": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813"
+  },
+  "meta": {
+    "coreAbbrevArgv": [
+      "git",
+      "--no-optional-locks",
+      "config",
+      "--get",
+      "core.abbrev"
+    ],
+    "endedUnixNs": 1789491434549774000,
+    "rawDiffPersisted": false,
+    "rawDiffPrinted": false,
+    "startedUnixNs": 1789491432728364000,
+    "versionArgv": [
+      "git",
+      "--no-optional-locks",
+      "version"
+    ]
+  },
+  "root": "/Users/vladmihaimiron/Documents/DebateAIRO",
+  "schema": "support-source-serialization-v1",
+  "summary": {
+    "defaultMatchesIntake": false,
+    "defaultMatchesLaterDefault": true,
+    "forwardFullIndexMatches": [
+      40
+    ],
+    "intakeMatches": [],
+    "laterDefaultMatches": [
+      8
+    ],
+    "variantCount": 37,
+    "workingFullMatchesForward": true
+  },
+  "variants": [
+    {
+      "abbrev": 4,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=4"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "758e8a8c93bf9f4cfa00e8a1ea6626aaad659011b3af6afa56789cc01eb538f5"
+    },
+    {
+      "abbrev": 5,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=5"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "a5bc12c2368e535f0190dad84a5c2f9c77220f96e03dc40e887cc45005699c8a"
+    },
+    {
+      "abbrev": 6,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=6"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "fd66ac4cd6dcb275c074213cc6b9434d91afb84a9b49c65b154717cfda6ded1e"
+    },
+    {
+      "abbrev": 7,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=7"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "379369c93eee33611847f4a3d647105430b9c65c9c219bc630a5a8a46c2ae62a"
+    },
+    {
+      "abbrev": 8,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=8"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": true,
+      "sha256": "dc9f0caa2b77b167ee9d4d779464f95f84494a362043eec1d48c2256622c1813"
+    },
+    {
+      "abbrev": 9,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=9"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "d06ad473850d2d6d1a5e6ebca38adc1622dc295fb88d39d3831aabb376cdfca1"
+    },
+    {
+      "abbrev": 10,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=10"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "2b06def36ed0c61e12e0df94af5918cfd9421ddf59a30499dfe7d0d2f8e036bd"
+    },
+    {
+      "abbrev": 11,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=11"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "c48f0c27666de77dfb449d72a45b0a7c66aa605150ed38b2d73bbeb74ecd3b27"
+    },
+    {
+      "abbrev": 12,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=12"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "3e30e71be1ffbd6b9eadcad6d600f621f3ccf0fbb69dec967f52e760bab01172"
+    },
+    {
+      "abbrev": 13,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=13"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "4b777fb8348db028dbfa82c742e69417c3406607f58798166c8f8c86757a4b24"
+    },
+    {
+      "abbrev": 14,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=14"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "e7b7c2f7e0d490c23f0d4b8f83ef1a58ab9c1811bcf3f7627e70a38a5b125cf0"
+    },
+    {
+      "abbrev": 15,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=15"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "a10437e641b74c54f607945ace999c5d84c250f2f3a4bdb6ca9abae6cb984aef"
+    },
+    {
+      "abbrev": 16,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=16"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "94a75e288235aba5be9a5cdc45c9dbd9fce72068613c0580c09c8f21c99dcb40"
+    },
+    {
+      "abbrev": 17,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=17"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "fd49369cb55894e00bb35ce1f58a885a097ef94fcf538f12cebe7183151724c8"
+    },
+    {
+      "abbrev": 18,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=18"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "b3a2f8b2dc5d1806a8f6ea6db5fffa280d63289f1dc592a6447c605ca9095a97"
+    },
+    {
+      "abbrev": 19,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=19"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "016b59f4f63b868ee467ca5b843921bcee58a94b2f22caad04cabf5ad46fcdfd"
+    },
+    {
+      "abbrev": 20,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=20"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "9efc703c32df65d650c52e9974f8f5c2d8477eda9ed2c8c8d0cec595cffefcab"
+    },
+    {
+      "abbrev": 21,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=21"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "7a31def9ebba95050ab2353ae531ac6b8095cba01186bc59221a0ba55d5b475b"
+    },
+    {
+      "abbrev": 22,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=22"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "ef84744af665b1c0e2bd8426cb3ef645fb6bd319f85d0332be719a2da66b951a"
+    },
+    {
+      "abbrev": 23,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=23"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "f7c1db13d0cb85d4d6cf10f97fcdae8e6cfd10b2ee7aecc67fd3b972e0eb7ab1"
+    },
+    {
+      "abbrev": 24,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=24"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "b929d83af47fcaa3b6175a5af749c1b8867c12f79b0350a1f31377537d3dafce"
+    },
+    {
+      "abbrev": 25,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=25"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "89aee6cde3c2cdb239e3dc7c3078cba855fe1860264d5601a08f66e997626497"
+    },
+    {
+      "abbrev": 26,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=26"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "048580f3e0bd3be6a9e3e73f716895a90dae4e4a7238c0f36d3b859ff6dee240"
+    },
+    {
+      "abbrev": 27,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=27"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "47950a95c9d39e0e3ae150f7540db399f17629c0e92b727cb0a822e95bd709c8"
+    },
+    {
+      "abbrev": 28,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=28"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "22d95fde00f18e3e015ce8fe280e092b3ded62e3ed9d5ef10a158b37f34b0a64"
+    },
+    {
+      "abbrev": 29,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=29"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "26ae94a60c4785e4d06ff212b55b60e20a97b735c0e829165cc375b2a2110f44"
+    },
+    {
+      "abbrev": 30,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=30"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "f06276089bfa0e1b2df4040d0e2273284b534ca8c09c71114243e8cc712f3456"
+    },
+    {
+      "abbrev": 31,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=31"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "ebcaa738a48780f64aefa3db000ca9bb00ac1fe0cd580f1a2e672f8a86c860f4"
+    },
+    {
+      "abbrev": 32,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=32"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "511d55dd969ca38e21a9a79a397ad8d297668534b602a464929c7d809fa90d40"
+    },
+    {
+      "abbrev": 33,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=33"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "ba76d4af091682863dd4e2e67d2e8d28d50473843aee76d940cd862a10d39c75"
+    },
+    {
+      "abbrev": 34,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=34"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "efbf3bad7c9e961bc38dd52558d27d40f642f730f50cc48c7620213350620a65"
+    },
+    {
+      "abbrev": 35,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=35"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "0a3b127120f1a273d1e645d8fb3fa146ad6f391cf15d4c3c529f8c164f5d1abd"
+    },
+    {
+      "abbrev": 36,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=36"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "b20d56e7d2c0f0e4734d872ce34ac34ed45614e9d0eb0cf686960f273adf13ba"
+    },
+    {
+      "abbrev": 37,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=37"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "2648b8bdbe2c78dac216d383d0ad04f901dd268f2dbad8b9c0c108abe8b2959e"
+    },
+    {
+      "abbrev": 38,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=38"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "034be63da64809f6a5a9104e87838094788ebb8f56a10b18f7aed636ec28fe72"
+    },
+    {
+      "abbrev": 39,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=39"
+      ],
+      "equalsForwardFullIndex": false,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "4fcd2c88172f7af5b7263e55a207f57b076aa5ad7c5907b113ccfbf0166b35de"
+    },
+    {
+      "abbrev": 40,
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--abbrev=40"
+      ],
+      "equalsForwardFullIndex": true,
+      "equalsIntake": false,
+      "equalsLaterDefault": false,
+      "sha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b"
+    }
+  ]
+}

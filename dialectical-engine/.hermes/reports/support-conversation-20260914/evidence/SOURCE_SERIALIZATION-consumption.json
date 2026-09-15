@@ -1,0 +1,136 @@
+{
+  "at": "2026-09-15T17:02:17.191813+00:00",
+  "node": "SOURCE_SERIALIZATION",
+  "ticket": "t_851668bc",
+  "result": "NO_MATCH",
+  "receipt": {
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/SOURCE_SERIALIZATION-receipt.json",
+    "sha256": "68f2db8bb007f58662452b789f503e56599cead6df1b7a7dc9eb5414f92f84e6"
+  },
+  "outputBindings": [
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/SOURCE_SERIALIZATION/compare_diff_serializations.py",
+      "bytes": 5117,
+      "kind": "comparisonHelper",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/probes/SOURCE_SERIALIZATION/compare_diff_serializations.py",
+      "sha256": "4bc9355aadafff101b450fcc9d5498ac05283b4d4adb966481c8fca7cbef63b9"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/SOURCE_SERIALIZATION-fixed-matrix.log",
+      "bytes": 19416,
+      "kind": "comparisonLog",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/SOURCE_SERIALIZATION-fixed-matrix.log",
+      "sha256": "faff388150d2a91bb6e13ab87a13625d911020a843570dd083a94531123de13d"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/SOURCE_SERIALIZATION.md",
+      "bytes": 3840,
+      "kind": "report",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/evidence/SOURCE_SERIALIZATION.md",
+      "sha256": "8dcfaa899dcd9853341ee09b8a514b0d06a622c997b8a63cefaebf24b63416d0"
+    },
+    {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/agent-reports/SOURCE_SERIALIZATION.md",
+      "bytes": 3564,
+      "kind": "selfReport",
+      "missionRelative": ".hermes/reports/support-conversation-20260914/agent-reports/SOURCE_SERIALIZATION.md",
+      "sha256": "1c3f3e852b8b707a73728a741f03ce9ba15fd9b84c8b662308dcc174d490a594"
+    }
+  ],
+  "checks": {
+    "variantMembership": 37,
+    "intakeMatches": 0,
+    "laterDefaultMatches": [
+      8
+    ],
+    "fullIndexMatches": [
+      40
+    ],
+    "capturedBeforeAfterEqual": true,
+    "capturedTrackedDirtyPaths": 56,
+    "matrixLogEqualsReceipt": true,
+    "nativeSkillBodies": 5
+  },
+  "nativeSkillBodyProof": {
+    "using-superpowers": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+      "sha256": "30f2ab78e20ddc27ee7158ae8d4a2abe161c360981c7cc3548070913142d3dc3",
+      "bodyPhrase": "This is not negotiable. You cannot rationalize your way out of this.",
+      "nativeToolOutputOccurrences": 3
+    },
+    "heartbeat-protocol": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md",
+      "sha256": "9f5c803cbdfb92a98bb749601b96d5fa1f2bdcba3805e7cff5be200fd98f3bb3",
+      "bodyPhrase": "One role per node: a seat that reviews does not code, and no seat reviews its own work",
+      "nativeToolOutputOccurrences": 5
+    },
+    "heartbeat-worker": {
+      "file": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md",
+      "sha256": "2cc1cb1676e582648002989f75259127421a223bbea1e47814f52366a9ca94c1",
+      "bodyPhrase": "Check the packet against reality and stop if it is wrong",
+      "nativeToolOutputOccurrences": 1
+    },
+    "systematic-debugging": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+      "sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787",
+      "bodyPhrase": "Violating the letter of this process is violating the spirit of debugging.",
+      "nativeToolOutputOccurrences": 2
+    },
+    "verification-before-completion": {
+      "file": "/Users/vladmihaimiron/.codex/plugins/cache/openai-curated-remote/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+      "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+      "bodyPhrase": "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+      "nativeToolOutputOccurrences": 2
+    }
+  },
+  "capturedCustody": {
+    "argv": {
+      "cachedBinaryFullIndex": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--cached",
+        "--binary",
+        "--full-index"
+      ],
+      "head": [
+        "git",
+        "--no-optional-locks",
+        "rev-parse",
+        "HEAD"
+      ],
+      "trackedDirtyPaths": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--name-only",
+        "-z",
+        "HEAD"
+      ],
+      "workingBinaryFullIndex": [
+        "git",
+        "--no-optional-locks",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index"
+      ]
+    },
+    "cachedBinaryFullIndexSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+    "trackedDirtyPathCount": 56,
+    "workingBinaryFullIndexSha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b"
+  },
+  "limits": [
+    "Root verifies captured hash matrix, argv membership, output bindings and skill BODY evidence; does not rerun the source investigation.",
+    "The bounded current-Git abbreviation explanation does not reproduce intake; no adaptive further source audit authorized by this node.",
+    "Current-run before/after equality does not establish historical file-byte change, actor, cause or intake-wide preservation.",
+    "Untracked and full per-file intake inventory remain unverified.",
+    "SOURCE_CUSTODY remains for separate final product-truth reviewer disposition; no product/runtime or acceptance verdict."
+  ]
+}

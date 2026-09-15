@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "status": "ATTEST_P2 AUTHORED; LIVE_P2 AND FINAL REVIEW PENDING",
+  "node": "ATTEST_P2",
+  "ticket": "t_51e73096",
+  "sourceRevision": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "baseRevision": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+  "commits": [
+    {
+      "revision": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f",
+      "message": "Bind reviewed Support recovery corpus",
+      "paths": [
+        "packages/support-kb/reviews/manifest.json",
+        "tests/unit/support-kb.test.ts",
+        "tests/unit/support-recovery-attestation.test.ts"
+      ]
+    },
+    {
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "message": "Fix recovery component fixture typing",
+      "paths": [
+        "tests/unit/support-recovery-components.test.ts"
+      ]
+    }
+  ],
+  "finalCommit": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "productPaths": [
+    {
+      "laneRelative": "packages/support-kb/reviews/manifest.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/reviews/manifest.json",
+      "sha256": "867d7a75d1918b1d3c7d796bda9d7a83d03028d367f5a3c04c30a018bd75b77f",
+      "bytes": 35841
+    },
+    {
+      "laneRelative": "tests/unit/support-kb.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-kb.test.ts",
+      "sha256": "e834af2791a18e7c578721a770007ae91daca7a6d4b8cbd2f441ca6120a339b4",
+      "bytes": 21944
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-attestation.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-attestation.test.ts",
+      "sha256": "cc4a97278023f755d92aaa2be60df7027217bc679ae4259105e5c7e4b3454dab",
+      "bytes": 13040
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-components.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-components.test.ts",
+      "sha256": "4cb5e9100d529c5cfe668fc970ea251e288e1f915368a9fde8a8f0c8d90c4bb5",
+      "bytes": 6037
+    }
+  ],
+  "verification": {
+    "strictCorpusRed": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-red.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-red.log",
+      "sha256": "8ec79c86af438d041dfd9f11f645957fef71c71f6746ee6c6be2c0fd8b2d6601",
+      "bytes": 1503,
+      "rc": 1,
+      "testFiles": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "revision": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+      "note": "SUPPORT_KB_RECOVERY_REVIEW_REQUIRED against manifest v1"
+    },
+    "strictCorpusGreen": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-strict-corpus-green.log",
+      "sha256": "a414254fbde65eb055f0c8a3674edb04a4783a2f4cbf3e89b51ed30ed3fd7196",
+      "bytes": 492,
+      "rc": 0,
+      "testFiles": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "revision": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f",
+      "note": "Exact 36-record production corpus admitted"
+    },
+    "transitionFailure": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final.log",
+      "sha256": "7416a0a9b922982ce48e4e30f02e3411e02f9c2acae4dc5717bb7329fc37b77f",
+      "bytes": 95015,
+      "rc": 1,
+      "testFiles": 12,
+      "passed": 447,
+      "failed": 2,
+      "skipped": 0,
+      "revision": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f",
+      "note": "Preserved stale v1-to-v2 transition assertions before scope amendment 1"
+    },
+    "transitionFocusedGreen": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-transition-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-transition-green.log",
+      "sha256": "e2d12aa1f74e35cfffd3a322edd2c08c49a65dd0500d6b1fac52fa4b94622a69",
+      "bytes": 5060,
+      "rc": 0,
+      "testFiles": 1,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 33,
+      "revision": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f"
+    },
+    "affectedFinalAtAttestationCommit": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final2.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-affected-final2.log",
+      "sha256": "2d4c2d82733972cfd4e958caf40768ee489a2efd95e7db3106e17538190d7ccd",
+      "bytes": 93292,
+      "rc": 0,
+      "testFiles": 12,
+      "passed": 449,
+      "failed": 0,
+      "skipped": 0,
+      "revision": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f"
+    },
+    "typecheckRed": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final.log",
+      "sha256": "1a5be748d82132c33b239ccfbb3fc728159002a2dbb4f6ef97084a73e2bc6dea",
+      "bytes": 39712,
+      "rc": 1,
+      "testFiles": null,
+      "passed": null,
+      "failed": null,
+      "skipped": 0,
+      "revision": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f",
+      "note": "77 diagnostics: baseline 76 plus mission-added TS2532"
+    },
+    "finalRevisionDelta": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-recovery-components-green.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-recovery-components-green.log",
+      "sha256": "57d14d6342df8c507fe65cc64514d63bb5b330ec30bba164f4173681f2e86740",
+      "bytes": 823,
+      "rc": 0,
+      "testFiles": 1,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "note": "Narrow fixture nullability correction only"
+    },
+    "typecheckFinal": {
+      "missionRelative": ".hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/ATTEST_P2-typecheck-final2.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611,
+      "rc": 1,
+      "testFiles": null,
+      "passed": null,
+      "failed": null,
+      "skipped": 0,
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "note": "76 diagnostics; byte-identical to attributed UI-root baseline"
+    },
+    "typecheckBaseline": {
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/UI-root-typecheck.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0",
+      "bytes": 39611,
+      "diagnostics": 76,
+      "comparison": "byte-identical to typecheckFinal"
+    },
+    "finalTestTotals": {
+      "commands": 2,
+      "testFileExecutions": 13,
+      "passed": 452,
+      "failed": 0,
+      "note": "449 tests across exact12 at attestation commit plus 3 tests in the final test-only delta; overlapping test membership is reported per command, LIVE_P2 owns the final25 union"
+    }
+  },
+  "finalSuiteUnion": {
+    "unchanged": true,
+    "count": 25,
+    "owner": "LIVE_P2",
+    "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2-required-suites.json",
+    "sha256": "d2534db538e8855ad9c0a01569cf36505c2832aeee08b11e9d2c7c04036651a5",
+    "bytes": 4343
+  },
+  "reviewBinding": {
+    "reviewedBy": "SOL",
+    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
+    "reviewedOn": "2026-09-15",
+    "ownerRatifiedRecords": 0
+  },
+  "limits": [
+    "No model/provider/browser/preview/HTTP traffic.",
+    "No content, component, runtime, source, index, or owner-ratification changes.",
+    "Forgot password destination unresolved; no checkpoint acceptance."
+  ]
+}
