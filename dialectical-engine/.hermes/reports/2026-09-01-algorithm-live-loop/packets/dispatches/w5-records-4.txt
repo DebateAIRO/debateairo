@@ -1,0 +1,17 @@
+# DISPATCH w5-records-4 · 2026-09-06 00:15 · records round 3 of 3 (AMENDMENT 3) · same seat resumed
+
+# ---- AMENDMENT 3 (00:15 2026-09-06) — ROUND 3 OF 3 (the last) · after codex records r2: F2 CLOSED, F3 open on R2-B1; R2-N1, R2-N3 yours ----
+
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5-records/codex-r2-verdict.final-snapshot.md — read R2-B1, R2-N1, R2-N3 whole.
+- **R2-B1 (blocking, F3):** the unqualified all-failures-explained claim survives at `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-dev-reconciliation.md` :560–561. Append a
+  dated supersession keyed to those lines: **80 common failing names have the recorded baseline/cause accounting; run 1 additionally contains the
+  model-shim timeout, observed in one of two runs, whose cause and merge influence remain undetermined.** Retain the no-regression scope the
+  reviewer says to retain (read its sentence).
+- **R2-N1:** the nine-hash assurance is not reproducible as filed — append complete expected digests with their actual pre-edit evidence
+  reference for every annotated file, or explicitly limit the assertion to the evidence that survives. Never backfill a digest you did not record.
+  (The orchestrator's packet count is corrected by an appended note — not yours.)
+- **R2-N3:** append an accurate round-2 AND round-3 skills declaration; if `superpowers:receiving-code-review` was read, identify the load
+  evidence; otherwise read it now and apply it. Do not claim a historical load retrospectively.
+- R2-N2 (canonical read-only grants) is the orchestrator's — done on the board.
+Same rules: append only; nothing rewritten; hashes reproduced or limited. STRENGTH on every claim (D67). Markers with
+`comments read through: w5-records-codex-r2-2026-09-05`; end with `REWORK READY FOR REVIEW`. After this round, anything open goes to V.

@@ -1,0 +1,19 @@
+# DISPATCH t1-oracle-evaluator-arch-4 · 2026-09-06 16:39 · V-AUTHORISED bounded architecture round (AMENDMENT 3) · same seat resumed
+
+# ---- AMENDMENT 3 (16:39 2026-09-06) — V-AUTHORISED BOUNDED ARCHITECTURE ROUND (V's ruling, V-DECISIONS-PACKET) · after codex PLAN r3 (CHANGES: 5 bounded) ----
+V ruled: one more architecture round, LIMITED to the five items codex names in "## For V — the residual" and specified in R3-B1–B5 of
+/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-plan-r3-verdict.final-snapshot.md. Read that verdict WHOLE. Nothing else in the plan changes in this round.
+1. R3-B1 — preserve primitive information across array operations, or use UNKNOWN explicitly where the stored abstraction cannot decide; repair
+   exact unary coercion and Set equality together (the reviewer executed the examples: primitive values disappear before the next operation needs them).
+2. R3-B2 — a member must be the call's CALLEE before its named return contract applies; a method reference used as an argument is not an
+   invocation → consume/report the unknown containing call.
+3. R3-B3 — make the discovery/evaluated records and the INCONCLUSIVE union TYPE-VALID at their first round; state the actual stub RED set.
+4. R3-B4 — route 27 ceiling controls and three bare DOMAIN controls to their proper harness/stage in the WORKER STEPS (not only in §5.4), preserving
+   both omitted standalone negatives.
+5. R3-B5 — replace mutation labels with the operative rule-edit / control / observable / result MANIFEST; require the four O1 semantic controls
+   before evaluator implementation; display/identity mutation coverage may stay a named follow-up with exact address/display assertions.
+Also: the Node runtime — V accepted the round-0 gate under Node 25.7.0 with "Node 22.23.1 UNVERIFIED" as a named fact (D68 ADDENDUM 2); adjust
+§9.12 R3 fact 2 accordingly (record the versions actually used; do not claim 22.23.1).
+Revise in place ("REVISION 4" blocks, originals preserved). STRENGTH on every claim. No code. Execute every example against its own rule before
+filing (the seat's own named failure mode). Markers: `comments read through: t1-oracle-evaluator-plan-codex-r3-2026-09-06`; end with
+`PLAN READY FOR REVIEW` or `BLOCKED <reason>`. This round exists by V's authority only; after it, the plan's disposition is V's.

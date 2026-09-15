@@ -1,0 +1,17 @@
+# DISPATCH t1-oracle-evaluator-worker-r1-2 · 2026-09-06 23:19 · round-1 REWORK (AMENDMENT 1) · same seat resumed
+
+# ---- AMENDMENT 1 (23:19 2026-09-06) — ROUND-1 REWORK (rework round 1 of 3) · after codex r1: CHANGES, MANIFEST GATE CLOSED · original preserved above ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-r1-verdict.final-snapshot.md — read B1–B7, F1–F3 and "## Manifest gate" WHOLE; the parser
+extraction and the 27 + 3 floor are VERIFIED and stay. What must change, in the reviewer's terms:
+- **B1** K31's shallow fixture is outside the callback grammar → a fully specified expression INSIDE the grammar exceeding 64 counted nodes below the recorded depth limit (e.g. `n` plus a balanced sum of 32 literal zeroes).
+- **B2** K43's replacement is decided before `at` is reached → a candidate that does not satisfy rule 1 and a known receiver reaching the element-return rule (e.g. `[0..5].map(n => "x").at(0)`: baseline UNDETERMINED under the conservative element-return contract).
+- **B3** K10 has the same baseline and mutant verdict → a discriminating fixture (e.g. `[0..5].map(n => n || 1)`: cells [1,1,2,3,4,5] RULED; boolean-result cells OTHER); specify the boolean-result edit exactly; assert cells as well as verdict.
+- **B4** K9 is NOT equivalent to K48 or to an unmutated control → restore a separate K9 mutation for zero truthiness; keep K48 (signed zero) and K35 (control); remove the false equivalence from both filings; recompute the inventories.
+- **B5** the every-row literal/observable contract is still incomplete → a canonical source inventory in the manifest (or exact named fixture references into the test file) for EVERY row; ranges and receiver prefixes fully expanded; declaration fixtures vs expressions distinguished; isolated async/assignment cases specified.
+- **B6** the parse-context and truncated-prefix blocks are incomplete → add the three specified contexts with clean-parse checks and literal candidate offsets/lines; import the five original truncated prefixes from the donor at 60641339:1047 preserving wrapping and comment bytes; each asserts failed parse, zero discovery candidates and one INCONCLUSIVE with path/line/diagnostic.
+- **B7** K23 has 57 diagnostic files (not 47); the derived list destroys paths → recount from the raw transcript; keep paths intact; re-derive every number from its enumeration (D67 ADDENDUM 2).
+- **F1** narrow the extraction and premeasurement claims; **F2** the fourcount tool still accepts internally inconsistent summaries — fix or state its limit; **F3** the F1–F5 correction sweep left contradictory conclusions — re-read (D67 ADDENDUM 3).
+Tooling: `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh` is now v3 (trap-restore on every exit path, nonzero exit on any inconsistent gate, RESULT line, MUT_EXPECT for declared multiplicity);
+re-run any transcript you touch with v3; v2 transcripts with clean gates stay valid.
+Same grants and forbiddens. NO evaluator transfer rules (still round 2). The manifest gate is re-asked at review: GATE OPEN is the condition for round 2.
+Markers: `comments read through: t1-oracle-evaluator-r1-2026-09-06`; end with `REWORK READY FOR REVIEW` or `BLOCKED <which item, why>`; return only at that marker.

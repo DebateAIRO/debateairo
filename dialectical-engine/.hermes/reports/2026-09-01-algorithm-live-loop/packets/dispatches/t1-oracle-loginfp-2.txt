@@ -1,0 +1,57 @@
+# DISPATCH t1-oracle-loginfp-2 · 2026-09-05 19:09 · F-T1-ORACLE-LOGINFP round 2 of 3 (AMENDMENT 1) · same seat resumed
+
+# ---- AMENDMENT 1 (19:08 2026-09-05) — ROUND 2 OF MAX 3 · after codex r1 CHANGES (B1, B2) · original preserved above ----
+
+codex verdict (final, snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-loginfp/codex-r1-verdict.final-snapshot.md  (also /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-loginfp-codex-r1.md)
+lane: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp @ f079a206 (your tip) · base 2af816f1
+
+## Corrections to the original packet (N3, N4, N5 — orchestrator defects, charged)
+- The original's "kept shape … near a depth token" was a MECHANISM, and one codex W5 r2 F1 had forbidden. You were right to
+  refuse it. The OUTCOME, restated without mechanism: **the oracle reports a DOMAIN_ENUMERATION site for every ordinary
+  single-declaration spelling that DERIVES the ruled option domain 1..5, and reports none for an unrelated index run such
+  as LoginFlow's six 0-based slots — in every layout the scanner can see.** Forbidden mechanisms: a filename exemption; a
+  depth-token requirement on the domain arm; deleting or weakening the three bare option-domain controls.
+- The original's expected owner site was STALE: the whole-tree assertions do not name `apps/ui/app/new/page.tsx` on this
+  tree (W5 already uses the imported constants there). The expected real sites are whatever the oracle named at 2af816f1
+  minus the LoginFlow false positive — measure them, do not inherit my sentence.
+- The failure kind is **DOMAIN_ENUMERATION**, not "exclusive-six" (my label was wrong).
+- `tools/mutate.sh` means `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh` (v2, accepts `/`).
+- **Named temporary mutant target (N5, D61):** for mutants that must plant a shape into a shipped file, you are granted
+  `apps/ui/components/LoginFlow.tsx` as a TEMPORARY MUTANT TARGET ONLY — applied and restored inside one `mutate.sh`
+  transcript with HASHES MATCH and empty porcelain; no permanent edit to that file is in scope, and any other shipped
+  file you plant into must be named in your report the same way.
+
+## B1 — an extended literal can still DERIVE exactly the ruled domain (blocking)
+Codex's counterexamples, each a legitimate way to define a depth selector's options without naming depth, all reported by
+the OLD oracle and missed by yours: `const choices = [0, 1, 2, 3, 4, 5].slice(1);` · `const choices = [1, 2, 3, 4, 5, 6].slice(0, -1);`
+· `const [unused, ...choices] = [0, 1, 2, 3, 4, 5];`. Distinguish an unrelated index run from a declaration that derives the
+ruled option domain; keep these prefix, suffix and sentinel cases as POSITIVE controls while the actual login expression
+stays NEGATIVE; retain the three existing bare option-domain controls. Revise the claim that any extended literal is
+necessarily a different domain (your report §3 and the comment at WHOLE_DOMAIN:238).
+
+## B2 — wrapping the excluded array restores the false positive (blocking)
+`const slots = [0,\n  1, 2, 3, 4, 5];` reports a line-2 DOMAIN_ENUMERATION; `const pages = [1, 2, 3, 4, 5,\n  6];` reports
+line 1 — the raw-line scan (:484) records a site before the declaration scan can exclude it, and results accumulate rather
+than cancel; the same wrapping applied to LoginFlow's JSX array brings the false positive back. Make the exclusion use
+sufficient context in EVERY window that can report a site; add prefix- and suffix-boundary wrapping controls, including
+the real JSX expression; require equivalent layouts to agree, while preserving the line scan's other intended coverage.
+Codex's method, reusable: extract the scanner block from the test blob, strip types in memory, apply before/after
+scanners to source strings — no Vitest, no git mutation.
+
+## Records (N2, Q3 — non-blocking, do them in this round since you hold the files)
+- N2: append actual per-mutant selectors and counts; retract "m4 kills exactly them and nothing else" (its command selected
+  ONE name; 2 failed | 48 skipped); distinguish recorded custody from later observations; note b14 lacks an after-porcelain
+  stamp and the cluster logs lack per-run stamps — do not rewrite any historical log; future captures carry the full
+  selected set and pre/post stamps.
+- Q3: the remaining 1/50 is J10 (`web/package.json` missing from the architecture audit) — inherited at 2af816f1, b5a6b6eb
+  and your tip; say so. The sendmail name stays in **79/1/0/1** — append the accurate fixture, timeout, sample trees and a
+  PROVISIONAL classification; do not claim "no possible suite influence"; W5's model-shim also uses a local fake CLI.
+
+## Gates
+RED for B1 (the three derivations reported as no site) and B2 (the wrapped forms) BEFORE your change; GREEN after; the
+oracle's own suite verbatim before/after; mutants through `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh` v2 with the named target above; typecheck
+differential (W5's 8); then ONE `pnpm test` with the four-count accounting against the parent
+`/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log` / `27-suite-run2.log` and your own round-1 b14 — every failing name attributed, none
+unexplained. Round 2 of max 3. Markers with `comments read through: t1-oracle-loginfp-codex-r1-2026-09-05`.
+
+<!-- NOTE appended 19:09: the two `tools/mutate.sh` mentions in the round-1 text above (lines 28, 46) mean /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh. Sent text is preserved; this note is the correction (codex N4). -->

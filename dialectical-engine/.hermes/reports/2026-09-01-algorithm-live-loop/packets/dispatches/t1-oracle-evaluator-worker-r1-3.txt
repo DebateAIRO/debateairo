@@ -1,0 +1,24 @@
+# DISPATCH t1-oracle-evaluator-worker-r1-3 · 2026-09-07 00:42 · rework round 2 (AMENDMENT 2) · same seat resumed
+
+# ---- AMENDMENT 2 (00:42 2026-09-07) — REWORK ROUND 2 OF 3 · after codex r1b: CHANGES (B5-R), MANIFEST GATE CLOSED · everything above preserved ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-r1b-verdict.final-snapshot.md — read B5-R, F1-R, F2-R, F3-R, F4 and "## Manifest gate" WHOLE.
+B1–B7 are DISPOSED (the reviewer replayed the rules); fifteen mutation rows spot-checked with no other invalid direction; 48 rows / 48 IDs / 3-2-43 /
+seven active control IDs (K7b, K7c, K7d, K20b, K34, K35, K37) / K24 merged / m6 survival = 57 disposition IDs, 49 transcripts — ACCEPTED as the count.
+- **B5-R (the one gating defect):** K7d still violates TWO purity clauses (it is meant to isolate the assignment clause). Replace it with an assignment
+  in an otherwise admitted single-expression callback — e.g. `const choices = [0,1,2,3,4,5].map(n => (n = n));` — one plain parameter, expression
+  body, non-async (clauses 1, 2, 4 satisfied); assignment alone fails clause 3. Bind the complete replacement in the manifest and the fixture inventory.
+- **F1-R:** the narrowed premeasurement claim still contradicts the self-report — annotate the surviving self-report claims with the ACTUAL 17-row
+  coverage; cite the final selected run for the other controls (the extraction correction itself is sound: five items literal, the sixth after the
+  `Map<string, DuplicateSite>` → `Site` rename).
+- **F2-R:** fourcount3 checks arithmetic but still accepts malformed PRESENT fields — validate complete summary/exit syntax, distinguish absent optional
+  fields from malformed present ones, validate Errors, reconcile failed-file identities with loaded-test failures plus load failures; add these cases
+  to its matrix, or explicitly LIMIT the tool's claim to what it checks.
+- **F3-R:** the four in-place annotations are incomplete — annotate the surviving historical claims with the replacement rule; distinguish historical
+  instructions from the operative manifest; causal non-attribution at most consistent-with; keep the hidden-exception uncertainty; replace the depth
+  universal with measured node/depth comparisons.
+- **F4:** the five reported "source byte" counts are serialized-string lengths — label serialized vs decoded, publish the five correct source lengths,
+  fix the donor row range, say what the record's `cands` instrument counted; preserve the original record, correct by annotation; include source and
+  probe command in future records.
+Same grants; `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh` v3; no evaluator transfer rules (round 2 waits for GATE OPEN). D67: STRENGTH on every claim; ADDENDUM 2 counts derived;
+ADDENDUM 3 state the rule and re-read. Markers: `comments read through: t1-oracle-evaluator-r1b-2026-09-06`; end with `REWORK READY FOR REVIEW` or
+`BLOCKED <which item, why>`; return only at that marker. One rework round remains after this one.

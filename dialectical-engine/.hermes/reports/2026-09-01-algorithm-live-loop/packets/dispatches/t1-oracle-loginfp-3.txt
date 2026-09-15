@@ -1,0 +1,45 @@
+# DISPATCH t1-oracle-loginfp-3 · 2026-09-05 22:32 · F-T1-ORACLE-LOGINFP round 3 of 3 (AMENDMENT 2) · same seat resumed
+
+# ---- AMENDMENT 2 (22:32 2026-09-05) — ROUND 3 OF 3, THE LAST · after codex r2 CHANGES (B1, B2; N1 records) · everything above preserved ----
+
+codex r2 (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-loginfp/codex-r2-verdict.final-snapshot.md — read B1 and B2 WHOLE, including the tables, before touching the file.
+lane: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp @ fbc421de (your tip) · base 2af816f1 · one round remains; after it, anything open goes to V.
+
+## B1 — the consumption classifier is unsound in BOTH directions (blocking)
+The class, in the reviewer's words: **accepting partial expression evidence as proof of whole-declaration consumption.** Misses (all define exactly
+the ruled domain, all reported at base, all [] at your tip): `[0,1,2,3,4,5,].slice(1)` (trailing comma → `after` starts with a comma);
+`[0..5].map(n => n).slice(1)` and the block-callback form (matching the first `.map` ignores the later `.slice`);
+`new Set([0..5].map(n => n || 1))` (length-preserving map inside a domain-collapsing wrapper); `[0..5]["slice"](1)` (computed access, `after`
+starts with `[`); `([0..5] as const).slice(1)` (type assertion, starts with `as`). All take the permissive `!after.startsWith(".")` branch.
+Length preservation is not domain preservation; a member operation need not start with a dot; a listed first operation can conceal later narrowing.
+False positives (should stay NEGATIVE): `[0..5].reverse()`, `[0..5].slice()`, `[0..5].slice(0,4)`, and the bare six-page `const pages = [1,2,3,4,5,6];`
+— round 2's "[1..6] reports in every layout" made the verdict consistent, not correct: a bare six-page list is not a duplicate definition of 1..5;
+that `.slice(0,-1)` changes its domain justifies distinguishing the DERIVATION from the bare list, not making both positive.
+**Required:** retain the three positive bare-domain controls and the corrected round-1 derivations; distinguish COMPLETE declaration use from an
+array's length or first suffix; add paired controls for the syntactic wrappers and composition classes above (a length-preserving map inside a
+collapsing wrapper, a later narrowing, a trailing comma); keep unrelated whole or differently narrowed index runs negative, the bare six-page
+example included; correct the contradictory overview at :210–211 and the stale "narrowed the shared WHOLE_DOMAIN" explanation at :379–383.
+No filename exemption, no depth-token requirement.
+
+## B2 — runs reclassified in incompatible representations, so layouts still disagree (blocking)
+`const slots = [0, /* first slot */ 1, 2, 3, 4, 5];` reports line 1; the same declaration wrapped over lines reports nothing — and the same
+holds in the real LoginFlow source edited in memory. Root cause (reviewer): `ruledDomainRuns(source)` sees the comment interrupting the run and
+classifies the remaining 1..5 as reportable; `ruledDomainRuns(unit.text)` runs again after the lexer strips comments and sees 0..5 and withholds;
+one line-set assembled from two representations does not give one verdict per occurrence. **Required:** every DOMAIN-producing window uses the
+SAME occurrence decision with source correspondence across comments and normalisation; the second representation must not invent a different run
+verdict merely to obtain a declaration's start line; add the paired commented layouts and full-JSX variants; preserve the existing literal-five and
+exclusive-six coverage (the reviewer confirmed the other arms are intact — keep it that way).
+
+## N1 — custody wording (records, this round)
+Replace the blanket "porcelain [] before and after every run" with PER-ARTIFACT custody: the cluster runs 1–3 were stamped runs of a MODIFIED
+working tree (porcelain shows the test file M, working-file hash 588dc181…), valid evidence when described so; logs 20/24 carry no custody header;
+21/22 identify intentional working changes. Round-2 b14 (empty pre/post porcelain at fd6eb212) is the clean one — do not dilute it.
+Sendmail PROVISIONAL and J10 inheritance: CLEARED by the reviewer; leave them.
+
+## Gates
+RED for every counterexample class above (misses AND false positives) before the change; GREEN after; the oracle suite verbatim; the reviewer's
+source-only method on the wrapped/commented forms and on the real JSX; mutants via `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/tools/mutate.sh` v2 with the named temporary target
+(LoginFlow.tsx, restored, hashes match); typecheck differential; one full `pnpm test` with four-count accounting vs the parent
+(`/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log`, `27-suite-run2.log`) and your round-2 b14 (78/1/0/1). Round 3 of 3.
+Markers: `comments read through: t1-oracle-loginfp-codex-r2-2026-09-05`; end with `REWORK READY FOR REVIEW` or `BLOCKED <reason>`.
+Contract: unchanged from the original + AMENDMENT 1 — `tests/unit/s1-1-depth-contract.test.ts` is your file; `packages/contract/src/index.ts` (the shipped site contract:112) and `apps/ui/components/LoginFlow.tsx` (temporary mutant target only) are read-only context; the round-2 logs 31/32/33 are yours to cite.

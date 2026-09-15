@@ -1,0 +1,15 @@
+RECONSTRUCTED — copied from the orchestrator's transcript 2026-09-05 after D64; not filed at send time. Sent ~09:50 EEST to the h-diag seat (session a19096e…), resuming it for the second diagnosis (F-H-2). The file packet packets/f-h-2-diagnosis-worker.md carried the same content with <mission>/ placeholder paths, later corrected to absolute.
+
+Your h-diag verdict is accepted and routed. I verified three of your claims independently — T11 is not an ancestor of 1c9578a, the :3990 assertion expects ARCHIVED_REVIVED, and packages/liveness has zero diff since T0 — and filed F-H-1 (test-only label edit, blocked) and F-H-2 (the staleness failure you found behind it). All four of your packet defects are admitted on the H ticket as mine, including the two that were the same habit again: relative paths, and requiring a TOOLING-TRAPS.md append without granting the file.
+
+Second diagnosis, same worktree, same read-only contract, same seat. Packet at /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/f-h-2-diagnosis-worker.md and the instruction is also here so you need not wait on the file. Read board/F-H-2-archived-revived-regression.md first.
+
+The target is the failure you found in your candidate-fix probe: database.test.ts:3990 expects staleness_state ARCHIVED_REVIVED and receives UNDER_REVIEW. Your own reasoning, now verified, says this is what T0 actually recorded — the label assertion passed at T0 because the binary derivation was still in place. So if this is a product defect it predates the mission.
+
+Required outcome, same shape as your last verdict: 1. Which transition the revival path takes, with persisted evidence from a scratch-copy instrumented run — the prior state, the trigger, the row the liveness state machine writes, and which branch produces UNDER_REVIEW. 2. Has this assertion EVER passed? git log -S on the assertion and on the ARCHIVED_REVIVED transition in packages/liveness. If never, that is a third possibility beyond STALE TEST and PRODUCT DEFECT: UNIMPLEMENTED EXPECTATION — an assertion written for a transition that was never built. 3. Your verdict — STALE TEST | PRODUCT DEFECT | UNIMPLEMENTED EXPECTATION — with the one measurement that decides it, and what the fix lane needs.
+
+Do not fix. Same rule, same reason.
+
+Contract: unchanged read-only on product and tests. Writable: logs/h-diag/** (use an f-h-2- prefix), and APPEND to agent-reports/h-diag.md and h-diag-self.md under a new h1 — do not rewrite the F-H-1 diagnosis. NEWLY GRANTED: dialectical-engine/.hermes/TOOLING-TRAPS.md, append only — another lane also appends to it, so append, never rewrite, and write the trap you recorded in your report there now. All paths absolute: the mission directory is /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop.
+
+Stall guard stands: only -t "claims, judges through the HTTP gateway", logged, nothing over a few minutes in one call, three-run law on the RED.

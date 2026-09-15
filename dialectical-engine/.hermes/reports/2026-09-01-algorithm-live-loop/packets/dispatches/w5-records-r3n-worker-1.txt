@@ -1,0 +1,15 @@
+# DISPATCH w5-records-r3n-worker-1 · 2026-09-06 08:05 · records-only, same seat resumed
+
+# W5-RECORDS-R3-N — RECORDS-ONLY PACKET (round 1 of max 3) · the two follow-ups from codex records r3
+
+mission dir : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop · ticket /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/W5-RECORDS-R3-N.md · verdict /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5-records/codex-r3-verdict.final-snapshot.md (R3-N1, R3-N2 whole)
+allowed  : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-records.md (append) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-records-self.md (append)
+readonly : the verdict · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5-records/codex-r2-verdict.final-snapshot.md
+forbidden: all_others · no code · no git · no edits to the board or the DECISIONS file · no credential values (D18)
+
+OUTCOME: R3-N1 — a precise layer/scope explanation appended: the two records that received round-1 annotations and no round-2 append have no
+separate Layer-2 tuple for their round-1 state; the records self-report's missing Layer-2 capture is named as an evidence limit; all 16 valid
+tuples retained; nothing invented. R3-N2 — the receipt's count units separated: five annotated records and two authored outputs kept apart;
+the schedule described as twelve annotated-record appends with report/self-report updates identified separately; filesystem-write totals
+undetermined unless evidenced; the taxonomy corrected to five categories. STRENGTH on every claim (D67). Append only; hashes reproduced or the
+assertion limited. Markers with `comments read through: w5-records-codex-r3-2026-09-06`; end with `READY FOR PEER REVIEW`.
