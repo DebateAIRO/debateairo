@@ -1,0 +1,86 @@
+PROMPT 1 full/en/creation status=200 outcome=ANSWER_GROUNDED sources=3 actions=1 diagnostic=ACCEPTED_DRAFT
+PROMPT 2 full/en/settings status=200 outcome=ANSWER_GROUNDED sources=1 actions=0 diagnostic=ATTRIBUTED_RECOVERY
+PROMPT 3 full/en/export status=200 outcome=ANSWER_GROUNDED sources=2 actions=0 diagnostic=ACCEPTED_DRAFT
+PROMPT 4 full/ro/creation status=200 outcome=ANSWER_GROUNDED sources=3 actions=1 diagnostic=ACCEPTED_DRAFT
+PROMPT 5 full/ro/settings status=200 outcome=ANSWER_GROUNDED sources=1 actions=0 diagnostic=ACCEPTED_DRAFT
+PROMPT 6 full/ro/export status=200 outcome=ANSWER_GROUNDED sources=2 actions=0 diagnostic=ACCEPTED_DRAFT
+PROMPT 7 compact/ro/creation-repeat status=200 outcome=ANSWER_GROUNDED sources=3 actions=1 diagnostic=ACCEPTED_DRAFT
+{
+  "completed": true,
+  "prompts": 7,
+  "grounded": 7,
+  "navigations": [
+    {
+      "input": "pointer",
+      "performed": true,
+      "label": "Start a debate",
+      "href": "/login?next=%2Fnew",
+      "destination": "https://localhost:3100/login?next=%2Fnew"
+    },
+    {
+      "input": "keyboard-enter",
+      "performed": true,
+      "label": "Pornește o dezbatere",
+      "href": "/login?next=%2Fnew",
+      "focused_label": "Pornește o dezbatere",
+      "destination": "https://localhost:3100/login?next=%2Fnew"
+    }
+  ],
+  "network": [
+    {
+      "operation": "support_status",
+      "status": 200
+    },
+    {
+      "operation": "create_session",
+      "status": 201
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "support_status",
+      "status": 200
+    },
+    {
+      "operation": "support_status",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    },
+    {
+      "operation": "create_session",
+      "status": 201
+    },
+    {
+      "operation": "send_message",
+      "status": 200
+    }
+  ],
+  "console_error_count": 15,
+  "console_error_categories": {
+    "HTTP_401": 15,
+    "HTTP_404": 0,
+    "JS_OR_HYDRATION": 0,
+    "OTHER": 0
+  }
+}

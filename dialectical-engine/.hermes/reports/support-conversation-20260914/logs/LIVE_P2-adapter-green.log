@@ -1,0 +1,14 @@
+{"responseEvidenceProperties":9,"transitionAndAmbiguityFixtures":18,"totalControls":27,"exactProducerKeys":7,"validRecoveryAttributed":true,"validRefusalAttributed":true,"groundedNoEventAcceptedDraft":true,"recoveryMatchNoEventAcceptedDraft":true,"mismatchedRecoveryAmbiguous":true,"incompatibleTerminalAmbiguous":true,"missingRefusalEventAmbiguous":true,"hostileDropped":true,"invalidUuidAmbiguous":true,"unknownCodeAmbiguous":true,"unknownPredicateAmbiguous":true,"malformedAmbiguous":true,"multipleAmbiguous":true,"duplicateAmbiguous":true,"recoveryDuplicateAmbiguous":true,"delayedOrOutOfWindowAmbiguous":true,"unknownEvidenceAmbiguous":true,"extraEvidenceAmbiguous":true}
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/pre-request-adapter.ts:24
+  throw new Error(code);
+        ^
+
+Error: LIVE_P2_ATTESTATION_INPUT_INVALID
+    at fail (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/pre-request-adapter.ts:24:9)
+    at createLiveP2SnapshotAdapter (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/pre-request-adapter.ts:66:5)
+    at <anonymous> (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/verify-pre-request-adapter.ts:26:17)
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.23.1

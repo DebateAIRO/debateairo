@@ -220,11 +220,25 @@
       "status": "completed_no_match_consumed",
       "ticket": "t_851668bc",
       "heavy_lease": false
+    },
+    "LIVE_P2": {
+      "session": "/root/preview",
+      "status": "completed_consumed_integrated_blocker",
+      "ticket": "t_f60b27a3",
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77"
+    },
+    "FIX_P2_DEGRADED": {
+      "session": "/root/requirements",
+      "status": "cause_reported_waiting_live_exit",
+      "ticket": "t_7f51fcb1",
+      "base": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "heavy_lease": false,
+      "git_lease": false
     }
   },
   "heavy_lease": null,
-  "state": "CP1_FINAL_LIVE_PREPARATION",
-  "last_event": "2026-09-15T17:21:13.743815+00:00",
+  "state": "CP1_FINAL_TEST_FIXTURE_CLOSURE",
+  "last_event": "2026-09-15T18:08:45.485121+00:00",
   "pending_owner_decision": "V-1 forgot-password destination",
   "lane": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
   "baseline_claim": "b7ca2c41",
@@ -234,5 +248,6 @@
   "last_blueprint_milestone": "PLAN_P2 consumed;36 corpus records,21/2 disjoint paths,25 final suites.",
   "last_author_milestone": "ATTEST_P2 consumed: clean 606b2eab; 108 exact cumulative files; 36 separate editorial bindings; 449 tests at c7, final delta 3, attributed 76 typecheck errors.",
   "last_transport_recovery": "FIX_P2 same Sol resumed after explicit network response decoding error; no active command; edits/RED preserved.",
-  "last_editorial_milestone": "EDITREV_P2 all36projection/fallbackPASS consumed atdfeb7eef;108hashes,4changed/34retained;correct native childidentity."
+  "last_editorial_milestone": "EDITREV_P2 all36projection/fallbackPASS consumed atdfeb7eef;108hashes,4changed/34retained;correct native childidentity.",
+  "last_live_milestone": "Worker reports seven-once grounded/API-DOM equal; six model drafts and one EN Settings reviewed recovery; EN pointer and compact RO keyboard pass. Final QA/custody/receipts pending. Exact25 has one degraded fixture failure."
 }

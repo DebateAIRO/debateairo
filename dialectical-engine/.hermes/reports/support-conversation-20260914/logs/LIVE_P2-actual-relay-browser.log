@@ -1,0 +1,10 @@
+file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/capture-actual-relay.mjs:149
+  if (sessionKbVersion !== kbVersion) throw new Error("LIVE_P2_RUNTIME_SESSION_VERSION_UNAVAILABLE");
+                                            ^
+
+Error: LIVE_P2_RUNTIME_SESSION_VERSION_UNAVAILABLE
+    at requireSessionVersion (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/capture-actual-relay.mjs:149:45)
+    at async openFull (file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/capture-actual-relay.mjs:292:3)
+    at async file:///Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/probes/LIVE_P2/capture-actual-relay.mjs:314:3
+
+Node.js v22.23.1

@@ -1,0 +1,7 @@
+606b2eabea1dc9212159e53c193cf69655424e77
+45639     1 45639 01-00:01:07 node /Users/vladmihaimiron/.local/bin/pnpm dev:auth:up
+tls_help_status=200
+awk: syntax error at source line 1
+ context is
+	 >>>  ~ <<< 
+awk: bailing out at source line 1
