@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
@@ -249,7 +250,13 @@ function parseArguments(arguments_: readonly string[]): Readonly<{
 
 async function main(): Promise<void> {
   const arguments_ = parseArguments(process.argv.slice(2));
-  const knowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
+  const knowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
+    reviewManifest: JSON.parse(readFileSync(
+      resolve("packages/support-kb/reviews/manifest.json"),"utf8"
+    )) as unknown,
+    recoveryComponents: readFileSync(resolve("packages/support-kb/recovery/components.json")),
+    requireReviewedRecovery: true
+  });
   let output: string;
   if (arguments_.configurationCredentialFile === null
     || arguments_.supportDataCredentialFile === null) {

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { analyzeSupportCredentialText,canonicalSupportTextViews } from "@debateai/kernel";
+import {
+  analyzeSupportCredentialText,canonicalSupportTextViews,supportTextContainsCredentialOperation,
+  supportTextHasUnsafePath
+} from "@debateai/kernel";
 import {
   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportActionId
 } from "@debateai/support-kb/catalog";
@@ -132,20 +135,6 @@ const CLOSED_NARRATIVE_IDS = new Set<string>([
   ...SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
 ].filter((id) => id.includes("-")));
 
-function containsCredentialOrSecurityAction(value: string): boolean {
-  const facts = analyzeSupportCredentialText(value);
-  return facts.operations.some((operation) => {
-    if (operation.negated) return false;
-    if (facts.credentialTerms.some((term) => term.scope === operation.scope)) return true;
-    const reference = facts.references.some((candidate) => candidate.scope === operation.scope);
-    if (!reference) return false;
-    return facts.credentialTerms.some((term) =>
-      term.scope < operation.scope && operation.scope - term.scope <= 1
-      && operation.sentence - term.sentence <= 1
-    );
-  });
-}
-
 type TextScreenResult = Readonly<{
   code: SupportDraftDiagnosticCode;predicate: SupportDraftPredicate;
 }>;
@@ -158,7 +147,7 @@ function linkPredicate(value: string): SupportDraftPredicate | null {
   const canonical = canonicalSupportTextViews(value);
   if (canonical.unsafeEncoding) return "ENCODED_LINK_OR_PATH";
   for (const candidate of canonical.views) {
-    if (!MARKUP_OR_LINK.test(candidate)) continue;
+    if (!MARKUP_OR_LINK.test(candidate) && !supportTextHasUnsafePath(candidate)) continue;
     if (candidate !== canonical.views[0]) return "ENCODED_LINK_OR_PATH";
     if (/(?:\[[^\]]+\]\s*\(|<\/?[a-z][^>]*>)/iu.test(candidate)) return "MARKUP";
     if (/(?:https?:\/\/|www\.|(?:^|\s)\/\/)/iu.test(candidate)) return "RAW_LINK_OR_PROTOCOL";
@@ -191,7 +180,7 @@ function screenCategory(value: string,internalIds: readonly string[] = []): Text
     || normalized.some((candidate) => SECRET_LIKE.test(candidate))) {
     return result("TEXT_SECRET_LIKE","LABELLED_OR_TOKEN_SECRET");
   }
-  if (normalized.some(containsCredentialOrSecurityAction)) {
+  if (normalized.some(supportTextContainsCredentialOperation)) {
     return result("TEXT_CREDENTIAL_OR_SECURITY_ACTION","CREDENTIAL_OPERATION");
   }
   if (normalized.some((candidate) => SIX_DIGIT_CODE.test(candidate))) {

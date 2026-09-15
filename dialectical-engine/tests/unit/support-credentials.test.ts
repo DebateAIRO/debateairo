@@ -48,6 +48,16 @@ describe("Support credential lexical facts", () => {
   });
 
   it.each([
+    ['My recovery code is "inert amber fern',"inert amber fern"],
+    ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
+    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
+  ])("owns the complete supplied-value span without retaining a suffix: %s", (text,secret) => {
+    const facts = analyzeSupportCredentialText(text);
+    expect(facts.credentialValueSpans.map(({ start,end }) => text.slice(start,end)))
+      .toContain(secret);
+  });
+
+  it.each([
     ["Support does not receive passwords and also asks you to send them here.","solicit"],
     ["Support does not receive passwords, so send them here.","solicit"],
     ["Asistența nu primește parole și de asemenea îți cere să le trimiți aici.","solicit"],
@@ -57,6 +67,15 @@ describe("Support credential lexical facts", () => {
   ])("does not carry negation into a later coordinated operation: %s", (text,kind) => {
     const operations = analyzeSupportCredentialText(text).operations.filter((row) => row.kind === kind);
     expect(operations.some(({ negated }) => negated === false)).toBe(true);
+  });
+
+  it.each([
+    "Support does not receive passwords and may receive them.",
+    "Support cannot accept security codes, but it could validate them.",
+    "Asistența nu primește parole și poate primi acestea.",
+    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
+  ])("starts a separate positive modal or auxiliary operation group: %s", (text) => {
+    expect(analyzeSupportCredentialText(text).operations.some(({ negated }) => !negated)).toBe(true);
   });
 
   it("emits only closed lexical facts and numeric spans", () => {

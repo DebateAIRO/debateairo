@@ -83,7 +83,9 @@ describe("support outcome metrics", () => {
       ratingResolution7Days: null,ratingResolution30Days: null
     });
 
-    await seedSession({ ageMs: 1,rating: "yes" });
+    // A recovered answer deliberately retains ANSWER_GROUNDED and model_called=true;
+    // metrics therefore count it as a rated resolution and as one relay call.
+    await seedSession({ ageMs: 1,rating: "yes",modelCalled: true });
     await seedSession({ ageMs: 3,outcome: "REFUSE_SAFETY",modelCalled: true });
     await seedSession({ ageMs: 2,rating: "no",openedCase: true });
     await seedSession({ ageMs: 10*24*60*60*1_000 });
@@ -98,7 +100,7 @@ describe("support outcome metrics", () => {
     });
     const status = await repository.status();
     expect(status.relayState).toBe("AVAILABLE");
-    expect(status.callsToday).toBe(1);
+    expect(status.callsToday).toBe(2);
     expect((await database.pool.query(
       "SELECT count(*)::int AS count FROM support.rating AS rating JOIN support.message AS message ON message.message_id=rating.message_id WHERE message.outcome='REFUSE_SAFETY'"
     )).rows).toEqual([{ count: 0 }]);

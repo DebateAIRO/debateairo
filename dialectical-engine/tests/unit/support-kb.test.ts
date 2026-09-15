@@ -142,6 +142,23 @@ describe("Help Corpus loader", () => {
     expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
   });
 
+  it("keeps the new complete recovery component set ineligible until its separate review manifest lands", () => {
+    const directory = fileURLToPath(
+      new URL("../../packages/support-kb/content/", import.meta.url),
+    );
+    const manifestPath = fileURLToPath(
+      new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
+    );
+    const componentPath = fileURLToPath(
+      new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
+    );
+
+    expect(() => loadHelpCorpus(directory,{
+      reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
+      recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
+    })).toThrowError(expect.objectContaining({ code: "SUPPORT_KB_RECOVERY_REVIEW_REQUIRED" }));
+  });
+
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {
     // Catches removal of the status, V-ratification, or bilingual completeness gates.
     const directory = fixtureDirectory();

@@ -37,6 +37,7 @@ export type SupportCredentialFacts = Readonly<{
   operations: readonly SupportSecurityOperationFact[];
   negations: readonly SupportScopedFact[];
   references: readonly SupportScopedFact[];
+  nonCredentialObjects: readonly SupportScopedFact[];
 }>;
 
 type NormalizedText = Readonly<{
@@ -77,23 +78,24 @@ const OPERATION_PATTERNS: readonly Readonly<{
 ]);
 
 const NEGATION = /\b(?:never|do\s+not|does\s+not|did\s+not|cannot|can\s+not|can't|must\s+not|will\s+not|should\s+not|nu|niciodata|nu\s+poate|nu\s+pot|nu\s+trebuie)\b/giu;
-const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|le|lor)\b|-o\b|-le\b)/giu;
-const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|should|must|will|can|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|trebuie|poti|vei|va|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|decod|encod|reset|schimb|inlocu|regener)))/giu;
+const REFERENCE = /(?:\b(?:it|them|this|that|these|those|acesta|aceasta|acestea|acestora|il|le|lor)\b|-o\b|-le\b)/giu;
+const NON_CREDENTIAL_OBJECT = /\b(?:display\s+name|account\s+name|profile\s+name|nume(?:le)?\s+(?:afisat|contului|profilului))\b/giu;
+const SCOPE_BOUNDARY = /(?:[.!?;\n]+|,?\s*\b(?:but|however|instead|except|unless|then|therefore|thus|so|as\s+a\s+result|because|while|although|yet|which\s+means|and\s+(?:also|then|generally|sometimes|later|still)|dar|insa|apoi|deci|asa\s+ca|prin\s+urmare|deoarece|fiindca|desi|totusi|ceea\s+ce\s+inseamna|si\s+de\s+asemenea)\b|\b(?:and|si)\s+(?=(?:you|the\s+visitor|support|i|we|they|may|might|should|must|will|would|can|could|is|are|please|send|share|provide|give|submit|enter|paste|upload|tell|show|receive|accept|repeat|transform|validate|decode|encode|reset|change|replace|regenerate|tu|vizitator|asistenta|poate|pot|ar|este|sunt|trebuie|poti|vei|va|vor|trim|partaj|furniz|introduc|lip|incarc|spun|arat|prim|accept|repet|transform|valid|verific|decod|encod|reset|schimb|inlocu|regener)))/giu;
 const SENTENCE_BOUNDARY = /[.!?;\n]+/gu;
 const LABEL_CONNECTOR = /^\s*(?:(?:my|your|his|her|our|their|visitor(?:'s)?|meu|mea|mele|ta|tau|dvs|dumneavoastra|utilizatorului)\s+){0,2}(?:(?:is|are|este|e|sunt)\b|:|=)\s*/iu;
-const VALUE_TOKEN = /^[^\s,;.!?]+/u;
 const VALUE_STOP_WORDS = new Set([
   "and","but","because","keep","please","so","then","therefore","which","while",
   "asa","apoi","dar","deci","iar","pastreaza","pentru","si"
 ]);
 const QUOTE_PAIRS = new Map([["\"","\""],["'","'"],["„","”"],["“","”"],["«","»"]]);
-const MAX_VALUE_WORDS = 6;
-const MAX_VALUE_CODE_UNITS = 160;
+const VALUE_HARD_DELIMITER = /[;\n]|[.!?](?=\s|$)|,(?=\s*(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b)/giu;
+const VALUE_COORDINATOR = /\s+\b(?:and|but|because|keep|please|so|then|therefore|which|while|asa|apoi|dar|deci|iar|pastreaza|pentru|si)\b/giu;
 const NON_VALUE_WORDS = new Set([
   "available","disponibil","disponibile","encrypted","forgotten","invalid","missing","never","not","private","protected",
   "required","safe","secure","unavailable","unknown","niciodata","nu","necesara",
   "necesar","protejata","protejat","sigura","sigur","uitata","uitat"
 ]);
+const VALUE_ARTICLES = new Set(["a","an","o","un","una"]);
 
 function normalizeWithMap(source: string): NormalizedText {
   let text = "";
@@ -161,20 +163,25 @@ function labelledValueSpan(text: string,start: number): Readonly<{ start: number
   const closing = first === undefined ? undefined : QUOTE_PAIRS.get(first);
   if (closing !== undefined) {
     const end = text.indexOf(closing,start + 1);
-    if (end <= start + 1 || end - start > MAX_VALUE_CODE_UNITS) return null;
-    return Object.freeze({ start:start + 1,end });
+    if (end > start + 1) return Object.freeze({ start:start + 1,end });
+    const remainder = text.slice(start + 1);
+    VALUE_HARD_DELIMITER.lastIndex = 0;
+    const delimiter = VALUE_HARD_DELIMITER.exec(remainder);
+    const unmatchedEnd = delimiter === null ? text.length : start + 1 + delimiter.index;
+    return unmatchedEnd > start + 1 ? Object.freeze({ start:start + 1,end:unmatchedEnd }) : null;
   }
-  let cursor = start;
-  let end = start;
-  for (let count = 0;count < MAX_VALUE_WORDS;count += 1) {
-    const spacing = /^\s*/u.exec(text.slice(cursor))?.[0] ?? "";
-    const tokenStart = cursor + spacing.length;
-    const token = VALUE_TOKEN.exec(text.slice(tokenStart))?.[0];
-    if (token === undefined || VALUE_STOP_WORDS.has(token) || tokenStart - start > MAX_VALUE_CODE_UNITS) break;
-    end = tokenStart + token.length;
-    cursor = end;
-  }
-  return end > start ? Object.freeze({ start,end }) : null;
+  const remainder = text.slice(start);
+  VALUE_HARD_DELIMITER.lastIndex = 0;
+  VALUE_COORDINATOR.lastIndex = 0;
+  const hard = VALUE_HARD_DELIMITER.exec(remainder)?.index ?? remainder.length;
+  const coordinator = VALUE_COORDINATOR.exec(remainder)?.index ?? remainder.length;
+  const end = start + Math.min(hard,coordinator);
+  const trimmedEnd = start + remainder.slice(0,end-start).trimEnd().length;
+  const words = remainder.slice(0,trimmedEnd-start).trimStart().split(/\s+/u);
+  const firstWord = words[0] ?? "";
+  if (VALUE_STOP_WORDS.has(firstWord) || NON_VALUE_WORDS.has(firstWord)
+    || (VALUE_ARTICLES.has(firstWord) && NON_VALUE_WORDS.has(words[1] ?? ""))) return null;
+  return trimmedEnd > start ? Object.freeze({ start,end:trimmedEnd }) : null;
 }
 
 export function analyzeSupportCredentialText(source: string): SupportCredentialFacts {
@@ -229,6 +236,8 @@ export function analyzeSupportCredentialText(source: string): SupportCredentialF
       const negated = [...normalized.text.slice(scopeStart,match.index).matchAll(NEGATION)].length > 0;
       const span = originalSpan(normalized,match.index,match.index + match[0].length);
       if (terms.some((term) => span.start >= term.start && span.end <= term.end)) continue;
+      const operationText = normalized.text.slice(match.index,match.index + match[0].length);
+      if (kind === "security-change" && /^(?:recovery|recuperare|recuperarea|recuperarii|inscriere|inscrierii|enrollment)$/u.test(operationText)) continue;
       operations.push(Object.freeze({
         kind,...span,
         scope,sentence:scopes[scope]?.sentence ?? 0,negated
@@ -246,9 +255,34 @@ export function analyzeSupportCredentialText(source: string): SupportCredentialF
       scope,sentence:scopes[scope]?.sentence ?? 0
     }));
   }
+  const nonCredentialObjects: SupportScopedFact[] = [];
+  NON_CREDENTIAL_OBJECT.lastIndex = 0;
+  for (const match of normalized.text.matchAll(NON_CREDENTIAL_OBJECT)) {
+    const scope = scopeAt(scopes,match.index);
+    nonCredentialObjects.push(Object.freeze({
+      ...originalSpan(normalized,match.index,match.index + match[0].length),
+      scope,sentence:scopes[scope]?.sentence ?? 0
+    }));
+  }
   return Object.freeze({
     credentialTerms:Object.freeze(terms),credentialValueSpans:uniqueSpans(values),
     operations:Object.freeze(operations),negations:Object.freeze(negations),
-    references:Object.freeze(references)
+    references:Object.freeze(references),nonCredentialObjects:Object.freeze(nonCredentialObjects)
+  });
+}
+
+/** Shared credential-operation relation used by every Support text sink. */
+export function supportTextContainsCredentialOperation(value: string): boolean {
+  const facts = analyzeSupportCredentialText(value);
+  return facts.operations.some((operation) => {
+    if (operation.negated) return false;
+    if (facts.credentialTerms.some((term) => term.scope === operation.scope)) return true;
+    if (facts.nonCredentialObjects.some((object) => object.scope === operation.scope)) return false;
+    const reference = facts.references.some((candidate) => candidate.scope === operation.scope);
+    if (!reference) return false;
+    return facts.credentialTerms.some((term) =>
+      term.scope < operation.scope && operation.scope - term.scope <= 1
+      && operation.sentence - term.sentence <= 1
+    );
   });
 }

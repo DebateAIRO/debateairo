@@ -18,7 +18,8 @@ import {
 import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
 import type { SupportDegradedPort } from "./degraded.js";
 import {
-  diagnoseSupportDraft,parseSupportDraft,type SupportDraftReport,validateSupportDraft
+  diagnoseSupportDraft,parseSupportDraft,screenSupportModelText,
+  type SupportDraftReport,validateSupportDraft
 } from "./response-policy.js";
 import {
   createSupportModelReferenceFactory,translateSupportDraftReferences,
@@ -220,8 +221,12 @@ export function createSupportAnswerService(input: Readonly<{
           - [...`${structuredInstruction(request.language)}\n\n`].length
       }) : undefined;
       const entries = structured
-        ? eligibleEntries.filter((entry) => entry.lang === request.language
-          && context!.sourceIds.includes(entry.id))
+        ? context!.sourceIds.flatMap((id) => {
+          const entry = eligibleEntries.find((candidate) =>
+            candidate.lang === request.language && candidate.id === id
+          );
+          return entry === undefined ? [] : [entry];
+        })
         : retrieve(eligibleEntries,prepared.text,request.language);
       if (entries.length === 0) {
         const completedAt = strictAfter(request.receivedAt,clock);
@@ -244,6 +249,12 @@ export function createSupportAnswerService(input: Readonly<{
           sources: Object.freeze([]),actions: Object.freeze([])
         });
       }
+      const recoveryEntry = structured ? entries[0] : undefined;
+      const sourceActionIds = recoveryEntry === undefined ? Object.freeze([]) : Object.freeze(
+        context!.requestedActionIds.filter((id) => SUPPORT_CAPABILITIES.some(({ articleIds,actionIds }) =>
+          articleIds.includes(recoveryEntry.id) && actionIds.includes(id)
+        ))
+      );
 
       let completion: Awaited<ReturnType<SupportModelPort["complete"]>> | undefined;
       let firstTokenAt: Date | undefined;
@@ -322,8 +333,12 @@ export function createSupportAnswerService(input: Readonly<{
             sources:context!.sourceReferences,actions:context!.actionReferences
           });
         const rejected = structured && draft === null;
+        const recovered = rejected
+          && recoveryEntry?.fallback !== undefined
+          && screenSupportModelText(recoveryEntry.fallback);
         const modelText = structured
-          ? rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
+          ? recovered ? recoveryEntry.fallback
+          : rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
           : withoutModelSources(completion.text);
         if (modelText === "") throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         input.degraded?.markAvailable();
@@ -333,12 +348,12 @@ export function createSupportAnswerService(input: Readonly<{
           groundedText,supportIntentSurface(request.text),
           await input.incidents.readActiveIncidents(),request.language
         );
-        const outcome = rejected ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
-        const sources = rejected ? Object.freeze([]) : Object.freeze(entries
-          .filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true)
+        const outcome = rejected && !recovered ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
+        const sources = rejected && !recovered ? Object.freeze([]) : Object.freeze((recovered
+          ? [recoveryEntry!] : entries.filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true))
           .map((entry) => Object.freeze({ id: entry.id,label: entry.title })));
-        const actions = rejected || !structured ? Object.freeze([]) : resolveSupportActions(
-          draft!.actionIds,
+        const actions = rejected && !recovered || !structured ? Object.freeze([]) : resolveSupportActions(
+          recovered ? sourceActionIds : draft!.actionIds,
           { signedIn: request.signedIn === true,language: request.language }
         );
         const messageId = randomUUID();

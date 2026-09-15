@@ -6,7 +6,7 @@ import {
   projectSupportDraftReport,
   validateSupportDraft
 } from "../../apps/api/src/support/response-policy.js";
-import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
+import { SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 
 function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
   return JSON.stringify({
@@ -158,6 +158,35 @@ describe("CP1 support model response policy", () => {
   });
 
   it.each([
+    "Support does not receive passwords and may receive them.",
+    "Support cannot accept a security code, but it could validate it.",
+    "Asistența nu primește parole și poate primi acestea.",
+    "Asistența nu verifică un cod de securitate, dar ar putea să îl primească."
+  ])("rejects a positive credential operation in a new modal group: %s", (text) => {
+    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).toBeNull();
+  });
+
+  it.each([
+    "Support cannot receive passwords. You can change this display name in Settings.",
+    "Support cannot accept recovery codes. You may edit that profile name in Settings.",
+    "Asistența nu primește parole. Poți schimba acest nume afișat în Setări."
+  ])("keeps an explicit noncredential object independent from an older credential: %s", (text) => {
+    expect(parseSupportDraft(raw(text,{ actionIds: [] }))).not.toBeNull();
+  });
+
+  it("keeps all current human labels neutral in factual framing", () => {
+    const labels = [
+      ...SUPPORT_ACTION_CATALOG.flatMap(({ labels }) => [labels.en,labels.ro]),
+      ...SUPPORT_CAPABILITIES.flatMap(({ labels }) => [labels.en,labels.ro])
+    ];
+    expect(labels).toHaveLength(52);
+    for (const label of labels) {
+      expect(parseSupportDraft(raw(`Available feature: ${label}.`,{ actionIds: [] })),label)
+        .not.toBeNull();
+    }
+  });
+
+  it.each([
     ["action","Select start-debate to continue.",["getting-started-debate"]],
     ["capability","Use owner-debate to export.",["export-json"]],
     ["selected source","Read getting-started-debate for details.",["getting-started-debate"]],
@@ -212,6 +241,12 @@ describe("CP1 support model response policy", () => {
     ["deeper encoded path", raw("Open %2525252Fsettings")],
     ["malformed structural escape", raw("Open https%3")],
     ["path instruction", raw("Go to /settings to continue")],
+    ["root backslash", raw("Open \\settings to continue")],
+    ["relative forward path", raw("Open ../settings to continue")],
+    ["relative backslash path", raw("Open ..\\settings to continue")],
+    ["drive path", raw("Open C:\\settings to continue")],
+    ["UNC path", raw("Open \\\\host\\share to continue")],
+    ["encoded backslash", raw("Open %5Csettings to continue")],
     ["Markdown link", raw("Use [this link](/new)")],
     ["HTML", raw("Choose <a href='/new'>Start</a>")],
     ["credential request", raw("Type your password here so I can check it")],

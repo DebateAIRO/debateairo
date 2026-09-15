@@ -31,6 +31,8 @@ function entry(
     ratifiedBy: "",
     ratifiedOn: "",
     body,
+    modelProjection: `MODEL PROJECTION: ${body}`,
+    fallback: `FALLBACK: ${body}`,
   });
 }
 
@@ -264,5 +266,21 @@ describe("Support knowledge context", () => {
     expect(result.text).toContain("Create a debate with plan controls");
     expect(result.text).toContain("Start a debate");
     expect(result.text).toContain("signed-in visitors");
+  });
+
+  it("uses the admitted projection and never exposes the raw title or article body", () => {
+    const candidate = Object.freeze({
+      ...entry("getting-started-debate","en","RAW TITLE /new","RAW BODY /new packages/private/source.ts"),
+      modelProjection: "Choose a topic longer than six characters before starting.",
+      fallback: "Choose a topic longer than six characters, then use Start a debate."
+    });
+    const result = buildSupportKnowledgeContext({
+      entries: [candidate],capabilities: SUPPORT_CAPABILITIES,language: "en",
+      query: "How do I start a debate with a topic?",historyText: "",maxCodePoints: 24_000,
+      availableActionIds: SUPPORT_ACTION_IDS
+    });
+    expect(result.text).toContain(candidate.modelProjection);
+    expect(result.text).not.toContain(candidate.title);
+    expect(result.text).not.toContain(candidate.body);
   });
 });

@@ -16,7 +16,8 @@ function entry(id: string,body: string): HelpCorpusEntry {
   return Object.freeze({
     id,lang: "en",title: "Crosscap article",status: "shipped",
     sources: Object.freeze(["fixture"]),verifiedAgainst: "fixture",
-    ratifiedBy: "V",ratifiedOn: "2026-09-01",body
+    ratifiedBy: "V",ratifiedOn: "2026-09-01",body,
+    modelProjection: body,fallback: "Use the reviewed guidance for this topic."
   });
 }
 
@@ -43,6 +44,32 @@ function request(snapshot: LoadedHelpCorpus) {
 }
 
 describe("CP1 composed answer context", () => {
+  it.each(["not-json",JSON.stringify({ kind: "tool",text: "ignored",sourceIds: [],actionIds: [] })])(
+    "recovers every rejected ordinary knowledge envelope from the pinned top source: %s",
+    async (completionText) => {
+      const top = entry("getting-started-debate","create debate topic plan controls");
+      const snapshot = corpus([top],"6".repeat(64));
+      const complete = vi.fn(async () => Object.freeze({
+        text: completionText,usage: { input_tokens: 11,output_tokens: 7,cost_usd: 0.002 }
+      }));
+      const service = createSupportAnswerService({
+        entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+        modelReferenceFactory,modelFor: () => Object.freeze({ complete }) as never,
+        clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
+      });
+
+      const result = await service.respond({ ...request(snapshot),text: "How do I create a debate?" });
+
+      expect(complete).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        outcome: "ANSWER_GROUNDED",text: top.fallback,
+        sources: [{ id: top.id,label: top.title }],usage: { input_tokens: 11,output_tokens: 7,cost_usd: 0.002 }
+      });
+      expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
+        role: "assistant",outcome: "ANSWER_GROUNDED",text: top.fallback
+      }));
+    }
+  );
   it("maps request-local model references to canonical response provenance", async () => {
     const snapshot = corpus([
       entry("getting-started-debate","create debate topic plan controls")
@@ -191,7 +218,7 @@ describe("CP1 composed answer context", () => {
 
     const result = await service.respond(request(snapshot));
 
-    expect(result.outcome).toBe("REFUSE_SAFETY");
+    expect(result.outcome).toBe("ANSWER_GROUNDED");
     expect(reportDraftDiagnostic).toHaveBeenCalledOnce();
     expect(reportDraftDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
       code: "JSON_INVALID",predicate: "JSON_SYNTAX",jsonValid: false,fenced: true,
@@ -221,10 +248,12 @@ describe("CP1 composed answer context", () => {
 
     const result = await service.respond(request(snapshot));
 
-    expect(result).toMatchObject({ outcome: "REFUSE_SAFETY",sources: [],actions: [] });
+    expect(result).toMatchObject({
+      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
+    });
     expect(result.text).not.toContain("start-debate");
     expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
-      role: "assistant",outcome: "REFUSE_SAFETY"
+      role: "assistant",outcome: "ANSWER_GROUNDED"
     }));
   });
 
@@ -244,7 +273,9 @@ describe("CP1 composed answer context", () => {
 
     const result = await service.respond(request(snapshot));
 
-    expect(result).toMatchObject({ outcome: "REFUSE_SAFETY",sources: [],actions: [] });
+    expect(result).toMatchObject({
+      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
+    });
     expect(result.text).not.toContain(SOURCE_REFERENCE);
   });
 
@@ -269,7 +300,7 @@ describe("CP1 composed answer context", () => {
       outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }]
     });
     await expect(service.respond(request(snapshot))).resolves.toMatchObject({
-      outcome: "REFUSE_SAFETY",sources: [],actions: []
+      outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
     });
   });
 

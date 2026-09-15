@@ -80,7 +80,9 @@ const environment = loadApiEnvironment();
 const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
   reviewManifest: JSON.parse(readFileSync(
     resolve("packages/support-kb/reviews/manifest.json"),"utf8"
-  )) as unknown
+  )) as unknown,
+  recoveryComponents: readFileSync(resolve("packages/support-kb/recovery/components.json")),
+  requireReviewedRecovery: true
 });
 const supportKnowledgeSnapshots = createHelpCorpusSnapshotLookup(supportKnowledge);
 const kek = loadKek(environment.KEK_PATH);

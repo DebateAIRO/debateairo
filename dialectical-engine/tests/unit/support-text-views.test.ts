@@ -1,6 +1,8 @@
 import { describe,expect,it } from "vitest";
 
-import { canonicalSupportTextViews } from "../../packages/kernel/src/support-text-views.js";
+import {
+  canonicalSupportTextViews,supportTextHasUnsafePath
+} from "../../packages/kernel/src/support-text-views.js";
 
 describe("CP1 bounded canonical Support text views", () => {
   it.each([
@@ -29,4 +31,19 @@ describe("CP1 bounded canonical Support text views", () => {
       expect(canonicalSupportTextViews(input)).toMatchObject({ unsafeEncoding: false });
     }
   );
+
+  it.each([
+    "/settings","../settings",".\\settings","C:\\Users\\visitor\\secret.txt",
+    "\\\\server\\share\\secret.txt","%2Fsettings","..%2Fsettings"
+  ])("recognizes every canonical filesystem and route path form: %s",(input) => {
+    expect(supportTextHasUnsafePath(input)).toBe(true);
+  });
+
+  it.each([
+    "Progress is 50% complete.",
+    "Choose Settings from the account page.",
+    "The ratio is 3/4 when four observations are available."
+  ])("does not classify ordinary prose as a path: %s",(input) => {
+    expect(supportTextHasUnsafePath(input)).toBe(false);
+  });
 });

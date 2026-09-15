@@ -1972,7 +1972,7 @@ describe("SUP-01 support routes", () => {
   it.each([
     ["encoded link","Open https%3A%2F%2Finvalid.example/reset"],
     ["internal identifier","Select start-debate to continue."]
-  ])("replaces a rejected %s draft before storage and HTTP while retaining usage and relay health", async (
+  ])("recovers a rejected %s draft from the pinned top source before storage and HTTP", async (
     _kind,unsafe
   ) => {
     const policyClockMs = CLOCK_BASE_MS + 20_000_000;
@@ -1980,7 +1980,9 @@ describe("SUP-01 support routes", () => {
       id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
       status: "shipped" as const,sources: Object.freeze(["test"]),
       verifiedAgainst: "test",ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
-      body: "Open the new debate page to start your first debate."
+      body: "Raw article body is excluded from the model surface.",
+      modelProjection: "The debate form accepts a topic longer than six characters.",
+      fallback: "Choose Start a debate and enter a topic longer than six characters."
     });
     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
     const complete = vi.fn(async () => Object.freeze({
@@ -2005,7 +2007,10 @@ describe("SUP-01 support routes", () => {
     );
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      outcome: "REFUSE_SAFETY",sources: [],actions: []
+      outcome: "ANSWER_GROUNDED",
+      text: article.fallback,
+      sources: [{ id: article.id,label: article.title }],
+      actions: [{ id: "start-debate",href: "/login?next=%2Fnew" }]
     });
     expect(JSON.stringify(response.json())).not.toContain(unsafe);
     expect(response.json()).not.toHaveProperty("case_token");
@@ -2017,7 +2022,7 @@ describe("SUP-01 support routes", () => {
         cost_usd::text FROM support.message
         WHERE session_id=$1 AND role='assistant'`,[opened.body.session_id])).rows[0]!;
     expect(assistant).toMatchObject({
-      outcome: "REFUSE_SAFETY",model_called: true,
+      outcome: "ANSWER_GROUNDED",model_called: true,
       input_tokens: "13",output_tokens: "7",cost_usd: "0.002000"
     });
     const stored = await messageCipher.read({
@@ -2032,7 +2037,7 @@ describe("SUP-01 support routes", () => {
       headers: { "x-support-session-token": opened.body.session_token },
       payload: { session_id: opened.body.session_id,rating: "yes" }
     });
-    expect(rating.statusCode).toBe(404);
+    expect(rating.statusCode).toBe(200);
     await server.close();
   });
 
@@ -2048,7 +2053,9 @@ describe("SUP-01 support routes", () => {
       verifiedAgainst: "2b670d30",
       ratifiedBy: "V" as const,
       ratifiedOn: "2026-09-04",
-      body: "Open the new debate page to start your first debate."
+      body: "Raw fixture article body.",
+      modelProjection: "Open the new debate page to start your first debate.",
+      fallback: "Choose Start a debate and enter a topic longer than six characters."
     });
     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
     const model: SupportModelPort = Object.freeze({
@@ -2141,7 +2148,9 @@ describe("SUP-01 support routes", () => {
       id: "export-json",lang: "en" as const,title: "Export a debate as JSON",
       status: "shipped" as const,sources: Object.freeze(["test"]),
       verifiedAgainst: "test",ratifiedBy: "V" as const,ratifiedOn: "2026-09-01",
-      body: "JSON export is available after a served answer and a readable ledger digest."
+      body: "Raw fixture article body.",
+      modelProjection: "JSON export is available after a served answer and a readable ledger digest.",
+      fallback: "Open an eligible owner debate and choose Export."
     });
     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
     let system = "";
@@ -2243,7 +2252,9 @@ describe("SUP-01 support routes", () => {
         verifiedAgainst: "2b670d30",
         ratifiedBy: "V" as const,
         ratifiedOn: "2026-09-04",
-        body: "Owners publish from the debate page and complete re-authentication."
+        body: "Raw fixture article body.",
+        modelProjection: "Owners publish from the debate page after fresh authentication.",
+        fallback: "Open a debate you own and choose its publish control."
       })],
       messages: messageCipher,
       modelFor: () => model,
@@ -2686,7 +2697,9 @@ describe("SUP-01 support routes", () => {
       entries: [{
         id: "getting-started-debate",lang: "en",title: "Start",status: "shipped",
         sources: ["test"],verifiedAgainst: "test",ratifiedBy: "V",ratifiedOn: "2026-09-01",
-        body: "Open the new debate page to start your first debate."
+        body: "Raw fixture article body.",
+        modelProjection: "Open the new debate page to start your first debate.",
+        fallback: "Choose Start a debate and enter a topic longer than six characters."
       }],messages: messageCipher,
       modelFor: () => new RelayAdapter({
         baseUrl: "http://127.0.0.1:8792/v1",authorizationHeader: "Bearer test-relay",

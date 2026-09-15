@@ -40,6 +40,17 @@ describe("CP1 Support credential redaction", () => {
     expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
   });
 
+  it.each([
+    ['My recovery code is "inert amber fern',"inert amber fern"],
+    ["My password is amber birch cedar dogwood elm fir grove hazel; keep it private.","amber birch cedar dogwood elm fir grove hazel"],
+    ["My reset token is inert.alpha-beta/gamma; keep it private.","inert.alpha-beta/gamma"]
+  ])("removes the complete supplied value through a safe delimiter or end: %s", (text,secret) => {
+    const result = redactSupportText(text);
+    expect(result.redacted).toBe(true);
+    expect(result.text).not.toContain(secret);
+    expect(result.text).toContain("[REDACTED_SECRET_LIKE]");
+  });
+
   it("stops an unquoted value at a declared coordinator without consuming benign prose", () => {
     const result = redactSupportText("My password is inert horse battery and I need help.");
     expect(result.text).toBe("My password is [REDACTED_SECRET_LIKE] and I need help.");

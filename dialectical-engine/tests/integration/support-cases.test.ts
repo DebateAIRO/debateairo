@@ -377,7 +377,9 @@ describe("SUP-02 cases", () => {
 
   it("stores a non-authoritative one-paragraph advisory summary within the bound", async () => {
     const persisted: Array<Readonly<Record<string,unknown>>> = [];
-    const summary = Array.from({ length: 40 },(_,index) => `word${index}`).join(" ") + ".";
+    const summary = `Change the display name from Settings. ${
+      Array.from({ length: 34 },(_,index) => `word${index}`).join(" ")
+    }.`;
     const service = createAdvisorySummaryService({
       complete: async (request) => {
         expect(request.system).toContain("exactly kind, text, sourceIds, and actionIds");
@@ -422,6 +424,8 @@ describe("SUP-02 cases", () => {
     ,["en","Open https%25253A%25252F%25252Fexample.test/reset.",
       "The advisory summary was omitted because it did not pass Support safety checks."]
     ,["en","The visitor should use forgot-password to continue.",
+      "The advisory summary was omitted because it did not pass Support safety checks."]
+    ,["en","My password is this synthetic phrase remains secret even when it contains many ordinary words.",
       "The advisory summary was omitted because it did not pass Support safety checks."]
   ] as const)("replaces an unsafe %s advisory summary before seal and persistence", async (
     language,hostile,fallback

@@ -5,6 +5,10 @@ import { TextDecoder } from "node:util";
 
 import { TypedDomainError } from "@debateai/kernel";
 import { SUPPORT_CATALOG_CANONICAL } from "./catalog.js";
+import {
+  parseSupportRecoveryComponents,supportRecoveryTextSha256,
+  type SupportRecoveryComponent
+} from "./recovery.js";
 
 export type HelpCorpusLanguage = "en" | "ro";
 export type HelpCorpusStatus = "shipped" | "intended";
@@ -19,6 +23,9 @@ export type HelpCorpusEntry = Readonly<{
   ratifiedBy: "V" | "";
   ratifiedOn: string;
   body: string;
+  modelProjection?: string;
+  fallback?: string;
+  recoveryReview?: SupportRecoveryReview;
 }>;
 
 export type SupportReviewDetails = Readonly<{
@@ -34,10 +41,26 @@ export type SupportArticleReview = SupportReviewDetails & Readonly<{
   sha256: string;
 }>;
 
+export type SupportRecoveryReview = SupportReviewDetails & Readonly<{
+  id: string;
+  lang: HelpCorpusLanguage;
+  articleSha256: string;
+  modelProjectionSha256: string;
+  fallbackSha256: string;
+  ratifiedBy: "V" | "";
+  ratifiedOn: string;
+}>;
+
+export type SupportRecoveryReviewManifest = Readonly<{
+  componentFileSha256: string;
+  components: readonly SupportRecoveryReview[];
+}>;
+
 export type SupportReviewManifest = Readonly<{
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   catalog: SupportReviewDetails & Readonly<{ sha256: string }>;
   articles: readonly SupportArticleReview[];
+  recovery?: SupportRecoveryReviewManifest;
 }>;
 
 export type LoadedHelpCorpus = Readonly<{
@@ -46,6 +69,8 @@ export type LoadedHelpCorpus = Readonly<{
   ignoredCount: number;
   previewReviewedCount: number;
   ownerRatifiedCount: number;
+  recoveryReviewedCount: number;
+  recoveryOwnerRatifiedCount: number;
   catalogDigest: string;
   reviewManifest: SupportReviewManifest;
   /**
@@ -289,6 +314,10 @@ function reviewManifestError(detail: string): never {
   throw new SupportKbError("SUPPORT_KB_REVIEW_MANIFEST_INVALID", detail);
 }
 
+function recoveryReviewError(detail: string): never {
+  throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_INVALID", detail);
+}
+
 function parseReviewDetails(value: unknown, subject: string): SupportReviewDetails {
   if (typeof value !== "object" || value === null) reviewManifestError(`${subject} must be an object`);
   const record = value as Record<string, unknown>;
@@ -322,13 +351,14 @@ function parseReviewManifest(value: unknown): SupportReviewManifest {
   if (typeof value !== "object" || value === null) reviewManifestError("manifest must be an object");
   const record = value as Record<string, unknown>;
   if (
-    record.schemaVersion !== 1
+    (record.schemaVersion !== 1 && record.schemaVersion !== 2)
     || !Array.isArray(record.articles)
     || typeof record.catalog !== "object"
     || record.catalog === null
-    || Object.keys(record).sort().join(",") !== "articles,catalog,schemaVersion"
+    || Object.keys(record).sort().join(",") !== (record.schemaVersion === 1
+      ? "articles,catalog,schemaVersion" : "articles,catalog,recovery,schemaVersion")
   ) {
-    reviewManifestError("manifest must contain exactly schemaVersion, catalog and articles");
+    reviewManifestError("manifest has an invalid schema or key set");
   }
   const catalogRecord = record.catalog as Record<string, unknown>;
   const catalogDetails = parseReviewDetails(catalogRecord, "catalog");
@@ -359,16 +389,73 @@ function parseReviewManifest(value: unknown): SupportReviewManifest {
       ...details,
     });
   });
+  let recovery: SupportRecoveryReviewManifest | undefined;
+  if (record.schemaVersion === 2) {
+    if (record.recovery === null || typeof record.recovery !== "object" || Array.isArray(record.recovery)) {
+      recoveryReviewError("recovery must be an object");
+    }
+    const rawRecovery = record.recovery as Record<string,unknown>;
+    if (Object.keys(rawRecovery).sort().join(",") !== "componentFileSha256,components"
+      || typeof rawRecovery.componentFileSha256 !== "string"
+      || !SHA256.test(rawRecovery.componentFileSha256)
+      || !Array.isArray(rawRecovery.components)) {
+      recoveryReviewError("recovery must contain an exact file digest and component array");
+    }
+    const recoverySeen = new Set<string>();
+    const recoveryComponents = rawRecovery.components.map((value,index) => {
+      const subject = `recovery.components[${index}]`;
+      if (value === null || typeof value !== "object" || Array.isArray(value)) recoveryReviewError(`${subject} must be an object`);
+      const row = value as Record<string,unknown>;
+      const allowed = [
+        "articleSha256","evidence","fallbackSha256","id","lang","modelProjectionSha256",
+        "ratifiedBy","ratifiedOn","reviewedBy","reviewedOn","reviewerSession"
+      ];
+      if (Object.keys(row).sort().join(",") !== allowed.join(",")) recoveryReviewError(`${subject} has an invalid key set`);
+      if (typeof row.id !== "string" || !ENTRY_ID.test(row.id)) recoveryReviewError(`${subject}.id is invalid`);
+      if (row.lang !== "en" && row.lang !== "ro") recoveryReviewError(`${subject}.lang is invalid`);
+      for (const key of ["articleSha256","modelProjectionSha256","fallbackSha256"] as const) {
+        if (typeof row[key] !== "string" || !SHA256.test(row[key])) recoveryReviewError(`${subject}.${key} is invalid`);
+      }
+      const details = parseReviewDetails({
+        id: row.id,lang: row.lang,sha256: row.articleSha256,
+        reviewedBy: row.reviewedBy,reviewerSession: row.reviewerSession,
+        reviewedOn: row.reviewedOn,evidence: row.evidence
+      },subject);
+      if ((row.ratifiedBy !== "" && row.ratifiedBy !== "V")
+        || typeof row.ratifiedOn !== "string"
+        || (row.ratifiedOn !== "" && !isIsoDate(row.ratifiedOn))
+        || ((row.ratifiedBy === "V") !== (row.ratifiedOn !== ""))) {
+        recoveryReviewError(`${subject} has invalid paired owner ratification`);
+      }
+      const key = `${row.id}.${row.lang}`;
+      if (recoverySeen.has(key)) recoveryReviewError(`${subject} duplicates ${key}`);
+      recoverySeen.add(key);
+      return Object.freeze({
+        id: row.id,lang: row.lang,articleSha256: row.articleSha256,
+        modelProjectionSha256: row.modelProjectionSha256,fallbackSha256: row.fallbackSha256,
+        ...details,ratifiedBy: row.ratifiedBy,ratifiedOn: row.ratifiedOn
+      }) as SupportRecoveryReview;
+    });
+    recovery = Object.freeze({
+      componentFileSha256: rawRecovery.componentFileSha256,
+      components: Object.freeze(recoveryComponents)
+    });
+  }
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: record.schemaVersion,
     catalog: Object.freeze({ sha256: catalogRecord.sha256, ...catalogDetails }),
     articles: Object.freeze(articles),
+    ...(recovery === undefined ? {} : { recovery }),
   });
 }
 
 export function loadHelpCorpus(
   directory: string,
-  options: Readonly<{ reviewManifest?: unknown }> = {},
+  options: Readonly<{
+    reviewManifest?: unknown;
+    recoveryComponents?: string | Buffer;
+    requireReviewedRecovery?: boolean;
+  }> = {},
 ): LoadedHelpCorpus {
   const reviewManifest = parseReviewManifest(options.reviewManifest);
   const catalogDigest = sha256(SUPPORT_CATALOG_CANONICAL);
@@ -477,19 +564,100 @@ export function loadHelpCorpus(
     }
   }
 
+  const recoveryDocument = options.recoveryComponents === undefined
+    ? undefined : parseSupportRecoveryComponents(options.recoveryComponents);
+  if (options.requireReviewedRecovery === true && recoveryDocument === undefined) {
+    throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_REQUIRED","recovery component bytes are required");
+  }
+  if (options.requireReviewedRecovery === true && reviewManifest.recovery === undefined) {
+    throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_REQUIRED","recovery review attestation is required");
+  }
+  const expectedRecoveryKeys = shippedFiles.map(({ entry }) => `${entry.id}.${entry.lang}`);
+  const recoveryKeys = recoveryDocument?.components.map(({ id,lang }) => `${id}.${lang}`) ?? [];
+  if (recoveryDocument !== undefined
+    && (recoveryKeys.length !== expectedRecoveryKeys.length
+      || recoveryKeys.some((key,index) => key !== expectedRecoveryKeys[index]))) {
+    throw new SupportKbError("SUPPORT_KB_RECOVERY_COMPONENT_INVALID","component keys must equal shipped article keys");
+  }
+  const recoveryReviews = reviewManifest.recovery?.components ?? [];
+  const recoveryReviewKeys = recoveryReviews.map(({ id,lang }) => `${id}.${lang}`);
+  if (reviewManifest.recovery !== undefined
+    && (recoveryDocument === undefined
+      || reviewManifest.recovery.componentFileSha256 !== recoveryDocument.fileSha256
+      || recoveryReviewKeys.length !== recoveryKeys.length
+      || recoveryReviewKeys.some((key,index) => key !== recoveryKeys[index]))) {
+    recoveryReviewError("recovery review does not bind the exact complete component file");
+  }
+  const componentsByKey = new Map<string,SupportRecoveryComponent>(
+    recoveryDocument?.components.map((component) => [`${component.id}.${component.lang}`,component]) ?? []
+  );
+  const recoveryReviewsByKey = new Map<string,SupportRecoveryReview>(
+    recoveryReviews.map((review) => [`${review.id}.${review.lang}`,review])
+  );
+  const admittedEntries: HelpCorpusEntry[] = [];
+  const selectedRecoveryLines: string[] = [];
+  const reviewedRecoveryKeys = new Set<string>();
+  const ratifiedRecoveryKeys = new Set<string>();
+  for (const file of shippedFiles) {
+    const key = `${file.entry.id}.${file.entry.lang}`;
+    const component = componentsByKey.get(key);
+    const review = recoveryReviewsByKey.get(key);
+    const articleSha256 = sha256(file.bytes);
+    const reviewed = component !== undefined && review !== undefined
+      && component.articleSha256 === articleSha256
+      && review.articleSha256 === articleSha256
+      && review.modelProjectionSha256 === supportRecoveryTextSha256(component.modelProjection)
+      && review.fallbackSha256 === supportRecoveryTextSha256(component.fallback);
+    if (component !== undefined && component.articleSha256 !== articleSha256) {
+      throw new SupportKbError("SUPPORT_KB_RECOVERY_HASH_INVALID",`${key} article hash is stale`);
+    }
+    if (!reviewed) {
+      if (options.requireReviewedRecovery === true) {
+        throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_INVALID",`${key} is not exactly reviewed`);
+      }
+      // Legacy/article-only callers keep their existing corpus view. Once a
+      // component document is supplied, however, only separately reviewed
+      // projection/fallback records are admitted into the returned snapshot.
+      if (recoveryDocument === undefined) admittedEntries.push(file.entry);
+      continue;
+    }
+    admittedEntries.push(Object.freeze({
+      ...file.entry,modelProjection: component.modelProjection,fallback: component.fallback,
+      recoveryReview: review
+    }));
+    selectedRecoveryLines.push([
+      `recovery:${key}`,articleSha256,review.modelProjectionSha256,review.fallbackSha256,
+      review.reviewedBy,review.reviewerSession,review.reviewedOn,review.evidence,
+      review.ratifiedBy,review.ratifiedOn
+    ].join(":"));
+    reviewedRecoveryKeys.add(key);
+    if (review.ratifiedBy === "V") ratifiedRecoveryKeys.add(key);
+  }
+
   const manifest = [
     `catalog:${catalogDigest}`,
     ...shippedFiles.map(({ filename, bytes }) => `${filename}:${sha256(bytes)}`),
     ...selectedReviewLines,
+    ...(recoveryDocument === undefined ? [] : [
+      `recovery-file:${recoveryDocument.fileSha256}`,
+      recoveryDocument.canonicalManifest,
+      ...selectedRecoveryLines
+    ]),
   ].join("\n");
   const shippedCount = shippedFiles.length / LANGUAGES.length;
 
   return Object.freeze({
-    entries: Object.freeze(shippedFiles.map(({ entry }) => entry)),
+    entries: Object.freeze(admittedEntries),
     shippedCount,
     ignoredCount: byId.size - shippedCount,
     previewReviewedCount,
     ownerRatifiedCount,
+    recoveryReviewedCount: [...new Set(shippedFiles.map(({ entry }) => entry.id))].filter((id) =>
+      reviewedRecoveryKeys.has(`${id}.en`) && reviewedRecoveryKeys.has(`${id}.ro`)
+    ).length,
+    recoveryOwnerRatifiedCount: [...new Set(shippedFiles.map(({ entry }) => entry.id))].filter((id) =>
+      ratifiedRecoveryKeys.has(`${id}.en`) && ratifiedRecoveryKeys.has(`${id}.ro`)
+    ).length,
     catalogDigest,
     reviewManifest,
     manifest,

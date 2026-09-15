@@ -96,7 +96,7 @@ function baseSection(
 }
 
 function articleSection(entry: HelpCorpusEntry,reference: string): string {
-  return `\n\nSOURCE ${reference}\nTITLE: ${entry.title}\n${entry.body}`;
+  return `\n\nSOURCE ${reference}\n${entry.modelProjection ?? ""}`;
 }
 
 function outputContract(
@@ -163,7 +163,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
     });
   }
   const ranked = input.entries
-    .filter(({ lang }) => lang === input.language)
+    .filter(({ lang,modelProjection }) => lang === input.language && modelProjection !== undefined)
     .map((entry) => ({
       entry,
       score: (capabilityArticleScore.get(entry.id) ?? 0)
