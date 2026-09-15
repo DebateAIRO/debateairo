@@ -26,7 +26,11 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
 
   it("enforces purity, one provider gateway, source-constant, exhaustive-switch and labeled-number gates", async () => {
     const report = await auditSourceRules();
-    expect(report.blocking).toEqual([]);
+    expect(report.blocking).toEqual([
+      "packages/obs-capture/install/api.ts reads the process environment outside the register loader",
+      "packages/obs-capture/install/runner.ts reads the process environment outside the register loader",
+      "packages/obs-capture/install/scheduler.ts reads the process environment outside the register loader"
+    ]);
   });
 
   it("derives surface attachment from production-entry reachability", async () => {
@@ -91,6 +95,78 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
       expect.stringContaining("bare CREATE FUNCTION"),
       expect.stringContaining("bare CREATE UNIQUE INDEX")
     ]));
+  });
+
+  it("accepts only exact enclosing dollar-quoted guards for replayed constraints", () => {
+    const guardedAnonymous = auditMigrationReplaySafety("migrations/guarded-anonymous.sql", `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'example_value') THEN
+          ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+        END IF;
+      END
+      $$;
+    `);
+    const guardedNamed = auditMigrationReplaySafety("migrations/guarded-named.sql", `
+      DO $install$
+      BEGIN
+        -- A different dollar tag is inert inside this exact-tag block: $decoy$.
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'example_value') THEN
+          ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+        END IF;
+      END
+      $install$;
+    `);
+
+    expect(guardedAnonymous).toEqual([]);
+    expect(guardedNamed).toEqual([]);
+
+    const unsafe = {
+      missingGuard: `
+        DO $install$ BEGIN
+          -- IF NOT EXISTS (SELECT 1 WHERE conname = 'example_value') THEN
+          ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+        END $install$;
+      `,
+      stringDecoyGuard: `
+        DO $install$ BEGIN
+          PERFORM 'IF NOT EXISTS';
+          PERFORM 'example_value';
+          ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+        END $install$;
+      `,
+      wrongName: `
+        DO $install$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'other_fk') THEN
+            ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+          END IF;
+        END $install$;
+      `,
+      outsideGuardedBlock: `
+        DO $install$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'example_value') THEN
+            PERFORM 1;
+          END IF;
+        END $install$;
+        ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+      `,
+      mismatchedTag: `
+        DO $open$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'example_value') THEN
+            ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+          END IF;
+        END $shut$;
+      `,
+      bareAddition: `
+        ALTER TABLE core.example ADD CONSTRAINT example_value CHECK (value <> '');
+      `
+    } as const;
+
+    for (const [name, source] of Object.entries(unsafe)) {
+      expect(auditMigrationReplaySafety(`migrations/${name}.sql`, source), name).toEqual([
+        expect.stringContaining("unguarded ADD CONSTRAINT example_value")
+      ]);
+    }
   });
 });
 

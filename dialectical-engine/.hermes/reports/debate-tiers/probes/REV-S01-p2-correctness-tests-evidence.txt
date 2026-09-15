@@ -1,0 +1,51 @@
+# REV(S01) p2 correctness/tests — evidence, 2026-09-10, worktree at 53b903d2 (0 dirty throughout)
+
+## Three runs of every cluster command (mine)
+== run 1  2026-09-10 05:27:14  HEAD=53b903d2 dirty=0
+CLUSTER_GREEN
+C1 rc=0
+CLUSTER_GREEN
+C2 rc=0
+CLUSTER_GREEN
+C3 rc=0
+CLUSTER_GREEN
+C4 rc=0
+== run 1 end 2026-09-10 05:28:06 dirty=0
+== run 2  2026-09-10 05:28:06  HEAD=53b903d2 dirty=0
+CLUSTER_GREEN
+C1 rc=0
+CLUSTER_GREEN
+C2 rc=0
+CLUSTER_GREEN
+C3 rc=0
+CLUSTER_GREEN
+C4 rc=0
+== run 2 end 2026-09-10 05:28:57 dirty=0
+== run 3  2026-09-10 05:28:57  HEAD=53b903d2 dirty=0
+CLUSTER_GREEN
+C1 rc=0
+CLUSTER_GREEN
+C2 rc=0
+CLUSTER_GREEN
+C3 rc=0
+CLUSTER_GREEN
+C4 rc=0
+== run 3 end 2026-09-10 05:29:47 dirty=0
+
+## Failing-test NAME diff across the ten mixed-pair suites (pre-FIX vs FIX head)
+captured: 30 names at 53b903d2, 30 at f6c147cc
+IDENTICAL — no test swapped in or out of the failing set
+
+## My own fixture (8 probes): GREEN at 53b903d2
+ Test Files 1 passed (1)
+ Tests 8 passed (8)
+   at f6c147cc (RED = discriminates):
+P1 · every one of the 14 locked controls RESTORES its value after a real-keystroke drive
+P3 · the NINE collapsed locks each carry a resolvable aria-describedby (the author only tests the expanded 14)
+P4 · every locked control is reachable by keyboard — none is removed from the tab order
+P5 · CLASS SWEEP of the B1 defect — every slider's value AND max sit on its own step grid
+P8 · the page carries no native `disabled` on the 14 — so the stylesheet's :disabled lock rules can never match
+
+## Promoted pass-1 probes re-pathed to the FIX head (the security lane is STILL at f6c147cc)
+at 53b903d2:  Tests 3 failed | 75 passed (78)
+at f6c147cc:  Tests 3 failed | 75 passed (78)

@@ -1,150 +1,128 @@
 ---
 name: heartbeat-protocol
-description: Entry point for the DebateAI heartbeat loop. Routes a seat to its role contract — orchestrator, worker, reviewer, requirements, or architecture — and states the laws that bind every seat regardless of role. Load this first, then the role skill it names.
+description: Entry point for the DebateAI heartbeat graph (v4.0.0). Routes a seat to its role contract — orchestrator, requirements, architecture, mock, worker, reviewer — and states the laws that bind every node regardless of role, including the graph, the reading floor, the no-terminal law, the self-report, SKILLS LOADED and the handoff shape. Load this first, then the role skill it names.
 ---
 
-# Heartbeat Protocol — router
+# Heartbeat Protocol — router (v4.0.0, graph mode)
 
-**You are one seat in a fleet. Find your role, load its contract, stop reading this.**
-Role contracts target ~100 lines and may exceed it when the content earns it (V, 2026-08-28)
-— what is forbidden is padding, and making a worker read routing law it cannot act on. Never
-cut a real rule or mangle a sentence to hit a number. If you are reading more than ~200 lines
-of protocol before starting work, something is wrong — say so.
+**You are one node in a graph. Find your role, load its contract, stop reading this.** If you are
+reading more than ~200 lines of protocol before starting work, something is wrong — say so.
 
 ## 1. Which contract is yours
 
-| If your packet makes you… | Load |
+| Your packet makes you… | Load |
 |---|---|
-| decompose, route, launch seats, assemble reports | `heartbeat-orchestrator` |
-| write code or tests | `heartbeat-worker` |
-| review someone else's work or their packet | `heartbeat-reviewer` |
-| turn a V prompt into the mission compass and SPEC | `heartbeat-requirements` |
+| schedule the graph — intake, dispatch, gates, ledgers | `heartbeat-orchestrator` |
+| turn V's prompt into the mission compass and the frozen SPECs | `heartbeat-requirements` |
 | decide HOW — fill PLAN.md, clusters, boundaries, ADRs | `heartbeat-architecture` |
+| build the mock UI of a slice, for V to define done on | `heartbeat-mock` |
+| write code or tests | `heartbeat-worker` |
+| review someone else's work, or the packet that dispatched it | `heartbeat-reviewer` |
 
-The four loops map onto these roles: REQUIREMENTS → `heartbeat-requirements` ·
-ARCHITECTURE → `heartbeat-architecture` · PROGRAMMING → `heartbeat-worker` ·
-QA → `heartbeat-reviewer` (plus verification seats). The R7 election assigns models to
-loops; the loop's contract is the skill above.
+One role per node: a seat that reviews does not code, and no seat reviews its own work (§3.1).
 
-Invoke it with the Skill tool. One role per seat: a seat that reviews does not also code,
-and a seat that codes never reviews its own work (§2.1).
-
-**Superpowers is mandatory, and EVERY seat may use ANY of it (V ruling, 2026-08-28).**
-Load `superpowers:using-superpowers` first. **The whole library is open to every role** —
-worker, reviewer, orchestrator, architecture, requirements alike. If a Superpowers skill
-fits what you are about to do, load it, whether or not your role names it.
-
-Heartbeat says WHAT you owe and to whom; Superpowers says HOW to do the work well. They do
-not compete — where they overlap, heartbeat's law wins on process (rework cap, finding
-discipline, self-report) and Superpowers wins on craft (RED-first, root-cause-before-fix,
-evidence-before-assertion).
-
-The table below is a **FLOOR, not a ceiling**: these are the ones your role must load
-anyway. Reaching past your row is expected, not an exception.
+**Superpowers is mandatory, and the whole library is open to every role (V, 2026-08-28).** Load
+`superpowers:using-superpowers` first, then anything else that fits what you are about to do.
+Heartbeat says WHAT you owe and to whom; Superpowers says HOW. Where they overlap, heartbeat wins
+on process (caps, finding discipline, self-report) and Superpowers wins on craft (RED-first,
+root cause before fixes, evidence before assertions). The floor below is what your role loads
+anyway — never a ceiling.
 
 | Role | Must load at minimum |
 |---|---|
-| worker | `test-driven-development` · `verification-before-completion` · `systematic-debugging` (any bug) · `receiving-code-review` (on rework) |
-| reviewer | `verification-before-completion` · `receiving-code-review` (when your finding is contested) |
-| architecture | `brainstorming` (before committing a direction) · `writing-plans` |
+| orchestrator | `dispatching-parallel-agents` · `using-git-worktrees` · `subagent-driven-development` · `finishing-a-development-branch` |
 | requirements | `brainstorming` |
-| orchestrator | `dispatching-parallel-agents` · `using-git-worktrees` · `subagent-driven-development` · `executing-plans` · `finishing-a-development-branch` |
+| architecture | `brainstorming`, then `writing-plans` |
+| mock | `design-taste-frontend` (the `/taste` skill) · `design` (the Claude Design canvas) |
+| worker | `test-driven-development` · `verification-before-completion` · `systematic-debugging` (any bug) · `receiving-code-review` (on a FIX node) |
+| reviewer | `verification-before-completion` · `receiving-code-review` (when your finding is contested) |
 
-Everything else in the library — `systematic-debugging`, `writing-plans`,
-`requesting-code-review`, `executing-plans`, `writing-skills`, `finishing-a-development-branch`,
-`using-git-worktrees`, `subagent-driven-development`, `dispatching-parallel-agents`,
-`brainstorming`, `test-driven-development`, `receiving-code-review`,
-`verification-before-completion` — is available to any seat that needs it.
+Non-Claude seats (Codex, Grok) read skills as markdown: the newest
+`~/.claude/plugins/cache/claude-plugins-official/superpowers/<version>/skills/<name>/SKILL.md` and
+the repo's `.claude/skills/<name>/SKILL.md`.
 
-Non-Claude seats (Codex, Grok) cannot invoke these: read them as markdown at
-`~/.claude/plugins/cache/claude-plugins-official/superpowers/<version>/skills/<name>/SKILL.md`,
-newest version directory. The whole `skills/` directory is open to them too.
+Sources of truth, highest first: the spine (`docs/agent-protocols/debateai-heartbeat-protocol.md`,
+its v4.0.0 amendments win over older text), these skills, the mission `INSTRUCTIONS.md`, the board.
+On disagreement the higher wins — and you report it.
 
-Sources of truth, in order: the spine
-(`docs/agent-protocols/debateai-heartbeat-protocol.md`), your role adapter beside it, the
-mission `INSTRUCTIONS.md`, the board. On disagreement the higher wins — and you report it.
+## 2. The graph
 
-## 2. Laws that bind every seat
+A mission is a DAG of board tickets. **A node is one ticket with one job, typed inputs (files named
+by absolute path), one output artifact and one handoff marker. An edge is a parent→child link on the
+board; a node is READY when every parent is done, and the board computes that.** You know your node
+and its inputs, never the route. Nothing loops: a REWORK verdict appends a FIX node and the next REV
+pass, and the cap is a node count. The code loop has exactly one review point per vertical slice —
+`REV(S)`, after every cluster of the slice is green. A UI slice passes through `MOCK(S)` and V's
+`DONE(S)` before any BUILD. The full vocabulary is `heartbeat-orchestrator` §2.
 
-**2.1 No reviewing your own homework.** No seat verifies, approves or accepts its own
-output — this holds for code, plans, packets and verdicts alike. The reviewer seat also
-reviews the *packet* that dispatched the work (see `heartbeat-reviewer` §1).
+## 3. Laws that bind every node
 
-**2.2 A finding is a finding — and you fix the CLASS, not the instance.** Blocking or not,
-every finding gets a ticket and a fix. **A reported finding is a SAMPLE of a class, never the
-whole class.** When one is handed to you, name the class it belongs to, then sweep every member
-of it and state per member whether it is affected — in the artifact, so a reviewer checks your
-sweep mechanically instead of re-deriving it. Measured 2026-08-29: a seat redacted the one
-leaking field a reviewer named and stopped; the same wholesale-copy decision was leaking two
-more, and a later sweep found two further fields no checklist had. Searching by NAMED LEAD
-instead of by RISK CLASS is how the second and third defects ship. And pick the remedy by the
-SHAPE, not by your confidence about the content: fixed key set → PROJECT to a named allow-list
-(build a new object, never spread the source); open key set with no semantic contract → REDACT
-wholesale; verified safe → copy with the producer trace recorded. "Flag it on a checklist" is
-not a remedy for an open shape — a checklist enumerates keys, and the defect is that the keys
-are not enumerable.
-Non-blocking changes *when* it is fixed, never *whether*. Nothing is filed as a residual
-and forgotten — a residual dropped on the floor came back as a blocker and cost a full round.
+**3.1 No reviewing your own homework.** No seat verifies, approves or accepts its own output —
+code, plans, packets, mocks or verdicts. The reviewer also reviews the packet that dispatched the work.
 
-**2.3 Three rework rounds, then it is V's.** Round 4 is not authorized: it goes to a V
-DECISIONS PACKET row instead. (Measured: rounds 1–3 carry 92.9% of all convergence.)
+**3.2 A finding is a finding, and you fix the CLASS.** Blocking or not, every finding gets a ticket
+the same day and a fix; the tier sets WHEN, never WHETHER. A reported finding is a SAMPLE of a class:
+name the class, sweep every member, record the sweep member-by-member so a reviewer checks it
+mechanically. Choose the remedy by the SHAPE — fixed key set → project to a named allow-list; open
+key set → redact wholesale; verified safe → copy with the producer trace recorded — never by your
+confidence about the content.
 
-**2.4 The board is the state.** Not logs, not live files, not your memory. If no ticket
-exists for your seat, say so and stop — do not log `not ticketed` to satisfy the format.
+**3.3 Three REV passes per slice, then it is V's.** Pass 4 does not exist; it is a V DECISIONS
+PACKET row. (Passes 1–3 carry 92.9% of measured convergence.)
 
-**2.5 Reproduce first.** RED before GREEN, always, including on every rework round. A test
-written after the fix, with no failing evidence, is not evidence.
+**3.4 The board is the state.** Not logs, not live files, not your memory. No ticket for your node →
+say so and stop.
 
-**2.6 Verbatim means verbatim.** Anything you format as command output must be that output.
-Report suites as `passed/total`, name every failure and whether it predates you, and never
-make the blanket claim that nothing is caused by your diff.
+**3.5 Reproduce first.** RED before GREEN, on every pass. A test written after the fix, with no
+failing evidence, is not evidence.
 
-**2.7 Say what you cannot do.** Blocked, unsure, out of contract, or the packet is wrong —
-say it and stop. A guess presented as a result is the most expensive thing in this harness.
+**3.6 Verbatim means verbatim.** Anything you format as command output is that output. Suites as
+`passed/total`, every failure named and dated pre-existing or yours; never the blanket claim that
+nothing is caused by your diff.
 
-## 3. Self-report — binding, before your final handoff
+**3.7 Say what you cannot do.** Blocked, unsure, out of contract, packet wrong — say it and stop.
+UNVERIFIED is always a legal answer; a guess presented as a result is the most expensive thing here.
 
-Every seat files `.hermes/reports/<mission>/agent-reports/<seat>.md`. No seat reaches FULLY
-DONE without one, and its path is in your `allowed` list at dispatch. Your packet carries
-this instruction verbatim, and it is the question your report answers:
+**3.8 The reading floor.** You read: `using-superpowers`, this file, your contract, your floor,
+`INSTRUCTIONS.md`, your packet, and the files your packet names AT THE LINES IT NAMES. A BUILD node
+reads its cluster's steps, never the whole PLAN. `TOOLING-TRAPS.md` is read as its index of HEADINGS
+(`grep -n '^## ' .hermes/TOOLING-TRAPS.md`) plus the bullets under the headings your packet names —
+never the whole bullet list. A packet that
+makes you read more is a packet defect — report it (3.7), do not absorb it.
 
-> treat it like a murder case. I want to get a nice report on what can be done
-> better. What we must upgrade. what repeatedly costed us tokens. how we can
-> make the coding more efficient. How can we turn this into a one prompt machine
-> even better.
+**3.9 The no-terminal law (V, 2026-09-09).** Nothing is opened on V's desktop: no `osascript`, no
+Terminal window, no browser window, no app — the visible-launch law is revoked. Every seat and every
+watchdog runs inside the orchestrator's own process tree: background subagents and background
+processes logging to files. The harness's in-app browser pane is its own PTY and may be used for
+verification. A terminal or UI element is opened only when V asks, and then exactly the one asked for.
 
-**A case file, not a diary.** Name the CAUSE, not the symptom. PRICE each finding —
-wall-clock, rounds, retries. Say what you NEARLY got wrong. Name DEAD ENDS so nobody
-re-derives them. Say where the packet was unclear and exactly where. An anodyne self-report
-is worse than none: it makes an empty record look full.
+## 4. Self-report and SKILLS LOADED — binding, before your final handoff
 
-## 3b. SKILLS LOADED — binding, the first line of your handoff
+Every seat files `.hermes/reports/<mission>/agent-reports/<seat>.md`; the path is in your `allowed`
+list, and no seat reaches FULLY DONE without it. Your packet carries this instruction verbatim, and
+it is the question your report answers:
 
-Your handoff OPENS with:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
 
-> `SKILLS LOADED: <every skill you actually loaded, comma-separated>`
+A case file, not a diary: name the CAUSE, not the symptom · PRICE each finding (wall-clock, tokens,
+passes) · say what you NEARLY got wrong · name DEAD ENDS so nobody re-derives them · say exactly
+where the packet was unclear. An anodyne report is worse than none.
 
-No seat reaches FULLY DONE without it. Naming a skill you did not load is a fabrication
-finding (§2.6). Falling short of your role's floor (§1) is a finding against you — say so
-plainly instead, per §2.7; an honest shortfall costs a line, a hidden one costs a round.
+Your handoff OPENS with `SKILLS LOADED: <every skill you actually loaded>`. Naming one you did not
+load is a fabrication finding (3.6); an honest shortfall from your floor costs a line, a hidden one
+costs a pass. The orchestrator verifies the line against the skill BODY in your transcript — a path
+proves nothing, because packets quote paths and they echo back.
 
-**Why this is a gate and not a reminder.** Measured 2026-08-29: all four seats DID load
-their floor — but nobody could tell without grepping session transcripts, because no handoff
-declared it. The orchestrator sampled a seat mid-run, saw two skills, and wrongly concluded
-it had skipped a mandated one; the seat had simply not reached it yet, and loaded it in the
-right order. **Unobservable compliance gets mis-judged in both directions** — skipped
-silently, or falsely charged. This line makes it observable at zero cost.
+## 5. The handoff — one shape, eight lines
 
-## 4. Markers
+1 `SKILLS LOADED: …` · 2 node, pass, ticket, session id · 3 the artifact path, or branch + commit ·
+4 verification verbatim — suites as passed/total, the three-run table, RED frames · 5 findings and
+packet defects, each with file:line · 6 UNVERIFIED — what you could not do, and why · 7 self-report
+path · 8 `comments read through: <n>`. Return control at your marker, at a genuine blocker, or at an
+IMPORTANT OPERATION; keep the session resumable. Silence is normal.
 
-`CLAIM` · `HEARTBEAT` · `BLOCKED` · `READY FOR PEER REVIEW` · `READY FOR HERMES STAGE
-REVIEW` · `REWORK READY FOR REVIEW` · `FULLY DONE` — each carrying its `comments read
-through` cursor. Return control at a handoff, a genuine blocker, or an IMPORTANT
-OPERATION, but keep the session alive and resumable. Silence is normal. Only the spine's
-FULLY DONE condition terminates a goal.
+## 6. Never
 
-## 5. Never
-
-Push without V · merge (V performs every merge) · mark Done from a non-verifier seat ·
-delete product or database data · fabricate runtime data or evidence · reveal secrets ·
-cross your file contract · ignore ticket comments · sub-delegate unless your packet grants it.
+Push · merge · mark a slice Done (V vetoes; the orchestrator closes sub-tickets on consumed verdicts)
+· delete product or database data · fabricate runtime data or evidence · reveal secrets · cross your
+file contract · ignore ticket comments · sub-delegate your deliverable · open anything on V's desktop.

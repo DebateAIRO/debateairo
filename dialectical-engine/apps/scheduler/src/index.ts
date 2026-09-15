@@ -2,7 +2,11 @@ import type { Pool } from "pg";
 import { evaluate, type OperatorResolution } from "@debateai/propagation";
 import { decideReplayEviction, ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
-import { readLivenessPolicy } from "@debateai/register";
+import {
+  parseRegisterVersionText,
+  readLivenessPolicy,
+  registerVersionToSafeLegacyNumber
+} from "@debateai/register";
 import {
   SettlementRepository,
   type SettlementOutcomeInput,
@@ -78,7 +82,11 @@ export async function runLivenessSweep(pool: Pool, now = new Date()): Promise<re
   const archived: string[] = [];
   const liveness = new LivenessRepository(pool);
   for (const row of versions.rows) {
-    const policy = await readLivenessPolicy(pool, Number(row.register_version), "standard");
+    const policy = await readLivenessPolicy(
+      pool,
+      registerVersionToSafeLegacyNumber(parseRegisterVersionText(row.register_version)),
+      "standard"
+    );
     archived.push(...await liveness.sweep(now, policy));
   }
   return Object.freeze(archived);

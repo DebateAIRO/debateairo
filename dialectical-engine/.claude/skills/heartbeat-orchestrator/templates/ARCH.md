@@ -1,0 +1,25 @@
+# PACKET __SEAT__ — ARCH(__SLICE__) (architecture) · mission `__MISSION__`
+
+Read FIRST, in full: this packet · then __PACKET_DIR__/COMMON.md · then ONLY the files they name, at the lines they name — plus a named skill's own `references/*.md` when that skill sends you there, each listed in your `SKILLS LOADED` line. The spine (`docs/agent-protocols/…`) is the authority for a DISPUTE, not floor reading — open it only for a section a packet or a conflict names.
+Skills (Skill tool, in order): `superpowers:using-superpowers` · `heartbeat-protocol` · `heartbeat-architecture` · `superpowers:brainstorming` · `superpowers:writing-plans` — then anything else in Superpowers that fits.
+
+## 1. Node
+- seat: __SEAT__ · node: ARCH(__SLICE__) (architecture) · pass: __PASS__ of 3 · rework rounds: max 3 · model: __MODEL__ · transport: __TRANSPORT__ (resume: __RESUME__)
+- ticket: __TICKET__ (slice ticket __SLICE_TICKET__ is V's) · comment cursor at dispatch: __CURSOR__
+- cwd for every command: __LANE__ · branch: __BRANCH__ · base: __BASE__
+- inputs (read these and nothing else): __MISSION_ROOT__/INSTRUCTIONS.md · __MISSION_ROOT__/slices/__SLICE__/SPEC.md (frozen; never edit) · DECISIONS.md · __REPO_ROOT__/docs/architecture/01-decisions/ · the tooling-traps index · the code surface the SPEC names (read-only)
+- output (the ONE artifact this node produces): __MISSION_ROOT__/slices/__SLICE__/PLAN.md filled (steps, clusters with ONE command each, the slice verification list, boundaries, DDD impact; UI slices: the `## Screens` block the mock seat consumes) + DECISIONS.md lines (append-only)
+- self-report: __REPORTS__/agent-reports/__SEAT__.md (new)
+
+## 2. Contract
+- allowed (exhaustive): __MISSION_ROOT__/slices/__SLICE__/PLAN.md · __MISSION_ROOT__/slices/__SLICE__/DECISIONS.md · __REPO_ROOT__/docs/architecture/01-decisions/ADR-<the next free number, measured with `ls` at write time — never pre-assigned>-*.md (new, only if a decision outlives the mission) · __REPORTS__/agent-reports/__SEAT__.md (new)
+- forbidden: everything else — in particular SPEC.md, every product file, git
+- verification: every cluster command RUN at base from a `.sh` file and its verdict recorded (RED for TDD-red is expected; BROKEN is a defect) · the SPEC↔PLAN trace both ways with zero gaps · every step passes the stranger test · zero banned words · a test path a step CREATES is omitted from the base run and recorded per command (a missing path is BROKEN only when nothing in the plan creates it)
+
+## 3. The work
+Brainstorm the direction, then plan. Steps are finite, categoric, quantifiable — as many as the slice has, no cap. Clusters are BUILD units; they are not reviewed one by one — write the slice-level verification list `REV(__SLICE__)` will run. Refute your own plan: per step, the failure its criterion catches and one it does not; per cluster, the mutant class its command detects. Contested product questions go up as V rows with your recommendation, never decided here. A step whose done-criterion is a rejection names the guard it expects (SQLSTATE, error code, constraint name) AND every guard that fires before it on the same operation — an older trigger or validator that rejects first makes the unqualified oracle observe a different invariant. Every production step names the case that goes RED when the step is omitted. Every step's done-criterion is satisfiable at that step's own boundary (a gate that needs a later step is a defect); a gate on shape (an exported binding, a field's presence) replaces a gate on physical line counts; every JSON example is labelled EXACT or CONTAINS; a count that serves as a later oracle names its members (file:line or stable ids) and the fixtures excluded from it.
+
+## 4. Handoff
+`READY` on __TICKET__, OPENING with `SKILLS LOADED: <list>`, then the eight-line shape (`heartbeat-protocol` §5). File the self-report FIRST; the question it answers, verbatim from V:
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+Then stop: no push, no merge, no Done, no board mutation beyond your own comments, nothing opened on V's desktop.

@@ -1,0 +1,223 @@
+Task t_085d4fa4: [gpt-5.6-sol] BUILD S01-C2 — the ask wire: the builder's tier + provenance (buildNewDebateAskConfig), the createDebate guard, the two sub-class B literals — S01-12…S01-19 — after C1
+  status:    done
+  assignee:  build-s01-c2
+  workspace: scratch
+  max-retries: 2 (default)
+  created:   2026-09-10 00:14 by user
+  completed: 2026-09-10 01:41
+  parents:   t_a682a931
+  children:  t_cd5642d0, t_d1dc1913
+
+Body:
+Worker node (Codex Sol). Inputs: packets/BUILD-S01-C2.md (written at C1's exit) · PLAN.md:283-350. Depends on C1 (reads plan_tier + PLAN_TIER_ROSTERS from the contract). Output: code + tests on slice/tiers-s01, committed on green.
+
+Result:
+READY: b866191f on slice/tiers-s01 (5 allowed paths, lane clean); RED frames S01-12/14/16 posted; refutation matrix per assertion; 3 runs CLUSTER_GREEN + orchestrator re-run CLUSTER_GREEN; SKILLS 6/6 (script); 4 findings ticketed
+
+Comments (7):
+  [2026-09-10 01:03] orchestrator: DISPATCHED 2026-09-10 01:07 EEST — seat BUILD-S01-C2, model gpt-5.6-sol via codex exec (background, danger-full-access inside the S01 lane only). Packet: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S01-C2.md (packet-check OK at main-tree HEAD 4b103b12; the LANE base is 7658e997 = BUILD(S01-C1)'s commit, 0 dirty). Parent BUILD(S01-C1) t_a682a931 completed READY. Comment cursor at dispatch: 1 (this comment). Expected: CLAIM → RED frames S01-12 / S01-14 / S01-16 pasted from the log → refutation matrix → three-run table → one commit feat(tiers S01-C2) → self-report → READY.
+  [2026-09-10 01:07] BUILD-S01-C2: CLAIM:
+- seat: BUILD-S01-C2
+- node: BUILD(S01-C2), pass 1 of 3
+- start time: 2026-09-10T01:06:48+0300
+- worker CLI session id: 01a08832-88c2-7be3-bf0a-a5835cb97455
+- lane: slice/tiers-s01
+- lane HEAD: 7658e997
+- dirty count: 0
+- comments read through: 1 (dispatch cursor; full scan follows before edits)
+  [2026-09-10 01:14] BUILD-S01-C2: S01-12 RED — property: buildNewDebateAskConfig preserves each chosen plan tier on the returned ask config. Current code is the mutant (no plan_tier key). Verbatim frame from /tmp/build-s01-c2.SCsweo/s01-12-red.log:
+
+ FAIL  tests/unit/tier01-ask-wire.test.ts > S01 tier ask wire > R13 puts the chosen tier in the ask config
+AssertionError: expected [ …(2) ] to match object [ { plan_tier: 'premium' }, …(1) ]
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  [
+    {
+-     "plan_tier": "premium",
++     "as_of": "2026-09-10T00:00:00.000Z",
++     "composition_budget_tier": "low",
++     "decision_scope": "tier wire",
++     "depth": 2,
++     "risk_tier": "standard",
++     "steering_annotations": [],
++     "steering_presets": [],
++     "tier_provenance_ref": "machine:deployment-floor",
++     "tier_source": "MACHINE_DEFAULT",
+    },
+    {
+-     "plan_tier": "free",
++     "as_of": "2026-09-10T00:00:00.000Z",
++     "composition_budget_tier": "low",
++     "decision_scope": "tier wire",
++     "depth": 2,
++     "risk_tier": "standard",
++     "steering_annotations": [],
++     "steering_presets": [],
++     "tier_provenance_ref": "machine:deployment-floor",
++     "tier_source": "MACHINE_DEFAULT",
+    },
+  ]
+
+comments read through: 2
+  [2026-09-10 01:17] BUILD-S01-C2: S01-14 RED — property: provenance names the exact mechanism for edited and unedited risk tiers, independently of Free/Premium. Current false branch is the mutant. Verbatim frame from /tmp/build-s01-c2.SCsweo/s01-14-red.log:
+
+ FAIL  tests/unit/tier01-ask-wire.test.ts > S01 tier ask wire > R7 names the mechanism that set an unedited risk tier
+AssertionError: expected [ { planTier: 'free', …(3) }, …(3) ] to deeply equal [ { planTier: 'free', …(3) }, …(3) ]
+
+- Expected
++ Received
+
+@@ -1,10 +1,10 @@
+  [
+    {
+      "planTier": "free",
+      "riskTierWasEdited": false,
+-     "tierProvenanceRef": "machine:plan-tier-free",
++     "tierProvenanceRef": "machine:deployment-floor",
+      "tierSource": "MACHINE_DEFAULT",
+    },
+@@ -12,11 +12,11 @@
+    {
+      "planTier": "premium",
+      "riskTierWasEdited": false,
+-     "tierProvenanceRef": "machine:plan-tier-free",
++     "tierProvenanceRef": "machine:deployment-floor",
+      "tierSource": "MACHINE_DEFAULT",
+
+comments read through: 3
+  [2026-09-10 01:19] BUILD-S01-C2: S01-16 RED — property: missing and unknown plan tiers are refused by prefix before the injected client can submit. Tier-less and gold configs are the two current-code mutants. Verbatim frame from /tmp/build-s01-c2.SCsweo/s01-16-red.log:
+
+ FAIL  tests/unit/tier01-ask-wire.test.ts > S01 tier ask wire > R13 refuses an ask with no tier or an unknown tier before any network call
+AssertionError: expected [ …(2) ] to deeply equal [ { …(2) }, { …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "message": StringMatching /^ASK_FIELD_REQUIRED:/,
+-     "submitAskCalls": 0,
++     "message": "",
++     "submitAskCalls": 1,
+    },
+    {
+-     "message": StringMatching /^ASK_FIELD_REQUIRED: plan_tier/,
+-     "submitAskCalls": 0,
++     "message": "",
++     "submitAskCalls": 1,
+    },
+  ]
+
+comments read through: 4
+  [2026-09-10 01:35] BUILD-S01-C2: SKILLS LOADED: superpowers:using-superpowers (/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md); heartbeat-protocol (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md, /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/agent-protocols/debateai-heartbeat-protocol.md); heartbeat-worker (/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md); superpowers:test-driven-development (/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md); superpowers:verification-before-completion (/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md); superpowers:systematic-debugging (/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/root-cause-tracing.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/defense-in-depth.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/condition-based-waiting.md, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/condition-based-waiting-example.ts, /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/find-polluter.sh)
+2. READY — node BUILD(S01-C2), pass 1 of 3, ticket t_085d4fa4, session 01a08832-88c2-7be3-bf0a-a5835cb97455.
+3. Artifact — branch slice/tiers-s01, one commit b866191f (`feat(tiers S01-C2): wire plan tier into asks`); changed only apps/ui/app/new/defaults.tsx, apps/ui/lib/api.ts, tests/unit/tier01-ask-wire.test.ts, tests/unit/v2ui-data-layer.test.ts, tests/unit/pol01-policy.test.ts; final `git status --porcelain` emitted nothing.
+4. Verification verbatim — command: `run_suites tests/unit/tier01-ask-wire.test.ts:3:0 tests/unit/v2ui-data-layer.test.ts:57:0 tests/unit/pol01-policy.test.ts:8:0 tests/architecture/s14-contract.test.ts:2:3 tests/render/prov01-honesty-drawer.test.tsx:1:0 tests/render/bug02-debate-effects.test.tsx:4:0 tests/render/evaluator-dev-menu-controls.test.tsx:1:0 tests/unit/s10-erasure-ui.test.ts:3:0 tests/unit/v2ui-ownership.test.ts:3:0`; runner `/tmp/build-s01-c2.SCsweo/run-cluster.sh`; full logs `/tmp/build-s01-c2.SCsweo/final-run-1.log`, `final-run-2.log`, `final-run-3.log`.
+
+| run | tier01-ask-wire | v2ui-data-layer | pol01-policy | s14-contract | prov01-honesty-drawer | bug02-debate-effects | evaluator-dev-menu-controls | s10-erasure-ui | v2ui-ownership | verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 3/3 | 57/57 | 8/8 | 2/5 | 1/1 | 4/4 | 1/1 | 3/3 | 3/3 | CLUSTER_GREEN |
+| 2 | 3/3 | 57/57 | 8/8 | 2/5 | 1/1 | 4/4 | 1/1 | 3/3 | 3/3 | CLUSTER_GREEN |
+| 3 | 3/3 | 57/57 | 8/8 | 2/5 | 1/1 | 4/4 | 1/1 | 3/3 | 3/3 | CLUSTER_GREEN |
+
+Worst run: CLUSTER_GREEN. `s14-contract` stayed at its 2026-09-09 inherited baseline, 2 passed / 5 total, with the same three failures: `uses the generated contract client for both browser and SSR with no V2 wire mirror`; `FX-ORPH-04 walks web consumers in both directions and rejects the death-list inventory`; `carries the S04 orphan-audit wording fix and deterministic locale tiebreak`.
+
+S01-12 RED, verbatim from `/tmp/build-s01-c2.SCsweo/s01-12-red.log`:
+```
+ FAIL  tests/unit/tier01-ask-wire.test.ts > S01 tier ask wire > R13 puts the chosen tier in the ask config
+AssertionError: expected [ …(2) ] to match object [ { plan_tier: 'premium' }, …(1) ]
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  [
+    {
+-     "plan_tier": "premium",
++     "as_of": "2026-09-10T00:00:00.000Z",
++     "composition_budget_tier": "low",
++     "decision_scope": "tier wire",
++     "depth": 2,
++     "risk_tier": "standard",
+```
+
+S01-14 RED, verbatim from `/tmp/build-s01-c2.SCsweo/s01-14-red.log`:
+```
+ FAIL  tests/unit/tier01-ask-wire.test.ts > S01 tier ask wire > R7 names the mechanism that set an unedited risk tier
+AssertionError: expected [ { planTier: 'free', …(3) }, …(3) ] to deeply equal [ { planTier: 'free', …(3) }, …(3) ]
+
+- Expected
++ Received
+
+@@ -1,10 +1,10 @@
+  [
+    {
+      "planTier": "free",
+      "riskTierWasEdited": false,
+-     "tierProvenanceRef": "machine:plan-tier-free",
++     "tierProvenanceRef": "machine:deployment-floor",
+      "tierSource": "MACHINE_DEFAULT",
+```
+
+S01-16 RED, verbatim from `/tmp/build-s01-c2.SCsweo/s01-16-red.log`:
+```
+ FAIL  tests/unit/tier01-ask-wire.test.ts > S01 tier ask wire > R13 refuses an ask with no tier or an unknown tier before any network call
+AssertionError: expected [ …(2) ] to deeply equal [ { …(2) }, { …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "message": StringMatching /^ASK_FIELD_REQUIRED:/,
+-     "submitAskCalls": 0,
++     "message": "",
++     "submitAskCalls": 1,
+    },
+    {
+-     "message": StringMatching /^ASK_FIELD_REQUIRED: plan_tier/,
+-     "submitAskCalls": 0,
++     "message": "",
++     "submitAskCalls": 1,
+    },
+  ]
+```
+
+Refutation matrix, one row per added assertion:
+
+| property | caught mutant → RED | revert → GREEN | neighbouring mutant not caught | restore status printed |
+|---|---|---|---|---|
+| chosen Free/Premium value survives in `plan_tier` | return object omitted `plan_tier` → `s01-12-red.log`, 0/1 | `s01-13-green.log`, 1/1 | hard-code unrelated `risk_tier: "casual"` → `s01-12-neighbor-green.log`, 1/1 | ` M dialectical-engine/apps/ui/app/new/defaults.tsx`; `?? dialectical-engine/tests/unit/tier01-ask-wire.test.ts` |
+| edited/unedited provenance is exact and tier-independent | unedited ref `machine:deployment-floor` → `s01-14-red.log`, 1/2 | `s01-15-tier-green.log`, 2/2 | hard-code unrelated `risk_tier: "casual"` → `s01-14-neighbor-green.log`, 2/2 | ` M dialectical-engine/apps/ui/app/new/defaults.tsx`; `?? dialectical-engine/tests/unit/tier01-ask-wire.test.ts` |
+| missing/unknown tier refuses by prefix before either injected submission | omit the tier guard → `s01-16-red.log`, 2/3; both arms called submit once | `s01-17-green.log`, 3/3 | hard-code unrelated `question_line: "neighbor-mutant"` → `s01-16-neighbor-green.log`, 3/3 | ` M dialectical-engine/apps/ui/app/new/defaults.tsx`; ` M dialectical-engine/apps/ui/lib/api.ts`; `?? dialectical-engine/tests/unit/tier01-ask-wire.test.ts` |
+
+Fresh compiler delta from `/tmp/build-s01-c2.SCsweo/typecheck-after-scoped-fix.log`:
+```
+typecheck rc=1
+allowed-path diagnostics=0
+ux01 diagnostics=0
+```
+5. Findings / packet defects — (F1) `PLAN.md:518-527` captures raw Vitest output without emitting it and returns shell rc 0 after both `CLUSTER_GREEN` and `CLUSTER_RED`; the packet simultaneously demands a full log and printed rc at `BUILD-S01-C2.md:25`, so the scratch runner needed an fd-3 tee and the marker, not rc, is the verdict. (F2) reading order conflicts between `BUILD-S01-C2.md:3` and `COMMON.md:1`. (F3) the “index” mandated at `BUILD-S01-C2.md:33` emits every top-level bullet in the 3,000-line traps file, not headings alone. (F4) the compiler gate at `BUILD-S01-C2.md:28` checks only `ux01` and initially missed two diagnostics in this seat's own paths; both are removed in b866191f and the self-report gives the cause and price. No out-of-contract code finding was changed.
+6. UNVERIFIED — full `pnpm typecheck` remains rc=1 from repository diagnostics outside this seat; only the binding `ux01` and allowed-path deltas are verified at zero. DONE.md/SPEC browser steps 11–12 were not run because this seat was forbidden from touching the live `:3000` stack; request-body behavior is covered by the builder/guard unit suite. No self-review or slice acceptance was performed.
+7. Self-report — `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S01-C2.md`.
+8. comments read through: 5.
+  [2026-09-10 01:41] orchestrator: CONSUMED 2026-09-10 01:42 EEST (orchestrator): SKILLS LOADED verified 6/6 by scripts/skills-check.sh against the Codex rollout body (session 01a08832…; the seat also listed the spine and six reference files, all inside the floor). Disk: slice/tiers-s01 @ b866191f, exactly the five allowed paths (+128/−2), lane 0 dirty; self-report on disk. Three RED frames pasted from the log before their GREEN steps (comments 3–5); refutation matrix per assertion (the BUILD-S01-C1 F5 class fix took effect); typecheck delta 0 in the allowed paths and in ux01. Orchestrator re-run of the cluster command once in the lane (logs/verify-S01-C2.log): CLUSTER_GREEN, every row at its pair — agrees with the seat's three runs. Four findings ticketed (F12_F1…F4 in tickets.env): F1 the runner's rc is not a signal (plan runner; marker is the verdict), F2 COMMON.md:1 still states the old reading order (mine, second occurrence), F3 the traps 'index' grep emits every bullet (protocol), F4 the typecheck gate covered only ux01 (mine). Ticket closed READY → BUILD(S01-C3) and BUILD(S01-C4) READY together.
+
+Events (10):
+  [2026-09-10 00:14] created {'assignee': 'build-s01-c2', 'status': 'todo', 'parents': ['t_a682a931'], 'tenant': None, 'branch_name': None, 'skills': None, 'goal_mode': None}
+  [2026-09-10 01:01] promoted
+  [2026-09-10 01:03] commented {'author': 'orchestrator', 'len': 638}
+  [2026-09-10 01:07] commented {'author': 'BUILD-S01-C2', 'len': 303}
+  [2026-09-10 01:14] commented {'author': 'BUILD-S01-C2', 'len': 1253}
+  [2026-09-10 01:17] commented {'author': 'BUILD-S01-C2', 'len': 985}
+  [2026-09-10 01:19] commented {'author': 'BUILD-S01-C2', 'len': 805}
+  [2026-09-10 01:35] commented {'author': 'BUILD-S01-C2', 'len': 8445}
+  [2026-09-10 01:41] commented {'author': 'orchestrator', 'len': 1084}
+  [2026-09-10 01:41] [run 86] completed {'result_len': 229, 'summary': 'READY: b866191f on slice/tiers-s01 (5 allowed paths, lane clean); RED frames S01-12/14/16 posted; refutation matrix per assertion; 3 runs CLUSTER_GREEN + orchestrator re-run CLUSTER_GREEN; SKILLS 6/6 (script); 4 findings ticketed'}
+
+Runs (1):
+  #86  completed    @build-s01-c2  0s  2026-09-10 01:41
+        → READY: b866191f on slice/tiers-s01 (5 allowed paths, lane clean); RED frames S01-12/14/16 posted; refutation matrix per assertion; 3 runs CLUSTER_GREEN + orches

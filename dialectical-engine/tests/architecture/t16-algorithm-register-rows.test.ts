@@ -150,9 +150,13 @@ describe("T16 algorithm register rows — schema, seeding and grep-proof", () =>
     expect(migration).toContain("CREATE OR REPLACE FUNCTION register.assert_required_rows");
   });
 
-  it("seals the seal itself — the seeding path calls the migration's manifest assertion", async () => {
+  it("enforces algorithm completeness before and inside the publication transaction", async () => {
     const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
-    expect(source).toContain("SELECT register.assert_required_rows($1)");
+    expect(source).toContain("ALGORITHM_REGISTER_ROW_KEYS.some");
+    expect(source).toContain("DEV_ALGORITHM_REGISTER_ROWS_INCOMPLETE");
+    const publicationMigration = await readFile("migrations/0061_algorithm_publication_profiles.sql", "utf8");
+    expect(publicationMigration).toContain("PERFORM register.assert_required_rows(NEW.register_version)");
+    expect(publicationMigration).toContain("BEFORE INSERT ON register.register_version");
     expect(source).toContain("buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)");
     // Ruling J7: the seeding entrypoint warns on its own process path.
     expect(source).toContain("warnOnIdenticalSynthesisRoleRefs({");

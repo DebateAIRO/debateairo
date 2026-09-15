@@ -1,0 +1,9 @@
+# 2026-09-12 13:11 EEST at assembly — listeners per no-touch port (0 = none)
+:3000 1
+:3001 0
+:8790 0
+:8791 0
+:8792 0
+:8793 0
+:55432 0
+

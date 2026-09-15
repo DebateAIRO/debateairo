@@ -1,0 +1,89 @@
+### comment 1 — author orchestrator
+S02-M DONE 2026-09-12 10:11 EEST (orchestrator) — the lane took S01 under V's word of today («If I well remember, we needed to implement S02»; row V-12 answered: S02 does NOT wait for S01's veto/merge — ruling and evidence in LEDGER.md and V-DECISIONS-PACKET.md).
+M1 — the commit taken: NOT a dev merge sha (S01 is still at V's test point). The lane merged `slice/tiers-s01` @ 9ddbb1ef, which is byte-identical on every product path to what MERGE(S01) puts on dev (`git diff --stat 7f89f7b7..dev -- apps packages tests migrations` is EMPTY). Two --no-ff merges on slice/tiers-s02: 835d6ce9 (dev @ e97953c8 — protocol/skills/record only) then 3bf54957 (slice/tiers-s01 @ 9ddbb1ef). Lane HEAD 3bf54957, `git status --porcelain` empty. C1's commit d2a58e9a is untouched (merge, not rebase).
+M2 — `git diff --stat slice/tiers-s01 HEAD -- apps packages tests migrations` = exactly S02-C1's four files (migration 0061, db/schema.ts, db/index.ts, tiers-s02-run-plan-tier.test.ts). Conflicts: none (merge-tree rc 0 before the merge).
+M3.1 — `grep -n 'plan_tier' packages/contract/src/index.ts` → `118:  plan_tier: PlanTierSchema,` inside `AskRequestSchema` (opens :108).
+M3.2 — `grep -rn 'gpt-5.6-luna' packages/contract/src` → `packages/contract/src/plan-tiers.ts:9:  free: Object.freeze(["gpt-5.6-luna", "claude-sonnet-5"]),`.
+M3.3 — `pnpm run generate:contract` rc=0; lane still 0 dirty (generated dir is gitignored).
+M3.4 — BASE RE-MEASURED at 3bf54957, each cluster command run once as written, full output in .hermes/reports/debate-tiers/logs/m3-base-{C2,C3,C4}.log:
+  C3 `pnpm exec vitest run tests/architecture/tiers-s02-rosters.test.ts tests/architecture/s14-contract.test.ts` → rc=1 · `Test Files  1 failed (1)` · `Tests  3 failed | 2 passed (5)` — the three s14-contract cases ("uses the generated contract client…", "FX-ORPH-04 walks web consumers…", "carries the S04 orphan-audit wording fix…"), pre-existing; dropped path: tiers-s02-rosters.test.ts (does not exist yet). GREEN target = `Test Files 1 failed | 1 passed (2)` · `Tests 3 failed | 6 passed (9)`.
+  C2 `pnpm exec vitest run tests/unit/tiers-s02-admission.test.ts tests/unit/api.test.ts tests/integration/evaluator-database.test.ts` → rc=0 · `Test Files  2 passed (2)` · `Tests  46 passed (46)` = api.test.ts 25 (S01-C1's case landed, PLAN F-7) + evaluator-database 21; dropped: tiers-s02-admission.test.ts. GREEN target = `Test Files 3 passed (3)` · `Tests 55 passed (55)`.
+  C4 `pnpm exec vitest run tests/unit/tiers-s02-wire.test.ts tests/unit/load01-live-proof.test.ts tests/unit/s7-authorization.test.ts tests/unit/contract.test.ts` → rc=0 · `Test Files  3 passed (3)` · `Tests  40 passed (40)` (contract.test 8 after S01); dropped: tiers-s02-wire.test.ts. GREEN target = `Test Files 4 passed (4)` · `Tests 42 passed (42)`.
+M4 read back VERBATIM in the lane at 3bf54957 (`grep -n -E 'PLAN_TIER_ROSTERS|PlanTier' packages/contract/src/plan-tiers.ts packages/contract/src/index.ts`):
+packages/contract/src/plan-tiers.ts:3:export const PlanTierSchema = z.enum(["free", "premium"]);
+packages/contract/src/plan-tiers.ts:4:export type PlanTier = z.infer<typeof PlanTierSchema>;
+packages/contract/src/plan-tiers.ts:8:export const PLAN_TIER_ROSTERS = Object.freeze({
+packages/contract/src/plan-tiers.ts:9:  free: Object.freeze(["gpt-5.6-luna", "claude-sonnet-5"]),
+packages/contract/src/plan-tiers.ts:10:  premium: Object.freeze(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"])
+packages/contract/src/plan-tiers.ts:11:} satisfies Readonly<Record<PlanTier, readonly string[]>>);
+packages/contract/src/index.ts:3:import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
+packages/contract/src/index.ts:118:  plan_tier: PlanTierSchema,
+Name and shape match PLAN.md §2 M4's table (frozen record keyed by tier, ordered arrays; `plan_tier` required on the `.strict()` `AskRequestSchema` at :108-120). M4 DONE.
+
+### comment 2 — author orchestrator
+DISPATCHED 2026-09-12 10:47 EEST — node BUILD(S02-C4) pass 1 of 3, gpt-5.6-sol via codex exec (background process, danger-full-access inside the S02 lane, stdout → .hermes/reports/debate-tiers/logs/BUILD-S02-C4.log, launcher logs/launch-BUILD-S02-C4.sh, pid file logs/BUILD-S02-C4.pid). Packet: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S02-C4.md — packet-check OK at main-tree HEAD 220fa199 (the freeze). Lane: slice/tiers-s02 @ 86bfa432, 0 dirty (= dev e97953c8 + slice/tiers-s01 9ddbb1ef + S02-C1 d2a58e9a + S02-C2 86bfa432). Sibling seat that may work in the same lane at the same time: BUILD-S02-C3 on tests/architecture/tiers-s02-rosters.test.ts — disjoint write surfaces; never add or touch its file. Comment cursor for the seat: 2 (this comment is #2; #1 is the S02-M receipts).
+
+### comment 3 — author BUILD-S02-C4
+CLAIM — seat BUILD-S02-C4 · node BUILD(S02-C4) pass 1 of 3 · start time 2026-09-12 10:48:53 EEST · session id 01a09496-0ca6-7590-bb9d-be977ad6138a · lane slice/tiers-s02 HEAD 86bfa432 · dirty count 0 · comments read through: 2
+
+### comment 4 — author BUILD-S02-C4
+HEARTBEAT — S02-C4-S2 RED (production unchanged). Attempts 1–2 were BROKEN harness calibration, not RED evidence: the fake PoolClient first lacked EventEmitter.on, then lacked the successful advisory-unlock row. Valid RED frame below is verbatim from /private/tmp/BUILD-S02-C4.ZXgvgo/S02-C4-S2-red-attempt-3.log:
+
+ × tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > forwards both ask plan tiers to StartRunInput.planTier 7ms
+   → expected [ undefined, undefined ] to deeply equal [ 'free', 'premium' ]
+ × tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > keeps one production startRun caller and wires planTier at that call 5ms
+   → expected '.startRun({\n          questionLine: …' to match /\.startRun\(\{[\s\S]*?\bplanTier\s*:/u
+
+ FAIL  tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > forwards both ask plan tiers to StartRunInput.planTier
+AssertionError: expected [ undefined, undefined ] to deeply equal [ 'free', 'premium' ]
+
+ FAIL  tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > keeps one production startRun caller and wires planTier at that call
+AssertionError: expected '.startRun({\n          questionLine: …' to match /\.startRun\(\{[\s\S]*?\bplanTier\s*:/u
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+
+comments read through: 3
+
+### comment 5 — author BUILD-S02-C4
+SKILLS LOADED: /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md
+2 READY — node BUILD(S02-C4) · pass 1 of 3 · ticket t_05227ae2 · session id 01a09496-0ca6-7590-bb9d-be977ad6138a
+3 ARTIFACT — branch slice/tiers-s02 · commit 9ef275aa · apps/api/src/index.ts:1325 · tests/unit/tiers-s02-wire.test.ts:1 · commit paths exactly those two; final git status clean; no push/merge
+4 VERIFICATION —
+S02-C4-S2 valid assertion RED, verbatim from /private/tmp/BUILD-S02-C4.ZXgvgo/S02-C4-S2-red-attempt-3.log (attempts 1–2 were BROKEN fixture calibration and are not counted as RED):
+ × tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > forwards both ask plan tiers to StartRunInput.planTier 7ms
+   → expected [ undefined, undefined ] to deeply equal [ 'free', 'premium' ]
+ × tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > keeps one production startRun caller and wires planTier at that call 5ms
+   → expected '.startRun({\n          questionLine: …' to match /\.startRun\(\{[\s\S]*?\bplanTier\s*:/u
+ FAIL  tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > forwards both ask plan tiers to StartRunInput.planTier
+AssertionError: expected [ undefined, undefined ] to deeply equal [ 'free', 'premium' ]
+ FAIL  tests/unit/tiers-s02-wire.test.ts > S02 plan-tier run wiring > keeps one production startRun caller and wires planTier at that call
+AssertionError: expected '.startRun({\n          questionLine: …' to match /\.startRun\(\{[\s\S]*?\bplanTier\s*:/u
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+Final three-run table, full logs /private/tmp/BUILD-S02-C4.ZXgvgo/S02-C4-final-cluster-attempt-{1,2,3}.log:
+attempt 1
+rc=0
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+attempt 2
+rc=0
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+attempt 3
+rc=0
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+Per-suite gate, /private/tmp/BUILD-S02-C4.ZXgvgo/S02-C4-final-run-suites.log:
+tests/unit/tiers-s02-wire.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+tests/unit/load01-live-proof.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s7-authorization.test.ts rc=0 passed=31 failed=0 (expect 31/0)
+tests/unit/contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+CLUSTER_GREEN
+Typecheck delta, /private/tmp/BUILD-S02-C4.ZXgvgo/final-typecheck.log: rc=1 inherited; zero diagnostics name apps/api/src/index.ts or tests/unit/tiers-s02-wire.test.ts.
+Refutation matrix: (a) property ask.plan_tier equals StartRunInput.planTier for free and premium · mutant remove apps/api/src/index.ts:1325 · target tiers-s02-wire case 1 RED: 1 failed/1 run (1 skipped) · neighbouring strangerSampleRate + 1 not caught: 1 passed/1 run (1 skipped) · restored from /private/tmp/BUILD-S02-C4.ZXgvgo/apps-api-index.green.ts, diff rc=0 and status printed. (b) property exactly one production .startRun( caller and its call site supplies planTier · mutant temporary packages/__build_s02_c4_mutant/src/extra.ts with a second method call · target case 2 RED: 1 failed/1 run (1 skipped) · neighbouring unqualified startRun( not caught: 1 passed/1 run (1 skipped) · exact temporary file/directories deleted, product snapshot diff rc=0 and status printed.
+5 FINDINGS / PACKET DEFECTS — no out-of-contract product finding. Read-scope contradiction at /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S02-C4.md:16 versus :27; tests/unit/api.test.ts:35 is explicit read-only input at packet :27 but the same file is in NEVER at :35; packet :32 permits a caller mutant anywhere under apps although the required scan surface names only apps/api/src/index.ts plus package src trees. Two BROKEN pre-RED fixture attempts and the type-fixture corrections are priced in the self-report. VERDICT: packet-check should reject contradictory read scopes and compare mutant locations to guard scan roots / CONFIDENCE: high / STRONGEST COUNTER: explicit exceptions remain necessary, so encode them as typed read ranges.
+6 UNVERIFIED — repo-wide typecheck GREEN (pnpm typecheck remains inherited rc=1); browser/live-stack acceptance and database read-back (forbidden to this seat); exact billed token count (not exposed by harness). No claim is made for those.
+7 SELF-REPORT — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S02-C4.md
+8 comments read through: 4
+

@@ -17,6 +17,7 @@ import {
   type RunOwnershipInput
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
+import { parseRegisterVersionText, registerVersionToSafeLegacyNumber } from "@debateai/register";
 
 export const MEMORY_MATCH_TIERS = ["EXACT_QUESTION", "SAME_BINDING", "PARTIAL_BINDING", "TERM_OVERLAP"] as const;
 export type MemoryMatchTier = typeof MEMORY_MATCH_TIERS[number];
@@ -836,7 +837,9 @@ export class MemoryRepository {
       artifactId: item.artifact_id, version: item.artifact_version, contentHash: item.content_hash,
       asOf: item.artifact_as_of.toISOString(), stalenessStateAtPull: item.staleness_state_at_pull,
       askerScope: item.asker_scope, registerRowKey: item.register_row_key,
-      registerVersion: Number(item.register_version), registerSourceRef: item.register_source_ref
+      registerVersion: registerVersionToSafeLegacyNumber(
+        parseRegisterVersionText(item.register_version)
+      ), registerSourceRef: item.register_source_ref
     }));
     const first = decryptedPulls[0];
     const match: MemoryMatchFact = Object.freeze({

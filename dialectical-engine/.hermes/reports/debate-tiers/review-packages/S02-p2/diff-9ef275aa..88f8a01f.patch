@@ -1,0 +1,664 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index b8e7b88a..11395f8f 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -1204,7 +1204,14 @@ export async function evaluateAskAdmission(
+ }> {
+   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
+   const discoveredPanel = await settings.resolveDiscoveredPanel();
+-  const roster = PLAN_TIER_ROSTERS[ask.plan_tier];
++  const planTier = ask.plan_tier as string;
++  if (!Object.hasOwn(PLAN_TIER_ROSTERS, planTier)) {
++    markAskRefusal(new TypedDomainError(
++      "ASK_PLAN_TIER_INVALID",
++      `The ${planTier} plan tier is invalid`
++    ));
++  }
++  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
+   const filteredPanel = roster
+     .map((modelId) => discoveredPanel.find((member) => member.model_id === modelId))
+     .filter((member): member is typeof discoveredPanel[number] => member !== undefined);
+diff --git a/dialectical-engine/packages/db/src/index.ts b/dialectical-engine/packages/db/src/index.ts
+index 1c168141..240db586 100644
+--- a/dialectical-engine/packages/db/src/index.ts
++++ b/dialectical-engine/packages/db/src/index.ts
+@@ -632,6 +632,19 @@ async function contentEncryptionSchemaIsApplied(pool: Pool): Promise<boolean> {
+   return result.rows[0]?.applied === true;
+ }
+ 
++async function planTierColumnIsApplied(
++  executor: Pick<Pool, "query"> | PoolClient
++): Promise<boolean> {
++  const result = await executor.query<{ applied: boolean }>(
++    `SELECT EXISTS (
++       SELECT 1 FROM information_schema.columns
++       WHERE table_schema='core' AND table_name='run'
++         AND column_name='plan_tier'
++     ) AS applied`
++  );
++  return result.rows[0]?.applied === true;
++}
++
+ type UntypedMethod = (...args: unknown[]) => unknown;
+ 
+ function typedPoolFailure(error: unknown): TypedDomainError {
+@@ -1122,6 +1135,8 @@ export class RunRepository {
+     } else if (!UUID_V4.test(input.principal.ownerRef)) {
+       throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
+     }
++    const planTierColumnApplied = input.principal.kind === "legacy"
++      && await planTierColumnIsApplied(this.pool);
+     const askContract = input.askContract ?? {};
+     let storedQuestionLine = input.questionLine;
+     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
+@@ -1180,7 +1195,15 @@ export class RunRepository {
+         commitAttempted = true;
+         const provisionExecutor=admissionClient ?? this.provisionPool;
+         const created = await provisionExecutor.query<{ created: boolean }>(
+-          "SELECT core.create_encrypted_run($1::jsonb,$2,$3,$4::jsonb) AS created",
++          `SELECT core.create_encrypted_run(
++             CASE WHEN COALESCE(
++               pg_get_functiondef(
++                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
++               ) LIKE '%''planTier''%',
++               false
++             ) THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
++             $2,$3,$4::jsonb
++           ) AS created`,
+           [JSON.stringify({
+             runId,
+             questionLine: storedQuestionLine,
+@@ -1236,22 +1259,30 @@ export class RunRepository {
+       const baseRunValues = [
+         runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
+         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
+-        input.compositionBudgetTier, input.planTier ?? null, JSON.stringify(input.depthParams),
++        input.compositionBudgetTier,
++        ...(planTierColumnApplied ? [input.planTier ?? null] : []),
++        JSON.stringify(input.depthParams),
+         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
+         JSON.stringify(input.envelopeBasis), input.registerVersion,
+         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
+       ];
++      const bindOffset = planTierColumnApplied ? 1 : 0;
+       await client.query(
+         `INSERT INTO core.run (
+           run_id, question_line, asker_id, session_id, caller_scope, as_of,
+           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
+-          composition_budget_tier, plan_tier, depth_params, agent_count, discovered_panel,
++          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
++          depth_params, agent_count, discovered_panel,
+           stranger_sample_rate, envelope_basis, register_version,
+           battery_version, ask_contract, created_at_seq
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+-          $11, $12, $13::jsonb, jsonb_array_length($14::jsonb), $14::jsonb, $15,
+-          $16::jsonb, $17, $18, $19::jsonb, $20
++          $11${planTierColumnApplied ? ", $12" : ""},
++          $${12 + bindOffset}::jsonb,
++          jsonb_array_length($${13 + bindOffset}::jsonb),
++          $${13 + bindOffset}::jsonb, $${14 + bindOffset},
++          $${15 + bindOffset}::jsonb, $${16 + bindOffset},
++          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}
+         )`,
+         baseRunValues
+       );
+diff --git a/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts b/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
+index 37d30303..072192b2 100644
+--- a/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
++++ b/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
+@@ -45,30 +45,125 @@ function sourceFiles(directory: string): string[] {
+     });
+ }
+ 
+-function sourceLinesContaining(needle: string): string[] {
++function sourceFilesContaining(needle: string): string[] {
+   return SOURCE_ROOTS.flatMap((sourceRoot) =>
+     sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
+       const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
+-      return readFileSync(absolutePath, "utf8")
+-        .split("\n")
+-        .flatMap((line, index) =>
+-          line.includes(needle) ? [`${projectPath}:${index + 1}`] : []
+-        );
++      return readFileSync(absolutePath, "utf8").includes(needle)
++        ? [projectPath]
++        : [];
+     })
+   ).sort();
+ }
+ 
++function closingDelimiter(
++  source: string,
++  openingIndex: number,
++  opening: "(" | "{",
++  closing: ")" | "}"
++): number {
++  let depth = 0;
++  let quote: '"' | "'" | "`" | undefined;
++
++  for (let index = openingIndex; index < source.length; index += 1) {
++    const character = source[index]!;
++    const next = source[index + 1];
++    if (quote) {
++      if (character === "\\") index += 1;
++      else if (character === quote) quote = undefined;
++      continue;
++    }
++    if (character === "/" && next === "/") {
++      index = source.indexOf("\n", index + 2);
++      if (index === -1) return source.length;
++      continue;
++    }
++    if (character === "/" && next === "*") {
++      index = source.indexOf("*/", index + 2);
++      if (index === -1) return source.length;
++      index += 1;
++      continue;
++    }
++    if (character === '"' || character === "'" || character === "`") {
++      quote = character;
++      continue;
++    }
++    if (character === opening) depth += 1;
++    if (character === closing) {
++      depth -= 1;
++      if (depth === 0) return index;
++    }
++  }
++
++  return source.length;
++}
++
++function skipTrivia(source: string, start: number): number {
++  let index = start;
++  while (index < source.length) {
++    if (/\s/.test(source[index]!)) {
++      index += 1;
++    } else if (source.startsWith("//", index)) {
++      const newline = source.indexOf("\n", index + 2);
++      index = newline === -1 ? source.length : newline + 1;
++    } else if (source.startsWith("/*", index)) {
++      const end = source.indexOf("*/", index + 2);
++      index = end === -1 ? source.length : end + 2;
++    } else {
++      break;
++    }
++  }
++  return index;
++}
++
++function branchBody(source: string, start: number): { body: string; end: number } {
++  const bodyStart = skipTrivia(source, start);
++  if (source[bodyStart] === "{") {
++    const end = closingDelimiter(source, bodyStart, "{", "}");
++    return { body: source.slice(bodyStart + 1, end), end: end + 1 };
++  }
++
++  const end = source.indexOf(";", bodyStart);
++  const statementEnd = end === -1 ? source.length : end + 1;
++  return { body: source.slice(bodyStart, statementEnd), end: statementEnd };
++}
++
+ function tierBranchLines(): string[] {
+   return SOURCE_ROOTS.flatMap((sourceRoot) =>
+     sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
+       const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
+       if (projectPath === "packages/contract/src/plan-tiers.ts") return [];
+ 
+-      return readFileSync(absolutePath, "utf8").split("\n").flatMap((line, index) => {
+-        const namesBothTiers = line.includes("free") && line.includes("premium");
+-        const branches = line.includes("===") || /\bcase\s+/.test(line);
+-        return namesBothTiers && branches ? [`${projectPath}:${index + 1}`] : [];
+-      });
++      const source = readFileSync(absolutePath, "utf8");
++      const hits: string[] = [];
++      const location = (index: number) =>
++        `${projectPath}:${source.slice(0, index).split("\n").length}`;
++      const controlFlow = /\b(if|switch)\s*\(/g;
++      for (const match of source.matchAll(controlFlow)) {
++        const opening = source.indexOf("(", match.index);
++        const closing = closingDelimiter(source, opening, "(", ")");
++        const condition = source.slice(opening + 1, closing);
++        if (!/\b(?:plan_tier|planTier)\b/.test(condition)) continue;
++
++        const consequent = branchBody(source, closing + 1);
++        let selectedBody = consequent.body;
++        if (match[1] === "if") {
++          const afterConsequent = skipTrivia(source, consequent.end);
++          if (source.startsWith("else", afterConsequent)) {
++            selectedBody += branchBody(source, afterConsequent + 4).body;
++          }
++        }
++        const selectsRoster = /\bPLAN_TIER_ROSTERS\b/.test(selectedBody);
++        const selectsTierCase = match[1] !== "switch" ||
++          /\bcase\s+(?:"(?:free|premium)"|'(?:free|premium)')\s*:/.test(selectedBody);
++        if (selectsRoster && selectsTierCase) hits.push(location(match.index));
++      }
++
++      const tierTernary = /\b(?:plan_tier|planTier)\b[^;?]*\?[^;]*\bPLAN_TIER_ROSTERS\b[^;]*;/gs;
++      for (const match of source.matchAll(tierTernary)) {
++        hits.push(location(match.index));
++      }
++      return [...new Set(hits)];
+     })
+   ).sort();
+ }
+@@ -87,22 +182,22 @@ describe("S02 tier roster architecture", () => {
+   });
+ 
+   it("keeps every roster model id in one canonical declaration", () => {
+-    const expectedOccurrences: Record<string, string[]> = {
+-      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts:9"],
+-      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts:9"],
++    const expectedFiles: Record<string, string[]> = {
++      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts"],
++      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts"],
+       "gpt-5.6-sol": [
+-        "apps/ui/components/landing/cards.ts:28",
+-        "packages/contract/src/plan-tiers.ts:10"
++        "apps/ui/components/landing/cards.ts",
++        "packages/contract/src/plan-tiers.ts"
+       ],
+       "claude-opus-5": [
+-        "apps/ui/components/landing/cards.ts:27",
+-        "packages/contract/src/plan-tiers.ts:10"
++        "apps/ui/components/landing/cards.ts",
++        "packages/contract/src/plan-tiers.ts"
+       ],
+-      "grok-4.6": ["packages/contract/src/plan-tiers.ts:10"]
++      "grok-4.6": ["packages/contract/src/plan-tiers.ts"]
+     };
+ 
+-    for (const [modelId, expectedLines] of Object.entries(expectedOccurrences)) {
+-      expect(sourceLinesContaining(modelId), modelId).toEqual(expectedLines);
++    for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {
++      expect(sourceFilesContaining(modelId), modelId).toEqual(expectedPaths);
+     }
+   });
+ 
+diff --git a/dialectical-engine/tests/integration/evaluator-database.test.ts b/dialectical-engine/tests/integration/evaluator-database.test.ts
+index 82e92127..73e88eb4 100644
+--- a/dialectical-engine/tests/integration/evaluator-database.test.ts
++++ b/dialectical-engine/tests/integration/evaluator-database.test.ts
+@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
+ import { afterAll, beforeAll, describe, expect, it } from "vitest";
+ import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
+ import type { AskRequest, Session } from "@debateai/contract";
+-import { migrate, ProviderProbeRepository } from "@debateai/db";
++import { migrate, ProviderProbeRepository, type DiscoveredPanelMember } from "@debateai/db";
+ import { readDeploymentMakerCapability } from "@debateai/critique";
+ import {
+   DomainRegistryRepository,
+@@ -1345,10 +1345,12 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+   async function admitAndReadPersistedRun(registerVersion: number): Promise<{
+     readonly panelBytes: string;
+     readonly discoveredPanel: readonly { readonly provider_ref: string; readonly maker: string }[];
++    readonly resolvedPanel: readonly DiscoveredPanelMember[];
+     readonly agentCount: number;
+   }> {
+     const deploymentMakers = await readDeploymentMakerCapability(database.pool, registerVersion);
+     const probes = new ProviderProbeRepository(database.pool);
++    let resolvedPanel: readonly DiscoveredPanelMember[] = [];
+     const settings: RunCreationSettings = {
+       strangerSampleRate: 0,
+       registerVersion,
+@@ -1359,7 +1361,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+           deploymentMakers.configuredProviders.map((provider) => provider.providerRef)
+         );
+         const now = Date.now();
+-        return Object.freeze(latest.flatMap((record) =>
++        resolvedPanel = Object.freeze(latest.flatMap((record) =>
+           record.state === "HEALTHY" && record.modelId !== null
+             && now - record.probedAt.getTime() <= 60_000
+             ? [Object.freeze({
+@@ -1371,6 +1373,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+               })]
+             : []
+         ));
++        return resolvedPanel;
+       },
+       resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 2),
+       resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+@@ -1401,6 +1404,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+     return Object.freeze({
+       panelBytes: row.panel_bytes,
+       discoveredPanel: row.discovered_panel,
++      resolvedPanel,
+       agentCount: row.agent_count
+     });
+   }
+@@ -1453,6 +1457,9 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+     const absent = await admitAndReadPersistedRun(absentVersion);
+     const healthy = await admitAndReadPersistedRun(healthyVersion);
+ 
++    expect(healthy.resolvedPanel.some((member) =>
++      member.provider_ref === EVALUATOR_PROVIDER_REF || member.maker === EVALUATOR_MAKER
++    )).toBe(false);
+     expect(healthy.panelBytes).toBe(absent.panelBytes);
+     expect(healthy.agentCount).toBe(absent.agentCount);
+     expect(healthy.discoveredPanel.some((member) =>
+diff --git a/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts b/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts
+index 1e2bd432..18cf0753 100644
+--- a/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts
++++ b/dialectical-engine/tests/integration/tiers-s02-run-plan-tier.test.ts
+@@ -1,5 +1,5 @@
+ import { randomBytes, randomUUID } from "node:crypto";
+-import { mkdtemp, rm } from "node:fs/promises";
++import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { afterAll, beforeAll, describe, expect, it } from "vitest";
+@@ -25,10 +25,15 @@ type RunInput = Parameters<RunRepository["startRun"]>[0] & {
+ };
+ 
+ let database: TestDatabase;
++let prePlanTierDatabase: TestDatabase;
+ let secretRoot: string;
++let prePlanTierSecretRoot: string;
+ let userId: string;
+ let ownerRef: string;
+ let sessionId: string;
++let prePlanTierUserId: string;
++let prePlanTierOwnerRef: string;
++let prePlanTierSessionId: string;
+ 
+ function runInput(
+   planTier: "free" | "premium",
+@@ -57,6 +62,26 @@ function runInput(
+   };
+ }
+ 
++async function migrateBeforePlanTier(target: TestDatabase): Promise<void> {
++  const directory = new URL("../../migrations/", import.meta.url);
++  const migrations = (await readdir(directory))
++    .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0061_plan_tier_on_run.sql")
++    .sort();
++  const client = await target.pool.connect();
++  try {
++    await client.query("BEGIN");
++    for (const name of migrations) {
++      await client.query(await readFile(new URL(name, directory), "utf8"));
++    }
++    await client.query("COMMIT");
++  } catch (error) {
++    await client.query("ROLLBACK");
++    throw error;
++  } finally {
++    client.release();
++  }
++}
++
+ async function createActiveUser(): Promise<void> {
+   userId = randomUUID();
+   ownerRef = randomUUID();
+@@ -84,6 +109,39 @@ async function createActiveUser(): Promise<void> {
+   );
+ }
+ 
++async function createPrePlanTierActiveUser(): Promise<void> {
++  prePlanTierUserId = randomUUID();
++  prePlanTierOwnerRef = randomUUID();
++  prePlanTierSessionId = randomUUID();
++  await prePlanTierDatabase.pool.query(
++    `INSERT INTO identity."user" (
++       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
++       adult_affirmed_at,created_at
++     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
++    [
++      prePlanTierUserId,
++      Buffer.alloc(32, 0x73),
++      `tiers-s02-${randomUUID()}`,
++      randomUUID(),
++      prePlanTierOwnerRef
++    ]
++  );
++  await prePlanTierDatabase.pool.query(
++    `INSERT INTO identity.session(
++       session_id,user_id,token_hash,csrf_token_hash,binding_context,
++       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
++     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
++       now()+interval '2 hours',now())`,
++    [
++      prePlanTierSessionId,
++      prePlanTierUserId,
++      `sha256:${randomBytes(32).toString("hex")}`,
++      `sha256:${randomBytes(32).toString("hex")}`
++    ]
++  );
++}
++
+ beforeAll(async () => {
+   database = await startTestDatabase();
+   await migrate(database.pool);
+@@ -101,11 +159,42 @@ beforeAll(async () => {
+     return resolved;
+   });
+   configureContentEncryption(database.pool, new ContentCipher(keys));
++
++  prePlanTierDatabase = await startTestDatabase();
++  await migrateBeforePlanTier(prePlanTierDatabase);
++  await createPrePlanTierActiveUser();
++  prePlanTierSecretRoot = await mkdtemp(join(tmpdir(), "debateai-tiers-s02-pre-0061-"));
++  const prePlanTierUsers = new FileUserDekStore(
++    prePlanTierSecretRoot,
++    loadKek(generateDek())
++  );
++  await prePlanTierUsers.store(prePlanTierUserId, generateDek());
++  const prePlanTierKeys = new FileRunContentKeyStore(
++    prePlanTierSecretRoot,
++    prePlanTierUsers,
++    async (candidate) => {
++      const result = await prePlanTierDatabase.pool.query<{ user_id: string }>(
++        `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
++        [candidate]
++      );
++      const resolved = result.rows[0]?.user_id;
++      if (resolved === undefined) throw new Error("OWNER_REF_UNRESOLVED");
++      return resolved;
++    }
++  );
++  configureContentEncryption(
++    prePlanTierDatabase.pool,
++    new ContentCipher(prePlanTierKeys)
++  );
+ }, 120_000);
+ 
+ afterAll(async () => {
+   await database?.stop();
++  await prePlanTierDatabase?.stop();
+   if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
++  if (prePlanTierSecretRoot !== undefined) {
++    await rm(prePlanTierSecretRoot, { recursive: true, force: true });
++  }
+ });
+ 
+ describe("S02 plan tier run storage", () => {
+@@ -177,4 +266,44 @@ describe("S02 plan tier run storage", () => {
+       question_line: CONTENT_CIPHERTEXT_SENTINEL
+     });
+   });
++
++  it("starts a legacy-principal run before migration 0061", async () => {
++    const input = runInput(
++      "premium",
++      { kind: "legacy", legacyAskerId: `tiers-s02-${randomUUID()}` }
++    );
++    const runId = await new RunRepository(prePlanTierDatabase.pool).startRun({
++      ...input,
++      sessionId: prePlanTierSessionId
++    });
++    const result = await prePlanTierDatabase.pool.query<{ question_line: string }>(
++      "SELECT question_line FROM core.run WHERE run_id=$1",
++      [runId]
++    );
++
++    expect(result.rows).toEqual([{ question_line: input.questionLine }]);
++  });
++
++  it("starts an encrypted server-principal run before migration 0061", async () => {
++    const runId = await new RunRepository(prePlanTierDatabase.pool).startRun({
++      ...runInput("free", {
++        kind: "server",
++        userId: prePlanTierUserId,
++        ownerRef: prePlanTierOwnerRef
++      }),
++      sessionId: prePlanTierSessionId
++    });
++    const result = await prePlanTierDatabase.pool.query<{
++      question_line: string;
++      content_encryption_version: number;
++    }>(
++      "SELECT question_line,content_encryption_version FROM core.run WHERE run_id=$1",
++      [runId]
++    );
++
++    expect(result.rows).toEqual([{
++      question_line: CONTENT_CIPHERTEXT_SENTINEL,
++      content_encryption_version: 1
++    }]);
++  });
+ });
+diff --git a/dialectical-engine/tests/unit/tiers-s02-admission.test.ts b/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
+index 75a17a01..96af2b94 100644
+--- a/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
++++ b/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
+@@ -145,11 +145,22 @@ describe("S02 tier roster admission", () => {
+ 
+     expect(error).toMatchObject({
+       name: "AskRefusal",
+-      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
+     });
+     expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
+   });
+ 
++  it("refuses Premium admission with every missing roster member named", async () => {
++    const error = await rejectedAdmission([], "premium");
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The premium plan needs gpt-5.6-sol, claude-opus-5, grok-4.6, and they are not available right now"
++    });
++  });
++
+   it("names the one missing Premium roster member in the tier-unavailable refusal", async () => {
+     const error = await rejectedAdmission([
+       member("gpt-5.6-sol", "sol"),
+@@ -178,7 +189,8 @@ describe("S02 tier roster admission", () => {
+ 
+     expect(error).toMatchObject({
+       name: "AskRefusal",
+-      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
+     });
+     expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
+     expect(error).not.toMatchObject({ code: "STRUCTURAL_CEILING_PANELSIZE_INVALID" });
+@@ -206,7 +218,54 @@ describe("S02 tier roster admission", () => {
+     });
+ 
+     expect(response.statusCode).toBe(422);
+-    expect(response.json().error).toBe("ASK_PLAN_TIER_MODEL_UNAVAILABLE");
++    expect(response.json()).toEqual({
++      error: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now"
++    });
++    await api.close();
++  });
++
++  it("returns typed refusals for out-of-vocabulary tiers at the exported boundary", async () => {
++    for (const planTier of ["constructor", "gold"]) {
++      const error = await rejectedAdmission(
++        [],
++        planTier as AskRequest["plan_tier"]
++      );
++
++      expect(error).toMatchObject({
++        name: "AskRefusal",
++        code: "ASK_PLAN_TIER_INVALID",
++        message: `The ${planTier} plan tier is invalid`
++      });
++    }
++  });
++
++  it("maps an invalid-tier boundary refusal to the HTTP 422 face", async () => {
++    const application = applicationWithSubmit(async (submittedAsk) => {
++      await evaluateAskAdmission(
++        settingsFor([]),
++        { ...submittedAsk, plan_tier: "gold" } as unknown as AskRequest
++      );
++      return { run_ref: RUN_ID, status: "QUEUED" };
++    });
++    const api = buildApi({
++      application,
++      sessions: testSessionApplication([HTTP_IDENTITY]),
++      allowedOrigin: TEST_APP_ORIGIN
++    });
++
++    const response = await api.inject({
++      method: "POST",
++      url: "/v1/asks",
++      headers: HTTP_HEADERS,
++      payload: ask("free")
++    });
++
++    expect(response.statusCode).toBe(422);
++    expect(response.json()).toEqual({
++      error: "ASK_PLAN_TIER_INVALID",
++      message: "The gold plan tier is invalid"
++    });
+     await api.close();
+   });
+ 
+@@ -255,11 +314,14 @@ describe("S02 tier roster admission", () => {
+       provisional_identity_model: false
+     };
+ 
+-    await application.submit(ask("free"), session, {
++    await expect(application.submit(ask("free"), session, {
+       kind: "server",
+       userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+       ownerRef: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+-    }).catch(() => undefined);
++    })).rejects.toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
++    });
+ 
+     expect(connectCalls).toBe(0);
+     expect(queries.join("\n")).not.toMatch(
+diff --git a/dialectical-engine/tests/unit/tiers-s02-wire.test.ts b/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
+index 90fdf054..f12efa7b 100644
+--- a/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
++++ b/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
+@@ -87,8 +87,10 @@ function settingsFor(tier: PlanTier): RunCreationSettings {
+ }
+ 
+ function productionSourceFiles(repoRoot: string): readonly string[] {
+-  const excludedDirectories = new Set(["dist", "generated", "node_modules"]);
+-  const files: string[] = [resolve(repoRoot, "apps/api/src/index.ts")];
++  const excludedDirectories = new Set([
++    ".next", "coverage", "dist", "generated", "node_modules", "test", "tests"
++  ]);
++  const files: string[] = [];
+ 
+   function walk(directory: string): void {
+     for (const entry of readdirSync(directory, { withFileTypes: true })) {
+@@ -101,10 +103,9 @@ function productionSourceFiles(repoRoot: string): readonly string[] {
+     }
+   }
+ 
+-  for (const packageEntry of readdirSync(resolve(repoRoot, "packages"), { withFileTypes: true })) {
+-    if (!packageEntry.isDirectory()) continue;
+-    const sourceRoot = resolve(repoRoot, "packages", packageEntry.name, "src");
+-    if (existsSync(sourceRoot)) walk(sourceRoot);
++  for (const workspaceName of ["apps", "packages"]) {
++    const workspaceRoot = resolve(repoRoot, workspaceName);
++    if (existsSync(workspaceRoot)) walk(workspaceRoot);
+   }
+   return files;
+ }

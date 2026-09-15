@@ -1,3 +1,4 @@
+import { importHistoricalRegisterFixture, registerFixtureRow } from "../tests/support/registerFixtures.js";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { once } from "node:events";
@@ -264,13 +265,8 @@ describe("T9 × F33 — the acceptance runtime policy carries the sealed synthes
     const directory = await mkdtemp(join(tmpdir(), `debateai-acc-${label}-`));
     const database_ = await startStandingDatabase({ port: await reservePort(), dataDirectory: directory });
     try {
-      for (const row of rows) {
-        await database_.pool.query(
-          `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-           VALUES ($1, $2, $3::jsonb, $4)`,
-          [ACCEPTANCE_REGISTER_VERSION, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-        );
-      }
+      await importHistoricalRegisterFixture(database_.pool, ACCEPTANCE_REGISTER_VERSION,
+        rows.map(row => registerFixtureRow(row.rowKey, row.value, row.sourceRef)));
       return await use(database_.pool);
     } finally {
       await database_.stop();

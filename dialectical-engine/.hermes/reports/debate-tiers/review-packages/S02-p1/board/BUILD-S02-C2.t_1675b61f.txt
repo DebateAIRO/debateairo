@@ -1,0 +1,114 @@
+### comment 1 — author orchestrator
+S02-M DONE 2026-09-12 10:11 EEST (orchestrator) — the lane took S01 under V's word of today («If I well remember, we needed to implement S02»; row V-12 answered: S02 does NOT wait for S01's veto/merge — ruling and evidence in LEDGER.md and V-DECISIONS-PACKET.md).
+M1 — the commit taken: NOT a dev merge sha (S01 is still at V's test point). The lane merged `slice/tiers-s01` @ 9ddbb1ef, which is byte-identical on every product path to what MERGE(S01) puts on dev (`git diff --stat 7f89f7b7..dev -- apps packages tests migrations` is EMPTY). Two --no-ff merges on slice/tiers-s02: 835d6ce9 (dev @ e97953c8 — protocol/skills/record only) then 3bf54957 (slice/tiers-s01 @ 9ddbb1ef). Lane HEAD 3bf54957, `git status --porcelain` empty. C1's commit d2a58e9a is untouched (merge, not rebase).
+M2 — `git diff --stat slice/tiers-s01 HEAD -- apps packages tests migrations` = exactly S02-C1's four files (migration 0061, db/schema.ts, db/index.ts, tiers-s02-run-plan-tier.test.ts). Conflicts: none (merge-tree rc 0 before the merge).
+M3.1 — `grep -n 'plan_tier' packages/contract/src/index.ts` → `118:  plan_tier: PlanTierSchema,` inside `AskRequestSchema` (opens :108).
+M3.2 — `grep -rn 'gpt-5.6-luna' packages/contract/src` → `packages/contract/src/plan-tiers.ts:9:  free: Object.freeze(["gpt-5.6-luna", "claude-sonnet-5"]),`.
+M3.3 — `pnpm run generate:contract` rc=0; lane still 0 dirty (generated dir is gitignored).
+M3.4 — BASE RE-MEASURED at 3bf54957, each cluster command run once as written, full output in .hermes/reports/debate-tiers/logs/m3-base-{C2,C3,C4}.log:
+  C3 `pnpm exec vitest run tests/architecture/tiers-s02-rosters.test.ts tests/architecture/s14-contract.test.ts` → rc=1 · `Test Files  1 failed (1)` · `Tests  3 failed | 2 passed (5)` — the three s14-contract cases ("uses the generated contract client…", "FX-ORPH-04 walks web consumers…", "carries the S04 orphan-audit wording fix…"), pre-existing; dropped path: tiers-s02-rosters.test.ts (does not exist yet). GREEN target = `Test Files 1 failed | 1 passed (2)` · `Tests 3 failed | 6 passed (9)`.
+  C2 `pnpm exec vitest run tests/unit/tiers-s02-admission.test.ts tests/unit/api.test.ts tests/integration/evaluator-database.test.ts` → rc=0 · `Test Files  2 passed (2)` · `Tests  46 passed (46)` = api.test.ts 25 (S01-C1's case landed, PLAN F-7) + evaluator-database 21; dropped: tiers-s02-admission.test.ts. GREEN target = `Test Files 3 passed (3)` · `Tests 55 passed (55)`.
+  C4 `pnpm exec vitest run tests/unit/tiers-s02-wire.test.ts tests/unit/load01-live-proof.test.ts tests/unit/s7-authorization.test.ts tests/unit/contract.test.ts` → rc=0 · `Test Files  3 passed (3)` · `Tests  40 passed (40)` (contract.test 8 after S01); dropped: tiers-s02-wire.test.ts. GREEN target = `Test Files 4 passed (4)` · `Tests 42 passed (42)`.
+M4 read back VERBATIM in the lane at 3bf54957 (`grep -n -E 'PLAN_TIER_ROSTERS|PlanTier' packages/contract/src/plan-tiers.ts packages/contract/src/index.ts`):
+packages/contract/src/plan-tiers.ts:3:export const PlanTierSchema = z.enum(["free", "premium"]);
+packages/contract/src/plan-tiers.ts:4:export type PlanTier = z.infer<typeof PlanTierSchema>;
+packages/contract/src/plan-tiers.ts:8:export const PLAN_TIER_ROSTERS = Object.freeze({
+packages/contract/src/plan-tiers.ts:9:  free: Object.freeze(["gpt-5.6-luna", "claude-sonnet-5"]),
+packages/contract/src/plan-tiers.ts:10:  premium: Object.freeze(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"])
+packages/contract/src/plan-tiers.ts:11:} satisfies Readonly<Record<PlanTier, readonly string[]>>);
+packages/contract/src/index.ts:3:import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
+packages/contract/src/index.ts:118:  plan_tier: PlanTierSchema,
+Name and shape match PLAN.md §2 M4's table (frozen record keyed by tier, ordered arrays; `plan_tier` required on the `.strict()` `AskRequestSchema` at :108-120). M4 DONE.
+
+### comment 2 — author orchestrator
+DISPATCHED 2026-09-12 10:20 EEST — node BUILD(S02-C2) pass 1 of 3, gpt-5.6-sol via `codex exec` (background process, danger-full-access inside the S02 lane, stdout → .hermes/reports/debate-tiers/logs/BUILD-S02-C2.log, launcher logs/launch-BUILD-S02-C2.sh, pid file logs/BUILD-S02-C2.pid). Packet: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S02-C2.md — packet-check OK at main-tree HEAD 75227acf (the freeze). Lane: slice/tiers-s02 @ 3bf54957, 0 dirty (= dev e97953c8 + slice/tiers-s01 9ddbb1ef + S02-C1 d2a58e9a). Sibling seat in the same lane at the same time: BUILD-S02-C3 on tests/architecture/tiers-s02-rosters.test.ts — disjoint write surfaces; never add or touch its file. Comment cursor for the seat: 2 (this comment is #2; #1 is the S02-M receipts).
+
+### comment 3 — author default
+UNBLOCK: S02-M4 done at 3bf54957; row V-12 answered by V's word 2026-09-12 (no wait for S01's merge)
+
+### comment 4 — author BUILD-S02-C2
+CLAIM — seat BUILD-S02-C2 · node BUILD(S02-C2) pass 1 of 3 · start 2026-09-12 10:23:16 EEST · session id 01a0947e-6434-7352-9146-70e6d5fb8677 · lane slice/tiers-s02 HEAD 3bf54957 · dirty count 0 · comments read through: 3
+
+### comment 5 — author BUILD-S02-C2
+S02-C2-S2 RED — command: `pnpm exec vitest run tests/unit/tiers-s02-admission.test.ts` · full log: `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S2-red-attempt-1.log`
+```text
+rc=1
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > filters Free admission to its two models in roster order and sizes the envelope to two 5ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > filters Premium admission to its three models in roster order and sizes the envelope to three 1ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses Free admission with the tier-unavailable code when every roster member is missing 1ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > names the one missing Premium roster member in the tier-unavailable refusal 1ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > names every missing Premium roster member and the tier in one refusal 0ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses an empty panel with the tier-unavailable code before maker or envelope errors 1ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > maps a real tier-unavailable admission refusal to the HTTP 422 face 47ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses before taking an admission lease or issuing any run-provision query 2ms
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > keeps one provider per roster model id and sizes the envelope to the roster 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > filters Free admission to its two models in roster order and sizes the envelope to two
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > filters Premium admission to its three models in roster order and sizes the envelope to three
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses Free admission with the tier-unavailable code when every roster member is missing
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > names the one missing Premium roster member in the tier-unavailable refusal
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > names every missing Premium roster member and the tier in one refusal
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses an empty panel with the tier-unavailable code before maker or envelope errors
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > maps a real tier-unavailable admission refusal to the HTTP 422 face
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses before taking an admission lease or issuing any run-provision query
+ FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > keeps one provider per roster model id and sizes the envelope to the roster
+ Test Files  1 failed (1)
+      Tests  9 failed (9)
+```
+comments read through: 4
+
+### comment 6 — author BUILD-S02-C2
+S02-C2-S6 HTTP RED → GREEN · full GREEN log: `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S6-http-green.log`
+RED line from S02-C2-S2:
+```text
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > maps a real tier-unavailable admission refusal to the HTTP 422 face 47ms
+```
+Assertions verbatim (`tests/unit/tiers-s02-admission.test.ts:208-209`):
+```ts
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toBe("ASK_PLAN_TIER_MODEL_UNAVAILABLE");
+```
+GREEN:
+```text
+rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 8 skipped (9)
+```
+
+### comment 7 — author BUILD-S02-C2
+S02-C2-S7 no-run RED → GREEN · full GREEN log: `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S7-no-run-green.log`
+RED line from S02-C2-S2:
+```text
+ × tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses before taking an admission lease or issuing any run-provision query 2ms
+```
+Positional proof re-measured after the build:
+- `apps/api/src/index.ts:1305` — `evaluateAskAdmission` is awaited.
+- `apps/api/src/index.ts:1310` — `withOwnerAskAdmissionLease` begins later.
+- `apps/api/src/index.ts:1314` — `startRun` begins later still.
+GREEN:
+```text
+rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 8 skipped (9)
+```
+
+### comment 8 — author BUILD-S02-C2
+S02-C2-S9 R9 seven-place sweep (re-measured in lane):
+1. `apps/api/src/index.ts:1206` — sole admission-path panel construction calls `settings.resolveDiscoveredPanel()`; PASS.
+2. `apps/api/src/index.ts:1222,1229,1241,1249` — makers, registerRef, envelope panelSize, and returned discoveredPanel all consume `filteredPanel`; PASS.
+3. `apps/api/src/index.ts:1232` — `assertMakerAdmission` follows completeness refusal at `:1214-1221`; a short roster cannot reach it; PASS.
+4. `apps/api/src/index.ts:1326` — `startRun` receives `discoveredPanel`, which is the filtered return destructured at `:1305`; PASS.
+5. `packages/db/src/index.ts:1253` and `migrations/0040_account_erasure.sql:4317` — both derive agent_count with `jsonb_array_length` from the same discovered-panel JSON supplied to the write; PASS. PACKET POINTER DEFECT: after C1 added plan_tier, the first path is `$14` at `:1253`, not planned `$13` at `:1250`.
+6. `apps/api/src/provider-discovery.ts:126-152` — probe resolution emits only fresh/probed HEALTHY records with non-null model ids; no fallback or substitution branch; PASS.
+7. `/usr/bin/grep -rn resolveDiscoveredPanel apps packages tests` — production wiring at `apps/api/src/main.ts:252`, interface `apps/api/src/index.ts:1171`, sole admission call `:1206`; test-layer resolvers at `tests/unit/tiers-s02-admission.test.ts:56`, `tests/unit/api.test.ts:101,179,189,200`, `tests/integration/evaluator-database.test.ts:1357`, `tests/integration/register-version-boundaries.test.ts:172`; one non-code markdown hit at `packages/evaluator/BIND-READINESS-seat-share.md:61`; PASS.
+
+### comment 9 — author BUILD-S02-C2
+SKILLS LOADED: /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md
+NODE: READY · BUILD(S02-C2) pass 1 of 3 · ticket t_1675b61f · seat BUILD-S02-C2 · session 01a0947e-6434-7352-9146-70e6d5fb8677
+ARTIFACT: branch `slice/tiers-s02` · commit `86bfa432` (`feat(tiers S02-C2): filter admission by plan roster`) · four authorized paths only · post-commit `git status --porcelain` empty
+VERIFICATION: RED S2 verbatim summary `rc=1` · `Test Files  1 failed (1)` · `Tests  9 failed (9)`; all nine named assertion failures are ours, log `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S2-red-attempt-1.log`. S8 standing-suite RED is ours: `Test Files  1 failed (1)` · `Tests  3 failed | 22 passed (25)`; names: `preserves MACHINE_DEFAULT provenance through admission without changing the effective tier`, `marks only maker and envelope evaluation refusals for the 422 face`, `refuses a saturated owner history before any run provision or partial output`; log `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S8-api-red-before-refix.log`; re-fixture GREEN `Tests  25 passed (25)`. S10 standing-suite RED is ours: `Test Files  1 failed (1)` · `Tests  1 failed | 20 passed (21)`; name: `persists byte-identical product membership and agent_count with evaluator healthy versus absent`; log `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S10-integration-red-before-reseed.log`; reseed GREEN `Tests  21 passed (21)`. Fresh three-run table after final edit: run 1 `rc=0` · `Test Files  3 passed (3)` · `Tests  55 passed (55)` (`/tmp/BUILD-S02-C2.rxXpjG/S02-C2-S11-final-attempt-1.log`); run 2 same (`...final-attempt-2.log`); run 3 same (`...final-attempt-3.log`); worst=GREEN, M3 base 2 files/46 tests + this cluster 1 file/9 tests = 3 files/55 tests. Runner readback verbatim: `tests/unit/tiers-s02-admission.test.ts rc=0 passed=9 failed=0 (expect 9/0)` · `tests/unit/api.test.ts rc=0 passed=25 failed=0 (expect 25/0)` · `tests/integration/evaluator-database.test.ts rc=0 passed=21 failed=0 (expect 21/0)` · `CLUSTER_GREEN`; log `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-run-suites-final.log`. `pnpm typecheck`: inherited `rc=1`, `allowed_diagnostics=0`; log `/tmp/BUILD-S02-C2.rxXpjG/S02-C2-typecheck-after-fixture.log`. Refutation matrix: roster equality · mutant `find`→duplicate-emitting `flatMap/filter` · target cases 1/2/9 gave `1 failed | 2 passed` with case 9 caught and neighboring cases 1/2 not caught · restored, status printed, `3 passed`; pinned refusal position · mutant moved check after `assertMakerAdmission` · target cases 3/6/9 gave `2 failed | 1 passed`, cases 3/6 caught and neighboring case 9 not caught · restored, status printed, `3 passed`; complete message · mutant `${missing.join(", ")}`→`${missing[0]}` · target cases 4/5 gave `1 failed | 1 passed`, case 5 caught and neighboring one-missing case 4 not caught · restored, status printed, `2 passed`.
+FINDINGS AND PACKET DEFECTS: stale S9 pointer `docs/missions/debate-tiers/slices/S02/PLAN.md:624` names `$13` at `packages/db/src/index.ts:1250`; after C1 the paired count/panel values are `$14` at `packages/db/src/index.ts:1253`. Stale plan count `PLAN.md:599` says api 24/24; dispatch packet correctly overrides it to 25/25. R9 seven-place sweep is in ticket comment 8. Concurrent-effect note: production uses `PLAN_TIER_ROSTERS[ask.plan_tier]` and contains no tier/model literals; temporary mutants were restored before final gates.
+UNVERIFIED: SPEC browser acceptance steps remain V-only and require the real stack plus V-7 discovery targets; this seat did not touch the live database, `:3000`, or provider configuration. No push, merge, status change, or self-review performed.
+SELF-REPORT: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S02-C2.md
+comments read through: 8
+

@@ -16,13 +16,15 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(cli).toContain("loadDevelopmentCommandEnvironment()");
     expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(commandEnvironment)");
     expect(cli).toContain("resolveDevelopmentSynthesisRoleRefs(providerPanel, commandEnvironment)");
-    expect(cli).toContain("seedDevelopmentDeploymentRegister({ adminPool: pool, providerPanel, roleRefs })");
-    expect(cli).toContain("DEV_DEPLOYMENT_REGISTER_READY=");
+    expect(cli).toContain("seedDevelopmentDeploymentRegister({");
+    expect(cli).toContain("repositoryRoot: process.cwd()");
+    expect(cli).toContain("DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX");
+    expect(cli).toContain("serializeDevelopmentDeploymentRegisterReceipt(receipt)");
     expect(source).toContain("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
     expect(source).not.toMatch(/acceptance\/|seedAcceptanceRegister/);
   });
 
-  it("defines the exact five additional API boot rows and fail-closed sealed ceremony", async () => {
+  it("defines the exact five additional API boot rows and delegates the sealed ceremony to the closed port", async () => {
     const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
     for (const rowKey of [
       "configuredProviderSet",
@@ -36,10 +38,22 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(source).toContain("SESSION_POLICY_REGISTER_ROW");
     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(source).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
-    expect(source).toContain("pg_advisory_xact_lock");
-    expect(source).toContain("DEV_DEPLOYMENT_REGISTER_DRIFT");
-    expect(source).toContain('await client.query("BEGIN")');
-    expect(source).toContain('await client.query("COMMIT")');
-    expect(source).toContain('await client.query("ROLLBACK")');
+    expect(source).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
+    expect(source).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
+    expect(source).not.toMatch(/INSERT\s+INTO\s+register[.]register_(?:row|version)/iu);
+    expect(source).not.toContain('await client.query("BEGIN")');
+  });
+
+  it("publishes one canonical receipt only after the closed port resolves and verifies custody", async () => {
+    const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
+    const port = source.indexOf("await createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
+    const receipt = source.indexOf("createDevelopmentDeploymentRegisterMachineReceipt", port);
+    const custody = source.indexOf("await writeDevelopmentDeploymentRegisterReceipt", receipt);
+    expect(port).toBeGreaterThan(-1);
+    expect(receipt).toBeGreaterThan(port);
+    expect(custody).toBeGreaterThan(receipt);
+    expect(source).toContain("O_NOFOLLOW");
+    expect(source).toContain("metadata.nlink !== 1");
+    expect(source).toContain("directory.sync()");
   });
 });

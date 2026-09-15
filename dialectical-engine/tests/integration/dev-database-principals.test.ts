@@ -1,12 +1,25 @@
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  link,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile
+} from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertAccountErasureDatabaseRole,
   assertContentProvisionDatabaseRole,
   assertPublicationCleanupDatabaseRole,
   assertPublicationDatabaseRoleSeparation,
+  assertSupportDatabaseRole,
   createPool,
   migrate,
   ProviderProbeRepository,
@@ -41,7 +54,10 @@ async function runProvisioningCli(environment: NodeJS.ProcessEnv): Promise<Reado
 }>> {
   return new Promise((resolve, reject) => {
     const child = spawn(
-      join(process.cwd(), "node_modules", ".bin", "tsx"),
+      [
+        join(process.cwd(), "node_modules", ".bin", "tsx"),
+        resolvePath(process.cwd(), "../../../node_modules/.bin/tsx")
+      ].find((candidate) => existsSync(candidate)) ?? "tsx",
       [join(process.cwd(), "apps", "runner", "src", "dev-database-principals-cli.ts")], {
       cwd: secretRoot,
       env: environment,
@@ -69,7 +85,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     await rm(secretRoot, { recursive: true, force: true });
   });
 
-  it("creates nine distinct SCRAM LOGINs with only their ruled direct memberships", async () => {
+  it("creates eleven distinct SCRAM LOGINs with only their ruled direct memberships", async () => {
     await provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
@@ -101,12 +117,12 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       WHERE rolname=ANY($1::text[])
       ORDER BY rolname
     `,[DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName)]);
-    expect(roles.rows).toHaveLength(9);
+    expect(roles.rows).toHaveLength(11);
     expect(roles.rows.every((role) => role.rolcanlogin && role.rolinherit
       && !role.rolsuper && !role.rolcreatedb && !role.rolcreaterole
       && !role.rolreplication && !role.rolbypassrls
       && role.rolpassword?.startsWith("SCRAM-SHA-256$") === true)).toBe(true);
-    expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).size).toBe(9);
+    expect(new Set(roles.rows.map(({ rolpassword }) => rolpassword)).size).toBe(11);
 
     const memberships = await database.pool.query<{
       member_name: string;
@@ -188,6 +204,118 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         runtimePool.end(), contentPool.end(), erasurePool.end(),
         authorizationPool.end(), cleanupPool.end()
       ]);
+    }
+  }, 120_000);
+
+  it("attests the exact runtime and support pools while runtime cannot resolve support tables", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const credentials = parseCredentialFile(await readFile(credentialFilePath, "utf8"));
+    const runtimePool = createPool(credentials.get("DATABASE_URL")!);
+    const supportPool = createPool(credentials.get("SUPPORT_DATABASE_URL")!);
+    try {
+      const runtime = (await runtimePool.query<{
+        schema_usage: boolean;
+        table_privilege: boolean;
+      }>(`
+        SELECT has_schema_privilege(current_user,namespace.oid,'USAGE') AS schema_usage,
+          bool_or(has_table_privilege(current_user,relation.oid,'SELECT,INSERT'))
+            AS table_privilege
+        FROM pg_catalog.pg_namespace AS namespace
+        JOIN pg_catalog.pg_class AS relation ON relation.relnamespace=namespace.oid
+        WHERE namespace.nspname='support' AND relation.relkind IN ('r','p')
+        GROUP BY namespace.oid
+      `)).rows[0];
+      expect(runtime).toEqual({ schema_usage: false, table_privilege: false });
+      await expect(runtimePool.query(
+        "SELECT * FROM support.session LIMIT 1"
+      )).rejects.toMatchObject({ code: "42501" });
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool)).resolves.toBeUndefined();
+    } finally {
+      await Promise.all([runtimePool.end(), supportPool.end()]);
+    }
+  }, 120_000);
+
+  it("rejects runtime support membership and direct support-table privilege", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const credentials = parseCredentialFile(await readFile(credentialFilePath, "utf8"));
+    const runtimePool = createPool(credentials.get("DATABASE_URL")!);
+    const supportPool = createPool(credentials.get("SUPPORT_DATABASE_URL")!);
+    try {
+      await database.pool.query("GRANT debateai_support TO debateai_dev_runtime");
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query("REVOKE debateai_support FROM debateai_dev_runtime");
+
+      await database.pool.query("GRANT SELECT ON support.session TO debateai_dev_runtime");
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query("REVOKE SELECT ON support.session FROM debateai_dev_runtime");
+
+      await database.pool.query("GRANT SELECT ON support.session TO debateai_dev_support");
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query("REVOKE SELECT ON support.session FROM debateai_dev_support");
+
+      await database.pool.query(
+        "GRANT UPDATE(state) ON support.session TO debateai_support"
+      );
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query(
+        "REVOKE UPDATE(state) ON support.session FROM debateai_support"
+      );
+
+      await database.pool.query(
+        "GRANT SELECT ON support._shred_integrity_guard TO debateai_support"
+      );
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+      await database.pool.query(
+        "REVOKE SELECT ON support._shred_integrity_guard FROM debateai_support"
+      );
+    } finally {
+      await database.pool.query("REVOKE debateai_support FROM debateai_dev_runtime")
+        .catch(() => undefined);
+      await database.pool.query("REVOKE SELECT ON support.session FROM debateai_dev_runtime")
+        .catch(() => undefined);
+      await database.pool.query("REVOKE SELECT ON support.session FROM debateai_dev_support")
+        .catch(() => undefined);
+      await database.pool.query(
+        "REVOKE UPDATE(state) ON support.session FROM debateai_support"
+      ).catch(() => undefined);
+      await database.pool.query(
+        "REVOKE SELECT ON support._shred_integrity_guard FROM debateai_support"
+      ).catch(() => undefined);
+      await Promise.all([runtimePool.end(), supportPool.end()]);
+    }
+  }, 120_000);
+
+  it("fails closed when a required support relation is missing", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const credentials = parseCredentialFile(await readFile(credentialFilePath, "utf8"));
+    const runtimePool = createPool(credentials.get("DATABASE_URL")!);
+    const supportPool = createPool(credentials.get("SUPPORT_DATABASE_URL")!);
+    try {
+      await database.pool.query("ALTER TABLE support.session_key RENAME TO session_key_missing");
+      await expect(assertSupportDatabaseRole(runtimePool, supportPool))
+        .rejects.toThrow("SUPPORT_DATABASE_ROLE_INVALID");
+    } finally {
+      await database.pool.query(
+        "ALTER TABLE IF EXISTS support.session_key_missing RENAME TO session_key"
+      );
+      await Promise.all([runtimePool.end(), supportPool.end()]);
     }
   }, 120_000);
 
@@ -364,7 +492,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 9 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 11 });
     const repaired = (await database.pool.query<{
       rolinherit: boolean;
       rolcreatedb: boolean;
@@ -417,7 +545,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     expect(outcome).toEqual({
       exitCode: 0,
-      stdout: `DEV_DATABASE_PRINCIPALS_READY=9:${cliCredentialPath}\n`,
+      stdout: `DEV_DATABASE_PRINCIPALS_READY=11:${cliCredentialPath}\n`,
       stderr: ""
     });
     const credentialSource = await readFile(cliCredentialPath, "utf8");
@@ -437,10 +565,10 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       })
     ));
     expect(outcomes.every((outcome) => outcome.status === "fulfilled")).toBe(true);
-    expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size).toBe(9);
+    expect(parseCredentialFile(await readFile(concurrentCredentialPath, "utf8")).size).toBe(11);
   }, 120_000);
 
-  it("adds a newly ruled principal without rotating existing development credentials", async () => {
+  it("adds the newly ruled support principal without rotating existing development credentials", async () => {
     await provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
@@ -448,10 +576,10 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     const currentSource = await readFile(credentialFilePath, "utf8");
     const legacySource = currentSource.split("\n")
-      .filter((row) => row.length > 0 && !row.startsWith("EVALUATOR_DEV_MENU_DATABASE_URL="))
+      .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_DATABASE_URL="))
       .join("\n") + "\n";
     const legacyCredentials = parseCredentialFile(legacySource);
-    expect(legacyCredentials.size).toBe(8);
+    expect(legacyCredentials.size).toBe(10);
     const upgradedPath = join(secretRoot, "legacy-database-principals.env");
     await writeFile(upgradedPath, legacySource, { encoding: "utf8", mode: 0o600 });
 
@@ -459,15 +587,15 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath: upgradedPath
-    })).resolves.toEqual({ credentialFilePath: upgradedPath, principalCount: 9 });
+    })).resolves.toEqual({ credentialFilePath: upgradedPath, principalCount: 11 });
 
     const upgraded = parseCredentialFile(await readFile(upgradedPath, "utf8"));
-    expect(upgraded.size).toBe(9);
+    expect(upgraded.size).toBe(11);
     for (const [environmentKey, databaseUrl] of legacyCredentials) {
       expect(upgraded.get(environmentKey)).toBe(databaseUrl);
     }
-    expect(upgraded.get("EVALUATOR_DEV_MENU_DATABASE_URL")).toMatch(
-      /^postgresql?:\/\/debateai_dev_evaluator_api:/
+    expect(upgraded.get("SUPPORT_DATABASE_URL")).toMatch(
+      /^postgresql?:\/\/debateai_dev_support:/
     );
 
     const truncatedPath = join(secretRoot, "truncated-database-principals.env");
@@ -481,6 +609,108 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       credentialFilePath: truncatedPath
     })).rejects.toThrow("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
     expect(await readFile(truncatedPath, "utf8")).toBe(truncatedSource);
+  }, 120_000);
+
+  it("rejects a permissive legacy credential before changing its bytes or mode", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const currentSource = await readFile(credentialFilePath, "utf8");
+    const legacySource = currentSource.split("\n").slice(0, -2).join("\n") + "\n";
+    const root = join(secretRoot, "unsafe-file-mode");
+    const path = join(root, "database-principals.env");
+    await mkdir(root, { mode: 0o700 });
+    await writeFile(path, legacySource, { mode: 0o644 });
+
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: path
+    })).rejects.toThrow("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    expect(await readFile(path, "utf8")).toBe(legacySource);
+    expect((await lstat(path)).mode & 0o777).toBe(0o644);
+  }, 120_000);
+
+  it("rejects a hardlinked legacy credential without replacing either name", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const currentSource = await readFile(credentialFilePath, "utf8");
+    const legacySource = currentSource.split("\n").slice(0, -2).join("\n") + "\n";
+    const root = join(secretRoot, "unsafe-hardlink");
+    const path = join(root, "database-principals.env");
+    const sibling = join(root, "database-principals.sibling.env");
+    await mkdir(root, { mode: 0o700 });
+    await writeFile(path, legacySource, { mode: 0o600 });
+    await link(path, sibling);
+
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: path
+    })).rejects.toThrow("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    expect(await readFile(path, "utf8")).toBe(legacySource);
+    expect(await readFile(sibling, "utf8")).toBe(legacySource);
+    expect((await lstat(path)).nlink).toBe(2);
+  }, 120_000);
+
+  it("rejects an unsafe existing credential parent without normalizing it", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const currentSource = await readFile(credentialFilePath, "utf8");
+    const legacySource = currentSource.split("\n").slice(0, -2).join("\n") + "\n";
+    const root = join(secretRoot, "unsafe-parent-mode");
+    const path = join(root, "database-principals.env");
+    await mkdir(root, { mode: 0o700 });
+    await writeFile(path, legacySource, { mode: 0o600 });
+    await chmod(root, 0o755);
+
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: path
+    })).rejects.toThrow("DEV_DATABASE_CREDENTIAL_ROOT_INVALID");
+    expect(await readFile(path, "utf8")).toBe(legacySource);
+    expect((await lstat(root)).mode & 0o777).toBe(0o755);
+  }, 120_000);
+
+  it("upgrades exact nine- and ten-row private neighbors by suffix append only", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const currentSource = await readFile(credentialFilePath, "utf8");
+    const currentRows = currentSource.trimEnd().split("\n");
+    for (const legacyLength of [9, 10]) {
+      const legacySource = currentRows.slice(0, legacyLength).join("\n") + "\n";
+      const root = join(secretRoot, `valid-legacy-${legacyLength}`);
+      const path = join(root, "database-principals.env");
+      await mkdir(root, { mode: 0o700 });
+      await writeFile(path, legacySource, { mode: 0o600 });
+
+      await expect(provisionDevelopmentDatabasePrincipals({
+        adminPool: database.pool,
+        adminDatabaseUrl: database.connectionString,
+        credentialFilePath: path
+      })).resolves.toEqual({ credentialFilePath: path, principalCount: 11 });
+      const upgraded = await readFile(path, "utf8");
+      expect(upgraded.startsWith(legacySource)).toBe(true);
+      expect(upgraded.slice(0, legacySource.length)).toBe(legacySource);
+      expect(upgraded.trimEnd().split("\n")).toHaveLength(11);
+      expect(upgraded.trimEnd().split("\n").slice(legacyLength).map(
+        (row) => row.slice(0, row.indexOf("="))
+      )).toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.slice(legacyLength).map(
+        ({ environmentKey }) => environmentKey
+      ));
+    }
   }, 120_000);
 });
 import { spawn } from "node:child_process";

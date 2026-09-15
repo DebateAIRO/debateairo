@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 describe("DEV-04 development secret generation source contract", () => {
-  it("publishes only the fixed ignored dev command and exact three-key/two-store inventory", async () => {
+  it("publishes only the fixed ignored dev command and exact five-file/three-store inventory", async () => {
     const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
       scripts?: Record<string, string>;
     };
@@ -16,6 +16,12 @@ describe("DEV-04 development secret generation source contract", () => {
     expect(source).toContain('relativePath: "secrets/kek.bin"');
     expect(source).toContain('relativePath: "secrets/blind-index-key.bin"');
     expect(source).toContain('relativePath: "secrets/audit-source-ip-salt.bin"');
+    expect(source).toContain(
+      'Object.freeze({ id: "support-kek", relativePath: "secrets/support-kek.bin" })'
+    );
+    expect(source.match(/relativePath: "secrets\//gu)).toHaveLength(5);
+    expect(source.indexOf('relativePath: "secrets/support-kek.bin"'))
+      .toBeGreaterThan(source.indexOf('relativePath: "secrets/audit-source-ip-salt.bin"'));
     expect(source).toContain('relativePath: "audit-keys"');
     expect(source).toContain('relativePath: "user-deks"');
   });

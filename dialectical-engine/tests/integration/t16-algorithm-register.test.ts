@@ -1,3 +1,5 @@
+import * as registerModule from "../../packages/register/src/index.js";
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -12,7 +14,11 @@ import {
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
-  loadBootstrapRegister
+  loadBootstrapRegister,
+  createPostgresRegisterPublicationPort,
+  parseRegisterVersionText,
+  persistBootstrapRegister,
+  registerVersionToSafeLegacyNumber
 } from "../../packages/register/src/index.js";
 import {
   DEVELOPMENT_REGISTER_VERSION,
@@ -27,6 +33,7 @@ import {
 } from "../../acceptance/seed-register.js";
 import { EXPANSION_DEPTH_MAX } from "@debateai/contract";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { importHistoricalRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 /** The sealed register identities that existed at the base `dev@1c9578a`. */
@@ -166,8 +173,11 @@ const T16_EXPECTED_ROWS = [
 const T16_FAMILIES = ["stopping", "verdictLabel", "synthesisRoles", "panelWeighting", "envelope"] as const;
 
 let database: TestDatabase;
+let repositoryRoot: string;
 
 beforeEach(async () => {
+  repositoryRoot = await mkdtemp(join(tmpdir(), "debateai-t16-receipt-"));
+  await mkdir(join(repositoryRoot, ".local", "dev-auth"), { recursive: true, mode: 0o700 });
   database = await startTestDatabase();
   await migrate(database.pool);
 }, 120_000);
@@ -175,39 +185,45 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   if (database !== undefined) await database.stop();
+  if (repositoryRoot !== undefined) await rm(repositoryRoot, { recursive: true, force: true });
 });
 
-/**
- * The migration declares WHICH versions must carry the manifest (dev 5,
- * ceremony 2); historical versions are deliberately ungoverned. A scratch
- * version used to probe the assertion must therefore declare itself first.
- */
-async function declareManifestVersion(registerVersion: number): Promise<void> {
-  await database.pool.query(
-    `INSERT INTO register.required_row_version (register_version,profile)
-     VALUES ($1,'t16-test:scratch') ON CONFLICT (register_version) DO NOTHING`,
-    [registerVersion]
-  );
-}
-
-async function insertRows(
-  registerVersion: number,
+async function publishAlgorithmRows(
   rows: readonly { readonly rowKey: string; readonly value: unknown }[]
-): Promise<void> {
-  for (const row of rows) {
-    await database.pool.query(
-      `INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-       VALUES ($1,$2,$3::jsonb,$4)`,
-      [registerVersion, row.rowKey, JSON.stringify(row.value), "t16-test:scratch"]
-    );
-  }
+): Promise<number> {
+  const bootstrap = await loadBootstrapRegister();
+  await persistBootstrapRegister(database.pool, bootstrap);
+  const receipt = await createPostgresRegisterPublicationPort(database.pool).publishGeneral({
+    publicationId: randomUUID(),
+    baseRegisterVersion: parseRegisterVersionText(String(bootstrap.registerVersion)),
+    rows: rows.map(row => registerFixtureRow(row.rowKey, row.value, "t16-test:scratch")),
+    sourceRef: "t16-test:scratch"
+  });
+  return registerVersionToSafeLegacyNumber(receipt.registerVersion);
 }
 
 describe("T16 algorithm register rows + seeding", () => {
+  it("rejects development publication when the complete algorithm family is omitted", async () => {
+    vi.spyOn(registerModule, "buildAlgorithmRegisterRows").mockReturnValue([]);
+    await expect(seedDevelopmentDeploymentRegister({ adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL, repositoryRoot }))
+      .rejects.toThrow("DEV_ALGORITHM_REGISTER_ROWS_INCOMPLETE");
+    expect((await database.pool.query("SELECT register_version FROM register.register_version WHERE register_version > 4")).rows).toEqual([]);
+  });
+
+  it("rolls back historical acceptance publication when all required algorithm rows are missing", async () => {
+    await expect(importHistoricalRegisterFixture(database.pool, 2, [
+      registerFixtureRow("riskTier", "standard", "test:incomplete-acceptance")
+    ])).rejects.toThrow("REGISTER_REQUIRED_ROW_MISSING");
+    expect((await database.pool.query("SELECT register_version FROM register.register_version WHERE register_version=2")).rows).toEqual([]);
+    expect((await database.pool.query("SELECT row_key FROM register.register_row WHERE register_version=2")).rows).toEqual([]);
+  });
+
   it("seeds every ruled algorithm row with its default value and dev provenance", async () => {
     await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     });
     const persisted = await database.pool.query<{
       row_key: string;
@@ -232,7 +248,8 @@ describe("T16 algorithm register rows + seeding", () => {
   it("cites J1 on exactly the five values J1 ruled and J8 on the two role identities", async () => {
     await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     });
     const persisted = await database.pool.query<{ row_key: string; source_ref: string }>(
       `SELECT row_key,source_ref FROM register.register_row
@@ -256,17 +273,15 @@ describe("T16 algorithm register rows + seeding", () => {
   });
 
   it("refuses to seal a register version that omits any algorithm row family", async () => {
-    for (const [index, omitted] of T16_FAMILIES.entries()) {
-      const registerVersion = 900 + index;
+    for (const omitted of T16_FAMILIES) {
+      const before = (await database.pool.query("SELECT count(*)::int AS count FROM register.required_row_version")).rows;
       const kept = T16_EXPECTED_ROWS.filter((row) => row.family !== omitted);
       const omittedKeys = T16_EXPECTED_ROWS
         .filter((row) => row.family === omitted)
         .map((row) => row.rowKey);
-      await declareManifestVersion(registerVersion);
-      await insertRows(registerVersion, kept);
-      const rejection = await database.pool
-        .query("SELECT register.assert_required_rows($1)", [registerVersion])
+      const rejection = await publishAlgorithmRows(kept)
         .then(() => null, (error: unknown) => error);
+      expect((await database.pool.query("SELECT count(*)::int AS count FROM register.required_row_version")).rows).toEqual(before);
       expect(rejection, omitted).toBeInstanceOf(Error);
       const message = (rejection as Error).message;
       expect(message, omitted).toContain("REGISTER_REQUIRED_ROW_MISSING");
@@ -283,9 +298,8 @@ describe("T16 algorithm register rows + seeding", () => {
   });
 
   it("accepts a register version that carries every algorithm row family", async () => {
-    await declareManifestVersion(950);
-    await insertRows(950, T16_EXPECTED_ROWS);
-    await expect(database.pool.query("SELECT register.assert_required_rows($1)", [950]))
+    const version = await publishAlgorithmRows(T16_EXPECTED_ROWS);
+    await expect(database.pool.query("SELECT register.assert_required_rows($1)", [version]))
       .resolves.toBeDefined();
   });
 
@@ -310,7 +324,8 @@ describe("T16 algorithm register rows + seeding", () => {
     const policy = await loadAlgorithmPolicy();
     await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     });
     await expect(policy.readAdaptiveStoppingControls(database.pool, DEVELOPMENT_REGISTER_VERSION))
       .resolves.toMatchObject({ delta: 0.02, epsilon: 0.01 });
@@ -325,12 +340,13 @@ describe("T16 algorithm register rows + seeding", () => {
   it("emits a startup warning when the synthesizer and evaluator role refs are identical", async () => {
     const policy = await loadAlgorithmPolicy();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    await insertRows(960, [
+    const version = await publishAlgorithmRows([
+      ...T16_EXPECTED_ROWS.filter(row => !["synthesizerRoleRef", "evaluatorRoleRef", "evaluatorLoopMaxRounds"].includes(row.rowKey)),
       { rowKey: "synthesizerRoleRef", value: { kind: "SYNTHESIZER_ROLE_REF", providerRef: "development:codex-cli", provisional: true } },
       { rowKey: "evaluatorRoleRef", value: { kind: "EVALUATOR_ROLE_REF", providerRef: "development:codex-cli", provisional: true } },
       { rowKey: "evaluatorLoopMaxRounds", value: { kind: "EVALUATOR_LOOP_MAX_ROUNDS", maxRounds: 3 } }
     ]);
-    const controls = await policy.readSynthesisRoleControls(database.pool, 960);
+    const controls = await policy.readSynthesisRoleControls(database.pool, version);
     expect(controls.identicalRoleRefs).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toContain("SYNTHESIS_ROLE_REFS_IDENTICAL");
@@ -339,12 +355,13 @@ describe("T16 algorithm register rows + seeding", () => {
   it("stays silent when the synthesizer and evaluator role refs differ", async () => {
     const policy = await loadAlgorithmPolicy();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    await insertRows(961, [
+    const version = await publishAlgorithmRows([
+      ...T16_EXPECTED_ROWS.filter(row => !["synthesizerRoleRef", "evaluatorRoleRef", "evaluatorLoopMaxRounds"].includes(row.rowKey)),
       { rowKey: "synthesizerRoleRef", value: { kind: "SYNTHESIZER_ROLE_REF", providerRef: "development:codex-cli", provisional: true } },
       { rowKey: "evaluatorRoleRef", value: { kind: "EVALUATOR_ROLE_REF", providerRef: "development:claude-cli", provisional: true } },
       { rowKey: "evaluatorLoopMaxRounds", value: { kind: "EVALUATOR_LOOP_MAX_ROUNDS", maxRounds: 3 } }
     ]);
-    const controls = await policy.readSynthesisRoleControls(database.pool, 961);
+    const controls = await policy.readSynthesisRoleControls(database.pool, version);
     expect(controls.identicalRoleRefs).toBe(false);
     expect(controls.synthesizerRoleRef).not.toBe(controls.evaluatorRoleRef);
     expect(warn).not.toHaveBeenCalled();
@@ -378,17 +395,10 @@ async function sealVersion(
   registerVersion: number,
   rows: readonly { readonly rowKey: string; readonly value: unknown; readonly sourceRef: string }[]
 ): Promise<void> {
-  for (const row of rows) {
-    await database.pool.query(
-      `INSERT INTO register.register_row (register_version,row_key,value_json,source_ref)
-       VALUES ($1,$2,$3::jsonb,$4)`,
-      [registerVersion, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-    );
-  }
-  await database.pool.query(
-    `INSERT INTO register.register_version (register_version,row_count,sealed) VALUES ($1,$2,true)`,
-    [registerVersion, rows.length]
-  );
+  if (registerVersion !== 1 && registerVersion !== 4) throw new Error("Historical fixture only");
+  await importHistoricalRegisterFixture(database.pool, registerVersion,
+    rows.map(row => registerFixtureRow(row.rowKey, row.value, row.sourceRef)));
+
 }
 
 describe("T16 sealed-version identity — historical versions are never re-opened", () => {
@@ -416,14 +426,15 @@ describe("T16 sealed-version identity — historical versions are never re-opene
 
     const receipt = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
     });
 
     // A NEW identity, never the sealed one that already existed.
-    expect(receipt.registerVersion).toBeGreaterThan(BASE_DEVELOPMENT_REGISTER_VERSION);
-    expect(receipt.registerVersion).toBe(DEVELOPMENT_REGISTER_VERSION);
+    expect(registerVersionToSafeLegacyNumber(receipt.registerVersion)).toBeGreaterThan(BASE_DEVELOPMENT_REGISTER_VERSION);
+    expect(registerVersionToSafeLegacyNumber(receipt.registerVersion)).toBe(DEVELOPMENT_REGISTER_VERSION);
     expect(await readVersionSnapshot(BASE_DEVELOPMENT_REGISTER_VERSION)).toEqual(before);
-    const current = await readVersionSnapshot(receipt.registerVersion);
+    const current = await readVersionSnapshot(registerVersionToSafeLegacyNumber(receipt.registerVersion));
     expect(current.version).toEqual({ row_count: receipt.rowCount, sealed: true });
     for (const rowKey of ALGORITHM_REGISTER_ROW_KEYS) {
       expect(current.rows.map((row) => row.row_key), rowKey).toContain(rowKey);
@@ -509,7 +520,7 @@ describe("T16 startup warning on the seeding entrypoint (ruling J7)", () => {
       DEBATEAI_DEV_EVALUATOR_ROLE_REF: "development:codex-cli"
     });
     expect(cli.exitCode).toBe(0);
-    expect(cli.stdout).toContain("DEV_DEPLOYMENT_REGISTER_READY=");
+    expect(cli.stdout).toContain("DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=");
     expect(countWarnings(cli.stderr)).toBe(1);
     expect(cli.stderr).toContain("development:codex-cli");
     expect(cli.stderr).not.toContain(database.connectionString);
@@ -518,7 +529,7 @@ describe("T16 startup warning on the seeding entrypoint (ruling J7)", () => {
   it("prints no warning on the dev seeding CLI's process path when the role refs differ", async () => {
     const cli = await runSeedingCli({});
     expect(cli.exitCode).toBe(0);
-    expect(cli.stdout).toContain("DEV_DEPLOYMENT_REGISTER_READY=");
+    expect(cli.stdout).toContain("DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=");
     expect(countWarnings(cli.stderr)).toBe(0);
     expect(cli.stderr).toBe("");
   }, 120_000);

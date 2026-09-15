@@ -1,0 +1,746 @@
+diff --git a/dialectical-engine/apps/api/src/index.ts b/dialectical-engine/apps/api/src/index.ts
+index 21f75fe2..b8e7b88a 100644
+--- a/dialectical-engine/apps/api/src/index.ts
++++ b/dialectical-engine/apps/api/src/index.ts
+@@ -20,6 +20,7 @@ import {
+   NodeSchema,
+   PrivateDebateErasureRequestSchema,
+   PrivateDebateErasureStatusSchema,
++  PLAN_TIER_ROSTERS,
+   PublicationTransitionSchema,
+   PublicDebateListSchema,
+   PublicDebateSchema,
+@@ -1203,14 +1204,29 @@ export async function evaluateAskAdmission(
+ }> {
+   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
+   const discoveredPanel = await settings.resolveDiscoveredPanel();
+-  const makers = Object.freeze([...new Set(discoveredPanel.map((member) => member.maker))]);
++  const roster = PLAN_TIER_ROSTERS[ask.plan_tier];
++  const filteredPanel = roster
++    .map((modelId) => discoveredPanel.find((member) => member.model_id === modelId))
++    .filter((member): member is typeof discoveredPanel[number] => member !== undefined);
++  const missing = roster.filter((modelId) =>
++    !filteredPanel.some((member) => member.model_id === modelId)
++  );
++  if (missing.length > 0) {
++    markAskRefusal(new TypedDomainError(
++      "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      `The ${ask.plan_tier} plan needs ${missing.join(", ")}, and ${
++        missing.length === 1 ? "it is" : "they are"
++      } not available right now`
++    ));
++  }
++  const makers = Object.freeze([...new Set(filteredPanel.map((member) => member.maker))]);
+   const makerAvailability = Object.freeze({
+     deploymentMakerCapability: makers.length > 0,
+     runMakerReachability: makers.length >= 2,
+     classification: makers.length >= 2 ? "CAPABLE" as const : "TRANSIENT_OUTAGE" as const,
+     configuredMakers: makers,
+     reachedMakers: makers,
+-    registerRef: discoveredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
++    registerRef: filteredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
+   });
+   try {
+     assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
+@@ -1222,12 +1238,17 @@ export async function evaluateAskAdmission(
+     envelopeBasis = await settings.resolveEnvelopeBasis({
+       depthParams: ask.depth_params,
+       riskTier: risk.effectiveRiskTier,
+-      panelSize: discoveredPanel.length
++      panelSize: filteredPanel.length
+     });
+   } catch (error) {
+     markAskRefusal(error);
+   }
+-  return { risk, envelopeBasis, discoveredPanel, criticUnavailableCap: applyCriticUnavailableCap(makerAvailability) };
++  return {
++    risk,
++    envelopeBasis,
++    discoveredPanel: filteredPanel,
++    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability)
++  };
+ }
+ 
+ export class PostgresAskApplication implements AskApplication {
+@@ -1301,6 +1322,7 @@ export class PostgresAskApplication implements AskApplication {
+           tierSource: risk.tierSource,
+           tierProvenanceRef: risk.tierProvenanceRef,
+           compositionBudgetTier: ask.composition_budget_tier,
++          planTier: ask.plan_tier,
+           depthParams: ask.depth_params,
+           discoveredPanel,
+           strangerSampleRate: this.settings.strangerSampleRate,
+diff --git a/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts b/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
+new file mode 100644
+index 00000000..37d30303
+--- /dev/null
++++ b/dialectical-engine/tests/architecture/tiers-s02-rosters.test.ts
+@@ -0,0 +1,118 @@
++import { readdirSync, readFileSync } from "node:fs";
++import { extname, join, relative, sep } from "node:path";
++
++import { describe, expect, it } from "vitest";
++
++import { PLAN_TIER_ROSTERS } from "@debateai/contract";
++
++const PROJECT_ROOT = process.cwd();
++const SOURCE_ROOTS = ["apps", "packages"] as const;
++const EXCLUDED_DIRECTORIES = new Set([
++  "node_modules",
++  "dist",
++  "generated",
++  ".next"
++]);
++const SOURCE_EXTENSIONS = new Set([
++  ".cjs",
++  ".cts",
++  ".js",
++  ".json",
++  ".jsx",
++  ".mjs",
++  ".mts",
++  ".ts",
++  ".tsx"
++]);
++
++function sourceFiles(directory: string): string[] {
++  return readdirSync(directory, { withFileTypes: true })
++    .sort((left, right) => left.name.localeCompare(right.name))
++    .flatMap((entry) => {
++      const absolutePath = join(directory, entry.name);
++      if (entry.isDirectory()) {
++        return EXCLUDED_DIRECTORIES.has(entry.name)
++          ? []
++          : sourceFiles(absolutePath);
++      }
++      if (!entry.isFile()) return [];
++
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      return projectPath.includes(".test.") ||
++        !SOURCE_EXTENSIONS.has(extname(entry.name))
++        ? []
++        : [absolutePath];
++    });
++}
++
++function sourceLinesContaining(needle: string): string[] {
++  return SOURCE_ROOTS.flatMap((sourceRoot) =>
++    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      return readFileSync(absolutePath, "utf8")
++        .split("\n")
++        .flatMap((line, index) =>
++          line.includes(needle) ? [`${projectPath}:${index + 1}`] : []
++        );
++    })
++  ).sort();
++}
++
++function tierBranchLines(): string[] {
++  return SOURCE_ROOTS.flatMap((sourceRoot) =>
++    sourceFiles(join(PROJECT_ROOT, sourceRoot)).flatMap((absolutePath) => {
++      const projectPath = relative(PROJECT_ROOT, absolutePath).split(sep).join("/");
++      if (projectPath === "packages/contract/src/plan-tiers.ts") return [];
++
++      return readFileSync(absolutePath, "utf8").split("\n").flatMap((line, index) => {
++        const namesBothTiers = line.includes("free") && line.includes("premium");
++        const branches = line.includes("===") || /\bcase\s+/.test(line);
++        return namesBothTiers && branches ? [`${projectPath}:${index + 1}`] : [];
++      });
++    })
++  ).sort();
++}
++
++describe("S02 tier roster architecture", () => {
++  it("keeps the exact ordered model roster for each plan tier", () => {
++    expect(PLAN_TIER_ROSTERS.free).toEqual([
++      "gpt-5.6-luna",
++      "claude-sonnet-5"
++    ]);
++    expect(PLAN_TIER_ROSTERS.premium).toEqual([
++      "gpt-5.6-sol",
++      "claude-opus-5",
++      "grok-4.6"
++    ]);
++  });
++
++  it("keeps every roster model id in one canonical declaration", () => {
++    const expectedOccurrences: Record<string, string[]> = {
++      "gpt-5.6-luna": ["packages/contract/src/plan-tiers.ts:9"],
++      "claude-sonnet-5": ["packages/contract/src/plan-tiers.ts:9"],
++      "gpt-5.6-sol": [
++        "apps/ui/components/landing/cards.ts:28",
++        "packages/contract/src/plan-tiers.ts:10"
++      ],
++      "claude-opus-5": [
++        "apps/ui/components/landing/cards.ts:27",
++        "packages/contract/src/plan-tiers.ts:10"
++      ],
++      "grok-4.6": ["packages/contract/src/plan-tiers.ts:10"]
++    };
++
++    for (const [modelId, expectedLines] of Object.entries(expectedOccurrences)) {
++      expect(sourceLinesContaining(modelId), modelId).toEqual(expectedLines);
++    }
++  });
++
++  it("keeps plan-tier model selection out of if and case branches", () => {
++    expect(tierBranchLines()).toEqual([]);
++  });
++
++  it("keeps at least two members in every tier roster", () => {
++    for (const roster of Object.values(PLAN_TIER_ROSTERS)) {
++      expect(roster.length).toBeGreaterThanOrEqual(2);
++    }
++  });
++});
+diff --git a/dialectical-engine/tests/integration/evaluator-database.test.ts b/dialectical-engine/tests/integration/evaluator-database.test.ts
+index d03e109f..82e92127 100644
+--- a/dialectical-engine/tests/integration/evaluator-database.test.ts
++++ b/dialectical-engine/tests/integration/evaluator-database.test.ts
+@@ -1443,8 +1443,8 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
+       ) VALUES ($1, 'AVAILABLE', NULL, $2, $2, ledger.allocate_sequence())
+     `, [EVALUATOR_PROVIDER_REF, probedAt]);
+     for (const probe of [
+-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "model:product-a" },
+-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "model:product-b" },
++      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "gpt-5.6-luna" },
++      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "claude-sonnet-5" },
+       { probeEvidenceRef: "00000000-0000-4000-8000-000000000203", providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER, modelId: "model:evaluator-local" }
+     ]) {
+       await probes.record({ ...probe, state: "HEALTHY", failureCode: null, probedAt });
+diff --git a/dialectical-engine/tests/unit/api.test.ts b/dialectical-engine/tests/unit/api.test.ts
+index 8b2997f9..fc6e5d21 100644
+--- a/dialectical-engine/tests/unit/api.test.ts
++++ b/dialectical-engine/tests/unit/api.test.ts
+@@ -8,9 +8,13 @@ import {
+   type AskApplication,
+   type RunCreationSettings
+ } from "@debateai/api";
+-import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
++import {
++  PLAN_TIER_ROSTERS,
++  createContractClient,
++  type AskRequest,
++  type Session
++} from "@debateai/contract";
+ import { TypedDomainError } from "@debateai/kernel";
+-import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+ import {
+   RETIRED_DEV_HEADER,
+   TEST_APP_ORIGIN,
+@@ -28,6 +32,19 @@ const USER_IDENTITY = testHttpIdentity("api-user");
+ const USER_HEADERS = testSessionHeaders(USER_IDENTITY);
+ const USER_MUTATION_HEADERS = testSessionHeaders(USER_IDENTITY, true);
+ 
++function rosterPanel(
++  tier: AskRequest["plan_tier"],
++  makers: readonly string[] = []
++) {
++  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
++    provider_ref: `provider:${tier}:${index + 1}`,
++    maker: makers[index] ?? `maker:${tier}:${index + 1}`,
++    model_id: modelId,
++    probe_evidence_ref: `probe:${tier}:${index + 1}`,
++    probed_at: "2026-09-12T00:00:00.000Z"
++  }));
++}
++
+ function buildApi(options: Parameters<typeof buildApiBase>[0]) {
+   return buildApiBase({
+     ...options,
+@@ -81,7 +98,7 @@ function admissionSettings(
+     registerVersion: 1,
+     batteryVersion: "battery:test",
+     settlementWatchHandle: "watch:test",
+-    resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
++    resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:2"]),
+     resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
+     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+       effectiveRiskTier,
+@@ -159,7 +176,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+       steering_annotations: []
+     };
+     await expect(evaluateAskAdmission(admissionSettings({
+-      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(1)
++      resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:1"])
+     }), ask)).resolves.toMatchObject({
+       criticUnavailableCap: {
+         serves: true,
+@@ -169,6 +186,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
+     });
+ 
+     await expect(evaluateAskAdmission(admissionSettings({
++      resolveDiscoveredPanel: async () => rosterPanel("free"),
+       resolveEnvelopeBasis: async () => {
+         throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "No computed structural ceiling");
+       }
+diff --git a/dialectical-engine/tests/unit/tiers-s02-admission.test.ts b/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
+new file mode 100644
+index 00000000..75a17a01
+--- /dev/null
++++ b/dialectical-engine/tests/unit/tiers-s02-admission.test.ts
+@@ -0,0 +1,290 @@
++import { describe, expect, it } from "vitest";
++import {
++  buildApi,
++  evaluateAskAdmission,
++  PostgresAskApplication,
++  type AskApplication,
++  type RunCreationSettings
++} from "@debateai/api";
++import type { AskRequest, Session } from "@debateai/contract";
++import {
++  TEST_APP_ORIGIN,
++  testHttpIdentity,
++  testSessionApplication,
++  testSessionHeaders
++} from "../support/httpSession.js";
++
++const RUN_ID = "11111111-1111-4111-8111-111111111111";
++const HTTP_IDENTITY = testHttpIdentity("tiers-s02-admission");
++const HTTP_HEADERS = testSessionHeaders(HTTP_IDENTITY, true);
++
++function ask(planTier: AskRequest["plan_tier"]): AskRequest {
++  return {
++    question_line: "Which models should debate this question?",
++    risk_tier: "casual",
++    tier_source: "ASKER",
++    tier_provenance_ref: "asker:test",
++    composition_budget_tier: "low",
++    depth_params: { depth: 1 },
++    decision_scope: "tier admission test",
++    as_of: "2026-09-12T00:00:00.000Z",
++    steering_presets: [],
++    plan_tier: planTier,
++    steering_annotations: []
++  };
++}
++
++function member(modelId: string, provider: string) {
++  return Object.freeze({
++    provider_ref: `provider:${provider}`,
++    maker: `maker:${provider}`,
++    model_id: modelId,
++    probe_evidence_ref: `probe:${provider}`,
++    probed_at: "2026-09-12T00:00:00.000Z"
++  });
++}
++
++function settingsFor(
++  discoveredPanel: readonly ReturnType<typeof member>[],
++  observedPanelSizes: number[] = []
++): RunCreationSettings {
++  return {
++    strangerSampleRate: 0,
++    registerVersion: 1,
++    batteryVersion: "battery:test",
++    settlementWatchHandle: "watch:test",
++    resolveDiscoveredPanel: async () => discoveredPanel,
++    resolveEnvelopeBasis: async ({ panelSize }) => {
++      observedPanelSizes.push(panelSize);
++      return { max_model_attempts: 1 };
++    },
++    resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
++      effectiveRiskTier,
++      tierSource,
++      tierProvenanceRef
++    })
++  };
++}
++
++function applicationWithSubmit(submit: AskApplication["submit"]): AskApplication {
++  return {
++    withContentLease: async (_runId, use) => use(),
++    submit,
++    readAnswer: async () => null,
++    readRunAnswer: async () => null,
++    readRun: async () => null,
++    readAnswerIndex: async (_session, limit, offset) => ({
++      items: [], open_runs: [], limit, offset, total: 0
++    }),
++    readInspection: async () => null,
++    readLedgerDigest: async () => null,
++    readNode: async () => null,
++    recordInvestigation: async () => null,
++    unlinkMemoryLink: async () => null,
++    readDeployment: async () => ({
++      register: { register_version: 1, rows: [] },
++      scorecards: [],
++      model_ledger: [],
++      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
++    }),
++    events: async function* () {}
++  };
++}
++
++async function rejectedAdmission(
++  discoveredPanel: readonly ReturnType<typeof member>[],
++  planTier: AskRequest["plan_tier"]
++): Promise<unknown> {
++  try {
++    await evaluateAskAdmission(settingsFor(discoveredPanel), ask(planTier));
++    return null;
++  } catch (error) {
++    return error;
++  }
++}
++
++describe("S02 tier roster admission", () => {
++  it("filters Free admission to its two models in roster order and sizes the envelope to two", async () => {
++    const panelSizes: number[] = [];
++    const result = await evaluateAskAdmission(settingsFor([
++      member("gpt-5.6-sol", "sol"),
++      member("claude-sonnet-5", "sonnet"),
++      member("gpt-5.6-luna", "luna")
++    ], panelSizes), ask("free"));
++
++    expect(result.discoveredPanel.map(({ model_id }) => model_id)).toEqual([
++      "gpt-5.6-luna",
++      "claude-sonnet-5"
++    ]);
++    expect(panelSizes).toEqual([2]);
++  });
++
++  it("filters Premium admission to its three models in roster order and sizes the envelope to three", async () => {
++    const panelSizes: number[] = [];
++    const result = await evaluateAskAdmission(settingsFor([
++      member("gpt-5.6-luna", "luna"),
++      member("grok-4.6", "grok"),
++      member("claude-opus-5", "opus"),
++      member("claude-sonnet-5", "sonnet"),
++      member("gpt-5.6-sol", "sol")
++    ], panelSizes), ask("premium"));
++
++    expect(result.discoveredPanel.map(({ model_id }) => model_id)).toEqual([
++      "gpt-5.6-sol",
++      "claude-opus-5",
++      "grok-4.6"
++    ]);
++    expect(panelSizes).toEqual([3]);
++  });
++
++  it("refuses Free admission with the tier-unavailable code when every roster member is missing", async () => {
++    const error = await rejectedAdmission([
++      member("gpt-5.6-sol", "sol"),
++      member("claude-opus-5", "opus")
++    ], "free");
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
++    });
++    expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
++  });
++
++  it("names the one missing Premium roster member in the tier-unavailable refusal", async () => {
++    const error = await rejectedAdmission([
++      member("gpt-5.6-sol", "sol"),
++      member("claude-opus-5", "opus")
++    ], "premium");
++
++    expect(error).toMatchObject({
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
++      message: expect.stringContaining("grok-4.6")
++    });
++  });
++
++  it("names every missing Premium roster member and the tier in one refusal", async () => {
++    const error = await rejectedAdmission([
++      member("gpt-5.6-sol", "sol")
++    ], "premium");
++
++    expect(error).toMatchObject({ code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
++    expect(error).toMatchObject({ message: expect.stringContaining("claude-opus-5") });
++    expect(error).toMatchObject({ message: expect.stringContaining("grok-4.6") });
++    expect(error).toMatchObject({ message: expect.stringContaining("premium") });
++  });
++
++  it("refuses an empty panel with the tier-unavailable code before maker or envelope errors", async () => {
++    const error = await rejectedAdmission([], "free");
++
++    expect(error).toMatchObject({
++      name: "AskRefusal",
++      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE"
++    });
++    expect(error).not.toMatchObject({ code: "MAKER_INVENTORY_UNSATISFIED" });
++    expect(error).not.toMatchObject({ code: "STRUCTURAL_CEILING_PANELSIZE_INVALID" });
++  });
++
++  it("maps a real tier-unavailable admission refusal to the HTTP 422 face", async () => {
++    const application = applicationWithSubmit(async (submittedAsk) => {
++      await evaluateAskAdmission(settingsFor([
++        member("gpt-5.6-sol", "sol"),
++        member("claude-opus-5", "opus")
++      ]), submittedAsk);
++      return { run_ref: RUN_ID, status: "QUEUED" };
++    });
++    const api = buildApi({
++      application,
++      sessions: testSessionApplication([HTTP_IDENTITY]),
++      allowedOrigin: TEST_APP_ORIGIN
++    });
++
++    const response = await api.inject({
++      method: "POST",
++      url: "/v1/asks",
++      headers: HTTP_HEADERS,
++      payload: ask("free")
++    });
++
++    expect(response.statusCode).toBe(422);
++    expect(response.json().error).toBe("ASK_PLAN_TIER_MODEL_UNAVAILABLE");
++    await api.close();
++  });
++
++  it("refuses before taking an admission lease or issuing any run-provision query", async () => {
++    const queries: string[] = [];
++    let connectCalls = 0;
++    const pool = {
++      async query(statement: string) {
++        queries.push(statement);
++        return { rows: [] };
++      },
++      async connect() {
++        connectCalls += 1;
++        return {
++          async query(statement: string) {
++            queries.push(statement);
++            return { rows: [] };
++          },
++          on() { return this; },
++          removeListener() { return this; },
++          release() {}
++        };
++      }
++    };
++    const serverAdmissionPool = new Proxy(pool, {});
++    const legacyAdmissionPool = new Proxy(pool, {});
++    const application = new PostgresAskApplication(
++      pool as never,
++      { dispatch: async () => undefined },
++      settingsFor([
++        member("gpt-5.6-sol", "sol"),
++        member("claude-opus-5", "opus")
++      ]),
++      undefined,
++      pool as never,
++      {
++        server: serverAdmissionPool as never,
++        legacy: legacyAdmissionPool as never
++      }
++    );
++    const session: Session = {
++      asker_id: "owner:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++      session_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++      caller_scope: "ASKER",
++      ownership_provenance: "server_session",
++      provisional_identity_model: false
++    };
++
++    await application.submit(ask("free"), session, {
++      kind: "server",
++      userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
++      ownerRef: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
++    }).catch(() => undefined);
++
++    expect(connectCalls).toBe(0);
++    expect(queries.join("\n")).not.toMatch(
++      /prepare_run_key_provision|create_encrypted_run|INSERT INTO core\.run/i
++    );
++  });
++
++  it("keeps one provider per roster model id and sizes the envelope to the roster", async () => {
++    const panelSizes: number[] = [];
++    const result = await evaluateAskAdmission(settingsFor([
++      member("gpt-5.6-sol", "a"),
++      member("claude-opus-5", "b"),
++      member("grok-4.6", "c"),
++      member("grok-4.6", "d")
++    ], panelSizes), ask("premium"));
++
++    expect(result.discoveredPanel.map(({ model_id, provider_ref }) => ({
++      model_id,
++      provider_ref
++    }))).toEqual([
++      { model_id: "gpt-5.6-sol", provider_ref: "provider:a" },
++      { model_id: "claude-opus-5", provider_ref: "provider:b" },
++      { model_id: "grok-4.6", provider_ref: "provider:c" }
++    ]);
++    expect(result.discoveredPanel).toHaveLength(3);
++    expect(panelSizes).toEqual([3]);
++  });
++});
+diff --git a/dialectical-engine/tests/unit/tiers-s02-wire.test.ts b/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
+new file mode 100644
+index 00000000..90fdf054
+--- /dev/null
++++ b/dialectical-engine/tests/unit/tiers-s02-wire.test.ts
+@@ -0,0 +1,167 @@
++import { EventEmitter } from "node:events";
++import { existsSync, readFileSync, readdirSync } from "node:fs";
++import { join, relative, resolve } from "node:path";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
++import { WorkItemRepository } from "@debateai/battery";
++import {
++  PLAN_TIER_ROSTERS,
++  type AskRequest,
++  type PlanTier,
++  type Session
++} from "@debateai/contract";
++import { RunRepository, type StartRunInput } from "@debateai/db";
++import { LivenessRepository } from "@debateai/liveness";
++import { ServeRepository } from "@debateai/serve";
++import type { Pool, PoolClient, QueryResult } from "pg";
++
++const RUN_ID = "11111111-1111-4111-8111-111111111111";
++const WORK_ITEM_ID = "22222222-2222-4222-8222-222222222222";
++const OWNER_REF = "44444444-4444-4444-8444-444444444444";
++
++function rosterPanel(tier: PlanTier) {
++  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
++    provider_ref: `provider:${tier}:${index + 1}`,
++    maker: `maker:${tier}:${index + 1}`,
++    model_id: modelId,
++    probe_evidence_ref: `probe:${tier}:${index + 1}`,
++    probed_at: "2026-09-12T00:00:00.000Z"
++  }));
++}
++
++function stubPool(): Pool {
++  const query = vi.fn(async () => ({
++    rows: [{ locked: true, unlocked: true }],
++    rowCount: 1
++  } as unknown as QueryResult));
++  const client = Object.assign(new EventEmitter(), {
++    query,
++    release: vi.fn()
++  }) as unknown as PoolClient;
++  return {
++    connect: vi.fn(async () => client),
++    query
++  } as unknown as Pool;
++}
++
++function askFor(planTier: PlanTier): AskRequest {
++  return {
++    question_line: `Should the ${planTier} tier be selected?`,
++    as_of: "2026-09-12T00:00:00.000Z",
++    risk_tier: "R1",
++    tier_source: "ASKER",
++    tier_provenance_ref: `test:${planTier}`,
++    composition_budget_tier: "STANDARD",
++    depth_params: {},
++    decision_scope: {},
++    steering_presets: [],
++    steering_annotations: [],
++    plan_tier: planTier
++  } as unknown as AskRequest;
++}
++
++function session(): Session {
++  return {
++    session_id: "33333333-3333-4333-8333-333333333333",
++    asker_id: `owner:${OWNER_REF}`,
++    caller_scope: "ASKER",
++    ownership_provenance: "server_session",
++    provisional_identity_model: false
++  };
++}
++
++function settingsFor(tier: PlanTier): RunCreationSettings {
++  return {
++    strangerSampleRate: 0,
++    registerVersion: 1,
++    batteryVersion: "tiers-s02-wire",
++    settlementWatchHandle: "tiers-s02-wire",
++    resolveDiscoveredPanel: async () => rosterPanel(tier),
++    resolveEnvelopeBasis: async () => Object.freeze({}),
++    resolveRisk: (askerRiskTier, tierSource, tierProvenanceRef) => ({
++      effectiveRiskTier: askerRiskTier,
++      tierSource: tierSource as never,
++      tierProvenanceRef
++    })
++  };
++}
++
++function productionSourceFiles(repoRoot: string): readonly string[] {
++  const excludedDirectories = new Set(["dist", "generated", "node_modules"]);
++  const files: string[] = [resolve(repoRoot, "apps/api/src/index.ts")];
++
++  function walk(directory: string): void {
++    for (const entry of readdirSync(directory, { withFileTypes: true })) {
++      const entryPath = join(directory, entry.name);
++      if (entry.isDirectory()) {
++        if (!excludedDirectories.has(entry.name)) walk(entryPath);
++      } else if (/\.tsx?$/u.test(entry.name) && !/\.(?:spec|test)\./u.test(entry.name)) {
++        files.push(entryPath);
++      }
++    }
++  }
++
++  for (const packageEntry of readdirSync(resolve(repoRoot, "packages"), { withFileTypes: true })) {
++    if (!packageEntry.isDirectory()) continue;
++    const sourceRoot = resolve(repoRoot, "packages", packageEntry.name, "src");
++    if (existsSync(sourceRoot)) walk(sourceRoot);
++  }
++  return files;
++}
++
++afterEach(() => {
++  vi.restoreAllMocks();
++});
++
++describe("S02 plan-tier run wiring", () => {
++  // Property: each accepted ask carries its selected plan tier into the real run-start boundary.
++  // Production break: remove the planTier member from PostgresAskApplication's startRun input.
++  it("forwards both ask plan tiers to StartRunInput.planTier", async () => {
++    const capturedInputs: StartRunInput[] = [];
++    vi.spyOn(RunRepository.prototype, "startRun").mockImplementation(async (input) => {
++      capturedInputs.push(input);
++      return RUN_ID;
++    });
++    vi.spyOn(LivenessRepository.prototype, "recordQuery").mockResolvedValue(1);
++    vi.spyOn(ServeRepository.prototype, "recordMemoryQuestion").mockResolvedValue(undefined);
++    vi.spyOn(WorkItemRepository.prototype, "enqueue").mockResolvedValue(WORK_ITEM_ID);
++
++    for (const tier of ["free", "premium"] as const) {
++      const primaryPool = stubPool();
++      const application = new PostgresAskApplication(
++        primaryPool,
++        { dispatch: vi.fn(async () => undefined) },
++        settingsFor(tier),
++        { read: async () => [] },
++        stubPool(),
++        { server: stubPool(), legacy: stubPool() }
++      );
++      const ask = askFor(tier);
++      await application.submit(
++        ask,
++        session(),
++        { kind: "server", userId: "tiers-s02-wire-user", ownerRef: OWNER_REF }
++      );
++    }
++
++    expect(capturedInputs.map((input) => input.planTier)).toEqual(["free", "premium"]);
++  });
++
++  // Property: one production startRun caller exists, and that caller supplies planTier.
++  // Production break: remove planTier from the sole call or add another production .startRun call.
++  it("keeps one production startRun caller and wires planTier at that call", () => {
++    const repoRoot = process.cwd();
++    const calls = productionSourceFiles(repoRoot).flatMap((file) => {
++      const source = readFileSync(file, "utf8");
++      return [...source.matchAll(/\.startRun\(/gu)].map((match) => ({
++        file: relative(repoRoot, file),
++        source,
++        offset: match.index
++      }));
++    });
++
++    expect(calls.map((call) => call.file)).toEqual(["apps/api/src/index.ts"]);
++    const callSite = calls[0]!.source.slice(calls[0]!.offset, calls[0]!.offset + 1_200);
++    expect(callSite).toMatch(/\.startRun\(\{[\s\S]*?\bplanTier\s*:/u);
++  });
++});

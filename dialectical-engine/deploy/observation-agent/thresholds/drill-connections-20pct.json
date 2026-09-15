@@ -1,0 +1,7 @@
+{
+  "modules": {
+    "postgres-capacity": {
+      "connections_severe_percent": 20
+    }
+  }
+}

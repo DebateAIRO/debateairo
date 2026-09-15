@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
+import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
 
 export const SESSION_POLICY_ROW_KEY = "sessionPolicy" as const;
 
@@ -44,28 +45,33 @@ export type SessionPolicy = Readonly<{
   sourceRef: string;
 }>;
 
-export const SESSION_POLICY_REGISTER_ROW = Object.freeze({
-  rowKey: SESSION_POLICY_ROW_KEY,
-  sourceRef: "DR-179; wave-2-target-architecture:session-security; S5-binding-contract",
-  value: Object.freeze({
-    kind: "SESSION_POLICY" as const,
-    token_bytes: 32 as const,
-    csrf_token_bytes: 32 as const,
-    login_challenge_ttl_ms: 5 * 60 * 1_000,
-    idle_ttl_ms: 14 * 24 * 60 * 60 * 1_000,
-    absolute_ttl_ms: 90 * 24 * 60 * 60 * 1_000,
-    cookie: Object.freeze({
-      session_name: "__Host-debateai-session" as const,
-      csrf_name: "__Host-debateai-csrf" as const,
-      path: "/" as const,
-      secure: true as const,
-      http_only: true as const,
-      same_site: "Lax" as const
+const SESSION_POLICY_PUBLICATION_ROW = Object.freeze({
+  "rowKey": "sessionPolicy",
+  "sourceRef": "DR-179; wave-2-target-architecture:session-security; S5-binding-contract",
+  "value": Object.freeze({
+    "kind": "SESSION_POLICY",
+    "token_bytes": canonicalDecimal("32"),
+    "csrf_token_bytes": canonicalDecimal("32"),
+    "login_challenge_ttl_ms": canonicalDecimal("300000"),
+    "idle_ttl_ms": canonicalDecimal("1209600000"),
+    "absolute_ttl_ms": canonicalDecimal("7776000000"),
+    "cookie": Object.freeze({
+      "session_name": "__Host-debateai-session",
+      "csrf_name": "__Host-debateai-csrf",
+      "path": "/",
+      "secure": true,
+      "http_only": true,
+      "same_site": "Lax"
     }),
-    // Step-up creates a new session/CSRF generation. S7 may require this
-    // timestamp for a sensitive route but cannot extend it at the caller.
-    step_up_freshness_ms: 5 * 60 * 1_000
+    "step_up_freshness_ms": canonicalDecimal("300000")
   })
+});
+
+export const SESSION_POLICY_REGISTER_ROW = Object.freeze({
+  rowKey: SESSION_POLICY_PUBLICATION_ROW.rowKey,
+  valueAst: SESSION_POLICY_PUBLICATION_ROW.value,
+  value: JSON.parse(canonicalRegisterJson(SESSION_POLICY_PUBLICATION_ROW.value)) as SessionPolicyValue,
+  sourceRef: SESSION_POLICY_PUBLICATION_ROW.sourceRef
 });
 
 export function sessionPolicyFromValue(value: unknown, sourceRef: string): SessionPolicy {

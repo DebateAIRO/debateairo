@@ -20,6 +20,7 @@ const REQUEST_HEADER_ALLOWLIST = Object.freeze([
   "range",
   "user-agent",
   "x-csrf-token"
+  ,"x-support-session-token"
 ] as const);
 const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "accept-ranges",

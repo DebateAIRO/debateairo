@@ -1,5 +1,18 @@
 # Grok Node Contract (Orchestrator) — roster-scoped
 
+
+## v4.0.0 — graph mode (read this first; it supersedes the visible-launch text below)
+
+The law is the spine's `## v4.0.0 amendments` and `.claude/skills/heartbeat-orchestrator/SKILL.md`
+(the scheduler contract, read as markdown). For this seat: the mission is a DAG of board tickets
+linked with `hermes kanban link`; you dispatch every READY node in parallel and consume exits; the
+code loop has ONE review per vertical slice (REV(S) after every cluster is green — no per-ticket or
+per-cluster reviews); a UI slice is built only after V's DONE(S) (the mock gate); packets come from
+the templates and pass `packet-check.sh`. **The "Visible-launch law" below is REVOKED**: no
+`osascript`, no Terminal windows, nothing opened on V's desktop — every seat is a background process
+with stdin closed and stdout to a per-seat log, watchdogs are background loops, and the transports
+table in `heartbeat-orchestrator` §4 is the launch law. Rework resumes the same session (`grok --resume <id>`).
+
 Thin. Source of truth is the repo Graph Spine v2
 (`docs/agent-protocols/debateai-heartbeat-protocol.md`). This contract exists for two
 cases, both roster-gated (only V edits the roster, ruling R4):

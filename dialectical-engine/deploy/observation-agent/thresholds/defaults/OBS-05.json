@@ -1,0 +1,36 @@
+{
+  "routing": {
+    "CAPACITY": "DEGRADED",
+    "CERT_EXPIRY": "DEGRADED"
+  },
+  "modules": {
+    "postgres-capacity": {
+      "probe_interval_ms": 30000,
+      "probe_timeout_ms": 2000,
+      "connections_severe_percent": 80,
+      "connections_fatal_percent": 95,
+      "lock_waiter_count": 1,
+      "lock_wait_s": 60,
+      "transaction_age_s": 300,
+      "idle_in_transaction_count": 5,
+      "idle_in_transaction_s": 120,
+      "clear_samples": 2
+    },
+    "host-capacity": {
+      "probe_interval_ms": 30000,
+      "probe_timeout_ms": 2000,
+      "disk_degraded_free_percent": 15,
+      "disk_fatal_free_percent": 5,
+      "memory_severe_available_percent": 10,
+      "load_per_core_multiplier": 2,
+      "load_sustained_samples": 10,
+      "clear_samples": 2
+    },
+    "certificate-capacity": {
+      "probe_interval_ms": 86400000,
+      "probe_timeout_ms": 2000,
+      "expiry_degraded_days": 14,
+      "expiry_severe_days": 3
+    }
+  }
+}

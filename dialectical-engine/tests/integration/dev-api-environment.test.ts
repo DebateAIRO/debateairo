@@ -1,3 +1,4 @@
+import { DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
 import { Buffer } from "node:buffer";
 import {
   chmod,
@@ -13,22 +14,30 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
-import { DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
 import { loadApiEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   DEVELOPMENT_API_ENVIRONMENT_KEYS,
   assembleDevelopmentApiEnvironment
 } from "../../apps/runner/src/dev-api-environment.js";
-import {
-  buildDevelopmentProviderPanel,
-  REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON
-} from "../../apps/runner/src/dev-provider-panel.js";
+import { buildDevelopmentProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
 import {
   TEST_DEVELOPMENT_PROVIDER_DOCUMENT,
   TEST_DEVELOPMENT_PROVIDER_PANEL
 } from "../support/developmentProviderPanel.js";
+import {
+  createDevelopmentDeploymentRegisterMachineReceipt,
+  readDevelopmentDeploymentRegisterReceipt,
+  writeDevelopmentDeploymentRegisterReceipt
+} from "../../apps/runner/src/dev-deployment-register.js";
+import { parseRegisterVersionText } from "../../packages/register/src/index.js";
 
 const roots: string[] = [];
+const TEST_SUPPORT_MODEL_TARGET = JSON.stringify({
+  provider_ref: "development:hermes-glm-5.3-flash",
+  base_url: "http://127.0.0.1:8794/v1",
+  model: "z-ai/glm-5.3-flash",
+  authorization_header: "Bearer support-test"
+});
 
 function testToken(tenantId = "11111111-1111-4111-8111-111111111111"): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -50,6 +59,7 @@ async function fixture() {
   await mkdir(join(custodyRoot, "mail"), { mode: 0o700 });
   await Promise.all([
     writeFile(join(custodyRoot, "secrets", "kek.bin"), Buffer.alloc(32, 1), { mode: 0o600 }),
+    writeFile(join(custodyRoot, "secrets", "support-kek.bin"), Buffer.alloc(32, 5), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 })
@@ -65,6 +75,14 @@ async function fixture() {
     `HATCHET_CLIENT_TOKEN=${testToken()}\n`,
     { mode: 0o600 }
   );
+  await writeDevelopmentDeploymentRegisterReceipt(
+    repositoryRoot,
+    createDevelopmentDeploymentRegisterMachineReceipt({
+      registerVersion: parseRegisterVersionText("424242"),
+      rowCount: 32,
+      snapshotSha256: "a".repeat(64)
+    })
+  );
   return {
     repositoryRoot,
     custodyRoot,
@@ -74,10 +92,12 @@ async function fixture() {
   };
 }
 
-function assemble(repositoryRoot: string) {
+async function assemble(repositoryRoot: string) {
   return assembleDevelopmentApiEnvironment({
     repositoryRoot,
-    providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL
+    providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+    registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot),
+    supportModelTarget: TEST_SUPPORT_MODEL_TARGET
   });
 }
 
@@ -95,6 +115,11 @@ afterEach(async () => {
 describe("DEV-09 private local API environment", () => {
   it("atomically assembles the exact environment without returning credential values", async () => {
     const test = await fixture();
+    const masterCredentials = parseEnvironment(
+      await readFile(test.databaseCredentialFilePath, "utf8")
+    );
+    const supportOperatorUrl = masterCredentials.get("SUPPORT_CONFIG_OPERATOR_DATABASE_URL")!;
+    const supportUrl = masterCredentials.get("SUPPORT_DATABASE_URL")!;
     const receipt = await assemble(test.repositoryRoot);
     expect(receipt).toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     expect(JSON.stringify(receipt)).not.toMatch(/password|token|postgresql|11111111/i);
@@ -106,7 +131,25 @@ describe("DEV-09 private local API environment", () => {
     expect(metadata.mode & 0o777).toBe(0o600);
     const environment = parseEnvironment(await readFile(test.outputFilePath, "utf8"));
     expect([...environment.keys()]).toEqual(DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    expect(DEVELOPMENT_API_ENVIRONMENT_KEYS).not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(JSON.stringify(receipt)).not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(JSON.stringify(receipt)).not.toContain(supportOperatorUrl);
+    expect(await readFile(test.outputFilePath, "utf8"))
+      .not.toContain("SUPPORT_CONFIG_OPERATOR_DATABASE_URL");
+    expect(await readFile(test.outputFilePath, "utf8")).not.toContain(supportOperatorUrl);
     expect(environment.get("DATABASE_URL")).toContain("debateai_dev_runtime");
+    expect(environment.get("SUPPORT_KEK_PATH"))
+      .toBe(join(test.custodyRoot, "secrets", "support-kek.bin"));
+    expect(new Set([
+      environment.get("SUPPORT_KEK_PATH"),
+      environment.get("KEK_PATH"),
+      environment.get("CORPUS_KEK_PATH"),
+      environment.get("BLIND_INDEX_KEY_PATH"),
+      environment.get("AUDIT_SOURCE_IP_SALT_PATH")
+    ])).toHaveLength(5);
+    expect(environment.get("SUPPORT_DATABASE_URL")).toContain("debateai_dev_support");
+    expect(environment.get("SUPPORT_DATABASE_URL")).toBe(supportUrl);
+    expect(environment.get("SUPPORT_DATABASE_URL")).not.toBe(environment.get("DATABASE_URL"));
     expect(environment.get("CONTENT_PROVISION_DATABASE_URL"))
       .toContain("debateai_dev_content_provision");
     expect(environment.get("AUTHORIZATION_DATABASE_URL"))
@@ -117,6 +160,11 @@ describe("DEV-09 private local API environment", () => {
     expect(environment.get("HATCHET_TENANT_ID")).toBe("11111111-1111-4111-8111-111111111111");
     expect(environment.get("HATCHET_CLIENT_TOKEN")).toBe(testToken());
     expect(environment.get("PUBLIC_APP_URL")).toBe("https://localhost:3000");
+    expect(environment.get("REGISTER_VERSION")).toBe("424242");
+    expect(environment.get("REGISTER_DEPLOYMENT_RECEIPT_SHA256"))
+      .toBe((await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot)).receiptSha256);
+    expect(environment.get("REGISTER_DEPLOYMENT_RECEIPT_FILE"))
+      .toBe(join(test.custodyRoot, "deployment-register-receipt.v1.json"));
     expect(environment.get("CONTENT_ENCRYPTION_ENABLED")).toBe("true");
     expect(environment.get("PUBLICATION_ENABLED")).toBe("true");
     expect(environment.get("PUBLICATION_CLEANUP_DATABASE_URL"))
@@ -135,6 +183,12 @@ describe("DEV-09 private local API environment", () => {
           ? { authorization_header: provider.authorization_header } : {})
       }))
     );
+    expect(JSON.parse(environment.get("SUPPORT_MODEL_TARGET_JSON")!)).toEqual({
+      provider_ref: "development:hermes-glm-5.3-flash",
+      base_url: "http://127.0.0.1:8794/v1",
+      model: "z-ai/glm-5.3-flash",
+      authorization_header: "Bearer support-test"
+    });
     expect(environment.get("PROVIDER_PROBE_TIMEOUT_MS")).toBe("180000");
     const prior = new Map<string, string | undefined>();
     for (const [key, value] of environment) {
@@ -207,7 +261,9 @@ describe("DEV-09 private local API environment", () => {
 
     await expect(assembleDevelopmentApiEnvironment({
       repositoryRoot: test.repositoryRoot,
-      providerPanel: refreshedPanel
+      providerPanel: refreshedPanel,
+      registerReceipt: await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot),
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET
     })).resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
     const after = parseEnvironment(await readFile(test.outputFilePath, "utf8"));
     for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
@@ -217,7 +273,7 @@ describe("DEV-09 private local API environment", () => {
     expect(after.get("PROVIDER_DISCOVERY_TARGETS_JSON")).toBe(refreshedPanel.targetsJson);
   });
 
-  it("atomically upgrades the exact publication-disabled environment", async () => {
+  it("rejects the removed publication-disabled fallback without overwriting it", async () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
@@ -230,13 +286,8 @@ describe("DEV-09 private local API environment", () => {
       .join("\n");
     await writeFile(test.outputFilePath, legacy, { mode: 0o600 });
 
-    await expect(assemble(test.repositoryRoot))
-      .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
-    const upgraded = await readFile(test.outputFilePath, "utf8");
-    expect(upgraded).toContain(`REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`);
-    expect(upgraded).toContain("PUBLICATION_ENABLED=true\n");
-    expect(upgraded).toContain("PROVIDER_DISCOVERY_TARGETS_JSON=");
-    expect(upgraded).toContain("PROVIDER_PROBE_TIMEOUT_MS=180000\n");
+    await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(legacy);
   });
 
   it("atomically upgrades the exact timeout that was shorter than a real CLI probe", async () => {
@@ -255,7 +306,22 @@ describe("DEV-09 private local API environment", () => {
       .toContain("PROVIDER_PROBE_TIMEOUT_MS=180000\n");
   });
 
-  it("atomically adds the evaluator principal to an exact earlier environment", async () => {
+  it("atomically adds the dedicated Support model target to the exact legacy environment",async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath,"utf8");
+    const legacy = current.split("\n")
+      .filter((row) => !row.startsWith("SUPPORT_MODEL_TARGET_JSON="))
+      .join("\n");
+    await writeFile(test.outputFilePath,legacy,{ mode: 0o600 });
+
+    await expect(assemble(test.repositoryRoot))
+      .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length,reused: false });
+    expect(await readFile(test.outputFilePath,"utf8"))
+      .toContain(`SUPPORT_MODEL_TARGET_JSON=${TEST_SUPPORT_MODEL_TARGET}\n`);
+  });
+
+  it("rejects an earlier environment that drops a required field", async () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
@@ -264,41 +330,42 @@ describe("DEV-09 private local API environment", () => {
       .join("\n");
     await writeFile(test.outputFilePath, legacy, { mode: 0o600 });
 
-    await expect(assemble(test.repositoryRoot))
-      .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
-    expect(await readFile(test.outputFilePath, "utf8"))
-      .toContain("EVALUATOR_DEV_MENU_DATABASE_URL=postgresql://debateai_dev_evaluator_api:");
+    await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(legacy);
   });
 
-  it("replaces only the byte-exact removed scaffold environment with the private real panel", async () => {
+  it("rejects v4 reconstruction and removed-provider fallback", async () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
     const legacy = current
-      .replace(`REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`, "REGISTER_VERSION=3\n")
-      .replace(
-        `PROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(
-          TEST_DEVELOPMENT_PROVIDER_DOCUMENT.providers.map((provider) => ({
-            provider_ref: provider.provider_ref,
-            base_url: provider.base_url,
-            model: provider.model,
-            ...("authorization_header" in provider
-              ? { authorization_header: provider.authorization_header } : {})
-          }))
-        )}\n`,
-        `PROVIDER_DISCOVERY_TARGETS_JSON=${REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON}\n`
-      );
+      .replace("REGISTER_VERSION=424242\n", "REGISTER_VERSION=4\n")
+      .replace("development:codex-cli", "development:local-vllm")
+      .replace("gpt-test-real", "qa-deterministic-v1");
     await writeFile(test.outputFilePath, legacy, { mode: 0o600 });
 
-    await expect(assemble(test.repositoryRoot))
-      .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
-    const upgraded = await readFile(test.outputFilePath, "utf8");
-    expect(upgraded).toContain(`REGISTER_VERSION=${DEVELOPMENT_REGISTER_VERSION}\n`);
-    expect(upgraded).toContain("development:codex-cli");
-    expect(upgraded).not.toContain("qa-deterministic-v1");
+    await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(legacy);
   });
 
   it("rejects unsafe custody, malformed tokens, and aliased database principals", async () => {
+    const unsafeSupportKek = await fixture();
+    await chmod(join(unsafeSupportKek.custodyRoot, "secrets", "support-kek.bin"), 0o640);
+    await expect(assemble(unsafeSupportKek.repositoryRoot))
+      .rejects.toThrow("DEV_API_ENVIRONMENT_SECRET_CUSTODY_INVALID");
+
+    const receiptMismatch = await fixture();
+    await expect(assembleDevelopmentApiEnvironment({
+      repositoryRoot: receiptMismatch.repositoryRoot,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      supportModelTarget: TEST_SUPPORT_MODEL_TARGET,
+      registerReceipt: createDevelopmentDeploymentRegisterMachineReceipt({
+        registerVersion: parseRegisterVersionText("424242"),
+        rowCount: 32,
+        snapshotSha256: "b".repeat(64)
+      })
+    })).rejects.toThrow("DEV_API_ENVIRONMENT_REGISTER_RECEIPT_MISMATCH");
+
     const unsafe = await fixture();
     await chmod(unsafe.hatchetCredentialFilePath, 0o644);
     await expect(assemble(unsafe.repositoryRoot))

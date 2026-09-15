@@ -7,7 +7,13 @@ import {
   buildAlgorithmRegisterRows,
   loadBootstrapRegister,
   warnOnIdenticalSynthesisRoleRefs,
-  type ProviderFamilyEntry
+  type ProviderFamilyEntry,
+  canonicalDecimal,
+  canonicalRegisterJson,
+  createPostgresRegisterPublicationPort,
+  parseRegisterVersionText,
+  type CanonicalJsonAst,
+  type RegisterPublicationRow
 } from "@debateai/register";
 
 /**
@@ -340,15 +346,16 @@ export async function buildAcceptanceRegisterRows(): Promise<readonly Acceptance
   );
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    return `{${Object.entries(value)
-      .sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
-      .map(([key, member]) => `${JSON.stringify(key)}:${canonicalJson(member)}`)
-      .join(",")}}`;
+function acceptanceValueAst(value: unknown): CanonicalJsonAst {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return canonicalDecimal(String(value));
+  if (Array.isArray(value)) return Object.freeze(value.map(acceptanceValueAst));
+  if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.freeze(Object.fromEntries(
+      Object.entries(value).map(([key, member]) => [key, acceptanceValueAst(member)])
+    ));
   }
-  return JSON.stringify(value);
+  throw new TypeError("ACCEPTANCE_REGISTER_VALUE_INVALID");
 }
 
 export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly rowCount: number }> {
@@ -369,54 +376,17 @@ export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly row
     sourceRef: bootstrap.resolution[rowKey as keyof typeof bootstrap.resolution]
   }));
   const rows = [...bootstrapRows, ...acceptanceRows];
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    for (const row of rows) {
-      await client.query(
-        `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES ($1, $2, $3::jsonb, $4)
-         ON CONFLICT (register_version, row_key) DO NOTHING`,
-        [ACCEPTANCE_REGISTER_VERSION, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-      );
-    }
-    await client.query(
-      `INSERT INTO register.register_version (register_version, row_count, sealed)
-       VALUES ($1, $2, true)
-       ON CONFLICT (register_version) DO NOTHING`,
-      [ACCEPTANCE_REGISTER_VERSION, rows.length]
-    );
-    // T16 · the migration-declared manifest fails the seal loudly, naming the
-    // family and row key, if any mandatory row was not supplied.
-    await client.query("SELECT register.assert_required_rows($1)", [ACCEPTANCE_REGISTER_VERSION]);
-    const persisted = await client.query<{ row_key: string; value_json: unknown; source_ref: string }>(
-      `SELECT row_key, value_json, source_ref FROM register.register_row
-       WHERE register_version=$1 AND row_key=ANY($2::text[]) ORDER BY row_key`,
-      [ACCEPTANCE_REGISTER_VERSION, rows.map((row) => row.rowKey)]
-    );
-    if (persisted.rows.length !== rows.length) throw new Error("ACCEPTANCE_REGISTER_ROW_COUNT_MISMATCH");
-    const expected = new Map(rows.map((row) => [row.rowKey, row]));
-    for (const row of persisted.rows) {
-      const wanted = expected.get(row.row_key);
-      if (wanted === undefined
-        || row.source_ref !== wanted.sourceRef
-        || canonicalJson(row.value_json) !== canonicalJson(wanted.value)) {
-        throw new Error(`ACCEPTANCE_REGISTER_CONFLICT:${row.row_key}`);
-      }
-    }
-    const version = await client.query<{ row_count: number; sealed: boolean }>(
-      "SELECT row_count, sealed FROM register.register_version WHERE register_version=$1",
-      [ACCEPTANCE_REGISTER_VERSION]
-    );
-    if (Number(version.rows[0]?.row_count) !== rows.length || version.rows[0]?.sealed !== true) {
-      throw new Error("ACCEPTANCE_REGISTER_VERSION_CONFLICT");
-    }
-    await client.query("COMMIT");
-    return Object.freeze({ rowCount: rows.length });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const publicationRows: readonly RegisterPublicationRow[] = Object.freeze(rows.map((row) =>
+    Object.freeze({
+      rowKey: row.rowKey,
+      valueJsonText: canonicalRegisterJson(acceptanceValueAst(row.value)),
+      sourceRef: row.sourceRef
+    })
+  ));
+  const receipt = await createPostgresRegisterPublicationPort(pool).importHistorical({
+    registerVersion: parseRegisterVersionText(String(ACCEPTANCE_REGISTER_VERSION)),
+    rows: publicationRows
+  });
+  await pool.query("SELECT register.assert_required_rows($1)", [ACCEPTANCE_REGISTER_VERSION]);
+  return Object.freeze({ rowCount: receipt.rowCount });
 }

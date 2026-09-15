@@ -10,6 +10,8 @@
   --ink: #29261F; --ink-hover: #3A362D;
   --text: #29261F; --text-strong: #1A1613; --text-2: #555147;
   --text-3: #6E675C; --muted: #6E675C; --muted-2: #6E675C;
+  /* the mute tag pill: tint(mute, .1) and tint(mute, .4) — consent-ui S01 */
+  --muted-bg: rgba(110,103,92,.1); --muted-border: rgba(110,103,92,.4);
   --line: rgba(41,38,31,.10); --line-2: rgba(41,38,31,.12); --line-strong: rgba(41,38,31,.20);
   --grid-dot: rgba(41,38,31,.12);
 
@@ -27,6 +29,8 @@
   --agree: #3E7A4E; --agree-text: #3C754B; --agree-bg: #E6ECE2; --agree-border: #ADC5AF;
   --dispute: #B0432F; --dispute-text: #B0432F; --dispute-bg: #F4E5DE; --dispute-border: #DDAEA2;
   --ok-dot: #3E7A4E; --ok-text: #3C754B; --ok-bg: #E6ECE2; --ok-border: #ADC5AF;
+  /* locked-toggle track fill and accent edge: tint(ok, .28) and tint(ok, .55) — consent-ui S01 */
+  --ok-soft: rgba(62,122,78,.28); --ok-edge: rgba(62,122,78,.55);
   --gen-dot: #A8823E; --gen-text: #826530; --gen-bg: #F3ECE0; --gen-border: #D9C8A9;
   --score-strength-text: #3C754B; --score-strength-bg: #E6ECE2; --score-strength-border: #ADC5AF;
   --score-uncertainty-text: #826530; --score-uncertainty-bg: #F3ECE0; --score-uncertainty-border: #D9C8A9;
@@ -49,10 +53,16 @@
   --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
   --shadow-chrome: 0 20px 46px -22px rgba(26,22,19,.26);
   --shadow-thumb: 0 1px 4px rgba(0,0,0,.3);
+  /* the 10b toggle knob's own shadow — consent-ui S01. One pixel tighter than
+     --shadow-thumb, which is the .ndSlider thumb's and belongs to another
+     surface, so it is copied rather than re-valued (CODE-REV-S01-C3C4 r1 N3) */
+  --shadow-knob: 0 1px 3px rgba(0,0,0,.3);
   --shadow-tab: 0 6px 16px -8px rgba(41,38,31,.55);
   /* a QR must stay dark-on-light for scanners in both modes */
   --qr-paper: #FFFFFF;
   --qr-ink: #111111;
+  /* the consent dialogs' overlay: one wash for both modes, from artboard 10c — consent-ui S01 */
+  --scrim: rgba(10,8,6,.42);
   --shadow-auth-card: 0 48px 90px -44px rgba(26,22,19,.5);
 
   /* mode-independent typography */
@@ -76,6 +86,12 @@
   --zoom-cluster-offset-b: calc(var(--dock-offset-b) + var(--dock-max-h) + 12px);
   --token-dock-clearance: calc(18px + var(--dock-max-h));
   --z-canvas-sticky: 4; --z-zoom-cluster: 5;
+  /* consent-ui S01 — the bar clears .topBar 30 and .tokenDock 40 but stays under
+     .drawerScrim 54; the two consent dialogs clear .modalScrim 70 and the policy
+     modal clears the card it opens from; .toast 80 keeps the ceiling */
+  --z-consent-bar: 45;
+  --z-consent-scrim: 75; --z-consent-card: 76;
+  --z-policy-scrim: 77; --z-policy-card: 78;
 
   /* landing page — the document ships two variants: Terracotta rides soft
      12-20px radii at display weight 480, Chamber the editorial variant */
@@ -103,6 +119,8 @@ html[data-mode="chamber"] {
   --ink: #F2EAD9; --ink-hover: #FFF8E8;
   --text: #F2EAD9; --text-strong: #FFFFFF; --text-2: #B5A88F;
   --text-3: #9C907A; --muted: #9C907A; --muted-2: #9C907A;
+  /* the mute tag pill: tint(mute, .14) and tint(mute, .5) — consent-ui S01 */
+  --muted-bg: rgba(156,144,122,.14); --muted-border: rgba(156,144,122,.5);
   --line: rgba(242,234,217,.09); --line-2: rgba(242,234,217,.08); --line-strong: rgba(242,234,217,.18);
   --grid-dot: rgba(242,234,217,.08);
 
@@ -118,6 +136,8 @@ html[data-mode="chamber"] {
   --agree: #86B58D; --agree-text: #86B58D; --agree-bg: #2A2E24; --agree-border: #4F654F;
   --dispute: #D67F65; --dispute-text: #D67F65; --dispute-bg: #36251E; --dispute-border: #774A3B;
   --ok-dot: #86B58D; --ok-text: #86B58D; --ok-bg: #2A2E24; --ok-border: #4F654F;
+  /* locked-toggle track fill and accent edge: tint(ok, .35) and tint(ok, .55) — consent-ui S01 */
+  --ok-soft: rgba(134,181,141,.35); --ok-edge: rgba(134,181,141,.55);
   --gen-dot: #C8A055; --gen-text: #C8A055; --gen-bg: #342A1B; --gen-border: #705A33;
   --score-strength-text: #86B58D; --score-strength-bg: #2A2E24; --score-strength-border: #4F654F;
   --score-uncertainty-text: #C8A055; --score-uncertainty-bg: #342A1B; --score-uncertainty-border: #705A33;
@@ -218,6 +238,1052 @@ select {
 @keyframes de-fadeup {
   0% { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: none; }
+}
+
+.supportWidget {
+  position: fixed;
+  right: var(--dock-offset-b);
+  bottom: var(--dock-offset-b);
+  z-index: calc(var(--z-zoom-cluster) + 1);
+  width: var(--dock-w);
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.supportWidgetToggle {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--surface-1);
+  padding: 10px 18px;
+  box-shadow: var(--shadow-pop);
+  cursor: pointer;
+  /* visibility carries the tab order with it: gone while the panel is open, back
+     the moment the panel starts folding away */
+  transition: opacity .16s ease, transform .16s ease, visibility 0s linear 0s;
+}
+
+.supportWidget[data-widget-state="expanded"] .supportWidgetToggle {
+  opacity: 0;
+  transform: scale(.94) translateY(4px);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .16s ease, transform .16s ease, visibility 0s linear .16s;
+}
+
+.supportWidgetPanel {
+  width: 100%;
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  background: var(--surface-1);
+  color: var(--text);
+  padding: 16px;
+  box-shadow: var(--shadow-pop);
+  /* it grows out of, and folds back into, the corner the pill sits in */
+  transform-origin: 100% 100%;
+  animation: de-dockin .24s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.supportWidget[data-widget-state="closing"] .supportWidgetPanel {
+  animation: de-dockout .18s ease both;
+}
+
+@keyframes de-dockin {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes de-dockout {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px) scale(.99); }
+}
+
+.supportWidgetFullPage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 4px 0;
+  color: var(--muted);
+  font: 500 9.5px/1 var(--font-mono);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.supportWidgetFullPageArrow { color: var(--gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .supportWidgetToggle,
+  .supportWidget[data-widget-state="expanded"] .supportWidgetToggle {
+    transition: visibility 0s linear 0s;
+  }
+
+  .supportWidgetPanel,
+  .supportWidget[data-widget-state="closing"] .supportWidgetPanel {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   Turn 11 — full-page Support desk
+   ============================================================ */
+
+.appShell:has([data-help-page]) > .topBar { display: none; }
+
+.supportPage {
+  min-height: 100vh;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 1.2px) 0 0 / 28px 28px,
+    var(--bg);
+}
+
+.supportDesk {
+  width: min(1180px, 100%);
+  height: calc(100vh - 32px);
+  min-height: 690px;
+  margin: 0 auto;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr);
+  color: var(--text);
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop);
+}
+
+.supportHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--header-bg);
+  backdrop-filter: blur(18px);
+}
+
+.supportHeader .brandDiamond {
+  width: 26px;
+  height: 26px;
+  transform: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+}
+
+.supportHeader .brandDiamondCore {
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  background: var(--gold);
+}
+
+.supportHeaderDivider {
+  width: 1px;
+  height: 26px;
+  background: var(--line-2);
+}
+
+.supportHeaderTitle {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-2);
+}
+
+.supportHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: auto;
+}
+
+.supportHeaderActions .modeToggle {
+  width: 32px;
+  height: 32px;
+}
+
+.supportIdentity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 13px 4px 5px;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.supportIdentityMark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--bg);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.supportDeskBody {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 258px minmax(0, 1fr) 268px;
+}
+
+.supportRail {
+  min-width: 0;
+  overflow: auto;
+  padding: 20px 18px;
+  background: var(--surface-2);
+  scrollbar-width: thin;
+}
+
+.supportTopicRail {
+  border-right: 1px solid var(--line);
+}
+
+.supportRightRail {
+  border-left: 1px solid var(--line);
+}
+
+.supportEyebrow {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.supportTopicList {
+  display: grid;
+  gap: 4px;
+}
+
+.supportTopic {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-2);
+  font: 600 11.5px/1.25 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.supportTopic:hover {
+  border-color: var(--line-2);
+  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+}
+
+.supportTopic[data-active="true"] {
+  border-color: var(--line-strong);
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: 0 8px 20px -18px rgba(0,0,0,.8);
+}
+
+.supportTopicDiamond {
+  width: 7px;
+  height: 7px;
+  justify-self: center;
+  transform: rotate(45deg);
+  background: var(--muted);
+}
+
+.supportTone--gold { background: var(--gold); }
+.supportTone--reasoning { background: var(--reasoning); }
+.supportTone--pro { background: var(--pro); }
+.supportTone--con { background: var(--con); }
+.supportTone--agree { background: var(--agree); }
+.supportTone--muted { background: var(--muted); }
+
+.supportTopicCount {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.supportService {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.supportServiceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.supportServiceRow > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.supportServiceRow strong {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: .08em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.supportStatusDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.supportStatusDot.is-ok { background: var(--agree); box-shadow: 0 0 0 3px color-mix(in srgb, var(--agree) 12%, transparent); }
+.supportStatusDot.is-warn { background: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 12%, transparent); }
+.supportStatusDot.is-down { background: var(--con); box-shadow: 0 0 0 3px color-mix(in srgb, var(--con) 12%, transparent); }
+
+.supportAgent {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface-1);
+}
+
+.supportAgentHeader {
+  min-width: 0;
+  min-height: 79px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--header-bg);
+}
+
+.supportAgentAvatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--gold-border);
+  border-radius: 10px;
+  background: var(--gold-bg);
+  color: var(--gold);
+  font-size: 12px;
+}
+
+.supportAgentIdentity {
+  min-width: 0;
+  flex: 1;
+}
+
+.supportAgentIdentity > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.supportAgentIdentity h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-strong);
+}
+
+.supportAgentIdentity p {
+  max-width: 390px;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supportOnline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--ok-border);
+  border-radius: var(--r-pill);
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.supportOnline::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.supportOnline--unavailable {
+  border-color: var(--dispute-border);
+  background: var(--dispute-bg);
+  color: var(--dispute-text);
+}
+
+.supportLanguage {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+}
+
+.supportLanguage button {
+  min-width: 27px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--muted);
+  font: 700 8px/1 var(--font-mono);
+  cursor: pointer;
+}
+
+.supportLanguage button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.supportNewConversation {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-2);
+  font: 650 9px/1 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.supportNewConversation:hover { background: var(--surface-2); color: var(--text); }
+
+.supportChatScroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 24px 24px;
+  scrollbar-width: thin;
+}
+
+.supportTimestamp {
+  margin: 0 0 16px;
+  font: 600 7.5px/1 var(--font-mono);
+  letter-spacing: .12em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.supportConversation {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.supportMessage {
+  max-width: 78%;
+  margin: 0;
+  animation: de-fadeup .26s ease both;
+}
+
+.supportMessage p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.supportMessage--user {
+  align-self: flex-end;
+  padding: 10px 13px;
+  border: 1px solid var(--gold-border);
+  border-radius: 14px 14px 4px 14px;
+  background: var(--gold-bg);
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.supportMessage--assistant {
+  align-self: flex-start;
+}
+
+.supportMessageShell {
+  position: relative;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 15px 15px 15px 4px;
+  background: var(--shell);
+  box-shadow: var(--shadow-card);
+}
+
+.supportMessageTab {
+  position: absolute;
+  top: -1px;
+  left: 18px;
+  width: 34px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: var(--gold);
+}
+
+.supportMessageCore {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--core);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.supportCitation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.supportCitation span {
+  padding: 3px 6px;
+  border: 1px solid var(--gold-border);
+  border-radius: 4px;
+  background: var(--gold-bg);
+  color: var(--gold-text);
+  font: 650 7px/1 var(--font-mono);
+  letter-spacing: .08em;
+}
+
+.supportCitation a {
+  color: var(--link);
+  font-size: 9px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.supportRating {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.supportRating button {
+  padding: 4px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 650 8px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.supportSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.supportSuggestions button {
+  padding: 7px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-2);
+  font: 550 9px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.supportSuggestions button:hover {
+  border-style: solid;
+  border-color: var(--gold);
+  color: var(--text);
+  background: var(--gold-bg);
+}
+
+.supportComposerDock {
+  position: relative;
+  min-width: 0;
+  padding: 12px 24px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--header-bg);
+}
+
+.supportComposer {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  display: grid;
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  background: var(--shell);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--surface-1) 75%, transparent);
+}
+
+.supportComposer::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--core);
+}
+
+.supportComposer > * { position: relative; z-index: 1; }
+
+.supportComposerLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.supportComposer input {
+  width: calc(100% - 10px);
+  min-width: 0;
+  min-height: 48px;
+  margin: 5px 5px 0;
+  padding: 12px 13px 8px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: 500 12px/1.45 var(--font-sans);
+}
+
+.supportComposer input::placeholder {
+  color: var(--muted);
+  font: italic 500 12px/1.45 var(--font-serif);
+}
+
+.supportComposer input:focus-visible {
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+
+.supportComposerBar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  margin: 0 5px 5px;
+  padding: 5px 7px 5px 9px;
+}
+
+.supportAttach {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 650 9px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.supportAttach[aria-expanded="true"] { color: var(--gold-text); }
+
+.supportComposerHint {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  color: var(--muted);
+  font-size: 7.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supportSend,
+.supportEscalation button {
+  padding: 8px 14px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font: 700 9px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.supportSend:disabled,
+.supportEscalation button:disabled { opacity: .5; cursor: wait; }
+
+.supportContextPanel {
+  position: absolute;
+  right: 24px;
+  bottom: calc(100% - 2px);
+  left: 24px;
+  z-index: 4;
+  max-height: 220px;
+  overflow: auto;
+  padding: 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-2);
+  font-size: 9px;
+}
+
+.supportContextPanel[hidden] { display: none; }
+/* a signed-out asker gets neither control, and an empty bordered box reads as a
+   broken card rather than as nothing to show */
+.supportContextPanel:empty { display: none; }
+
+.supportContextPanel label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.supportContextPanel section { margin-top: 10px; }
+.supportContextPanel section > button,
+.supportContextPanel li button {
+  padding: 5px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 600 8.5px/1.25 var(--font-sans);
+  cursor: pointer;
+}
+
+.supportContextPanel ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.supportRightRail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.supportSideCard {
+  position: relative;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface-1);
+  box-shadow: 0 12px 28px -26px rgba(0,0,0,.9);
+}
+
+.supportMetadata {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.supportMetadata > div {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.supportMetadata > div:first-child { border-top: 0; padding-top: 1px; }
+
+.supportMetadata dt {
+  color: var(--muted);
+  font: 650 7.5px/1.4 var(--font-mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.supportMetadata dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 9px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.supportSideLanguage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.supportSideLanguage > span {
+  color: var(--muted);
+  font: 650 7.5px/1.4 var(--font-mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.supportEscalation {
+  padding-top: 18px;
+}
+
+.supportEscalationTab {
+  position: absolute;
+  top: -1px;
+  left: 18px;
+  width: 38px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: var(--con);
+}
+
+.supportEscalation h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.supportEscalation p {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.supportEscalation button { width: 100%; }
+
+.supportEscalation > a {
+  display: block;
+  margin-top: 9px;
+  color: var(--muted);
+  font: 500 8px/1 var(--font-mono);
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.supportShortcuts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.supportShortcuts li {
+  border-top: 1px solid var(--line);
+}
+
+.supportShortcuts li:first-child { border-top: 0; }
+
+.supportShortcuts a,
+.supportShortcuts button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 600 9px/1.3 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.supportShortcuts span { color: var(--gold); }
+
+.supportShortcutNote {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 7.5px;
+  line-height: 1.5;
+}
+
+.supportAuxiliary:empty { display: none; }
+.supportAuxiliary > section {
+  margin-top: 0;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface-1);
+  font-size: 9px;
+}
+.supportAuxiliary form { display: grid; gap: 7px; }
+.supportAuxiliary textarea { width: 100%; min-height: 64px; }
+
+.supportAssistantCompact {
+  display: grid;
+  gap: 12px;
+}
+
+.supportAssistantCompact > .supportConversation .supportMessage { max-width: 92%; }
+.supportAssistantCompact > .supportContextPanel { position: static; }
+.supportAssistantCompact > .supportComposer { padding: 5px; }
+
+.supportCompactHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.supportCompactClose {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  background: var(--surface-2);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background .18s;
+}
+
+.supportCompactClose:hover {
+  background: var(--surface-sunken);
+  color: var(--text-2);
+}
+
+.supportEscalateCompact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text);
+  font: 700 10.5px/1 var(--font-sans);
+  cursor: pointer;
+  transition: background .18s;
+}
+
+.supportEscalateCompact:hover { background: var(--surface-2); }
+.supportEscalateCompact:disabled { opacity: .5; cursor: wait; }
+
+.supportComposerBar--compact { justify-content: flex-end; }
+
+.supportAssistantCompact .supportSend {
+  min-height: 30px;
+  padding: 8px 16px;
+  font-size: 10px;
+}
+
+@media (max-width: 1100px) {
+  .supportDeskBody { grid-template-columns: 218px minmax(0, 1fr) 238px; }
+  .supportRail { padding-inline: 14px; }
+  .supportAgentHeader { padding-inline: 18px; }
+  .supportChatScroll,
+  .supportComposerDock { padding-inline: 18px; }
+  .supportAgentIdentity p { max-width: 380px; }
+  .supportComposerHint { display: none; }
+}
+
+@media (max-width: 860px) {
+  .supportPage { padding: 0; }
+  .supportDesk {
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    border-inline: 0;
+    border-radius: 0;
+  }
+  .supportDeskBody {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+  .supportTopicRail {
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .supportTopicList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .supportService { display: none; }
+  .supportAgent { min-height: 650px; }
+  .supportRightRail {
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .supportAuxiliary { grid-column: 1 / -1; }
+}
+
+@media (max-width: 600px) {
+  .supportHeader { padding-inline: 14px; gap: 10px; }
+  .supportHeader .brandText { display: none; }
+  .supportIdentity > span:last-child { display: none; }
+  .supportIdentity { padding-right: 5px; }
+  .supportTopicRail { padding: 14px 10px; }
+  .supportTopicList { display: flex; overflow-x: auto; padding-bottom: 3px; }
+  .supportTopic { width: 170px; flex: 0 0 170px; }
+  .supportAgentHeader { align-items: flex-start; flex-wrap: wrap; }
+  .supportAgentIdentity { min-width: 180px; }
+  .supportAgentIdentity p { white-space: normal; }
+  .supportNewConversation { margin-left: auto; }
+  .supportMessage { max-width: 92%; }
+  .supportChatScroll { padding: 18px 14px 22px; }
+  .supportComposerDock { padding: 10px 12px 14px; }
+  .supportContextPanel { right: 12px; left: 12px; }
+  .supportComposerBar { gap: 7px; }
+  .supportRightRail { grid-template-columns: minmax(0, 1fr); }
+  .supportComposerHint { display: none; }
 }
 @keyframes de-popin {
   0% { opacity: 0; transform: scale(0.95) translateY(5px); }
@@ -487,6 +1553,7 @@ html.theme-transition-fallback body *::after {
 
 .btn:focus-visible,
 .iconBtn:focus-visible,
+.supportCompactClose:focus-visible,
 .modeToggle:focus-visible,
 .input:focus-visible,
 input:focus-visible,
@@ -7194,3 +8261,797 @@ a:focus-visible {
   .publicArgumentSpacer { display: none; }
   .publicModelPill { max-width: 100%; }
 }
+
+/* === consent-ui S01 === */
+/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
+   The ONE delimited block this slice may append, at the very end of the file
+   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
+   slice adds live in the two token blocks at the top, which S01 also owns. */
+
+.consentBar {
+  position: fixed;
+  left: 22px;
+  right: 22px;
+  bottom: calc(22px + var(--safe-b));
+  z-index: var(--z-consent-bar);
+}
+
+.consentBarBezel {
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 7px;
+}
+
+.consentBarCore {
+  align-items: center;
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  gap: 24px;
+  overflow: hidden;
+  padding: 17px 20px 16px;
+  position: relative;
+}
+
+.consentTab {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 52px;
+  height: 4px;
+  border-radius: var(--r-tab);
+  background: var(--gold);
+}
+
+.consentCopy {
+  flex: 1;
+  min-width: 0;
+}
+
+.consentEyebrow {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.consentTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin-top: 7px;
+}
+
+.consentBody {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+  max-width: 560px;
+  text-wrap: pretty;
+}
+
+.consentActions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+
+.consentGhost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 9px 15px;
+  white-space: nowrap;
+}
+
+.consentGhostStrong { color: var(--ink); }
+
+/* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
+   choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
+   :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
+   used size is content + padding + border, so a 1px edge the artboard omits
+   ships the primary 2px taller and 2px wider — and breaks the equality the
+   design builds on, where a ghost pill's `9px 15px` + 1px border and a
+   primary's `10px` + 0 border are both 10px of effective edge in the same row
+   (CODE-REV-S01-C3C4 r1 N2). */
+.consentPrimary {
+  background: var(--ink);
+  border: none;
+  border-radius: var(--r-pill);
+  color: var(--bg);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 19px;
+  white-space: nowrap;
+}
+
+.consentGhost:focus-visible,
+.consentPrimary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 10a's own spring, transcribed from the artboard
+   (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
+   `Save choices` with no transition, and one class serving two artboards must
+   take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
+   Its reduced-motion counterpart is the block at the end of this file. */
+.consentBar .consentPrimary {
+  transition: transform .5s cubic-bezier(.34,1.56,.64,1);
+}
+
+.consentBar .consentPrimary:hover { transform: scale(1.04); }
+
+/* --- 10b: the preferences card. One presentation serves both entry points
+   (the bar's "Choose what to store" and Settings -> Privacy), because there is
+   no bar in Settings to replace or to grow from (S01-R14). --- */
+
+.consentScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-consent-scrim);
+  align-items: center;
+  background: var(--scrim);
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.consentCard {
+  position: relative;
+  z-index: var(--z-consent-card);
+  width: min(520px, calc(100vw - 32px));
+  max-height: 92vh;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  padding: 7px;
+}
+
+.consentCardCore {
+  position: relative;
+  overflow: hidden;
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 22px 24px 20px;
+}
+
+.consentCardCore .consentTab { left: 24px; }
+
+.consentCardTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin-top: 9px;
+}
+
+.consentLede {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+.consentCatList {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.consentCatRow {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.consentCatMain { flex: 1; min-width: 0; }
+
+.consentCatHead { align-items: center; display: flex; gap: 8px; }
+
+.consentCatName {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.consentTag {
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 2px 8px;
+}
+
+.consentTag-essential {
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+  color: var(--ok-dot);
+}
+
+.consentTag-quality {
+  background: var(--gold-bg);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+}
+
+.consentTag-analytics {
+  background: var(--muted-bg);
+  border: 1px solid var(--muted-border);
+  color: var(--muted);
+}
+
+.consentCatDesc {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.consentCatDetail {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  margin-top: 5px;
+}
+
+.consentSwitch {
+  align-items: center;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  height: 22px;
+  justify-content: flex-start;
+  margin-top: 2px;
+  padding: 2px;
+  width: 38px;
+}
+
+.consentSwitch[aria-checked="true"] {
+  background: var(--ok-dot);
+  border-color: var(--ok-edge);
+  justify-content: flex-end;
+}
+
+/* The locked track keeps the design's softer fill so "on and not yours to
+   change" reads differently from "on because you chose it" (design-data.js:44). */
+.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
+
+.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
+
+.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.consentKnob {
+  background: var(--muted);
+  border-radius: var(--r-dot);
+  box-shadow: var(--shadow-knob);
+  height: 16px;
+  width: 16px;
+}
+
+.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
+
+.consentCardFooter {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+/* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
+   all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
+   `10px 19px` at :39). One class serves both surfaces, so the second artboard
+   states its own value here rather than inheriting the first's
+   (CODE-REV-S01-C3C4 r1 N1). */
+.consentCardFooter .consentPrimary { padding: 10px 18px; }
+
+.consentFooterGap { flex: 1; }
+
+.consentLink {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.consentLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Below the derived 720px breakpoint the designed row stops fitting: the three
+   labels measure ~118 + 155 + 100 = 373px, plus two 9px gaps = ~391px; a
+   readable copy column needs ~260px; the row gap is 24px and the core's
+   horizontal padding is 40px — 391 + 260 + 24 + 40 = 715px. 720 also sits below
+   the 768px tablet-portrait width, so tablets keep the designed layout. */
+@media (max-width: 719.98px) {
+  .consentBar {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + var(--safe-b));
+  }
+
+  .consentBarCore {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .consentActions { flex-wrap: wrap; }
+
+  .consentGhost,
+  .consentPrimary {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+/* S01-R27: the slice animates one thing — 10a's primary — so it ships the
+   scoped counterpart itself. There is no global reduced-motion reset here; the
+   four existing blocks (:269, :3663, :4681, :5244) are each scoped to their own
+   component, and this one names only the selectors above. */
+@media (prefers-reduced-motion: reduce) {
+  .consentBar .consentPrimary { transition: none; }
+
+  .consentBar .consentPrimary:hover { transform: none; }
+}
+/* === end consent-ui S01 === */
+
+/* === consent-ui S02 === */
+/* Slice S02 of mission `consent-ui` — the sign-up privacy gate.
+   ONE block, appended at the end of the file, after S01's. Nothing above the opening
+   marker is touched: `globals.css` is the only file both slices write, and this delimiter
+   is what makes the single-writer contract mechanically visible (S02-S59).
+   Every colour is a `var(--token)` reference and this block declares NO token (S02-S60,
+   R22) — the two token blocks and `tests/unit/t9-mode-tokens.test.ts` belong to S01, which
+   declares `--scrim`, `--ok-edge`, `--z-policy-scrim` and `--z-policy-card` for this block.
+   Sources: `docs/missions/consent-ui/design/turn-10-cookie-consent.html:46-95` (10c) and
+   `.../turn-8a-checkbox-group.html:1-10` (8a). */
+
+/* --- The sign-up consent group (design 8a) -------------------------------------------- */
+
+.consentGroup {
+  padding: 2px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--shell);
+}
+
+.consentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 0;
+  cursor: pointer;
+}
+
+/* The hairline sits between the two rows, so it belongs to the FIRST row only (:2 carries it,
+   :6 does not). Written as a child selector on the group rather than as a `:not(:last-child)`
+   so a third row could never inherit it silently. */
+.consentGroup > .consentRow:first-child {
+  border-bottom: 1px solid var(--line);
+}
+
+/* The square IS the input: `appearance: none` keeps native focus, native activation, native
+   `required` and one focus ring, and the check glyph is a pseudo-element on it. */
+.consentBox {
+  flex: 0 0 auto;
+  margin: 1px 0 0;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  appearance: none;
+  border: 1.5px solid var(--ok-edge);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+
+.consentBox:checked {
+  background: var(--ok-dot);
+}
+
+.consentBox:checked::after {
+  content: "✓";
+  color: var(--core);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.consentBox:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.consentBox:disabled {
+  cursor: not-allowed;
+}
+
+.consentText {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* The design draws `Privacy Policy` as an <a>; ARCH-S02 ruled it a <button type="button">
+   because it opens a modal and navigates nowhere, so the button's UA chrome is reset back to
+   the anchor the artboard draws (:8). */
+.consentPolicyLink {
+  padding: 0;
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* --- The privacy-policy modal (design 10c) ------------------------------------------- */
+
+.policyScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-policy-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--scrim);
+  animation: consentPolicyScrimIn 140ms ease-out both;
+}
+
+/* 680 is the artboard's own modal width — 760px less the 40px inset each side (:48,:50);
+   92vh approximates its vertical proportion (660 less 34px top and bottom = 592, 89.7%).
+   The 32px of the clamp is this scrim's 16px padding on each side. */
+.policyBezel {
+  position: relative;
+  z-index: var(--z-policy-card);
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 32px));
+  max-height: 92vh;
+  padding: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  background: var(--shell);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink);
+  animation: consentPolicyCardIn 180ms cubic-bezier(.2, .7, .2, 1) both;
+}
+
+.policyCore {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--core);
+}
+
+.policyTab {
+  position: absolute;
+  top: 0;
+  left: 24px;
+  width: 52px;
+  height: 4px;
+  border-radius: var(--r-tab);
+  background: var(--gold);
+  z-index: 2;
+}
+
+.policyHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.policyHeadText {
+  flex: 1;
+  min-width: 0;
+}
+
+.policyEyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  color: var(--gold);
+}
+
+.policyTitle {
+  margin-top: 9px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.018em;
+}
+
+.policyLede {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.policyClose {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The scroll region. `min-height: 0` is what lets it shrink inside the flex column, and the
+   scroll-to-end gate (R15) measures exactly this element. */
+.policyBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px 8px;
+}
+
+.policyBody:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.policyJumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.policyPill {
+  padding: 4px 10px;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--shell);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.policySection {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.policySectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* `--accent` is set per section by the component as a token REFERENCE (`var(--ok-dot)`,
+   `var(--gold)`, ...), so the accent follows the mode toggle with nothing wired. The base
+   `--accent` declared in both token blocks is the fallback. */
+.policyNo {
+  flex: 0 0 26px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.policySectionTitle {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -.012em;
+}
+
+.policyText {
+  margin: 7px 0 0 38px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.policyItems {
+  margin: 9px 0 0 38px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.policyItem {
+  display: flex;
+  gap: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.policyDot {
+  flex: 0 0 auto;
+  margin-top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-dot);
+  background: var(--accent);
+}
+
+.policyItemText {
+  color: var(--text-2);
+}
+
+.policyEnd {
+  padding-bottom: 6px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--muted);
+}
+
+.policyFoot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--shell);
+}
+
+.policyContact {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.policyMail {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.policyFootSpacer {
+  flex: 1;
+}
+
+.policyPrimary {
+  padding: 10px 18px;
+  appearance: none;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* `.65` is MEASURED, not chosen: stepping alpha by 0.05 over the label and the face composited
+   on the footer's `--shell` ground gives .60 -> Terracotta 4.13 (fails 4.5:1), .65 -> 4.79 /
+   7.17, .70 -> 5.54 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
+   dimmed value that a reader can still read. Every rung above is now ASSERTED, not just narrated,
+   in `tests/unit/consent-s02-style-contract.test.ts` (S02-S64) — the first version of this
+   comment said 5.61 at .70, which is what `Math.round` returns only if `1 - .70` is re-spelled
+   as the literal `.30`; the rung is a tie and the two spellings fall on opposite sides of it
+   (CODE-REV-S02-C8-r1 B1). */
+.policyPrimary:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+/* The reason the button is disabled reaches assistive technology through `aria-describedby`
+   and must NOT reach it as visible footer text. `display: none` and `visibility: hidden` both
+   remove the element from the accessibility tree and take R15's description with it, so this is
+   the repo's own `.srOnly` treatment (`globals.css:684-694`), copied declaration for
+   declaration: clipped to 1x1 and off the flow, still rendered, still announced. */
+.policyGateHint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Focus rings for the controls the repo's shared rule cannot reach --------------------- */
+
+/* The repo's shared ring (`globals.css:488-495`) is keyed on `.btn, .iconBtn, .modeToggle,
+   .input, input, textarea, select, a` — a class list plus four element names. Every control
+   here is a BARE `<button>`, so it matches none of them and falls through to the browser's own
+   ring, which is chrome-coloured: the one paint on either S02 surface that would NOT follow the
+   Terracotta/Chamber toggle. `SPEC.md:612` maps focus rings to `--focus`, `:637` requires them
+   on every control in both modes, so the treatment is added HERE rather than by widening
+   `:488-495`, which is above this block's opening marker and outside S02's single-writer
+   contract. `.consentBox` and `.policyBody` carry their own rules above; the four grouped here
+   are the rest of the block's focusable inventory (CODE-REV-S02-C8-r1 N1). */
+.consentPolicyLink:focus-visible,
+.policyClose:focus-visible,
+.policyPill:focus-visible,
+.policyPrimary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* --- Motion, and switching it off (S02-S63, R24) -------------------------------------- */
+
+@keyframes consentPolicyScrimIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes consentPolicyCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* There is no global reduced-motion reset in this stylesheet — the four existing blocks are
+   each component-scoped — so S02 switches off its own two animations and nothing else. */
+@media (prefers-reduced-motion: reduce) {
+  .policyScrim,
+  .policyBezel {
+    animation: none;
+  }
+}
+
+/* === end consent-ui S02 === */

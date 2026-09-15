@@ -397,18 +397,134 @@ function maskSqlComments(source: string): string {
     .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
 }
 
+type SqlDoBlock = {
+  readonly start: number;
+  readonly end: number;
+  readonly bodyStart: number;
+  readonly bodyEnd: number;
+};
+
+function dollarTagAt(source: string, index: number): string | null {
+  return /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/u.exec(source.slice(index))?.[0] ?? null;
+}
+
+function quotedSqlEnd(source: string, index: number, quote: "'" | "\""): number {
+  for (let cursor = index + 1; cursor < source.length; cursor += 1) {
+    if (source[cursor] === quote && source[cursor + 1] === quote) {
+      cursor += 1;
+      continue;
+    }
+    if (source[cursor] === quote) return cursor + 1;
+  }
+  return source.length;
+}
+
+function sqlDoBlocks(source: string): readonly SqlDoBlock[] {
+  const blocks: SqlDoBlock[] = [];
+  for (let index = 0; index < source.length;) {
+    const char = source[index];
+    if (char === "'" || char === "\"") {
+      index = quotedSqlEnd(source, index, char);
+      continue;
+    }
+    const before = source[index - 1] ?? "";
+    const after = source[index + 2] ?? "";
+    if ((source.slice(index, index + 2).toUpperCase() === "DO")
+      && !/[A-Za-z0-9_$]/u.test(before)
+      && !/[A-Za-z0-9_$]/u.test(after)) {
+      let open = index + 2;
+      while (/\s/u.test(source[open] ?? "")) open += 1;
+      const tag = dollarTagAt(source, open);
+      if (tag !== null) {
+        const bodyStart = open + tag.length;
+        const bodyEnd = source.indexOf(tag, bodyStart);
+        if (bodyEnd < 0) break;
+        let semicolon = bodyEnd + tag.length;
+        while (/\s/u.test(source[semicolon] ?? "")) semicolon += 1;
+        if (source[semicolon] === ";") {
+          blocks.push(Object.freeze({
+            start: index,
+            end: semicolon + 1,
+            bodyStart,
+            bodyEnd
+          }));
+          index = semicolon + 1;
+          continue;
+        }
+        index = bodyEnd + tag.length;
+        continue;
+      }
+    }
+    if (char === "$") {
+      const tag = dollarTagAt(source, index);
+      if (tag !== null) {
+        const close = source.indexOf(tag, index + tag.length);
+        if (close < 0) break;
+        index = close + tag.length;
+        continue;
+      }
+    }
+    index += 1;
+  }
+  return blocks;
+}
+
+function maskSqlQuotedLiterals(source: string): string {
+  const output = [...source];
+  for (let index = 0; index < source.length;) {
+    const char = source[index];
+    if (char === "'" || char === "\"") {
+      const end = quotedSqlEnd(source, index, char);
+      for (let cursor = index; cursor < end; cursor += 1) {
+        if (output[cursor] !== "\n") output[cursor] = " ";
+      }
+      index = end;
+      continue;
+    }
+    if (char === "$") {
+      const tag = dollarTagAt(source, index);
+      if (tag !== null) {
+        const close = source.indexOf(tag, index + tag.length);
+        if (close < 0) return output.join("");
+        const end = close + tag.length;
+        for (let cursor = index; cursor < end; cursor += 1) {
+          if (output[cursor] !== "\n") output[cursor] = " ";
+        }
+        index = end;
+        continue;
+      }
+    }
+    index += 1;
+  }
+  return output.join("");
+}
+
+function blockHasConstraintGuard(source: string, block: SqlDoBlock, index: number, name: string): boolean {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const body = source.slice(block.bodyStart, block.bodyEnd);
+  const code = maskSqlQuotedLiterals(body);
+  const additionOffset = index - block.bodyStart;
+  for (const guard of code.matchAll(/\bIF\s+NOT\s+EXISTS\b/gi)) {
+    if (guard.index >= additionOffset) continue;
+    const then = /\bTHEN\b/i.exec(code.slice(guard.index + guard[0].length));
+    if (then === null) continue;
+    const conditionEnd = guard.index + guard[0].length + then.index;
+    if (conditionEnd >= additionOffset) continue;
+    const condition = body.slice(guard.index, conditionEnd);
+    if (new RegExp(`['"]${escapedName}['"]`, "i").test(condition)) return true;
+  }
+  return false;
+}
+
 function constraintHasReplayGuard(source: string, index: number, name: string): boolean {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const before = source.slice(0, index);
   if (new RegExp(`\\bDROP\\s+CONSTRAINT\\s+IF\\s+EXISTS\\s+${escapedName}\\b`, "i").test(before)) {
     return true;
   }
-  for (const block of source.matchAll(/\bDO\s+\$\$[\s\S]*?\$\$\s*;/gi)) {
-    const start = block.index;
-    const end = start + block[0].length;
-    if (index < start || index >= end) continue;
-    return /\bIF\s+NOT\s+EXISTS\b/i.test(block[0])
-      && new RegExp(`['"]${escapedName}['"]`, "i").test(block[0]);
+  for (const block of sqlDoBlocks(source)) {
+    if (index < block.bodyStart || index >= block.bodyEnd) continue;
+    return blockHasConstraintGuard(source, block, index, name);
   }
   return false;
 }

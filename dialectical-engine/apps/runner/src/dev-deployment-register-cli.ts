@@ -2,7 +2,9 @@ import { createPool } from "@debateai/db";
 import { loadDevelopmentCommandEnvironment, loadMigrationEnvironment } from "@debateai/register";
 import {
   resolveDevelopmentSynthesisRoleRefs,
-  seedDevelopmentDeploymentRegister
+  DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
+  seedDevelopmentDeploymentRegister,
+  serializeDevelopmentDeploymentRegisterReceipt
 } from "./dev-deployment-register.js";
 import { loadDevelopmentProviderPanelFromEnvironment } from "./dev-provider-panel.js";
 
@@ -12,10 +14,15 @@ try {
   const commandEnvironment = loadDevelopmentCommandEnvironment();
   const providerPanel = loadDevelopmentProviderPanelFromEnvironment(commandEnvironment);
   const roleRefs = resolveDevelopmentSynthesisRoleRefs(providerPanel, commandEnvironment);
-  const receipt = await seedDevelopmentDeploymentRegister({ adminPool: pool, providerPanel, roleRefs });
-  console.log(
-    `DEV_DEPLOYMENT_REGISTER_READY=${receipt.registerVersion}:${receipt.rowCount}`
-  );
+  const receipt = await seedDevelopmentDeploymentRegister({
+    adminPool: pool,
+    providerPanel,
+    roleRefs,
+    repositoryRoot: process.cwd()
+  });
+  console.log(`${DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX}${
+    serializeDevelopmentDeploymentRegisterReceipt(receipt)
+  }`);
 } finally {
   await pool.end();
 }

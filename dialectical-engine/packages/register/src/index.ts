@@ -17,6 +17,13 @@ import { MFA_POLICY_REGISTER_ROW } from "./mfa-policy.js";
 import { PRODUCT_ROLE_POLICY_REGISTER_ROW } from "./product-role-policy.js";
 import { RECOVERY_POLICY_REGISTER_ROW } from "./recovery-policy.js";
 import { SESSION_POLICY_REGISTER_ROW } from "./session-policy.js";
+import {
+  canonicalRegisterJson,
+  createPostgresRegisterPublicationPort,
+  parseRegisterVersionText,
+  type CanonicalJsonAst,
+  type RegisterPublicationRow
+} from "./register-publication.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export {
@@ -672,72 +679,49 @@ export async function persistBootstrapRegister(pool: Pool, bootstrap: BootstrapR
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW
   ];
-  const expectedRowCount = bootstrapKeys.length + AUTH_POLICY_REGISTER_ROWS.length + 4;
-  const canonicalJson = (value: unknown): string => {
-    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-    if (typeof value === "object" && value !== null) {
-      return `{${Object.entries(value)
-        .sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
-        .map(([key, member]) => `${JSON.stringify(key)}:${canonicalJson(member)}`)
-        .join(",")}}`;
-    }
-    return JSON.stringify(value);
-  };
-  const client = await pool.connect();
+  const publicationRows = buildBootstrapRegisterPublicationRowsFromRows(rows);
   try {
-    await client.query("BEGIN");
-    await client.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('debateai:bootstrap-register',0))"
-    );
-    const version = (await client.query<{ row_count: number; sealed: boolean }>(
-      "SELECT row_count,sealed FROM register.register_version WHERE register_version=$1",
-      [bootstrap.registerVersion]
-    )).rows[0];
-    const persisted = await client.query<{
-      row_key: string;
-      value_json: unknown;
-      source_ref: string;
-    }>(`
-      SELECT row_key,value_json,source_ref FROM register.register_row
-      WHERE register_version=$1 ORDER BY row_key
-    `, [bootstrap.registerVersion]);
-    if (version !== undefined || persisted.rows.length > 0) {
-      if (version === undefined || !version.sealed || Number(version.row_count) !== expectedRowCount
-        || persisted.rows.length !== expectedRowCount) {
-        throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH");
-      }
-      const expected = new Map<string, (typeof rows)[number]>(
-        rows.map((row) => [row.rowKey, row])
-      );
-      for (const row of persisted.rows) {
-        const wanted = expected.get(row.row_key);
-        if (wanted === undefined || row.source_ref !== wanted.sourceRef
-          || canonicalJson(row.value_json) !== canonicalJson(wanted.value)) {
-          throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH");
-        }
-      }
-      await client.query("COMMIT");
-      return;
-    }
-    for (const row of rows) {
-      await client.query(
-        `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES ($1, $2, $3::jsonb, $4)`,
-        [bootstrap.registerVersion, row.rowKey, JSON.stringify(row.value), row.sourceRef]
-      );
-    }
-    await client.query(
-      `INSERT INTO register.register_version (register_version, row_count, sealed)
-       VALUES ($1, $2, true)`,
-      [bootstrap.registerVersion, expectedRowCount]
-    );
-    await client.query("COMMIT");
+    await createPostgresRegisterPublicationPort(pool).importHistorical({
+      registerVersion: parseRegisterVersionText(String(bootstrap.registerVersion)),
+      rows: publicationRows
+    });
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (error instanceof Error && /REGISTER_PUBLICATION_SEAL_INVALID/u.test(error.message)) {
+      throw new TypeError("FX-REG-SEALED_VERSION_MISMATCH", { cause: error });
+    }
     throw error;
-  } finally {
-    client.release();
   }
+}
+
+function buildBootstrapRegisterPublicationRowsFromRows(
+  rows: readonly Readonly<{ rowKey: string; value: unknown; sourceRef: string; valueAst?: CanonicalJsonAst }>[]
+): readonly RegisterPublicationRow[] {
+  return Object.freeze(rows.map((row) =>
+    Object.freeze({
+      rowKey: row.rowKey,
+      valueJsonText: canonicalRegisterJson(
+        ("valueAst" in row ? row.valueAst : row.value) as CanonicalJsonAst
+      ),
+      sourceRef: row.sourceRef
+    })
+  ));
+}
+
+export function buildBootstrapRegisterPublicationRows(
+  bootstrap: BootstrapRegister
+): readonly RegisterPublicationRow[] {
+  return buildBootstrapRegisterPublicationRowsFromRows([
+    ...bootstrapKeys.map((rowKey) => Object.freeze({
+      rowKey,
+      value: bootstrap.values[rowKey],
+      sourceRef: bootstrap.resolution[rowKey]
+    })),
+    ...AUTH_POLICY_REGISTER_ROWS,
+    MFA_POLICY_REGISTER_ROW,
+    SESSION_POLICY_REGISTER_ROW,
+    RECOVERY_POLICY_REGISTER_ROW,
+    PRODUCT_ROLE_POLICY_REGISTER_ROW
+  ]);
 }
 
 export async function assertBootstrapEquality(pool: Pool, bootstrap: BootstrapRegister): Promise<void> {
@@ -842,3 +826,43 @@ export {
   type ProductRolePolicy,
   type ProductRolePolicyRegisterRow
 } from "./product-role-policy.js";
+
+export {
+  SUPPORT_CONFIGURATION_KEYS,
+  canonicalDecimal,
+  canonicalRegisterJson,
+  computeGeneralPublicationRequestSha256,
+  computeRegisterSnapshotSha256,
+  computeSupportPublicationRequestSha256,
+  createPostgresRegisterPublicationPort,
+  parseCanonicalRegisterJson,
+  parseRegisterVersionText,
+  registerVersionToSafeLegacyNumber,
+  validateSupportConfigurationValue,
+  type CanonicalDecimalText,
+  type CanonicalJsonAst,
+  type CanonicalRegisterJson,
+  type GeneralRegisterPublication,
+  type HistoricalRegisterImport,
+  type HistoricalRegisterImportReceipt,
+  type RegisterPublicationPort,
+  type RegisterPublicationReceipt,
+  type RegisterPublicationRow,
+  type RegisterVersionText,
+  type SupportConfigurationKey,
+  type SupportConfigurationPatchRow,
+  type SupportConfigurationPublication,
+  type SupportConfigurationStatus,
+  type SupportPublicationReceipt
+} from "./register-publication.js";
+
+export {
+  SUPPORT_CONFIG_CACHE_MAX_AGE_MS,
+  SUPPORT_CONFIG_REFRESH_DEADLINE_MS,
+  createSupportConfigurationPort,
+  type SupportConfigurationPort,
+  type SupportConfigurationPortOptions,
+  type SupportConfigurationSnapshot,
+  type SupportConfigurationState,
+  type SupportConfigurationValues
+} from "./support-config.js";

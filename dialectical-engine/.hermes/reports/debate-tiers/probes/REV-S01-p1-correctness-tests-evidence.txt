@@ -1,0 +1,240 @@
+# REV-S01-p1-correctness-tests — raw evidence, 2026-09-10, worktree f6c147cc (0 dirty before and after)
+
+## three cluster runs (worst run wins: GREEN)
+--- run 1 ---
+== run 1  2026-09-10 03:46:44  HEAD=f6c147cc dirty=0
+generate:contract rc=0 dirty-after=0
+== S01-C1 ==
+tests/unit/contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/api.test.ts rc=0 passed=25 failed=0 (expect 25/0)
+tests/unit/load01-live-proof.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s7-authorization.test.ts rc=0 passed=31 failed=0 (expect 31/0)
+tests/integration/evaluator-database.test.ts rc=0 passed=21 failed=0 (expect 21/0)
+tests/architecture/tier01-roster.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/architecture/s7-authorization-contract.test.ts rc=1 passed=5 failed=1 (expect 5/1)
+tests/architecture/s8-publication-contract.test.ts rc=1 passed=4 failed=1 (expect 4/1)
+CLUSTER_GREEN
+== S01-C2 ==
+tests/unit/tier01-ask-wire.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/unit/v2ui-data-layer.test.ts rc=0 passed=57 failed=0 (expect 57/0)
+tests/unit/pol01-policy.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/architecture/s14-contract.test.ts rc=1 passed=2 failed=3 (expect 2/3)
+tests/render/prov01-honesty-drawer.test.tsx rc=0 passed=1 failed=0 (expect 1/0)
+tests/render/bug02-debate-effects.test.tsx rc=0 passed=4 failed=0 (expect 4/0)
+tests/render/evaluator-dev-menu-controls.test.tsx rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s10-erasure-ui.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/unit/v2ui-ownership.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+== S01-C3 ==
+tests/render/tier01-new-plan-tier.test.tsx rc=0 passed=21 failed=0 (expect 21/0)
+tests/unit/v2ui-pages.test.ts rc=1 passed=36 failed=5 (expect 36/5)
+tests/render/ux01-new-debate-form.test.tsx rc=1 passed=1 failed=7 (expect 1/7)
+tests/render/sup-04-widget.test.tsx rc=0 passed=8 failed=0 (expect 8/0)
+tests/architecture/sup-04-mounts.test.ts rc=1 passed=0 failed=2 (expect 0/2)
+tests/unit/evaluator-dev-menu-ui.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+CLUSTER_GREEN
+== S01-C4 ==
+tests/unit/tier01-style-contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/t9-mode-tokens.test.ts rc=1 passed=7 failed=2 (expect 7/2)
+tests/render/consent-bar.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/unit/consent-s02-style-contract.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/render/consent-card.test.tsx rc=0 passed=11 failed=0 (expect 11/0)
+tests/render/consent-cross-slice.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/render/consent-guards.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/render/consent-policy-link.test.tsx rc=0 passed=14 failed=0 (expect 14/0)
+tests/render/t3-library.test.tsx rc=1 passed=11 failed=4 (expect 11/4)
+tests/architecture/role-token-map.test.ts rc=1 passed=46 failed=3 (expect 46/3)
+tests/unit/pda-s03-keyboard-accessibility.test.ts rc=1 passed=3 failed=2 (expect 3/2)
+CLUSTER_GREEN
+== run 1 end 2026-09-10 03:47:41 dirty=0
+--- run 2 ---
+== run 2  2026-09-10 03:47:54  HEAD=f6c147cc dirty=0
+generate:contract rc=0 dirty-after=0
+== S01-C1 ==
+tests/unit/contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/api.test.ts rc=0 passed=25 failed=0 (expect 25/0)
+tests/unit/load01-live-proof.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s7-authorization.test.ts rc=0 passed=31 failed=0 (expect 31/0)
+tests/integration/evaluator-database.test.ts rc=0 passed=21 failed=0 (expect 21/0)
+tests/architecture/tier01-roster.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/architecture/s7-authorization-contract.test.ts rc=1 passed=5 failed=1 (expect 5/1)
+tests/architecture/s8-publication-contract.test.ts rc=1 passed=4 failed=1 (expect 4/1)
+CLUSTER_GREEN
+== S01-C2 ==
+tests/unit/tier01-ask-wire.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/unit/v2ui-data-layer.test.ts rc=0 passed=57 failed=0 (expect 57/0)
+tests/unit/pol01-policy.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/architecture/s14-contract.test.ts rc=1 passed=2 failed=3 (expect 2/3)
+tests/render/prov01-honesty-drawer.test.tsx rc=0 passed=1 failed=0 (expect 1/0)
+tests/render/bug02-debate-effects.test.tsx rc=0 passed=4 failed=0 (expect 4/0)
+tests/render/evaluator-dev-menu-controls.test.tsx rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s10-erasure-ui.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/unit/v2ui-ownership.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+== S01-C3 ==
+tests/render/tier01-new-plan-tier.test.tsx rc=0 passed=21 failed=0 (expect 21/0)
+tests/unit/v2ui-pages.test.ts rc=1 passed=36 failed=5 (expect 36/5)
+tests/render/ux01-new-debate-form.test.tsx rc=1 passed=1 failed=7 (expect 1/7)
+tests/render/sup-04-widget.test.tsx rc=0 passed=8 failed=0 (expect 8/0)
+tests/architecture/sup-04-mounts.test.ts rc=1 passed=0 failed=2 (expect 0/2)
+tests/unit/evaluator-dev-menu-ui.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+CLUSTER_GREEN
+== S01-C4 ==
+tests/unit/tier01-style-contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/t9-mode-tokens.test.ts rc=1 passed=7 failed=2 (expect 7/2)
+tests/render/consent-bar.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/unit/consent-s02-style-contract.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/render/consent-card.test.tsx rc=0 passed=11 failed=0 (expect 11/0)
+tests/render/consent-cross-slice.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/render/consent-guards.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/render/consent-policy-link.test.tsx rc=0 passed=14 failed=0 (expect 14/0)
+tests/render/t3-library.test.tsx rc=1 passed=11 failed=4 (expect 11/4)
+tests/architecture/role-token-map.test.ts rc=1 passed=46 failed=3 (expect 46/3)
+tests/unit/pda-s03-keyboard-accessibility.test.ts rc=1 passed=3 failed=2 (expect 3/2)
+CLUSTER_GREEN
+== run 2 end 2026-09-10 03:48:46 dirty=0
+--- run 3 ---
+== run 3  2026-09-10 03:48:46  HEAD=f6c147cc dirty=0
+generate:contract rc=0 dirty-after=0
+== S01-C1 ==
+tests/unit/contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/api.test.ts rc=0 passed=25 failed=0 (expect 25/0)
+tests/unit/load01-live-proof.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s7-authorization.test.ts rc=0 passed=31 failed=0 (expect 31/0)
+tests/integration/evaluator-database.test.ts rc=0 passed=21 failed=0 (expect 21/0)
+tests/architecture/tier01-roster.test.ts rc=0 passed=1 failed=0 (expect 1/0)
+tests/architecture/s7-authorization-contract.test.ts rc=1 passed=5 failed=1 (expect 5/1)
+tests/architecture/s8-publication-contract.test.ts rc=1 passed=4 failed=1 (expect 4/1)
+CLUSTER_GREEN
+== S01-C2 ==
+tests/unit/tier01-ask-wire.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/unit/v2ui-data-layer.test.ts rc=0 passed=57 failed=0 (expect 57/0)
+tests/unit/pol01-policy.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/architecture/s14-contract.test.ts rc=1 passed=2 failed=3 (expect 2/3)
+tests/render/prov01-honesty-drawer.test.tsx rc=0 passed=1 failed=0 (expect 1/0)
+tests/render/bug02-debate-effects.test.tsx rc=0 passed=4 failed=0 (expect 4/0)
+tests/render/evaluator-dev-menu-controls.test.tsx rc=0 passed=1 failed=0 (expect 1/0)
+tests/unit/s10-erasure-ui.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+tests/unit/v2ui-ownership.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+== S01-C3 ==
+tests/render/tier01-new-plan-tier.test.tsx rc=0 passed=21 failed=0 (expect 21/0)
+tests/unit/v2ui-pages.test.ts rc=1 passed=36 failed=5 (expect 36/5)
+tests/render/ux01-new-debate-form.test.tsx rc=1 passed=1 failed=7 (expect 1/7)
+tests/render/sup-04-widget.test.tsx rc=0 passed=8 failed=0 (expect 8/0)
+tests/architecture/sup-04-mounts.test.ts rc=1 passed=0 failed=2 (expect 0/2)
+tests/unit/evaluator-dev-menu-ui.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+CLUSTER_GREEN
+== S01-C4 ==
+tests/unit/tier01-style-contract.test.ts rc=0 passed=8 failed=0 (expect 8/0)
+tests/unit/t9-mode-tokens.test.ts rc=1 passed=7 failed=2 (expect 7/2)
+tests/render/consent-bar.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/unit/consent-s02-style-contract.test.ts rc=0 passed=10 failed=0 (expect 10/0)
+tests/render/consent-card.test.tsx rc=0 passed=11 failed=0 (expect 11/0)
+tests/render/consent-cross-slice.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/render/consent-guards.test.tsx rc=0 passed=7 failed=0 (expect 7/0)
+tests/render/consent-policy-link.test.tsx rc=0 passed=14 failed=0 (expect 14/0)
+tests/render/t3-library.test.tsx rc=1 passed=11 failed=4 (expect 11/4)
+tests/architecture/role-token-map.test.ts rc=1 passed=46 failed=3 (expect 46/3)
+tests/unit/pda-s03-keyboard-accessibility.test.ts rc=1 passed=3 failed=2 (expect 3/2)
+CLUSTER_GREEN
+== run 3 end 2026-09-10 03:49:36 dirty=0
+
+## mutant battery (product mutated in-worktree, exact bytes restored, CLEAN after each)
+baseline dirty: ''
+
+### M8-risk-lock-removed
+    file apps/ui/app/new/page.tsx (anchor occurrences: 1, replaced first)
+    -  options={RISK_TIER_OPTIONS}
+              value={riskTier}
+              disabled={planTier === "free"}
+    +  options={RISK_TIER_OPTIONS}
+              value={riskTier}
+    tests/render/tier01-new-plan-tier.test.tsx: Tests  4 failed | 17 passed (21)   -> RED  (predicted RED)
+    restored; dirty now: CLEAN
+
+### M7-roster-order-swapped
+    file packages/contract/src/plan-tiers.ts (anchor occurrences: 1, replaced first)
+    -  premium: Object.freeze(["gpt-5.6-sol", "claude-opus-5", "grok-4.6"])
+    +  premium: Object.freeze(["claude-opus-5", "gpt-5.6-sol", "grok-4.6"])
+    tests/render/tier01-new-plan-tier.test.tsx: Tests  1 failed | 20 passed (21)   -> RED  (predicted RED)
+    restored; dirty now: CLEAN
+
+### M10-free-depth-3
+    file apps/ui/app/new/page.tsx (anchor occurrences: 1, replaced first)
+    -  setDepth(2);
+    +  setDepth(3);
+    tests/render/tier01-new-plan-tier.test.tsx: Tests  2 failed | 19 passed (21)   -> RED  (predicted RED)
+    restored; dirty now: CLEAN
+
+### M8-dim-0.5
+    file apps/ui/app/globals.css (anchor occurrences: 1, replaced first)
+    -  .ndSelect:has(select:disabled) {
+  opacity: 0.45;
+    +  .ndSelect:has(select:disabled) {
+  opacity: 0.5;
+    tests/unit/tier01-style-contract.test.ts: Tests  1 failed | 7 passed (8)   -> RED  (predicted RED)
+    restored; dirty now: CLEAN
+
+### M2-chamber-line-strong-VALUE-changed
+    file apps/ui/app/globals.css (anchor occurrences: 1, replaced first)
+    -  --line: rgba(242,234,217,.09); --line-2: rgba(242,234,217,.08); --line-strong: rgba(242,234,217,.18);
+    +  --line: rgba(242,234,217,.09); --line-2: rgba(242,234,217,.08); --line-strong: rgba(255,0,0,.99);
+    tests/unit/tier01-style-contract.test.ts: Tests  8 passed (8)   -> GREEN  (predicted GREEN(vacuity))
+    restored; dirty now: CLEAN
+
+### M7-m-grok-VALUE-changed
+    file apps/ui/app/globals.css (anchor occurrences: 1, replaced first)
+    -  --m-grok: #5F6670; --m-qwen: #3F8E7C; --m-default: #888888;
+  --m-claude-bg: #EFE9F1;
+    +  --m-grok: #00FF00; --m-qwen: #3F8E7C; --m-default: #888888;
+  --m-claude-bg: #EFE9F1;
+    tests/unit/tier01-style-contract.test.ts: Tests  8 passed (8)   -> GREEN  (predicted GREEN(vacuity))
+    restored; dirty now: CLEAN
+
+FINAL dirty: ''
+
+## probe 1 and probe 5 (temporary suite, copied in, run, deleted)
+PROBE5 {
+  "libraryComposer": "ASK_FIELD_REQUIRED: risk_tier must be supplied explicitly; the UI invents no ask values.",
+  "completeMinusPlanTier": "ASK_FIELD_REQUIRED: plan_tier must be supplied explicitly; the UI invents no ask values.",
+  "unknownTier": "ASK_FIELD_REQUIRED: plan_tier must be free or premium.",
+  "forgedPremium": "NO REFUSAL"
+}
+PROBE1 rostered=[{"id":"gpt-5.6-luna","viaPage":"var(--m-gpt)","viaModelMeta":"var(--m-gpt)","same":true},{"id":"claude-sonnet-5","viaPage":"var(--m-claude)","viaModelMeta":"var(--m-claude)","same":true},{"id":"gpt-5.6-sol","viaPage":"var(--m-gpt)","viaModelMeta":"var(--m-gpt)","same":true},{"id":"claude-opus-5","viaPage":"var(--m-claude)","viaModelMeta":"var(--m-claude)","same":true},{"id":"grok-4.6","viaPage":"var(--m-grok)","viaModelMeta":"var(--m-grok)","same":true}]
+PROBE1 divergent=[
+  {
+    "id": "openai-o3",
+    "viaPage": "var(--m-default)",
+    "viaModelMeta": "var(--m-gpt)"
+  },
+  {
+    "id": "sol-gpt-5",
+    "viaPage": "var(--m-default)",
+    "viaModelMeta": "var(--m-gpt)"
+  },
+  {
+    "id": "GPT-5.6-SOL",
+    "viaPage": "var(--m-default)",
+    "viaModelMeta": "var(--m-gpt)"
+  },
+  {
+    "id": "claude_opus",
+    "viaPage": "var(--m-default)",
+    "viaModelMeta": "var(--m-claude)"
+  },
+  {
+    "id": "grok/4.6",
+    "viaPage": "var(--m-default)",
+    "viaModelMeta": "var(--m-grok)"
+  },
+  {
+    "id": "gemini-3",
+    "viaPage": "var(--m-default)",
+    "viaModelMeta": "var(--m-gemini)"
+  }
+]
+
+## the wire — every POST /v1/asks my browser session produced, verbatim
+2026-09-10T00:56:33.848Z POST /v1/asks :: {"question_line":"Remote work should be the default for knowledge workers.","plan_tier":"free","risk_tier":"standard","tier_source":"MACHINE_DEFAULT","tier_provenance_ref":"machine:plan-tier-free","composition_budget_tier":"low","depth_params":{"depth":2},"decision_scope":"personal","as_of":"2026-09-10T00:56:33.765Z","steering_presets":[],"steering_annotations":[]}
+2026-09-10T00:56:59.483Z POST /v1/asks :: {"question_line":"Remote work should be the default for knowledge workers.","plan_tier":"premium","risk_tier":"standard","tier_source":"MACHINE_DEFAULT","tier_provenance_ref":"machine:plan-tier-free","composition_budget_tier":"low","depth_params":{"depth":2},"decision_scope":"personal","as_of":"2026-09-10T00:56:59.446Z","steering_presets":[],"steering_annotations":[]}

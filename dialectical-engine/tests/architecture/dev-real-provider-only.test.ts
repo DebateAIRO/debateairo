@@ -30,4 +30,23 @@ describe("development debate provider boundary", () => {
     expect(panel).toContain("DEVELOPMENT_MINIMUM_DISTINCT_MAKERS = 1");
     expect(panel).toContain("qa-deterministic-v1");
   });
+
+  it("keeps Hermes GLM in the Support-only stack seam and out of the debate roster",async () => {
+    const [panel,stack] = await Promise.all([
+      readFile("apps/runner/src/dev-provider-panel.ts","utf8"),
+      readFile("apps/runner/src/dev-auth-stack.ts","utf8")
+    ]);
+    expect(panel).not.toContain("hermes-glm-5.3-flash");
+    expect(panel).not.toContain("startHermesSupportRelay");
+    expect(stack).toContain("startHermesSupportRelay");
+    expect(stack).toContain("supportModelTarget");
+  });
+
+  it("builds the Support model map only from the dedicated target instead of debate discovery",async () => {
+    const main = await readFile("apps/api/src/main.ts","utf8");
+    const support = main.slice(main.indexOf("const supportModels"),main.indexOf("const supportStatus"));
+    expect(main).toContain("parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON)");
+    expect(support).toContain("supportModelTarget.providerRef");
+    expect(support).not.toContain("providerDiscoveryTargets.map");
+  });
 });

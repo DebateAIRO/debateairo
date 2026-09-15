@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-02",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "What should I put in the debate topic, and what belongs in the description?" }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["debate-topic-and-description"],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

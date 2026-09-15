@@ -8,6 +8,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startStandingDatabase, type StandingDatabase } from "./standing-db.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { runDualMakerProof } from "./dual-maker-proof.js";
+import {
+  importHistoricalRegisterFixture,
+  registerFixtureRow
+} from "../tests/support/registerFixtures.js";
 
 const fakeCodexCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
 const fakeClaudeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
@@ -99,18 +103,16 @@ describe("FAIR-02 dual-maker proof", () => {
       dataDirectory: staleDataDirectory
     });
     try {
-      await staleDatabase.pool.query(
-        `INSERT INTO register.register_row (register_version, row_key, value_json, source_ref)
-         VALUES ($3, 'configuredProviderSet', $1::jsonb, $2)`,
-        [JSON.stringify({
+      await importHistoricalRegisterFixture(staleDatabase.pool, ACCEPTANCE_REGISTER_VERSION, [
+        registerFixtureRow("configuredProviderSet", {
           kind: "CONFIGURED_PROVIDER_SET",
           requiredDistinctMakers: 1,
           providers: [{ providerRef: "acceptance:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" }]
-        }), "acceptance:DR-133:V-approved", ACCEPTANCE_REGISTER_VERSION]
-      );
+        }, "acceptance:DR-133:V-approved")
+      ]);
 
       await expect(seedAcceptanceRegister(staleDatabase.pool))
-        .rejects.toThrow("ACCEPTANCE_REGISTER_CONFLICT:configuredProviderSet");
+        .rejects.toThrow("REGISTER_PUBLICATION_SEAL_INVALID");
     } finally {
       await staleDatabase.stop();
       await rm(staleDataDirectory, { recursive: true, force: true });

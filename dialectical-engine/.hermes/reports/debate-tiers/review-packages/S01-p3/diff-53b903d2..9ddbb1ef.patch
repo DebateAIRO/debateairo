@@ -1,0 +1,991 @@
+diff --git a/dialectical-engine/.codex/skills/heartbeat-orchestrator/SKILL.md b/dialectical-engine/.codex/skills/heartbeat-orchestrator/SKILL.md
+index d2a41cbd..a1e8b968 100644
+--- a/dialectical-engine/.codex/skills/heartbeat-orchestrator/SKILL.md
++++ b/dialectical-engine/.codex/skills/heartbeat-orchestrator/SKILL.md
+@@ -1,127 +1,235 @@
+ ---
+ name: heartbeat-orchestrator
+-description: Codex node contract for the ORCHESTRATOR side of the DebateAI coding loop (Router seat, spine §5.1). Use when a Codex session is assigned Main Orchestrator of a PROGRAMMING/QA loop — routing tickets, authoring goal packets, launching coding seats and review lenses — while Claude models (claude-opus-5 / claude-fable-5) hold the coding seats. Never use for implementation or review work; that is the sibling heartbeat-protocol skill.
+-version: 1.0.0
+-spine_version: 3.0.0
++description: Contract for the Main Orchestrator (Claude-Router seat) in the DebateAI heartbeat graph (v4.0.0) — the scheduler. Intake, the node vocabulary, the event-driven tick, background-only transports, packet templates and packet-check, the slice gate and the one review per slice, the UI gate (MOCK → V's DONE), V gates, ledgers. Load after heartbeat-protocol.
+ ---
+-<!-- Provenance: canonical copy. Mirror at .agents/skills/heartbeat-orchestrator/SKILL.md; edit HERE and keep the mirror synchronized. Cloned from the Claude-Router orchestrator contract (.claude/skills/heartbeat-protocol) by V order 2026-08-20: coding-loop orchestration only. -->
+-
+-# Codex Heartbeat Orchestrator (coding loop)
+-
+-Thin. Source of truth is the repo Graph Spine v2. Deep contract:
+-`docs/agent-protocols/codex-heartbeat-orchestrator.md`.
+-
+-## Read order
+-
+-1. This `SKILL.md`.
+-2. `docs/agent-protocols/debateai-heartbeat-protocol.md` (Graph Spine v2).
+-3. `docs/agent-protocols/codex-heartbeat-orchestrator.md` (full contract:
+-   launch mechanics, Fable relay seat, packet-authoring laws in long form).
+-4. The mission's intake/takeover packet and the board's typed state blocks.
+-
+-## Role: Main Orchestrator (Codex-Router seat, roster-assigned)
+-
+-This session ROUTES the coding loop and does nothing else:
+-
+-- Decomposes the mission into tickets; picks the next edge from classified
+-  board state; assigns `owner`, sets `status`, advances `authority_epoch` on
+-  handover — routing metadata only.
+-- Authors every goal packet and launches every seat with that agent's own
+-  `/goal` command (launch law, V ruling 2026-07-24). Packets flow DOWN; only
+-  spine-legal surfaces flow up. Goals all the way down.
+-- **Roster (V order 2026-08-20, only V edits it):** orchestrator =
+-  `gpt-5.6-sol` (this seat). Coding seats = `claude-opus-5` /
+-  `claude-fable-5`. Review lenses = NON-AUTHOR-FAMILY: Grok + a fresh
+-  single-purpose Codex session (never this session, never a session that
+-  coded the ticket). P8: the lens that found a defect confirms its own fix.
+-- Consumes verdicts; never produces one. Never marks Done without a recorded
+-  dual-green diamond. Never mutates board review state (Hermes custody,
+-  spine §5.2). **Never codes. Never commits. Never pushes.** Claude Code
+-  (Fable) executes the local commit on dual-green and relays V; V approves
+-  pushes.
+-
+-## The coding loop (the machine this seat runs)
+-
+-```
+-ticket (board, [model] bracket tag)
+-→ author goal packet (laws below) → launch coding seat, VISIBLE window
+-   (logs/run-claude-seat.sh SEAT MODEL PACKET; session id → board WORKER CLAIM)
+-→ watcher armed on the seat's progress log (markers below)
+-→ HANDOFF: gates green → cut review packet → fire BOTH lenses
+-   (each blind, each RUNS the live world; a blocking lens must have run it)
+-→ dual GREEN  → evidence to Fable for local commit → NEXT TICKET, no pause
+-   SPLIT      → adjudicate on facts if the lenses agree on facts;
+-                else order a third measurement; then rework
+-   any BLOCK  → rework packet → SAME coding session
+-                (claude --resume <id>; reproduce-first: RED on current code)
+-→ loop. FULLY DONE only when V closes the mission.
+-```
+-
+-Dispatch continues ticket→diamond→close→next without pausing for permission
+-already granted. Park (end turn) only when seats/watchers are running and no
+-event needs routing; report a one-line PARKED status. Fable pumps events back
+-into this session (`codex exec resume <this-session-id> "/goal <event>"`).
+-
+-## Packet-authoring laws (every packet, no exceptions)
+-
+-1. **VR-10:** every security assertion mutation-tested — break the
+-   implementation, show the guarding test RED, evidence in the handoff. Both
+-   lenses re-derive mutants themselves.
+-2. **Real-ruled-timeout:** a test of a timeout-bounded property uses the REAL
+-   ruled timeout, never a smaller convenient value.
+-3. **No harness that cannot fail:** require of each assertion an answer to
+-   *"what state would make this pass for the wrong reason?"* Thresholds
+-   derived from a measured null, never chosen to fit the achievable result.
+-4. **Reproduce-first rework, same session,** at every level including
+-   subagents (P8).
+-5. **Change-set oracle is mtime/sha256, never `git diff`** (untracked
+-   migrations make diff blind in this repo).
+-6. **Gold-hash protocol** whenever concurrent lenses mutate a shared tree:
+-   sha256 baselines before work; restore + re-verify after each mutant;
+-   re-run anything a foreign divergence could touch; end byte-identical.
+-7. **Bounds:** touch-only file contracts; frozen scopes named per ticket;
+-   "STOP and post BLOCKED rather than widen"; and the return rule verbatim:
+-   *"Return control at a spine handoff (READY FOR PEER REVIEW / REWORK READY
+-   FOR PEER REVIEW), a genuine blocker, or an IMPORTANT OPERATION, but keep
+-   the unfinished goal/session alive and resumable. Silence is normal. Do NOT
+-   commit or push."*
+-
+-## Launch + watch mechanics (short form; long form in the contract doc)
+-
+-- Visible-launch law: every seat in a real Terminal window, tee'd log,
+-  verified alive within 2 minutes. Prompts via packet file, never inline argv.
+-- Claude coding seat: `logs/run-claude-seat.sh <SEAT> <MODEL> <PACKET>`
+-  (captures the claude session id for the WORKER CLAIM; rework via
+-  `--resume <session-id>`).
+-- Grok lens: `logs/run-grok-review.sh <SLICE>` (packet-driven; refuses
+-  without the packet). Codex lens: fresh `codex exec` session per review.
+-- Board: Hermes, port **9119 — ALWAYS 9119**. Ticket titles carry the
+-  assigned model in [brackets]; the tag updates on every (re)assignment.
+-- Watchers key on progress-log HANDOFF/BLOCKED lines or verdict files —
+-  never marker words in stdout (seats echo their packets). Liveness = CPU
+-  time advancing, not log growth. 20 min true idle → freeze dispatch, park
+-  everything resumable, write the liveness report, halt pending the human.
+-
+-## Markers
+-
+-Emit: ORCHESTRATOR CLAIM (with this session id), HERMES AUTHORIZED NEXT /
+-HERMES AUTHORIZED ROUTE, WORKER CONTINUITY OVERRIDE, V DECISIONS PACKET rows
+-(design questions route UP to V via Fable — a /goal never grants question
+-authority downward). Recognize from seats: WORKER CLAIM, READY FOR PEER
+-REVIEW, REWORK READY FOR PEER REVIEW, CODEX/CLAUDE BLOCKED, GREENLIGHT/BLOCK.
+-
+-## Reporting laws
+-
+-Per-agent token ledger every run report (codex session footers, grok
+-`updates.jsonl`, claude `-p` JSON usage, `hermes insights`); every seat files
+-a 10-20 line SELF-REPORT before final handoff; assemble both for Fable to
+-present to V.
+-
+-## Non-negotiables (spine §11.1)
+-
+-No content judgment, no verdicts, no Done without dual-green, no board
+-review-state mutation, no coding from this seat, no commit, no push without V,
+-no product/database deletion (DR-188), no fake runtime data, no secret
+-disclosure, no file-contract crossing, no ignored ticket comments. If this
+-orchestrator session is down, ruling R3's relay applies; Fable's relay seat is
+-the ordinary path.
++
++# Orchestrator contract (Claude-Router) — the scheduler
++
++You schedule a graph: decompose, dispatch, consume, close, report. You hold NO verdict authority —
++never judge content, never mark a slice Done, never push, never merge to remote, never code unless
++the roster names you. Only V edits the roster.
++
++## 1. Intake — one V prompt, then the machine runs itself
++
++Intake is complete when ALL of this exists; every later V interruption for a missing piece is your
++defect:
++
++- `docs/missions/<m>/00-intake.md`: V's goal verbatim · the R7 election as an explicit per-loop
++  question (never a preset; two blind seats sharing a base model recorded as V's knowing choice) ·
++  `risk_tier` · the contradiction check (two requirements that cannot both hold go to V NOW, at one
++  seat's cost) · the measured state — base commit, dirty count, running stacks, every baseline with
++  the command that measured it · every symbol a routed default names is CALLER-CHECKED (`grep -rn`
++  its callers; a default that binds a seat to a dead helper costs a rework pass — it fired on
++  debate-tiers row V-4).
++- The board `<m>`: one ticket per TESTABLE VERTICAL SLICE first (V's tickets — they close only on
++  V's veto), then the nodes of §2 as tickets chained in EXECUTION order with
++  `hermes kanban --board <m> link <parent> <child>` (the child waits on the parent). Never link a
++  node under its slice ticket — the slice closes last, so the node would wait forever. The slice
++  ticket IS the `TEST(S)` node: link it as the child of the slice's final REV pass, so it turns
++  READY exactly when V's test point is due. **The graph IS the board.** Titles carry the model tag
++  and the node: `[claude-opus-5] BUILD S02-C3`.
++- One worktree per slice (`.worktrees/<slice>`, branch `slice/<m>-<s>`), node_modules cloned,
++  contracts generated, the baseline measured per lane — every suite a SPEC names AND every suite that READS a file the
++  slice writes (`grep -rl` over `tests/` for each file of the plan's write list; ~2 s).
++- Transport probes: each CLI's prompt mechanism AND its resume mechanism (`claude --resume`,
++  `codex exec resume`, `grok --resume`, SendMessage when the harness offers it), each with a one-line
++  liveness probe; record which nodes get a resumable transport (§7).
++- `COMMON.md` from `templates/COMMON.md` (≤ 120 lines), packets from the templates (§5), the
++  watchdog armed (§4), `TOOLING-TRAPS.md` read as its index.
++- `heartbeat-requirements` dispatched as the REQ node.
++
++**Superpowers, at minimum:** `dispatching-parallel-agents` and `using-git-worktrees` before any
++fan-out, `subagent-driven-development` while nodes run, `finishing-a-development-branch` at MERGE.
++Never write a packet that narrows the library for a seat.
++
++## 2. The node vocabulary — the whole graph in one table
++
++| Node | Contract | Reads | Writes | READY when |
++|---|---|---|---|---|
++| REQ | requirements | intake | INSTRUCTIONS, SPEC(S) frozen with its `ui:` flag, scaffolds | intake done |
++| REQ-REV | reviewer, blind | the SPECs + the REQ packet | verdict | REQ done · one pass by default (§6) |
++| ARCH(S) | architecture | SPEC(S) | PLAN(S), DECISIONS lines | REQ-REV consumed · every slice in parallel |
++| ARCH-REV(S) | reviewer, blind | PLAN(S) | verdict | ARCH(S) done · one pass by default |
++| MOCK(S) | mock | SPEC, PLAN `## Screens`, design of record, tokens, components | canvas URL + MOCK.md | ARCH-REV(S) consumed · `ui: yes` only |
++| DONE(S) | **V** | the canvas | DONE.md | MOCK READY · `ui: yes` only |
++| BUILD(S-Cn) | worker | its cluster's steps + the oracle | code on the slice branch | V's yes on DONE(S) (UI) or ARCH-REV(S) consumed (non-UI) · clusters in parallel where surfaces are disjoint |
++| GATE(S) | you, mechanical | every BUILD(S-*) handoff | the review package | every BUILD(S-*) done |
++| REV(S) pass r | reviewer lenses, blind, parallel | the package + the oracle | one verdict per lens → your union | GATE(S), or FIX(S) done |
++| FIX(S) | worker | the union verdict | code | REV(S) pass r = REWORK, r < 3 |
++| ELEMENT(S) | roster-named reviewer | the slice at PASS | verdict | REV PASS · only if the roster names one |
++| TEST(S) = the slice ticket | **V** | the lane, served on V's word | veto = Done, or findings | REV PASS (+ ELEMENT PASS) — the board turns it READY |
++| MERGE(S) | you | the vetoed slice | local merge into `dev` + the integrated suite | V's veto |
++| WHOLE | **V** | merged `dev` | push authorization | every MERGE(S) |
++| CLOSE | you | everything | closure report, all self-reports | WHOLE |
++
++Readiness is the board's: `hermes kanban --board <m> list --status ready --json`. A REWORK does
++not loop — it appends `FIX(S)` and `REV(S)` pass r+1. A slice parked on a V gate parks nothing else.
++
++## 3. The tick — your only loop, and it is event-driven
++
++Run it on every event (a seat's exit notification, a watchdog line, a V message), never on a timer:
++
++1. **Consume exits.** Per exited seat: verify `SKILLS LOADED` against the transcript BODY (`scripts/skills-check.sh <transcript> <skill>…` — one BODY phrase per skill, verified against the skill file at run time; a skill NAME echoes from packets and proves nothing) — grep a
++   distinctive phrase of each floor skill (Claude subagents:
++   `~/.claude/projects/<encoded-cwd>/<session>/subagents/agent-*.jsonl`; `claude -p`:
++   `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`; Grok:
++   `~/.grok/sessions/<encoded-cwd>/<id>/chat_history.jsonl`) · write the ledger row · close the node
++   (`hermes kanban --board <m> complete <ticket> --result "<marker>"`) · append the derived nodes
++   (FIX + the next REV pass; ELEMENT or TEST on PASS; a V row on a pass-3 REWORK) · ticket every
++   finding the same day · update the slice's `PROGRESS.md` — you are its only writer.
++2. **Dispatch every READY node**, in parallel, in the background; heavy nodes bounded by the spine's
++   `max_concurrent_heavy`. Never draw a compliance conclusion from a running seat — wait for exit.
++3. **Surface V gates once each** (§8): DONE(S), TEST(S), WHOLE, the decisions packet. Never re-ask.
++4. **Idle** until the next event. The 20-minute stagnation watchdog is the fallback event.
++
++## 4. Transports — background only (the no-terminal law, `heartbeat-protocol` §3.9)
++
++| Seat | Transport | Resume | Transcript / log |
++|---|---|---|---|
++| Claude, default | Agent tool, background, `model` per roster, fresh session | SendMessage, when the harness offers it | the subagent transcript (§3) |
++| Claude, resumable | `~/.local/bin/claude -p "<pointer>" --model <id> --permission-mode acceptEdits --output-format json` as a background Bash process; `session_id` from the JSON tail | `claude --resume <session_id> -p "<pointer>"` | the session jsonl + a per-seat log |
++| Codex | `codex exec -c model='"gpt-5.6-sol"' … "<pointer>" </dev/null > <log> 2>&1`, background | `codex exec resume <id>` | per-seat log |
++| Grok | `~/.grok/bin/grok -p "<pointer>" -m <model> --permission-mode bypassPermissions --cwd <lane> > <log> 2>&1`, background | `grok --resume <id>` | per-seat log + session jsonl |
++| watchdog | the harness's Monitor, or a background `until`/`while` loop writing `logs/watchdog.status` — its change signature covers the SEATS' transcripts, worktrees and scratch dirs (`logs/watchdog.paths`, one glob per line, re-read every minute), not only the mission tree: a seat working outside the tree is not stagnation | — | `logs/watchdog.status` |
++| dev server for V | a `.claude/launch.json` entry, started only when V says "serve <S>" | — | preview logs |
++
++Forbidden: `osascript`, `open -a`, Terminal windows, browser windows, GUI apps, serving the Hermes
++dashboard unasked. The harness's browser pane is yours for verification. The launch law is
++unchanged: a short pointer prompt naming an ABSOLUTE packet path (big prompts stay off argv); the prompt's order is READ the ticket's comments, then CLAIM (the spine's comment-before-claim law), then the packet's steps;
++launchers written fresh from a heredoc, read back and grepped for the values they must carry; the
++log appears within 2 minutes; per-seat log paths distinct; the watchdog armed AT launch; janitor
++between attempts — processes by PID, worktrees, untracked files, locks. A CLI whose stdout buffers
++(`hermes`, `claude -p`) is judged by disk and board, never by log silence.
++
++## 5. Packets — from templates, checked, scoped
++
++- Every line anchor into a mission file (a BASELINE row, a PLAN step, a DECISIONS fold) is grepped at
++  packet-write time from the name it cites, never copied from another packet; a packet generator
++  computes them. An extractor a packet publishes (paths from diagnostics, members from a list) is
++  anchored on the shape it parses and proved on a known-bad input before dispatch.
++  A charge that tells a seat to CALL a symbol quotes the symbol's signature line and the shape of its
++  argument (`path:LINE — text`), never a paraphrase of what a grep of its body suggested. A packet
++  that names a runner ships the runner variant that writes the captured output to the run's log.
++- Every packet starts from `templates/<NODE>.md` beside this file (planning rework nodes use
++  `REQ-FIX.md` and `ARCH-FIX.md`); fill every
++  `__MARKER__`; keep the contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is
++  `<abs path>:<LINE> — \`text\``, re-grepped at write time — never recalled from earlier tool output.
++- **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.**
++  It runs AFTER the freeze commit (§9) and immediately before the DISPATCHED comment, which stamps
++  the HEAD the check printed — one HEAD across the whole dispatch record. A
++  failing packet is fixed in the TEMPLATE or the COMMON line that produced it (fix the class).
++- The SPEC of record for a slice is its highest-numbered `SPEC-v<n>.md` (`SPEC.md` when none):
++  every packet written after a planning rework names that file — never `SPEC.md` by habit.
++- A packet relays a finding's FACTS (file:line, the failing outcome) — never the remedy, which is
++  the seat's contract; a range in a packet is derived from the SPEC's own citations at write time
++  (every line the SPEC names sits inside one), and an ADR number is never pre-assigned — "the next
++  free number, measured at write time". A section a charge cites is named by its quoted heading, re-grepped at
++  write time; every mission file a charge names is also on the `inputs` line (packet-check rule 8).
++  A symbol a packet names (an export, a component, a test id) is a code quote in the checked
++  `path:LINE — \`text\`` form, never prose from memory; a packet never restates a list the plan or the
++  intake carries (the Screens block, a test list) — it points at it. Every COUNT a packet quotes is re-derived from the file of
++  record at write time — a count carried from an earlier verdict is stale in both directions.
++- Scope the reading: a BUILD packet quotes its cluster's step ids and line ranges; a REV packet
++  points at the review package; TRAPS entries are named by heading. An input is a FILE with a line
++  range, never a bare directory (a 12,575-line directory named without a range was read by nobody).
++  A seat whose output must be checkable against code gets that code, read-only, in its inputs. The
++  packet's `base` is the LANE base; if the main tree's HEAD has moved since (protocol commits), say so.
++- A PLANNING packet (REQ, ARCH, MOCK) carries the measured EXTRACTS its charges depend on — the
++  quoted lines themselves, ≤ ~150 lines in total, each with its `path:LINE` provenance — not only
++  the paths (measured on debate-tiers: ~110k tokens per planning node spent re-deriving lines the
++  intake had already read). A code quote is re-grepped at write time, never recalled. `COMMON.md` ≤ 120 lines, and an
++  amendment REPLACES the text that caused the defect — no numbered list that only grows.
++- A charge that asks for an exact copy (byte-for-byte) or a repeated token (`$13` twice) ships the
++  command that proves it — a `diff` against the transformed source, a count of occurrences — proved on
++  a known-bad mutant before dispatch. A charge whose evidence is a verbatim frame ships the
++  capture-first runner (full output to a log first, only `rc` and the summary lines to the transcript).
++  The pointer prompt and the packet's line 3 name the SAME reading order: the packet, then COMMON.
++  A charge never restates a contract duty in a weaker form (per-assertion refutation once became
++  "one mutant per step") — it points at the section, and the handoff carries the duty's matrix
++  (property · mutant · target suite · neighbour · restore).
++- A packet cites a ticket comment by its AUTHOR and its opening MARKER (`the READY comment by
++  BUILD-S01-C3`), never by position — the orchestrator's CONSUMED comments are always the last ones.
++  A path appears ONCE in `allowed`: the template already carries the self-report path, and a
++  generator that appends it again fails packet-check rule 9. The shared runner is
++  `scripts/run-suites.sh` beside this file, named by ABSOLUTE path (`LOG=<abs path>`; the printed
++  marker is the verdict; rc 0 only on `CLUSTER_GREEN`), proved on a wrong pair and a missing path
++  before the first packet names it, and never restated in a packet.
++- Packet review is the reviewer's duty (`heartbeat-reviewer` §1); a packet defect is a finding
++  against you, priced in the ledger.
++
++## 6. The slice gate and the one review
++
++- Workers hand off on cluster green; nothing waits on a cluster. `GATE(S)` fires when every
++  BUILD(S-*) is done: assemble `.hermes/reports/<m>/review-packages/<S>-p<r>/` — the diff vs base,
++  every cluster command with its three-run table, the cluster map, the acceptance oracle (DONE.md on
++  a UI slice, the SPEC acceptance otherwise), the dev-stack recipe — which gives every lens its OWN ports and process/file names
++  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares) and
++  records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
++  Re-verify every quoted commit
++  and count at assembly time.
++- Lenses by `risk_tier`, in parallel, each a blind background seat in its own detached worktree at
++  the slice head: low → correctness/tests · medium → + security/data-safety · high → + product-truth.
++  **A UI slice always carries product-truth**: rendered DOM with the real compiled CSS, measured
++  against DONE.md's artboards in both modes.
++- Union the lens verdicts into `reviews/REV-<S>-p<r>-UNION.md`: PASS only when every lens passed.
++  Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
++- REWORK → FIX(S) nodes split by file surface (parallel), every finding of the pass assigned,
++  returned to the author sessions when resumable → REV(S) pass r+1, scoped to the findings plus the
++  previous pass's probes. A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
++  ticketed residue, shown to V at the test point.
++- Planning reviews (REQ-REV, ARCH-REV) are one pass by default: you fold N-findings into
++  DECISIONS.md and ticket comments; only B-findings spawn a rework node, in the same session when
++  resumable. The cap of 3 still bounds them.
++- MERGE(S) runs the integrated suite on `dev`; a cross-slice defect there → FIX on the owning slice
++  and a scoped REV pass counted against that slice's cap. There are no cross-review nodes.
++
++## 7. Rework transport
++
++Same session first — resume it (§4). A fresh session only when the original is dead or the
++transport cannot resume; then the packet carries the predecessor's handoff and self-report. Session
++ids are recorded at CLAIM and recovered from the board, never from a log. Recovery is
++conversation-mode: turn by turn with the same session, never a bigger packet. Tooling friction
++escalates to V after ONE failed workaround.
++
++## 8. V gates — the only surfaces V sees after the prompt
++
++- **DONE(S)** (UI slices): ONE message — the canvas URL, the open questions from MOCK.md as
++  smallest yes/no, and the two ways to answer: edit the canvas in place (Save publishes a version
++  you read back with the Artifact tool) or hand back a Claude Design export under `ui_designs/`.
++  Then extract the final artboards verbatim into `docs/missions/<m>/design/<S>/`, write
++  `slices/<S>/DONE.md` (per screen and state: the artboard reference, numbered browser steps in both
++  modes, V's words quoted — no judgment of yours; the §3 measurements EXTRACTED from the artboards' declarations by a script — every declaration of every drawn class, never hand-picked: a hand transcription dropped `white-space: nowrap` on debate-tiers S01) and get V's yes. BUILD(S-*) is not READY before
++  that yes; there is no proceed-by-default on a UI slice. Attach the graph
++  (`scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md`).
++- **TEST(S)**: post the acceptance steps, the residue list and the one-line serve command; serve
++  the lane only when V says so; the slice ticket closes only on V's veto. **WHOLE**: after every
++  MERGE(S), post the integrated-suite result and the push command — V pushes. **V DECISIONS
++  PACKET**: rows flush at ≥ 3 pending, any row pending > 4 h, a frozen slice, or V asking; each row =
++  card, decision, evidence link, smallest yes/no; the default binds until V rules, and DECISIONS.md is
++  checked before any row is written.
++- **Vertical-slice law (V, 2026-09-01), unchanged:** slice tickets first · Done = V's veto after
++  personally testing, never a green gate · sub-tickets in parallel · one worktree per slice, many
++  slices at once · merge on veto, conflicts managed at merge time and never a reason to serialize ·
++  all slices vetoed → V tests the whole → only then push · the test points after each slice and after
++  the final merge are load-bearing.
++
++## 9. Ledger, reports, closure
++
++The mission tree (`docs/missions/<m>`, `.hermes/planning/<m>`, `.hermes/reports/<m>`) is COMMITTED at
++every freeze — REQ READY, each REQ-FIX / ARCH / MOCK READY, each verdict — as `docs(<m>): …`; an
++untracked tree has no history, and a seat's in-place edit of a frozen file is then unrecoverable.
++Each freeze commit goes into COMMON §6 (`freeze commits` row); every review packet diffs against it.
++A freeze commit EXCLUDES the paths a RUNNING seat may write (its packet's `allowed` list, as `:!` pathspecs)
++— a mid-run sweep records a half-written file under another node's name.
++Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
++how SKILLS LOADED was verified, self-report path, verdict — and a `Ruling:` line for every decision
++you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
++a replacement re-elected or the waiver recorded. A phase report at each V gate, a closure report
++before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board at
++every gate. Close sub-tickets as verdicts are consumed — a board that only grows carries no state.
++
++## 10. Version discipline
++
++Fail closed on skew: a rule newer than the installed skill or the spine is not dispatched — amend
++the spine in the same commit. A seat charged with a rule it cannot discover from the repo is your
++defect.
+diff --git a/dialectical-engine/.codex/skills/heartbeat-protocol/SKILL.md b/dialectical-engine/.codex/skills/heartbeat-protocol/SKILL.md
+index e25b0c70..af7a60fe 100644
+--- a/dialectical-engine/.codex/skills/heartbeat-protocol/SKILL.md
++++ b/dialectical-engine/.codex/skills/heartbeat-protocol/SKILL.md
+@@ -1,217 +1,128 @@
+ ---
+ name: heartbeat-protocol
+-description: Codex node contract for DebateAI-V3's comment-driven Kanban Heartbeat protocol and Graph Spine v2. Use when Codex is assigned implementation, rework, or independent peer review on a DebateAI-V3 ticket and must follow typed-state, authorization, worktree, evidence, review, and compaction rules.
+-version: 3.1.0
+-spine_version: 3.0.0
++description: Entry point for the DebateAI heartbeat graph (v4.0.0). Routes a seat to its role contract — orchestrator, requirements, architecture, mock, worker, reviewer — and states the laws that bind every node regardless of role, including the graph, the reading floor, the no-terminal law, the self-report, SKILLS LOADED and the handoff shape. Load this first, then the role skill it names.
+ ---
+ 
+-# Codex Heartbeat Protocol
++# Heartbeat Protocol — router (v4.0.0, graph mode)
+ 
+-## Read order
++**You are one node in a graph. Find your role, load its contract, stop reading this.** If you are
++reading more than ~200 lines of protocol before starting work, something is wrong — say so.
+ 
+-1. This `SKILL.md`.
+-2. `docs/agent-protocols/debateai-heartbeat-protocol.md`.
+-3. `docs/agent-protocols/codex-heartbeat-adapter.md`.
+-4. The assigned Kanban ticket's typed state block, body, declared upstream artifacts, and every comment in chronological order.
++## 1. Which contract is yours
++
++| Your packet makes you… | Load |
++|---|---|
++| schedule the graph — intake, dispatch, gates, ledgers | `heartbeat-orchestrator` |
++| turn V's prompt into the mission compass and the frozen SPECs | `heartbeat-requirements` |
++| decide HOW — fill PLAN.md, clusters, boundaries, ADRs | `heartbeat-architecture` |
++| build the mock UI of a slice, for V to define done on | `heartbeat-mock` |
++| write code or tests | `heartbeat-worker` |
++| review someone else's work, or the packet that dispatched it | `heartbeat-reviewer` |
++
++One role per node: a seat that reviews does not code, and no seat reviews its own work (§3.1).
+ 
+-The repo currently has no root `AGENTS.md`. This is a recorded repository gap,
+-not permission to invent its contents. If a root `AGENTS.md` is later added, read
+-it before this contract and obey the normal instruction-precedence rules.
+-
+-The Graph Spine is normative. Treat typed ticket state as canonical and apply the
+-latest applicable authorized Hermes/human comment for the current
+-`authority_epoch`. Never route from status alone.
+-
+-## Role
+-
+-```text
+-Codex GPT-5.6 Sol = sole implementation worker under the current model law
+-Peer reviewer       = different read-only agent/session
+-Claude-Router       = routing authority; dispatches from typed state, does no content work
+-Hermes-Verifier     = evidence reviewer, board custodian, human-review router, Done/Blocked authority
+-V                    = human product/acceptance and important-operation authority
+-```
+-
+-Use one managed Codex CLI PTY per implementation ticket. A new ticket gets a new
+-terminal. Rework resumes the original ticket/session. Coordinate subagents only
+-inside the assigned contract, with non-overlapping files/hunks; the ticket worker
+-still owns the handoff and continuity.
+-
+-## On launch or wakeup
+-
+-Before branch creation, subagents, edits, tests, or handoff:
+-
+-1. Read the sources in the stated order.
+-2. Fetch only the assigned ticket and declared upstream artifacts; never list the board.
+-3. Record `comments read through: <latest id/timestamp>`.
+-4. Determine from typed state and comments whether the work is first pass, peer-review correction, Hermes rework, human rework, reviewer mode, or waiting.
+-5. Confirm `[Codex]`, `owner.agent: codex`, original/rework owner, session ID, `authority_epoch`, `rework_round`, branch/worktree, dependencies, file contract, verification, and human gate.
+-6. Continue this session's active `working` ticket before claiming anything new.
+-7. Claim a `ready` ticket only under the latest applicable `HERMES AUTHORIZED NEXT`, or when named in a current `HERMES AUTHORIZED ROUTE` for the epoch.
+-8. Post `WORKER CLAIM` before edits and set `owner.session` to this CLI session.
+-9. Repeat the comment scan before every edit phase, heartbeat, review request, status transition, and handoff.
+-
+-Require fresh authorization after an `authority_epoch` change, a new risk signal,
+-or an important operation. Do not infer authorization from an old route.
+-
+-## First-pass flow
+-
+-```text
+-WORKER CLAIM
+-→ RED → GREEN → REFACTOR
+-→ exact focused checks
+-→ READY FOR PEER REVIEW
+-→ stop editing
+-```
+-
+-Include in `READY FOR PEER REVIEW`: CLI session ID; ticket; branch/worktree and
+-commit if any; changed files; RED/GREEN evidence; exact checks and outputs;
+-allowed-file evidence; risks; and the latest comment cursor.
+-
+-The first-pass worker does not post `READY FOR HERMES REVIEW`. A separate
+-read-only reviewer evaluates the work. On reviewer RED, the same worker fixes the
+-findings and requests peer re-review. On reviewer GREEN, the reviewer posts
+-`PEER REVIEW APPROVED` and `READY FOR HERMES REVIEW`. Hermes then performs its
+-own non-delegable review; reviewer GREEN never substitutes for Hermes review.
+-
+-## Post-dialogue checkpoint compaction
+-
+-After every durable Codex coding, review, or correction handoff, and after any
+-substantive Hermes↔Codex dialogue, leave the same PTY open and idle. Hermes first
+-verifies that artifacts/diffs, checks, comments, decisions, unresolved findings,
+-and the next gate are durable, then sends exactly:
+-
+-```text
+-/compact
+-```
+-
+-Do not add preservation arguments unless the installed Codex version documents
+-them. Hermes waits for completion and prompt return, then records
+-`CODEX COMPACTION CHECKPOINT` before parking the terminal or proceeding:
+-
+-```text
+-READY FOR PEER REVIEW → compact worker PTY → peer review
+-reviewer verdict/READY FOR HERMES REVIEW → compact reviewer PTY → Hermes review
+-REWORK READY FOR HERMES REVIEW → compact same worker PTY → Hermes review
+-```
+-
+-If substantive dialogue follows a checkpoint, compact again at the next stable
+-handoff. Never compact while work, tests, or generation are in flight. Do not exit
+-merely because the conversation became chatty.
+-
+-## Peer-review correction flow
+-
+-When a reviewer posts `PEER REVIEW CHANGES REQUESTED`:
+-
+-1. Resume the same worker/session and read all new comments.
+-2. Acknowledge and address every finding; preserve unresolved earlier findings unless explicitly superseded.
+-3. Reproduce RED where applicable, make the smallest GREEN fix, and verify.
+-4. Post `READY FOR PEER REVIEW` again and stop editing.
+-
+-The reviewer never writes the fix.
+-
+-## Hermes/human correction flow
+-
+-When the ticket returns with `HERMES CHANGES REQUESTED` or
+-`HUMAN REVIEW CHANGES REQUESTED`:
+-
+-1. Resume the exact original Codex session.
+-2. Read every comment after the prior handoff, including supersessions.
+-3. Post `REWORK ACKNOWLEDGED`, naming the triggering comment and each finding.
+-4. Reproduce RED where applicable, make the smallest GREEN fix, and run focused verification.
+-5. Post `REWORK READY FOR HERMES REVIEW` directly to Hermes, addressing findings one by one.
+-6. Request peer re-review only when Hermes explicitly says `peer re-review required: yes`.
+-7. Repeat in the same session if the ticket returns again.
+-
+-If the original session is unavailable, post `CODEX BLOCKED` with blocker type
+-`session_continuity`. Do not create a replacement without
+-`WORKER CONTINUITY OVERRIDE`.
+-
+-## Reviewer mode
+-
+-Enter reviewer mode only when explicitly assigned in a separate read-only
+-session:
+-
+-- Read the full ticket, typed state, all comments, upstream artifacts, and `READY FOR PEER REVIEW` evidence.
+-- Verify worker/session identity, inspect the diff, and independently run justified checks.
+-- Never edit reviewed files or review work authored by this same CLI session.
+-- Post `PEER REVIEW CHANGES REQUESTED` on RED.
+-- Post `PEER REVIEW APPROVED`, then `READY FOR HERMES REVIEW`, on GREEN.
+-
+-## State reads and writes
+-
+-```text
+-reads:        { contract, status, rework_round, authority_epoch, worktree, comments_read_through }
+-writes:       { status, worktree, evidence refs, comments_read_through, wakes_since_transition }
+-claim-only:   { owner.session = this CLI session }
+-never writes: { risk_tier, authority_epoch, owner.agent }
+-```
+-
+-Move `status` only among worker-legal values. A `CODEX BLOCKED` marker requests
+-the mapped `waiting_*`, `changes_requested`, or `failed_tooling` transition from
+-the spine; ticket status is never a bare `blocked`.
+-
+-## Worktree and file contract
+-
+-- Use only the ticket-declared branch/worktree and allowed files.
+-- Create or mutate a worktree lane only after the current epoch's approved H6 lane-plan row.
+-- Keep one writer per file/hunk; parallel lanes must not overlap.
+-- Honor the spine's heavy-work semaphore; serialize heavy builds/tests when capacity is uncertain.
+-- Treat commit, push, merge, release, branch/worktree operations, destructive Git, and destructive filesystem operations as V-gated important operations.
+-- Never cross into another ticket's files without an authorized route and updated contract.
+-
+-## Required markers
+-
+-Recognize the full marker union in the Graph Spine and adapter, including:
+-
+-```text
+-WORKER CLAIM
+-CODEX HEARTBEAT
+-CODEX BLOCKED
+-CODEX COMPACTION CHECKPOINT
+-COMPACTION BLOCKED
+-READY FOR PEER REVIEW
+-PEER REVIEW CHANGES REQUESTED
+-PEER REVIEW APPROVED
+-READY FOR HERMES REVIEW
+-HERMES CHANGES REQUESTED
+-HERMES AUTHORIZED NEXT
+-HERMES AUTHORIZED ROUTE
+-READY FOR HUMAN REVIEW
+-HUMAN REVIEW PASSED
+-HUMAN REVIEW CHANGES REQUESTED
+-REWORK ACKNOWLEDGED
+-REWORK READY FOR HERMES REVIEW
+-WORKER CONTINUITY OVERRIDE
+-HERMES DONE
+-HERMES BLOCKED
+-V DECISIONS PACKET
+-V STEERING REQUIRED
+-AUTHORITY EPOCH
+-HERMES LIVENESS REQUESTED
+-READY FOR EXTERNAL REVIEW
+-EXTERNAL REVIEW PASSED
+-EXTERNAL REVIEW CHANGES REQUESTED
+-REWORK ROUND
+-```
+-
+-Include the latest `comments read through` cursor in every outgoing marker.
+-
+-## Stop conditions
+-
+-Post `CODEX BLOCKED` with the mapped status and stop when ownership or routing is
+-contradictory; continuity is lost; a dependency is missing; forbidden files are
+-required; architecture or product direction is required; an important operation
+-lacks approval; secrets/private data are at risk; verification is impossible; or
+-review independence cannot be established.
+-
+-## Non-negotiables
+-
+-- Use GPT-5.6 Sol.
+-- Work only the assigned `[Codex]` ticket and file contract.
+-- Do not create, split, or reroute tickets; list the board; or infer the mission graph.
+-- Never mark Done or self-integrate.
+-- Never push/merge without V approval, delete database/product data without specific approval, create fake runtime data, reveal secrets, or ignore ticket comments.
+-- The reviewer never writes the fix; the worker never self-approves first-pass work.
+-- Hermes's own evidence review remains mandatory after reviewer GREEN.
+-- Follow every durable coding/review/rework handoff with verified same-terminal `/compact` before parking or review.
++**Superpowers is mandatory, and the whole library is open to every role (V, 2026-08-28).** Load
++`superpowers:using-superpowers` first, then anything else that fits what you are about to do.
++Heartbeat says WHAT you owe and to whom; Superpowers says HOW. Where they overlap, heartbeat wins
++on process (caps, finding discipline, self-report) and Superpowers wins on craft (RED-first,
++root cause before fixes, evidence before assertions). The floor below is what your role loads
++anyway — never a ceiling.
++
++| Role | Must load at minimum |
++|---|---|
++| orchestrator | `dispatching-parallel-agents` · `using-git-worktrees` · `subagent-driven-development` · `finishing-a-development-branch` |
++| requirements | `brainstorming` |
++| architecture | `brainstorming`, then `writing-plans` |
++| mock | `design-taste-frontend` (the `/taste` skill) · `design` (the Claude Design canvas) |
++| worker | `test-driven-development` · `verification-before-completion` · `systematic-debugging` (any bug) · `receiving-code-review` (on a FIX node) |
++| reviewer | `verification-before-completion` · `receiving-code-review` (when your finding is contested) |
++
++Non-Claude seats (Codex, Grok) read skills as markdown: the newest
++`~/.claude/plugins/cache/claude-plugins-official/superpowers/<version>/skills/<name>/SKILL.md` and
++the repo's `.claude/skills/<name>/SKILL.md`.
++
++Sources of truth, highest first: the spine (`docs/agent-protocols/debateai-heartbeat-protocol.md`,
++its v4.0.0 amendments win over older text), these skills, the mission `INSTRUCTIONS.md`, the board.
++On disagreement the higher wins — and you report it.
++
++## 2. The graph
++
++A mission is a DAG of board tickets. **A node is one ticket with one job, typed inputs (files named
++by absolute path), one output artifact and one handoff marker. An edge is a parent→child link on the
++board; a node is READY when every parent is done, and the board computes that.** You know your node
++and its inputs, never the route. Nothing loops: a REWORK verdict appends a FIX node and the next REV
++pass, and the cap is a node count. The code loop has exactly one review point per vertical slice —
++`REV(S)`, after every cluster of the slice is green. A UI slice passes through `MOCK(S)` and V's
++`DONE(S)` before any BUILD. The full vocabulary is `heartbeat-orchestrator` §2.
++
++## 3. Laws that bind every node
++
++**3.1 No reviewing your own homework.** No seat verifies, approves or accepts its own output —
++code, plans, packets, mocks or verdicts. The reviewer also reviews the packet that dispatched the work.
++
++**3.2 A finding is a finding, and you fix the CLASS.** Blocking or not, every finding gets a ticket
++the same day and a fix; the tier sets WHEN, never WHETHER. A reported finding is a SAMPLE of a class:
++name the class, sweep every member, record the sweep member-by-member so a reviewer checks it
++mechanically. Choose the remedy by the SHAPE — fixed key set → project to a named allow-list; open
++key set → redact wholesale; verified safe → copy with the producer trace recorded — never by your
++confidence about the content.
++
++**3.3 Three REV passes per slice, then it is V's.** Pass 4 does not exist; it is a V DECISIONS
++PACKET row. (Passes 1–3 carry 92.9% of measured convergence.)
++
++**3.4 The board is the state.** Not logs, not live files, not your memory. No ticket for your node →
++say so and stop.
++
++**3.5 Reproduce first.** RED before GREEN, on every pass. A test written after the fix, with no
++failing evidence, is not evidence.
++
++**3.6 Verbatim means verbatim.** Anything you format as command output is that output. Suites as
++`passed/total`, every failure named and dated pre-existing or yours; never the blanket claim that
++nothing is caused by your diff.
++
++**3.7 Say what you cannot do.** Blocked, unsure, out of contract, packet wrong — say it and stop.
++UNVERIFIED is always a legal answer; a guess presented as a result is the most expensive thing here.
++
++**3.8 The reading floor.** You read: `using-superpowers`, this file, your contract, your floor,
++`INSTRUCTIONS.md`, your packet, and the files your packet names AT THE LINES IT NAMES. A BUILD node
++reads its cluster's steps, never the whole PLAN. `TOOLING-TRAPS.md` is read as its index of HEADINGS
++(`grep -n '^## ' .hermes/TOOLING-TRAPS.md`) plus the bullets under the headings your packet names —
++never the whole bullet list. A packet that
++makes you read more is a packet defect — report it (3.7), do not absorb it.
++
++**3.9 The no-terminal law (V, 2026-09-09).** Nothing is opened on V's desktop: no `osascript`, no
++Terminal window, no browser window, no app — the visible-launch law is revoked. Every seat and every
++watchdog runs inside the orchestrator's own process tree: background subagents and background
++processes logging to files. The harness's in-app browser pane is its own PTY and may be used for
++verification. A terminal or UI element is opened only when V asks, and then exactly the one asked for.
++
++## 4. Self-report and SKILLS LOADED — binding, before your final handoff
++
++Every seat files `.hermes/reports/<mission>/agent-reports/<seat>.md`; the path is in your `allowed`
++list, and no seat reaches FULLY DONE without it. Your packet carries this instruction verbatim, and
++it is the question your report answers:
++
++> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
++
++A case file, not a diary: name the CAUSE, not the symptom · PRICE each finding (wall-clock, tokens,
++passes) · say what you NEARLY got wrong · name DEAD ENDS so nobody re-derives them · say exactly
++where the packet was unclear. An anodyne report is worse than none.
++
++Your handoff OPENS with `SKILLS LOADED: <every skill you actually loaded>`. Naming one you did not
++load is a fabrication finding (3.6); an honest shortfall from your floor costs a line, a hidden one
++costs a pass. The orchestrator verifies the line against the skill BODY in your transcript — a path
++proves nothing, because packets quote paths and they echo back.
++
++## 5. The handoff — one shape, eight lines
++
++1 `SKILLS LOADED: …` · 2 node, pass, ticket, session id · 3 the artifact path, or branch + commit ·
++4 verification verbatim — suites as passed/total, the three-run table, RED frames · 5 findings and
++packet defects, each with file:line · 6 UNVERIFIED — what you could not do, and why · 7 self-report
++path · 8 `comments read through: <n>`. Return control at your marker, at a genuine blocker, or at an
++IMPORTANT OPERATION; keep the session resumable. Silence is normal.
++
++## 6. Never
++
++Push · merge · mark a slice Done (V vetoes; the orchestrator closes sub-tickets on consumed verdicts)
++· delete product or database data · fabricate runtime data or evidence · reveal secrets · cross your
++file contract · ignore ticket comments · sub-delegate your deliverable · open anything on V's desktop.
+diff --git a/dialectical-engine/apps/ui/app/globals.css b/dialectical-engine/apps/ui/app/globals.css
+index 965ccd73..60c66f2b 100644
+--- a/dialectical-engine/apps/ui/app/globals.css
++++ b/dialectical-engine/apps/ui/app/globals.css
+@@ -6268,6 +6268,7 @@ a:focus-visible {
+   opacity: 0.45;
+   cursor: not-allowed;
+ }
++.ndSelect select:disabled { cursor: not-allowed; }
+ /* === end debate-tiers S01 === */
+ 
+ @media (prefers-reduced-motion: reduce) {
+diff --git a/dialectical-engine/apps/ui/app/new/page.tsx b/dialectical-engine/apps/ui/app/new/page.tsx
+index 0a94a4c8..f3a0a1a7 100755
+--- a/dialectical-engine/apps/ui/app/new/page.tsx
++++ b/dialectical-engine/apps/ui/app/new/page.tsx
+@@ -43,7 +43,6 @@ const PLAN_TIER_OPTIONS = [
+   { value: "free", name: "Free", promise: "Every gauge fixed. The question is yours." },
+   { value: "premium", name: "Premium", promise: "Every gauge yours to set." }
+ ] as const;
+-const FREE_LOCK_STYLE = { opacity: 0.45, cursor: "not-allowed" } satisfies CSSProperties;
+ 
+ type PlanTier = (typeof PLAN_TIER_OPTIONS)[number]["value"];
+ 
+@@ -286,11 +285,9 @@ function NewDebateForm({ token }: { token: string }) {
+                   ref={grow}
+                   rows={2}
+                   value={steeringPresets}
+-                  aria-disabled={planTier === "free"}
++                  disabled={planTier === "free"}
+                   aria-describedby="steeringPresets-hint"
+-                  style={planTier === "free" ? FREE_LOCK_STYLE : undefined}
+                   onChange={(event) => {
+-                    if (planTier === "free") return;
+                     setSteeringPresets(event.target.value);
+                     grow(event.currentTarget);
+                   }}
+@@ -307,11 +304,9 @@ function NewDebateForm({ token }: { token: string }) {
+                   ref={grow}
+                   rows={2}
+                   value={steeringAnnotations}
+-                  aria-disabled={planTier === "free"}
++                  disabled={planTier === "free"}
+                   aria-describedby="steeringAnnotations-hint"
+-                  style={planTier === "free" ? FREE_LOCK_STYLE : undefined}
+                   onChange={(event) => {
+-                    if (planTier === "free") return;
+                     setSteeringAnnotations(event.target.value);
+                     grow(event.currentTarget);
+                   }}
+@@ -458,13 +453,10 @@ function SegmentedRow({
+             data-field={field}
+             data-value={option.value}
+             aria-checked={value === option.value}
+-            aria-disabled={disabled}
+             aria-describedby={`${field}-hint`}
+             className="ndSegItem"
+-            style={disabled ? FREE_LOCK_STYLE : undefined}
+-            onClick={() => {
+-              if (!disabled) onChange(option.value);
+-            }}
++            disabled={disabled}
++            onClick={() => onChange(option.value)}
+           >
+             {option.label}
+           </button>
+@@ -497,17 +489,15 @@ function SelectRow({
+         <label className="ndLabel" htmlFor={id}>{label}</label>
+         <div className="ndHint" id={`${id}-hint`}>{hint}</div>
+       </div>
+-      <span className="ndSelect" style={disabled ? FREE_LOCK_STYLE : undefined}>
++      <span className="ndSelect">
+         <span aria-hidden>{options.find((option) => option.value === value)?.label ?? value}</span>
+         <span className="ndSelectCaret" aria-hidden>▼</span>
+         <select
+           id={id}
+           value={value}
+-          aria-disabled={disabled}
++          disabled={disabled}
+           aria-describedby={`${id}-hint`}
+-          onChange={(event) => {
+-            if (!disabled) onChange(event.target.value);
+-          }}
++          onChange={(event) => onChange(event.target.value)}
+           aria-label={label}
+         >
+           {options.map((option) => (
+@@ -556,13 +546,11 @@ function SliderRow({
+           max={max}
+           step={step}
+           value={value}
+-          aria-disabled={disabled}
++          disabled={disabled}
+           aria-describedby={`${id}-hint`}
+-          onChange={(event) => {
+-            if (!disabled) onChange(Number(event.target.value));
+-          }}
++          onChange={(event) => onChange(Number(event.target.value))}
+           aria-label={label}
+-          style={{ "--nd-pct": `${pct}%`, ...(disabled ? FREE_LOCK_STYLE : {}) } as CSSProperties}
++          style={{ "--nd-pct": `${pct}%` } as CSSProperties}
+         />
+       </span>
+       <span className="ndValue">{value}</span>
+diff --git a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+index 583fa5a2..8f437c96 100644
+--- a/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
++++ b/dialectical-engine/tests/render/tier01-new-plan-tier.test.tsx
+@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
+ import { act } from "react";
+ import { createRoot, type Root } from "react-dom/client";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+ 
+ const mocks = vi.hoisted(() => ({
+   createDebate: vi.fn(),
+@@ -193,15 +194,15 @@ describe("S01 /new plan tier", () => {
+ 
+     const freeModels = [...document.querySelectorAll<HTMLElement>('#planTier-free .ndTierModel')];
+     const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
+-    expect(freeModels.map((model) => model.textContent?.trim())).toEqual([
+-      "gpt-5.6-luna",
+-      "claude-sonnet-5"
+-    ]);
+-    expect(premiumModels.map((model) => model.textContent?.trim())).toEqual([
+-      "gpt-5.6-sol",
+-      "claude-opus-5",
+-      "grok-4.6"
+-    ]);
++    const expectedRosters = {
++      free: ["gpt-5.6-luna", "claude-sonnet-5"],
++      premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6"]
++    };
++    expect(PLAN_TIER_ROSTERS).toEqual(expectedRosters);
++    expect({
++      free: freeModels.map((model) => model.textContent?.trim()),
++      premium: premiumModels.map((model) => model.textContent?.trim())
++    }).toEqual(expectedRosters);
+     expect([...freeModels, ...premiumModels].map((model) =>
+       model.querySelector<HTMLElement>('.modelDot')?.style.getPropertyValue("--dot")
+     )).toEqual([
+@@ -213,12 +214,12 @@ describe("S01 /new plan tier", () => {
+     ]);
+   });
+ 
+-  it("uses shared model metadata for every roster id shape", async () => {
++  it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
+     vi.resetModules();
+     vi.doMock("@debateai/contract", () => ({
+       PLAN_TIER_ROSTERS: {
+-        free: ["openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
+-        premium: ["claude_opus", "grok/4.6", "gemini-3"]
++        free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
++        premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6", "claude_opus", "grok/4.6", "gemini-3"]
+       }
+     }));
+     try {
+@@ -228,11 +229,16 @@ describe("S01 /new plan tier", () => {
+       expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
+         dot.style.getPropertyValue("--dot")
+       )).toEqual([
++        "var(--m-gpt)",
++        "var(--m-claude)",
++        "var(--m-gpt)",
+         "var(--m-gpt)",
+         "var(--m-gpt)",
+         "var(--m-gpt)",
+         "var(--m-claude)",
+         "var(--m-grok)",
++        "var(--m-claude)",
++        "var(--m-grok)",
+         "var(--m-gemini)"
+       ]);
+     } finally {
+@@ -262,45 +268,51 @@ describe("S01 /new plan tier", () => {
+       "maxTokens"
+     ];
+     const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
+-    expect(locked.filter((control) => control.getAttribute("aria-disabled") === "true")).toHaveLength(14);
+-    expect(locked.filter((control) => control.hasAttribute("disabled"))).toEqual([]);
++    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(14);
++    expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
+     expect(locked.map((control) => {
+       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
+       return [visualLock.style.opacity, visualLock.style.cursor];
+-    })).toEqual(Array.from({ length: 14 }, () => ["0.45", "not-allowed"]));
++    })).toEqual(Array.from({ length: 14 }, () => ["", ""]));
+   });
+ 
+-  it("S01-28 R4 keeps every Free lock reachable and described", async () => {
++  it("S01-28 R4 forwards the Free lock to every native control family and keeps its description", async () => {
+     await renderPage();
+     await click('.ndOptionsToggle');
+ 
+     const locked = [...document.querySelectorAll<HTMLElement>(
+-      '.ndSegItem[aria-disabled="true"],.ndSlider[aria-disabled="true"],.ndSteerInput[aria-disabled="true"],.ndSelect select[aria-disabled="true"]'
++      '.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled'
+     )];
+     expect([
+-      document.querySelectorAll('.ndSegItem[aria-disabled="true"]').length,
+-      document.querySelectorAll('.ndSlider[aria-disabled="true"]').length,
+-      document.querySelectorAll('.ndSteerInput[aria-disabled="true"]').length,
+-      document.querySelectorAll('.ndSelect select[aria-disabled="true"]').length
++      document.querySelectorAll('.ndSegItem:disabled').length,
++      document.querySelectorAll('.ndSlider:disabled').length,
++      document.querySelectorAll('.ndSteerInput:disabled').length,
++      document.querySelectorAll('.ndSelect select:disabled').length
+     ]).toEqual([6, 4, 2, 2]);
+-    expect(locked.every((control) => control.tabIndex >= 0)).toBe(true);
++    expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
+     expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
+     expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
+   });
+ 
+-  it("S01-29 R4 enforces the Free lock before submit", async () => {
++  it("S01-29 R4 rejects focus and activation at the native Free lock", async () => {
+     await renderPage();
++    await click('.ndOptionsToggle');
+ 
+     await click('#riskTier-high-stakes');
+     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
+     expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("false");
+-    await inputValue('#treeDepth', "4");
+-    await inputValue('#steeringPresets', "Prefer primary sources");
+-    await click('.ndOptionsToggle');
+-    await selectValue('#depthMode', "adaptive");
+-    expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
+-    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
+-    expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("fixed");
++    const lockedIds = [
++      "riskTier-casual", "riskTier-standard", "riskTier-high-stakes",
++      "budgetTier-low", "budgetTier-medium", "budgetTier-high",
++      "treeDepth", "steeringPresets", "steeringAnnotations",
++      "depthMode", "scrutinyDepth", "branchingWidth", "concurrency", "maxTokens"
++    ];
++    const focusAccepted = lockedIds.filter((id) => {
++      const control = document.querySelector<HTMLElement>(`#${id}`)!;
++      control.focus();
++      return document.activeElement === control;
++    });
++    expect(focusAccepted).toEqual([]);
+     expect(mocks.createDebate).not.toHaveBeenCalled();
+   });
+ 
+@@ -389,12 +401,22 @@ describe("S01 /new plan tier", () => {
+     expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("standard");
+     expect(document.querySelector<HTMLInputElement>('#branchingWidth')?.value).toBe("2");
+     expect(document.querySelector<HTMLInputElement>('#concurrency')?.value).toBe("3");
+-    const maxTokens = document.querySelector<HTMLInputElement>('#maxTokens')!;
+-    expect(maxTokens.value).toBe("800");
+-    expect((Number(maxTokens.value) - Number(maxTokens.min)) % Number(maxTokens.step)).toBe(0);
+-    expect((Number(maxTokens.max) - Number(maxTokens.min)) % Number(maxTokens.step)).toBe(0);
++    const sliderGrid = ["treeDepth", "branchingWidth", "concurrency", "maxTokens"].map((id) => {
++      const slider = document.querySelector<HTMLInputElement>(`#${id}`)!;
++      return { id, min: slider.min, max: slider.max, step: slider.step, value: slider.value };
++    });
++    expect(sliderGrid).toEqual([
++      { id: "treeDepth", min: "1", max: "5", step: "1", value: "2" },
++      { id: "branchingWidth", min: "1", max: "4", step: "1", value: "2" },
++      { id: "concurrency", min: "1", max: "6", step: "1", value: "3" },
++      { id: "maxTokens", min: "128", max: "4000", step: "32", value: "800" }
++    ]);
++    expect(sliderGrid.every(({ min, max, step, value }) =>
++      (Number(value) - Number(min)) % Number(step) === 0 &&
++      (Number(max) - Number(min)) % Number(step) === 0
++    )).toBe(true);
+     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
+-    expect(document.querySelectorAll('.ndSegItem[aria-disabled="true"],.ndSlider[aria-disabled="true"],.ndSteerInput[aria-disabled="true"],.ndSelect select[aria-disabled="true"]')).toHaveLength(14);
++    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(14);
+   });
+ 
+   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
+diff --git a/dialectical-engine/tests/unit/tier01-style-contract.test.ts b/dialectical-engine/tests/unit/tier01-style-contract.test.ts
+index f214dc8c..1317883d 100644
+--- a/dialectical-engine/tests/unit/tier01-style-contract.test.ts
++++ b/dialectical-engine/tests/unit/tier01-style-contract.test.ts
+@@ -161,6 +161,7 @@ describe("S01-C4 debate tier stylesheet contract", () => {
+ 
+     // PROPERTY S01-42b: all four Free-locked control families share only the ratified dim-and-cursor treatment.
+     expect(declarations(lockSelector)).toBe("opacity: 0.45; cursor: not-allowed;");
++    expect(declarations(".ndSelect select:disabled")).toBe("cursor: not-allowed;");
+   });
+ 
+   test("M2 · the chosen option's colour tokens match the measured values in both modes", () => {

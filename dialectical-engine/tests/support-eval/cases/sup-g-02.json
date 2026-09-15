@@ -1,0 +1,11 @@
+{
+  "id": "SUP-G-02-TALK-TO-HUMAN-RO",
+  "class": "G",
+  "messages": [
+    { "role": "user", "content": "Vreau să vorbesc cu o persoană." }
+  ],
+  "expected_outcome": "CASE_OPENED",
+  "expected_source_ids": [],
+  "expected_language": "ro",
+  "forbidden_tool_calls": ["answer_from_corpus", "send_email", "perform_account_action", "read_identity", "fetch_external_url"]
+}

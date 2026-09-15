@@ -5,7 +5,6 @@ import { parseProviderDiscoveryTargets } from "@debateai/providers";
 import { loadDevelopmentApiProcessEnvironment } from "./dev-api-process.js";
 import {
   DEVELOPMENT_ORGAN_COST_BOUNDS,
-  DEVELOPMENT_REGISTER_VERSION,
   DEVELOPMENT_RUN_DEATH_POLICY
 } from "./dev-deployment-register.js";
 import {
@@ -41,7 +40,7 @@ export type DevelopmentRunnerProcessOperations = Readonly<{
 }>;
 
 export type DevelopmentRunnerProcess = Readonly<{
-  receipt: Readonly<{ worker: "debateai-dev-runner"; registerVersion: typeof DEVELOPMENT_REGISTER_VERSION; state: "REGISTERED" }>;
+  receipt: Readonly<{ worker: "debateai-dev-runner"; registerVersion: string; state: "REGISTERED" }>;
   exited: Promise<DevelopmentRunnerChildExit>;
   stop(): Promise<void>;
 }>;
@@ -65,9 +64,12 @@ function createRunnerEnvironment(
     providerPanel.configuredProviders
   );
   const primary = targets[0];
+  const registerVersion = apiEnvironment.REGISTER_VERSION;
   if (primary === undefined
-    || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson
-    || apiEnvironment.REGISTER_VERSION !== String(DEVELOPMENT_REGISTER_VERSION)) {
+    || registerVersion === undefined
+    || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256 === undefined
+    || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE === undefined
+    || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
   }
   return Object.freeze({
@@ -75,7 +77,9 @@ function createRunnerEnvironment(
     KEK_PATH: apiEnvironment.KEK_PATH!,
     DATABASE_URL: apiEnvironment.DATABASE_URL!,
     RUNNER_WORKER_ID: "development:walking-skeleton",
-    REGISTER_VERSION: apiEnvironment.REGISTER_VERSION,
+    REGISTER_VERSION: registerVersion,
+    REGISTER_DEPLOYMENT_RECEIPT_SHA256: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256!,
+    REGISTER_DEPLOYMENT_RECEIPT_FILE: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE!,
     CONTENT_ENCRYPTION_ENABLED: apiEnvironment.CONTENT_ENCRYPTION_ENABLED!,
     USER_DEK_STORE_PATH: apiEnvironment.USER_DEK_STORE_PATH!,
     CLAIM_MS: String(developmentRunnerClaimMs()),
@@ -96,7 +100,7 @@ function createRunnerEnvironment(
     PROPAGATION_CONTRACT_HASH: "sealed-register-v4",
     SERVE_CONTRACT_HASH: "sealed-register-v4",
     MAX_RECOMPOSE: "2",
-    FACT_BUNDLE_VERSION: apiEnvironment.REGISTER_VERSION,
+    FACT_BUNDLE_VERSION: registerVersion,
     JUDGEMENT_NUMBER_KIND: "base-probability",
     JUDGEMENT_PRODUCER: "judgement:development",
     PROPAGATION_NUMBER_KIND: "propagated-probability",
@@ -145,14 +149,15 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
     if (message === null
       || message.kind !== "DEBATEAI_RUNNER_READY"
       || message.worker !== "debateai-dev-runner"
-      || message.registerVersion !== DEVELOPMENT_REGISTER_VERSION) {
+      || typeof message.registerVersion !== "string"
+      || message.registerVersion !== apiEnvironment.REGISTER_VERSION) {
       throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_READINESS_INVALID");
     }
     let stopped = false;
     return Object.freeze({
       receipt: Object.freeze({
         worker: "debateai-dev-runner",
-        registerVersion: DEVELOPMENT_REGISTER_VERSION,
+        registerVersion: apiEnvironment.REGISTER_VERSION!,
         state: "REGISTERED"
       }),
       exited: child.exited,

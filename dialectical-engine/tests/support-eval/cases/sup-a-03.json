@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-03",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "How do I choose the risk tier and the budget tier for a new debate?" }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["risk-tier-choice", "budget-tier-choice"],
+  "expected_language": "en",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}

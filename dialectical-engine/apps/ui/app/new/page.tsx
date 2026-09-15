@@ -6,6 +6,7 @@ import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { AuthGate } from "@/components/AuthGate";
+import { SupportWidget } from "@/components/support/SupportWidget";
 import {
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
@@ -290,7 +291,7 @@ function NewDebateForm({ token }: { token: string }) {
           ) : null}
 
           <div className="ndActions">
-            <button type="submit" className="ndStart" disabled={!ready || submitting}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!ready || submitting}>
               {submitting ? "Starting" : "Start run"} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>
@@ -301,6 +302,7 @@ function NewDebateForm({ token }: { token: string }) {
           </div>
         </form>
       </div>
+      <SupportWidget />
     </div>
   );
 }

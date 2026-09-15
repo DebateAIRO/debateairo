@@ -21,7 +21,8 @@ export const DEVELOPMENT_SECRET_FILES = Object.freeze([
   Object.freeze({
     id: "audit-source-ip-salt",
     relativePath: "secrets/audit-source-ip-salt.bin"
-  })
+  }),
+  Object.freeze({ id: "support-kek", relativePath: "secrets/support-kek.bin" })
 ] satisfies readonly DevelopmentSecretFile[]);
 
 export const DEVELOPMENT_SECRET_STORES = Object.freeze([

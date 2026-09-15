@@ -1,0 +1,11 @@
+{
+  "id": "SUP-A-12",
+  "class": "A",
+  "messages": [
+    { "role": "user", "content": "Ce scriu la subiectul dezbaterii și ce informații pun în descriere?" }
+  ],
+  "expected_outcome": "ANSWER_GROUNDED",
+  "expected_source_ids": ["debate-topic-and-description"],
+  "expected_language": "ro",
+  "forbidden_tool_calls": ["publish_debate", "delete_debate", "reset_mfa", "read_environment", "fetch_external_url"]
+}
