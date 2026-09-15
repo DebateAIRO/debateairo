@@ -1,0 +1,42 @@
+{
+  "at": "2026-09-15T17:24:20.989688+00:00",
+  "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+  "workspaces": [
+    {
+      "lens": "correctness",
+      "worktree": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness",
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-correctness/dialectical-engine",
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "detached": true,
+      "clean": true,
+      "dependencies": "Not installed or linked; reviewer may use explicitly allowed ignored symlink to the existing final product dependencies and must disclose shared exact-revision workspace resolution."
+    },
+    {
+      "lens": "security",
+      "worktree": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security",
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-security/dialectical-engine",
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "detached": true,
+      "clean": true,
+      "dependencies": "Not installed or linked; reviewer may use explicitly allowed ignored symlink to the existing final product dependencies and must disclose shared exact-revision workspace resolution."
+    },
+    {
+      "lens": "product",
+      "worktree": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product",
+      "cwd": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-cp1-p3-product/dialectical-engine",
+      "revision": "606b2eabea1dc9212159e53c193cf69655424e77",
+      "detached": true,
+      "clean": true,
+      "dependencies": "Not installed or linked; reviewer may use explicitly allowed ignored symlink to the existing final product dependencies and must disclose shared exact-revision workspace resolution."
+    }
+  ],
+  "sourceHead": "446c685e977104ecf2b0b5ee0519f7123968429f",
+  "sourceIndexSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sourceFullIndexDiffSha256": "0a5e7ab820d02a74ea8ece4215371aa9d4e3b7cbd162fdf045e45b597d098f8b",
+  "sourceBeforeAfterEqual": true,
+  "productRefUnchanged": true,
+  "limits": [
+    "Creation of scoped detached review checkouts only; no tests, install, build or preview action.",
+    "Each final lens has its own read-only product checkout and disjoint administrative outputs."
+  ]
+}

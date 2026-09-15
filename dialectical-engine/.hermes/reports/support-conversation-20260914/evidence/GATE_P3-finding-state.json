@@ -1,0 +1,343 @@
+{
+  "at": "2026-09-15T17:28:05.195996+00:00",
+  "scope": "Assigned final review findings and retained prior dispositions; no status changed.",
+  "findings": [
+    {
+      "key": "COR_C1",
+      "ticket": "t_32281522",
+      "title": "[gpt-5.6-sol] FINDING Context ceiling differs from approved24k code-point requirement",
+      "body": "CORPREP C1; frozen58fbaa7d answer-service cap12000 versus CP1-R11 initial24000. Meaningful composed-answer regression probe required.",
+      "status": "archived",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "ROUTED FIX1 t_2ebd85d4 to same NAV author for composed24k context regression/correction; final reviewer will verify.",
+          "created_at": 1789387743
+        },
+        {
+          "author": "Astra",
+          "body": "RESOLVED: Final REV1 independently confirms exact24k composed context and meaningful oracle.",
+          "created_at": 1789404598
+        }
+      ]
+    },
+    {
+      "key": "COR_C2",
+      "ticket": "t_4f43d8c1",
+      "title": "[gpt-5.6-sol] FINDING Resolved snapshot discarded at answer-service boundary",
+      "body": "CORPREP C2; production map currently coherent, but CP1-R10 explicitly requires passing already-resolved snapshot. Preserve fail-closed admission ordering.",
+      "status": "archived",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "ROUTED FIX1 t_2ebd85d4 to same NAV author for explicit resolved snapshot identity contract; current production remains coherent. Final reviewer will verify.",
+          "created_at": 1789387743
+        },
+        {
+          "author": "Astra",
+          "body": "RESOLVED: Final REV1 independently confirms exact route-resolved snapshot object and identity oracle.",
+          "created_at": 1789404599
+        }
+      ]
+    },
+    {
+      "key": "COR_C3",
+      "ticket": "t_e248c7cc",
+      "title": "[gpt-5.6-sol] FINDING Clarify trusted dynamic action reachability",
+      "body": "CORPREP C3; safe current behavior drops dynamic actions without trusted projection. Expectation/probe candidate, not established defect.",
+      "status": "archived",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "ROUTED bounded disposition to FIX1 using actual trusted own-context callers. No new adapter or product change authorized solely from this expectation candidate.",
+          "created_at": 1789387743
+        },
+        {
+          "author": "Astra",
+          "body": "RESOLVED: Final REV1 confirms intentional fail-closed trusted context under frozen summary contract; no guessed/model-provided debate IDs or generic adapter required.",
+          "created_at": 1789404599
+        }
+      ]
+    },
+    {
+      "key": "LIVE_GUIDANCE",
+      "ticket": "t_8596ccbc",
+      "title": "[gpt-5.6-sol] Finding: benign real-relay product guidance rejected",
+      "body": "At085fff68 actual UI/API/unchanged relay: six of seven benign creation/Settings/export questions returned REFUSE_SAFETY without sources/actions. Only EN export grounded. Cause unresolved. CP1-A09 blocker; no raw rejected completion retained.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "SECDELTA B3 confirms benign ENRO cross-sentence falsepositive at43; ARCHCHECK A1 staticjoin traced. This is independentlyproved defect, not exactcauseattributionofLIVE3. FIX4architecture-backedrelation correction thenLIVE4 once.",
+          "created_at": 1789399025
+        },
+        {
+          "author": "Astra",
+          "body": "Final product review REV3-P2-F1 at e0dcfe77 confirms current 3/7 useful and 4 REFUSE_SAFETY, all four with zero sources/actions; EN pointer unverified. PATH_OR_ROUTE x3 and CREDENTIAL_OPERATION x1 are category evidence only, not discarded text or semantic false-positive proof. F1 remains open; no causal claim from comparing separate LIVE4 and LIVE_P1 samples. Await full pass2 union before correction.",
+          "created_at": 1789408737
+        },
+        {
+          "author": "Astra",
+          "body": "PASS2 REWORK U1/U2: REV1 identifies raw-body model projection leakage and REV3 confirms 3/7 useful actual answers, EN pointer unavailable. Final correction under SPEC-v3 uses complete separately reviewed projections and exact reviewed fallback after one rejected model attempt. Retain actual evidence separation; no readiness claim.",
+          "created_at": 1789410716
+        }
+      ]
+    },
+    {
+      "key": "SEC_P1",
+      "ticket": "t_4bccb334",
+      "title": "[gpt-5.6-sol] FINDING Validate supplied-secret persistence and E3 case summary path",
+      "body": "SECPREP static candidate only; short labelled synthetic secrets may survive redaction and reach advisory model after repeated REFUSE_ZONE. Executable probe pending.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "SECDELTA B1/ARCHCHECK A5 confirm partial fix only: obfuscated and non-password credential labels survive canonicalredaction, encryption input/model/case-summary transit. Sameclass routedFIX4, finalreview pending.",
+          "created_at": 1789399024
+        },
+        {
+          "author": "Astra",
+          "body": "REV2-p1 B1: exactFIX4supplied-valuecasesfixed; quotedmultiword credential retainsresidualtokens. Classopen at support-credentials.ts83,171-179; canonicalseal/transit/E3/legacy/casereply verificationneeded.",
+          "created_at": 1789403803
+        },
+        {
+          "author": "Astra",
+          "body": "PASS2 REWORK U3: REV2 B1 confirms unmatched quote, over-bound value and dotted-token partial redaction reaches shared sinks in actual-module in-memory probe. Invariant: no supplied-value suffix may survive; reject or redact uncertain whole tail, not a larger fixed word cap.",
+          "created_at": 1789410716
+        }
+      ]
+    },
+    {
+      "key": "SEC_P2",
+      "ticket": "t_18646f0a",
+      "title": "[gpt-5.6-sol] FINDING Validate advisory summary completion boundary",
+      "body": "SECPREP static candidate only; case summaries appear to bypass strict structured and content screening. Executable probe pending.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "SECDELTA P2 partialfix: schema and testedencoded/resetclaim controls replace safely; B2 policy solicitation still reaches advisoryproducer/legacyprojection. Sharedcredentialpolicy finding and FIX4 nowrequired; no closure.",
+          "created_at": 1789399024
+        },
+        {
+          "author": "Astra",
+          "body": "REV2-p1 sharedsummaryscreenclassstillopen: exact4keyenvelope/replacementfixed, but coordinator/encoding/IDexceptionmembersaccepted before summary persistence/projection.",
+          "created_at": 1789403803
+        },
+        {
+          "author": "Astra",
+          "body": "PASS2 REWORK summary boundary: shared U3/U4/U5 fixes must reach case-summary screening. New reviewed KB recovery does not apply to summaries; preserve four keys, empty arrays, 80-word bound and existing non-authoritative replacement.",
+          "created_at": 1789410717
+        }
+      ]
+    },
+    {
+      "key": "SEC_P3",
+      "ticket": "t_55cc12ff",
+      "title": "[gpt-5.6-sol] FINDING Validate encoded and protocol-relative free-text links",
+      "body": "SECPREP static regex candidate only; actual parser probe required, distinguish text boundary from clickable exploit.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "SECDELTA actualparser rejects tested raw/protocol-relative, encoded/double-encodedlinks; summaryproducer/access replace testedencodedlink. Finiteclass confirmation recorded; finalintegratedreviewdisposition pending.",
+          "created_at": 1789399024
+        },
+        {
+          "author": "Astra",
+          "body": "REV2-p1 B4: raw/protocol-relative/single/doubleencodedtestedmembersreject; thirdencodedHTTPSaccepted andactualanswerservicepersists/returns. Two-passcanonicalizationclassopen.",
+          "created_at": 1789403803
+        },
+        {
+          "author": "Astra",
+          "body": "PASS2 REWORK U5: decoded backslash path passes answer and summary screens in the in-memory probe. Cover structural slash/backslash and applicable drive/UNC forms across canonical views; retain malformed and benign-percent controls. No clickability or execution claim.",
+          "created_at": 1789410717
+        }
+      ]
+    },
+    {
+      "key": "SEC_CREDENTIAL_POLICY",
+      "ticket": "t_db79b682",
+      "title": "[gpt-5.6-sol] Finding: credential policy plural and negation scope bypass",
+      "body": "SECDELTA B2 at43cf9386: plural ENRO credential solicitation and same-clause negation conjunction pass shared output policy. Actual answer service persists/returns ANSWER_GROUNDED; advisory producer and legacy projection also accept. Direct-import synthetic ports, no real transport/provider. ARCHCHECK A2 corroborates relation defect. Routed to FIX4 and finalREV2.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "REV2-p1 B2: exactpluralandnamedcoordinatorcasesfixed; and also / comma so permitpriornegationtosuppresspositivecredentialsolicitation. Actualanswerservicepersists/returns, summaryaccepts. SeparateencodednounB3willownitsnormalizationpath.",
+          "created_at": 1789403803
+        },
+        {
+          "author": "Astra",
+          "body": "PASS2 REWORK U4/U6: REV2 B2/B4 proves positive modal/additive groups inherit negation, while safe explicit display-name object and 2/52 human labels reject. Independently scope operation groups and governed objects; preserve safe negatives and all neutral labels without global exemptions.",
+          "created_at": 1789410717
+        }
+      ]
+    },
+    {
+      "key": "SEC_ENCODED_CREDENTIAL",
+      "ticket": "t_f2ecb7e7",
+      "title": "[gpt-5.6-sol] REV2 B3 encoded credential nouns bypass raw-only relation screen",
+      "body": "Final REV2-p1 at6e proves Send your p%61ssword to Support is accepted/persisted/returned and summary accepted. URI-normalized views feed link/token/ID checks but credential relation analyzes raw value. Source response-policy.ts138-161,201-206. Distinct normalization path; synthetic direct-import evidence only. Correct within final-pass union.",
+      "status": "ready",
+      "parents": [],
+      "children": [
+        "t_e584e488"
+      ],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "PASS2 scoped disposition F4: REV2 reports fixed for demonstrated and bounded transformed members. Retain exact regression evidence; no formal arbitrary-encoding completeness claim. Final correction preserves these controls.",
+          "created_at": 1789410717
+        }
+      ]
+    },
+    {
+      "key": "LIVE2_ACTION_ID",
+      "ticket": "t_67a569fe",
+      "title": "[gpt-5.6-sol] Finding: grounded export text exposes unresolved internal action ID",
+      "body": "LIVE2 at82f57f1e: validated grounded Romanian export text directs visitor to owner-debate while anonymous trusted context resolves/renders zero actions. Preserve actual receipt; correct available-action producer/visitor-text contract without accepting untrusted run IDs or adding permissions. Assigned to FIX3 and final product/correctness review.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "SECDELTA N1 confirms start-debate proseaccepted,persisted,returned andsummaryaccepted at43; liveCP1A09 remainsblocking despite securitylens N classification. ARCHCHECK A3 recommends server closed-IDscreen. FIX4 assigned.",
+          "created_at": 1789399025
+        },
+        {
+          "author": "Astra",
+          "body": "REV2-p1 B5: start-debate/owner-debate/selectedIDsreject; fourexacthyphenatedIDexceptionsstillaccepted asprose, actualforgot-passwordcasepersists/returns. Preservehumanlabelswithspaces/localization; classopen.",
+          "created_at": 1789403803
+        },
+        {
+          "author": "Astra",
+          "body": "PASS2 disposition U6: all 35 exact hyphenated IDs and tested transforms reject; request aliases bind correctly. Display compatibility remains open with U4; retain old exact-ID and alias controls through final pass3.",
+          "created_at": 1789410717
+        }
+      ]
+    },
+    {
+      "key": "SOURCE_CUSTODY",
+      "ticket": "t_e582c85f",
+      "title": "[gpt-5.6-sol] Reconcile historical original checkout fingerprint drift",
+      "body": "Source HEAD/index match intake, tracked working diff hash changed between14:04and14:30Z and remains unchanged through current freeze. Bounded REV3 provenance check required; no source restoration. Exact isolated product6e inventory clean. See CP1-SOURCE-DRIFT.md.",
+      "status": "ready",
+      "parents": [],
+      "children": [
+        "t_e584e488"
+      ],
+      "latestComments": [
+        {
+          "author": "Astra",
+          "body": "Final REV3 bounded result: only serialized diff hash drift proved; underlying byte change/cause/actor/timeunverified. Commonabbreviation/fullindexrerendersdidnotmatchintake, cannotruleouthistoricalrepresentation.12BASE-selectedsourcehashesstillmatch; product99/99exact. No source restoration. Retainasdisclosedevidencelimitation; originalall56filehasheswerenotcaptured.",
+          "created_at": 1789403645
+        },
+        {
+          "author": "Astra",
+          "body": "New bounded evidence consumed: SOURCE_SERIALIZATION t_851668bc found no match to intake across37 explicit Git abbreviation widths. Current default8 and full-index40 controls match; source/index/full-index custody stayed equal. Report SOURCE_SERIALIZATION.md and consumer a84d9ee142ccf124ac2947b7a6938bd90c12dc0f086e1450bdef108e38ab8544. Abbreviation-only explanation under current Git is unsupported; other historical inputs, byte change, cause/actor and untracked inventory remain unverified. Separate final REV3_P3 owns disposition.",
+          "created_at": 1789491846
+        }
+      ]
+    },
+    {
+      "key": "OBS_CORRELATION",
+      "ticket": "t_f9e289db",
+      "title": "[gpt-5.6-sol] Finding: aggregate diagnostics cannot identify failing request or predicate",
+      "body": "ARCHCHECK A4/LIVE2/LIVE3: safe fixed enum counts have no request correlation and coarse predicates, so exact rejected-output causes cannot be attributed. Preserve zero rejected bytes/identifiers/capabilities while enabling opaque per-attempt fixed-category evidence. Routed to FIX4 and final review.",
+      "status": "triage",
+      "parents": [],
+      "children": [],
+      "latestComments": []
+    },
+    {
+      "key": "TYPE_P2_REGRESSION",
+      "ticket": "t_5bce1d7b",
+      "title": "[gpt-5.6-sol] TYPE_P2_REGRESSION Resolve mission-added recovery fixture diagnostic",
+      "body": "Final ATTEST typecheck has 77 diagnostics: known76 plus TS2532 in support-recovery-components.test.ts:122, introduced earlier in FIX_P2. Narrow test-only correction stays in ATTEST; separate final correctness review consumes the final typecheck evidence. This diagnostic is not part of the inherited baseline.",
+      "status": "todo",
+      "parents": [
+        "t_88683868"
+      ],
+      "children": [
+        "t_e584e488"
+      ],
+      "latestComments": []
+    },
+    {
+      "key": "DEST",
+      "ticket": "t_979fe293",
+      "title": "[V] INPUT CP1 \u2014 Exact existing Forgot password destination",
+      "body": "Owner input pending: exact canonical URL/path or screen and UI opener. Owner confirms feature exists. No guessed destination or substitute.",
+      "status": "blocked",
+      "parents": [],
+      "children": [
+        "t_e584e488"
+      ],
+      "latestComments": [
+        {
+          "author": "default",
+          "body": "BLOCKED: V-1: exact existing Forgot password destination requested asynchronously; independent work continues",
+          "created_at": 1789374063
+        },
+        {
+          "author": "ASTRA",
+          "body": "ASTRA dependency refinement authorized by owner internal-reordering instruction: DEST now directly blocks human CP1 rather than technical GATE, so independent whole-bundle review may proceed while V-1 is pending. GATE must carry destination UNVERIFIED explicitly; reviewers cannot certify destination or full CP1. Actual destination/catalog/server/UI changes require scoped independent re-review before READY FOR USER VERIFICATION. No acceptance by silence or reviewer PASS; CP2 remains gated.",
+          "created_at": 1789385150
+        }
+      ]
+    },
+    {
+      "key": "PROC_REV1_HANDOFF",
+      "ticket": "t_aea64ed1",
+      "title": "[gpt-6-astra] Process residue: constrain review handoff to verified local refs and Hermes",
+      "body": "REV1 miscopied a full58fbaa7d commit ref, overstated source clean state, and attempted unrelated Linear comments read that stalled16:31:34..16:42. Root interruptedread, noresultused; amendedfinalreportqualifiedsourceandcorrectedref. Prevent recurrence through manifest-derived refs and explicit Hermes-only board calls; no product finding or automatic checkpoint block.",
+      "status": "ready",
+      "parents": [],
+      "children": [],
+      "latestComments": []
+    },
+    {
+      "key": "PROC_HARNESS_LEASE",
+      "ticket": "t_e0627403",
+      "title": "[gpt-6-astra] Process residue: lease held during stalled harness preparation",
+      "body": "Observed HARNESS_P2 native tool activity stopped20:30 UTC; message20:31, usage metadata continued through21:45. Root interrupted and resumed the same Sol session; worker confirmed only preserved RED, no active process, and released lease. Underlying stall cause UNKNOWN. Mitigation now applied: grant the short harness test lease only when exact command is ready, at explicit author boundary, then promptly return. Keep process limitation visible; no product finding or new functional review.",
+      "status": "ready",
+      "parents": [],
+      "children": [],
+      "latestComments": []
+    },
+    {
+      "key": "INT_P2_DEGRADED",
+      "ticket": "t_480d1d11",
+      "title": "[gpt-5.6-sol] INT_P2_DEGRADED Resolve final degraded-mode test failure",
+      "body": "LIVE_P2 reports the single final 25-suite run at 606b2eabea1dc9212159e53c193cf69655424e77 failed support-degraded.test.ts: treats a screened model draft as successful relay transport. Expected REFUSE_SAFETY with usage; received NO_SOURCE. Reported totals 977 passed, 1 failed, 1 TODO across 24 passed/1 failed files. Failure is preserved without rerun or repair. Separate REV1_P3 must reproduce the specific failure and distinguish fixture/admission drift from runtime regression using bounded evidence; no production cause is assumed. A remaining pass3 blocker goes to owner decisions, not hidden implementation.",
+      "status": "todo",
+      "parents": [
+        "t_88683868"
+      ],
+      "children": [
+        "t_e584e488"
+      ],
+      "latestComments": []
+    }
+  ],
+  "additionalCaptureAt": "2026-09-15T17:36:27.427909+00:00"
+}
