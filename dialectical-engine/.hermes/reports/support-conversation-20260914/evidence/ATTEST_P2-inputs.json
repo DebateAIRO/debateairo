@@ -1,0 +1,87 @@
+{
+  "node": "ATTEST_P2",
+  "baseRevision": "dfeb7eef93de31e19367760d87c09ca1ef76544e",
+  "productPaths": [
+    {
+      "laneRelative": "packages/support-kb/reviews/manifest.json",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/packages/support-kb/reviews/manifest.json"
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-attestation.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-attestation.test.ts"
+    }
+  ],
+  "reviewInputs": [
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITREV_P2-consumption.json",
+      "sha256": "5b877215e190ae7faedc93b7b1f2d334d36192e11a2567c7815c9f092ace729c"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
+      "sha256": "68e85a06a84fd3dc161d8f6d654fdc892f6f0325988ce106f92d785ec7e38cf6"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITREV_P2-receipt.json",
+      "sha256": "77f9b019b269bee3c2dacbdfa89acae8da4deea8ab6b52f81119aedd6b7f2da7"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-consumption.json",
+      "sha256": "e8ce37315359e8f30dbd73240cfc0dccc676b98a4d61eba8c8b6b21cacbde219"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2-consumption.json",
+      "sha256": "41e580a63b5be31f6ca408277db8b50c70719907ea36f46b5d415b420eb31183"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/EDITFIX_P2-editorial-digests.json",
+      "sha256": "1e80f9fa142e50d0acee729dc0505e12ab5726268315babb96acde24ffae9601"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/FIX_P2-required-suites.json",
+      "sha256": "d2534db538e8855ad9c0a01569cf36505c2832aeee08b11e9d2c7c04036651a5"
+    },
+    {
+      "path": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/logs/UI-root-typecheck.log",
+      "sha256": "06e6f0b6b88e174dd01601d511b0b193128933cb40a583315dc672347c61a6f0"
+    }
+  ],
+  "focusedFiles": [
+    "tests/integration/support-cases.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-text-views.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts"
+  ],
+  "focusedArgv": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/integration/support-cases.test.ts",
+    "tests/integration/support-metrics.test.ts",
+    "tests/integration/support-routes.test.ts",
+    "tests/unit/support-answer-context.test.ts",
+    "tests/unit/support-context.test.ts",
+    "tests/unit/support-credentials.test.ts",
+    "tests/unit/support-kb.test.ts",
+    "tests/unit/support-recovery-components.test.ts",
+    "tests/unit/support-redaction.test.ts",
+    "tests/unit/support-response-policy.test.ts",
+    "tests/unit/support-text-views.test.ts",
+    "tests/unit/support-recovery-attestation.test.ts"
+  ],
+  "typecheckArgv": [
+    "pnpm",
+    "run",
+    "typecheck"
+  ],
+  "baselineDiagnostics": 76,
+  "limits": "Mechanical attestation of actual separate review only. Owner fields blank. Strict production-corpus test RED before v2 manifest. Final25-file union belongs to LIVE_P2."
+}

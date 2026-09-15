@@ -46,3 +46,5 @@ Final correction freezes: PLAN union68f0efbc05101b36e3f26110bec56e7eb99f05e3; PL
 Completed FIX_P2/HARNESS_P2 and EDIT_P2 contract freeze90d792cfeaeb5c08c1984b313d5b5077f8fcc8fa;57 exact files, current-state custody preserved. EDIT_P2 REWORK consumes34 passing rows and2 account-access rows requiring four-string correction. Scoped EDITFIX_P2→EDITREV_P2 precedes attestation; final functional pass3 cap unchanged.
 
 Scoped editorial correction freeze9897ebdeee5858e26eb0c1f06623ad24853c11a3;16 completed files, current-state custody preserved. EDITFIX_P2 clean dfeb7eef93de31e19367760d87c09ca1ef76544e consumed:4 strings changed,34 retained,36 semantic admission. No new runtime sample. EDITREV_P2 actual native child reviewer id01a09ef7-e096-7c31-9b35-806840028cf0, parent id distinct.
+
+Completed EDITFIX_P2/recheck contract freeze0808ed60c18d525e73baff567c517614a2975a23;19files, current-state custody preserved. EDITREV_P2 PASS atdfeb7eef consumedall36 newprojections/fallbacks; attestation may copy actual separate native child reviewer01a09ef7-e096-7c31-9b35-806840028cf0, date2026-09-15/evidenceEDITORIAL-RECOVERY-p2.md. Owner fields stayblank, no runtime/acceptanceclaim.
