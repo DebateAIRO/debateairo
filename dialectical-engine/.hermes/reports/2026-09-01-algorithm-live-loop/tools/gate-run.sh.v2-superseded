@@ -1,0 +1,70 @@
+#!/bin/bash
+# gate-run.sh v2 — emits a COMPLETE gate record. Use this for every acceptance gate (D45, D49).
+# Usage: gate-run.sh <worktree-being-measured> <out.log> <label> <cmd...>
+#
+# Emits, in order: the MEASURED checkout's commit and tree · a PROVISIONING block · porcelain
+# BEFORE · the exact command (unpiped) · raw output between markers · the command's own exit ·
+# porcelain AFTER · a clean verdict.
+#
+# WHAT PORCELAIN DOES AND DOES NOT COVER (v1 overclaimed this and a reviewer was right to say
+# so): `git status --porcelain` excludes IGNORED paths. Dependency installs and the generated
+# contract directory are ignored here, and the actual compiler launcher lives under them. So
+# identical commit, tree and both porcelain fields do NOT by themselves rule out a swapped
+# tsc launcher or a changed generated artifact. The PROVISIONING block below exists to cover
+# exactly that gap: it records interpreter and package-manager versions, the locked-input
+# hash, a manifest hash of the generated contract directory, and — for each tool named in the
+# command — the resolved launcher's path, its sha256, and its self-reported version.
+set -u
+WT=${1:?worktree}; OUT=${2:?out}; LABEL=${3:?label}; shift 3
+COMMIT=$(git -C "$WT" rev-parse HEAD); TREE=$(git -C "$WT" rev-parse HEAD^{tree})
+PRE=$(git -C "$WT" status --porcelain | tr '\n' ';')
+
+# the package root the gate actually runs in (this repo nests the engine one level down)
+PKG="$WT"; [ -d "$WT/dialectical-engine/node_modules" ] && PKG="$WT/dialectical-engine"
+
+sha() { [ -f "$1" ] && shasum -a 256 "$1" | cut -d' ' -f1 || echo "(absent)"; }
+
+{
+  echo "commit=$COMMIT tree=$TREE  gate=$LABEL  $(date '+%F %T %Z')"
+  echo "measured worktree : $WT"
+  echo "package root      : $PKG"
+  echo "PROVISIONING (porcelain cannot see ignored paths; this block covers them):"
+  printf '  %-20s: %s\n' "node" "$(node --version 2>/dev/null || echo '(absent)')"
+  printf '  %-20s: %s\n' "pnpm" "$(pnpm --version 2>/dev/null || echo '(absent)')"
+  printf '  %-20s: %s\n' "pnpm-lock.yaml" "sha256 $(sha "$PKG/pnpm-lock.yaml")"
+  GEN="$PKG/packages/contract/generated"
+  if [ -d "$GEN" ]; then
+    n=$(find "$GEN" -type f | wc -l | tr -d ' ')
+    h=$(find "$GEN" -type f -exec shasum -a 256 {} \; | sort | shasum -a 256 | cut -d' ' -f1)
+    printf '  %-20s: %s files, manifest sha256 %s\n' "generated contract" "$n" "$h"
+  else
+    printf '  %-20s: %s\n' "generated contract" "(absent)"
+  fi
+  # every tool named in the command gets its launcher identified and hashed
+  for tok in "$@"; do
+    case "$tok" in
+      tsc|vitest|eslint|tsx|prettier)
+        BIN="$PKG/node_modules/.bin/$tok"
+        RESOLVED=$([ -e "$BIN" ] && (readlink "$BIN" 2>/dev/null || echo "$BIN") || echo "(not found)")
+        REAL=$([ -e "$BIN" ] && (cd "$(dirname "$BIN")" && python3 -c "import os,sys;print(os.path.realpath(sys.argv[1]))" "$(basename "$BIN")" 2>/dev/null) || echo "")
+        printf '  %-20s: launcher %s\n' "$tok" "$RESOLVED"
+        [ -n "$REAL" ] && printf '  %-20s  sha256 %s\n' "" "$(sha "$REAL")"
+        printf '  %-20s  version %s\n' "" "$( (cd "$PKG" && pnpm exec "$tok" --version) 2>/dev/null | head -1 || echo '(unavailable)')"
+        ;;
+    esac
+  done
+  echo "porcelain BEFORE  : [${PRE}]"
+  echo "\$ $*"
+  echo "<<<OUTPUT"
+} > "$OUT"
+( cd "$WT" && "$@" ) >> "$OUT" 2>&1
+rc=$?
+POST=$(git -C "$WT" status --porcelain | tr '\n' ';')
+{
+  echo "OUTPUT>>>"
+  echo "EXIT = $rc"
+  echo "porcelain AFTER   : [${POST}]"
+  if [ "$PRE" = "$POST" ]; then echo "CLEAN-STATE: unchanged across the run (TRACKED paths only — see PROVISIONING)"; else echo "CLEAN-STATE: CHANGED — this measurement is suspect"; fi
+} >> "$OUT"
+echo "$OUT: exit=$rc clean=$([ "$PRE" = "$POST" ] && echo yes || echo NO)"
+exit $rc

@@ -1,0 +1,44 @@
+#!/bin/bash
+# D15 batch suite on the integration worktree, with set-equality classification vs T0's authority.
+# Usage: d15-suite.sh <batch-label>   (bash, not zsh — word-splitting traps)
+set -u
+M=/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+W=/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/integration/dialectical-engine
+L=${1:?batch label}; OUT="$M/logs/integration-suite-$L.log"; CL="$M/logs/integration-suite-$L.CLASSIFICATION.txt"
+cd "$W" || exit 2
+tip=$(git rev-parse --short HEAD); dirty=$(git status --porcelain | wc -l | tr -d ' ')
+{ echo "D15 SUITE $L · tip $tip · dirty $dirty · start $(date '+%F %T %Z')"; for i in 1 2 3; do echo "load sample $i: $(uptime | awk -F'load averages?:' '{print $2}')"; sleep 20; done; } > "$OUT"
+[ "$dirty" = "0" ] || { echo "DIRTY TREE — refusing" | tee -a "$OUT"; exit 3; }
+pnpm test >> "$OUT" 2>&1; rc=$?
+echo "EXIT STATUS: $rc · end $(date '+%F %T %Z')" >> "$OUT"
+summary=$(grep -aE "^ *Tests +[0-9]+" "$OUT" | tail -1 | sed 's/^ *//'); echo "SUMMARY: ${summary:-none}" >> "$OUT"
+python3 - "$M" "$OUT" "$CL" <<'PY'
+import re,sys
+M,OUT,CL=sys.argv[1:4]
+t0=open(f"{M}/agent-reports/t00-baseline.md").read().splitlines()
+def key(s):
+    s=s.replace("`","").strip(); s=re.sub(r"\s+\d+ms$","",s); return re.sub(r"\s+"," ",s)[:120]
+stable=set(); unstable=set()
+for l in t0[187:210]:
+    m=re.match(r"\|\s*X\s*\|\s*X\s*\|\s*X\s*\|\s*(.+?)\s*\|",l)
+    if m: stable.add(key(m.group(1)))
+for l in t0[213:231]:
+    m=re.match(r"\|\s*[X·]\s*\|\s*[X·]\s*\|\s*[X·]\s*\|\s*(.+?)\s*\|",l)
+    if m: unstable.add(key(m.group(1)))
+fails=set()
+for l in open(OUT,errors="replace"):
+    m=re.match(r"\s*(?:FAIL|×)\s+(.+)$",l.rstrip())
+    if m and ".test." in m.group(1) and " > " in m.group(1): fails.add(key(m.group(1)))
+summary=0
+for l in open(OUT,errors="replace"):
+    m2=re.search(r"Tests\s+(\d+)\s+failed",l)
+    if m2: summary=max(summary,int(m2.group(1)))
+if summary and len(fails)!=summary:
+    open(CL,"w").write(f"PARSE MISMATCH — refusing to classify.\nsummary says {summary} failed; parsed {len(fails)} names.\nvitest's FAIL/x lines are not always emitted in captured output (F-S09-6): fix the parser before trusting any set-equality verdict.\n")
+    print(open(CL).read()); raise SystemExit(9)
+new=sorted(fails-stable-unstable); gone=sorted(stable-fails); still=sorted(fails&stable); unst=sorted(fails&unstable)
+with open(CL,"w") as f:
+    f.write(f"authority: {len(stable)} stable-red + {len(unstable)} unstable\nfailing names: {len(fails)}\n\nNEW ({len(new)}):\n"+"\n".join(new)+f"\n\nVANISHED from stable-red ({len(gone)}):\n"+"\n".join(gone)+f"\n\nstable-red still failing: {len(still)}\nunstable-family failing: {len(unst)}\n"+"\n".join(unst)+"\n")
+print(open(CL).read())
+PY
+echo "classification: $CL"; exit $rc

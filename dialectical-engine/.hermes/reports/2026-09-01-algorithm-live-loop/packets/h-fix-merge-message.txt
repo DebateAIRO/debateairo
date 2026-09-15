@@ -1,0 +1,26 @@
+Merge branch 'lane/h-diag' into mission/2026-09-01-algorithm-live-loop
+
+F-H-2: a re-asked archived run revives again. packages/liveness/src/index.ts:144
+called core.run_private_content_is_live unguarded — a v1-encrypted-run predicate
+wearing a general name, false for every unencrypted run — so recordQuery found no
+candidates, wrote no QUERY event, and revival never happened in the default
+deployment. Regressed in 2d1f86b8 (2026-08-28, "chore: checkpoint … in-flight
+tree"), before the mission's T0 baseline. Guarded at the call site as
+lock_owned_live_runs guards the same predicate. A straight revert was rejected
+(the helper also checks identity_user.state='active'); an honest-helper fix was
+rejected (SECURITY DEFINER with five refuse-gate callers in migrations/0040).
+
+F-H-1: the lifecycle test expected SUPPORTED on a one-maker, one-judge fixture.
+Under T11's ladder both margin and disagreement are ABSENT there and rung 0 fires
+by design; the expectation predated T11 by eleven days. Corrected with its reason
+stated; fixture untouched.
+
+One red test name since T0, two stacked causes, both closed in one lane so the
+test is proven green rather than half-fixed. database.test.ts 87/87. Mutants
+reverting either half alone land on the other cause. F-H-3 filed: the encrypted
+half of the new guard is caught by no test, including s6's 48.
+
+Diagnosed by lane/h-diag (read-only), fixed by the same seat under a write
+contract; codex r1 instructed to verify the diagnosis independently.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

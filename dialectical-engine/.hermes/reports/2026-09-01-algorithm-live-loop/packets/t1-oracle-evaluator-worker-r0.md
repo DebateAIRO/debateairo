@@ -1,0 +1,60 @@
+# F-T1-ORACLE-EVALUATOR — WORKER PACKET, ROUND 0: the dependency and resolution gate · dispatched after codex plan r4 and V's rulings of 2026-09-06
+
+```
+mission dir      : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+lane worktree    : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator   (branch lane/t1-oracle-evaluator, cut from lane/devsync 2af816f1 — the dev-reconciled line V chose, D66/D68; clean; the alias is ABSENT here today)
+working directory: /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator/dialectical-engine   (every command below runs from here; root package.json and pnpm-lock.yaml are /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator/dialectical-engine/package.json and /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator/dialectical-engine/pnpm-lock.yaml)
+the plan         : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-plan.md — REVISION 4 is current (Revision indexes at the top; SUPERSEDED banners mark what is not). §8.8 R3 = this round; §9.12 (R3, R4) = the gate's facts; §9.15 R4 = the Node ruling.
+plan reviews     : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-plan-r{1,2,3,4}-verdict.final-snapshot.md — r4's "## F2" is the specification of THIS dispatch; read it whole.
+authority        : D68, D68 ADDENDUM (the alias grant), D68 ADDENDUM 2 (the Node ruling), D68 ADDENDUM 3 (the manifest disposition) in /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/DECISIONS.md
+V's residual disposition (2026-09-06): the architecture and four repaired contracts stand; the mutation MANIFEST is corrected by the WORKER in round 1 against real parser output and reviewed by codex before round 2 — not in this round.
+control corpus   : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp @ 60641339 (read-only; 66 static instances in ITS selected describe — that is the PARKED corpus, not this base) — not touched in round 0
+rework rounds    : max 3 for this ticket's worker rounds; this is the seat's first.
+```
+
+## NAMED FACT, carried verbatim into your report and every dependent round (D68 ADDENDUM 2)
+Node 22.23.1 UNVERIFIED (V, 2026-09-06): the pinned parser was installed and imported under Node 25.7.0 only.
+The runtime shortfall is NOT a stop condition (V waived it). Failed or unavailable NON-runtime gate evidence IS: dependent rounds stop.
+
+## OUTCOME (D58) — every fact below proven by a record under `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/r0/`, absolute paths named in your report
+1. **Baselines first, on this clean base.** Before any change: (a) `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts -t "the depth bound has a single source"`
+   — record the names and counts (this base's selected group is **31** static instances; not 66); (b) `pnpm typecheck` — record every diagnostic's
+   identity/code/path (the parent may have attributed failures; "any eight errors" is never the rule); (c) a NAMED package-resolution failure for
+   `typescript-classic` from the root test context, recorded before installation.
+2. **The one dependency change.** Root `package.json` gains exactly one devDependency line `"typescript-classic": "npm:typescript@5.9.3"`; ONE
+   `pnpm install` (the only run without `--frozen-lockfile`); afterwards `pnpm install --frozen-lockfile` exit 0. The lockfile delta is shown in the
+   report, line by line, with the statement that it contains NO unrelated upgrade (root `typescript` still 7.0.2). Record `node --version`
+   (expected v25.7.0) and `pnpm --version` (expected 11.20.0) as the runtimes actually used.
+3. **Package-name resolution from the root test context** for BOTH `typescript-classic@5.9.3` and unchanged `typescript@7.0.2`, recorded.
+4. **The counted smoke**, at exactly `tests/unit/depth-oracle-r0.smoke.test.ts` (new file; separate from the s1-1 describe), run with
+   `pnpm exec vitest run tests/unit/depth-oracle-r0.smoke.test.ts`, with FIVE named instances: (i) alias import + `ts.version === "5.9.3"` + the
+   API surface used; (ii) TS parse with 0 diagnostics + `parent` links set + a source position check; (iii) TSX parse with 0 diagnostics + parent
+   links; (iv) `NumericLiteral.text` normalisation and unary sign (plan M14); (v) a deliberately malformed input detected through ONE test-local
+   diagnostic accessor (`parseDiagnostics` behind that accessor; name where it moves in round 1). Report `passed/total` verbatim. A suite-load
+   failure is a failure, not a skip.
+5. **After the change**, re-run 1(a) and 1(b): the selected group's names/counts unchanged; diagnostics compared by identity/code/path — no NEW
+   attributable diagnostic. Then ONE `pnpm test` on your tip with the four-count accounting (test failures / suite-load / skips / unhandled)
+   against the parent's `/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log` and `27-suite-run2.log`, every failing name attributed, none unexplained (D66).
+6. **Your report names**: the smoke's exact file, the absolute working directory, every command, the log paths, the lockfile delta, the runtimes.
+   For the LATER rounds it states (so no one pretends it exists at round 0): the 27 + 3 control floor is imported/adapted from 60641339 onto this
+   base in round 1 via the authorised oracle-test co-touch; the corrected mutation manifest (K16 → OTHER; K21's explicit edit/result; K31 isolated
+   from the depth limit; K43; K45 bound to literal bytes/offsets; K8/K9/K10 dispositions) is filed in round 1 and codex-gated before round 2;
+   display/identity assertions are compulsory.
+
+## Contract (D61)
+allowed  : package.json (the ONE devDependency line) · pnpm-lock.yaml (the alias entry and its importer only) · tests/unit/depth-oracle-r0.smoke.test.ts (new) ·
+           /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t1-oracle-evaluator-self.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/r0/* ·
+           the lane's .hermes/TOOLING-TRAPS.md (append-only)
+readonly : the plan · the four plan verdicts · apps/ui/package.json (where 5.9.3 already lives) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-loginfp/dialectical-engine/tests/unit/s1-1-depth-contract.test.ts (the parked corpus) ·
+           /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/27-suite-run2.log
+forbidden: all_others · NO evaluator code in this round · never push · never merge · never touch integration, lane-devsync or lane-t1-oracle-loginfp ·
+           no edits to the board or the DECISIONS file · no credential values (D18) · no relative import into apps/ui or .pnpm · not the TS 7 scanner
+skills   : heartbeat-worker floor — if the Skill tool cannot load a repo skill, read it at /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/lane-t1-oracle-evaluator/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md and say so;
+           whole Superpowers library open. STRENGTH on every claim (D67); summary lines derived from their enumeration in the same pass (D67 ADDENDUM 2);
+           after any fix, state the rule and re-read (D67 ADDENDUM 3).
+
+## Records you owe
+Report and self-report (the router §3 question verbatim: "treat it like a murder case. I want to get a nice report on what can be done better. What we must
+upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.").
+Markers with `comments read through: t1-oracle-evaluator-plan-r4-2026-09-06`. End with `READY FOR PEER REVIEW` (all facts proven, the named fact carried)
+or `BLOCKED <which fact, why>`. Nothing pushed, nothing merged.
