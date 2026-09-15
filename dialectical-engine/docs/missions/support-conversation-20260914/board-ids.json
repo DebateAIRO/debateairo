@@ -103,7 +103,8 @@
     "EDIT_ACCOUNT_PREREQ": "t_a34fc97b",
     "EDIT_VISITOR_METADATA": "t_cb565a63",
     "PROC_EDIT_ID": "t_8175c38e",
-    "SOURCE_SERIALIZATION": "t_851668bc"
+    "SOURCE_SERIALIZATION": "t_851668bc",
+    "TYPE_P2_REGRESSION": "t_5bce1d7b"
   },
   "edges": [
     [
@@ -557,6 +558,14 @@
     [
       "SOURCE_SERIALIZATION",
       "GATE_P3"
+    ],
+    [
+      "REV1_P3",
+      "TYPE_P2_REGRESSION"
+    ],
+    [
+      "TYPE_P2_REGRESSION",
+      "CP1"
     ]
   ]
 }

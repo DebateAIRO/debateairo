@@ -13,6 +13,10 @@
     {
       "laneRelative": "tests/unit/support-kb.test.ts",
       "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-kb.test.ts"
+    },
+    {
+      "laneRelative": "tests/unit/support-recovery-components.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-components.test.ts"
     }
   ],
   "reviewInputs": [
@@ -100,5 +104,24 @@
     },
     "originalBlueprintProductPaths": 2,
     "currentAuthorizedProductPaths": 3
+  },
+  "typecheckScopeAmendment": {
+    "preservedCommit": "c7e50817d6d2ee744e7acdc7c7ff007f1c842c3f",
+    "additionalPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-components.test.ts",
+    "diagnostic": "tests/unit/support-recovery-components.test.ts(122,5): error TS2532: Object is possibly undefined.",
+    "failingTypecheckSha256": "1a5be748d82132c33b239ccfbb3fc728159002a2dbb4f6ef97084a73e2bc6dea",
+    "knownInheritedDiagnostics": 76,
+    "observedDiagnostics": 77,
+    "finalAuthorizedProductPaths": 4,
+    "focusedAfterTypingArgv": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "tests/unit/support-recovery-components.test.ts"
+    ],
+    "repeatTypecheckForNewFailure": true,
+    "final25SuiteRunOwner": "LIVE_P2",
+    "findingTicket": "t_5bce1d7b"
   }
 }
