@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DebateAI — Question to Verdict</title>
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#f4f0e8,#0f1217);--surface:light-dark(#fffdf8,#171b22);--surface2:light-dark(#f0ebe1,#202630);--ink:light-dark(#19201d,#edf2ee);--muted:light-dark(#65706a,#a8b1ac);--line:light-dark(#d7d0c3,#343c48);--blue:light-dark(#135f93,#67b7e8);--green:light-dark(#24734c,#6dd5a0);--amber:light-dark(#9b5c08,#f3b55b);--red:light-dark(#a33838,#ff8e8e);--violet:light-dark(#6c4ba3,#b69aef);--codebg:light-dark(#e9e4da,#10141a);--shadow:0 12px 35px light-dark(rgba(31,38,34,.09),rgba(0,0,0,.28))}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 8% 0%,color-mix(in srgb,var(--blue) 11%,transparent),transparent 30rem),radial-gradient(circle at 92% 14%,color-mix(in srgb,var(--violet) 10%,transparent),transparent 28rem),var(--bg);color:var(--ink);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit}.shell{max-width:1480px;margin:auto;padding:28px}.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:24px;margin-bottom:18px}.hero-main,.truth-box{background:color-mix(in srgb,var(--surface) 94%,transparent);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:24px}.hero-main{padding:30px}.truth-box{padding:24px;display:grid;gap:14px}.eyebrow{margin:0 0 9px;color:var(--blue);font-size:11px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}h1{margin:0;max-width:900px;font-size:clamp(34px,5vw,66px);line-height:1.02;letter-spacing:-.045em}h2,h3{line-height:1.2}.dek{max-width:850px;margin:18px 0 0;color:var(--muted);font-size:17px}.truth-box h2{margin:0;font-size:19px}.truth-row{border-left:4px solid var(--green);padding-left:13px}.truth-row.warn{border-color:var(--red)}.truth-row strong{display:block}.truth-row p{margin:3px 0 0;color:var(--muted);font-size:13px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;padding:13px 15px;background:color-mix(in srgb,var(--surface) 90%,transparent);border:1px solid var(--line);border-radius:15px}.chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}.dot{width:9px;height:9px;border-radius:50%;background:var(--blue)}.dot.model{background:var(--violet)}.dot.math{background:var(--green)}.dot.gate{background:var(--amber)}.dot.gap{background:var(--red)}
+.tabs{position:sticky;top:0;z-index:30;display:flex;gap:8px;overflow-x:auto;padding:10px;margin-bottom:20px;background:color-mix(in srgb,var(--bg) 90%,transparent);border:1px solid var(--line);backdrop-filter:blur(16px);border-radius:16px}.tab{flex:none;border:1px solid transparent;background:transparent;border-radius:11px;padding:9px 13px;cursor:pointer;font-size:13px;font-weight:750}.tab[aria-selected=true]{background:var(--surface);border-color:var(--line);color:var(--blue)}.panel{display:none}.panel.active{display:block}
+.map-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px;align-items:start}.rail{position:sticky;top:76px;display:grid;gap:7px;padding:12px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--surface) 94%,transparent)}.phase-btn{border:1px solid transparent;background:transparent;text-align:left;border-radius:11px;padding:10px 11px;cursor:pointer}.phase-btn strong{display:block;font-size:13px}.phase-btn span{color:var(--muted);font-size:11px}.phase-btn.active{border-color:var(--line);background:var(--surface2)}.phase-btn.active strong{color:var(--blue)}
+.phase{scroll-margin-top:88px}.phase-title{display:flex;align-items:baseline;gap:11px;margin:28px 0 13px}.phase-title:first-child{margin-top:0}.phase-title span{color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.1em}.phase-title h2{margin:0;font-size:25px;letter-spacing:-.025em}.stack{display:grid;gap:12px}.step{display:grid;grid-template-columns:46px minmax(0,1fr);gap:14px;padding:18px;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--line);border-radius:17px;box-shadow:0 6px 18px color-mix(in srgb,var(--ink) 5%,transparent)}.idx{width:38px;height:38px;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:11px;color:var(--blue);font-weight:900}.step h3{margin:0 0 5px;font-size:17px}.step p{margin:6px 0;color:var(--muted)}.step ul,.step ol{margin:8px 0 0;padding-left:21px;color:var(--muted)}.step li+li{margin-top:4px}.arrow{width:2px;height:16px;margin-left:37px;background:var(--line);position:relative}.arrow:after{content:"";position:absolute;bottom:-1px;left:-3px;border:4px solid transparent;border-top-color:var(--line)}
+.io{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}.io div{padding:10px;background:var(--surface2);border-radius:11px}.io b{display:block;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.io span{color:var(--muted);font-size:12px}.call{margin-top:11px;padding:11px 12px;border-left:4px solid var(--amber);background:color-mix(in srgb,var(--amber) 9%,transparent);border-radius:4px 11px 11px 4px;font-size:13px}.call.gap{border-color:var(--red);background:color-mix(in srgb,var(--red) 9%,transparent)}.call.good{border-color:var(--green);background:color-mix(in srgb,var(--green) 9%,transparent)}
+code,pre{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace}code{background:var(--codebg);padding:.15em .38em;border-radius:5px}pre{margin:10px 0 0;padding:14px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--codebg);font-size:12px;line-height:1.55;white-space:pre-wrap}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--line);border-radius:18px;padding:18px}.card h2,.card h3{margin:0 0 8px}.card p{margin:5px 0;color:var(--muted)}.card ul{padding-left:20px;color:var(--muted)}.metrics{display:grid;gap:7px;margin-top:12px}.metric{display:grid;grid-template-columns:1fr auto;gap:12px;padding-bottom:7px;border-bottom:1px dashed var(--line)}.metric span{color:var(--muted);font-size:13px}.metric strong{font-family:"SFMono-Regular",Consolas,monospace;font-size:13px}.eq{padding:16px;background:color-mix(in srgb,var(--green) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--green) 35%,var(--line));border-radius:14px}.eq strong{color:var(--green)}
+.gaps{display:grid;gap:12px}.gap-card{display:grid;grid-template-columns:minmax(180px,.65fr) minmax(0,1.35fr);gap:16px;padding:17px;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--line);border-left:5px solid var(--red);border-radius:15px}.gap-card h3{margin:0 0 5px;font-size:15px}.now{color:var(--muted);font-size:13px}.questions{font-size:13px}.questions b{color:var(--green)}.priority{display:inline-block;margin-bottom:8px;color:var(--red);font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.sources{display:grid;gap:8px}.source{display:grid;grid-template-columns:minmax(210px,.85fr) minmax(0,1.15fr);gap:14px;padding:10px 0;border-bottom:1px solid var(--line)}.source:last-child{border:0}.source code{font-size:11px;word-break:break-all}.source span{color:var(--muted);font-size:13px}.foot{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}
+@media(max-width:960px){.shell{padding:18px}.hero,.map-layout{grid-template-columns:1fr}.rail{position:static;grid-template-columns:repeat(3,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.shell{padding:12px}.hero-main,.truth-box{padding:20px;border-radius:18px}.rail{grid-template-columns:1fr 1fr}.step{grid-template-columns:36px minmax(0,1fr);padding:14px;gap:10px}.idx{width:32px;height:32px}.io,.grid2,.grid3{grid-template-columns:1fr}.gap-card,.source{grid-template-columns:1fr}.phase-title h2{font-size:21px}}
+</style>
+</head>
+<body>
+<main class="shell">
+<section class="hero">
+<div class="hero-main"><p class="eyebrow">DebateAI algorithm · current working tree</p><h1>What happens between a question and a verdict?</h1><p class="dek">Every important data transformation, model call, formula, gate, persistence decision, current limitation, and improvement seam—in actual execution order.</p></div>
+<aside class="truth-box"><h2>Two truths to keep separate</h2><div class="truth-row"><strong>Algorithm body</strong><p>The fully wired acceptance runtime can execute the pipeline below.</p></div><div class="truth-row warn"><strong>Production entry point</strong><p><code>apps/runner/src/main.ts</code> omits required judgement policy, serve policy, terminal evaluator, multi-maker gateways, and scoring configuration. As written, it stops before the first model call.</p></div></aside>
+</section>
+<div class="legend"><span class="chip"><span class="dot"></span>deterministic code</span><span class="chip"><span class="dot model"></span>model-authored</span><span class="chip"><span class="dot math"></span>numeric reduction</span><span class="chip"><span class="dot gate"></span>gate / stop</span><span class="chip"><span class="dot gap"></span>current behavior to reconsider</span></div>
+<nav class="tabs"><button class="tab" data-tab="trace" aria-selected="true">1 · Ordered execution</button><button class="tab" data-tab="objects" aria-selected="false">2 · Data anatomy</button><button class="tab" data-tab="math" aria-selected="false">3 · Scoring mechanics</button><button class="tab" data-tab="gaps" aria-selected="false">4 · Improvement seams</button><button class="tab" data-tab="sources" aria-selected="false">5 · Debugging map</button></nav>
+
+<section class="panel active" data-panel="trace"><div class="map-layout">
+<aside class="rail"><button class="phase-btn active" data-target="intake"><strong>01 · Intake</strong><span>Steps 1–5</span></button><button class="phase-btn" data-target="root"><strong>02 · Root judgement</strong><span>Steps 6–12</span></button><button class="phase-btn" data-target="debate"><strong>03 · Debate graph</strong><span>Steps 13–18</span></button><button class="phase-btn" data-target="score"><strong>04 · Propagation</strong><span>Steps 19–20</span></button><button class="phase-btn" data-target="serve"><strong>05 · Compose & gate</strong><span>Steps 21–27</span></button><button class="phase-btn" data-target="final"><strong>06 · Finalize</strong><span>Steps 28–32</span></button></aside>
+<div>
+
+<section class="phase" id="intake"><div class="phase-title"><span>PHASE 01</span><h2>Intake: raw question → durable run</h2></div><div class="stack">
+<article class="step"><div class="idx">1</div><div><h3>Browser builds an AskRequest</h3><p>The question is bundled with risk tier, composition-budget tier, depth, personal decision scope, machine timestamp, steering presets, and free-text steering annotations.</p><pre>{ question_line, risk_tier, tier_source: "ASKER",
+  composition_budget_tier, depth_params: { depth },
+  decision_scope: "personal", as_of,
+  steering_presets, steering_annotations }</pre><div class="io"><div><b>Input</b><span>Form fields</span></div><div><b>Transform</b><span>Strings + depth conversion</span></div><div><b>Output</b><span>Typed AskRequest</span></div></div><div class="call gap">UI accepts every positive integer depth; the runner later accepts only 1–5.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">2</div><div><h3>API validates the exact object</h3><p>Zod trims the question, rejects empty values and invalid vocabularies, validates ISO time, and rejects extra keys. The question is not summarized or semantically rewritten.</p><div class="io"><div><b>Input</b><span>Raw JSON body</span></div><div><b>Transform</b><span>Strict schema parse</span></div><div><b>Output</b><span>Trimmed validated ask</span></div></div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">3</div><div><h3>Admission resolves risk, panel, and structural ceiling</h3><ul><li>Resolve effective risk and provenance; deployment policy can override asker selection.</li><li>Read recent healthy provider probes and freeze maker/model identities.</li><li>Require maker availability appropriate to effective risk.</li><li>Compute maximum work implied by panel size, depth, branching, retries, composition, and conformance.</li></ul><div class="call">A question can be refused here before any debate model sees it.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">4</div><div><h3>Run contract is frozen and encrypted</h3><p>A UUID run stores question, identity scope, as-of time, risk decision, panel, depth, composition tier, register/battery versions, cost-envelope basis, steering data, and initial battery activation rows. Authenticated-run content is encrypted at rest.</p><div class="call gap">Steering data is stored in <code>askContract</code>, but <code>readFrozenHead()</code> does not return it. The runner never places it in model prompts.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">5</div><div><h3>Durable Q1 work is queued</h3><p>The API records liveness/memory information, inserts a READY work item with idempotent command key <code>S00:&lt;runId&gt;:Q1</code>, dispatches Hatchet, and returns HTTP 202. The UI navigates before an answer exists.</p><pre>READY → CLAIMED → SETTLED | FAILED</pre></div></article>
+</div></section>
+
+<section class="phase" id="root"><div class="phase-title"><span>PHASE 02</span><h2>Root judgement: question → statement + τ</h2></div><div class="stack">
+<article class="step"><div class="idx">6</div><div><h3>Runner preflight and idempotent claim</h3><p>Before claiming work, the runner requires coherent deadline/lease values, claim-type composition, judgement selection, serve policy, and—when multiple makers create arrows—a scoring operator. It checks the ledger for an already successful command or exhausted attempt.</p><div class="call gap">The production entry currently fails at this boundary. Acceptance supplies the missing settings.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">7</div><div><h3>Frozen panel is checked again</h3><p>Ask-time identities are compared with gateways configured in this process and optional claim-time probes. Missing gateways, absent models, or changed model IDs are removed.</p><pre>effectiveMakerCount = healthy pinned makers with configured gateways
+1 maker  → root only; requested depth is not expanded
+2+ makers → roots + binary trees + cross-root exchanges</pre></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">8</div><div><h3>Primary model authors and self-assesses one position</h3><p>The original question is wrapped in an untrusted-data envelope. The system requires one object containing statement, way of knowing, locator, restatement, value-laden flag, optional claim type, steelman, critic, evidence, context, ambiguity, and fallacy assessments.</p><div class="call good">Question text is explicitly declared untrusted data, reducing prompt-injection risk.</div><div class="call gap">One call both authors the position and supplies the scores used to judge it.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">9</div><div><h3>Every provider attempt is bounded and recorded</h3><p>The gateway enforces max attempts, token ceiling, deadline, contract hash, and input hash. Raw HTTP artifacts and ledger outcomes persist. Parse/schema failures append a machine-error repair prompt and retry. Transport failures become typed FAILED/TIMED_OUT; optional cooldown/final retry can apply.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">10</div><div><h3>Code classifies the original question</h3><p>Keyword regexes resolve empirical, causal, normative, definitional, prediction, comparative, mixed, or unknown. Unknown may use the model’s closed-vocabulary suggestion. Scope extraction attempts timeframe, geography, population, and URL locators.</p><div class="call">Every child uses the original question as <code>claimClassificationLine</code>; one claim frame controls all node reducers even if a child has a different local claim type.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">11</div><div><h3>Assessment reduces deterministically to base strength τ</h3><pre>metrics = {
+  steelman_fidelity,
+  counter_resilience = 1 − counterargumentStrength,
+  evidence_quality, evidence_relevance, context_fit,
+  clarity = max(0, 1 − ambiguityDecay × ambiguityCount),
+  fallacy_resilience = 1 − fallacySeverity
+}
+τ = clamp(Σ(metric × register coefficient), 0, 1)
+τ = min(τ, each matching fatal-flag cap)</pre><p>The original-question claim-type register cell supplies coefficients, ambiguity decay, caps, and uncertainty ladder. Missing row/cell is a loud failure. Fatal flags also become uncertainty drivers and assessment holes.</p><div class="call gap">Selection receives one candidate. Earned weight affects recorded selection score, but selected τ remains the authoring model’s τ.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">12</div><div><h3>Root node and provenance are persisted</h3><p>The graph node stores statement, claim type, path metadata, way of knowing, locator, value-laden flag, and artifact reference. Separate rows store stranger restatement and reduced judgement details.</p><div class="call gap"><code>LOOKED_UP</code> survives only with a locator. Every other returned value—including <code>RAN</code>—becomes <code>REASONING</code>.</div></div></article>
+</div></section>
+
+<section class="phase" id="debate"><div class="phase-title"><span>PHASE 03</span><h2>Debate graph: positions, branches, and review coverage</h2></div><div class="stack">
+<article class="step"><div class="idx">13</div><div><h3>Other makers author independent roots</h3><p>Each additional healthy configured maker authors an independent position without grading or imitating another maker. Each root repeats steps 8–12 and gets its own statement, self-assessment, τ, restatement, and provenance.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">14</div><div><h3>Every root receives a breadth-first binary pro/con tree</h3><pre>root
+├── strongest genuine support
+│   ├── support for that support
+│   └── attack on that support
+└── strongest genuine counter-position
+    ├── support for that counter-position
+    └── attack on that counter-position</pre><p>Each round doubles the frontier. Author rotates by <code>(rootIndex + round) mod makerCount</code>. Support uses sibling ordinal 1; attack uses 2. Failed authoring halts the planned subtree and records <code>UNAUTHORED-BRANCH-HALTED</code>.</p><pre>tree nodes = M × (2^(depth + 1) − 1)
+cross-root nodes = M × (M − 1)
+total = M × (2^(depth + 1) − 1) + M × (M − 1)
+M=2, depth=2 → 14 tree nodes + 2 exchanges = 16</pre></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">15</div><div><h3>Ordered cross-root responses connect makers</h3><p>For every ordered distinct pair, a maker writes one response that supports its own root and attacks the other root. Two makers create two response nodes.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">16</div><div><h3>Arguments create structural—but unmeasured—edges</h3><pre>{ sourceNodeId, targetNodeId,
+  polarity: "support" | "attack",
+  strength: null,
+  magnitudeStatus: "UNKNOWN",
+  strengthSource: "EVIDENCE_VERIFIER" }</pre><p>A strong child is not automatically a strong influence: node strength and edge strength are independent.</p><div class="call gap">No later live organ measures these generated edge magnitudes.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">17</div><div><h3>Different-maker reviews land at round boundaries</h3><p>Roots are reviewed, then new nodes between rounds, then exchanges. Reviewer rotation avoids the author. Output is <code>agree</code>, <code>dispute</code>, or <code>cannot-assess</code> plus reasons.</p><div class="call gap">Outcome does not change τ, edge magnitude, polarity, or verdict. Any review row—including dispute/cannot-assess—counts as reviewed.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">18</div><div><h3>Judged standing is a fixed-point coverage projection</h3><p>Directly reviewed nodes seed basis sets. Basis travels upward through child-parent and incoming-edge relationships until no set changes. Unreviewed nodes with reviewed descendants can receive derived standing; nodes with no basis leave the scoring snapshot.</p><pre>direct review row → reviewed
+reviewed descendant/source → derived-standing ancestor
+no reviewed basis → HIDDEN-UNJUDGEABLE</pre></div></article>
+</div></section>
+
+<section class="phase" id="score"><div class="phase-title"><span>PHASE 04</span><h2>Propagation: graph snapshot → served number candidate</h2></div><div class="stack">
+<article class="step"><div class="idx">19</div><div><h3>Propagation recursively computes strengths</h3><ul><li>Validate references, unit intervals, arrow order, and operator resolution.</li><li>Derive measured undercut reductions.</li><li>Lift arrows from folder/unjudged targets to a judged ancestor when possible.</li><li>Cluster correlated edges by target, polarity, provenance, producing run, and model family; retain the strongest member.</li><li>Recursively compute sources before targets.</li><li>Measured contribution = edge strength × source final strength.</li><li>Aggregate support with accumulate or strict-and; attacks use probabilistic aggregation.</li><li>Run rival-operator and leave-one-node-out sensitivity passes for audit.</li></ul><pre>agg(values) = 1 − Π(1 − value)
+
+if attack ≥ support:
+  final = τ − τ × (attack − support)
+else:
+  final = τ + (1 − τ) × (support − attack)</pre><div class="call gap">UNKNOWN edges: accumulate skips them, so a root normally stays at τ. Strict-and withholds a target when an unknown support conjunct exists; generated roots can become unservable.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">20</div><div><h3>Eligible root selection is ordered, not competitive</h3><p>The propagation receipt stores strengths, lineage, fingerprint, operator, clustering, lifts, rival results, and sensitivity. Roots with a propagated strength are eligible.</p><pre>servedRoot = first eligible root in configured-provider order</pre><div class="call gap">No highest-score, vote, agreement, or debate-winner selection. Low-score threshold only adds <code>HIDDEN-LOW-SCORE</code>; it does not disqualify a root.</div></div></article>
+</div></section>
+
+<section class="phase" id="serve"><div class="phase-title"><span>PHASE 05</span><h2>Serve: selected root → cleared prose</h2></div><div class="stack">
+<article class="step"><div class="idx">21</div><div><h3>Fact bundle contains one selected-root fact</h3><pre>{
+  facts: [servedRoot.statement],
+  residualObjections: [],
+  badges: [],
+  conditionMarks,
+  reversalPoint: servedRoot.selfAssessment.critic.summary,
+  buildsOnPrevious,
+  memoryDisclosure
+}</pre><div class="call gap">Other positions/branches are excluded. Residual objections are hardcoded empty, so their gate passes vacuously. Reversal point is the root author’s own critic summary.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">22</div><div><h3>Primary provider composes at most two segments</h3><p>It receives the fact bundle, one available node named <code>primary</code>, and reference <code>number:final-strength</code>. It must preserve facts, add none, and cite only supplied references.</p><div class="call gap">It receives the number reference but not the actual numeric strength, so it cannot reason about or accurately state that value.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">23</div><div><h3>Serve gates can force components-only</h3><ol><li>Load-bearing root restatement must be PASS.</li><li>Residual-objection array must be empty.</li><li>UTF-8 byte length of serialized fact bundle must fit selected composition tier.</li><li>Cost envelope may skip enrichment; protected-core exhaustion becomes <code>ENVELOPE_EXHAUSTED</code>, distinct from <code>DEFECT</code>.</li></ol><pre>gate failure → terminal COMPONENTS_ONLY
+              answerForm null
+              confidenceBand null
+              condition mark DEFECT or ENVELOPE_EXHAUSTED</pre></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">24</div><div><h3>Conformance checks every load-bearing segment</h3><p>A model judges each segment against the frozen bundle. Non-load-bearing segments are exhaustive or deterministically sampled by segment-ID hash. Failure triggers one recomposition; a second failure becomes components-only.</p><pre>compose 1 → conform
+  pass → continue
+  fail → compose 2 → conform
+            fail → COMPONENTS_ONLY + DEFECT</pre></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">25</div><div><h3>Way of knowing decides answer form and terminal</h3><pre>valid LOOKED_UP + locator
+  → SERVED + answerForm VERDICT
+
+all REASONING
+  → segment 1 hypothesis
+  → segment 2 research plan
+  → DOWNGRADED + HYPOTHESIS_WITH_RESEARCH_PLAN
+
+LOOKED_UP without locator
+  → COMPONENTS_ONLY + DEFECT</pre><div class="call gap">RAN is normalized to REASONING, leaving authored roots effectively LOOKED_UP-with-locator or REASONING.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">26</div><div><h3>Post-compose R9 checks final wording</h3><p>A conformance-role model sees the original question and final segments and returns only <code>{ pass }</code>. Failure suppresses prose into components-only.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">27</div><div><h3>Confidence band is capped by basis—not score</h3><p>The runner counts load-bearing LOOKED_UP/RAN/REASONING nodes. Register cuts cap the candidate band and provide label, source, and lift path. A cap still serves. Mono-maker runs lower the candidate one step before the ceiling.</p><div class="call">Confidence band and verdict state are independent.</div></div></article>
+</div></section>
+
+<section class="phase" id="final"><div class="phase-title"><span>PHASE 06</span><h2>Finalize: recorded facts → answer row → UI</h2></div><div class="stack">
+<article class="step"><div class="idx">28</div><div><h3>Terminal battery activations are drained</h3><p>WAIT rows are evaluated from recorded facts. ACTIVE without execution adds <code>OWED-CHECK-UNEXECUTED</code>. Question-type fallback adds <code>UNRESOLVED-TYPE-FALLBACK</code>. These marks do not map the verdict to CONTESTED/UNSUPPORTED.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">29</div><div><h3>Selected root strength becomes the served number</h3><pre>{ numberRef: "number:final-strength",
+  value: selectedRoot.finalStrength,
+  numberKind: "propagated-probability",
+  sourceRef, producer, replayHandle, propagationRunId }</pre><p>The number persists separately from prose. Pre-composition components-only omits it; some post-composition components-only may retain it but still cannot produce a verdict state.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">30</div><div><h3>Verdict state uses one Boolean—not the score</h3><pre>usableBasis = servedNumber exists
+              AND terminal ∈ { SERVED, DOWNGRADED }
+
+usableBasis ? verdict_state = SUPPORTED
+            : verdict_state = null + unavailable reason</pre><div class="call gap">No thresholds map strength to SUPPORTED/CONTESTED/UNSUPPORTED. Score 0.05 can be SUPPORTED if gates pass; 0.95 can be unavailable if a gate fails. CONTESTED and UNSUPPORTED are schema-declared but unreachable here.</div></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">31</div><div><h3>Answer, evidence, and terminal persist atomically</h3><p>The repository inserts fact bundle, composed text, conformance, answer form, terminal, serve state, verdict state, band, condition marks, served-number event, and run TERMINAL event. The work settles with answer ID; racing workers return the winning artifact.</p></div></article><div class="arrow"></div>
+<article class="step"><div class="idx">32</div><div><h3>UI refreshes on terminal event</h3><p>The debate page streams events, updates live node state, and reloads on <code>run.terminal</code>. The banner separately displays verdict state, confidence band, unavailable reason, and serve state; the graph stays inspectable.</p></div></article>
+</div></section>
+</div></div></section>
+
+<section class="panel" data-panel="objects"><div class="grid2">
+<article class="card"><p class="eyebrow">Boundary A</p><h2>AskRequest</h2><pre>{ question_line, risk_tier, tier_source,
+  tier_provenance_ref, composition_budget_tier,
+  depth_params, decision_scope, as_of,
+  steering_presets, steering_annotations }</pre><p>User intent plus execution knobs. Steering is persisted but not consumed.</p></article>
+<article class="card"><p class="eyebrow">Boundary B</p><h2>Frozen run head</h2><pre>{ runId, questionLine, discoveredPanel,
+  agentCount, depthParams, compositionBudgetTier,
+  strangerSampleRate, envelopeBasis }</pre><p>Immutable subset the runner consumes; askContract steering is absent.</p></article>
+<article class="card"><p class="eyebrow">Boundary C</p><h2>JudgedNode</h2><pre>{ statement, normalizedClaim, assessment,
+  wayOfKnowing, locator, restatementText,
+  restatementStatus, provenanceRef }</pre><p>Mostly model-authored; code validates and normalizes it.</p></article>
+<article class="card"><p class="eyebrow">Boundary D</p><h2>Reduced judgement</h2><pre>{ nodeId, τ, uncertaintyLadderPosition,
+  uncertaintyDrivers, scoreCaps, holes,
+  branchIdentifier, selectedJudgementRef,
+  reducerVersion }</pre><p>Deterministic reduction plus audit metadata; selection currently has one candidate.</p></article>
+<article class="card"><p class="eyebrow">Boundary E</p><h2>Graph snapshot</h2><pre>{ nodes: [{ nodeId, baseStrength: τ, ... }],
+  arrows: [{ polarity, strength: null,
+             magnitudeStatus: "UNKNOWN" }],
+  arrowOrder, operatorResolutions }</pre><p>Rich structure; influence magnitudes remain unknown.</p></article>
+<article class="card"><p class="eyebrow">Boundary F</p><h2>Propagation receipt</h2><pre>{ strengths, withheld, unjudgedNodeIds,
+  transmissionReductions, liftRecords,
+  clusterRecords, operatorResolutions,
+  sensitivityRecords, graphFingerprint }</pre><p>Replayable scoring and audit trail for surviving nodes.</p></article>
+<article class="card"><p class="eyebrow">Boundary G</p><h2>FactBundle</h2><pre>{ facts: [selectedRoot.statement],
+  residualObjections: [], badges: [],
+  conditionMarks, reversalPoint,
+  buildsOnPrevious, memoryDisclosure }</pre><p>Only the chosen root crosses into composition.</p></article>
+<article class="card"><p class="eyebrow">Boundary H</p><h2>Persisted Answer</h2><pre>{ terminal, serve_state, verdict_state,
+  verdict_unavailable, answer_form, composed_text,
+  confidence_band, band_ceiling, number_slots,
+  condition_marks, nodes, edges, reversal_point,
+  memory_disclosure }</pre><p>Terminal, prose form, support category, band, score, and honesty marks remain separate.</p></article>
+</div><article class="card" style="margin-top:16px"><p class="eyebrow">Vocabulary</p><div class="grid3"><div><h3>Terminal</h3><p><code>SERVED</code>: cleared verdict prose<br><code>DOWNGRADED</code>: hypothesis + research plan<br><code>COMPONENTS_ONLY</code>: prose not cleared</p></div><div><h3>Answer form</h3><p><code>VERDICT</code> or <code>HYPOTHESIS_WITH_RESEARCH_PLAN</code>; prose shape, not support category.</p></div><div><h3>Verdict state</h3><p>Schema allows SUPPORTED, CONTESTED, UNSUPPORTED, null. Current derivation yields only SUPPORTED or null.</p></div></div></article></section>
+
+<section class="panel" data-panel="math"><div class="grid2">
+<article class="card"><p class="eyebrow">Stage A</p><h2>Self-assessment → τ</h2><div class="metrics"><div class="metric"><span>steelman fidelity</span><strong>0.85</strong></div><div class="metric"><span>counter resilience = 1 − 0.55</span><strong>0.45</strong></div><div class="metric"><span>evidence quality</span><strong>0.40</strong></div><div class="metric"><span>evidence relevance</span><strong>0.75</strong></div><div class="metric"><span>context fit</span><strong>0.80</strong></div><div class="metric"><span>clarity after ambiguity</span><strong>0.90</strong></div><div class="metric"><span>fallacy resilience</span><strong>0.90</strong></div></div><p>With illustrative coefficients:</p><div class="eq"><strong>τ = 0.715</strong><br>Actual coefficients/caps come from sealed <code>claimTypeCompositionMap</code>.</div></article>
+<article class="card"><p class="eyebrow">Stage B</p><h2>Measured arrows → propagated strength</h2><pre>contribution = edgeStrength × sourceFinalStrength
+agg(values) = 1 − Π(1 − value)</pre><p>Source 0.80 through edge 0.50 contributes 0.40. Supports 0.40 and 0.30 aggregate to 0.58.</p><div class="eq"><strong>With τ=.715, support=.58, attack=.20:</strong><br>final = .715 + .285 × .38 = .8233</div></article>
+<article class="card"><p class="eyebrow">Current accumulate</p><h2>UNKNOWN edges contribute nothing</h2><pre>strength=null + UNKNOWN → skip
+support=0, attack=0 → final=τ</pre><div class="call gap">Visible debate does not numerically move the root.</div></article>
+<article class="card"><p class="eyebrow">Current strict-and</p><h2>Unknown support withholds target</h2><pre>UNKNOWN support conjunct
+→ missingStrictConjunct
+→ target withheld</pre><div class="call gap">With depth ≥1, every generated root gets unknown support and may become unservable.</div></article>
+<article class="card"><p class="eyebrow">Selection</p><h2>Order beats score</h2><pre>servedRoot = eligibleRoots[0]</pre><p>Model A 0.20 and Model B 0.90 → A serves if first and eligible.</p></article>
+<article class="card"><p class="eyebrow">Verdict</p><h2>Score is not an input</h2><pre>number exists + terminal served/downgraded
+→ SUPPORTED
+otherwise → unavailable</pre><p>CONTESTED/UNSUPPORTED have no production mapping here.</p></article>
+</div><article class="card" style="margin-top:16px"><p class="eyebrow">Cost growth</p><h2>Depth is exponential</h2><pre>N(M,d) = M × (2^(d+1) − 1) + M × (M − 1)</pre><div class="grid3"><div><h3>M=2,d=1</h3><p>8 nodes</p></div><div><h3>M=2,d=2</h3><p>16 nodes</p></div><div><h3>M=3,d=5</h3><p>195 nodes</p></div></div><p>Each node normally adds an author call and a different-maker review call, plus composition, conformance, R9, retries, cooldowns, and sensitivity recomputation.</p></article></section>
+
+<section class="panel" data-panel="gaps"><article class="card" style="margin-bottom:16px"><p class="eyebrow">Reading guide</p><h2>Decision seams, not automatic fixes</h2><p>Start with the red critical path: production wiring → independent judgement → edge measurement → root selection → verdict mapping.</p></article><div class="gaps">
+<article class="gap-card"><div><span class="priority">Critical · executable</span><h3>Production runner stops before work</h3><p class="now">Main omits judgement policy, serve policy, terminal evaluator, and multi-maker/scoring wiring.</p></div><div class="questions"><b>Questions:</b> Which sealed rows populate them? Should startup fail before worker registration? How does production mirror acceptance gateway/probe wiring?</div></article>
+<article class="gap-card"><div><span class="priority">Critical · epistemic</span><h3>Author also supplies its score</h3><p class="now">Same call authors and grades; selection has one candidate.</p></div><div class="questions"><b>Questions:</b> Separate author from judges? How many judges? How should family correlation, dispersion, abstention, and disagreement affect confidence without averaging away dissent?</div></article>
+<article class="gap-card"><div><span class="priority">Critical · causal</span><h3>Debate edges stay UNKNOWN</h3><p class="now">Accumulate leaves root at τ; strict-and may withhold it.</p></div><div class="questions"><b>Questions:</b> What independent verifier measures relevance/influence? Are support/attack symmetric? How are undercuts and correlated evidence calibrated?</div></article>
+<article class="gap-card"><div><span class="priority">Critical · decision</span><h3>First eligible provider always serves</h3><p class="now">Order—not score or outcome—selects the root.</p></div><div class="questions"><b>Questions:</b> Is the product serving one perspective, adjudicating, or synthesizing? Choose a rule: max strength, Pareto set, pairwise comparison, vote, risk-aware abstention, or multi-answer display.</div></article>
+<article class="gap-card"><div><span class="priority">Critical · verdict</span><h3>Verdict collapses to SUPPORTED/null</h3><p class="now">Strength never enters verdict derivation.</p></div><div class="questions"><b>Questions:</b> What does strength mean? Which claim/risk cuts create states? Should disagreement, residual objections, uncertainty, or sensitivity create CONTESTED or abstention?</div></article>
+<article class="gap-card"><div><span class="priority">High · critique</span><h3>Review existence matters; outcome does not</h3><p class="now">Agree, dispute, cannot-assess all seed standing equally.</p></div><div class="questions"><b>Questions:</b> Should cannot-assess count? Should dispute create attack, lower band, reopen scoring, or live as a separate disagreement dimension?</div></article>
+<article class="gap-card"><div><span class="priority">High · composition</span><h3>Composer sees one root, no objections, no value</h3><p class="now">Other nodes excluded; objections empty; only number reference is passed.</p></div><div class="questions"><b>Questions:</b> Include strongest objections, other positions, score, sensitivity, uncertainty? Which facts are load-bearing? How can prose summarize disagreement without new facts?</div></article>
+<article class="gap-card"><div><span class="priority">High · control</span><h3>Steering is recorded but inert</h3><p class="now">Stored in askContract, omitted from runner head.</p></div><div class="questions"><b>Questions:</b> Should steering affect prompts, branch priority, values, or disclosure only? How is untrusted free text isolated and replayed?</div></article>
+<article class="gap-card"><div><span class="priority">High · evidence</span><h3>RAN collapses to REASONING</h3><p class="now">Only LOOKED_UP with locator survives.</p></div><div class="questions"><b>Questions:</b> What execution receipt proves RAN? How are tool outputs attested? Should locators be independently resolved?</div></article>
+<article class="gap-card"><div><span class="priority">Medium · typing</span><h3>Original question type controls every child</h3><p class="now">A normative debate’s empirical child still uses normative composition.</p></div><div class="questions"><b>Questions:</b> One decision frame plus local node type? Which reducer controls credibility versus influence? How are mixed claims decomposed?</div></article>
+<article class="gap-card"><div><span class="priority">Medium · gates</span><h3>Residual-objection gate is vacuous</h3><p class="now">Runner always creates an empty array.</p></div><div class="questions"><b>Questions:</b> Who selects unresolved attacks? Should they block, contest, lower score, or appear as caveats?</div></article>
+<article class="gap-card"><div><span class="priority">Medium · reliability</span><h3>Restatement and conformance are model judgements</h3><p class="now">Author declares restatement; primary composes; conformance-role model checks.</p></div><div class="questions"><b>Questions:</b> Independent provider? Which checks deterministic? How do we calibrate false passes and correlated error?</div></article>
+<article class="gap-card"><div><span class="priority">Medium · cost</span><h3>Depth multiplies calls exponentially</h3><p class="now">Binary expansion plus every ordered root exchange; normally author + review per node.</p></div><div class="questions"><b>Questions:</b> Adapt depth to leverage, uncertainty, novelty, or budget? Collapse duplicates? Which branches deserve depth?</div></article>
+<article class="gap-card"><div><span class="priority">Medium · semantics</span><h3>“Verdict” names three things</h3><p class="now">Terminal, answer form, and verdict state are adjacent but distinct.</p></div><div class="questions"><b>Questions:</b> Separate evidence clearance, prose form, support category, and confidence. What does SUPPORTED mean when the answer is a reasoning hypothesis?</div></article>
+</div></section>
+
+<section class="panel" data-panel="sources"><div class="grid2">
+<article class="card"><p class="eyebrow">Call tree</p><h2>Runtime ownership</h2><pre>NewQuestionForm.submit
+  contractClient.submitAsk
+    POST /v1/asks
+      AskRequestSchema.parse
+      PostgresAskApplication.submit
+        evaluateAskAdmission
+        RunRepository.startRun
+        recordMemoryQuestion
+        WorkItemRepository.enqueue(Q1)
+        HatchetDispatcher.dispatch
+
+Hatchet task
+  WalkingSkeletonRunner.executeWorkItem
+    preflight + claim
+    readFrozenHead
+    Judge.judge(primary)
+      ProviderGateway.call
+      classifyClaimText
+      reduceAssessment → τ
+      addNode + recordReduced
+    author other roots
+    review roots
+    expand binary pro/con trees
+    review each round
+    author + review cross-root exchanges
+    projectJudgedStanding
+    propagation.evaluate
+    selectServedRoot(first eligible)
+    buildFactBundle(one root)
+    runServeGateChain
+      compose → conform → R9 → band
+    resolveTerminalActivations
+    ServeRepository.persist
+      deriveHonestVerdict
+    settle work
+
+DebatePageClient
+  streamEvents
+  run.terminal → readRunAnswer
+  VerdictBanner</pre></article>
+<article class="card"><p class="eyebrow">Condensed pseudocode</p><h2>Actual decision logic</h2><pre>ask = validate(form)
+admission = resolveRiskPanelBudget(ask)
+run = freezeEncryptQueue(ask, admission)
+
+requirePoliciesOrFail()
+makers = recheckPinnedPanel(run)
+
+for each node in roots/tree/exchanges:
+  artifact = modelAuthorsAndSelfAssesses()
+  type = classifyOriginalQuestion()
+  tau = reduce(artifact.assessment, register[type])
+  persistNode(node, tau)
+  persistEdges(strength=null, UNKNOWN)
+
+for each node:
+  persistDifferentMakerReview(any outcome)
+
+snapshot = keepAnyReviewedBasis()
+strengths = propagate(snapshot)
+servedRoot = eligibleRoots[0]
+
+facts = {
+  selectedRootStatement,
+  residualObjections: [],
+  rootSelfCriticSummary,
+  honestyMarks,
+  memory
+}
+
+result = composeAndGate(facts)
+number = resultNeedsEvidence ? root.strength : null
+usable = number != null
+         && terminal in [SERVED, DOWNGRADED]
+verdict = usable ? SUPPORTED : UNAVAILABLE
+persistEverything()</pre></article>
+</div>
+<article class="card" style="margin-top:16px"><p class="eyebrow">Source map</p><h2>Where to place breakpoints</h2><div class="sources">
+<div class="source"><code>web/app/new/NewQuestionForm.tsx:14</code><span>Raw form and AskRequest.</span></div>
+<div class="source"><code>packages/contract/src/index.ts:107</code><span>Normalization and strict validation.</span></div>
+<div class="source"><code>apps/api/src/index.ts:1110,1184</code><span>Risk, panel, envelope, run input, queue.</span></div>
+<div class="source"><code>packages/db/src/index.ts:1417</code><span>Frozen head; notice missing askContract.</span></div>
+<div class="source"><code>apps/runner/src/index.ts:1211,1266</code><span>Policy preflight, claim, decrypted run.</span></div>
+<div class="source"><code>packages/judgement/src/index.ts:120</code><span>Author/self-assessment prompt and normalization.</span></div>
+<div class="source"><code>packages/providers/src/index.ts:195</code><span>Attempts, artifacts, repair, deadlines, ledger.</span></div>
+<div class="source"><code>packages/judgement/src/s04.ts:173</code><span>Metrics, coefficients, caps, τ.</span></div>
+<div class="source"><code>apps/runner/src/index.ts:1699–1908</code><span>Roots, review cadence, trees, rotation, exchanges.</span></div>
+<div class="source"><code>apps/runner/src/index.ts:1647</code><span>UNKNOWN edge creation.</span></div>
+<div class="source"><code>packages/judgement/src/index.ts:407</code><span>All review outcomes count as reviewed.</span></div>
+<div class="source"><code>apps/runner/src/index.ts:299</code><span>Reviewed-basis fixed point.</span></div>
+<div class="source"><code>packages/propagation/src/index.ts:397</code><span>Contributions, UNKNOWN, operators.</span></div>
+<div class="source"><code>apps/runner/src/index.ts:934,1938</code><span>First-eligible selection and low-score mark.</span></div>
+<div class="source"><code>apps/runner/src/index.ts:2050,2233</code><span>One-root bundle, empty objections, composer input.</span></div>
+<div class="source"><code>packages/serve/src/index.ts:443</code><span>Serve gates, recomposition, form, band.</span></div>
+<div class="source"><code>packages/serve/src/index.ts:662,1008</code><span>SUPPORTED/null derivation.</span></div>
+<div class="source"><code>apps/runner/src/main.ts:51</code><span>Production omissions; compare acceptance/main.ts:489.</span></div>
+<div class="source"><code>web/app/debate/[id]/DebatePageClient.tsx:75</code><span>Terminal refresh and UI.</span></div>
+</div></article></section>
+<p class="foot">Illustrative numbers are examples. Deployment coefficients, caps, operator, bands, and budgets must come from the sealed database register.</p>
+</main>
+<script>
+(()=>{const tabs=[...document.querySelectorAll(".tab")],panels=[...document.querySelectorAll(".panel")];tabs.forEach(t=>t.addEventListener("click",()=>{tabs.forEach(x=>x.setAttribute("aria-selected",String(x===t)));panels.forEach(p=>p.classList.toggle("active",p.dataset.panel===t.dataset.tab));window.scrollTo({top:0,behavior:"smooth"})}));const buttons=[...document.querySelectorAll(".phase-btn")];buttons.forEach(b=>b.addEventListener("click",()=>{buttons.forEach(x=>x.classList.toggle("active",x===b));document.getElementById(b.dataset.target)?.scrollIntoView({behavior:"smooth",block:"start"})}));const obs=new IntersectionObserver(es=>{const v=es.filter(e=>e.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(v)buttons.forEach(b=>b.classList.toggle("active",b.dataset.target===v.target.id))},{rootMargin:"-20% 0px -65% 0px",threshold:[0,.2,.5]});document.querySelectorAll(".phase").forEach(x=>obs.observe(x))})();
+</script>
+</body>
+</html>
