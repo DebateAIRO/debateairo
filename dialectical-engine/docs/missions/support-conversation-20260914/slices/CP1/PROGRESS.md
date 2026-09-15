@@ -1,8 +1,8 @@
 # CP1 progress
 
-Current status: **BLOCKED — two account-access recovery records need editorial correction; existing Forgot destination still needs owner input.** CP1 is not ready or accepted and cannot unlock CP2/CP3.
+Current status: **BLOCKED — account-access correction awaits separate editorial recheck; existing Forgot destination still needs owner input.** CP1 is not ready or accepted and cannot unlock CP2/CP3.
 
-Product is clean `codex/support-conversation-cp1` at `f440287179f71e18a4b4b93607951c1e5f862cc1`. FIX_P2 author evidence consumed: 21 authorized changed paths, 107 cumulative committed/current paths, 37 artifact references, 36 article/projection/fallback bindings and 7 native skill BODY reads verified. Captured final committed-byte affected tests pass 448/448 across 11 files. This is author verification; separate review remains.
+Product is clean `codex/support-conversation-cp1` at `dfeb7eef93de31e19367760d87c09ca1ef76544e`. EDITFIX_P2 changed exactly4 account-access strings, preserved34 records and every article hash, and passes actual36-record semantic admission. Separate EDITREV_P2 remains required. Earlier core FIX_P2 at f4402871 supplied the448-test frame below; content-only correction has its own parser evidence. FIX_P2 author evidence consumed: 21 authorized changed paths, 107 cumulative committed/current paths, 37 artifact references, 36 article/projection/fallback bindings and 7 native skill BODY reads verified. Captured final committed-byte affected tests pass 448/448 across 11 files. This is author verification; separate review remains.
 
 All 36 new guidance records require separate Sol editorial review and actual manifest attestation. Strict API/status intentionally cannot load the current v1 manifest. No new text is owner-ratified. SPEC-v3 and CP1-REVIEWED-RECOVERY.md govern this final correction.
 

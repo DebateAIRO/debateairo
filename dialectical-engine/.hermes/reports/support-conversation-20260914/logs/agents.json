@@ -193,11 +193,18 @@
       "status": "completed_rework_consumed_identity_corrected",
       "revision": "f440287179f71e18a4b4b93607951c1e5f862cc1",
       "ticket": "t_1bce517f"
+    },
+    "EDITFIX_P2": {
+      "session": "/root/requirements",
+      "status": "completed_author_correction_consumed",
+      "ticket": "t_8edac644",
+      "base": "f440287179f71e18a4b4b93607951c1e5f862cc1",
+      "revision": "dfeb7eef93de31e19367760d87c09ca1ef76544e"
     }
   },
   "heavy_lease": null,
-  "state": "CP1_SCOPED_ACCOUNT_EDITORIAL_CORRECTION",
-  "last_event": "2026-09-15T16:24:08.230599+00:00",
+  "state": "CP1_ACCOUNT_EDITORIAL_RECHECK_PENDING",
+  "last_event": "2026-09-15T16:35:18.109721+00:00",
   "pending_owner_decision": "V-1 forgot-password destination",
   "lane": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine",
   "baseline_claim": "b7ca2c41",
