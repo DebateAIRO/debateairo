@@ -9,6 +9,10 @@
     {
       "laneRelative": "tests/unit/support-recovery-attestation.test.ts",
       "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-recovery-attestation.test.ts"
+    },
+    {
+      "laneRelative": "tests/unit/support-kb.test.ts",
+      "absolute": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-kb.test.ts"
     }
   ],
   "reviewInputs": [
@@ -83,5 +87,18 @@
     "typecheck"
   ],
   "baselineDiagnostics": 76,
-  "limits": "Mechanical attestation of actual separate review only. Owner fields blank. Strict production-corpus test RED before v2 manifest. Final25-file union belongs to LIVE_P2."
+  "limits": "Mechanical attestation of actual separate review only. Owner fields blank. Strict production-corpus test RED before v2 manifest. Final25-file union belongs to LIVE_P2.",
+  "scopeAmendment": {
+    "at": "2026-09-15T16:53:12.048183+00:00",
+    "additionalPath": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/support-conversation-cp1/dialectical-engine/tests/unit/support-kb.test.ts",
+    "reason": "Two existing manifest-transition assertions must reflect actual final v2 admission; no product behavior change.",
+    "failingLogSha256": "7416a0a9b922982ce48e4e30f02e3411e02f9c2acae4dc5717bb7329fc37b77f",
+    "capturedTests": {
+      "passed": 447,
+      "failed": 2,
+      "files": 12
+    },
+    "originalBlueprintProductPaths": 2,
+    "currentAuthorizedProductPaths": 3
+  }
 }
