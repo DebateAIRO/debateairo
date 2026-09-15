@@ -111,8 +111,13 @@ describe("Help Corpus loader", () => {
     const manifestPath = fileURLToPath(
       new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
     );
+    const componentPath = fileURLToPath(
+      new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
+    );
     const corpus = loadHelpCorpus(directory, {
       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
+      recoveryComponents: readFileSync(componentPath),
+      requireReviewedRecovery: true,
     });
 
     expect(corpus).toMatchObject({
@@ -120,7 +125,9 @@ describe("Help Corpus loader", () => {
       ignoredCount: 0,
       previewReviewedCount: 12,
       ownerRatifiedCount: 6,
-      kbVersion: "b6f48a593b500f108e0eed11e0ceccfe8654e684fcdf0bb8284c1ded179867ca",
+      recoveryReviewedCount: 18,
+      recoveryOwnerRatifiedCount: 0,
+      kbVersion: "d674533e89d145bf9203248e2e324b451e57a2f1d3f257614d31678b7ac379df",
     });
     expect(corpus.reviewManifest.articles).toHaveLength(24);
     expect(corpus.entries.filter(({ ratifiedBy }) => ratifiedBy === "")).toHaveLength(24);
@@ -142,7 +149,7 @@ describe("Help Corpus loader", () => {
     expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it("keeps the new complete recovery component set ineligible until its separate review manifest lands", () => {
+  it("admits the complete recovery component set after its separate review manifest lands", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
@@ -153,10 +160,14 @@ describe("Help Corpus loader", () => {
       new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
     );
 
-    expect(() => loadHelpCorpus(directory,{
+    const corpus = loadHelpCorpus(directory,{
       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
-    })).toThrowError(expect.objectContaining({ code: "SUPPORT_KB_RECOVERY_REVIEW_REQUIRED" }));
+    });
+
+    expect(corpus.entries).toHaveLength(36);
+    expect(corpus.recoveryReviewedCount).toBe(18);
+    expect(corpus.recoveryOwnerRatifiedCount).toBe(0);
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {
