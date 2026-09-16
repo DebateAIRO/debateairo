@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,20 @@ import {
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
 const handles: ClaudeRelayHandle[] = [];
 const temporaryDirectories: string[] = [];
+
+/**
+ * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
+ * fixture — it emits this one-way digest instead, so an assertion can still pin
+ * WHICH value the relay passed without the value itself reaching model content
+ * or `ledger.raw_artifact`. The rule for which names count is stated once in
+ * `test-fixtures/fake-claude-cli.mjs:44-58`.
+ * Restated here rather than imported from the fixture on purpose: an assertion
+ * computed with the producer's own helper would agree with a broken one
+ * (TOOLING-TRAPS `:1320`).
+ */
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+}
 
 function posixQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
@@ -228,8 +243,13 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       expect(Object.fromEntries(Object.entries(relayed.environment).filter(([key]) =>
         key !== "__CF_USER_TEXT_ENCODING"
       ))).toEqual({
-        ANTHROPIC_API_KEY: "anthropic-test-sentinel",
-        CLAUDE_CODE_OAUTH_TOKEN: "claude-oauth-test-sentinel",
+        // W6/F4: these two are credential-shaped, so the fixture emits a digest
+        // of the sentinel rather than the sentinel. The assertion is as strong as
+        // before — it still fails if the relay passes a different value or none —
+        // and the F26 parity case below, which sets no sentinels, can no longer
+        // write an operator's real key into the persisted content.
+        ANTHROPIC_API_KEY: digestOf("anthropic-test-sentinel"),
+        CLAUDE_CODE_OAUTH_TOKEN: digestOf("claude-oauth-test-sentinel"),
         HOME: "/tmp/relay-home-sentinel",
         LANG: "C.UTF-8",
         LOGNAME: "claude-keychain-user",

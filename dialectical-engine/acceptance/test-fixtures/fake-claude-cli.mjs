@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 // Test-layer fake of the Claude Code CLI headless print mode (FAIR-02).
 // Mimics the EMPIRICALLY OBSERVED `claude -p <prompt> --output-format json`
 // envelope: a single JSON object on stdout carrying is_error, result,
@@ -39,11 +41,35 @@ const ECHOED_ENVIRONMENT_KEYS = [
   "XAI_API_KEY"
 ];
 
+// W6 fix round 1 / F4 — the CREDENTIAL-SHAPE rule, stated identically in all six
+// members of the class. A key is credential-shaped when a SEGMENT of its name is
+// one of KEY, TOKEN, SECRET, PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL,
+// URI or DSN.
+// Why a pattern over the NAME and not an explicit list: an explicit list would
+// have to be maintained in six places and would silently miss the next maker's
+// locator, which is exactly how this leak survived. Why SEGMENT-anchored and not
+// a substring: HOME, PATH, TMPDIR, LANG, USER, LOGNAME, PWD, OLDPWD, HERMES_HOME
+// and CODEX_HOME are paths and identities the assertions need in clear, and none
+// of them matches. Why URL/URI/DSN are in it: a connection string such as
+// DATABASE_URL embeds a password — the most damaging value in this tree — and it
+// matches none of the key/token words.
+// A credential-shaped key's VALUE is never emitted. Presence and identity travel
+// as a truncated one-way digest, so an assertion can still prove the relay passed
+// THE key it was given by comparing the digest of the sentinel it set.
+const CREDENTIAL_SHAPED_NAME =
+  /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;
+
+function echoedValue(key, value) {
+  return CREDENTIAL_SHAPED_NAME.test(key)
+    ? `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`
+    : value;
+}
+
 function echoedEnvironment() {
   const echoed = {};
   for (const key of ECHOED_ENVIRONMENT_KEYS) {
     const value = process.env[key];
-    if (value !== undefined) echoed[key] = value;
+    if (value !== undefined) echoed[key] = echoedValue(key, value);
   }
   return echoed;
 }

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,6 +43,34 @@ const CANARY_VALUE = "canary-9c1e";
  */
 const UNLISTED_KEY = "W6_UNLISTED_CANARY";
 const UNLISTED_VALUE = "canary-b7d3";
+
+/**
+ * FIX ROUND 1, F4. The original incident's shape, still live after the
+ * allow-list: `claude-relay.test.ts` pins the exact VALUES of
+ * `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN`, so the claude fixture had
+ * to echo them — and the F26 preflight-parity case sets no sentinels, so a suite
+ * run on an operator's shell wrote the real key into `ledger.raw_artifact`.
+ *
+ * No value of a credential-shaped key is emitted any more. Presence and identity
+ * are carried by a one-way digest instead, so an assertion can still prove the
+ * relay passed THE key it was given — by comparing the digest of the sentinel it
+ * set — while the value itself never leaves the child.
+ *
+ * The digest is restated here rather than imported from the fixtures on purpose:
+ * a test that computed it with the producer's own helper would agree with a
+ * broken helper (TOOLING-TRAPS `:1320`).
+ */
+const CREDENTIAL_CANARY_VALUE = "canary-c8e1";
+
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+}
+
+function expectCredentialDigestedNotEchoed(echo: Echo, emitted: string, key: string): void {
+  expect(echo.environment[key], `${key} must be emitted as a digest, never its value (F4)`)
+    .toBe(digestOf(CREDENTIAL_CANARY_VALUE));
+  expect(emitted).not.toContain(CREDENTIAL_CANARY_VALUE);
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -144,14 +173,15 @@ interface Echo {
 describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
   it("fake-claude-cli.mjs echoes the admitted maker locator and not the unnamed canary", async () => {
     const stdout = await emit([fixturePath("fake-claude-cli.mjs"), "-p", "W6 allow-list probe"], {
-      ANTHROPIC_API_KEY: "w6-admitted-anthropic-locator",
+      ANTHROPIC_API_KEY: CREDENTIAL_CANARY_VALUE,
       HOME: "/tmp/w6-claude-home",
       PATH: "/usr/bin:/bin"
     });
     const envelope = JSON.parse(stdout) as { readonly result: string };
     const echo = JSON.parse(envelope.result) as Echo;
 
-    expect(echo.environment.ANTHROPIC_API_KEY).toBe("w6-admitted-anthropic-locator");
+    expect(echo.environment.HOME).toBe("/tmp/w6-claude-home");
+    expectCredentialDigestedNotEchoed(echo, stdout, "ANTHROPIC_API_KEY");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(echo, stdout);
@@ -161,12 +191,13 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     const stdout = await emit([fixturePath("fake-grok-cli.mjs"), "--single", "W6 allow-list probe"], {
       HOME: "/tmp/w6-grok-home",
       PATH: "/usr/bin:/bin",
-      XAI_API_KEY: "w6-admitted-xai-locator"
+      XAI_API_KEY: CREDENTIAL_CANARY_VALUE
     });
     const envelope = JSON.parse(stdout) as { readonly text: string };
     const echo = JSON.parse(envelope.text) as Echo;
 
-    expect(echo.environment.XAI_API_KEY).toBe("w6-admitted-xai-locator");
+    expect(echo.environment.HOME).toBe("/tmp/w6-grok-home");
+    expectCredentialDigestedNotEchoed(echo, stdout, "XAI_API_KEY");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(echo, stdout);
@@ -175,14 +206,15 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
   it("fake-hermes-cli.mjs echoes the admitted maker locator and not the unnamed canary", async () => {
     const hermesHome = await scratchDirectory("w6-hermes-home-");
     const stdout = await emit([fixturePath("fake-hermes-cli.mjs"), "-z", "W6 allow-list probe"], {
-      GLM_API_KEY: "w6-admitted-glm-locator",
+      GLM_API_KEY: CREDENTIAL_CANARY_VALUE,
       HERMES_HOME: hermesHome,
       HOME: hermesHome,
       PATH: "/usr/bin:/bin"
     });
     const echo = JSON.parse(stdout) as Echo;
 
-    expect(echo.environment.GLM_API_KEY).toBe("w6-admitted-glm-locator");
+    expect(echo.environment.HERMES_HOME).toBe(hermesHome);
+    expectCredentialDigestedNotEchoed(echo, stdout, "GLM_API_KEY");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(echo, stdout);
@@ -193,13 +225,14 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
       ["-e", inlineScript(acceptanceFile("adversarial-corpus.test.ts"), "fixtureScript"), "--", "W6 allow-list probe"],
       {
         HOME: "/tmp/w6-corpus-home",
-        P4_ALLOWED_MAKER_KEY: "w6-admitted-maker-locator",
+        P4_ALLOWED_MAKER_KEY: CREDENTIAL_CANARY_VALUE,
         PATH: "/usr/bin:/bin"
       }
     );
     const observation = JSON.parse(stdout) as Echo;
 
-    expect(observation.environment.P4_ALLOWED_MAKER_KEY).toBe("w6-admitted-maker-locator");
+    expect(observation.environment.HOME).toBe("/tmp/w6-corpus-home");
+    expectCredentialDigestedNotEchoed(observation, stdout, "P4_ALLOWED_MAKER_KEY");
     expect(observation.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(observation, stdout);
@@ -214,6 +247,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
       {
         CODEX_HOME: "/tmp/w6-admitted-codex-home",
         HOME: "/tmp/w6-shim-home",
+        OPENAI_API_KEY: CREDENTIAL_CANARY_VALUE,
         PATH: "/usr/bin:/bin"
       },
       cwd
@@ -225,6 +259,7 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     const probe = JSON.parse(completed.item.text) as Echo;
 
     expect(probe.environment.CODEX_HOME).toBe("/tmp/w6-admitted-codex-home");
+    expectCredentialDigestedNotEchoed(probe, stdout, "OPENAI_API_KEY");
     expect(probe.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(probe, stdout);
@@ -247,6 +282,11 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     const observation = JSON.parse(written) as Echo;
 
     expect(stdout).toBe("OK");
+    // F4 is vacuous for this member and that is a measurement, not an omission:
+    // none of the six keys it may echo (HOME, LANG, OLDPWD, PATH, PWD, TMPDIR)
+    // is credential-shaped, so the digest rule never fires here. Its protection
+    // against a credential is the allow-list itself plus the names list, and the
+    // Bearer-token assertions this member's own suite already carries at `:376`.
     expect(observation.environment.HOME).toBe("/tmp/w6-admitted-relay-home");
     expect(observation.environment[CANARY_KEY]).toBeUndefined();
     expect(written).not.toContain(CANARY_VALUE);

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 // Test-layer fake of Grok Build's single-turn JSON mode. It is reachable only
 // through the NODE_ENV=test guarded command seam (DR-115).
 const argumentList = process.argv.slice(2);
@@ -31,11 +33,30 @@ const ECHOED_ENVIRONMENT_KEYS = [
   "UNRELATED_SECRET"
 ];
 
+// W6 fix round 1 / F4 — the CREDENTIAL-SHAPE rule, stated identically in all six
+// members of the class: a key is credential-shaped when a SEGMENT of its name is
+// one of KEY, TOKEN, SECRET, PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL,
+// URI or DSN. A pattern over the NAME rather than an explicit list, because a
+// list maintained in six places silently misses the next maker's locator — which
+// is how this leak survived. Segment-anchored so HOME, PATH, TMPDIR, LANG, PWD
+// and OLDPWD, which the assertions need in clear, do not match. URL/URI/DSN are
+// included because a connection string such as DATABASE_URL embeds a password.
+// A credential-shaped key's VALUE is never emitted; presence and identity travel
+// as a truncated one-way digest. Full reasoning in `fake-claude-cli.mjs:44-58`.
+const CREDENTIAL_SHAPED_NAME =
+  /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;
+
+function echoedValue(key, value) {
+  return CREDENTIAL_SHAPED_NAME.test(key)
+    ? `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`
+    : value;
+}
+
 function echoedEnvironment() {
   const echoed = {};
   for (const key of ECHOED_ENVIRONMENT_KEYS) {
     const value = process.env[key];
-    if (value !== undefined) echoed[key] = value;
+    if (value !== undefined) echoed[key] = echoedValue(key, value);
   }
   return echoed;
 }

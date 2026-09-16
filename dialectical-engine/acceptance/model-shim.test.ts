@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isAbsolute, relative } from "node:path";
@@ -13,6 +14,16 @@ import {
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
 const fakeSessionsRoot = fileURLToPath(new URL("./test-fixtures/codex-sessions", import.meta.url));
 const handles: ModelShimHandle[] = [];
+
+/**
+ * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
+ * probe — it emits this one-way digest instead. Rule in
+ * `test-fixtures/fake-claude-cli.mjs:44-58`; restated rather than imported so a
+ * broken producer helper cannot be agreed with (TOOLING-TRAPS `:1320`).
+ */
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+}
 
 function relayHeaders(handle: ModelShimHandle): Readonly<Record<string, string>> {
   return { "content-type": "application/json", authorization: handle.authorizationHeader };
@@ -111,8 +122,18 @@ describe("ACC-01 model shim", () => {
     const probeScript = [
       'const { readdirSync, writeFileSync } = require("node:fs");',
       "const echoedEnvironmentKeys = ['CODEX_HOME','HOME','LANG','OLDPWD','OPENAI_API_KEY','PATH','PWD','TMPDIR','ANTHROPIC_API_KEY','DATABASE_URL','SSH_AUTH_SOCK','UNRELATED_SECRET','XAI_API_KEY'];",
+      // F4 — the CREDENTIAL-SHAPE rule, identical in all six members: a key is
+      // credential-shaped when a SEGMENT of its name is KEY, TOKEN, SECRET,
+      // PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL, URI or DSN, and such
+      // a key's VALUE is never emitted — only a truncated one-way digest of it.
+      // `OPENAI_API_KEY` matches, so the exact-set assertion below compares the
+      // digest of the sentinel it set; `CODEX_HOME` does not and stays in clear.
+      // Full reasoning in `test-fixtures/fake-claude-cli.mjs:44-58`.
+      "const { createHash } = require('node:crypto');",
+      "const credentialShapedName = /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;",
+      "const echoedValue = (key, value) => credentialShapedName.test(key) ? 'sha256:' + createHash('sha256').update(value).digest('hex').slice(0, 16) : value;",
       'const environment = {};',
-      'for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }',
+      "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = echoedValue(key, process.env[key]); }",
       // F3: the key NAMES restore the reach the allow-list removed — a name is
       // not a credential, a value is. Read by `:178-181`.
       'const environmentKeyNames = Object.keys(process.env).sort();',
@@ -158,7 +179,10 @@ describe("ACC-01 model shim", () => {
         HOME: "/tmp/relay-home-sentinel",
         LANG: "C.UTF-8",
         OLDPWD: probe.cwd,
-        OPENAI_API_KEY: "openai-test-sentinel",
+        // W6/F4: credential-shaped, so the probe emits a digest of the sentinel
+        // rather than the sentinel. `CODEX_HOME` above is a path, matches no
+        // credential segment, and stays in clear.
+        OPENAI_API_KEY: digestOf("openai-test-sentinel"),
         PATH: "/usr/bin:/bin",
         PWD: probe.cwd,
         TMPDIR: "/tmp"

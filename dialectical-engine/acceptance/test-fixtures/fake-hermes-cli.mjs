@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -27,11 +28,26 @@ const ECHOED_ENVIRONMENT_KEYS = [
   "OPENROUTER_API_KEY"
 ];
 
+// W6 fix round 1 / F4 — the CREDENTIAL-SHAPE rule, stated identically in all six
+// members of the class: a key is credential-shaped when a SEGMENT of its name is
+// one of KEY, TOKEN, SECRET, PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL,
+// URI or DSN. Segment-anchored matters here in particular: `HERMES_HOME` and
+// `HOME` are paths this suite `lstat`s and compares, and neither matches, while
+// `GLM_API_KEY` does. Full reasoning in `fake-claude-cli.mjs:44-58`.
+const CREDENTIAL_SHAPED_NAME =
+  /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;
+
+function echoedValue(key, value) {
+  return CREDENTIAL_SHAPED_NAME.test(key)
+    ? `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`
+    : value;
+}
+
 function echoedEnvironment() {
   const echoed = {};
   for (const key of ECHOED_ENVIRONMENT_KEYS) {
     const value = process.env[key];
-    if (value !== undefined) echoed[key] = value;
+    if (value !== undefined) echoed[key] = echoedValue(key, value);
   }
   return echoed;
 }

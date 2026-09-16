@@ -313,8 +313,17 @@ describe("P4-10 loopback relay authentication", () => {
       const script = [
         'const { writeFileSync } = require("node:fs");',
         "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','PATH','PWD','TMPDIR'];",
+        // F4 — the CREDENTIAL-SHAPE rule, carried identically by all six members
+        // of the class: a credential-shaped key's VALUE is never emitted, only a
+        // truncated one-way digest of it. None of the six keys this member may
+        // echo matches the pattern, so the rule never fires here TODAY — it is
+        // present so that widening the allow-list above cannot reintroduce the
+        // leak silently. Full reasoning in `test-fixtures/fake-claude-cli.mjs:44-58`.
+        "const { createHash } = require('node:crypto');",
+        "const credentialShapedName = /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;",
+        "const echoedValue = (key, value) => credentialShapedName.test(key) ? 'sha256:' + createHash('sha256').update(value).digest('hex').slice(0, 16) : value;",
         'const environment = {};',
-        'for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }',
+        "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = echoedValue(key, process.env[key]); }",
         // F3: this member's assertions name no key, so the allow-list alone left
         // nothing able to see a wrongly admitted one. The key NAMES restore that
         // at zero risk — a name is not a credential, a value is. Read by `:392-394`.

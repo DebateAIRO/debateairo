@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,16 @@ import {
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-grok-cli.mjs", import.meta.url));
 const handles: GrokRelayHandle[] = [];
 const temporaryDirectories: string[] = [];
+
+/**
+ * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
+ * fixture — it emits this one-way digest instead. Rule in
+ * `test-fixtures/fake-claude-cli.mjs:44-58`; restated rather than imported so a
+ * broken producer helper cannot be agreed with (TOOLING-TRAPS `:1320`).
+ */
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+}
 
 function posixQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
@@ -208,7 +219,10 @@ describe("GROK-01 Grok Build CLI relay", () => {
         PATH: "/usr/bin:/bin",
         PWD: expect.stringMatching(/[/\\]relay-xai-[^/\\]+$/),
         TMPDIR: "/tmp",
-        XAI_API_KEY: "xai-test-sentinel"
+        // W6/F4: credential-shaped, so the fixture emits a digest of the
+        // sentinel rather than the sentinel. Still fails if the relay passes a
+        // different value or none.
+        XAI_API_KEY: digestOf("xai-test-sentinel")
       });
       for (const key of [
         "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN",

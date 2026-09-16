@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -57,6 +58,16 @@ const corpus = JSON.parse(readFileSync(fileURLToPath(new URL(
 )), "utf8")) as CorpusSpec;
 const cases = new Map(corpus.cases.map((entry) => [entry.id, entry]));
 const handles: CliRelayHandle[] = [];
+
+/**
+ * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
+ * fixture — it emits this one-way digest instead. Rule in
+ * `test-fixtures/fake-claude-cli.mjs:44-58`; restated rather than imported so a
+ * broken producer helper cannot be agreed with (TOOLING-TRAPS `:1320`).
+ */
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+}
 const temporaryDirectories: string[] = [];
 const executedCaseIds = new Set<string>();
 const fakeClaudeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
@@ -91,8 +102,18 @@ async function startObservationRelay(
     "if (prompt.includes('SELECT p4_corpus_canary')) requestedCapabilities.push('DATABASE');",
     "if (prompt.includes('P4_OUTSIDE_SCRATCH_SENTINEL')) requestedCapabilities.push('FILESYSTEM');",
     "const echoedEnvironmentKeys = ['HOME','LANG','OLDPWD','P4_ALLOWED_MAKER_KEY','PATH','PWD','TMPDIR','ANTHROPIC_API_KEY','DATABASE_URL','OPENAI_API_KEY','SSH_AUTH_SOCK','UNRELATED_SECRET','XAI_API_KEY'];",
+    // F4 — the CREDENTIAL-SHAPE rule, identical in all six members: a key is
+    // credential-shaped when a SEGMENT of its name is KEY, TOKEN, SECRET,
+    // PASSWORD, PASSWD, OAUTH, AUTH, CREDENTIAL(S), URL, URI or DSN, and such a
+    // key's VALUE is never emitted — only a truncated one-way digest of it.
+    // `P4_ALLOWED_MAKER_KEY` matches, so SECRET-01's exact-set assertion below
+    // compares the digest of the sentinel it set. Full reasoning in
+    // `test-fixtures/fake-claude-cli.mjs:44-58`.
+    "const { createHash } = require('node:crypto');",
+    "const credentialShapedName = /(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|OAUTH|AUTH|CREDENTIAL|CREDENTIALS|URL|URI|DSN)(?:_|$)/u;",
+    "const echoedValue = (key, value) => credentialShapedName.test(key) ? 'sha256:' + createHash('sha256').update(value).digest('hex').slice(0, 16) : value;",
     "const environment = {};",
-    "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = process.env[key]; }",
+    "for (const key of echoedEnvironmentKeys) { if (process.env[key] !== undefined) environment[key] = echoedValue(key, process.env[key]); }",
     // F3: the key NAMES restore the reach the allow-list removed — a name is not
     // a credential, a value is — so a key the relay wrongly admits is still
     // caught. Read by `:445-453` (SECRET-01) and `:501-503` (DB-01).
@@ -437,7 +458,12 @@ describe("P4-13 approved adversarial relay corpus", () => {
         HOME: "/tmp/p4-corpus-home",
         LANG: "C.UTF-8",
         OLDPWD: expect.stringMatching(/[/\\]relay-p4-local-corpus-fixture-[^/\\]+$/),
-        P4_ALLOWED_MAKER_KEY: "P4_SENTINEL_ALLOWED_MAKER_KEY",
+        // W6/F4: credential-shaped, so the fixture emits a digest of the
+        // sentinel rather than the sentinel. SECRET-01's whole point is that an
+        // admitted maker locator reaches the child and nothing else does — the
+        // digest proves the same thing without writing the locator into content
+        // that `ledger.raw_artifact` persists.
+        P4_ALLOWED_MAKER_KEY: digestOf("P4_SENTINEL_ALLOWED_MAKER_KEY"),
         PATH: "/usr/bin:/bin",
         PWD: expect.stringMatching(/[/\\]relay-p4-local-corpus-fixture-[^/\\]+$/),
         TMPDIR: "/tmp"

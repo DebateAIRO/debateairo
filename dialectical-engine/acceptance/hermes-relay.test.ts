@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { afterEach,describe,expect,it } from "vitest";
@@ -10,6 +11,16 @@ import {
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-hermes-cli.mjs",import.meta.url));
 const handles: HermesSupportRelayHandle[] = [];
+
+/**
+ * W6 fix round 1 / F4: a credential-shaped key's VALUE is never echoed by the
+ * fixture — it emits this one-way digest instead. Rule in
+ * `test-fixtures/fake-claude-cli.mjs:44-58`; restated rather than imported so a
+ * broken producer helper cannot be agreed with (TOOLING-TRAPS `:1320`).
+ */
+function digestOf(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex").slice(0,16)}`;
+}
 
 async function start(): Promise<HermesSupportRelayHandle> {
   const handle = await startHermesSupportRelay({
@@ -64,7 +75,12 @@ describe("Support-only Hermes GLM relay",() => {
       format: "debateai.relay-messages.v1",
       messages: [{ role: "user",content: "Help me" }]
     });
-    expect(observed.environment.GLM_API_KEY).toBe("zai-test-only");
+    // W6/F4: `GLM_API_KEY` is credential-shaped, so the fixture emits a digest
+    // of the key the relay injected rather than the key. This still proves the
+    // relay passed THE configured GLM credential and nothing else. `HERMES_HOME`
+    // and `HOME` below are paths, match no credential segment, and stay in clear
+    // — the `lstat` on the next-but-four line depends on that.
+    expect(observed.environment.GLM_API_KEY).toBe(digestOf("zai-test-only"));
     expect(observed.environment.OPENROUTER_API_KEY).toBeUndefined();
     expect(observed.environment.HERMES_HOME).toMatch(/[/\\]relay-z-ai-[^/\\]+$/u);
     expect(observed.environment.HOME).toBe(observed.environment.HERMES_HOME);
