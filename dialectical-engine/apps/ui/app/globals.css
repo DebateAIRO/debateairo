@@ -497,7 +497,7 @@ select {
   border-color: var(--line-strong);
   background: var(--surface-1);
   color: var(--text);
-  box-shadow: 0 8px 20px -18px rgba(0,0,0,.8);
+  box-shadow: var(--shadow-card);
 }
 
 .supportTopicDiamond {
@@ -1018,7 +1018,7 @@ select {
   border: 1px solid var(--line-2);
   border-radius: 12px;
   background: var(--surface-1);
-  box-shadow: 0 12px 28px -26px rgba(0,0,0,.9);
+  box-shadow: var(--shadow-card);
 }
 
 .supportMetadata {
@@ -6732,7 +6732,7 @@ a:focus-visible {
   color: var(--muted);
   font-family: var(--font-sans);
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
@@ -7134,7 +7134,7 @@ a:focus-visible {
 }
 
 .drawerScrim[data-drawer-scrim] {
-  background: color-mix(in srgb, #0a0806 32%, transparent);
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
 }
 
 .drawer[data-drawer-panel] {
