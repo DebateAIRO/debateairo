@@ -16,6 +16,7 @@ import {
 } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { configureContentEncryption, RunRepository } from "@debateai/db";
+import { buildDevelopmentDeploymentRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import {
   RETIRED_DEV_HEADER,
   TEST_APP_ORIGIN,
@@ -311,6 +312,52 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(rosters).toEqual({
       free: ["free-register-a", "free-register-b"],
       premium: ["premium-register-a", "premium-register-b", "premium-register-c"]
+    });
+  });
+
+  // Property: the application accepts the discriminated row emitted by the production publisher,
+  // while projecting only the two public roster lists.
+  // Production break: parse the published value directly with the strict wire schema or leak its kind.
+  it("projects the plan-tier roster row exactly as the stack publishes it", async () => {
+    const publishedRow = buildDevelopmentDeploymentRegisterRows(
+      { requiredDistinctMakers: 1, configuredProviders: [] } as never,
+      {
+        free: ["free-published-a", "free-published-b"],
+        premium: ["premium-published-a", "premium-published-b", "premium-published-c"]
+      }
+    ).find(({ rowKey }) => rowKey === "planTierRosters");
+    if (publishedRow === undefined) throw new TypeError("Published planTierRosters row is missing");
+
+    const pool = {
+      query: async (statement: string) => {
+        if (statement.includes("FROM register.register_row")) {
+          return { rows: [{
+            row_key: publishedRow.rowKey,
+            value_json: publishedRow.value,
+            source_ref: publishedRow.sourceRef
+          }] };
+        }
+        if (statement.includes("FROM scorecard.scorecard_cell") ||
+          statement.includes("FROM identity.run_execution_binding")) {
+          return { rows: [] };
+        }
+        throw new Error(`UNEXPECTED_QUERY:${statement}`);
+      }
+    };
+    const application = new PostgresAskApplication(
+      pool as never,
+      { dispatch: async () => undefined },
+      admissionSettings({ registerVersion: 7 }),
+      undefined,
+      {} as never,
+      { server: {} as never, legacy: {} as never }
+    );
+
+    await expect(
+      application.readPlanTierRosters(USER_IDENTITY.authenticated.session)
+    ).resolves.toEqual({
+      free: ["free-published-a", "free-published-b"],
+      premium: ["premium-published-a", "premium-published-b", "premium-published-c"]
     });
   });
 

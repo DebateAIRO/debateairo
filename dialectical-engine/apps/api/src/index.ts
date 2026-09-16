@@ -1487,7 +1487,14 @@ export class PostgresAskApplication implements AskApplication {
   async readPlanTierRosters(session: Session): Promise<PlanTierRosters> {
     const deployment = await this.readDeployment(session);
     const row = deployment.register.rows.find(({ row_key }) => row_key === "planTierRosters");
-    return PlanTierRostersSchema.parse(row?.value);
+    const value = row?.value as Readonly<{
+      free?: unknown;
+      premium?: unknown;
+    }> | null | undefined;
+    return PlanTierRostersSchema.parse({
+      free: value?.free,
+      premium: value?.premium
+    });
   }
 
   async *events(runId: string, _session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown> {
