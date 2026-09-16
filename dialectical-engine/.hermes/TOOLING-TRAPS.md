@@ -3102,3 +3102,12 @@ The fixture's `DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 = 42b90bca…` at th
 
 ## The orchestrator never `claim`s a Codex seat's ticket — the seat claims for itself (2026-09-16, RULING 7)
 The DISPATCHED comment gives the CLAIM shape and the seat runs `hermes kanban claim`; an orchestrator claim leaves the seat's claim refused. `hermes kanban reclaim <t>` releases it. (Agent-tool Claude seats are the opposite: the orchestrator holds the lock and the pointer says "do not run claim".)
+
+## A relay flag for a real CLI proven only against a fake CLI is unproven — one real handshake before REV consumes it (2026-09-16, V's second TEST(S03) finding)
+- FIX-S03-p1-F1 (cd043907) made the grok relay pass the file's id as `--model grok-4.6-build`; every review measured it against the suite's fake CLI, which accepts any `--model`. grok 1.0.30 refuses it ("unknown model id" — its selectable ids are `grok-4.6`/`grok-4.5`; `grok-4.6-build` is the lineage it REPORTS), the panel drops the rejected relay silently (`Promise.allSettled`, no line for a `cli:` slot), and every S03 serve ran `PANEL_READY healthy=2` for a day until V's Premium Start was refused. The sibling of the privilege-blind trap below it: a fake that is more permissive than the real thing passes three passes. Rule: a charge that adds or changes what a relay asks a real CLI ships ONE real handshake frame on a port outside the no-touch list (`startGrokRelay`/`startClaudeRelay`/`startModelShim` as the panel calls them), and the suite's fake refuses what the real CLI refuses.
+
+## `packet-check.sh` runs under `zsh` — `bash packet-check.sh` dies at line 19 (2026-09-16, RULING 8)
+- Its shebang is `#!/bin/zsh`; the one-line `case … in *"(new"*) continue;; esac` is a bash syntax error. Run it as `zsh …/packet-check.sh <packet>` (or by path, executable). Same day: a seat's own commit renamed a parameter (`session` → `_session`) and staled the PREVIOUS ruling's quote of that signature; `reanchor-quotes.py` reports it MISSING (the text is gone, not moved) — that quote becomes prose naming the commit it stood at.
+
+## A watchdog's alternation must not match the packet the seat echoes — `codex.*error` fired on the ruling text (2026-09-16, RULING 8)
+- The Codex seat prints the packet section into its log; a ruling that names the codex relay and quotes a CLI error line matches `codex.*(error|ERROR)`. Filter on the handoff shape only (`^.{0,4}(READY|BLOCKED|CLAIM)[ :]`), exclude the previous READY by its ticket id, and let the pid's exit be the crash signal.

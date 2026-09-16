@@ -195,6 +195,12 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   superuser pool is privilege-blind, and three passes plus a re-check passed a route that fails 42501 on
   every real database (V's TEST(S03) finding, 2026-09-16: the roster route reused a read whose join the
   runtime role may not touch).
+  **A slice that changes what a relay asks a real CLI is measured once against the real CLI**: the
+  charge ships one real handshake frame (the panel's own `start<Cli>Relay` call, on a port outside the
+  no-touch list) and the suite's fake CLI refuses what the real one refuses — a fake more permissive
+  than the real thing is CLI-blind, the sibling of privilege-blind (V's second TEST(S03) finding,
+  2026-09-16: `--model grok-4.6-build` passed three passes against a fake that accepts any id; grok
+  1.0.30 refuses it, and the panel dropped the slot silently for a day).
 - Union the lens verdicts into `reviews/REV-<S>-p<r>-UNION.md`: PASS only when every lens passed.
   Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
 - REWORK → FIX(S) nodes split by FINDING surface — every file a finding needs to change sits in ONE node, and two nodes whose files overlap run one after the other; parallel only when disjoint (FIX-S01-p1 split a lock's semantics from its appearance and the fix landed on one side), every finding of the pass assigned,
