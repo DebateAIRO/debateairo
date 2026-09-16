@@ -37,6 +37,14 @@ const hooks = vi.hoisted(() => {
       };
       return [slots[index] as T, set] as const;
     },
+    // Client components reached by this walker may hold refs (the merge mounted
+    // SupportWidget, which holds three). A ref is one slot that survives re-renders,
+    // so it uses the same cursor discipline as useState and is cleared by reset().
+    useRef<T>(initial: T) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = { current: initial };
+      return slots[index] as { current: T };
+    },
     useEffect(effect: () => void | (() => void), dependencies?: readonly unknown[]) {
       const index = cursor++;
       const previous = slots[index] as readonly unknown[] | undefined;
@@ -57,6 +65,7 @@ const hooks = vi.hoisted(() => {
 vi.mock("react", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react")>()),
   useEffect: hooks.useEffect,
+  useRef: hooks.useRef,
   useState: hooks.useState
 }));
 vi.mock("next/navigation", () => ({
