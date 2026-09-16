@@ -101,3 +101,69 @@ was self-consistent while the real restart still drifted.
 - A test-only digest change would have left production drifting. The mutant that restored the two
   premium historical entries reproduced `REGISTER_PUBLICATION_SEAL_INVALID: historical replay drift`,
   proving the production constant is the decisive boundary.
+
+## RULING 5
+
+### Cause
+
+The V-49 generator stage was placed before `checkModelConfig`. That ordering made the generator the
+first parser of a broken `config/models.yaml`; its child-process diagnostic was captured, and the
+stack reduced the failure to `DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED`. The existing curated R22
+line was therefore unreachable even though generation still preceded the seed. This was a stage
+dependency error: validation owns operator-facing shape refusals, while generation owns only a
+validated file.
+
+N6 exposed a second loss at the producer boundary. `validateRoster` collapsed "fewer than two
+entries" and "repeated maker" into one aggregate class-5 branch. The branch carried only the tier,
+so the stack handler could not recover the repeated entry's model without reparsing or guessing.
+RULING 6 correctly widened the surface to the producer: the first entry whose maker is already seen
+now rides on `ModelConfigShapeError.model`; an undersized roster still carries no model and the
+renderer omits the model token.
+
+### Price
+
+- One consumed RULING 4 landing required another V-authorized product-truth pass and continuation.
+- The initial RULING 5 surface excluded the class-5 producer. The session stopped at a measured
+  blocker, then resumed under RULING 6; this cost one board round-trip and a repeated skill/packet
+  reading cycle.
+- Verification added a promoted 3-case acceptance detector, a 5-member class sweep, three focused
+  mutants with path-partitioned restores, the five C1 suites, three C3 runs, the 57-test database
+  pair, the 17-file integrated run, C4, route pins, and before/after typecheck—about 33 minutes,
+  mostly embedded PostgreSQL.
+- Typecheck found one new test-helper diagnostic after runtime tests were green. Two small helper
+  revisions were needed before the before/after diagnostic sets were byte-for-byte equal.
+
+### What nearly went wrong
+
+- Fixing N6 in the stack handler would have invented a model or duplicated YAML parsing. The BLOCKED
+  handoff forced the missing datum back to `packages/model-config/src/shape.ts`, where it belongs.
+- The reviewer's original step-7 probe recorded the defect but expected it. Promoting it required
+  changing the observable to `startDevelopmentAuthStack` and asserting the curated line plus a
+  never-called generator; copying it verbatim would have produced a misleading green detector.
+- A passing runtime suite could have hidden the `exactOptionalPropertyTypes` regression in the new
+  helper. The inherited-red typecheck must continue to be judged by diagnostic delta, not exit code.
+
+### Dead ends not to re-derive
+
+- Do not place contract generation ahead of model validation. The required order is validate →
+  generate → seed; generation still precedes every consumer of the compiled roster.
+- Do not surface captured generator stderr as the R22 remedy. Shape refusals already have one curated
+  owner, and duplicating its formatter creates two error contracts.
+- Do not print `model=undefined`, and do not assign the sole entry's model to an undersized roster.
+  Only a repeated-maker refusal has a specific refused entry.
+- Do not infer the repeated entry in `dev-auth-stack.ts`; `validateRoster` already has ordered entries
+  and maker identities and can name the first repeat deterministically.
+
+### What must improve
+
+1. Encode startup stages as a dependency table in the packet: validation before generation,
+   generation before seed, seed before publication/environment consumers. A prose example placed at
+   the wrong edge caused this regression.
+2. Promote acceptance probes before dispatch and make them assert the desired operator observable.
+   A measurement fixture that expects the defect is evidence for review, not a regression test.
+3. Build allowed lists from the full data path. When a handler prints `error.model`, packet-check
+   should trace that field to every constructor before freezing the worker surface.
+4. Make packet-check run `pnpm typecheck` against the proposed test diff as well as runtime suites;
+   exact-optional mismatches are cheap to catch before the heavy database matrix.
+5. Preserve a reusable stage-order fixture whose mutant moves generation ahead of validation. That
+   single detector should become part of C3 so future startup-stage additions cannot mask R22 again.
