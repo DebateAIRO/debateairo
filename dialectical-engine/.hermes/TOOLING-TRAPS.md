@@ -5410,3 +5410,72 @@ not in 4 000 lines of prose every author skims.
   not a stale copy.
 - **Rule: a probe that reconstructs its subject asserts something it can only satisfy when the
   reconstruction WORKED (`:4787`), in the same test, before any absence assertion is believed.**
+
+## An unanchored `perl -0pi` pattern matches the TAIL of a deeper indent (2026-09-16, FIX(CONT-T16) round 1)
+- Adding one field to several echo type declarations: the 8-space sites were patched with
+  `s/        environment: Readonly<...>;\n/...\n        environmentKeyNames: ...;\n/g`, then the
+  6-space sites with the same pattern at 6 spaces. The second run matched the **last six spaces of
+  the eight-space line it had just patched**, so `claude-relay.test.ts` — the one file carrying both
+  indents — got the field twice, at two different indents, inside one type literal.
+- It compiles far enough to look fine in a diff hunk and `tsc` reports a duplicate-property error
+  only if the file is typechecked; a seat that runs vitest first sees a normal-looking collection
+  error instead.
+- **Rule: a `perl` replacement whose pattern is leading whitespace must anchor it — `^` with `/m`,
+  or match the line's first non-space token. When the same edit lands at two indents in one file,
+  do the deeper indent LAST, or do them with a single pattern that captures the indent
+  (`s/^(\s*)environment: .../$1environment: ...\n$1environmentKeyNames: .../mg`).**
+
+## A `grep -c` that counts ZERO exits 1 and kills the `&&` chain behind it — live instance (2026-09-16, FIX(CONT-T16) round 1)
+- The round's own verification line was
+  `git diff --summary <base>..HEAD | grep -c "mode change" && git log ... && git status --porcelain`.
+  The count was `0` — the required answer — and the command still exited 1, so the commit list and
+  the tree check never ran.
+- This is `:2150` firing on a *success* condition, which is the part that makes it dangerous: the
+  chain dies precisely when the thing you were checking for is ABSENT, i.e. when everything is fine.
+- **Rule: a diagnostic script separates its steps with `;`, never `&&`. If a count must gate
+  something, capture it first (`n=$(… | grep -c …  || true)`) and test the variable.**
+
+## RED-first against a field that does not exist yet needs a LABELLED assertion, or the frame describes the plumbing (2026-09-16, FIX(CONT-T16) round 1)
+- Refines `:5161` ("a MISSING-SYMBOL red is not the defect's red") with the cheap remedy. Asserting
+  `expect(echo.environmentKeyNames).toContain(KEY)` on a member that does not emit the field yet
+  produced: `AssertionError: the given combination of arguments (undefined and string) is invalid
+  for this assertion` — six times, naming nothing about the owed emission.
+- Adding `expect(value, "member must emit environmentKeyNames (F3)").toBeInstanceOf(Array)` in front
+  turned every frame into `member must emit environmentKeyNames (F3): expected undefined to be an
+  instance of Array`. Same RED, now self-describing, and it stays useful as a regression frame.
+- **Rule: when the owed change is a NEW EMISSION, the first assertion about it carries vitest's
+  message argument naming the field and the finding. A missing field IS the defect there, so the
+  frame must say so rather than describing the matcher that choked.**
+
+## A fixture generated inside a test file can be a TEMPLATE LITERAL, and no quote-aware regex can read it (2026-09-16, FIX(CONT-T16) round 1)
+- Task 16 extracted one inline fixture by matching double-quoted literals and `JSON.parse`ing each.
+  Fix round 1 needed two more, and they are not the same shape:
+  `model-shim.test.ts` uses SINGLE-quoted literals containing double quotes (so the double-quote
+  regex matches `"node:fs"` — the wrong span), and `relay-core.test.ts` interpolates a path into a
+  TEMPLATE literal, which no quote regex can resolve at all.
+- What works for all three uniformly: slice the region between `const <name> = [` and `].join(`, then
+  build it with `new Function(...freeIdentifierNames, "return [" + body + "].join(\"\");")` and call
+  it with the bindings. One extractor, three shapes, no copy of the product's script.
+- Guard it exactly as before: a positive control in the same test — an admitted key must come back
+  with its exact value — so a mis-sliced or empty region cannot read as green. Verified from the
+  other side too: mutating the region turned that case and only that case RED, which is what proves
+  the harness runs the product's script rather than a stale copy.
+- **Rule: extraction by regex is a bet on the quoting style a future author will use. Evaluating the
+  array expression is not, and the positive control is what makes evaluating it safe to trust.**
+
+## A security remedy that removes a VALUE must keep the assertion that pinned it, not delete it (2026-09-16, FIX(CONT-T16) round 1)
+- The third and last shape of the W6 remedy. The allow-list stopped unnamed variables; it could not
+  stop `ANTHROPIC_API_KEY`, because `claude-relay.test.ts` pinned that key's exact VALUE and the
+  fixture had to echo it to satisfy the pin. Deleting the pin would have removed the only evidence
+  that the relay passes the right credential.
+- A truncated one-way digest keeps both: `sha256:<16 hex>` of the value is emitted, the assertion
+  compares the digest of the sentinel it set, and the assertion still fails on a wrong value or a
+  missing one. The value itself never leaves the child.
+- Two details that make it honest rather than decorative: (a) the consumer RESTATES the digest
+  instead of importing the producer's helper — an assertion computed with the producer's own code
+  agrees with a broken producer (`:1320`); (b) which names count is a SEGMENT-anchored pattern over
+  the key name, not a list, because a list maintained in six places silently misses the next maker's
+  locator — which is how the original leak survived.
+- **Rule: when a value must stop being emitted, ask what the assertion that reads it was proving,
+  and find the one-way representation that still proves it. "Delete the assertion" and "keep the
+  leak" are both wrong answers, and they are the only two on offer if the question is not asked.**

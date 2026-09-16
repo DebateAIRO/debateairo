@@ -184,3 +184,144 @@ at tip. Full frames and the per-key justification table are in the SDD report,
 report and in every frame I pasted is the canary `canary-9c1e`, which I created. The child
 environments in the new test are constructed literally, not inherited, so no ambient value could
 enter a failure frame.**
+
+---
+
+# Fix round 1 — the same murder, two rooms further in
+
+commits `d6817a8c` (F1/F2) · `f9860eee` (F3) · `6417171a` (F4) · `fd83b25b` (T11 collateral)
+base for this round `52e2cbf2` · gate 8 files, 87/87, three runs
+
+## 1. What the first round got wrong, stated plainly
+
+**I closed two-thirds of a class and called the remaining third a finding.** That was inside my
+contract and it was the correct move for the contract I had — but it is worth being precise about
+what it cost: the orchestrator had to spend a review round handing back scope I had already
+identified, described and priced. F1 and F2 were in my own §5 with file:line. The remedy was
+obvious. The only thing standing between the finding and the fix was a write surface.
+
+**More seriously: I filed F3 and F4 as "concerns" when they were defects.** F3 said the exact-set
+assertions had lost reach — I even proposed the remedy (emit the key names) and declined to build it
+because it was a new emission outside my surface. F4 said the residual credential echo was
+"precisely the half V's key rotation owns". Both framings are technically true and both are wrong in
+the way that matters: **a security fix that leaves the original leak reachable is not finished, and a
+fix that converts eight live assertions into a narrower instrument has a debt to pay before it ships,
+not after.** The coordinator adopted both of my own proposals as outcomes. I had the answers and
+filed them as someone else's problem.
+
+The thing to learn is not "be braver about scope". It is: **when the remedy you are declining is one
+you can already describe in a sentence, that is a signal the packet is under-scoped, and the honest
+move is to say so in the handoff as a packet defect** — which I did not do. I listed them as
+findings under my own work, which reads as "known limitation" rather than "this ticket is not done".
+
+## 2. What this round cost, priced
+
+| Cost | Cause | Price |
+|---|---|---|
+| **Re-measuring citations four times** | Every insert shifts every line number below it, and I write `file:line` citations into comments as documentation. Four edit passes over eight files meant four rounds of re-grep-and-correct. | ~6 measurement greps + 4 correction passes — the single largest overhead of the round |
+| **An unanchored `perl` pattern** | Patching two indent depths with two patterns; the 6-space pattern matched the tail of the 8-space line it had just patched, duplicating a field inside one type literal. Caught by reading the grep output, not by a gate. | one debug cycle, no rework |
+| **`grep -c` returning 0 killed my verification chain** | `:2150`, firing on the SUCCESS condition — the mode-change count was 0, which is what was required, and the `&&` chain died exactly because the answer was good. | one re-run |
+| **A weak first RED** | `toContain(undefined)` described the matcher, not the missing emission. Re-ran RED with a labelled assertion. | one extra RED run, and it was worth it |
+| **Reader discovery by running, not by reading** | For F4 I did not enumerate the five value-pinning assertions by hand; I changed the producer and let the suites name them. | ~10 s of suite time, and it was the CHEAPEST step of the round |
+
+That last row is the one to generalise. See §4.
+
+## 3. What I nearly got wrong this round
+
+1. **I nearly pinned an exact key-name set in `hermes-relay.test.ts` and `relay-core.test.ts`.** Both
+   suites inherit `HOME`/`PATH`/`TMPDIR`/`LANG` from the operator's shell — the trap the DB-01
+   comment in `adversarial-corpus.test.ts` already records from the other direction. An exact set
+   there passes on my shell and fails on a colleague's. Refusing the COMPLEMENT is host-independent
+   and still catches a leak. Two of six assertions had to be a different shape than the other four,
+   and noticing that was the difference between a gate and a flake.
+2. **I nearly digested `HERMES_HOME`.** An early draft of the credential pattern used substring
+   matching. `HERMES_HOME` contains no credential word, but a sloppier list (`HOME` → no, but
+   `AUTH` as a substring catches `SSH_AUTH_SOCK` either way) makes it easy to drift into matching
+   paths. `hermes-relay.test.ts` `lstat`s that value — digesting it would have turned a real
+   filesystem assertion into a comparison of two hashes that both exist. Segment-anchoring is not a
+   style choice; it is what keeps paths readable.
+3. **I nearly let the relay-core member carry the credential rule silently as dead code.** It has no
+   credential-shaped key today, so the rule never fires. Writing "F4 is vacuous here and that is a
+   measurement, not an omission" into the test is what stops the next reader deleting it as unused.
+
+## 4. Upgrades — sharper than round 0's, because this round tested them
+
+1. **Let the SUITES enumerate the readers.** Round 0's `WHO-READS-THIS-STRING` is a grep, and it is
+   good at names. It is bad at semantics: it cannot tell "reads the field" from "pins the field's
+   value". For F4 I changed the producer first and read the five failures. That found the exact
+   five, with zero false positives, in ten seconds — and it is the only method that cannot miss one.
+   **Proposal: for any change to what a double EMITS, the reader sweep is "mutate the producer, run
+   the widest suite, list the failures", and the grep is the cross-check, not the primary.** It would
+   have caught the Task 11 collateral (§5) at the time, because that suite fails the moment the field
+   is removed — nobody ran it.
+2. **Citations in comments need a line-free form.** I wrote ~20 `file:line` citations this round and
+   re-measured them four times. Every one of them is a measurement with an expiry (`:5045`). A
+   citation by TEST NAME or by a stable anchor string (`— see the SECRET-01 exact-set assertion`)
+   costs nothing to maintain and never rots. **Proposal: cite by name; use a line number only when
+   nothing nameable exists.** I would have saved the largest single cost of this round.
+3. **Ship the run-logger as a tool.** I fixed my own `×`-oracle bug from round 0 in this round's copy
+   of the script — and then hit `:2150` in a hand-written chain ten minutes later. Both are solved
+   problems with recorded traps; both cost me time anyway, because every seat writes this scaffolding
+   fresh. One `tools/gate.sh` retires five trap families permanently.
+4. **A fix round should get the finding's OWNER, not just its text.** This round's brief was
+   excellent in one specific way: it converted each of my findings into an OUTCOME and left the
+   mechanism to me. That is the right contract and it is why the round was fast. The thing that would
+   make it faster still is the previous round handing over the write surface the finding implies —
+   F1/F2 needed two files I had named, at lines I had named.
+
+## 5. The Task 11 collateral — the part that should worry someone
+
+DELIM-01 was red since `abb6b21b` (W7 / V-BLIND-CONTEXT), not since this mission's base. I reported
+it as "pre-existing at `f0f9eeb2`", which was literally true — I measured it by ablation — and which
+**hid the real fact**: a mission commit broke a suite and nobody noticed for five days.
+
+Why nobody noticed: Task 11's reader sweep found the tests that call the Judge directly.
+`adversarial-corpus.test.ts` reads the same review packet through a CLI fixture and a local HTTP
+relay, so a grep over Judge call sites cannot see it. **The field `author_maker` appears in that
+file, and a grep for the literal WOULD have found it** — the sweep was scoped to callers, not to the
+string. That is the same generating condition as W6 itself: a class scoped by the wrong axis.
+
+And the honest self-criticism: I had the evidence in hand. I ran the ablation, saw an identical red
+at base, and stopped — because "pre-existing" discharged my duty. The question I did not ask is
+*when did this start*, which is one `git log -S` away and would have named `abb6b21b` in seconds.
+**"Not mine" is a much weaker claim than "here is whose it is", and it costs about a minute to
+upgrade.**
+
+## 6. Where this round's brief was exactly right, and where it was not
+
+- **Right, and worth copying:** every finding restated as an OUTCOME with the mechanism left to me;
+  the contract additions naming the files rather than the edits; "if a suggested step proves
+  impossible, reach the outcome another way and report it" — which I needed, see below; the explicit
+  verification ORDER, which caught that both typechecks are 0 before any edit and so the post-edit 0
+  means something.
+- **One suggested step was impossible as written.** The brief says to extend the canary suite with
+  a case per new member, "the relay-core one reads its file back, so the probe asserts on the file's
+  content". Reading the file back is exactly right and that is what the case does. But reaching the
+  file requires RUNNING that member's script, and that script is a TEMPLATE LITERAL with a path
+  interpolated into it — the double-quote regex Task 16 used cannot read it, and neither can any
+  quote-aware regex. Outcome reached another way: the extractor now evaluates the array region with
+  its free identifiers bound, which handles all three inline shapes uniformly. Recorded in
+  TOOLING-TRAPS.
+- **One number in the brief needed re-measuring, not correcting:** the F3 assertion sites are given
+  as `claude-relay.test.ts:227-240`, `grok-relay.test.ts:201-211`,
+  `adversarial-corpus.test.ts:429-438`. All three were correct at `52e2cbf2` and all three moved as
+  soon as I edited above them. That is not a defect in the brief; it is the citation-rot problem in
+  §4.2, arriving from the other side.
+
+## 7. Verification
+
+RED frames, all four findings, each measured before its fix:
+  F1/F2 — `Tests 2 failed | 4 passed (6)`, the two new members, `expected 'canary-9c1e' to be undefined`
+  F3    — `Tests 6 failed (6)`, every member, `member must emit environmentKeyNames (F3): expected undefined to be an instance of Array`
+  F4    — `Tests 5 failed | 1 passed (6)`, `<KEY> must be emitted as a digest, never its value (F4): expected 'canary-c8e1' to be 'sha256:17be29202c5ecfde'`; the one pass is relay-core, where the rule is vacuous
+  T11   — `AssertionError: expected { …(2) } to deeply equal { …(2) }`, the `author_maker` field
+Mutants: 3 of 3 killed, two of them at BOTH layers (canary suite and the restored consumer reach).
+Gate: three runs, `testResults.length` 8, 87 passed / 0 failed each time. Worst run 87/87.
+Typechecks: root 0 and `acceptance/tsconfig.json` 0, before any edit and after the last commit.
+Class sweep: `grep -rn 'environment: process.env' acceptance` → zero hits. The class is CLOSED.
+`git diff --summary 52e2cbf2..HEAD | grep -c "mode change"` → 0. Tree clean.
+
+**No credential value was read, echoed or reproduced. The three canaries — `canary-9c1e`,
+`canary-b7d3`, `canary-c8e1` — are strings I minted, and they are the only secret-shaped strings in
+this report or in any frame I pasted. Every child environment in the canary suite is built
+literally, so no ambient value can enter a failure frame.**
