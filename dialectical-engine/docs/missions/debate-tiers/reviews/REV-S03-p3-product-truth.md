@@ -340,3 +340,154 @@ VERDICT: fix the pipeline / CONFIDENCE medium-high / STRONGEST COUNTER: the gene
   should be closed as "no". I could not measure the live consequence: step 10b is
   provider-gated on V-34 and I ran no stack.
 ```
+
+---
+
+# Re-check — 2026-09-16, single-finding re-check node (ticket `t_909dbfe1`), lens product-truth
+
+**My PASS above CHANGES to REWORK (pass 3).** Sections 1–8 stand exactly as written and are not
+reopened; this section supersedes only the verdict line. I read comments through 1 and never saw the
+orchestrator's two notes on `t_08142adf` (posted 12:47/12:50 and 12:53) — **that is my error, not the
+packet's**: COMMON §2 requires every marker to carry `comments read through: <n>`, and mine honestly
+recorded 1 while two notes sat unread. Comments read through: 5.
+
+## What I was asked
+
+Price **N13** (`t_9a808054`) and **N14** (`t_6b9ca826`) from this lens: is SPEC-v3 **R32** ("the
+restart completes") unmet on a merge-day database/custody **BLOCKING** for the slice at `3f488b3f`?
+The orchestrator measured both on V's LIVE dev database and a custody copy (both no-touch for me);
+the security lens ruled both are integrity guards refusing **correctly** and flagged them
+**blocking through product-truth**. I verified the MECHANISM statically at `3f488b3f` in my own
+worktree and re-read the SPEC.
+
+## Verdict: BLOCKING for the slice
+
+### The frame — the SPEC lines
+
+**R32** (`SPEC-v3-section-1-requirements.md:267-272`), titled *"The post-merge start on a machine
+with no keys"* — this is the merge-day requirement, verbatim in the two clauses that decide it:
+
+> `pnpm dev:auth:up` starts the stack: … `/new` lists both tiers from the file …
+> **The dev stack does not become un-startable for anyone but V.**
+
+(That last clause reads awkwardly; the only sensible construction in a mission with one human is
+"S03 must not make the stack un-startable". I note the ambiguity rather than lean on it — **the
+finding rests on R32's main clause, `pnpm dev:auth:up` starts the stack**, which is measured to
+fail, and no reading of the trailing clause rescues it.)
+
+And **SPEC-v3 §2 acceptance steps 6, 7, 8, 9 and 10 each name that same command or "restart"** —
+five of the eleven steps, including every step that exercises S03's central promise (edit the file,
+restart, see the new lists).
+
+### The frame — the code lines I re-read at `3f488b3f`
+
+1. `apps/runner/src/dev-deployment-register.ts:334-352` — `buildDevelopmentDeploymentRegisterRows`
+   returns `planTierRosters` **inside the row set**, alongside `configuredProviderSet` and the static
+   rows. S03 added a row to the **historical bootstrap row set**.
+2. `:708-716` — `seedDevelopmentDeploymentRegister` builds publication rows from that **current** set
+   and hands them to `importHistorical({ registerVersion: 4, rows })`. It replays the sealed v4 with
+   today's rows.
+3. `:644-650` — **the product's own comment says this is the wrong door**: *"The historical bootstrap
+   (versions 1-4) … is sealed: `register.register_row` rejects UPDATE and DELETE outright, and the
+   historical import is capped at version 4 in both TypeScript and SQL. So a deployment that grows a
+   provider … supersedes the old set by publication"* — i.e. growth goes through
+   `publishDevelopmentDeploymentRegisterProviderSet` (`:651-689`), not through the seed.
+4. `packages/register/src/register-publication.ts:782` — the seed's path reaches
+   `register.import_historical_register_version(...)`, which raises
+   `REGISTER_PUBLICATION_SEAL_INVALID` (surfaced at `packages/register/src/index.ts:494`).
+5. `apps/runner/src/dev-auth-data-plane.ts:373-383` — `seedRegister()` runs `dev:auth:seed-register`
+   and raises `DEV_AUTH_DATA_PLANE_REGISTER_FAILED`; it runs **before** any publication, so the
+   supersede-by-publication path the comment prescribes is never reached by `dev:auth:up`.
+6. N14: `apps/runner/src/dev-api-environment.ts:269-273` — an **existing** api.env that is neither
+   byte-identical nor an accepted transition throws `DEV_API_ENVIRONMENT_DRIFT`; a **missing** file is
+   written fresh (the `existing !== undefined` guard at `:269`). The S03 panel transition is not among
+   the accepted predicates (`:312`, `:344`, `:399`).
+
+**Every pass-1, pass-2 and pass-3 measurement — mine included — ran on fresh embedded postgres,
+where a pre-S03 seal cannot exist.** That is precisely why three passes of three lenses missed it.
+
+### Why it is BLOCKING *from this lens* — and it lands on my own §6
+
+My packet's bar is *"blocking only if S03's own promise is unmet at `3f488b3f`"*. It is, and the
+chain ends inside a measurement I already made this session:
+
+- If the seed refuses, the `planTierRosters` row is **never published** on V's database.
+- `readPlanTierRosters` (`apps/api/src/index.ts:1536-1547`) then finds no row.
+- **My own pass-3 probe case 7 measured exactly that state** (§3, "recorded, not predicted"):
+  `[PROBE p3] row ABSENT -> status=500 body={"error":"INTERNAL_ERROR","correlation_id":"…"}` — and
+  P2's fault case renders `ids=[]` under `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: INTERNAL_ERROR`.
+
+**So on V's merge-day database, `/new` lists ZERO model ids — B1's exact user-visible symptom,
+restored by a different mechanism.** Acceptance step 2 fails on the only database that exists on
+merge day, and steps 6–10 cannot be run at all.
+
+**My §6 named this tail and called it UNVERIFIED** — *"V's live register row … I proved the
+publisher's output and the reader's acceptance of it; I never read the bytes in V's DB."* The
+orchestrator has now measured that tail, and it fails. My PASS was sound on its evidence and wrong in
+its conclusion the moment the evidence arrived. **A green measured only on a fresh database is not a
+measurement of the product's merge-day behaviour** — that is the lesson, and it is the same shape as
+pass-2 B1 (a suite that only ever exercises a state the product cannot reach), one layer further out.
+
+### The remedy does NOT weaken either guard
+
+I agree with the security lens without reservation: **never lift the v4 seal cap, never widen the
+api.env predicates.** Both guards did their job; they are the only reason this was caught at all.
+
+- **N13 — a code defect in S03, with the remedy written in the product's own comment.** Take
+  `planTierRosters` **out of the sealed historical v4 row set** and let it enter by **publication**
+  (`publishDevelopmentDeploymentRegisterProviderSet`), exactly as `:644-650` prescribes for a grown
+  row set. The seal stays intact, a fresh database is unaffected, and an existing database gains the
+  row as a new version instead of being asked to re-seal history. The regression test must build a
+  **pre-S03 sealed v4** and then run the seed — the producer law again: the defect is invisible to
+  any test that seeds from today's row set.
+- **N14 — a SPEC/procedure gap, not a code defect.** Because the predicates must not be widened, the
+  honest fix is that SPEC-v3 §2 names the one-time custody step (move the pre-S03 `api.env` aside, or
+  a `dev:auth:` command that does it) before step 1. Without it, R32's "starts the stack" is false on
+  any custody carrying a pre-S03 api.env, and the operator is left to discover a hand step the SPEC
+  never mentions.
+
+Both are the **same class**: *S03 changed an artefact that an existing installation has already
+sealed or written, and no acceptance step or test exercises an installation that predates S03.*
+
+### Confidence and the strongest counter
+
+VERDICT **blocking** · CONFIDENCE **high** on the mechanism (I re-read all six code sites at
+`3f488b3f` and the seal's SQL entry point; the SPEC lines are verbatim), **and I did not re-measure
+the live failure** — the database and the custody are no-touch for me, so the live reproduction stays
+the orchestrator's measurement, cited, not mine. **STRONGEST COUNTER:** *"the orchestrator already
+served the merged tree by publishing the new version with the product's own publish command, so V can
+test today."* True, and it is why this is a V row rather than a stop-everything — but it is a
+hand-operated step outside the SPEC that **does not survive the next `dev:auth:up`**, and steps 6, 7,
+9 and 10 each re-run that command. A slice whose acceptance procedure cannot be executed twice in a
+row on V's machine has not met R32.
+
+## Row for V (replaces nothing in §8; this is the second row from this lens)
+
+```
+V-ROW: NEW · S03 · `pnpm dev:auth:up` — the command SPEC-v3 §2 steps 6-10 name — cannot run
+  on any dev database or custody that predates S03, so R32 ("the post-merge start") is unmet
+  and /new lists zero ids on V's actual machine
+Recommended default: a FIX inside S03 before merge, on the S03 side only, not on the guards.
+  Move the `planTierRosters` row out of the sealed historical v4 set and let it arrive by
+  publication (publishDevelopmentDeploymentRegisterProviderSet), which is what the product's
+  own comment at dev-deployment-register.ts:644-650 says growth must do; and add the one-time
+  custody step for a pre-S03 api.env to SPEC-v3 §2. Do NOT lift the v4 seal cap and do NOT
+  widen the api.env transition predicates — both guards refused correctly and are the only
+  reason this surfaced.
+Smallest yes/no for V: "Fix the pre-S03 database/custody start inside S03 before merge — yes?
+  (no = merge with `pnpm dev:auth:up` failing on your existing database, /new listing zero
+  model ids there, and acceptance steps 2 and 6-10 runnable only after a hand-published
+  register version that the next restart undoes)"
+VERDICT: fix inside S03 / CONFIDENCE high on the mechanism, the live failure cited from the
+  orchestrator's measurement and UNVERIFIED by me / STRONGEST COUNTER: every other thing this
+  slice promises is verified and green, including the whole of B1's remedy which I re-proved
+  end-to-end this pass; the remedy here touches one row's publication path, not the read path;
+  so if V wants the backend landed today, a follow-up slice plus a documented one-time
+  migration is defensible — the price is that R32 is false until it lands, and R32 is the
+  requirement that says the dev stack must not become un-startable.
+```
+
+**Verdict for this lens, final: REWORK (pass 3).** Pass 3 is the last lawful pass, so this is a V
+DECISIONS PACKET row, not a fourth pass. Everything in §1–§8 above stands: B1 is genuinely fixed, the
+wire is exactly the two lists, and the page renders the file's five ids — **on a database where the
+row exists.** Making that true on V's database is what remains.

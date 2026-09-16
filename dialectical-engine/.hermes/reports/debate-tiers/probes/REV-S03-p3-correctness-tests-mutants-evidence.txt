@@ -1,0 +1,60 @@
+worktree: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/rev-s03-p3-correctness-tests/dialectical-engine
+HEAD: 3f488b3f
+written against head: 3f488b3f
+porcelain before (excluding this seat's probe): 0 entries
+
+=== MUTANT A-reader-pre-f1 — revert the reader to the pre-F1 whole-row parse: re-derives the RED the F1 handoff claims at cd043907 — the joining case must fail on the published `kind`
+    file apps/api/src/index.ts · literal occurrences: 1
+    applied: sha ddbbeb3a -> 43012a29 (changed: True)
+    rc=1
+    Test Files  2 failed | 4 passed (6)
+    Tests  6 failed | 79 passed (85)
+    × tests/unit/api.test.ts > Fastify sole facade / FX-WIRE-03 > projects the plan-tier roster row exactly as the stack publishes it 7ms
+    × tests/unit/REV-S03-p3-correctness-tests-probe.test.ts > REV-S03-p3 correctness — what the reader-side projection stopped refusing > Y1 records, shape by shape
+    × tests/unit/REV-S03-p3-correctness-tests-probe.test.ts > REV-S03-p3 correctness — what the reader-side projection stopped refusing > Y2 serves a row whose disc
+    × tests/unit/REV-S03-p3-correctness-tests-probe.test.ts > REV-S03-p3 correctness — what the reader-side projection stopped refusing > Y3 drops any extra top-lev
+    × tests/unit/REV-S03-p3-correctness-tests-probe.test.ts > REV-S03-p3 correctness — what the reader-side projection stopped refusing > Y4 preserves the published
+    × tests/unit/REV-S03-p3-correctness-tests-probe.test.ts > REV-S03-p3 correctness — what the reader-side projection stopped refusing > Y6 a real own __proto__ me
+    log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/seats/REV-S03-p3-correctness-tests/mutant-A-reader-pre-f1.log
+    restored: sha ddbbeb3a · matches original: True
+
+=== MUTANT B-publisher-rowkey — rename the PUBLISHER's row key: the joining case must break, which proves it is built from the publisher's shape and not from a hand-written row
+    file apps/runner/src/dev-deployment-register.ts · literal occurrences: 1
+    applied: sha ed2878ff -> 0f984740 (changed: True)
+    rc=1
+    Test Files  1 failed | 4 passed (5)
+    Tests  1 failed | 78 passed (79)
+    × tests/unit/api.test.ts > Fastify sole facade / FX-WIRE-03 > projects the plan-tier roster row exactly as the stack publishes it 4ms
+    log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/seats/REV-S03-p3-correctness-tests/mutant-B-publisher-rowkey.log
+    restored: sha ed2878ff · matches original: True
+
+=== MUTANT C-publisher-kind — corrupt the PUBLISHER's discriminant: does any suite of record notice?
+    file apps/runner/src/dev-deployment-register.ts · literal occurrences: 1
+    applied: sha ed2878ff -> 9a0e17e3 (changed: True)
+    rc=1
+    Test Files  1 failed | 4 passed (5)
+    Tests  1 failed | 78 passed (79)
+    × tests/architecture/tiers-s02-rosters.test.ts > S02 tier roster architecture > keeps plan-tier roster selection in server production files only 35ms
+    log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/seats/REV-S03-p3-correctness-tests/mutant-C-publisher-kind.log
+    restored: sha ed2878ff · matches original: True
+
+=== MUTANT D-drift-s03-row — drift S03's OWN policy row at the merged head: is the drift detector alive?
+    file apps/api/src/index.ts · literal occurrences: 1
+    applied: sha ddbbeb3a -> d12ee5d2 (changed: True)
+    rc=1
+    Test Files  1 failed | 1 passed (2)
+    Tests  1 failed | 40 passed (41)
+    × tests/unit/s7-authorization.test.ts > S7 deny-by-default authorization > keeps one complete, duplicate-free policy row per contract route 5ms
+    log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/seats/REV-S03-p3-correctness-tests/mutant-D-drift-s03-row.log
+    restored: sha ddbbeb3a · matches original: True
+
+=== MUTANT E-supply-obs-pair — add the inherited obs pair to contractInventory AND the expected matrix: isolates the cause of the RED at this head
+    packages/contract/src/index.ts · occurrences: 1
+    tests/unit/s7-authorization.test.ts · occurrences: 1
+    rc=0
+    Test Files  2 passed (2)
+    Tests  41 passed (41)
+    log=/private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/96555a10-dafb-468d-88b3-f6c3afd4c825/scratchpad/seats/REV-S03-p3-correctness-tests/mutant-E-supply-obs-pair.log
+    restored both files; porcelain now: 0 entries
+
+porcelain after all mutants (excluding this seat's probe): 0 entries
