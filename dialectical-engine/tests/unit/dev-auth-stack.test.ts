@@ -502,10 +502,19 @@ describe("F-DEV-TLS-DOUBLE-WRAP the front door wraps a cause exactly once", () =
       .toBe("DEV_TLS_FRONT_DOOR_CLEANUP_FAILED:DEV_TLS_LISTEN_FAILED");
   });
 
-  // The neighbouring control: a front-door error the ternary passes through UNWRAPPED must
-  // still carry no cause at all. A "fix" that made the constructor stop wrapping, or that
-  // attached a cause everywhere, would also satisfy the two rows above.
-  it("leaves a DevTlsFrontDoorError raised by startFrontDoor untouched, with no cause", async () => {
+  // The neighbouring control, named for what it EXECUTES. F-DIAG-TAIL-N (codex diag-tail r1
+  // N1): this row's earlier name and comment claimed a front-door error raised by
+  // `startFrontDoor` and passed through the ternary UNWRAPPED. It never reaches that branch.
+  // `tlsReadinessOperations` above supplies the DEFAULT, SUCCEEDING `startFrontDoor` (:444-445)
+  // and is overridden here only on `probePublicUi`, so nothing is raised at start; the error
+  // asserted below is the readiness timeout raised after the probe budget is spent, which is
+  // why its message is DEV_TLS_PUBLIC_READINESS_TIMEOUT and not a start code.
+  // What it still controls for, and why it belongs beside the two rows above: a "fix" that made
+  // the constructor stop wrapping, or that attached a cause everywhere, would also satisfy
+  // those two rows — this row fails if a cause is attached to an error that has none.
+  // NOT covered here: the start-rejection pass-through itself. No row in this file exercises
+  // an error that IS a DevTlsFrontDoorError arriving at that ternary.
+  it("leaves a no-cause readiness-timeout error untouched when every public probe is unready", async () => {
     const caught = await rejectionOf(startAttestedDevTlsFrontDoor({
       operations: tlsReadinessOperations({ probePublicUi: async () => null }),
       maximumProbeAttempts: 1
