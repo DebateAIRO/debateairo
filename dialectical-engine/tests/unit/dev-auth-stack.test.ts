@@ -106,6 +106,9 @@ function operations(input: Readonly<{
     apiExit,
     uiExit,
     runnerExit,
+    generateContract: vi.fn(async () => {
+      calls.push("contract:generate");
+    }),
     checkModelConfig: vi.fn(async () => {
       calls.push("model-config");
     }),
@@ -183,6 +186,37 @@ function operations(input: Readonly<{
 }
 
 describe("DEV-10F bounded local auth stack supervisor", () => {
+  it("generates the contract before checking model config or starting the data plane", async () => {
+    // Property: every stack start regenerates admission rosters before any consumer can seed them.
+    // Break caught: omitting or moving the generator after model-config validation/data startup.
+    const runtime = operations();
+    const withGenerator = Object.assign(runtime, {
+      generateContract: vi.fn(async () => { runtime.calls.push("contract:generate"); })
+    });
+    const stack = await startDevelopmentAuthStack(withGenerator);
+    expect(runtime.calls.slice(0, 2)).toEqual(["contract:generate", "model-config"]);
+    expect(runtime.calls.indexOf("contract:generate"))
+      .toBeLessThan(runtime.calls.indexOf("data:start"));
+    await stack.stop();
+  });
+
+  it("stops before model config and data startup when contract generation fails", async () => {
+    // Property: a failed roster generation is a named, fail-closed startup stage.
+    // Break caught: continuing with a stale generated PLAN_TIER_ROSTERS artifact.
+    const runtime = operations();
+    const withGenerator = Object.assign(runtime, {
+      generateContract: vi.fn(async () => {
+        throw new Error("sensitive generator failure");
+      })
+    });
+    const outcome = await startDevelopmentAuthStack(withGenerator).then(async (stack) => {
+      await stack.stop();
+      return "STARTED";
+    }, (error: unknown) => error instanceof Error ? error.message : "UNKNOWN");
+    expect(outcome).toBe("DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED");
+    expect(runtime.calls).toEqual([]);
+  });
+
   it("refuses a world-readable provider key file", async () => {
     const repositoryRoot = await mkdtemp(join(tmpdir(), "debateai-provider-keys-mode-"));
     const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
@@ -368,7 +402,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       expect(message).toContain("broken-shape-model");
       expect(message).toContain("class 2");
       expect(message).not.toMatch(/sk-|Bearer|OPENAI_API_KEY=/u);
-      expect(runtime.calls).toEqual([]);
+      expect(runtime.calls).toEqual(["contract:generate"]);
     } finally {
       stderr.mockRestore();
       await rm(repositoryRoot, { recursive: true, force: true });
@@ -403,7 +437,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       runner: "REGISTERED"
     });
     expect(runtime.calls).toEqual([
-      "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
+      "contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
       "api:start", "runner:start", "ui:start", "tls:start"
     ]);
     expect(runtime.startDataPlane).toHaveBeenCalledWith(TEST_DEVELOPMENT_PROVIDER_PANEL);
@@ -418,7 +452,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     await Promise.all([stack.stop(), stack.stop()]);
     await stack.stop();
     expect(runtime.calls).toEqual([
-      "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
+      "contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment",
       "api:start", "runner:start", "ui:start", "tls:start",
       "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"
     ]);
@@ -428,19 +462,19 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     const runtime = operations({ occupied: true });
     await expect(startDevelopmentAuthStack(runtime))
       .rejects.toThrow("DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED");
-    expect(runtime.calls).toEqual(["model-config", "preflight"]);
+    expect(runtime.calls).toEqual(["contract:generate", "model-config", "preflight"]);
   });
 
   it.each([
-    ["provider_panel", ["model-config", "preflight", "providers:start"]],
-    ["support_model", ["model-config", "preflight", "providers:start", "support:start", "providers:stop"]],
-    ["data", ["model-config", "preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
-    ["token", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
-    ["environment", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
-    ["api", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
-    ["runner", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
-    ["ui", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
-    ["tls", ["model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
+    ["provider_panel", ["contract:generate", "model-config", "preflight", "providers:start"]],
+    ["support_model", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "providers:stop"]],
+    ["data", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "support:stop", "providers:stop"]],
+    ["token", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "data:stop", "support:stop", "providers:stop"]],
+    ["environment", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "data:stop", "support:stop", "providers:stop"]],
+    ["api", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "data:stop", "support:stop", "providers:stop"]],
+    ["runner", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+    ["ui", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]],
+    ["tls", ["contract:generate", "model-config", "preflight", "providers:start", "support:start", "data:start", "token", "environment", "api:start", "runner:start", "ui:start", "tls:start", "ui:stop", "runner:stop", "api:stop", "data:stop", "support:stop", "providers:stop"]]
   ] as const)("unwinds only the started prefix when %s fails", async (failAt, expected) => {
     const runtime = operations({ failAt });
     await expect(startDevelopmentAuthStack(runtime))

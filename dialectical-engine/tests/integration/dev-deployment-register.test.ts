@@ -29,6 +29,7 @@ import {
 } from "../../packages/register/src/index.js";
 import {
   buildDevelopmentDeploymentRegisterRows,
+  buildDevelopmentDeploymentRegisterHistoricalRows,
   buildDevelopmentDeploymentRegisterPublicationRows,
   createDevelopmentDeploymentRegisterMachineReceipt,
   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
@@ -53,7 +54,8 @@ import {
   buildDevelopmentProviderPanel,
   DEVELOPMENT_UNAVAILABLE_CLI_MODEL,
   developmentProviderSlots,
-  loadModelConfigConfiguredProviders
+  loadModelConfigConfiguredProviders,
+  type DevelopmentProviderPanel
 } from "../../apps/runner/src/dev-provider-panel.js";
 import {
   importHistoricalRegisterFixture,
@@ -83,6 +85,45 @@ const DEVELOPMENT_SUPPORT_VALUE_TEXT = Object.freeze<Record<string, string>>({
   support_retention_policy: '"keep"',
   support_retention_ratified_by: "null"
 });
+
+const PRE_S03_DEVELOPMENT_PROVIDER_PANEL = Object.freeze({
+  requiredDistinctMakers: 1,
+  configuredProviders: Object.freeze([
+    Object.freeze({
+      adapterKind: "openai-compatible-http" as const,
+      maker: "OpenAI",
+      providerRef: "development:codex-cli"
+    }),
+    Object.freeze({
+      adapterKind: "openai-compatible-http" as const,
+      maker: "OpenAI",
+      providerRef: "development:codex-premium-cli"
+    }),
+    Object.freeze({
+      adapterKind: "openai-compatible-http" as const,
+      maker: "Anthropic",
+      providerRef: "development:claude-cli"
+    }),
+    Object.freeze({
+      adapterKind: "openai-compatible-http" as const,
+      maker: "Anthropic",
+      providerRef: "development:claude-premium-cli"
+    }),
+    Object.freeze({
+      adapterKind: "openai-compatible-http" as const,
+      maker: "xAI",
+      providerRef: "development:grok-cli"
+    })
+  ])
+}) as DevelopmentProviderPanel;
+
+async function preS03DevelopmentV4Rows() {
+  return Object.freeze((await buildDevelopmentDeploymentRegisterPublicationRows(
+    await loadBootstrapRegister(),
+    PRE_S03_DEVELOPMENT_PROVIDER_PANEL,
+    TEST_PLAN_TIER_ROSTERS
+  )).filter(({ rowKey }) => rowKey !== "planTierRosters"));
+}
 
 function developmentOperatorUrl(credentialSource: string): string {
   const rows = new Map(credentialSource.trim().split("\n").map((line) => {
@@ -163,6 +204,78 @@ afterEach(async () => {
 });
 
 describe("DEV-05 complete development deployment register", () => {
+  it("accepts the exact pre-S03 sealed v4 without replay drift or byte changes", async () => {
+    // Property: a correct historical v4 remains immutable and valid after S03 is installed.
+    // Break caught: feeding today's provider/roster rows back through importHistorical(version 4).
+    const historicalRows = await preS03DevelopmentV4Rows();
+    expect(historicalRows).toHaveLength(32);
+    expect(computeRegisterSnapshotSha256(historicalRows))
+      .toBe("42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb");
+    await createPostgresRegisterPublicationPort(database.pool).importHistorical({
+      registerVersion: parseRegisterVersionText("4"),
+      rows: historicalRows
+    });
+    const before = await database.pool.query(
+      "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=4 ORDER BY row_key"
+    );
+
+    await expect(seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      repositoryRoot
+    })).resolves.toMatchObject({
+      registerVersion: "4",
+      rowCount: 32,
+      snapshotSha256: "42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb"
+    });
+    expect((await database.pool.query(
+      "SELECT row_key,value_json,source_ref FROM register.register_row WHERE register_version=4 ORDER BY row_key"
+    )).rows).toEqual(before.rows);
+  });
+
+  it("publishes the current provider and roster rows once across an identical second restart", async () => {
+    // Property: current file-owned rows supersede v4 by publication, and an equal restart is a no-op.
+    // Break caught: allocating a new GENERAL version when the latest receipt already has the snapshot.
+    const historicalRows = await preS03DevelopmentV4Rows();
+    const historical = await createPostgresRegisterPublicationPort(database.pool).importHistorical({
+      registerVersion: parseRegisterVersionText("4"),
+      rows: historicalRows
+    });
+    await writeDevelopmentDeploymentRegisterReceipt(
+      repositoryRoot,
+      createDevelopmentDeploymentRegisterMachineReceipt(historical)
+    );
+    const first = await publishDevelopmentDeploymentRegisterProviderSet({
+      adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot,
+      baseRegisterVersion: parseRegisterVersionText("4")
+    });
+    expect(first.registerVersion).toBe("5");
+    expect((await database.pool.query<{ row_key: string }>(
+      "SELECT row_key FROM register.register_row WHERE register_version=$1 AND row_key IN ('configuredProviderSet','planTierRosters') ORDER BY row_key",
+      [first.registerVersion]
+    )).rows).toEqual([
+      { row_key: "configuredProviderSet" },
+      { row_key: "planTierRosters" }
+    ]);
+    const countAfterFirst = await database.pool.query(
+      "SELECT count(*)::int AS count FROM register.register_version"
+    );
+
+    const second = await publishDevelopmentDeploymentRegisterProviderSet({
+      adminPool: database.pool,
+      planTierRosters: TEST_PLAN_TIER_ROSTERS,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot,
+      baseRegisterVersion: first.registerVersion
+    });
+    expect(second).toEqual(first);
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM register.register_version"
+    )).rows).toEqual(countAfterFirst.rows);
+  });
+
   it("adds exactly one plan-tier roster row from the file model ids", () => {
     const config = loadModelConfig(process.cwd());
     const planTierRosters = Object.freeze({
@@ -289,8 +402,6 @@ describe("DEV-05 complete development deployment register", () => {
   it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
     const deployed = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     });
     const publicationId = randomUUID();
@@ -458,8 +569,6 @@ describe("DEV-05 complete development deployment register", () => {
 
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     })).resolves.toMatchObject({ registerVersion: String(DEVELOPMENT_REGISTER_VERSION) });
     expect((await database.pool.query(
@@ -527,16 +636,11 @@ describe("DEV-05 complete development deployment register", () => {
     const bootstrap = await loadBootstrapRegister();
     const first = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     });
     expect(first.registerVersion).toBe(String(DEVELOPMENT_REGISTER_VERSION));
     expect(first.rowCount).toBeGreaterThan(
-      buildDevelopmentDeploymentRegisterRows(
-        TEST_DEVELOPMENT_PROVIDER_PANEL,
-        TEST_PLAN_TIER_ROSTERS
-      ).length
+      buildDevelopmentDeploymentRegisterHistoricalRows().length
     );
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
@@ -567,13 +671,13 @@ describe("DEV-05 complete development deployment register", () => {
     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
-      configuredMakers: ["Anthropic", "OpenAI", "Z.AI", "xAI"],
+      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
       configuredProviders: [
+        { providerRef: "development:codex-cli", maker: "OpenAI" },
         { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
+        { providerRef: "development:claude-cli", maker: "Anthropic" },
         { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
-        { providerRef: "development:grok-cli", maker: "xAI" },
-        { providerRef: "development:openai-free-api", maker: "OpenAI" },
-        { providerRef: "development:zai-free-api", maker: "Z.AI" }
+        { providerRef: "development:grok-cli", maker: "xAI" }
       ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });
@@ -613,8 +717,6 @@ describe("DEV-05 complete development deployment register", () => {
     `,[first.registerVersion]);
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     }))
       .resolves.toEqual(first);
@@ -688,8 +790,6 @@ describe("DEV-05 complete development deployment register", () => {
     )).rows).toEqual([{ row_key: "riskTier" }]);
     await expect(seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
-      planTierRosters: TEST_PLAN_TIER_ROSTERS,
-      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot
     }))
       .rejects.toThrow("REGISTER_PUBLICATION_SEAL_INVALID");
@@ -717,8 +817,6 @@ describe("DEV-05 complete development deployment register", () => {
     try {
       await expect(seedDevelopmentDeploymentRegister({
         adminPool: attackerPool,
-        planTierRosters: TEST_PLAN_TIER_ROSTERS,
-        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
         repositoryRoot
       }))
         .rejects.toThrow("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
@@ -732,8 +830,6 @@ describe("DEV-05 complete development deployment register", () => {
     const receipts = await Promise.all(Array.from({ length: 12 }, () =>
       seedDevelopmentDeploymentRegister({
         adminPool: database.pool,
-        planTierRosters: TEST_PLAN_TIER_ROSTERS,
-        providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
         repositoryRoot
       })
     ));

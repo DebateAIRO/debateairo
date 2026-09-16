@@ -371,7 +371,7 @@ export function createDevelopmentAuthDataPlaneOperations(
       );
     },
     async seedRegister() {
-      const output = await runPnpm(
+      const seedOutput = await runPnpm(
         ["dev:auth:seed-register"],
         "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
         {
@@ -379,7 +379,13 @@ export function createDevelopmentAuthDataPlaneOperations(
           DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
         }
       );
-      return parseDevelopmentDeploymentRegisterCliOutput(output, cwd);
+      await parseDevelopmentDeploymentRegisterCliOutput(seedOutput, cwd);
+      const publishOutput = await runPnpm(
+        ["dev:auth:publish-provider-set"],
+        "DEV_AUTH_DATA_PLANE_REGISTER_PUBLICATION_FAILED",
+        migrationEnvironment
+      );
+      return parseDevelopmentDeploymentRegisterCliOutput(publishOutput, cwd);
     },
     async initializeSupportConfiguration(registerReceipt) {
       const credentials = await loadDevelopmentSupportConfigCliCredentials(

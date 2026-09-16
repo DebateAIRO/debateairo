@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
   createDevelopmentAuthDataPlaneOperations,
   startDevelopmentAuthDataPlane
@@ -67,6 +69,7 @@ export type DevelopmentApiProviderAvailabilityOperations = Readonly<{
 }>;
 
 export type DevelopmentAuthStackOperations = Readonly<{
+  generateContract(): Promise<void>;
   checkModelConfig(): Promise<void>;
   isPublicPortOccupied(): Promise<boolean>;
   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
@@ -149,6 +152,10 @@ async function stopOwned(resources: readonly Stoppable[]): Promise<void> {
 export async function startDevelopmentAuthStack(
   operations: DevelopmentAuthStackOperations
 ): Promise<DevelopmentAuthStack> {
+  await fixedStage(
+    "DEV_AUTH_STACK_CONTRACT_GENERATION_FAILED",
+    () => operations.generateContract()
+  );
   await fixedStage(
     "DEV_AUTH_STACK_MODEL_CONFIG_INVALID",
     () => operations.checkModelConfig()
@@ -278,6 +285,7 @@ export function createDevelopmentAuthStackOperations(
     warning: (line) => console.warn(line)
   })
 ): DevelopmentAuthStackOperations {
+  const execFileAsync = promisify(execFile);
   const hatchetOperations = createDevelopmentHatchetTokenOperations(
     repositoryRoot,
     commandEnvironment
@@ -285,6 +293,17 @@ export function createDevelopmentAuthStackOperations(
   const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
   let checkedModelConfig: ModelConfig | undefined;
   return Object.freeze({
+    async generateContract() {
+      await execFileAsync(
+        commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm",
+        ["generate:contract"],
+        {
+          cwd: repositoryRoot,
+          env: { ...commandEnvironment },
+          maxBuffer: 128 * 1024
+        }
+      );
+    },
     async checkModelConfig() {
       try {
         checkedModelConfig = loadModelConfig(repositoryRoot);

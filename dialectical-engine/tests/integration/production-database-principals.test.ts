@@ -26,7 +26,7 @@ import {
   parseRegisterVersionText,
   SUPPORT_CONFIGURATION_KEYS
 } from "../../packages/register/src/index.js";
-import { buildDevelopmentDeploymentRegisterPublicationRows } from
+import { buildDevelopmentDeploymentRegisterHistoricalPublicationRows } from
   "../../apps/runner/src/dev-deployment-register.js";
 import {
   PRODUCTION_DATABASE_PRINCIPAL_CREDENTIAL_FORMAT,
@@ -38,10 +38,8 @@ import {
   withProductionSupportConfigCliConnection
 } from "../../apps/runner/src/support-config-cli-credentials.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import {
-  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
-  TEST_PLAN_TIER_ROSTERS
+  DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256
 } from "../support/registerFixtures.js";
 
 const MANIFEST_PATH =
@@ -2749,10 +2747,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       ({ principalId }) => principalId === "support-config-operator"
     )!.databaseUrl;
     const adminRegister = createPostgresRegisterPublicationPort(adminPool);
-    const deterministicV4Rows = await buildDevelopmentDeploymentRegisterPublicationRows(
-      await loadBootstrapRegister(),
-      TEST_DEVELOPMENT_PROVIDER_PANEL,
-      TEST_PLAN_TIER_ROSTERS
+    const deterministicV4Rows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
+      await loadBootstrapRegister()
     );
     expect(computeRegisterSnapshotSha256(deterministicV4Rows))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);

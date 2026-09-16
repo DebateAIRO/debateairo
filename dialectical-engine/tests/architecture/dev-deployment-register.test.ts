@@ -8,6 +8,7 @@ describe("DEV-05 development deployment register source contract", () => {
     };
     const cli = await readFile("apps/runner/src/dev-deployment-register-cli.ts", "utf8");
     const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
+    const dataPlane = await readFile("apps/runner/src/dev-auth-data-plane.ts", "utf8");
     expect(packageJson.scripts?.["dev:auth:seed-register"])
       .toBe("tsx apps/runner/src/dev-deployment-register-cli.ts");
     expect(cli).toContain("loadMigrationEnvironment()");
@@ -17,6 +18,10 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(cli).toContain("DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX");
     expect(cli).toContain("serializeDevelopmentDeploymentRegisterReceipt(receipt)");
     expect(source).toContain("DEV_DEPLOYMENT_REGISTER_ADMIN_REQUIRED");
+    const seed = dataPlane.indexOf('["dev:auth:seed-register"]');
+    const publish = dataPlane.indexOf('["dev:auth:publish-provider-set"]');
+    expect(seed).toBeGreaterThan(-1);
+    expect(publish).toBeGreaterThan(seed);
     expect(source).not.toMatch(/acceptance\/|seedAcceptanceRegister/);
   });
 
@@ -35,6 +40,7 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(source).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(source).toContain("createPostgresRegisterPublicationPort(input.adminPool).importHistorical");
+    expect(source).toContain("buildDevelopmentDeploymentRegisterHistoricalPublicationRows");
     expect(source).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
     expect(source).not.toMatch(/INSERT\s+INTO\s+register[.]register_(?:row|version)/iu);
     expect(source).not.toContain('await client.query("BEGIN")');

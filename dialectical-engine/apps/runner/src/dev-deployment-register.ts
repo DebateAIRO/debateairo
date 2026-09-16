@@ -326,6 +326,50 @@ const DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS = Object.freeze([
   })
 ] satisfies readonly DevelopmentDeploymentRegisterRow[]);
 
+const DEVELOPMENT_HISTORICAL_V4_CONFIGURED_PROVIDER_SET_ROW = Object.freeze({
+  rowKey: "configuredProviderSet",
+  value: Object.freeze({
+    kind: "CONFIGURED_PROVIDER_SET" as const,
+    requiredDistinctMakers: 1,
+    providers: Object.freeze([
+      Object.freeze({
+        adapterKind: "openai-compatible-http" as const,
+        maker: "OpenAI",
+        providerRef: "development:codex-cli"
+      }),
+      Object.freeze({
+        adapterKind: "openai-compatible-http" as const,
+        maker: "OpenAI",
+        providerRef: "development:codex-premium-cli"
+      }),
+      Object.freeze({
+        adapterKind: "openai-compatible-http" as const,
+        maker: "Anthropic",
+        providerRef: "development:claude-cli"
+      }),
+      Object.freeze({
+        adapterKind: "openai-compatible-http" as const,
+        maker: "Anthropic",
+        providerRef: "development:claude-premium-cli"
+      }),
+      Object.freeze({
+        adapterKind: "openai-compatible-http" as const,
+        maker: "xAI",
+        providerRef: "development:grok-cli"
+      })
+    ])
+  }),
+  sourceRef: DEVELOPMENT_SOURCE_REF
+} satisfies DevelopmentDeploymentRegisterRow);
+
+export function buildDevelopmentDeploymentRegisterHistoricalRows(
+): readonly DevelopmentDeploymentRegisterRow[] {
+  return Object.freeze([
+    DEVELOPMENT_HISTORICAL_V4_CONFIGURED_PROVIDER_SET_ROW,
+    ...DEVELOPMENT_DEPLOYMENT_REGISTER_STATIC_ROWS
+  ]);
+}
+
 export function buildDevelopmentDeploymentRegisterRows(
   providerPanel: DevelopmentProviderPanel,
   planTierRosters: DevelopmentPlanTierRosters
@@ -475,8 +519,6 @@ export async function buildDevelopmentRunnerRegisterRows(): Promise<readonly Dev
 
 type SeedDevelopmentDeploymentRegisterInput = Readonly<{
   adminPool: Pool;
-  planTierRosters: DevelopmentPlanTierRosters;
-  providerPanel: DevelopmentProviderPanel;
   repositoryRoot: string;
 }>;
 
@@ -523,6 +565,31 @@ function developmentRows(
   return Object.freeze(rows.map((row) => Object.freeze(row)));
 }
 
+function historicalDevelopmentRows(
+  bootstrap: BootstrapRegister
+): readonly DevelopmentDeploymentRegisterRow[] {
+  const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
+    Object.freeze({
+      rowKey,
+      value,
+      sourceRef: bootstrap.resolution[rowKey as keyof typeof bootstrap.resolution]
+    })
+  );
+  const rows = [
+    ...bootstrapRows,
+    ...AUTH_POLICY_REGISTER_ROWS,
+    MFA_POLICY_REGISTER_ROW,
+    SESSION_POLICY_REGISTER_ROW,
+    RECOVERY_POLICY_REGISTER_ROW,
+    PRODUCT_ROLE_POLICY_REGISTER_ROW,
+    ...buildDevelopmentDeploymentRegisterHistoricalRows()
+  ];
+  if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
+  }
+  return Object.freeze(rows.map((row) => Object.freeze(row)));
+}
+
 async function expectedRunnerRows(
   bootstrap: BootstrapRegister,
   providerPanel: DevelopmentProviderPanel,
@@ -538,22 +605,45 @@ async function expectedRunnerRows(
   return Object.freeze(rows.map((row) => Object.freeze(row)));
 }
 
+async function expectedHistoricalRunnerRows(
+  bootstrap: BootstrapRegister
+): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
+  const rows = [
+    ...historicalDevelopmentRows(bootstrap),
+    ...await buildDevelopmentRunnerRegisterRows()
+  ];
+  if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
+    throw new TypeError("DEV_RUNNER_REGISTER_DEFINITION_INVALID");
+  }
+  return Object.freeze(rows.map((row) => Object.freeze(row)));
+}
+
+function publicationRows(
+  rows: readonly DevelopmentDeploymentRegisterRow[]
+): readonly RegisterPublicationRow[] {
+  return Object.freeze(rows.map((row) => Object.freeze({
+    rowKey: row.rowKey,
+    valueJsonText: canonicalRegisterJson(
+      "valueAst" in row
+        ? (row.valueAst as CanonicalJsonAst)
+        : developmentValueAst(row.value)
+    ),
+    sourceRef: row.sourceRef
+  })));
+}
+
+export async function buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
+  bootstrap: BootstrapRegister
+): Promise<readonly RegisterPublicationRow[]> {
+  return publicationRows(await expectedHistoricalRunnerRows(bootstrap));
+}
+
 export async function buildDevelopmentDeploymentRegisterPublicationRows(
   bootstrap: BootstrapRegister,
   providerPanel: DevelopmentProviderPanel,
   planTierRosters: DevelopmentPlanTierRosters
 ): Promise<readonly RegisterPublicationRow[]> {
-  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel, planTierRosters)).map((row) =>
-    Object.freeze({
-      rowKey: row.rowKey,
-      valueJsonText: canonicalRegisterJson(
-        "valueAst" in row
-          ? (row.valueAst as CanonicalJsonAst)
-          : developmentValueAst(row.value)
-      ),
-      sourceRef: row.sourceRef
-    })
-  ));
+  return publicationRows(await expectedRunnerRows(bootstrap, providerPanel, planTierRosters));
 }
 
 async function assertAdmin(client: PoolClient): Promise<void> {
@@ -603,6 +693,38 @@ async function persistOrAcceptSealedHistoricalBootstrap(
       throw error;
     }
     await assertSealedHistoricalBootstrap(pool, bootstrap.registerVersion);
+  }
+}
+
+async function readDevelopmentDeploymentRegisterReceiptIfPresent(
+  repositoryRoot: string
+): Promise<DevelopmentDeploymentRegisterMachineReceiptV1 | undefined> {
+  try {
+    return await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
+  } catch (error) {
+    if (error instanceof TypeError
+      && error.message === "DEV_DEPLOYMENT_REGISTER_RECEIPT_REQUIRED") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function assertReceiptMatchesRegister(
+  pool: Pool,
+  receipt: DevelopmentDeploymentRegisterMachineReceiptV1
+): Promise<void> {
+  const state = (await pool.query<{
+    row_count: number;
+    snapshot_sha256: string;
+  }>(`
+    SELECT row_count,register._snapshot_sha256(register_version) AS snapshot_sha256
+    FROM register.register_version WHERE register_version=$1
+  `, [receipt.registerVersion])).rows[0];
+  if (state === undefined
+    || Number(state.row_count) !== receipt.rowCount
+    || state.snapshot_sha256 !== receipt.snapshotSha256) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_REGISTER_MISMATCH");
   }
 }
 
@@ -668,6 +790,18 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
     input.planTierRosters
   );
   const snapshotSha256 = computeRegisterSnapshotSha256(rows);
+  const current = await readDevelopmentDeploymentRegisterReceiptIfPresent(
+    resolve(input.repositoryRoot)
+  );
+  if (current !== undefined) {
+    if (current.registerVersion !== input.baseRegisterVersion) {
+      throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_BASE_MISMATCH");
+    }
+    await assertReceiptMatchesRegister(input.adminPool, current);
+    if (current.rowCount === rows.length && current.snapshotSha256 === snapshotSha256) {
+      return current;
+    }
+  }
   const operations = input.operations
     ?? createPostgresRegisterPublicationPort(input.adminPool);
   const published = await operations.publishGeneral({
@@ -705,10 +839,8 @@ export async function seedDevelopmentDeploymentRegister(
   if (DEVELOPMENT_REGISTER_VERSION <= bootstrap.registerVersion) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_VERSION_INVALID");
   }
-  const publicationRows = await buildDevelopmentDeploymentRegisterPublicationRows(
-    bootstrap,
-    input.providerPanel,
-    input.planTierRosters
+  const publicationRows = await buildDevelopmentDeploymentRegisterHistoricalPublicationRows(
+    bootstrap
   );
   const imported = await createPostgresRegisterPublicationPort(input.adminPool).importHistorical({
     registerVersion: parseRegisterVersionText(String(DEVELOPMENT_REGISTER_VERSION)),
@@ -719,6 +851,14 @@ export async function seedDevelopmentDeploymentRegister(
     rowCount: imported.rowCount,
     snapshotSha256: imported.snapshotSha256
   });
+  const current = await readDevelopmentDeploymentRegisterReceiptIfPresent(
+    resolve(input.repositoryRoot)
+  );
+  if (current !== undefined
+    && BigInt(current.registerVersion) >= BigInt(receipt.registerVersion)) {
+    await assertReceiptMatchesRegister(input.adminPool, current);
+    return current;
+  }
   await writeDevelopmentDeploymentRegisterReceipt(resolve(input.repositoryRoot), receipt);
   return receipt;
 }
