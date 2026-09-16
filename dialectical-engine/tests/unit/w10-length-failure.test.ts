@@ -324,3 +324,52 @@ describe("W10 C3 · the synthesizer and the evaluator have bounds of their own",
     expect(seeder).toContain("judgeDeadlineMs: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.deadlineMs");
   });
 });
+
+/**
+ * W10 fix round 1 · F7 — C1's own missing boundary, and F1/F2's class member C.
+ */
+describe("W10 F7 · LENGTH_EXCEEDED wins when the strict response schema also fails", () => {
+  it("names the truncation even though the body is unusable to the strict parse", async () => {
+    // `choices[0].message.content` is absent, so `responseSchema` REJECTS this
+    // body and the strict parse throws — the exact case the lenient
+    // `observedFinishReason` read exists for. The finish reason must still
+    // reach the artifact, and the call must still fail as a length failure.
+    const artifacts: RawArtifactInput[] = [];
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1",
+      model: "fixture/model",
+      maker: "fixture",
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "fixture-strict-reject",
+        model: "fixture/model",
+        choices: [{ message: {}, finish_reason: "length" }]
+      })),
+      persistRawArtifact: async (artifact) => { artifacts.push(artifact); return "artifact:strict"; },
+      appendLedgerEntry: async () => "ledger:w10",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    const rejection = await gateway.call(w10Request()).then(() => null, (error: unknown) => error);
+    expect(rejection).toBeInstanceOf(ProviderContentUnacceptedError);
+    expect((rejection as ProviderContentUnacceptedError).lastParseStatus).toBe("LENGTH_EXCEEDED");
+    expect(artifacts.map((artifact) => artifact.metadata.finish_reason)).toEqual(["length"]);
+  });
+
+  it("D71 boundary — the same unusable body WITHOUT a length finish stays a call failure", async () => {
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1",
+      model: "fixture/model",
+      maker: "fixture",
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "fixture-strict-reject",
+        model: "fixture/model",
+        choices: [{ message: {}, finish_reason: "stop" }]
+      })),
+      persistRawArtifact: async () => "artifact:strict",
+      appendLedgerEntry: async () => "ledger:w10",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    const rejection = await gateway.call(w10Request()).then(() => null, (error: unknown) => error);
+    expect(rejection).not.toBeInstanceOf(ProviderContentUnacceptedError);
+    expect((rejection as { code?: string }).code).toBe("PROVIDER_CALL_FAILED");
+  });
+});

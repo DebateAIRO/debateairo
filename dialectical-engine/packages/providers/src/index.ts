@@ -481,23 +481,32 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contentHash: digest(rawText)
         });
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
-        const responseJson = responseSchema.parse(decoded);
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
         // (PARSE_FAILED on a half-written object) describes the symptom; the
         // finish reason describes the cause, and only the cause is actionable.
+        //
+        // W10 fix round 1 (F7): the truncation WINS even when the cut landed
+        // before a body the strict response schema will accept. Previously that
+        // case fell through to `responseSchema.parse`, which threw and surfaced
+        // as PROVIDER_CALL_FAILED — a transport-shaped name for a length
+        // failure, which is the very confusion this ticket exists to remove.
+        const truncated = finishReason === PROVIDER_FINISH_REASON_LENGTH;
         const contentRejection: {
           readonly parseStatus: ProviderContentRejectionStatus;
           readonly parseError: string;
         } | null =
           classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED"
             ? {
-                parseStatus: finishReason === PROVIDER_FINISH_REASON_LENGTH
-                  ? PROVIDER_CONTENT_LENGTH_EXCEEDED
-                  : classifiedContent.parseStatus,
+                parseStatus: truncated ? PROVIDER_CONTENT_LENGTH_EXCEEDED : classifiedContent.parseStatus,
                 parseError: classifiedContent.parseError
               }
-            : null;
+            : truncated && !strict.success
+              ? {
+                  parseStatus: PROVIDER_CONTENT_LENGTH_EXCEEDED,
+                  parseError: "The completion was cut off at the token bound before a parseable response body"
+                }
+              : null;
         if (request.classifyContent !== undefined && contentRejection !== null) {
           const ledgerEntryRef = await this.#options.appendLedgerEntry({
             attemptId,
@@ -532,7 +541,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             attemptPacket = request.packet;
           } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             attemptPacket = request.buildRepairPacket({
-              rawText: responseJson.choices[0]!.message.content,
+              // `content` is the strict parse's, or the raw body when the cut
+              // landed before one existed. Either way it is what arrived.
+              rawText: content ?? rawText,
               parseStatus: contentRejection.parseStatus,
               parseError: contentRejection.parseError
             });
@@ -540,6 +551,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           continue;
         }
         lastContentRejection = null;
+        const responseJson = responseSchema.parse(decoded);
         const ledgerEntryRef = await this.#options.appendLedgerEntry({
           attemptId,
           runId: request.runId,
