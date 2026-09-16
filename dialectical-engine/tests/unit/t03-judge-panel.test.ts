@@ -79,7 +79,12 @@ describe("T3 / S2-2 — the judge panel member call", () => {
       readonly messages: readonly { readonly role: string; readonly content: string }[];
     };
     const system = packet.messages.find((message) => message.role === "system")!.content;
-    expect(system).toContain("Assess an existing debate node authored by another maker");
+    // W7 / V-BLIND-CONTEXT (2026-09-03): the foreign-text framing stays, the
+    // author's identity goes. "another maker" also asserts a maker-level
+    // difference V-S11-GRADER no longer guarantees, so the wording is
+    // "another participant". `tests/unit/prompt-surface-guard.test.ts` owns the
+    // withholding property for the whole prompt surface.
+    expect(system).toContain("Assess an existing debate node authored by another participant");
     expect(system).not.toContain("restatement_text");
     expect(packet.messages.find((message) => message.role === "user")!.content)
       .toContain("The proposal should stand.");
