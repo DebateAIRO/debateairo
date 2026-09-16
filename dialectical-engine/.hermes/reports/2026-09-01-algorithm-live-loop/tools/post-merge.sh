@@ -7,7 +7,11 @@
 # compare its hash to integration's (D9 ADDENDUM); reinstall if the lockfile changed.
 set -u
 LANE_TIP=${1:?lane tip}; EXPECT_TREE=${2:?expected merged tree}; GUARD=${3:?integration tip guard}; MSG=${4:?message file}; shift 4
-V5=/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5
+# HOST-INDEPENDENT (2026-09-16, Task 18): the checkout root comes from this script's own location via
+# git, never from a hard-coded home. Export V5=<checkout> to override; inside a linked worktree
+# `--show-toplevel` is that worktree's root, so run this from the checkout that owns `.worktrees/`.
+M="$(cd "$(dirname "$0")/.." && pwd)"
+V5="${V5:-$(git -C "$(cd "$M/../../.." && pwd)" rev-parse --show-toplevel)}"
 INT=$V5/.worktrees/integration
 [ -f "$MSG" ] || { echo "REFUSING: message file missing: $MSG"; exit 3; }
 cd "$INT" || exit 2

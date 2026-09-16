@@ -34,8 +34,15 @@ for l in lines[start:end]:
 # so a diagnosed fix stops reporting as VANISHED. Only rows with a fix commit and a ticket count.
 # A closed name is subtracted ONLY when the measured tree CONTAINS its fix commit — a batch taken
 # before the fix must still see the name as stable-red, or historical logs re-classify wrongly.
-import subprocess
-INT = "/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/.worktrees/integration"
+import os, subprocess
+# HOST-INDEPENDENT (2026-09-16, Task 18): the integration worktree is resolved from the mission dir this
+# run was handed (argv[1] -> the engine three levels up) via `git rev-parse --show-toplevel`, never from a
+# hard-coded home. INT= in the environment wins. An INT that does not resolve leaves `contains` False for
+# every closed name, exactly as the unreachable hard-coded path did — behaviour unchanged, see the report.
+_ENGINE = os.path.abspath(os.path.join(M, "..", "..", ".."))
+_ROOT = subprocess.run(["git", "-C", _ENGINE, "rev-parse", "--show-toplevel"],
+                       capture_output=True, text=True).stdout.strip()
+INT = os.environ.get("INT") or os.path.join(_ROOT, ".worktrees", "integration")
 head = open(OUT, errors="replace").read(4000)
 mt = re.search(r"tip ([0-9a-f]{7,40})", head) or re.search(r"commit=([0-9a-f]{7,40})", head)
 measured_tip = mt.group(1) if mt else None

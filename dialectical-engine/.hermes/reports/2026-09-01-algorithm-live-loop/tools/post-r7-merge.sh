@@ -4,9 +4,13 @@
 # 1) merge lane/sealedrows → integration with the staged message (no-ff, so the lane is one merge commit)
 # 2) fast-forward the two pre-provisioned lanes (t17t9, h-diag) to the new integration tip
 # 3) print every tip so the dispatch messages can name them exactly
+# HOST-INDEPENDENT (2026-09-16, Task 18): the mission dir comes from this script's own location and the
+# checkout root from git, never from a hard-coded home. Export V5=<checkout> to override; inside a
+# linked worktree `--show-toplevel` is that worktree's root, so run this from the checkout that owns
+# `.worktrees/`.
 set -u
-V5=/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5
-M=$V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+M="$(cd "$(dirname "$0")/.." && pwd)"
+V5="${V5:-$(git -C "$(cd "$M/../../.." && pwd)" rev-parse --show-toplevel)}"
 INT=$V5/.worktrees/integration
 LANE_TIP=a6948439
 EXPECT_TREE=c5850f732e93760cc109429a22f941c6e2d34eba   # merge-tree dry-run object for this tip

@@ -5574,3 +5574,41 @@ not in 4 000 lines of prose every author skims.
   absent passes vacuously — the negative-assertion failure mode of `:329`.
 - **Rule: distinguish a DEFECT test (RED first, always) from a REGRESSION pin (green at birth). For
   the second, the mutant is not optional — it is the only evidence the pin can fail at all.**
+
+## perl's `\Q…\E` does NOT stop variable interpolation, and `perl -0pi` exits 0 on no-match (2026-09-16, BUILD(CONT-T18))
+- Building a mutant over `closing-run.sh`'s credential gate, the pattern was
+  `s{\Qprintf '%s' "$ACCEPTANCE_SERVICE_CREDENTIAL" | grep -qE '…' || \E}{true || }`. `\Q` quotes regex
+  METAcharacters; it does **not** suppress perl's own interpolation, so `$ACCEPTANCE_SERVICE_CREDENTIAL`
+  expanded to the **empty string** and the pattern could never match the file.
+- **`perl -0pi -e` exits 0 when nothing matched.** So the mutant step "succeeded", the file was
+  unchanged, and the probe returned the SAME exit status as green. Read naively that says "the gate does
+  not catch this mutant" — the exact false conclusion of `:2997` ("A BROKEN run inside a MUTANT harness
+  reads as 'the mutant was not caught'"), arriving through the substitution instead of the runner.
+- What caught it: printing the target line after mutating. The verdict alone could not.
+- **Rule: a mutation step must ASSERT the text changed before anything measures the mutant** — compare a
+  hash, or `assert old not in text and new in text`. In a shell script any `$NAME` inside a perl pattern
+  must be `\$NAME`; safer still, do literal replacement in python and assert the landing.
+
+## A mutant can leave residue that `git status` cannot see, because `logs/` is gitignored (same seat, same day)
+- The "bypass the credential check" mutant let `closing-run.sh` run three lines further than green ever
+  does, and those lines include `mkdir -p "$OUTDIR"` — which sits BEFORE the dirty-tree refusal, not
+  after it. The run then exited 3 as designed, leaving an empty
+  `.hermes/reports/<mission>/logs/closing-run/` behind.
+- `git status --porcelain` showed nothing, three times, because `dialectical-engine/.gitignore:13`
+  ignores `logs/`. The porcelain bracket that `:1724` relies on is **blind to every ignored path**, so
+  "porcelain unchanged" is not "the tree is unchanged".
+- Priced at one RED gate run plus one diagnosis; it would have been free if the check had existed before
+  the mutant ran, and expensive if the residue had been mistaken later for a real ceremony's output.
+- **Rule: when the claim is "this touched nothing", assert against the FILESYSTEM for the paths the tool
+  writes (`[ -d "$OUTDIR" ]`), not only against porcelain. And read a tool's ordering before mutating it:
+  `mkdir` before the refusal means even a refused run writes.**
+
+## Every file under this mission's `tools/` is mode 100644 — the documented `tools/x.sh` invocation exits 126 (same seat, same day)
+- `git ls-files -s tools/` reports `100644` for all 26 files. So `tools/packet-lint.sh <packet>`, exactly
+  as the briefs, packets and the tools' own usage comments write it, fails with
+  `permission denied` and **exit 126** — which is not 0 and not the tool's own 1, so a gate that only
+  tests "non-zero = lint failed" reports a lint failure that never ran.
+- Invoke them as `bash tools/<x>.sh …` / `python3 tools/<x>.py …`. `$0`-relative resolution still works:
+  `dirname "$0"` is `tools`, so `cd "$(dirname "$0")/.." && pwd` is still the mission dir.
+- Related to `:1477` (OneDrive exec-bit flips get COMMITTED) — this is that trap's end state, now
+  uniform across the directory.
