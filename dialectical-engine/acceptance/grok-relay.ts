@@ -81,7 +81,7 @@ function parseGrokEnvelope(stdout: string): {
  */
 export type GrokSandboxProfile = "read-only" | "none";
 
-function createGrokAdapter(sandboxProfile: GrokSandboxProfile, model?: string): CliRelayAdapter {
+function createGrokAdapter(sandboxProfile: GrokSandboxProfile): CliRelayAdapter {
   return {
   maker: XAI_MAKER,
   authEnvironmentKeys: ["XAI_API_KEY"],
@@ -101,8 +101,7 @@ function createGrokAdapter(sandboxProfile: GrokSandboxProfile, model?: string): 
     "--no-memory",
     "--no-subagents",
     "--disable-web-search",
-    "--tools", "",
-    ...(model === undefined ? [] : ["--model", model])
+    "--tools", ""
   ],
   parseCompletion: (stdout) => parseGrokEnvelope(stdout)
   };
@@ -115,7 +114,7 @@ export interface GrokRelayOptions {
   readonly testOnlyCommand?: CommandSpec;
   /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
   readonly sandboxProfile?: GrokSandboxProfile;
-  /** The full model id asked of the CLI (`--model`). Lineage stays CLI-reported. */
+  /** Required model lineage reported by the CLI handshake. Grok does not accept it via `--model`. */
   readonly model?: string;
 }
 
@@ -131,13 +130,19 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );
-  const adapter = createGrokAdapter(options.sandboxProfile ?? "read-only", options.model);
+  const adapter = createGrokAdapter(options.sandboxProfile ?? "read-only");
   const handshake = await invokeCli(
     command,
     adapter,
     GROK_HANDSHAKE_PROMPT,
     options.timeoutMs
   ) as ReturnType<typeof parseGrokEnvelope>;
+  if (options.model !== undefined && handshake.model !== options.model) {
+    throw new CliRelayFailure(
+      "FAILED",
+      `GROK_CLI_MODEL_MISMATCH expected=${options.model} answered=${handshake.model}`
+    );
+  }
   const server = await startCliRelayServer({
     port: options.port,
     timeoutMs: options.timeoutMs,
