@@ -149,3 +149,76 @@ F13 · F21 · F22 (+2) · F31 · F-T5-3 — full table attached at closure from 
 **What I ask:** permission to delete the worktrees AND branches of the 38 merged lanes, in one recorded step, with the list of what was deleted and each branch's last commit written to the ledger first (capture-before-destroy, D60). Example: `lane/small-trio` at ac2ccbb9 is inside dev e2adf68b, so deleting the branch loses nothing — every commit stays reachable from dev.
 **What I would keep:** the two unmerged lanes (their commits exist nowhere else) and every lane still running.
 **Options:** (1) delete the 38 now — recommended; (2) delete at closure instead; (3) keep everything. Nothing is pushed or changed on origin in any option.
+
+## 2026-09-16 continuation — rows for V
+
+Written by the RECORDS(CONT-T19) seat as the orchestrator's delegated writer. Nothing below was
+pushed or merged (D70/D73 e/9). Every row cites the SDD ledger
+`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/.superpowers/sdd/2026-09-16-algorithm-live-loop-continuation/progress.md`
+by its line number, or a commit, and carries a STRENGTH tag.
+
+### A. Defaults the orchestrator applied on your behalf — each has a veto window
+
+These are decisions that were yours to make. The work is done under the default; saying nothing keeps
+it. Each row is one yes/no.
+
+| card | the decision I took for you | evidence | your smallest possible answer | if you say nothing |
+|---|---|---|---|---|
+| **Two support-kb edges** | The architecture audit began reporting again and showed two unowned edges — `apps/api → support-kb` and `apps/runner → support-kb`. I **declared** them as legitimate, commenting each with your own commit `9c68ceb3`. | Task 1 found them (ledger :30); Task 6 declared them at `73922db8` (ledger :61). STRENGTH: entailed. | "declare" (nothing to do) or "remove". | The edges stay declared; the dependency stays. |
+| **F31's three obs-capture rows stay red** | Both audits report exactly three violations at every gate of this continuation. They are your ticketed debt (F31), pinned by your own test. I left them alone rather than absorb or fix them. | ledger :61, :95, `FINAL GATE ATTRIBUTION`. STRENGTH: entailed. | "leave" or "fix them next". | They stay red and ticketed. |
+| **Grok: degrade with a mark** | The F-GROK ticket left outcome (2) open for you. I applied **degrade-with-mark**: the relay probes `--sandbox read-only` first, and on refusal re-runs the identical handshake WITHOUT it, printing `RELAY DEGRADED xAI SANDBOX-PROFILE-UNAVAILABLE <code>`. If the unsandboxed handshake ALSO fails, the ORIGINAL failure is re-thrown — **an absent maker is never traded for an unprotected one**. | Declared at the pre-flight scan (ledger :8); landed by Task 17, `a38dde4a..5ace5d7c` (ledger :141–:145). STRENGTH: entailed. | "keep the degrade" or "never run grok unsandboxed". | The degrade stands, visibly marked. |
+| **Migration `0062` was amended after it was written** | Task 5b's forward migration was edited again in the same continuation to sweep the class's fourth table. I ruled this honest **because `0062` has never been applied outside ephemeral test databases on this unpushed branch** — the never-amend rule exists to protect databases that already carry a migration. | ledger :74. STRENGTH: entailed. | "fine" or "split it into `0062` + `0065`". | `0062` ships as the single amended file. |
+| **`priorCandidateRef` withheld from the synthesizer's retry payload** | W9 made the payload an allow-list projection. `priorCandidateRef` is an artifact ADDRESS, not part of the model's task, so I left it out — outside the ruling's kept-list. | Task 12 (ledger :116). STRENGTH: entailed. | one `projectedKeys` entry re-adds it. | It stays withheld. |
+| **The DEGRADED-DIVERSITY detail is not persisted** | The new mark carries `{roles, identity}` to the reader but is NOT stored as a `ConditionMarkRecord`. The identity is already in the register rows and the ledger. | Task 13 (ledger :121). STRENGTH: entailed. | "persist it" = a contract + db + serve change. | The mark is served; the detail is not stored. |
+| **Two grading marks retired, and `gradersPerCell` is 1** | `BLIND-GRADING-DEGRADED` and `GRADER-REPEATS-IDENTITY` were harness-local constants with **no reader outside `acceptance/eval-harness.ts` and its test** (measured at the tip), and neither is a degradation under V-S11-GRADER. I retired both. I also ruled that **`gradersPerCell` = 1 supersedes the goal's "2 graders" clause** — once the ruling says "the same model grades every arm", a second seat is a repeat, not a second opinion. The projection printed before the approval gate falls 90/180 → 75/150. | Task 14 (ledger :127). STRENGTH: entailed. | "agreed" or "restore the two-grader matrix". | One fixed grader; the goal's 2-grader clause is superseded on the record. |
+| **The fixed grader is chosen sorted-first** | **No register row nominates a grader** (F-W1-1). Until you seal one, the harness takes the sorted-first identity — deterministic and disclosed as fixed, but arbitrary. | Task 14 (ledger :127). STRENGTH: entailed. | seal a grader row (S01/T16), or accept sorted-first. | Sorted-first, disclosed. |
+| **A truncation is a LENGTH failure and is retried under a raised bound** | D73 ADDENDUM 1. A completion cut off before a parseable body is `LENGTH_EXCEEDED` and the ORIGINAL packet is re-sent at 2048 → 4096 → 6144. **Cost consequence you should see: a truncating call's worst case becomes 12 288 tokens instead of 6 144.** Your sealed `tokenCeiling` is untouched. | Task 15 (ledger :129, :131). STRENGTH: entailed. | "accept the spend" or "cap the escalation at one step". | Two escalation steps; worst case 12 288. |
+
+### B. Questions the seats raised that only you can answer
+
+| question | what was measured | what I recommend |
+|---|---|---|
+| **Was the anonymous landing branch of `apps/ui/app/page.tsx` removed on purpose?** | `^1` = `3d43ab3b`, `^2` = `d004d0fb`, HEAD = `d004d0fb` — **HEAD equals your parent**, and your own commits (`b300ee91` support agent, `af50e349` ui-overhaul "anonymous chrome suppression") changed it. So it is your deliberate change, NOT merge damage. But `if (token === null) return <LandingPage />;` and `<section id="start-a-debate">` are gone, and tests still pin them. Blob hashes re-measured this pass. STRENGTH: entailed. | Tell us which is stale — the product or the oracle. No task was opened either way. |
+| **`t9-landing`: the landing now mounts `SupportWidget`** (D-T9-1) | `apps/ui/app/page.tsx:22` returns `<><LandingPage /><SupportWidget /></>`; the oracle at `tests/render/t9-landing.test.tsx:133` pins a bare `return <LandingPage />;`. The mission's `DECISIONS.md` carries no ruling on the widget's surfaces. STRENGTH: entailed (Task 9, ledger :95). | Either remove the mount or widen the regex to tolerate a fragment while still pinning that the branch is immediate. The row stays red with its ticket until you rule. |
+| **The Grok re-run** | Still open from 2026-09-08. The ceremony ran on two makers; Grok's handshake failed because `--sandbox read-only` cannot resolve `/var/run/docker.sock` while Docker Desktop is down. Task 17 has now made the absence LOUD and the sandbox degradable, so a re-run would no longer fail silently either way. | Start Docker Desktop and re-run the ceremony once — now with the loud-absence and degrade-with-mark behaviour in place. |
+| **F-TOOL-MUTATE-3 is still at the rework cap** | Untouched by this continuation. The live record tools stay v3/v3/v3.2; the staged v4.1 set still waits. `V-DECISIONS-PACKET.md` §F-TOOL-MUTATE-3 carries the three options. | Unchanged: (a) one more rework, then stop. |
+| **T3B was never authorized** | Still true. Re-presented, not assumed. | Authorize (~30 lines, test-only) or close the row. |
+| **The peer security branch is merged into neither line** | `origin/security/2026-09-01-hardening` (`35bd80c4`) carries **130** commits not in `origin/dev` and **379** not in `origin/main` — both counted this pass. Nothing in this continuation touched it. STRENGTH: entailed. | It needs its own review and merge decision. Reported, not acted on. |
+| **A serve outcome that cannot be persisted** (F-T12-1) | `migrations/0000_s00.sql:235`'s CHECK forbids `NOT_RUN`, while `packages/serve/src/index.ts:690,729` PRODUCE it and `:2018-2030` INSERT it. Found, not caused, by Task 12 — a real product defect outside that task's scope. STRENGTH: entailed (ledger :116). | Widen the CHECK or stop producing `NOT_RUN`. Ticketed; needs your call on which. |
+| **Two maker relays default to another operator's home** (F-RELAY-BINARY-HOST-DEFAULT) | `acceptance/grok-relay.ts:13` = `/Users/vladmihaimiron/.grok/bin/grok`, `acceptance/claude-relay.ts:29` = `/Users/vladmihaimiron/.local/bin/claude`, each pinned by a test. The D10 env override (`ACCEPTANCE_GROK_BINARY` / `ACCEPTANCE_CLAUDE_BINARY`) is the working road today. STRENGTH: entailed (Task 17). | The discovery rule is yours: `command -v`, a config key, or keep the override. The seat did not choose. |
+| **A run-level mark for `SANDBOX-PROFILE-UNAVAILABLE`?** | The kernel vocabulary is CLOSED at 37 members and positionally pinned, so Task 17 carried the degradation on the relay handle and stdout instead. Making it a mark is a vocabulary change with pin-count and UI-label consequences. STRENGTH: entailed (D73 ADDENDUM 3). | Leave it off the vocabulary unless you want the mark in the served answer. |
+
+### C. Re-run readiness — the pointer
+
+Task 18 wrote the re-run readiness packet at
+`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/packets/readiness-ask-2026-09-16.md`
+(verified present this pass). It carries the eight strict schema keys with the closing run's values,
+the three binary keys with THIS host's discovered paths (**the compiled-in defaults were measured
+ABSENT here**), the credential as the operator's own procedure (D18 — no seat reads it), the
+Docker/sandbox choice with both arms honest after Task 17, the exact command in both forms, and the
+four-count order. **Standing caveat, by design:** the table is a transcription — ports, versions and
+paths go stale, and the operator re-measures at run time. STRENGTH: entailed (ledger :147–:151).
+
+### D. What this continuation could NOT settle, and why
+
+None of these is a seat's to do. Each needs the operator's credential, the operator's go, or a machine
+this branch does not have.
+
+- **The acceptance ceremony re-run on this branch** — needs the credential and your go (D18/D72).
+- **The mono-maker acceptance run** — never run at any closing tree; the only mono ceremony on record
+  is T0's BASELINE, which pre-dates T11 and printed `verdict SUPPORTED`, exactly what confirm-item 6
+  now forbids. See `agent-reports/w12-closure-audit-2026-09-16.md`.
+- **The δ/ε refit** — declared as a duty (J2) and never executed; it needs a real M≥2 run to fit from.
+- **A Node 22.23.1 run** — this host is Node 26.5.0 (D73 e/7). Expect ~100 `localStorage` rows in
+  `tests/render` to CLEAR and ~4 real `t1-canvas` reds to APPEAR.
+- **The judge's whole-goal verdict** — does not exist, and cannot be issued from this branch. The audit
+  says exactly what it would rest on and what is missing.
+
+### E. The V packet's own status
+
+Still **LIVING DRAFT** (`V-DECISIONS-PACKET.md:1`). It becomes FINAL only at W12 closure with the
+judge's whole-goal verdict attached, and that verdict cannot be issued until the re-run above happens.
+The line at `:48` — *"(Items 1 and 7 text to be quoted verbatim from goal-v4 at closure.)"* — is still
+true: **the acceptance presentation itself is unfinished**, and all seven confirm-items have run as
+operative defaults under R7-3 without ever being presented to you. The W12 audit quotes all seven
+verbatim so the presentation can be made.
