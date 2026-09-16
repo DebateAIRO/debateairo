@@ -231,7 +231,7 @@ describe("development real CLI provider panel", () => {
     const codex = relay(8795, "OpenAI", "gpt-real");
     const handle = await startDevelopmentCliProviderPanel(config, operations([
       codex, new Error("logged out"), new Error("logged out")
-    ]));
+    ]), () => undefined);
     expect(handle.healthyProviderRefs).toEqual(["development:codex-premium-cli"]);
     expect(handle.panel.targets.map(({ model }) => model)).toEqual([
       "gpt-real", "CLI_HANDSHAKE_UNAVAILABLE", "CLI_HANDSHAKE_UNAVAILABLE",
@@ -244,7 +244,29 @@ describe("development real CLI provider panel", () => {
   it("refuses when no real CLI answers", async () => {
     await expect(startDevelopmentCliProviderPanel(loadModelConfig(process.cwd()), operations([
       new Error("logged out"), new Error("logged out"), new Error("logged out")
-    ]))).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+    ]), () => undefined)).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
+  });
+
+  // Property: every rejected CLI slot is named once with its configured identity and typed cause.
+  // Production break: map a rejected Promise.allSettled outcome silently to the unavailable model.
+  it("prints one class-(c) line for a rejected CLI relay", async () => {
+    const mismatchCode =
+      "GROK_CLI_MODEL_MISMATCH expected=grok-4.6-build answered=grok-4.5-build";
+    const warnings: string[] = [];
+    const handle = await startDevelopmentCliProviderPanel(
+      loadModelConfig(process.cwd()),
+      operations([
+        relay(8795, "OpenAI", "gpt-5.6-sol"),
+        relay(8796, "Anthropic", "claude-opus-5"),
+        new Error(mismatchCode)
+      ]),
+      (line: string) => { warnings.push(line); }
+    );
+
+    expect(warnings).toEqual([
+      `DEV_PROVIDER_SLOT_UNAVAILABLE class (c) tier=premium model=grok-4.6-build code=${mismatchCode}`
+    ]);
+    await handle.stop();
   });
 });
 
@@ -317,7 +339,7 @@ describe("development CLI full-id starts", () => {
     });
   });
 
-  it("starts the Grok relay with `--model grok-4.6-build`", async () => {
+  it("starts Grok with the configured reported lineage and no unsupported --model", async () => {
     relayStarts.grok.mockClear();
     const operations = createDevelopmentCliProviderPanelOperations(loadModelConfig(process.cwd()));
     expect(operations.starts).toHaveLength(3);
@@ -330,12 +352,22 @@ describe("development CLI full-id starts", () => {
     const { startGrokRelay } = await vi.importActual<
       typeof import("../../acceptance/grok-relay.js")
     >("../../acceptance/grok-relay.js");
-    const capturedEnvelopeScript = [
-      'console.log(JSON.stringify({',
-      '  text: JSON.stringify({ argumentList: process.argv }),',
-      '  stopReason: "end_turn",',
-      '  modelUsage: { "grok-4.6-build": {} }',
-      '}));'
+    const realSelectionBoundaryScript = [
+      'const selectedIndex = process.argv.indexOf("--model");',
+      'if (selectedIndex >= 0) {',
+      '  const selected = process.argv[selectedIndex + 1];',
+      '  console.log(JSON.stringify({',
+      '    type: "error",',
+      '    message: `Couldn\'t set model \'${selected}\': Invalid params: "unknown model id". Run \'grok models\' to see available models.`',
+      '  }));',
+      '  process.exitCode = 1;',
+      '} else {',
+      '  console.log(JSON.stringify({',
+      '    text: JSON.stringify({ argumentList: process.argv }),',
+      '    stopReason: "end_turn",',
+      '    modelUsage: { "grok-4.6-build": {} }',
+      '  }));',
+      '}'
     ].join("");
     const relay = await startGrokRelay({
       ...panelOptions!,
@@ -343,7 +375,7 @@ describe("development CLI full-id starts", () => {
       timeoutMs: 1_000,
       testOnlyCommand: {
         binary: process.execPath,
-        prefixArguments: ["-e", capturedEnvelopeScript, "--"]
+        prefixArguments: ["-e", realSelectionBoundaryScript, "--"]
       }
     });
     try {
@@ -362,8 +394,8 @@ describe("development CLI full-id starts", () => {
       const relayed = JSON.parse(completion.choices[0]!.message.content) as {
         argumentList: readonly string[];
       };
-      expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
-        .toBe("grok-4.6-build");
+      expect(relay.model).toBe("grok-4.6-build");
+      expect(relayed.argumentList).not.toContain("--model");
     } finally {
       await relay.close();
     }

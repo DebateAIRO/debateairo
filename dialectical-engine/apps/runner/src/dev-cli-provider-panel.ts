@@ -42,7 +42,8 @@ async function closeRelays(relays: readonly DevelopmentCliRelay[]): Promise<void
 
 export async function startDevelopmentCliProviderPanel(
   config: ModelConfig = loadModelConfig(process.cwd()),
-  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(config)
+  operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(config),
+  warning: (line: string) => void = (line) => { console.warn(line); }
 ): Promise<DevelopmentCliProviderPanelHandle> {
   const slots = developmentProviderSlots(config);
   const cliSlots = slots.filter((slot) => slot.transport === "cli");
@@ -80,6 +81,12 @@ export async function startDevelopmentCliProviderPanel(
           authorizationHeader: outcome.value.authorizationHeader
         });
       }
+      const code = outcome?.status === "rejected" && outcome.reason instanceof Error
+        ? outcome.reason.message
+        : "DEV_CLI_RELAY_FAILED";
+      warning(
+        `DEV_PROVIDER_SLOT_UNAVAILABLE class (c) tier=${provider.tier} model=${provider.model} code=${code}`
+      );
       return Object.freeze({
         providerRef: provider.providerRef,
         baseUrl: `http://127.0.0.1:${provider.port}/v1`,

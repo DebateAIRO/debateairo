@@ -133,12 +133,35 @@ describe("GROK-01 Grok Build CLI relay", () => {
     expect(relayed.argumentList).not.toContain("read-only");
   });
 
-  it("asks the CLI for the caller's full model id", async () => {
+  // Property: the configured Grok lineage is proved from modelUsage without being sent as
+  // an unsupported selectable --model id. Production break: append --model options.model.
+  it("keeps the panel's Grok start healthy with the file's reported lineage id", async () => {
+    const realSelectionBoundaryScript = [
+      'const selectedIndex = process.argv.indexOf("--model");',
+      'if (selectedIndex >= 0) {',
+      '  const selected = process.argv[selectedIndex + 1];',
+      '  console.log(JSON.stringify({',
+      '    type: "error",',
+      '    message: `Couldn\'t set model \'${selected}\': Invalid params: "unknown model id". Run \'grok models\' to see available models.`',
+      '  }));',
+      '  process.exitCode = 1;',
+      '} else {',
+      '  console.log(JSON.stringify({',
+      '    text: JSON.stringify({ argumentList: process.argv }),',
+      '    stopReason: "end_turn",',
+      '    total_cost_usd: 0.00001,',
+      '    modelUsage: { "grok-4.6-build": { input_tokens: 1, output_tokens: 1 } }',
+      '  }));',
+      '}'
+    ].join("");
     const relay = await startGrokRelay({
       port: 0,
       timeoutMs: 1_000,
       model: "grok-4.6-build",
-      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", realSelectionBoundaryScript, "--"]
+      }
     });
     handles.push(relay);
 
@@ -150,8 +173,41 @@ describe("GROK-01 Grok Build CLI relay", () => {
     const relayed = JSON.parse(completion.choices[0]!.message.content) as {
       argumentList: readonly string[];
     };
-    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1])
-      .toBe("grok-4.6-build");
+    expect(relay.model).toBe("grok-4.6-build");
+    expect(relayed.argumentList).not.toContain("--model");
+  });
+
+  // Property: the file's lineage and the CLI-reported lineage are an exact handshake equality.
+  // Production break: accept a parsed modelUsage id without comparing it to options.model.
+  it("refuses a reported Grok lineage mismatch by naming both ids", async () => {
+    const mismatchScript = [
+      'console.log(JSON.stringify({',
+      '  text: "OK",',
+      '  stopReason: "end_turn",',
+      '  modelUsage: { "grok-4.5-build": {} }',
+      '}));'
+    ].join("");
+    const outcome = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "grok-4.6-build",
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", mismatchScript, "--"]
+      }
+    }).then(
+      (handle) => ({ status: "fulfilled" as const, handle }),
+      (error: unknown) => ({ status: "rejected" as const, error })
+    );
+    if (outcome.status === "fulfilled") handles.push(outcome.handle);
+
+    expect(outcome.status).toBe("rejected");
+    if (outcome.status === "rejected") {
+      expect(outcome.error).toMatchObject({
+        name: "CliRelayFailure",
+        message: "GROK_CLI_MODEL_MISMATCH expected=grok-4.6-build answered=grok-4.5-build"
+      });
+    }
   });
 
   it("maps the OpenAI-compatible transcript to a single, verbatim, tool-less Grok call", async () => {
