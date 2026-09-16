@@ -502,11 +502,31 @@ Node-26 rows in `tests/render` + the 40 owned rows). New tests since `78e89ea4`:
 Both typecheck projects 0 at `5ace5d7c`; both audits unchanged since Task 15's baseline (F31's three
 rows). **PRODUCT FINAL at `35dc4c15`** (`c1c08bd7` is docs).
 
+### THE FINAL GATE RE-RUN — `c1c08bd7` (product final at `35dc4c15`) — the gate of record for this branch
+
+Measured by the orchestrator 2026-09-16 14:52–15:39Z (17:52–18:39 local), detached, same instrument,
+concurrent with the records seat. The four-count line, verbatim from
+`scratchpad/logs/final-gate/full-c1c08bd7.four-count.txt`:
+
+```
+FOUR-COUNT  failures=141  suite-load=0  skips=0  unhandled=1
+TOTALS(json)  tests=5271  passed=5130  failedTests=141  files=425  failedFiles=31
+```
+
+Delta against `6cdc14b2`: **CLEARED 1** — the `register-support-publication` policy-row pin (the `35dc4c15`
+fix; entailed). **NEW 1** — `tests/integration/registration-database.test.ts` › *"S3d rework7 B4 measures
+healthy-MTA availability against the structural 103 cap"* — an F22 load-coupled row of the suite whose two
+siblings cleared between `78e89ea4` and `6cdc14b2`; consistent-with `env:resource` (the records seat's own
+processes shared the machine; no product or registration file changed between the two gates — exactly one
+test file differs). **UNHANDLED 1** — the same s7 rejection. **STILL RED 140** — the Phase 1 names.
+**Every one of the 141 is owned:** 100 `env:toolchain` (`localStorage`, Node 26), 40 owned rows, 1
+`env:resource`. Appended by the orchestrator, as RESUME's "exact next action" instructed.
+
 ### Open after this continuation
 
-- **The full-suite re-run at the tip `c1c08bd7`** — started detached with the same instrument. Its
-  four-count is MEASURED, never predicted; the orchestrator appends the result. Until it lands, the gate
-  of record for this branch is `6cdc14b2` **plus** the Task 15 round-2 fix at `35dc4c15`.
+- **The gate of record is `c1c08bd7` — 141/0/0/1** (above). A Node 22.23.1 run and a quiet machine are
+  the two environment conditions under which the 101 environment rows are expected to move; both are the
+  operator's.
 - **Operator-owed, cannot be done by a seat:** a Node **22.23.1** run (expected to clear ~100
   `localStorage` rows and reveal ~4 real `t1-canvas` reds); the **Grok re-run** (Docker Desktop, then the
   ceremony once); the **acceptance ceremony re-run** on this branch; the **mono-maker run**; the **δ/ε

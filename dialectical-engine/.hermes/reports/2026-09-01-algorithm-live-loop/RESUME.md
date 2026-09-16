@@ -317,3 +317,22 @@ merge damage), T3B (never authorized), and F-TOOL-MUTATE-3 (still at the rework 
 `lane-cont-t2`, `lane-cont-t3`, `lane-cont-t8` — hold only untracked packet copies. Remove them with
 `git worktree remove`; never reuse them. Subagents inherit the parent session's worktree pin, so lanes
 are not available in this harness (D73 d).
+
+## 2026-09-16 18:4x — NEWEST ENTRY WINS
+
+**The re-run landed.** The full suite at the tip `c1c08bd7` (product final at `35dc4c15`) measures
+`FOUR-COUNT failures=141 suite-load=0 skips=0 unhandled=1 · tests=5271 passed=5130 files=425 failedFiles=31`
+(verbatim from `scratchpad/logs/final-gate/full-c1c08bd7.four-count.txt`). Against `6cdc14b2` the fixed
+publication pin CLEARED and one F22 load-coupled `registration-database` row went red (env:resource — the
+records seat shared the machine). **This is the gate of record for the branch; every name is owned** — the
+rows are in `PROGRESS.md` (§ THE FINAL GATE RE-RUN) and `LEDGER.md`. Appended by the orchestrator, the
+records' writer, exactly as the previous entry's "exact next action" said.
+
+**What happens next, in order:** (1) the blind second-lens whole-branch review — packet
+`packets/cont-final-review.md`, a reviewer that never codes, verdict file in the SDD workspace; its
+findings get ONE fix dispatch and a scoped re-check; (2) the orchestrator's final report to the operator;
+(3) **the operator**: push (D70), the Node 22.23.1 run, and — after the ceremony's phase report is extended
+to print the six absent facts (`agent-reports/w12-closure-audit-2026-09-16.md` §6 step 1, code, no spend) —
+the M≥2 re-run with Docker up, the M=1 run, δ/ε, the seven confirm-items, the verdict.
+
+**Nothing is pushed.** Tip when this entry was written: the commit that carries it.
