@@ -205,3 +205,99 @@ packet, not in the seat.
   mark "once T15's harness lands, whenever a grader shares an identity with its candidate". That
   harness is not in scope here and `deriveDegradedDiversity` is exported so a second caller can reuse
   the rule rather than restate it.
+
+---
+
+# Addendum — fix round 1 (the collateral I did not see, and why)
+
+Fix commit `e78d195d`. One assertion changed: `tests/integration/database.test.ts:3987`.
+
+## The finding I reported as ABSENT, and it was present
+
+My round-0 handoff said, in bold: *"my change alters and removes NO literal … no test pinned the
+absent producer, so no suite was edited at any assertion."* That sentence is true and it is
+**misleading**, which is the worse failure of the two.
+
+It is true because the WHO-READS-THIS-STRING law says what it says: run the grep for every literal
+your change **alters or removes**. I altered none. The grep came back with two readers — the kernel
+declaration and the UI label — and both were untouched. Mechanically correct.
+
+It is misleading because I answered the law's question instead of the real one. **A literal that is
+ALTERED has readers of the literal. A literal that is newly EMITTED has readers of the COLLECTION it
+joins** — every test that pins the exact list the new value now appears in. Grepping the literal
+cannot possibly find them: before my emitter existed, no test could mention a mark nothing produced.
+`tests/integration/database.test.ts:3987` pins the served answer's mark list exactly, its fixture
+seals both synthesis refs to one identity **on purpose** (`:238-240`, `identicalRoleRefs: true`), and
+so it went red the moment `e4bd9821` landed.
+
+**PRICE:** one orchestrator review cycle, one fix round, ~25 minutes of my time and about 12 minutes of
+integration-suite wall clock across three reader runs plus two RED/mutant runs. It would have cost
+**one grep** — under a minute — at round 0.
+
+## The cause, stated so it generalises
+
+This is not "I forgot to run the integration suites". I DID name that gap honestly in round 0 under
+UNVERIFIED, and I gave a reason that sounded good and was wrong: *"the change does not touch the
+persist path, the schema or any SQL."* All three clauses are true. **And the defect had nothing to do
+with any of them.** The answer's CONTENT changed, which no amount of reasoning about the persistence
+MACHINERY can reach.
+
+The cause is a reasoning pattern worth naming, because I expect it to recur: **I reasoned about which
+CODE PATHS my diff touched, when the question was which VALUES my diff changed.** A one-file change
+with a clean blast radius in the call graph can still change what every consumer of that value sees.
+Blast radius in the call graph is not blast radius in the data.
+
+**The mechanical fix, which is what I would want a future seat handed:** after adding a producer for a
+value, grep for EXACT pins of the collection that value joins, then for each hit ask whether its
+fixture puts the run in the state the emitter fires on. Here: `grep -rnF 'condition_marks: [' tests
+acceptance` (and three sibling spellings) → 52 hits → filter to the 4 that are exact pins of a served
+answer → `grep -n 'synthesizerRoleRef' <suite>` on each → exactly one collapses the identities. Two
+greps, four rows to read.
+
+## What I got RIGHT, and it is worth keeping
+
+The crash-terminal boundary. In round 0 I set `degradedDiversity: null` in `componentsOnly` and
+`createEnvelopeExhaustedResult` and defended it as a design decision that a reviewer could overturn.
+This round turned it into a **measurement**: `database.test.ts:4497` (envelope exhausted),
+`:4600` and `:4614` (digest cannot exist) are three live exact pins of crash answers **in the very
+suite whose fixture collapses the identities**, and all three stayed green with no edit. A boundary I
+argued for is now a boundary the suite enforces. I could not have known that in round 0 without
+running the integration suites — which is one more reason the answer to "should I have run them?" is
+yes, and the reason is not only the failure it would have caught.
+
+I also caught and corrected my own false constant this round: the first fix commit message said the
+sweep found "40 hits" — an estimate I wrote before counting. Measured: 52. Amended before anything
+left the worktree. **A number I have not counted is a guess, and a guess in a commit message is the
+same defect as a guess in a report**, just harder to find later.
+
+## What I NEARLY got wrong this round
+
+I nearly took the review's diagnosis as the RED. The orchestrator's JSON frame is
+`expected { …(36) } to match object { verdict_state: 'CONTESTED', …(4) }` with "40 matching properties
+omitted" — it names the assertion but NOT which property moved. Accepting "your emitter added the
+mark" from that frame would have been trusting a conclusion over an observation. I re-ran the suite
+with the default reporter (~3 minutes) and got the diff, which gave me something the diagnosis did not:
+the **POSITION**. The mark lands third of four, not last, because the chain appends it before the
+runner appends `LABEL-BASIS-INCOMPLETE`. Had I patched the pin from the diagnosis alone I would have
+appended it at the end and taken a second red.
+
+## Toward the one-prompt machine — one addition to my round-0 list
+
+My round-0 upgrade (2) was "a packet should carry DISCRIMINATORS, not CANDIDATES". This round adds a
+sharper one, and it is a change to a LAW rather than to a packet:
+
+**WHO-READS-THIS-STRING should have two limbs, not one.**
+- *Limb 1 (exists):* for every literal you ALTER or REMOVE, grep the literal; every reader suite joins
+  your gate.
+- *Limb 2 (missing):* for every value you newly EMIT into a collection, grep the EXACT pins of that
+  collection; for each, check whether its fixture reaches your emission condition.
+
+Limb 2 is the same shape as limb 1 and the same cost. Without it the law returns a clean bill of health
+that provably does not cover the change — which is worse than no law, because a seat that ran it (me)
+reports "no readers" with evidence, and the reviewer has to find the collateral by running suites.
+`toContain` and `expect.arrayContaining` pins are immune by construction, so limb 2's real cost is
+tiny: here it cut 52 hits to 4 rows worth reading.
+
+The orchestrator has already charged the blind spot to itself. I record it here too, because **I am the
+seat that ran the law, satisfied it, and shipped the collateral** — the law being incomplete does not
+make my "no readers exist" sentence less wrong, and the next seat will read this file, not the review.

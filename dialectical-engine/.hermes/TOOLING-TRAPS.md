@@ -5218,3 +5218,24 @@ not in 4 000 lines of prose every author skims.
   wrong when it was written, and a MULTI-ALTERNATIVE grep is what hid it.
 - **Rule: when a packet's grep ORs several patterns as evidence for one claim, run each alternative
   separately once. A zero-hit alternative inside an OR is indistinguishable from a satisfied one.**
+
+## A NEW EMISSION has readers too, and WHO-READS-THIS-STRING as written cannot see them (2026-09-16, BUILD(CONT-T13) fix round 1)
+- The law's stated trigger is "for every string literal your change ALTERS or REMOVES". W2 altered and
+  removed nothing — it added a producer for a literal that already existed — so the binding grep ran,
+  found only the kernel declaration and the UI label, and correctly reported "no reader to update".
+  One integration test then went red: `tests/integration/database.test.ts:3982` pins the served
+  answer's mark list EXACTLY, and the new mark joined that list.
+- The blind spot is precise: **a literal that is ALTERED has readers of the literal; a literal that is
+  newly EMITTED has readers of the COLLECTION it joins.** Grepping the literal cannot find them,
+  because before the emitter existed no test could mention it.
+- The second grep, and it is cheap: for a mark, a badge, a gate trace or any member of a collection an
+  answer carries, grep for EXACT pins of that collection —
+  `grep -rnF 'condition_marks: [' tests acceptance` plus the camel, `.toEqual` and `toStrictEqual`
+  spellings — then, for each hit, check whether its fixture puts the run in the state your emitter
+  fires on. Here that second test is `grep -n 'synthesizerRoleRef' <suite>`: one suite of the 52 hits
+  sealed identical refs, and it was the one that went red.
+- `toContain` and `expect.arrayContaining` pins are immune by construction and need no review; only
+  EXACT collection pins are in the class. That distinction cuts the sweep from 52 rows to 4.
+- **Rule: adding a value to a collection is a change to every EXACT pin of that collection. Run the
+  collection sweep whenever you add a producer, and note that the WHO-READS-THIS-STRING grep will
+  return a clean bill of health that does not cover it.**
