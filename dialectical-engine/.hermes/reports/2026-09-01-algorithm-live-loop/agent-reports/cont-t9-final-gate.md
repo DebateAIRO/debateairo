@@ -225,3 +225,54 @@ a seat that was not warned would have mis-joined them.
 
 Full attribution table, RED/GREEN frames, the mutant table, the four-count and the KNOWN REDS block:
 `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/algo-loop-2026-09-16/.superpowers/sdd/2026-09-16-algorithm-live-loop-continuation/task-9-report.md`
+
+---
+
+## 8. Addendum — fix round 1 (FINDING F1), gate tip `78e89ea4`
+
+I closed my first pass with one red name and no owner: `tests/unit/v2ui-node-runner.test.ts` ›
+*executes the maintained 31KB scoring-response behavioral suite*, filed **UNATTRIBUTED** because the
+measurement of record listed it green and it was not among my assigned 21. The coordinator pushed it
+back under D64 ADDENDUM 8. That was correct, and the reflex I got wrong is worth naming precisely:
+
+> **A row that is red at the tip and green in the baseline is this branch's by default.** "It is not in
+> my assigned set" is a statement about the packet, not about the code. The whole diagnosis took about
+> four minutes; declining to spend them cost a review round.
+
+**Cause.** Commit `58ba1376` (BUILD(CONT-T3)) changed `.libTab { font-weight: 700 → 600 }` in
+`apps/ui/app/globals.css` — correctly, because `tests/unit/pda-s03-keyboard-accessibility.test.ts:193`
+pins `"600"` as the ruled value. But the same constant was independently pinned at `700` by
+`apps/ui/components/debateReferenceDesign.source-test.mjs:71`, a **node** source test that the root
+vitest gate only reaches through a spawned subprocess. Fixing one oracle broke the other.
+
+**Two upgrades come out of this, and both are cheap:**
+
+1. **A constant pinned by more than one oracle needs one named source.** Nothing connected
+   `pda-s03`'s `"600"` to the source test's `700`; they are different runners, different assertion
+   libraries, different directories, and the only thing they share is a CSS property. A seat fixing
+   one cannot discover the other by reading its own cluster. The cure is a grep-able registry of
+   cross-oracle constants, or at minimum a comment at each pin naming its sibling — which is what I
+   left behind at the site I fixed.
+2. **A nested-runner gate must name the inner failure in its own message.** The vitest row's entire
+   evidence was `expected { status: 1, … } to match object { status: 0 … }` — the inner runner's
+   stdout and stderr were captured into the assertion object and then *omitted from the printed diff*
+   ("2 matching properties omitted"). The failing test's name, file and regex were all present and all
+   invisible. Every reader of that gate line has to re-run the subprocess by hand to learn anything.
+   **Assert on the inner runner's parsed failure list, not on its exit status** — or at minimum print
+   `result.stdout` on failure. Priced: one manual re-run per person who ever meets this row.
+
+**What the fix was, and was not.** `700 → 600` in the source test, with the ruling cited in place. It
+is not a weakening: the regex still pins an exact weight, and the two oracles now agree on one value.
+The mutant check was exactly this — restoring `700` turns the row RED again, so the assertion still
+catches the thing it exists to catch.
+
+**Method note worth keeping.** `git bisect run` confirmed `58ba1376` in six steps of two seconds each,
+but the direct evidence was cheaper and arrived first: the source test's blob is `26bf5d13` at **both**
+ends of the range (so the test never moved), and `git log -- apps/ui/app/globals.css` returns exactly
+one commit in the range. **When a row flips inside a branch, compare the test's blob at both ends
+before bisecting** — if the test is unchanged, the cause is in what it reads, and `git log -- <that
+file>` often names it outright.
+
+**Gate at `78e89ea4`:** 142 test failures / 0 suite-load failures / 0 skips / 1 unhandled error;
+5050/5192 passed; 31 of 419 files. The failing-file diff against the previous gate is a single line —
+`v2ui-node-runner` removed — so nothing else moved. **No red name is left without an owner.**
