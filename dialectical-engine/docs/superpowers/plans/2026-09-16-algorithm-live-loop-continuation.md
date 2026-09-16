@@ -136,6 +136,23 @@ Attribution (verifier §6 rows 16–19, §7 rows 2–3, 10, §8b, §9 "not menti
 - [ ] **Step 3: GREEN.** The Step 1 commands → 0 failed; `pnpm exec vitest run tests/unit/t17-envelope.test.ts tests/integration/t17-envelope-ledger.test.ts tests/integration/t16-algorithm-register.test.ts tests/architecture/t16-algorithm-register-rows.test.ts acceptance/runtime-policy.test.ts` passed/total; `pnpm run typecheck`; `pnpm run audit:architecture` unchanged from Task 1's verdict.
 - [ ] **Step 4: Commit** one commit per cluster (`fix(api): …`, `fix(reconcile): …`, `test(gates): …`) and report with the per-row decision table.
 
+### Task 5b: Restore the column-level grant floor for `debateai_obs_view_owner` (security finding of Task 5)
+
+Minted 2026-09-16 by the orchestrator from BUILD(CONT-T5)'s finding F1 (pre-existing on the second parent, STRENGTH entailed): `migrations/0060_observation_throughput_views.sql:23` issues a TABLE-level `GRANT SELECT ON core.run, core.work_item, ledger.raw_artifact TO debateai_obs_view_owner`, superseding the five-column grant of `migrations/0034_obs_foundation.sql:274-275` (`run_id, created_at_seq, register_version, battery_version, risk_tier`), so the owner reaches `content_ciphertext`, `question_line`, `question_blind_index`, `session_id` and every other column. The views it owns are `security_invoker = false`, so its privilege IS the chokepoint floor; `0060`'s own `obs.run_throughput_v` reads only `run_id` and `created_at_seq`. The two `NOT UPDATED` rows of `tests/integration/obs-l1-s01-foundation.test.ts` are the guard that caught it and stay as they are.
+
+**Files:**
+- Create: `migrations/<next free number>_obs_view_owner_column_floor.sql` (a forward migration — a landed migration is never amended)
+- Modify: `tests/integration/obs-l1-s01-foundation.test.ts` (only the two `NOT UPDATED` comments, rewritten to state the repair; the pins are unchanged)
+
+**Interfaces:**
+- Consumes: Task 5 (the per-row pins and the finding).
+- Produces: after the chain applies, the owner holds SELECT on `core.run` for exactly the five columns and no table-level SELECT; `core.work_item` and `ledger.raw_artifact` narrowed to exactly the columns `0060`'s views read (measured); every `0060` view still selects; the two rows GREEN.
+
+- [ ] **Step 1: RED.** `pnpm exec vitest run tests/integration/obs-l1-s01-foundation.test.ts` → the two rows red (paste); measure the role's current privileges in the test database (`information_schema.column_privileges`, `has_table_privilege`) and the columns each `0060` view reads.
+- [ ] **Step 2: Implement** the forward migration (REVOKE the table-level grants, GRANT the column lists), idempotent on re-application, numbered above the highest existing migration (measured at write time).
+- [ ] **Step 3: GREEN.** The file passes; the same file THREE times; `pnpm exec vitest run tests/integration/tint1-upgrade-migration.test.ts tests/integration/database.test.ts tests/integration/obs-agent-06-views.test.ts tests/integration/obs-agent-06-status.test.ts` passed/total; `pnpm run audit:source` unchanged; `pnpm run typecheck`. Mutant: the REVOKE commented out → the rows RED again. Boundary: `run_id` readable by the owner (admitted), `content_ciphertext` not readable (rejected).
+- [ ] **Step 4: Commit** as `fix(obs): restore the column-level grant floor for debateai_obs_view_owner (forward migration <n>)`.
+
 ### Task 6: The source audit and the scaffold pins
 
 Attribution (verifier §5b, §6 row 15, §10 item 3): `audit:source` has 5 blocking rows; `scaffold.test.ts:29` pins exactly the three `packages/obs-capture/install/*.ts` env-read rows (V's accepted state, F18/F31 owned). The 4th (`packages/serve/src/synthesis.ts exports a numeric source literal instead of a register/law carrier`) is pre-existing on the first parent; the 5th (`migrations/0061_algorithm_publication_profiles.sql:10 has bare CREATE FUNCTION without OR REPLACE`) is the merge's own new file — absent on both parents.
