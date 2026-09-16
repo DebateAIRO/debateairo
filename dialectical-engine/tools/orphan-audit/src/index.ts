@@ -28,8 +28,14 @@ const rows: readonly Row[] = [
   ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract"]],
+  // `support-kb` is DECLARED, not a violation: V's support program depends on
+  // the package in shipped code. `@debateai/support-kb` entered apps/api's and
+  // apps/runner's manifests on the second merge parent at 9c68ceb3 ("feat(support):
+  // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
+  // lagged the product only because this audit was crashing on the retired `web`
+  // manifest read and had never reported a verdict. Both rows are the same commit.
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract", "support-kb"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   // The `web` row retired with its surface: `web/` is retired in favour of
