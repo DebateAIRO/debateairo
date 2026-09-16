@@ -2,10 +2,16 @@
 # board-lint — typed-state validator vs spine enums + high-risk floor triggers.
 # Ranked-#1 upgrade from the 2026-08-31 orchestrator self-report. Usage: board-lint.sh board/*.md
 FAIL=0
+# The summary counts what was CHECKED and what was SKIPPED here, where the skip
+# is decided — never a second copy of the pattern below, which would drift from
+# it. `OK (N files)` used to print the count HANDED IN and read as coverage.
+CHECKED=0
+SKIPPED=0
 for f in "$@"; do
   [ -f "$f" ] || continue
   base=$(basename "$f")
-  case "$base" in F*-*.md) continue;; esac   # finding tickets carry no state block
+  case "$base" in F*-*.md) SKIPPED=$((SKIPPED + 1)); continue;; esac   # finding tickets carry no state block
+  CHECKED=$((CHECKED + 1))
   head -1 "$f" | grep -qE '^\# \[(claude@opus-5|claude@fable-5|codex@gpt-5\.6-sol|unassigned)\]' \
     || { echo "$base: title lacks [model] bracket tag"; FAIL=1; }
   tier=$(grep -m1 'risk_tier:' "$f" | sed 's/.*risk_tier:[[:space:]]*//;s/[[:space:]].*//')
@@ -30,5 +36,5 @@ for f in "$@"; do
     [ "$tier" = "high" ] || { echo "$base: floor trigger present but risk_tier=$tier (must be high)"; FAIL=1; }
   fi
 done
-[ $FAIL -eq 0 ] && echo "board-lint: OK ($# files)"
+[ $FAIL -eq 0 ] && echo "board-lint: OK (validated $CHECKED of $#; $SKIPPED F*-*.md finding tickets carry no state block, skipped by design)"
 exit $FAIL
