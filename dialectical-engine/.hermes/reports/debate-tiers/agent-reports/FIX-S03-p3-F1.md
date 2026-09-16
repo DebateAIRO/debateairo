@@ -53,3 +53,51 @@ The orchestrator should compile the prompt into a machine-checkable invariant ta
 | Consumers | migration compatibility | receipt, api.env, /new |
 
 From that table it can derive the allowed files, grep every assertion that mentions the symbols, run packet-check plus the real cluster command, and dispatch one coherent class ruling. That would have prevented all three packet defects and converted this seat from a multi-ruling conversation into one prompt plus one verification pass.
+
+## RULING 4
+
+### Cause
+
+The packet treated a repository fixture digest as evidence of the database's sealed history. It called
+`42b90bca…` the pre-S03 v4 digest because that was what the code fixture produced, but nobody had
+measured `register._snapshot_sha256(4)` on V's database. The live measurement proved that
+`42b90bca…` belongs to GENERAL version 9: it contains the later five-slot provider set. The actual
+sealed v4 is `120bdfea…` and contains only `codex-cli`, `claude-cli`, and `grok-cli`.
+
+The historical/current design was correct, but its historical constant copied the wrong era. This is
+the fourth packet defect on the seat and the most expensive one because all repository verification
+was self-consistent while the real restart still drifted.
+
+### Price
+
+- One consumed and merged READY (`ef302060`) that still failed on the only database whose sealed
+  bytes mattered.
+- A fourth orchestration ruling and continuation ticket.
+- Another RED/GREEN/mutant cycle, three C3 runs, the 57-test database pair, the 17-file integrated
+  run, C4, route pins, typecheck, and the full cluster marker—roughly another 20 minutes dominated by
+  embedded PostgreSQL.
+- One additional class-sweep miss found by C3: the title `seeds exactly every production API boot
+  row, seals it, and reuses it unchanged` still asserted five historical providers.
+
+### What must improve
+
+1. A packet may never label a digest as database history from code inspection alone. Historical
+   constants require provenance: database version, measured digest, row count, and per-row diff.
+2. The dispatch preflight should compare the proposed historical builder against the authoritative
+   sealed rows before any worker starts. Here that would have shown 31 equal rows and one
+   `configuredProviderSet` mismatch immediately.
+3. Class sweeps must include semantic assertions such as decoded provider lists, not only references
+   to the builder and digest constant. The C3 diagnostic found the omitted decoded-value assertion.
+4. The invariant table from the original report is corrected for RULING 4:
+   historical v4 = three-provider set / `120bdfea…`; later five-slot publication =
+   `42b90bca…` at v9; current S03 publication remains derived from current inputs.
+
+### Dead ends and near misses
+
+- Changing the current publication builder would be wrong; the five-slot set still arrives by
+  publication exactly as designed.
+- Changing SQL, the v4 cap, replay drift enforcement, generator order, or api.env predicates remains
+  out of scope and unnecessary.
+- A test-only digest change would have left production drifting. The mutant that restored the two
+  premium historical entries reproduced `REGISTER_PUBLICATION_SEAL_INVALID: historical replay drift`,
+  proving the production constant is the decisive boundary.
