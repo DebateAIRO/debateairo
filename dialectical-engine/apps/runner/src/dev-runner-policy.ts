@@ -279,6 +279,12 @@ export async function readDevelopmentRunnerPolicy(
       evaluatorRoleRef: synthesisRoles.evaluatorRoleRef,
       evaluatorLoopMaxRounds: synthesisRoles.evaluatorLoopMaxRounds,
       identicalRoleRefs: synthesisRoles.identicalRoleRefs,
+      // W10/3: the sealed cost rows the same T16 reader resolved. Passed
+      // through verbatim — the runner carries no bound of its own for these
+      // roles, and the deployment can no longer omit them: the field is
+      // required, so this line is compile-enforced.
+      synthesizerBound: synthesisRoles.synthesizerBound,
+      evaluatorBound: synthesisRoles.evaluatorBound,
       sourceRefs: synthesisRoles.sourceRefs
     }),
     hashes: Object.freeze({

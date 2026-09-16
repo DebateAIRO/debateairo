@@ -262,6 +262,20 @@ export interface RunnerSynthesisRolePolicy {
   readonly evaluatorRoleRef: string;
   readonly evaluatorLoopMaxRounds: number;
   readonly identicalRoleRefs: boolean;
+  /**
+   * W10/3: the SEALED cost bound for each synthesis role, read from the T16
+   * register family by the deployment's boot and handed here whole.
+   *
+   * REQUIRED, not optional, and that is the point: until this field existed the
+   * synthesizer was handed COMPOSER's bound and the evaluator CONFORMANCE's —
+   * two organs T9 retired, both at 60_000ms against the JUDGE's 180_000. An
+   * optional field would have let a deployment keep borrowing them silently;
+   * required makes every settings constructor a compile error until it says
+   * which bound the role spends, which is the same guard board F33 chose for
+   * `synthesisRolePolicy` itself.
+   */
+  readonly synthesizerBound: CallBound;
+  readonly evaluatorBound: CallBound;
   readonly sourceRefs: Readonly<Record<string, string>>;
 }
 
@@ -2128,10 +2142,24 @@ export class WalkingSkeletonRunner {
   }
 
   private async execute(workItemId?: string): Promise<RunnerExecutionResult> {
+    // W10/3: the claim must cover the LONGEST call this execution can make, and
+    // since the synthesis legs now spend their own sealed bounds those two
+    // deadlines belong in the max. The composer/conformance pair STAYS: both are
+    // still declared deployment bounds, `Math.max` makes a shorter one a no-op,
+    // and dropping them would loosen the claim guard for no gain.
     const longestDeadline = Math.max(
       this.settings.judgeBound.deadlineMs,
       this.settings.composerBound.deadlineMs,
-      this.settings.conformanceBound.deadlineMs
+      this.settings.conformanceBound.deadlineMs,
+      // Optional-chained ON PURPOSE, and `0` can never raise a maximum. The
+      // ABSENT family is not this guard's to report: a caller who defeats the
+      // required type (a JavaScript caller, a cast, settings built from parsed
+      // data) must still reach the NAMED refusal below —
+      // `SYNTHESIS_ROLE_CONTROLS_UNRESOLVED`, ~80 lines on — instead of dying
+      // here on `Cannot read properties of undefined`. Measured: without this,
+      // the test that pins that runtime gate reports a raw TypeError.
+      this.settings.synthesisRolePolicy?.synthesizerBound.deadlineMs ?? 0,
+      this.settings.synthesisRolePolicy?.evaluatorBound.deadlineMs ?? 0
     );
     assertClaimCoversCall({
       claimMs: this.settings.claimMs,
@@ -2717,8 +2745,18 @@ export class WalkingSkeletonRunner {
         contractHash: this.settings.judgeContractHash,
         maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)
       },
-      { contractHash: this.settings.composerContractHash, maxAttempts: this.settings.composerBound.maxAttempts },
-      { contractHash: this.settings.conformanceContractHash, maxAttempts: this.settings.conformanceBound.maxAttempts }
+      // W10/3: the CONTRACT HASH still names the OUTPUT contract (the composition
+      // and verdict schemas), which this ticket does not touch — but the attempt
+      // budget must be the one the call actually spends, and that is now the
+      // synthesis role's sealed `maxAttempts`, not the retired organ's.
+      {
+        contractHash: this.settings.composerContractHash,
+        maxAttempts: this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
+      },
+      {
+        contractHash: this.settings.conformanceContractHash,
+        maxAttempts: this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts
+      }
     ]) {
       const exhausted = await this.#ledger.findExhaustedModelAttempt({
         runId: run.runId,
@@ -4095,7 +4133,11 @@ export class WalkingSkeletonRunner {
           callSiteKey: synthesizerCallSiteKey,
           role: "SYNTHESIZER",
           lane: "served",
-          bound: this.settings.composerBound,
+          // W10/3: the SYNTHESIZER's own sealed bound. It used to be
+          // `composerBound` — an organ T9 retired — which is how the longest
+          // generation in the system ended up with a 60-second clock while the
+          // judge, answering about ONE node, had 180.
+          bound: this.settings.synthesisRolePolicy.synthesizerBound,
           contractHash: this.settings.composerContractHash,
           providerRef: role.providerRef,
           packet,
@@ -4167,7 +4209,8 @@ export class WalkingSkeletonRunner {
           callSiteKey: evaluatorCallSiteKey,
           role: "EVALUATOR",
           lane: "served",
-          bound: this.settings.conformanceBound,
+          // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
+          bound: this.settings.synthesisRolePolicy.evaluatorBound,
           contractHash: this.settings.conformanceContractHash,
           providerRef: role.providerRef,
           packet,

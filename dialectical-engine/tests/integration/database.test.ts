@@ -239,6 +239,21 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
     evaluatorRoleRef: "provider:test-layer",
     evaluatorLoopMaxRounds: 3,
     identicalRoleRefs: true,
+    // W10/F3: the two roles' OWN sealed bounds. Deliberately DISTINCT from
+    // `composerBound`/`conformanceBound` above and from each other, so the
+    // recorded-bound assertion can tell which one the call site actually used —
+    // a fixture that repeated the composer values would pass either way.
+    //
+    // They differ in `tokenCeiling` and NOT in `deadlineMs`, and that is
+    // measured, not stylistic: the synthesis deadlines now enter the claim
+    // guard (`assertClaimCoversCall`, apps/runner/src/index.ts execute), whose
+    // requirement is `holds * (cooldown + deadline) + deadline + margin`. With
+    // this file's `maxCooldownHoldsPerRun: 2` and `cooldownMs: 600_000`, every
+    // extra second of deadline costs three against the claim, and a 4_000ms
+    // synthesizer deadline put 25 scenarios over CLAIM_BOUND_MISMATCH. The
+    // deadline's participation in that arithmetic is pinned on its own, below.
+    synthesizerBound: { maxAttempts: 1, tokenCeiling: 512, deadlineMs: 1_000 },
+    evaluatorBound: { maxAttempts: 1, tokenCeiling: 768, deadlineMs: 1_000 },
     sourceRefs: {
       synthesizerRoleRef: "test-layer:J8",
       evaluatorRoleRef: "test-layer:J8",
@@ -628,18 +643,26 @@ async function executeResil01Scenario(input: {
 function recordingRunner(endpoint: string, settings = runnerSettings()): {
   readonly runner: WalkingSkeletonRunner;
   readonly evaluatorCalls: readonly ProviderCallRequest[];
+  /** W10/F3: the SYNTHESIZER half of the same boundary, recorded the same way. */
+  readonly synthesizerCalls: readonly ProviderCallRequest[];
 } {
   const evaluatorCalls: ProviderCallRequest[] = [];
+  const synthesizerCalls: ProviderCallRequest[] = [];
   const inner = createPostgresProviderGateway(database.pool, {
     endpoint, model: "test-layer/model", maker: "test-layer"
   });
   const gateway: ProviderGateway = {
     call: async (request) => {
       if (request.role === "EVALUATOR") evaluatorCalls.push(request);
+      if (request.role === "SYNTHESIZER") synthesizerCalls.push(request);
       return inner.call(request);
     }
   };
-  return { runner: new WalkingSkeletonRunner(database.pool, gateway, settings), evaluatorCalls };
+  return {
+    runner: new WalkingSkeletonRunner(database.pool, gateway, settings),
+    evaluatorCalls,
+    synthesizerCalls
+  };
 }
 
 function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): WalkingSkeletonRunner {
@@ -4186,9 +4209,18 @@ describe("apps/runner — legal command lifecycle", () => {
       // callback and the third wire attempt did not exist, and a helper that
       // preserved the contract on its first call but not its second passed.
       // The bound is now the shipped one and the fixture drives all three.
+      // W10/3: the EVALUATOR's attempt budget is its OWN sealed row now, not
+      // CONFORMANCE's. Raising the retired organ's bound here drove nothing:
+      // the evaluator spent `evaluatorBound.maxAttempts` (1) and the run died
+      // on the first schema failure, so the second repair callback and the
+      // third wire attempt this fixture exists to drive never happened.
       const settings = {
         ...runnerSettings(),
-        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 3 }
+        conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 3 },
+        synthesisRolePolicy: {
+          ...runnerSettings().synthesisRolePolicy,
+          evaluatorBound: { ...runnerSettings().synthesisRolePolicy.evaluatorBound, maxAttempts: 3 }
+        }
       };
       const { runner, evaluatorCalls } = recordingRunner(provider.endpoint, settings);
       // NB: the question line feeds the code-first claim classifier
@@ -4260,6 +4292,86 @@ describe("apps/runner — legal command lifecycle", () => {
       // the fingerprinted contract and the sent contract are the same value
       expect(evaluatorCalls[0]!.contractHash).toBe(runnerSettings().conformanceContractHash);
     } finally { await provider.stop(); }
+  });
+
+  /**
+   * W10/F3 · THE COST BOUND EACH SYNTHESIS ROLE IS ACTUALLY HANDED, observed at
+   * the same provider boundary and for the same reason: a source read of the
+   * call site can be redirected by a comment or an alias, and the only thing
+   * that must fail is sending the wrong bound.
+   *
+   * At the base the SYNTHESIZER was handed `composerBound` and the EVALUATOR
+   * `conformanceBound` — two organs T9 retired. In the development deployment
+   * that is 60_000ms against the JUDGE's 180_000; in this fixture it is the
+   * `{1, 256, 1_000}` pair, which is why the fixture seals two DISTINCT bounds:
+   * the assertion has to be able to tell which object arrived.
+   */
+  it("hands the SYNTHESIZER and EVALUATOR their own sealed bounds, not the retired organs'", async () => {
+    const provider = await startProviderDouble([
+      JSON.stringify({ statement: "A looked-up answer.", way_of_knowing: "LOOKED_UP",
+        locator: "https://example.invalid/test-layer", restatement_text: "A looked-up answer.", restatement_status: "PASS", value_laden: false,
+        steelman: { summary: "A looked-up answer.", fidelity: 0.72 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+      JSON.stringify({ segments: [
+        { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+        { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
+      ] }),
+      evaluatorSatisfied()
+    ]);
+    try {
+      const settings = runnerSettings();
+      const { runner, evaluatorCalls, synthesizerCalls } = recordingRunner(provider.endpoint, settings);
+      const work = await createRunnerWork("synthesis-bounds-at-the-gateway");
+      const result = await runner.executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The vacuity guard: an empty recorder cannot satisfy a `for` loop, so the
+      // count is asserted before anything is read out of it.
+      expect(synthesizerCalls.length).toBeGreaterThanOrEqual(1);
+      expect(evaluatorCalls.length).toBeGreaterThanOrEqual(1);
+
+      for (const [index, call] of synthesizerCalls.entries()) {
+        expect(call.bound, `synthesizer attempt ${index}`)
+          .toEqual(settings.synthesisRolePolicy.synthesizerBound);
+        expect(call.bound, `synthesizer attempt ${index}`).not.toEqual(settings.composerBound);
+      }
+      for (const [index, call] of evaluatorCalls.entries()) {
+        expect(call.bound, `evaluator attempt ${index}`)
+          .toEqual(settings.synthesisRolePolicy.evaluatorBound);
+        expect(call.bound, `evaluator attempt ${index}`).not.toEqual(settings.conformanceBound);
+      }
+
+      // The contract hash names the OUTPUT contract (the composition and verdict
+      // schemas), not the cost row, so it is unchanged by this fix and pinned
+      // here so a future edit cannot quietly move it with the bound.
+      expect(synthesizerCalls[0]!.contractHash).toBe(settings.composerContractHash);
+      expect(evaluatorCalls[0]!.contractHash).toBe(settings.conformanceContractHash);
+    } finally { await provider.stop(); }
+  });
+
+  /**
+   * W10/F3 · the SYNTHESIS deadlines are inside the claim arithmetic.
+   *
+   * `execute` refuses a claim that cannot cover the longest call it may make.
+   * Before this fix that maximum was taken over the judge and the two retired
+   * organs only, so a synthesis leg could outlive the claim that authorised it
+   * and nothing would say so. This is the one assertion that fails if the
+   * synthesis deadlines are dropped back out of that maximum.
+   */
+  it("refuses a claim that cannot cover the SYNTHESIZER's sealed deadline", async () => {
+    const base = runnerSettings();
+    const runner = runnerWithEndpoint("http://provider.invalid/v1", {
+      ...base,
+      synthesisRolePolicy: {
+        ...base.synthesisRolePolicy,
+        // 20_000ms against a 10_000ms claim: required is at least
+        // deadline + margin = 21_000, so the guard must refuse. Nothing else
+        // in these settings moves.
+        synthesizerBound: { ...base.synthesisRolePolicy.synthesizerBound, deadlineMs: 20_000 }
+      }
+    });
+    const work = await createRunnerWork("synthesis-deadline-outruns-the-claim");
+    await expect(runner.executeWorkItem(work.workItemId)).rejects.toThrow("CLAIM_BOUND_MISMATCH");
   });
 
   it("derives and persists a firing WOK band ceiling from the register cut matrix", async () => {
@@ -4901,7 +5013,14 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
       const settings = runnerSettings();
       const result = await runnerWithEndpoint(provider.endpoint, {
         ...settings,
-        composerBound: { ...settings.composerBound, maxAttempts: 2 }
+        // W10/3: the SYNTHESIZER's attempt budget is its own sealed row. The
+        // composer bound below is left raised because this fixture's subject is
+        // the composer CONTRACT text, and the two now travel separately.
+        composerBound: { ...settings.composerBound, maxAttempts: 2 },
+        synthesisRolePolicy: {
+          ...settings.synthesisRolePolicy,
+          synthesizerBound: { ...settings.synthesisRolePolicy.synthesizerBound, maxAttempts: 2 }
+        }
       }).executeWorkItem(work.workItemId);
       expect(result.kind).toBe("COMPLETED");
       expect(provider.composerCalls()).toBe(2);

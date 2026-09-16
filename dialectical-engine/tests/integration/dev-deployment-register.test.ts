@@ -637,6 +637,11 @@ describe("DEV-05 complete development deployment register", () => {
         evaluatorRoleRef: "provider:t3c:primary",
         evaluatorLoopMaxRounds: 3,
         identicalRoleRefs: true,
+        // W10/3: provisioning only — this fixture's refusal fires on an EARLIER
+        // gate and no synthesis call is made, so the values only have to exist
+        // and stay inside the claim the fixture declares.
+        synthesizerBound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+        evaluatorBound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
         sourceRefs: {
           synthesizerRoleRef: "test-layer:J8",
           evaluatorRoleRef: "test-layer:J8",
@@ -764,6 +769,11 @@ describe("DEV-05 complete development deployment register", () => {
         evaluatorRoleRef: "provider:test-layer",
         evaluatorLoopMaxRounds: 3,
         identicalRoleRefs: true,
+        // W10/3: provisioning only — this fixture's refusal fires on an EARLIER
+        // gate and no synthesis call is made, so the values only have to exist
+        // and stay inside the claim the fixture declares.
+        synthesizerBound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+        evaluatorBound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
         sourceRefs: {
           synthesizerRoleRef: "test-layer:J8",
           evaluatorRoleRef: "test-layer:J8",

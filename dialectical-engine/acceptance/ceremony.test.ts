@@ -265,6 +265,12 @@ describe("ACC-01 dry-run ceremony", () => {
         evaluatorRoleRef: "acceptance:codex-cli",
         evaluatorLoopMaxRounds: 3,
         identicalRoleRefs: true,
+        // W10/3: provisioning only. This fixture's provider REFUSES every call
+        // (`TEST_PROVIDER_MUST_NOT_BE_CALLED`), so no synthesis bound is ever
+        // spent here; the fixture reuses the same `bound` the organ pair above
+        // uses so the claim guard sees nothing new.
+        synthesizerBound: bound,
+        evaluatorBound: bound,
         sourceRefs: {
           synthesizerRoleRef: "test-layer:J8",
           evaluatorRoleRef: "test-layer:J8",

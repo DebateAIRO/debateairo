@@ -467,6 +467,12 @@ function runnerSettings(): WalkingSkeletonSettings {
       evaluatorRoleRef: "provider:test-layer",
       evaluatorLoopMaxRounds: EVALUATOR_LOOP_MAX_ROUNDS,
       identicalRoleRefs: true,
+      // W10/3: the synthesis legs now spend their OWN sealed bounds. Held at
+      // ORGAN_MAX_ATTEMPTS — the very value the organ pair carries — so the
+      // attempt budget this suite measures is arithmetically unchanged and the
+      // sealed 106 ceiling is proved, not merely assumed, under the new wiring.
+      synthesizerBound: { maxAttempts: ORGAN_MAX_ATTEMPTS, tokenCeiling: 256, deadlineMs: 2_000 },
+      evaluatorBound: { maxAttempts: ORGAN_MAX_ATTEMPTS, tokenCeiling: 256, deadlineMs: 2_000 },
       sourceRefs: {
         synthesizerRoleRef: "test-layer:J8",
         evaluatorRoleRef: "test-layer:J8",
