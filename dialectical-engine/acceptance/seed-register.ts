@@ -358,14 +358,20 @@ function acceptanceValueAst(value: unknown): CanonicalJsonAst {
   throw new TypeError("ACCEPTANCE_REGISTER_VALUE_INVALID");
 }
 
-export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly rowCount: number }> {
-  // Ruling J7: the ceremony's seeding path is a T16 startup surface.
-  const roleRefs = resolveAcceptanceSynthesisRoleRefs();
-  warnOnIdenticalSynthesisRoleRefs({
-    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
-    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
-    deploymentRef: ACCEPTANCE_ALGORITHM_SOURCE_REF
-  });
+/**
+ * The EXACT publication rows `seedAcceptanceRegister` seals into
+ * `ACCEPTANCE_REGISTER_VERSION` — the bootstrap rows plus every acceptance row,
+ * including the fifteen the `register.required_row` manifest
+ * (`migrations/0050_t16_algorithm_register_rows.sql:31-45`) declares mandatory for
+ * that version, `envelope:envelopeFormulaInputs` among them.
+ *
+ * Exported so a fixture that has to stand a database up in a PRE-seeding state
+ * seals a COMPLETE version and varies only the row it is about. Sealing a subset
+ * of a declared version is rejected by `register.assert_required_rows` at the
+ * seal itself (`:58-91`), which is that guard working, not a fixture affordance
+ * to route around.
+ */
+export async function buildAcceptanceRegisterPublicationRows(): Promise<readonly RegisterPublicationRow[]> {
   const [bootstrap, acceptanceRows] = await Promise.all([
     loadBootstrapRegister(),
     buildAcceptanceRegisterRows()
@@ -375,14 +381,24 @@ export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly row
     value,
     sourceRef: bootstrap.resolution[rowKey as keyof typeof bootstrap.resolution]
   }));
-  const rows = [...bootstrapRows, ...acceptanceRows];
-  const publicationRows: readonly RegisterPublicationRow[] = Object.freeze(rows.map((row) =>
+  return Object.freeze([...bootstrapRows, ...acceptanceRows].map((row) =>
     Object.freeze({
       rowKey: row.rowKey,
       valueJsonText: canonicalRegisterJson(acceptanceValueAst(row.value)),
       sourceRef: row.sourceRef
     })
   ));
+}
+
+export async function seedAcceptanceRegister(pool: Pool): Promise<{ readonly rowCount: number }> {
+  // Ruling J7: the ceremony's seeding path is a T16 startup surface.
+  const roleRefs = resolveAcceptanceSynthesisRoleRefs();
+  warnOnIdenticalSynthesisRoleRefs({
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    deploymentRef: ACCEPTANCE_ALGORITHM_SOURCE_REF
+  });
+  const publicationRows = await buildAcceptanceRegisterPublicationRows();
   const receipt = await createPostgresRegisterPublicationPort(pool).importHistorical({
     registerVersion: parseRegisterVersionText(String(ACCEPTANCE_REGISTER_VERSION)),
     rows: publicationRows
