@@ -214,3 +214,17 @@ open anything on V's desktop.
 - 2026-09-13 10:15 EEST - **FREEZE FIXED (V: "the stack fell the moment i inserted a Debate")** — it was a lock freeze, not a crash. Readers of a running debate spun on the runner's EXCLUSIVE run content lease, and the proxy returned 502 after 300 s. `acquireRunContentLease` now takes the lease SHARED; erasure alone stays exclusive. Test `tests/integration/run-content-lease-sharing.test.ts`; Grok PASS in `docs/missions/run-content-lease-sharing/`. Stack restarted 10:09 and the reads now answer in ~20 ms mid-debate. Never `pg_terminate_backend` a live API's session: it poisons its pool for good (`DATABASE_POOL_FAILED`). Restart the API instead. See LEDGER 2026-09-13 10:15.
 
 - 2026-09-13 14:40 EEST - **S03 OPENED (V: "/heartbeat : For the free tier, switch Sonnet 5 with GLM 5.3 Flash. Switch to API_KEYS…")** — Free = `gpt-5.6-luna` + `glm-5.3-flash` over API keys, Premium stays on its CLIs, both tiers declared in `config/models.yaml` (V's shape: tiers list models). Intake `00-intake-S03.md`; slice `t_f14b0ca0`; REQ `t_089ce7cc` running (Opus 5). V's side: an OpenAI API key → `.local/dev-auth/provider-keys.env` (V-34); Z.ai API balance (V-35). Base `7188b167` (yesterday's work committed locally, never pushed); lane `.worktrees/tiers-s03`. See LEDGER 2026-09-13 14:40.
+
+## 12. 2026-09-16 — the stack from the MERGED tree (`.worktrees/all`, integration/all ≥ 3f488b3f): serve order + V's two commands
+
+The main checkout is still at 446c685e (V runs `.hermes/reports/debate-tiers/merge-all-2026-09-14/ff-main.sh` to fast-forward it); until then the
+stack of record is served from `.worktrees/all/dialectical-engine` against a private COPY of the custody (`.local/dev-auth`, cp -Rp on 2026-09-16;
+a symlinked `.local` is refused by every custody-root check). Scripts (all in `.hermes/reports/debate-tiers/logs/`, PID files beside them):
+`serve-merged.sh` (idempotent: panel+env+API `serve-merged-stack.sh` → runner `serve-merged-runner.sh` → UI :3001 `serve-merged-ui-3001-supervised.sh`
+→ TLS front door :3000 `serve-merged-frontdoor.sh`) · `serve-merged-stop.sh` (by PID, supervisors first) · `serve-merged-up.sh` (the product's
+`pnpm dev:auth:up`, which FAILS on this database — historical replay drift at the seed stage, `logs/serve-merged-diag-seed-register.log`) ·
+**`serve-merged-publish.sh` — V's command**: publishes register v10 (S03's configured provider set + the `planTierRosters` row) through
+`pnpm dev:auth:publish-provider-set`, moves the copy's api.env aside, then runs `serve-merged.sh`. Why V: it writes the live dev database and the
+harness refused the orchestrator that write. Without v10 the API exits at startup (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` against v9).
+Docker: `docker start debateai-v3-postgres-1 debateai-v3-hatchet-lite-1` (both were `Exited` after the 09-14 reboot). Keys: `provider-keys.env`
+does not exist → both Free slots absent from the healthy panel (V-34/V-35); the stack still starts (R32) once v10 is published.
