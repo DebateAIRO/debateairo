@@ -168,6 +168,20 @@ async function persistVerdict(runId: string, answerForm: AnswerForm, segmentText
     }),
     confidenceBand: null,
     bandCeiling: null,
+    // FOLD RECONCILE (FL-1, 2026-09-16). This literal was written on
+    // 2026-09-02 against b5a6b6eb, before T9 added `digest`, `loopRounds`,
+    // `standingObjection` and `crashClass` to ServeGateResult; without them the
+    // merged tree gains one TS2739 here (vitest transpiles without checking, so
+    // only `pnpm run typecheck` sees it). The four take the same shape the
+    // repo's own pre-T9 fixture uses (tests/support/settledRun.ts:100-107):
+    // this answer never ran the synthesis loop, so all four are ABSENT rather
+    // than back-filled with a digest or a crash class it never had.
+    // `loopRounds: []` is also what keeps the persist path's producer-binding
+    // proof out of this test — the carrier, not the loop, is what is on trial.
+    digest: null,
+    loopRounds: Object.freeze([]),
+    standingObjection: null,
+    crashClass: null,
     projections: Object.freeze({
       reversalPoint: factBundle.reversalPoint,
       buildsOnPrevious: factBundle.buildsOnPrevious,
