@@ -18,7 +18,7 @@ The slice ticket closes only on V's veto. Everything below is the state at the F
 | 2 | `/new`: Free lists exactly `gpt-5.6-luna` + `glm-5.3-flash`; Premium exactly `gpt-5.6-sol`, `claude-opus-5`, `grok-4.6-build`; `claude-sonnet-5` nowhere; a dot and a name per id | no | V's first run showed `ASK_PLAN_TIER_ROSTERS_UNAVAILABLE: INTERNAL_ERROR` (the route reused a read the API's role may not run — fixed under RULING 7 `t_1af1f40a`, re-served from 8a1d738c); V reloads |
 | 3 | Free debate runs on both models | **V-34** | UNVERIFIED (no keys) |
 | 4 | `discovered_panel` for that run names the two | **V-34** | UNVERIFIED |
-| 5 | Premium debate runs on the three CLI models | no | not run by any seat (real CLI turns are V's) |
+| 5 | Premium debate runs on the three CLI models | no | V's second run: refused `ASK_PLAN_TIER_MODEL_UNAVAILABLE … needs grok-4.6-build` — the panel's grok slot fails on every S03 start because the relay asks grok 1.0.30 for `--model grok-4.6-build`, an id the CLI reports but cannot be asked for (its list: `grok-4.6`, `grok-4.5`); fixing under RULING 8 `t_120e8940` (row V-55); the stack is re-served when it lands, then V retries Start on Premium |
 | 6 | edit one line, restart, `/new` shows it; nothing under `apps/ui/` rebuilt | no | the two-command restart (V-53); V-49 measured: the card and the run read the same file |
 | 7 | a broken edit is refused by name (tier, model id, class); api.env sha unchanged; register version unchanged; the stack keeps serving | no | RULING 5: the curated line is back (all four faults swept) — V confirms live |
 | 8 | with no keys the restart completes, warns per Free entry, `/new` still lists both, a Free debate is refused with `ASK_PLAN_TIER_MODEL_UNAVAILABLE` naming both ids | no | the warning reads `class (a)` rather than the words "missing key" (N3, residue) |
@@ -28,7 +28,7 @@ The slice ticket closes only on V's veto. Everything below is the state at the F
 
 ## 3. Rows for V (`V-DECISIONS-PACKET.md`; the defaults bind until ruled)
 
-V-34 (keys) · V-41 · V-42 · V-48 = NO (residue) · **V-50** (RULING 4 = the same FIX node — default taken) · **V-51** (the runner readiness gate: one line, V's call) · **V-52** (RULING 5 inside S03 — default taken, landed f43b3f8b) · **V-53** (V-51 sequencing: the two-command procedure by default) · **V-54** (V's first test finding — the roster route's privilege gap: RULING 7 inside S03, default taken, landed 1a1c4ede).
+V-34 (keys) · V-41 · V-42 · V-48 = NO (residue) · **V-50** (RULING 4 = the same FIX node — default taken) · **V-51** (the runner readiness gate: one line, V's call) · **V-52** (RULING 5 inside S03 — default taken, landed f43b3f8b) · **V-53** (V-51 sequencing: the two-command procedure by default) · **V-54** (V's first test finding — the roster route's privilege gap: RULING 7 inside S03, default taken, landed 1a1c4ede) · **V-55** (V's second test finding — the grok relay asks the CLI for the file's reported id, which grok 1.0.30 cannot select: RULING 8 inside S03 on `t_120e8940`, default taken; the alternative is a SPEC change to how the file spells a grok model).
 
 ## 4. Residue (ticketed; shown, not hidden)
 
