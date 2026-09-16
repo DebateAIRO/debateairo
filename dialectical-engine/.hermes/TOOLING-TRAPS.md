@@ -4930,3 +4930,41 @@ not in 4 000 lines of prose every author skims.
 - Corollary worth keeping: to count control bytes, use `perl -ne '… /[\x00-\x08\x0B\x0C\x0E-\x1F]/'`.
   A bracket expression with `\xNN` escapes is NOT interpreted by the `grep` on this Mac — it matched the
   literal characters `x`, `0`, `8`, `B`, `C`, `E`, `F` and reported 3886 "control bytes" in a clean file.
+
+## A clean MERGE and a compiling merge are different claims — vitest never typechecks (2026-09-16, BUILD(CONT-T10))
+- Fold-lane FL-1 merged a 2026-09-02 security handoff onto a tree that T6/T7/S06/T9/T12/T13 had
+  rewritten. `git merge --no-ff` was textually clean, the incoming integration test went 2/2, and the
+  six-file gate was 90/90 — while `pnpm run typecheck` was **RED**: the handoff's own
+  `ServeGateResult` fixture predated T9's four new required fields (`digest`, `loopRounds`,
+  `standingObjection`, `crashClass`), one `TS2739`. vitest transpiles and does not typecheck, so no
+  number in any suite summary can see this.
+- Measured, not argued: 0 diagnostics at the base `a30c549f`, 1 after the merge, 0 after the fix.
+  Getting a baseline needs no new worktree — `git checkout --quiet <base>` in your OWN worktree, run,
+  `git checkout --quiet <branch>` back, with `git status --porcelain` empty on both sides.
+- **Rule: a fold's gate is the SUITE PLUS THE COMPILER, and both are read against a measured base.**
+  The reconcile everyone predicted (product regions) was a no-op here; the whole cost was in a test
+  fixture's TYPE, which is the one surface a green suite cannot speak about.
+- The prediction that failed the other way: the brief named the three product regions the patch
+  "assumed" and said T9 had rewritten them. Measured, the `answer_form` site set is IDENTICAL at the
+  patch base and at HEAD — same four roles, +880 lines of drift, no fifth site. A file moving a lot is
+  not the same as its site set moving at all; diff the SITE SET, not the file.
+
+## A mutant can be killed by the DATABASE instead of the assertion, and the transcript looks the same (same seat, same day)
+- Mutant M1 bypassed the encryption at the write site. Expected RED at the test's
+  "stored row contains no plaintext" assertion (`:268`). Observed RED at `:264` — the *persist call* —
+  because `core.enforce_content_ciphertext()` raised `CONTENT_PLAINTEXT_WRITE_FORBIDDEN` inside the
+  INSERT. The plaintext row never existed to be asserted about.
+- Both outcomes print `Tests 1 failed | 1 passed`. A mutant index that records only RED/GREEN cannot
+  tell "the application preserved the invariant" from "the application broke it and a trigger caught
+  it" — which are different findings about different layers.
+- **Rule: record the KILL LAYER (assertion id, or the raising function) beside every kill.** Here it is
+  the good news — defence in depth — but read as an app-level kill it would have overstated the code.
+
+## The migration number a brief predicts is stale the moment another lane lands (same seat, same day)
+- The brief said, three times, that the placeholder migration must become `0062`. Measured at write
+  time, `0062_obs_view_owner_column_floor.sql` already existed on this branch, so the free slot was
+  `0063`. Nothing inside the file depends on the number and the tests locate it by suffix
+  (`/^\d+_serve_answer_content_carrier\.sql$/`), which is why the mismatch was cheap — by design.
+- **Rule: `ls migrations | tail -3` at write time is the number; a number in a brief is a timestamp.**
+  Check both directions afterwards: the collision you were avoiding (`ls migrations | grep -c '^0057_'`
+  still 2) AND the slot you took (`grep -c '^0063_'` = 1).
