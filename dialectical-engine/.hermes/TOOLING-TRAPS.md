@@ -5715,3 +5715,31 @@ not in 4 000 lines of prose every author skims.
 - **Write every path out literally**, keep compound commands short, and put long generated text in a
   scratchpad file that is then `cat >>`-ed into place. A records seat feels this most, because it is the
   one seat whose natural style is a root variable plus a loop.
+
+## `readdirSync(dir, { recursive: true })` is typed `string[] | Buffer[]` — the suite goes GREEN while `tsc` is RED (2026-09-16, FIX(WHOLE-BRANCH) F3)
+
+- Making a non-recursive enumeration recursive is a one-word change, and it ran: the suite was
+  `23 passed (23)` with the mutant probe removed. `pnpm run typecheck` then failed with
+  `TS2339: Property 'endsWith' does not exist on type 'string | NonSharedBuffer'` — the overload
+  chosen without an explicit `encoding` returns `string[] | Buffer[]`, and `.filter(e => e.endsWith(…))`
+  is not valid on that union. Fix: `readdirSync(dir, { encoding: "utf8", recursive: true })`.
+- The live instance of `:4934` ("a clean merge and a compiling merge are different claims — vitest
+  never typechecks"), reached from the other direction: a seat that trusts a green suite ships a tree
+  that does not compile. **Both typechecks after EVERY edit to a `.ts` file, including a test file** —
+  a test file is compiled by the root project too.
+- Cost on this seat: one typecheck round trip; zero if the ordering rule had been followed first.
+
+## A finding's file:line can be ~1450 lines past EOF and everything downstream still quotes it (2026-09-16, FIX(WHOLE-BRANCH))
+
+- The whole-branch verdict cited `acceptance/grok-relay.test.ts:1982-2052` for "the three existing
+  probe cases", and the fix packet carried that range into its read-surface. The file is **549 lines**
+  at the review's own tip (`git show bb5faade:dialectical-engine/acceptance/grok-relay.test.ts | wc -l`
+  = 549) and at the fix base. The cases are at `:448-547`, inside the `describe` at `:385`.
+- The citation was still USABLE, because the finding also named the SYMBOL (`handshakeWithProbedSandbox`,
+  `catch (sandboxedFailure)`) and the behaviour — and the symbol names were all correct. A seat that
+  navigates by `grep -n '<symbol>'` loses nothing; a seat that opens `sed -n '1982,2052p'` gets an
+  empty result and must decide whether the packet or the tree is wrong.
+- **Rule: a file:line in a finding is a claim like any other — `wc -l` the file before you quote the
+  range back, and cite the SYMBOL beside the line so the citation survives the file moving.** The same
+  packet's other constants were checked the same way: `index.ts:2161-2162` verified exact,
+  `board-lint.sh` stated as 26 lines and measured at 34.
