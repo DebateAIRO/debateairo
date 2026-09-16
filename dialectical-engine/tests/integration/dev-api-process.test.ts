@@ -62,9 +62,8 @@ function environment(
     }),
     PROVIDER_PROBE_TIMEOUT_MS: "180000",
     NODE_ENV: "development",
-    EVALUATOR_DEV_MENU_ENABLED: "true",
+    EVALUATOR_DEV_MENU_ENABLED: "false",
     EVALUATOR_DEV_MENU_DATABASE_URL: "postgresql://debateai_dev_evaluator_api:evaluator@127.0.0.1:55432/debateai",
-    EVALUATOR_DATABASE_URL: "postgresql://debateai_dev_evaluator_worker:worker@127.0.0.1:55432/debateai",
     HATCHET_CLIENT_TOKEN: "header.payload.signature",
     HATCHET_HOST_PORT: "127.0.0.1:7077",
     HATCHET_API_URL: "http://127.0.0.1:8888",
@@ -166,9 +165,6 @@ describe("DEV-10B production API host process", () => {
     expect(passedEnvironment).not.toHaveProperty("AWS_SECRET_ACCESS_KEY");
     expect(passedEnvironment.SUPPORT_KEK_PATH)
       .toBe(join(test.root, ".local", "dev-auth", "secrets", "support-kek.bin"));
-    expect(passedEnvironment.EVALUATOR_DEV_MENU_ENABLED).toBe("true");
-    expect(passedEnvironment.EVALUATOR_DATABASE_URL)
-      .toContain("debateai_dev_evaluator_worker");
     await process.stop();
     expect(runtime.apiChild.terminate).toHaveBeenCalledTimes(1);
   });

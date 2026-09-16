@@ -63,7 +63,6 @@ import type {
   EvaluatorConsumerSelectionResult,
   EvaluatorDevMenuView
 } from "@debateai/evaluator";
-import type { EvaluatorRankingsView } from "../../../packages/evaluator/src/rankings.js";
 import { Argon2InfrastructureError } from "@debateai/crypto";
 import {
   captureHandled,
@@ -149,7 +148,6 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/plan-tiers", auth: "user", resource: "plan-tier-rosters", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
-  { route: "GET /v1/evaluator/rankings", auth: "user", resource: "evaluator", action: "read-rankings" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
@@ -270,7 +268,6 @@ export interface ApiOptions {
   readonly legacyRunClaim?: LegacyRunClaimApplication;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
-  readonly evaluatorRankings?: EvaluatorRankingsApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
   readonly support?: SupportApplication;
@@ -284,10 +281,6 @@ export interface EvaluatorDevMenuApplication {
     readonly orderRef: string;
     readonly selectedAt: Date;
   }): Promise<EvaluatorConsumerSelectionResult>;
-}
-
-export interface EvaluatorRankingsApplication {
-  readRankings(): Promise<EvaluatorRankingsView>;
 }
 
 /**
@@ -939,12 +932,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
   });
-
-  if (options.evaluatorRankings !== undefined) {
-    api.get("/v1/evaluator/rankings", routePolicy("GET /v1/evaluator/rankings"), async (_request, reply) => {
-      return reply.send(await options.evaluatorRankings!.readRankings());
-    });
-  }
 
   if (options.evaluatorDevMenu !== undefined) {
     if (!Number.isInteger(options.evaluatorDevMenuRegisterVersion)

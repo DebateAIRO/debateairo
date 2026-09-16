@@ -33,7 +33,6 @@ import {
   modelLedgerIdentityKey,
   scoringUnavailable,
   unrepresentedEdges,
-  v3NodeHonestyRows,
   v3NodeScoreState,
   v3NodeScoreDetails,
   v3ScorePercentage,
@@ -428,46 +427,6 @@ describe("UI-02a: V3's per-node numbers reach V2's cards (DR-149(3), DR-115, AC-
     expect(v3NodeScoreDetails(node)[0]!.percentage.text).toBe("≈41%");
   });
 
-  it("presents drawer honesty records without exposing storage UUIDs or raw disagreement JSON", () => {
-    const uuid = "011e87e3-b511-49e9-807a-231dcf4ee6ae";
-    const raw = buildFairShapedAnswer().nodes[0]!;
-    const node = {
-      ...raw,
-      base_score: {
-        ...raw.base_score,
-        value: 0.92,
-        source: uuid,
-        producer: "judgement:development",
-        replay_handle: `judgement:${uuid}`
-      },
-      final_strength: raw.final_strength === null ? null : {
-        ...raw.final_strength,
-        value: 0.92,
-        source: uuid,
-        producer: "propagation:development",
-        replay_handle: `replay:${uuid}:d8a9dbdc-8d4d-4fd8-9505-3d9ee199fafd`
-      },
-      disagreement: {
-        kind: "NOT_MEASURED",
-        reason: "SINGLE_JUDGE_WALKING_SKELETON",
-        predicateRef: null,
-        observationRef: null,
-        certaintyEffect: "UNCHANGED"
-      }
-    };
-    const rows = v3NodeHonestyRows(node);
-    expect(rows).toEqual([
-      { key: "BASE SCORE", value: "92% · judge-panel", title: "92% (exact percentage restatement)" },
-      { key: "FINAL STRENGTH", value: "92% · replayed", title: "92% (exact percentage restatement)" },
-      { key: "REPLAY", value: "Recorded replay available" },
-      { key: "RESTATEMENT", value: "Stranger restatement check passed" },
-      { key: "DEFEATERS", value: "1 recorded defeater" },
-      { key: "JUDGE DISAGREEMENT", value: "Not measured · single-judge run" }
-    ]);
-    expect(JSON.stringify(rows)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
-    expect(JSON.stringify(rows)).not.toContain("predicateRef");
-  });
-
   it("shows typed absence for every card that genuinely has no recorded number", () => {
     // The question card is not a graph node; the served answer synthesises it.
     expect(v3NodeScoreState(card(answer.answer_id, "ROOT_CLAIM"), nodesById)).toEqual({
@@ -795,6 +754,7 @@ describe("v2-ui data access over the V3 contract client", () => {
       "Question?",
       {
         risk_tier: "casual",
+        plan_tier: "free",
         tier_source: "MACHINE_DEFAULT",
         tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",

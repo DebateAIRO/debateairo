@@ -69,8 +69,7 @@ describe("DEV-10C private local UI process", () => {
       DIALECTICAL_UI_HOST: "127.0.0.1",
       PORT: "3001",
       DIALECTICAL_API_BASE: "http://127.0.0.1:8790",
-      NEXT_PUBLIC_API_BASE: "/api",
-      NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED: "true"
+      NEXT_PUBLIC_API_BASE: "/api"
     });
     await uiProcess.stop();
     expect(runtime.uiChild.terminate).toHaveBeenCalledTimes(1);
