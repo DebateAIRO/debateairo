@@ -1,10 +1,15 @@
 -- Security hardening 2026-09-01 / B21 (finding L5-F2, HIGH) — serve.answer becomes
 -- a content carrier.
 --
--- PROVISIONAL NUMBER: this file is numbered 0057 only as a placeholder. The
--- live mission continues from 0057 after the security mission's 0056, so the
--- folding orchestrator MUST renumber this file (and nothing else in it depends
--- on the number) to the next free slot at fold time. Never edit 0038 / 0040.
+-- RENUMBERED AT FOLD, 2026-09-16 (mission 2026-09-01-algorithm-live-loop,
+-- fold-lane FL-1). This file arrived from the security handoff numbered 0057
+-- as an explicit placeholder. The next free slot was MEASURED on this branch at
+-- fold time rather than assumed: HEAD already carried two 0057_* files
+-- (0057_observation_foundation, 0057_t09_synthesis_round) and ran through
+-- 0062_obs_view_owner_column_floor, so the free slot is 0063 and this file
+-- takes it. `packages/db/src/index.ts` applies migrations/*.sql sorted BY NAME,
+-- so the number is the apply order and nothing else; nothing inside this file
+-- depends on it, and the tests locate it by suffix. Never edit 0038 / 0040.
 --
 -- Additive and replay-safe, in the 0038 / 0040 pattern. No historical heap
 -- tuple is rewritten: rows written before this migration keep NULL carrier
