@@ -4906,3 +4906,27 @@ not in 4 000 lines of prose every author skims.
 - **Rule: when an assertion fails on a SELECTOR, grep the selector across both parents before attributing.
   Absence on both is entailed pre-existing, and it is one grep.** Same family as `A class member can be
   stale by ABSENCE, and a sweep that greps the SYMPTOM cannot see it`.
+
+## `pnpm test -- --reporter=json --outputFile=X` runs the whole suite and writes NO JSON (2026-09-16, BUILD(CONT-T9))
+- pnpm 11.20.0 forwards the bare `--` **literally**, so the script line becomes
+  `vitest run -- --reporter=default --reporter=json --outputFile=…`. vitest reads everything after a bare
+  `--` as positional **filename filters**, not flags. No JSON reporter is installed, no `outputFile` is
+  honoured, and the run still executes all 419 files and prints a correct-looking summary.
+- Cost here: **one wasted 45-minute full-suite gate**, because the four-count must be read from the JSON.
+  The console summary was right; the required artifact simply did not exist.
+- Correct form — no `--`: `pnpm test --reporter=default --reporter=json --outputFile=<path>`
+  (or `pnpm exec vitest run --reporter=…`). Proved on one file in ~1 s before re-spending the 45 minutes.
+- **Rule: a long gate is smoke-tested in a ONE-FILE form first, and its artifact asserted to exist
+  (`[ -s "$OUT" ] || fail`) before the real run.** Same family as `Prove the instrument can still say YES
+  before reporting eight NOs` — applied to a reporter instead of an audit. The exit code, the `Tests N`
+  line and the `Test Files N` line are ALL satisfied by a run whose reporter never loaded.
+
+## A gate taken over a tree the seat is still editing is not a gate (same seat, same day)
+- `tests/unit/text-control-bytes.test.ts` scans *"cached or untracked repository text sources"*, and
+  `tests/unit/s1-1-depth-contract.test.ts` scans the shipped corpus. Writing a report file into
+  `.hermes/` while the full suite runs puts the seat's own prose inside the measurement.
+- **Rule: commit (or otherwise freeze) every file you intend to write BEFORE launching a long gate, and
+  touch nothing in the worktree until it exits.** Scratchpad writes are free; repo writes are not.
+- Corollary worth keeping: to count control bytes, use `perl -ne '… /[\x00-\x08\x0B\x0C\x0E-\x1F]/'`.
+  A bracket expression with `\xNN` escapes is NOT interpreted by the `grep` on this Mac — it matched the
+  literal characters `x`, `0`, `8`, `B`, `C`, `E`, `F` and reported 3886 "control bytes" in a clean file.
