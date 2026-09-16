@@ -171,3 +171,46 @@ things that still needed a human-shaped judgement:
   does not apply — I added no test.
 - `audit:source` exits 1 with three blocking rows, all pre-existing (`packages/obs-capture/install/*`,
   = Task 5's F3). `0062` adds none; no `migrations/` row appears at all.
+
+---
+
+## Addendum — fix round 1 (`af2c93c8`)
+
+Both review findings were my own (F-5b-2, F-5b-3), so round 1 is the cheapest possible kind of
+rework: no reproduction cost, no disagreement, no re-measurement of anything I had not already
+measured. That is the good news and also the finding.
+
+**The expensive question this round answers: why did I NAME the fourth member instead of FIXING it?**
+
+Because the packet's outcome enumerated three tables and its §3 said "out-of-contract findings are
+named with file:line, never fixed here", while the spine's §3.2 said fix the CLASS. I read the
+narrower instruction as binding and reported the member. The coordinator then spent a dispatch
+telling me to do the thing I had already measured, in the file I already owned, with the method I had
+already used. **Cost: one full review round for four tokens of SQL** (`,core.run_progress_event`).
+
+The rule that would have avoided it is not "be bolder" — a seat guessing at its own scope is worse
+than one that asks. It is: **a packet that enumerates targets must say whether the enumeration is the
+OUTCOME or a FLOOR.** One word — "exactly these three" versus "at least these three; sweep the class"
+— decides it with no judgement and no round-trip. Every packet that carries a class-shaped finding
+(§3.2) should carry that word, and the orchestrator can generate it mechanically: if the finding is a
+sample of a class, the packet's target list is a floor.
+
+**Second-order cost, and the reason this matters beyond bookkeeping:** because the sweep was deferred,
+the guard I wrote in round 0 was also scoped to what the packet named — `core.run` only. Round 0's
+own neighbour mutant proved that gap immediately (`obs.work_item_liveness_v` 42501 at 20/20 green),
+and I reported it rather than closing it, for the same reason. **A deferred class sweep silently
+defers the class's TEST too.** Round 1's mutants M4/M5/M6 are all mutants that nothing caught before
+this commit. The scope decision propagated from the migration into the coverage.
+
+**What I nearly got wrong this round:** writing the new pin as four separate assertions, one per
+table. A single exact `toEqual` over all four rows was the right shape, because a per-table assertion
+would have let a FIFTH table appear with every assertion green — the same failure mode one level up.
+It still would: the pin names its four tables. The derived version (§6's `pg_depend` query, with no
+table list in the test) is the only shape immune to a new member, and I left it as a ticket rather
+than smuggling a new guard shape into a fix round.
+
+**What went right and should be copied:** the round-0 probe script was reusable verbatim. RED for a
+database-privilege finding cost one command and thirty seconds, four mutants cost four commands, and
+nothing had to be re-derived. A probe that measures the invariant — rather than a test that asserts
+one instance of it — is the artifact that makes rework cheap, and it lives outside the write contract
+so it costs a seat nothing to build.
