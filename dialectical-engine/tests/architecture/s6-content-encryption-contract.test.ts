@@ -29,12 +29,47 @@ describe("S6 content-encryption architecture contract", () => {
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_ciphertext jsonb");
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_attestation bytea");
     expect(migration).toContain("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer");
-    expect(migration).toContain("WHEN 'serve.answer' THEN row_json->>'answer_id'");
+    expect(migration).toContain("target_primary_key:=row_json->>'answer_id';");
     for (const trigger of [
       "aaa_enforce_content_attestation_v2", "enforce_content_ciphertext", "enforce_erasure_barrier"
     ]) {
       expect(migration).toContain(`DROP TRIGGER IF EXISTS ${trigger} ON serve.answer`);
       expect(migration).toContain(`CREATE TRIGGER ${trigger}\nBEFORE INSERT ON serve.answer`);
+    }
+    // FIX ROUND 1 / F1. The two guards serve.answer needs are its OWN functions,
+    // and its triggers execute those. Reaching them by CREATE OR REPLACE-ing
+    // 0038's or 0040's function is what the sweep below forbids.
+    expect(migration).toContain(
+      "CREATE TRIGGER aaa_enforce_content_attestation_v2\nBEFORE INSERT ON serve.answer\n"
+      + "FOR EACH ROW EXECUTE FUNCTION core.enforce_content_attestation_v2_serve_answer();"
+    );
+    expect(migration).toContain(
+      "CREATE TRIGGER enforce_content_ciphertext\nBEFORE INSERT ON serve.answer\n"
+      + "FOR EACH ROW EXECUTE FUNCTION core.enforce_content_ciphertext_serve_answer();"
+    );
+
+    // The CLASS, swept mechanically: no function this migration defines may be
+    // defined by any other migration. An earlier migration is replayed on its
+    // own — the S6 suite of record replays 0040 over the applied chain — and a
+    // replay restores the OWNER's body, deleting any arm a later migration
+    // grafted on while that later migration's triggers keep firing. Calling
+    // another migration's function is safe; redefining it is not.
+    const defined = (sql: string): readonly string[] => [
+      ...sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-z_][a-z0-9_]*\.[a-z0-9_]+)\s*\(/gi)
+    ].map((match) => match[1]!.toLowerCase());
+    const definedHere = defined(migration);
+    expect(definedHere).toEqual([
+      "core.enforce_content_ciphertext_serve_answer",
+      "core.enforce_content_attestation_v2_serve_answer"
+    ]);
+    const others = (await readdir(new URL("migrations/", root)))
+      .filter((name) => name.endsWith(".sql") && name !== names[0]);
+    expect(others.length).toBeGreaterThan(50);
+    for (const other of others) {
+      for (const owned of defined(await read(`migrations/${other}`))) {
+        expect({ migration: other, function: owned, alsoDefinedByB21: definedHere.includes(owned) })
+          .toEqual({ migration: other, function: owned, alsoDefinedByB21: false });
+      }
     }
 
     const crypto = await read("packages/crypto/src/index.ts");

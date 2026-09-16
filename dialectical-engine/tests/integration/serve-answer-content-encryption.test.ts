@@ -364,4 +364,74 @@ describe("serve.answer verdict text is an encrypted content carrier (L5-F2)", ()
     await expect(serve.readAnswerProjection(legacyAnswerId, { ownerRef: null, legacyAskerId }))
       .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: legacyVerdict } });
   }, 120_000);
+
+  // FIX ROUND 1 / F1. This migration must not OWN any function an earlier
+  // migration owns: `migrate()` is not the only way these files reach a
+  // database — 0038 and 0040 are replayed on their own (the S6 suite of record
+  // replays 0040 at tests/integration/s6-content-encryption-database.test.ts:780,
+  // and the same replay is legal in production). A `CREATE OR REPLACE` of a
+  // function 0038 or 0040 defines is therefore reverted by that migration's own
+  // replay, while the triggers this migration created on serve.answer keep
+  // firing — the guards vanish and the write path breaks, with no diff to see.
+  // The property under test is the one the replay attacks: after ANY earlier
+  // owner replays, serve.answer is still BOTH writable through the production
+  // path AND guarded at the three layers this migration installed.
+  it("keeps serve.answer writable and guarded after 0038 or 0040 is replayed over the applied chain", async () => {
+    const directory = new URL("../../migrations/", import.meta.url);
+    const serve = new ServeRepository(database.pool);
+    for (const earlier of ["0038_content_encryption.sql", "0040_account_erasure.sql"]) {
+      const migration = await readFile(new URL(earlier, directory), "utf8");
+      // Replayed exactly the way the S6 suite of record replays 0040: the file's
+      // own bytes, on the pool that already carries the whole chain.
+      await expect(database.pool.query(migration)).resolves.toBeDefined();
+
+      const marker = randomUUID();
+      const verdictText = `B21_REPLAY_${earlier.slice(0, 4)}_VERDICT_${marker}`;
+      const runId = await createEncryptedRun(`b21 replay ${earlier} ${marker}`);
+
+      // (a) WRITABLE — the production serve write path still lands the row.
+      const answerId = await persistVerdict(
+        runId, { kind: "VERDICT", text: verdictText }, `b21-replay-segment-${marker}`
+      );
+      const storedRow = await readStoredAnswer(answerId);
+      expect(storedRow.answer_form).toEqual(CONTENT_JSON_SENTINEL);
+      expect(storedRow.row_text).not.toContain(verdictText);
+      await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }))
+        .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: verdictText } });
+
+      // (b) GUARDED, plaintext layer — a plaintext answer_form row for an
+      //     encrypted run is still refused, and by serve.answer's OWN message.
+      await expect(database.pool.query(
+        `INSERT INTO serve.answer
+         SELECT (jsonb_populate_record(NULL::serve.answer, to_jsonb(source)
+           || jsonb_build_object(
+                'answer_version', source.answer_version + 1,
+                'answer_form', $2::jsonb,
+                'sealed_at_seq', ledger.allocate_sequence(),
+                'content_ciphertext', NULL,
+                'content_attestation', NULL
+              ))).*
+         FROM serve.answer AS source
+         WHERE source.answer_id=$1
+         ORDER BY source.answer_version DESC LIMIT 1`,
+        [answerId, JSON.stringify({ kind: "VERDICT", text: `b21-replay-plaintext-${marker}` })]
+      )).rejects.toThrow("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer");
+
+      // (c) GUARDED, attestation layer — the envelope is still authenticated
+      //     against the run secret, so a forged attestation is still refused.
+      await expect(database.pool.query(
+        `INSERT INTO serve.answer
+         SELECT (jsonb_populate_record(NULL::serve.answer, to_jsonb(source)
+           || jsonb_build_object(
+                'answer_version', source.answer_version + 1,
+                'sealed_at_seq', ledger.allocate_sequence(),
+                'content_attestation', '\\x' || repeat('5a', 32)
+              ))).*
+         FROM serve.answer AS source
+         WHERE source.answer_id=$1
+         ORDER BY source.answer_version DESC LIMIT 1`,
+        [answerId]
+      )).rejects.toThrow("CONTENT_ATTESTATION_INVALID");
+    }
+  }, 180_000);
 });
